@@ -76,11 +76,6 @@ class ControleVeiculosServiceImplTeste {
     requisicao.setDestino("Centro");
     requisicao.setCombustivelConsumidoLitros(new BigDecimal("5"));
 
-    Veiculo veiculo = new Veiculo();
-    veiculo.setId(1L);
-    veiculo.setMediaConsumoPadrao(new BigDecimal("10"));
-    when(veiculoRepository.buscarPorId(1L)).thenReturn(Optional.of(veiculo));
-
     assertThrows(ResponseStatusException.class, () -> servico.criarDiario(requisicao));
   }
 

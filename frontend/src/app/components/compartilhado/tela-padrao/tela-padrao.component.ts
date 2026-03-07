@@ -13,6 +13,7 @@ import { ConfigAcoesCrud, EstadoAcoesCrud } from '../tela-base.component';
 export class TelaPadraoComponent {
   @Input() acoes: ConfigAcoesCrud = {};
   @Input() desabilitado: EstadoAcoesCrud = {};
+  @Input() carregando: EstadoAcoesCrud = {};
   @Input() mostrarToolbar = true;
   @Input() mostrarFechar = false;
   @Input() fullWidth = false;

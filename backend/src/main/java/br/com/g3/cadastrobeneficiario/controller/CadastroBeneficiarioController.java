@@ -89,8 +89,12 @@ public class CadastroBeneficiarioController {
   public CadastroBeneficiarioListaResponse listar(
       @RequestParam(value = "nome", required = false) String nome,
       @RequestParam(value = "status", required = false) String status,
-      @RequestParam(value = "codigo", required = false) String codigo) {
-    List<CadastroBeneficiarioResponse> beneficiarios = service.listar(nome, status, codigo);
+      @RequestParam(value = "codigo", required = false) String codigo,
+      @RequestParam(value = "cpf", required = false) String cpf,
+      @RequestParam(value = "nis", required = false) String nis,
+      @RequestParam(value = "data_nascimento", required = false) String dataNascimento) {
+    List<CadastroBeneficiarioResponse> beneficiarios =
+        service.listar(nome, status, codigo, cpf, nis, dataNascimento);
     return new CadastroBeneficiarioListaResponse(beneficiarios);
   }
 
@@ -103,8 +107,12 @@ public class CadastroBeneficiarioController {
   public CadastroBeneficiarioResumoListaResponse listarResumo(
       @RequestParam(value = "nome", required = false) String nome,
       @RequestParam(value = "status", required = false) String status,
-      @RequestParam(value = "codigo", required = false) String codigo) {
-    List<CadastroBeneficiarioResumoResponse> beneficiarios = service.listarResumo(nome, status, codigo);
+      @RequestParam(value = "codigo", required = false) String codigo,
+      @RequestParam(value = "cpf", required = false) String cpf,
+      @RequestParam(value = "nis", required = false) String nis,
+      @RequestParam(value = "data_nascimento", required = false) String dataNascimento) {
+    List<CadastroBeneficiarioResumoResponse> beneficiarios =
+        service.listarResumo(nome, status, codigo, cpf, nis, dataNascimento);
     return new CadastroBeneficiarioResumoListaResponse(beneficiarios);
   }
 

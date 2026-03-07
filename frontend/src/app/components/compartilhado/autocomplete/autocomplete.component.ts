@@ -31,22 +31,18 @@ export class AutocompleteComponent {
     this.aberto = !!valor;
   }
 
-  selecionarOpcao(opcao: AutocompleteOpcao): void {
+  selecionarOpcao(opcao: AutocompleteOpcao, event?: MouseEvent): void {
+    event?.preventDefault();
     this.selecionar.emit(opcao);
     this.aberto = false;
-    setTimeout(() => {
-      this.aberto = false;
-    }, 0);
   }
 
   abrirPainel(): void {
     this.aberto = true;
   }
 
-  fecharPainelComDelay(): void {
-    setTimeout(() => {
-      this.aberto = false;
-    }, 150);
+  fecharPainel(): void {
+    this.aberto = false;
   }
 }
 

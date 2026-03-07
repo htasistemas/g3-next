@@ -10,7 +10,7 @@
       <ng-content></ng-content>
     </div>
     <div class="dialog__actions">
-      <button type="button" class="primary" (mousedown)="confirmar.emit(); $event.preventDefault()">{{ confirmarLabel }}</button>
+      <button type="button" class="primary" (click)="confirmar.emit()">{{ confirmarLabel }}</button>
       <button type="button" class="ghost" (click)="cancelar.emit()">{{ cancelarLabel }}</button>
     </div>
   </div>

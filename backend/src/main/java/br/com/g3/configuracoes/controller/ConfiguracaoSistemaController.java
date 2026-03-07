@@ -1,6 +1,8 @@
 package br.com.g3.configuracoes.controller;
 
 import br.com.g3.configuracoes.dto.AtualizarVersaoRequest;
+import br.com.g3.configuracoes.dto.BeneficiarioDocumentoConfigListaRequest;
+import br.com.g3.configuracoes.dto.BeneficiarioDocumentoConfigListaResponse;
 import br.com.g3.configuracoes.dto.DestinoChamadoResponse;
 import br.com.g3.configuracoes.dto.HistoricoVersaoResponse;
 import br.com.g3.configuracoes.dto.VersaoSistemaResponse;
@@ -27,6 +29,18 @@ public class ConfiguracaoSistemaController {
   @GetMapping("/versao")
   public VersaoSistemaResponse obterVersaoAtual() {
     return service.obterVersaoAtual();
+  }
+
+  @GetMapping("/beneficiary-documents")
+  public BeneficiarioDocumentoConfigListaResponse listarDocumentosBeneficiario() {
+    return new BeneficiarioDocumentoConfigListaResponse(service.listarDocumentosBeneficiario());
+  }
+
+  @PutMapping("/beneficiary-documents")
+  public BeneficiarioDocumentoConfigListaResponse atualizarDocumentosBeneficiario(
+      @RequestBody BeneficiarioDocumentoConfigListaRequest request) {
+    return new BeneficiarioDocumentoConfigListaResponse(
+        service.atualizarDocumentosBeneficiario(request == null ? null : request.getDocuments()));
   }
 
   @GetMapping(value = "/versao/arquivo", produces = MediaType.TEXT_PLAIN_VALUE)

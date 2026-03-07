@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { catchError, map, Observable, throwError } from 'rxjs';
+import { map, Observable } from 'rxjs';
 import { RuntimeConfigService } from './runtime-config.service';
 
 export interface DocumentoObrigatorio {
@@ -139,20 +139,18 @@ export interface BeneficiaryPayload {
 export class BeneficiaryService {
   private readonly runtimeConfig = inject(RuntimeConfigService);
   private readonly apiBaseUrl = this.runtimeConfig.apiUrl.replace(/\/api\/?$/, '');
-  private readonly baseUrls = [`${this.apiBaseUrl}/api/beneficiarios`, `${this.apiBaseUrl}/api/beneficiaries`];
+  private readonly baseUrl = `${this.apiBaseUrl}/api/beneficiarios`;
 
   constructor(private readonly http: HttpClient) {}
 
   getById(id: number): Observable<BeneficiaryPayload> {
-    return this.requestWithFallback((baseUrl) =>
-      this.http.get<{ beneficiario: BeneficiaryPayload }>(`${baseUrl}/${id}`)
-    ).pipe(map(({ beneficiario }) => beneficiario));
+    return this.http
+      .get<{ beneficiario: BeneficiaryPayload }>(`${this.baseUrl}/${id}`)
+      .pipe(map(({ beneficiario }) => beneficiario));
   }
 
   getRequiredDocuments(): Observable<{ documents: DocumentoObrigatorio[] }> {
-    return this.requestWithFallback((baseUrl) =>
-      this.http.get<{ documents: DocumentoObrigatorio[] }>(`${baseUrl}/documents`)
-    );
+    return this.http.get<{ documents: DocumentoObrigatorio[] }>(`${this.baseUrl}/documents`);
   }
 
   list(filters?: { nome?: string; cpf?: string; codigo?: string; data_nascimento?: string }): Observable<{ beneficiarios: BeneficiaryPayload[] }> {
@@ -162,17 +160,11 @@ export class BeneficiaryService {
     if (filters?.codigo) params = params.set('codigo', filters.codigo);
     if (filters?.data_nascimento) params = params.set('data_nascimento', filters.data_nascimento);
 
-    return this.requestWithFallback((baseUrl) =>
-      this.http.get<
-        { beneficiarios?: BeneficiaryPayload[] } | { beneficiaries?: BeneficiaryPayload[] } | { data?: BeneficiaryPayload[] } | BeneficiaryPayload[]
-      >(baseUrl, { params })
-    ).pipe(
+    return this.http
+      .get<{ beneficiarios?: BeneficiaryPayload[] }>(this.baseUrl, { params })
+      .pipe(
       map((response) => {
-        if (Array.isArray(response)) return { beneficiarios: response };
-        if ('beneficiarios' in response) return { beneficiarios: response.beneficiarios ?? [] };
-        if ('beneficiaries' in response) return { beneficiarios: response.beneficiaries ?? [] };
-        if ('data' in response) return { beneficiarios: response.data ?? [] };
-        return { beneficiarios: [] };
+        return { beneficiarios: response?.beneficiarios ?? [] };
       })
     );
   }
@@ -183,9 +175,7 @@ export class BeneficiaryService {
     dataNascimento?: string;
     cpf?: string;
   }): Observable<{ candidatos: BeneficiaryPayload[] }> {
-    return this.requestWithFallback((baseUrl) =>
-      this.http.post<{ candidatos: BeneficiaryPayload[] }>(`${baseUrl}/verificar-duplicidade`, payload)
-    );
+    return this.http.post<{ candidatos: BeneficiaryPayload[] }>(`${this.baseUrl}/verificar-duplicidade`, payload);
   }
 
   recalculateIvf(idBeneficiario: string): Observable<VulnerabilityIndexPayload> {
@@ -197,22 +187,20 @@ export class BeneficiaryService {
     const formData = this.buildFormData(payload, photoFile);
 
     if (payload.id) {
-      return this.requestWithFallback((baseUrl) => this.http.put<BeneficiaryPayload>(`${baseUrl}/${payload.id}`, formData));
+      return this.http.put<BeneficiaryPayload>(`${this.baseUrl}/${payload.id}`, formData);
     }
 
-    return this.requestWithFallback((baseUrl) => this.http.post<BeneficiaryPayload>(baseUrl, formData));
+    return this.http.post<BeneficiaryPayload>(this.baseUrl, formData);
   }
 
   atualizarAptidaoCestaBasica(
     id: number,
     payload: { optaReceberCestaBasica?: boolean; aptoReceberCestaBasica?: boolean | null }
   ): Observable<BeneficiaryPayload> {
-    return this.requestWithFallback((baseUrl) =>
-      this.http.patch<BeneficiaryPayload>(`${baseUrl}/${id}/aptidao-cesta-basica`, {
+    return this.http.patch<BeneficiaryPayload>(`${this.baseUrl}/${id}/aptidao-cesta-basica`, {
         opta_receber_cesta_basica: payload.optaReceberCestaBasica,
         apto_receber_cesta_basica: payload.aptoReceberCestaBasica
-      })
-    );
+      });
   }
 
   private buildFormData(payload: BeneficiaryPayload, photoFile?: File | null): FormData {
@@ -240,15 +228,5 @@ export class BeneficiaryService {
     }
 
     return formData;
-  }
-
-  private requestWithFallback<T>(requestFactory: (baseUrl: string) => Observable<T>): Observable<T> {
-    const [primaryUrl, secondaryUrl] = this.baseUrls;
-
-    return requestFactory(primaryUrl).pipe(
-      catchError((primaryError) =>
-        requestFactory(secondaryUrl).pipe(catchError((secondaryError) => throwError(() => secondaryError ?? primaryError)))
-      )
-    );
   }
 }

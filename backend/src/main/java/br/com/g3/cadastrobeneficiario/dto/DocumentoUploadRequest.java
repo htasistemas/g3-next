@@ -4,6 +4,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.Size;
 
 public class DocumentoUploadRequest {
+  @JsonProperty("id")
+  private Long id;
+
   @Size(max = 200)
   @JsonProperty("nome")
   private String nome;
@@ -21,6 +24,18 @@ public class DocumentoUploadRequest {
   @Size(max = 120)
   @JsonProperty("contentType")
   private String contentType;
+
+  @Size(max = 400)
+  @JsonProperty("caminhoArquivo")
+  private String caminhoArquivo;
+
+  public Long getId() {
+    return id;
+  }
+
+  public void setId(Long id) {
+    this.id = id;
+  }
 
   public String getNome() {
     return nome;
@@ -60,5 +75,13 @@ public class DocumentoUploadRequest {
 
   public void setContentType(String contentType) {
     this.contentType = contentType;
+  }
+
+  public String getCaminhoArquivo() {
+    return caminhoArquivo;
+  }
+
+  public void setCaminhoArquivo(String caminhoArquivo) {
+    this.caminhoArquivo = caminhoArquivo;
   }
 }

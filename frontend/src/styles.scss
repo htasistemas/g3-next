@@ -191,6 +191,34 @@ body {
   background: var(--surface-hover);
 }
 
+button.g3-acao-async--loading {
+  position: relative;
+  pointer-events: none;
+  opacity: 0.82;
+}
+
+button.g3-acao-async--loading::after {
+  content: '';
+  width: 0.82rem;
+  height: 0.82rem;
+  margin-left: 0.42rem;
+  border-radius: 999px;
+  border: 2px solid rgba(15, 122, 67, 0.28);
+  border-top-color: #0f7a43;
+  display: inline-block;
+  animation: g3-spin-um-clique 0.7s linear infinite;
+  vertical-align: middle;
+}
+
+@keyframes g3-spin-um-clique {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .file-input {
   @apply text-sm file:mr-3 file:py-2 file:px-3 file:rounded-md file:border file:bg-slate-50 file:text-slate-700 hover:file:bg-slate-100;
   color: var(--text-primary);

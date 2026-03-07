@@ -8,6 +8,7 @@ import br.com.g3.autenticacao.dto.GoogleLoginRequest;
 import br.com.g3.autenticacao.dto.RecuperarSenhaRequest;
 import br.com.g3.autenticacao.dto.RedefinirSenhaRequest;
 import br.com.g3.autenticacao.dto.UsuarioInfo;
+import br.com.g3.autenticacao.security.TokenAutenticacaoService;
 import br.com.g3.autenticacao.repository.UsuarioRecuperacaoSenhaRepository;
 import br.com.g3.autenticacao.service.AutenticacaoService;
 import br.com.g3.autenticacao.service.GoogleTokenService;
@@ -43,6 +44,7 @@ public class AutenticacaoServiceImpl implements AutenticacaoService {
   private final EmailService emailService;
   private final GoogleTokenService googleTokenService;
   private final PermissaoService permissaoService;
+  private final TokenAutenticacaoService tokenAutenticacaoService;
   private final SecureRandom secureRandom = new SecureRandom();
   private static final DateTimeFormatter DATA_HORA_FORMATO =
       DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm", Locale.forLanguageTag("pt-BR"));
@@ -53,13 +55,15 @@ public class AutenticacaoServiceImpl implements AutenticacaoService {
       PasswordEncoder passwordEncoder,
       EmailService emailService,
       GoogleTokenService googleTokenService,
-      PermissaoService permissaoService) {
+      PermissaoService permissaoService,
+      TokenAutenticacaoService tokenAutenticacaoService) {
     this.repository = repository;
     this.recuperacaoRepository = recuperacaoRepository;
     this.passwordEncoder = passwordEncoder;
     this.emailService = emailService;
     this.googleTokenService = googleTokenService;
     this.permissaoService = permissaoService;
+    this.tokenAutenticacaoService = tokenAutenticacaoService;
   }
 
   @Override
@@ -70,7 +74,7 @@ public class AutenticacaoServiceImpl implements AutenticacaoService {
       throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Credenciais invalidas");
     }
 
-    String token = UUID.randomUUID().toString();
+    String token = tokenAutenticacaoService.gerarToken(usuario);
     List<String> permissoes =
         usuario.getPermissoes().stream().map(p -> p.getNome()).collect(Collectors.toList());
     UsuarioInfo usuarioInfo =
@@ -144,7 +148,7 @@ public class AutenticacaoServiceImpl implements AutenticacaoService {
                   return repository.salvar(novo);
                 });
 
-    String token = UUID.randomUUID().toString();
+    String token = tokenAutenticacaoService.gerarToken(usuario);
     List<String> permissoes =
         usuario.getPermissoes().stream().map(Permissao::getNome).collect(Collectors.toList());
     UsuarioInfo usuarioInfo =

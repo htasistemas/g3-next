@@ -7,7 +7,7 @@
     [placeholder]="placeholder"
     (input)="atualizarTermo($any($event.target).value)"
     (focus)="abrirPainel()"
-    (blur)="fecharPainelComDelay()"
+    (blur)="fecharPainel()"
   />
 
   <div class="autocomplete__panel" *ngIf="termo && aberto">
@@ -17,7 +17,7 @@
       type="button"
       class="autocomplete__item"
       *ngFor="let opcao of opcoes"
-      (click)="selecionarOpcao(opcao); inputRef.blur()"
+      (mousedown)="selecionarOpcao(opcao, $event)"
     >
       <span class="autocomplete__label">{{ opcao.label }}</span>
       <span class="autocomplete__sublabel" *ngIf="opcao.sublabel">{{ opcao.sublabel }}</span>

@@ -12,7 +12,7 @@ public interface VinculoFamiliarService {
 
   VinculoFamiliarResponse buscarPorId(Long id);
 
-  List<VinculoFamiliarResponse> listar();
+  List<VinculoFamiliarResponse> listar(String nomeFamilia, String municipio, String referencia);
 
   VinculoFamiliarResponse adicionarMembro(Long familiaId, VinculoFamiliarMembroRequest request);
 

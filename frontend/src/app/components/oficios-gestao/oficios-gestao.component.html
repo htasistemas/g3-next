@@ -408,7 +408,7 @@
                     </tr>
                   </thead>
                   <tbody>
-                    <tr *ngFor="let oficio of oficiosFiltrados" (dblclick)="edit(oficio)">
+                    <tr *ngFor="let oficio of oficiosFiltrados" (click)="edit(oficio)">
                       <td>
                         <span class="status-pill" [ngClass]="obterClasseStatus(oficio.protocolo.status)">
                           {{ formatarStatus(oficio.protocolo.status) }}
@@ -418,7 +418,7 @@
                       <td>{{ oficio.conteudo.assunto }}</td>
                       <td>{{ oficio.conteudo.razaoSocial || '-' }}</td>
                       <td>{{ oficio.conteudo.para || '-' }}</td>
-                      <td class="col-anexo">
+                      <td class="col-anexo" (click)="$event.stopPropagation()">
                         <button
                           type="button"
                           class="anexo-botao"
@@ -435,7 +435,7 @@
                         </button>
                         <span class="anexo-sem" *ngIf="!oficio.pdfAssinadoUrl">X</span>
                       </td>
-                      <td>
+                      <td (click)="$event.stopPropagation()">
                         <div class="table-actions">
                           <div class="table-actions__row">
                             <button type="button" class="ghost" (click)="imprimirModelo(oficio)">Imprimir</button>

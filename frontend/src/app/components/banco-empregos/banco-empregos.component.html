@@ -364,7 +364,7 @@
     </div>
 
     <div class="listing-grid" *ngIf="!listLoading; else loadingList">
-      <article class="vaga-card" *ngFor="let record of filteredRecords" (dblclick)="editRecord(record)">
+      <article class="vaga-card" *ngFor="let record of filteredRecords" (click)="editRecord(record)">
         <header class="vaga-card__header">
           <div>
             <p class="vaga-card__title">{{ record.dadosVaga.titulo }}</p>
@@ -390,7 +390,7 @@
           </div>
         </dl>
         <div class="vaga-card__actions">
-          <button type="button" class="nav-button nav-button--danger" (click)="deleteRecord(record)" [disabled]="deletingId === record.id">
+          <button type="button" class="nav-button nav-button--danger" (click)="deleteRecord(record); $event.stopPropagation()" [disabled]="deletingId === record.id">
             {{ deletingId === record.id ? 'Removendo...' : 'Excluir' }}
           </button>
         </div>

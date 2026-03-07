@@ -4410,3 +4410,95 @@ WHERE NOT EXISTS (
   SELECT 1 FROM historico_versao_sistema
   WHERE versao = '1.00.86'
 );
+
+CREATE TABLE IF NOT EXISTS config_documento_beneficiario (
+  id BIGSERIAL PRIMARY KEY,
+  nome VARCHAR(120) NOT NULL,
+  obrigatorio BOOLEAN NOT NULL DEFAULT FALSE,
+  ordem INTEGER NOT NULL DEFAULT 0,
+  criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+  atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS config_documento_beneficiario_nome_unique
+  ON config_documento_beneficiario (LOWER(nome));
+CREATE INDEX IF NOT EXISTS config_documento_beneficiario_ordem_idx
+  ON config_documento_beneficiario (ordem, id);
+
+INSERT INTO config_documento_beneficiario (nome, obrigatorio, ordem, criado_em, atualizado_em)
+SELECT 'CPF', TRUE, 1, NOW(), NOW()
+WHERE NOT EXISTS (
+  SELECT 1 FROM config_documento_beneficiario WHERE LOWER(nome) = LOWER('CPF')
+);
+
+INSERT INTO config_documento_beneficiario (nome, obrigatorio, ordem, criado_em, atualizado_em)
+SELECT 'CNH', FALSE, 2, NOW(), NOW()
+WHERE NOT EXISTS (
+  SELECT 1 FROM config_documento_beneficiario WHERE LOWER(nome) = LOWER('CNH')
+);
+
+INSERT INTO config_documento_beneficiario (nome, obrigatorio, ordem, criado_em, atualizado_em)
+SELECT 'Título de eleitor', FALSE, 3, NOW(), NOW()
+WHERE NOT EXISTS (
+  SELECT 1 FROM config_documento_beneficiario WHERE LOWER(nome) = LOWER('Título de eleitor')
+);
+
+INSERT INTO config_documento_beneficiario (nome, obrigatorio, ordem, criado_em, atualizado_em)
+SELECT 'Cartão SUS', FALSE, 4, NOW(), NOW()
+WHERE NOT EXISTS (
+  SELECT 1 FROM config_documento_beneficiario WHERE LOWER(nome) = LOWER('Cartão SUS')
+);
+
+INSERT INTO config_documento_beneficiario (nome, obrigatorio, ordem, criado_em, atualizado_em)
+SELECT 'Comprovante de endereço', FALSE, 5, NOW(), NOW()
+WHERE NOT EXISTS (
+  SELECT 1 FROM config_documento_beneficiario WHERE LOWER(nome) = LOWER('Comprovante de endereço')
+);
+
+INSERT INTO config_documento_beneficiario (nome, obrigatorio, ordem, criado_em, atualizado_em)
+SELECT 'Carteira de trabalho', FALSE, 6, NOW(), NOW()
+WHERE NOT EXISTS (
+  SELECT 1 FROM config_documento_beneficiario WHERE LOWER(nome) = LOWER('Carteira de trabalho')
+);
+
+INSERT INTO config_documento_beneficiario (nome, obrigatorio, ordem, criado_em, atualizado_em)
+SELECT 'Certidão de casamento', FALSE, 7, NOW(), NOW()
+WHERE NOT EXISTS (
+  SELECT 1 FROM config_documento_beneficiario WHERE LOWER(nome) = LOWER('Certidão de casamento')
+);
+
+INSERT INTO config_documento_beneficiario (nome, obrigatorio, ordem, criado_em, atualizado_em)
+SELECT 'Certidão de nascimento', FALSE, 8, NOW(), NOW()
+WHERE NOT EXISTS (
+  SELECT 1 FROM config_documento_beneficiario WHERE LOWER(nome) = LOWER('Certidão de nascimento')
+);
+
+CREATE INDEX IF NOT EXISTS cadastro_beneficiario_codigo_idx
+  ON cadastro_beneficiario (codigo);
+CREATE INDEX IF NOT EXISTS cadastro_beneficiario_nome_idx
+  ON cadastro_beneficiario (nome_completo);
+CREATE INDEX IF NOT EXISTS cadastro_beneficiario_status_idx
+  ON cadastro_beneficiario (status);
+CREATE INDEX IF NOT EXISTS documentos_beneficiario_tipo_idx
+  ON documentos (beneficiario_id, tipo_documento);
+CREATE INDEX IF NOT EXISTS vinculo_familiar_nome_idx
+  ON vinculo_familiar (nome_familia);
+CREATE INDEX IF NOT EXISTS doacao_realizada_beneficiario_data_idx
+  ON doacao_realizada (beneficiario_id, data_doacao);
+CREATE INDEX IF NOT EXISTS doacao_planejada_status_data_idx
+  ON doacao_planejada (status, data_prevista);
+CREATE INDEX IF NOT EXISTS doacao_planejada_beneficiario_idx
+  ON doacao_planejada (beneficiario_id);
+
+UPDATE versao_sistema
+SET versao = '1.00.109',
+  descricao = 'Seguranca de autenticacao, padronizacao de APIs e otimizacoes de busca.',
+  atualizado_em = NOW()
+WHERE versao <> '1.00.109';
+
+INSERT INTO historico_versao_sistema (versao, descricao, criado_em)
+SELECT '1.00.109', 'Seguranca de autenticacao, padronizacao de APIs e otimizacoes de busca.', NOW()
+WHERE NOT EXISTS (
+  SELECT 1 FROM historico_versao_sistema
+  WHERE versao = '1.00.109'
+);

@@ -1261,7 +1261,7 @@
 
 
 
-          <tr *ngFor="let record of filteredHistory()" (dblclick)="podeEditarDoacao(record) && abrirEdicaoDoacao(record)">
+          <tr *ngFor="let record of filteredHistory()" (click)="podeEditarDoacao(record) && abrirEdicaoDoacao(record)">
 
 
 
@@ -1322,7 +1322,7 @@
               <button
                 type="button"
                 class="ghost ghost--icon"
-                (click)="imprimirTermoRecebimento(record)"
+                (click)="imprimirTermoRecebimento(record); $event.stopPropagation()"
                 title="Imprimir termo de recebimento"
                 aria-label="Imprimir termo de recebimento"
               >

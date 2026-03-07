@@ -370,7 +370,7 @@
       <div *ngIf="listLoading" class="list-panel__loading">Carregando profissionais...</div>
 
       <div class="unit-list" *ngIf="!listLoading && professionalsPaginados.length">
-        <div class="unit-list__item" *ngFor="let professional of professionalsPaginados" (dblclick)="edit(professional)">
+        <div class="unit-list__item" *ngFor="let professional of professionalsPaginados" (click)="edit(professional)">
           <div>
             <div class="unit-list__name-row">
               <div class="unit-list__avatar" [class.unit-list__avatar--empty]="!professional.foto3x4">

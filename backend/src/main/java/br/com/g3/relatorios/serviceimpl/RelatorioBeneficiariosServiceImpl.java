@@ -43,7 +43,7 @@ public class RelatorioBeneficiariosServiceImpl implements RelatorioBeneficiarios
     String nome = limpar(request.getNome());
     String status = limpar(request.getStatus());
     List<CadastroBeneficiarioResponse> beneficiarios =
-        cadastroBeneficiarioService.listar(nome, status, null);
+        cadastroBeneficiarioService.listar(nome, status, null, null, null, null);
 
     beneficiarios = aplicarFiltrosExtras(beneficiarios, request);
     beneficiarios = ordenar(beneficiarios, request.getOrdenarPor(), request.getOrdem());

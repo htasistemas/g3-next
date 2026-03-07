@@ -1,5 +1,6 @@
 package br.com.g3.informacoesadministrativas.controller;
 
+import br.com.g3.autenticacao.security.UsuarioAutenticadoUtil;
 import br.com.g3.informacoesadministrativas.dto.InformacaoAdministrativaRequest;
 import br.com.g3.informacoesadministrativas.dto.InformacaoAdministrativaResponse;
 import br.com.g3.informacoesadministrativas.dto.InformacaoAdministrativaRevealResponse;
@@ -8,6 +9,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -35,34 +37,38 @@ public class InformacaoAdministrativaController {
       @RequestParam(value = "titulo", required = false) String titulo,
       @RequestParam(value = "tags", required = false) String tags,
       @RequestParam(value = "status", required = false) Boolean status,
-      @RequestParam("usuarioId") Long usuarioId,
+      Authentication authentication,
       HttpServletRequest request) {
+    Long usuarioId = UsuarioAutenticadoUtil.obterIdObrigatorio(authentication);
     return service.listar(tipo, categoria, titulo, tags, status, usuarioId, obterIp(request));
   }
 
   @GetMapping("/{id}")
   public InformacaoAdministrativaResponse buscarPorId(
       @PathVariable("id") Long id,
-      @RequestParam("usuarioId") Long usuarioId,
+      Authentication authentication,
       HttpServletRequest request) {
+    Long usuarioId = UsuarioAutenticadoUtil.obterIdObrigatorio(authentication);
     return service.buscarPorId(id, usuarioId, obterIp(request));
   }
 
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
   public InformacaoAdministrativaResponse criar(
-      @RequestParam("usuarioId") Long usuarioId,
+      Authentication authentication,
       @Valid @RequestBody InformacaoAdministrativaRequest request,
       HttpServletRequest servletRequest) {
+    Long usuarioId = UsuarioAutenticadoUtil.obterIdObrigatorio(authentication);
     return service.criar(request, usuarioId, obterIp(servletRequest));
   }
 
   @PutMapping("/{id}")
   public InformacaoAdministrativaResponse atualizar(
       @PathVariable("id") Long id,
-      @RequestParam("usuarioId") Long usuarioId,
+      Authentication authentication,
       @Valid @RequestBody InformacaoAdministrativaRequest request,
       HttpServletRequest servletRequest) {
+    Long usuarioId = UsuarioAutenticadoUtil.obterIdObrigatorio(authentication);
     return service.atualizar(id, request, usuarioId, obterIp(servletRequest));
   }
 
@@ -70,16 +76,18 @@ public class InformacaoAdministrativaController {
   @ResponseStatus(HttpStatus.NO_CONTENT)
   public void remover(
       @PathVariable("id") Long id,
-      @RequestParam("usuarioId") Long usuarioId,
+      Authentication authentication,
       HttpServletRequest request) {
+    Long usuarioId = UsuarioAutenticadoUtil.obterIdObrigatorio(authentication);
     service.remover(id, usuarioId, obterIp(request));
   }
 
   @PostMapping("/{id}/reveal")
   public InformacaoAdministrativaRevealResponse revelar(
       @PathVariable("id") Long id,
-      @RequestParam("usuarioId") Long usuarioId,
+      Authentication authentication,
       HttpServletRequest request) {
+    Long usuarioId = UsuarioAutenticadoUtil.obterIdObrigatorio(authentication);
     return service.revelar(id, usuarioId, obterIp(request));
   }
 
@@ -87,8 +95,9 @@ public class InformacaoAdministrativaController {
   @ResponseStatus(HttpStatus.NO_CONTENT)
   public void copiar(
       @PathVariable("id") Long id,
-      @RequestParam("usuarioId") Long usuarioId,
+      Authentication authentication,
       HttpServletRequest request) {
+    Long usuarioId = UsuarioAutenticadoUtil.obterIdObrigatorio(authentication);
     service.registrarCopia(id, usuarioId, obterIp(request));
   }
 

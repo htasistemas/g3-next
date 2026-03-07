@@ -30,6 +30,9 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://g3-db:5432/${DB_NAME:-g3}
       - SPRING_DATASOURCE_USERNAME=${DB_USERNAME:-g3}
       - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-admin}
+      - APP_AUTH_TOKEN_SECRET=${APP_AUTH_TOKEN_SECRET}
+    volumes:
+      - backend_storage:/app/storage
     depends_on:
       db:
         condition: service_healthy

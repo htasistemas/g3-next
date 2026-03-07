@@ -44,6 +44,24 @@
   box-shadow: none;
 }
 
+.nav-button__spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  border: 2px solid rgba(15, 122, 67, 0.25);
+  border-top-color: #0f7a43;
+  animation: nav-button-spin 0.7s linear infinite;
+}
+
+@keyframes nav-button-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .nav-button--danger {
   color: #0f172a;
   border-color: #d1d5db;

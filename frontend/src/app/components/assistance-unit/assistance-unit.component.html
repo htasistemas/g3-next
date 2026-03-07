@@ -499,7 +499,7 @@
         </div>
       </div>
 
-      <div class="unit-active" *ngIf="unidadePrincipal" (dblclick)="selecionarUnidade(unidadePrincipal)">
+      <div class="unit-active" *ngIf="unidadePrincipal" (click)="selecionarUnidade(unidadePrincipal)">
         <div>
           <p class="unit-active__eyebrow">Unidade principal</p>
           <p class="unit-active__name">{{ unidadePrincipal.nomeFantasia || 'Unidade sem nome' }}</p>
@@ -513,7 +513,7 @@
         <div
           class="unit-list__item"
           *ngFor="let unidadeItem of unidadesPaginadas"
-          (dblclick)="selecionarUnidade(unidadeItem)"
+          (click)="selecionarUnidade(unidadeItem)"
         >
           <div>
             <p class="unit-list__name">{{ unidadeItem.nomeFantasia || 'Unidade sem nome' }}</p>

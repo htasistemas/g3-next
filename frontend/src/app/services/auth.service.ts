@@ -111,7 +111,6 @@ export class AuthService {
 
   logout(): void {
     this.user.set(null);
-    localStorage.removeItem(this.storageKey);
     sessionStorage.removeItem(this.storageKey);
     this.router.navigate(['/login']);
   }
@@ -126,8 +125,19 @@ export class AuthService {
   }
 
   private loadSession(): LoginResponse | null {
-    const raw = localStorage.getItem(this.storageKey);
-    return raw ? (JSON.parse(raw) as LoginResponse) : null;
+    const rawSessao = sessionStorage.getItem(this.storageKey);
+    if (rawSessao) {
+      return JSON.parse(rawSessao) as LoginResponse;
+    }
+
+    const legado = localStorage.getItem(this.storageKey);
+    if (!legado) {
+      return null;
+    }
+
+    sessionStorage.setItem(this.storageKey, legado);
+    localStorage.removeItem(this.storageKey);
+    return JSON.parse(legado) as LoginResponse;
   }
 
   private loadUser(): {
@@ -142,7 +152,7 @@ export class AuthService {
 
   private persistSession(session: LoginResponse): void {
     this.user.set(session.user ?? null);
-    localStorage.setItem(this.storageKey, JSON.stringify(session));
+    sessionStorage.setItem(this.storageKey, JSON.stringify(session));
   }
 
 }

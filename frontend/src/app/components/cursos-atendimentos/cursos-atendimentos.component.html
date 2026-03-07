@@ -1138,7 +1138,7 @@
 
             <tbody>
 
-              <tr *ngFor="let course of records" (dblclick)="fillFromCourse(course)">
+              <tr *ngFor="let course of records" (click)="fillFromCourse(course)">
                 <td>{{ course.tipo }}</td>
 
                 <td>{{ course.nome }}</td>
@@ -1148,7 +1148,7 @@
                 <td>{{ getRoomName(course) }}</td>
                 <td>{{ course.horarioInicial }}</td>
                 <td class="table-actions">
-                  <button type="button" class="ghost" (click)="fillFromCourse(course)">Editar</button>
+                  <button type="button" class="ghost" (click)="fillFromCourse(course); $event.stopPropagation()">Editar</button>
                 </td>
               </tr>
               <tr *ngIf="!records.length">

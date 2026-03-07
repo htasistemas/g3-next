@@ -80,14 +80,14 @@
             </tr>
           </thead>
           <tbody *ngIf="beneficiariosPaginados.length; else emptyList">
-            <tr *ngFor="let beneficiario of beneficiariosPaginados" (dblclick)="onBeneficiarioSelected(beneficiario)">
+            <tr *ngFor="let beneficiario of beneficiariosPaginados" (click)="onBeneficiarioSelected(beneficiario)">
               <td>{{ formatarNomeListagem(beneficiario) }}</td>
               <td>{{ beneficiario.codigo || '---' }}</td>
               <td>{{ beneficiario.cpf || beneficiario.nis || '---' }}</td>
               <td>{{ formatarDataNascimentoListagem(beneficiario.data_nascimento) }}</td>
               <td><span [ngClass]="getStatusClass(beneficiario.status)">{{ formatStatusLabel(beneficiario.status) }}</span></td>
               <td class="text-right actions">
-                <button type="button" class="danger" (click)="deleteBeneficiario(beneficiario)">Excluir</button>
+                <button type="button" class="danger" (click)="deleteBeneficiario(beneficiario); $event.stopPropagation()">Excluir</button>
               </td>
             </tr>
           </tbody>
@@ -882,7 +882,7 @@
         </div>
       </div>
 
-      <div class="unit-active" *ngIf="selectedBeneficiary" (dblclick)="selecionarBeneficiarioNaLista(selectedBeneficiary)">
+      <div class="unit-active" *ngIf="selectedBeneficiary" (click)="selecionarBeneficiarioNaLista(selectedBeneficiary)">
         <div>
           <p class="unit-active__eyebrow">Beneficiário ativo</p>
           <p class="unit-active__name">{{ selectedBeneficiary ? formatarNomeListagem(selectedBeneficiary) : 'Beneficiário sem nome' }}</p>
@@ -893,7 +893,7 @@
       </div>
 
       <div class="unit-list" *ngIf="beneficiariosPaginados.length">
-        <div class="unit-list__item" *ngFor="let beneficiario of beneficiariosPaginados" (dblclick)="selecionarBeneficiarioNaLista(beneficiario)">
+        <div class="unit-list__item" *ngFor="let beneficiario of beneficiariosPaginados" (click)="selecionarBeneficiarioNaLista(beneficiario)">
           <div>
             <div class="unit-list__header-row">
               <span class="unit-list__code">Código: {{ beneficiario.codigo || '---' }}</span>

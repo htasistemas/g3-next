@@ -1,0 +1,313 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Endereco {
+  id              BigInt                 @id @default(autoincrement())
+  cep             String?                @db.VarChar(20)
+  logradouro      String?                @db.VarChar(200)
+  numero          String?                @db.VarChar(20)
+  complemento     String?                @db.VarChar(150)
+  bairro          String?                @db.VarChar(150)
+  pontoReferencia String?                @map("ponto_referencia") @db.VarChar(200)
+  cidade          String?                @db.VarChar(150)
+  zona            String?                @db.VarChar(60)
+  subzona         String?                @db.VarChar(60)
+  estado          String?                @db.VarChar(2)
+  latitude        Decimal?               @db.Decimal(10, 6)
+  longitude       Decimal?               @db.Decimal(10, 6)
+  criadoEm        DateTime               @map("criado_em")
+  atualizadoEm    DateTime               @map("atualizado_em")
+  beneficiarios   CadastroBeneficiario[] @relation("BeneficiarioEndereco")
+  unidades        UnidadeAssistencial[]  @relation("UnidadeEndereco")
+
+  @@map("endereco")
+}
+
+model CadastroBeneficiario {
+  id                     BigInt                  @id @default(autoincrement())
+  codigo                 String?                 @db.VarChar(20)
+  nomeCompleto           String                  @map("nome_completo") @db.VarChar(200)
+  nomeSocial             String?                 @map("nome_social") @db.VarChar(200)
+  apelido                String?                 @db.VarChar(120)
+  dataNascimento         DateTime                @map("data_nascimento") @db.Date
+  foto3x4                String?                 @map("foto_3x4")
+  sexoBiologico          String?                 @map("sexo_biologico") @db.VarChar(60)
+  identidadeGenero       String?                 @map("identidade_genero") @db.VarChar(120)
+  corRaca                String?                 @map("cor_raca") @db.VarChar(60)
+  estadoCivil            String?                 @map("estado_civil") @db.VarChar(60)
+  nacionalidade          String?                 @db.VarChar(120)
+  naturalidadeCidade     String?                 @map("naturalidade_cidade") @db.VarChar(150)
+  naturalidadeUf         String?                 @map("naturalidade_uf") @db.VarChar(2)
+  nomeMae                String                  @map("nome_mae") @db.VarChar(200)
+  nomePai                String?                 @map("nome_pai") @db.VarChar(200)
+  status                 String?                 @db.VarChar(60)
+  optaReceberCestaBasica Boolean?                @map("opta_receber_cesta_basica")
+  aptoReceberCestaBasica Boolean?                @map("apto_receber_cesta_basica")
+  enderecoId             BigInt?                 @map("endereco_id")
+  criadoEm               DateTime                @map("criado_em")
+  atualizadoEm           DateTime                @map("atualizado_em")
+  endereco               Endereco?               @relation("BeneficiarioEndereco", fields: [enderecoId], references: [id], onDelete: SetNull)
+  contatos               ContatoBeneficiario[]
+  documentos             Documento[]
+  situacoesSociais       SituacaoSocial[]
+  escolaridades          EscolaridadeBeneficiario[]
+  saudes                 SaudeBeneficiario[]
+  beneficios             BeneficiosBeneficiario[]
+  observacoes            ObservacoesBeneficiario[]
+  familiasReferencia     VinculoFamiliar[]       @relation("ReferenciaFamiliar")
+  familiasMembro         VinculoFamiliarMembro[] @relation("FamiliaMembroBeneficiario")
+
+  @@map("cadastro_beneficiario")
+}
+
+model ContatoBeneficiario {
+  id                        BigInt               @id @default(autoincrement())
+  beneficiarioId            BigInt               @map("beneficiario_id")
+  telefonePrincipal         String?              @map("telefone_principal") @db.VarChar(30)
+  telefonePrincipalWhatsapp Boolean?             @map("telefone_principal_whatsapp")
+  telefoneSecundario        String?              @map("telefone_secundario") @db.VarChar(30)
+  telefoneRecadoNome        String?              @map("telefone_recado_nome") @db.VarChar(150)
+  telefoneRecadoNumero      String?              @map("telefone_recado_numero") @db.VarChar(30)
+  email                     String?              @db.VarChar(150)
+  permiteContatoTel         Boolean?             @map("permite_contato_tel")
+  permiteContatoWhatsapp    Boolean?             @map("permite_contato_whatsapp")
+  permiteContatoSms         Boolean?             @map("permite_contato_sms")
+  permiteContatoEmail       Boolean?             @map("permite_contato_email")
+  horarioPreferencial       String?              @map("horario_preferencial_contato") @db.VarChar(80)
+  criadoEm                  DateTime             @map("criado_em")
+  atualizadoEm              DateTime             @map("atualizado_em")
+  beneficiario              CadastroBeneficiario @relation(fields: [beneficiarioId], references: [id], onDelete: Cascade)
+
+  @@map("contato_beneficiario")
+}
+
+model Documento {
+  id             BigInt               @id @default(autoincrement())
+  beneficiarioId BigInt               @map("beneficiario_id")
+  tipoDocumento  String?              @map("tipo_documento") @db.VarChar(80)
+  numeroDocumento String?             @map("numero_documento") @db.VarChar(80)
+  orgaoEmissor   String?              @map("orgao_emissor") @db.VarChar(120)
+  ufEmissor      String?              @map("uf_emissor") @db.VarChar(2)
+  dataEmissao    DateTime?            @map("data_emissao") @db.Date
+  livro          String?              @db.VarChar(40)
+  folha          String?              @db.VarChar(40)
+  termo          String?              @db.VarChar(60)
+  cartorio       String?              @db.VarChar(150)
+  municipio      String?              @db.VarChar(150)
+  uf             String?              @db.VarChar(2)
+  nomeDocumento  String?              @map("nome_documento") @db.VarChar(200)
+  nomeArquivo    String?              @map("nome_arquivo") @db.VarChar(200)
+  caminhoArquivo String?              @map("caminho_arquivo") @db.VarChar(400)
+  contentType    String?              @map("content_type") @db.VarChar(120)
+  obrigatorio    Boolean?
+  criadoEm       DateTime             @map("criado_em")
+  atualizadoEm   DateTime             @map("atualizado_em")
+  beneficiario   CadastroBeneficiario @relation(fields: [beneficiarioId], references: [id], onDelete: Cascade)
+
+  @@map("documentos")
+}
+
+model SituacaoSocial {
+  id                    BigInt               @id @default(autoincrement())
+  beneficiarioId        BigInt               @map("beneficiario_id")
+  moraComFamilia        Boolean?             @map("mora_com_familia")
+  responsavelLegal      Boolean?             @map("responsavel_legal")
+  vinculoFamiliar       String?              @map("vinculo_familiar") @db.VarChar(150)
+  situacaoVulnerabilidade String?            @map("situacao_vulnerabilidade")
+  composicaoFamiliar    String?              @map("composicao_familiar")
+  criancasAdolescentes  Int?                 @map("criancas_adolescentes")
+  idosos                Int?
+  acompanhamentoCras    Boolean?             @map("acompanhamento_cras")
+  acompanhamentoSaude   Boolean?             @map("acompanhamento_saude")
+  participaComunidade   String?              @map("participa_comunidade") @db.VarChar(200)
+  redeApoio             String?              @map("rede_apoio")
+  criadoEm              DateTime             @map("criado_em")
+  atualizadoEm          DateTime             @map("atualizado_em")
+  beneficiario          CadastroBeneficiario @relation(fields: [beneficiarioId], references: [id], onDelete: Cascade)
+
+  @@map("situacao_social")
+}
+
+model EscolaridadeBeneficiario {
+  id               BigInt               @id @default(autoincrement())
+  beneficiarioId   BigInt               @map("beneficiario_id")
+  sabeLerEscrever  Boolean?             @map("sabe_ler_escrever")
+  nivelEscolaridade String?             @map("nivel_escolaridade") @db.VarChar(150)
+  estudaAtualmente Boolean?             @map("estuda_atualmente")
+  ocupacao         String?              @db.VarChar(150)
+  situacaoTrabalho String?              @map("situacao_trabalho") @db.VarChar(150)
+  localTrabalho    String?              @map("local_trabalho") @db.VarChar(150)
+  rendaMensal      String?              @map("renda_mensal") @db.VarChar(60)
+  fonteRenda       String?              @map("fonte_renda") @db.VarChar(150)
+  criadoEm         DateTime             @map("criado_em")
+  atualizadoEm     DateTime             @map("atualizado_em")
+  beneficiario     CadastroBeneficiario @relation(fields: [beneficiarioId], references: [id], onDelete: Cascade)
+
+  @@map("escolaridade_beneficiario")
+}
+
+model SaudeBeneficiario {
+  id                     BigInt               @id @default(autoincrement())
+  beneficiarioId         BigInt               @map("beneficiario_id")
+  possuiDeficiencia      Boolean?             @map("possui_deficiencia")
+  tipoDeficiencia        String?              @map("tipo_deficiencia") @db.VarChar(200)
+  cidPrincipal           String?              @map("cid_principal") @db.VarChar(60)
+  usaMedicacaoContinua   Boolean?             @map("usa_medicacao_continua")
+  descricaoMedicacao     String?              @map("descricao_medicacao")
+  servicoSaudeReferencia String?              @map("servico_saude_referencia") @db.VarChar(200)
+  criadoEm               DateTime             @map("criado_em")
+  atualizadoEm           DateTime             @map("atualizado_em")
+  beneficiario           CadastroBeneficiario @relation(fields: [beneficiarioId], references: [id], onDelete: Cascade)
+
+  @@map("saude_beneficiario")
+}
+
+model BeneficiosBeneficiario {
+  id                   BigInt               @id @default(autoincrement())
+  beneficiarioId       BigInt               @map("beneficiario_id")
+  recebeBeneficio      Boolean?             @map("recebe_beneficio")
+  beneficiosDescricao  String?              @map("beneficios_descricao")
+  valorTotalBeneficios String?              @map("valor_total_beneficios") @db.VarChar(60)
+  beneficiosRecebidos  String?              @map("beneficios_recebidos")
+  criadoEm             DateTime             @map("criado_em")
+  atualizadoEm         DateTime             @map("atualizado_em")
+  beneficiario         CadastroBeneficiario @relation(fields: [beneficiarioId], references: [id], onDelete: Cascade)
+
+  @@map("beneficios_beneficiario")
+}
+
+model ObservacoesBeneficiario {
+  id            BigInt               @id @default(autoincrement())
+  beneficiarioId BigInt              @map("beneficiario_id")
+  aceiteLgpd    Boolean?             @map("aceite_lgpd")
+  dataAceiteLgpd DateTime?           @map("data_aceite_lgpd") @db.Date
+  observacoes   String?
+  criadoEm      DateTime             @map("criado_em")
+  atualizadoEm  DateTime             @map("atualizado_em")
+  beneficiario  CadastroBeneficiario @relation(fields: [beneficiarioId], references: [id], onDelete: Cascade)
+
+  @@map("observacoes_beneficiario")
+}
+
+model VinculoFamiliar {
+  id                          BigInt                  @id @default(autoincrement())
+  nomeFamilia                 String                  @map("nome_familia") @db.VarChar(200)
+  idReferenciaFamiliar        BigInt?                 @map("id_referencia_familiar")
+  status                      String                  @db.VarChar(60)
+  cep                         String?                 @db.VarChar(20)
+  logradouro                  String?                 @db.VarChar(200)
+  numero                      String?                 @db.VarChar(20)
+  complemento                 String?                 @db.VarChar(150)
+  bairro                      String?                 @db.VarChar(150)
+  pontoReferencia             String?                 @map("ponto_referencia") @db.VarChar(200)
+  municipio                   String?                 @db.VarChar(150)
+  uf                          String?                 @db.VarChar(2)
+  zona                        String?                 @db.VarChar(60)
+  situacaoImovel              String?                 @map("situacao_imovel") @db.VarChar(120)
+  tipoMoradia                 String?                 @map("tipo_moradia") @db.VarChar(120)
+  aguaEncanada                Boolean?                @map("agua_encanada")
+  esgotoTipo                  String?                 @map("esgoto_tipo") @db.VarChar(120)
+  coletaLixo                  String?                 @map("coleta_lixo") @db.VarChar(120)
+  energiaEletrica             Boolean?                @map("energia_eletrica")
+  internet                    Boolean?
+  arranjoFamiliar             String?                 @map("arranjo_familiar") @db.VarChar(200)
+  qtdMembros                  Int?                    @map("qtd_membros")
+  qtdCriancas                 Int?                    @map("qtd_criancas")
+  qtdAdolescentes             Int?                    @map("qtd_adolescentes")
+  qtdIdosos                   Int?                    @map("qtd_idosos")
+  qtdPessoasDeficiencia       Int?                    @map("qtd_pessoas_deficiencia")
+  rendaFamiliarTotal          String?                 @map("renda_familiar_total") @db.VarChar(60)
+  rendaPerCapita              String?                 @map("renda_per_capita") @db.VarChar(60)
+  faixaRendaPerCapita         String?                 @map("faixa_renda_per_capita") @db.VarChar(120)
+  principaisFontesRenda       String?                 @map("principais_fontes_renda")
+  situacaoInsegurancaAlimentar String?                @map("situacao_inseguranca_alimentar")
+  possuiDividasRelevantes     Boolean?                @map("possui_dividas_relevantes")
+  descricaoDividas            String?                 @map("descricao_dividas")
+  vulnerabilidadesFamilia     String?                 @map("vulnerabilidades_familia")
+  servicosAcompanhamento      String?                 @map("servicos_acompanhamento")
+  tecnicoResponsavel          String?                 @map("tecnico_responsavel") @db.VarChar(150)
+  periodicidadeAtendimento    String?                 @map("periodicidade_atendimento") @db.VarChar(120)
+  proximaVisitaPrevista       DateTime?               @map("proxima_visita_prevista") @db.Date
+  observacoes                 String?
+  criadoEm                    DateTime                @map("criado_em")
+  atualizadoEm                DateTime                @map("atualizado_em")
+  referenciaFamiliar          CadastroBeneficiario?   @relation("ReferenciaFamiliar", fields: [idReferenciaFamiliar], references: [id], onDelete: SetNull)
+  membros                     VinculoFamiliarMembro[]
+
+  @@map("vinculo_familiar")
+}
+
+model VinculoFamiliarMembro {
+  id                 BigInt               @id @default(autoincrement())
+  vinculoFamiliarId  BigInt               @map("vinculo_familiar_id")
+  beneficiarioId     BigInt               @map("beneficiario_id")
+  parentesco         String?              @db.VarChar(120)
+  responsavelFamiliar Boolean?            @map("responsavel_familiar")
+  contribuiRenda     Boolean?             @map("contribui_renda")
+  rendaIndividual    String?              @map("renda_individual") @db.VarChar(60)
+  participaServicos  Boolean?             @map("participa_servicos")
+  observacoes        String?
+  usaEnderecoFamilia Boolean?             @map("usa_endereco_familia")
+  criadoEm           DateTime             @map("criado_em")
+  atualizadoEm       DateTime             @map("atualizado_em")
+  vinculoFamiliar    VinculoFamiliar      @relation(fields: [vinculoFamiliarId], references: [id], onDelete: Cascade)
+  beneficiario       CadastroBeneficiario @relation("FamiliaMembroBeneficiario", fields: [beneficiarioId], references: [id], onDelete: Cascade)
+
+  @@map("vinculo_familiar_membro")
+}
+
+model UnidadeAssistencial {
+  id                   BigInt    @id @default(autoincrement())
+  nomeFantasia         String    @map("nome_fantasia") @db.VarChar(200)
+  razaoSocial          String?   @map("razao_social") @db.VarChar(200)
+  cnpj                 String?   @db.VarChar(20)
+  email                String?   @db.VarChar(150)
+  site                 String?   @db.VarChar(200)
+  telefone             String?   @db.VarChar(30)
+  unidadePrincipal     Boolean   @map("unidade_principal")
+  enderecoId           BigInt?   @map("endereco_id")
+  criadoEm             DateTime  @map("criado_em")
+  atualizadoEm         DateTime  @map("atualizado_em")
+  endereco             Endereco? @relation("UnidadeEndereco", fields: [enderecoId], references: [id], onDelete: SetNull)
+
+  @@map("unidade_assistencial")
+}
+
+model Usuario {
+  id             BigInt            @id @default(autoincrement())
+  nomeUsuario    String            @map("nome_usuario") @db.VarChar(120)
+  nome           String?           @db.VarChar(150)
+  email          String?           @db.VarChar(150)
+  googleId       String?           @map("google_id") @db.VarChar(80)
+  fotoUrl        String?           @map("foto_url") @db.VarChar(255)
+  senhaHash      String            @map("senha_hash") @db.VarChar(255)
+  criadoEm       DateTime          @map("criado_em")
+  atualizadoEm   DateTime          @map("atualizado_em")
+  permissoes     UsuarioPermissao[]
+
+  @@map("usuarios")
+}
+
+model Permissao {
+  id          BigInt            @id @default(autoincrement())
+  nome        String            @db.VarChar(60)
+  usuarios    UsuarioPermissao[]
+
+  @@map("permissao")
+}
+
+model UsuarioPermissao {
+  usuarioId   BigInt    @map("usuario_id")
+  permissaoId BigInt    @map("permissao_id")
+  usuario     Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  permissao   Permissao @relation(fields: [permissaoId], references: [id], onDelete: Restrict)
+
+  @@id([usuarioId, permissaoId])
+  @@map("usuario_permissao")
+}

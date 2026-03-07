@@ -55,6 +55,14 @@ public class BeneficiarioFichaServiceImpl implements BeneficiarioFichaService {
 
   private String montarCorpo(CadastroBeneficiarioResponse b, UnidadeAssistencialResponse unidade) {
     StringBuilder sb = new StringBuilder();
+    sb.append("<style>");
+    sb.append(
+        "@page{size:A4;margin-top:58mm !important;margin-right:20mm !important;margin-bottom:20mm !important;margin-left:20mm !important;}");
+    sb.append(".header{padding-bottom:6px !important;margin-bottom:12px !important;}");
+    sb.append(".header__title{font-size:20px !important;line-height:1.1 !important;}");
+    sb.append(".content{margin-top:10mm !important;padding:0 !important;}");
+    sb.append("</style>");
+    sb.append("<div class=\"ficha-cadastro-root\">");
     sb.append("<section class=\"ficha-info\">");
     sb.append("<table class=\"info-line\"><tr>");
     sb.append("<td>")
@@ -125,6 +133,7 @@ public class BeneficiarioFichaServiceImpl implements BeneficiarioFichaService {
     if (!cardInformacoes.isEmpty()) {
       sb.append(cardInformacoes);
     }
+    sb.append("</div>");
     return sb.toString();
   }
 

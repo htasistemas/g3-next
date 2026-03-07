@@ -1,0 +1,15 @@
+import { Router } from "express";
+import { asyncHandler } from "../../../shared/http/async-handler.js";
+import { BeneficiarioController } from "../controllers/beneficiario.controller.js";
+import { ensureAuthenticated, ensurePermissions } from "../../auth/middlewares/auth.middleware.js";
+const controller = new BeneficiarioController();
+export const beneficiarioRoutes = Router();
+const permissoesLeitura = ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"];
+const permissoesEscrita = ["ADMINISTRADOR", "OPERADOR"];
+const permissaoExclusao = ["ADMINISTRADOR"];
+beneficiarioRoutes.get("/", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.listar.bind(controller)));
+beneficiarioRoutes.get("/proximo-codigo", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.obterProximoCodigo.bind(controller)));
+beneficiarioRoutes.get("/:id", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.buscarPorId.bind(controller)));
+beneficiarioRoutes.post("/", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.criar.bind(controller)));
+beneficiarioRoutes.put("/:id", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.atualizar.bind(controller)));
+beneficiarioRoutes.delete("/:id", ensureAuthenticated, ensurePermissions(permissaoExclusao), asyncHandler(controller.remover.bind(controller)));

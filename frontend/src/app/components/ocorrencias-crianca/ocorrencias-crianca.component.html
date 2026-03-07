@@ -597,7 +597,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let ocorrencia of ocorrenciasFiltradas" (dblclick)="selecionarOcorrencia(ocorrencia)">
+              <tr *ngFor="let ocorrencia of ocorrenciasFiltradas" (click)="selecionarOcorrencia(ocorrencia)">
                 <td>{{ ocorrencia.dataPreenchimento }}</td>
                 <td>{{ ocorrencia.vitimaNome }}</td>
               </tr>

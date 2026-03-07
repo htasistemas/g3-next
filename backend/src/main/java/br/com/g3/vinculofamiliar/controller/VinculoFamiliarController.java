@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -48,8 +49,11 @@ public class VinculoFamiliarController {
   }
 
   @GetMapping
-  public VinculoFamiliarListaResponse listar() {
-    List<VinculoFamiliarResponse> familias = service.listar();
+  public VinculoFamiliarListaResponse listar(
+      @RequestParam(value = "nome_familia", required = false) String nomeFamilia,
+      @RequestParam(value = "municipio", required = false) String municipio,
+      @RequestParam(value = "referencia", required = false) String referencia) {
+    List<VinculoFamiliarResponse> familias = service.listar(nomeFamilia, municipio, referencia);
     return new VinculoFamiliarListaResponse(familias);
   }
 

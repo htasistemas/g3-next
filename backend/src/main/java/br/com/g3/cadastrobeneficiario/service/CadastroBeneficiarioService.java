@@ -14,9 +14,11 @@ public interface CadastroBeneficiarioService {
 
   CadastroBeneficiarioResponse buscarPorId(Long id);
 
-  List<CadastroBeneficiarioResponse> listar(String nome, String status, String codigo);
+  List<CadastroBeneficiarioResponse> listar(
+      String nome, String status, String codigo, String cpf, String nis, String dataNascimento);
 
-  List<CadastroBeneficiarioResumoResponse> listarResumo(String nome, String status, String codigo);
+  List<CadastroBeneficiarioResumoResponse> listarResumo(
+      String nome, String status, String codigo, String cpf, String nis, String dataNascimento);
 
   String obterProximoCodigo();
 

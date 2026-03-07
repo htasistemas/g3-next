@@ -1,15 +1,16 @@
-﻿<div class="nav-buttons" aria-label="ações rapidas da tela">
-  <button type="button" class="nav-button" *ngIf="acoes.buscar" (click)="buscar.emit()" [disabled]="desabilitado.buscar">
+<div class="nav-buttons" data-no-async-guard="true" aria-label="ações rápidas da tela">
+  <button type="button" class="nav-button" *ngIf="acoes.buscar" (click)="dispararAcao('buscar', buscar)" [disabled]="isActionDisabled('buscar')">
     <span class="nav-button__icon" aria-hidden="true">
       <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
         <circle cx="9" cy="9" r="5.5" stroke="currentColor" stroke-width="1.25" />
         <path d="M13.5 13.5L16.5 16.5" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" />
       </svg>
     </span>
-    <span class="nav-button__label">Buscar</span>
+    <span class="nav-button__spinner" *ngIf="isActionLoading('buscar')" aria-hidden="true"></span>
+    <span class="nav-button__label">{{ getActionLabel('buscar', 'Buscar') }}</span>
   </button>
 
-  <button type="button" class="nav-button" *ngIf="acoes.novo" (click)="novo.emit()" [disabled]="desabilitado.novo">
+  <button type="button" class="nav-button" *ngIf="acoes.novo" (click)="dispararAcao('novo', novo)" [disabled]="isActionDisabled('novo')">
     <span class="nav-button__icon" aria-hidden="true">
       <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path
@@ -28,10 +29,11 @@
         />
       </svg>
     </span>
-    <span class="nav-button__label">Novo</span>
+    <span class="nav-button__spinner" *ngIf="isActionLoading('novo')" aria-hidden="true"></span>
+    <span class="nav-button__label">{{ getActionLabel('novo', 'Novo') }}</span>
   </button>
 
-  <button type="button" class="nav-button" *ngIf="acoes.salvar" (click)="salvar.emit()" [disabled]="desabilitado.salvar">
+  <button type="button" class="nav-button" *ngIf="acoes.salvar" (click)="dispararAcao('salvar', salvar)" [disabled]="isActionDisabled('salvar')">
     <span class="nav-button__icon" aria-hidden="true">
       <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path
@@ -43,10 +45,11 @@
         <rect x="7" y="11.5" width="6" height="3" rx="0.5" fill="currentColor" />
       </svg>
     </span>
-    <span class="nav-button__label">Salvar</span>
+    <span class="nav-button__spinner" *ngIf="isActionLoading('salvar')" aria-hidden="true"></span>
+    <span class="nav-button__label">{{ getActionLabel('salvar', 'Salvar') }}</span>
   </button>
 
-  <button type="button" class="nav-button" *ngIf="acoes.cancelar" (click)="cancelar.emit()" [disabled]="desabilitado.cancelar">
+  <button type="button" class="nav-button" *ngIf="acoes.cancelar" (click)="dispararAcao('cancelar', cancelar)" [disabled]="isActionDisabled('cancelar')">
     <span class="nav-button__icon" aria-hidden="true">
       <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path
@@ -77,10 +80,11 @@
         />
       </svg>
     </span>
-    <span class="nav-button__label">Cancelar</span>
+    <span class="nav-button__spinner" *ngIf="isActionLoading('cancelar')" aria-hidden="true"></span>
+    <span class="nav-button__label">{{ getActionLabel('cancelar', 'Cancelar') }}</span>
   </button>
 
-  <button type="button" class="nav-button nav-button--danger" *ngIf="acoes.excluir" (click)="excluir.emit()" [disabled]="desabilitado.excluir">
+  <button type="button" class="nav-button nav-button--danger" *ngIf="acoes.excluir" (click)="dispararAcao('excluir', excluir)" [disabled]="isActionDisabled('excluir')">
     <span class="nav-button__icon" aria-hidden="true">
       <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path
@@ -100,10 +104,11 @@
         <path d="M10.75 9.5V14" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" />
       </svg>
     </span>
-    <span class="nav-button__label">Excluir</span>
+    <span class="nav-button__spinner" *ngIf="isActionLoading('excluir')" aria-hidden="true"></span>
+    <span class="nav-button__label">{{ getActionLabel('excluir', 'Excluir') }}</span>
   </button>
 
-  <button type="button" class="nav-button" *ngIf="acoes.imprimir" (click)="imprimir.emit()" [disabled]="desabilitado.imprimir">
+  <button type="button" class="nav-button" *ngIf="acoes.imprimir" (click)="dispararAcao('imprimir', imprimir)" [disabled]="isActionDisabled('imprimir')">
     <span class="nav-button__icon" aria-hidden="true">
       <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path
@@ -118,10 +123,11 @@
         />
       </svg>
     </span>
-    <span class="nav-button__label">Imprimir</span>
+    <span class="nav-button__spinner" *ngIf="isActionLoading('imprimir')" aria-hidden="true"></span>
+    <span class="nav-button__label">{{ getActionLabel('imprimir', 'Imprimir') }}</span>
   </button>
 
-  <button type="button" class="nav-button" *ngIf="mostrarFechar" (click)="fechar.emit()">
+  <button type="button" class="nav-button" *ngIf="mostrarFechar" (click)="fecharUmaVez()">
     <span class="nav-button__icon" aria-hidden="true">
       <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path

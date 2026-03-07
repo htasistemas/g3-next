@@ -513,7 +513,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let item of recebimentos" (dblclick)="editarRecebimento(item)">
+          <tr *ngFor="let item of recebimentos" (click)="editarRecebimento(item)">
             <td>
               <p class="strong">{{ item.doadorNome || getNomeDoador(item.doadorId) }}</p>
               <p class="muted">{{ item.tipoDoacao }}</p>
@@ -528,7 +528,7 @@
               </span>
             </td>
             <td class="text-right">
-              <button type="button" class="ghost danger" (click)="excluirRecebimento(item)">Excluir</button>
+              <button type="button" class="ghost danger" (click)="excluirRecebimento(item); $event.stopPropagation()">Excluir</button>
             </td>
           </tr>
         </tbody>

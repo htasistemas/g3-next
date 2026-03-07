@@ -14,9 +14,11 @@ import br.com.g3.cadastrobeneficiario.service.ArmazenamentoDocumentoService;
 import br.com.g3.cadastrobeneficiario.service.CadastroBeneficiarioService;
 import br.com.g3.unidadeassistencial.domain.Endereco;
 import br.com.g3.unidadeassistencial.service.GeocodificacaoService;
+import java.time.format.DateTimeFormatter;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -85,7 +87,8 @@ public class CadastroBeneficiarioServiceImpl implements CadastroBeneficiarioServ
   }
 
   @Override
-  public List<CadastroBeneficiarioResponse> listar(String nome, String status, String codigo) {
+  public List<CadastroBeneficiarioResponse> listar(
+      String nome, String status, String codigo, String cpf, String nis, String dataNascimento) {
     boolean temNome = nome != null && !nome.trim().isEmpty();
     boolean temStatus = status != null && !status.trim().isEmpty();
     boolean temCodigo = codigo != null && !codigo.trim().isEmpty();
@@ -93,6 +96,14 @@ public class CadastroBeneficiarioServiceImpl implements CadastroBeneficiarioServ
     List<CadastroBeneficiario> cadastros;
     if (temCodigo) {
       cadastros = repository.buscarPorCodigo(montarCodigosPesquisa(codigo));
+      if (cadastros.isEmpty()) {
+        String codigoNormalizado = normalizarCodigoComparacao(codigo);
+        if (codigoNormalizado != null) {
+          cadastros = repository.listar().stream()
+              .filter(cadastro -> codigoNormalizado.equals(normalizarCodigoComparacao(cadastro.getCodigo())))
+              .collect(Collectors.toList());
+        }
+      }
       if (temNome) {
         cadastros = cadastros.stream()
             .filter(cadastro -> cadastro.getNomeCompleto() != null
@@ -115,50 +126,19 @@ public class CadastroBeneficiarioServiceImpl implements CadastroBeneficiarioServ
     } else {
       cadastros = repository.listar();
     }
-    return cadastros.stream()
+    List<CadastroBeneficiarioResponse> respostaBase = cadastros.stream()
         .collect(Collectors.toMap(CadastroBeneficiario::getId, cadastro -> cadastro, (a, b) -> a, java.util.LinkedHashMap::new))
         .values()
         .stream()
         .map(CadastroBeneficiarioMapper::toResponse)
         .collect(Collectors.toList());
+    return aplicarFiltrosComplementares(respostaBase, cpf, nis, dataNascimento);
   }
 
   @Override
-  public List<CadastroBeneficiarioResumoResponse> listarResumo(String nome, String status, String codigo) {
-    boolean temNome = nome != null && !nome.trim().isEmpty();
-    boolean temStatus = status != null && !status.trim().isEmpty();
-    boolean temCodigo = codigo != null && !codigo.trim().isEmpty();
-
-    List<CadastroBeneficiario> cadastros;
-    if (temCodigo) {
-      cadastros = repository.buscarPorCodigo(montarCodigosPesquisa(codigo));
-      if (temNome) {
-        cadastros = cadastros.stream()
-            .filter(cadastro -> cadastro.getNomeCompleto() != null
-                && cadastro.getNomeCompleto().toLowerCase(Locale.ROOT).contains(nome.toLowerCase(Locale.ROOT)))
-            .collect(Collectors.toList());
-      }
-      if (temStatus) {
-        cadastros = cadastros.stream()
-            .filter(cadastro -> status.equalsIgnoreCase(cadastro.getStatus()))
-            .collect(Collectors.toList());
-      }
-    } else if (temNome && temStatus) {
-      cadastros = repository.listarPorNomeEStatus(nome, status);
-    } else if (temNome) {
-      cadastros = repository.buscarPorNome(nome);
-    } else if (temStatus) {
-      cadastros = repository.listar().stream()
-          .filter(cadastro -> status.equalsIgnoreCase(cadastro.getStatus()))
-          .collect(Collectors.toList());
-    } else {
-      cadastros = repository.listar();
-    }
-
-    return cadastros.stream()
-        .collect(Collectors.toMap(CadastroBeneficiario::getId, cadastro -> cadastro, (a, b) -> a, java.util.LinkedHashMap::new))
-        .values()
-        .stream()
+  public List<CadastroBeneficiarioResumoResponse> listarResumo(
+      String nome, String status, String codigo, String cpf, String nis, String dataNascimento) {
+    return listar(nome, status, codigo, cpf, nis, dataNascimento).stream()
         .map(cadastro -> new CadastroBeneficiarioResumoResponse(cadastro.getId(), cadastro.getNomeCompleto()))
         .collect(Collectors.toList());
   }
@@ -168,6 +148,63 @@ public class CadastroBeneficiarioServiceImpl implements CadastroBeneficiarioServ
     Integer maiorCodigo = repository.buscarMaiorCodigo();
     int proximoCodigo = (maiorCodigo == null ? 0 : maiorCodigo) + 1;
     return String.format("%04d", proximoCodigo);
+  }
+
+  private List<CadastroBeneficiarioResponse> aplicarFiltrosComplementares(
+      List<CadastroBeneficiarioResponse> base, String cpf, String nis, String dataNascimento) {
+    String cpfNormalizado = normalizarDocumento(cpf);
+    String nisNormalizado = normalizarDocumento(nis);
+    java.time.LocalDate dataNascimentoFiltro = parseData(dataNascimento);
+
+    return base.stream()
+        .filter(
+            item ->
+                cpfNormalizado == null
+                    || normalizarDocumento(item.getCpf()) != null
+                        && normalizarDocumento(item.getCpf()).contains(cpfNormalizado))
+        .filter(
+            item ->
+                nisNormalizado == null
+                    || normalizarDocumento(item.getNis()) != null
+                        && normalizarDocumento(item.getNis()).contains(nisNormalizado))
+        .filter(
+            item ->
+                dataNascimentoFiltro == null
+                    || dataNascimentoFiltro.equals(item.getDataNascimento()))
+        .collect(Collectors.toList());
+  }
+
+  private String normalizarDocumento(String valor) {
+    if (valor == null) {
+      return null;
+    }
+    String normalizado = valor.replaceAll("\\D", "");
+    return normalizado.isEmpty() ? null : normalizado;
+  }
+
+  private java.time.LocalDate parseData(String dataNascimento) {
+    if (dataNascimento == null || dataNascimento.trim().isEmpty()) {
+      return null;
+    }
+    String valor = dataNascimento.trim();
+    try {
+      return java.time.LocalDate.parse(valor);
+    } catch (Exception ex) {
+      try {
+        return java.time.LocalDate.parse(valor, DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+      } catch (Exception ignored) {
+        return null;
+      }
+    }
+  }
+
+  private String normalizarCodigoComparacao(String codigo) {
+    String digitos = normalizarDocumento(codigo);
+    if (digitos == null) {
+      return null;
+    }
+    String semZeros = digitos.replaceFirst("^0+", "");
+    return semZeros.isEmpty() ? "0" : semZeros;
   }
 
   private List<String> montarCodigosPesquisa(String codigo) {
@@ -260,23 +297,108 @@ public class CadastroBeneficiarioServiceImpl implements CadastroBeneficiarioServ
     }
 
     LocalDateTime agora = LocalDateTime.now();
+    Map<Long, DocumentoBeneficiario> documentosPorId =
+        cadastro.getDocumentos().stream()
+            .filter(documento -> documento.getId() != null)
+            .collect(Collectors.toMap(DocumentoBeneficiario::getId, documento -> documento, (atual, novo) -> novo));
+    Map<String, DocumentoBeneficiario> documentosPorNome =
+        cadastro.getDocumentos().stream()
+            .filter(documento -> temTexto(documento.getNomeDocumento()))
+            .collect(
+                Collectors.toMap(
+                    documento -> documentNameKey(documento.getNomeDocumento()),
+                    documento -> documento,
+                    this::escolherDocumentoMaisRecente));
+
     for (DocumentoUploadRequest doc : documentos) {
-      if (doc == null || doc.getConteudo() == null || doc.getConteudo().trim().isEmpty()) {
+      if (doc == null || !temTexto(doc.getNome())) {
         continue;
       }
 
-      String caminho = armazenamentoDocumentoService.salvarArquivo(cadastro.getId(), doc);
-      DocumentoBeneficiario documento = new DocumentoBeneficiario();
-      documento.setBeneficiario(cadastro);
+      DocumentoBeneficiario documento = localizarDocumentoExistente(doc, documentosPorId, documentosPorNome);
+      boolean novoDocumento = documento == null;
+      if (novoDocumento) {
+        documento = new DocumentoBeneficiario();
+        documento.setBeneficiario(cadastro);
+        documento.setCriadoEm(agora);
+      }
+
+      String conteudo = doc.getConteudo();
+      String caminho =
+          temTexto(conteudo)
+              ? armazenamentoDocumentoService.salvarArquivo(cadastro.getId(), doc)
+              : primeiroValorNaoVazio(doc.getCaminhoArquivo(), documento.getCaminhoArquivo());
+      String nomeArquivo = primeiroValorNaoVazio(doc.getNomeArquivo(), documento.getNomeArquivo());
+      String contentType = primeiroValorNaoVazio(doc.getContentType(), documento.getContentType());
+
+      if (!temTexto(caminho) && !temTexto(nomeArquivo)) {
+        if (!novoDocumento) {
+          documento.setNomeArquivo(null);
+          documento.setCaminhoArquivo(null);
+          documento.setContentType(null);
+          documento.setAtualizadoEm(agora);
+        }
+        continue;
+      }
+
       documento.setNomeDocumento(doc.getNome());
-      documento.setNomeArquivo(doc.getNomeArquivo());
-      documento.setContentType(doc.getContentType());
+      documento.setNomeArquivo(nomeArquivo);
+      documento.setContentType(contentType);
       documento.setObrigatorio(doc.getObrigatorio());
       documento.setCaminhoArquivo(caminho);
-      documento.setCriadoEm(agora);
       documento.setAtualizadoEm(agora);
-      cadastro.getDocumentos().add(documento);
+      if (novoDocumento) {
+        cadastro.getDocumentos().add(documento);
+        if (doc.getId() != null) {
+          documentosPorId.put(doc.getId(), documento);
+        }
+        documentosPorNome.put(documentNameKey(doc.getNome()), documento);
+      }
     }
+  }
+
+  private DocumentoBeneficiario localizarDocumentoExistente(
+      DocumentoUploadRequest doc,
+      Map<Long, DocumentoBeneficiario> documentosPorId,
+      Map<String, DocumentoBeneficiario> documentosPorNome) {
+    if (doc.getId() != null) {
+      DocumentoBeneficiario porId = documentosPorId.get(doc.getId());
+      if (porId != null) {
+        return porId;
+      }
+    }
+    String chaveNome = documentNameKey(doc.getNome());
+    return chaveNome.isEmpty() ? null : documentosPorNome.get(chaveNome);
+  }
+
+  private DocumentoBeneficiario escolherDocumentoMaisRecente(
+      DocumentoBeneficiario atual, DocumentoBeneficiario novo) {
+    LocalDateTime atualizadaAtual = atual.getAtualizadoEm();
+    LocalDateTime atualizadaNova = novo.getAtualizadoEm();
+    if (atualizadaAtual == null) {
+      return novo;
+    }
+    if (atualizadaNova == null) {
+      return atual;
+    }
+    return atualizadaNova.isAfter(atualizadaAtual) ? novo : atual;
+  }
+
+  private String primeiroValorNaoVazio(String... valores) {
+    for (String valor : valores) {
+      if (temTexto(valor)) {
+        return valor;
+      }
+    }
+    return null;
+  }
+
+  private boolean temTexto(String valor) {
+    return valor != null && !valor.trim().isEmpty();
+  }
+
+  private String documentNameKey(String nome) {
+    return nome == null ? "" : nome.trim().toLowerCase(Locale.ROOT);
   }
 
   private String gerarCodigoSequencial() {

@@ -1,4 +1,7 @@
 spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
   datasource:
     url: jdbc:postgresql://localhost:5432/g3
     username: postgres
@@ -40,6 +43,8 @@ server:
 
 app:
   auth:
+    token-secret: ${APP_AUTH_TOKEN_SECRET:}
+    token-expiration-minutes: ${APP_AUTH_TOKEN_EXPIRATION_MINUTES:480}
     google:
       client-id: ${GOOGLE_CLIENT_ID:1026369251340-2eskbj74ierlra1i9fm0aas29ucvnudf.apps.googleusercontent.com}
   geocoding:

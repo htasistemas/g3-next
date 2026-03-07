@@ -120,6 +120,7 @@ public class RhPontoServiceImplTeste {
     Mockito.when(usuarioRepository.buscarPorId(10L)).thenReturn(Optional.of(usuario));
     Mockito.when(passwordEncoder.matches(ArgumentMatchers.any(), ArgumentMatchers.any())).thenReturn(false);
     Mockito.when(unidadeAssistencialService.obterAtual()).thenReturn(unidadeResponse);
+    Mockito.when(configuracaoRepository.buscarAtual()).thenReturn(Optional.of(configuracao));
 
     ResponseStatusException ex = Assertions.assertThrows(
         ResponseStatusException.class,
@@ -175,6 +176,7 @@ public class RhPontoServiceImplTeste {
     request.setSenha("ok");
 
     Mockito.when(unidadeAssistencialService.obterAtual()).thenReturn(unidadeResponse);
+    Mockito.when(configuracaoRepository.buscarAtual()).thenReturn(Optional.of(configuracao));
     Mockito.when(pontoNetworkValidator.validarAutorizacao(
             ArgumentMatchers.any(),
             ArgumentMatchers.any(),

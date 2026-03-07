@@ -342,7 +342,7 @@
         </form>
 
         <div class="unit-list" *ngIf="familiasPaginadas.length">
-          <div class="unit-list__item" *ngFor="let familia of familiasPaginadas" (dblclick)="editarFamiliaNaLista(familia)">
+          <div class="unit-list__item" *ngFor="let familia of familiasPaginadas" (click)="editarFamiliaNaLista(familia)">
             <div>
               <div class="unit-list__header-row">
                 <span class="unit-list__code">Código: {{ familia.id_familia || '---' }}</span>

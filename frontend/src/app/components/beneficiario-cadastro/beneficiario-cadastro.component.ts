@@ -1020,6 +1020,8 @@ export class BeneficiarioCadastroComponent extends TelaBaseComponent implements 
   }
   private resetDocumentArray(existing?: DocumentoObrigatorio[]): void {
     this.anexos.clear();
+    this.uploadProgress = {};
+    this.uploadingDocuments = false;
     const configDocs = this.normalizeDocumentList(this.documentosObrigatorios ?? []);
     const existingDocs = this.normalizeDocumentList(existing ?? []);
     if (configDocs.length) {
@@ -1208,11 +1210,15 @@ export class BeneficiarioCadastroComponent extends TelaBaseComponent implements 
         contentType: file.type,
       });
       this.uploadProgress[index] = 100;
-      this.updateUploadState();
     };
     reader.onerror = () => {
       this.feedback = 'N??o foi poss??vel carregar o arquivo selecionado. Tente novamente.';
       delete this.uploadProgress[index];
+    };
+    reader.onabort = () => {
+      delete this.uploadProgress[index];
+    };
+    reader.onloadend = () => {
       this.updateUploadState();
     };
     reader.readAsDataURL(file);
@@ -1242,7 +1248,14 @@ export class BeneficiarioCadastroComponent extends TelaBaseComponent implements 
   removeUploadedDocument(index: number): void {
     const control = this.anexos.at(index) as FormGroup | undefined;
     if (!control) return;
-    control.patchValue({ nomeArquivo: '', conteudo: '', contentType: '', file: null });
+    control.patchValue({
+      id: null,
+      nomeArquivo: '',
+      caminhoArquivo: '',
+      conteudo: '',
+      contentType: '',
+      file: null,
+    });
     delete this.uploadProgress[index];
     this.updateUploadState();
     control.markAsDirty();
@@ -1253,6 +1266,13 @@ export class BeneficiarioCadastroComponent extends TelaBaseComponent implements 
     );
   }
   private updateUploadState(): void {
+    const highestIndex = this.anexos.length - 1;
+    Object.keys(this.uploadProgress).forEach((key) => {
+      const index = Number(key);
+      if (!Number.isInteger(index) || index < 0 || index > highestIndex) {
+        delete this.uploadProgress[index];
+      }
+    });
     this.uploadingDocuments = Object.values(this.uploadProgress).some((value) => value < 100);
   }
   viewDocument(index: number | null): void {
@@ -1841,6 +1861,12 @@ export class BeneficiarioCadastroComponent extends TelaBaseComponent implements 
   private normalizeDigits(value?: string | null): string {
     return (value ?? '').toString().replace(/\D+/g, '');
   }
+  private normalizeCodeForComparison(value?: string | null): string {
+    const digits = this.normalizeDigits(value);
+    if (!digits) return '';
+    const semZeros = digits.replace(/^0+/, '');
+    return semZeros || '0';
+  }
   private normalizeDateForFilter(value?: string | null): string {
     if (!value) return '';
     const raw = value.toString().trim();
@@ -2127,11 +2153,13 @@ export class BeneficiarioCadastroComponent extends TelaBaseComponent implements 
     return documents.map((doc) => {
       const file = doc.file as File | undefined;
       return {
+        id: doc.id,
         nome: doc.nome,
         obrigatorio: doc.obrigatorio,
         nomeArquivo: file ? file.name : doc.nomeArquivo,
         conteudo: doc.conteudo,
         contentType: doc.contentType,
+        caminhoArquivo: file ? undefined : doc.caminhoArquivo,
       } as DocumentoObrigatorio;
     });
   }
@@ -2417,13 +2445,14 @@ export class BeneficiarioCadastroComponent extends TelaBaseComponent implements 
   }
   searchBeneficiaries(): void {
     const { nome, cpf, codigo, data_nascimento, status } = this.searchForm.value;
+    const codigoNormalizado = this.normalizeBeneficiaryCode(codigo) || codigo || undefined;
     this.listLoading = true;
     this.listError = null;
     this.service
       .list({
         nome: nome || undefined,
         cpf: cpf || undefined,
-        codigo: codigo || undefined,
+        codigo: codigoNormalizado,
         data_nascimento: data_nascimento || undefined,
         status: status || undefined,
       })
@@ -2442,7 +2471,7 @@ export class BeneficiarioCadastroComponent extends TelaBaseComponent implements 
       this.searchForm.value;
     const nomeFiltro = this.normalizeSearchTerm(nome);
     const cpfFiltro = this.normalizeDigits(cpf);
-    const codigoFiltro = this.normalizeDigits(codigo);
+    const codigoFiltro = this.normalizeCodeForComparison(codigo);
     const dataFiltro = this.normalizeDateForFilter(data_nascimento);
     this.filteredBeneficiarios = (this.beneficiarios ?? [])
       .filter((beneficiario) => {
@@ -2461,7 +2490,7 @@ export class BeneficiarioCadastroComponent extends TelaBaseComponent implements 
           if (cpfBeneficiario !== cpfFiltro) return false;
         }
         if (codigoFiltro) {
-          const codigoBeneficiario = this.normalizeDigits(beneficiario.codigo);
+          const codigoBeneficiario = this.normalizeCodeForComparison(beneficiario.codigo);
           if (codigoBeneficiario !== codigoFiltro) return false;
         }
         if (dataFiltro) {
@@ -2570,7 +2599,7 @@ export class BeneficiarioCadastroComponent extends TelaBaseComponent implements 
     return !!(nome || cpf || codigo || data_nascimento || status);
   }
   private getBeneficiarioChaveUnica(beneficiario: BeneficiarioApiPayload): string {
-    const codigo = this.normalizeDigits(beneficiario.codigo);
+    const codigo = this.normalizeCodeForComparison(beneficiario.codigo);
     if (codigo) return `codigo:${codigo}`;
     const cpf = this.normalizeDigits(beneficiario.cpf);
     if (cpf) return `cpf:${cpf}`;
@@ -2582,14 +2611,18 @@ export class BeneficiarioCadastroComponent extends TelaBaseComponent implements 
   }
   private mapBeneficiaryPayload(beneficiary: BeneficiaryPayload): BeneficiarioApiPayload {
     const codigoPayload = (beneficiary as any).codigo_beneficiario ?? (beneficiary as any).codigoBeneficiario ?? beneficiary.codigo;
+    const nomeCompletoPayload = (beneficiary as any).nome_completo ?? beneficiary.nomeCompleto;
+    const nomeMaePayload = (beneficiary as any).nome_mae ?? beneficiary.nomeMae;
+    const dataNascimentoPayload = (beneficiary as any).data_nascimento ?? beneficiary.dataNascimento;
+    const statusPayload = (beneficiary as any).status;
     return {
       id_beneficiario: beneficiary.id ? String(beneficiary.id) : undefined,
       codigo: codigoPayload,
-      nome_completo: this.normalizarTextoNome(beneficiary.nomeCompleto),
-      nome_mae: this.normalizarTextoNome(beneficiary.nomeMae ?? ''),
-      data_nascimento: beneficiary.dataNascimento,
-      cpf: beneficiary.cpf ?? beneficiary.documentos ?? null,
-      status: (beneficiary.status as BeneficiarioApiPayload['status']) || 'EM_ANALISE',
+      nome_completo: this.normalizarTextoNome(nomeCompletoPayload),
+      nome_mae: this.normalizarTextoNome(nomeMaePayload ?? ''),
+      data_nascimento: dataNascimentoPayload,
+      cpf: beneficiary.cpf ?? (beneficiary as any).cpf ?? beneficiary.documentos ?? null,
+      status: (statusPayload as BeneficiarioApiPayload['status']) || 'EM_ANALISE',
     };
   }
   buscarBeneficiariosNaListagem(): void {

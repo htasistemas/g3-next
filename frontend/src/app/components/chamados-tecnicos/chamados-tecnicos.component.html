@@ -93,7 +93,7 @@
           <div *ngIf="carregando" class="list-panel__loading">Carregando chamados...</div>
 
           <div class="unit-list" *ngIf="chamados.length; else emptyList">
-            <div class="unit-list__item" *ngFor="let chamado of chamados" (dblclick)="abrirChamado(chamado)">
+            <div class="unit-list__item" *ngFor="let chamado of chamados" (click)="abrirChamado(chamado)">
               <div class="unit-list__row">
                 <span class="unit-list__code unit-list__code--fixed">{{ chamado.codigo || '---' }}</span>
                 <span class="unit-list__status" [ngClass]="statusClass(chamado.status)">{{ formatStatus(chamado.status) }}</span>

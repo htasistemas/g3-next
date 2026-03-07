@@ -1,0 +1,49 @@
+services:
+  db:
+    image: postgres:15
+    container_name: g3-next-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-admin}
+      POSTGRES_DB: ${DB_NAME:-g3}
+    ports:
+      - "5432:5432"
+    volumes:
+      - g3_next_db_data:/var/lib/postgresql/data
+
+  backend-next:
+    image: node:20-alpine
+    container_name: g3-next-backend-node
+    working_dir: /app
+    command: sh -c "npm install && npm run prisma:generate && npm run dev"
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:admin@db:5432/g3?schema=public}
+      API_PORT: 3333
+      API_HOST: 0.0.0.0
+      CORS_ORIGIN: http://localhost:5173
+      APP_AUTH_TOKEN_SECRET: ${APP_AUTH_TOKEN_SECRET:-g3-next-dev-token-secret-2026}
+      APP_AUTH_TOKEN_EXPIRATION_MINUTES: ${APP_AUTH_TOKEN_EXPIRATION_MINUTES:-480}
+    ports:
+      - "3333:3333"
+    depends_on:
+      - db
+    volumes:
+      - ../backend:/app
+
+  frontend-next:
+    image: node:20-alpine
+    container_name: g3-next-frontend-react
+    working_dir: /app
+    command: sh -c "npm install && npm run react:dev -- --host 0.0.0.0 --port 5173"
+    environment:
+      VITE_API_URL: http://localhost:3333
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend-next
+    volumes:
+      - ../frontend:/app
+
+volumes:
+  g3_next_db_data:

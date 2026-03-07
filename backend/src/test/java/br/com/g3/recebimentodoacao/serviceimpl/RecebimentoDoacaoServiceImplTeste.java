@@ -75,7 +75,7 @@ class RecebimentoDoacaoServiceImplTeste {
 
     ContaBancaria conta = new ContaBancaria();
     conta.setId(99L);
-    when(contaBancariaRepository.buscarRecebimentoLocal()).thenReturn(Optional.of(conta));
+    when(contaBancariaRepository.listarRecebimentoLocal()).thenReturn(List.of(conta));
     when(movimentacaoFinanceiraRepository.existePorDoacaoId(any())).thenReturn(false);
     when(almoxarifadoRepository.existeMovimentacaoPorDoacaoId(any())).thenReturn(false);
     when(patrimonioRepository.existePorDoacaoId(any())).thenReturn(false);

@@ -1,5 +1,5 @@
 ﻿import { CommonModule } from '@angular/common';
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators, FormsModule } from '@angular/forms';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import {
@@ -20,7 +20,7 @@ import {
   faUserCheck,
   faUserPlus
 } from '@fortawesome/free-solid-svg-icons';
-import { firstValueFrom } from 'rxjs';
+import { Subject, debounceTime, distinctUntilChanged, firstValueFrom, takeUntil } from 'rxjs';
 import { BeneficiarioApiPayload, BeneficiarioApiService } from '../../services/beneficiario-api.service';
 import { FamilyService, FamiliaPayload } from '../../services/family.service';
 import { AlmoxarifadoService } from '../../services/almoxarifado.service';
@@ -145,7 +145,7 @@ type TabId = 'identificacao' | 'historico' | 'planejamento' | 'dashboard';
   templateUrl: './donation-management.component.html',
   styleUrl: './donation-management.component.scss'
 })
-export class DonationManagementComponent extends TelaBaseComponent implements OnInit {
+export class DonationManagementComponent extends TelaBaseComponent implements OnInit, OnDestroy {
   readonly faUserPlus = faUserPlus;
   readonly faClipboardList = faClipboardList;
   readonly faMagnifyingGlass = faMagnifyingGlass;
@@ -194,6 +194,8 @@ export class DonationManagementComponent extends TelaBaseComponent implements On
   private readonly visitaService = inject(VisitaDomiciliarService);
   private readonly unidadeService = inject(AssistanceUnitService);
   private readonly todayIso = new Date().toISOString().substring(0, 10);
+  private readonly destroy$ = new Subject<void>();
+  private readonly beneficiarySearchInput$ = new Subject<string>();
 
   tabs: { id: TabId; label: string }[] = [
     { id: 'identificacao', label: 'Identificação' },
@@ -413,6 +415,16 @@ export class DonationManagementComponent extends TelaBaseComponent implements On
     this.loadDoacoesPlanejadas();
     this.preencherResponsavelLogado();
     this.carregarUnidadeAtual();
+    this.beneficiarySearchInput$
+      .pipe(debounceTime(250), distinctUntilChanged(), takeUntil(this.destroy$))
+      .subscribe((valor) => {
+        void this.lookupBeneficiaries(valor);
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   get selectedDeliveryItem() {
@@ -506,12 +518,19 @@ export class DonationManagementComponent extends TelaBaseComponent implements On
     this.atualizarDataPrevistaPorUltimaRetirada(codigo);
   }
 
-  async onBeneficiaryInput(value: string): Promise<void> {
+  onBeneficiaryInput(value: string): void {
     this.beneficiarySearch.set(value);
     this.identificationForm.get('beneficiaryName')?.setValue(value);
     this.motivoCestaBasica.set(null);
     this.mostrarMotivoCestaBasica.set(false);
-    await this.lookupBeneficiaries(value);
+    if (!(value ?? '').trim()) {
+      this.beneficiarySearchError.set(null);
+      this.searchingBeneficiaries.set(false);
+      this.beneficiaries.set([]);
+      this.selectedBeneficiary.set(null);
+      return;
+    }
+    this.beneficiarySearchInput$.next(value);
   }
 
   private mapBeneficiary(payload: BeneficiarioApiPayload): Beneficiary {
@@ -606,6 +625,10 @@ export class DonationManagementComponent extends TelaBaseComponent implements On
       const familyResults = (familyResponse.familias ?? []).map((item) => this.mapFamily(item));
       const merged = [...beneficiaryResults, ...familyResults];
 
+      if (query !== this.beneficiarySearch().trim()) {
+        return;
+      }
+
       this.beneficiaries.set(merged);
 
       if (beneficiaryResult.status === 'rejected' && familyResult.status === 'rejected') {
@@ -621,9 +644,13 @@ export class DonationManagementComponent extends TelaBaseComponent implements On
       }
     } catch (error) {
       console.error('Failed to search beneficiaries', error);
-      this.beneficiarySearchError.set('Não foi possível buscar beneficiários no momento.');
+      if (query === this.beneficiarySearch().trim()) {
+        this.beneficiarySearchError.set('Não foi possível buscar beneficiários no momento.');
+      }
     } finally {
-      this.searchingBeneficiaries.set(false);
+      if (query === this.beneficiarySearch().trim()) {
+        this.searchingBeneficiaries.set(false);
+      }
     }
   }
 

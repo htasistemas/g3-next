@@ -171,9 +171,9 @@ public class ManualSistemaServiceImpl implements ManualSistemaService {
                         + "<strong>"
                         + formatarData(mudanca.getDataMudanca())
                         + "</strong> - "
-                        + textoSeguro(mudanca.getDescricaoCurta())
+                        + escaparHtml(textoSeguro(mudanca.getDescricaoCurta()))
                         + (mudanca.getTela() != null && !mudanca.getTela().isBlank()
-                            ? " <em>(" + mudanca.getTela() + ")</em>"
+                            ? " <em>(" + escaparHtml(textoSeguro(mudanca.getTela())) + ")</em>"
                             : "")
                         + "</li>")
             .collect(Collectors.joining());
@@ -188,7 +188,7 @@ public class ManualSistemaServiceImpl implements ManualSistemaService {
         "<li><strong>"
             + formatarData(mudanca.getDataMudanca())
             + "</strong> - "
-            + textoSeguro(mudanca.getDescricaoCurta())
+            + escaparHtml(textoSeguro(mudanca.getDescricaoCurta()))
             + "</li>";
     if (conteudo == null || conteudo.isBlank()) {
       return "<h3>Atualizacoes recentes</h3><ul data-manual-atualizacoes>" + item + "</ul>";
@@ -210,6 +210,18 @@ public class ManualSistemaServiceImpl implements ManualSistemaService {
 
   private String textoSeguro(String valor) {
     return valor == null ? null : valor.trim();
+  }
+
+  private String escaparHtml(String valor) {
+    if (valor == null) {
+      return "";
+    }
+    return valor
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\"", "&quot;")
+        .replace("'", "&#39;");
   }
 
   private String formatarData(LocalDateTime data) {

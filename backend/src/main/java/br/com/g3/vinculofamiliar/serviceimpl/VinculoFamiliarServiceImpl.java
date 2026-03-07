@@ -79,9 +79,29 @@ public class VinculoFamiliarServiceImpl implements VinculoFamiliarService {
 
   @Override
   @Transactional(readOnly = true)
-  public List<VinculoFamiliarResponse> listar() {
+  public List<VinculoFamiliarResponse> listar(
+      String nomeFamilia, String municipio, String referencia) {
+    String nomeNormalizado = normalizarFiltro(nomeFamilia);
+    String municipioNormalizado = normalizarFiltro(municipio);
+    String referenciaNormalizada = normalizarFiltro(referencia);
+
     return vinculoRepository.listar().stream()
         .map(VinculoFamiliarMapper::toResponse)
+        .filter(
+            familia ->
+                nomeNormalizado == null
+                    || contemFiltro(familia.getNomeFamilia(), nomeNormalizado))
+        .filter(
+            familia ->
+                municipioNormalizado == null
+                    || contemFiltro(familia.getMunicipio(), municipioNormalizado))
+        .filter(
+            familia ->
+                referenciaNormalizada == null
+                    || (familia.getReferenciaFamiliar() != null
+                        && contemFiltro(
+                            familia.getReferenciaFamiliar().getNomeCompleto(),
+                            referenciaNormalizada)))
         .collect(Collectors.toList());
   }
 
@@ -161,5 +181,18 @@ public class VinculoFamiliarServiceImpl implements VinculoFamiliarService {
     }
     CadastroBeneficiario referencia = buscarBeneficiario(referenciaId);
     vinculo.setReferenciaFamiliar(referencia);
+  }
+
+  private String normalizarFiltro(String valor) {
+    if (valor == null) {
+      return null;
+    }
+    String normalizado = valor.trim().toLowerCase();
+    return normalizado.isEmpty() ? null : normalizado;
+  }
+
+  private boolean contemFiltro(String valor, String filtro) {
+    String valorNormalizado = normalizarFiltro(valor);
+    return valorNormalizado != null && valorNormalizado.contains(filtro);
   }
 }

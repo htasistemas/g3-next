@@ -1,7 +1,6 @@
 ﻿import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { faBook, faChevronDown, faChevronUp, faMagnifyingGlass } from '@fortawesome/free-solid-svg-icons';
 import { Router } from '@angular/router';
@@ -35,7 +34,7 @@ export class ManualSistemaComponent implements OnInit, OnDestroy {
   termoPesquisa = '';
   secoesResumo: ManualSistemaSecaoResumo[] = [];
   secoesCarregadas = new Map<string, ManualSistemaSecao>();
-  conteudosSeguros = new Map<string, SafeHtml>();
+  conteudosSeguros = new Map<string, string>();
   secoesAbertas = new Set<string>();
   carregandoResumo = false;
   carregandoChangelog = false;
@@ -49,7 +48,6 @@ export class ManualSistemaComponent implements OnInit, OnDestroy {
 
   constructor(
     private readonly manualService: ManualSistemaService,
-    private readonly sanitizer: DomSanitizer,
     private readonly router: Router
   ) {}
 
@@ -119,7 +117,7 @@ export class ManualSistemaComponent implements OnInit, OnDestroy {
     this.rolarParaSecao(slug);
   }
 
-  obterConteudoSeguro(slug: string): SafeHtml | null {
+  obterConteudoSeguro(slug: string): string | null {
     return this.conteudosSeguros.get(slug) || null;
   }
 
@@ -198,16 +196,13 @@ export class ManualSistemaComponent implements OnInit, OnDestroy {
       .subscribe({
         next: (secao) => {
           this.secoesCarregadas.set(slug, secao);
-          this.conteudosSeguros.set(slug, this.sanitizer.bypassSecurityTrustHtml(secao.conteudo || ''));
+          this.conteudosSeguros.set(slug, secao.conteudo || '');
           if (aoCarregar) {
             aoCarregar();
           }
         },
         error: () => {
-          this.conteudosSeguros.set(
-            slug,
-            this.sanitizer.bypassSecurityTrustHtml('<p>Não foi possível carregar esta seção.</p>')
-          );
+          this.conteudosSeguros.set(slug, '<p>Não foi possível carregar esta seção.</p>');
         }
       });
   }
@@ -226,16 +221,10 @@ export class ManualSistemaComponent implements OnInit, OnDestroy {
         .subscribe({
           next: (secaoCompleta) => {
             this.secoesCarregadas.set(secao.slug, secaoCompleta);
-            this.conteudosSeguros.set(
-              secao.slug,
-              this.sanitizer.bypassSecurityTrustHtml(secaoCompleta.conteudo || '')
-            );
+            this.conteudosSeguros.set(secao.slug, secaoCompleta.conteudo || '');
           },
           error: () => {
-            this.conteudosSeguros.set(
-              secao.slug,
-              this.sanitizer.bypassSecurityTrustHtml('<p>Conteúdo indisponível.</p>')
-            );
+            this.conteudosSeguros.set(secao.slug, '<p>Conteúdo indisponível.</p>');
           },
           complete: () => {
             carregados += 1;

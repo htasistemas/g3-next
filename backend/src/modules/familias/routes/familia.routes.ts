@@ -1,0 +1,57 @@
+import { Router } from "express";
+import { asyncHandler } from "../../../shared/http/async-handler.js";
+import {
+  ensureAuthenticated,
+  ensurePermissions
+} from "../../auth/middlewares/auth.middleware.js";
+import { FamiliaController } from "../controllers/familia.controller.js";
+
+const controller = new FamiliaController();
+
+export const familiaRoutes = Router();
+
+const permissoesLeitura = ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"];
+const permissoesEscrita = ["ADMINISTRADOR", "OPERADOR"];
+
+familiaRoutes.get(
+  "/",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.listar.bind(controller))
+);
+familiaRoutes.get(
+  "/:id",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.buscarPorId.bind(controller))
+);
+familiaRoutes.post(
+  "/",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.criar.bind(controller))
+);
+familiaRoutes.put(
+  "/:id",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.atualizar.bind(controller))
+);
+familiaRoutes.post(
+  "/:id/membros",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.adicionarMembro.bind(controller))
+);
+familiaRoutes.put(
+  "/:id/membros/:membroId",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.atualizarMembro.bind(controller))
+);
+familiaRoutes.delete(
+  "/:id/membros/:membroId",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.removerMembro.bind(controller))
+);

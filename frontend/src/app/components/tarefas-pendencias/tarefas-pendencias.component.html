@@ -351,7 +351,7 @@
 
           <tbody>
 
-            <tr *ngFor="let task of tarefasFiltradas" (dblclick)="editTask(task)">
+            <tr *ngFor="let task of tarefasFiltradas" (click)="editTask(task)">
 
               <td>
 
@@ -387,16 +387,16 @@
 
                 <div class="row-actions">
 
-                  <button type="button" class="ghost" (click)="abrirHistorico(task)">Histórico</button>
+                  <button type="button" class="ghost" (click)="abrirHistorico(task); $event.stopPropagation()">Histórico</button>
 
 
-                  <button type="button" class="primary" (click)="changeStatus(task, 'Concluída')" [disabled]="task.status === 'Concluída'">
+                  <button type="button" class="primary" (click)="changeStatus(task, 'Concluída'); $event.stopPropagation()" [disabled]="task.status === 'Concluída'">
 
                     Concluir
 
                   </button>
 
-                  <button type="button" class="danger" (click)="removeTask(task)">Excluir</button>
+                  <button type="button" class="danger" (click)="removeTask(task); $event.stopPropagation()">Excluir</button>
 
                 </div>
 

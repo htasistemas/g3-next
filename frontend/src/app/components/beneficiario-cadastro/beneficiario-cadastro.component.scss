@@ -2543,33 +2543,63 @@
 }
             
 .documentos-dados__table {
+  width: 100%;
   overflow-x: auto;
-  }
+  overflow-y: hidden;
+  padding-bottom: 0.25rem;
+}
   
 .documentos-dados__table table {
   width: 100%;
-    border-collapse: collapse;
-      font-size: 0.9rem;
-        color: #0f172a;
-          }
+  min-width: 1024px;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  color: #0f172a;
+}
           
 .documentos-dados__table th,
 .documentos-dados__table td {
-  padding: 0.5rem 0.45rem;
-    border-bottom: 1px solid #e2e8f0;
-    }
-    
+  padding: 0.55rem 0.5rem;
+  border-bottom: 1px solid #e2e8f0;
+  vertical-align: top;
+}
+     
 .documentos-dados__table th {
   font-weight: 600;
     text-transform: uppercase;
       letter-spacing: 0.04em;
         font-size: 0.78rem;
           color: #1d4ed8;
-            }
-            
+}
+             
 .documentos-dados__table td {
-  min-width: 180px;
-  }
+  min-width: 140px;
+}
+
+.documentos-dados__table th:nth-child(1),
+.documentos-dados__table td:nth-child(1) {
+  min-width: 190px;
+}
+
+.documentos-dados__table th:nth-child(2),
+.documentos-dados__table td:nth-child(2) {
+  min-width: 210px;
+}
+
+.documentos-dados__table th:nth-child(3),
+.documentos-dados__table td:nth-child(3) {
+  min-width: 120px;
+}
+
+.documentos-dados__table th:nth-child(4),
+.documentos-dados__table td:nth-child(4) {
+  min-width: 210px;
+}
+
+.documentos-dados__table th:nth-child(5),
+.documentos-dados__table td:nth-child(5) {
+  min-width: 160px;
+}
 
 .documentos-dados__table tr.document-row--attached td {
   background: #ecfdf3;
@@ -2580,7 +2610,12 @@
 }
 
 .documentos-dados__table .actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
   gap: 0.35rem;
+  flex-wrap: nowrap;
+  white-space: nowrap;
 }
 
 .documentos-dados__upload {
@@ -2739,5 +2774,15 @@
   .document-upload-card__body {
       grid-template-columns: 1fr;
         }
-        }
+}
+
+@media (max-width: 768px) {
+  .documentos-dados {
+    padding: 1rem;
+  }
+
+  .documentos-dados__table table {
+    min-width: 920px;
+  }
+}
         

@@ -162,7 +162,7 @@
             <div *ngIf="!carregando && !lembretesFiltrados.length" class="muted">Nenhum lembrete encontrado.</div>
 
             <div class="lembrete-list" *ngIf="lembretesFiltrados.length">
-              <div class="lembrete-item" *ngFor="let lembrete of lembretesFiltrados" (dblclick)="selecionar(lembrete)">
+              <div class="lembrete-item" *ngFor="let lembrete of lembretesFiltrados" (click)="selecionar(lembrete)">
                 <div class="lembrete-info">
                   <p class="lembrete-linha">
                     <span class="lembrete-title">{{ lembrete.dataInicial | date: 'dd/MM/yyyy' }}</span>

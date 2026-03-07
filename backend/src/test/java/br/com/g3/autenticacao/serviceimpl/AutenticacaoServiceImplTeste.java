@@ -8,10 +8,13 @@ import static org.mockito.Mockito.when;
 import br.com.g3.autenticacao.dto.LoginRequest;
 import br.com.g3.autenticacao.dto.LoginResponse;
 import br.com.g3.autenticacao.repository.UsuarioRecuperacaoSenhaRepository;
+import br.com.g3.autenticacao.security.TokenAutenticacaoService;
+import br.com.g3.autenticacao.service.GoogleTokenService;
 import br.com.g3.shared.service.EmailService;
 import br.com.g3.usuario.domain.Permissao;
 import br.com.g3.usuario.domain.Usuario;
 import br.com.g3.usuario.repository.UsuarioRepository;
+import br.com.g3.usuario.service.PermissaoService;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,6 +39,15 @@ class AutenticacaoServiceImplTeste {
   @Mock
   private EmailService emailService;
 
+  @Mock
+  private GoogleTokenService googleTokenService;
+
+  @Mock
+  private PermissaoService permissaoService;
+
+  @Mock
+  private TokenAutenticacaoService tokenAutenticacaoService;
+
   @InjectMocks
   private AutenticacaoServiceImpl autenticacaoService;
 
@@ -59,6 +71,7 @@ class AutenticacaoServiceImplTeste {
     when(usuarioRepository.buscarPorNomeUsuarioIgnoreCase("usuario"))
         .thenReturn(Optional.of(usuario));
     when(passwordEncoder.matches("senha", "hash")).thenReturn(true);
+    when(tokenAutenticacaoService.gerarToken(usuario)).thenReturn("token-teste");
 
     LoginResponse response = autenticacaoService.autenticar(request);
 

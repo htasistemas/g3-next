@@ -394,7 +394,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let visita of filteredVisitas" (dblclick)="editarVisita(visita)">
+              <tr *ngFor="let visita of filteredVisitas" (click)="editarVisita(visita)">
                 <td>{{ visita.dataVisita }}</td>
                 <td>
                   <div class="strong">{{ visita.beneficiario }}</div>

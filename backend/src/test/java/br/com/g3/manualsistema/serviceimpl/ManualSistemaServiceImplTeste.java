@@ -2,6 +2,7 @@ package br.com.g3.manualsistema.serviceimpl;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -64,7 +65,7 @@ class ManualSistemaServiceImplTeste {
           mudanca.setId(1L);
           return mudanca;
         });
-    when(mudancaRepository.listarRecentes(any())).thenReturn(List.of(new ManualSistemaMudanca()));
+    when(mudancaRepository.listarRecentes(anyInt())).thenReturn(List.of(new ManualSistemaMudanca()));
     when(secaoRepository.buscarPorSlug(any())).thenReturn(Optional.empty());
 
     service.registrarMudanca(request);

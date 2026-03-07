@@ -67,10 +67,10 @@ public class TermoAutorizacaoServiceImpl implements TermoAutorizacaoService {
     StringBuilder sb = new StringBuilder();
     sb.append("<style>");
     sb.append(
-        "@page{size:A4;margin-top:42mm !important;margin-right:20mm !important;margin-bottom:20mm !important;margin-left:20mm !important;}");
-    sb.append(".header{padding-bottom:6px !important;margin-bottom:10px !important;}");
+        "@page{size:A4;margin-top:58mm !important;margin-right:20mm !important;margin-bottom:20mm !important;margin-left:20mm !important;}");
+    sb.append(".header{padding-bottom:6px !important;margin-bottom:12px !important;}");
     sb.append(".header__title{font-size:18px !important;line-height:1.15 !important;}");
-    sb.append(".content{margin-top:0 !important;padding:0 !important;}");
+    sb.append(".content{margin-top:10mm !important;padding:0 !important;}");
     sb.append("</style>");
     sb.append("<div style=\"font-size: 12px;\">");
     sb.append("<p>Pelo presente instrumento, eu, <strong>")
