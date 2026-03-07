@@ -5,14 +5,16 @@
     "ng": "ng",
     "start": "ng serve",
     "predev": "node ./scripts/ensure-deps.cjs",
-    "dev": "ng serve --host 0.0.0.0 --port 4200",
+    "dev": "vite --config vite.react.config.ts --host 0.0.0.0 --port 5173",
+    "angular:dev": "ng serve --host 0.0.0.0 --port 4200",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "react:dev": "vite --config vite.react.config.ts --host 0.0.0.0 --port 5173",
     "react:build": "vite build --config vite.react.config.ts",
     "react:preview": "vite preview --config vite.react.config.ts",
-    "react:typecheck": "tsc -p tsconfig.react.json --noEmit"
+    "react:typecheck": "tsc -p tsconfig.react.json --noEmit",
+    "test:text": "vitest run src/lib/__tests__/text-formatter.test.ts"
   },
   "prettier": {
     "printWidth": 100,

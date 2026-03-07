@@ -6,6 +6,17 @@ export type BeneficiarioStatus =
   | "EM_ANALISE"
   | "BLOQUEADO";
 
+export type DocumentoBeneficiario = {
+  id?: string;
+  nome: string;
+  numeroDocumento?: string;
+  nomeArquivo?: string;
+  caminhoArquivo?: string;
+  contentType?: string;
+  obrigatorio?: boolean;
+  ignorado?: boolean;
+};
+
 export type Beneficiario = {
   id_beneficiario?: string;
   codigo?: string;
@@ -85,6 +96,7 @@ export type Beneficiario = {
   aceite_lgpd: boolean;
   data_aceite_lgpd?: string;
   observacoes?: string;
+  documentos_obrigatorios?: DocumentoBeneficiario[];
   data_cadastro?: string;
   data_atualizacao?: string;
 };

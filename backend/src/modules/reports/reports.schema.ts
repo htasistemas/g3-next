@@ -41,3 +41,38 @@ export const termoAutorizacaoRequestSchema = z.object({
   representanteCargo: optionalString,
   issuedBy: optionalString
 });
+
+export const unidadeAssistencialRelacaoRequestSchema = z.object({
+  nome_fantasia: optionalString,
+  cnpj: optionalString,
+  cidade: optionalString,
+  unidade_principal: z.boolean().optional(),
+  usuarioEmissor: optionalString
+});
+
+export const profissionalRelacaoRequestSchema = z.object({
+  nome: optionalString,
+  categoria: optionalString,
+  status: optionalString,
+  cpf: optionalString,
+  vinculo: optionalString,
+  usuarioEmissor: optionalString
+});
+
+export const profissionalFichaRequestSchema = z.object({
+  profissionalId: z.string().trim().min(1, "profissionalId e obrigatorio."),
+  usuarioEmissor: optionalString
+});
+
+export const voluntarioRelacaoRequestSchema = z.object({
+  nome: optionalString,
+  cpf: optionalString,
+  status: optionalString,
+  email: optionalString,
+  usuarioEmissor: optionalString
+});
+
+export const voluntarioFichaRequestSchema = z.object({
+  voluntarioId: z.string().trim().min(1, "voluntarioId e obrigatorio."),
+  usuarioEmissor: optionalString
+});

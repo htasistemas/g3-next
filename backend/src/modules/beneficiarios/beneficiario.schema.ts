@@ -132,10 +132,12 @@ export const beneficiarioInputSchema = z.object({
       z.object({
         id: z.union([z.string(), z.number()]).optional(),
         nome: z.string().trim().min(1, "Nome do documento obrigatorio."),
+        numeroDocumento: optionalTrimmedString,
         nomeArquivo: optionalTrimmedString,
         caminhoArquivo: optionalTrimmedString,
         contentType: optionalTrimmedString,
         obrigatorio: optionalBoolean,
+        ignorado: optionalBoolean,
         conteudo: optionalTrimmedString
       })
     )

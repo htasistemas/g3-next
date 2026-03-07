@@ -25,6 +25,8 @@ model Endereco {
   atualizadoEm    DateTime               @map("atualizado_em")
   beneficiarios   CadastroBeneficiario[] @relation("BeneficiarioEndereco")
   unidades        UnidadeAssistencial[]  @relation("UnidadeEndereco")
+  profissionais   CadastroProfissional[] @relation("ProfissionalEndereco")
+  voluntarios     CadastroVoluntario[]   @relation("VoluntarioEndereco")
 
   @@map("endereco")
 }
@@ -263,20 +265,152 @@ model VinculoFamiliarMembro {
 }
 
 model UnidadeAssistencial {
-  id                   BigInt    @id @default(autoincrement())
-  nomeFantasia         String    @map("nome_fantasia") @db.VarChar(200)
-  razaoSocial          String?   @map("razao_social") @db.VarChar(200)
-  cnpj                 String?   @db.VarChar(20)
-  email                String?   @db.VarChar(150)
-  site                 String?   @db.VarChar(200)
-  telefone             String?   @db.VarChar(30)
-  unidadePrincipal     Boolean   @map("unidade_principal")
-  enderecoId           BigInt?   @map("endereco_id")
-  criadoEm             DateTime  @map("criado_em")
-  atualizadoEm         DateTime  @map("atualizado_em")
-  endereco             Endereco? @relation("UnidadeEndereco", fields: [enderecoId], references: [id], onDelete: SetNull)
+  id                   BigInt             @id @default(autoincrement())
+  nomeFantasia         String             @map("nome_fantasia") @db.VarChar(200)
+  razaoSocial          String?            @map("razao_social") @db.VarChar(200)
+  cnpj                 String?            @db.VarChar(20)
+  email                String?            @db.VarChar(150)
+  site                 String?            @db.VarChar(200)
+  telefone             String?            @db.VarChar(30)
+  horarioFuncionamento String?            @map("horario_funcionamento") @db.VarChar(120)
+  observacoes          String?
+  unidadePrincipal     Boolean            @default(false) @map("unidade_principal")
+  enderecoId           BigInt?            @map("endereco_id")
+  raioPontoMetros      Int                @default(100) @map("raio_ponto_metros")
+  accuracyMaxPontoMetros Int              @default(80) @map("accuracy_max_ponto_metros")
+  ipValidacaoPonto     String?            @map("ip_validacao_ponto") @db.VarChar(45)
+  ipsPublicosPonto     String?            @map("ips_publicos_ponto")
+  redesLocaisPonto     String?            @map("redes_locais_ponto")
+  modoValidacaoPonto   String             @default("IP_OU_REDE") @map("modo_validacao_ponto") @db.VarChar(30)
+  pingTimeoutMs        Int                @default(2000) @map("ping_timeout_ms")
+  criadoEm             DateTime           @map("criado_em")
+  atualizadoEm         DateTime           @map("atualizado_em")
+  endereco             Endereco?          @relation("UnidadeEndereco", fields: [enderecoId], references: [id], onDelete: SetNull)
+  imagemUnidade        ImagemUnidade?
+  diretoria            DiretoriaUnidade[]
+  salas                SalaUnidade[]
 
   @@map("unidade_assistencial")
+}
+
+model ImagemUnidade {
+  id               BigInt              @id @default(autoincrement())
+  unidadeId        BigInt              @unique @map("unidade_id")
+  logomarca        String?
+  logomarcaRelatorio String?           @map("logomarca_relatorio")
+  criadoEm         DateTime            @default(now()) @map("criado_em")
+  atualizadoEm     DateTime            @default(now()) @map("atualizado_em")
+  unidade          UnidadeAssistencial @relation(fields: [unidadeId], references: [id], onDelete: Cascade)
+
+  @@map("imagens_unidade")
+}
+
+model DiretoriaUnidade {
+  id            BigInt              @id @default(autoincrement())
+  unidadeId     BigInt              @map("unidade_id")
+  nomeCompleto  String              @map("nome_completo") @db.VarChar(200)
+  documento     String              @db.VarChar(60)
+  funcao        String              @db.VarChar(120)
+  mandatoInicio String?             @map("mandato_inicio") @db.VarChar(9)
+  mandatoFim    String?             @map("mandato_fim") @db.VarChar(9)
+  criadoEm      DateTime            @default(now()) @map("criado_em")
+  atualizadoEm  DateTime            @default(now()) @map("atualizado_em")
+  unidade       UnidadeAssistencial @relation(fields: [unidadeId], references: [id], onDelete: Cascade)
+
+  @@map("diretoria_unidade")
+}
+
+model SalaUnidade {
+  id          BigInt              @id @default(autoincrement())
+  unidadeId   BigInt              @map("unidade_id")
+  nome        String              @db.VarChar(120)
+  criadoEm    DateTime            @default(now()) @map("criado_em")
+  atualizadoEm DateTime           @default(now()) @map("atualizado_em")
+  unidade     UnidadeAssistencial @relation(fields: [unidadeId], references: [id], onDelete: Cascade)
+
+  @@map("salas_unidade")
+}
+
+model CadastroProfissional {
+  id                BigInt               @id @default(autoincrement())
+  nomeCompleto      String               @map("nome_completo") @db.VarChar(200)
+  cpf               String?              @db.VarChar(20)
+  nomeSocial        String?              @map("nome_social") @db.VarChar(200)
+  apelido           String?              @db.VarChar(120)
+  dataNascimento    DateTime?            @map("data_nascimento") @db.Date
+  foto3x4           String?              @map("foto_3x4")
+  sexoBiologico     String?              @map("sexo_biologico") @db.VarChar(60)
+  identidadeGenero  String?              @map("identidade_genero") @db.VarChar(120)
+  corRaca           String?              @map("cor_raca") @db.VarChar(60)
+  estadoCivil       String?              @map("estado_civil") @db.VarChar(60)
+  nacionalidade     String?              @db.VarChar(120)
+  naturalidadeCidade String?             @map("naturalidade_cidade") @db.VarChar(150)
+  naturalidadeUf    String?              @map("naturalidade_uf") @db.VarChar(2)
+  nomeMae           String?              @map("nome_mae") @db.VarChar(200)
+  nomePai           String?              @map("nome_pai") @db.VarChar(200)
+  vinculo           String?              @db.VarChar(40)
+  categoria         String               @db.VarChar(120)
+  registroConselho  String?              @map("registro_conselho") @db.VarChar(120)
+  especialidade     String?              @db.VarChar(120)
+  email             String?              @db.VarChar(150)
+  telefone          String?              @db.VarChar(30)
+  unidade           String?              @db.VarChar(200)
+  salaAtendimento   String?              @map("sala_atendimento") @db.VarChar(120)
+  cargaHoraria      Int?                 @map("carga_horaria")
+  disponibilidade   String?
+  canaisAtendimento String?              @map("canais_atendimento")
+  status            String?              @db.VarChar(60)
+  tags              String?
+  resumo            String?
+  observacoes       String?
+  enderecoId        BigInt?              @map("endereco_id")
+  criadoEm          DateTime             @map("criado_em")
+  atualizadoEm      DateTime             @map("atualizado_em")
+  endereco          Endereco?            @relation("ProfissionalEndereco", fields: [enderecoId], references: [id], onDelete: SetNull)
+  voluntarios       CadastroVoluntario[] @relation("VoluntarioProfissional")
+
+  @@map("cadastro_profissionais")
+}
+
+model CadastroVoluntario {
+  id                     BigInt               @id @default(autoincrement())
+  profissionalId         BigInt?              @map("profissional_id")
+  nomeCompleto           String               @map("nome_completo") @db.VarChar(200)
+  cpf                    String               @db.VarChar(20)
+  rg                     String?              @db.VarChar(20)
+  foto3x4                String?              @map("foto_3x4")
+  enderecoId             BigInt?              @map("endereco_id")
+  dataNascimento         DateTime?            @map("data_nascimento") @db.Date
+  genero                 String?              @db.VarChar(60)
+  profissao              String?              @db.VarChar(120)
+  motivacao              String?
+  telefone               String?              @db.VarChar(30)
+  email                  String               @db.VarChar(150)
+  cidade                 String?              @db.VarChar(150)
+  estado                 String?              @db.VarChar(2)
+  areaInteresse          String?              @map("area_interesse") @db.VarChar(150)
+  habilidades            String?
+  idiomas                String?
+  linkedin               String?              @db.VarChar(200)
+  status                 String?              @db.VarChar(60)
+  disponibilidadeDias    String?              @map("disponibilidade_dias")
+  disponibilidadePeriodos String?             @map("disponibilidade_periodos")
+  cargaHorariaSemanal    String?              @map("carga_horaria_semanal") @db.VarChar(50)
+  presencial             Boolean?             @default(false)
+  remoto                 Boolean?             @default(false)
+  inicioPrevisto         DateTime?            @map("inicio_previsto") @db.Date
+  observacoes            String?
+  documentoIdentificacao String?              @map("documento_identificacao")
+  comprovanteEndereco    String?              @map("comprovante_endereco")
+  aceiteVoluntariado     Boolean              @default(false) @map("aceite_voluntariado")
+  aceiteImagem           Boolean              @default(false) @map("aceite_imagem")
+  assinaturaDigital      String?              @map("assinatura_digital")
+  criadoEm               DateTime             @map("criado_em")
+  atualizadoEm           DateTime             @map("atualizado_em")
+  profissional           CadastroProfissional? @relation("VoluntarioProfissional", fields: [profissionalId], references: [id], onDelete: SetNull)
+  endereco               Endereco?            @relation("VoluntarioEndereco", fields: [enderecoId], references: [id], onDelete: SetNull)
+
+  @@map("cadastro_voluntario")
 }
 
 model Usuario {

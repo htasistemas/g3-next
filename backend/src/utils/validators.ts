@@ -29,3 +29,24 @@ export function isValidPhone(value?: string | null): boolean {
   const digits = normalizeDigits(value);
   return !!digits && (digits.length === 10 || digits.length === 11);
 }
+
+export function isValidCnpj(value?: string | null): boolean {
+  const cnpj = normalizeDigits(value);
+  if (!cnpj || cnpj.length !== 14 || /^(\d)\1{13}$/.test(cnpj)) {
+    return false;
+  }
+
+  const calculateDigit = (base: string, factors: number[]): number => {
+    const total = [...base].reduce((sum, char, index) => {
+      return sum + Number(char) * factors[index];
+    }, 0);
+
+    const remainder = total % 11;
+    return remainder < 2 ? 0 : 11 - remainder;
+  };
+
+  const digit1 = calculateDigit(cnpj.slice(0, 12), [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
+  const digit2 = calculateDigit(cnpj.slice(0, 13), [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
+
+  return digit1 === Number(cnpj[12]) && digit2 === Number(cnpj[13]);
+}

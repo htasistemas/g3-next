@@ -21,6 +21,12 @@ function responderRelatorio(
 }
 
 export class ReportsController {
+  async relacaoUnidadesAssistenciais(request: Request, response: Response) {
+    const formato = formatoRelatorioSchema.parse(request.query.formato);
+    const resultado = await service.gerarRelacaoUnidadesAssistenciais(request.body);
+    return responderRelatorio(response, resultado, formato);
+  }
+
   async relacaoBeneficiarios(request: Request, response: Response) {
     const formato = formatoRelatorioSchema.parse(request.query.formato);
     const resultado = await service.gerarRelacaoBeneficiarios(request.body);
@@ -36,6 +42,30 @@ export class ReportsController {
   async termoAutorizacao(request: Request, response: Response) {
     const formato = formatoRelatorioSchema.parse(request.query.formato);
     const resultado = await service.gerarTermoAutorizacao(request.body);
+    return responderRelatorio(response, resultado, formato);
+  }
+
+  async relacaoProfissionais(request: Request, response: Response) {
+    const formato = formatoRelatorioSchema.parse(request.query.formato);
+    const resultado = await service.gerarRelacaoProfissionais(request.body);
+    return responderRelatorio(response, resultado, formato);
+  }
+
+  async fichaProfissional(request: Request, response: Response) {
+    const formato = formatoRelatorioSchema.parse(request.query.formato);
+    const resultado = await service.gerarFichaProfissional(request.body);
+    return responderRelatorio(response, resultado, formato);
+  }
+
+  async relacaoVoluntarios(request: Request, response: Response) {
+    const formato = formatoRelatorioSchema.parse(request.query.formato);
+    const resultado = await service.gerarRelacaoVoluntarios(request.body);
+    return responderRelatorio(response, resultado, formato);
+  }
+
+  async fichaVoluntario(request: Request, response: Response) {
+    const formato = formatoRelatorioSchema.parse(request.query.formato);
+    const resultado = await service.gerarFichaVoluntario(request.body);
     return responderRelatorio(response, resultado, formato);
   }
 }

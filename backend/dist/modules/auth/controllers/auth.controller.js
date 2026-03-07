@@ -18,6 +18,11 @@ export class AuthController {
         response.cookie(AUTH_COOKIE_NAME, data.token, authCookieOptions());
         return response.json(data);
     }
+    async loginGoogle(request, response) {
+        const data = await authService.loginGoogle(request.body);
+        response.cookie(AUTH_COOKIE_NAME, data.token, authCookieOptions());
+        return response.json(data);
+    }
     async me(request, response) {
         if (!request.authUser?.id) {
             throw new AppError("Nao autenticado.", 401);

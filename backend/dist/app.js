@@ -9,7 +9,19 @@ import { notFoundHandler } from "./middlewares/not-found.js";
 import { appRoutes } from "./routes/index.js";
 export const app = express();
 app.use(helmet());
-app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
+app.use(cors({
+    origin: (requestOrigin, callback) => {
+        if (!requestOrigin) {
+            return callback(null, true);
+        }
+        if (env.CORS_ORIGINS.includes(requestOrigin)) {
+            return callback(null, true);
+        }
+        console.warn(`[cors] origem nao permitida: ${requestOrigin}`);
+        return callback(null, false);
+    },
+    credentials: true
+}));
 app.use(express.json({ limit: "10mb" }));
 app.use(cookieParser());
 app.use(morgan("dev"));

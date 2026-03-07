@@ -2,10 +2,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { beneficiariosService } from "@/services/beneficiarios.service";
 import type { Beneficiario, BeneficiarioFiltro } from "@/types/beneficiario";
 
-export function useBeneficiarios(filtros: BeneficiarioFiltro) {
+type UseBeneficiariosOptions = {
+  enabled?: boolean;
+};
+
+export function useBeneficiarios(filtros: BeneficiarioFiltro, options?: UseBeneficiariosOptions) {
   return useQuery({
     queryKey: ["beneficiarios", filtros],
-    queryFn: () => beneficiariosService.listar(filtros)
+    queryFn: () => beneficiariosService.listar(filtros),
+    enabled: options?.enabled ?? true
   });
 }
 

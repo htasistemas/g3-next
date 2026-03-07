@@ -24,3 +24,22 @@ export function validarCpf(valor?: string | null): boolean {
 export function validarCep(valor?: string | null): boolean {
   return somenteDigitos(valor).length === 8;
 }
+
+export function validarCnpj(valor?: string | null): boolean {
+  const cnpj = somenteDigitos(valor);
+  if (!cnpj || cnpj.length !== 14 || /^(\d)\1{13}$/.test(cnpj)) {
+    return false;
+  }
+
+  const calcularDigito = (base: string, fatores: number[]) => {
+    const total = [...base].reduce((soma, caractere, indice) => {
+      return soma + Number(caractere) * fatores[indice];
+    }, 0);
+    const resto = total % 11;
+    return resto < 2 ? 0 : 11 - resto;
+  };
+
+  const digito1 = calcularDigito(cnpj.slice(0, 12), [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
+  const digito2 = calcularDigito(cnpj.slice(0, 13), [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
+  return digito1 === Number(cnpj[12]) && digito2 === Number(cnpj[13]);
+}

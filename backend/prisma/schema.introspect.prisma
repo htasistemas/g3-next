@@ -1,0 +1,2539 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Endereco {
+  id                     BigInt                   @id @default(autoincrement())
+  cep                    String?                  @db.VarChar(20)
+  logradouro             String?                  @db.VarChar(200)
+  numero                 String?                  @db.VarChar(20)
+  bairro                 String?                  @db.VarChar(150)
+  cidade                 String?                  @db.VarChar(150)
+  estado                 String?                  @db.VarChar(2)
+  criadoEm               DateTime                 @default(now()) @map("criado_em") @db.Timestamp(6)
+  atualizadoEm           DateTime                 @default(now()) @map("atualizado_em") @db.Timestamp(6)
+  complemento            String?                  @db.VarChar(150)
+  pontoReferencia        String?                  @map("ponto_referencia") @db.VarChar(200)
+  zona                   String?                  @db.VarChar(60)
+  subzona                String?                  @db.VarChar(60)
+  latitude               Decimal?                 @db.Decimal(10, 6)
+  longitude              Decimal?                 @db.Decimal(10, 6)
+  beneficiarios          CadastroBeneficiario[]   @relation("BeneficiarioEndereco")
+  cadastro_profissionais cadastro_profissionais[]
+  cadastro_voluntario    cadastro_voluntario[]
+  unidades               UnidadeAssistencial[]    @relation("UnidadeEndereco")
+
+  @@map("endereco")
+}
+
+model CadastroBeneficiario {
+  id                             BigInt                           @id @default(autoincrement())
+  nomeCompleto                   String                           @map("nome_completo") @db.VarChar(200)
+  nomeSocial                     String?                          @map("nome_social") @db.VarChar(200)
+  apelido                        String?                          @db.VarChar(120)
+  dataNascimento                 DateTime                         @map("data_nascimento") @db.Date
+  sexoBiologico                  String?                          @map("sexo_biologico") @db.VarChar(60)
+  identidadeGenero               String?                          @map("identidade_genero") @db.VarChar(120)
+  corRaca                        String?                          @map("cor_raca") @db.VarChar(60)
+  estadoCivil                    String?                          @map("estado_civil") @db.VarChar(60)
+  nacionalidade                  String?                          @db.VarChar(120)
+  naturalidadeCidade             String?                          @map("naturalidade_cidade") @db.VarChar(150)
+  naturalidadeUf                 String?                          @map("naturalidade_uf") @db.VarChar(2)
+  nomeMae                        String                           @map("nome_mae") @db.VarChar(200)
+  nomePai                        String?                          @map("nome_pai") @db.VarChar(200)
+  criadoEm                       DateTime                         @default(now()) @map("criado_em") @db.Timestamp(6)
+  atualizadoEm                   DateTime                         @default(now()) @map("atualizado_em") @db.Timestamp(6)
+  enderecoId                     BigInt?                          @map("endereco_id")
+  foto3x4                        String?                          @map("foto_3x4")
+  codigo                         String?                          @db.VarChar(20)
+  status                         String?                          @db.VarChar(60)
+  optaReceberCestaBasica         Boolean?                         @map("opta_receber_cesta_basica")
+  aptoReceberCestaBasica         Boolean?                         @map("apto_receber_cesta_basica")
+  banco_empregos_candidatos      banco_empregos_candidatos[]
+  banco_empregos_encaminhamentos banco_empregos_encaminhamentos[]
+  beneficios                     BeneficiosBeneficiario[]
+  biblioteca_emprestimos         biblioteca_emprestimos[]
+  endereco                       Endereco?                        @relation("BeneficiarioEndereco", fields: [enderecoId], references: [id], onUpdate: NoAction)
+  contatos                       ContatoBeneficiario[]
+  doacao_planejada               doacao_planejada[]
+  doacao_realizada               doacao_realizada[]
+  documentos                     Documento[]
+  escolaridades                  EscolaridadeBeneficiario[]
+  observacoes                    ObservacoesBeneficiario[]
+  prontuario_registros           prontuario_registros[]
+  saudes                         SaudeBeneficiario[]
+  senha_fila                     senha_fila[]
+  situacoesSociais               SituacaoSocial[]
+  familiasReferencia             VinculoFamiliar[]                @relation("ReferenciaFamiliar")
+  familiasMembro                 VinculoFamiliarMembro[]          @relation("FamiliaMembroBeneficiario")
+  visita_domiciliar              visita_domiciliar[]
+
+  @@index([codigo])
+  @@index([nomeCompleto], map: "cadastro_beneficiario_nome_idx")
+  @@index([status])
+  @@map("cadastro_beneficiario")
+}
+
+model ContatoBeneficiario {
+  id                        BigInt               @id @default(autoincrement())
+  beneficiarioId            BigInt               @map("beneficiario_id")
+  telefonePrincipal         String?              @map("telefone_principal") @db.VarChar(30)
+  telefonePrincipalWhatsapp Boolean?             @default(false) @map("telefone_principal_whatsapp")
+  telefoneSecundario        String?              @map("telefone_secundario") @db.VarChar(30)
+  telefoneRecadoNome        String?              @map("telefone_recado_nome") @db.VarChar(150)
+  telefoneRecadoNumero      String?              @map("telefone_recado_numero") @db.VarChar(30)
+  email                     String?              @db.VarChar(150)
+  permiteContatoTel         Boolean?             @default(false) @map("permite_contato_tel")
+  permiteContatoWhatsapp    Boolean?             @default(false) @map("permite_contato_whatsapp")
+  permiteContatoSms         Boolean?             @default(false) @map("permite_contato_sms")
+  permiteContatoEmail       Boolean?             @default(false) @map("permite_contato_email")
+  horarioPreferencial       String?              @map("horario_preferencial_contato") @db.VarChar(80)
+  criadoEm                  DateTime             @default(now()) @map("criado_em") @db.Timestamp(6)
+  atualizadoEm              DateTime             @default(now()) @map("atualizado_em") @db.Timestamp(6)
+  beneficiario              CadastroBeneficiario @relation(fields: [beneficiarioId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@map("contato_beneficiario")
+}
+
+model Documento {
+  id              BigInt               @id @default(autoincrement())
+  beneficiarioId  BigInt               @map("beneficiario_id")
+  tipoDocumento   String?              @map("tipo_documento") @db.VarChar(80)
+  numeroDocumento String?              @map("numero_documento") @db.VarChar(80)
+  orgaoEmissor    String?              @map("orgao_emissor") @db.VarChar(120)
+  ufEmissor       String?              @map("uf_emissor") @db.VarChar(2)
+  dataEmissao     DateTime?            @map("data_emissao") @db.Date
+  livro           String?              @db.VarChar(40)
+  folha           String?              @db.VarChar(40)
+  termo           String?              @db.VarChar(60)
+  cartorio        String?              @db.VarChar(150)
+  municipio       String?              @db.VarChar(150)
+  uf              String?              @db.VarChar(2)
+  nomeDocumento   String?              @map("nome_documento") @db.VarChar(200)
+  nomeArquivo     String?              @map("nome_arquivo") @db.VarChar(200)
+  caminhoArquivo  String?              @map("caminho_arquivo") @db.VarChar(400)
+  contentType     String?              @map("content_type") @db.VarChar(120)
+  obrigatorio     Boolean?             @default(false)
+  criadoEm        DateTime             @default(now()) @map("criado_em") @db.Timestamp(6)
+  atualizadoEm    DateTime             @default(now()) @map("atualizado_em") @db.Timestamp(6)
+  beneficiario    CadastroBeneficiario @relation(fields: [beneficiarioId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([beneficiarioId, tipoDocumento], map: "documentos_beneficiario_tipo_idx")
+  @@map("documentos")
+}
+
+model SituacaoSocial {
+  id                      BigInt               @id @default(autoincrement())
+  beneficiarioId          BigInt               @map("beneficiario_id")
+  moraComFamilia          Boolean?             @default(false) @map("mora_com_familia")
+  responsavelLegal        Boolean?             @default(false) @map("responsavel_legal")
+  vinculoFamiliar         String?              @map("vinculo_familiar") @db.VarChar(150)
+  situacaoVulnerabilidade String?              @map("situacao_vulnerabilidade")
+  composicaoFamiliar      String?              @map("composicao_familiar")
+  criancasAdolescentes    Int?                 @map("criancas_adolescentes")
+  idosos                  Int?
+  acompanhamentoCras      Boolean?             @default(false) @map("acompanhamento_cras")
+  acompanhamentoSaude     Boolean?             @default(false) @map("acompanhamento_saude")
+  participaComunidade     String?              @map("participa_comunidade") @db.VarChar(200)
+  redeApoio               String?              @map("rede_apoio")
+  criadoEm                DateTime             @default(now()) @map("criado_em") @db.Timestamp(6)
+  atualizadoEm            DateTime             @default(now()) @map("atualizado_em") @db.Timestamp(6)
+  beneficiario            CadastroBeneficiario @relation(fields: [beneficiarioId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@map("situacao_social")
+}
+
+model EscolaridadeBeneficiario {
+  id                BigInt               @id @default(autoincrement())
+  beneficiarioId    BigInt               @map("beneficiario_id")
+  sabeLerEscrever   Boolean?             @default(false) @map("sabe_ler_escrever")
+  nivelEscolaridade String?              @map("nivel_escolaridade") @db.VarChar(150)
+  estudaAtualmente  Boolean?             @default(false) @map("estuda_atualmente")
+  ocupacao          String?              @db.VarChar(150)
+  situacaoTrabalho  String?              @map("situacao_trabalho") @db.VarChar(150)
+  localTrabalho     String?              @map("local_trabalho") @db.VarChar(150)
+  rendaMensal       String?              @map("renda_mensal") @db.VarChar(60)
+  fonteRenda        String?              @map("fonte_renda") @db.VarChar(150)
+  criadoEm          DateTime             @default(now()) @map("criado_em") @db.Timestamp(6)
+  atualizadoEm      DateTime             @default(now()) @map("atualizado_em") @db.Timestamp(6)
+  beneficiario      CadastroBeneficiario @relation(fields: [beneficiarioId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@map("escolaridade_beneficiario")
+}
+
+model SaudeBeneficiario {
+  id                     BigInt               @id @default(autoincrement())
+  beneficiarioId         BigInt               @map("beneficiario_id")
+  possuiDeficiencia      Boolean?             @default(false) @map("possui_deficiencia")
+  tipoDeficiencia        String?              @map("tipo_deficiencia") @db.VarChar(200)
+  cidPrincipal           String?              @map("cid_principal") @db.VarChar(60)
+  usaMedicacaoContinua   Boolean?             @default(false) @map("usa_medicacao_continua")
+  descricaoMedicacao     String?              @map("descricao_medicacao")
+  servicoSaudeReferencia String?              @map("servico_saude_referencia") @db.VarChar(200)
+  criadoEm               DateTime             @default(now()) @map("criado_em") @db.Timestamp(6)
+  atualizadoEm           DateTime             @default(now()) @map("atualizado_em") @db.Timestamp(6)
+  beneficiario           CadastroBeneficiario @relation(fields: [beneficiarioId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@map("saude_beneficiario")
+}
+
+model BeneficiosBeneficiario {
+  id                   BigInt               @id @default(autoincrement())
+  beneficiarioId       BigInt               @map("beneficiario_id")
+  recebeBeneficio      Boolean?             @default(false) @map("recebe_beneficio")
+  beneficiosDescricao  String?              @map("beneficios_descricao")
+  valorTotalBeneficios String?              @map("valor_total_beneficios") @db.VarChar(60)
+  beneficiosRecebidos  String?              @map("beneficios_recebidos")
+  criadoEm             DateTime             @default(now()) @map("criado_em") @db.Timestamp(6)
+  atualizadoEm         DateTime             @default(now()) @map("atualizado_em") @db.Timestamp(6)
+  beneficiario         CadastroBeneficiario @relation(fields: [beneficiarioId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@map("beneficios_beneficiario")
+}
+
+model ObservacoesBeneficiario {
+  id             BigInt               @id @default(autoincrement())
+  beneficiarioId BigInt               @map("beneficiario_id")
+  aceiteLgpd     Boolean?             @default(false) @map("aceite_lgpd")
+  dataAceiteLgpd DateTime?            @map("data_aceite_lgpd") @db.Date
+  observacoes    String?
+  criadoEm       DateTime             @default(now()) @map("criado_em") @db.Timestamp(6)
+  atualizadoEm   DateTime             @default(now()) @map("atualizado_em") @db.Timestamp(6)
+  beneficiario   CadastroBeneficiario @relation(fields: [beneficiarioId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@map("observacoes_beneficiario")
+}
+
+model VinculoFamiliar {
+  id                           BigInt                  @id @default(autoincrement())
+  nomeFamilia                  String                  @map("nome_familia") @db.VarChar(200)
+  idReferenciaFamiliar         BigInt?                 @map("id_referencia_familiar")
+  status                       String                  @default("ATIVO") @db.VarChar(60)
+  cep                          String?                 @db.VarChar(20)
+  logradouro                   String?                 @db.VarChar(200)
+  numero                       String?                 @db.VarChar(20)
+  complemento                  String?                 @db.VarChar(150)
+  bairro                       String?                 @db.VarChar(150)
+  pontoReferencia              String?                 @map("ponto_referencia") @db.VarChar(200)
+  municipio                    String?                 @db.VarChar(150)
+  uf                           String?                 @db.VarChar(2)
+  zona                         String?                 @db.VarChar(60)
+  situacaoImovel               String?                 @map("situacao_imovel") @db.VarChar(120)
+  tipoMoradia                  String?                 @map("tipo_moradia") @db.VarChar(120)
+  aguaEncanada                 Boolean?                @default(false) @map("agua_encanada")
+  esgotoTipo                   String?                 @map("esgoto_tipo") @db.VarChar(120)
+  coletaLixo                   String?                 @map("coleta_lixo") @db.VarChar(120)
+  energiaEletrica              Boolean?                @default(false) @map("energia_eletrica")
+  internet                     Boolean?                @default(false)
+  arranjoFamiliar              String?                 @map("arranjo_familiar") @db.VarChar(200)
+  qtdMembros                   Int?                    @map("qtd_membros")
+  qtdCriancas                  Int?                    @map("qtd_criancas")
+  qtdAdolescentes              Int?                    @map("qtd_adolescentes")
+  qtdIdosos                    Int?                    @map("qtd_idosos")
+  qtdPessoasDeficiencia        Int?                    @map("qtd_pessoas_deficiencia")
+  rendaFamiliarTotal           String?                 @map("renda_familiar_total") @db.VarChar(60)
+  rendaPerCapita               String?                 @map("renda_per_capita") @db.VarChar(60)
+  faixaRendaPerCapita          String?                 @map("faixa_renda_per_capita") @db.VarChar(120)
+  principaisFontesRenda        String?                 @map("principais_fontes_renda")
+  situacaoInsegurancaAlimentar String?                 @map("situacao_inseguranca_alimentar")
+  possuiDividasRelevantes      Boolean?                @default(false) @map("possui_dividas_relevantes")
+  descricaoDividas             String?                 @map("descricao_dividas")
+  vulnerabilidadesFamilia      String?                 @map("vulnerabilidades_familia")
+  servicosAcompanhamento       String?                 @map("servicos_acompanhamento")
+  tecnicoResponsavel           String?                 @map("tecnico_responsavel") @db.VarChar(150)
+  periodicidadeAtendimento     String?                 @map("periodicidade_atendimento") @db.VarChar(120)
+  proximaVisitaPrevista        DateTime?               @map("proxima_visita_prevista") @db.Date
+  observacoes                  String?
+  criadoEm                     DateTime                @default(now()) @map("criado_em") @db.Timestamp(6)
+  atualizadoEm                 DateTime                @default(now()) @map("atualizado_em") @db.Timestamp(6)
+  doacao_planejada             doacao_planejada[]
+  doacao_realizada             doacao_realizada[]
+  prontuario_registros         prontuario_registros[]
+  referenciaFamiliar           CadastroBeneficiario?   @relation("ReferenciaFamiliar", fields: [idReferenciaFamiliar], references: [id], onUpdate: NoAction)
+  membros                      VinculoFamiliarMembro[]
+
+  @@index([nomeFamilia], map: "vinculo_familiar_nome_idx")
+  @@map("vinculo_familiar")
+}
+
+model VinculoFamiliarMembro {
+  id                  BigInt               @id @default(autoincrement())
+  vinculoFamiliarId   BigInt               @map("vinculo_familiar_id")
+  beneficiarioId      BigInt               @map("beneficiario_id")
+  parentesco          String?              @db.VarChar(120)
+  responsavelFamiliar Boolean?             @default(false) @map("responsavel_familiar")
+  contribuiRenda      Boolean?             @default(false) @map("contribui_renda")
+  rendaIndividual     String?              @map("renda_individual") @db.VarChar(60)
+  participaServicos   Boolean?             @default(false) @map("participa_servicos")
+  observacoes         String?
+  usaEnderecoFamilia  Boolean?             @default(true) @map("usa_endereco_familia")
+  criadoEm            DateTime             @default(now()) @map("criado_em") @db.Timestamp(6)
+  atualizadoEm        DateTime             @default(now()) @map("atualizado_em") @db.Timestamp(6)
+  beneficiario        CadastroBeneficiario @relation("FamiliaMembroBeneficiario", fields: [beneficiarioId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  vinculoFamiliar     VinculoFamiliar      @relation(fields: [vinculoFamiliarId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@map("vinculo_familiar_membro")
+}
+
+model UnidadeAssistencial {
+  id                        BigInt                 @id @default(autoincrement())
+  nomeFantasia              String                 @map("nome_fantasia") @db.VarChar(200)
+  razaoSocial               String?                @map("razao_social") @db.VarChar(200)
+  cnpj                      String?                @db.VarChar(20)
+  email                     String?                @db.VarChar(150)
+  telefone                  String?                @db.VarChar(30)
+  horario_funcionamento     String?                @db.VarChar(120)
+  observacoes               String?
+  criadoEm                  DateTime               @default(now()) @map("criado_em") @db.Timestamp(6)
+  atualizadoEm              DateTime               @default(now()) @map("atualizado_em") @db.Timestamp(6)
+  unidadePrincipal          Boolean                @default(false) @map("unidade_principal")
+  enderecoId                BigInt?                @map("endereco_id")
+  site                      String?                @db.VarChar(200)
+  raio_ponto_metros         Int                    @default(100)
+  accuracy_max_ponto_metros Int                    @default(80)
+  ip_validacao_ponto        String?                @db.VarChar(45)
+  ping_timeout_ms           Int                    @default(2000)
+  ips_publicos_ponto        String?
+  redes_locais_ponto        String?
+  modo_validacao_ponto      String                 @default("IP_OU_REDE") @db.VarChar(30)
+  diretoria_unidade         diretoria_unidade[]
+  emprestimos_eventos       emprestimos_eventos[]
+  fotos_eventos             fotos_eventos[]
+  imagens_unidade           imagens_unidade?
+  oficios                   oficios[]
+  prontuario_registros      prontuario_registros[]
+  salas_unidade             salas_unidade[]
+  senha_chamada             senha_chamada[]
+  senha_config              senha_config[]
+  senha_fila                senha_fila[]
+  transparencia             transparencia[]
+  endereco                  Endereco?              @relation("UnidadeEndereco", fields: [enderecoId], references: [id], onUpdate: NoAction)
+
+  @@map("unidade_assistencial")
+}
+
+model Usuario {
+  id                                                                        BigInt                              @id @default(autoincrement())
+  nomeUsuario                                                               String                              @unique(map: "usuarios_nome_usuario_unique") @map("nome_usuario") @db.VarChar(120)
+  senhaHash                                                                 String                              @map("senha_hash") @db.VarChar(255)
+  criadoEm                                                                  DateTime                            @default(now()) @map("criado_em") @db.Timestamp(6)
+  atualizadoEm                                                              DateTime                            @default(now()) @map("atualizado_em") @db.Timestamp(6)
+  nome                                                                      String?                             @db.VarChar(150)
+  email                                                                     String?                             @unique(map: "usuarios_email_unique") @db.VarChar(150)
+  googleId                                                                  String?                             @map("google_id") @db.VarChar(80)
+  fotoUrl                                                                   String?                             @map("foto_url") @db.VarChar(255)
+  horario_entrada_1                                                         DateTime?                           @db.Time(6)
+  horario_saida_1                                                           DateTime?                           @db.Time(6)
+  horario_entrada_2                                                         DateTime?                           @db.Time(6)
+  horario_saida_2                                                           DateTime?                           @db.Time(6)
+  horario_segunda_entrada_1                                                 DateTime?                           @db.Time(6)
+  horario_segunda_saida_1                                                   DateTime?                           @db.Time(6)
+  horario_segunda_entrada_2                                                 DateTime?                           @db.Time(6)
+  horario_segunda_saida_2                                                   DateTime?                           @db.Time(6)
+  horario_terca_entrada_1                                                   DateTime?                           @db.Time(6)
+  horario_terca_saida_1                                                     DateTime?                           @db.Time(6)
+  horario_terca_entrada_2                                                   DateTime?                           @db.Time(6)
+  horario_terca_saida_2                                                     DateTime?                           @db.Time(6)
+  horario_quarta_entrada_1                                                  DateTime?                           @db.Time(6)
+  horario_quarta_saida_1                                                    DateTime?                           @db.Time(6)
+  horario_quarta_entrada_2                                                  DateTime?                           @db.Time(6)
+  horario_quarta_saida_2                                                    DateTime?                           @db.Time(6)
+  horario_quinta_entrada_1                                                  DateTime?                           @db.Time(6)
+  horario_quinta_saida_1                                                    DateTime?                           @db.Time(6)
+  horario_quinta_entrada_2                                                  DateTime?                           @db.Time(6)
+  horario_quinta_saida_2                                                    DateTime?                           @db.Time(6)
+  horario_sexta_entrada_1                                                   DateTime?                           @db.Time(6)
+  horario_sexta_saida_1                                                     DateTime?                           @db.Time(6)
+  horario_sexta_entrada_2                                                   DateTime?                           @db.Time(6)
+  horario_sexta_saida_2                                                     DateTime?                           @db.Time(6)
+  horario_sabado_entrada_1                                                  DateTime?                           @db.Time(6)
+  horario_sabado_saida_1                                                    DateTime?                           @db.Time(6)
+  horario_sabado_entrada_2                                                  DateTime?                           @db.Time(6)
+  horario_sabado_saida_2                                                    DateTime?                           @db.Time(6)
+  horario_domingo_entrada_1                                                 DateTime?                           @db.Time(6)
+  horario_domingo_saida_1                                                   DateTime?                           @db.Time(6)
+  horario_domingo_entrada_2                                                 DateTime?                           @db.Time(6)
+  horario_domingo_saida_2                                                   DateTime?                           @db.Time(6)
+  auditoria_evento                                                          auditoria_evento[]
+  biblioteca_emprestimos                                                    biblioteca_emprestimos[]
+  chamado_tecnico_chamado_tecnico_criado_por_usuario_idTousuarios           chamado_tecnico[]                   @relation("chamado_tecnico_criado_por_usuario_idTousuarios")
+  chamado_tecnico_chamado_tecnico_respondido_por_usuario_idTousuarios       chamado_tecnico[]                   @relation("chamado_tecnico_respondido_por_usuario_idTousuarios")
+  chamado_tecnico_chamado_tecnico_responsavel_usuario_idTousuarios          chamado_tecnico[]                   @relation("chamado_tecnico_responsavel_usuario_idTousuarios")
+  chamado_tecnico_acao_chamado_tecnico_acao_criado_por_usuario_idTousuarios chamado_tecnico_acao[]              @relation("chamado_tecnico_acao_criado_por_usuario_idTousuarios")
+  chamado_tecnico_acao_chamado_tecnico_acao_de_responsavel_idTousuarios     chamado_tecnico_acao[]              @relation("chamado_tecnico_acao_de_responsavel_idTousuarios")
+  chamado_tecnico_acao_chamado_tecnico_acao_para_responsavel_idTousuarios   chamado_tecnico_acao[]              @relation("chamado_tecnico_acao_para_responsavel_idTousuarios")
+  chamado_tecnico_anexo                                                     chamado_tecnico_anexo[]
+  chamado_tecnico_auditoria_vinculo                                         chamado_tecnico_auditoria_vinculo[]
+  chamado_tecnico_comentario                                                chamado_tecnico_comentario[]
+  emprestimos_eventos                                                       emprestimos_eventos[]
+  emprestimos_eventos_movimentacoes                                         emprestimos_eventos_movimentacoes[]
+  fotos_eventos                                                             fotos_eventos[]
+  oficios                                                                   oficios[]
+  prontuario_registros_prontuario_registros_atualizado_porTousuarios        prontuario_registros[]              @relation("prontuario_registros_atualizado_porTousuarios")
+  prontuario_registros_prontuario_registros_criado_porTousuarios            prontuario_registros[]              @relation("prontuario_registros_criado_porTousuarios")
+  rh_arquivo                                                                rh_arquivo[]
+  rh_auditoria_contratacao                                                  rh_auditoria_contratacao[]
+  rh_documento_item                                                         rh_documento_item[]
+  rh_entrevista                                                             rh_entrevista[]
+  rh_ponto_auditoria                                                        rh_ponto_auditoria[]
+  rh_ponto_dia                                                              rh_ponto_dia[]
+  rh_processo_contratacao_rh_processo_contratacao_gestor_idTousuarios       rh_processo_contratacao[]           @relation("rh_processo_contratacao_gestor_idTousuarios")
+  rh_processo_contratacao_rh_processo_contratacao_responsavel_idTousuarios  rh_processo_contratacao[]           @relation("rh_processo_contratacao_responsavel_idTousuarios")
+  senha_chamada                                                             senha_chamada[]
+  senha_fila                                                                senha_fila[]
+  permissoes                                                                UsuarioPermissao[]
+  usuario_recuperacao_senha                                                 usuario_recuperacao_senha[]
+
+  @@map("usuarios")
+}
+
+model Permissao {
+  id       BigInt             @id @default(autoincrement())
+  nome     String             @unique @db.VarChar(60)
+  usuarios UsuarioPermissao[]
+
+  @@map("permissao")
+}
+
+model UsuarioPermissao {
+  usuarioId   BigInt    @map("usuario_id")
+  permissaoId BigInt    @map("permissao_id")
+  permissao   Permissao @relation(fields: [permissaoId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuario     Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([usuarioId, permissaoId])
+  @@map("usuario_permissao")
+}
+
+model alertas_sistema {
+  id               BigInt   @id @default(autoincrement())
+  tipo_alerta      String   @db.VarChar(80)
+  frequencia_envio String   @db.VarChar(30)
+  ativo            Boolean  @default(true)
+  criado_em        DateTime @default(now()) @db.Timestamp(6)
+  atualizado_em    DateTime @default(now()) @db.Timestamp(6)
+}
+
+model almoxarifado_item {
+  id                                                                                 BigInt                      @id @default(autoincrement())
+  codigo                                                                             String                      @unique @db.VarChar(30)
+  descricao                                                                          String                      @db.VarChar(200)
+  categoria                                                                          String                      @db.VarChar(120)
+  unidade                                                                            String                      @db.VarChar(60)
+  localizacao                                                                        String?                     @db.VarChar(120)
+  localizacao_interna                                                                String?                     @db.VarChar(120)
+  estoque_atual                                                                      Int                         @default(0)
+  estoque_minimo                                                                     Int                         @default(0)
+  valor_unitario                                                                     Decimal                     @default(0) @db.Decimal(12, 2)
+  situacao                                                                           String                      @db.VarChar(20)
+  validade                                                                           DateTime?                   @db.Date
+  observacoes                                                                        String?
+  criado_em                                                                          DateTime                    @default(now()) @db.Timestamp(6)
+  atualizado_em                                                                      DateTime                    @default(now()) @db.Timestamp(6)
+  codigo_barras                                                                      String?                     @unique(map: "almoxarifado_item_codigo_barras_unique") @db.VarChar(60)
+  ignorar_validade                                                                   Boolean?                    @default(false)
+  is_kit                                                                             Boolean                     @default(false)
+  almoxarifado_movimentacao                                                          almoxarifado_movimentacao[]
+  doacao_planejada                                                                   doacao_planejada[]
+  doacao_realizada_item                                                              doacao_realizada_item[]
+  produtos_kit_composicao_produtos_kit_composicao_produto_item_idToalmoxarifado_item produtos_kit_composicao[]   @relation("produtos_kit_composicao_produto_item_idToalmoxarifado_item")
+  produtos_kit_composicao_produtos_kit_composicao_produto_kit_idToalmoxarifado_item  produtos_kit_composicao[]   @relation("produtos_kit_composicao_produto_kit_idToalmoxarifado_item")
+}
+
+model almoxarifado_movimentacao {
+  id                                                                                                     BigInt                     @id @default(autoincrement())
+  item_id                                                                                                BigInt
+  data_movimentacao                                                                                      DateTime                   @db.Date
+  tipo                                                                                                   String                     @db.VarChar(20)
+  quantidade                                                                                             Int
+  saldo_apos                                                                                             Int
+  referencia                                                                                             String?                    @db.VarChar(150)
+  responsavel                                                                                            String?                    @db.VarChar(150)
+  observacoes                                                                                            String?
+  direcao_ajuste                                                                                         String?                    @db.VarChar(20)
+  criado_em                                                                                              DateTime                   @default(now()) @db.Timestamp(6)
+  doacao_id                                                                                              BigInt?
+  almoxarifado_item                                                                                      almoxarifado_item          @relation(fields: [item_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  movimentacao_vinculo_kit_movimentacao_vinculo_kit_movimentacao_gerada_idToalmoxarifado_movimentacao    movimentacao_vinculo_kit[] @relation("movimentacao_vinculo_kit_movimentacao_gerada_idToalmoxarifado_movimentacao")
+  movimentacao_vinculo_kit_movimentacao_vinculo_kit_movimentacao_principal_idToalmoxarifado_movimentacao movimentacao_vinculo_kit[] @relation("movimentacao_vinculo_kit_movimentacao_principal_idToalmoxarifado_movimentacao")
+}
+
+model auditoria_evento {
+  id                                String                              @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  usuario_id                        BigInt?
+  acao                              String                              @db.VarChar(120)
+  entidade                          String                              @db.VarChar(120)
+  entidade_id                       String?                             @db.VarChar(120)
+  dados_json                        Json?
+  criado_em                         DateTime                            @default(now()) @db.Timestamp(6)
+  usuarios                          Usuario?                            @relation(fields: [usuario_id], references: [id], onUpdate: NoAction)
+  chamado_tecnico_auditoria_vinculo chamado_tecnico_auditoria_vinculo[]
+
+  @@index([criado_em])
+  @@index([entidade])
+  @@index([usuario_id], map: "auditoria_evento_usuario_idx")
+}
+
+model autorizacao_compras {
+  id                                   BigInt                                 @id @default(autoincrement())
+  titulo                               String                                 @db.VarChar(255)
+  tipo                                 String                                 @db.VarChar(30)
+  area                                 String?                                @db.VarChar(150)
+  responsavel                          String?                                @db.VarChar(150)
+  data_prevista                        DateTime?                              @db.Date
+  valor                                Decimal?                               @db.Decimal(14, 2)
+  quantidade_itens                     Int                                    @default(1)
+  justificativa                        String?
+  centro_custo                         String?                                @db.VarChar(60)
+  prioridade                           String                                 @default("normal") @db.VarChar(20)
+  status                               String                                 @db.VarChar(40)
+  aprovador                            String?                                @db.VarChar(150)
+  decisao                              String?                                @db.VarChar(30)
+  observacoes_aprovacao                String?
+  data_aprovacao                       DateTime?                              @db.Date
+  dispensar_cotacao                    Boolean                                @default(false)
+  motivo_dispensa                      String?
+  vencedor                             String?                                @db.VarChar(255)
+  registro_patrimonio                  Boolean                                @default(false)
+  registro_almoxarifado                Boolean                                @default(false)
+  numero_reserva                       String?                                @db.VarChar(60)
+  autorizacao_pagamento_numero         String?                                @db.VarChar(100)
+  autorizacao_pagamento_autor          String?                                @db.VarChar(150)
+  autorizacao_pagamento_data           DateTime?                              @db.Date
+  autorizacao_pagamento_observacoes    String?
+  criado_em                            DateTime                               @default(now()) @db.Timestamp(6)
+  atualizado_em                        DateTime                               @default(now()) @db.Timestamp(6)
+  numero_termo                         String?                                @db.VarChar(20)
+  autorizacao_compras_cotacoes         autorizacao_compras_cotacoes[]
+  autorizacao_compras_reserva_bancaria autorizacao_compras_reserva_bancaria[]
+  lancamento_financeiro                lancamento_financeiro[]
+}
+
+model autorizacao_compras_cotacoes {
+  id                        BigInt              @id @default(autoincrement())
+  autorizacao_compra_id     BigInt
+  fornecedor                String              @db.VarChar(200)
+  razao_social              String?             @db.VarChar(200)
+  cnpj                      String?             @db.VarChar(20)
+  valor                     Decimal             @db.Decimal(14, 2)
+  prazo_entrega             DateTime?           @db.Date
+  validade                  DateTime?           @db.Date
+  conformidade              String?             @db.VarChar(30)
+  observacoes               String?
+  orcamento_fisico_nome     String?             @db.VarChar(255)
+  orcamento_fisico_tipo     String?             @db.VarChar(100)
+  orcamento_fisico_conteudo String?
+  criado_em                 DateTime            @default(now()) @db.Timestamp(6)
+  cartao_cnpj_url           String?             @db.VarChar(400)
+  cartao_cnpj_nome          String?             @db.VarChar(255)
+  cartao_cnpj_tipo          String?             @db.VarChar(100)
+  cartao_cnpj_conteudo      String?
+  autorizacao_compras       autorizacao_compras @relation(fields: [autorizacao_compra_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model autorizacao_compras_reserva_bancaria {
+  id                    BigInt              @id @default(autoincrement())
+  autorizacao_compra_id BigInt
+  conta_bancaria_id     BigInt
+  valor                 Decimal             @db.Decimal(14, 2)
+  criado_em             DateTime            @default(now()) @db.Timestamp(6)
+  autorizacao_compras   autorizacao_compras @relation(fields: [autorizacao_compra_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  conta_bancaria        conta_bancaria      @relation(fields: [conta_bancaria_id], references: [id], onUpdate: NoAction)
+}
+
+model banco_empregos {
+  id                             BigInt                           @id @default(autoincrement())
+  titulo                         String                           @db.VarChar(200)
+  area                           String?                          @db.VarChar(120)
+  tipo                           String?                          @db.VarChar(80)
+  nivel                          String?                          @db.VarChar(80)
+  modelo                         String?                          @db.VarChar(80)
+  status                         String                           @db.VarChar(20)
+  salario                        String?                          @db.VarChar(80)
+  beneficios                     String?
+  nome_empresa                   String?                          @db.VarChar(200)
+  responsavel                    String?                          @db.VarChar(150)
+  telefone                       String?                          @db.VarChar(60)
+  email                          String?                          @db.VarChar(150)
+  endereco                       String?                          @db.VarChar(200)
+  bairro                         String?                          @db.VarChar(120)
+  cidade                         String?                          @db.VarChar(120)
+  uf                             String?                          @db.VarChar(10)
+  escolaridade                   String?                          @db.VarChar(120)
+  experiencia                    String?                          @db.VarChar(200)
+  habilidades                    String?
+  descricao                      String?
+  criado_em                      DateTime                         @default(now()) @db.Timestamp(6)
+  atualizado_em                  DateTime                         @default(now()) @db.Timestamp(6)
+  data_abertura                  DateTime?                        @db.Date
+  data_encerramento              DateTime?                        @db.Date
+  tipo_contrato                  String?                          @db.VarChar(80)
+  carga_horaria                  String?                          @db.VarChar(80)
+  cnpj                           String?                          @db.VarChar(20)
+  requisitos                     String?
+  observacoes                    String?
+  banco_empregos_candidatos      banco_empregos_candidatos[]
+  banco_empregos_encaminhamentos banco_empregos_encaminhamentos[]
+
+  @@index([status])
+}
+
+model banco_empregos_candidatos {
+  id                         BigInt                @id @default(autoincrement())
+  emprego_id                 BigInt
+  beneficiario_id            BigInt?
+  beneficiario_nome          String                @db.VarChar(200)
+  necessidades_profissionais String?
+  status                     String                @default("EM_ANALISE") @db.VarChar(40)
+  curriculo_nome             String?               @db.VarChar(255)
+  curriculo_tipo             String?               @db.VarChar(120)
+  curriculo_conteudo         String?
+  criado_em                  DateTime              @default(now()) @db.Timestamp(6)
+  atualizado_em              DateTime              @default(now()) @db.Timestamp(6)
+  cadastro_beneficiario      CadastroBeneficiario? @relation(fields: [beneficiario_id], references: [id], onUpdate: NoAction)
+  banco_empregos             banco_empregos        @relation(fields: [emprego_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model banco_empregos_encaminhamentos {
+  id                    BigInt                @id @default(autoincrement())
+  emprego_id            BigInt
+  beneficiario_id       BigInt?
+  beneficiario_nome     String?               @db.VarChar(200)
+  data_encaminhamento   DateTime              @db.Date
+  status                String                @db.VarChar(40)
+  observacoes           String?
+  cadastro_beneficiario CadastroBeneficiario? @relation(fields: [beneficiario_id], references: [id], onUpdate: NoAction)
+  banco_empregos        banco_empregos        @relation(fields: [emprego_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([emprego_id], map: "banco_empregos_encaminhamentos_emprego_idx")
+}
+
+model beneficiario {
+  id_beneficiario       BigInt             @id @default(autoincrement())
+  nome_beneficiario     String             @db.VarChar(200)
+  documento             String?            @db.VarChar(50)
+  ativo                 Boolean            @default(true)
+  data_hora_criacao     DateTime           @default(now()) @db.Timestamp(6)
+  data_hora_atualizacao DateTime           @default(now()) @db.Timestamp(6)
+  fila_atendimento      fila_atendimento[]
+}
+
+model biblioteca_emprestimos {
+  id                      BigInt                @id @default(autoincrement())
+  livro_id                BigInt
+  beneficiario_id         BigInt?
+  beneficiario_nome       String                @db.VarChar(200)
+  responsavel_id          BigInt?
+  responsavel_nome        String?               @db.VarChar(200)
+  data_emprestimo         DateTime              @db.Date
+  data_devolucao_prevista DateTime              @db.Date
+  data_devolucao_real     DateTime?             @db.Date
+  status                  String                @default("ATIVO") @db.VarChar(20)
+  observacoes             String?
+  criado_em               DateTime              @default(now()) @db.Timestamp(6)
+  atualizado_em           DateTime              @default(now()) @db.Timestamp(6)
+  cadastro_beneficiario   CadastroBeneficiario? @relation(fields: [beneficiario_id], references: [id], onUpdate: NoAction)
+  biblioteca_livros       biblioteca_livros     @relation(fields: [livro_id], references: [id], onUpdate: NoAction)
+  usuarios                Usuario?              @relation(fields: [responsavel_id], references: [id], onUpdate: NoAction)
+
+  @@index([data_devolucao_prevista], map: "biblioteca_emprestimos_devolucao_idx")
+  @@index([status])
+}
+
+model biblioteca_livros {
+  id                     BigInt                   @id @default(autoincrement())
+  codigo                 String                   @unique @db.VarChar(40)
+  titulo                 String                   @db.VarChar(220)
+  autor                  String                   @db.VarChar(200)
+  isbn                   String?                  @db.VarChar(40)
+  editora                String?                  @db.VarChar(180)
+  ano_publicacao         Int?
+  categoria              String?                  @db.VarChar(120)
+  quantidade_total       Int
+  quantidade_disponivel  Int
+  localizacao            String?                  @db.VarChar(160)
+  status                 String                   @default("ATIVO") @db.VarChar(20)
+  observacoes            String?
+  criado_em              DateTime                 @default(now()) @db.Timestamp(6)
+  atualizado_em          DateTime                 @default(now()) @db.Timestamp(6)
+  estado_livro           String?                  @db.VarChar(30)
+  biblioteca_emprestimos biblioteca_emprestimos[]
+}
+
+model cadastro_profissionais {
+  id                   BigInt                 @id @default(autoincrement())
+  nome_completo        String                 @db.VarChar(200)
+  categoria            String                 @db.VarChar(120)
+  registro_conselho    String?                @db.VarChar(120)
+  especialidade        String?                @db.VarChar(120)
+  email                String?                @db.VarChar(150)
+  telefone             String?                @db.VarChar(30)
+  unidade              String?                @db.VarChar(200)
+  carga_horaria        Int?
+  disponibilidade      String?
+  canais_atendimento   String?
+  status               String?                @db.VarChar(60)
+  tags                 String?
+  resumo               String?
+  observacoes          String?
+  criado_em            DateTime               @default(now()) @db.Timestamp(6)
+  atualizado_em        DateTime               @default(now()) @db.Timestamp(6)
+  nome_social          String?                @db.VarChar(200)
+  apelido              String?                @db.VarChar(120)
+  data_nascimento      DateTime?              @db.Date
+  foto_3x4             String?
+  sexo_biologico       String?                @db.VarChar(60)
+  identidade_genero    String?                @db.VarChar(120)
+  cor_raca             String?                @db.VarChar(60)
+  estado_civil         String?                @db.VarChar(60)
+  nacionalidade        String?                @db.VarChar(120)
+  naturalidade_cidade  String?                @db.VarChar(150)
+  naturalidade_uf      String?                @db.VarChar(2)
+  nome_mae             String?                @db.VarChar(200)
+  nome_pai             String?                @db.VarChar(200)
+  endereco_id          BigInt?
+  cpf                  String?                @db.VarChar(20)
+  vinculo              String?                @db.VarChar(40)
+  sala_atendimento     String?                @db.VarChar(120)
+  endereco             Endereco?              @relation(fields: [endereco_id], references: [id], onUpdate: NoAction)
+  cadastro_voluntario  cadastro_voluntario[]
+  prontuario_registros prontuario_registros[]
+}
+
+model cadastro_voluntario {
+  id                       BigInt                  @id @default(autoincrement())
+  profissional_id          BigInt?
+  nome_completo            String                  @db.VarChar(200)
+  cpf                      String                  @db.VarChar(20)
+  rg                       String?                 @db.VarChar(20)
+  data_nascimento          DateTime?               @db.Date
+  genero                   String?                 @db.VarChar(60)
+  profissao                String?                 @db.VarChar(120)
+  motivacao                String?
+  telefone                 String?                 @db.VarChar(30)
+  email                    String                  @db.VarChar(150)
+  cidade                   String?                 @db.VarChar(150)
+  estado                   String?                 @db.VarChar(2)
+  area_interesse           String?                 @db.VarChar(150)
+  habilidades              String?
+  idiomas                  String?
+  linkedin                 String?                 @db.VarChar(200)
+  disponibilidade_dias     String?
+  disponibilidade_periodos String?
+  carga_horaria_semanal    String?                 @db.VarChar(50)
+  presencial               Boolean?                @default(false)
+  remoto                   Boolean?                @default(false)
+  inicio_previsto          DateTime?               @db.Date
+  observacoes              String?
+  documento_identificacao  String?
+  comprovante_endereco     String?
+  aceite_voluntariado      Boolean                 @default(false)
+  aceite_imagem            Boolean                 @default(false)
+  assinatura_digital       String?
+  criado_em                DateTime                @default(now()) @db.Timestamp(6)
+  atualizado_em            DateTime                @default(now()) @db.Timestamp(6)
+  status                   String?                 @default("ATIVO") @db.VarChar(60)
+  foto_3x4                 String?
+  endereco_id              BigInt?
+  endereco                 Endereco?               @relation(fields: [endereco_id], references: [id], onUpdate: NoAction)
+  cadastro_profissionais   cadastro_profissionais? @relation(fields: [profissional_id], references: [id], onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model chamada {
+  id_chamada          String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id_fila_atendimento BigInt
+  nome_beneficiario   String           @db.VarChar(200)
+  local_atendimento   String           @db.VarChar(80)
+  status_chamada      String           @db.VarChar(20)
+  data_hora_chamada   DateTime         @default(now()) @db.Timestamp(6)
+  chamado_por         String?          @db.VarChar(120)
+  data_hora_criacao   DateTime         @default(now()) @db.Timestamp(6)
+  fila_atendimento    fila_atendimento @relation(fields: [id_fila_atendimento], references: [id_fila_atendimento], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([data_hora_chamada(sort: Desc)], map: "idx_chamada_data")
+  @@index([local_atendimento, data_hora_chamada(sort: Desc)], map: "idx_chamada_local_data")
+}
+
+model chamado_tecnico {
+  id                                                           String                              @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  codigo                                                       String                              @unique(map: "chamado_tecnico_codigo_unique") @db.VarChar(20)
+  titulo                                                       String                              @db.VarChar(200)
+  descricao                                                    String
+  tipo                                                         chamado_tipo
+  status                                                       chamado_status
+  prioridade                                                   chamado_prioridade
+  impacto                                                      chamado_impacto
+  modulo                                                       String                              @db.VarChar(120)
+  menu                                                         String                              @db.VarChar(160)
+  cliente                                                      String                              @db.VarChar(160)
+  ambiente                                                     String                              @default("PRODUCAO") @db.VarChar(40)
+  versao_sistema                                               String?                             @db.VarChar(40)
+  passos_reproducao                                            String?
+  resultado_atual                                              String?
+  resultado_esperado                                           String?
+  usuarios_teste                                               String?
+  prazo_sla_em_horas                                           Int?
+  data_limite_sla                                              DateTime?                           @db.Timestamp(6)
+  resposta_desenvolvedor                                       String?
+  respondido_em                                                DateTime?                           @db.Timestamp(6)
+  respondido_por_usuario_id                                    BigInt?
+  responsavel_usuario_id                                       BigInt?
+  criado_por_usuario_id                                        BigInt?
+  tags                                                         String?
+  criado_em                                                    DateTime                            @default(now()) @db.Timestamp(6)
+  atualizado_em                                                DateTime                            @default(now()) @db.Timestamp(6)
+  usuarios_chamado_tecnico_criado_por_usuario_idTousuarios     Usuario?                            @relation("chamado_tecnico_criado_por_usuario_idTousuarios", fields: [criado_por_usuario_id], references: [id], onUpdate: NoAction)
+  usuarios_chamado_tecnico_respondido_por_usuario_idTousuarios Usuario?                            @relation("chamado_tecnico_respondido_por_usuario_idTousuarios", fields: [respondido_por_usuario_id], references: [id], onUpdate: NoAction)
+  usuarios_chamado_tecnico_responsavel_usuario_idTousuarios    Usuario?                            @relation("chamado_tecnico_responsavel_usuario_idTousuarios", fields: [responsavel_usuario_id], references: [id], onUpdate: NoAction)
+  chamado_tecnico_acao                                         chamado_tecnico_acao[]
+  chamado_tecnico_anexo                                        chamado_tecnico_anexo[]
+  chamado_tecnico_auditoria_vinculo                            chamado_tecnico_auditoria_vinculo[]
+  chamado_tecnico_comentario                                   chamado_tecnico_comentario[]
+
+  @@index([criado_em])
+  @@index([modulo])
+  @@index([prioridade])
+  @@index([status])
+}
+
+model chamado_tecnico_acao {
+  id                                                            String            @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  chamado_id                                                    String            @db.Uuid
+  tipo                                                          chamado_acao_tipo
+  descricao                                                     String
+  de_status                                                     chamado_status?
+  para_status                                                   chamado_status?
+  de_responsavel_id                                             BigInt?
+  para_responsavel_id                                           BigInt?
+  criado_por_usuario_id                                         BigInt?
+  criado_em                                                     DateTime          @default(now()) @db.Timestamp(6)
+  chamado_tecnico                                               chamado_tecnico   @relation(fields: [chamado_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  usuarios_chamado_tecnico_acao_criado_por_usuario_idTousuarios Usuario?          @relation("chamado_tecnico_acao_criado_por_usuario_idTousuarios", fields: [criado_por_usuario_id], references: [id], onUpdate: NoAction)
+  usuarios_chamado_tecnico_acao_de_responsavel_idTousuarios     Usuario?          @relation("chamado_tecnico_acao_de_responsavel_idTousuarios", fields: [de_responsavel_id], references: [id], onUpdate: NoAction)
+  usuarios_chamado_tecnico_acao_para_responsavel_idTousuarios   Usuario?          @relation("chamado_tecnico_acao_para_responsavel_idTousuarios", fields: [para_responsavel_id], references: [id], onUpdate: NoAction)
+
+  @@index([chamado_id], map: "chamado_tecnico_acao_chamado_idx")
+}
+
+model chamado_tecnico_anexo {
+  id                    String          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  chamado_id            String          @db.Uuid
+  nome_arquivo          String?         @db.VarChar(255)
+  mime_type             String?         @db.VarChar(120)
+  tamanho_bytes         BigInt?
+  storage_path          String?         @db.VarChar(600)
+  hash_sha256           String?         @db.VarChar(120)
+  criado_por_usuario_id BigInt?
+  criado_em             DateTime        @default(now()) @db.Timestamp(6)
+  chamado_tecnico       chamado_tecnico @relation(fields: [chamado_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  usuarios              Usuario?        @relation(fields: [criado_por_usuario_id], references: [id], onUpdate: NoAction)
+
+  @@index([chamado_id], map: "chamado_tecnico_anexo_chamado_idx")
+}
+
+model chamado_tecnico_auditoria_vinculo {
+  id                    String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  chamado_id            String           @db.Uuid
+  auditoria_evento_id   String           @db.Uuid
+  criado_por_usuario_id BigInt?
+  criado_em             DateTime         @default(now()) @db.Timestamp(6)
+  auditoria_evento      auditoria_evento @relation(fields: [auditoria_evento_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  chamado_tecnico       chamado_tecnico  @relation(fields: [chamado_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  usuarios              Usuario?         @relation(fields: [criado_por_usuario_id], references: [id], onUpdate: NoAction)
+
+  @@index([chamado_id], map: "chamado_tecnico_auditoria_vinculo_chamado_idx")
+}
+
+model chamado_tecnico_comentario {
+  id                    String          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  chamado_id            String          @db.Uuid
+  comentario            String
+  criado_por_usuario_id BigInt?
+  criado_em             DateTime        @default(now()) @db.Timestamp(6)
+  chamado_tecnico       chamado_tecnico @relation(fields: [chamado_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  usuarios              Usuario?        @relation(fields: [criado_por_usuario_id], references: [id], onUpdate: NoAction)
+
+  @@index([chamado_id], map: "chamado_tecnico_comentario_chamado_idx")
+}
+
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model config_documento_beneficiario {
+  id            BigInt   @id @default(autoincrement())
+  nome          String   @db.VarChar(120)
+  obrigatorio   Boolean  @default(false)
+  ordem         Int      @default(0)
+  criado_em     DateTime @default(now()) @db.Timestamp(6)
+  atualizado_em DateTime @default(now()) @db.Timestamp(6)
+
+  @@index([ordem, id], map: "config_documento_beneficiario_ordem_idx")
+}
+
+model conta_bancaria {
+  id                                   BigInt                                 @id @default(autoincrement())
+  banco                                String                                 @db.VarChar(120)
+  numero                               String                                 @db.VarChar(40)
+  tipo                                 String                                 @db.VarChar(30)
+  saldo                                Decimal                                @default(0) @db.Decimal(12, 2)
+  data_atualizacao                     DateTime                               @db.Date
+  criado_em                            DateTime                               @default(now()) @db.Timestamp(6)
+  atualizado_em                        DateTime                               @default(now()) @db.Timestamp(6)
+  agencia                              String?                                @db.VarChar(20)
+  projeto_vinculado                    String?                                @db.VarChar(200)
+  pix_vinculado                        Boolean                                @default(false)
+  tipo_chave_pix                       String?                                @db.VarChar(20)
+  chave_pix                            String?                                @db.VarChar(200)
+  recebimento_local                    Boolean                                @default(false)
+  autorizacao_compras_reserva_bancaria autorizacao_compras_reserva_bancaria[]
+  movimentacao_financeira              movimentacao_financeira[]
+}
+
+model controle_veiculos {
+  id                                       BigInt                                     @id @default(autoincrement())
+  placa                                    String?                                    @unique(map: "controle_veiculos_placa_idx") @db.VarChar(20)
+  modelo                                   String?                                    @db.VarChar(120)
+  marca                                    String?                                    @db.VarChar(120)
+  ano                                      Int?
+  tipo_combustivel                         String?                                    @db.VarChar(60)
+  capacidade_tanque_litros                 Decimal?                                   @db.Decimal(10, 2)
+  observacoes                              String?
+  ativo                                    Boolean?                                   @default(true)
+  criado_em                                DateTime                                   @default(now()) @db.Timestamp(6)
+  atualizado_em                            DateTime                                   @default(now()) @db.Timestamp(6)
+  foto_frente                              String?
+  foto_lateral_esquerda                    String?
+  foto_lateral_direita                     String?
+  foto_traseira                            String?
+  media_consumo_padrao                     Decimal?                                   @db.Decimal(12, 2)
+  documento_veiculo_pdf                    String?
+  controle_veiculos_diario                 controle_veiculos_diario[]
+  controle_veiculos_motoristas_autorizados controle_veiculos_motoristas_autorizados[]
+}
+
+model controle_veiculos_diario {
+  id                           BigInt             @id @default(autoincrement())
+  veiculo_id                   BigInt?
+  data                         DateTime?          @db.Date
+  condutor                     String?            @db.VarChar(150)
+  horario_saida                DateTime?          @db.Time(6)
+  km_inicial                   Decimal?           @db.Decimal(12, 2)
+  horario_chegada              DateTime?          @db.Time(6)
+  km_final                     Decimal?           @db.Decimal(12, 2)
+  destino                      String?            @db.VarChar(200)
+  combustivel_consumido_litros Decimal?           @db.Decimal(12, 2)
+  km_rodados                   Decimal?           @db.Decimal(12, 2)
+  media_consumo                Decimal?           @db.Decimal(12, 2)
+  observacoes                  String?
+  criado_em                    DateTime           @default(now()) @db.Timestamp(6)
+  atualizado_em                DateTime           @default(now()) @db.Timestamp(6)
+  controle_veiculos            controle_veiculos? @relation(fields: [veiculo_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([data(sort: Desc)])
+  @@index([veiculo_id], map: "controle_veiculos_diario_veiculo_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model controle_veiculos_motoristas_autorizados {
+  id                   BigInt            @id @default(autoincrement())
+  veiculo_id           BigInt
+  tipo_origem          String            @db.VarChar(20)
+  profissional_id      BigInt?
+  voluntario_id        BigInt?
+  nome_motorista       String            @db.VarChar(200)
+  criado_em            DateTime          @default(now()) @db.Timestamp(6)
+  atualizado_em        DateTime          @default(now()) @db.Timestamp(6)
+  numero_carteira      String?           @db.VarChar(40)
+  categoria_carteira   String?           @db.VarChar(10)
+  vencimento_carteira  DateTime?         @db.Date
+  arquivo_carteira_pdf String?
+  controle_veiculos    controle_veiculos @relation(fields: [veiculo_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([veiculo_id, tipo_origem, profissional_id, voluntario_id], map: "controle_veiculos_motoristas_autorizados_unique_idx")
+  @@index([veiculo_id], map: "controle_veiculos_motoristas_autorizados_veiculo_idx")
+}
+
+model cursos_atendimentos {
+  id                                 BigInt                               @id @default(autoincrement())
+  tipo                               String                               @db.VarChar(20)
+  nome                               String                               @db.VarChar(200)
+  descricao                          String?
+  imagem                             String?
+  vagas_totais                       Int                                  @default(0)
+  vagas_disponiveis                  Int                                  @default(0)
+  carga_horaria                      Int?
+  horario_inicial                    DateTime?                            @db.Time(6)
+  duracao_horas                      Int                                  @default(0)
+  dias_semana                        String?
+  restricoes                         String?
+  profissional                       String?                              @db.VarChar(150)
+  sala_id                            BigInt?
+  status                             String                               @db.VarChar(30)
+  data_triagem                       DateTime?                            @db.Date
+  data_encaminhamento                DateTime?                            @db.Date
+  data_conclusao                     DateTime?                            @db.Date
+  criado_em                          DateTime                             @default(now()) @db.Timestamp(6)
+  atualizado_em                      DateTime                             @default(now()) @db.Timestamp(6)
+  faixa_etaria                       String?
+  vaga_preferencial_idosos           Boolean                              @default(false)
+  sexo_permitido                     String?                              @db.VarChar(20)
+  instituicao_parceira               String?                              @db.VarChar(200)
+  salas_unidade                      salas_unidade?                       @relation(fields: [sala_id], references: [id], onUpdate: NoAction)
+  cursos_atendimentos_fila_espera    cursos_atendimentos_fila_espera[]
+  cursos_atendimentos_matriculas     cursos_atendimentos_matriculas[]
+  cursos_atendimentos_presenca_datas cursos_atendimentos_presenca_datas[]
+  cursos_atendimentos_presencas      cursos_atendimentos_presencas[]
+  cursos_atendimentos_status         cursos_atendimentos_status[]
+
+  @@index([sala_id], map: "cursos_atendimentos_sala_idx")
+  @@index([status])
+}
+
+model cursos_atendimentos_fila_espera {
+  id                  BigInt              @id @default(autoincrement())
+  curso_id            BigInt
+  beneficiario_nome   String              @db.VarChar(200)
+  cpf                 String?             @db.VarChar(20)
+  data_entrada        DateTime            @default(now()) @db.Timestamp(6)
+  cursos_atendimentos cursos_atendimentos @relation(fields: [curso_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model cursos_atendimentos_matriculas {
+  id                            BigInt                          @id @default(autoincrement())
+  curso_id                      BigInt
+  beneficiario_nome             String                          @db.VarChar(200)
+  cpf                           String?                         @db.VarChar(20)
+  status                        String                          @db.VarChar(20)
+  data_matricula                DateTime                        @default(now()) @db.Timestamp(6)
+  data_agendada                 DateTime?                       @db.Date
+  hora_agendada                 DateTime?                       @db.Time(6)
+  status_agendamento            String?                         @db.VarChar(30)
+  profissional_id               String?                         @db.VarChar(40)
+  profissional_nome             String?                         @db.VarChar(200)
+  profissional_tipo             String?                         @db.VarChar(20)
+  confirmacao_presenca          Boolean                         @default(false)
+  cursos_atendimentos           cursos_atendimentos             @relation(fields: [curso_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  cursos_atendimentos_presencas cursos_atendimentos_presencas[]
+}
+
+model cursos_atendimentos_presenca_anexos {
+  id                                 BigInt                             @id @default(autoincrement())
+  presenca_data_id                   BigInt
+  nome_arquivo                       String                             @db.VarChar(200)
+  tipo_mime                          String                             @db.VarChar(120)
+  tamanho                            String?                            @db.VarChar(40)
+  caminho_arquivo                    String?
+  data_upload                        DateTime                           @db.Date
+  usuario                            String                             @db.VarChar(120)
+  criado_em                          DateTime                           @default(now()) @db.Timestamp(6)
+  cursos_atendimentos_presenca_datas cursos_atendimentos_presenca_datas @relation(fields: [presenca_data_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([presenca_data_id, data_upload(sort: Desc)], map: "cursos_atendimentos_presenca_anexos_data_idx")
+}
+
+model cursos_atendimentos_presenca_datas {
+  id                                  BigInt                                @id @default(autoincrement())
+  curso_id                            BigInt
+  data_aula                           DateTime                              @db.Date
+  status                              String                                @db.VarChar(20)
+  observacoes                         String?
+  criado_em                           DateTime                              @default(now()) @db.Timestamp(6)
+  atualizado_em                       DateTime                              @default(now()) @db.Timestamp(6)
+  cursos_atendimentos_presenca_anexos cursos_atendimentos_presenca_anexos[]
+  cursos_atendimentos                 cursos_atendimentos                   @relation(fields: [curso_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([curso_id, data_aula])
+  @@index([curso_id, data_aula], map: "cursos_atendimentos_presenca_datas_curso_data_idx")
+}
+
+model cursos_atendimentos_presencas {
+  id                             BigInt                         @id @default(autoincrement())
+  curso_id                       BigInt
+  matricula_id                   BigInt
+  data_aula                      DateTime                       @db.Date
+  status                         String                         @db.VarChar(10)
+  criado_em                      DateTime                       @default(now()) @db.Timestamp(6)
+  atualizado_em                  DateTime                       @default(now()) @db.Timestamp(6)
+  cursos_atendimentos            cursos_atendimentos            @relation(fields: [curso_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  cursos_atendimentos_matriculas cursos_atendimentos_matriculas @relation(fields: [matricula_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([curso_id, matricula_id, data_aula])
+  @@index([curso_id, data_aula], map: "cursos_atendimentos_presencas_curso_data_idx")
+}
+
+model cursos_atendimentos_status {
+  id                  BigInt              @id @default(autoincrement())
+  curso_id            BigInt
+  status              String              @db.VarChar(30)
+  data_alteracao      DateTime            @default(now()) @db.Timestamp(6)
+  justificativa       String?
+  cursos_atendimentos cursos_atendimentos @relation(fields: [curso_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model diretoria_unidade {
+  id                   BigInt              @id @default(autoincrement())
+  unidade_id           BigInt
+  nome_completo        String              @db.VarChar(200)
+  documento            String              @db.VarChar(60)
+  funcao               String              @db.VarChar(120)
+  criado_em            DateTime            @default(now()) @db.Timestamp(6)
+  atualizado_em        DateTime            @default(now()) @db.Timestamp(6)
+  mandato_inicio       String?             @db.VarChar(9)
+  mandato_fim          String?             @db.VarChar(9)
+  unidade_assistencial UnidadeAssistencial @relation(fields: [unidade_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model doacao_planejada {
+  id                    BigInt                @id @default(autoincrement())
+  beneficiario_id       BigInt?
+  vinculo_familiar_id   BigInt?
+  almoxarifado_item_id  BigInt
+  quantidade            Int
+  data_prevista         DateTime              @db.Date
+  prioridade            String                @db.VarChar(20)
+  status                String                @db.VarChar(20)
+  observacoes           String?
+  motivo_cancelamento   String?
+  criado_em             DateTime              @default(now()) @db.Timestamp(6)
+  atualizado_em         DateTime              @default(now()) @db.Timestamp(6)
+  almoxarifado_item     almoxarifado_item     @relation(fields: [almoxarifado_item_id], references: [id], onUpdate: NoAction)
+  cadastro_beneficiario CadastroBeneficiario? @relation(fields: [beneficiario_id], references: [id], onUpdate: NoAction)
+  vinculo_familiar      VinculoFamiliar?      @relation(fields: [vinculo_familiar_id], references: [id], onUpdate: NoAction)
+
+  @@index([beneficiario_id], map: "doacao_planejada_beneficiario_idx")
+  @@index([status, data_prevista], map: "doacao_planejada_status_data_idx")
+}
+
+model doacao_realizada {
+  id                    BigInt                  @id @default(autoincrement())
+  beneficiario_id       BigInt?
+  vinculo_familiar_id   BigInt?
+  tipo_doacao           String                  @db.VarChar(120)
+  situacao              String                  @db.VarChar(60)
+  responsavel           String?                 @db.VarChar(150)
+  observacoes           String?
+  data_doacao           DateTime                @db.Date
+  criado_em             DateTime                @default(now()) @db.Timestamp(6)
+  atualizado_em         DateTime                @default(now()) @db.Timestamp(6)
+  cadastro_beneficiario CadastroBeneficiario?   @relation(fields: [beneficiario_id], references: [id], onUpdate: NoAction)
+  vinculo_familiar      VinculoFamiliar?        @relation(fields: [vinculo_familiar_id], references: [id], onUpdate: NoAction)
+  doacao_realizada_item doacao_realizada_item[]
+
+  @@index([beneficiario_id, data_doacao], map: "doacao_realizada_beneficiario_data_idx")
+}
+
+model doacao_realizada_item {
+  id                   BigInt            @id @default(autoincrement())
+  doacao_realizada_id  BigInt
+  almoxarifado_item_id BigInt
+  quantidade           Int
+  observacoes          String?
+  criado_em            DateTime          @default(now()) @db.Timestamp(6)
+  almoxarifado_item    almoxarifado_item @relation(fields: [almoxarifado_item_id], references: [id], onUpdate: NoAction)
+  doacao_realizada     doacao_realizada  @relation(fields: [doacao_realizada_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model doador {
+  id                  BigInt               @id @default(autoincrement())
+  nome                String               @db.VarChar(200)
+  tipo_pessoa         String?              @db.VarChar(20)
+  documento           String?              @db.VarChar(30)
+  email               String?              @db.VarChar(150)
+  telefone            String?              @db.VarChar(30)
+  observacoes         String?
+  criado_em           DateTime             @default(now()) @db.Timestamp(6)
+  atualizado_em       DateTime             @default(now()) @db.Timestamp(6)
+  responsavel_empresa String?              @db.VarChar(200)
+  logradouro          String?              @db.VarChar(200)
+  numero              String?              @db.VarChar(40)
+  complemento         String?              @db.VarChar(120)
+  bairro              String?              @db.VarChar(120)
+  cidade              String?              @db.VarChar(120)
+  uf                  String?              @db.VarChar(2)
+  cep                 String?              @db.VarChar(12)
+  recebimento_doacao  recebimento_doacao[]
+}
+
+model documentos_instituicao {
+  id                               BigInt                             @id @default(autoincrement())
+  tipo_documento                   String                             @db.VarChar(200)
+  orgao_emissor                    String                             @db.VarChar(200)
+  descricao                        String?
+  categoria                        String?                            @db.VarChar(120)
+  emissao                          DateTime                           @db.Date
+  validade                         DateTime?                          @db.Date
+  responsavel_interno              String?                            @db.VarChar(200)
+  modo_renovacao                   String?                            @db.VarChar(30)
+  observacao_renovacao             String?
+  gerar_alerta                     Boolean                            @default(true)
+  dias_antecedencia                Json?
+  forma_alerta                     String?                            @db.VarChar(60)
+  em_renovacao                     Boolean                            @default(false)
+  sem_vencimento                   Boolean                            @default(false)
+  vencimento_indeterminado         Boolean                            @default(false)
+  situacao                         String?                            @db.VarChar(30)
+  criado_em                        DateTime                           @default(now()) @db.Timestamp(6)
+  atualizado_em                    DateTime                           @default(now()) @db.Timestamp(6)
+  documentos_instituicao_anexos    documentos_instituicao_anexos[]
+  documentos_instituicao_historico documentos_instituicao_historico[]
+
+  @@index([categoria])
+  @@index([emissao(sort: Desc)])
+  @@index([situacao])
+}
+
+model documentos_instituicao_anexos {
+  id                     BigInt                 @id @default(autoincrement())
+  documento_id           BigInt
+  nome_arquivo           String                 @db.VarChar(200)
+  tipo                   String                 @db.VarChar(30)
+  tamanho                String?                @db.VarChar(40)
+  data_upload            DateTime               @db.Date
+  usuario                String                 @db.VarChar(120)
+  criado_em              DateTime               @default(now()) @db.Timestamp(6)
+  tipo_mime              String?                @db.VarChar(120)
+  caminho_arquivo        String?
+  documentos_instituicao documentos_instituicao @relation(fields: [documento_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([documento_id], map: "documentos_instituicao_anexos_documento_idx")
+}
+
+model documentos_instituicao_historico {
+  id                     BigInt                 @id @default(autoincrement())
+  documento_id           BigInt
+  data_hora              DateTime               @db.Timestamp(6)
+  usuario                String                 @db.VarChar(120)
+  tipo_alteracao         String                 @db.VarChar(60)
+  observacao             String?
+  criado_em              DateTime               @default(now()) @db.Timestamp(6)
+  documentos_instituicao documentos_instituicao @relation(fields: [documento_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([documento_id], map: "documentos_instituicao_historico_documento_idx")
+}
+
+model emenda_impositiva {
+  id               BigInt   @id @default(autoincrement())
+  identificacao    String   @db.VarChar(120)
+  referencia_legal String?  @db.VarChar(160)
+  data_prevista    DateTime @db.Date
+  valor_previsto   Decimal  @db.Decimal(12, 2)
+  dias_alerta      Int      @default(15)
+  status           String   @db.VarChar(20)
+  observacoes      String?
+  criado_em        DateTime @default(now()) @db.Timestamp(6)
+  atualizado_em    DateTime @default(now()) @db.Timestamp(6)
+}
+
+model emprestimos_eventos {
+  id                                BigInt                              @id @default(autoincrement())
+  evento_id                         BigInt
+  unidade_id                        BigInt?
+  responsavel_id                    BigInt?
+  data_retirada_prevista            DateTime                            @db.Timestamp(6)
+  data_devolucao_prevista           DateTime                            @db.Timestamp(6)
+  data_retirada_real                DateTime?                           @db.Timestamp(6)
+  data_devolucao_real               DateTime?                           @db.Timestamp(6)
+  status                            String                              @default("RASCUNHO") @db.VarChar(20)
+  observacoes                       String?
+  criado_em                         DateTime                            @default(now()) @db.Timestamp(6)
+  atualizado_em                     DateTime                            @default(now()) @db.Timestamp(6)
+  eventos_emprestimos               eventos_emprestimos                 @relation(fields: [evento_id], references: [id], onUpdate: NoAction)
+  usuarios                          Usuario?                            @relation(fields: [responsavel_id], references: [id], onUpdate: NoAction)
+  unidade_assistencial              UnidadeAssistencial?                @relation(fields: [unidade_id], references: [id], onUpdate: NoAction)
+  emprestimos_eventos_itens         emprestimos_eventos_itens[]
+  emprestimos_eventos_movimentacoes emprestimos_eventos_movimentacoes[]
+
+  @@index([data_retirada_prevista, data_devolucao_prevista], map: "emprestimos_eventos_periodo_idx")
+  @@index([status])
+}
+
+model emprestimos_eventos_itens {
+  id                  BigInt              @id @default(autoincrement())
+  emprestimo_id       BigInt
+  item_id             BigInt
+  tipo_item           String              @db.VarChar(20)
+  quantidade          Int
+  status_item         String              @default("RESERVADO") @db.VarChar(20)
+  observacao_item     String?
+  criado_em           DateTime            @default(now()) @db.Timestamp(6)
+  atualizado_em       DateTime            @default(now()) @db.Timestamp(6)
+  emprestimos_eventos emprestimos_eventos @relation(fields: [emprestimo_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([item_id, tipo_item], map: "emprestimos_eventos_itens_item_idx")
+}
+
+model emprestimos_eventos_movimentacoes {
+  id                  BigInt              @id @default(autoincrement())
+  emprestimo_id       BigInt
+  acao                String              @db.VarChar(120)
+  descricao           String?
+  usuario_id          BigInt?
+  criado_em           DateTime            @default(now()) @db.Timestamp(6)
+  emprestimos_eventos emprestimos_eventos @relation(fields: [emprestimo_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  usuarios            Usuario?            @relation(fields: [usuario_id], references: [id], onUpdate: NoAction)
+}
+
+model eventos {
+  id            BigInt   @id @default(autoincrement())
+  titulo        String   @db.VarChar(200)
+  descricao     String?
+  local         String?  @db.VarChar(200)
+  data_inicio   DateTime @db.Timestamp(6)
+  data_fim      DateTime @db.Timestamp(6)
+  status        String   @default("PLANEJADO") @db.VarChar(20)
+  criado_em     DateTime @default(now()) @db.Timestamp(6)
+  atualizado_em DateTime @default(now()) @db.Timestamp(6)
+}
+
+model eventos_emprestimos {
+  id                  BigInt                @id @default(autoincrement())
+  titulo              String                @db.VarChar(200)
+  descricao           String?
+  local               String?               @db.VarChar(200)
+  data_inicio         DateTime              @db.Timestamp(6)
+  data_fim            DateTime              @db.Timestamp(6)
+  status              String                @default("PLANEJADO") @db.VarChar(20)
+  criado_em           DateTime              @default(now()) @db.Timestamp(6)
+  atualizado_em       DateTime              @default(now()) @db.Timestamp(6)
+  emprestimos_eventos emprestimos_eventos[]
+}
+
+model feriados {
+  id            BigInt   @id @default(autoincrement())
+  data          DateTime @db.Date
+  descricao     String   @db.VarChar(200)
+  criado_em     DateTime @default(now()) @db.Timestamp(6)
+  atualizado_em DateTime @default(now()) @db.Timestamp(6)
+
+  @@index([data])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model fila_atendimento {
+  id_fila_atendimento   BigInt       @id @default(autoincrement())
+  id_beneficiario       BigInt
+  status_fila           String       @db.VarChar(20)
+  prioridade            Int          @default(0)
+  data_hora_entrada     DateTime     @default(now()) @db.Timestamp(6)
+  data_hora_atualizacao DateTime     @default(now()) @db.Timestamp(6)
+  chamada               chamada[]
+  beneficiario          beneficiario @relation(fields: [id_beneficiario], references: [id_beneficiario], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([status_fila, data_hora_entrada], map: "idx_fila_status_data")
+}
+
+model flyway_schema_history {
+  installed_rank Int      @id(map: "flyway_schema_history_pk")
+  version        String?  @db.VarChar(50)
+  description    String   @db.VarChar(200)
+  type           String   @db.VarChar(20)
+  script         String   @db.VarChar(1000)
+  checksum       Int?
+  installed_by   String   @db.VarChar(100)
+  installed_on   DateTime @default(now()) @db.Timestamp(6)
+  execution_time Int
+  success        Boolean
+
+  @@index([success], map: "flyway_schema_history_s_idx")
+}
+
+model flyway_schema_history_chamadas {
+  installed_rank Int      @id(map: "flyway_schema_history_chamadas_pk")
+  version        String?  @db.VarChar(50)
+  description    String   @db.VarChar(200)
+  type           String   @db.VarChar(20)
+  script         String   @db.VarChar(1000)
+  checksum       Int?
+  installed_by   String   @db.VarChar(100)
+  installed_on   DateTime @default(now()) @db.Timestamp(6)
+  execution_time Int
+  success        Boolean
+
+  @@index([success], map: "flyway_schema_history_chamadas_s_idx")
+}
+
+model fotos_eventos {
+  id                                                                       BigInt                @id @default(autoincrement())
+  unidade_id                                                               BigInt?
+  titulo                                                                   String                @db.VarChar(200)
+  descricao                                                                String?
+  data_evento                                                              DateTime              @db.Date
+  local                                                                    String?               @db.VarChar(200)
+  tags                                                                     String?
+  criado_em                                                                DateTime              @default(now()) @db.Timestamp(6)
+  atualizado_em                                                            DateTime              @default(now()) @db.Timestamp(6)
+  status                                                                   String                @default("PLANEJADO") @db.VarChar(20)
+  foto_principal_id                                                        BigInt?
+  criado_por                                                               BigInt?
+  usuarios                                                                 Usuario?              @relation(fields: [criado_por], references: [id], onUpdate: NoAction)
+  fotos_eventos_itens_fotos_eventos_foto_principal_idTofotos_eventos_itens fotos_eventos_itens?  @relation("fotos_eventos_foto_principal_idTofotos_eventos_itens", fields: [foto_principal_id], references: [id], onUpdate: NoAction)
+  unidade_assistencial                                                     UnidadeAssistencial?  @relation(fields: [unidade_id], references: [id], onUpdate: NoAction)
+  fotos_eventos_itens_fotos_eventos_itens_evento_idTofotos_eventos         fotos_eventos_itens[] @relation("fotos_eventos_itens_evento_idTofotos_eventos")
+  fotos_eventos_tags                                                       fotos_eventos_tags[]
+
+  @@index([data_evento(sort: Desc)], map: "fotos_eventos_data_idx")
+  @@index([titulo])
+}
+
+model fotos_eventos_itens {
+  id                                                                 BigInt          @id(map: "fotos_eventos_fotos_pkey") @default(autoincrement())
+  evento_id                                                          BigInt
+  arquivo                                                            String
+  legenda                                                            String?         @db.VarChar(255)
+  ordem                                                              Int?
+  criado_em                                                          DateTime        @default(now()) @db.Timestamp(6)
+  nome_arquivo                                                       String?         @db.VarChar(255)
+  mime_type                                                          String?         @db.VarChar(120)
+  tamanho_bytes                                                      BigInt?
+  largura                                                            Int?
+  altura                                                             Int?
+  creditos                                                           String?         @db.VarChar(200)
+  tags                                                               String?
+  atualizado_em                                                      DateTime        @default(now()) @db.Timestamp(6)
+  fotos_eventos_fotos_eventos_foto_principal_idTofotos_eventos_itens fotos_eventos[] @relation("fotos_eventos_foto_principal_idTofotos_eventos_itens")
+  fotos_eventos_fotos_eventos_itens_evento_idTofotos_eventos         fotos_eventos   @relation("fotos_eventos_itens_evento_idTofotos_eventos", fields: [evento_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fotos_eventos_fotos_evento_id_fkey")
+}
+
+model fotos_eventos_tags {
+  id            BigInt        @id @default(autoincrement())
+  evento_id     BigInt
+  tag           String        @db.VarChar(120)
+  fotos_eventos fotos_eventos @relation(fields: [evento_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([evento_id], map: "fotos_eventos_tags_evento_idx")
+  @@index([tag])
+}
+
+model g3_auditoria_info_admin {
+  id            BigInt   @id @default(autoincrement())
+  info_admin_id BigInt
+  acao          String   @db.VarChar(40)
+  usuario_id    BigInt?
+  usuario_nome  String?  @db.VarChar(160)
+  data_hora     DateTime @default(now()) @db.Timestamp(6)
+  ip_origem     String?  @db.VarChar(120)
+  detalhes      String?
+}
+
+model g3_informacoes_administrativas {
+  id                 BigInt   @id @default(autoincrement())
+  tipo               String   @db.VarChar(80)
+  categoria          String   @db.VarChar(120)
+  titulo             String   @db.VarChar(200)
+  descricao          String?
+  responsavel        String?  @db.VarChar(160)
+  host_url           String?  @db.VarChar(300)
+  porta              Int?
+  login              String?  @db.VarChar(160)
+  segredo_ciphertext String?
+  segredo_iv         String?
+  segredo_tag        String?
+  tags               String?  @db.VarChar(300)
+  status             Boolean  @default(true)
+  criado_em          DateTime @default(now()) @db.Timestamp(6)
+  criado_por         String?  @db.VarChar(120)
+  atualizado_em      DateTime @default(now()) @db.Timestamp(6)
+  atualizado_por     String?  @db.VarChar(120)
+}
+
+model gerenciamento_dados {
+  id                       BigInt   @id @default(autoincrement())
+  frequencia               String   @db.VarChar(20)
+  horario_execucao         String   @db.VarChar(8)
+  horario_incremental      String   @db.VarChar(8)
+  retencao_dias            Int
+  automacao_ativa          Boolean  @default(true)
+  limite_banda             Int      @default(65)
+  pausar_horario_comercial Boolean  @default(true)
+  provedor                 String   @db.VarChar(20)
+  caminho_destino          String?  @db.VarChar(200)
+  bucket_nome              String?  @db.VarChar(120)
+  criptografia             Boolean  @default(true)
+  compressao               String   @db.VarChar(20)
+  verificar_integridade    Boolean  @default(true)
+  email_notificacao        String?  @db.VarChar(160)
+  copia_externa            Boolean  @default(true)
+  alertas                  Boolean  @default(true)
+  deteccao_anomalia        Boolean  @default(true)
+  auto_verificacao         Boolean  @default(true)
+  integracoes              String?  @db.VarChar(40)
+  simulacao_retencao       Boolean  @default(true)
+  criado_em                DateTime @default(now()) @db.Timestamp(6)
+  atualizado_em            DateTime @default(now()) @db.Timestamp(6)
+}
+
+model gerenciamento_dados_backup {
+  id            BigInt   @id @default(autoincrement())
+  codigo        String   @db.VarChar(30)
+  rotulo        String   @db.VarChar(200)
+  tipo          String   @db.VarChar(20)
+  status        String   @db.VarChar(20)
+  iniciado_em   DateTime @db.Timestamp(6)
+  armazenado_em String?  @db.VarChar(60)
+  tamanho       String?  @db.VarChar(40)
+  criptografado Boolean  @default(false)
+  retencao_dias Int
+  criado_em     DateTime @default(now()) @db.Timestamp(6)
+  atualizado_em DateTime @default(now()) @db.Timestamp(6)
+}
+
+model historico_versao_sistema {
+  id        BigInt   @id @default(autoincrement())
+  versao    String   @db.VarChar(50)
+  descricao String?
+  criado_em DateTime @default(now()) @db.Timestamp(6)
+}
+
+model imagens_unidade {
+  id                   BigInt              @id @default(autoincrement())
+  unidade_id           BigInt              @unique
+  logomarca            String?
+  logomarca_relatorio  String?
+  criado_em            DateTime            @default(now()) @db.Timestamp(6)
+  atualizado_em        DateTime            @default(now()) @db.Timestamp(6)
+  unidade_assistencial UnidadeAssistencial @relation(fields: [unidade_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model lancamento_financeiro {
+  id                  BigInt               @id @default(autoincrement())
+  tipo                String               @db.VarChar(20)
+  descricao           String               @db.VarChar(200)
+  contraparte         String               @db.VarChar(200)
+  vencimento          DateTime             @db.Date
+  valor               Decimal              @db.Decimal(12, 2)
+  situacao            String               @db.VarChar(20)
+  criado_em           DateTime             @default(now()) @db.Timestamp(6)
+  atualizado_em       DateTime             @default(now()) @db.Timestamp(6)
+  compra_id           BigInt?
+  autorizacao_compras autorizacao_compras? @relation(fields: [compra_id], references: [id], onUpdate: NoAction)
+}
+
+model lembretes_diarios {
+  id                  BigInt    @id @default(autoincrement())
+  titulo              String    @db.VarChar(200)
+  descricao           String?
+  data_inicial        DateTime  @db.Date
+  recorrencia         String    @db.VarChar(20)
+  hora_aviso          DateTime? @db.Time(6)
+  status              String    @db.VarChar(20)
+  proxima_execucao_em DateTime  @db.Timestamp(6)
+  adiado_ate          DateTime? @db.Timestamp(6)
+  concluido_em        DateTime? @db.Timestamp(6)
+  deletado_em         DateTime? @db.Timestamp(6)
+  criado_em           DateTime  @default(now()) @db.Timestamp(6)
+  atualizado_em       DateTime  @default(now()) @db.Timestamp(6)
+  usuario_id          BigInt?
+  todos_usuarios      Boolean   @default(false)
+}
+
+model manual_sistema_mudancas {
+  id                  BigInt   @id @default(autoincrement())
+  data_mudanca        DateTime @default(now()) @db.Timestamp(6)
+  autor               String?  @db.VarChar(120)
+  modulo              String?  @db.VarChar(120)
+  tela                String?  @db.VarChar(120)
+  tipo                String?  @db.VarChar(30)
+  descricao_curta     String?  @db.VarChar(200)
+  descricao_detalhada String?
+  versao_build        String?  @db.VarChar(40)
+  links               String?
+  criado_em           DateTime @default(now()) @db.Timestamp(6)
+
+  @@index([data_mudanca(sort: Desc)], map: "manual_sistema_mudancas_data_idx")
+}
+
+model manual_sistema_secoes {
+  id             BigInt   @id @default(autoincrement())
+  slug           String   @unique @db.VarChar(120)
+  titulo         String   @db.VarChar(200)
+  conteudo       String?
+  ordem          Int      @default(0)
+  tags           String?  @db.VarChar(300)
+  atualizado_em  DateTime @default(now()) @db.Timestamp(6)
+  atualizado_por String?  @db.VarChar(120)
+  versao         String?  @db.VarChar(40)
+}
+
+model movimentacao_financeira {
+  id                BigInt          @id @default(autoincrement())
+  tipo              String          @db.VarChar(20)
+  descricao         String          @db.VarChar(200)
+  contraparte       String?         @db.VarChar(200)
+  categoria         String?         @db.VarChar(80)
+  conta_bancaria_id BigInt?
+  data_movimentacao DateTime        @db.Date
+  valor             Decimal         @db.Decimal(12, 2)
+  criado_em         DateTime        @default(now()) @db.Timestamp(6)
+  doacao_id         BigInt?
+  conta_bancaria    conta_bancaria? @relation(fields: [conta_bancaria_id], references: [id], onUpdate: NoAction)
+}
+
+model movimentacao_vinculo_kit {
+  id                                                                                                      BigInt                    @id @default(autoincrement())
+  movimentacao_principal_id                                                                               BigInt
+  movimentacao_gerada_id                                                                                  BigInt
+  criado_em                                                                                               DateTime                  @default(now()) @db.Timestamp(6)
+  almoxarifado_movimentacao_movimentacao_vinculo_kit_movimentacao_gerada_idToalmoxarifado_movimentacao    almoxarifado_movimentacao @relation("movimentacao_vinculo_kit_movimentacao_gerada_idToalmoxarifado_movimentacao", fields: [movimentacao_gerada_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  almoxarifado_movimentacao_movimentacao_vinculo_kit_movimentacao_principal_idToalmoxarifado_movimentacao almoxarifado_movimentacao @relation("movimentacao_vinculo_kit_movimentacao_principal_idToalmoxarifado_movimentacao", fields: [movimentacao_principal_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([movimentacao_principal_id, movimentacao_gerada_id])
+  @@index([movimentacao_principal_id], map: "movimentacao_vinculo_kit_principal_idx")
+}
+
+model ocorrencia_crianca {
+  id                           BigInt                     @id @default(autoincrement())
+  data_preenchimento           DateTime                   @db.Date
+  local_violencia              String?                    @db.VarChar(60)
+  local_violencia_outro        String?                    @db.VarChar(200)
+  violencia_motivada_por       Json?
+  violencia_motivada_outro     String?                    @db.VarChar(200)
+  violencia_praticada_por      Json?
+  violencia_praticada_outro    String?                    @db.VarChar(200)
+  outras_violacoes             Json?
+  vitima_nome                  String                     @db.VarChar(200)
+  vitima_idade                 Int
+  vitima_raca_cor              String?                    @db.VarChar(40)
+  vitima_identidade_genero     String?                    @db.VarChar(60)
+  vitima_orientacao_sexual     String?                    @db.VarChar(40)
+  vitima_orientacao_outro      String?                    @db.VarChar(120)
+  vitima_escolaridade          String?                    @db.VarChar(40)
+  vitima_responsavel_tipo      String?                    @db.VarChar(20)
+  vitima_responsavel_nome      String?                    @db.VarChar(200)
+  vitima_telefone_responsavel  String?                    @db.VarChar(40)
+  vitima_endereco_logradouro   String?                    @db.VarChar(200)
+  vitima_endereco_complemento  String?                    @db.VarChar(200)
+  vitima_endereco_bairro       String?                    @db.VarChar(120)
+  vitima_endereco_municipio    String?                    @db.VarChar(120)
+  autor_nome                   String?                    @db.VarChar(200)
+  autor_idade                  Int?
+  autor_nao_consta             Boolean?
+  autor_parentesco             String?                    @db.VarChar(20)
+  autor_parentesco_grau        String?                    @db.VarChar(200)
+  autor_responsavel_tipo       String?                    @db.VarChar(20)
+  autor_responsavel_nome       String?                    @db.VarChar(200)
+  autor_responsavel_telefone   String?                    @db.VarChar(40)
+  autor_responsavel_nao_consta Boolean?
+  autor_endereco_logradouro    String?                    @db.VarChar(200)
+  autor_endereco_complemento   String?                    @db.VarChar(200)
+  autor_endereco_bairro        String?                    @db.VarChar(120)
+  autor_endereco_municipio     String?                    @db.VarChar(120)
+  autor_endereco_nao_consta    Boolean?
+  tipificacao_violencia        Json?
+  tipificacao_psicologica      Json?
+  tipificacao_sexual           Json?
+  violencia_autoprovocada      Json?
+  outro_tipo_violencia         String?
+  resumo_violencia             String
+  encaminhar_conselho          Boolean?
+  encaminhar_motivo            String?
+  data_envio_conselho          DateTime?                  @db.Date
+  denuncia_origem              Json?
+  denuncia_origem_outro        String?                    @db.VarChar(200)
+  criado_em                    DateTime                   @default(now()) @db.Timestamp(6)
+  atualizado_em                DateTime                   @default(now()) @db.Timestamp(6)
+  ocorrencia_crianca_anexo     ocorrencia_crianca_anexo[]
+
+  @@index([data_preenchimento(sort: Desc)], map: "ocorrencia_crianca_data_idx")
+}
+
+model ocorrencia_crianca_anexo {
+  id                 BigInt             @id @default(autoincrement())
+  ocorrencia_id      BigInt
+  nome_arquivo       String             @db.VarChar(200)
+  tipo_mime          String             @db.VarChar(120)
+  conteudo_base64    String
+  ordem              Int
+  criado_em          DateTime           @default(now()) @db.Timestamp(6)
+  atualizado_em      DateTime           @default(now()) @db.Timestamp(6)
+  ocorrencia_crianca ocorrencia_crianca @relation(fields: [ocorrencia_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([ocorrencia_id], map: "ocorrencia_crianca_anexo_ocorrencia_idx")
+}
+
+model oficios {
+  id                    BigInt               @id @default(autoincrement())
+  tipo                  String               @db.VarChar(20)
+  numero                String               @db.VarChar(120)
+  data                  DateTime             @db.Date
+  setor_origem          String               @db.VarChar(200)
+  responsavel           String               @db.VarChar(200)
+  destinatario          String               @db.VarChar(200)
+  meio_envio            String               @db.VarChar(120)
+  prazo_resposta        String?              @db.VarChar(120)
+  classificacao         String?              @db.VarChar(120)
+  razao_social          String               @db.VarChar(200)
+  logo_url              String?
+  titulo                String?              @db.VarChar(200)
+  saudacao              String?              @db.VarChar(200)
+  assunto               String               @db.VarChar(300)
+  corpo                 String
+  finalizacao           String?
+  assinatura_nome       String?              @db.VarChar(200)
+  assinatura_cargo      String?              @db.VarChar(200)
+  rodape                String?
+  status                String               @db.VarChar(30)
+  protocolo_envio       String?              @db.VarChar(120)
+  data_envio            DateTime?            @db.Date
+  protocolo_recebimento String?              @db.VarChar(120)
+  data_recebimento      DateTime?            @db.Date
+  proximo_destino       String?              @db.VarChar(200)
+  observacoes           String?
+  unidade_id            BigInt?
+  criado_por            BigInt?
+  criado_em             DateTime             @default(now()) @db.Timestamp(6)
+  atualizado_em         DateTime             @default(now()) @db.Timestamp(6)
+  para                  String?              @db.VarChar(200)
+  cargo_para            String?              @db.VarChar(200)
+  pdf_assinado_nome     String?              @db.VarChar(255)
+  pdf_assinado_tipo     String?              @db.VarChar(100)
+  pdf_assinado_conteudo String?
+  usuarios              Usuario?             @relation(fields: [criado_por], references: [id], onUpdate: NoAction)
+  unidade_assistencial  UnidadeAssistencial? @relation(fields: [unidade_id], references: [id], onUpdate: NoAction)
+  oficios_imagens       oficios_imagens[]
+  oficios_tramites      oficios_tramites[]
+
+  @@index([data(sort: Desc)])
+  @@index([numero])
+  @@index([status])
+}
+
+model oficios_imagens {
+  id              BigInt   @id @default(autoincrement())
+  oficio_id       BigInt
+  nome_arquivo    String   @db.VarChar(200)
+  tipo_mime       String   @db.VarChar(60)
+  conteudo_base64 String
+  ordem           Int
+  criado_em       DateTime @default(now()) @db.Timestamp(6)
+  atualizado_em   DateTime @default(now()) @db.Timestamp(6)
+  oficios         oficios  @relation(fields: [oficio_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([oficio_id], map: "oficios_imagens_oficio_idx")
+}
+
+model oficios_tramites {
+  id            BigInt    @id @default(autoincrement())
+  oficio_id     BigInt
+  data          DateTime? @db.Date
+  origem        String?   @db.VarChar(200)
+  destino       String?   @db.VarChar(200)
+  responsavel   String?   @db.VarChar(200)
+  acao          String    @db.VarChar(200)
+  observacoes   String?
+  criado_em     DateTime  @default(now()) @db.Timestamp(6)
+  atualizado_em DateTime  @default(now()) @db.Timestamp(6)
+  oficios       oficios   @relation(fields: [oficio_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([oficio_id], map: "oficios_tramites_oficio_idx")
+}
+
+model patrimonio_item {
+  id                      BigInt                    @id @default(autoincrement())
+  numero_patrimonio       String                    @db.VarChar(60)
+  nome                    String                    @db.VarChar(200)
+  categoria               String?                   @db.VarChar(120)
+  subcategoria            String?                   @db.VarChar(120)
+  conservacao             String?                   @db.VarChar(60)
+  status                  String?                   @db.VarChar(60)
+  data_aquisicao          DateTime?                 @db.Date
+  valor_aquisicao         Decimal?                  @db.Decimal(14, 2)
+  origem                  String?                   @db.VarChar(120)
+  responsavel             String?                   @db.VarChar(150)
+  unidade                 String?                   @db.VarChar(120)
+  sala                    String?                   @db.VarChar(120)
+  taxa_depreciacao        Decimal?                  @db.Decimal(5, 2)
+  observacoes             String?
+  criado_em               DateTime                  @default(now()) @db.Timestamp(6)
+  atualizado_em           DateTime                  @default(now()) @db.Timestamp(6)
+  doacao_id               BigInt?
+  patrimonio_movimentacao patrimonio_movimentacao[]
+}
+
+model patrimonio_movimentacao {
+  id              BigInt          @id @default(autoincrement())
+  patrimonio_id   BigInt
+  tipo            String          @db.VarChar(30)
+  destino         String?         @db.VarChar(150)
+  responsavel     String?         @db.VarChar(150)
+  observacao      String?
+  data_movimento  DateTime        @db.Date
+  criado_em       DateTime        @default(now()) @db.Timestamp(6)
+  patrimonio_item patrimonio_item @relation(fields: [patrimonio_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model plano_trabalho {
+  id                        BigInt                      @id @default(autoincrement())
+  codigo_interno            String                      @db.VarChar(40)
+  titulo                    String                      @db.VarChar(200)
+  descricao_geral           String
+  status                    String                      @db.VarChar(20)
+  orgao_concedente          String?                     @db.VarChar(40)
+  orgao_outro_descricao     String?                     @db.VarChar(200)
+  area_programa             String?                     @db.VarChar(120)
+  data_elaboracao           DateTime?                   @db.Date
+  data_aprovacao            DateTime?                   @db.Date
+  vigencia_inicio           DateTime?                   @db.Date
+  vigencia_fim              DateTime?                   @db.Date
+  termo_fomento_id          BigInt
+  numero_processo           String?                     @db.VarChar(120)
+  modalidade                String?                     @db.VarChar(120)
+  observacoes_vinculacao    String?
+  arquivo_formato           String?                     @db.VarChar(20)
+  criado_em                 DateTime                    @default(now()) @db.Timestamp(6)
+  atualizado_em             DateTime                    @default(now()) @db.Timestamp(6)
+  termo_fomento             termo_fomento               @relation(fields: [termo_fomento_id], references: [id], onUpdate: NoAction)
+  plano_trabalho_cronograma plano_trabalho_cronograma[]
+  plano_trabalho_equipe     plano_trabalho_equipe[]
+  plano_trabalho_metas      plano_trabalho_metas[]
+
+  @@index([status])
+  @@index([termo_fomento_id], map: "plano_trabalho_termo_idx")
+}
+
+model plano_trabalho_atividades {
+  id                    BigInt                  @id @default(autoincrement())
+  meta_id               BigInt
+  descricao             String
+  justificativa         String?
+  publico_alvo          String?
+  local_execucao        String?
+  produto_esperado      String?
+  criado_em             DateTime                @default(now()) @db.Timestamp(6)
+  plano_trabalho_metas  plano_trabalho_metas    @relation(fields: [meta_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  plano_trabalho_etapas plano_trabalho_etapas[]
+
+  @@index([meta_id], map: "plano_trabalho_atividades_meta_idx")
+}
+
+model plano_trabalho_cronograma {
+  id                   BigInt         @id @default(autoincrement())
+  plano_trabalho_id    BigInt
+  referencia_tipo      String?        @db.VarChar(40)
+  referencia_id        String?        @db.VarChar(40)
+  referencia_descricao String?
+  competencia          String         @db.VarChar(20)
+  descricao_resumida   String?
+  valor_previsto       Decimal?       @db.Decimal(14, 2)
+  fonte_recurso        String?        @db.VarChar(60)
+  natureza_despesa     String?        @db.VarChar(120)
+  observacoes          String?
+  criado_em            DateTime       @default(now()) @db.Timestamp(6)
+  plano_trabalho       plano_trabalho @relation(fields: [plano_trabalho_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([plano_trabalho_id], map: "plano_trabalho_cronograma_plano_idx")
+}
+
+model plano_trabalho_equipe {
+  id                BigInt         @id @default(autoincrement())
+  plano_trabalho_id BigInt
+  nome              String         @db.VarChar(200)
+  funcao            String?        @db.VarChar(200)
+  cpf               String?        @db.VarChar(20)
+  carga_horaria     String?        @db.VarChar(80)
+  tipo_vinculo      String?        @db.VarChar(120)
+  contato           String?        @db.VarChar(200)
+  criado_em         DateTime       @default(now()) @db.Timestamp(6)
+  plano_trabalho    plano_trabalho @relation(fields: [plano_trabalho_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([plano_trabalho_id], map: "plano_trabalho_equipe_plano_idx")
+}
+
+model plano_trabalho_etapas {
+  id                        BigInt                    @id @default(autoincrement())
+  atividade_id              BigInt
+  descricao                 String
+  status                    String?                   @db.VarChar(30)
+  data_inicio_prevista      DateTime?                 @db.Date
+  data_fim_prevista         DateTime?                 @db.Date
+  data_conclusao            DateTime?                 @db.Date
+  responsavel               String?                   @db.VarChar(200)
+  criado_em                 DateTime                  @default(now()) @db.Timestamp(6)
+  plano_trabalho_atividades plano_trabalho_atividades @relation(fields: [atividade_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([atividade_id], map: "plano_trabalho_etapas_atividade_idx")
+}
+
+model plano_trabalho_metas {
+  id                        BigInt                      @id @default(autoincrement())
+  plano_trabalho_id         BigInt
+  codigo                    String?                     @db.VarChar(60)
+  descricao                 String
+  indicador                 String?
+  unidade_medida            String?                     @db.VarChar(60)
+  quantidade_prevista       Decimal?                    @db.Decimal(14, 2)
+  resultado_esperado        String?
+  criado_em                 DateTime                    @default(now()) @db.Timestamp(6)
+  plano_trabalho_atividades plano_trabalho_atividades[]
+  plano_trabalho            plano_trabalho              @relation(fields: [plano_trabalho_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([plano_trabalho_id], map: "plano_trabalho_metas_plano_idx")
+}
+
+model produtos_kit_composicao {
+  id                                                                           BigInt            @id @default(autoincrement())
+  produto_kit_id                                                               BigInt
+  produto_item_id                                                              BigInt
+  quantidade_item                                                              Decimal           @db.Decimal(12, 4)
+  ativo                                                                        Boolean           @default(true)
+  criado_em                                                                    DateTime          @default(now()) @db.Timestamp(6)
+  atualizado_em                                                                DateTime          @default(now()) @db.Timestamp(6)
+  almoxarifado_item_produtos_kit_composicao_produto_item_idToalmoxarifado_item almoxarifado_item @relation("produtos_kit_composicao_produto_item_idToalmoxarifado_item", fields: [produto_item_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  almoxarifado_item_produtos_kit_composicao_produto_kit_idToalmoxarifado_item  almoxarifado_item @relation("produtos_kit_composicao_produto_kit_idToalmoxarifado_item", fields: [produto_kit_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([produto_kit_id, produto_item_id])
+  @@index([produto_kit_id], map: "produtos_kit_composicao_kit_idx")
+}
+
+model prontuario_anexos {
+  id                   BigInt               @id @default(autoincrement())
+  registro_id          BigInt
+  nome_arquivo         String               @db.VarChar(200)
+  tipo_mime            String?              @db.VarChar(80)
+  url_arquivo          String
+  criado_em            DateTime             @default(now()) @db.Timestamp(6)
+  prontuario_registros prontuario_registros @relation(fields: [registro_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model prontuario_registros {
+  id                                                     BigInt                  @id @default(autoincrement())
+  beneficiario_id                                        BigInt
+  tipo                                                   String                  @db.VarChar(40)
+  data_registro                                          DateTime                @db.Timestamp(6)
+  profissional_id                                        BigInt?
+  unidade_id                                             BigInt?
+  titulo                                                 String?                 @db.VarChar(200)
+  descricao                                              String
+  dados_extra                                            Json?
+  status                                                 String                  @default("aberto") @db.VarChar(20)
+  criado_em                                              DateTime                @default(now()) @db.Timestamp(6)
+  criado_por                                             BigInt?
+  atualizado_em                                          DateTime                @default(now()) @db.Timestamp(6)
+  atualizado_por                                         BigInt?
+  familia_id                                             BigInt?
+  referencia_origem_tipo                                 String?                 @db.VarChar(40)
+  referencia_origem_id                                   BigInt?
+  nivel_sigilo                                           String?                 @db.VarChar(30)
+  prontuario_anexos                                      prontuario_anexos[]
+  usuarios_prontuario_registros_atualizado_porTousuarios Usuario?                @relation("prontuario_registros_atualizado_porTousuarios", fields: [atualizado_por], references: [id], onUpdate: NoAction)
+  cadastro_beneficiario                                  CadastroBeneficiario    @relation(fields: [beneficiario_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  usuarios_prontuario_registros_criado_porTousuarios     Usuario?                @relation("prontuario_registros_criado_porTousuarios", fields: [criado_por], references: [id], onUpdate: NoAction)
+  vinculo_familiar                                       VinculoFamiliar?        @relation(fields: [familia_id], references: [id], onUpdate: NoAction)
+  cadastro_profissionais                                 cadastro_profissionais? @relation(fields: [profissional_id], references: [id], onUpdate: NoAction)
+  unidade_assistencial                                   UnidadeAssistencial?    @relation(fields: [unidade_id], references: [id], onUpdate: NoAction)
+
+  @@index([beneficiario_id, data_registro(sort: Desc)], map: "prontuario_registros_beneficiario_data_idx")
+  @@index([familia_id], map: "prontuario_registros_familia_idx")
+  @@index([profissional_id], map: "prontuario_registros_profissional_idx")
+  @@index([tipo])
+}
+
+model recebimento_doacao {
+  id                      BigInt                    @id @default(autoincrement())
+  doador_id               BigInt?
+  tipo_doacao             String                    @db.VarChar(40)
+  descricao               String?
+  valor                   Decimal?                  @db.Decimal(12, 2)
+  data_recebimento        DateTime                  @db.Date
+  forma_recebimento       String?                   @db.VarChar(60)
+  recorrente              Boolean                   @default(false)
+  periodicidade           String?                   @db.VarChar(40)
+  proxima_cobranca        DateTime?                 @db.Date
+  status                  String                    @db.VarChar(40)
+  observacoes             String?
+  contabilidade_pendente  Boolean                   @default(false)
+  criado_em               DateTime                  @default(now()) @db.Timestamp(6)
+  atualizado_em           DateTime                  @default(now()) @db.Timestamp(6)
+  quantidade_itens        Int?
+  valor_medio             Decimal?                  @db.Decimal(12, 2)
+  valor_total             Decimal?                  @db.Decimal(12, 2)
+  lancamentos_gerados     Boolean                   @default(false)
+  conta_recebimento_id    BigInt?
+  doador                  doador?                   @relation(fields: [doador_id], references: [id], onUpdate: NoAction)
+  recebimento_doacao_item recebimento_doacao_item[]
+}
+
+model recebimento_doacao_item {
+  id                    BigInt             @id @default(autoincrement())
+  recebimento_doacao_id BigInt
+  descricao             String             @db.VarChar(200)
+  quantidade            Int
+  unidade               String?            @db.VarChar(20)
+  valor_unitario        Decimal?           @db.Decimal(12, 2)
+  valor_total           Decimal?           @db.Decimal(12, 2)
+  marca                 String?            @db.VarChar(120)
+  modelo                String?            @db.VarChar(120)
+  conservacao           String?            @db.VarChar(80)
+  observacoes           String?
+  criado_em             DateTime           @default(now()) @db.Timestamp(6)
+  recebimento_doacao    recebimento_doacao @relation(fields: [recebimento_doacao_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model rh_arquivo {
+  id                      BigInt                  @id @default(autoincrement())
+  processo_id             BigInt
+  categoria               String                  @db.VarChar(80)
+  tipo_documento          String?                 @db.VarChar(160)
+  nome_arquivo            String                  @db.VarChar(255)
+  mime_type               String                  @db.VarChar(120)
+  tamanho_bytes           BigInt
+  caminho_arquivo         String
+  versao                  Int                     @default(1)
+  criado_por              BigInt?
+  criado_em               DateTime                @default(now()) @db.Timestamp(6)
+  usuarios                Usuario?                @relation(fields: [criado_por], references: [id], onUpdate: NoAction)
+  rh_processo_contratacao rh_processo_contratacao @relation(fields: [processo_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model rh_auditoria_contratacao {
+  id                      BigInt                  @id @default(autoincrement())
+  processo_id             BigInt
+  ator_id                 BigInt?
+  acao                    String                  @db.VarChar(160)
+  detalhes                String?
+  criado_em               DateTime                @default(now()) @db.Timestamp(6)
+  usuarios                Usuario?                @relation(fields: [ator_id], references: [id], onUpdate: NoAction)
+  rh_processo_contratacao rh_processo_contratacao @relation(fields: [processo_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model rh_candidato {
+  id                      BigInt                   @id @default(autoincrement())
+  nome_completo           String                   @db.VarChar(200)
+  cpf                     String?                  @db.VarChar(20)
+  rg                      String?                  @db.VarChar(40)
+  pis                     String?                  @db.VarChar(40)
+  data_nascimento         DateTime?                @db.Date
+  naturalidade            String?                  @db.VarChar(120)
+  estado_civil            String?                  @db.VarChar(60)
+  nome_mae                String?                  @db.VarChar(200)
+  nome_conjuge            String?                  @db.VarChar(200)
+  vaga_pretendida         String?                  @db.VarChar(160)
+  data_preenchimento      DateTime?                @db.Date
+  filhos_possui           Boolean                  @default(false)
+  filhos_json             String?
+  deficiencia_possui      Boolean                  @default(false)
+  deficiencia_tipo        String?                  @db.VarChar(80)
+  deficiencia_descricao   String?
+  endereco_json           String?
+  telefone                String?                  @db.VarChar(40)
+  whatsapp                String?                  @db.VarChar(40)
+  anexos_json             String?
+  ativo                   Boolean                  @default(true)
+  criado_em               DateTime                 @default(now()) @db.Timestamp(6)
+  atualizado_em           DateTime                 @default(now()) @db.Timestamp(6)
+  rh_processo_contratacao rh_processo_contratacao?
+
+  @@index([cpf])
+  @@index([nome_completo], map: "rh_candidato_nome_idx")
+}
+
+model rh_carta_banco {
+  id                      BigInt                  @id @default(autoincrement())
+  processo_id             BigInt                  @unique(map: "rh_carta_banco_processo_unique")
+  dados_json              String?
+  criado_em               DateTime                @default(now()) @db.Timestamp(6)
+  atualizado_em           DateTime                @default(now()) @db.Timestamp(6)
+  rh_processo_contratacao rh_processo_contratacao @relation(fields: [processo_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model rh_configuracao_ponto {
+  id                     BigInt   @id @default(autoincrement())
+  carga_semanal_minutos  Int      @default(2400)
+  carga_seg_qui_minutos  Int      @default(540)
+  carga_sexta_minutos    Int      @default(240)
+  carga_sabado_minutos   Int      @default(0)
+  carga_domingo_minutos  Int      @default(0)
+  tolerancia_minutos     Int      @default(10)
+  atualizado_em          DateTime @default(now()) @db.Timestamp(6)
+  ignorar_validacao_rede Boolean  @default(false)
+}
+
+model rh_documento_item {
+  id                      BigInt                  @id @default(autoincrement())
+  processo_id             BigInt
+  tipo_documento          String                  @db.VarChar(160)
+  obrigatorio             Boolean                 @default(true)
+  status                  String                  @default("pendente") @db.VarChar(30)
+  observacao              String?
+  atualizado_por          BigInt?
+  criado_em               DateTime                @default(now()) @db.Timestamp(6)
+  atualizado_em           DateTime                @default(now()) @db.Timestamp(6)
+  usuarios                Usuario?                @relation(fields: [atualizado_por], references: [id], onUpdate: NoAction)
+  rh_processo_contratacao rh_processo_contratacao @relation(fields: [processo_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([processo_id, tipo_documento], map: "rh_documento_item_unique")
+}
+
+model rh_entrevista {
+  id                      BigInt                  @id @default(autoincrement())
+  processo_id             BigInt
+  tipo_roteiro            String                  @db.VarChar(80)
+  perguntas_json          String?
+  respostas_json          String?
+  parecer                 String?                 @db.VarChar(40)
+  observacoes             String?
+  data_entrevista         DateTime?               @db.Timestamp(6)
+  criado_por              BigInt?
+  criado_em               DateTime                @default(now()) @db.Timestamp(6)
+  usuarios                Usuario?                @relation(fields: [criado_por], references: [id], onUpdate: NoAction)
+  rh_processo_contratacao rh_processo_contratacao @relation(fields: [processo_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model rh_ficha_admissao {
+  id                      BigInt                  @id @default(autoincrement())
+  processo_id             BigInt                  @unique(map: "rh_ficha_admissao_processo_unique")
+  dados_pessoais_json     String?
+  dependentes_json        String?
+  dados_internos_json     String?
+  criado_em               DateTime                @default(now()) @db.Timestamp(6)
+  atualizado_em           DateTime                @default(now()) @db.Timestamp(6)
+  rh_processo_contratacao rh_processo_contratacao @relation(fields: [processo_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model rh_local_ponto {
+  id                  BigInt   @id @default(autoincrement())
+  nome                String   @db.VarChar(150)
+  endereco            String?
+  latitude            Decimal  @db.Decimal(10, 7)
+  longitude           Decimal  @db.Decimal(10, 7)
+  raio_metros         Int
+  accuracy_max_metros Int      @default(80)
+  ativo               Boolean  @default(true)
+  criado_em           DateTime @default(now()) @db.Timestamp(6)
+  atualizado_em       DateTime @default(now()) @db.Timestamp(6)
+}
+
+model rh_ponto_auditoria {
+  id                 BigInt   @id @default(autoincrement())
+  funcionario_id     BigInt?
+  acao               String   @db.VarChar(120)
+  detalhes           String?
+  criado_em          DateTime @default(now()) @db.Timestamp(6)
+  unidade_id         BigInt?
+  tipo_marcacao      String?  @db.VarChar(2)
+  ip_detectado       String?  @db.VarChar(60)
+  user_agent         String?  @db.VarChar(255)
+  data_hora_servidor DateTime @default(now()) @db.Timestamp(6)
+  resultado          String?  @db.VarChar(20)
+  motivo             String?
+  ponto_marcacao_id  BigInt?
+  usuarios           Usuario? @relation(fields: [funcionario_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rh_ponto_auditoria_usuario")
+}
+
+model rh_ponto_dia {
+  id                       BigInt              @id @default(autoincrement())
+  funcionario_id           BigInt
+  data                     DateTime            @db.Date
+  ocorrencia               String              @default("NORMAL") @db.VarChar(30)
+  observacoes              String?
+  carga_prevista_minutos   Int                 @default(0)
+  tolerancia_minutos       Int                 @default(0)
+  total_trabalhado_minutos Int                 @default(0)
+  extras_minutos           Int                 @default(0)
+  faltas_atrasos_minutos   Int                 @default(0)
+  criado_em                DateTime            @default(now()) @db.Timestamp(6)
+  atualizado_em            DateTime            @default(now()) @db.Timestamp(6)
+  usuarios                 Usuario             @relation(fields: [funcionario_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_rh_ponto_dia_usuario")
+  rh_ponto_marcacao        rh_ponto_marcacao[]
+
+  @@unique([funcionario_id, data])
+}
+
+model rh_ponto_marcacao {
+  id                 BigInt       @id @default(autoincrement())
+  ponto_dia_id       BigInt
+  tipo               String       @db.VarChar(2)
+  data_hora_servidor DateTime     @db.Timestamp(6)
+  latitude           Decimal?     @db.Decimal(10, 7)
+  longitude          Decimal?     @db.Decimal(10, 7)
+  accuracy           Decimal?     @db.Decimal(10, 2)
+  distancia_metros   Decimal?     @db.Decimal(10, 2)
+  dentro_perimetro   Boolean?
+  ip                 String?      @db.VarChar(60)
+  user_agent         String?      @db.VarChar(255)
+  criado_em          DateTime     @default(now()) @db.Timestamp(6)
+  rh_ponto_dia       rh_ponto_dia @relation(fields: [ponto_dia_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model rh_ppd {
+  id                      BigInt                  @id @default(autoincrement())
+  processo_id             BigInt                  @unique(map: "rh_ppd_processo_unique")
+  cabecalho_json          String?
+  lado_a_json             String?
+  lado_b_json             String?
+  criado_em               DateTime                @default(now()) @db.Timestamp(6)
+  atualizado_em           DateTime                @default(now()) @db.Timestamp(6)
+  rh_processo_contratacao rh_processo_contratacao @relation(fields: [processo_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model rh_processo_contratacao {
+  id                                                        BigInt                     @id @default(autoincrement())
+  candidato_id                                              BigInt                     @unique(map: "rh_processo_contratacao_candidato_unique")
+  status                                                    String                     @db.VarChar(40)
+  responsavel_id                                            BigInt?
+  gestor_id                                                 BigInt?
+  criado_em                                                 DateTime                   @default(now()) @db.Timestamp(6)
+  atualizado_em                                             DateTime                   @default(now()) @db.Timestamp(6)
+  ultima_movimentacao_em                                    DateTime?                  @db.Timestamp(6)
+  rh_arquivo                                                rh_arquivo[]
+  rh_auditoria_contratacao                                  rh_auditoria_contratacao[]
+  rh_carta_banco                                            rh_carta_banco?
+  rh_documento_item                                         rh_documento_item[]
+  rh_entrevista                                             rh_entrevista[]
+  rh_ficha_admissao                                         rh_ficha_admissao?
+  rh_ppd                                                    rh_ppd?
+  rh_candidato                                              rh_candidato               @relation(fields: [candidato_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  usuarios_rh_processo_contratacao_gestor_idTousuarios      Usuario?                   @relation("rh_processo_contratacao_gestor_idTousuarios", fields: [gestor_id], references: [id], onUpdate: NoAction)
+  usuarios_rh_processo_contratacao_responsavel_idTousuarios Usuario?                   @relation("rh_processo_contratacao_responsavel_idTousuarios", fields: [responsavel_id], references: [id], onUpdate: NoAction)
+  rh_termo                                                  rh_termo[]
+}
+
+model rh_termo {
+  id                      BigInt                  @id @default(autoincrement())
+  processo_id             BigInt
+  tipo                    String                  @db.VarChar(40)
+  dados_json              String?
+  status_assinatura       String?                 @db.VarChar(30)
+  data_assinatura         DateTime?               @db.Date
+  responsavel             String?                 @db.VarChar(120)
+  criado_em               DateTime                @default(now()) @db.Timestamp(6)
+  atualizado_em           DateTime                @default(now()) @db.Timestamp(6)
+  rh_processo_contratacao rh_processo_contratacao @relation(fields: [processo_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([processo_id, tipo], map: "rh_termo_unique")
+}
+
+model salas_unidade {
+  id                   BigInt                @id @default(autoincrement())
+  unidade_id           BigInt
+  nome                 String                @db.VarChar(120)
+  criado_em            DateTime              @default(now()) @db.Timestamp(6)
+  atualizado_em        DateTime              @default(now()) @db.Timestamp(6)
+  cursos_atendimentos  cursos_atendimentos[]
+  unidade_assistencial UnidadeAssistencial   @relation(fields: [unidade_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model senha_chamada {
+  id                   String               @id @db.Uuid
+  fila_id              BigInt
+  nome_beneficiario    String               @db.VarChar(200)
+  local_atendimento    String               @db.VarChar(120)
+  status               String               @db.VarChar(20)
+  data_hora_chamada    DateTime             @db.Timestamp(6)
+  data_hora_criacao    DateTime             @db.Timestamp(6)
+  chamado_por          String               @db.VarChar(120)
+  unidade_id           BigInt?
+  usuario_id           BigInt?
+  senha_fila           senha_fila           @relation(fields: [fila_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  unidade_assistencial UnidadeAssistencial? @relation(fields: [unidade_id], references: [id], onUpdate: NoAction)
+  usuarios             Usuario?             @relation(fields: [usuario_id], references: [id], onUpdate: NoAction)
+
+  @@index([data_hora_chamada(sort: Desc)], map: "senha_chamada_data_idx")
+  @@index([unidade_id], map: "senha_chamada_unidade_idx")
+}
+
+model senha_config {
+  id                          BigInt               @id
+  frase_fala                  String               @db.VarChar(300)
+  rss_url                     String               @db.VarChar(500)
+  velocidade_ticker           Int
+  titulo_tela                 String?              @db.VarChar(120)
+  descricao_tela              String?              @db.VarChar(200)
+  atualizado_em               DateTime             @db.Timestamp(6)
+  quantidade_ultimas_chamadas Int                  @default(4)
+  unidade_painel_id           BigInt?
+  modo_noticias               String?              @db.VarChar(20)
+  noticias_manuais            String?
+  unidade_assistencial        UnidadeAssistencial? @relation(fields: [unidade_painel_id], references: [id], onUpdate: NoAction)
+}
+
+model senha_fila {
+  id                    BigInt               @id @default(autoincrement())
+  beneficiario_id       BigInt
+  status                String               @db.VarChar(20)
+  prioridade            Int                  @default(0)
+  data_hora_entrada     DateTime             @default(now()) @db.Timestamp(6)
+  data_hora_atualizacao DateTime             @default(now()) @db.Timestamp(6)
+  unidade_id            BigInt?
+  usuario_id            BigInt?
+  sala_atendimento      String?              @db.VarChar(120)
+  senha_chamada         senha_chamada[]
+  cadastro_beneficiario CadastroBeneficiario @relation(fields: [beneficiario_id], references: [id], onUpdate: NoAction)
+  unidade_assistencial  UnidadeAssistencial? @relation(fields: [unidade_id], references: [id], onUpdate: NoAction)
+  usuarios              Usuario?             @relation(fields: [usuario_id], references: [id], onUpdate: NoAction)
+
+  @@index([status, prioridade(sort: Desc), data_hora_entrada], map: "senha_fila_prioridade_data_idx")
+  @@index([status])
+  @@index([unidade_id], map: "senha_fila_unidade_idx")
+}
+
+model tarefas_pendencias {
+  id                           BigInt                         @id @default(autoincrement())
+  titulo                       String                         @db.VarChar(200)
+  descricao                    String
+  responsavel                  String                         @db.VarChar(150)
+  prioridade                   String                         @db.VarChar(20)
+  prazo                        DateTime?                      @db.Date
+  status                       String                         @db.VarChar(40)
+  criado_em                    DateTime                       @default(now()) @db.Timestamp(6)
+  atualizado_em                DateTime                       @default(now()) @db.Timestamp(6)
+  tarefas_pendencias_checklist tarefas_pendencias_checklist[]
+  tarefas_pendencias_historico tarefas_pendencias_historico[]
+}
+
+model tarefas_pendencias_checklist {
+  id                 BigInt             @id @default(autoincrement())
+  tarefa_id          BigInt
+  titulo             String             @db.VarChar(200)
+  concluido          Boolean            @default(false)
+  concluido_em       DateTime?          @db.Timestamp(6)
+  ordem              Int
+  criado_em          DateTime           @default(now()) @db.Timestamp(6)
+  atualizado_em      DateTime           @default(now()) @db.Timestamp(6)
+  tarefas_pendencias tarefas_pendencias @relation(fields: [tarefa_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model tarefas_pendencias_historico {
+  id                 BigInt             @id @default(autoincrement())
+  tarefa_id          BigInt
+  mensagem           String             @db.VarChar(500)
+  criado_em          DateTime           @default(now()) @db.Timestamp(6)
+  tarefas_pendencias tarefas_pendencias @relation(fields: [tarefa_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model termo_fomento {
+  id                       BigInt                     @id @default(autoincrement())
+  numero_termo             String                     @db.VarChar(120)
+  tipo_termo               String                     @db.VarChar(20)
+  orgao_concedente         String?                    @db.VarChar(200)
+  data_assinatura          DateTime?                  @db.Date
+  data_inicio_vigencia     DateTime?                  @db.Date
+  data_fim_vigencia        DateTime?                  @db.Date
+  situacao                 String                     @db.VarChar(20)
+  descricao_objeto         String?
+  valor_global             Decimal?                   @db.Decimal(14, 2)
+  responsavel_interno      String?                    @db.VarChar(200)
+  criado_em                DateTime                   @default(now()) @db.Timestamp(6)
+  atualizado_em            DateTime                   @default(now()) @db.Timestamp(6)
+  plano_trabalho           plano_trabalho[]
+  termo_fomento_aditivos   termo_fomento_aditivos[]
+  termo_fomento_documentos termo_fomento_documentos[]
+
+  @@index([numero_termo], map: "termo_fomento_numero_idx")
+  @@index([situacao])
+}
+
+model termo_fomento_aditivos {
+  id                       BigInt                     @id @default(autoincrement())
+  termo_fomento_id         BigInt
+  tipo_aditivo             String                     @db.VarChar(60)
+  data_aditivo             DateTime                   @db.Date
+  nova_data_fim            DateTime?                  @db.Date
+  novo_valor               Decimal?                   @db.Decimal(14, 2)
+  observacoes              String?
+  criado_em                DateTime                   @default(now()) @db.Timestamp(6)
+  atualizado_em            DateTime                   @default(now()) @db.Timestamp(6)
+  termo_fomento            termo_fomento              @relation(fields: [termo_fomento_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  termo_fomento_documentos termo_fomento_documentos[]
+
+  @@index([termo_fomento_id], map: "termo_fomento_aditivos_termo_idx")
+}
+
+model termo_fomento_documentos {
+  id                     BigInt                  @id @default(autoincrement())
+  termo_fomento_id       BigInt
+  aditivo_id             BigInt?
+  tipo_documento         String                  @db.VarChar(20)
+  nome                   String                  @db.VarChar(255)
+  data_url               String?
+  criado_em              DateTime                @default(now()) @db.Timestamp(6)
+  termo_fomento_aditivos termo_fomento_aditivos? @relation(fields: [aditivo_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  termo_fomento          termo_fomento           @relation(fields: [termo_fomento_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([termo_fomento_id], map: "termo_fomento_documentos_termo_idx")
+}
+
+model transparencia {
+  id                         BigInt                       @id @default(autoincrement())
+  unidade_id                 BigInt?
+  total_recebido             Decimal?                     @db.Decimal(14, 2)
+  total_recebido_helper      String?                      @db.VarChar(200)
+  total_aplicado             Decimal?                     @db.Decimal(14, 2)
+  total_aplicado_helper      String?                      @db.VarChar(200)
+  saldo_disponivel           Decimal?                     @db.Decimal(14, 2)
+  saldo_disponivel_helper    String?                      @db.VarChar(200)
+  prestado_mes               Decimal?                     @db.Decimal(14, 2)
+  prestado_mes_helper        String?                      @db.VarChar(200)
+  criado_em                  DateTime                     @default(now()) @db.Timestamp(6)
+  atualizado_em              DateTime                     @default(now()) @db.Timestamp(6)
+  unidade_assistencial       UnidadeAssistencial?         @relation(fields: [unidade_id], references: [id], onUpdate: NoAction)
+  transparencia_checklist    transparencia_checklist[]
+  transparencia_comprovantes transparencia_comprovantes[]
+  transparencia_destinacoes  transparencia_destinacoes[]
+  transparencia_recebimentos transparencia_recebimentos[]
+  transparencia_timelines    transparencia_timelines[]
+
+  @@index([unidade_id], map: "transparencia_unidade_idx")
+}
+
+model transparencia_checklist {
+  id               BigInt        @id @default(autoincrement())
+  transparencia_id BigInt
+  titulo           String        @db.VarChar(200)
+  descricao        String?
+  status           String?       @db.VarChar(30)
+  criado_em        DateTime      @default(now()) @db.Timestamp(6)
+  transparencia    transparencia @relation(fields: [transparencia_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([transparencia_id], map: "transparencia_checklist_idx")
+}
+
+model transparencia_comprovantes {
+  id               BigInt        @id @default(autoincrement())
+  transparencia_id BigInt
+  titulo           String        @db.VarChar(200)
+  descricao        String?
+  arquivo_nome     String?       @db.VarChar(255)
+  arquivo_url      String?
+  criado_em        DateTime      @default(now()) @db.Timestamp(6)
+  transparencia    transparencia @relation(fields: [transparencia_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([transparencia_id], map: "transparencia_comprovantes_idx")
+}
+
+model transparencia_destinacoes {
+  id               BigInt        @id @default(autoincrement())
+  transparencia_id BigInt
+  titulo           String        @db.VarChar(200)
+  descricao        String?
+  percentual       Int?
+  criado_em        DateTime      @default(now()) @db.Timestamp(6)
+  transparencia    transparencia @relation(fields: [transparencia_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([transparencia_id], map: "transparencia_destinacoes_idx")
+}
+
+model transparencia_recebimentos {
+  id               BigInt        @id @default(autoincrement())
+  transparencia_id BigInt
+  fonte            String        @db.VarChar(200)
+  valor            Decimal?      @db.Decimal(14, 2)
+  periodicidade    String?       @db.VarChar(200)
+  status           String?       @db.VarChar(60)
+  criado_em        DateTime      @default(now()) @db.Timestamp(6)
+  transparencia    transparencia @relation(fields: [transparencia_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([transparencia_id], map: "transparencia_recebimentos_idx")
+}
+
+model transparencia_timelines {
+  id               BigInt        @id @default(autoincrement())
+  transparencia_id BigInt
+  titulo           String        @db.VarChar(200)
+  detalhe          String?
+  status           String?       @db.VarChar(30)
+  criado_em        DateTime      @default(now()) @db.Timestamp(6)
+  transparencia    transparencia @relation(fields: [transparencia_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([transparencia_id], map: "transparencia_timelines_idx")
+}
+
+model usuario_recuperacao_senha {
+  id         BigInt    @id @default(autoincrement())
+  usuario_id BigInt
+  token      String    @unique(map: "usuario_recuperacao_senha_token_unique") @db.VarChar(120)
+  expira_em  DateTime  @db.Timestamp(6)
+  usado_em   DateTime? @db.Timestamp(6)
+  criado_em  DateTime  @default(now()) @db.Timestamp(6)
+  usuarios   Usuario   @relation(fields: [usuario_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([usuario_id], map: "usuario_recuperacao_senha_usuario_idx")
+}
+
+model versao_sistema {
+  id            BigInt   @id @default(autoincrement())
+  versao        String   @db.VarChar(50)
+  descricao     String?
+  atualizado_em DateTime @default(now()) @db.Timestamp(6)
+}
+
+model visita_domiciliar {
+  id                         BigInt                    @id @default(autoincrement())
+  beneficiario_id            BigInt
+  unidade                    String                    @db.VarChar(200)
+  responsavel                String                    @db.VarChar(150)
+  data_visita                DateTime                  @db.Date
+  horario_inicial            DateTime                  @db.Time(6)
+  horario_final              DateTime?                 @db.Time(6)
+  tipo_visita                String?                   @db.VarChar(80)
+  situacao                   String                    @db.VarChar(30)
+  usar_endereco_beneficiario Boolean                   @default(true)
+  endereco                   Json?
+  observacoes_iniciais       String?
+  condicoes                  Json?
+  situacao_social            Json?
+  registro                   Json?
+  criado_em                  DateTime                  @default(now()) @db.Timestamp(6)
+  atualizado_em              DateTime                  @default(now()) @db.Timestamp(6)
+  cadastro_beneficiario      CadastroBeneficiario      @relation(fields: [beneficiario_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  visita_domiciliar_anexo    visita_domiciliar_anexo[]
+
+  @@index([beneficiario_id], map: "visita_domiciliar_beneficiario_idx")
+  @@index([data_visita(sort: Desc)], map: "visita_domiciliar_data_idx")
+}
+
+model visita_domiciliar_anexo {
+  id                BigInt            @id @default(autoincrement())
+  visita_id         BigInt
+  nome              String            @db.VarChar(200)
+  tipo              String            @db.VarChar(60)
+  tamanho           String?           @db.VarChar(40)
+  criado_em         DateTime          @default(now()) @db.Timestamp(6)
+  visita_domiciliar visita_domiciliar @relation(fields: [visita_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+enum chamado_acao_tipo {
+  CRIACAO
+  COMENTARIO
+  MUDANCA_STATUS
+  ATRIBUICAO
+  ANEXO
+  EDICAO
+  VINCULO
+  REGISTRO_ATIVIDADE
+}
+
+enum chamado_impacto {
+  BAIXO
+  MEDIO
+  ALTO
+}
+
+enum chamado_prioridade {
+  BAIXA
+  MEDIA
+  ALTA
+  CRITICA
+}
+
+enum chamado_status {
+  ABERTO
+  EM_ANALISE
+  EM_DESENVOLVIMENTO
+  EM_TESTE
+  AGUARDANDO_CLIENTE
+  RESOLVIDO
+  CANCELADO
+  REABERTO
+  FECHADO
+}
+
+enum chamado_tipo {
+  ERRO
+  MELHORIA
+  CORRECAO
+  NOVA_IMPLEMENTACAO
+}

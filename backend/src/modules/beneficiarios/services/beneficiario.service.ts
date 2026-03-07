@@ -5,12 +5,28 @@ import {
 } from "../beneficiario.schema.js";
 import { mapBeneficiarioToResponse } from "../beneficiario.mapper.js";
 import { BeneficiarioRepository } from "../repositories/beneficiario.repository.js";
+import {
+  mapaCamposTextoBeneficiario,
+  mapaDocumentoBeneficiario
+} from "../../../utils/text-format-config.js";
+import { normalizarObjetoTexto } from "../../../utils/text-formatter.js";
 
 export class BeneficiarioService {
   private readonly repository = new BeneficiarioRepository();
 
   async listar(rawFilters: unknown) {
-    const filters = beneficiarioFiltersSchema.parse(rawFilters);
+    const filtersNormalizados =
+      rawFilters && typeof rawFilters === "object"
+        ? normalizarObjetoTexto(
+            rawFilters as Record<string, unknown>,
+            {
+              nome: "nomePessoa",
+              status: "textoCurto"
+            }
+          )
+        : rawFilters;
+
+    const filters = beneficiarioFiltersSchema.parse(filtersNormalizados);
     const beneficiarios = await this.repository.listar(filters);
     return beneficiarios.map(mapBeneficiarioToResponse);
   }
@@ -22,14 +38,16 @@ export class BeneficiarioService {
   }
 
   async criar(rawInput: unknown) {
-    const input = beneficiarioInputSchema.parse(rawInput);
+    const inputNormalizado = this.normalizarPayload(rawInput);
+    const input = beneficiarioInputSchema.parse(inputNormalizado);
     const beneficiario = await this.repository.criar(input);
     return mapBeneficiarioToResponse(beneficiario);
   }
 
   async atualizar(rawId: string, rawInput: unknown) {
     const id = this.parseId(rawId);
-    const input = beneficiarioInputSchema.parse(rawInput);
+    const inputNormalizado = this.normalizarPayload(rawInput);
+    const input = beneficiarioInputSchema.parse(inputNormalizado);
     const beneficiario = await this.repository.atualizar(id, input);
     return mapBeneficiarioToResponse(beneficiario);
   }
@@ -50,5 +68,25 @@ export class BeneficiarioService {
       throw new AppError("Identificador de beneficiario invalido.", 400);
     }
     return BigInt(id);
+  }
+
+  private normalizarPayload(rawInput: unknown) {
+    if (!rawInput || typeof rawInput !== "object") {
+      return rawInput;
+    }
+
+    const inputBase = normalizarObjetoTexto(
+      rawInput as Record<string, unknown>,
+      mapaCamposTextoBeneficiario
+    );
+
+    if (Array.isArray(inputBase.documentos_obrigatorios)) {
+      inputBase.documentos_obrigatorios = inputBase.documentos_obrigatorios.map((documento) => {
+        if (!documento || typeof documento !== "object") return documento;
+        return normalizarObjetoTexto(documento as Record<string, unknown>, mapaDocumentoBeneficiario);
+      });
+    }
+
+    return inputBase;
   }
 }

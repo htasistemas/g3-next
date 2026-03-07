@@ -4490,15 +4490,27 @@ CREATE INDEX IF NOT EXISTS doacao_planejada_status_data_idx
 CREATE INDEX IF NOT EXISTS doacao_planejada_beneficiario_idx
   ON doacao_planejada (beneficiario_id);
 
+CREATE TABLE IF NOT EXISTS parametros_sistema (
+  id BIGSERIAL PRIMARY KEY,
+  chave VARCHAR(100) NOT NULL UNIQUE,
+  valor_json JSONB NOT NULL,
+  criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+  atualizado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+  atualizado_por VARCHAR(120)
+);
+
+CREATE INDEX IF NOT EXISTS parametros_sistema_chave_idx
+  ON parametros_sistema (chave);
+
 UPDATE versao_sistema
-SET versao = '1.00.109',
-  descricao = 'Seguranca de autenticacao, padronizacao de APIs e otimizacoes de busca.',
+SET versao = '1.00.110',
+  descricao = 'Cadastro de unidade assistencial em React e parametros de personalizacao visual.',
   atualizado_em = NOW()
-WHERE versao <> '1.00.109';
+WHERE versao <> '1.00.110';
 
 INSERT INTO historico_versao_sistema (versao, descricao, criado_em)
-SELECT '1.00.109', 'Seguranca de autenticacao, padronizacao de APIs e otimizacoes de busca.', NOW()
+SELECT '1.00.110', 'Cadastro de unidade assistencial em React e parametros de personalizacao visual.', NOW()
 WHERE NOT EXISTS (
   SELECT 1 FROM historico_versao_sistema
-  WHERE versao = '1.00.109'
+  WHERE versao = '1.00.110'
 );

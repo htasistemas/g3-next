@@ -7,7 +7,8 @@
     "outDir": "./out-tsc/app",
     "types": [],
     "paths": {
-      "@nit-sst/cboservice/*": ["node_modules/@nit-sst/cboservice/*"]
+      "@nit-sst/cboservice/*": ["node_modules/@nit-sst/cboservice/*"],
+      "@/*": ["src/*"]
     }
   },
   "include": [

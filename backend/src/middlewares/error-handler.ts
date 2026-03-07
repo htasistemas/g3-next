@@ -20,6 +20,15 @@ export function errorHandler(
     });
   }
 
+  if (
+    error instanceof SyntaxError &&
+    typeof error === "object" &&
+    error !== null &&
+    "body" in error
+  ) {
+    return response.status(400).json({ message: "JSON invalido na requisicao." });
+  }
+
   console.error(error);
   return response.status(500).json({ message: "Erro interno do servidor." });
 }

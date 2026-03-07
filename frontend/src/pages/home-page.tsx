@@ -7,18 +7,24 @@ export function HomePage() {
     <main className="g3-container">
       <Card className="mx-auto max-w-3xl">
         <CardHeader>
-          <CardTitle>Migracao G3 - Base React/Node</CardTitle>
+          <CardTitle>Migração G3 - Base React/Node</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-slate-600">
-            Esta base inicia a migracao do sistema G3 para a nova arquitetura.
+            Esta base inicia a migração do sistema G3 para a nova arquitetura.
           </p>
           <div className="flex flex-wrap gap-2">
             <Button asChild>
-              <Link to="/cadastros/beneficiarios">Abrir Cadastro de Beneficiario</Link>
+              <Link to="/cadastros/beneficiarios">Abrir cadastro de beneficiário</Link>
             </Button>
             <Button variant="outline" asChild>
-              <Link to="/cadastros/vinculo-familiar">Abrir Vinculo Familiar</Link>
+              <Link to="/cadastros/unidades-assistenciais">Abrir cadastro de unidade assistencial</Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link to="/cadastros/vinculo-familiar">Abrir cadastro de vínculo familiar</Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link to="/configuracoes/parametros-sistema">Abrir parâmetros do sistema</Link>
             </Button>
           </div>
         </CardContent>

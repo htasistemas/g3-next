@@ -12,10 +12,12 @@ export type BeneficiarioStatus = (typeof beneficiarioStatusValues)[number];
 export type DocumentoObrigatorioInput = {
   id?: string | number;
   nome: string;
+  numeroDocumento?: string;
   nomeArquivo?: string;
   caminhoArquivo?: string;
   contentType?: string;
   obrigatorio?: boolean;
+  ignorado?: boolean;
   conteudo?: string;
 };
 

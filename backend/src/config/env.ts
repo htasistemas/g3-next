@@ -20,7 +20,7 @@ const envSchema = z.object({
     .string()
     .min(1)
     .default(
-      "http://localhost:5173,http://127.0.0.1:5173,http://localhost:4200,http://127.0.0.1:4200"
+      "http://localhost:5173,http://127.0.0.1:5173,http://0.0.0.0:5173,http://localhost:4200,http://127.0.0.1:4200,http://0.0.0.0:4200"
     ),
   DATABASE_URL: z.string().min(1, "DATABASE_URL nao configurada"),
   APP_AUTH_TOKEN_SECRET: z.string().min(16).default("g3-next-dev-token-secret-2026"),

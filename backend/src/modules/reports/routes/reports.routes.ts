@@ -8,7 +8,27 @@ export const reportsRoutes = Router();
 
 reportsRoutes.post("/authorization-term", asyncHandler(controller.termoAutorizacao.bind(controller)));
 reportsRoutes.post(
+  "/unidades-assistenciais/relacao",
+  asyncHandler(controller.relacaoUnidadesAssistenciais.bind(controller))
+);
+reportsRoutes.post(
   "/beneficiarios/relacao",
   asyncHandler(controller.relacaoBeneficiarios.bind(controller))
 );
 reportsRoutes.post("/beneficiarios/ficha", asyncHandler(controller.fichaBeneficiario.bind(controller)));
+reportsRoutes.post(
+  "/profissionais/relacao",
+  asyncHandler(controller.relacaoProfissionais.bind(controller))
+);
+reportsRoutes.post(
+  "/profissionais/ficha",
+  asyncHandler(controller.fichaProfissional.bind(controller))
+);
+reportsRoutes.post(
+  "/voluntarios/relacao",
+  asyncHandler(controller.relacaoVoluntarios.bind(controller))
+);
+reportsRoutes.post(
+  "/voluntarios/ficha",
+  asyncHandler(controller.fichaVoluntario.bind(controller))
+);

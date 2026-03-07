@@ -12,6 +12,11 @@ function responderRelatorio(response, resultado, formato) {
         .send(resultado.pdf);
 }
 export class ReportsController {
+    async relacaoUnidadesAssistenciais(request, response) {
+        const formato = formatoRelatorioSchema.parse(request.query.formato);
+        const resultado = await service.gerarRelacaoUnidadesAssistenciais(request.body);
+        return responderRelatorio(response, resultado, formato);
+    }
     async relacaoBeneficiarios(request, response) {
         const formato = formatoRelatorioSchema.parse(request.query.formato);
         const resultado = await service.gerarRelacaoBeneficiarios(request.body);
@@ -25,6 +30,26 @@ export class ReportsController {
     async termoAutorizacao(request, response) {
         const formato = formatoRelatorioSchema.parse(request.query.formato);
         const resultado = await service.gerarTermoAutorizacao(request.body);
+        return responderRelatorio(response, resultado, formato);
+    }
+    async relacaoProfissionais(request, response) {
+        const formato = formatoRelatorioSchema.parse(request.query.formato);
+        const resultado = await service.gerarRelacaoProfissionais(request.body);
+        return responderRelatorio(response, resultado, formato);
+    }
+    async fichaProfissional(request, response) {
+        const formato = formatoRelatorioSchema.parse(request.query.formato);
+        const resultado = await service.gerarFichaProfissional(request.body);
+        return responderRelatorio(response, resultado, formato);
+    }
+    async relacaoVoluntarios(request, response) {
+        const formato = formatoRelatorioSchema.parse(request.query.formato);
+        const resultado = await service.gerarRelacaoVoluntarios(request.body);
+        return responderRelatorio(response, resultado, formato);
+    }
+    async fichaVoluntario(request, response) {
+        const formato = formatoRelatorioSchema.parse(request.query.formato);
+        const resultado = await service.gerarFichaVoluntario(request.body);
         return responderRelatorio(response, resultado, formato);
     }
 }

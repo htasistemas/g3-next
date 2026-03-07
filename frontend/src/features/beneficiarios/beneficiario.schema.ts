@@ -1,5 +1,5 @@
-import { z } from "zod";
-import { validarCep, validarCpf } from "@/lib/validators";
+﻿import { z } from "zod";
+import { validarCep } from "@/lib/validators";
 
 export const beneficiarioStatusOptions = [
   "ATIVO",
@@ -19,9 +19,15 @@ export const beneficiarioFormSchema = z.object({
   apelido: z.string().optional(),
   data_nascimento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data de nascimento invalida."),
   foto_3x4: z.string().optional(),
-  nome_mae: z.string().trim().min(3, "Informe o nome da mãe."),
+  sexo_biologico: z.string().optional(),
+  cor_raca: z.string().optional(),
+  estado_civil: z.string().optional(),
+  nacionalidade: z.string().optional(),
+  naturalidade_cidade: z.string().optional(),
+  naturalidade_uf: z.string().optional(),
+  nome_mae: z.string().trim().min(3, "Informe o nome da mÃ£e."),
   nome_pai: z.string().optional(),
-  cpf: z.string().refine((value) => validarCpf(value), "Informe um CPF válido."),
+  cpf: z.string().optional(),
   rg_numero: z.string().optional(),
   rg_orgao_emissor: z.string().optional(),
   rg_uf: z.string().optional(),
@@ -30,13 +36,13 @@ export const beneficiarioFormSchema = z.object({
   telefone_secundario: z.string().optional(),
   telefone_recado_nome: z.string().optional(),
   telefone_recado_numero: z.string().optional(),
-  email: z.union([z.string().email("E-mail inválido."), z.literal("")]).optional(),
+  email: z.union([z.string().email("E-mail invÃ¡lido."), z.literal("")]).optional(),
   permite_contato_tel: z.boolean().default(true),
   permite_contato_whatsapp: z.boolean().default(true),
   permite_contato_sms: z.boolean().default(false),
   permite_contato_email: z.boolean().default(false),
   horario_preferencial_contato: z.string().optional(),
-  cep: z.string().refine((value) => validarCep(value), "Informe um CEP válido."),
+  cep: z.string().refine((value) => validarCep(value), "Informe um CEP vÃ¡lido."),
   logradouro: z.string().optional(),
   numero: z.string().optional(),
   complemento: z.string().optional(),
@@ -77,7 +83,21 @@ export const beneficiarioFormSchema = z.object({
   servico_saude_referencia: z.string().optional(),
   aceite_lgpd: z.boolean().refine((value) => value, "Confirme o aceite LGPD para salvar."),
   data_aceite_lgpd: z.string().optional(),
-  observacoes: z.string().optional()
+  observacoes: z.string().optional(),
+  documentos_obrigatorios: z
+    .array(
+      z.object({
+        id: z.string().optional(),
+        nome: z.string(),
+        numeroDocumento: z.string().optional(),
+        nomeArquivo: z.string().optional(),
+        caminhoArquivo: z.string().optional(),
+        contentType: z.string().optional(),
+        obrigatorio: z.boolean().optional(),
+        ignorado: z.boolean().optional()
+      })
+    )
+    .optional()
 });
 
 export type BeneficiarioFormValues = z.infer<typeof beneficiarioFormSchema>;
@@ -89,6 +109,12 @@ export const beneficiarioDefaultValues: BeneficiarioFormValues = {
   apelido: "",
   data_nascimento: "",
   foto_3x4: "",
+  sexo_biologico: "",
+  cor_raca: "",
+  estado_civil: "",
+  nacionalidade: "",
+  naturalidade_cidade: "",
+  naturalidade_uf: "",
   nome_mae: "",
   nome_pai: "",
   cpf: "",
@@ -147,5 +173,7 @@ export const beneficiarioDefaultValues: BeneficiarioFormValues = {
   servico_saude_referencia: "",
   aceite_lgpd: true,
   data_aceite_lgpd: new Date().toISOString().slice(0, 10),
-  observacoes: ""
+  observacoes: "",
+  documentos_obrigatorios: []
 };
+

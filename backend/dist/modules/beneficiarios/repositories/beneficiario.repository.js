@@ -438,10 +438,11 @@ export class BeneficiarioRepository {
                 beneficiarioId,
                 tipoDocumento: "ANEXO",
                 nomeDocumento: trimOrUndefined(doc.nome),
+                numeroDocumento: trimOrUndefined(doc.numeroDocumento),
                 nomeArquivo: trimOrUndefined(doc.nomeArquivo),
                 caminhoArquivo: trimOrUndefined(doc.caminhoArquivo),
                 contentType: trimOrUndefined(doc.contentType),
-                obrigatorio: doc.obrigatorio ?? false,
+                obrigatorio: doc.ignorado ? false : (doc.obrigatorio ?? true),
                 criadoEm: now,
                 atualizadoEm: now
             });

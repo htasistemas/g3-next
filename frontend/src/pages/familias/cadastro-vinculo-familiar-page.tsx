@@ -1,8 +1,23 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import type { LucideIcon } from "lucide-react";
+import {
+  Search,
+  Plus,
+  Save,
+  Undo2,
+  Trash2,
+  Printer,
+  X,
+  ListFilter,
+  IdCard,
+  MapPinned,
+  UsersRound,
+  HandCoins
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -10,6 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import {
   familiaDefaultValues,
   familiaFormSchema,
@@ -26,32 +42,55 @@ import {
 import { beneficiariosService } from "@/services/beneficiarios.service";
 import type { Beneficiario, BeneficiarioFiltro } from "@/types/beneficiario";
 import type { BeneficiarioResumo, Familia, FamiliaFiltro, FamiliaMembro } from "@/types/familia";
+import {
+  mapaCamposTextoFamiliaForm,
+  mapaMembroFamiliaForm
+} from "@/lib/text-format-config";
+import { formatarTextoPorCampo, normalizarObjetoTexto } from "@/lib/text-formatter";
+import {
+  classeBotaoAbaLateral,
+  classeNumeroAbaLateral,
+  classesTelaPadraoBeneficiario,
+  ordemAcoesCrudPadrao
+} from "@/lib/tela-padrao-beneficiario";
+
+const tituloTela = "Cadastro de vínculo familiar";
 
 const abas = [
-  { id: "lista", label: "Listagem de familias" },
-  { id: "cadastro", label: "Cadastro da familia" },
-  { id: "endereco", label: "Endereco da familia" },
-  { id: "membros", label: "Membros vinculados" },
-  { id: "indicadores", label: "Indicadores sociais" }
+  { id: "listagem", label: "Listagem de famílias", icon: ListFilter },
+  { id: "dados", label: "Dados da família", icon: IdCard },
+  { id: "endereco", label: "Endereço", icon: MapPinned },
+  { id: "membros", label: "Membros vinculados", icon: UsersRound },
+  { id: "indicadores", label: "Indicadores sociais", icon: HandCoins }
 ] as const;
 
-const opcoesSituacaoImovel = ["Proprio", "Alugado", "Cedido", "Financiado", "Ocupacao", "Outro"];
+const opcoesSituacaoImovel = ["Próprio", "Alugado", "Cedido", "Financiado", "Ocupação", "Outro"];
 const opcoesTipoMoradia = [
   "Casa",
   "Apartamento",
-  "Comodo",
+  "Cômodo",
   "Barraco",
   "Casa de madeira",
-  "Sitio/Chacara",
+  "Sítio/Chácara",
   "Outro"
 ];
 
+const mensagemImpressaoNaoMigrada = "A impressão de vínculo familiar ainda não foi migrada.";
+const mensagemExclusaoNaoMigrada =
+  "A exclusão de família será disponibilizada na próxima etapa da migração.";
+
 type AbaId = (typeof abas)[number]["id"];
-type AcaoToolbar = {
+
+type AcaoCrud = {
   label: string;
   onClick: () => void;
   variant: "default" | "outline" | "danger" | "ghost";
-  disabled: boolean;
+  icon: LucideIcon;
+};
+
+type Mensagem = {
+  tipo: "sucesso" | "erro";
+  texto: string;
 };
 
 function normalizarStatus(status?: string) {
@@ -59,9 +98,20 @@ function normalizarStatus(status?: string) {
   return status.replaceAll("_", " ");
 }
 
+function labelStatus(status?: string) {
+  const texto = normalizarStatus(status).toLowerCase();
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
+
+function variantStatus(status?: string) {
+  if (status === "ATIVO") return "success" as const;
+  if (status === "BLOQUEADO") return "danger" as const;
+  return "warning" as const;
+}
+
 function nomeBeneficiario(beneficiario?: BeneficiarioResumo | null) {
-  if (!beneficiario) return "Beneficiario";
-  return beneficiario.nome_completo || beneficiario.nome_social || "Beneficiario";
+  if (!beneficiario) return "Beneficiário";
+  return beneficiario.nome_completo || beneficiario.nome_social || "Beneficiário";
 }
 
 function documentoBeneficiario(beneficiario?: BeneficiarioResumo | null) {
@@ -107,23 +157,23 @@ function mapFamiliaParaFormulario(familia: Familia): FamiliaFormValues {
   };
 }
 
-function mapFormularioParaPayload(
-  values: FamiliaFormValues,
-  familiaId?: string
-): Familia {
-  const membros: FamiliaMembro[] = values.membros.map((membro) => ({
-    id_familia_membro: membro.id_familia_membro,
-    id_beneficiario: membro.id_beneficiario,
-    parentesco: membro.parentesco,
-    responsavel_familiar: membro.responsavel_familiar,
-    contribui_renda: membro.contribui_renda,
-    renda_individual: membro.renda_individual || undefined,
-    participa_servicos: membro.participa_servicos,
-    observacoes: membro.observacoes || undefined,
-    usa_endereco_familia: membro.usa_endereco_familia
-  }));
+function mapFormularioParaPayload(values: FamiliaFormValues, familiaId?: string): Familia {
+  const membros: FamiliaMembro[] = values.membros.map((membro) => {
+    const membroNormalizado = normalizarObjetoTexto(membro, mapaMembroFamiliaForm);
+    return {
+      id_familia_membro: membro.id_familia_membro,
+      id_beneficiario: membro.id_beneficiario,
+      parentesco: membroNormalizado.parentesco,
+      responsavel_familiar: membro.responsavel_familiar,
+      contribui_renda: membro.contribui_renda,
+      renda_individual: membro.renda_individual || undefined,
+      participa_servicos: membro.participa_servicos,
+      observacoes: membroNormalizado.observacoes || undefined,
+      usa_endereco_familia: membro.usa_endereco_familia
+    };
+  });
 
-  return {
+  const payload: Familia = {
     id_familia: familiaId,
     nome_familia: values.nome_familia,
     id_referencia_familiar: values.id_referencia_familiar,
@@ -165,11 +215,13 @@ function mapFormularioParaPayload(
     observacoes: values.observacoes || undefined,
     membros
   };
+
+  return normalizarObjetoTexto(payload, mapaCamposTextoFamiliaForm);
 }
 
 export function CadastroVinculoFamiliarPage() {
   const navigate = useNavigate();
-  const [abaAtiva, setAbaAtiva] = useState<AbaId>("lista");
+  const [abaAtiva, setAbaAtiva] = useState<AbaId>("listagem");
   const [filtroDraft, setFiltroDraft] = useState<FamiliaFiltro>({
     nome_familia: "",
     municipio: "",
@@ -180,7 +232,10 @@ export function CadastroVinculoFamiliarPage() {
   const [snapshot, setSnapshot] = useState<FamiliaFormValues | null>(null);
   const [principalBusca, setPrincipalBusca] = useState("");
   const [membroBusca, setMembroBusca] = useState("");
-  const [mensagem, setMensagem] = useState<{ tipo: "sucesso" | "erro"; texto: string } | null>(null);
+  const [mensagem, setMensagem] = useState<Mensagem | null>(null);
+  const [popupSalvarAberto, setPopupSalvarAberto] = useState(false);
+  const [popupExcluirAberto, setPopupExcluirAberto] = useState(false);
+  const [popupImprimirAberto, setPopupImprimirAberto] = useState(false);
 
   const { data: listaData, isLoading: carregandoLista } = useFamilias(filtros);
   const { data: familiaData, isLoading: carregandoFamilia } = useFamilia(familiaSelecionadaId);
@@ -190,6 +245,7 @@ export function CadastroVinculoFamiliarPage() {
   const {
     register,
     control,
+    watch,
     handleSubmit,
     reset,
     getValues,
@@ -205,6 +261,8 @@ export function CadastroVinculoFamiliarPage() {
     control
   });
 
+  const membrosWatch = watch("membros");
+
   useEffect(() => {
     if (!familiaData?.familia) return;
     const values = mapFamiliaParaFormulario(familiaData.familia);
@@ -212,7 +270,7 @@ export function CadastroVinculoFamiliarPage() {
     replace(values.membros);
     setSnapshot(values);
     setMensagem(null);
-    setAbaAtiva("cadastro");
+    setAbaAtiva("dados");
     setPrincipalBusca(nomeBeneficiario(familiaData.familia.referencia_familiar));
   }, [familiaData, replace, reset]);
 
@@ -233,39 +291,58 @@ export function CadastroVinculoFamiliarPage() {
   });
 
   const familias = listaData?.familias ?? [];
+  const familiaAtual = familiaData?.familia;
   const principalResultados = principalQuery.data?.beneficiarios ?? [];
   const membroResultados = membroQuery.data?.beneficiarios ?? [];
   const bloqueadoAcao = salvarMutation.isPending || removerMembroMutation.isPending || carregandoFamilia;
 
-  const onSalvar = handleSubmit(async (values) => {
-    setMensagem(null);
-    try {
-      const payload = mapFormularioParaPayload(values, familiaSelecionadaId);
-      const response = await salvarMutation.mutateAsync(payload);
-      const familia = response.familia;
-      const valuesAtualizados = mapFamiliaParaFormulario(familia);
-      setFamiliaSelecionadaId(familia.id_familia);
-      reset(valuesAtualizados);
-      replace(valuesAtualizados.membros);
-      setSnapshot(valuesAtualizados);
-      setMensagem({ tipo: "sucesso", texto: "Familia salva com sucesso." });
-      setFiltros((prev) => ({ ...prev }));
-      setAbaAtiva("cadastro");
-    } catch (error: any) {
+  const abaAtual = abas.find((aba) => aba.id === abaAtiva);
+  const tituloAbaAtiva = abaAtual?.label ?? tituloTela;
+  const IconeAbaAtiva = abaAtual?.icon ?? IdCard;
+
+  const onSalvar = handleSubmit(
+    async (values) => {
+      setMensagem(null);
+      try {
+        const payload = mapFormularioParaPayload(values, familiaSelecionadaId);
+        const response = await salvarMutation.mutateAsync(payload);
+        const familia = response.familia;
+        const valuesAtualizados = mapFamiliaParaFormulario(familia);
+
+        setFamiliaSelecionadaId(familia.id_familia);
+        reset(valuesAtualizados);
+        replace(valuesAtualizados.membros);
+        setSnapshot(valuesAtualizados);
+        setFiltros((prev) => ({ ...prev }));
+        setAbaAtiva("dados");
+        setPopupSalvarAberto(true);
+      } catch (error: any) {
+        setMensagem({
+          tipo: "erro",
+          texto: error?.response?.data?.message ?? "Não foi possível salvar a família."
+        });
+      }
+    },
+    () => {
+      setAbaAtiva("dados");
       setMensagem({
         tipo: "erro",
-        texto: error?.response?.data?.message ?? "Nao foi possivel salvar a familia."
+        texto: "Preencha os campos obrigatórios antes de salvar."
       });
     }
-  });
+  );
 
-  function acaoBuscar(): void {
-    setMensagem(null);
-    setFiltros({ ...filtroDraft });
-    setAbaAtiva("lista");
+  function acaoSalvar() {
+    void onSalvar();
   }
 
-  function acaoNovo(): void {
+  function acaoBuscar() {
+    setMensagem(null);
+    setFiltros({ ...filtroDraft });
+    setAbaAtiva("listagem");
+  }
+
+  function acaoNovo() {
     setFamiliaSelecionadaId(undefined);
     setSnapshot(null);
     reset(familiaDefaultValues);
@@ -273,45 +350,110 @@ export function CadastroVinculoFamiliarPage() {
     setPrincipalBusca("");
     setMembroBusca("");
     setMensagem(null);
-    setAbaAtiva("cadastro");
+    setAbaAtiva("dados");
   }
 
-  function acaoCancelar(): void {
+  function acaoCancelar() {
     if (!snapshot) {
       acaoNovo();
       return;
     }
+
     reset(snapshot);
     replace(snapshot.membros);
     setMensagem(null);
   }
 
-  function acaoExcluir(): void {
-    setMensagem({
-      tipo: "erro",
-      texto: "Exclusao de familia nao esta disponivel nesta fase da migracao."
-    });
+  function acaoExcluir() {
+    if (!familiaSelecionadaId) {
+      setMensagem({ tipo: "erro", texto: "Selecione uma família para excluir." });
+      return;
+    }
+    setPopupExcluirAberto(true);
   }
 
-  function acaoImprimir(): void {
-    setMensagem({
-      tipo: "erro",
-      texto: "Impressao de vinculo familiar ainda nao foi migrada."
-    });
+  function confirmarExclusaoFamilia() {
+    setPopupExcluirAberto(false);
+    setMensagem({ tipo: "erro", texto: mensagemExclusaoNaoMigrada });
   }
 
-  function acaoFechar(): void {
+  function acaoImprimir() {
+    if (!familiaSelecionadaId) {
+      setMensagem({ tipo: "erro", texto: "Selecione uma família para imprimir." });
+      return;
+    }
+    setPopupImprimirAberto(true);
+  }
+
+  function confirmarImpressao() {
+    setPopupImprimirAberto(false);
+    setMensagem({ tipo: "erro", texto: mensagemImpressaoNaoMigrada });
+  }
+
+  function acaoFechar() {
     navigate("/");
+  }
+
+  function aplicarFormatacaoCampo(campo: keyof FamiliaFormValues) {
+    const valorAtual = getValues(campo);
+    const valorFormatado = formatarTextoPorCampo(String(campo), valorAtual, mapaCamposTextoFamiliaForm);
+
+    if (typeof valorAtual === "string" && typeof valorFormatado === "string" && valorAtual !== valorFormatado) {
+      setValue(campo, valorFormatado as FamiliaFormValues[keyof FamiliaFormValues], {
+        shouldDirty: true,
+        shouldValidate: true
+      });
+    }
+  }
+
+  function aplicarFormatacaoMembro(index: number, campo: "observacoes") {
+    const chave = `membros.${index}.${campo}` as const;
+    const valorAtual = getValues(chave);
+    const valorFormatado = formatarTextoPorCampo(campo, valorAtual, mapaMembroFamiliaForm);
+
+    if (typeof valorAtual === "string" && typeof valorFormatado === "string" && valorAtual !== valorFormatado) {
+      setValue(chave, valorFormatado, {
+        shouldDirty: true,
+        shouldValidate: true
+      });
+    }
   }
 
   function selecionarFamilia(familia: Familia) {
     if (!familia.id_familia) return;
     setFamiliaSelecionadaId(familia.id_familia);
+    setAbaAtiva("dados");
     setMensagem(null);
+  }
+
+  function alternarResponsavelFamiliar(index: number, marcado: boolean) {
+    const membros = getValues("membros");
+
+    membros.forEach((_, indice) => {
+      setValue(`membros.${indice}.responsavel_familiar`, marcado ? indice === index : false, {
+        shouldDirty: true,
+        shouldValidate: true
+      });
+    });
+
+    if (!marcado) {
+      return;
+    }
+
+    const membro = membros[index];
+    if (membro?.id_beneficiario) {
+      setValue("id_referencia_familiar", membro.id_beneficiario, {
+        shouldDirty: true,
+        shouldValidate: true
+      });
+    }
+
+    setPrincipalBusca(membro?.beneficiario_nome || "");
   }
 
   function adicionarOuAtualizarMembro(beneficiario: Beneficiario, responsavel: boolean) {
     if (!beneficiario.id_beneficiario) return;
+
     const membros = getValues("membros");
     const membroId = beneficiario.id_beneficiario;
     const indexExistente = membros.findIndex((membro) => membro.id_beneficiario === membroId);
@@ -331,6 +473,7 @@ export function CadastroVinculoFamiliarPage() {
           }
         });
       }
+
       replace(atualizados);
       return;
     }
@@ -352,21 +495,23 @@ export function CadastroVinculoFamiliarPage() {
       participa_servicos: false,
       observacoes: "",
       usa_endereco_familia: true,
-      beneficiario_nome: beneficiario.nome_completo || beneficiario.nome_social || "Beneficiario",
+      beneficiario_nome: beneficiario.nome_completo || beneficiario.nome_social || "Beneficiário",
       beneficiario_documento: beneficiario.cpf || beneficiario.nis || beneficiario.codigo || ""
     });
   }
 
   function selecionarPrincipal(beneficiario: Beneficiario) {
     if (!beneficiario.id_beneficiario) return;
+
     setValue("id_referencia_familiar", beneficiario.id_beneficiario, {
       shouldDirty: true,
       shouldValidate: true
     });
 
     if (!getValues("nome_familia")) {
-      setValue("nome_familia", `Familia ${beneficiario.nome_completo ?? ""}`.trim(), {
-        shouldDirty: true
+      setValue("nome_familia", `Família ${beneficiario.nome_completo ?? ""}`.trim(), {
+        shouldDirty: true,
+        shouldValidate: true
       });
     }
 
@@ -382,10 +527,11 @@ export function CadastroVinculoFamiliarPage() {
   async function removerMembro(index: number) {
     const membro = getValues(`membros.${index}`);
     const principalId = getValues("id_referencia_familiar");
+
     if (membro.id_beneficiario === principalId) {
       setMensagem({
         tipo: "erro",
-        texto: "O responsavel principal nao pode ser removido da familia."
+        texto: "O responsável principal não pode ser removido da família."
       });
       return;
     }
@@ -399,200 +545,247 @@ export function CadastroVinculoFamiliarPage() {
       } catch (error: any) {
         setMensagem({
           tipo: "erro",
-          texto: error?.response?.data?.message ?? "Nao foi possivel remover o membro."
+          texto: error?.response?.data?.message ?? "Não foi possível remover o membro."
         });
         return;
       }
     }
+
     remove(index);
     setMensagem(null);
   }
 
-  const acoes = useMemo<AcaoToolbar[]>(
+  const acoes: AcaoCrud[] = useMemo(
     () => [
-      { label: "Buscar", onClick: acaoBuscar, variant: "outline" as const, disabled: false },
-      { label: "Novo", onClick: acaoNovo, variant: "outline" as const, disabled: false },
-      {
-        label: "Salvar",
-        onClick: () => {
-          void onSalvar();
-        },
-        variant: "default" as const,
-        disabled: false
-      },
-      { label: "Cancelar", onClick: acaoCancelar, variant: "outline" as const, disabled: false },
-      { label: "Excluir", onClick: acaoExcluir, variant: "danger" as const, disabled: true },
-      { label: "Imprimir", onClick: acaoImprimir, variant: "outline" as const, disabled: true },
-      { label: "Fechar", onClick: acaoFechar, variant: "ghost" as const, disabled: false }
+      { label: "Buscar", onClick: acaoBuscar, variant: "outline", icon: Search },
+      { label: "Novo", onClick: acaoNovo, variant: "outline", icon: Plus },
+      { label: "Salvar", onClick: acaoSalvar, variant: "default", icon: Save },
+      { label: "Cancelar", onClick: acaoCancelar, variant: "outline", icon: Undo2 },
+      { label: "Excluir", onClick: acaoExcluir, variant: "danger", icon: Trash2 },
+      { label: "Imprimir", onClick: acaoImprimir, variant: "outline", icon: Printer },
+      { label: "Fechar", onClick: acaoFechar, variant: "outline", icon: X }
     ],
-    [onSalvar]
+    [onSalvar, snapshot, filtros, filtroDraft, familiaSelecionadaId]
   );
 
+  const acoesNaOrdemPadrao = ordemAcoesCrudPadrao
+    .map((label) => acoes.find((acao) => acao.label === label))
+    .filter((acao): acao is AcaoCrud => !!acao);
+
   return (
-    <main className="g3-container space-y-4">
-      <section className="rounded-xl border border-slate-200 bg-white p-3">
-        <div className="flex flex-wrap gap-2">
-          {acoes.map((acao) => (
+    <main className={classesTelaPadraoBeneficiario.container}>
+      <section className={classesTelaPadraoBeneficiario.barraAcoes}>
+        <div className={classesTelaPadraoBeneficiario.gradeAcoes}>
+          {acoesNaOrdemPadrao.map((acao) => (
             <Button
               key={acao.label}
+              type="button"
               variant={acao.variant}
+              size="sm"
+              className={classesTelaPadraoBeneficiario.botaoAcao}
               onClick={acao.onClick}
-              disabled={bloqueadoAcao || acao.disabled}
+              disabled={
+                bloqueadoAcao ||
+                ((acao.label === "Excluir" || acao.label === "Imprimir") && !familiaSelecionadaId)
+              }
             >
+              <acao.icon className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
               {acao.label}
             </Button>
           ))}
         </div>
       </section>
 
-      {mensagem && (
-        <div
-          className={`rounded-md border px-3 py-2 text-sm ${
-            mensagem.tipo === "sucesso"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-              : "border-red-200 bg-red-50 text-red-700"
-          }`}
-        >
-          {mensagem.texto}
-        </div>
-      )}
-
-      <div className="grid gap-4 xl:grid-cols-[390px_1fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle>Listagem de familias</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-2">
-              <div>
-                <Label>Nome da familia</Label>
-                <Input
-                  value={filtroDraft.nome_familia ?? ""}
-                  onChange={(event) =>
-                    setFiltroDraft((prev) => ({ ...prev, nome_familia: event.target.value }))
-                  }
-                />
-              </div>
-              <div>
-                <Label>Municipio</Label>
-                <Input
-                  value={filtroDraft.municipio ?? ""}
-                  onChange={(event) =>
-                    setFiltroDraft((prev) => ({ ...prev, municipio: event.target.value }))
-                  }
-                />
-              </div>
-              <div>
-                <Label>Status</Label>
-                <Select
-                  value={filtroDraft.status ?? ""}
-                  onChange={(event) =>
-                    setFiltroDraft((prev) => ({ ...prev, status: event.target.value }))
-                  }
-                >
-                  <option value="">Todos</option>
-                  {familiaStatusOptions.map((status) => (
-                    <option key={status} value={status}>
-                      {normalizarStatus(status)}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-            </div>
-
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => setFiltroDraft({ nome_familia: "", municipio: "", status: "" })}
-            >
-              Limpar filtros
-            </Button>
-
-            <div className="max-h-[540px] overflow-auto rounded-md border border-slate-200">
-              {carregandoLista ? (
-                <p className="p-3 text-sm text-slate-500">Carregando familias...</p>
-              ) : !familias.length ? (
-                <p className="p-3 text-sm text-slate-500">Nenhuma familia encontrada.</p>
-              ) : (
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-                    <tr>
-                      <th className="px-2 py-2">Familia</th>
-                      <th className="px-2 py-2">Referencia</th>
-                      <th className="px-2 py-2">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {familias.map((familia) => (
-                      <tr
-                        key={familia.id_familia}
-                        className={`cursor-pointer border-t border-slate-100 hover:bg-slate-50 ${
-                          familia.id_familia === familiaSelecionadaId ? "bg-emerald-50" : ""
-                        }`}
-                        onClick={() => selecionarFamilia(familia)}
-                      >
-                        <td className="px-2 py-2">{familia.nome_familia}</td>
-                        <td className="px-2 py-2 text-xs">{nomeBeneficiario(familia.referencia_familiar)}</td>
-                        <td className="px-2 py-2 text-xs">{normalizarStatus(familia.status)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
+      <div className={classesTelaPadraoBeneficiario.gradePrincipal}>
+        <Card className={classesTelaPadraoBeneficiario.cardAbas}>
+          <CardContent className={classesTelaPadraoBeneficiario.conteudoAbas}>
+            {abas.map((aba, indice) => (
+              <button
+                key={aba.id}
+                type="button"
+                onClick={() => setAbaAtiva(aba.id)}
+                className={classeBotaoAbaLateral(abaAtiva === aba.id)}
+              >
+                <span className={classeNumeroAbaLateral(abaAtiva === aba.id)} aria-hidden="true">
+                  {indice + 1}
+                </span>
+                <span>{aba.label}</span>
+              </button>
+            ))}
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="space-y-3">
-            <CardTitle>Cadastro de Vinculo Familiar</CardTitle>
-            <div className="flex flex-wrap gap-2">
-              {abas.map((aba) => (
-                <Button
-                  key={aba.id}
-                  variant={abaAtiva === aba.id ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setAbaAtiva(aba.id)}
-                >
-                  {aba.label}
-                </Button>
-              ))}
+        <Card className={classesTelaPadraoBeneficiario.cardConteudo}>
+          <CardHeader className={classesTelaPadraoBeneficiario.cabecalhoConteudo}>
+            <div className={classesTelaPadraoBeneficiario.tituloAba}>
+              <IconeAbaAtiva className="h-4 w-4" aria-hidden="true" />
+              <CardTitle className={classesTelaPadraoBeneficiario.tituloAbaTexto}>
+                {tituloAbaAtiva}
+              </CardTitle>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Badge variant={variantStatus(familiaAtual?.status)}>
+                {labelStatus(familiaAtual?.status ?? "ATIVO")}
+              </Badge>
+              <Badge variant={classesTelaPadraoBeneficiario.badgeCodigo}>
+                Código {familiaAtual?.id_familia ?? "---"}
+              </Badge>
             </div>
           </CardHeader>
-          <CardContent className="space-y-4">
+
+          <CardContent className="space-y-4 p-3">
             {typeof errors.membros?.message === "string" && (
               <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                 {errors.membros.message}
               </div>
             )}
 
-            {abaAtiva === "cadastro" && (
+            {abaAtiva === "listagem" && (
+              <section className="space-y-3">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-12">
+                  <div className="sm:col-span-2 xl:col-span-5">
+                    <Label>Nome da família</Label>
+                    <Input
+                      className="h-8 text-xs"
+                      value={filtroDraft.nome_familia ?? ""}
+                      onChange={(event) =>
+                        setFiltroDraft((prev) => ({ ...prev, nome_familia: event.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="sm:col-span-1 xl:col-span-3">
+                    <Label>Município</Label>
+                    <Input
+                      className="h-8 text-xs"
+                      value={filtroDraft.municipio ?? ""}
+                      onChange={(event) =>
+                        setFiltroDraft((prev) => ({ ...prev, municipio: event.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="sm:col-span-1 xl:col-span-2">
+                    <Label>Status</Label>
+                    <Select
+                      className="h-8 text-xs"
+                      value={filtroDraft.status ?? ""}
+                      onChange={(event) =>
+                        setFiltroDraft((prev) => ({ ...prev, status: event.target.value }))
+                      }
+                    >
+                      <option value="">Todos</option>
+                      {familiaStatusOptions.map((status) => (
+                        <option key={status} value={status}>
+                          {labelStatus(status)}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                  <div className="sm:col-span-2 xl:col-span-2">
+                    <Label className="invisible">Limpar</Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 w-full border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                      onClick={() => setFiltroDraft({ nome_familia: "", municipio: "", status: "" })}
+                    >
+                      Limpar filtros
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="max-h-[560px] overflow-auto rounded-lg border border-slate-200">
+                  {carregandoLista ? (
+                    <p className="p-3 text-sm text-slate-500">Carregando famílias...</p>
+                  ) : !familias.length ? (
+                    <p className="p-3 text-sm text-slate-500">Nenhuma família encontrada.</p>
+                  ) : (
+                    <table className="w-full min-w-[760px] text-left text-xs">
+                      <thead className="bg-slate-100 text-[11px] uppercase tracking-wide text-slate-600">
+                        <tr>
+                          <th className="px-2 py-2">Código</th>
+                          <th className="px-2 py-2">Nome da família</th>
+                          <th className="px-2 py-2">Responsável</th>
+                          <th className="px-2 py-2">Município/UF</th>
+                          <th className="px-2 py-2">Status</th>
+                          <th className="px-2 py-2">Membros</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {familias.map((familia, index) => {
+                          const selecionada = familia.id_familia === familiaSelecionadaId;
+                          return (
+                            <tr
+                              key={familia.id_familia}
+                              className={`cursor-pointer border-t border-slate-200 ${
+                                selecionada
+                                  ? "bg-[var(--g3-primary-soft)]"
+                                  : index % 2 === 0
+                                    ? "bg-white"
+                                    : "bg-slate-50"
+                              } hover:bg-slate-100`}
+                              onClick={() => selecionarFamilia(familia)}
+                            >
+                              <td className="px-2 py-2">{familia.id_familia ?? "---"}</td>
+                              <td className="px-2 py-2 font-medium text-slate-800">{familia.nome_familia}</td>
+                              <td className="px-2 py-2">{nomeBeneficiario(familia.referencia_familiar)}</td>
+                              <td className="px-2 py-2">
+                                {[familia.municipio, familia.uf].filter(Boolean).join("/") || "---"}
+                              </td>
+                              <td className="px-2 py-2">{labelStatus(familia.status)}</td>
+                              <td className="px-2 py-2">{familia.qtd_membros ?? familia.membros?.length ?? 0}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </section>
+            )}
+
+            {abaAtiva === "dados" && (
               <section className="grid gap-3 sm:grid-cols-2">
                 <input type="hidden" {...register("id_referencia_familiar")} />
                 <div>
-                  <Label>Status</Label>
+                  <Label>Status*</Label>
                   <Select {...register("status")}>
                     {familiaStatusOptions.map((status) => (
                       <option key={status} value={status}>
-                        {normalizarStatus(status)}
+                        {labelStatus(status)}
                       </option>
                     ))}
                   </Select>
                 </div>
+                <div>
+                  <Label>Total de membros</Label>
+                  <Input type="number" min={0} {...register("qtd_membros")} />
+                </div>
+
                 <div className="sm:col-span-2">
-                  <Label>Nome da familia*</Label>
-                  <Input {...register("nome_familia")} />
+                  <Label>Nome da família*</Label>
+                  <Input
+                    {...register("nome_familia")}
+                    onBlurCapture={() => aplicarFormatacaoCampo("nome_familia")}
+                  />
                   {errors.nome_familia && (
                     <p className="mt-1 text-xs text-red-600">{errors.nome_familia.message}</p>
                   )}
                 </div>
+
                 <div className="sm:col-span-2">
-                  <Label>Buscar responsavel principal</Label>
+                  <Label>Buscar responsável principal</Label>
                   <Input
                     value={principalBusca}
                     onChange={(event) => setPrincipalBusca(event.target.value)}
-                    placeholder="Digite nome, CPF ou codigo"
+                    placeholder="Digite nome, CPF ou código"
                   />
+
+                  {principalQuery.isFetching && (
+                    <p className="mt-1 text-xs text-slate-500">Buscando beneficiários...</p>
+                  )}
+
                   {!!principalResultados.length && (
                     <div className="mt-2 max-h-48 overflow-auto rounded-md border border-slate-200">
                       {principalResultados.map((beneficiario) => (
@@ -611,55 +804,59 @@ export function CadastroVinculoFamiliarPage() {
                     </div>
                   )}
                 </div>
+
                 <div className="sm:col-span-2">
-                  <Label>Responsavel principal*</Label>
+                  <Label>Responsável principal*</Label>
                   <Input readOnly value={principalBusca || ""} />
                   {errors.id_referencia_familiar && (
-                    <p className="mt-1 text-xs text-red-600">
-                      {errors.id_referencia_familiar.message}
-                    </p>
+                    <p className="mt-1 text-xs text-red-600">{errors.id_referencia_familiar.message}</p>
                   )}
                 </div>
               </section>
             )}
 
             {abaAtiva === "endereco" && (
-              <section className="grid gap-3 sm:grid-cols-2">
-                <div>
+              <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-12">
+                <div className="xl:col-span-2">
                   <Label>CEP</Label>
                   <Input {...register("cep")} />
                 </div>
-                <div>
+                <div className="xl:col-span-5">
                   <Label>Logradouro</Label>
-                  <Input {...register("logradouro")} />
+                  <Input {...register("logradouro")} onBlurCapture={() => aplicarFormatacaoCampo("logradouro")} />
                 </div>
-                <div>
-                  <Label>Numero</Label>
+                <div className="xl:col-span-2">
+                  <Label>Número</Label>
                   <Input {...register("numero")} />
                 </div>
-                <div>
+                <div className="xl:col-span-3">
                   <Label>Complemento</Label>
-                  <Input {...register("complemento")} />
+                  <Input {...register("complemento")} onBlurCapture={() => aplicarFormatacaoCampo("complemento")} />
                 </div>
-                <div>
+
+                <div className="xl:col-span-4">
                   <Label>Bairro</Label>
-                  <Input {...register("bairro")} />
+                  <Input {...register("bairro")} onBlurCapture={() => aplicarFormatacaoCampo("bairro")} />
                 </div>
-                <div>
-                  <Label>Ponto de referencia</Label>
-                  <Input {...register("ponto_referencia")} />
+                <div className="xl:col-span-4">
+                  <Label>Ponto de referência</Label>
+                  <Input
+                    {...register("ponto_referencia")}
+                    onBlurCapture={() => aplicarFormatacaoCampo("ponto_referencia")}
+                  />
                 </div>
-                <div>
-                  <Label>Municipio</Label>
-                  <Input {...register("municipio")} />
+                <div className="xl:col-span-3">
+                  <Label>Município</Label>
+                  <Input {...register("municipio")} onBlurCapture={() => aplicarFormatacaoCampo("municipio")} />
                 </div>
-                <div>
+                <div className="xl:col-span-1">
                   <Label>UF</Label>
                   <Input maxLength={2} {...register("uf")} />
                 </div>
-                <div className="sm:col-span-2">
+
+                <div className="xl:col-span-4">
                   <Label>Zona</Label>
-                  <Input {...register("zona")} />
+                  <Input {...register("zona")} onBlurCapture={() => aplicarFormatacaoCampo("zona")} />
                 </div>
               </section>
             )}
@@ -667,12 +864,19 @@ export function CadastroVinculoFamiliarPage() {
             {abaAtiva === "membros" && (
               <section className="space-y-4">
                 <div>
-                  <Label>Buscar beneficiario para vincular</Label>
-                  <Input
-                    value={membroBusca}
-                    onChange={(event) => setMembroBusca(event.target.value)}
-                    placeholder="Digite nome, CPF ou codigo"
-                  />
+                  <Label>Buscar beneficiário para vincular</Label>
+                  <div className="mt-1 flex flex-col gap-2 sm:flex-row">
+                    <Input
+                      value={membroBusca}
+                      onChange={(event) => setMembroBusca(event.target.value)}
+                      placeholder="Digite nome, CPF ou código"
+                    />
+                  </div>
+
+                  {membroQuery.isFetching && (
+                    <p className="mt-1 text-xs text-slate-500">Buscando beneficiários...</p>
+                  )}
+
                   {!!membroResultados.length && (
                     <div className="mt-2 max-h-48 overflow-auto rounded-md border border-slate-200">
                       {membroResultados.map((beneficiario) => (
@@ -698,74 +902,96 @@ export function CadastroVinculoFamiliarPage() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {membrosFields.map((field, index) => (
-                      <div key={field.id} className="rounded-md border border-slate-200 p-3">
-                        <div className="mb-2 flex items-start justify-between gap-2">
-                          <div>
-                            <p className="text-sm font-semibold text-slate-800">
-                              {getValues(`membros.${index}.beneficiario_nome`) || "Beneficiario"}
-                            </p>
-                            <p className="text-xs text-slate-500">
-                              {getValues(`membros.${index}.beneficiario_documento`) || "---"}
-                            </p>
+                    {membrosFields.map((field, index) => {
+                      const membroAtual = membrosWatch?.[index];
+
+                      return (
+                        <article key={field.id} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+                          <div className="mb-2 flex items-start justify-between gap-2">
+                            <div>
+                              <p className="text-sm font-semibold text-slate-800">
+                                {membroAtual?.beneficiario_nome || "Beneficiário"}
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                {membroAtual?.beneficiario_documento || "---"}
+                              </p>
+                            </div>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => void removerMembro(index)}
+                              disabled={removerMembroMutation.isPending}
+                            >
+                              <Trash2 className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                              Remover
+                            </Button>
                           </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => void removerMembro(index)}
-                            disabled={removerMembroMutation.isPending}
-                          >
-                            Remover
-                          </Button>
-                        </div>
-                        <div className="grid gap-2 sm:grid-cols-2">
-                          <div>
-                            <Label>Parentesco*</Label>
-                            <Select {...register(`membros.${index}.parentesco` as const)}>
-                              <option value="">Selecione</option>
-                              {parentescoOptions.map((opcao) => (
-                                <option key={opcao} value={opcao}>
-                                  {opcao}
-                                </option>
-                              ))}
-                            </Select>
+
+                          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-12">
+                            <div className="sm:col-span-2 xl:col-span-4">
+                              <Label>Parentesco*</Label>
+                              <Select {...register(`membros.${index}.parentesco` as const)}>
+                                <option value="">Selecione</option>
+                                {parentescoOptions.map((opcao) => (
+                                  <option key={opcao} value={opcao}>
+                                    {opcao}
+                                  </option>
+                                ))}
+                              </Select>
+                            </div>
+
+                            <div className="sm:col-span-2 xl:col-span-2">
+                              <Label>Renda individual</Label>
+                              <Input {...register(`membros.${index}.renda_individual` as const)} />
+                            </div>
+
+                            <label className="sm:col-span-1 xl:col-span-2 flex items-center gap-2 text-sm text-slate-700">
+                              <Checkbox
+                                checked={!!membroAtual?.responsavel_familiar}
+                                onChange={(event) =>
+                                  alternarResponsavelFamiliar(index, event.target.checked)
+                                }
+                              />
+                              Responsável
+                            </label>
+
+                            <label className="sm:col-span-1 xl:col-span-2 flex items-center gap-2 text-sm text-slate-700">
+                              <Checkbox {...register(`membros.${index}.contribui_renda` as const)} />
+                              Contribui renda
+                            </label>
+
+                            <label className="sm:col-span-1 xl:col-span-2 flex items-center gap-2 text-sm text-slate-700">
+                              <Checkbox {...register(`membros.${index}.participa_servicos` as const)} />
+                              Participa dos serviços
+                            </label>
+
+                            <label className="sm:col-span-1 xl:col-span-2 flex items-center gap-2 text-sm text-slate-700">
+                              <Checkbox {...register(`membros.${index}.usa_endereco_familia` as const)} />
+                              Usa endereço da família
+                            </label>
+
+                            <div className="sm:col-span-2 xl:col-span-12">
+                              <Label>Observações</Label>
+                              <Textarea
+                                rows={2}
+                                {...register(`membros.${index}.observacoes` as const)}
+                                onBlurCapture={() => aplicarFormatacaoMembro(index, "observacoes")}
+                              />
+                            </div>
                           </div>
-                          <div>
-                            <Label>Renda individual</Label>
-                            <Input {...register(`membros.${index}.renda_individual` as const)} />
-                          </div>
-                          <label className="flex items-center gap-2 text-sm text-slate-700">
-                            <Checkbox {...register(`membros.${index}.responsavel_familiar` as const)} />
-                            Responsavel familiar
-                          </label>
-                          <label className="flex items-center gap-2 text-sm text-slate-700">
-                            <Checkbox {...register(`membros.${index}.contribui_renda` as const)} />
-                            Contribui renda
-                          </label>
-                          <label className="flex items-center gap-2 text-sm text-slate-700">
-                            <Checkbox {...register(`membros.${index}.participa_servicos` as const)} />
-                            Participa dos servicos
-                          </label>
-                          <label className="flex items-center gap-2 text-sm text-slate-700">
-                            <Checkbox {...register(`membros.${index}.usa_endereco_familia` as const)} />
-                            Usa endereco da familia
-                          </label>
-                          <div className="sm:col-span-2">
-                            <Label>Observacoes</Label>
-                            <Textarea rows={2} {...register(`membros.${index}.observacoes` as const)} />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                        </article>
+                      );
+                    })}
                   </div>
                 )}
               </section>
             )}
 
             {abaAtiva === "indicadores" && (
-              <section className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <Label>Situacao do imovel</Label>
+              <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-12">
+                <div className="xl:col-span-3">
+                  <Label>Situação do imóvel</Label>
                   <Select {...register("situacao_imovel")}>
                     <option value="">Selecione</option>
                     {opcoesSituacaoImovel.map((opcao) => (
@@ -775,7 +1001,8 @@ export function CadastroVinculoFamiliarPage() {
                     ))}
                   </Select>
                 </div>
-                <div>
+
+                <div className="xl:col-span-3">
                   <Label>Tipo de moradia</Label>
                   <Select {...register("tipo_moradia")}>
                     <option value="">Selecione</option>
@@ -786,18 +1013,9 @@ export function CadastroVinculoFamiliarPage() {
                     ))}
                   </Select>
                 </div>
-                <div>
-                  <Label>Total de membros</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    {...register("qtd_membros", {
-                      setValueAs: (value) => (value === "" ? undefined : Number(value))
-                    })}
-                  />
-                </div>
-                <div>
-                  <Label>Criancas</Label>
+
+                <div className="xl:col-span-2">
+                  <Label>Crianças</Label>
                   <Input
                     type="number"
                     min={0}
@@ -806,7 +1024,8 @@ export function CadastroVinculoFamiliarPage() {
                     })}
                   />
                 </div>
-                <div>
+
+                <div className="xl:col-span-2">
                   <Label>Adolescentes</Label>
                   <Input
                     type="number"
@@ -816,7 +1035,8 @@ export function CadastroVinculoFamiliarPage() {
                     })}
                   />
                 </div>
-                <div>
+
+                <div className="xl:col-span-2">
                   <Label>Idosos</Label>
                   <Input
                     type="number"
@@ -826,54 +1046,268 @@ export function CadastroVinculoFamiliarPage() {
                     })}
                   />
                 </div>
-                <div className="sm:col-span-2">
+
+                <div className="xl:col-span-3">
+                  <Label>Pessoas com deficiência</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    {...register("qtd_pessoas_deficiencia", {
+                      setValueAs: (value) => (value === "" ? undefined : Number(value))
+                    })}
+                  />
+                </div>
+
+                <div className="xl:col-span-3">
+                  <Label>Renda familiar total</Label>
+                  <Input {...register("renda_familiar_total")} />
+                </div>
+
+                <div className="xl:col-span-3">
+                  <Label>Renda per capita</Label>
+                  <Input {...register("renda_per_capita")} />
+                </div>
+
+                <div className="xl:col-span-3">
+                  <Label>Faixa de renda per capita</Label>
+                  <Input
+                    {...register("faixa_renda_per_capita")}
+                    onBlurCapture={() => aplicarFormatacaoCampo("faixa_renda_per_capita")}
+                  />
+                </div>
+
+                <div className="xl:col-span-4">
+                  <Label>Esgoto</Label>
+                  <Input {...register("esgoto_tipo")} onBlurCapture={() => aplicarFormatacaoCampo("esgoto_tipo")} />
+                </div>
+
+                <div className="xl:col-span-4">
+                  <Label>Coleta de lixo</Label>
+                  <Input {...register("coleta_lixo")} onBlurCapture={() => aplicarFormatacaoCampo("coleta_lixo")} />
+                </div>
+
+                <div className="xl:col-span-4">
+                  <Label>Arranjo familiar</Label>
+                  <Input
+                    {...register("arranjo_familiar")}
+                    onBlurCapture={() => aplicarFormatacaoCampo("arranjo_familiar")}
+                  />
+                </div>
+
+                <div className="xl:col-span-6">
                   <Label>Principais fontes de renda</Label>
-                  <Textarea rows={2} {...register("principais_fontes_renda")} />
+                  <Textarea
+                    rows={2}
+                    {...register("principais_fontes_renda")}
+                    onBlurCapture={() => aplicarFormatacaoCampo("principais_fontes_renda")}
+                  />
                 </div>
-                <div className="sm:col-span-2">
-                  <Label>Observacoes</Label>
-                  <Textarea rows={3} {...register("observacoes")} />
+
+                <div className="xl:col-span-6">
+                  <Label>Situação de insegurança alimentar</Label>
+                  <Textarea
+                    rows={2}
+                    {...register("situacao_inseguranca_alimentar")}
+                    onBlurCapture={() => aplicarFormatacaoCampo("situacao_inseguranca_alimentar")}
+                  />
                 </div>
-                <label className="flex items-center gap-2 text-sm text-slate-700">
+
+                <label className="xl:col-span-2 flex items-center gap-2 text-sm text-slate-700">
                   <Checkbox {...register("agua_encanada")} />
-                  Agua encanada
+                  Água encanada
                 </label>
-                <label className="flex items-center gap-2 text-sm text-slate-700">
+
+                <label className="xl:col-span-2 flex items-center gap-2 text-sm text-slate-700">
                   <Checkbox {...register("energia_eletrica")} />
-                  Energia eletrica
+                  Energia elétrica
                 </label>
-                <label className="flex items-center gap-2 text-sm text-slate-700">
+
+                <label className="xl:col-span-2 flex items-center gap-2 text-sm text-slate-700">
                   <Checkbox {...register("internet")} />
                   Internet
                 </label>
+
+                <label className="xl:col-span-2 flex items-center gap-2 text-sm text-slate-700">
+                  <Checkbox {...register("possui_dividas_relevantes")} />
+                  Possui dívidas
+                </label>
+
+                <div className="xl:col-span-6">
+                  <Label>Descrição de dívidas</Label>
+                  <Textarea
+                    rows={2}
+                    {...register("descricao_dividas")}
+                    onBlurCapture={() => aplicarFormatacaoCampo("descricao_dividas")}
+                  />
+                </div>
+
+                <div className="xl:col-span-6">
+                  <Label>Vulnerabilidades da família</Label>
+                  <Textarea
+                    rows={2}
+                    {...register("vulnerabilidades_familia")}
+                    onBlurCapture={() => aplicarFormatacaoCampo("vulnerabilidades_familia")}
+                  />
+                </div>
+
+                <div className="xl:col-span-4">
+                  <Label>Serviços de acompanhamento</Label>
+                  <Input
+                    {...register("servicos_acompanhamento")}
+                    onBlurCapture={() => aplicarFormatacaoCampo("servicos_acompanhamento")}
+                  />
+                </div>
+
+                <div className="xl:col-span-4">
+                  <Label>Técnico responsável</Label>
+                  <Input
+                    {...register("tecnico_responsavel")}
+                    onBlurCapture={() => aplicarFormatacaoCampo("tecnico_responsavel")}
+                  />
+                </div>
+
+                <div className="xl:col-span-4">
+                  <Label>Periodicidade de atendimento</Label>
+                  <Input
+                    {...register("periodicidade_atendimento")}
+                    onBlurCapture={() => aplicarFormatacaoCampo("periodicidade_atendimento")}
+                  />
+                </div>
+
+                <div className="xl:col-span-3">
+                  <Label>Próxima visita prevista</Label>
+                  <Input type="date" {...register("proxima_visita_prevista")} />
+                </div>
+
+                <div className="xl:col-span-9">
+                  <Label>Observações</Label>
+                  <Textarea
+                    rows={2}
+                    {...register("observacoes")}
+                    onBlurCapture={() => aplicarFormatacaoCampo("observacoes")}
+                  />
+                </div>
               </section>
             )}
-
-            <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-3">
-              <Button
-                variant="outline"
-                onClick={() =>
-                  setAbaAtiva(abas[Math.max(0, abas.findIndex((aba) => aba.id === abaAtiva) - 1)].id)
-                }
-                disabled={abaAtiva === "lista"}
-              >
-                Aba anterior
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() =>
-                  setAbaAtiva(
-                    abas[Math.min(abas.length - 1, abas.findIndex((aba) => aba.id === abaAtiva) + 1)].id
-                  )
-                }
-                disabled={abaAtiva === "indicadores"}
-              >
-                Proxima aba
-              </Button>
-            </div>
           </CardContent>
         </Card>
       </div>
+
+      {mensagem && (
+        <div
+          className="fixed inset-0 z-[58] flex items-center justify-center bg-slate-900/45 px-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setMensagem(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="border-b border-slate-100 px-5 py-4">
+              <h3
+                className={`text-base font-semibold ${
+                  mensagem.tipo === "sucesso" ? "text-emerald-800" : "text-red-700"
+                }`}
+              >
+                {mensagem.tipo === "sucesso" ? "Confirmação" : "Atenção"}
+              </h3>
+            </div>
+            <div className="px-5 py-4">
+              <p className="text-sm text-slate-700">{mensagem.texto}</p>
+            </div>
+            <div className="flex justify-end border-t border-slate-100 px-5 py-3">
+              <Button type="button" onClick={() => setMensagem(null)}>
+                OK
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {popupSalvarAberto && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/45 px-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setPopupSalvarAberto(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="border-b border-slate-100 px-5 py-4">
+              <h3 className="text-base font-semibold text-slate-900">Confirmação</h3>
+            </div>
+            <div className="px-5 py-4">
+              <p className="text-sm text-slate-700">Salvo com sucesso.</p>
+            </div>
+            <div className="flex justify-end border-t border-slate-100 px-5 py-3">
+              <Button type="button" onClick={() => setPopupSalvarAberto(false)}>
+                OK
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {popupExcluirAberto && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/45 px-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setPopupExcluirAberto(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="border-b border-slate-100 px-5 py-4">
+              <h3 className="text-base font-semibold text-slate-900">Confirmar exclusão</h3>
+            </div>
+            <div className="px-5 py-4">
+              <p className="text-sm text-slate-700">Esta ação é irreversível. Deseja continuar?</p>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3">
+              <Button type="button" variant="outline" onClick={() => setPopupExcluirAberto(false)}>
+                Cancelar
+              </Button>
+              <Button type="button" variant="danger" onClick={confirmarExclusaoFamilia}>
+                Excluir
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {popupImprimirAberto && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/45 px-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setPopupImprimirAberto(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="border-b border-slate-100 px-5 py-4">
+              <h3 className="text-base font-semibold text-slate-900">Imprimir vínculo familiar</h3>
+            </div>
+            <div className="px-5 py-4">
+              <p className="text-sm text-slate-700">Deseja gerar a impressão desta família?</p>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3">
+              <Button type="button" variant="outline" onClick={() => setPopupImprimirAberto(false)}>
+                Cancelar
+              </Button>
+              <Button type="button" onClick={confirmarImpressao}>
+                Continuar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

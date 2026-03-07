@@ -18,14 +18,18 @@ export function mapBeneficiarioToResponse(record) {
     const docCnh = findDocByType(record.documentos, "CNH");
     const docCartaoSus = findDocByType(record.documentos, "CARTAO_SUS");
     const documentosObrigatorios = record.documentos
-        .filter((doc) => !!doc.nomeArquivo || !!doc.caminhoArquivo)
+        .filter((doc) => doc.tipoDocumento === "ANEXO")
         .map((doc) => ({
         id: toStringId(doc.id),
         nome: doc.nomeDocumento ?? doc.tipoDocumento ?? "Documento",
+        numeroDocumento: doc.numeroDocumento ?? undefined,
         nomeArquivo: doc.nomeArquivo ?? undefined,
         caminhoArquivo: doc.caminhoArquivo ?? undefined,
         contentType: doc.contentType ?? undefined,
-        obrigatorio: doc.obrigatorio ?? false
+        obrigatorio: doc.obrigatorio ?? true,
+        ignorado: (doc.obrigatorio ?? true) === false &&
+            !doc.nomeArquivo &&
+            !doc.caminhoArquivo
     }));
     return {
         id_beneficiario: toStringId(record.id),
