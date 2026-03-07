@@ -1,31 +1,45 @@
-﻿import { useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import {
+  Building2,
+  ChartColumn,
+  ChartPie,
   ChevronDown,
   ChevronRight,
+  FileText,
   FolderOpen,
-  Home,
+  HandHeart,
+  HandCoins,
+  Handshake,
   LayoutDashboard,
+  Link2,
+  ListFilter,
   PanelLeftClose,
   PanelLeftOpen,
+  Settings2,
+  SlidersHorizontal,
+  Stethoscope,
   UserRound,
   UsersRound,
-  Link2,
   type LucideIcon
 } from "lucide-react";
 
 type MenuItem = {
-  to: string;
+  id: string;
+  to?: string;
   label: string;
   icon: LucideIcon;
+  requiredPermissions?: string[];
+  emMigracao?: boolean;
 };
 
 type MenuSection = {
   id: string;
   secao: string;
   icon: LucideIcon;
+  requiredPermissions?: string[];
   itens: MenuItem[];
 };
 
@@ -34,30 +48,148 @@ const menuSections: MenuSection[] = [
     id: "dashboard",
     secao: "Dashboard",
     icon: LayoutDashboard,
-    itens: [{ to: "/", label: "Dashboard", icon: Home }]
+    itens: [
+      { id: "dashboard-visao-geral", to: "/dashboard/visao-geral", label: "Visão geral", icon: ChartPie },
+      { id: "dashboard-indicadores", to: "/dashboard/indicadores", label: "Indicadores", icon: ChartColumn }
+    ]
   },
   {
     id: "cadastros",
     secao: "Cadastros",
     icon: FolderOpen,
     itens: [
-      { to: "/cadastros/beneficiarios", label: "Beneficiários", icon: UserRound },
-      { to: "/cadastros/vinculo-familiar", label: "Vínculo familiar", icon: Link2 }
+      { id: "cadastros-beneficiarios", to: "/cadastros/beneficiarios", label: "Beneficiários", icon: UserRound },
+      {
+        id: "cadastros-profissionais",
+        to: "/cadastros/profissionais",
+        label: "Profissionais",
+        icon: Stethoscope
+      },
+      {
+        id: "cadastros-voluntariado",
+        to: "/cadastros/voluntariado",
+        label: "Voluntariado",
+        icon: HandHeart
+      },
+      {
+        id: "cadastros-unidades-assistenciais",
+        to: "/cadastros/unidades-assistenciais",
+        label: "Unidades assistenciais",
+        icon: Building2
+      },
+      {
+        id: "cadastros-vinculo-familiar",
+        to: "/cadastros/vinculo-familiar",
+        label: "Vínculo familiar",
+        icon: Link2
+      }
+    ]
+  },
+  {
+    id: "atendimentos",
+    secao: "Atendimentos",
+    icon: Handshake,
+    itens: [
+      {
+        id: "atendimentos-migracao",
+        label: "Módulo em migração",
+        icon: Handshake,
+        emMigracao: true
+      }
+    ]
+  },
+  {
+    id: "setor-administrativo",
+    secao: "Setor administrativo",
+    icon: FileText,
+    itens: [
+      {
+        id: "setor-administrativo-migracao",
+        label: "Módulo em migração",
+        icon: FileText,
+        emMigracao: true
+      }
+    ]
+  },
+  {
+    id: "almoxarifado",
+    secao: "Setor jurídico",
+    icon: ListFilter,
+    itens: [
+      {
+        id: "setor-juridico-migracao",
+        label: "Módulo em migração",
+        icon: ListFilter,
+        emMigracao: true
+      }
+    ]
+  },
+  {
+    id: "financeiro",
+    secao: "Setor financeiro",
+    icon: HandCoins,
+    itens: [
+      {
+        id: "setor-financeiro-migracao",
+        label: "Módulo em migração",
+        icon: HandCoins,
+        emMigracao: true
+      }
+    ]
+  },
+  {
+    id: "setor-rh",
+    secao: "Setor RH",
+    icon: UsersRound,
+    itens: [
+      {
+        id: "setor-rh-migracao",
+        label: "Módulo em migração",
+        icon: UsersRound,
+        emMigracao: true
+      }
+    ]
+  },
+  {
+    id: "configuracoes-gerais",
+    secao: "Configurações gerais",
+    icon: Settings2,
+    requiredPermissions: ["ADMINISTRADOR"],
+    itens: [
+      {
+        id: "configuracoes-parametros-sistema",
+        to: "/configuracoes/parametros-sistema",
+        label: "Parâmetros do sistema",
+        icon: SlidersHorizontal,
+        requiredPermissions: ["ADMINISTRADOR"]
+      },
+      {
+        id: "configuracoes-usuarios",
+        to: "/configuracoes/usuarios",
+        label: "Usuários",
+        icon: UsersRound,
+        requiredPermissions: ["ADMINISTRADOR"]
+      }
     ]
   }
 ];
 
 function obterTitulo(pathname: string): string {
-  if (pathname === "/") {
-    return "Dashboard";
-  }
-  if (pathname.startsWith("/cadastros/beneficiarios")) {
-    return "Cadastro de beneficiários";
-  }
-  if (pathname.startsWith("/cadastros/vinculo-familiar")) {
-    return "Cadastro de vínculo familiar";
-  }
+  if (pathname === "/" || pathname.startsWith("/dashboard/visao-geral")) return "Visão geral";
+  if (pathname.startsWith("/dashboard/indicadores")) return "Indicadores";
+  if (pathname.startsWith("/cadastros/beneficiarios")) return "Cadastro de beneficiários";
+  if (pathname.startsWith("/cadastros/profissionais")) return "Cadastro de profissionais";
+  if (pathname.startsWith("/cadastros/voluntariado")) return "Cadastro de voluntariado";
+  if (pathname.startsWith("/cadastros/unidades-assistenciais")) return "Cadastro de unidade assistencial";
+  if (pathname.startsWith("/cadastros/vinculo-familiar")) return "Cadastro de vínculo familiar";
+  if (pathname.startsWith("/configuracoes/parametros-sistema")) return "Parâmetros do sistema";
+  if (pathname.startsWith("/configuracoes/usuarios")) return "Usuários";
   return "Painel de migração";
+}
+
+function itemEstaAtivo(pathname: string, item: MenuItem) {
+  if (!item.to) return false;
+  return pathname === item.to || pathname.startsWith(`${item.to}/`);
 }
 
 export function AppShell() {
@@ -65,11 +197,53 @@ export function AppShell() {
   const location = useLocation();
   const titulo = obterTitulo(location.pathname);
   const versaoSistema = import.meta.env.VITE_APP_VERSION ?? "1.00.12";
-
   const [sidebarRecolhida, setSidebarRecolhida] = useState(false);
-  const [gruposAbertos, setGruposAbertos] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(menuSections.map((secao) => [secao.id, true]))
+  const [gruposAbertos, setGruposAbertos] = useState<Record<string, boolean>>({});
+
+  const permissoesUsuario = usuario?.permissoes ?? [];
+  const possuiPermissao = useMemo(
+    () =>
+      (permissoesNecessarias?: string[]) => {
+        if (!permissoesNecessarias?.length) return true;
+        return permissoesNecessarias.some((permissao) => permissoesUsuario.includes(permissao));
+      },
+    [permissoesUsuario]
   );
+
+  const menuSectionsVisiveis = useMemo(() => {
+    return menuSections
+      .filter((secao) => possuiPermissao(secao.requiredPermissions))
+      .map((secao) => ({
+        ...secao,
+        itens: secao.itens.filter((item) => possuiPermissao(item.requiredPermissions))
+      }))
+      .filter((secao) => secao.itens.length > 0);
+  }, [possuiPermissao]);
+
+  const secaoAtivaId = useMemo(() => {
+    for (const secao of menuSectionsVisiveis) {
+      if (secao.itens.some((item) => itemEstaAtivo(location.pathname, item))) {
+        return secao.id;
+      }
+    }
+    return undefined;
+  }, [location.pathname, menuSectionsVisiveis]);
+
+  useEffect(() => {
+    setGruposAbertos((estadoAtual) => {
+      const proximoEstado: Record<string, boolean> = {};
+
+      menuSectionsVisiveis.forEach((secao, indice) => {
+        proximoEstado[secao.id] = estadoAtual[secao.id] ?? (secao.id === secaoAtivaId || indice === 0);
+      });
+
+      if (secaoAtivaId) {
+        proximoEstado[secaoAtivaId] = true;
+      }
+
+      return proximoEstado;
+    });
+  }, [menuSectionsVisiveis, secaoAtivaId]);
 
   function alternarSidebar() {
     setSidebarRecolhida((valorAtual) => !valorAtual);
@@ -82,24 +256,29 @@ export function AppShell() {
     }));
   }
 
+  function abrirSidebarNoGrupo(id: string) {
+    if (!sidebarRecolhida) return;
+    setSidebarRecolhida(false);
+    setGruposAbertos((estadoAtual) => ({
+      ...estadoAtual,
+      [id]: true
+    }));
+  }
+
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-[var(--g3-bg)]">
       <aside
-        className={`fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-emerald-800/30 bg-gradient-to-b from-emerald-950 via-emerald-900 to-emerald-900 text-white shadow-2xl shadow-emerald-950/35 transition-[width] duration-300 lg:flex ${
-          sidebarRecolhida ? "w-20" : "w-72"
+        className={`fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-[var(--g3-sidebar-border)] bg-[linear-gradient(180deg,var(--g3-sidebar-bg)_0%,var(--g3-sidebar-bg-alt)_100%)] text-[var(--g3-sidebar-text)] shadow-2xl shadow-[color:var(--g3-sidebar-shadow)] transition-[width] duration-300 lg:flex ${
+          sidebarRecolhida ? "w-16" : "w-64"
         }`}
       >
-        <div className={`border-b border-white/10 ${sidebarRecolhida ? "px-2 py-3" : "px-5 py-4"}`}>
+        <div className={`border-b border-white/10 ${sidebarRecolhida ? "px-2 py-2" : "px-4 py-3"}`}>
           <div className="relative flex items-center justify-center">
             {sidebarRecolhida ? (
-              <span className="mx-auto text-xs font-semibold uppercase tracking-[0.2em] text-emerald-200">
-                G3
-              </span>
+              <span className="mx-auto text-xs font-semibold uppercase tracking-[0.2em] text-white/85">G3</span>
             ) : (
               <div className="w-full text-center">
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-200">
-                  Sistema G3
-                </p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/85">Sistema G3</p>
               </div>
             )}
 
@@ -107,62 +286,91 @@ export function AppShell() {
               type="button"
               variant="ghost"
               size="sm"
-              className="absolute right-0 h-7 w-7 p-0 text-emerald-100 hover:bg-white/10 hover:text-white"
+              className="absolute right-0 h-6 w-6 p-0 text-white/85 hover:bg-white/10 hover:text-white"
               onClick={alternarSidebar}
-              title={sidebarRecolhida ? "Expandir Menu Lateral" : "Recolher Menu Lateral"}
-              aria-label={sidebarRecolhida ? "Expandir Menu Lateral" : "Recolher Menu Lateral"}
+              title={sidebarRecolhida ? "Expandir menu lateral" : "Recolher menu lateral"}
+              aria-label={sidebarRecolhida ? "Expandir menu lateral" : "Recolher menu lateral"}
             >
               {sidebarRecolhida ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
             </Button>
           </div>
-
         </div>
 
-        <nav className={`flex-1 overflow-y-auto ${sidebarRecolhida ? "space-y-2 px-2 py-3" : "space-y-4 px-4 py-4"}`}>
-          {menuSections.map((secao) => {
+        <nav
+          className={`g3-sidebar-scroll flex-1 overflow-y-auto ${
+            sidebarRecolhida ? "space-y-1.5 px-1.5 py-2" : "space-y-2 px-2.5 py-3"
+          }`}
+        >
+          {menuSectionsVisiveis.map((secao) => {
             const grupoAberto = gruposAbertos[secao.id] ?? true;
+            const grupoAtivo = secao.id === secaoAtivaId;
             const IconeSecao = secao.icon;
 
             return (
-              <section key={secao.id} className="space-y-1.5">
+              <section key={secao.id} className="space-y-1">
                 <button
                   type="button"
-                  className={`flex w-full items-center rounded-lg border border-white/10 bg-white/5 text-left font-semibold text-emerald-100 transition-colors hover:bg-white/10 ${
-                    sidebarRecolhida ? "justify-center px-2 py-2" : "justify-between px-3 py-2 text-xs uppercase tracking-[0.16em]"
+                  className={`flex w-full items-center rounded-lg border text-left font-semibold transition-colors ${
+                    sidebarRecolhida
+                      ? "justify-center px-1.5 py-1.5"
+                      : "justify-between gap-2 px-2.5 py-2 text-[12px]"
+                  } ${
+                    grupoAtivo
+                      ? "border-[var(--g3-active)] bg-[var(--g3-sidebar-bg)] text-[var(--g3-sidebar-text)] shadow-md"
+                      : "border-[var(--g3-sidebar-border)] bg-[var(--g3-sidebar-bg)] text-[var(--g3-sidebar-text)] hover:bg-[var(--g3-sidebar-bg-alt)]"
                   }`}
-                  onClick={() => alternarGrupo(secao.id)}
+                  onClick={() => {
+                    if (sidebarRecolhida) {
+                      abrirSidebarNoGrupo(secao.id);
+                      return;
+                    }
+                    alternarGrupo(secao.id);
+                  }}
                   title={sidebarRecolhida ? secao.secao : undefined}
-                  aria-label={`Alternar Grupo ${secao.secao}`}
+                  aria-label={`Alternar grupo ${secao.secao}`}
+                  aria-expanded={grupoAberto}
                 >
                   <span className={`flex items-center ${sidebarRecolhida ? "justify-center" : "gap-2"}`}>
-                    {IconeSecao ? <IconeSecao className="h-4 w-4" /> : null}
+                    <IconeSecao className="h-3.5 w-3.5" />
                     {!sidebarRecolhida && secao.secao}
                   </span>
                   {!sidebarRecolhida &&
-                    (grupoAberto ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />)}
+                    (grupoAberto ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />)}
                 </button>
 
-                {grupoAberto && (
-                  <div className={`space-y-1 rounded-xl border border-white/10 bg-white/5 ${sidebarRecolhida ? "p-1" : "p-2"}`}>
-                    {secao.itens.map((item) => (
-                      <NavLink key={item.to} to={item.to}>
-                        {({ isActive }) => (
-                          <span
-                            className={`flex items-center rounded-lg border text-sm font-medium transition-colors ${
-                              sidebarRecolhida ? "justify-center px-2 py-2" : "gap-3 px-3 py-2"
-                            } ${
-                              isActive
-                                ? "border-emerald-200 bg-emerald-50 text-emerald-900"
-                                : "border-transparent text-emerald-100 hover:border-white/20 hover:bg-white/10"
-                            }`}
-                            title={sidebarRecolhida ? item.label : undefined}
-                          >
-                            <item.icon className="h-4 w-4" />
-                            {!sidebarRecolhida && item.label}
-                          </span>
-                        )}
-                      </NavLink>
-                    ))}
+                {grupoAberto && !sidebarRecolhida && (
+                  <div
+                    className={`ml-1.5 space-y-1 rounded-lg border bg-[var(--g3-primary-soft)] p-1.5 ${
+                      secao.id === "configuracoes-gerais" ? "border-transparent" : "border-[var(--g3-border)]"
+                    }`}
+                  >
+                    {secao.itens.map((item) =>
+                      item.to ? (
+                        <NavLink key={item.id} to={item.to}>
+                          {({ isActive }) => (
+                            <span
+                              className={`flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                                isActive
+                                  ? "border-[var(--g3-active)] bg-[var(--g3-card)] text-[var(--g3-active)] shadow-sm"
+                                  : "border-transparent text-[var(--g3-foreground)] hover:border-[var(--g3-border)] hover:bg-[var(--g3-primary-soft-hover)]"
+                              }`}
+                            >
+                              <item.icon className="h-3.5 w-3.5" />
+                              {item.label}
+                            </span>
+                          )}
+                        </NavLink>
+                      ) : (
+                        <span
+                          key={item.id}
+                          className="flex cursor-not-allowed items-center gap-2 rounded-md border border-dashed border-[var(--g3-border)] bg-[var(--g3-card)]/70 px-2.5 py-1.5 text-xs text-[var(--g3-muted)]"
+                          aria-disabled="true"
+                        >
+                          <item.icon className="h-3.5 w-3.5" />
+                          {item.label}
+                        </span>
+                      )
+                    )}
                   </div>
                 )}
               </section>
@@ -171,28 +379,26 @@ export function AppShell() {
         </nav>
 
         <div
-          className={`border-t border-white/10 text-center text-emerald-100/90 ${
-            sidebarRecolhida ? "px-2 py-3 text-[10px]" : "px-5 py-3 text-xs"
+          className={`border-t border-white/10 text-center text-white/80 ${
+            sidebarRecolhida ? "px-1.5 py-2 text-[10px]" : "px-4 py-2.5 text-[11px]"
           }`}
         >
           {sidebarRecolhida ? `v${versaoSistema}` : `Versão do sistema: ${versaoSistema}`}
         </div>
       </aside>
 
-      <div
-        className={`transition-[padding] duration-300 ${sidebarRecolhida ? "lg:pl-20" : "lg:pl-72"}`}
-      >
-        <header className="border-b border-emerald-200 bg-emerald-100/95 backdrop-blur">
+      <div className={`transition-[padding] duration-300 ${sidebarRecolhida ? "lg:pl-16" : "lg:pl-64"}`}>
+        <header className="border-b border-[var(--g3-header-border)] bg-[var(--g3-header-bg)]/95 backdrop-blur">
           <div className="mx-auto w-full max-w-[1440px] px-4 py-1.5 lg:px-8">
             <div className="flex min-h-9 flex-wrap items-center justify-between gap-2">
               <div className="min-w-0">
-                <h1 className="truncate text-sm font-semibold text-slate-900 sm:text-base">{titulo}</h1>
+                <h1 className="truncate text-sm font-semibold text-[var(--g3-foreground)] sm:text-base">{titulo}</h1>
               </div>
               <div className="flex items-center gap-1.5 sm:gap-2">
-                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-emerald-700">
+                <span className="rounded-full bg-[var(--g3-primary-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--g3-active)]">
                   G3 Next
                 </span>
-                <span className="text-[11px] text-slate-600">{usuario?.nomeUsuario}</span>
+                <span className="text-[11px] text-[var(--g3-muted)]">{usuario?.nomeUsuario}</span>
                 <Button
                   type="button"
                   variant="outline"
@@ -206,22 +412,24 @@ export function AppShell() {
             </div>
 
             <nav className="mt-1 flex flex-wrap gap-1.5 lg:hidden">
-              {menuSections.flatMap((secao) =>
-                secao.itens.map((item) => (
-                  <NavLink key={item.to} to={item.to}>
-                    {({ isActive }) => (
-                      <span
-                        className={`inline-flex rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-                          isActive
-                            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                            : "border-slate-200 bg-white text-slate-600"
-                        }`}
-                      >
-                        {item.label}
-                      </span>
-                    )}
-                  </NavLink>
-                ))
+              {menuSectionsVisiveis.flatMap((secao) =>
+                secao.itens.map((item) =>
+                  item.to ? (
+                    <NavLink key={item.id} to={item.to}>
+                      {({ isActive }) => (
+                        <span
+                          className={`inline-flex rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                            isActive
+                              ? "border-[var(--g3-active)] bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"
+                              : "border-[var(--g3-border)] bg-[var(--g3-card)] text-[var(--g3-muted)]"
+                          }`}
+                        >
+                          {item.label}
+                        </span>
+                      )}
+                    </NavLink>
+                  ) : null
+                )
               )}
             </nav>
           </div>

@@ -22,11 +22,20 @@ export class AuthService {
       throw new AppError("Credenciais invalidas.", 401);
     }
 
+    const controle = await this.repository.buscarControleAcessoPorUsuarioId(usuario.id);
+    this.validarAcessoUsuario(controle?.status);
+
     const senhaValida = await bcrypt.compare(input.senha, usuario.senhaHash);
     if (!senhaValida) {
+      const atualizado = await this.repository.registrarFalhaLogin(usuario.id);
       console.warn(`[auth] tentativa de login invalida para usuario: ${input.nomeUsuario}`);
+      if ((atualizado?.status ?? "").toUpperCase() === "BLOQUEADO") {
+        throw new AppError("Usuario bloqueado por tentativas invalidas de acesso.", 403);
+      }
       throw new AppError("Credenciais invalidas.", 401);
     }
+
+    await this.repository.registrarLoginSucesso(usuario.id);
 
     const usuarioAutenticado = this.mapUsuarioAutenticado(usuario);
     const token = this.tokenService.gerarToken(usuarioAutenticado);
@@ -72,6 +81,10 @@ export class AuthService {
       );
     }
 
+    const controle = await this.repository.buscarControleAcessoPorUsuarioId(usuario.id);
+    this.validarAcessoUsuario(controle?.status);
+    await this.repository.registrarLoginSucesso(usuario.id);
+
     const usuarioAutenticado = this.mapUsuarioAutenticado(usuario);
     const token = this.tokenService.gerarToken(usuarioAutenticado);
 
@@ -91,6 +104,9 @@ export class AuthService {
     if (!usuario) {
       throw new AppError("Usuario autenticado nao encontrado.", 401);
     }
+
+    const controle = await this.repository.buscarControleAcessoPorUsuarioId(usuario.id);
+    this.validarAcessoUsuario(controle?.status);
 
     return this.mapUsuarioAutenticado(usuario);
   }
@@ -122,5 +138,16 @@ export class AuthService {
       email: usuario.email ?? undefined,
       permissoes: usuario.permissoes.map((item) => item.permissao.nome)
     };
+  }
+
+  private validarAcessoUsuario(status?: string | null) {
+    const statusNormalizado = (status ?? "").trim().toUpperCase();
+    if (statusNormalizado === "INATIVO") {
+      throw new AppError("Usuario inativo. Procure o administrador.", 403);
+    }
+
+    if (statusNormalizado === "BLOQUEADO") {
+      throw new AppError("Usuario bloqueado. Procure o administrador.", 403);
+    }
   }
 }

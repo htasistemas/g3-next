@@ -1,0 +1,69 @@
+import { Router } from "express";
+import { asyncHandler } from "../../../shared/http/async-handler.js";
+import {
+  ensureAuthenticated,
+  ensurePermissions
+} from "../../auth/middlewares/auth.middleware.js";
+import { UsuarioController } from "../controllers/usuario.controller.js";
+
+const controller = new UsuarioController();
+
+export const usuarioRoutes = Router();
+
+const permissoesAdministracaoUsuarios = ["ADMINISTRADOR"];
+
+usuarioRoutes.get(
+  "/permissoes",
+  ensureAuthenticated,
+  ensurePermissions(permissoesAdministracaoUsuarios),
+  asyncHandler(controller.listarPermissoes.bind(controller))
+);
+
+usuarioRoutes.get(
+  "/",
+  ensureAuthenticated,
+  ensurePermissions(permissoesAdministracaoUsuarios),
+  asyncHandler(controller.listar.bind(controller))
+);
+
+usuarioRoutes.get(
+  "/:id",
+  ensureAuthenticated,
+  ensurePermissions(permissoesAdministracaoUsuarios),
+  asyncHandler(controller.buscarPorId.bind(controller))
+);
+
+usuarioRoutes.post(
+  "/",
+  ensureAuthenticated,
+  ensurePermissions(permissoesAdministracaoUsuarios),
+  asyncHandler(controller.criar.bind(controller))
+);
+
+usuarioRoutes.put(
+  "/:id",
+  ensureAuthenticated,
+  ensurePermissions(permissoesAdministracaoUsuarios),
+  asyncHandler(controller.atualizar.bind(controller))
+);
+
+usuarioRoutes.patch(
+  "/:id/status",
+  ensureAuthenticated,
+  ensurePermissions(permissoesAdministracaoUsuarios),
+  asyncHandler(controller.atualizarStatus.bind(controller))
+);
+
+usuarioRoutes.post(
+  "/:id/reset-senha",
+  ensureAuthenticated,
+  ensurePermissions(permissoesAdministracaoUsuarios),
+  asyncHandler(controller.resetarSenha.bind(controller))
+);
+
+usuarioRoutes.delete(
+  "/:id",
+  ensureAuthenticated,
+  ensurePermissions(permissoesAdministracaoUsuarios),
+  asyncHandler(controller.remover.bind(controller))
+);
