@@ -1,128 +1,26 @@
-name: Deploy Docker G3
+name: Build G3 Next
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
-  deploy:
-    runs-on: self-hosted
-    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+  build:
+    runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout do codigo
+      - name: Baixar codigo
         uses: actions/checkout@v4
+
+      - name: Configurar Node
+        uses: actions/setup-node@v4
         with:
-          fetch-depth: 0
+          node-version: 20
 
-      - name: Incrementar versao e atualizar containers
+      - name: Verificar estrutura
         run: |
-          set -euo pipefail
-
-          echo "Sincronizando repositorio no runner..."
-          git fetch --all --prune
-          git checkout "${GITHUB_REF_NAME}"
-          git pull origin "${GITHUB_REF_NAME}"
-
-          if [ -f docker-compose.tunnel.yml ]; then
-            echo "ERRO: docker-compose.tunnel.yml existe. Remova para evitar queda do sistema."
-            exit 1
-          fi
-
-          arquivoVersao="backend/src/main/resources/static/version.txt"
-
-          if [ ! -f "$arquivoVersao" ]; then
-            echo "Arquivo de versao nao encontrado: $arquivoVersao"
-            exit 1
-          fi
-
-          versaoAtual=$(head -n 1 "$arquivoVersao" | tr -cd '0-9.')
-          major=$(echo "$versaoAtual" | cut -d. -f1)
-          minor=$(echo "$versaoAtual" | cut -d. -f2)
-          patch=$(echo "$versaoAtual" | cut -d. -f3)
-
-          if [ -z "$major" ] || [ -z "$minor" ] || [ -z "$patch" ]; then
-            echo "Formato de versao invalido: $versaoAtual"
-            exit 1
-          fi
-
-          patch=$((10#$patch + 1))
-          novaVersao="${major}.${minor}.${patch}"
-          echo "$novaVersao" > "$arquivoVersao"
-
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-
-          git add "$arquivoVersao"
-          git commit -m "chore: atualiza versao para ${novaVersao} [skip ci]"
-          git push origin "${GITHUB_REF_NAME}"
-
-          # Garante que o compose tenha acesso ao TUNNEL_TOKEN (e demais variaveis)
-          if [ -f /home/srv/g3/.env ]; then
-            cp /home/srv/g3/.env ./.env
-          fi
-
-          # Garante que a rede externa exista para evitar falha na remocao
-          if ! docker network inspect g3_g3_net >/dev/null 2>&1; then
-            docker network create g3_g3_net
-          fi
-
-          # Remove tunnel antigo que ficou preso na rede
-          if docker ps -aq --filter "name=^g3-tunnel-1$" | grep -q .; then
-            docker rm -f g3-tunnel-1
-          fi
-
-          # Evita downtime e erro de rede com containers externos (ex.: g3-tunnel)
-          docker compose -p g3 -f docker-compose.yml up -d --build --force-recreate
-
-          # Remove apenas containers encerrados do projeto (evita erro de rede)
-          docker ps -aq --filter "label=com.docker.compose.project=g3" --filter "status=exited" | xargs -r docker rm -f || true
-
-          container_health() {
-            local name="$1"
-            local id
-            id="$(docker compose -p g3 -f docker-compose.yml ps -q "$name" || true)"
-            if [[ -z "$id" ]]; then
-              echo "missing"
-              return 0
-            fi
-            docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}no-health{{end}}' "$id" 2>/dev/null || echo "missing"
-          }
-
-          wait_healthy() {
-            local name="$1"
-            local timeout="${2:-120}"
-            local start
-            local status
-            start="$(date +%s)"
-            while true; do
-              status="$(container_health "$name")"
-              if [[ "$status" == "healthy" ]]; then
-                echo "$name is healthy"
-                return 0
-              fi
-              if [[ "$status" == "unhealthy" ]]; then
-                echo "$name is unhealthy"
-                return 1
-              fi
-              if (( "$(date +%s)" - start >= timeout )); then
-                echo "$name healthcheck timeout after ${timeout}s (status: $status)"
-                return 1
-              fi
-              sleep 3
-            done
-          }
-
-          echo "Aguardando backend subir..."
-          wait_healthy backend 180 || { echo "Erro: backend nao respondeu /health"; exit 1; }
-
-          echo "Aguardando frontend subir..."
-          wait_healthy frontend 180 || { echo "Erro: frontend nao respondeu"; exit 1; }
-
-          echo "Atualizando versao do sistema a partir do arquivo..."
-          docker exec g3-backend curl -fsS http://localhost:8080/api/config/versao > /dev/null || true
-
-          # Garante que os containers permaneçam em execucao mesmo apos falha anterior
-          docker compose -p g3 -f docker-compose.yml up -d
+          pwd
+          ls -la
+          echo "GitHub Actions funcionando"
