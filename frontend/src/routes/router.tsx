@@ -7,6 +7,10 @@ import { CadastroVinculoFamiliarPage } from "@/pages/familias/cadastro-vinculo-f
 import { CadastroUnidadeAssistencialPage } from "@/pages/unidades-assistenciais/cadastro-unidade-assistencial-page";
 import { CadastroProfissionalPage } from "@/pages/profissionais/cadastro-profissional-page";
 import { CadastroVoluntariadoPage } from "@/pages/voluntarios/cadastro-voluntariado-page";
+import { CadastroMatriculasPage } from "@/pages/matriculas/cadastro-matriculas-page";
+import { RegistroDoacaoPage } from "@/pages/registro-doacao/registro-doacao-page";
+import { DoacoesRealizadasPage } from "@/pages/doacoes-realizadas/doacoes-realizadas-page";
+import { RegistroPontoPage } from "@/pages/registro-ponto/registro-ponto-page";
 import { ParametrosSistemaPage } from "@/pages/configuracoes/parametros-sistema-page";
 import { UsuariosPage } from "@/pages/configuracoes/usuarios-page";
 import { VisaoGeralPage } from "@/pages/dashboard/visao-geral-page";
@@ -47,6 +51,10 @@ export const router = createBrowserRouter([
       { path: "/cadastros/beneficiarios", element: <CadastroBeneficiarioPage /> },
       { path: "/cadastros/profissionais", element: <CadastroProfissionalPage /> },
       { path: "/cadastros/voluntariado", element: <CadastroVoluntariadoPage /> },
+      { path: "/atendimentos/matriculas", element: <CadastroMatriculasPage /> },
+      { path: "/financeiro/registro-doacao", element: <RegistroDoacaoPage /> },
+      { path: "/financeiro/doacoes-realizadas", element: <DoacoesRealizadasPage /> },
+      { path: "/setor-rh/registro-ponto", element: <RegistroPontoPage /> },
       { path: "/cadastros/unidades-assistenciais", element: <CadastroUnidadeAssistencialPage /> },
       { path: "/cadastros/vinculo-familiar", element: <CadastroVinculoFamiliarPage /> },
       {

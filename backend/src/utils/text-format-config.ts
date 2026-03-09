@@ -155,6 +155,10 @@ export const mapaDiretoriaUnidade: Record<string, TipoFormatacaoTexto> = {
   funcao: "instituicao"
 };
 
+export const mapaSalaUnidade: Record<string, TipoFormatacaoTexto> = {
+  nome: "textoCurto"
+};
+
 export const mapaCamposTextoProfissional: Record<string, TipoFormatacaoTexto> = {
   nome_completo: "nomePessoa",
   nome_social: "nomePessoa",
@@ -198,6 +202,54 @@ export const mapaCamposTextoVoluntario: Record<string, TipoFormatacaoTexto> = {
   subzona: "textoCurto",
   carga_horaria_semanal: "textoCurto",
   observacoes: "textoCurto"
+};
+
+export const mapaCamposTextoMatricula: Record<string, TipoFormatacaoTexto> = {
+  tipo: "textoCurto",
+  nome: "instituicao",
+  descricao: "textoCurto",
+  sexo_permitido: "textoCurto",
+  restricoes: "textoCurto",
+  profissional: "nomePessoa",
+  instituicao_parceira: "instituicao",
+  beneficiario_nome: "nomePessoa",
+  profissional_nome: "nomePessoa",
+  profissional_tipo: "textoCurto"
+};
+
+export const mapaCamposTextoDoador: Record<string, TipoFormatacaoTexto> = {
+  nome: "nomePessoa",
+  tipo_pessoa: "textoCurto",
+  responsavel_empresa: "nomePessoa",
+  logradouro: "endereco",
+  complemento: "endereco",
+  bairro: "endereco",
+  cidade: "endereco",
+  observacoes: "textoCurto"
+};
+
+export const mapaCamposTextoRegistroDoacao: Record<string, TipoFormatacaoTexto> = {
+  tipo_doacao: "textoCurto",
+  descricao: "textoCurto",
+  forma_recebimento: "textoCurto",
+  periodicidade: "textoCurto",
+  status: "textoCurto",
+  observacoes: "textoCurto",
+  conservacao: "textoCurto"
+};
+
+export const mapaCamposTextoDoacaoRealizada: Record<string, TipoFormatacaoTexto> = {
+  tipo_doacao: "textoCurto",
+  situacao: "textoCurto",
+  responsavel: "nomePessoa",
+  observacoes: "textoCurto"
+};
+
+export const mapaCamposTextoDoacaoPlanejada: Record<string, TipoFormatacaoTexto> = {
+  prioridade: "textoCurto",
+  status: "textoCurto",
+  observacoes: "textoCurto",
+  motivo_cancelamento: "textoCurto"
 };
 
 export const mapaCamposTextoUsuario: Record<string, TipoFormatacaoTexto> = {

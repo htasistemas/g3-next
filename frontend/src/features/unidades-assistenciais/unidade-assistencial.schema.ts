@@ -17,6 +17,11 @@ export const diretoriaUnidadeSchema = z.object({
   mandato_fim: z.string().optional()
 });
 
+export const salaUnidadeSchema = z.object({
+  id: z.string().optional(),
+  nome: z.string().trim().optional()
+});
+
 export const unidadeAssistencialFormSchema = z.object({
   id_unidade: z.string().optional(),
   nome_fantasia: z.string().trim().min(3, "Informe o nome fantasia."),
@@ -55,7 +60,8 @@ export const unidadeAssistencialFormSchema = z.object({
   ping_timeout_ms: inteiroOpcional,
   logomarca: z.string().optional(),
   logomarca_relatorio: z.string().optional(),
-  diretoria: z.array(diretoriaUnidadeSchema).default([])
+  diretoria: z.array(diretoriaUnidadeSchema).default([]),
+  salas: z.array(salaUnidadeSchema).default([])
 });
 
 export type UnidadeAssistencialFormValues = z.infer<typeof unidadeAssistencialFormSchema>;
@@ -91,5 +97,6 @@ export const unidadeAssistencialDefaultValues: UnidadeAssistencialFormValues = {
   ping_timeout_ms: 2000,
   logomarca: "",
   logomarca_relatorio: "",
-  diretoria: []
+  diretoria: [],
+  salas: []
 };

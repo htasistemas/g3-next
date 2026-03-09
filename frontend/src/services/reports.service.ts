@@ -55,5 +55,40 @@ export const reportsService = {
       responseType: "blob"
     });
     return data as Blob;
+  },
+
+  async gerarRelacaoMatriculas(payload: Record<string, unknown>) {
+    const { data } = await httpClient.post("/api/reports/matriculas/relacao", payload, {
+      responseType: "blob"
+    });
+    return data as Blob;
+  },
+
+  async gerarComprovanteMatricula(payload: Record<string, unknown>) {
+    const { data } = await httpClient.post("/api/reports/matriculas/comprovante", payload, {
+      responseType: "blob"
+    });
+    return data as Blob;
+  },
+
+  async gerarComprovantePreMatriculaListaEspera(payload: Record<string, unknown>) {
+    const { data } = await httpClient.post("/api/reports/matriculas/pre-matricula-lista-espera", payload, {
+      responseType: "blob"
+    });
+    return data as Blob;
+  },
+
+  async gerarRelacaoRegistroDoacao(payload: Record<string, unknown>) {
+    const { data } = await httpClient.post("/api/reports/registro-doacao/relacao", payload, {
+      responseType: "blob"
+    });
+    return data as Blob;
+  },
+
+  async gerarRelacaoDoacoesRealizadas(payload: Record<string, unknown>) {
+    const { data } = await httpClient.post("/api/reports/doacoes-realizadas/relacao", payload, {
+      responseType: "blob"
+    });
+    return data as Blob;
   }
 };

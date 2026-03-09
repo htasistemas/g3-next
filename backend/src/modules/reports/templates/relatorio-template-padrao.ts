@@ -45,6 +45,7 @@ export type RelatorioHtmlInput = {
   metadadosTopo?: RelatorioMetaTopo[];
   blocos?: RelatorioBloco[];
   fotoUrl?: string;
+  fotoAjuste?: "contain" | "cover";
   cabecalho: RelatorioCabecalhoTemplate;
   rodape: RodapeTemplate;
 };
@@ -111,11 +112,12 @@ export class RelatorioTemplatePadrao {
         })
         .join("") ?? "";
 
+    const fotoObjectFit = input.fotoAjuste === "cover" ? "cover" : "contain";
     const fotoHtml = input.fotoUrl
       ? `
         <section class="foto-destaque">
           <div class="foto-destaque__box">
-            <img src="${this.escapeHtml(input.fotoUrl)}" alt="Foto 3x4 do beneficiário" />
+            <img src="${this.escapeHtml(input.fotoUrl)}" alt="Foto 4x3 do beneficiário" style="object-fit:${fotoObjectFit};" />
           </div>
         </section>
       `
@@ -211,7 +213,7 @@ export class RelatorioTemplatePadrao {
               margin-bottom: 10px;
             }
             .foto-destaque__box {
-              width: 96px;
+              width: 128px;
               border: 1px solid #cbd5e1;
               border-radius: 8px;
               padding: 4px;
@@ -220,7 +222,7 @@ export class RelatorioTemplatePadrao {
             }
             .foto-destaque__box img {
               width: 100%;
-              height: 128px;
+              height: 96px;
               object-fit: contain;
               border-radius: 4px;
             }

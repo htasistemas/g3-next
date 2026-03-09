@@ -8,7 +8,7 @@ export type DiretoriaUnidade = {
 };
 
 export type SalaUnidade = {
-  id: string;
+  id?: string;
   nome: string;
 };
 

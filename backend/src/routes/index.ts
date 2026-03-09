@@ -14,6 +14,11 @@ import { dashboardRoutes } from "../modules/dashboard/routes/dashboard.routes.js
 import { profissionalRoutes } from "../modules/profissionais/routes/profissional.routes.js";
 import { voluntarioRoutes } from "../modules/voluntarios/routes/voluntario.routes.js";
 import { usuarioRoutes } from "../modules/usuarios/routes/usuario.routes.js";
+import { matriculaRoutes } from "../modules/matriculas/routes/matricula.routes.js";
+import { registroDoacaoRoutes } from "../modules/registro-doacao/routes/registro-doacao.routes.js";
+import { doacaoRealizadaRoutes } from "../modules/doacoes-realizadas/routes/doacao-realizada.routes.js";
+import { doacaoPlanejadaRoutes } from "../modules/doacoes-planejadas/routes/doacao-planejada.routes.js";
+import { registroPontoRoutes } from "../modules/registro-ponto/routes/registro-ponto.routes.js";
 
 export const appRoutes = Router();
 
@@ -27,6 +32,11 @@ appRoutes.use("/api/familias", familiaRoutes);
 appRoutes.use("/api/unidades-assistenciais", unidadeAssistencialRoutes);
 appRoutes.use("/api/profissionais", profissionalRoutes);
 appRoutes.use("/api/voluntarios", voluntarioRoutes);
+appRoutes.use("/api/matriculas", matriculaRoutes);
+appRoutes.use("/api/registro-doacao", registroDoacaoRoutes);
+appRoutes.use("/api/doacoes-realizadas", doacaoRealizadaRoutes);
+appRoutes.use("/api/doacoes-planejadas", doacaoPlanejadaRoutes);
+appRoutes.use("/api/registro-ponto", registroPontoRoutes);
 appRoutes.use("/api/dashboard", dashboardRoutes);
 appRoutes.use("/api/configuracoes/parametros", parametrosSistemaRoutes);
 appRoutes.use("/api/usuarios", usuarioRoutes);

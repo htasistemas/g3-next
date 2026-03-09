@@ -40,6 +40,11 @@ export const diretoriaUnidadeSchema = z.object({
   mandato_fim: optionalTrimmedString
 });
 
+export const salaUnidadeSchema = z.object({
+  id: z.union([z.string(), z.number()]).optional(),
+  nome: z.string().trim().min(2, "Informe o nome da sala ou auditório.")
+});
+
 export const unidadeAssistencialInputSchema = z.object({
   nome_fantasia: z.string().trim().min(3, "Informe o nome fantasia da unidade."),
   razao_social: optionalTrimmedString,
@@ -80,7 +85,8 @@ export const unidadeAssistencialInputSchema = z.object({
   ping_timeout_ms: optionalInteger,
   logomarca: optionalTrimmedString,
   logomarca_relatorio: optionalTrimmedString,
-  diretoria: z.array(diretoriaUnidadeSchema).optional()
+  diretoria: z.array(diretoriaUnidadeSchema).optional(),
+  salas: z.array(salaUnidadeSchema).optional()
 });
 
 export const unidadeAssistencialFiltersSchema = z.object({

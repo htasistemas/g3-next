@@ -7,6 +7,13 @@ type UsuarioControleAcesso = {
   tentativas_login_invalidas: number | bigint | null;
 };
 
+type UsuarioRecuperacaoSenha = {
+  id: bigint;
+  nome_usuario: string;
+  nome: string | null;
+  email: string;
+};
+
 export class AuthRepository {
   async buscarUsuarioPorLogin(login: string) {
     await this.ensureEstruturaUsuarios();
@@ -156,6 +163,63 @@ export class AuthRepository {
       `,
       id
     );
+  }
+
+  async redefinirSenhaPorEmail(email: string, senhaHash: string): Promise<UsuarioRecuperacaoSenha | null> {
+    await this.ensureEstruturaUsuarios();
+
+    const usuario = await prisma.usuario.findFirst({
+      where: {
+        email: {
+          equals: email.trim().toLowerCase(),
+          mode: "insensitive"
+        }
+      },
+      select: {
+        id: true,
+        nomeUsuario: true,
+        nome: true,
+        email: true
+      }
+    });
+
+    if (!usuario || !usuario.email) {
+      return null;
+    }
+
+    const atualizado = await prisma.usuario.update({
+      where: { id: usuario.id },
+      data: {
+        senhaHash,
+        atualizadoEm: new Date()
+      },
+      select: {
+        id: true,
+        nomeUsuario: true,
+        nome: true,
+        email: true
+      }
+    });
+
+    await prisma.$executeRawUnsafe(
+      `
+        UPDATE usuarios
+        SET
+          exigir_troca_senha = TRUE,
+          tentativas_login_invalidas = 0,
+          ultimo_login_invalido_em = NULL,
+          atualizado_em = NOW()
+        WHERE id = $1
+      `,
+      atualizado.id
+    );
+
+    return {
+      id: atualizado.id,
+      nome_usuario: atualizado.nomeUsuario,
+      nome: atualizado.nome,
+      email: atualizado.email ?? usuario.email
+    };
   }
 
   private async ensureEstruturaUsuarios() {

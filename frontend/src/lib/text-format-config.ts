@@ -147,6 +147,10 @@ export const mapaDiretoriaUnidadeForm: Record<string, TipoFormatacaoTexto> = {
   funcao: "instituicao"
 };
 
+export const mapaSalaUnidadeForm: Record<string, TipoFormatacaoTexto> = {
+  nome: "textoCurto"
+};
+
 export const mapaCamposTextoProfissionalForm: Record<string, TipoFormatacaoTexto> = {
   nome_completo: "nomePessoa",
   nome_social: "nomePessoa",
@@ -190,6 +194,56 @@ export const mapaCamposTextoVoluntarioForm: Record<string, TipoFormatacaoTexto> 
   subzona: "textoCurto",
   carga_horaria_semanal: "textoCurto",
   observacoes: "textoCurto"
+};
+
+export const mapaCamposTextoMatriculaForm: Record<string, TipoFormatacaoTexto> = {
+  tipo: "textoCurto",
+  nome: "instituicao",
+  descricao: "textoCurto",
+  sexo_permitido: "textoCurto",
+  restricoes: "textoCurto",
+  profissional: "nomePessoa",
+  instituicao_parceira: "instituicao",
+  status: "textoCurto",
+  beneficiario_nome: "nomePessoa",
+  status_agendamento: "textoCurto",
+  profissional_nome: "nomePessoa",
+  profissional_tipo: "textoCurto"
+};
+
+export const mapaCamposTextoDoadorForm: Record<string, TipoFormatacaoTexto> = {
+  nome: "nomePessoa",
+  tipo_pessoa: "textoCurto",
+  responsavel_empresa: "nomePessoa",
+  logradouro: "endereco",
+  complemento: "endereco",
+  bairro: "endereco",
+  cidade: "endereco",
+  observacoes: "textoCurto"
+};
+
+export const mapaCamposTextoRegistroDoacaoForm: Record<string, TipoFormatacaoTexto> = {
+  tipo_doacao: "textoCurto",
+  descricao: "textoCurto",
+  forma_recebimento: "textoCurto",
+  periodicidade: "textoCurto",
+  status: "textoCurto",
+  observacoes: "textoCurto",
+  conservacao: "textoCurto"
+};
+
+export const mapaCamposTextoDoacaoRealizadaForm: Record<string, TipoFormatacaoTexto> = {
+  tipo_doacao: "textoCurto",
+  situacao: "textoCurto",
+  responsavel: "nomePessoa",
+  observacoes: "textoCurto"
+};
+
+export const mapaCamposTextoDoacaoPlanejadaForm: Record<string, TipoFormatacaoTexto> = {
+  prioridade: "textoCurto",
+  status: "textoCurto",
+  observacoes: "textoCurto",
+  motivo_cancelamento: "textoCurto"
 };
 
 export const mapaCamposTextoUsuarioForm: Record<string, TipoFormatacaoTexto> = {

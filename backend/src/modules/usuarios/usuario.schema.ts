@@ -29,6 +29,12 @@ const optionalIsoDate = z.preprocess((value) => {
   return trimmed.length ? trimmed : undefined;
 }, z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional());
 
+const optionalUsuarioStatus = z.preprocess((value) => {
+  if (typeof value !== "string") return value;
+  const trimmed = value.trim();
+  return trimmed.length ? trimmed.toUpperCase() : undefined;
+}, z.enum(usuarioStatusValues).optional());
+
 const optionalPermissoesArray = z.preprocess((value) => {
   if (value === null || value === undefined || value === "") return undefined;
   if (Array.isArray(value)) return value;
@@ -112,7 +118,7 @@ export const usuarioFiltersSchema = z.object({
   perfil: optionalTrimmedString,
   setor: optionalTrimmedString,
   unidade: optionalTrimmedString,
-  status: z.enum(usuarioStatusValues).optional(),
+  status: optionalUsuarioStatus,
   criado_de: optionalIsoDate,
   criado_ate: optionalIsoDate,
   pagina: optionalInteger.default(1),

@@ -1,9 +1,11 @@
 ﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import type { LucideIcon } from "lucide-react";
 import {
+  Camera,
   FileText,
   ListFilter,
   MapPinned,
@@ -41,12 +43,21 @@ import {
 import { useBeneficiarios } from "@/features/beneficiarios/use-beneficiarios";
 import type { Profissional, ProfissionalFiltro } from "@/types/profissional";
 import type { Beneficiario, BeneficiarioFiltro } from "@/types/beneficiario";
+import type { MatriculaSalaCatalogo } from "@/types/matricula";
 import { buscarEnderecoPorCep } from "@/services/cep.service";
+import { matriculasService } from "@/services/matriculas.service";
+import { unidadesAssistenciaisService } from "@/services/unidades-assistenciais.service";
 import { reportsService } from "@/services/reports.service";
 import { somenteDigitos } from "@/lib/validators";
 import { formatarTextoPorCampo, normalizarObjetoTexto } from "@/lib/text-formatter";
 import { mapaCamposTextoProfissionalForm } from "@/lib/text-format-config";
 import { abrirRelatorioPdf } from "@/lib/report-utils";
+import {
+  ajustarParaFotoTresPorQuatro,
+  capturarFotoTresPorQuatroDoVideo,
+  fotoMaximaBytes,
+  lerArquivoComoDataUrl
+} from "@/lib/foto-3x4";
 import { useAuth } from "@/hooks/use-auth";
 import {
   classeBotaoAbaLateral,
@@ -58,10 +69,10 @@ import {
 const abas = [
   { id: "listagem", label: "Listagem de profissionais", icon: ListFilter },
   { id: "dados", label: "Dados pessoais", icon: UserRound },
-  { id: "endereco", label: "EndereÃ§o", icon: MapPinned },
+  { id: "endereco", label: "Endereço", icon: MapPinned },
   { id: "perfil", label: "Perfil profissional", icon: Stethoscope },
   { id: "agenda", label: "Agenda e canais", icon: UsersRound },
-  { id: "resumo", label: "Resumo e observaÃ§Ãµes", icon: FileText }
+  { id: "resumo", label: "Resumo e observações", icon: FileText }
 ] as const;
 
 type AbaId = (typeof abas)[number]["id"];
@@ -73,7 +84,7 @@ type AcaoCrud = {
   icon: LucideIcon;
 };
 
-const disponibilidadesOptions = ["ManhÃ£", "Tarde", "Noite"];
+const disponibilidadesOptions = ["Manhã", "Tarde", "Noite"];
 const canaisAtendimentoOptions = ["Presencial", "Online", "Telefone"];
 const vinculosOptions = ["VOLUNTARIO", "CLT", "PJ", "ESTAGIARIO"];
 const sexoOptions = ["Masculino", "Feminino", "Outro"];
@@ -92,8 +103,20 @@ function formatarCpf(valor?: string) {
   return `${digitos.slice(0, 3)}.${digitos.slice(3, 6)}.${digitos.slice(6, 9)}-${digitos.slice(9)}`;
 }
 
+function formatarTelefone(valor?: string) {
+  if (!valor) return "---";
+  const digitos = valor.replace(/\D/g, "");
+  if (digitos.length === 11) {
+    return `(${digitos.slice(0, 2)}) ${digitos.slice(2, 7)}-${digitos.slice(7)}`;
+  }
+  if (digitos.length === 10) {
+    return `(${digitos.slice(0, 2)}) ${digitos.slice(2, 6)}-${digitos.slice(6)}`;
+  }
+  return valor;
+}
+
 function formatarStatus(status?: string) {
-  if (!status) return "Em anÃ¡lise";
+  if (!status) return "Em análise";
   const texto = status.toLowerCase().replaceAll("_", " ");
   return texto.charAt(0).toUpperCase() + texto.slice(1);
 }
@@ -188,7 +211,11 @@ export function CadastroProfissionalPage() {
   });
   const [carregandoCep, setCarregandoCep] = useState(false);
   const [imprimindoRelatorio, setImprimindoRelatorio] = useState(false);
+  const [webcamAberta, setWebcamAberta] = useState(false);
+  const [carregandoWebcam, setCarregandoWebcam] = useState(false);
   const inputFotoRef = useRef<HTMLInputElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamWebcamRef = useRef<MediaStream | null>(null);
   const ultimoCepConsultadoRef = useRef("");
 
   const { data: listaData, isLoading: carregandoLista } = useProfissionais(filtros);
@@ -202,6 +229,14 @@ export function CadastroProfissionalPage() {
     { enabled: buscaBeneficiarioAtiva }
   );
   const { data: detalhesData, isLoading: carregandoDetalhes } = useProfissional(idSelecionado);
+  const { data: unidadesCatalogoData } = useQuery({
+    queryKey: ["profissionais", "catalogo-unidades"],
+    queryFn: () => unidadesAssistenciaisService.listar()
+  });
+  const { data: salasCatalogoData } = useQuery({
+    queryKey: ["profissionais", "catalogo-salas"],
+    queryFn: () => matriculasService.listarSalas()
+  });
   const salvarMutation = useSalvarProfissional();
   const removerMutation = useRemoverProfissional();
 
@@ -225,6 +260,7 @@ export function CadastroProfissionalPage() {
   const municipioAtual = watch("municipio") || "";
   const ufAtual = watch("uf") || "";
   const subzonaAtual = watch("subzona") || "";
+  const unidadeAgendaAtual = (watch("unidade") || "").trim();
 
   useEffect(() => {
     if (!detalhesData?.profissional) return;
@@ -259,7 +295,7 @@ export function CadastroProfissionalPage() {
         ultimoCepConsultadoRef.current = cepNormalizado;
 
         if (!endereco) {
-          setMensagem({ tipo: "erro", texto: "CEP nÃ£o encontrado." });
+          setMensagem({ tipo: "erro", texto: "CEP não encontrado." });
           return;
         }
 
@@ -279,7 +315,7 @@ export function CadastroProfissionalPage() {
         if (!ativo) return;
         setMensagem({
           tipo: "erro",
-          texto: error?.message ?? "NÃ£o foi possÃ­vel consultar o CEP informado."
+          texto: error?.message ?? "Não foi possível consultar o CEP informado."
         });
       } finally {
         if (ativo) setCarregandoCep(false);
@@ -291,8 +327,38 @@ export function CadastroProfissionalPage() {
     };
   }, [cepAtual, getValues, setValue]);
 
+  useEffect(() => {
+    if (!webcamAberta) return;
+    const video = videoRef.current;
+    const stream = streamWebcamRef.current;
+    if (!video || !stream) return;
+    video.srcObject = stream;
+    void video.play();
+  }, [webcamAberta]);
+
+  useEffect(() => {
+    return () => {
+      const stream = streamWebcamRef.current;
+      if (!stream) return;
+      for (const track of stream.getTracks()) {
+        track.stop();
+      }
+      streamWebcamRef.current = null;
+    };
+  }, []);
+
   const profissionais = listaData?.profissionais ?? [];
   const beneficiariosBusca = beneficiariosBuscaData?.beneficiarios ?? [];
+  const unidadesCatalogo = unidadesCatalogoData?.unidades ?? [];
+  const salasCatalogo = salasCatalogoData?.salas ?? [];
+  const salasAgendaFiltradas = useMemo(() => {
+    if (!unidadeAgendaAtual) return salasCatalogo;
+    const unidadeNormalizada = unidadeAgendaAtual.toLocaleLowerCase("pt-BR");
+    const salasDaUnidade = salasCatalogo.filter((sala: MatriculaSalaCatalogo) =>
+      (sala.unidade_nome ?? "").toLocaleLowerCase("pt-BR").includes(unidadeNormalizada)
+    );
+    return salasDaUnidade.length ? salasDaUnidade : salasCatalogo;
+  }, [salasCatalogo, unidadeAgendaAtual]);
   const bloqueadoAcao =
     salvarMutation.isPending || removerMutation.isPending || carregandoDetalhes || imprimindoRelatorio;
   const abaAtual = abas.find((aba) => aba.id === abaAtiva);
@@ -329,7 +395,7 @@ export function CadastroProfissionalPage() {
     if (nome.length < 2 && cpf.length !== 11 && codigo.length < 1) {
       setMensagem({
         tipo: "erro",
-        texto: "Informe pelo menos nome (2 letras), CPF completo ou cÃ³digo para buscar beneficiÃ¡rios."
+        texto: "Informe pelo menos nome (2 letras), CPF completo ou código para buscar beneficiários."
       });
       return;
     }
@@ -377,19 +443,115 @@ export function CadastroProfissionalPage() {
     setAbaAtiva("dados");
     setMensagem({
       tipo: "sucesso",
-      texto: "Dados do beneficiÃ¡rio carregados no cadastro do profissional."
+      texto: "Dados do beneficiário carregados no cadastro do profissional."
     });
+  }
+
+  function encerrarWebcam() {
+    const video = videoRef.current;
+    if (video) {
+      video.pause();
+      video.srcObject = null;
+    }
+
+    const stream = streamWebcamRef.current;
+    if (stream) {
+      for (const track of stream.getTracks()) {
+        track.stop();
+      }
+    }
+    streamWebcamRef.current = null;
+    setWebcamAberta(false);
+  }
+
+  async function abrirWebcam() {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setMensagem({
+        tipo: "erro",
+        texto: "Este navegador não permite captura por webcam."
+      });
+      return;
+    }
+
+    setMensagem(null);
+    setCarregandoWebcam(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user" },
+        audio: false
+      });
+      streamWebcamRef.current = stream;
+      setWebcamAberta(true);
+    } catch {
+      setMensagem({
+        tipo: "erro",
+        texto: "Não foi possível acessar a webcam. Verifique as permissões."
+      });
+    } finally {
+      setCarregandoWebcam(false);
+    }
+  }
+
+  async function definirFotoPorDataUrl(dataUrl: string) {
+    const fotoTratada = await ajustarParaFotoTresPorQuatro(dataUrl);
+    setValue("foto_3x4", fotoTratada, { shouldDirty: true, shouldValidate: true });
   }
 
   async function onSelecionarFoto(event: React.ChangeEvent<HTMLInputElement>) {
     const arquivo = event.target.files?.[0];
     event.target.value = "";
     if (!arquivo) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      setValue("foto_3x4", String(reader.result ?? ""), { shouldDirty: true, shouldValidate: true });
-    };
-    reader.readAsDataURL(arquivo);
+    if (!arquivo.type.startsWith("image/")) {
+      setMensagem({ tipo: "erro", texto: "Selecione um arquivo de imagem válido." });
+      return;
+    }
+
+    if (arquivo.size > fotoMaximaBytes) {
+      setMensagem({
+        tipo: "erro",
+        texto: "A foto deve ter no máximo 5 MB."
+      });
+      return;
+    }
+
+    try {
+      const dataUrl = await lerArquivoComoDataUrl(arquivo);
+      await definirFotoPorDataUrl(dataUrl);
+      setMensagem(null);
+    } catch (error: any) {
+      setMensagem({
+        tipo: "erro",
+        texto: error?.message ?? "Não foi possível processar a foto enviada."
+      });
+    }
+  }
+
+  async function capturarFotoWebcam() {
+    const video = videoRef.current;
+    if (!video || !video.videoWidth || !video.videoHeight) {
+      setMensagem({
+        tipo: "erro",
+        texto: "A webcam ainda não está pronta para captura."
+      });
+      return;
+    }
+
+    try {
+      const dataUrl = capturarFotoTresPorQuatroDoVideo(video);
+      await definirFotoPorDataUrl(dataUrl);
+      encerrarWebcam();
+      setMensagem(null);
+    } catch (error: any) {
+      setMensagem({
+        tipo: "erro",
+        texto: error?.message ?? "Não foi possível concluir a captura da foto."
+      });
+    }
+  }
+
+  function removerFoto() {
+    setValue("foto_3x4", "", { shouldDirty: true, shouldValidate: true });
+    setMensagem(null);
   }
 
   const onSalvar = handleSubmit(
@@ -407,13 +569,13 @@ export function CadastroProfissionalPage() {
       } catch (error: any) {
         setMensagem({
           tipo: "erro",
-          texto: error?.response?.data?.message ?? "NÃ£o foi possÃ­vel salvar o profissional."
+          texto: error?.response?.data?.message ?? "Não foi possível salvar o profissional."
         });
       }
     },
     () => {
       setAbaAtiva("dados");
-      setMensagem({ tipo: "erro", texto: "Preencha os campos obrigatÃ³rios antes de salvar." });
+      setMensagem({ tipo: "erro", texto: "Preencha os campos obrigatórios antes de salvar." });
     }
   );
 
@@ -423,6 +585,7 @@ export function CadastroProfissionalPage() {
   }
 
   function acaoNovo() {
+    encerrarWebcam();
     setIdSelecionado(undefined);
     setSnapshot(null);
     reset(profissionalDefaultValues);
@@ -434,6 +597,7 @@ export function CadastroProfissionalPage() {
 
   function acaoCancelar() {
     if (!snapshot) return acaoNovo();
+    encerrarWebcam();
     reset(snapshot);
   }
 
@@ -448,11 +612,11 @@ export function CadastroProfissionalPage() {
       await removerMutation.mutateAsync(idSelecionado);
       setPopupExcluirAberto(false);
       acaoNovo();
-      setMensagem({ tipo: "sucesso", texto: "Profissional excluÃ­do com sucesso." });
+      setMensagem({ tipo: "sucesso", texto: "Profissional excluído com sucesso." });
     } catch (error: any) {
       setMensagem({
         tipo: "erro",
-        texto: error?.response?.data?.message ?? "NÃ£o foi possÃ­vel excluir o profissional."
+        texto: error?.response?.data?.message ?? "Não foi possível excluir o profissional."
       });
     }
   }
@@ -480,7 +644,7 @@ export function CadastroProfissionalPage() {
     } catch (error: any) {
       setMensagem({
         tipo: "erro",
-        texto: error?.response?.data?.message ?? "NÃ£o foi possÃ­vel gerar o relatÃ³rio."
+        texto: error?.response?.data?.message ?? "Não foi possível gerar o relatório."
       });
     } finally {
       setImprimindoRelatorio(false);
@@ -495,7 +659,7 @@ export function CadastroProfissionalPage() {
     if (partesEndereco.length === 0) {
       setMensagem({
         tipo: "erro",
-        texto: "Preencha o endereÃ§o antes de abrir no Google Maps."
+        texto: "Preencha o endereço antes de abrir no Google Maps."
       });
       return;
     }
@@ -563,11 +727,12 @@ export function CadastroProfissionalPage() {
                 {carregandoLista ? <p className="text-sm text-slate-500">Carregando profissionais...</p> : (
                   <div className="overflow-hidden rounded-lg border border-[var(--g3-border)]">
                     {profissionais.map((item, indice) => (
-                      <button key={item.id_profissional} type="button" onClick={() => { if (item.id_profissional) { setIdSelecionado(item.id_profissional); setAbaAtiva("dados"); } }} className={`grid w-full gap-2 border-b border-[var(--g3-border)] px-3 py-2 text-left xl:grid-cols-[minmax(0,2fr)_minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)] ${indice % 2 === 0 ? "bg-white" : "bg-[var(--g3-primary-soft)]/30"}`}>
+                      <button key={item.id_profissional} type="button" onClick={() => { if (item.id_profissional) { setIdSelecionado(item.id_profissional); setAbaAtiva("dados"); } }} className={`grid w-full gap-2 border-b border-[var(--g3-border)] px-3 py-2 text-left xl:grid-cols-[minmax(0,2fr)_minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] ${indice % 2 === 0 ? "bg-white" : "bg-[var(--g3-primary-soft)]/30"}`}>
                         <span className="text-sm font-semibold">{item.nome_completo}</span>
                         <span className="text-xs text-[var(--g3-muted)]">{item.categoria}</span>
                         <span className="text-xs text-[var(--g3-muted)]">{formatarStatus(item.status)}</span>
                         <span className="text-xs text-[var(--g3-muted)]">{formatarCpf(item.cpf)}</span>
+                        <span className="text-xs text-[var(--g3-muted)]">{formatarTelefone(item.telefone)}</span>
                       </button>
                     ))}
                   </div>
@@ -579,14 +744,14 @@ export function CadastroProfissionalPage() {
               <form className="space-y-3">
                                 {abaAtiva === "dados" && (
                   <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-12">
-                    <div className="sm:col-span-2 xl:col-span-3 space-y-2">
-                      <Label>Foto 3x4</Label>
-                      <div className="aspect-[3/4] overflow-hidden rounded-md border border-[var(--g3-border)] bg-[var(--g3-card-soft)]">
+                    <div className="sm:col-span-2 xl:col-span-3 flex flex-col items-start space-y-2">
+                      <Label>Foto 4x3</Label>
+                      <div className="w-full max-w-[170px] aspect-[4/3] overflow-hidden rounded-md border border-[var(--g3-border)] bg-[var(--g3-card-soft)]">
                         {watch("foto_3x4") ? (
                           <img
                             src={watch("foto_3x4")}
                             alt="Foto do profissional"
-                            className="h-full w-full object-contain"
+                            className="h-full w-full object-cover"
                           />
                         ) : (
                           <div className="flex h-full items-center justify-center text-xs text-[var(--g3-muted)]">
@@ -601,15 +766,37 @@ export function CadastroProfissionalPage() {
                         className="hidden"
                         onChange={(e) => void onSelecionarFoto(e)}
                       />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => inputFotoRef.current?.click()}
-                      >
-                        <Upload className="mr-1.5 h-3.5 w-3.5" />
-                        Enviar foto
-                      </Button>
+                      <div className="flex w-full max-w-[170px] flex-col gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => inputFotoRef.current?.click()}
+                        >
+                          <Upload className="mr-1.5 h-3.5 w-3.5" />
+                          Enviar foto
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => void abrirWebcam()}
+                          disabled={carregandoWebcam}
+                        >
+                          <Camera className="mr-1.5 h-3.5 w-3.5" />
+                          {carregandoWebcam ? "Abrindo webcam..." : "Capturar webcam"}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={removerFoto}
+                          disabled={!watch("foto_3x4")}
+                        >
+                          <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                          Remover foto
+                        </Button>
+                      </div>
                     </div>
 
                     <div className="sm:col-span-2 xl:col-span-9 grid gap-3 sm:grid-cols-2 xl:grid-cols-12">
@@ -646,7 +833,7 @@ export function CadastroProfissionalPage() {
                         {errors.cpf && <p className="mt-1 text-xs text-red-600">{errors.cpf.message}</p>}
                       </div>
                       <div className="xl:col-span-4">
-                        <Label>Categoria*</Label>
+                        <Label>Atividade Exercida*</Label>
                         <Input
                           {...register("categoria")}
                           className="h-9"
@@ -809,18 +996,146 @@ export function CadastroProfissionalPage() {
                     </div>
                   </section>
                 )}
-                {abaAtiva === "perfil" && <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-12"><div className="xl:col-span-3"><Label>VÃ­nculo</Label><Select {...register("vinculo")}><option value="">Selecione</option>{vinculosOptions.map((item) => <option key={item} value={item}>{item}</option>)}</Select></div><div className="xl:col-span-4"><Label>Registro em conselho</Label><Input {...register("registro_conselho")} onBlurCapture={() => aplicarFormatacaoCampo("registro_conselho")} /></div><div className="xl:col-span-5"><Label>Especialidade</Label><Input {...register("especialidade")} onBlurCapture={() => aplicarFormatacaoCampo("especialidade")} /></div><div className="xl:col-span-4"><Label>E-mail</Label><Input type="email" {...register("email")} /></div><div className="xl:col-span-3"><Label>Telefone</Label><Input {...register("telefone")} /></div></section>}
-                {abaAtiva === "agenda" && <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-12"><div className="xl:col-span-5"><Label>Unidade</Label><Input {...register("unidade")} onBlurCapture={() => aplicarFormatacaoCampo("unidade")} /></div><div className="xl:col-span-4"><Label>Sala</Label><Input {...register("sala_atendimento")} onBlurCapture={() => aplicarFormatacaoCampo("sala_atendimento")} /></div><div className="xl:col-span-3"><Label>Carga horÃ¡ria</Label><Input type="number" min={1} {...register("carga_horaria", { setValueAs: (value) => (value === "" ? undefined : Number(value)) })} /></div><div className="xl:col-span-3"><Label>Status</Label><Select {...register("status")}>{profissionalStatusOptions.map((status) => <option key={status} value={status}>{formatarStatus(status)}</option>)}</Select></div><div className="sm:col-span-2 xl:col-span-5"><Label>Disponibilidade</Label><div className="mt-2 flex flex-wrap gap-3">{disponibilidadesOptions.map((item) => <label key={item} className="inline-flex items-center gap-2 text-sm"><Checkbox checked={watch("disponibilidade")?.includes(item)} onChange={() => alternarLista("disponibilidade", item)} />{item}</label>)}</div></div><div className="sm:col-span-2 xl:col-span-4"><Label>Canais</Label><div className="mt-2 flex flex-wrap gap-3">{canaisAtendimentoOptions.map((item) => <label key={item} className="inline-flex items-center gap-2 text-sm"><Checkbox checked={watch("canais_atendimento")?.includes(item)} onChange={() => alternarLista("canais_atendimento", item)} />{item}</label>)}</div></div></section>}
-                {abaAtiva === "resumo" && <section className="grid gap-3 xl:grid-cols-12"><div className="xl:col-span-12"><Label>Tags (separadas por vÃ­rgula)</Label><Input value={(watch("tags") ?? []).join(", ")} onChange={(e) => setValue("tags", e.target.value.split(",").map((t) => t.trim()).filter(Boolean), { shouldDirty: true, shouldValidate: true })} /></div><div className="xl:col-span-12"><Label>Resumo</Label><Textarea {...register("resumo")} rows={3} onBlurCapture={() => aplicarFormatacaoCampo("resumo")} /></div><div className="xl:col-span-12"><Label>ObservaÃ§Ãµes</Label><Textarea {...register("observacoes")} rows={3} onBlurCapture={() => aplicarFormatacaoCampo("observacoes")} /></div></section>}
+                {abaAtiva === "perfil" && <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-12"><div className="xl:col-span-3"><Label>Vínculo</Label><Select {...register("vinculo")}><option value="">Selecione</option>{vinculosOptions.map((item) => <option key={item} value={item}>{item}</option>)}</Select></div><div className="xl:col-span-4"><Label>Registro em conselho</Label><Input {...register("registro_conselho")} onBlurCapture={() => aplicarFormatacaoCampo("registro_conselho")} /></div><div className="xl:col-span-5"><Label>Especialidade</Label><Input {...register("especialidade")} onBlurCapture={() => aplicarFormatacaoCampo("especialidade")} /></div><div className="xl:col-span-4"><Label>E-mail</Label><Input type="email" {...register("email")} /></div><div className="xl:col-span-3"><Label>Telefone</Label><Input {...register("telefone")} /></div></section>}
+                {abaAtiva === "agenda" && (
+                  <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-12">
+                    <div className="xl:col-span-5">
+                      <Label>Unidade</Label>
+                      <Input
+                        list="catalogo-unidades-assistenciais"
+                        {...register("unidade")}
+                        onBlurCapture={() => aplicarFormatacaoCampo("unidade")}
+                      />
+                      <datalist id="catalogo-unidades-assistenciais">
+                        {unidadesCatalogo.map((unidade) => (
+                          <option
+                            key={unidade.id_unidade ?? unidade.nome_fantasia}
+                            value={unidade.nome_fantasia}
+                          >
+                            {`${unidade.cidade ?? ""}${unidade.estado ? ` - ${unidade.estado}` : ""}`}
+                          </option>
+                        ))}
+                      </datalist>
+                    </div>
+                    <div className="xl:col-span-4">
+                      <Label>Sala</Label>
+                      <Input
+                        list="catalogo-salas-atendimento"
+                        {...register("sala_atendimento")}
+                        onBlurCapture={() => aplicarFormatacaoCampo("sala_atendimento")}
+                      />
+                      <datalist id="catalogo-salas-atendimento">
+                        {salasAgendaFiltradas.map((sala: MatriculaSalaCatalogo) => (
+                          <option key={sala.id_sala} value={sala.nome}>
+                            {sala.unidade_nome ?? ""}
+                          </option>
+                        ))}
+                      </datalist>
+                    </div>
+                    <div className="xl:col-span-3">
+                      <Label>Carga horária</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        {...register("carga_horaria", {
+                          setValueAs: (value) => (value === "" ? undefined : Number(value))
+                        })}
+                      />
+                    </div>
+                    <div className="xl:col-span-3">
+                      <Label>Status</Label>
+                      <Select {...register("status")}>
+                        {profissionalStatusOptions.map((status) => (
+                          <option key={status} value={status}>
+                            {formatarStatus(status)}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+                    <div className="sm:col-span-2 xl:col-span-5">
+                      <Label>Disponibilidade</Label>
+                      <div className="mt-2 flex flex-wrap gap-3">
+                        {disponibilidadesOptions.map((item) => (
+                          <label key={item} className="inline-flex items-center gap-2 text-sm">
+                            <Checkbox
+                              checked={watch("disponibilidade")?.includes(item)}
+                              onChange={() => alternarLista("disponibilidade", item)}
+                            />
+                            {item}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="sm:col-span-2 xl:col-span-4">
+                      <Label>Canais</Label>
+                      <div className="mt-2 flex flex-wrap gap-3">
+                        {canaisAtendimentoOptions.map((item) => (
+                          <label key={item} className="inline-flex items-center gap-2 text-sm">
+                            <Checkbox
+                              checked={watch("canais_atendimento")?.includes(item)}
+                              onChange={() => alternarLista("canais_atendimento", item)}
+                            />
+                            {item}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </section>
+                )}
+                {abaAtiva === "resumo" && <section className="grid gap-3 xl:grid-cols-12"><div className="xl:col-span-12"><Label>Tags (separadas por vírgula)</Label><Input value={(watch("tags") ?? []).join(", ")} onChange={(e) => setValue("tags", e.target.value.split(",").map((t) => t.trim()).filter(Boolean), { shouldDirty: true, shouldValidate: true })} /></div><div className="xl:col-span-12"><Label>Resumo</Label><Textarea {...register("resumo")} rows={3} onBlurCapture={() => aplicarFormatacaoCampo("resumo")} /></div><div className="xl:col-span-12"><Label>Observações</Label><Textarea {...register("observacoes")} rows={3} onBlurCapture={() => aplicarFormatacaoCampo("observacoes")} /></div></section>}
               </form>
             )}
           </CardContent>
         </Card>
       </div>
 
-      {mensagem && <div className="fixed inset-0 z-[58] flex items-center justify-center bg-slate-900/45 px-4" onClick={() => setMensagem(null)}><div className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}><div className="border-b border-slate-100 px-5 py-4"><h3 className={`text-base font-semibold ${mensagem.tipo === "sucesso" ? "text-emerald-800" : "text-red-700"}`}>{mensagem.tipo === "sucesso" ? "ConfirmaÃ§Ã£o" : "AtenÃ§Ã£o"}</h3></div><div className="px-5 py-4"><p className="text-sm text-slate-700">{mensagem.texto}</p></div><div className="flex justify-end border-t border-slate-100 px-5 py-3"><Button type="button" onClick={() => setMensagem(null)}>OK</Button></div></div></div>}
-      {popupSalvarAberto && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/45 px-4" onClick={() => setPopupSalvarAberto(false)}><div className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}><div className="border-b border-slate-100 px-5 py-4"><h3 className="text-base font-semibold text-slate-900">ConfirmaÃ§Ã£o</h3></div><div className="px-5 py-4"><p className="text-sm text-slate-700">Salvo com sucesso</p></div><div className="flex justify-end border-t border-slate-100 px-5 py-3"><Button type="button" onClick={() => setPopupSalvarAberto(false)}>OK</Button></div></div></div>}
-      {popupExcluirAberto && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/45 px-4" onClick={() => !removerMutation.isPending && setPopupExcluirAberto(false)}><div className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}><div className="border-b border-slate-100 px-5 py-4"><h3 className="text-base font-semibold text-slate-900">Confirmar exclusÃ£o</h3></div><div className="px-5 py-4"><p className="text-sm text-slate-700">Esta aÃ§Ã£o Ã© irreversÃ­vel. Deseja continuar?</p></div><div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3"><Button type="button" variant="outline" onClick={() => setPopupExcluirAberto(false)} disabled={removerMutation.isPending}>Cancelar</Button><Button type="button" variant="danger" onClick={() => void confirmarExclusao()} disabled={removerMutation.isPending}>{removerMutation.isPending ? "Excluindo..." : "Excluir"}</Button></div></div></div>}
+      {mensagem && <div className="fixed inset-0 z-[58] flex items-center justify-center bg-slate-900/45 px-4" onClick={() => setMensagem(null)}><div className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}><div className="border-b border-slate-100 px-5 py-4"><h3 className={`text-base font-semibold ${mensagem.tipo === "sucesso" ? "text-emerald-800" : "text-red-700"}`}>{mensagem.tipo === "sucesso" ? "Confirmação" : "Atenção"}</h3></div><div className="px-5 py-4"><p className="text-sm text-slate-700">{mensagem.texto}</p></div><div className="flex justify-end border-t border-slate-100 px-5 py-3"><Button type="button" onClick={() => setMensagem(null)}>OK</Button></div></div></div>}
+      {popupSalvarAberto && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/45 px-4" onClick={() => setPopupSalvarAberto(false)}><div className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}><div className="border-b border-slate-100 px-5 py-4"><h3 className="text-base font-semibold text-slate-900">Confirmação</h3></div><div className="px-5 py-4"><p className="text-sm text-slate-700">Salvo com sucesso</p></div><div className="flex justify-end border-t border-slate-100 px-5 py-3"><Button type="button" onClick={() => setPopupSalvarAberto(false)}>OK</Button></div></div></div>}
+      {popupExcluirAberto && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/45 px-4" onClick={() => !removerMutation.isPending && setPopupExcluirAberto(false)}><div className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}><div className="border-b border-slate-100 px-5 py-4"><h3 className="text-base font-semibold text-slate-900">Confirmar exclusão</h3></div><div className="px-5 py-4"><p className="text-sm text-slate-700">Esta ação é irreversível. Deseja continuar?</p></div><div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3"><Button type="button" variant="outline" onClick={() => setPopupExcluirAberto(false)} disabled={removerMutation.isPending}>Cancelar</Button><Button type="button" variant="danger" onClick={() => void confirmarExclusao()} disabled={removerMutation.isPending}>{removerMutation.isPending ? "Excluindo..." : "Excluir"}</Button></div></div></div>}
+      {webcamAberta && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 px-4 py-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={encerrarWebcam}
+        >
+          <div
+            className="flex max-h-[92vh] w-full max-w-xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+              <h3 className="text-base font-semibold text-slate-900">Capturar Foto 4x3</h3>
+              <Button type="button" variant="ghost" size="sm" onClick={encerrarWebcam}>
+                Fechar
+              </Button>
+            </div>
+
+            <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
+              <div className="mx-auto w-full max-w-[280px] overflow-hidden rounded-lg border border-slate-200 bg-slate-900 sm:max-w-sm">
+                <video
+                  ref={videoRef}
+                  className="aspect-[4/3] w-full object-cover"
+                  autoPlay
+                  playsInline
+                  muted
+                />
+              </div>
+              <p className="text-center text-xs text-slate-600">
+                Posicione o rosto no centro e clique em Capturar.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2 border-t border-slate-100 bg-white px-5 py-3">
+              <Button type="button" variant="outline" onClick={encerrarWebcam}>
+                Cancelar
+              </Button>
+              <Button type="button" onClick={() => void capturarFotoWebcam()}>
+                Capturar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
       {popupBuscarBeneficiarioAberto && (
         <div
           className="fixed inset-0 z-[62] flex items-center justify-center bg-slate-900/50 p-4"
@@ -955,4 +1270,9 @@ export function CadastroProfissionalPage() {
     </main>
   );
 }
+
+
+
+
+
 

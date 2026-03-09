@@ -76,3 +76,65 @@ export const voluntarioFichaRequestSchema = z.object({
   voluntarioId: z.string().trim().min(1, "voluntarioId e obrigatorio."),
   usuarioEmissor: optionalString
 });
+
+export const matriculasRelacaoRequestSchema = z.object({
+  nome: optionalString,
+  tipo: optionalString,
+  status: optionalString,
+  profissional: optionalString,
+  beneficiario: optionalString,
+  usuarioEmissor: optionalString
+});
+
+export const comprovanteMatriculaRequestSchema = z.object({
+  beneficiarioNome: z.string().trim().min(1, "beneficiarioNome e obrigatorio."),
+  cpf: optionalString,
+  telefone: optionalString,
+  dataRegistro: optionalString,
+  cursoNome: optionalString,
+  cursoTipo: optionalString,
+  cursoStatus: optionalString,
+  cursoProfissional: optionalString,
+  cursoSala: optionalString,
+  cursoHorario: optionalString,
+  cursoDias: optionalString,
+  cursoPeriodo: optionalString,
+  cursoInstituicao: optionalString,
+  usuarioEmissor: optionalString
+});
+
+export const comprovantePreMatriculaEsperaRequestSchema = z.object({
+  beneficiarioNome: z.string().trim().min(1, "beneficiarioNome e obrigatorio."),
+  cpf: optionalString,
+  telefone: optionalString,
+  dataEntradaFila: optionalString,
+  posicaoFila: optionalString,
+  cursoNome: optionalString,
+  cursoTipo: optionalString,
+  cursoStatus: optionalString,
+  cursoProfissional: optionalString,
+  cursoSala: optionalString,
+  cursoHorario: optionalString,
+  cursoDias: optionalString,
+  cursoPeriodo: optionalString,
+  cursoInstituicao: optionalString,
+  usuarioEmissor: optionalString
+});
+
+export const registroDoacaoRelacaoRequestSchema = z.object({
+  doador_nome: optionalString,
+  tipo_doacao: optionalString,
+  status: optionalString,
+  data_inicial: optionalString,
+  data_final: optionalString,
+  usuarioEmissor: optionalString
+});
+
+export const doacaoRealizadaRelacaoRequestSchema = z.object({
+  beneficiario_nome: optionalString,
+  tipo_doacao: optionalString,
+  situacao: optionalString,
+  data_inicial: optionalString,
+  data_final: optionalString,
+  usuarioEmissor: optionalString
+});

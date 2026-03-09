@@ -2,22 +2,26 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
+import { useUnidadeAssistencialAtual } from "@/features/unidades-assistenciais/use-unidades-assistenciais";
 import {
+  BookOpenCheck,
   Building2,
   ChartColumn,
   ChartPie,
+  ChevronLeft,
+  Clock3,
   ChevronDown,
   ChevronRight,
+  DollarSign,
   FileText,
   FolderOpen,
+  Gift,
   HandHeart,
   HandCoins,
   Handshake,
   LayoutDashboard,
   Link2,
   ListFilter,
-  PanelLeftClose,
-  PanelLeftOpen,
   Settings2,
   SlidersHorizontal,
   Stethoscope,
@@ -91,6 +95,24 @@ const menuSections: MenuSection[] = [
     icon: Handshake,
     itens: [
       {
+        id: "atendimentos-matriculas",
+        to: "/atendimentos/matriculas",
+        label: "Matrículas",
+        icon: BookOpenCheck
+      },
+      {
+        id: "atendimentos-registro-doacao",
+        to: "/financeiro/registro-doacao",
+        label: "Recebimento de doações",
+        icon: DollarSign
+      },
+      {
+        id: "atendimentos-doacoes-realizadas",
+        to: "/financeiro/doacoes-realizadas",
+        label: "Doação realizada",
+        icon: Gift
+      },
+      {
         id: "atendimentos-migracao",
         label: "Módulo em migração",
         icon: Handshake,
@@ -143,6 +165,12 @@ const menuSections: MenuSection[] = [
     icon: UsersRound,
     itens: [
       {
+        id: "setor-rh-registro-ponto",
+        to: "/setor-rh/registro-ponto",
+        label: "Registro de ponto",
+        icon: Clock3
+      },
+      {
         id: "setor-rh-migracao",
         label: "Módulo em migração",
         icon: UsersRound,
@@ -180,10 +208,14 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/cadastros/beneficiarios")) return "Cadastro de beneficiários";
   if (pathname.startsWith("/cadastros/profissionais")) return "Cadastro de profissionais";
   if (pathname.startsWith("/cadastros/voluntariado")) return "Cadastro de voluntariado";
+  if (pathname.startsWith("/atendimentos/matriculas")) return "Matrículas";
+  if (pathname.startsWith("/financeiro/registro-doacao")) return "Recebimento de doações";
+  if (pathname.startsWith("/financeiro/doacoes-realizadas")) return "Doação realizada";
   if (pathname.startsWith("/cadastros/unidades-assistenciais")) return "Cadastro de unidade assistencial";
   if (pathname.startsWith("/cadastros/vinculo-familiar")) return "Cadastro de vínculo familiar";
   if (pathname.startsWith("/configuracoes/parametros-sistema")) return "Parâmetros do sistema";
   if (pathname.startsWith("/configuracoes/usuarios")) return "Usuários";
+  if (pathname.startsWith("/setor-rh/registro-ponto")) return "Registro de ponto";
   return "Painel de migração";
 }
 
@@ -194,11 +226,17 @@ function itemEstaAtivo(pathname: string, item: MenuItem) {
 
 export function AppShell() {
   const { usuario, logout } = useAuth();
+  const { data: unidadeAtualData } = useUnidadeAssistencialAtual();
   const location = useLocation();
   const titulo = obterTitulo(location.pathname);
   const versaoSistema = import.meta.env.VITE_APP_VERSION ?? "1.00.12";
   const [sidebarRecolhida, setSidebarRecolhida] = useState(false);
   const [gruposAbertos, setGruposAbertos] = useState<Record<string, boolean>>({});
+  const logomarcaInstituicao = unidadeAtualData?.unidade?.logomarca;
+  const nomeInstituicao =
+    unidadeAtualData?.unidade?.nome_fantasia ??
+    unidadeAtualData?.unidade?.razao_social ??
+    "Sistema G3";
 
   const permissoesUsuario = usuario?.permissoes ?? [];
   const possuiPermissao = useMemo(
@@ -230,15 +268,16 @@ export function AppShell() {
   }, [location.pathname, menuSectionsVisiveis]);
 
   useEffect(() => {
-    setGruposAbertos((estadoAtual) => {
+    setGruposAbertos(() => {
       const proximoEstado: Record<string, boolean> = {};
 
-      menuSectionsVisiveis.forEach((secao, indice) => {
-        proximoEstado[secao.id] = estadoAtual[secao.id] ?? (secao.id === secaoAtivaId || indice === 0);
+      menuSectionsVisiveis.forEach((secao) => {
+        proximoEstado[secao.id] = false;
       });
 
-      if (secaoAtivaId) {
-        proximoEstado[secaoAtivaId] = true;
+      const grupoParaAbrir = secaoAtivaId ?? menuSectionsVisiveis[0]?.id;
+      if (grupoParaAbrir) {
+        proximoEstado[grupoParaAbrir] = true;
       }
 
       return proximoEstado;
@@ -250,19 +289,29 @@ export function AppShell() {
   }
 
   function alternarGrupo(id: string) {
-    setGruposAbertos((estadoAtual) => ({
-      ...estadoAtual,
-      [id]: !estadoAtual[id]
-    }));
+    setGruposAbertos((estadoAtual) => {
+      const proximoEstado: Record<string, boolean> = {};
+      const abrirGrupoSelecionado = !estadoAtual[id];
+
+      menuSectionsVisiveis.forEach((secao) => {
+        proximoEstado[secao.id] = false;
+      });
+
+      proximoEstado[id] = abrirGrupoSelecionado;
+      return proximoEstado;
+    });
   }
 
   function abrirSidebarNoGrupo(id: string) {
     if (!sidebarRecolhida) return;
     setSidebarRecolhida(false);
-    setGruposAbertos((estadoAtual) => ({
-      ...estadoAtual,
-      [id]: true
-    }));
+    setGruposAbertos(() => {
+      const proximoEstado: Record<string, boolean> = {};
+      menuSectionsVisiveis.forEach((secao) => {
+        proximoEstado[secao.id] = secao.id === id;
+      });
+      return proximoEstado;
+    });
   }
 
   return (
@@ -275,10 +324,20 @@ export function AppShell() {
         <div className={`border-b border-white/10 ${sidebarRecolhida ? "px-2 py-2" : "px-4 py-3"}`}>
           <div className="relative flex items-center justify-center">
             {sidebarRecolhida ? (
-              <span className="mx-auto text-xs font-semibold uppercase tracking-[0.2em] text-white/85">G3</span>
+              <span className="mx-auto inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white">
+                <HandHeart className="h-4 w-4" />
+              </span>
             ) : (
               <div className="w-full text-center">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/85">Sistema G3</p>
+                {logomarcaInstituicao ? (
+                  <img
+                    src={logomarcaInstituicao}
+                    alt={`Logomarca da instituição ${nomeInstituicao}`}
+                    className="mx-auto h-10 w-auto max-w-[170px] object-contain"
+                  />
+                ) : (
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/85">Sistema G3</p>
+                )}
               </div>
             )}
 
@@ -291,7 +350,7 @@ export function AppShell() {
               title={sidebarRecolhida ? "Expandir menu lateral" : "Recolher menu lateral"}
               aria-label={sidebarRecolhida ? "Expandir menu lateral" : "Recolher menu lateral"}
             >
-              {sidebarRecolhida ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+              {sidebarRecolhida ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
             </Button>
           </div>
         </div>

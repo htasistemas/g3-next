@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
 import type { LucideIcon } from "lucide-react";
 import {
   Building2,
+  DoorOpen,
   ExternalLink,
   FileText,
   ListFilter,
@@ -14,9 +15,9 @@ import {
   Printer,
   Save,
   Search,
-  ShieldCheck,
   Trash2,
   Undo2,
+  Upload,
   UserPlus,
   UsersRound,
   X
@@ -51,10 +52,12 @@ import {
 import { somenteDigitos } from "@/lib/validators";
 import {
   mapaCamposTextoUnidadeForm,
-  mapaDiretoriaUnidadeForm
+  mapaDiretoriaUnidadeForm,
+  mapaSalaUnidadeForm
 } from "@/lib/text-format-config";
 import { formatarTextoPorCampo, normalizarObjetoTexto } from "@/lib/text-formatter";
 import { abrirRelatorioPdf } from "@/lib/report-utils";
+import { fotoMaximaBytes, lerArquivoComoDataUrl } from "@/lib/foto-3x4";
 import { useAuth } from "@/hooks/use-auth";
 import type {
   DiretoriaUnidade,
@@ -68,8 +71,17 @@ const abas = [
   { id: "contato", label: "Contato e operação", icon: Phone },
   { id: "endereco", label: "Endereço", icon: MapPinned },
   { id: "diretoria", label: "Diretoria", icon: UsersRound },
-  { id: "ponto", label: "Configuração de ponto", icon: ShieldCheck },
+  { id: "salas", label: "Salas de atendimento", icon: DoorOpen },
   { id: "observacoes", label: "Observações", icon: FileText }
+] as const;
+
+const modosValidacaoPontoOptions = [
+  { value: "IP_OU_REDE", label: "IP ou rede interna" },
+  { value: "IP", label: "Somente IP fixo" },
+  { value: "REDE", label: "Somente rede (CIDR)" },
+  { value: "GEO", label: "Somente geolocalização" },
+  { value: "GEO_OU_IP", label: "Geolocalização ou IP/rede" },
+  { value: "LIVRE", label: "Livre (sem bloqueio)" }
 ] as const;
 
 type AbaId = (typeof abas)[number]["id"];
@@ -82,12 +94,6 @@ type AcaoCrud = {
 };
 
 const tituloTela = "Cadastro de unidade assistencial";
-
-const modoValidacaoPontoOptions = [
-  { value: "IP_OU_REDE", label: "IP ou rede local" },
-  { value: "IP_E_COORDENADAS", label: "IP e coordenadas" },
-  { value: "COORDENADAS", label: "Somente coordenadas" }
-] as const;
 
 function formatarCnpj(valor?: string) {
   const digitos = somenteDigitos(valor);
@@ -121,6 +127,11 @@ function mapUnidadeParaFormulario(unidade: UnidadeAssistencial): UnidadeAssisten
         funcao: membro.funcao ?? "",
         mandato_inicio: membro.mandato_inicio ?? "",
         mandato_fim: membro.mandato_fim ?? ""
+      })) ?? [],
+    salas:
+      unidade.salas?.map((sala) => ({
+        id: sala.id,
+        nome: sala.nome ?? ""
       })) ?? []
   };
 }
@@ -139,6 +150,25 @@ function limparDiretoria(payload: Array<Partial<DiretoriaUnidade>>): DiretoriaUn
       };
     })
     .filter((membro) => membro.nome_completo && membro.documento && membro.funcao);
+}
+
+function limparSalas(payload: Array<{ id?: string; nome?: string }>) {
+  const salasNormalizadas = payload
+    .map((sala) => {
+      const salaNormalizada = normalizarObjetoTexto(sala, mapaSalaUnidadeForm);
+      return {
+        id: sala.id,
+        nome: salaNormalizada.nome?.trim() ?? ""
+      };
+    })
+    .filter((sala) => sala.nome.length > 0);
+
+  const nomes = new Set<string>();
+  return salasNormalizadas.filter((sala) => {
+    if (nomes.has(sala.nome)) return false;
+    nomes.add(sala.nome);
+    return true;
+  });
 }
 
 function mapFormularioParaPayload(
@@ -177,7 +207,8 @@ function mapFormularioParaPayload(
     ping_timeout_ms: values.ping_timeout_ms,
     logomarca: values.logomarca?.trim() || undefined,
     logomarca_relatorio: values.logomarca_relatorio?.trim() || undefined,
-    diretoria: limparDiretoria(values.diretoria ?? [])
+    diretoria: limparDiretoria(values.diretoria ?? []),
+    salas: limparSalas(values.salas ?? [])
   };
 
   return normalizarObjetoTexto(payload, mapaCamposTextoUnidadeForm);
@@ -202,6 +233,8 @@ export function CadastroUnidadeAssistencialPage() {
   const [carregandoCep, setCarregandoCep] = useState(false);
   const [imprimindoRelatorio, setImprimindoRelatorio] = useState(false);
   const ultimoCepConsultadoRef = useRef("");
+  const inputLogomarcaRef = useRef<HTMLInputElement | null>(null);
+  const inputLogomarcaRelatorioRef = useRef<HTMLInputElement | null>(null);
 
   const { data: listaData, isLoading: carregandoLista } = useUnidadesAssistenciais(filtros);
   const { data: unidadeData, isLoading: carregandoDetalhes } = useUnidadeAssistencial(unidadeSelecionadaId);
@@ -222,9 +255,24 @@ export function CadastroUnidadeAssistencialPage() {
     defaultValues: unidadeAssistencialDefaultValues
   });
 
-  const { fields: diretoriaFields, append, remove, replace } = useFieldArray({
+  const {
+    fields: diretoriaFields,
+    append: appendDiretoria,
+    remove: removerDiretoria,
+    replace: replaceDiretoria
+  } = useFieldArray({
     control,
     name: "diretoria"
+  });
+
+  const {
+    fields: salasFields,
+    append: appendSala,
+    remove: removerSala,
+    replace: replaceSalas
+  } = useFieldArray({
+    control,
+    name: "salas"
   });
 
   const cepAtual = watch("cep") || "";
@@ -233,16 +281,19 @@ export function CadastroUnidadeAssistencialPage() {
   const bairroAtual = watch("bairro") || "";
   const cidadeAtual = watch("cidade") || "";
   const estadoAtual = watch("estado") || "";
+  const logomarcaAtual = watch("logomarca") || "";
+  const logomarcaRelatorioAtual = watch("logomarca_relatorio") || "";
 
   useEffect(() => {
     if (!unidadeData?.unidade) return;
     const values = mapUnidadeParaFormulario(unidadeData.unidade);
     reset(values);
-    replace(values.diretoria ?? []);
+    replaceDiretoria(values.diretoria ?? []);
+    replaceSalas(values.salas ?? []);
     setSnapshot(values);
     setMensagem(null);
     setAbaAtiva("dados");
-  }, [unidadeData, replace, reset]);
+  }, [replaceDiretoria, replaceSalas, reset, unidadeData]);
 
   useEffect(() => {
     const cepNormalizado = somenteDigitos(cepAtual);
@@ -372,6 +423,54 @@ export function CadastroUnidadeAssistencialPage() {
     }
   }
 
+  function aplicarFormatacaoSala(indice: number) {
+    const chave = `salas.${indice}.nome` as const;
+    const valorAtual = getValues(chave);
+    const valorFormatado = formatarTextoPorCampo("nome", valorAtual, mapaSalaUnidadeForm);
+
+    if (typeof valorAtual === "string" && typeof valorFormatado === "string" && valorAtual !== valorFormatado) {
+      setValue(chave, valorFormatado, {
+        shouldDirty: true,
+        shouldValidate: true
+      });
+    }
+  }
+
+  async function carregarLogomarca(
+    campo: "logomarca" | "logomarca_relatorio",
+    event: React.ChangeEvent<HTMLInputElement>
+  ) {
+    const arquivo = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!arquivo) return;
+    if (!arquivo.type.startsWith("image/")) {
+      setMensagem({ tipo: "erro", texto: "Selecione um arquivo de imagem válido." });
+      return;
+    }
+
+    if (arquivo.size > fotoMaximaBytes) {
+      setMensagem({ tipo: "erro", texto: "A imagem deve ter no máximo 5 MB." });
+      return;
+    }
+
+    try {
+      const dataUrl = await lerArquivoComoDataUrl(arquivo);
+      setValue(campo, dataUrl, { shouldDirty: true, shouldValidate: true });
+      setMensagem(null);
+    } catch (error: any) {
+      setMensagem({
+        tipo: "erro",
+        texto: error?.message ?? "Não foi possível processar a imagem enviada."
+      });
+    }
+  }
+
+  function removerLogomarca(campo: "logomarca" | "logomarca_relatorio") {
+    setValue(campo, "", { shouldDirty: true, shouldValidate: true });
+    setMensagem(null);
+  }
+
   const onSalvar = handleSubmit(
     async (values) => {
       setMensagem(null);
@@ -385,7 +484,8 @@ export function CadastroUnidadeAssistencialPage() {
 
         const atualizado = mapUnidadeParaFormulario(unidade ?? payload);
         reset(atualizado);
-        replace(atualizado.diretoria ?? []);
+        replaceDiretoria(atualizado.diretoria ?? []);
+        replaceSalas(atualizado.salas ?? []);
         setSnapshot(atualizado);
         setFiltros((estadoAtual) => ({ ...estadoAtual }));
         setPopupSalvarAberto(true);
@@ -420,7 +520,8 @@ export function CadastroUnidadeAssistencialPage() {
     setUnidadeSelecionadaId(undefined);
     setSnapshot(null);
     reset(unidadeAssistencialDefaultValues);
-    replace([]);
+    replaceDiretoria([]);
+    replaceSalas([]);
     setAbaAtiva("dados");
   }
 
@@ -430,7 +531,8 @@ export function CadastroUnidadeAssistencialPage() {
       return;
     }
     reset(snapshot);
-    replace(snapshot.diretoria ?? []);
+    replaceDiretoria(snapshot.diretoria ?? []);
+    replaceSalas(snapshot.salas ?? []);
     setMensagem(null);
   }
 
@@ -723,18 +825,96 @@ export function CadastroUnidadeAssistencialPage() {
                       {errors.cnpj && <p className="mt-1 text-xs text-red-600">{errors.cnpj.message}</p>}
                     </div>
 
-                    <div className="xl:col-span-4">
-                      <Label htmlFor="logomarca">URL da logomarca</Label>
-                      <Input id="logomarca" {...register("logomarca")} placeholder="https://..." />
+                    <div className="xl:col-span-3">
+                      <input type="hidden" {...register("logomarca")} />
+                      <Label>Logomarca da unidade vazado</Label>
+                      <div className="mt-2 flex aspect-[4/3] w-full max-w-[170px] items-center justify-center overflow-hidden rounded-md border border-emerald-800 bg-emerald-900">
+                        {logomarcaAtual ? (
+                          <img
+                            src={logomarcaAtual}
+                            alt="Logomarca da unidade vazado"
+                            className="h-full w-full object-contain"
+                          />
+                        ) : (
+                          <span className="px-3 text-center text-xs text-emerald-100">Sem logomarca</span>
+                        )}
+                      </div>
+                      <input
+                        ref={inputLogomarcaRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(event) => void carregarLogomarca("logomarca", event)}
+                      />
+                      <div className="mt-2 flex w-full max-w-[170px] gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => inputLogomarcaRef.current?.click()}
+                        >
+                          <Upload className="mr-1.5 h-3.5 w-3.5" />
+                          Enviar
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => removerLogomarca("logomarca")}
+                          disabled={!logomarcaAtual}
+                        >
+                          <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                          Remover
+                        </Button>
+                      </div>
                     </div>
 
-                    <div className="xl:col-span-4">
-                      <Label htmlFor="logomarca_relatorio">URL da logomarca do relatório</Label>
-                      <Input
-                        id="logomarca_relatorio"
-                        {...register("logomarca_relatorio")}
-                        placeholder="https://..."
+                    <div className="xl:col-span-3">
+                      <input type="hidden" {...register("logomarca_relatorio")} />
+                      <Label>Logomarca do relatório</Label>
+                      <div className="mt-2 flex aspect-[4/3] w-full max-w-[170px] items-center justify-center overflow-hidden rounded-md border border-[var(--g3-border)] bg-[var(--g3-card-soft)]">
+                        {logomarcaRelatorioAtual ? (
+                          <img
+                            src={logomarcaRelatorioAtual}
+                            alt="Logomarca do relatório"
+                            className="h-full w-full object-contain"
+                          />
+                        ) : (
+                          <span className="px-3 text-center text-xs text-[var(--g3-muted)]">Sem logomarca</span>
+                        )}
+                      </div>
+                      <input
+                        ref={inputLogomarcaRelatorioRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(event) => void carregarLogomarca("logomarca_relatorio", event)}
                       />
+                      <div className="mt-2 flex w-full max-w-[170px] gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => inputLogomarcaRelatorioRef.current?.click()}
+                        >
+                          <Upload className="mr-1.5 h-3.5 w-3.5" />
+                          Enviar
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => removerLogomarca("logomarca_relatorio")}
+                          disabled={!logomarcaRelatorioAtual}
+                        >
+                          <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                          Remover
+                        </Button>
+                      </div>
                     </div>
 
                     <div className="sm:col-span-2 xl:col-span-12">
@@ -770,6 +950,96 @@ export function CadastroUnidadeAssistencialPage() {
                         id="horario_funcionamento"
                         {...register("horario_funcionamento")}
                         onBlurCapture={() => aplicarFormatacaoCampo("horario_funcionamento")}
+                        placeholder="08:00 às 18:00"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2 xl:col-span-12">
+                      <div className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-primary-soft)] p-3">
+                        <h4 className="text-sm font-semibold text-[var(--g3-active)]">Validação de ponto</h4>
+                        <p className="mt-1 text-xs text-[var(--g3-muted)]">
+                          Configure as regras de registro de ponto para esta unidade.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="xl:col-span-4">
+                      <Label htmlFor="modo_validacao_ponto">Modo de validação do ponto</Label>
+                      <Select id="modo_validacao_ponto" {...register("modo_validacao_ponto")}>
+                        {modosValidacaoPontoOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+
+                    <div className="xl:col-span-4">
+                      <Label htmlFor="raio_ponto_metros">Raio permitido (metros)</Label>
+                      <Input
+                        id="raio_ponto_metros"
+                        type="number"
+                        min={1}
+                        step={1}
+                        {...register("raio_ponto_metros", {
+                          setValueAs: (value) => (value === "" ? undefined : Number(value))
+                        })}
+                        placeholder="100"
+                      />
+                    </div>
+
+                    <div className="xl:col-span-4">
+                      <Label htmlFor="accuracy_max_ponto_metros">Precisão máxima GPS (metros)</Label>
+                      <Input
+                        id="accuracy_max_ponto_metros"
+                        type="number"
+                        min={1}
+                        step={1}
+                        {...register("accuracy_max_ponto_metros", {
+                          setValueAs: (value) => (value === "" ? undefined : Number(value))
+                        })}
+                        placeholder="80"
+                      />
+                    </div>
+
+                    <div className="xl:col-span-4">
+                      <Label htmlFor="ip_validacao_ponto">IP fixo permitido</Label>
+                      <Input
+                        id="ip_validacao_ponto"
+                        {...register("ip_validacao_ponto")}
+                        placeholder="200.200.200.10"
+                      />
+                    </div>
+
+                    <div className="xl:col-span-4">
+                      <Label htmlFor="ips_publicos_ponto">IPs públicos permitidos</Label>
+                      <Input
+                        id="ips_publicos_ponto"
+                        {...register("ips_publicos_ponto")}
+                        placeholder="200.200.200.10; 200.200.200.11"
+                      />
+                    </div>
+
+                    <div className="xl:col-span-4">
+                      <Label htmlFor="redes_locais_ponto">Redes locais permitidas (CIDR)</Label>
+                      <Input
+                        id="redes_locais_ponto"
+                        {...register("redes_locais_ponto")}
+                        placeholder="192.168.0.0/24; 10.0.0.0/8"
+                      />
+                    </div>
+
+                    <div className="xl:col-span-4">
+                      <Label htmlFor="ping_timeout_ms">Timeout de verificação (ms)</Label>
+                      <Input
+                        id="ping_timeout_ms"
+                        type="number"
+                        min={500}
+                        step={100}
+                        {...register("ping_timeout_ms", {
+                          setValueAs: (value) => (value === "" ? undefined : Number(value))
+                        })}
+                        placeholder="2000"
                       />
                     </div>
                   </section>
@@ -890,7 +1160,7 @@ export function CadastroUnidadeAssistencialPage() {
                         type="button"
                         variant="outline"
                         onClick={() =>
-                          append({
+                          appendDiretoria({
                             nome_completo: "",
                             documento: "",
                             funcao: "",
@@ -923,7 +1193,7 @@ export function CadastroUnidadeAssistencialPage() {
                                 type="button"
                                 variant="danger"
                                 size="sm"
-                                onClick={() => remove(indice)}
+                                onClick={() => removerDiretoria(indice)}
                               >
                                 <Trash2 className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
                                 Remover
@@ -982,71 +1252,65 @@ export function CadastroUnidadeAssistencialPage() {
                   </section>
                 )}
 
-                {abaAtiva === "ponto" && (
-                  <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-12">
-                    <div className="xl:col-span-3">
-                      <Label htmlFor="raio_ponto_metros">Raio de validação (m)</Label>
-                      <Input
-                        id="raio_ponto_metros"
-                        type="number"
-                        min={1}
-                        {...register("raio_ponto_metros", { valueAsNumber: true })}
-                      />
+                {abaAtiva === "salas" && (
+                  <section className="space-y-3">
+                    <div className="flex justify-end">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => appendSala({ nome: "" })}
+                      >
+                        <Plus className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                        Adicionar sala
+                      </Button>
                     </div>
 
-                    <div className="xl:col-span-3">
-                      <Label htmlFor="accuracy_max_ponto_metros">Precisão máxima (m)</Label>
-                      <Input
-                        id="accuracy_max_ponto_metros"
-                        type="number"
-                        min={1}
-                        {...register("accuracy_max_ponto_metros", { valueAsNumber: true })}
-                      />
-                    </div>
-
-                    <div className="xl:col-span-3">
-                      <Label htmlFor="ping_timeout_ms">Timeout de ping (ms)</Label>
-                      <Input
-                        id="ping_timeout_ms"
-                        type="number"
-                        min={1}
-                        {...register("ping_timeout_ms", { valueAsNumber: true })}
-                      />
-                    </div>
-
-                    <div className="sm:col-span-2 xl:col-span-6">
-                      <Label htmlFor="modo_validacao_ponto">Modo de validação</Label>
-                      <Select id="modo_validacao_ponto" {...register("modo_validacao_ponto")}>
-                        {modoValidacaoPontoOptions.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </Select>
-                    </div>
-
-                    <div className="sm:col-span-2 xl:col-span-6">
-                      <Label htmlFor="ip_validacao_ponto">IP para validação</Label>
-                      <Input id="ip_validacao_ponto" {...register("ip_validacao_ponto")} />
-                    </div>
-
-                    <div className="sm:col-span-2 xl:col-span-6">
-                      <Label htmlFor="ips_publicos_ponto">IPs públicos permitidos</Label>
-                      <Textarea
-                        id="ips_publicos_ponto"
-                        {...register("ips_publicos_ponto")}
-                        className="min-h-[96px]"
-                      />
-                    </div>
-
-                    <div className="sm:col-span-2 xl:col-span-6">
-                      <Label htmlFor="redes_locais_ponto">Redes locais permitidas</Label>
-                      <Textarea
-                        id="redes_locais_ponto"
-                        {...register("redes_locais_ponto")}
-                        className="min-h-[96px]"
-                      />
-                    </div>
+                    {salasFields.length === 0 ? (
+                      <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                        Nenhuma sala ou auditório cadastrado.
+                      </p>
+                    ) : (
+                      <div className="overflow-hidden rounded-lg border border-slate-200">
+                        <table className="min-w-full text-left text-sm">
+                          <thead className="bg-slate-50 text-slate-700">
+                            <tr>
+                              <th className="w-16 px-3 py-2 font-semibold">#</th>
+                              <th className="px-3 py-2 font-semibold">Nome da sala ou auditório</th>
+                              <th className="w-40 px-3 py-2 text-right font-semibold">Ações</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {salasFields.map((field, indice) => (
+                              <tr
+                                key={field.id}
+                                className={indice % 2 === 0 ? "bg-white" : "bg-emerald-50/30"}
+                              >
+                                <td className="px-3 py-2 text-slate-600">{indice + 1}</td>
+                                <td className="px-3 py-2">
+                                  <Input
+                                    id={`sala_nome_${indice}`}
+                                    {...register(`salas.${indice}.nome`)}
+                                    onBlurCapture={() => aplicarFormatacaoSala(indice)}
+                                    placeholder="Ex.: Sala 01, Auditório Principal"
+                                  />
+                                </td>
+                                <td className="px-3 py-2 text-right">
+                                  <Button
+                                    type="button"
+                                    variant="danger"
+                                    size="sm"
+                                    onClick={() => removerSala(indice)}
+                                  >
+                                    <Trash2 className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                                    Remover
+                                  </Button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </section>
                 )}
 
@@ -1170,3 +1434,4 @@ export function CadastroUnidadeAssistencialPage() {
     </main>
   );
 }
+

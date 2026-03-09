@@ -2,16 +2,22 @@ import bcrypt from "bcryptjs";
 import { OAuth2Client } from "google-auth-library";
 import { env } from "../../../config/env.js";
 import { AppError } from "../../../shared/errors/app-error.js";
-import { authGoogleSchema, authLoginSchema } from "../auth.schema.js";
+import {
+  authEsqueciSenhaSchema,
+  authGoogleSchema,
+  authLoginSchema
+} from "../auth.schema.js";
 import { AuthRepository } from "../repositories/auth.repository.js";
 import { TokenService } from "./token.service.js";
 import type { UsuarioAutenticado } from "../auth.types.js";
+import { EmailService } from "../../email/services/email.service.js";
 
 const googleClient = new OAuth2Client();
 
 export class AuthService {
   private readonly repository = new AuthRepository();
   private readonly tokenService = new TokenService();
+  private readonly emailService = new EmailService();
 
   async login(rawInput: unknown) {
     const input = authLoginSchema.parse(rawInput);
@@ -111,6 +117,36 @@ export class AuthService {
     return this.mapUsuarioAutenticado(usuario);
   }
 
+  async esqueciSenha(rawInput: unknown) {
+    const input = authEsqueciSenhaSchema.parse(rawInput);
+
+    const senhaTemporaria = this.gerarSenhaTemporaria();
+    const senhaHash = await bcrypt.hash(senhaTemporaria, 10);
+
+    const usuario = await this.repository.redefinirSenhaPorEmail(input.email, senhaHash);
+
+    if (!usuario) {
+      return {
+        enviado: true
+      };
+    }
+
+    try {
+      await this.emailService.enviarEmailRecuperacaoSenha({
+        destinatario: usuario.email,
+        nomeUsuario: usuario.nome ?? usuario.nome_usuario,
+        senhaTemporaria
+      });
+    } catch (error) {
+      console.error("[auth] falha ao enviar email de recuperacao", error);
+      throw new AppError("Nao foi possivel enviar o email de recuperacao.", 503);
+    }
+
+    return {
+      enviado: true
+    };
+  }
+
   validarToken(token: string) {
     return this.tokenService.validarToken(token);
   }
@@ -149,5 +185,15 @@ export class AuthService {
     if (statusNormalizado === "BLOQUEADO") {
       throw new AppError("Usuario bloqueado. Procure o administrador.", 403);
     }
+  }
+
+  private gerarSenhaTemporaria() {
+    const alfabeto = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+    let senha = "";
+    for (let indice = 0; indice < 10; indice += 1) {
+      const randomIndex = Math.floor(Math.random() * alfabeto.length);
+      senha += alfabeto[randomIndex];
+    }
+    return senha;
   }
 }

@@ -254,8 +254,8 @@ function statusVariant(status?: BeneficiarioStatus) {
   }
 }
 
-const fotoLarguraPx = 300;
-const fotoAlturaPx = 400;
+const fotoLarguraPx = 400;
+const fotoAlturaPx = 300;
 const fotoMaximaBytes = 5 * 1024 * 1024;
 const documentoMaximoBytes = 10 * 1024 * 1024;
 
@@ -284,7 +284,7 @@ function carregarImagem(dataUrl: string): Promise<HTMLImageElement> {
   });
 }
 
-async function ajustarParaFotoTresPorQuatro(dataUrl: string): Promise<string> {
+async function ajustarParaFotoQuatroPorTres(dataUrl: string): Promise<string> {
   const imagem = await carregarImagem(dataUrl);
   const canvas = document.createElement("canvas");
   canvas.width = fotoLarguraPx;
@@ -295,7 +295,7 @@ async function ajustarParaFotoTresPorQuatro(dataUrl: string): Promise<string> {
     throw new Error("Não foi possível preparar a área de edição da foto.");
   }
 
-  // Mantém a foto inteira visível (sem corte), ajustando com "contain" no quadro 3x4.
+  // Mantém a foto inteira visível (sem corte), ajustando com "contain" no quadro 4x3.
   contexto.fillStyle = "#ffffff";
   contexto.fillRect(0, 0, fotoLarguraPx, fotoAlturaPx);
 
@@ -1140,7 +1140,7 @@ export function CadastroBeneficiarioPage() {
   }
 
   async function definirFotoPorDataUrl(dataUrl: string) {
-    const fotoTratada = await ajustarParaFotoTresPorQuatro(dataUrl);
+    const fotoTratada = await ajustarParaFotoQuatroPorTres(dataUrl);
     setValue("foto_3x4", fotoTratada, { shouldDirty: true, shouldValidate: true });
   }
 
@@ -1165,7 +1165,7 @@ export function CadastroBeneficiarioPage() {
     try {
       const dataUrl = await lerArquivoComoDataUrl(arquivo);
       await definirFotoPorDataUrl(dataUrl);
-      setMensagem({ tipo: "sucesso", texto: "Foto 3x4 atualizada com sucesso." });
+      setMensagem({ tipo: "sucesso", texto: "Foto 4x3 atualizada com sucesso." });
     } catch (error: any) {
       setMensagem({
         tipo: "erro",
@@ -1197,7 +1197,7 @@ export function CadastroBeneficiarioPage() {
       return;
     }
 
-    // Captura sem recorte: mantém toda a imagem visível dentro do quadro 3x4.
+    // Captura sem recorte: mantém toda a imagem visível dentro do quadro 4x3.
     contexto.fillStyle = "#ffffff";
     contexto.fillRect(0, 0, fotoLarguraPx, fotoAlturaPx);
 
@@ -1497,22 +1497,22 @@ export function CadastroBeneficiarioPage() {
                     <input type="hidden" {...register("foto_3x4")} />
                     <div className="sm:col-span-2 xl:col-span-12 rounded-lg border border-emerald-200 bg-emerald-50/40 p-3">
                       <div className="flex flex-col gap-4 md:flex-row md:items-center">
-                        <div className="mx-auto flex aspect-[3/4] w-36 items-center justify-center overflow-hidden rounded-md border border-emerald-200 bg-white">
+                        <div className="mx-auto flex aspect-[4/3] w-44 items-center justify-center overflow-hidden rounded-md border border-emerald-200 bg-white">
                           {foto3x4Atual ? (
                             <img
                               src={foto3x4Atual}
-                              alt="Foto 3x4 do beneficiário"
+                              alt="Foto 4x3 do beneficiário"
                               className="h-full w-full object-cover"
                             />
                           ) : (
                             <span className="px-2 text-center text-xs font-medium text-slate-500">
-                              Foto 3x4
+                              Foto 4x3
                             </span>
                           )}
                         </div>
 
                         <div className="flex-1 space-y-3">
-                          <Label>Foto 3x4 do beneficiário</Label>
+                          <Label>Foto 4x3 do beneficiário</Label>
                           <input
                             ref={inputArquivoRef}
                             type="file"
@@ -1546,7 +1546,7 @@ export function CadastroBeneficiarioPage() {
                             </Button>
                           </div>
                           <p className="text-xs text-slate-600">
-                            A Foto Será Ajustada Automaticamente No Formato 3x4.
+                            A Foto Será Ajustada Automaticamente No Formato 4x3.
                           </p>
                         </div>
                       </div>
@@ -2408,7 +2408,7 @@ export function CadastroBeneficiarioPage() {
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-              <h3 className="text-base font-semibold text-slate-900">Capturar Foto 3x4</h3>
+              <h3 className="text-base font-semibold text-slate-900">Capturar Foto 4x3</h3>
               <Button type="button" variant="ghost" size="sm" onClick={encerrarWebcam}>
                 Fechar
               </Button>
@@ -2418,7 +2418,7 @@ export function CadastroBeneficiarioPage() {
               <div className="mx-auto w-full max-w-[280px] overflow-hidden rounded-lg border border-slate-200 bg-slate-900 sm:max-w-sm">
                 <video
                   ref={videoRef}
-                  className="aspect-[3/4] w-full object-cover"
+                  className="aspect-[4/3] w-full object-cover"
                   autoPlay
                   playsInline
                   muted

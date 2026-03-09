@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
+import { authService } from "@/services/auth.service";
 
 const FOTO_LATERAL_URL = "/images/loguim.jpg";
 const GOOGLE_CLIENT_ID =
@@ -60,15 +61,19 @@ function BandeiraBrasilIcon() {
 
 export function LoginPage() {
   const [modalAberto, setModalAberto] = useState<"termos" | "politica" | null>(null);
+  const [popupEsqueciSenhaAberto, setPopupEsqueciSenhaAberto] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { login, loginGoogle } = useAuth();
   const [nomeUsuario, setNomeUsuario] = useState("");
   const [senha, setSenha] = useState("");
+  const [emailRecuperacao, setEmailRecuperacao] = useState("");
   const [carregando, setCarregando] = useState(false);
   const [carregandoGoogle, setCarregandoGoogle] = useState(false);
+  const [carregandoRecuperacao, setCarregandoRecuperacao] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
+  const [mensagemRecuperacao, setMensagemRecuperacao] = useState<string | null>(null);
   const [googleBotaoPronto, setGoogleBotaoPronto] = useState(false);
   const versaoSistema = import.meta.env.VITE_APP_VERSION ?? "1.00.12";
   const googleButtonRef = useRef<HTMLDivElement | null>(null);
@@ -168,6 +173,23 @@ export function LoginPage() {
     document.head.appendChild(script);
   }, [location.state, loginGoogle, navigate]);
 
+  async function onEnviarRecuperacaoSenha(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setMensagemRecuperacao(null);
+    setCarregandoRecuperacao(true);
+
+    try {
+      const resultado = await authService.esqueciSenha(emailRecuperacao);
+      setMensagemRecuperacao(resultado.message);
+    } catch (error: any) {
+      setMensagemRecuperacao(
+        error?.response?.data?.message ?? "Não foi possível enviar a recuperação de senha."
+      );
+    } finally {
+      setCarregandoRecuperacao(false);
+    }
+  }
+
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-emerald-100 px-4 py-8">
       <div className="absolute inset-0 bg-[linear-gradient(180deg,#d9f7e5_0%,#bdeed1_100%)]" />
@@ -219,6 +241,19 @@ export function LoginPage() {
                     onChange={(event) => setSenha(event.target.value)}
                     placeholder="Senha"
                   />
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    className="text-xs font-medium text-emerald-700 underline decoration-emerald-300 underline-offset-2 hover:text-emerald-800"
+                    onClick={() => {
+                      setPopupEsqueciSenhaAberto(true);
+                      setMensagemRecuperacao(null);
+                    }}
+                  >
+                    Esqueci minha senha
+                  </button>
                 </div>
 
                 {erro && (
@@ -327,6 +362,69 @@ export function LoginPage() {
                 Entendi
               </Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {popupEsqueciSenhaAberto && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 px-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => {
+            if (carregandoRecuperacao) return;
+            setPopupEsqueciSenhaAberto(false);
+          }}
+        >
+          <div
+            className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+              <h3 className="text-base font-semibold text-slate-900">Recuperar senha</h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setPopupEsqueciSenhaAberto(false)}
+                disabled={carregandoRecuperacao}
+              >
+                Fechar
+              </Button>
+            </div>
+
+            <form className="space-y-3 px-5 py-4" onSubmit={onEnviarRecuperacaoSenha}>
+              <div>
+                <Label>E-mail cadastrado</Label>
+                <Input
+                  type="email"
+                  value={emailRecuperacao}
+                  onChange={(event) => setEmailRecuperacao(event.target.value)}
+                  placeholder="Digite seu e-mail"
+                  required
+                  disabled={carregandoRecuperacao}
+                />
+              </div>
+
+              {mensagemRecuperacao && (
+                <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                  {mensagemRecuperacao}
+                </p>
+              )}
+
+              <div className="flex justify-end gap-2 border-t border-slate-100 pt-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setPopupEsqueciSenhaAberto(false)}
+                  disabled={carregandoRecuperacao}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={carregandoRecuperacao}>
+                  {carregandoRecuperacao ? "Enviando..." : "Enviar"}
+                </Button>
+              </div>
+            </form>
           </div>
         </div>
       )}

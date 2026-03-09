@@ -4,6 +4,7 @@ import { AppError } from "../../../shared/errors/app-error.js";
 import { normalizeDigits, trimOrUndefined } from "../../../utils/string-utils.js";
 import type {
   DiretoriaUnidadeInput,
+  SalaUnidadeInput,
   UnidadeAssistencialFilters,
   UnidadeAssistencialInput
 } from "../unidade-assistencial.types.js";
@@ -60,6 +61,17 @@ function normalizarDiretoria(diretoria?: DiretoriaUnidadeInput[]) {
     mandatoInicio?: string;
     mandatoFim?: string;
   }>;
+}
+
+function normalizarSalas(salas?: SalaUnidadeInput[]) {
+  if (!salas?.length) return [];
+  const nomesUnicos = new Set<string>();
+  for (const sala of salas) {
+    const nome = trimOrUndefined(sala.nome);
+    if (!nome) continue;
+    nomesUnicos.add(nome);
+  }
+  return Array.from(nomesUnicos);
 }
 
 export class UnidadeAssistencialRepository {
@@ -218,6 +230,18 @@ export class UnidadeAssistencialRepository {
         });
       }
 
+      const salas = normalizarSalas(input.salas);
+      if (salas.length) {
+        await tx.salaUnidade.createMany({
+          data: salas.map((nome) => ({
+            unidadeId: unidade.id,
+            nome,
+            criadoEm: now,
+            atualizadoEm: now
+          }))
+        });
+      }
+
       return this.buscarPorIdTransacao(tx, unidade.id);
     });
   }
@@ -351,6 +375,21 @@ export class UnidadeAssistencialRepository {
               funcao: membro.funcao,
               mandatoInicio: membro.mandatoInicio,
               mandatoFim: membro.mandatoFim,
+              criadoEm: now,
+              atualizadoEm: now
+            }))
+          });
+        }
+      }
+
+      if (input.salas) {
+        await tx.salaUnidade.deleteMany({ where: { unidadeId: id } });
+        const salas = normalizarSalas(input.salas);
+        if (salas.length) {
+          await tx.salaUnidade.createMany({
+            data: salas.map((nome) => ({
+              unidadeId: id,
+              nome,
               criadoEm: now,
               atualizadoEm: now
             }))

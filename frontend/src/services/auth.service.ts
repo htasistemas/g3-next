@@ -33,5 +33,12 @@ export const authService = {
 
   async logout(): Promise<void> {
     await httpClient.post("/api/auth/logout");
+  },
+
+  async esqueciSenha(email: string): Promise<{ message: string }> {
+    const { data } = await httpClient.post<{ message: string }>("/api/auth/esqueci-senha", {
+      email
+    });
+    return data;
   }
 };

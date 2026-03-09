@@ -7,6 +7,11 @@ export type DiretoriaUnidadeInput = {
   mandato_fim?: string;
 };
 
+export type SalaUnidadeInput = {
+  id?: string | number;
+  nome: string;
+};
+
 export type UnidadeAssistencialInput = {
   nome_fantasia: string;
   razao_social?: string;
@@ -39,6 +44,7 @@ export type UnidadeAssistencialInput = {
   logomarca?: string;
   logomarca_relatorio?: string;
   diretoria?: DiretoriaUnidadeInput[];
+  salas?: SalaUnidadeInput[];
 };
 
 export type UnidadeAssistencialFilters = {

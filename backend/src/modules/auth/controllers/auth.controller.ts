@@ -44,4 +44,12 @@ export class AuthController {
     });
     return response.status(204).send();
   }
+
+  async esqueciSenha(request: Request, response: Response) {
+    await authService.esqueciSenha(request.body);
+    return response.status(200).json({
+      message:
+        "Se o e-mail informado estiver cadastrado, uma senha temporaria foi enviada."
+    });
+  }
 }

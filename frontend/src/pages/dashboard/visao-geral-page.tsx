@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
   BanknoteArrowUp,
@@ -15,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useDashboardAssistencia } from "@/features/dashboard/use-dashboard";
+import { matriculasService } from "@/services/matriculas.service";
 import { classesTelaPadraoBeneficiario } from "@/lib/tela-padrao-beneficiario";
 
 function formatarMoeda(valor: number) {
@@ -32,6 +34,18 @@ function formatarPercentual(valor: number) {
 export function VisaoGeralPage() {
   const navigate = useNavigate();
   const { data, isLoading, isFetching, isError, refetch } = useDashboardAssistencia({}, { autoRefresh: true });
+  const { data: matriculasCatalogoData, isFetching: atualizandoResumoMatriculas } = useQuery({
+    queryKey: ["dashboard", "visao-geral", "matriculas-resumo"],
+    queryFn: () =>
+      matriculasService.listar({
+        nome: "",
+        tipo: "",
+        status: "",
+        profissional: "",
+        beneficiario: ""
+      }),
+    staleTime: 60_000
+  });
 
   const dadosCadastros = useMemo(() => {
     if (!data) return [];
@@ -101,6 +115,21 @@ export function VisaoGeralPage() {
     ];
   }, [data]);
 
+  const resumoCatalogoVagas = useMemo(() => {
+    const lista = matriculasCatalogoData?.matriculas ?? [];
+    const cursosNoCatalogo = lista.length;
+    const totalVagas = lista.reduce((total, item) => total + (item.vagas_totais ?? 0), 0);
+    const vagasDisponiveis = lista.reduce((total, item) => total + (item.vagas_disponiveis ?? 0), 0);
+    const inscricoesAtivas = lista.reduce((total, item) => total + (item.total_matriculas ?? 0), 0);
+
+    return {
+      cursosNoCatalogo,
+      totalVagas,
+      vagasDisponiveis,
+      inscricoesAtivas
+    };
+  }, [matriculasCatalogoData]);
+
   return (
     <main className={classesTelaPadraoBeneficiario.container}>
       <Card className={classesTelaPadraoBeneficiario.cardConteudo}>
@@ -157,6 +186,55 @@ export function VisaoGeralPage() {
                     </div>
                   </button>
                 ))}
+              </div>
+
+              <div className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] p-3">
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
+                    Catálogo e vagas de matrículas
+                  </p>
+                  {atualizandoResumoMatriculas && (
+                    <span className="text-[11px] text-[var(--g3-muted)]">Atualizando...</span>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  <button
+                    type="button"
+                    className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-3 text-left transition hover:border-[var(--g3-active)] hover:bg-[var(--g3-primary-soft)]"
+                    onClick={() => navigate("/atendimentos/matriculas")}
+                  >
+                    <p className="text-xs text-[var(--g3-muted)]">Cursos no catálogo</p>
+                    <p className="text-lg font-semibold text-[var(--g3-foreground)]">
+                      {resumoCatalogoVagas.cursosNoCatalogo}
+                    </p>
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-3 text-left transition hover:border-[var(--g3-active)] hover:bg-[var(--g3-primary-soft)]"
+                    onClick={() => navigate("/atendimentos/matriculas")}
+                  >
+                    <p className="text-xs text-[var(--g3-muted)]">Total de vagas</p>
+                    <p className="text-lg font-semibold text-[var(--g3-foreground)]">{resumoCatalogoVagas.totalVagas}</p>
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-3 text-left transition hover:border-[var(--g3-active)] hover:bg-[var(--g3-primary-soft)]"
+                    onClick={() => navigate("/atendimentos/matriculas")}
+                  >
+                    <p className="text-xs text-[var(--g3-muted)]">Vagas disponíveis</p>
+                    <p className="text-lg font-semibold text-emerald-700">{resumoCatalogoVagas.vagasDisponiveis}</p>
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-3 text-left transition hover:border-[var(--g3-active)] hover:bg-[var(--g3-primary-soft)]"
+                    onClick={() => navigate("/atendimentos/matriculas")}
+                  >
+                    <p className="text-xs text-[var(--g3-muted)]">Inscrições ativas</p>
+                    <p className="text-lg font-semibold text-[var(--g3-foreground)]">
+                      {resumoCatalogoVagas.inscricoesAtivas}
+                    </p>
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">

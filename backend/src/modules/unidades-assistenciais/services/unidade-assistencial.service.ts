@@ -7,7 +7,8 @@ import { mapUnidadeAssistencialToResponse } from "../unidade-assistencial.mapper
 import { UnidadeAssistencialRepository } from "../repositories/unidade-assistencial.repository.js";
 import {
   mapaCamposTextoUnidadeAssistencial,
-  mapaDiretoriaUnidade
+  mapaDiretoriaUnidade,
+  mapaSalaUnidade
 } from "../../../utils/text-format-config.js";
 import { normalizarObjetoTexto } from "../../../utils/text-formatter.js";
 
@@ -84,6 +85,13 @@ export class UnidadeAssistencialService {
       inputBase.diretoria = inputBase.diretoria.map((membro) => {
         if (!membro || typeof membro !== "object") return membro;
         return normalizarObjetoTexto(membro as Record<string, unknown>, mapaDiretoriaUnidade);
+      });
+    }
+
+    if (Array.isArray(inputBase.salas)) {
+      inputBase.salas = inputBase.salas.map((sala) => {
+        if (!sala || typeof sala !== "object") return sala;
+        return normalizarObjetoTexto(sala as Record<string, unknown>, mapaSalaUnidade);
       });
     }
 
