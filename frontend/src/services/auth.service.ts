@@ -7,7 +7,7 @@ type LoginResponse = {
 };
 
 type MeResponse = {
-  usuario: UsuarioAutenticado;
+  usuario: UsuarioAutenticado | null;
 };
 
 export const authService = {
@@ -19,7 +19,7 @@ export const authService = {
     return data.usuario;
   },
 
-  async me(): Promise<UsuarioAutenticado> {
+  async me(): Promise<UsuarioAutenticado | null> {
     const { data } = await httpClient.get<MeResponse>("/api/auth/me");
     return data.usuario;
   },

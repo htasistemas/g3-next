@@ -33,4 +33,9 @@ export class BeneficiarioController {
     const data = await service.obterProximoCodigo();
     return response.json(data);
   }
+
+  async obterSugestaoEndereco(request: Request, response: Response) {
+    const sugestao = await service.obterSugestaoEndereco(request.query);
+    return response.json({ sugestao });
+  }
 }

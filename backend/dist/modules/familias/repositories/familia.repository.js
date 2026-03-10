@@ -317,4 +317,9 @@ export class FamiliaRepository {
             });
         });
     }
+    async remover(familiaId) {
+        await prisma.vinculoFamiliar.delete({
+            where: { id: familiaId }
+        });
+    }
 }

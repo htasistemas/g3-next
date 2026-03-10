@@ -1,4 +1,4 @@
-﻿export const fotoLarguraPx = 400;
+export const fotoLarguraPx = 400;
 export const fotoAlturaPx = 300;
 export const fotoMaximaBytes = 5 * 1024 * 1024;
 

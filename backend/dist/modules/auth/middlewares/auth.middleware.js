@@ -28,6 +28,24 @@ export function ensureAuthenticated(request, _response, next) {
         throw new AppError("Token de autenticacao invalido.", 401);
     }
 }
+export function hydrateAuthenticatedUser(request, _response, next) {
+    const token = obterTokenDaRequisicao(request);
+    if (!token) {
+        return next();
+    }
+    try {
+        const payload = authService.validarToken(token);
+        request.authUser = {
+            id: payload.sub,
+            nomeUsuario: payload.nomeUsuario,
+            permissoes: payload.permissoes ?? []
+        };
+    }
+    catch {
+        request.authUser = undefined;
+    }
+    return next();
+}
 export function ensurePermissions(permissoesPermitidas) {
     return (request, _response, next) => {
         const usuario = request.authUser;

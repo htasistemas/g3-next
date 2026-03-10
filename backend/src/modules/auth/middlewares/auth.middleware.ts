@@ -46,6 +46,30 @@ export function ensureAuthenticated(
   }
 }
 
+export function hydrateAuthenticatedUser(
+  request: AuthenticatedRequest,
+  _response: Response,
+  next: NextFunction
+) {
+  const token = obterTokenDaRequisicao(request);
+  if (!token) {
+    return next();
+  }
+
+  try {
+    const payload = authService.validarToken(token);
+    request.authUser = {
+      id: payload.sub,
+      nomeUsuario: payload.nomeUsuario,
+      permissoes: payload.permissoes ?? []
+    };
+  } catch {
+    request.authUser = undefined;
+  }
+
+  return next();
+}
+
 export function ensurePermissions(permissoesPermitidas: string[]) {
   return (request: AuthenticatedRequest, _response: Response, next: NextFunction) => {
     const usuario = request.authUser;

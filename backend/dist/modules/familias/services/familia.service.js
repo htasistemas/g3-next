@@ -61,6 +61,11 @@ export class FamiliaService {
         const membroId = this.parseId(rawMembroId, "membro");
         await this.repository.removerMembro(familiaId, membroId);
     }
+    async remover(rawId) {
+        const familiaId = this.parseId(rawId, "familia");
+        await this.repository.buscarPorIdOuFalhar(familiaId);
+        await this.repository.remover(familiaId);
+    }
     parseId(rawId, context) {
         const id = Number(rawId);
         if (!Number.isInteger(id) || id <= 0) {

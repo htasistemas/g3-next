@@ -1,0 +1,82 @@
+﻿import { Router } from "express";
+import { asyncHandler } from "../../../shared/http/async-handler.js";
+import { ensureAuthenticated, ensurePermissions } from "../../auth/middlewares/auth.middleware.js";
+import { OcorrenciasCriancaController } from "../controllers/ocorrencias-crianca.controller.js";
+
+const controller = new OcorrenciasCriancaController();
+
+export const ocorrenciasCriancaRoutes = Router();
+
+const permissoesLeitura = ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"];
+const permissoesEscrita = ["ADMINISTRADOR", "OPERADOR"];
+const permissaoExclusao = ["ADMINISTRADOR"];
+
+ocorrenciasCriancaRoutes.get(
+  "/",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.listar.bind(controller))
+);
+
+ocorrenciasCriancaRoutes.post(
+  "/",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.criar.bind(controller))
+);
+
+ocorrenciasCriancaRoutes.get(
+  "/:id",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.obter.bind(controller))
+);
+
+ocorrenciasCriancaRoutes.put(
+  "/:id",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.atualizar.bind(controller))
+);
+
+ocorrenciasCriancaRoutes.delete(
+  "/:id",
+  ensureAuthenticated,
+  ensurePermissions(permissaoExclusao),
+  asyncHandler(controller.excluir.bind(controller))
+);
+
+ocorrenciasCriancaRoutes.get(
+  "/:id/anexos",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.listarAnexos.bind(controller))
+);
+
+ocorrenciasCriancaRoutes.post(
+  "/:id/anexos",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.adicionarAnexo.bind(controller))
+);
+
+ocorrenciasCriancaRoutes.delete(
+  "/:id/anexos/:anexoId",
+  ensureAuthenticated,
+  ensurePermissions(permissaoExclusao),
+  asyncHandler(controller.removerAnexo.bind(controller))
+);
+
+ocorrenciasCriancaRoutes.get(
+  "/:id/pdf/denuncia",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.pdfDenuncia.bind(controller))
+);
+
+ocorrenciasCriancaRoutes.get(
+  "/:id/pdf/conselho-tutelar",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.pdfConselhoTutelar.bind(controller))
+);

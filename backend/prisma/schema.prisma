@@ -105,7 +105,7 @@ model Documento {
   uf             String?              @db.VarChar(2)
   nomeDocumento  String?              @map("nome_documento") @db.VarChar(200)
   nomeArquivo    String?              @map("nome_arquivo") @db.VarChar(200)
-  caminhoArquivo String?              @map("caminho_arquivo") @db.VarChar(400)
+  caminhoArquivo String?              @map("caminho_arquivo") @db.Text
   contentType    String?              @map("content_type") @db.VarChar(120)
   obrigatorio    Boolean?
   criadoEm       DateTime             @map("criado_em")

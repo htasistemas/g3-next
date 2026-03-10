@@ -1759,12 +1759,15 @@ CREATE TABLE IF NOT EXISTS documentos (
   uf VARCHAR(2),
   nome_documento VARCHAR(200),
   nome_arquivo VARCHAR(200),
-  caminho_arquivo VARCHAR(400),
+  caminho_arquivo TEXT,
   content_type VARCHAR(120),
   obrigatorio BOOLEAN DEFAULT FALSE,
   criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
   atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE IF EXISTS documentos
+  ALTER COLUMN caminho_arquivo TYPE TEXT;
 
 CREATE TABLE IF NOT EXISTS situacao_social (
   id BIGSERIAL PRIMARY KEY,

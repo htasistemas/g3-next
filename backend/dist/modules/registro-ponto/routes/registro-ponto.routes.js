@@ -1,0 +1,16 @@
+import { Router } from "express";
+import { asyncHandler } from "../../../shared/http/async-handler.js";
+import { ensureAuthenticated, ensurePermissions } from "../../auth/middlewares/auth.middleware.js";
+import { RegistroPontoController } from "../controllers/registro-ponto.controller.js";
+const controller = new RegistroPontoController();
+export const registroPontoRoutes = Router();
+const permissoesLeitura = ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"];
+const permissoesMarcacao = ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"];
+const permissoesAjuste = ["ADMINISTRADOR"];
+registroPontoRoutes.get("/catalogo/usuarios", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.listarUsuarios.bind(controller)));
+registroPontoRoutes.get("/espelho", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.listarEspelho.bind(controller)));
+registroPontoRoutes.post("/marcar", ensureAuthenticated, ensurePermissions(permissoesMarcacao), asyncHandler(controller.marcarPonto.bind(controller)));
+registroPontoRoutes.get("/", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.listar.bind(controller)));
+registroPontoRoutes.patch("/:id/ajuste", ensureAuthenticated, ensurePermissions(permissoesAjuste), asyncHandler(controller.ajustarRegistro.bind(controller)));
+registroPontoRoutes.post("/:id/ocorrencias", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.adicionarOcorrencia.bind(controller)));
+registroPontoRoutes.get("/:id/historico", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.buscarHistorico.bind(controller)));

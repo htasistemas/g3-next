@@ -1,0 +1,96 @@
+import { Router } from "express";
+import { asyncHandler } from "../../../shared/http/async-handler.js";
+import { ControleVeiculosController } from "../controllers/controle-veiculos.controller.js";
+import {
+  ensureAuthenticated,
+  ensurePermissions
+} from "../../auth/middlewares/auth.middleware.js";
+
+const controller = new ControleVeiculosController();
+
+export const controleVeiculosRoutes = Router();
+
+const permissoesLeitura = ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"];
+const permissoesEscrita = ["ADMINISTRADOR", "OPERADOR"];
+const permissaoExclusao = ["ADMINISTRADOR"];
+
+controleVeiculosRoutes.get(
+  "/veiculos",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.listarVeiculos.bind(controller))
+);
+controleVeiculosRoutes.post(
+  "/veiculos",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.criarVeiculo.bind(controller))
+);
+controleVeiculosRoutes.put(
+  "/veiculos/:id",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.atualizarVeiculo.bind(controller))
+);
+controleVeiculosRoutes.delete(
+  "/veiculos/:id",
+  ensureAuthenticated,
+  ensurePermissions(permissaoExclusao),
+  asyncHandler(controller.removerVeiculo.bind(controller))
+);
+
+controleVeiculosRoutes.get(
+  "/diario-bordo",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.listarDiario.bind(controller))
+);
+controleVeiculosRoutes.post(
+  "/diario-bordo",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.criarDiario.bind(controller))
+);
+controleVeiculosRoutes.put(
+  "/diario-bordo/:id",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.atualizarDiario.bind(controller))
+);
+controleVeiculosRoutes.delete(
+  "/diario-bordo/:id",
+  ensureAuthenticated,
+  ensurePermissions(permissaoExclusao),
+  asyncHandler(controller.removerDiario.bind(controller))
+);
+
+controleVeiculosRoutes.get(
+  "/motoristas-disponiveis",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.listarMotoristasDisponiveis.bind(controller))
+);
+controleVeiculosRoutes.get(
+  "/motoristas-autorizados",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.listarMotoristasAutorizados.bind(controller))
+);
+controleVeiculosRoutes.post(
+  "/motoristas-autorizados",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.criarMotoristaAutorizado.bind(controller))
+);
+controleVeiculosRoutes.put(
+  "/motoristas-autorizados/:id",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.atualizarMotoristaAutorizado.bind(controller))
+);
+controleVeiculosRoutes.delete(
+  "/motoristas-autorizados/:id",
+  ensureAuthenticated,
+  ensurePermissions(permissaoExclusao),
+  asyncHandler(controller.removerMotoristaAutorizado.bind(controller))
+);

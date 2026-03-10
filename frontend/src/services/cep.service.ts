@@ -1,4 +1,5 @@
 import { somenteDigitos } from "@/lib/validators";
+import { httpClient } from "./http-client";
 
 export type EnderecoPorCep = {
   cep: string;
@@ -7,6 +8,11 @@ export type EnderecoPorCep = {
   bairro: string;
   municipio: string;
   uf: string;
+};
+
+export type SugestaoZonaSubzona = {
+  zona?: string;
+  subzona?: string;
 };
 
 type ViaCepResponse = {
@@ -46,4 +52,26 @@ export async function buscarEnderecoPorCep(cepInformado: string): Promise<Endere
     municipio: data.localidade?.trim() ?? "",
     uf: data.uf?.trim() ?? ""
   };
+}
+
+export async function buscarSugestaoZonaSubzona(
+  municipio?: string,
+  bairro?: string
+): Promise<SugestaoZonaSubzona | null> {
+  const municipioNormalizado = municipio?.trim();
+  if (!municipioNormalizado) {
+    return null;
+  }
+
+  const { data } = await httpClient.get<{ sugestao: SugestaoZonaSubzona | null }>(
+    "/api/beneficiarios/sugestao-endereco",
+    {
+      params: {
+        municipio: municipioNormalizado,
+        bairro: bairro?.trim() || undefined
+      }
+    }
+  );
+
+  return data.sugestao ?? null;
 }

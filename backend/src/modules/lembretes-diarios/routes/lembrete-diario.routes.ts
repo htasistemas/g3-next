@@ -1,0 +1,52 @@
+import { Router } from "express";
+import { asyncHandler } from "../../../shared/http/async-handler.js";
+import { LembreteDiarioController } from "../controllers/lembrete-diario.controller.js";
+import {
+  ensureAuthenticated,
+  ensurePermissions
+} from "../../auth/middlewares/auth.middleware.js";
+
+const controller = new LembreteDiarioController();
+
+export const lembreteDiarioRoutes = Router();
+
+const permissoesLeitura = ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"];
+const permissoesEscrita = ["ADMINISTRADOR", "OPERADOR"];
+const permissaoExclusao = ["ADMINISTRADOR"];
+
+lembreteDiarioRoutes.get(
+  "/",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.listar.bind(controller))
+);
+lembreteDiarioRoutes.post(
+  "/",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.criar.bind(controller))
+);
+lembreteDiarioRoutes.put(
+  "/:id",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.atualizar.bind(controller))
+);
+lembreteDiarioRoutes.patch(
+  "/:id/concluir",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.concluir.bind(controller))
+);
+lembreteDiarioRoutes.patch(
+  "/:id/adiar",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.adiar.bind(controller))
+);
+lembreteDiarioRoutes.delete(
+  "/:id",
+  ensureAuthenticated,
+  ensurePermissions(permissaoExclusao),
+  asyncHandler(controller.excluir.bind(controller))
+);

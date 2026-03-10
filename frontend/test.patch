@@ -1,6 +1,0 @@
-﻿*** Begin Patch
-*** Update File: src/app/components/beneficiario-cadastro/beneficiario-cadastro.component.ts
-@@
--import { Subject, firstValueFrom, of } from 'rxjs';
-+import { Subject, firstValueFrom, of } from 'rxjs';
-*** End Patch

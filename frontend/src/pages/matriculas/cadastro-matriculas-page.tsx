@@ -1739,7 +1739,7 @@ export function CadastroMatriculasPage() {
       setPopupMensagem({
         tipo: "aviso",
         titulo: "Validação",
-        texto: "Esse beneficiário já está inscrito. Não é necessário incluir em lista de espera."
+        texto: "Esse beneficiário já está inscrito. Não é necessório incluir em lista de espera."
       });
       return;
     }
@@ -1928,7 +1928,7 @@ export function CadastroMatriculasPage() {
   return (
     <section className="w-full min-h-[calc(100vh-3.5rem)] px-2 py-2 sm:px-3 lg:px-4">
       <div className={`${classesTelaPadraoBeneficiario.container} !mx-0 !max-w-none !px-2 !pb-3 !pt-2 sm:!px-3 lg:!px-4`}>
-        <Card className={classesTelaPadraoBeneficiario.barraAcoes}>
+        <Card className={classesTelaPadraoBeneficiario.barraAcoes} data-print="toolbar">
           <CardContent className="p-0">
             <div className={classesTelaPadraoBeneficiario.gradeAcoes}>
               {ordemAcoesCrudPadrao.map((ordem) => {
@@ -1955,8 +1955,9 @@ export function CadastroMatriculasPage() {
 
         <div
           className={`${classesTelaPadraoBeneficiario.gradePrincipal} lg:grid-cols-[220px_minmax(0,1fr)] xl:grid-cols-[240px_minmax(0,1fr)]`}
+          data-print="layout-grid"
         >
-          <Card className={classesTelaPadraoBeneficiario.cardAbas}>
+          <Card className={classesTelaPadraoBeneficiario.cardAbas} data-print="tabs">
             <CardContent className={classesTelaPadraoBeneficiario.conteudoAbas}>
               {abas.map((aba, indice) => (
                 <button
@@ -1966,7 +1967,7 @@ export function CadastroMatriculasPage() {
                   onClick={() => setAbaAtiva(aba.id)}
                 >
                   <span className={classeNumeroAbaLateral(abaAtiva === aba.id)}>{indice + 1}</span>
-                  <span className="truncate">{aba.label}</span>
+                  <span className="min-w-0 break-words">{aba.label}</span>
                 </button>
               ))}
             </CardContent>
@@ -1987,26 +1988,59 @@ export function CadastroMatriculasPage() {
               {abaAtiva === "listagem" && (
                 <div className="space-y-3">
                   <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                    <div className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card)] p-3">
-                      <p className="text-xs text-[var(--g3-muted)]">Cursos/atendimentos</p>
-                      <p className="text-lg font-semibold text-[var(--g3-foreground)]">{resumoListagem.totalCursos}</p>
+                    <div className="rounded-2xl border border-emerald-200 bg-[linear-gradient(180deg,#f5fff7_0%,#def7e6_100%)] p-4 text-center shadow-[0_18px_40px_rgba(22,101,52,0.12)]">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700/80">
+                        Cursos/atendimentos
+                      </p>
+                      <p className="mt-3 text-3xl font-black text-emerald-950">
+                        {resumoListagem.totalCursos}
+                      </p>
+                      <p className="mt-2 text-sm text-emerald-800/80">
+                        Opções ativas para matrícula e acompanhamento.
+                      </p>
                     </div>
-                    <div className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card)] p-3">
-                      <p className="text-xs text-[var(--g3-muted)]">Vagas totais</p>
-                      <p className="text-lg font-semibold text-[var(--g3-foreground)]">{resumoListagem.totalVagas}</p>
+                    <div className="rounded-2xl border border-emerald-200 bg-[linear-gradient(180deg,#f6fff8_0%,#e3f8e9_100%)] p-4 text-center shadow-[0_18px_40px_rgba(22,101,52,0.12)]">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700/80">
+                        Vagas totais
+                      </p>
+                      <p className="mt-3 text-3xl font-black text-emerald-950">
+                        {resumoListagem.totalVagas}
+                      </p>
+                      <p className="mt-2 text-sm text-emerald-800/80">
+                        Capacidade cadastrada em todos os cursos e atendimentos.
+                      </p>
                     </div>
-                    <div className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card)] p-3">
-                      <p className="text-xs text-[var(--g3-muted)]">Vagas disponíveis</p>
-                      <p className="text-lg font-semibold text-emerald-700">{resumoListagem.totalDisponiveis}</p>
+                    <div className="rounded-2xl border border-emerald-200 bg-[linear-gradient(180deg,#f8fffa_0%,#dcfce6_100%)] p-4 text-center shadow-[0_18px_40px_rgba(22,101,52,0.14)]">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700/80">
+                        Vagas disponíveis
+                      </p>
+                      <p className="mt-3 text-3xl font-black text-emerald-700">
+                        {resumoListagem.totalDisponiveis}
+                      </p>
+                      <p className="mt-2 text-sm text-emerald-800/80">
+                        Quantidade liberada para novas inscrições no momento.
+                      </p>
                     </div>
-                    <div className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card)] p-3">
-                      <p className="text-xs text-[var(--g3-muted)]">Inscrições</p>
-                      <p className="text-lg font-semibold text-[var(--g3-foreground)]">{resumoListagem.totalInscritos}</p>
+                    <div className="rounded-2xl border border-emerald-200 bg-[linear-gradient(180deg,#f5fff7_0%,#ddf6e5_100%)] p-4 text-center shadow-[0_18px_40px_rgba(22,101,52,0.12)]">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700/80">
+                        Inscrições
+                      </p>
+                      <p className="mt-3 text-3xl font-black text-emerald-950">
+                        {resumoListagem.totalInscritos}
+                      </p>
+                      <p className="mt-2 text-sm text-emerald-800/80">
+                        Matrículas registradas considerando todos os status ativos.
+                      </p>
                     </div>
-                    <div className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card)] p-3">
-                      <p className="text-xs text-[var(--g3-muted)]">Fila de espera / Ocupação</p>
-                      <p className="text-lg font-semibold text-[var(--g3-foreground)]">
-                        {resumoListagem.totalFila} / {resumoListagem.ocupacao}%
+                    <div className="rounded-2xl border border-emerald-200 bg-[linear-gradient(180deg,#f7fff9_0%,#dff7e7_100%)] p-4 text-center shadow-[0_18px_40px_rgba(22,101,52,0.12)]">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700/80">
+                        Fila de espera
+                      </p>
+                      <p className="mt-3 text-3xl font-black text-emerald-950">
+                        {resumoListagem.totalFila}
+                      </p>
+                      <p className="mt-2 text-sm text-emerald-800/80">
+                        Ocupação atual do quadro: {resumoListagem.ocupacao}%.
                       </p>
                     </div>
                   </div>

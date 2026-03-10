@@ -37,6 +37,12 @@ familiaRoutes.put(
   ensurePermissions(permissoesEscrita),
   asyncHandler(controller.atualizar.bind(controller))
 );
+familiaRoutes.delete(
+  "/:id",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.remover.bind(controller))
+);
 familiaRoutes.post(
   "/:id/membros",
   ensureAuthenticated,

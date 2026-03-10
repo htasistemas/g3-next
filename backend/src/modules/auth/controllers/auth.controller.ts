@@ -1,6 +1,5 @@
 import type { CookieOptions, Request, Response } from "express";
 import { env } from "../../../config/env.js";
-import { AppError } from "../../../shared/errors/app-error.js";
 import { AUTH_COOKIE_NAME, type AuthenticatedRequest } from "../middlewares/auth.middleware.js";
 import { AuthService } from "../services/auth.service.js";
 
@@ -31,7 +30,7 @@ export class AuthController {
 
   async me(request: AuthenticatedRequest, response: Response) {
     if (!request.authUser?.id) {
-      throw new AppError("Nao autenticado.", 401);
+      return response.status(200).json({ usuario: null });
     }
     const usuario = await authService.obterPerfilUsuario(request.authUser.id);
     return response.json({ usuario });

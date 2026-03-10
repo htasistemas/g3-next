@@ -9,6 +9,7 @@ const permissoesEscrita = ["ADMINISTRADOR", "OPERADOR"];
 const permissaoExclusao = ["ADMINISTRADOR"];
 beneficiarioRoutes.get("/", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.listar.bind(controller)));
 beneficiarioRoutes.get("/proximo-codigo", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.obterProximoCodigo.bind(controller)));
+beneficiarioRoutes.get("/sugestao-endereco", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.obterSugestaoEndereco.bind(controller)));
 beneficiarioRoutes.get("/:id", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.buscarPorId.bind(controller)));
 beneficiarioRoutes.post("/", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.criar.bind(controller)));
 beneficiarioRoutes.put("/:id", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.atualizar.bind(controller)));

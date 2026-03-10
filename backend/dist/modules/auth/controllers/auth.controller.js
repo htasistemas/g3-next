@@ -1,5 +1,4 @@
 import { env } from "../../../config/env.js";
-import { AppError } from "../../../shared/errors/app-error.js";
 import { AUTH_COOKIE_NAME } from "../middlewares/auth.middleware.js";
 import { AuthService } from "../services/auth.service.js";
 const authService = new AuthService();
@@ -25,7 +24,7 @@ export class AuthController {
     }
     async me(request, response) {
         if (!request.authUser?.id) {
-            throw new AppError("Nao autenticado.", 401);
+            return response.status(200).json({ usuario: null });
         }
         const usuario = await authService.obterPerfilUsuario(request.authUser.id);
         return response.json({ usuario });
@@ -36,5 +35,11 @@ export class AuthController {
             maxAge: 0
         });
         return response.status(204).send();
+    }
+    async esqueciSenha(request, response) {
+        await authService.esqueciSenha(request.body);
+        return response.status(200).json({
+            message: "Se o e-mail informado estiver cadastrado, uma senha temporaria foi enviada."
+        });
     }
 }

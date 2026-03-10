@@ -7,16 +7,15 @@ export function CriarContaPage() {
     <main className="g3-container flex min-h-screen items-center justify-center py-8">
       <Card className="w-full max-w-2xl">
         <CardHeader>
-          <CardTitle>Criar conta</CardTitle>
+          <CardTitle>Solicitar acesso</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 text-sm text-slate-700">
           <p>
-            O fluxo de cadastro de novos usuários será integrado em breve ao backend Node com
-            validações e regras de segurança.
+            O acesso ao G3 Next é administrado pela equipe responsável pelo sistema.
           </p>
           <p>
-            Nesta fase, para acesso local de homologação da migração, utilize o usuário de teste
-            disponibilizado no login.
+            Novos usuários devem solicitar liberação de conta e permissões ao administrador
+            institucional. O cadastro público direto não fica disponível nesta tela.
           </p>
           <Button asChild>
             <Link to="/login">Voltar para login</Link>

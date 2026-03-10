@@ -1,8 +1,9 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
-import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, Tooltip, XAxis, YAxis } from "recharts";
+import { ResponsiveChart } from "@/components/charts/responsive-chart";
 import type { LucideIcon } from "lucide-react";
 import {
   Search,
@@ -47,7 +48,7 @@ import {
   useSalvarBeneficiario
 } from "@/features/beneficiarios/use-beneficiarios";
 import { reportsService } from "@/services/reports.service";
-import { buscarEnderecoPorCep } from "@/services/cep.service";
+import { buscarEnderecoPorCep, buscarSugestaoZonaSubzona } from "@/services/cep.service";
 import type { Beneficiario, BeneficiarioFiltro, BeneficiarioStatus } from "@/types/beneficiario";
 import { useAuth } from "@/hooks/use-auth";
 import { somenteDigitos, validarCpf } from "@/lib/validators";
@@ -121,7 +122,7 @@ const subzonaEnderecoOptions = [
   { value: "ZONA_CENTRAL", label: "Zona Central" }
 ] as const;
 
-type DocumentoCadastroId = (typeof documentosConfig)[number]["id"];
+type DocumentoCadastroId = string;
 
 type DocumentoCadastro = {
   id: DocumentoCadastroId;
@@ -136,6 +137,33 @@ type DocumentoCadastro = {
 };
 
 const tituloTela = "Cadastro de beneficiários";
+type AbaFormularioId = (typeof abas)[number]["id"];
+
+const mapaCamposObrigatorios: Partial<
+  Record<keyof BeneficiarioFormValues, { label: string; aba: AbaFormularioId }>
+> = {
+  nome_completo: { label: "Nome completo", aba: "dados" },
+  data_nascimento: { label: "Data de nascimento", aba: "dados" },
+  nome_mae: { label: "Nome da mãe", aba: "dados" },
+  cep: { label: "CEP", aba: "endereco" },
+  telefone_principal: { label: "Telefone principal", aba: "contato" },
+  telefone_secundario: { label: "Telefone secundário", aba: "contato" },
+  telefone_recado_numero: { label: "Telefone recado", aba: "contato" },
+  email: { label: "E-mail", aba: "contato" },
+  aceite_lgpd: { label: "Aceite LGPD", aba: "observacoes" }
+};
+
+function obterPendenciasFormulario(
+  errors: Partial<Record<keyof BeneficiarioFormValues, unknown>>
+) {
+  return Object.entries(mapaCamposObrigatorios).flatMap(([campo, definicao]) => {
+    if (!definicao || !errors[campo as keyof BeneficiarioFormValues]) {
+      return [];
+    }
+
+    return [definicao];
+  });
+}
 
 function formatarStatus(status?: string) {
   if (!status) return "Em análise";
@@ -176,15 +204,34 @@ function calcularIdade(data?: string) {
 }
 
 function formatarTelefone(telefone?: string) {
-  if (!telefone) return "---";
-  const digitos = telefone.replace(/\D/g, "");
-  if (digitos.length === 11) {
-    return `(${digitos.slice(0, 2)}) ${digitos.slice(2, 7)}-${digitos.slice(7)}`;
+  const formatado = formatarTelefoneInput(telefone);
+  return formatado || "---";
+}
+
+function formatarTelefoneInput(telefone?: string) {
+  const digitos = somenteDigitos(telefone).slice(0, 11);
+  if (!digitos) return "";
+  const temNonoDigito = digitos.length > 10;
+  const ddd = digitos.slice(0, 2);
+  const prefixo = digitos.slice(2, temNonoDigito ? 7 : 6);
+  const sufixo = digitos.slice(temNonoDigito ? 7 : 6, temNonoDigito ? 11 : 10);
+  if (sufixo) {
+    return `(${ddd}) ${prefixo}-${sufixo}`;
   }
-  if (digitos.length === 10) {
-    return `(${digitos.slice(0, 2)}) ${digitos.slice(2, 6)}-${digitos.slice(6)}`;
+  if (prefixo) {
+    return `(${ddd}) ${prefixo}`;
   }
-  return telefone;
+  return `(${ddd}`;
+}
+
+function formatarCep(cep?: string) {
+  const digitos = somenteDigitos(cep).slice(0, 8);
+  if (!digitos) return "";
+  return digitos.length > 5 ? `${digitos.slice(0, 5)}-${digitos.slice(5)}` : digitos;
+}
+
+function normalizarEmailDigitado(email?: string) {
+  return (email ?? "").replace(/\s+/g, "").toLowerCase();
 }
 
 function criarDocumentosPadrao(): DocumentoCadastro[] {
@@ -210,11 +257,11 @@ function normalizarNomeDocumento(nome: string) {
 }
 
 function mapearDocumentosDoBeneficiario(item: Beneficiario): DocumentoCadastro[] {
-  const anexosPorNome = new Map(
-    (item.documentos_obrigatorios ?? []).map((doc) => [normalizarNomeDocumento(doc.nome), doc])
-  );
+  const anexos = item.documentos_obrigatorios ?? [];
+  const anexosPorNome = new Map(anexos.map((doc) => [normalizarNomeDocumento(doc.nome), doc]));
+  const nomesDocumentosPadrao = new Set(documentosConfig.map((doc) => normalizarNomeDocumento(doc.nome)));
 
-  return criarDocumentosPadrao().map((documento) => {
+  const documentosPadrao = criarDocumentosPadrao().map((documento) => {
     const anexo = anexosPorNome.get(normalizarNomeDocumento(documento.nome));
     const numeroDocumento =
       anexo?.numeroDocumento ??
@@ -235,9 +282,87 @@ function mapearDocumentosDoBeneficiario(item: Beneficiario): DocumentoCadastro[]
       nomeArquivo: anexo?.nomeArquivo,
       caminhoArquivo: anexo?.caminhoArquivo,
       contentType: anexo?.contentType,
-      ignorado: documento.permiteIgnorar ? !!anexo?.ignorado : false
+      ignorado: documento.permiteIgnorar ? !!anexo?.ignorado : false,
+      obrigatorio: anexo?.obrigatorio ?? documento.obrigatorio
     };
   });
+
+  const documentosExtras = anexos
+    .filter((doc) => !nomesDocumentosPadrao.has(normalizarNomeDocumento(doc.nome)))
+    .map((doc, indice) => {
+      const identificadorExtra = doc.id ?? normalizarNomeDocumento(doc.nome) ?? String(indice);
+
+      return {
+        id: `extra-${identificadorExtra}`,
+        nome: doc.nome,
+        numeroDocumento: doc.numeroDocumento ?? "",
+        nomeArquivo: doc.nomeArquivo,
+        caminhoArquivo: doc.caminhoArquivo,
+        contentType: doc.contentType,
+        ignorado: !!doc.ignorado,
+        obrigatorio: !!doc.obrigatorio,
+        permiteIgnorar: true
+      };
+    });
+
+  return [...documentosPadrao, ...documentosExtras];
+}
+
+function mapearBeneficiarioParaFormulario(item?: Beneficiario): BeneficiarioFormValues {
+  if (!item) {
+    return beneficiarioDefaultValues;
+  }
+
+  return {
+    ...beneficiarioDefaultValues,
+    ...item,
+    cep: formatarCep(item.cep),
+    telefone_principal: formatarTelefoneInput(item.telefone_principal),
+    telefone_secundario: formatarTelefoneInput(item.telefone_secundario),
+    telefone_recado_numero: formatarTelefoneInput(item.telefone_recado_numero),
+    email: normalizarEmailDigitado(item.email),
+    status: item.status ?? "EM_ANALISE",
+    aceite_lgpd: item.aceite_lgpd ?? true
+  };
+}
+
+function isDocumentoPdf(documento: DocumentoCadastro) {
+  return (
+    (documento.contentType ?? "").includes("pdf") ||
+    documento.caminhoArquivo?.startsWith("data:application/pdf") ||
+    documento.nomeArquivo?.toLowerCase().endsWith(".pdf") ||
+    false
+  );
+}
+
+async function prepararUrlDocumento(documento: DocumentoCadastro) {
+  const caminhoArquivo = documento.caminhoArquivo;
+  if (!caminhoArquivo) {
+    throw new Error("Nenhum arquivo enviado para este documento.");
+  }
+
+  if (!caminhoArquivo.startsWith("data:")) {
+    return {
+      url: caminhoArquivo,
+      isPdf: isDocumentoPdf(documento),
+      revoke: undefined as (() => void) | undefined
+    };
+  }
+
+  const response = await fetch(caminhoArquivo);
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+
+  return {
+    url,
+    isPdf: blob.type.includes("pdf") || isDocumentoPdf(documento),
+    revoke: () => URL.revokeObjectURL(url)
+  };
+}
+
+function agendarLimpezaUrlDocumento(revoke?: () => void) {
+  if (!revoke) return;
+  window.setTimeout(() => revoke(), 60_000);
 }
 
 function statusVariant(status?: BeneficiarioStatus) {
@@ -292,7 +417,7 @@ async function ajustarParaFotoQuatroPorTres(dataUrl: string): Promise<string> {
 
   const contexto = canvas.getContext("2d");
   if (!contexto) {
-    throw new Error("Não foi possível preparar a área de edição da foto.");
+    throw new Error("Não foi possível preparar a Área de edição da foto.");
   }
 
   // Mantém a foto inteira visível (sem corte), ajustando com "contain" no quadro 4x3.
@@ -365,6 +490,11 @@ export function CadastroBeneficiarioPage() {
     resolver: zodResolver(beneficiarioFormSchema),
     defaultValues: beneficiarioDefaultValues
   });
+  const campoCep = register("cep");
+  const campoTelefonePrincipal = register("telefone_principal");
+  const campoTelefoneSecundario = register("telefone_secundario");
+  const campoTelefoneRecadoNumero = register("telefone_recado_numero");
+  const campoEmail = register("email");
 
   const foto3x4Atual = watch("foto_3x4") || "";
   const cepAtual = watch("cep") || "";
@@ -387,12 +517,7 @@ export function CadastroBeneficiarioPage() {
     if (!detalhesData?.beneficiario) return;
     const item = detalhesData.beneficiario;
 
-    reset({
-      ...beneficiarioDefaultValues,
-      ...item,
-      status: item.status ?? "EM_ANALISE",
-      aceite_lgpd: item.aceite_lgpd ?? true
-    });
+    reset(mapearBeneficiarioParaFormulario(item));
     setDocumentos(mapearDocumentosDoBeneficiario(item));
     setPopupExcluirDocumentoId(null);
     setMensagem(null);
@@ -440,6 +565,10 @@ export function CadastroBeneficiarioPage() {
           return;
         }
 
+        setValue("cep", formatarCep(endereco.cep || cepNormalizado), {
+          shouldDirty: true,
+          shouldValidate: true
+        });
         setValue("logradouro", endereco.logradouro, { shouldDirty: true, shouldValidate: true });
         setValue("bairro", endereco.bairro, { shouldDirty: true, shouldValidate: true });
         setValue("municipio", endereco.municipio, { shouldDirty: true, shouldValidate: true });
@@ -451,6 +580,20 @@ export function CadastroBeneficiarioPage() {
             shouldDirty: true,
             shouldValidate: true
           });
+        }
+        try {
+          const sugestao = await buscarSugestaoZonaSubzona(endereco.municipio, endereco.bairro);
+          if (!ativo) return;
+          setValue("zona", sugestao?.zona?.trim() || "URBANA", {
+            shouldDirty: true,
+            shouldValidate: true
+          });
+          setValue("subzona", sugestao?.subzona?.trim() || "", {
+            shouldDirty: true,
+            shouldValidate: true
+          });
+        } catch {
+          if (!ativo) return;
         }
 
       } catch (error: any) {
@@ -553,13 +696,14 @@ export function CadastroBeneficiarioPage() {
     async (values) => {
       setMensagem(null);
       const valoresNormalizados = normalizarObjetoTexto(values, mapaCamposTextoBeneficiarioForm);
+      const beneficiarioPersistido = detalhesData?.beneficiario;
 
       const documentoCpf = documentos.find((documento) => documento.id === "cpf");
       if (!documentoCpf || !validarCpf(documentoCpf.numeroDocumento)) {
         setAbaAtiva("documentos");
         setMensagem({
           tipo: "erro",
-          texto: "Informe um CPF válido na aba Documentos."
+          texto: "Preencha ou corrija os campos: CPF."
         });
         return;
       }
@@ -572,7 +716,7 @@ export function CadastroBeneficiarioPage() {
           nomeArquivo: documento.nomeArquivo,
           caminhoArquivo: documento.caminhoArquivo,
           contentType: documento.contentType,
-          obrigatorio: true,
+          obrigatorio: documento.obrigatorio,
           ignorado: documento.permiteIgnorar ? documento.ignorado : false
         };
       });
@@ -586,24 +730,26 @@ export function CadastroBeneficiarioPage() {
       )?.numeroDocumento;
 
       const payload = {
+        ...beneficiarioPersistido,
         ...valoresNormalizados,
         id_beneficiario: beneficiarioSelecionadoId,
-        codigo: valoresNormalizados.codigo || proximoCodigoData?.codigo,
+        codigo: valoresNormalizados.codigo || beneficiarioPersistido?.codigo || proximoCodigoData?.codigo,
         cpf: documentoCpf.numeroDocumento,
-        rg_numero: "",
-        rg_orgao_emissor: "",
-        rg_uf: "",
-        rg_data_emissao: "",
+        rg_numero: beneficiarioPersistido?.rg_numero || undefined,
+        rg_orgao_emissor: beneficiarioPersistido?.rg_orgao_emissor || undefined,
+        rg_uf: beneficiarioPersistido?.rg_uf || undefined,
+        rg_data_emissao: beneficiarioPersistido?.rg_data_emissao || undefined,
+        nis: beneficiarioPersistido?.nis || undefined,
         cnh: numeroCnh || undefined,
         titulo_eleitor: numeroTituloEleitor || undefined,
         cartao_sus: numeroCartaoSus || undefined,
-        certidao_tipo: undefined,
-        certidao_livro: undefined,
-        certidao_folha: undefined,
-        certidao_termo: undefined,
-        certidao_cartorio: undefined,
-        certidao_municipio: undefined,
-        certidao_uf: undefined,
+        certidao_tipo: beneficiarioPersistido?.certidao_tipo || undefined,
+        certidao_livro: beneficiarioPersistido?.certidao_livro || undefined,
+        certidao_folha: beneficiarioPersistido?.certidao_folha || undefined,
+        certidao_termo: beneficiarioPersistido?.certidao_termo || undefined,
+        certidao_cartorio: beneficiarioPersistido?.certidao_cartorio || undefined,
+        certidao_municipio: beneficiarioPersistido?.certidao_municipio || undefined,
+        certidao_uf: beneficiarioPersistido?.certidao_uf || undefined,
         documentos_obrigatorios: documentosPayload,
         data_aceite_lgpd: valoresNormalizados.data_aceite_lgpd || new Date().toISOString().slice(0, 10)
       } as unknown as Beneficiario;
@@ -623,11 +769,14 @@ export function CadastroBeneficiarioPage() {
         });
       }
     },
-    () => {
-      setAbaAtiva("dados");
+    (submitErrors) => {
+      const pendencias = obterPendenciasFormulario(submitErrors);
+      setAbaAtiva(pendencias[0]?.aba ?? "dados");
       setMensagem({
         tipo: "erro",
-        texto: "Preencha os campos obrigatórios antes de salvar."
+        texto: pendencias.length
+          ? `Preencha ou corrija os campos: ${pendencias.map((item) => item.label).join(", ")}.`
+          : "Preencha os campos obrigatórios antes de salvar."
       });
     }
   );
@@ -784,50 +933,78 @@ export function CadastroBeneficiarioPage() {
     setMensagem({ tipo: "sucesso", texto: "Documento capturado com sucesso." });
   }
 
-  function visualizarDocumento(documento: DocumentoCadastro) {
+  async function visualizarDocumento(documento: DocumentoCadastro) {
     if (!documento.caminhoArquivo) {
       setMensagem({ tipo: "erro", texto: "Nenhum arquivo enviado para este documento." });
       return;
     }
-    window.open(documento.caminhoArquivo, "_blank", "noopener,noreferrer");
+
+    const novaJanela = window.open("", "_blank", "noopener,noreferrer");
+    if (!novaJanela) {
+      setMensagem({ tipo: "erro", texto: "Não foi possível abrir a visualização do documento." });
+      return;
+    }
+
+    try {
+      const fonteDocumento = await prepararUrlDocumento(documento);
+      novaJanela.location.replace(fonteDocumento.url);
+      agendarLimpezaUrlDocumento(fonteDocumento.revoke);
+    } catch (error: any) {
+      novaJanela.close();
+      setMensagem({
+        tipo: "erro",
+        texto: error?.message ?? "Não foi possível abrir o documento."
+      });
+    }
   }
 
-  function imprimirDocumento(documento: DocumentoCadastro) {
+  async function imprimirDocumento(documento: DocumentoCadastro) {
     if (!documento.caminhoArquivo) {
       setMensagem({ tipo: "erro", texto: "Nenhum arquivo enviado para este documento." });
       return;
     }
 
-    const novaJanela = window.open("", "_blank");
+    const novaJanela = window.open("", "_blank", "noopener,noreferrer");
     if (!novaJanela) {
       setMensagem({ tipo: "erro", texto: "Não foi possível abrir a visualização para impressão." });
       return;
     }
 
-    const documentoEscapado = documento.nome.replaceAll("\"", "'");
-    const isPdf =
-      (documento.contentType ?? "").includes("pdf") ||
-      documento.caminhoArquivo.startsWith("data:application/pdf");
+    try {
+      const documentoEscapado = documento.nome.replaceAll("\"", "'");
+      const fonteDocumento = await prepararUrlDocumento(documento);
 
-    if (isPdf) {
-      novaJanela.document.write(`<!doctype html>
-        <html>
-          <head><title>${documentoEscapado}</title></head>
-          <body style="margin:0">
-            <iframe src="${documento.caminhoArquivo}" style="border:0;width:100vw;height:100vh"></iframe>
-          </body>
-        </html>`);
-    } else {
-      novaJanela.document.write(`<!doctype html>
-        <html>
-          <head><title>${documentoEscapado}</title></head>
-          <body style="margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#fff">
-            <img src="${documento.caminhoArquivo}" alt="${documentoEscapado}" style="max-width:100%;max-height:100vh" />
-          </body>
-        </html>`);
+      if (fonteDocumento.isPdf) {
+        novaJanela.document.write(`<!doctype html>
+          <html>
+            <head><title>${documentoEscapado}</title></head>
+            <body style="margin:0">
+              <iframe src="${fonteDocumento.url}" style="border:0;width:100vw;height:100vh"></iframe>
+            </body>
+          </html>`);
+      } else {
+        novaJanela.document.write(`<!doctype html>
+          <html>
+            <head><title>${documentoEscapado}</title></head>
+            <body style="margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#fff">
+              <img src="${fonteDocumento.url}" alt="${documentoEscapado}" style="max-width:100%;max-height:100vh" />
+            </body>
+          </html>`);
+      }
+
+      novaJanela.document.close();
+      window.setTimeout(() => {
+        novaJanela.focus();
+        novaJanela.print();
+      }, 500);
+      agendarLimpezaUrlDocumento(fonteDocumento.revoke);
+    } catch (error: any) {
+      novaJanela.close();
+      setMensagem({
+        tipo: "erro",
+        texto: error?.message ?? "Não foi possível preparar o documento para impressão."
+      });
     }
-    novaJanela.document.close();
-    setTimeout(() => novaJanela.print(), 500);
   }
 
   function marcarIgnorarDocumento(documentoId: DocumentoCadastroId, ignorar: boolean) {
@@ -886,12 +1063,7 @@ export function CadastroBeneficiarioPage() {
     encerrarWebcam();
     encerrarWebcamDocumento();
     if (detalhesData?.beneficiario) {
-      reset({
-        ...beneficiarioDefaultValues,
-        ...detalhesData.beneficiario,
-        status: detalhesData.beneficiario.status ?? "EM_ANALISE",
-        aceite_lgpd: detalhesData.beneficiario.aceite_lgpd ?? true
-      });
+      reset(mapearBeneficiarioParaFormulario(detalhesData.beneficiario));
       setDocumentos(mapearDocumentosDoBeneficiario(detalhesData.beneficiario));
       setPopupExcluirDocumentoId(null);
       setMensagem(null);
@@ -945,6 +1117,31 @@ export function CadastroBeneficiarioPage() {
       return null;
     }
     return item;
+  }
+
+  function obterBeneficiarioContextoTermo(): Beneficiario {
+    if (detalhesData?.beneficiario) {
+      return detalhesData.beneficiario;
+    }
+
+    const valores = getValues();
+
+    return {
+      nome_completo: valores.nome_completo?.trim() || "Beneficiário",
+      nome_social: valores.nome_social?.trim() || undefined,
+      data_nascimento: valores.data_nascimento || new Date().toISOString().slice(0, 10),
+      nome_mae: valores.nome_mae?.trim() || "Não informado",
+      telefone_principal: valores.telefone_principal || "",
+      cpf: documentos.find((documento) => documento.id === "cpf")?.numeroDocumento || "",
+      cep: valores.cep || "",
+      logradouro: valores.logradouro || "",
+      numero: valores.numero || "",
+      complemento: valores.complemento || "",
+      bairro: valores.bairro || "",
+      municipio: valores.municipio || "",
+      uf: valores.uf || "",
+      aceite_lgpd: !!valores.aceite_lgpd
+    };
   }
 
   function montarPayloadTermoConsentimento(item: Beneficiario) {
@@ -1079,8 +1276,7 @@ export function CadastroBeneficiarioPage() {
       });
     }
 
-    const item = obterBeneficiarioParaImpressao();
-    if (!item) return;
+    const item = obterBeneficiarioContextoTermo();
 
     await executarImpressaoSegura(
       async () => {
@@ -1274,7 +1470,7 @@ export function CadastroBeneficiarioPage() {
 
   return (
     <main className={classesTelaPadraoBeneficiario.container}>
-      <section className={classesTelaPadraoBeneficiario.barraAcoes}>
+      <section className={classesTelaPadraoBeneficiario.barraAcoes} data-print="toolbar">
         <div className={classesTelaPadraoBeneficiario.gradeAcoes}>
           {acoesNaOrdemPadrao.map((acao) => (
             <Button
@@ -1293,8 +1489,8 @@ export function CadastroBeneficiarioPage() {
         </div>
       </section>
 
-      <div className={classesTelaPadraoBeneficiario.gradePrincipal}>
-        <Card className={classesTelaPadraoBeneficiario.cardAbas}>
+      <div className={classesTelaPadraoBeneficiario.gradePrincipal} data-print="layout-grid">
+        <Card className={classesTelaPadraoBeneficiario.cardAbas} data-print="tabs">
           <CardContent className={classesTelaPadraoBeneficiario.conteudoAbas}>
             {abas.map((aba, indice) => (
               <button
@@ -1479,15 +1675,15 @@ export function CadastroBeneficiarioPage() {
                   )}
                 </div>
 
-                <div className="h-52 rounded-md border border-slate-200 bg-slate-50 p-2">
-                  <ResponsiveContainer width="100%" height="100%">
+                <div className="h-52 min-w-0 rounded-md border border-slate-200 bg-slate-50 p-2">
+                  <ResponsiveChart minWidth={0} minHeight={180}>
                     <BarChart data={dadosGrafico}>
                       <XAxis dataKey="status" hide />
                       <YAxis allowDecimals={false} width={24} />
                       <Tooltip />
                       <Bar dataKey="total" fill="var(--g3-primary)" radius={[6, 6, 0, 0]} />
                     </BarChart>
-                  </ResponsiveContainer>
+                  </ResponsiveChart>
                 </div>
               </section>
             ) : (
@@ -1655,10 +1851,18 @@ export function CadastroBeneficiarioPage() {
                     <div className="xl:col-span-3">
                       <Label>CEP*</Label>
                       <Input
-                        {...register("cep")}
+                        {...campoCep}
                         className="h-9"
                         maxLength={9}
                         placeholder="00000-000"
+                        onChange={(event) => {
+                          event.target.value = formatarCep(event.target.value);
+                          campoCep.onChange(event);
+                        }}
+                        onBlur={(event) => {
+                          event.target.value = formatarCep(event.target.value);
+                          campoCep.onBlur(event);
+                        }}
                       />
                       {carregandoCep && (
                         <p className="mt-1 text-xs text-emerald-700">Consultando CEP...</p>
@@ -1751,18 +1955,63 @@ export function CadastroBeneficiarioPage() {
                   <section className="grid gap-3 sm:grid-cols-2">
                     <div>
                       <Label>Telefone principal*</Label>
-                      <Input {...register("telefone_principal")} />
+                      <Input
+                        {...campoTelefonePrincipal}
+                        inputMode="tel"
+                        maxLength={15}
+                        placeholder="(34) 99999-9999"
+                        onChange={(event) => {
+                          event.target.value = formatarTelefoneInput(event.target.value);
+                          campoTelefonePrincipal.onChange(event);
+                        }}
+                        onBlur={(event) => {
+                          event.target.value = formatarTelefoneInput(event.target.value);
+                          campoTelefonePrincipal.onBlur(event);
+                        }}
+                      />
                       {errors.telefone_principal && (
                         <p className="mt-1 text-xs text-red-600">{errors.telefone_principal.message}</p>
                       )}
                     </div>
                     <div>
                       <Label>Telefone secundário</Label>
-                      <Input {...register("telefone_secundario")} />
+                      <Input
+                        {...campoTelefoneSecundario}
+                        inputMode="tel"
+                        maxLength={15}
+                        placeholder="(34) 99999-9999"
+                        onChange={(event) => {
+                          event.target.value = formatarTelefoneInput(event.target.value);
+                          campoTelefoneSecundario.onChange(event);
+                        }}
+                        onBlur={(event) => {
+                          event.target.value = formatarTelefoneInput(event.target.value);
+                          campoTelefoneSecundario.onBlur(event);
+                        }}
+                      />
+                      {errors.telefone_secundario && (
+                        <p className="mt-1 text-xs text-red-600">{errors.telefone_secundario.message}</p>
+                      )}
                     </div>
                     <div>
                       <Label>Telefone recado</Label>
-                      <Input {...register("telefone_recado_numero")} />
+                      <Input
+                        {...campoTelefoneRecadoNumero}
+                        inputMode="tel"
+                        maxLength={15}
+                        placeholder="(34) 99999-9999"
+                        onChange={(event) => {
+                          event.target.value = formatarTelefoneInput(event.target.value);
+                          campoTelefoneRecadoNumero.onChange(event);
+                        }}
+                        onBlur={(event) => {
+                          event.target.value = formatarTelefoneInput(event.target.value);
+                          campoTelefoneRecadoNumero.onBlur(event);
+                        }}
+                      />
+                      {errors.telefone_recado_numero && (
+                        <p className="mt-1 text-xs text-red-600">{errors.telefone_recado_numero.message}</p>
+                      )}
                     </div>
                     <div>
                       <Label>Nome recado</Label>
@@ -1773,7 +2022,23 @@ export function CadastroBeneficiarioPage() {
                     </div>
                     <div className="sm:col-span-2">
                       <Label>E-mail</Label>
-                      <Input type="email" {...register("email")} />
+                      <Input
+                        type="email"
+                        {...campoEmail}
+                        inputMode="email"
+                        placeholder="nome@dominio.com.br"
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        onChange={(event) => {
+                          event.target.value = normalizarEmailDigitado(event.target.value);
+                          campoEmail.onChange(event);
+                        }}
+                        onBlur={(event) => {
+                          event.target.value = normalizarEmailDigitado(event.target.value);
+                          campoEmail.onBlur(event);
+                        }}
+                      />
                       {errors.email && <p className="mt-1 text-xs text-red-600">{errors.email.message}</p>}
                     </div>
                     <div className="sm:col-span-2 grid grid-cols-2 gap-3 rounded-md border border-slate-200 p-3">

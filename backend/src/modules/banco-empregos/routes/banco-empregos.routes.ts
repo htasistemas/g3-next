@@ -1,0 +1,68 @@
+﻿import { Router } from "express";
+import { asyncHandler } from "../../../shared/http/async-handler.js";
+import { ensureAuthenticated, ensurePermissions } from "../../auth/middlewares/auth.middleware.js";
+import { BancoEmpregosController } from "../controllers/banco-empregos.controller.js";
+
+const controller = new BancoEmpregosController();
+
+export const bancoEmpregosRoutes = Router();
+
+const permissoesLeitura = ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"];
+const permissoesEscrita = ["ADMINISTRADOR", "OPERADOR"];
+const permissaoExclusao = ["ADMINISTRADOR"];
+
+bancoEmpregosRoutes.get(
+  "/",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.listar.bind(controller))
+);
+
+bancoEmpregosRoutes.post(
+  "/",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.criar.bind(controller))
+);
+
+bancoEmpregosRoutes.get(
+  "/:id",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.obter.bind(controller))
+);
+
+bancoEmpregosRoutes.put(
+  "/:id",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.atualizar.bind(controller))
+);
+
+bancoEmpregosRoutes.delete(
+  "/:id",
+  ensureAuthenticated,
+  ensurePermissions(permissaoExclusao),
+  asyncHandler(controller.excluir.bind(controller))
+);
+
+bancoEmpregosRoutes.get(
+  "/:id/candidatos",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.listarCandidatos.bind(controller))
+);
+
+bancoEmpregosRoutes.post(
+  "/:id/candidatos",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.criarCandidato.bind(controller))
+);
+
+bancoEmpregosRoutes.delete(
+  "/candidatos/:candidatoId",
+  ensureAuthenticated,
+  ensurePermissions(permissaoExclusao),
+  asyncHandler(controller.removerCandidato.bind(controller))
+);

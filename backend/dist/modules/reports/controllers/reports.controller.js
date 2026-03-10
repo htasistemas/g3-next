@@ -52,4 +52,29 @@ export class ReportsController {
         const resultado = await service.gerarFichaVoluntario(request.body);
         return responderRelatorio(response, resultado, formato);
     }
+    async relacaoMatriculas(request, response) {
+        const formato = formatoRelatorioSchema.parse(request.query.formato);
+        const resultado = await service.gerarRelacaoMatriculas(request.body);
+        return responderRelatorio(response, resultado, formato);
+    }
+    async comprovanteMatricula(request, response) {
+        const formato = formatoRelatorioSchema.parse(request.query.formato);
+        const resultado = await service.gerarComprovanteMatricula(request.body);
+        return responderRelatorio(response, resultado, formato);
+    }
+    async comprovantePreMatriculaEspera(request, response) {
+        const formato = formatoRelatorioSchema.parse(request.query.formato);
+        const resultado = await service.gerarComprovantePreMatriculaEspera(request.body);
+        return responderRelatorio(response, resultado, formato);
+    }
+    async relacaoRegistroDoacao(request, response) {
+        const formato = formatoRelatorioSchema.parse(request.query.formato);
+        const resultado = await service.gerarRelacaoRegistroDoacao(request.body);
+        return responderRelatorio(response, resultado, formato);
+    }
+    async relacaoDoacoesRealizadas(request, response) {
+        const formato = formatoRelatorioSchema.parse(request.query.formato);
+        const resultado = await service.gerarRelacaoDoacoesRealizadas(request.body);
+        return responderRelatorio(response, resultado, formato);
+    }
 }

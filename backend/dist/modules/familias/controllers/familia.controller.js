@@ -17,6 +17,10 @@ export class FamiliaController {
         const familia = await service.atualizar(request.params.id, request.body);
         return response.json({ familia });
     }
+    async remover(request, response) {
+        await service.remover(request.params.id);
+        return response.status(204).send();
+    }
     async adicionarMembro(request, response) {
         const familia = await service.adicionarMembro(request.params.id, request.body);
         return response.json({ familia });

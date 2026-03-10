@@ -172,6 +172,7 @@ export class HtmlPdfRenderer {
                 if (!layout.blocos?.length)
                     return;
                 let fotoAcoplada = false;
+                const fotoAjuste = layout.fotoAjuste ?? "contain";
                 for (let indice = 0; indice < layout.blocos.length; indice += 1) {
                     const bloco = layout.blocos[indice];
                     const titulo = toSafeText(bloco.titulo);
@@ -185,8 +186,8 @@ export class HtmlPdfRenderer {
                     const blocoIdentificacao = destaque && indice === 0 && campos.length === 2;
                     const acoplarFoto = !!fotoBuffer && !fotoAcoplada && indice === 0;
                     const larguraFoto = acoplarFoto ? mmToPt(32) : 0;
-                    // Foto em proporção fixa 3x4 (retrato), sem esticar ou cortar.
-                    const alturaFoto = acoplarFoto ? (larguraFoto * 4) / 3 : 0;
+                    // Foto em proporção fixa 4x3 (horizontal), sem esticar ou cortar.
+                    const alturaFoto = acoplarFoto ? (larguraFoto * 3) / 4 : 0;
                     const gapFoto = acoplarFoto ? 8 : 0;
                     const larguraBloco = Math.max(mmToPt(80), pageWidth() - larguraFoto - gapFoto);
                     const paddingX = destaque ? 8 : 6;
@@ -247,11 +248,17 @@ export class HtmlPdfRenderer {
                         const areaImagemLargura = Math.max(20, larguraFoto - margemFoto * 2);
                         const areaImagemAltura = Math.max(20, alturaFoto - margemFoto * 2);
                         try {
-                            doc.image(fotoBuffer, xFoto + margemFoto, yBloco + margemFoto, {
-                                fit: [areaImagemLargura, areaImagemAltura],
-                                align: "center",
-                                valign: "center"
-                            });
+                            doc.image(fotoBuffer, xFoto + margemFoto, yBloco + margemFoto, fotoAjuste === "cover"
+                                ? {
+                                    cover: [areaImagemLargura, areaImagemAltura],
+                                    align: "center",
+                                    valign: "center"
+                                }
+                                : {
+                                    fit: [areaImagemLargura, areaImagemAltura],
+                                    align: "center",
+                                    valign: "center"
+                                });
                         }
                         catch {
                             // Mantem o fluxo mesmo sem imagem valida.

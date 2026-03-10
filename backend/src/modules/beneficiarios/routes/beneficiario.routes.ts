@@ -27,6 +27,12 @@ beneficiarioRoutes.get(
   asyncHandler(controller.obterProximoCodigo.bind(controller))
 );
 beneficiarioRoutes.get(
+  "/sugestao-endereco",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.obterSugestaoEndereco.bind(controller))
+);
+beneficiarioRoutes.get(
   "/:id",
   ensureAuthenticated,
   ensurePermissions(permissoesLeitura),

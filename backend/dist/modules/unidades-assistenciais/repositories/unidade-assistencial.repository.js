@@ -45,6 +45,18 @@ function normalizarDiretoria(diretoria) {
     }))
         .filter((membro) => membro.nomeCompleto && membro.documento && membro.funcao);
 }
+function normalizarSalas(salas) {
+    if (!salas?.length)
+        return [];
+    const nomesUnicos = new Set();
+    for (const sala of salas) {
+        const nome = trimOrUndefined(sala.nome);
+        if (!nome)
+            continue;
+        nomesUnicos.add(nome);
+    }
+    return Array.from(nomesUnicos);
+}
 export class UnidadeAssistencialRepository {
     async listar(filters) {
         const where = {};
@@ -185,6 +197,17 @@ export class UnidadeAssistencialRepository {
                     }))
                 });
             }
+            const salas = normalizarSalas(input.salas);
+            if (salas.length) {
+                await tx.salaUnidade.createMany({
+                    data: salas.map((nome) => ({
+                        unidadeId: unidade.id,
+                        nome,
+                        criadoEm: now,
+                        atualizadoEm: now
+                    }))
+                });
+            }
             return this.buscarPorIdTransacao(tx, unidade.id);
         });
     }
@@ -309,6 +332,20 @@ export class UnidadeAssistencialRepository {
                             funcao: membro.funcao,
                             mandatoInicio: membro.mandatoInicio,
                             mandatoFim: membro.mandatoFim,
+                            criadoEm: now,
+                            atualizadoEm: now
+                        }))
+                    });
+                }
+            }
+            if (input.salas) {
+                await tx.salaUnidade.deleteMany({ where: { unidadeId: id } });
+                const salas = normalizarSalas(input.salas);
+                if (salas.length) {
+                    await tx.salaUnidade.createMany({
+                        data: salas.map((nome) => ({
+                            unidadeId: id,
+                            nome,
                             criadoEm: now,
                             atualizadoEm: now
                         }))

@@ -47,3 +47,14 @@ export function useRemoverMembroFamilia() {
     }
   });
 }
+
+export function useRemoverFamilia() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => familiasService.remover(id),
+    onSuccess: async (_data, id) => {
+      await queryClient.invalidateQueries({ queryKey: ["familias"] });
+      await queryClient.removeQueries({ queryKey: ["familia", id] });
+    }
+  });
+}

@@ -1,0 +1,11 @@
+export const registroPontoOcorrenciaTipos = [
+    "AJUSTE_MANUAL",
+    "ATRASO",
+    "FALTA",
+    "HORA_EXTRA",
+    "BANCO_HORAS",
+    "ESQUECIMENTO_BATIDA",
+    "INCONSISTENCIA_SEQUENCIA",
+    "CORRECAO_ADMINISTRATIVA",
+    "OBSERVACAO_OPERACIONAL"
+];

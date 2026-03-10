@@ -30,6 +30,10 @@ export const familiasService = {
     return data;
   },
 
+  async remover(id: string): Promise<void> {
+    await httpClient.delete(`/api/familias/${id}`);
+  },
+
   async adicionarMembro(id: string, payload: FamiliaMembro): Promise<FamiliaItemResponse> {
     const { data } = await httpClient.post<FamiliaItemResponse>(`/api/familias/${id}/membros`, payload);
     return data;

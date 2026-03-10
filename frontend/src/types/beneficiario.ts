@@ -40,6 +40,13 @@ export type Beneficiario = {
   rg_uf?: string;
   rg_data_emissao?: string;
   nis?: string;
+  certidao_tipo?: string;
+  certidao_livro?: string;
+  certidao_folha?: string;
+  certidao_termo?: string;
+  certidao_cartorio?: string;
+  certidao_municipio?: string;
+  certidao_uf?: string;
   titulo_eleitor?: string;
   cnh?: string;
   cartao_sus?: string;

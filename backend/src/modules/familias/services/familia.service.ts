@@ -84,6 +84,12 @@ export class FamiliaService {
     await this.repository.removerMembro(familiaId, membroId);
   }
 
+  async remover(rawId: string) {
+    const familiaId = this.parseId(rawId, "familia");
+    await this.repository.buscarPorIdOuFalhar(familiaId);
+    await this.repository.remover(familiaId);
+  }
+
   private parseId(rawId: string, context: "familia" | "membro"): bigint {
     const id = Number(rawId);
     if (!Number.isInteger(id) || id <= 0) {

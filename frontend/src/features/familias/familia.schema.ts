@@ -3,19 +3,19 @@ import { z } from "zod";
 export const familiaStatusOptions = ["ATIVO", "INATIVO", "BLOQUEADO"] as const;
 
 export const parentescoOptions = [
-  "Responsavel familiar",
-  "Conjuge/companheiro(a)",
+  "Responsável familiar",
+  "Cônjuge/companheiro(a)",
   "Filho(a)",
   "Enteado(a)",
-  "Pai/Mae",
-  "Avo/Avo",
-  "Irmao(a)",
+  "Pai/Mãe",
+  "Avô/Avó",
+  "Irmão(ã)",
   "Outro"
 ] as const;
 
 export const familiaMembroFormSchema = z.object({
   id_familia_membro: z.string().optional(),
-  id_beneficiario: z.string().min(1, "Selecione um beneficiario."),
+  id_beneficiario: z.string().min(1, "Selecione um beneficiário."),
   parentesco: z.string().trim().min(1, "Informe o parentesco."),
   responsavel_familiar: z.boolean().default(false),
   contribui_renda: z.boolean().default(false),
@@ -29,8 +29,8 @@ export const familiaMembroFormSchema = z.object({
 
 export const familiaFormSchema = z
   .object({
-    nome_familia: z.string().trim().min(3, "Informe o nome da familia."),
-    id_referencia_familiar: z.string().min(1, "Selecione o responsavel principal."),
+    nome_familia: z.string().trim().min(3, "Informe o nome da família."),
+    id_referencia_familiar: z.string().min(1, "Selecione o responsável principal."),
     status: z.enum(familiaStatusOptions),
     cep: z.string().optional(),
     logradouro: z.string().optional(),
@@ -73,7 +73,7 @@ export const familiaFormSchema = z
     if (!value.membros.length) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Inclua pelo menos um membro na familia.",
+        message: "Inclua pelo menos um membro na família.",
         path: ["membros"]
       });
     }
@@ -85,7 +85,7 @@ export const familiaFormSchema = z
       if (ids.has(membro.id_beneficiario)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "Nao repita o mesmo beneficiario.",
+          message: "Não repita o mesmo beneficiário.",
           path: ["membros", index, "id_beneficiario"]
         });
       }
@@ -99,7 +99,7 @@ export const familiaFormSchema = z
     if (responsaveis > 1) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "A familia pode ter apenas um responsavel familiar.",
+        message: "A família pode ter apenas um responsável familiar.",
         path: ["membros"]
       });
     }

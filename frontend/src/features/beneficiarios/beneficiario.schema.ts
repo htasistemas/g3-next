@@ -1,5 +1,21 @@
 ﻿import { z } from "zod";
-import { validarCep } from "@/lib/validators";
+import { somenteDigitos, validarCep } from "@/lib/validators";
+
+const telefoneObrigatorioSchema = z.string().refine((value) => {
+  const totalDigitos = somenteDigitos(value).length;
+  return totalDigitos === 10 || totalDigitos === 11;
+}, "Informe o telefone principal.");
+
+const telefoneOpcionalSchema = z.string().refine((value) => {
+  if (!value.trim()) return true;
+  const totalDigitos = somenteDigitos(value).length;
+  return totalDigitos === 10 || totalDigitos === 11;
+}, "Informe um telefone válido.");
+
+const emailOpcionalSchema = z.preprocess(
+  (value) => (typeof value === "string" ? value.trim().toLowerCase() : value),
+  z.union([z.string().email("E-mail inválido."), z.literal("")]).optional()
+);
 
 export const beneficiarioStatusOptions = [
   "ATIVO",
@@ -32,11 +48,11 @@ export const beneficiarioFormSchema = z.object({
   rg_orgao_emissor: z.string().optional(),
   rg_uf: z.string().optional(),
   rg_data_emissao: z.string().optional(),
-  telefone_principal: z.string().min(10, "Informe o telefone principal."),
-  telefone_secundario: z.string().optional(),
+  telefone_principal: telefoneObrigatorioSchema,
+  telefone_secundario: telefoneOpcionalSchema.optional(),
   telefone_recado_nome: z.string().optional(),
-  telefone_recado_numero: z.string().optional(),
-  email: z.union([z.string().email("E-mail inválido."), z.literal("")]).optional(),
+  telefone_recado_numero: telefoneOpcionalSchema.optional(),
+  email: emailOpcionalSchema,
   permite_contato_tel: z.boolean().default(true),
   permite_contato_whatsapp: z.boolean().default(true),
   permite_contato_sms: z.boolean().default(false),

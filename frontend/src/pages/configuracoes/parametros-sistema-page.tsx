@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Eye, RefreshCcw, Save, Settings2, SlidersHorizontal, X } from "lucide-react";
+import { Eye, RefreshCcw, Save, SlidersHorizontal, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,8 +16,7 @@ import {
 import type { ThemeSettings } from "@/types/theme";
 
 const abas = [
-  { id: "personalizacao", label: "Personalização", icon: SlidersHorizontal },
-  { id: "geral", label: "Geral (em breve)", icon: Settings2 }
+  { id: "personalizacao", label: "Personalização", icon: SlidersHorizontal }
 ] as const;
 
 type AbaId = (typeof abas)[number]["id"];
@@ -96,7 +95,7 @@ export function ParametrosSistemaPage() {
     } catch (error: any) {
       setMensagem({
         tipo: "erro",
-        texto: error?.response?.data?.message ?? "Nao foi possivel salvar a personalizacao."
+        texto: error?.response?.data?.message ?? "Não foi possível salvar a personalização."
       });
     } finally {
       setSalvando(false);
@@ -118,7 +117,7 @@ export function ParametrosSistemaPage() {
 
   return (
     <main className={classesTelaPadraoBeneficiario.container}>
-      <section className={classesTelaPadraoBeneficiario.barraAcoes}>
+      <section className={classesTelaPadraoBeneficiario.barraAcoes} data-print="toolbar">
         <div className={classesTelaPadraoBeneficiario.gradeAcoes}>
           <Button
             type="button"
@@ -165,8 +164,8 @@ export function ParametrosSistemaPage() {
         </div>
       </section>
 
-      <div className={classesTelaPadraoBeneficiario.gradePrincipal}>
-        <Card className={classesTelaPadraoBeneficiario.cardAbas}>
+      <div className={classesTelaPadraoBeneficiario.gradePrincipal} data-print="layout-grid">
+        <Card className={classesTelaPadraoBeneficiario.cardAbas} data-print="tabs">
           <CardContent className={classesTelaPadraoBeneficiario.conteudoAbas}>
             {abas.map((aba, indice) => (
               <button
@@ -196,93 +195,85 @@ export function ParametrosSistemaPage() {
           </CardHeader>
 
           <CardContent>
-            {abaAtiva === "personalizacao" ? (
-              <section className="space-y-5">
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="preset">Preset</Label>
-                    <Select
-                      id="preset"
-                      value={draft.preset ?? ""}
-                      onChange={(event) => aplicarPreset(event.target.value)}
-                    >
-                      {themePresets.map((preset) => (
-                        <option key={preset.id} value={preset.id}>
-                          {preset.nome}
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="modo">Tema</Label>
-                    <Select id="modo" value={draft.modo} onChange={(event) => atualizarModo(event.target.value as ThemeSettings["modo"])}>
-                      <option value="claro">Claro</option>
-                      <option value="escuro">Escuro</option>
-                      <option value="automatico">Automático</option>
-                    </Select>
-                  </div>
+            <section className="space-y-5">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                <div className="space-y-2">
+                  <Label htmlFor="preset">Preset</Label>
+                  <Select
+                    id="preset"
+                    value={draft.preset ?? ""}
+                    onChange={(event) => aplicarPreset(event.target.value)}
+                  >
+                    {themePresets.map((preset) => (
+                      <option key={preset.id} value={preset.id}>
+                        {preset.nome}
+                      </option>
+                    ))}
+                  </Select>
                 </div>
 
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                  {camposCor.map((campo) => (
-                    <div key={campo.key} className="space-y-1.5 rounded-lg border border-slate-200 p-3">
-                      <Label className="text-xs">{campo.label}</Label>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="color"
-                          className="h-9 w-14 p-1"
-                          value={draft.paleta[campo.key]}
-                          onChange={(event) => atualizarCor(campo.key, event.target.value)}
-                        />
-                        <Input
-                          value={draft.paleta[campo.key]}
-                          onChange={(event) => atualizarCor(campo.key, event.target.value)}
-                          className="h-9"
-                        />
-                      </div>
-                    </div>
-                  ))}
+                <div className="space-y-2">
+                  <Label htmlFor="modo">Tema</Label>
+                  <Select id="modo" value={draft.modo} onChange={(event) => atualizarModo(event.target.value as ThemeSettings["modo"])}>
+                    <option value="claro">Claro</option>
+                    <option value="escuro">Escuro</option>
+                    <option value="automatico">Automático</option>
+                  </Select>
                 </div>
+              </div>
 
-                <div className="rounded-xl border border-slate-200 bg-white p-4">
-                  <p className="mb-3 text-sm font-semibold text-slate-900">Preview</p>
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <div className="space-y-2 rounded-lg border p-3">
-                      <p className="text-sm font-semibold">Componentes</p>
-                      <div className="flex flex-wrap gap-2">
-                        <Button size="sm">Botão primário</Button>
-                        <Button size="sm" variant="outline">
-                          Botão outline
-                        </Button>
-                        <Button size="sm" variant="danger">
-                          Danger
-                        </Button>
-                      </div>
-                      <Input placeholder="Campo com foco e borda" />
-                    </div>
-                    <div className="space-y-2 rounded-lg border p-3">
-                      <p className="text-sm font-semibold">Estados</p>
-                      <div className="flex flex-wrap gap-2">
-                        <Badge variant="success">Sucesso</Badge>
-                        <Badge variant="warning">Aviso</Badge>
-                        <Badge variant="danger">Erro</Badge>
-                        <Badge variant="info">Informação</Badge>
-                      </div>
-                      <span className="text-sm underline underline-offset-2 text-[var(--g3-link)]">
-                        Link de exemplo
-                      </span>
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {camposCor.map((campo) => (
+                  <div key={campo.key} className="space-y-1.5 rounded-lg border border-slate-200 p-3">
+                    <Label className="text-xs">{campo.label}</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="color"
+                        className="h-9 w-14 p-1"
+                        value={draft.paleta[campo.key]}
+                        onChange={(event) => atualizarCor(campo.key, event.target.value)}
+                      />
+                      <Input
+                        value={draft.paleta[campo.key]}
+                        onChange={(event) => atualizarCor(campo.key, event.target.value)}
+                        className="h-9"
+                      />
                     </div>
                   </div>
+                ))}
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <p className="mb-3 text-sm font-semibold text-slate-900">Preview</p>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="space-y-2 rounded-lg border p-3">
+                    <p className="text-sm font-semibold">Componentes</p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm">Botão primário</Button>
+                      <Button size="sm" variant="outline">
+                        Botão outline
+                      </Button>
+                      <Button size="sm" variant="danger">
+                        Danger
+                      </Button>
+                    </div>
+                    <Input placeholder="Campo com foco e borda" />
+                  </div>
+                  <div className="space-y-2 rounded-lg border p-3">
+                    <p className="text-sm font-semibold">Estados</p>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="success">Sucesso</Badge>
+                      <Badge variant="warning">Aviso</Badge>
+                      <Badge variant="danger">Erro</Badge>
+                      <Badge variant="info">Informação</Badge>
+                    </div>
+                    <span className="text-sm underline underline-offset-2 text-[var(--g3-link)]">
+                      Link de exemplo
+                    </span>
+                  </div>
                 </div>
-              </section>
-            ) : (
-              <section className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6">
-                <p className="text-sm text-slate-600">
-                  Esta aba está preparada para futuras configurações do sistema.
-                </p>
-              </section>
-            )}
+              </div>
+            </section>
           </CardContent>
         </Card>
       </div>

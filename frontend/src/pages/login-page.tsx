@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,9 +7,13 @@ import { useAuth } from "@/hooks/use-auth";
 import { authService } from "@/services/auth.service";
 
 const FOTO_LATERAL_URL = "/images/loguim.jpg";
-const GOOGLE_CLIENT_ID =
-  import.meta.env.VITE_GOOGLE_CLIENT_ID ??
-  "1026369251340-2eskbj74ierlra1i9fm0aas29ucvnudf.apps.googleusercontent.com";
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim() || undefined;
+const GOOGLE_ALLOWED_ORIGINS = new Set(
+  (import.meta.env.VITE_GOOGLE_ALLOWED_ORIGINS ?? "")
+    .split(",")
+    .map((origem: string) => origem.trim())
+    .filter(Boolean)
+);
 
 type GoogleCredentialResponse = {
   credential?: string;
@@ -75,8 +79,20 @@ export function LoginPage() {
   const [aviso, setAviso] = useState<string | null>(null);
   const [mensagemRecuperacao, setMensagemRecuperacao] = useState<string | null>(null);
   const [googleBotaoPronto, setGoogleBotaoPronto] = useState(false);
-  const versaoSistema = import.meta.env.VITE_APP_VERSION ?? "1.00.12";
+  const versaoSistema = import.meta.env.VITE_APP_VERSION ?? "1.00.13";
   const googleButtonRef = useRef<HTMLDivElement | null>(null);
+  const origemAtual = typeof window === "undefined" ? "" : window.location.origin;
+  const hostnameAtual = typeof window === "undefined" ? "" : window.location.hostname;
+  const ambienteLocal =
+    hostnameAtual === "localhost" || hostnameAtual === "127.0.0.1" || hostnameAtual === "0.0.0.0";
+  const googleAviso = !GOOGLE_CLIENT_ID
+    ? "Login com Google indisponível: client ID não configurado."
+    : GOOGLE_ALLOWED_ORIGINS.size === 0 && ambienteLocal
+      ? "Login com Google indisponível neste ambiente: origem não configurada."
+      : GOOGLE_ALLOWED_ORIGINS.size > 0 && !GOOGLE_ALLOWED_ORIGINS.has(origemAtual)
+        ? "Login com Google indisponível neste ambiente."
+        : null;
+  const googleDisponivel = googleAviso === null;
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -110,10 +126,13 @@ export function LoginPage() {
   }
 
   useEffect(() => {
-    if (!GOOGLE_CLIENT_ID) {
-      setAviso("Login com Google indisponível: client id não configurado.");
+    if (!googleDisponivel) {
+      setGoogleBotaoPronto(false);
+      setAviso(googleAviso);
       return;
     }
+
+    setAviso(null);
 
     function inicializarGoogle() {
       if (!window.google?.accounts?.id || !googleButtonRef.current) {
@@ -171,7 +190,7 @@ export function LoginPage() {
       setErro("Não foi possível carregar o login com Google.");
     };
     document.head.appendChild(script);
-  }, [location.state, loginGoogle, navigate]);
+  }, [googleAviso, googleDisponivel, location.state, navigate]);
 
   async function onEnviarRecuperacaoSenha(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -269,23 +288,31 @@ export function LoginPage() {
               </form>
 
               <div className="space-y-2">
-                <div
-                  ref={googleButtonRef}
-                  className="flex min-h-11 w-full items-center justify-center"
-                  aria-label="Login com Google"
-                />
-                {!googleBotaoPronto && (
-                  <p className="text-center text-xs text-slate-500">Preparando login com Google...</p>
-                )}
-                {carregandoGoogle && (
-                  <p className="text-center text-xs text-emerald-700">Autenticando com Google...</p>
+                {googleDisponivel ? (
+                  <>
+                    <div
+                      ref={googleButtonRef}
+                      className="flex min-h-11 w-full items-center justify-center"
+                      aria-label="Login com Google"
+                    />
+                    {!googleBotaoPronto && (
+                      <p className="text-center text-xs text-slate-500">Preparando login com Google...</p>
+                    )}
+                    {carregandoGoogle && (
+                      <p className="text-center text-xs text-emerald-700">Autenticando com Google...</p>
+                    )}
+                  </>
+                ) : (
+                  <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-center text-xs text-slate-600">
+                    Login com Google disponível apenas em ambientes configurados.
+                  </p>
                 )}
               </div>
 
               <div className="space-y-2 border-t border-slate-100 pt-4 text-center text-sm">
-                <p className="text-slate-700">Não possui conta?</p>
+                <p className="text-slate-700">Precisa de acesso?</p>
                 <Button asChild variant="outline" size="sm" className="mx-auto">
-                  <Link to="/criar-conta">Criar conta</Link>
+                  <Link to="/criar-conta">Solicitar acesso</Link>
                 </Button>
                 <p className="text-slate-600">
                   Ao continuar, você concorda com os {" "}

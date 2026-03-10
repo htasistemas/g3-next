@@ -259,3 +259,230 @@ export const mapaCamposTextoUsuario: Record<string, TipoFormatacaoTexto> = {
   unidade: "instituicao",
   cargo: "instituicao"
 };
+
+export const mapaCamposTextoTarefaAdministrativa: Record<string, TipoFormatacaoTexto> = {
+  titulo: "textoCurto",
+  descricao: "textoCurto",
+  responsavel: "nomePessoa",
+  prioridade: "textoCurto",
+  status: "textoCurto"
+};
+
+export const mapaCamposTextoPatrimonio: Record<string, TipoFormatacaoTexto> = {
+  numeroPatrimonio: "textoCurto",
+  nome: "textoCurto",
+  categoria: "textoCurto",
+  subcategoria: "textoCurto",
+  conservacao: "textoCurto",
+  status: "textoCurto",
+  origem: "instituicao",
+  responsavel: "nomePessoa",
+  unidade: "instituicao",
+  sala: "textoCurto",
+  observacoes: "textoCurto",
+  destino: "endereco",
+  observacao: "textoCurto"
+};
+
+export const mapaCamposTextoControleVeiculos: Record<string, TipoFormatacaoTexto> = {
+  placa: "textoCurto",
+  modelo: "instituicao",
+  marca: "instituicao",
+  tipoCombustivel: "textoCurto",
+  observacoes: "textoCurto",
+  condutor: "nomePessoa",
+  destino: "endereco",
+  tipoOrigem: "textoCurto",
+  numeroCarteira: "textoCurto",
+  categoriaCarteira: "textoCurto"
+};
+
+export const mapaCamposTextoAlmoxarifado: Record<string, TipoFormatacaoTexto> = {
+  descricao: "textoCurto",
+  categoria: "textoCurto",
+  unidade: "textoCurto",
+  localizacao: "endereco",
+  localizacao_interna: "endereco",
+  situacao: "textoCurto",
+  observacoes: "textoCurto",
+  tipo: "textoCurto",
+  referencia: "textoCurto",
+  responsavel: "nomePessoa",
+  direcao_ajuste: "textoCurto"
+};
+
+export const mapaCamposTextoEmprestimosEventos: Record<string, TipoFormatacaoTexto> = {
+  titulo: "textoCurto",
+  descricao: "textoCurto",
+  local: "endereco",
+  status: "textoCurto",
+  observacoes: "textoCurto",
+  tipoItem: "textoCurto",
+  statusItem: "textoCurto",
+  observacaoItem: "textoCurto",
+  acao: "textoCurto"
+};
+
+export const mapaCamposTextoFotosEventos: Record<string, TipoFormatacaoTexto> = {
+  titulo: "textoCurto",
+  descricao: "textoCurto",
+  local: "endereco",
+  status: "textoCurto",
+  tags: "textoCurto",
+  legenda: "textoCurto",
+  creditos: "nomePessoa",
+  nomeArquivo: "textoCurto"
+};
+
+export const mapaCamposTextoDocumentosInstituicao: Record<string, TipoFormatacaoTexto> = {
+  tipoDocumento: "textoCurto",
+  orgaoEmissor: "instituicao",
+  descricao: "textoCurto",
+  categoria: "textoCurto",
+  responsavelInterno: "nomePessoa",
+  modoRenovacao: "textoCurto",
+  observacaoRenovacao: "textoCurto",
+  formaAlerta: "textoCurto",
+  nomeArquivo: "textoCurto",
+  tipo: "textoCurto",
+  usuario: "nomePessoa",
+  tipoAlteracao: "textoCurto",
+  observacao: "textoCurto"
+};
+
+export const mapaCamposTextoOficios: Record<string, TipoFormatacaoTexto> = {
+  tipo: "textoCurto",
+  numero: "textoCurto",
+  setorOrigem: "instituicao",
+  responsavel: "nomePessoa",
+  destinatario: "instituicao",
+  destinatarioResponsavel: "nomePessoa",
+  destinatarioCargo: "instituicao",
+  meioEnvio: "textoCurto",
+  prazoResposta: "textoCurto",
+  classificacao: "textoCurto",
+  razaoSocial: "instituicao",
+  titulo: "textoCurto",
+  saudacao: "textoCurto",
+  para: "nomePessoa",
+  cargoPara: "instituicao",
+  assunto: "textoCurto",
+  corpo: "textoCurto",
+  finalizacao: "textoCurto",
+  assinaturaNome: "nomePessoa",
+  assinaturaCargo: "instituicao",
+  rodape: "textoCurto",
+  protocoloEnvio: "textoCurto",
+  protocoloRecebimento: "textoCurto",
+  proximoDestino: "instituicao",
+  observacoes: "textoCurto",
+  origem: "instituicao",
+  destino: "instituicao",
+  acao: "textoCurto"
+};
+
+export const mapaCamposTextoTermoFomento: Record<string, TipoFormatacaoTexto> = {
+  numeroTermo: "textoCurto",
+  tipoTermo: "textoCurto",
+  orgaoConcedente: "instituicao",
+  situacao: "textoCurto",
+  descricaoObjeto: "textoCurto",
+  responsavelInterno: "nomePessoa",
+  nome: "textoCurto",
+  tipo: "textoCurto",
+  tipoAditivo: "textoCurto",
+  observacoes: "textoCurto"
+};
+
+export const mapaCamposTextoPlanoTrabalho: Record<string, TipoFormatacaoTexto> = {
+  codigoInterno: "textoCurto",
+  titulo: "textoCurto",
+  descricaoGeral: "textoCurto",
+  status: "textoCurto",
+  orgaoConcedente: "instituicao",
+  orgaoOutroDescricao: "instituicao",
+  areaPrograma: "textoCurto",
+  numeroProcesso: "textoCurto",
+  modalidade: "textoCurto",
+  observacoesVinculacao: "textoCurto"
+};
+
+export const mapaCamposTextoAutorizacaoCompras: Record<string, TipoFormatacaoTexto> = {
+  titulo: "textoCurto",
+  tipo: "textoCurto",
+  area: "textoCurto",
+  responsavel: "nomePessoa",
+  justificativa: "textoCurto",
+  centroCusto: "textoCurto",
+  prioridade: "textoCurto",
+  status: "textoCurto",
+  aprovador: "nomePessoa",
+  decisao: "textoCurto",
+  observacoesAprovacao: "textoCurto",
+  motivoDispensa: "textoCurto",
+  vencedor: "instituicao",
+  numeroReserva: "textoCurto",
+  numeroTermo: "textoCurto",
+  autorizacaoPagamentoNumero: "textoCurto",
+  autorizacaoPagamentoAutor: "nomePessoa",
+  autorizacaoPagamentoObservacoes: "textoCurto",
+  fornecedor: "instituicao",
+  razaoSocial: "instituicao",
+  conformidade: "textoCurto",
+  observacoes: "textoCurto",
+  autor: "nomePessoa"
+};
+
+export const mapaCamposTextoContabilidade: Record<string, TipoFormatacaoTexto> = {
+  banco: "instituicao",
+  agencia: "textoCurto",
+  numero: "textoCurto",
+  tipo: "textoCurto",
+  projetoVinculado: "textoCurto",
+  tipoChavePix: "textoCurto",
+  descricao: "textoCurto",
+  contraparte: "instituicao",
+  situacao: "textoCurto",
+  categoria: "textoCurto",
+  identificacao: "textoCurto",
+  referenciaLegal: "textoCurto",
+  status: "textoCurto",
+  observacoes: "textoCurto",
+  responsavel: "nomePessoa"
+};
+
+export const mapaCamposTextoPrestacaoContas: Record<string, TipoFormatacaoTexto> = {
+  fonte: "instituicao",
+  periodicidade: "textoCurto",
+  status: "textoCurto",
+  titulo: "textoCurto",
+  descricao: "textoCurto",
+  detalhe: "textoCurto",
+  arquivoNome: "textoCurto",
+  arquivoUrl: "textoCurto"
+};
+
+export const mapaCamposTextoContratacao: Record<string, TipoFormatacaoTexto> = {
+  nomeCompleto: "nomePessoa",
+  naturalidade: "endereco",
+  estadoCivil: "textoCurto",
+  nomeMae: "nomePessoa",
+  nomeConjuge: "nomePessoa",
+  vagaPretendida: "textoCurto",
+  deficienciaTipo: "textoCurto",
+  deficienciaDescricao: "textoCurto",
+  telefone: "textoCurto",
+  whatsapp: "textoCurto",
+  statusProcesso: "textoCurto",
+  status: "textoCurto",
+  tipoRoteiro: "textoCurto",
+  parecer: "textoCurto",
+  observacoes: "textoCurto",
+  tipoDocumento: "textoCurto",
+  observacao: "textoCurto",
+  categoria: "textoCurto",
+  nomeArquivo: "textoCurto",
+  tipo: "textoCurto",
+  statusAssinatura: "textoCurto",
+  responsavel: "nomePessoa"
+};

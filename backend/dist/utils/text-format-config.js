@@ -144,6 +144,9 @@ export const mapaDiretoriaUnidade = {
     nome_completo: "nomePessoa",
     funcao: "instituicao"
 };
+export const mapaSalaUnidade = {
+    nome: "textoCurto"
+};
 export const mapaCamposTextoProfissional = {
     nome_completo: "nomePessoa",
     nome_social: "nomePessoa",
@@ -186,4 +189,267 @@ export const mapaCamposTextoVoluntario = {
     subzona: "textoCurto",
     carga_horaria_semanal: "textoCurto",
     observacoes: "textoCurto"
+};
+export const mapaCamposTextoMatricula = {
+    tipo: "textoCurto",
+    nome: "instituicao",
+    descricao: "textoCurto",
+    sexo_permitido: "textoCurto",
+    restricoes: "textoCurto",
+    profissional: "nomePessoa",
+    instituicao_parceira: "instituicao",
+    beneficiario_nome: "nomePessoa",
+    profissional_nome: "nomePessoa",
+    profissional_tipo: "textoCurto"
+};
+export const mapaCamposTextoDoador = {
+    nome: "nomePessoa",
+    tipo_pessoa: "textoCurto",
+    responsavel_empresa: "nomePessoa",
+    logradouro: "endereco",
+    complemento: "endereco",
+    bairro: "endereco",
+    cidade: "endereco",
+    observacoes: "textoCurto"
+};
+export const mapaCamposTextoRegistroDoacao = {
+    tipo_doacao: "textoCurto",
+    descricao: "textoCurto",
+    forma_recebimento: "textoCurto",
+    periodicidade: "textoCurto",
+    status: "textoCurto",
+    observacoes: "textoCurto",
+    conservacao: "textoCurto"
+};
+export const mapaCamposTextoDoacaoRealizada = {
+    tipo_doacao: "textoCurto",
+    situacao: "textoCurto",
+    responsavel: "nomePessoa",
+    observacoes: "textoCurto"
+};
+export const mapaCamposTextoDoacaoPlanejada = {
+    prioridade: "textoCurto",
+    status: "textoCurto",
+    observacoes: "textoCurto",
+    motivo_cancelamento: "textoCurto"
+};
+export const mapaCamposTextoUsuario = {
+    nome_completo: "nomePessoa",
+    nome_exibicao: "nomePessoa",
+    setor: "instituicao",
+    unidade: "instituicao",
+    cargo: "instituicao"
+};
+export const mapaCamposTextoTarefaAdministrativa = {
+    titulo: "textoCurto",
+    descricao: "textoCurto",
+    responsavel: "nomePessoa",
+    prioridade: "textoCurto",
+    status: "textoCurto"
+};
+export const mapaCamposTextoPatrimonio = {
+    numeroPatrimonio: "textoCurto",
+    nome: "textoCurto",
+    categoria: "textoCurto",
+    subcategoria: "textoCurto",
+    conservacao: "textoCurto",
+    status: "textoCurto",
+    origem: "instituicao",
+    responsavel: "nomePessoa",
+    unidade: "instituicao",
+    sala: "textoCurto",
+    observacoes: "textoCurto",
+    destino: "endereco",
+    observacao: "textoCurto"
+};
+export const mapaCamposTextoControleVeiculos = {
+    placa: "textoCurto",
+    modelo: "instituicao",
+    marca: "instituicao",
+    tipoCombustivel: "textoCurto",
+    observacoes: "textoCurto",
+    condutor: "nomePessoa",
+    destino: "endereco",
+    tipoOrigem: "textoCurto",
+    numeroCarteira: "textoCurto",
+    categoriaCarteira: "textoCurto"
+};
+export const mapaCamposTextoAlmoxarifado = {
+    descricao: "textoCurto",
+    categoria: "textoCurto",
+    unidade: "textoCurto",
+    localizacao: "endereco",
+    localizacao_interna: "endereco",
+    situacao: "textoCurto",
+    observacoes: "textoCurto",
+    tipo: "textoCurto",
+    referencia: "textoCurto",
+    responsavel: "nomePessoa",
+    direcao_ajuste: "textoCurto"
+};
+export const mapaCamposTextoEmprestimosEventos = {
+    titulo: "textoCurto",
+    descricao: "textoCurto",
+    local: "endereco",
+    status: "textoCurto",
+    observacoes: "textoCurto",
+    tipoItem: "textoCurto",
+    statusItem: "textoCurto",
+    observacaoItem: "textoCurto",
+    acao: "textoCurto"
+};
+export const mapaCamposTextoFotosEventos = {
+    titulo: "textoCurto",
+    descricao: "textoCurto",
+    local: "endereco",
+    status: "textoCurto",
+    tags: "textoCurto",
+    legenda: "textoCurto",
+    creditos: "nomePessoa",
+    nomeArquivo: "textoCurto"
+};
+export const mapaCamposTextoDocumentosInstituicao = {
+    tipoDocumento: "textoCurto",
+    orgaoEmissor: "instituicao",
+    descricao: "textoCurto",
+    categoria: "textoCurto",
+    responsavelInterno: "nomePessoa",
+    modoRenovacao: "textoCurto",
+    observacaoRenovacao: "textoCurto",
+    formaAlerta: "textoCurto",
+    nomeArquivo: "textoCurto",
+    tipo: "textoCurto",
+    usuario: "nomePessoa",
+    tipoAlteracao: "textoCurto",
+    observacao: "textoCurto"
+};
+export const mapaCamposTextoOficios = {
+    tipo: "textoCurto",
+    numero: "textoCurto",
+    setorOrigem: "instituicao",
+    responsavel: "nomePessoa",
+    destinatario: "instituicao",
+    destinatarioResponsavel: "nomePessoa",
+    destinatarioCargo: "instituicao",
+    meioEnvio: "textoCurto",
+    prazoResposta: "textoCurto",
+    classificacao: "textoCurto",
+    razaoSocial: "instituicao",
+    titulo: "textoCurto",
+    saudacao: "textoCurto",
+    para: "nomePessoa",
+    cargoPara: "instituicao",
+    assunto: "textoCurto",
+    corpo: "textoCurto",
+    finalizacao: "textoCurto",
+    assinaturaNome: "nomePessoa",
+    assinaturaCargo: "instituicao",
+    rodape: "textoCurto",
+    protocoloEnvio: "textoCurto",
+    protocoloRecebimento: "textoCurto",
+    proximoDestino: "instituicao",
+    observacoes: "textoCurto",
+    origem: "instituicao",
+    destino: "instituicao",
+    acao: "textoCurto"
+};
+export const mapaCamposTextoTermoFomento = {
+    numeroTermo: "textoCurto",
+    tipoTermo: "textoCurto",
+    orgaoConcedente: "instituicao",
+    situacao: "textoCurto",
+    descricaoObjeto: "textoCurto",
+    responsavelInterno: "nomePessoa",
+    nome: "textoCurto",
+    tipo: "textoCurto",
+    tipoAditivo: "textoCurto",
+    observacoes: "textoCurto"
+};
+export const mapaCamposTextoPlanoTrabalho = {
+    codigoInterno: "textoCurto",
+    titulo: "textoCurto",
+    descricaoGeral: "textoCurto",
+    status: "textoCurto",
+    orgaoConcedente: "instituicao",
+    orgaoOutroDescricao: "instituicao",
+    areaPrograma: "textoCurto",
+    numeroProcesso: "textoCurto",
+    modalidade: "textoCurto",
+    observacoesVinculacao: "textoCurto"
+};
+export const mapaCamposTextoAutorizacaoCompras = {
+    titulo: "textoCurto",
+    tipo: "textoCurto",
+    area: "textoCurto",
+    responsavel: "nomePessoa",
+    justificativa: "textoCurto",
+    centroCusto: "textoCurto",
+    prioridade: "textoCurto",
+    status: "textoCurto",
+    aprovador: "nomePessoa",
+    decisao: "textoCurto",
+    observacoesAprovacao: "textoCurto",
+    motivoDispensa: "textoCurto",
+    vencedor: "instituicao",
+    numeroReserva: "textoCurto",
+    numeroTermo: "textoCurto",
+    autorizacaoPagamentoNumero: "textoCurto",
+    autorizacaoPagamentoAutor: "nomePessoa",
+    autorizacaoPagamentoObservacoes: "textoCurto",
+    fornecedor: "instituicao",
+    razaoSocial: "instituicao",
+    conformidade: "textoCurto",
+    observacoes: "textoCurto",
+    autor: "nomePessoa"
+};
+export const mapaCamposTextoContabilidade = {
+    banco: "instituicao",
+    agencia: "textoCurto",
+    numero: "textoCurto",
+    tipo: "textoCurto",
+    projetoVinculado: "textoCurto",
+    tipoChavePix: "textoCurto",
+    descricao: "textoCurto",
+    contraparte: "instituicao",
+    situacao: "textoCurto",
+    categoria: "textoCurto",
+    identificacao: "textoCurto",
+    referenciaLegal: "textoCurto",
+    status: "textoCurto",
+    observacoes: "textoCurto",
+    responsavel: "nomePessoa"
+};
+export const mapaCamposTextoPrestacaoContas = {
+    fonte: "instituicao",
+    periodicidade: "textoCurto",
+    status: "textoCurto",
+    titulo: "textoCurto",
+    descricao: "textoCurto",
+    detalhe: "textoCurto",
+    arquivoNome: "textoCurto",
+    arquivoUrl: "textoCurto"
+};
+export const mapaCamposTextoContratacao = {
+    nomeCompleto: "nomePessoa",
+    naturalidade: "endereco",
+    estadoCivil: "textoCurto",
+    nomeMae: "nomePessoa",
+    nomeConjuge: "nomePessoa",
+    vagaPretendida: "textoCurto",
+    deficienciaTipo: "textoCurto",
+    deficienciaDescricao: "textoCurto",
+    telefone: "textoCurto",
+    whatsapp: "textoCurto",
+    statusProcesso: "textoCurto",
+    status: "textoCurto",
+    tipoRoteiro: "textoCurto",
+    parecer: "textoCurto",
+    observacoes: "textoCurto",
+    tipoDocumento: "textoCurto",
+    observacao: "textoCurto",
+    categoria: "textoCurto",
+    nomeArquivo: "textoCurto",
+    tipo: "textoCurto",
+    statusAssinatura: "textoCurto",
+    responsavel: "nomePessoa"
 };

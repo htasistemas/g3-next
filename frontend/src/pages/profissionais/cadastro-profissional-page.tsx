@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
@@ -84,7 +84,7 @@ type AcaoCrud = {
   icon: LucideIcon;
 };
 
-const disponibilidadesOptions = ["Manhã", "Tarde", "Noite"];
+const disponibilidadesOptions = ["Manhá", "Tarde", "Noite"];
 const canaisAtendimentoOptions = ["Presencial", "Online", "Telefone"];
 const vinculosOptions = ["VOLUNTARIO", "CLT", "PJ", "ESTAGIARIO"];
 const sexoOptions = ["Masculino", "Feminino", "Outro"];
@@ -684,7 +684,7 @@ export function CadastroProfissionalPage() {
 
   return (
     <main className={classesTelaPadraoBeneficiario.container}>
-      <section className={classesTelaPadraoBeneficiario.barraAcoes}>
+      <section className={classesTelaPadraoBeneficiario.barraAcoes} data-print="toolbar">
         <div className={classesTelaPadraoBeneficiario.gradeAcoes}>
           {acoesNaOrdemPadrao.map((acao) => (
             <Button key={acao.label} type="button" variant={acao.variant} size="sm" className={classesTelaPadraoBeneficiario.botaoAcao} onClick={acao.onClick} disabled={bloqueadoAcao || (acao.label === "Excluir" && !idSelecionado)}>
@@ -695,8 +695,8 @@ export function CadastroProfissionalPage() {
         </div>
       </section>
 
-      <div className={classesTelaPadraoBeneficiario.gradePrincipal}>
-        <Card className={classesTelaPadraoBeneficiario.cardAbas}>
+      <div className={classesTelaPadraoBeneficiario.gradePrincipal} data-print="layout-grid">
+        <Card className={classesTelaPadraoBeneficiario.cardAbas} data-print="tabs">
           <CardContent className={classesTelaPadraoBeneficiario.conteudoAbas}>
             {abas.map((aba, indice) => (
               <button key={aba.id} type="button" onClick={() => setAbaAtiva(aba.id)} className={classeBotaoAbaLateral(abaAtiva === aba.id)}>

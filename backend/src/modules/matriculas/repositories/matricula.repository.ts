@@ -444,11 +444,20 @@ export class MatriculaRepository {
 
   async listarBeneficiarios(termo?: string) {
     const termoSanitizado = trimOrUndefined(termo);
-    const termoLike = termoSanitizado ? `%${termoSanitizado}%` : null;
+    const termoLike = termoSanitizado ? `%${termoSanitizado}%` : undefined;
     const termoDigits = termoSanitizado ? normalizeDigits(termoSanitizado) : undefined;
-    const termoCpfLike = termoDigits ? `%${termoDigits}%` : null;
+    const termoCpfLike = termoDigits ? `%${termoDigits}%` : undefined;
     const filtroCpf = termoCpfLike
       ? Prisma.sql`OR regexp_replace(COALESCE(cpf_doc.numero_documento, ''), '\\D', '', 'g') LIKE ${termoCpfLike}`
+      : Prisma.empty;
+    const filtroBusca = termoLike
+      ? Prisma.sql`
+        AND (
+          b.nome_completo ILIKE ${termoLike}
+          OR b.codigo ILIKE ${termoLike}
+          ${filtroCpf}
+        )
+      `
       : Prisma.empty;
 
     return prisma.$queryRaw<
@@ -480,12 +489,8 @@ export class MatriculaRepository {
         ORDER BY d.id DESC
         LIMIT 1
       ) cpf_doc ON TRUE
-      WHERE (
-        ${termoLike} IS NULL
-        OR b.nome_completo ILIKE ${termoLike}
-        OR b.codigo ILIKE ${termoLike}
-        ${filtroCpf}
-      )
+      WHERE 1 = 1
+      ${filtroBusca}
       ORDER BY b.nome_completo ASC
       LIMIT 20
     `);

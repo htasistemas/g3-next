@@ -1,0 +1,728 @@
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  AlertTriangle,
+  Bell,
+  FileStack,
+  FolderOpen,
+  History,
+  Plus,
+  Printer,
+  Save,
+  Search,
+  Trash2,
+  Undo2,
+  Upload,
+  X
+} from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AdminPageLayout, type AdminAction, type AdminTab } from "@/components/admin/admin-page-layout";
+import { PopupConfirmacao, PopupMensagem, type PopupMensagemState } from "@/components/admin/admin-popups";
+import {
+  useAdicionarAnexoDocumentoInstituicao,
+  useAdicionarHistoricoDocumentoInstituicao,
+  useAnexosDocumentoInstituicao,
+  useDocumentosInstituicao,
+  useExcluirDocumentoInstituicao,
+  useHistoricoDocumentoInstituicao,
+  useSalvarDocumentoInstituicao
+} from "@/features/documentos-instituicao/use-documentos-instituicao";
+import { imprimirConteudoAtual } from "@/lib/report-utils";
+import type {
+  DocumentoInstituicao,
+  DocumentoInstituicaoAnexoPayload,
+  DocumentoInstituicaoPayload
+} from "@/types/documentos-instituicao";
+import { useAuth } from "@/hooks/use-auth";
+
+type AbaId = "lista" | "cadastro" | "anexos" | "alertas" | "relatorios";
+
+const abas: AdminTab[] = [
+  { id: "lista", label: "Lista De Documentos", icon: FolderOpen },
+  { id: "cadastro", label: "Cadastro / Edição", icon: FileStack },
+  { id: "anexos", label: "Anexos E Histórico", icon: History },
+  { id: "alertas", label: "Alertas E Vencimentos", icon: AlertTriangle },
+  { id: "relatorios", label: "Relatórios / Dashboard", icon: Bell }
+];
+
+type FormState = DocumentoInstituicaoPayload & { id?: string };
+
+const defaultForm: FormState = {
+  tipoDocumento: "",
+  orgaoEmissor: "",
+  descricao: "",
+  categoria: "Fiscal",
+  emissao: "",
+  validade: "",
+  responsavelInterno: "",
+  modoRenovacao: "Manual",
+  observacaoRenovacao: "",
+  gerarAlerta: true,
+  diasAntecedencia: [30],
+  formaAlerta: "Sistema",
+  emRenovacao: false,
+  semVencimento: false,
+  vencimentoIndeterminado: false
+};
+
+export function GestaoDocumentosPage() {
+  const navigate = useNavigate();
+  const { usuario } = useAuth();
+  const [abaAtiva, setAbaAtiva] = useState<AbaId>("lista");
+  const [busca, setBusca] = useState("");
+  const [form, setForm] = useState<FormState>(defaultForm);
+  const [snapshot, setSnapshot] = useState<FormState>(defaultForm);
+  const [popupMensagem, setPopupMensagem] = useState<PopupMensagemState | null>(null);
+  const [confirmarExcluir, setConfirmarExcluir] = useState(false);
+  const [historicoTexto, setHistoricoTexto] = useState("");
+
+  const { data, isLoading } = useDocumentosInstituicao();
+  const anexosQuery = useAnexosDocumentoInstituicao(form.id);
+  const historicoQuery = useHistoricoDocumentoInstituicao(form.id);
+  const salvarMutation = useSalvarDocumentoInstituicao();
+  const excluirMutation = useExcluirDocumentoInstituicao();
+  const anexoMutation = useAdicionarAnexoDocumentoInstituicao();
+  const historicoMutation = useAdicionarHistoricoDocumentoInstituicao();
+
+  const documentos = data ?? [];
+
+  const documentosFiltrados = useMemo(() => {
+    const termo = busca.trim().toLowerCase();
+    if (!termo) return documentos;
+    return documentos.filter((item) => {
+      const alvo = `${item.tipoDocumento} ${item.orgaoEmissor} ${item.categoria ?? ""} ${item.situacao ?? ""}`;
+      return alvo.toLowerCase().includes(termo);
+    });
+  }, [busca, documentos]);
+
+  const alertas = useMemo(() => {
+    const hoje = new Date();
+    return documentos
+      .filter((item) => !!item.validade)
+      .map((item) => {
+        const validade = new Date(String(item.validade));
+        const diffDias = Math.ceil((validade.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
+        return {
+          ...item,
+          diasParaVencer: diffDias
+        };
+      })
+      .sort((a, b) => a.diasParaVencer - b.diasParaVencer);
+  }, [documentos]);
+
+  const anexos = anexosQuery.data ?? [];
+  const historico = historicoQuery.data ?? [];
+
+  const carregandoAcoes =
+    salvarMutation.isPending ||
+    excluirMutation.isPending ||
+    anexoMutation.isPending ||
+    historicoMutation.isPending;
+
+  function novo() {
+    setForm(defaultForm);
+    setSnapshot(defaultForm);
+    setHistoricoTexto("");
+    setAbaAtiva("cadastro");
+  }
+
+  function selecionar(item: DocumentoInstituicao) {
+    const proximo: FormState = {
+      id: item.id,
+      tipoDocumento: item.tipoDocumento,
+      orgaoEmissor: item.orgaoEmissor,
+      descricao: item.descricao ?? "",
+      categoria: item.categoria ?? "",
+      emissao: item.emissao ?? "",
+      validade: item.validade ?? "",
+      responsavelInterno: item.responsavelInterno ?? "",
+      modoRenovacao: item.modoRenovacao ?? "Manual",
+      observacaoRenovacao: item.observacaoRenovacao ?? "",
+      gerarAlerta: !!item.gerarAlerta,
+      diasAntecedencia: item.diasAntecedencia ?? [30],
+      formaAlerta: item.formaAlerta ?? "Sistema",
+      emRenovacao: !!item.emRenovacao,
+      semVencimento: !!item.semVencimento,
+      vencimentoIndeterminado: !!item.vencimentoIndeterminado
+    };
+    setForm(proximo);
+    setSnapshot(proximo);
+    setAbaAtiva("cadastro");
+  }
+
+  function buscar() {
+    setAbaAtiva("lista");
+  }
+
+  function cancelar() {
+    setForm(snapshot);
+  }
+
+  async function salvar() {
+    if (!form.tipoDocumento.trim() || !form.orgaoEmissor.trim() || !form.emissao) {
+      setPopupMensagem({
+        tipo: "aviso",
+        titulo: "Validação",
+        texto: "Informe tipo, órgão emissor e data de emissão."
+      });
+      return;
+    }
+    try {
+      const payload: FormState = {
+        ...form,
+        tipoDocumento: form.tipoDocumento.trim(),
+        orgaoEmissor: form.orgaoEmissor.trim(),
+        descricao: form.descricao?.trim() || undefined,
+        categoria: form.categoria?.trim() || undefined,
+        validade: form.semVencimento ? undefined : form.validade || undefined,
+        responsavelInterno: form.responsavelInterno?.trim() || undefined,
+        modoRenovacao: form.modoRenovacao?.trim() || undefined,
+        observacaoRenovacao: form.observacaoRenovacao?.trim() || undefined,
+        formaAlerta: form.formaAlerta?.trim() || undefined
+      };
+
+      const response = await salvarMutation.mutateAsync(payload);
+      const proximo = { ...payload, id: response.id };
+      setForm(proximo);
+      setSnapshot(proximo);
+      setPopupMensagem({ tipo: "sucesso", titulo: "Confirmação", texto: "Documento salvo com sucesso." });
+    } catch (error: any) {
+      setPopupMensagem({
+        tipo: "erro",
+        titulo: "Erro",
+        texto: error?.response?.data?.message ?? "Não foi possível salvar o documento."
+      });
+    }
+  }
+
+  function excluir() {
+    if (!form.id) {
+      setPopupMensagem({
+        tipo: "aviso",
+        titulo: "Atenção",
+        texto: "Selecione um documento para excluir."
+      });
+      return;
+    }
+    setConfirmarExcluir(true);
+  }
+
+  async function confirmarExclusao() {
+    if (!form.id) return;
+    try {
+      await excluirMutation.mutateAsync(form.id);
+      setConfirmarExcluir(false);
+      novo();
+      setPopupMensagem({
+        tipo: "sucesso",
+        titulo: "Confirmação",
+        texto: "Documento excluído com sucesso."
+      });
+    } catch (error: any) {
+      setPopupMensagem({
+        tipo: "erro",
+        titulo: "Erro",
+        texto: error?.response?.data?.message ?? "Não foi possível excluir o documento."
+      });
+    }
+  }
+
+  async function subirAnexo(file: File) {
+    if (!form.id) {
+      setPopupMensagem({
+        tipo: "aviso",
+        titulo: "Atenção",
+        texto: "Selecione um documento antes de anexar arquivo."
+      });
+      return;
+    }
+
+    const conteudoBase64 = await file.arrayBuffer().then((buffer) => {
+      const bytes = new Uint8Array(buffer);
+      let binary = "";
+      bytes.forEach((byte) => {
+        binary += String.fromCharCode(byte);
+      });
+      return btoa(binary);
+    });
+
+    const payload: DocumentoInstituicaoAnexoPayload = {
+      nomeArquivo: file.name,
+      tipo: file.type || "arquivo",
+      tipoMime: file.type || "application/octet-stream",
+      conteudoBase64,
+      tamanho: `${Math.round(file.size / 1024)} KB`,
+      dataUpload: new Date().toISOString().slice(0, 10),
+      usuario: usuario?.nomeUsuario ?? "Usuário"
+    };
+
+    try {
+      await anexoMutation.mutateAsync({ id: form.id, payload });
+      setPopupMensagem({
+        tipo: "sucesso",
+        titulo: "Confirmação",
+        texto: "Anexo enviado com sucesso."
+      });
+    } catch (error: any) {
+      setPopupMensagem({
+        tipo: "erro",
+        titulo: "Erro",
+        texto: error?.response?.data?.message ?? "Não foi possível enviar o anexo."
+      });
+    }
+  }
+
+  async function adicionarHistorico() {
+    if (!form.id) {
+      setPopupMensagem({
+        tipo: "aviso",
+        titulo: "Atenção",
+        texto: "Selecione um documento antes de registrar histórico."
+      });
+      return;
+    }
+    if (!historicoTexto.trim()) {
+      setPopupMensagem({
+        tipo: "aviso",
+        titulo: "Validação",
+        texto: "Informe a descrição do histórico."
+      });
+      return;
+    }
+
+    try {
+      await historicoMutation.mutateAsync({
+        id: form.id,
+        payload: {
+          usuario: usuario?.nomeUsuario ?? "Usuário",
+          tipoAlteracao: "Atualização",
+          observacao: historicoTexto.trim(),
+          dataHora: new Date().toISOString()
+        }
+      });
+      setHistoricoTexto("");
+      setPopupMensagem({
+        tipo: "sucesso",
+        titulo: "Confirmação",
+        texto: "Histórico registrado com sucesso."
+      });
+    } catch (error: any) {
+      setPopupMensagem({
+        tipo: "erro",
+        titulo: "Erro",
+        texto: error?.response?.data?.message ?? "Não foi possível registrar o histórico."
+      });
+    }
+  }
+
+  function imprimir() {
+    try {
+      imprimirConteudoAtual({ titulo: "Relatório de documentos" });
+    } catch (error: any) {
+      setPopupMensagem({
+        tipo: "erro",
+        titulo: "Erro",
+        texto: error?.message ?? "Não foi possível preparar a impressão."
+      });
+    }
+  }
+
+  function fechar() {
+    navigate("/dashboard/visao-geral");
+  }
+
+  const acoes: AdminAction[] = [
+    { label: "Buscar", icon: Search, onClick: buscar, variant: "outline" },
+    { label: "Novo", icon: Plus, onClick: novo, variant: "default", disabled: carregandoAcoes },
+    { label: "Salvar", icon: Save, onClick: () => void salvar(), variant: "default", disabled: carregandoAcoes },
+    { label: "Cancelar", icon: Undo2, onClick: cancelar, variant: "outline", disabled: carregandoAcoes },
+    { label: "Excluir", icon: Trash2, onClick: excluir, variant: "danger", disabled: carregandoAcoes },
+    { label: "Imprimir", icon: Printer, onClick: imprimir, variant: "outline", disabled: carregandoAcoes },
+    { label: "Fechar", icon: X, onClick: fechar, variant: "outline" }
+  ];
+
+  return (
+    <>
+      <AdminPageLayout
+        tabs={abas}
+        activeTab={abaAtiva}
+        onChangeTab={(tabId) => setAbaAtiva(tabId as AbaId)}
+        actions={acoes}
+        activeTitle={abas.find((item) => item.id === abaAtiva)?.label}
+        codeBadge={form.id ? `Código: ${form.id}` : "Novo"}
+      >
+        {abaAtiva === "lista" ? (
+          <section className="space-y-3">
+            <div className="space-y-1">
+              <Label>Buscar Documento</Label>
+              <Input
+                placeholder="Tipo, órgão emissor, categoria ou situação"
+                value={busca}
+                onChange={(event) => setBusca(event.target.value)}
+              />
+            </div>
+
+            <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]">
+              <table className="min-w-full text-sm">
+                <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Tipo</th>
+                    <th className="px-3 py-2 text-left">órgão Emissor</th>
+                    <th className="px-3 py-2 text-left">Emissão</th>
+                    <th className="px-3 py-2 text-left">Validade</th>
+                    <th className="px-3 py-2 text-left">Situação</th>
+                    <th className="px-3 py-2 text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {isLoading ? (
+                    <tr>
+                      <td colSpan={6} className="px-3 py-4 text-center">
+                        Carregando documentos...
+                      </td>
+                    </tr>
+                  ) : documentosFiltrados.length ? (
+                    documentosFiltrados.map((item, index) => (
+                      <tr
+                        key={item.id}
+                        className={`border-t border-[var(--g3-border)] ${
+                          index % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35"
+                        }`}
+                      >
+                        <td className="px-3 py-2 font-medium">{item.tipoDocumento}</td>
+                        <td className="px-3 py-2">{item.orgaoEmissor}</td>
+                        <td className="px-3 py-2">{item.emissao ?? "---"}</td>
+                        <td className="px-3 py-2">{item.validade ?? "---"}</td>
+                        <td className="px-3 py-2">{item.situacao ?? "---"}</td>
+                        <td className="px-3 py-2 text-right">
+                          <Button variant="outline" size="sm" onClick={() => selecionar(item)}>
+                            Selecionar
+                          </Button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={6} className="px-3 py-4 text-center">
+                        Nenhum documento encontrado.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        ) : null}
+
+        {abaAtiva === "cadastro" ? (
+          <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="space-y-1">
+              <Label>Tipo De Documento *</Label>
+              <Input
+                value={form.tipoDocumento}
+                onChange={(event) =>
+                  setForm((atual) => ({ ...atual, tipoDocumento: event.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>órgão Emissor *</Label>
+              <Input
+                value={form.orgaoEmissor}
+                onChange={(event) =>
+                  setForm((atual) => ({ ...atual, orgaoEmissor: event.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Categoria</Label>
+              <Input
+                value={form.categoria ?? ""}
+                onChange={(event) => setForm((atual) => ({ ...atual, categoria: event.target.value }))}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Responsável Interno</Label>
+              <Input
+                value={form.responsavelInterno ?? ""}
+                onChange={(event) =>
+                  setForm((atual) => ({ ...atual, responsavelInterno: event.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Data De Emissão *</Label>
+              <Input
+                type="date"
+                value={form.emissao}
+                onChange={(event) => setForm((atual) => ({ ...atual, emissao: event.target.value }))}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Validade</Label>
+              <Input
+                type="date"
+                disabled={!!form.semVencimento}
+                value={form.validade ?? ""}
+                onChange={(event) => setForm((atual) => ({ ...atual, validade: event.target.value }))}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Modo De Renovação</Label>
+              <Select
+                value={form.modoRenovacao ?? "Manual"}
+                onChange={(event) =>
+                  setForm((atual) => ({ ...atual, modoRenovacao: event.target.value }))
+                }
+              >
+                <option value="Manual">Manual</option>
+                <option value="Automática">Automática</option>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Forma De Alerta</Label>
+              <Select
+                value={form.formaAlerta ?? "Sistema"}
+                onChange={(event) =>
+                  setForm((atual) => ({ ...atual, formaAlerta: event.target.value }))
+                }
+              >
+                <option value="Sistema">Sistema</option>
+                <option value="E-mail">E-mail</option>
+                <option value="WhatsApp">WhatsApp</option>
+              </Select>
+            </div>
+            <label className="inline-flex items-center gap-2 text-sm md:col-span-2">
+              <input
+                type="checkbox"
+                checked={!!form.gerarAlerta}
+                onChange={(event) =>
+                  setForm((atual) => ({ ...atual, gerarAlerta: event.target.checked }))
+                }
+              />
+              Gerar Alerta
+            </label>
+            <label className="inline-flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={!!form.semVencimento}
+                onChange={(event) =>
+                  setForm((atual) => ({
+                    ...atual,
+                    semVencimento: event.target.checked,
+                    validade: event.target.checked ? "" : atual.validade
+                  }))
+                }
+              />
+              Sem Vencimento
+            </label>
+            <label className="inline-flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={!!form.emRenovacao}
+                onChange={(event) =>
+                  setForm((atual) => ({ ...atual, emRenovacao: event.target.checked }))
+                }
+              />
+              Em Renovação
+            </label>
+            <div className="space-y-1 md:col-span-2 xl:col-span-4">
+              <Label>Descrição</Label>
+              <Textarea
+                rows={3}
+                value={form.descricao ?? ""}
+                onChange={(event) => setForm((atual) => ({ ...atual, descricao: event.target.value }))}
+              />
+            </div>
+            <div className="space-y-1 md:col-span-2 xl:col-span-4">
+              <Label>Observação De Renovação</Label>
+              <Textarea
+                rows={2}
+                value={form.observacaoRenovacao ?? ""}
+                onChange={(event) =>
+                  setForm((atual) => ({ ...atual, observacaoRenovacao: event.target.value }))
+                }
+              />
+            </div>
+          </section>
+        ) : null}
+
+        {abaAtiva === "anexos" ? (
+          <section className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                id="arquivoDocumento"
+                type="file"
+                className="hidden"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) {
+                    void subirAnexo(file);
+                  }
+                  event.target.value = "";
+                }}
+              />
+              <Button
+                variant="outline"
+                onClick={() => document.getElementById("arquivoDocumento")?.click()}
+                disabled={!form.id}
+              >
+                <Upload className="mr-1 h-3.5 w-3.5" />
+                Enviar Anexo
+              </Button>
+              <span className="text-sm text-[var(--g3-muted)]">
+                Documento selecionado: {form.id ? form.tipoDocumento : "Nenhum"}
+              </span>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <Card className="border-[var(--g3-border)]">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Anexos</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {anexos.length ? (
+                    anexos.map((item) => (
+                      <article
+                        key={item.id}
+                        className="rounded-md border border-[var(--g3-border)] bg-[var(--g3-card)] p-2 text-sm"
+                      >
+                        <p className="font-semibold">{item.nomeArquivo}</p>
+                        <p className="text-xs text-[var(--g3-muted)]">
+                          {item.tipoMime ?? item.tipo} - {item.tamanho ?? "---"}
+                        </p>
+                      </article>
+                    ))
+                  ) : (
+                    <p className="text-sm text-[var(--g3-muted)]">Nenhum anexo encontrado.</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="border-[var(--g3-border)]">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Histórico</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Input
+                      placeholder="Descreva a atualização realizada"
+                      value={historicoTexto}
+                      onChange={(event) => setHistoricoTexto(event.target.value)}
+                    />
+                    <Button onClick={() => void adicionarHistorico()} disabled={!form.id}>
+                      Adicionar
+                    </Button>
+                  </div>
+                  <div className="max-h-52 space-y-1 overflow-y-auto">
+                    {historico.length ? (
+                      historico.map((item) => (
+                        <article
+                          key={item.id}
+                          className="rounded-md border border-[var(--g3-border)] bg-[var(--g3-card)] p-2 text-xs"
+                        >
+                          <p className="font-semibold">{item.tipoAlteracao}</p>
+                          <p>{item.observacao ?? "---"}</p>
+                          <p className="text-[var(--g3-muted)]">
+                            {item.usuario} - {item.dataHora}
+                          </p>
+                        </article>
+                      ))
+                    ) : (
+                      <p className="text-sm text-[var(--g3-muted)]">Nenhum histórico registrado.</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </section>
+        ) : null}
+
+        {abaAtiva === "alertas" ? (
+          <section className="space-y-3">
+            <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]">
+              <table className="min-w-full text-sm">
+                <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Documento</th>
+                    <th className="px-3 py-2 text-left">Validade</th>
+                    <th className="px-3 py-2 text-left">Dias Para Vencer</th>
+                    <th className="px-3 py-2 text-left">Situação</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {alertas.length ? (
+                    alertas.map((item, index) => (
+                      <tr
+                        key={item.id}
+                        className={`border-t border-[var(--g3-border)] ${
+                          index % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35"
+                        }`}
+                      >
+                        <td className="px-3 py-2 font-medium">{item.tipoDocumento}</td>
+                        <td className="px-3 py-2">{item.validade ?? "---"}</td>
+                        <td className="px-3 py-2">{item.diasParaVencer}</td>
+                        <td className="px-3 py-2">{item.situacao ?? "---"}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={4} className="px-3 py-4 text-center">
+                        Nenhum alerta de vencimento encontrado.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        ) : null}
+
+        {abaAtiva === "relatorios" ? (
+          <section className="grid gap-3 md:grid-cols-3">
+            <Card className="border-[var(--g3-border)]">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Total De Documentos</CardTitle>
+              </CardHeader>
+              <CardContent className="text-3xl font-semibold text-[var(--g3-active)]">
+                {documentos.length}
+              </CardContent>
+            </Card>
+            <Card className="border-[var(--g3-border)]">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Em Renovação</CardTitle>
+              </CardHeader>
+              <CardContent className="text-3xl font-semibold text-amber-600">
+                {documentos.filter((item) => item.emRenovacao).length}
+              </CardContent>
+            </Card>
+            <Card className="border-[var(--g3-border)]">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Vencidos</CardTitle>
+              </CardHeader>
+              <CardContent className="text-3xl font-semibold text-[var(--g3-danger)]">
+                {documentos.filter((item) => item.situacao === "vencido").length}
+              </CardContent>
+            </Card>
+          </section>
+        ) : null}
+      </AdminPageLayout>
+
+      {popupMensagem ? <PopupMensagem popup={popupMensagem} onClose={() => setPopupMensagem(null)} /> : null}
+      <PopupConfirmacao
+        aberto={confirmarExcluir}
+        titulo="Confirmar Exclusão"
+        texto="Esta ação é irreversível. Deseja continuar?"
+        processando={excluirMutation.isPending}
+        onCancel={() => setConfirmarExcluir(false)}
+        onConfirm={() => void confirmarExclusao()}
+        confirmarTexto="Excluir"
+      />
+    </>
+  );
+}

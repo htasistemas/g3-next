@@ -12,6 +12,13 @@ const beneficiarioInclude = {
     beneficios: { orderBy: { atualizadoEm: "desc" }, take: 1 },
     observacoes: { orderBy: { atualizadoEm: "desc" }, take: 1 }
 };
+const sqlCidadeNormalizada = Prisma.raw("translate(lower(trim(coalesce(cidade, ''))), 'áàãâäéèêëíìîïóòõôöúùûüç', 'aaaaaeeeeiiiiooooouuuuc')");
+const sqlBairroNormalizado = Prisma.raw("translate(lower(trim(coalesce(bairro, ''))), 'áàãâäéèêëíìîïóòõôöúùûüç', 'aaaaaeeeeiiiiooooouuuuc')");
+const caracteresAcentuadosNormalizacao = "\u00E1\u00E0\u00E3\u00E2\u00E4\u00E9\u00E8\u00EA\u00EB\u00ED\u00EC\u00EE\u00EF\u00F3\u00F2\u00F5\u00F4\u00F6\u00FA\u00F9\u00FB\u00FC\u00E7";
+const sqlCidadeNormalizadaBusca = Prisma.raw(`translate(lower(trim(coalesce(cidade, ''))), '${caracteresAcentuadosNormalizacao}', 'aaaaaeeeeiiiiooooouuuuc')`);
+const sqlBairroNormalizadoBusca = Prisma.raw(`translate(lower(trim(coalesce(bairro, ''))), '${caracteresAcentuadosNormalizacao}', 'aaaaaeeeeiiiiooooouuuuc')`);
+const sqlNomeCompletoNormalizadoBusca = Prisma.raw(`translate(lower(trim(coalesce(nome_completo, ''))), '${caracteresAcentuadosNormalizacao}', 'aaaaaeeeeiiiiooooouuuuc')`);
+const sqlNomeMaeNormalizadoBusca = Prisma.raw(`translate(lower(trim(coalesce(nome_mae, ''))), '${caracteresAcentuadosNormalizacao}', 'aaaaaeeeeiiiiooooouuuuc')`);
 function hasAnyAddressData(input) {
     return !!(trimOrUndefined(input.cep) ||
         trimOrUndefined(input.logradouro) ||
@@ -33,6 +40,15 @@ function parseDecimal(value) {
     catch {
         return undefined;
     }
+}
+function normalizarTextoBusca(value) {
+    const texto = trimOrUndefined(value);
+    if (!texto)
+        return undefined;
+    return texto
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase();
 }
 function buildCodigoVariants(value) {
     if (!value)
@@ -130,6 +146,96 @@ export class BeneficiarioRepository {
     }
     async obterProximoCodigo() {
         return obterProximoCodigoTransacao(prisma);
+    }
+    async buscarDuplicidadeCadastro(input, idIgnorado) {
+        const nomeCompleto = normalizarTextoBusca(input.nome_completo);
+        const nomeMae = normalizarTextoBusca(input.nome_mae);
+        const dataNascimento = toOptionalDate(input.data_nascimento);
+        const cpf = normalizeDigits(input.cpf);
+        if (!nomeCompleto || !nomeMae || !dataNascimento) {
+            return null;
+        }
+        const filtroIdIgnorado = typeof idIgnorado === "bigint" ? Prisma.sql `AND b.id <> ${idIgnorado}` : Prisma.empty;
+        const duplicadosPorDados = await prisma.$queryRaw(Prisma.sql `
+      SELECT
+        b.id,
+        b.codigo,
+        b.nome_completo,
+        (
+          SELECT regexp_replace(coalesce(d.numero_documento, ''), '[^0-9]', '', 'g')
+          FROM documentos d
+          WHERE d.beneficiario_id = b.id
+            AND upper(coalesce(d.tipo_documento, '')) = 'CPF'
+          ORDER BY d.id DESC
+          LIMIT 1
+        ) AS cpf
+      FROM cadastro_beneficiario b
+      WHERE b.data_nascimento = ${dataNascimento}
+        AND ${sqlNomeCompletoNormalizadoBusca} = ${nomeCompleto}
+        AND ${sqlNomeMaeNormalizadoBusca} = ${nomeMae}
+        ${filtroIdIgnorado}
+      LIMIT 1
+    `);
+        if (duplicadosPorDados[0]) {
+            return duplicadosPorDados[0];
+        }
+        if (!cpf) {
+            return null;
+        }
+        const duplicadosPorCpf = await prisma.$queryRaw(Prisma.sql `
+      SELECT
+        b.id,
+        b.codigo,
+        b.nome_completo,
+        ${cpf} AS cpf
+      FROM cadastro_beneficiario b
+      WHERE EXISTS (
+        SELECT 1
+        FROM documentos d
+        WHERE d.beneficiario_id = b.id
+          AND upper(coalesce(d.tipo_documento, '')) = 'CPF'
+          AND regexp_replace(coalesce(d.numero_documento, ''), '[^0-9]', '', 'g') = ${cpf}
+      )
+      ${filtroIdIgnorado}
+      LIMIT 1
+    `);
+        return duplicadosPorCpf[0] ?? null;
+    }
+    async buscarSugestaoEndereco(filters) {
+        const municipio = normalizarTextoBusca(filters.municipio);
+        if (!municipio) {
+            return null;
+        }
+        const bairro = normalizarTextoBusca(filters.bairro);
+        const buscarCombinacao = async (filtrarPorBairro) => {
+            const rows = await prisma.$queryRaw(Prisma.sql `
+        SELECT
+          NULLIF(TRIM(zona), '') AS zona,
+          NULLIF(TRIM(subzona), '') AS subzona,
+          COUNT(*)::integer AS total
+        FROM endereco
+        WHERE ${sqlCidadeNormalizadaBusca} = ${municipio}
+          AND (
+            COALESCE(TRIM(zona), '') <> ''
+            OR COALESCE(TRIM(subzona), '') <> ''
+          )
+          ${filtrarPorBairro && bairro
+                ? Prisma.sql `AND ${sqlBairroNormalizadoBusca} = ${bairro}`
+                : Prisma.empty}
+        GROUP BY 1, 2
+        ORDER BY COUNT(*) DESC, zona NULLS LAST, subzona NULLS LAST
+        LIMIT 1
+      `);
+            const sugestao = rows[0];
+            if (!sugestao?.zona && !sugestao?.subzona) {
+                return null;
+            }
+            return {
+                zona: sugestao.zona ?? undefined,
+                subzona: sugestao.subzona ?? undefined
+            };
+        };
+        return (await buscarCombinacao(true)) ?? (await buscarCombinacao(false));
     }
     async criar(input) {
         return prisma.$transaction(async (tx) => {
@@ -434,14 +540,25 @@ export class BeneficiarioRepository {
             });
         }
         for (const doc of input.documentos_obrigatorios ?? []) {
+            const contentType = trimOrUndefined(doc.contentType);
+            const caminhoArquivoInformado = trimOrUndefined(doc.caminhoArquivo);
+            const conteudoInformado = trimOrUndefined(doc.conteudo);
+            const caminhoArquivo = caminhoArquivoInformado ??
+                (conteudoInformado
+                    ? conteudoInformado.startsWith("data:")
+                        ? conteudoInformado
+                        : contentType
+                            ? `data:${contentType};base64,${conteudoInformado}`
+                            : conteudoInformado
+                    : undefined);
             documentos.push({
                 beneficiarioId,
                 tipoDocumento: "ANEXO",
                 nomeDocumento: trimOrUndefined(doc.nome),
                 numeroDocumento: trimOrUndefined(doc.numeroDocumento),
                 nomeArquivo: trimOrUndefined(doc.nomeArquivo),
-                caminhoArquivo: trimOrUndefined(doc.caminhoArquivo),
-                contentType: trimOrUndefined(doc.contentType),
+                caminhoArquivo,
+                contentType,
                 obrigatorio: doc.ignorado ? false : (doc.obrigatorio ?? true),
                 criadoEm: now,
                 atualizadoEm: now

@@ -252,7 +252,16 @@ export class RegistroDoacaoRepository {
 
   async listarDoadores(termo?: string) {
     const termoSanitizado = trimOrUndefined(termo);
-    const like = termoSanitizado ? `%${termoSanitizado}%` : null;
+    const like = termoSanitizado ? `%${termoSanitizado}%` : undefined;
+    const filtroBusca = like
+      ? Prisma.sql`
+        AND (
+          nome ILIKE ${like}
+          OR documento ILIKE ${like}
+          OR email ILIKE ${like}
+        )
+      `
+      : Prisma.empty;
 
     return prisma.$queryRaw<DoadorRow[]>(Prisma.sql`
       SELECT
@@ -274,12 +283,8 @@ export class RegistroDoacaoRepository {
         criado_em,
         atualizado_em
       FROM doador
-      WHERE (
-        ${like} IS NULL
-        OR nome ILIKE ${like}
-        OR documento ILIKE ${like}
-        OR email ILIKE ${like}
-      )
+      WHERE 1 = 1
+      ${filtroBusca}
       ORDER BY nome ASC
     `);
   }

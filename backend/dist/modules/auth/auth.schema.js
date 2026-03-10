@@ -6,3 +6,6 @@ export const authLoginSchema = z.object({
 export const authGoogleSchema = z.object({
     idToken: z.string().trim().min(1, "Token Google obrigatorio.")
 });
+export const authEsqueciSenhaSchema = z.object({
+    email: z.string().trim().email("Informe um email valido.")
+});

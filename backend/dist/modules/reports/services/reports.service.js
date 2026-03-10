@@ -1,14 +1,20 @@
 import { BeneficiarioService } from "../../beneficiarios/services/beneficiario.service.js";
 import { ProfissionalService } from "../../profissionais/services/profissional.service.js";
+import { MatriculaService } from "../../matriculas/services/matricula.service.js";
+import { RegistroDoacaoService } from "../../registro-doacao/services/registro-doacao.service.js";
+import { DoacaoRealizadaService } from "../../doacoes-realizadas/services/doacao-realizada.service.js";
 import { UnidadeAssistencialService } from "../../unidades-assistenciais/services/unidade-assistencial.service.js";
 import { VoluntarioService } from "../../voluntarios/services/voluntario.service.js";
 import { ReportsRepository } from "../repositories/reports.repository.js";
 import { RelatorioTemplatePadrao } from "../templates/relatorio-template-padrao.js";
 import { HtmlPdfRenderer } from "./html-pdf-renderer.js";
-import { beneficiarioFichaRequestSchema, beneficiarioRelacaoRequestSchema, profissionalFichaRequestSchema, profissionalRelacaoRequestSchema, termoAutorizacaoRequestSchema, unidadeAssistencialRelacaoRequestSchema, voluntarioFichaRequestSchema, voluntarioRelacaoRequestSchema } from "../reports.schema.js";
+import { beneficiarioFichaRequestSchema, beneficiarioRelacaoRequestSchema, comprovanteMatriculaRequestSchema, comprovantePreMatriculaEsperaRequestSchema, doacaoRealizadaRelacaoRequestSchema, matriculasRelacaoRequestSchema, profissionalFichaRequestSchema, profissionalRelacaoRequestSchema, registroDoacaoRelacaoRequestSchema, termoAutorizacaoRequestSchema, unidadeAssistencialRelacaoRequestSchema, voluntarioFichaRequestSchema, voluntarioRelacaoRequestSchema } from "../reports.schema.js";
 export class ReportsService {
     beneficiarioService = new BeneficiarioService();
     profissionalService = new ProfissionalService();
+    matriculaService = new MatriculaService();
+    registroDoacaoService = new RegistroDoacaoService();
+    doacaoRealizadaService = new DoacaoRealizadaService();
     unidadeAssistencialService = new UnidadeAssistencialService();
     voluntarioService = new VoluntarioService();
     repository = new ReportsRepository();
@@ -410,6 +416,7 @@ export class ReportsService {
             titulo: "Ficha Cadastral de Beneficiário",
             metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),
             fotoUrl: beneficiario.foto_3x4,
+            fotoAjuste: "contain",
             blocos: this.montarBlocosFichaBeneficiario(beneficiario),
             cabecalho: contexto.cabecalho,
             rodape: contexto.rodape
@@ -512,6 +519,233 @@ export class ReportsService {
         const html = this.template.montarHtml(relatorioInput);
         const pdf = await this.renderer.render(html, contexto.rodape, relatorioInput);
         return { html, pdf, filename: "relacao-voluntarios.pdf" };
+    }
+    async gerarRelacaoMatriculas(rawPayload) {
+        const payload = matriculasRelacaoRequestSchema.parse(rawPayload);
+        const matriculas = await this.matriculaService.listar({
+            nome: payload.nome,
+            tipo: payload.tipo,
+            status: payload.status,
+            profissional: payload.profissional,
+            beneficiario: payload.beneficiario
+        });
+        const listaOrdenada = [...matriculas].sort((a, b) => (a.nome || "").toLowerCase().localeCompare((b.nome || "").toLowerCase()));
+        const contexto = await this.montarContextoInstitucional();
+        const relatorioInput = {
+            titulo: "Relacao de Matriculas",
+            metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),
+            descricao: "Relacao de cursos, atendimentos e oficinas com indicadores de matriculas.",
+            tabela: {
+                colunas: [
+                    { titulo: "Tipo", largura: "12%" },
+                    { titulo: "Nome", largura: "28%" },
+                    { titulo: "Status", largura: "12%" },
+                    { titulo: "Vagas", largura: "10%" },
+                    { titulo: "Inscritos", largura: "10%" },
+                    { titulo: "Fila", largura: "8%" },
+                    { titulo: "Profissional", largura: "20%" }
+                ],
+                linhas: listaOrdenada.map((item) => [
+                    item.tipo || "---",
+                    item.nome || "---",
+                    this.formatarStatus(item.status),
+                    `${item.vagas_disponiveis ?? 0}/${item.vagas_totais ?? 0}`,
+                    String(item.total_matriculas ?? 0),
+                    String(item.total_fila_espera ?? 0),
+                    item.profissional || "---"
+                ])
+            },
+            cabecalho: contexto.cabecalho,
+            rodape: contexto.rodape
+        };
+        const html = this.template.montarHtml(relatorioInput);
+        const pdf = await this.renderer.render(html, contexto.rodape, relatorioInput);
+        return { html, pdf, filename: "relacao-matriculas.pdf" };
+    }
+    async gerarComprovanteMatricula(rawPayload) {
+        const payload = comprovanteMatriculaRequestSchema.parse(rawPayload);
+        const contexto = await this.montarContextoInstitucional();
+        const relatorioInput = {
+            titulo: "Comprovante de Matricula",
+            metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),
+            descricao: "Este comprovante confirma a matricula do beneficiario no curso/atendimento informado.",
+            blocos: [
+                {
+                    titulo: "Dados do beneficiario",
+                    colunas: 2,
+                    destaque: true,
+                    campos: [
+                        this.campo("Nome completo", payload.beneficiarioNome),
+                        this.campo("CPF", payload.cpf),
+                        this.campo("Telefone", payload.telefone),
+                        this.campo("Data da matricula", this.formatarData(payload.dataRegistro))
+                    ]
+                },
+                {
+                    titulo: "Dados da matricula",
+                    colunas: 3,
+                    campos: [
+                        this.campo("Curso/atendimento", payload.cursoNome),
+                        this.campo("Tipo", payload.cursoTipo),
+                        this.campo("Status", this.formatarStatus(payload.cursoStatus)),
+                        this.campo("Profissional responsavel", payload.cursoProfissional),
+                        this.campo("Sala", payload.cursoSala),
+                        this.campo("Horario", payload.cursoHorario),
+                        this.campo("Dias", payload.cursoDias),
+                        this.campo("Periodo", payload.cursoPeriodo),
+                        this.campo("Instituicao parceira", payload.cursoInstituicao)
+                    ]
+                }
+            ],
+            cabecalho: contexto.cabecalho,
+            rodape: contexto.rodape
+        };
+        const html = this.template.montarHtml(relatorioInput);
+        const pdf = await this.renderer.render(html, contexto.rodape, relatorioInput);
+        return { html, pdf, filename: "comprovante-matricula.pdf" };
+    }
+    async gerarComprovantePreMatriculaEspera(rawPayload) {
+        const payload = comprovantePreMatriculaEsperaRequestSchema.parse(rawPayload);
+        const contexto = await this.montarContextoInstitucional();
+        const relatorioInput = {
+            titulo: "Comprovante de Pre-Matricula em Lista de Espera",
+            metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),
+            descricao: "Este comprovante confirma o cadastro do beneficiario na lista de espera para futura matricula.",
+            blocos: [
+                {
+                    titulo: "Dados do beneficiario",
+                    colunas: 2,
+                    destaque: true,
+                    campos: [
+                        this.campo("Nome completo", payload.beneficiarioNome),
+                        this.campo("CPF", payload.cpf),
+                        this.campo("Telefone", payload.telefone),
+                        this.campo("Data de entrada na fila", this.formatarData(payload.dataEntradaFila)),
+                        this.campo("Posicao atual na fila", payload.posicaoFila)
+                    ]
+                },
+                {
+                    titulo: "Curso/atendimento de referencia",
+                    colunas: 3,
+                    campos: [
+                        this.campo("Curso/atendimento", payload.cursoNome),
+                        this.campo("Tipo", payload.cursoTipo),
+                        this.campo("Status", this.formatarStatus(payload.cursoStatus)),
+                        this.campo("Profissional responsavel", payload.cursoProfissional),
+                        this.campo("Sala", payload.cursoSala),
+                        this.campo("Horario", payload.cursoHorario),
+                        this.campo("Dias", payload.cursoDias),
+                        this.campo("Periodo", payload.cursoPeriodo),
+                        this.campo("Instituicao parceira", payload.cursoInstituicao)
+                    ]
+                }
+            ],
+            cabecalho: contexto.cabecalho,
+            rodape: contexto.rodape
+        };
+        const html = this.template.montarHtml(relatorioInput);
+        const pdf = await this.renderer.render(html, contexto.rodape, relatorioInput);
+        return { html, pdf, filename: "comprovante-pre-matricula-lista-espera.pdf" };
+    }
+    async gerarRelacaoRegistroDoacao(rawPayload) {
+        const payload = registroDoacaoRelacaoRequestSchema.parse(rawPayload);
+        const registros = await this.registroDoacaoService.listar({
+            doador_nome: payload.doador_nome,
+            tipo_doacao: payload.tipo_doacao,
+            status: payload.status,
+            data_inicial: payload.data_inicial,
+            data_final: payload.data_final
+        });
+        const listaOrdenada = [...registros].sort((a, b) => {
+            const dataA = a.data_recebimento || "";
+            const dataB = b.data_recebimento || "";
+            return dataB.localeCompare(dataA);
+        });
+        const contexto = await this.montarContextoInstitucional();
+        const relatorioInput = {
+            titulo: "Relacao de Registro de Doacao",
+            metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),
+            descricao: "Relacao de recebimentos de doacoes cadastrados no sistema G3-Next.",
+            tabela: {
+                colunas: [
+                    { titulo: "Data", largura: "12%" },
+                    { titulo: "Doador", largura: "24%" },
+                    { titulo: "Tipo", largura: "16%" },
+                    { titulo: "Status", largura: "12%" },
+                    { titulo: "Valor", largura: "12%" },
+                    { titulo: "Itens", largura: "8%" },
+                    { titulo: "Recorrente", largura: "8%" },
+                    { titulo: "Forma", largura: "8%" }
+                ],
+                linhas: listaOrdenada.map((item) => [
+                    this.formatarData(item.data_recebimento),
+                    item.doador_nome || "---",
+                    item.tipo_doacao || "---",
+                    this.formatarStatus(item.status),
+                    item.valor_total?.toLocaleString("pt-BR", {
+                        style: "currency",
+                        currency: "BRL"
+                    }) ??
+                        item.valor?.toLocaleString("pt-BR", {
+                            style: "currency",
+                            currency: "BRL"
+                        }) ??
+                        "---",
+                    String(item.quantidade_itens ?? item.itens?.length ?? 0),
+                    item.recorrente ? "Sim" : "Nao",
+                    item.forma_recebimento || "---"
+                ])
+            },
+            cabecalho: contexto.cabecalho,
+            rodape: contexto.rodape
+        };
+        const html = this.template.montarHtml(relatorioInput);
+        const pdf = await this.renderer.render(html, contexto.rodape, relatorioInput);
+        return { html, pdf, filename: "relacao-registro-doacao.pdf" };
+    }
+    async gerarRelacaoDoacoesRealizadas(rawPayload) {
+        const payload = doacaoRealizadaRelacaoRequestSchema.parse(rawPayload);
+        const doacoes = await this.doacaoRealizadaService.listar({
+            beneficiario_nome: payload.beneficiario_nome,
+            tipo_doacao: payload.tipo_doacao,
+            situacao: payload.situacao,
+            data_inicial: payload.data_inicial,
+            data_final: payload.data_final
+        });
+        const listaOrdenada = [...doacoes].sort((a, b) => {
+            const dataA = a.data_doacao || "";
+            const dataB = b.data_doacao || "";
+            return dataB.localeCompare(dataA);
+        });
+        const contexto = await this.montarContextoInstitucional();
+        const relatorioInput = {
+            titulo: "Relacao de Doacoes Realizadas",
+            metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),
+            descricao: "Relacao de doacoes entregues a beneficiarios e familias.",
+            tabela: {
+                colunas: [
+                    { titulo: "Data", largura: "12%" },
+                    { titulo: "Beneficiario/Familia", largura: "28%" },
+                    { titulo: "Tipo", largura: "16%" },
+                    { titulo: "Situacao", largura: "12%" },
+                    { titulo: "Responsavel", largura: "22%" },
+                    { titulo: "Itens", largura: "10%" }
+                ],
+                linhas: listaOrdenada.map((item) => [
+                    this.formatarData(item.data_doacao),
+                    item.beneficiario_nome || item.familia_nome || "---",
+                    item.tipo_doacao || "---",
+                    item.situacao || "---",
+                    item.responsavel || "---",
+                    String(item.total_itens ?? item.itens?.length ?? 0)
+                ])
+            },
+            cabecalho: contexto.cabecalho,
+            rodape: contexto.rodape
+        };
+        const html = this.template.montarHtml(relatorioInput);
+        const pdf = await this.renderer.render(html, contexto.rodape, relatorioInput);
+        return { html, pdf, filename: "relacao-doacoes-realizadas.pdf" };
     }
     async gerarFichaVoluntario(rawPayload) {
         const payload = voluntarioFichaRequestSchema.parse(rawPayload);

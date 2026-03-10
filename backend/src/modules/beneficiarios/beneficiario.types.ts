@@ -122,3 +122,8 @@ export type BeneficiarioFilters = {
   nis?: string;
   data_nascimento?: string;
 };
+
+export type BeneficiarioAddressSuggestionFilters = {
+  municipio?: string;
+  bairro?: string;
+};

@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
@@ -373,7 +373,7 @@ export function RegistroDoacaoPage() {
   return (
     <section className="mx-auto w-full max-w-[1440px] px-4 py-4 lg:px-8">
       <div className={classesTelaPadraoBeneficiario.container}>
-        <Card className={classesTelaPadraoBeneficiario.barraAcoes}>
+        <Card className={classesTelaPadraoBeneficiario.barraAcoes} data-print="toolbar">
           <CardContent className="p-0">
             <div className={classesTelaPadraoBeneficiario.gradeAcoes}>
               {ordemAcoesCrudPadrao.map((ordem) => {
@@ -398,13 +398,13 @@ export function RegistroDoacaoPage() {
           </CardContent>
         </Card>
 
-        <div className={classesTelaPadraoBeneficiario.gradePrincipal}>
-          <Card className={classesTelaPadraoBeneficiario.cardAbas}>
+        <div className={classesTelaPadraoBeneficiario.gradePrincipal} data-print="layout-grid">
+          <Card className={classesTelaPadraoBeneficiario.cardAbas} data-print="tabs">
             <CardContent className={classesTelaPadraoBeneficiario.conteudoAbas}>
               {abas.map((aba, indice) => (
                 <button key={aba.id} type="button" className={classeBotaoAbaLateral(abaAtiva === aba.id)} onClick={() => setAbaAtiva(aba.id)}>
                   <span className={classeNumeroAbaLateral(abaAtiva === aba.id)}>{indice + 1}</span>
-                  <span className="truncate">{aba.label}</span>
+                  <span className="min-w-0 break-words">{aba.label}</span>
                 </button>
               ))}
             </CardContent>

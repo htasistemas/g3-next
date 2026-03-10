@@ -1,0 +1,85 @@
+<div class="p-6 space-y-4">
+  <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+      <p class="text-sm font-semibold text-g3-green-700 uppercase">Beneficiários</p>
+      <h1 class="text-2xl font-semibold text-slate-900">Lista de beneficiários</h1>
+      <p class="text-sm text-slate-600">Gerencie os beneficiários cadastrados e acesse rapidamente a edição.</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button type="button" class="btn-primary" (click)="newBeneficiary()">Novo beneficiário</button>
+    </div>
+  </div>
+
+  <div class="card space-y-4">
+    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      <div>
+        <h2 class="card__header">Beneficiários cadastrados</h2>
+        <p class="text-sm text-slate-600">Clique em editar para abrir o cadastro completo com abas.</p>
+      </div>
+      <div class="flex items-center gap-2 w-full md:w-auto">
+        <input
+          type="text"
+          class="input w-full md:w-64"
+          placeholder="Buscar por nome, CPF ou código"
+          [(ngModel)]="searchTerm"
+          (ngModelChange)="applyFilter()"
+        />
+        <button type="button" class="btn-outline" (click)="loadBeneficiaries()">Atualizar</button>
+      </div>
+    </div>
+
+    <div *ngIf="error" class="alert alert-error">{{ error }}</div>
+
+    <div *ngIf="loading" class="text-center py-6 text-slate-600">Carregando beneficiários...</div>
+
+    <div *ngIf="!loading" class="overflow-hidden border border-slate-200 rounded-xl">
+      <table class="min-w-full divide-y divide-slate-200">
+        <thead class="bg-slate-50">
+          <tr>
+            <th class="table-head">Nome completo</th>
+            <th class="table-head">Código</th>
+            <th class="table-head">CPF</th>
+            <th class="table-head cursor-pointer" (click)="toggleIvfOrder()">
+              IVF
+              <span class="text-xs text-slate-500">{{ orderIvfDesc ? '▼' : '▲' }}</span>
+            </th>
+            <th class="table-head">Data de nascimento</th>
+            <th class="table-head">Cidade/UF</th>
+            <th class="table-head text-right">Ações</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-200" *ngIf="filtered.length; else emptyState">
+          <tr *ngFor="let beneficiary of filtered" class="hover:bg-slate-50">
+            <td class="table-cell">{{ beneficiary.nomeCompleto || 'Não informado' }}</td>
+            <td class="table-cell">{{ beneficiary.codigo || '---' }}</td>
+            <td class="table-cell">{{ beneficiary.cpf || beneficiary.documentos || '---' }}</td>
+            <td class="table-cell">
+              <div class="flex items-center gap-2">
+                <span
+                  class="px-2 py-1 rounded-full text-xs font-semibold"
+                  [ngClass]="getBadgeClass(beneficiary.indiceVulnerabilidade?.faixaVulnerabilidade)"
+                >
+                  {{ getIvfLabel(beneficiary) }}
+                </span>
+                <span class="text-xs text-slate-500">{{ getIvfScore(beneficiary) }}</span>
+              </div>
+            </td>
+            <td class="table-cell">
+              {{ formatarDataNascimento(beneficiary.dataNascimento) }}
+            </td>
+            <td class="table-cell">{{ beneficiary.cidade || '---' }}{{ beneficiary.uf ? '/' + beneficiary.uf : '' }}</td>
+            <td class="table-cell text-right">
+              <button type="button" class="btn-ghost" (click)="editBeneficiary(beneficiary.id)">Editar</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <ng-template #emptyState>
+        <tr>
+          <td colspan="7" class="text-center py-6 text-slate-600">Nenhum beneficiário encontrado.</td>
+        </tr>
+      </ng-template>
+    </div>
+  </div>
+</div>
+

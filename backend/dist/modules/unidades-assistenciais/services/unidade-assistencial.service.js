@@ -2,7 +2,7 @@ import { AppError } from "../../../shared/errors/app-error.js";
 import { unidadeAssistencialFiltersSchema, unidadeAssistencialInputSchema } from "../unidade-assistencial.schema.js";
 import { mapUnidadeAssistencialToResponse } from "../unidade-assistencial.mapper.js";
 import { UnidadeAssistencialRepository } from "../repositories/unidade-assistencial.repository.js";
-import { mapaCamposTextoUnidadeAssistencial, mapaDiretoriaUnidade } from "../../../utils/text-format-config.js";
+import { mapaCamposTextoUnidadeAssistencial, mapaDiretoriaUnidade, mapaSalaUnidade } from "../../../utils/text-format-config.js";
 import { normalizarObjetoTexto } from "../../../utils/text-formatter.js";
 export class UnidadeAssistencialService {
     repository = new UnidadeAssistencialRepository();
@@ -60,6 +60,13 @@ export class UnidadeAssistencialService {
                 if (!membro || typeof membro !== "object")
                     return membro;
                 return normalizarObjetoTexto(membro, mapaDiretoriaUnidade);
+            });
+        }
+        if (Array.isArray(inputBase.salas)) {
+            inputBase.salas = inputBase.salas.map((sala) => {
+                if (!sala || typeof sala !== "object")
+                    return sala;
+                return normalizarObjetoTexto(sala, mapaSalaUnidade);
             });
         }
         return inputBase;

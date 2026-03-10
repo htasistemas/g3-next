@@ -150,3 +150,7 @@ export const beneficiarioFiltersSchema = z.object({
     nis: optionalTrimmedString,
     data_nascimento: optionalIsoDate
 });
+export const beneficiarioAddressSuggestionSchema = z.object({
+    municipio: optionalTrimmedString,
+    bairro: optionalTrimmedString
+});

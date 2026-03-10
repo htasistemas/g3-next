@@ -24,6 +24,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { imprimirConteudoAtual } from "@/lib/report-utils";
 import {
   usuarioDefaultValues,
   usuarioFormSchema,
@@ -57,10 +58,10 @@ import type {
 } from "@/types/usuario";
 
 const abas = [
-  { id: "listagem", label: "Listagem de usuarios", icon: ListFilter },
-  { id: "cadastro", label: "Cadastro / edicao", icon: UserRound },
-  { id: "permissoes", label: "Permissoes e acessos", icon: ShieldCheck },
-  { id: "auditoria", label: "Auditoria / historico", icon: History }
+  { id: "listagem", label: "Listagem de usuários", icon: ListFilter },
+  { id: "cadastro", label: "Cadastro / edição", icon: UserRound },
+  { id: "permissoes", label: "Permissões e acessos", icon: ShieldCheck },
+  { id: "auditoria", label: "Auditoria / histórico", icon: History }
 ] as const;
 
 type AbaId = (typeof abas)[number]["id"];
@@ -323,22 +324,30 @@ export function UsuariosPage() {
     if (!id) {
       setPopupMensagem({
         tipo: "aviso",
-        titulo: "Atencao",
-        texto: "Selecione um usuario para excluir."
+        titulo: "Atenção",
+        texto: "Selecione um usuário para excluir."
       });
       return;
     }
 
     setPopupConfirmacao({
       tipo: "excluir",
-      titulo: "Confirmar exclusao",
-      texto: "Esta acao e irreversivel. Deseja continuar?",
+      titulo: "Confirmar exclusão",
+      texto: "Esta ação é irreversível. Deseja continuar?",
       usuarioId: id
     });
   }
 
   function imprimir() {
-    window.print();
+    try {
+      imprimirConteudoAtual({ titulo: "Usuários" });
+    } catch (error: any) {
+      setPopupMensagem({
+        tipo: "erro",
+        titulo: "Erro",
+        texto: error?.message ?? "Não foi possível preparar a impressão."
+      });
+    }
   }
 
   function fechar() {
@@ -392,14 +401,14 @@ export function UsuariosPage() {
       setIdSelecionado(resultado.usuario.id_usuario);
       setPopupMensagem({
         tipo: "sucesso",
-        titulo: "Confirmacao",
-        texto: "Usuario salvo com sucesso."
+        titulo: "Confirmação",
+        texto: "Usuário salvo com sucesso."
       });
     } catch (error: any) {
       setPopupMensagem({
         tipo: "erro",
         titulo: "Erro",
-        texto: error?.response?.data?.message ?? "Nao foi possivel salvar o usuario."
+        texto: error?.response?.data?.message ?? "Não foi possível salvar o usuário."
       });
     }
   }
@@ -407,7 +416,7 @@ export function UsuariosPage() {
   function abrirPopupStatus(usuario: Usuario, status: UsuarioStatus) {
     setPopupConfirmacao({
       tipo: "status",
-      titulo: "Confirmar alteracao",
+      titulo: "Confirmar alteração",
       texto: `Deseja alterar o status para ${formatarStatus(status).toLowerCase()}?`,
       usuarioId: usuario.id_usuario,
       status
@@ -441,14 +450,14 @@ export function UsuariosPage() {
 
       setPopupMensagem({
         tipo: "sucesso",
-        titulo: "Confirmacao",
-        texto: "Operacao concluida com sucesso."
+        titulo: "Confirmação",
+        texto: "Operação concluída com sucesso."
       });
     } catch (error: any) {
       setPopupMensagem({
         tipo: "erro",
         titulo: "Erro",
-        texto: error?.response?.data?.message ?? "Nao foi possivel concluir a operacao."
+        texto: error?.response?.data?.message ?? "Não foi possível concluir a operação."
       });
     } finally {
       setPopupConfirmacao(null);
@@ -460,8 +469,8 @@ export function UsuariosPage() {
     if (!id) {
       setPopupMensagem({
         tipo: "aviso",
-        titulo: "Atencao",
-        texto: "Selecione um usuario para redefinir a senha."
+        titulo: "Atenção",
+        texto: "Selecione um usuário para redefinir a senha."
       });
       return;
     }
@@ -469,7 +478,7 @@ export function UsuariosPage() {
     if (!novaSenha || !confirmarNovaSenha) {
       setPopupMensagem({
         tipo: "aviso",
-        titulo: "Atencao",
+        titulo: "Atenção",
         texto: "Informe e confirme a nova senha."
       });
       return;
@@ -478,8 +487,8 @@ export function UsuariosPage() {
     if (novaSenha.length < 6 || confirmarNovaSenha.length < 6) {
       setPopupMensagem({
         tipo: "aviso",
-        titulo: "Atencao",
-        texto: "A nova senha deve ter no minimo 6 caracteres."
+        titulo: "Atenção",
+        texto: "A nova senha deve ter no mínimo 6 caracteres."
       });
       return;
     }
@@ -487,8 +496,8 @@ export function UsuariosPage() {
     if (novaSenha !== confirmarNovaSenha) {
       setPopupMensagem({
         tipo: "aviso",
-        titulo: "Atencao",
-        texto: "As senhas nao conferem."
+        titulo: "Atenção",
+        texto: "As senhas não conferem."
       });
       return;
     }
@@ -506,14 +515,14 @@ export function UsuariosPage() {
       setExigirTrocaSenhaReset(true);
       setPopupMensagem({
         tipo: "sucesso",
-        titulo: "Confirmacao",
+        titulo: "Confirmação",
         texto: "Senha redefinida com sucesso."
       });
     } catch (error: any) {
       setPopupMensagem({
         tipo: "erro",
         titulo: "Erro",
-        texto: error?.response?.data?.message ?? "Nao foi possivel redefinir a senha."
+        texto: error?.response?.data?.message ?? "Não foi possível redefinir a senha."
       });
     }
   }
@@ -542,7 +551,7 @@ export function UsuariosPage() {
 
   return (
     <main className={classesTelaPadraoBeneficiario.container}>
-      <section className={classesTelaPadraoBeneficiario.barraAcoes}>
+      <section className={classesTelaPadraoBeneficiario.barraAcoes} data-print="toolbar">
         <div className={classesTelaPadraoBeneficiario.gradeAcoes}>
           {acoesCrud.map((acao) => (
             <Button
@@ -561,8 +570,8 @@ export function UsuariosPage() {
         </div>
       </section>
 
-      <div className={classesTelaPadraoBeneficiario.gradePrincipal}>
-        <Card className={classesTelaPadraoBeneficiario.cardAbas}>
+      <div className={classesTelaPadraoBeneficiario.gradePrincipal} data-print="layout-grid">
+        <Card className={classesTelaPadraoBeneficiario.cardAbas} data-print="tabs">
           <CardContent className={classesTelaPadraoBeneficiario.conteudoAbas}>
             {abas.map((aba, indice) => (
               <button
@@ -634,22 +643,22 @@ export function UsuariosPage() {
                         <th className="px-3 py-2 text-left">Login</th>
                         <th className="px-3 py-2 text-left">Perfil</th>
                         <th className="px-3 py-2 text-left">Status</th>
-                        <th className="px-3 py-2 text-left">Ultimo acesso</th>
-                        <th className="px-3 py-2 text-left">Acoes</th>
+                        <th className="px-3 py-2 text-left">Último acesso</th>
+                        <th className="px-3 py-2 text-left">Ações</th>
                       </tr>
                     </thead>
                     <tbody>
                       {carregandoLista && (
                         <tr>
                           <td className="px-3 py-4 text-center text-[var(--g3-muted)]" colSpan={6}>
-                            Carregando usuarios...
+                            Carregando usuários...
                           </td>
                         </tr>
                       )}
                       {!carregandoLista && !listaData?.usuarios.length && (
                         <tr>
                           <td className="px-3 py-4 text-center text-[var(--g3-muted)]" colSpan={6}>
-                            Nenhum usuario encontrado.
+                            Nenhum usuário encontrado.
                           </td>
                         </tr>
                       )}
@@ -696,10 +705,10 @@ export function UsuariosPage() {
                       Anterior
                     </Button>
                     <span className="text-xs text-[var(--g3-muted)]">
-                      Pagina {paginaAtual} de {totalPaginas}
+                      Página {paginaAtual} de {totalPaginas}
                     </span>
                     <Button type="button" variant="outline" size="sm" disabled={paginaAtual >= totalPaginas} onClick={() => setFiltros((v) => ({ ...v, pagina: paginaAtual + 1 }))}>
-                      Proxima
+                      Próxima
                     </Button>
                   </div>
                 </div>
@@ -714,7 +723,7 @@ export function UsuariosPage() {
                   {errors.nome_completo && <p className="text-xs text-red-600">{errors.nome_completo.message}</p>}
                 </div>
                 <div className="space-y-1 xl:col-span-3">
-                  <Label>Nome de exibicao</Label>
+                  <Label>Nome de exibição</Label>
                   <Input {...register("nome_exibicao")} onBlur={() => aplicarFormatacaoCampo("nome_exibicao")} />
                 </div>
                 <div className="space-y-1 xl:col-span-2">
@@ -747,7 +756,7 @@ export function UsuariosPage() {
                   {errors.cpf && <p className="text-xs text-red-600">{errors.cpf.message}</p>}
                 </div>
                 <div className="space-y-1 xl:col-span-2">
-                  <Label>Matricula</Label>
+                  <Label>Matrícula</Label>
                   <Input {...register("matricula")} />
                 </div>
                 <div className="space-y-1 xl:col-span-2">
@@ -775,7 +784,7 @@ export function UsuariosPage() {
                   <Input {...register("unidade")} onBlur={() => aplicarFormatacaoCampo("unidade")} />
                 </div>
                 <div className="space-y-1 xl:col-span-4">
-                  <Label>Cargo / funcao</Label>
+                  <Label>Cargo / função</Label>
                   <Input {...register("cargo")} onBlur={() => aplicarFormatacaoCampo("cargo")} />
                 </div>
                 {!getValues("id_usuario") && (
@@ -815,8 +824,8 @@ export function UsuariosPage() {
 
             {abaAtiva === "permissoes" && (
               <section className="space-y-3">
-                {carregandoPermissoes && <p className="text-sm text-[var(--g3-muted)]">Carregando permissoes...</p>}
-                {!carregandoPermissoes && !gruposPermissoes.length && <p className="text-sm text-[var(--g3-muted)]">Nenhuma permissao cadastrada.</p>}
+                {carregandoPermissoes && <p className="text-sm text-[var(--g3-muted)]">Carregando permissões...</p>}
+                {!carregandoPermissoes && !gruposPermissoes.length && <p className="text-sm text-[var(--g3-muted)]">Nenhuma permissão cadastrada.</p>}
                 {gruposPermissoes.map((grupo) => (
                   <Card key={grupo.modulo} className="border border-[var(--g3-border)]">
                     <CardHeader className="pb-2">
@@ -843,10 +852,10 @@ export function UsuariosPage() {
 
             {abaAtiva === "auditoria" && (
               <section className="space-y-3">
-                {carregandoUsuario && <p className="text-sm text-[var(--g3-muted)]">Carregando historico...</p>}
-                {!carregandoUsuario && !idSelecionado && <p className="text-sm text-[var(--g3-muted)]">Selecione um usuario na listagem.</p>}
+                {carregandoUsuario && <p className="text-sm text-[var(--g3-muted)]">Carregando histórico...</p>}
+                {!carregandoUsuario && !idSelecionado && <p className="text-sm text-[var(--g3-muted)]">Selecione um usuário na listagem.</p>}
                 {!carregandoUsuario && idSelecionado && !usuarioData?.auditoria?.length && (
-                  <p className="text-sm text-[var(--g3-muted)]">Nenhum registro de auditoria para este usuario.</p>
+                  <p className="text-sm text-[var(--g3-muted)]">Nenhum registro de auditoria para este usuário.</p>
                 )}
                 {!!usuarioData?.auditoria?.length && (
                   <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]">
@@ -854,7 +863,7 @@ export function UsuariosPage() {
                       <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]">
                         <tr>
                           <th className="px-3 py-2 text-left">Data</th>
-                          <th className="px-3 py-2 text-left">Acao</th>
+                          <th className="px-3 py-2 text-left">Ação</th>
                           <th className="px-3 py-2 text-left">Executado por</th>
                           <th className="px-3 py-2 text-left">Detalhes</th>
                         </tr>
@@ -922,7 +931,7 @@ export function UsuariosPage() {
               </div>
               <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-[var(--g3-foreground)] sm:col-span-2">
                 <Checkbox checked={exigirTrocaSenhaReset} onChange={(event) => setExigirTrocaSenhaReset(event.target.checked)} />
-                Exigir troca de senha no proximo acesso
+                Exigir troca de senha no próximo acesso
               </label>
             </div>
             <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3">

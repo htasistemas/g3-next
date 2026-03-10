@@ -122,6 +122,16 @@ export class RelatorioTemplatePadrao {
         </section>
       `
       : "";
+    const conteudoCorpoHtml = fotoHtml
+      ? `
+        <section class="corpo-com-foto">
+          ${fotoHtml}
+          <div class="corpo-com-foto__blocos">
+            ${blocosHtml}
+          </div>
+        </section>
+      `
+      : blocosHtml;
 
     const logoHtml = input.cabecalho.logoUrl
       ? `<img src="${this.escapeHtml(input.cabecalho.logoUrl)}" alt="Logomarca da instituição" />`
@@ -207,10 +217,22 @@ export class RelatorioTemplatePadrao {
             }
             .corpo { margin-top: 10px; }
             .descricao { margin: 0 0 10px 0; font-size: 11px; color: #1f2937; }
+            .corpo-com-foto {
+              display: grid;
+              grid-template-columns: 128px minmax(0, 1fr);
+              align-items: start;
+              gap: 12px;
+            }
+            .corpo-com-foto__blocos {
+              min-width: 0;
+            }
+            .corpo-com-foto__blocos .bloco:first-child {
+              margin-top: 0;
+            }
             .foto-destaque {
               display: flex;
               justify-content: flex-start;
-              margin-bottom: 10px;
+              margin: 0;
             }
             .foto-destaque__box {
               width: 128px;
@@ -222,7 +244,7 @@ export class RelatorioTemplatePadrao {
             }
             .foto-destaque__box img {
               width: 100%;
-              height: 96px;
+              height: 160px;
               object-fit: contain;
               border-radius: 4px;
             }
@@ -337,6 +359,11 @@ export class RelatorioTemplatePadrao {
               color: #374151;
               line-height: 1.45;
             }
+            @media (max-width: 720px) {
+              .corpo-com-foto {
+                grid-template-columns: 1fr;
+              }
+            }
           </style>
         </head>
         <body>
@@ -355,8 +382,7 @@ export class RelatorioTemplatePadrao {
 
             <section class="corpo">
               ${input.descricao ? `<p class="descricao">${this.escapeHtml(input.descricao)}</p>` : ""}
-              ${fotoHtml}
-              ${blocosHtml}
+              ${conteudoCorpoHtml}
 
               ${
                 input.tabela

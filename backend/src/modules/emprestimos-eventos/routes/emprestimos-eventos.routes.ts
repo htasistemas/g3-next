@@ -1,0 +1,113 @@
+import { Router } from "express";
+import { asyncHandler } from "../../../shared/http/async-handler.js";
+import {
+  ensureAuthenticated,
+  ensurePermissions
+} from "../../auth/middlewares/auth.middleware.js";
+import { EmprestimosEventosController } from "../controllers/emprestimos-eventos.controller.js";
+
+const controller = new EmprestimosEventosController();
+
+export const emprestimosEventosRoutes = Router();
+
+const permissoesLeitura = ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"];
+const permissoesEscrita = ["ADMINISTRADOR", "OPERADOR"];
+const permissaoExclusao = ["ADMINISTRADOR"];
+
+emprestimosEventosRoutes.get(
+  "/agenda/resumo",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.listarAgendaResumo.bind(controller))
+);
+emprestimosEventosRoutes.get(
+  "/agenda/dia",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.listarAgendaDia.bind(controller))
+);
+emprestimosEventosRoutes.get(
+  "/disponibilidade",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.consultarDisponibilidade.bind(controller))
+);
+emprestimosEventosRoutes.get(
+  "/eventos",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.listarEventos.bind(controller))
+);
+emprestimosEventosRoutes.post(
+  "/eventos",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.criarEvento.bind(controller))
+);
+emprestimosEventosRoutes.put(
+  "/eventos/:id",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.atualizarEvento.bind(controller))
+);
+emprestimosEventosRoutes.delete(
+  "/eventos/:id",
+  ensureAuthenticated,
+  ensurePermissions(permissaoExclusao),
+  asyncHandler(controller.excluirEvento.bind(controller))
+);
+
+emprestimosEventosRoutes.get(
+  "/",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.listar.bind(controller))
+);
+emprestimosEventosRoutes.post(
+  "/",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.criar.bind(controller))
+);
+emprestimosEventosRoutes.get(
+  "/:id/movimentacoes",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.listarMovimentacoes.bind(controller))
+);
+emprestimosEventosRoutes.post(
+  "/:id/confirmar-retirada",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.confirmarRetirada.bind(controller))
+);
+emprestimosEventosRoutes.post(
+  "/:id/confirmar-devolucao",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.confirmarDevolucao.bind(controller))
+);
+emprestimosEventosRoutes.post(
+  "/:id/cancelar",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.cancelar.bind(controller))
+);
+emprestimosEventosRoutes.get(
+  "/:id",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.obter.bind(controller))
+);
+emprestimosEventosRoutes.put(
+  "/:id",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.atualizar.bind(controller))
+);
+emprestimosEventosRoutes.delete(
+  "/:id",
+  ensureAuthenticated,
+  ensurePermissions(permissaoExclusao),
+  asyncHandler(controller.excluir.bind(controller))
+);

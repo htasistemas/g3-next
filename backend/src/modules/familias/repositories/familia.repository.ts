@@ -434,4 +434,10 @@ export class FamiliaRepository {
       });
     });
   }
+
+  async remover(familiaId: bigint) {
+    await prisma.vinculoFamiliar.delete({
+      where: { id: familiaId }
+    });
+  }
 }

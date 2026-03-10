@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
@@ -36,6 +36,7 @@ import {
 import {
   useFamilia,
   useFamilias,
+  useRemoverFamilia,
   useRemoverMembroFamilia,
   useSalvarFamilia
 } from "@/features/familias/use-familias";
@@ -53,6 +54,7 @@ import {
   classesTelaPadraoBeneficiario,
   ordemAcoesCrudPadrao
 } from "@/lib/tela-padrao-beneficiario";
+import { imprimirConteudoAtual } from "@/lib/report-utils";
 
 const tituloTela = "Cadastro de vínculo familiar";
 
@@ -74,10 +76,6 @@ const opcoesTipoMoradia = [
   "Sítio/Chácara",
   "Outro"
 ];
-
-const mensagemImpressaoNaoMigrada = "A impressão de vínculo familiar ainda não foi migrada.";
-const mensagemExclusaoNaoMigrada =
-  "A exclusão de família será disponibilizada na próxima etapa da migração.";
 
 type AbaId = (typeof abas)[number]["id"];
 
@@ -235,11 +233,11 @@ export function CadastroVinculoFamiliarPage() {
   const [mensagem, setMensagem] = useState<Mensagem | null>(null);
   const [popupSalvarAberto, setPopupSalvarAberto] = useState(false);
   const [popupExcluirAberto, setPopupExcluirAberto] = useState(false);
-  const [popupImprimirAberto, setPopupImprimirAberto] = useState(false);
 
   const { data: listaData, isLoading: carregandoLista } = useFamilias(filtros);
   const { data: familiaData, isLoading: carregandoFamilia } = useFamilia(familiaSelecionadaId);
   const salvarMutation = useSalvarFamilia();
+  const removerFamiliaMutation = useRemoverFamilia();
   const removerMembroMutation = useRemoverMembroFamilia();
 
   const {
@@ -294,7 +292,11 @@ export function CadastroVinculoFamiliarPage() {
   const familiaAtual = familiaData?.familia;
   const principalResultados = principalQuery.data?.beneficiarios ?? [];
   const membroResultados = membroQuery.data?.beneficiarios ?? [];
-  const bloqueadoAcao = salvarMutation.isPending || removerMembroMutation.isPending || carregandoFamilia;
+  const bloqueadoAcao =
+    salvarMutation.isPending ||
+    removerFamiliaMutation.isPending ||
+    removerMembroMutation.isPending ||
+    carregandoFamilia;
 
   const abaAtual = abas.find((aba) => aba.id === abaAtiva);
   const tituloAbaAtiva = abaAtual?.label ?? tituloTela;
@@ -372,22 +374,41 @@ export function CadastroVinculoFamiliarPage() {
     setPopupExcluirAberto(true);
   }
 
-  function confirmarExclusaoFamilia() {
-    setPopupExcluirAberto(false);
-    setMensagem({ tipo: "erro", texto: mensagemExclusaoNaoMigrada });
+  async function confirmarExclusaoFamilia() {
+    if (!familiaSelecionadaId) {
+      setPopupExcluirAberto(false);
+      setMensagem({ tipo: "erro", texto: "Selecione uma família para excluir." });
+      return;
+    }
+
+    try {
+      await removerFamiliaMutation.mutateAsync(familiaSelecionadaId);
+      setPopupExcluirAberto(false);
+      setFamiliaSelecionadaId(undefined);
+      setSnapshot(null);
+      setPrincipalBusca("");
+      setMembroBusca("");
+      reset(familiaDefaultValues);
+      replace([]);
+      setMensagem({ tipo: "sucesso", texto: "Família excluída com sucesso." });
+      setAbaAtiva("listagem");
+    } catch (error: any) {
+      setMensagem({
+        tipo: "erro",
+        texto: error?.response?.data?.message ?? "Não foi possível excluir a família."
+      });
+    }
   }
 
   function acaoImprimir() {
-    if (!familiaSelecionadaId) {
-      setMensagem({ tipo: "erro", texto: "Selecione uma família para imprimir." });
-      return;
+    try {
+      imprimirConteudoAtual({ titulo: "Vínculo familiar" });
+    } catch (error: any) {
+      setMensagem({
+        tipo: "erro",
+        texto: error?.message ?? "Não foi possível preparar a impressão."
+      });
     }
-    setPopupImprimirAberto(true);
-  }
-
-  function confirmarImpressao() {
-    setPopupImprimirAberto(false);
-    setMensagem({ tipo: "erro", texto: mensagemImpressaoNaoMigrada });
   }
 
   function acaoFechar() {
@@ -574,7 +595,7 @@ export function CadastroVinculoFamiliarPage() {
 
   return (
     <main className={classesTelaPadraoBeneficiario.container}>
-      <section className={classesTelaPadraoBeneficiario.barraAcoes}>
+      <section className={classesTelaPadraoBeneficiario.barraAcoes} data-print="toolbar">
         <div className={classesTelaPadraoBeneficiario.gradeAcoes}>
           {acoesNaOrdemPadrao.map((acao) => (
             <Button
@@ -596,8 +617,8 @@ export function CadastroVinculoFamiliarPage() {
         </div>
       </section>
 
-      <div className={classesTelaPadraoBeneficiario.gradePrincipal}>
-        <Card className={classesTelaPadraoBeneficiario.cardAbas}>
+      <div className={classesTelaPadraoBeneficiario.gradePrincipal} data-print="layout-grid">
+        <Card className={classesTelaPadraoBeneficiario.cardAbas} data-print="tabs">
           <CardContent className={classesTelaPadraoBeneficiario.conteudoAbas}>
             {abas.map((aba, indice) => (
               <button
@@ -1256,7 +1277,7 @@ export function CadastroVinculoFamiliarPage() {
           className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/45 px-4"
           role="dialog"
           aria-modal="true"
-          onClick={() => setPopupExcluirAberto(false)}
+          onClick={() => !removerFamiliaMutation.isPending && setPopupExcluirAberto(false)}
         >
           <div
             className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl"
@@ -1269,45 +1290,27 @@ export function CadastroVinculoFamiliarPage() {
               <p className="text-sm text-slate-700">Esta ação é irreversível. Deseja continuar?</p>
             </div>
             <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3">
-              <Button type="button" variant="outline" onClick={() => setPopupExcluirAberto(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setPopupExcluirAberto(false)}
+                disabled={removerFamiliaMutation.isPending}
+              >
                 Cancelar
               </Button>
-              <Button type="button" variant="danger" onClick={confirmarExclusaoFamilia}>
-                Excluir
+              <Button
+                type="button"
+                variant="danger"
+                onClick={() => void confirmarExclusaoFamilia()}
+                disabled={removerFamiliaMutation.isPending}
+              >
+                {removerFamiliaMutation.isPending ? "Excluindo..." : "Excluir"}
               </Button>
             </div>
           </div>
         </div>
       )}
 
-      {popupImprimirAberto && (
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/45 px-4"
-          role="dialog"
-          aria-modal="true"
-          onClick={() => setPopupImprimirAberto(false)}
-        >
-          <div
-            className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="border-b border-slate-100 px-5 py-4">
-              <h3 className="text-base font-semibold text-slate-900">Imprimir vínculo familiar</h3>
-            </div>
-            <div className="px-5 py-4">
-              <p className="text-sm text-slate-700">Deseja gerar a impressão desta família?</p>
-            </div>
-            <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3">
-              <Button type="button" variant="outline" onClick={() => setPopupImprimirAberto(false)}>
-                Cancelar
-              </Button>
-              <Button type="button" onClick={confirmarImpressao}>
-                Continuar
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </main>
   );
 }

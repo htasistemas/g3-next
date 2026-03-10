@@ -192,18 +192,12 @@ export function ThemeProvider({ children }: PropsWithChildren) {
 
   const saveSettings = useCallback(async (novo: ThemeSettings) => {
     const normalizado = normalizarSettings(novo);
-    setPreviewAtivo(null);
-    setSettings(normalizado);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(normalizado));
+    const remoto = await parametrosSistemaService.salvarPersonalizacao(normalizado);
+    const remotoNormalizado = normalizarSettings(remoto);
 
-    try {
-      const remoto = await parametrosSistemaService.salvarPersonalizacao(normalizado);
-      const remotoNormalizado = normalizarSettings(remoto);
-      setSettings(remotoNormalizado);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(remotoNormalizado));
-    } catch {
-      // Mantem estado local se a persistencia remota falhar.
-    }
+    setPreviewAtivo(null);
+    setSettings(remotoNormalizado);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(remotoNormalizado));
   }, []);
 
   const value = useMemo<ThemeContextValue>(

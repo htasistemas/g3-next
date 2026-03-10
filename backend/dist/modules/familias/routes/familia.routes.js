@@ -10,6 +10,7 @@ familiaRoutes.get("/", ensureAuthenticated, ensurePermissions(permissoesLeitura)
 familiaRoutes.get("/:id", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.buscarPorId.bind(controller)));
 familiaRoutes.post("/", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.criar.bind(controller)));
 familiaRoutes.put("/:id", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.atualizar.bind(controller)));
+familiaRoutes.delete("/:id", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.remover.bind(controller)));
 familiaRoutes.post("/:id/membros", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.adicionarMembro.bind(controller)));
 familiaRoutes.put("/:id/membros/:membroId", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.atualizarMembro.bind(controller)));
 familiaRoutes.delete("/:id/membros/:membroId", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.removerMembro.bind(controller)));

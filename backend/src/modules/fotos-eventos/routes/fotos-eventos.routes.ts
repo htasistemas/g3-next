@@ -1,0 +1,78 @@
+import { Router } from "express";
+import { asyncHandler } from "../../../shared/http/async-handler.js";
+import {
+  ensureAuthenticated,
+  ensurePermissions
+} from "../../auth/middlewares/auth.middleware.js";
+import { FotosEventosController } from "../controllers/fotos-eventos.controller.js";
+
+const controller = new FotosEventosController();
+
+export const fotosEventosRoutes = Router();
+
+const permissoesLeitura = ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"];
+const permissoesEscrita = ["ADMINISTRADOR", "OPERADOR"];
+const permissaoExclusao = ["ADMINISTRADOR"];
+
+fotosEventosRoutes.get(
+  "/",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.listar.bind(controller))
+);
+fotosEventosRoutes.post(
+  "/",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.criar.bind(controller))
+);
+
+fotosEventosRoutes.get(
+  "/:id/principal",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.obterFotoPrincipal.bind(controller))
+);
+fotosEventosRoutes.post(
+  "/:id/fotos",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.adicionarFoto.bind(controller))
+);
+fotosEventosRoutes.put(
+  "/:id/fotos/:fotoId",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.atualizarFoto.bind(controller))
+);
+fotosEventosRoutes.delete(
+  "/:id/fotos/:fotoId",
+  ensureAuthenticated,
+  ensurePermissions(permissaoExclusao),
+  asyncHandler(controller.removerFoto.bind(controller))
+);
+fotosEventosRoutes.get(
+  "/:id/fotos/:fotoId/arquivo",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.obterArquivoFoto.bind(controller))
+);
+
+fotosEventosRoutes.get(
+  "/:id",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.obter.bind(controller))
+);
+fotosEventosRoutes.put(
+  "/:id",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.atualizar.bind(controller))
+);
+fotosEventosRoutes.delete(
+  "/:id",
+  ensureAuthenticated,
+  ensurePermissions(permissaoExclusao),
+  asyncHandler(controller.remover.bind(controller))
+);

@@ -1,5 +1,5 @@
 import { AppError } from "../../../shared/errors/app-error.js";
-import { beneficiarioFiltersSchema, beneficiarioInputSchema } from "../beneficiario.schema.js";
+import { beneficiarioAddressSuggestionSchema, beneficiarioFiltersSchema, beneficiarioInputSchema } from "../beneficiario.schema.js";
 import { mapBeneficiarioToResponse } from "../beneficiario.mapper.js";
 import { BeneficiarioRepository } from "../repositories/beneficiario.repository.js";
 import { mapaCamposTextoBeneficiario, mapaDocumentoBeneficiario } from "../../../utils/text-format-config.js";
@@ -25,6 +25,7 @@ export class BeneficiarioService {
     async criar(rawInput) {
         const inputNormalizado = this.normalizarPayload(rawInput);
         const input = beneficiarioInputSchema.parse(inputNormalizado);
+        await this.validarDuplicidadeCadastro(input);
         const beneficiario = await this.repository.criar(input);
         return mapBeneficiarioToResponse(beneficiario);
     }
@@ -32,6 +33,7 @@ export class BeneficiarioService {
         const id = this.parseId(rawId);
         const inputNormalizado = this.normalizarPayload(rawInput);
         const input = beneficiarioInputSchema.parse(inputNormalizado);
+        await this.validarDuplicidadeCadastro(input, id);
         const beneficiario = await this.repository.atualizar(id, input);
         return mapBeneficiarioToResponse(beneficiario);
     }
@@ -42,6 +44,10 @@ export class BeneficiarioService {
     async obterProximoCodigo() {
         const codigo = await this.repository.obterProximoCodigo();
         return { codigo };
+    }
+    async obterSugestaoEndereco(rawQuery) {
+        const query = beneficiarioAddressSuggestionSchema.parse(rawQuery);
+        return this.repository.buscarSugestaoEndereco(query);
     }
     parseId(rawId) {
         const id = Number(rawId);
@@ -63,5 +69,17 @@ export class BeneficiarioService {
             });
         }
         return inputBase;
+    }
+    async validarDuplicidadeCadastro(input, idIgnorado) {
+        const duplicidade = await this.repository.buscarDuplicidadeCadastro(input, idIgnorado);
+        if (!duplicidade) {
+            return;
+        }
+        const detalhes = [
+            duplicidade.codigo ? `código ${duplicidade.codigo}` : null,
+            duplicidade.cpf ? `CPF ${duplicidade.cpf}` : null
+        ].filter(Boolean);
+        const sufixo = detalhes.length ? ` (${detalhes.join(", ")})` : "";
+        throw new AppError(`Já existe um beneficiário cadastrado com os mesmos dados${sufixo}.`, 409);
     }
 }

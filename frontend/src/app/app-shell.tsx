@@ -4,24 +4,34 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { useUnidadeAssistencialAtual } from "@/features/unidades-assistenciais/use-unidades-assistenciais";
 import {
+  Bell,
   BookOpenCheck,
   Building2,
+  CalendarRange,
+  CarFront,
   ChartColumn,
   ChartPie,
+  CheckSquare2,
   ChevronLeft,
   Clock3,
   ChevronDown,
   ChevronRight,
+  ClipboardPenLine,
   DollarSign,
   FileText,
+  Files,
   FolderOpen,
   Gift,
   HandHeart,
   HandCoins,
   Handshake,
+  ImageIcon,
+  Landmark,
   LayoutDashboard,
   Link2,
   ListFilter,
+  Monitor,
+  Package,
   Settings2,
   SlidersHorizontal,
   Stethoscope,
@@ -46,6 +56,17 @@ type MenuSection = {
   requiredPermissions?: string[];
   itens: MenuItem[];
 };
+
+const comparadorItensMenu = new Intl.Collator("pt-BR", {
+  sensitivity: "base",
+  numeric: true
+});
+
+function ordenarItensMenu<T extends { label: string }>(itens: T[]) {
+  return [...itens].sort((itemA, itemB) =>
+    comparadorItensMenu.compare(itemA.label.trim(), itemB.label.trim())
+  );
+}
 
 const menuSections: MenuSection[] = [
   {
@@ -101,6 +122,42 @@ const menuSections: MenuSection[] = [
         icon: BookOpenCheck
       },
       {
+        id: "atendimentos-banco-empregos",
+        to: "/atendimentos/banco-empregos",
+        label: "Banco de empregos",
+        icon: Handshake
+      },
+      {
+        id: "atendimentos-biblioteca",
+        to: "/atendimentos/biblioteca",
+        label: "Biblioteca",
+        icon: FileText
+      },
+      {
+        id: "atendimentos-registro-visitas",
+        to: "/atendimentos/registro-visitas",
+        label: "Registro de visitas",
+        icon: ClipboardPenLine
+      },
+      {
+        id: "atendimentos-ocorrencias",
+        to: "/atendimentos/ocorrencias",
+        label: "Ocorrências",
+        icon: Bell
+      },
+      {
+        id: "atendimentos-chamada-senhas",
+        to: "/atendimentos/chamada-senhas",
+        label: "Chamada de senhas",
+        icon: Clock3
+      },
+      {
+        id: "atendimentos-painel-senhas",
+        to: "/senhas/painel",
+        label: "Painel de senhas",
+        icon: Monitor
+      },
+      {
         id: "atendimentos-registro-doacao",
         to: "/financeiro/registro-doacao",
         label: "Recebimento de doações",
@@ -111,12 +168,6 @@ const menuSections: MenuSection[] = [
         to: "/financeiro/doacoes-realizadas",
         label: "Doação realizada",
         icon: Gift
-      },
-      {
-        id: "atendimentos-migracao",
-        label: "Módulo em migração",
-        icon: Handshake,
-        emMigracao: true
       }
     ]
   },
@@ -126,23 +177,77 @@ const menuSections: MenuSection[] = [
     icon: FileText,
     itens: [
       {
-        id: "setor-administrativo-migracao",
-        label: "Módulo em migração",
-        icon: FileText,
-        emMigracao: true
+        id: "setor-administrativo-almoxarifado",
+        to: "/setor-administrativo/almoxarifado",
+        label: "Almoxarifado",
+        icon: Package
+      },
+      {
+        id: "setor-administrativo-controle-veiculos",
+        to: "/setor-administrativo/controle-veiculos",
+        label: "Controle de veículos",
+        icon: CarFront
+      },
+      {
+        id: "setor-administrativo-emprestimos-eventos",
+        to: "/setor-administrativo/emprestimo-eventos",
+        label: "Empréstimo para eventos",
+        icon: CalendarRange
+      },
+      {
+        id: "setor-administrativo-fotos-eventos",
+        to: "/setor-administrativo/fotos-eventos",
+        label: "Fotos e eventos",
+        icon: ImageIcon
+      },
+      {
+        id: "setor-administrativo-gestao-documentos",
+        to: "/setor-administrativo/gestao-documentos",
+        label: "Gestão de documentos",
+        icon: Files
+      },
+      {
+        id: "setor-administrativo-oficios-protocolos",
+        to: "/setor-administrativo/oficios-protocolos",
+        label: "Ofícios e protocolos",
+        icon: ClipboardPenLine
+      },
+      {
+        id: "setor-administrativo-patrimonio",
+        to: "/setor-administrativo/patrimonio",
+        label: "Patrimônio",
+        icon: Landmark
+      },
+      {
+        id: "setor-administrativo-tarefas-pendencias",
+        to: "/setor-administrativo/tarefas-pendencias",
+        label: "Tarefas e pendências",
+        icon: CheckSquare2
+      },
+      {
+        id: "setor-administrativo-lembretes-diarios",
+        to: "/setor-administrativo/lembretes-diarios",
+        label: "Lembretes diários",
+        icon: Bell
       }
     ]
   },
   {
-    id: "almoxarifado",
+    id: "setor-juridico",
     secao: "Setor jurídico",
-    icon: ListFilter,
+    icon: FileText,
     itens: [
       {
-        id: "setor-juridico-migracao",
-        label: "Módulo em migração",
-        icon: ListFilter,
-        emMigracao: true
+        id: "setor-juridico-plano-trabalho",
+        to: "/setor-juridico/plano-trabalho",
+        label: "Plano de trabalho",
+        icon: ClipboardPenLine
+      },
+      {
+        id: "setor-juridico-termo-fomento",
+        to: "/setor-juridico/termo-fomento",
+        label: "Termo de fomento",
+        icon: FileText
       }
     ]
   },
@@ -152,10 +257,22 @@ const menuSections: MenuSection[] = [
     icon: HandCoins,
     itens: [
       {
-        id: "setor-financeiro-migracao",
-        label: "Módulo em migração",
-        icon: HandCoins,
-        emMigracao: true
+        id: "setor-financeiro-autorizacao-compras",
+        to: "/setor-financeiro/autorizacao-compras",
+        label: "Autorização de compras",
+        icon: HandCoins
+      },
+      {
+        id: "setor-financeiro-contabilidade",
+        to: "/setor-financeiro/contabilidade",
+        label: "Contabilidade",
+        icon: DollarSign
+      },
+      {
+        id: "setor-financeiro-prestacao-contas",
+        to: "/setor-financeiro/prestacao-contas",
+        label: "Prestação de contas",
+        icon: ChartPie
       }
     ]
   },
@@ -171,10 +288,10 @@ const menuSections: MenuSection[] = [
         icon: Clock3
       },
       {
-        id: "setor-rh-migracao",
-        label: "Módulo em migração",
-        icon: UsersRound,
-        emMigracao: true
+        id: "setor-rh-contratacao",
+        to: "/setor-rh/contratacao",
+        label: "Contratação",
+        icon: UsersRound
       }
     ]
   },
@@ -209,6 +326,11 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/cadastros/profissionais")) return "Cadastro de profissionais";
   if (pathname.startsWith("/cadastros/voluntariado")) return "Cadastro de voluntariado";
   if (pathname.startsWith("/atendimentos/matriculas")) return "Matrículas";
+  if (pathname.startsWith("/atendimentos/banco-empregos")) return "Banco de empregos";
+  if (pathname.startsWith("/atendimentos/biblioteca")) return "Biblioteca";
+  if (pathname.startsWith("/atendimentos/registro-visitas")) return "Registro de visitas";
+  if (pathname.startsWith("/atendimentos/ocorrencias")) return "Ocorrências";
+  if (pathname.startsWith("/atendimentos/chamada-senhas")) return "Chamada de senhas";
   if (pathname.startsWith("/financeiro/registro-doacao")) return "Recebimento de doações";
   if (pathname.startsWith("/financeiro/doacoes-realizadas")) return "Doação realizada";
   if (pathname.startsWith("/cadastros/unidades-assistenciais")) return "Cadastro de unidade assistencial";
@@ -216,6 +338,21 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/configuracoes/parametros-sistema")) return "Parâmetros do sistema";
   if (pathname.startsWith("/configuracoes/usuarios")) return "Usuários";
   if (pathname.startsWith("/setor-rh/registro-ponto")) return "Registro de ponto";
+  if (pathname.startsWith("/setor-administrativo/almoxarifado")) return "Almoxarifado";
+  if (pathname.startsWith("/setor-administrativo/controle-veiculos")) return "Controle de veículos";
+  if (pathname.startsWith("/setor-administrativo/emprestimo-eventos")) return "Empréstimo para eventos";
+  if (pathname.startsWith("/setor-administrativo/fotos-eventos")) return "Fotos e eventos";
+  if (pathname.startsWith("/setor-administrativo/gestao-documentos")) return "Gestão de documentos";
+  if (pathname.startsWith("/setor-administrativo/oficios-protocolos")) return "Ofícios e protocolos";
+  if (pathname.startsWith("/setor-administrativo/patrimonio")) return "Patrimônio";
+  if (pathname.startsWith("/setor-administrativo/tarefas-pendencias")) return "Tarefas e pendências";
+  if (pathname.startsWith("/setor-administrativo/lembretes-diarios")) return "Lembretes diários";
+  if (pathname.startsWith("/setor-juridico/plano-trabalho")) return "Plano de trabalho";
+  if (pathname.startsWith("/setor-juridico/termo-fomento")) return "Termo de fomento";
+  if (pathname.startsWith("/setor-financeiro/autorizacao-compras")) return "Autorização de compras";
+  if (pathname.startsWith("/setor-financeiro/contabilidade")) return "Contabilidade";
+  if (pathname.startsWith("/setor-financeiro/prestacao-contas")) return "Prestação de contas";
+  if (pathname.startsWith("/setor-rh/contratacao")) return "Contratação";
   return "Painel de migração";
 }
 
@@ -229,7 +366,7 @@ export function AppShell() {
   const { data: unidadeAtualData } = useUnidadeAssistencialAtual();
   const location = useLocation();
   const titulo = obterTitulo(location.pathname);
-  const versaoSistema = import.meta.env.VITE_APP_VERSION ?? "1.00.12";
+  const versaoSistema = import.meta.env.VITE_APP_VERSION ?? "1.00.13";
   const [sidebarRecolhida, setSidebarRecolhida] = useState(false);
   const [gruposAbertos, setGruposAbertos] = useState<Record<string, boolean>>({});
   const logomarcaInstituicao = unidadeAtualData?.unidade?.logomarca;
@@ -253,7 +390,9 @@ export function AppShell() {
       .filter((secao) => possuiPermissao(secao.requiredPermissions))
       .map((secao) => ({
         ...secao,
-        itens: secao.itens.filter((item) => possuiPermissao(item.requiredPermissions))
+        itens: ordenarItensMenu(
+          secao.itens.filter((item) => possuiPermissao(item.requiredPermissions))
+        )
       }))
       .filter((secao) => secao.itens.length > 0);
   }, [possuiPermissao]);

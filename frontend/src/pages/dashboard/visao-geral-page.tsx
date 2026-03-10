@@ -1,7 +1,8 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, Cell, Pie, PieChart, Tooltip, XAxis, YAxis } from "recharts";
+import { ResponsiveChart } from "@/components/charts/responsive-chart";
 import {
   BanknoteArrowUp,
   BriefcaseBusiness,
@@ -238,12 +239,12 @@ export function VisaoGeralPage() {
               </div>
 
               <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                <div className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] p-3">
+                <div className="min-w-0 rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] p-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
                     Cadastros por tipo
                   </p>
                   <div className="mt-3 h-72">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveChart minWidth={0} minHeight={220}>
                       <BarChart data={dadosCadastros}>
                         <XAxis dataKey="nome" stroke="var(--g3-muted)" fontSize={11} />
                         <YAxis stroke="var(--g3-muted)" fontSize={11} allowDecimals={false} />
@@ -257,17 +258,17 @@ export function VisaoGeralPage() {
                         />
                         <Bar dataKey="valor" fill="var(--g3-primary)" radius={[6, 6, 0, 0]} />
                       </BarChart>
-                    </ResponsiveContainer>
+                    </ResponsiveChart>
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] p-3">
+                <div className="min-w-0 rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] p-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
                     Composição financeira
                   </p>
                   <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
                     <div className="h-56">
-                      <ResponsiveContainer width="100%" height="100%">
+                      <ResponsiveChart minWidth={0} minHeight={180}>
                         <PieChart>
                           <Pie
                             data={dadosFinanceiro}
@@ -292,7 +293,7 @@ export function VisaoGeralPage() {
                             }}
                           />
                         </PieChart>
-                      </ResponsiveContainer>
+                      </ResponsiveChart>
                     </div>
                     <div className="space-y-2">
                       {dadosFinanceiro.map((item) => (

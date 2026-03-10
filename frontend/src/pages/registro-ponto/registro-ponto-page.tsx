@@ -1,4 +1,4 @@
-﻿
+
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -26,6 +26,7 @@ import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
+import { imprimirConteudoAtual } from "@/lib/report-utils";
 import {
   classeBotaoAbaLateral,
   classeNumeroAbaLateral,
@@ -410,7 +411,14 @@ export function RegistroPontoPage() {
   }
 
   function acaoImprimir() {
-    window.print();
+    try {
+      imprimirConteudoAtual({ titulo: "Registro de ponto" });
+    } catch (error: any) {
+      setMensagem({
+        tipo: "erro",
+        texto: error?.message ?? "Não foi possível preparar a impressão."
+      });
+    }
   }
 
   function acaoFechar() {
@@ -660,7 +668,7 @@ export function RegistroPontoPage() {
               <div className="flex justify-end">
                 <Button
                   type="button"
-                  className="min-w-[220px] shadow-md"
+                  className="w-full shadow-md sm:w-auto sm:min-w-[220px]"
                   onClick={() => setPopupMarcarAberto(true)}
                   disabled={marcacaoEmAndamento}
                 >
@@ -815,12 +823,7 @@ export function RegistroPontoPage() {
   return (
     <section className="px-4 py-4 lg:px-8">
       <div className={classesTelaPadraoBeneficiario.container}>
-        <div className="space-y-0.5">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--g3-muted)]">Setor RH</p>
-          <h2 className="text-base font-semibold text-[var(--g3-foreground)]">{tituloTela}</h2>
-        </div>
-
-        <Card className={classesTelaPadraoBeneficiario.barraAcoes}>
+        <Card className={classesTelaPadraoBeneficiario.barraAcoes} data-print="toolbar">
           <CardContent className="p-0">
             <div className={classesTelaPadraoBeneficiario.gradeAcoes}>
               <Button type="button" variant="outline" className={classesTelaPadraoBeneficiario.botaoAcao} onClick={aplicarBusca} disabled={acoesDesabilitadas}><Search className="mr-2 h-4 w-4" />Buscar</Button>
@@ -834,8 +837,8 @@ export function RegistroPontoPage() {
           </CardContent>
         </Card>
 
-        <div className={classesTelaPadraoBeneficiario.gradePrincipal}>
-          <Card className={classesTelaPadraoBeneficiario.cardAbas}>
+        <div className={classesTelaPadraoBeneficiario.gradePrincipal} data-print="layout-grid">
+          <Card className={classesTelaPadraoBeneficiario.cardAbas} data-print="tabs">
             <CardContent className={classesTelaPadraoBeneficiario.conteudoAbas}>
               {abas
                 .filter((aba) => (aba.id === "ajuste" ? isAdmin : true))

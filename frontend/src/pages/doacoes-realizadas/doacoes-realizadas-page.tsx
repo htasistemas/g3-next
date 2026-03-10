@@ -68,6 +68,7 @@ type AbaId = (typeof abas)[number]["id"];
 
 type AcaoCrud = {
   label: (typeof ordemAcoesCrudPadrao)[number];
+  texto?: string;
   icon: LucideIcon;
   onClick: () => void;
   variant: "default" | "outline" | "danger" | "ghost";
@@ -156,6 +157,11 @@ export function DoacoesRealizadasPage() {
   const removerMutation = useRemoverDoacaoRealizada();
   const salvarPlanejadaMutation = useSalvarDoacaoPlanejada();
   const removerPlanejadaMutation = useRemoverDoacaoPlanejada();
+  const processandoAcoes =
+    salvarMutation.isPending ||
+    removerMutation.isPending ||
+    salvarPlanejadaMutation.isPending ||
+    removerPlanejadaMutation.isPending;
 
   const { data: beneficiariosData } = useQuery({
     queryKey: ["doacoes-realizadas", "beneficiarios", termoBeneficiario],
@@ -400,9 +406,10 @@ export function DoacoesRealizadasPage() {
 
   const acoes: AcaoCrud[] = [
     { label: "Buscar", icon: Search, onClick: buscar, variant: "outline" },
-    { label: "Novo", icon: Plus, onClick: novo, variant: "default" },
+    { label: "Novo", icon: Plus, onClick: novo, variant: "default", disabled: processandoAcoes },
     {
       label: "Salvar",
+      texto: abaAtiva === "planejamento" ? salvarPlanejadaMutation.isPending ? "Salvando..." : "Salvar" : salvarMutation.isPending ? "Salvando..." : "Salvar",
       icon: Save,
       onClick: () => {
         if (abaAtiva === "planejamento") {
@@ -412,10 +419,10 @@ export function DoacoesRealizadasPage() {
         void handleSubmit(salvarDoacao)();
       },
       variant: "default",
-      disabled: salvarMutation.isPending || salvarPlanejadaMutation.isPending
+      disabled: processandoAcoes
     },
-    { label: "Cancelar", icon: Undo2, onClick: cancelar, variant: "outline" },
-    { label: "Excluir", icon: Trash2, onClick: () => void excluir(), variant: "danger" },
+    { label: "Cancelar", icon: Undo2, onClick: cancelar, variant: "outline", disabled: processandoAcoes },
+    { label: "Excluir", icon: Trash2, onClick: () => void excluir(), variant: "danger", disabled: processandoAcoes },
     { label: "Imprimir", icon: Printer, onClick: () => void imprimir(), variant: "outline" },
     { label: "Fechar", icon: X, onClick: fechar, variant: "outline" }
   ];
@@ -423,7 +430,7 @@ export function DoacoesRealizadasPage() {
   return (
     <section className="mx-auto w-full max-w-[1440px] px-4 py-4 lg:px-8">
       <div className={classesTelaPadraoBeneficiario.container}>
-        <Card className={classesTelaPadraoBeneficiario.barraAcoes}>
+        <Card className={classesTelaPadraoBeneficiario.barraAcoes} data-print="toolbar">
           <CardContent className="p-0">
             <div className={classesTelaPadraoBeneficiario.gradeAcoes}>
               {ordemAcoesCrudPadrao.map((ordem) => {
@@ -433,7 +440,7 @@ export function DoacoesRealizadasPage() {
                 return (
                   <Button key={acao.label} type="button" variant={acao.variant} onClick={acao.onClick} disabled={acao.disabled} className={`${classesTelaPadraoBeneficiario.botaoAcao} h-8 px-3 py-1 text-xs`}>
                     <Icone className="h-3.5 w-3.5" />
-                    {acao.label}
+                    {acao.texto ?? acao.label}
                   </Button>
                 );
               })}
@@ -441,13 +448,13 @@ export function DoacoesRealizadasPage() {
           </CardContent>
         </Card>
 
-        <div className={classesTelaPadraoBeneficiario.gradePrincipal}>
-          <Card className={classesTelaPadraoBeneficiario.cardAbas}>
+        <div className={classesTelaPadraoBeneficiario.gradePrincipal} data-print="layout-grid">
+          <Card className={classesTelaPadraoBeneficiario.cardAbas} data-print="tabs">
             <CardContent className={classesTelaPadraoBeneficiario.conteudoAbas}>
               {abas.map((aba, index) => (
                 <button key={aba.id} type="button" className={classeBotaoAbaLateral(abaAtiva === aba.id)} onClick={() => setAbaAtiva(aba.id)}>
                   <span className={classeNumeroAbaLateral(abaAtiva === aba.id)}>{index + 1}</span>
-                  <span className="truncate">{aba.label}</span>
+                  <span className="min-w-0 break-words">{aba.label}</span>
                 </button>
               ))}
             </CardContent>
@@ -505,8 +512,8 @@ export function DoacoesRealizadasPage() {
                     <div className="space-y-1"><Label>Status</Label><Select value={plano.status} onChange={(e) => setPlano((atual) => ({ ...atual, status: e.target.value }))}><option value="Pendente">Pendente</option><option value="Em separação">Em separação</option><option value="Pronto">Pronto</option><option value="Entregue">Entregue</option><option value="Cancelada">Cancelada</option></Select></div>
                     <div className="space-y-1 xl:col-span-2"><Label>Observações</Label><Input value={plano.observacoes ?? ""} onChange={(e) => setPlano((atual) => ({ ...atual, observacoes: e.target.value }))} /></div>
                   </div>
-                  <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => { setPlano(planoInicial); setPlanoSelecionado(undefined); }}>Limpar</Button><Button type="button" onClick={() => void salvarPlanejamento()}>Salvar planejamento</Button></div>
-                  <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]"><table className="min-w-full text-sm"><thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"><tr><th className="px-3 py-2 text-left">Item</th><th className="px-3 py-2 text-left">Beneficiário/Família</th><th className="px-3 py-2 text-left">Previsto</th><th className="px-3 py-2 text-left">Status</th><th className="px-3 py-2 text-right">Ações</th></tr></thead><tbody>{carregandoPlanejadas ? <tr><td className="px-3 py-4 text-center" colSpan={5}>Carregando...</td></tr> : planejadas.length ? planejadas.map((item, index) => <tr key={item.id_doacao_planejada} className={`border-t border-[var(--g3-border)] ${index % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35"}`}><td className="px-3 py-2">{item.item_descricao ?? item.item_codigo}</td><td className="px-3 py-2">{item.beneficiario_nome || item.familia_nome || "---"}</td><td className="px-3 py-2">{item.quantidade} em {item.data_prevista}</td><td className="px-3 py-2">{item.status}</td><td className="px-3 py-2 text-right"><div className="flex justify-end gap-1"><Button type="button" variant="outline" className="h-7 px-2 text-xs" onClick={() => { setPlanoSelecionado(item.id_doacao_planejada); setPlano({ id_doacao_planejada: item.id_doacao_planejada, item_id: item.item_id, quantidade: item.quantidade, data_prevista: item.data_prevista ?? planoInicial.data_prevista, prioridade: item.prioridade, status: item.status, observacoes: item.observacoes }); }}>Editar</Button><Button type="button" variant="outline" className="h-7 px-2 text-xs" onClick={() => void realizarPlanejada(item)}>Realizar</Button></div></td></tr>) : <tr><td className="px-3 py-4 text-center" colSpan={5}>Nenhum planejamento encontrado.</td></tr>}</tbody></table></div>
+                  <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => { setPlano(planoInicial); setPlanoSelecionado(undefined); }} disabled={processandoAcoes}>Limpar</Button><Button type="button" onClick={() => void salvarPlanejamento()} disabled={processandoAcoes}>{salvarPlanejadaMutation.isPending ? "Salvando..." : "Salvar planejamento"}</Button></div>
+                  <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]"><table className="min-w-full text-sm"><thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"><tr><th className="px-3 py-2 text-left">Item</th><th className="px-3 py-2 text-left">Beneficiário/Família</th><th className="px-3 py-2 text-left">Previsto</th><th className="px-3 py-2 text-left">Status</th><th className="px-3 py-2 text-right">Ações</th></tr></thead><tbody>{carregandoPlanejadas ? <tr><td className="px-3 py-4 text-center" colSpan={5}>Carregando...</td></tr> : planejadas.length ? planejadas.map((item, index) => <tr key={item.id_doacao_planejada} className={`border-t border-[var(--g3-border)] ${index % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35"}`}><td className="px-3 py-2">{item.item_descricao ?? item.item_codigo}</td><td className="px-3 py-2">{item.beneficiario_nome || item.familia_nome || "---"}</td><td className="px-3 py-2">{item.quantidade} em {item.data_prevista}</td><td className="px-3 py-2">{item.status}</td><td className="px-3 py-2 text-right"><div className="flex justify-end gap-1"><Button type="button" variant="outline" className="h-7 px-2 text-xs" onClick={() => { setPlanoSelecionado(item.id_doacao_planejada); setPlano({ id_doacao_planejada: item.id_doacao_planejada, item_id: item.item_id, quantidade: item.quantidade, data_prevista: item.data_prevista ?? planoInicial.data_prevista, prioridade: item.prioridade, status: item.status, observacoes: item.observacoes }); }} disabled={processandoAcoes}>Editar</Button><Button type="button" variant="outline" className="h-7 px-2 text-xs" onClick={() => void realizarPlanejada(item)} disabled={processandoAcoes}>{salvarMutation.isPending || salvarPlanejadaMutation.isPending ? "Processando..." : "Realizar"}</Button></div></td></tr>) : <tr><td className="px-3 py-4 text-center" colSpan={5}>Nenhum planejamento encontrado.</td></tr>}</tbody></table></div>
                 </div>
               )}
 
