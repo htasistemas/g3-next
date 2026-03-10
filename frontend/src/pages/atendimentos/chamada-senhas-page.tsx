@@ -37,6 +37,14 @@ import {
   useSenhasAguardando,
   useSenhasConfig
 } from "@/features/senhas/use-senhas";
+import {
+  destravarSinteseVoz,
+  emitirEventoPainelChamada,
+  falarChamadaNavegador,
+  FRASE_FALA_PADRAO,
+  painelJaFalouChamada,
+  painelAtivoComVoz
+} from "@/lib/senhas-voz";
 import { imprimirConteudoAtual } from "@/lib/report-utils";
 import { beneficiariosService } from "@/services/beneficiarios.service";
 import { unidadesAssistenciaisService } from "@/services/unidades-assistenciais.service";
@@ -50,80 +58,9 @@ const abas: AdminTab[] = [
   { id: "fila", label: "Fila aguardando", icon: List },
   { id: "config", label: "Configurações do painel", icon: Monitor }
 ];
-const FRASE_FALA_PADRAO = "Beneficiário {beneficiario} dirija-se a {sala} para atendimento.";
 
 function obterBeneficiarioId(beneficiario: Beneficiario | null) {
   return Number(beneficiario?.id_beneficiario ?? 0) || null;
-}
-
-function montarMensagemFala(frase: string, beneficiario: string, sala: string) {
-  return frase
-    .replace("{beneficiario}", beneficiario || "não identificado")
-    .replace("{sala}", sala || "atendimento");
-}
-
-function destravarSinteseVoz() {
-  if (typeof window === "undefined" || !("speechSynthesis" in window)) {
-    return;
-  }
-
-  const synth = window.speechSynthesis;
-  const utter = new SpeechSynthesisUtterance(" ");
-
-  utter.lang = "pt-BR";
-  utter.volume = 0;
-
-  synth.cancel();
-  synth.resume();
-  synth.speak(utter);
-  window.sessionStorage.setItem("g3-painel-audio-habilitado", "1");
-  window.localStorage.setItem("g3-painel-audio-habilitado", "1");
-
-  window.setTimeout(() => {
-    synth.cancel();
-  }, 80);
-}
-
-function falarChamadaNavegador(
-  frase: string,
-  beneficiario: string,
-  sala: string,
-  tentativa = 0
-) {
-  if (typeof window === "undefined" || !("speechSynthesis" in window)) {
-    return;
-  }
-
-  const synth = window.speechSynthesis;
-  const vozes = synth.getVoices();
-
-  if (vozes.length === 0 && tentativa < 4) {
-    window.setTimeout(() => {
-      falarChamadaNavegador(frase, beneficiario, sala, tentativa + 1);
-    }, 250);
-    return;
-  }
-
-  const vozGooglePt = vozes.find(
-    (voz) =>
-      voz.lang?.toLowerCase().startsWith("pt") &&
-      voz.name?.toLowerCase().includes("google")
-  );
-  const vozPt = vozes.find((voz) => voz.lang?.toLowerCase().startsWith("pt"));
-  const utter = new SpeechSynthesisUtterance(
-    montarMensagemFala(frase || FRASE_FALA_PADRAO, beneficiario, sala)
-  );
-
-  utter.lang = "pt-BR";
-  utter.voice = vozGooglePt ?? vozPt ?? null;
-  utter.rate = 0.95;
-  utter.pitch = 1;
-
-  synth.cancel();
-  synth.resume();
-  synth.speak(utter);
-  window.sessionStorage.setItem("g3-painel-audio-habilitado", "1");
-  window.localStorage.setItem("g3-painel-audio-habilitado", "1");
 }
 
 export function ChamadaSenhasPage() {
@@ -296,11 +233,17 @@ export function ChamadaSenhasPage() {
         localAtendimento,
         unidadeId: unidadeSelecionadaId
       });
-      falarChamadaNavegador(
-        configFrase || FRASE_FALA_PADRAO,
-        chamada.nomeBeneficiario,
-        chamada.localAtendimento
-      );
+      emitirEventoPainelChamada(chamada);
+
+      window.setTimeout(() => {
+        if (!painelAtivoComVoz() || !painelJaFalouChamada(chamada.id)) {
+          falarChamadaNavegador({
+            frase: configFrase || FRASE_FALA_PADRAO,
+            beneficiario: chamada.nomeBeneficiario,
+            sala: chamada.localAtendimento
+          });
+        }
+      }, 5500);
 
       setPopup({
         tipo: "sucesso",

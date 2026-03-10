@@ -18,7 +18,8 @@ export function useSenhaPainel(unidadeId?: number | null, limite = 10, refetchIn
   return useQuery({
     queryKey: ["senhas", "painel", unidadeId ?? "todas", limite],
     queryFn: () => senhasService.painel(unidadeId, limite),
-    refetchInterval
+    refetchInterval,
+    refetchIntervalInBackground: true
   });
 }
 
@@ -26,7 +27,8 @@ export function useSenhaAtual(unidadeId?: number | null) {
   return useQuery({
     queryKey: ["senhas", "atual", unidadeId ?? "todas"],
     queryFn: () => senhasService.atual(unidadeId),
-    refetchInterval: 5000
+    refetchInterval: 5000,
+    refetchIntervalInBackground: true
   });
 }
 

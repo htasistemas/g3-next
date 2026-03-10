@@ -1,34 +1,58 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useSenhaAtual, useSenhaPainel, useSenhasConfig } from "@/features/senhas/use-senhas";
-import { Button } from "@/components/ui/button";
+import {
+  audioPainelJaLiberado,
+  atualizarHeartbeatPainel,
+  destravarSinteseVoz,
+  falarChamadaNavegador,
+  FRASE_FALA_PADRAO,
+  registrarChamadaFalando,
+  ouvirEventoPainelChamada
+} from "@/lib/senhas-voz";
 import { unidadesAssistenciaisService } from "@/services/unidades-assistenciais.service";
+import type { SenhaChamadaResponse } from "@/types/senhas";
 
-const FRASE_FALA_PADRAO = "Beneficiário {beneficiario} dirija-se a {sala} para atendimento.";
+const NoticiasTicker = memo(function NoticiasTicker({
+  noticias,
+  velocidadeTicker
+}: {
+  noticias: string[];
+  velocidadeTicker: number;
+}) {
+  const itensTicker = useMemo(() => [...noticias, ...noticias], [noticias]);
+  const duracao = `${Math.max(18, Number(velocidadeTicker || 60) / 1.35)}s`;
 
-function montarMensagemFala(frase: string, beneficiario: string, sala: string) {
-  return frase
-    .replace("{beneficiario}", beneficiario || "não identificado")
-    .replace("{sala}", sala || "atendimento");
-}
+  return (
+    <section className="overflow-hidden rounded-[24px] border border-white/20 bg-black/20 shadow-[0_18px_50px_rgba(0,0,0,0.18)]">
+      <div className="relative overflow-hidden py-4">
+        <div
+          className="flex min-w-max items-center gap-10 whitespace-nowrap pr-10 text-sm font-semibold tracking-[0.01em] text-emerald-50 will-change-transform [animation-iteration-count:infinite] [animation-name:marquee] [animation-timing-function:linear] sm:text-base lg:text-lg"
+          style={{
+            animationDuration: duracao
+          }}
+        >
+          {itensTicker.map((item, index) => (
+            <span key={`${item}-${index}`} className="inline-flex items-center gap-3">
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-300 shadow-[0_0_16px_rgba(110,231,183,0.85)]" />
+              {item}
+            </span>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+});
 
 export function PainelSenhasPage() {
   const [searchParams] = useSearchParams();
   const [agora, setAgora] = useState(() => new Date());
-  const [tokenVozes, setTokenVozes] = useState(0);
   const [logomarcaUnidade, setLogomarcaUnidade] = useState("");
-  const [audioHabilitado, setAudioHabilitado] = useState(() => {
-    if (typeof window === "undefined") {
-      return false;
-    }
-
-    return (
-      window.sessionStorage.getItem("g3-painel-audio-habilitado") === "1" ||
-      window.localStorage.getItem("g3-painel-audio-habilitado") === "1"
-    );
-  });
-  const [mostrarAtivacaoAudio, setMostrarAtivacaoAudio] = useState(false);
+  const [audioHabilitado, setAudioHabilitado] = useState(() => audioPainelJaLiberado());
+  const [chamadaRecebida, setChamadaRecebida] = useState<SenhaChamadaResponse | null>(null);
   const ultimaChamadaIdRef = useRef<string | null>(null);
+  const chamadaEmAndamentoRef = useRef<string | null>(null);
+  const ultimoEventoRecebidoRef = useRef<{ id: string; em: number } | null>(null);
   const unidadeId = Number(searchParams.get("unidadeId") ?? 0) || undefined;
   const configQuery = useSenhasConfig();
   const limite = configQuery.data?.quantidadeUltimasChamadas ?? 4;
@@ -36,6 +60,7 @@ export function PainelSenhasPage() {
   const senhaAtualQuery = useSenhaAtual(unidadeId);
   const chamadas = painelQuery.data ?? [];
   const chamadaAtual = senhaAtualQuery.data ?? chamadas[0] ?? null;
+  const chamadaParaAnunciar = chamadaRecebida ?? chamadaAtual;
   const fraseFala = configQuery.data?.fraseFala?.trim() || FRASE_FALA_PADRAO;
 
   const noticias = useMemo(() => {
@@ -78,52 +103,9 @@ export function PainelSenhasPage() {
   }, [configQuery.data?.unidadePainelId, unidadeId]);
 
   useEffect(() => {
-    if (!("speechSynthesis" in window)) {
-      return;
-    }
-
-    const synth = window.speechSynthesis;
-    const atualizarVozes = () => {
-      setTokenVozes((atual) => atual + 1);
-    };
-    const timeoutId = window.setTimeout(() => {
-      synth.getVoices();
-      atualizarVozes();
-    }, 300);
-
-    synth.getVoices();
-    synth.addEventListener("voiceschanged", atualizarVozes);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-      synth.removeEventListener("voiceschanged", atualizarVozes);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!("speechSynthesis" in window)) {
-      return;
-    }
-
     const habilitarAudio = () => {
-      const synth = window.speechSynthesis;
-      const utter = new SpeechSynthesisUtterance(" ");
-
-      utter.lang = "pt-BR";
-      utter.volume = 0;
-
-      synth.cancel();
-      synth.resume();
-      synth.speak(utter);
-
-      window.setTimeout(() => {
-        synth.cancel();
-      }, 80);
-
+      destravarSinteseVoz();
       setAudioHabilitado(true);
-      setMostrarAtivacaoAudio(false);
-      window.sessionStorage.setItem("g3-painel-audio-habilitado", "1");
-      window.localStorage.setItem("g3-painel-audio-habilitado", "1");
     };
 
     window.addEventListener("pointerdown", habilitarAudio, { once: true });
@@ -136,87 +118,95 @@ export function PainelSenhasPage() {
   }, []);
 
   useEffect(() => {
-    if (!chamadaAtual?.id || ultimaChamadaIdRef.current === chamadaAtual.id) {
+    atualizarHeartbeatPainel(audioHabilitado);
+    const intervalId = window.setInterval(() => {
+      atualizarHeartbeatPainel(audioHabilitado);
+    }, 4000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [audioHabilitado]);
+
+  useEffect(() => {
+    return ouvirEventoPainelChamada((payload) => {
+      const ultimoEvento = ultimoEventoRecebidoRef.current;
+      if (
+        ultimoEvento &&
+        ultimoEvento.id === payload.id &&
+        Date.now() - ultimoEvento.em < 1500
+      ) {
+        return;
+      }
+
+      ultimoEventoRecebidoRef.current = {
+        id: payload.id,
+        em: Date.now()
+      };
+      setChamadaRecebida(payload);
+      void senhaAtualQuery.refetch();
+      void painelQuery.refetch();
+    });
+  }, [painelQuery.refetch, senhaAtualQuery.refetch]);
+
+  useEffect(() => {
+    if (!chamadaRecebida?.id) {
       return;
     }
 
+    const timeoutId = window.setTimeout(() => {
+      setChamadaRecebida((atual) => (atual?.id === chamadaRecebida.id ? null : atual));
+    }, 6000);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [chamadaRecebida]);
+
+  useEffect(() => {
+    if (
+      !chamadaParaAnunciar?.id ||
+      ultimaChamadaIdRef.current === chamadaParaAnunciar.id ||
+      chamadaEmAndamentoRef.current === chamadaParaAnunciar.id
+    ) {
+      return;
+    }
+
+    ultimaChamadaIdRef.current = chamadaParaAnunciar.id;
+    chamadaEmAndamentoRef.current = chamadaParaAnunciar.id;
+
+    falarChamadaNavegador({
+      frase: fraseFala,
+      beneficiario: chamadaParaAnunciar.nomeBeneficiario,
+      sala: chamadaParaAnunciar.localAtendimento,
+      onStart: () => {
+        chamadaEmAndamentoRef.current = null;
+        registrarChamadaFalando(chamadaParaAnunciar.id);
+        setAudioHabilitado(true);
+      },
+      onError: () => {
+        chamadaEmAndamentoRef.current = null;
+      }
+    });
+  }, [chamadaParaAnunciar, fraseFala]);
+
+  useEffect(() => {
     if (!("speechSynthesis" in window)) {
       return;
     }
 
-    const mensagem = montarMensagemFala(
-      fraseFala,
-      chamadaAtual.nomeBeneficiario,
-      chamadaAtual.localAtendimento
-    );
     const synth = window.speechSynthesis;
-    const vozes = synth.getVoices();
-
-    if (vozes.length === 0) {
-      const timeoutId = window.setTimeout(() => {
-        synth.getVoices();
-        setTokenVozes((atual) => atual + 1);
-      }, 350);
-
-      return () => {
-        window.clearTimeout(timeoutId);
-      };
-    }
-
-    const vozGooglePt = vozes.find(
-      (voz) =>
-        voz.lang?.toLowerCase().startsWith("pt") &&
-        voz.name?.toLowerCase().includes("google")
-    );
-    const vozPt = vozes.find((voz) => voz.lang?.toLowerCase().startsWith("pt"));
-    const utter = new SpeechSynthesisUtterance(mensagem);
-    let iniciouFala = false;
-    const timeoutFalhaId = window.setTimeout(() => {
-      if (!iniciouFala) {
-        ultimaChamadaIdRef.current = null;
-        const audioJaLiberado =
-          window.sessionStorage.getItem("g3-painel-audio-habilitado") === "1" ||
-          window.localStorage.getItem("g3-painel-audio-habilitado") === "1";
-        if (!audioJaLiberado) {
-          setMostrarAtivacaoAudio(true);
-        }
-      }
-    }, 1500);
-
-    utter.lang = "pt-BR";
-    utter.voice = vozGooglePt ?? vozPt ?? null;
-    utter.rate = 0.95;
-    utter.pitch = 1;
-    utter.onerror = () => {
-      window.clearTimeout(timeoutFalhaId);
-      if (ultimaChamadaIdRef.current === chamadaAtual.id) {
-        ultimaChamadaIdRef.current = null;
-      }
-      const audioJaLiberado =
-        window.sessionStorage.getItem("g3-painel-audio-habilitado") === "1" ||
-        window.localStorage.getItem("g3-painel-audio-habilitado") === "1";
-      if (!audioJaLiberado) {
-        setMostrarAtivacaoAudio(true);
-      }
-    };
-    utter.onstart = () => {
-      iniciouFala = true;
-      window.clearTimeout(timeoutFalhaId);
-      ultimaChamadaIdRef.current = chamadaAtual.id;
-      setAudioHabilitado(true);
-      setMostrarAtivacaoAudio(false);
-      window.sessionStorage.setItem("g3-painel-audio-habilitado", "1");
-      window.localStorage.setItem("g3-painel-audio-habilitado", "1");
+    const atualizarVozes = () => {
+      void senhaAtualQuery.refetch();
     };
 
-    synth.cancel();
-    synth.resume();
-    synth.speak(utter);
+    synth.getVoices();
+    synth.addEventListener("voiceschanged", atualizarVozes);
 
     return () => {
-      window.clearTimeout(timeoutFalhaId);
+      synth.removeEventListener("voiceschanged", atualizarVozes);
     };
-  }, [audioHabilitado, chamadaAtual, fraseFala, tokenVozes]);
+  }, [senhaAtualQuery.refetch]);
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,#1f8f66_0%,#0f5a43_30%,#072c21_100%)] px-3 py-3 text-white sm:px-4 lg:px-6">
@@ -343,67 +333,13 @@ export function PainelSenhasPage() {
           </div>
         </section>
 
-        <section className="overflow-hidden rounded-[24px] border border-white/20 bg-black/20 shadow-[0_18px_50px_rgba(0,0,0,0.18)]">
-          <div
-            className="whitespace-nowrap py-3 text-xs font-medium sm:text-sm [animation:marquee_28s_linear_infinite]"
-            style={{
-              animationDuration: `${Math.max(
-                10,
-                Number(configQuery.data?.velocidadeTicker ?? 60) / 2
-              )}s`
-            }}
-          >
-            {[...noticias, ...noticias].map((item, index) => (
-              <span key={`${item}-${index}`} className="mx-6 inline-flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-emerald-300" />
-                {item}
-              </span>
-            ))}
-          </div>
-        </section>
+        <NoticiasTicker
+          noticias={noticias}
+          velocidadeTicker={Number(configQuery.data?.velocidadeTicker ?? 60)}
+        />
       </div>
 
-      {mostrarAtivacaoAudio ? (
-        <div className="fixed bottom-4 right-4 z-50 w-[min(92vw,360px)] rounded-2xl border border-emerald-200 bg-white p-4 text-[var(--g3-foreground)] shadow-[0_18px_45px_rgba(0,0,0,0.22)]">
-          <p className="text-sm font-semibold text-emerald-900">Ativar voz do painel</p>
-          <p className="mt-1 text-sm text-[var(--g3-muted)]">
-            O navegador bloqueou a primeira fala. Clique abaixo uma vez para habilitar os
-            anúncios por voz.
-          </p>
-          <Button
-            className="mt-3 w-full"
-            onClick={() => {
-              if (!("speechSynthesis" in window)) {
-                return;
-              }
-
-              const synth = window.speechSynthesis;
-              const utter = new SpeechSynthesisUtterance(" ");
-
-              utter.lang = "pt-BR";
-              utter.volume = 0;
-
-              synth.cancel();
-              synth.resume();
-              synth.speak(utter);
-
-              window.setTimeout(() => {
-                synth.cancel();
-              }, 80);
-
-              setAudioHabilitado(true);
-              setMostrarAtivacaoAudio(false);
-              window.sessionStorage.setItem("g3-painel-audio-habilitado", "1");
-              window.localStorage.setItem("g3-painel-audio-habilitado", "1");
-              setTokenVozes((atual) => atual + 1);
-            }}
-          >
-            Habilitar voz
-          </Button>
-        </div>
-      ) : null}
-
-      <style>{`@keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }`}</style>
+      <style>{`@keyframes marquee { from { transform: translate3d(0,0,0); } to { transform: translate3d(-50%,0,0); } }`}</style>
     </main>
   );
 }

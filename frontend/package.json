@@ -14,7 +14,7 @@
     "react:build": "vite build --config vite.react.config.ts",
     "react:preview": "vite preview --config vite.react.config.ts",
     "react:typecheck": "tsc -p tsconfig.react.json --noEmit",
-    "test:text": "vitest run src/lib/__tests__/text-formatter.test.ts"
+    "test:text": "vitest run src/lib/__tests__"
   },
   "prettier": {
     "printWidth": 100,
