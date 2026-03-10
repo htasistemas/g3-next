@@ -43,6 +43,8 @@ const abas: AdminTab[] = [
   { id: "listagem", label: "Listagem", icon: ListChecks }
 ];
 
+const tituloTela = "Patrimônio";
+
 const defaultForm: Patrimonio = {
   numeroPatrimonio: "",
   nome: "",
@@ -259,6 +261,8 @@ export function PatrimonioPage() {
         activeTab={abaAtiva}
         onChangeTab={(tabId) => setAbaAtiva(tabId as AbaId)}
         actions={acoes}
+        sectionLabel="Setor administrativo"
+        pageTitle={tituloTela}
         activeTitle={abas.find((aba) => aba.id === abaAtiva)?.label}
         codeBadge={form.idPatrimonio ? `Código: ${form.idPatrimonio}` : "Novo"}
       >

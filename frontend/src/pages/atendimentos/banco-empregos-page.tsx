@@ -65,6 +65,8 @@ const abas: AdminTab[] = [
   { id: "candidatos", label: "Candidatos da vaga", icon: Users }
 ];
 
+const tituloTela = "Banco de empregos";
+
 function criarFormularioVazio(): JobPayload {
   return {
     dadosVaga: {
@@ -194,6 +196,21 @@ export function BancoEmpregosPage() {
     setSnapshot(vaga);
     limparSelecoesAuxiliares();
     setAbaAtiva("dadosVaga");
+  }
+
+  function selecionarVagaParaCandidatos(vagaId: string) {
+    const vaga = vagas.find((item) => item.id === vagaId);
+    if (!vaga) {
+      setVagaSelecionadaId(undefined);
+      limparSelecoesAuxiliares();
+      return;
+    }
+
+    setVagaSelecionadaId(vaga.id);
+    setForm(vaga);
+    setSnapshot(vaga);
+    limparSelecoesAuxiliares();
+    setAbaAtiva("candidatos");
   }
 
   function atualizarBeneficiarioEncaminhamento(valor: string) {
@@ -415,7 +432,11 @@ export function BancoEmpregosPage() {
         activeTab={abaAtiva}
         onChangeTab={(tabId) => setAbaAtiva(tabId as AbaId)}
         actions={acoes}
-        activeTitle={abas.find((item) => item.id === abaAtiva)?.label}
+        sectionLabel="Atendimentos"
+        pageTitle={tituloTela}
+        activeTitle={
+          abaAtiva === "listagemVagas" ? "Listagem" : abas.find((item) => item.id === abaAtiva)?.label
+        }
         codeBadge={vagaSelecionadaId ? `Código: ${vagaSelecionadaId}` : "Novo"}
       >
         {abaAtiva === "listagemVagas" ? (
@@ -670,7 +691,25 @@ export function BancoEmpregosPage() {
 
         {abaAtiva === "candidatos" ? (
           <section className="space-y-3">
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-4">
+              <div className="space-y-1 md:col-span-2">
+                <Label>Vaga *</Label>
+                <Select
+                  value={vagaSelecionadaId ?? ""}
+                  onChange={(event) => selecionarVagaParaCandidatos(event.target.value)}
+                  disabled={criarCandidatoMutation.isPending || removerCandidatoMutation.isPending}
+                >
+                  <option value="">Selecione a vaga</option>
+                  {vagas.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.dadosVaga.titulo} - {item.empresaLocal?.nomeEmpresa ?? "Sem empresa"}
+                    </option>
+                  ))}
+                </Select>
+                <p className="text-xs text-slate-500">
+                  Selecione a vaga para vincular corretamente o candidato.
+                </p>
+              </div>
               <div className="space-y-1 md:col-span-2">
                 <Label>Nome do candidato</Label>
                 <Input
@@ -692,7 +731,7 @@ export function BancoEmpregosPage() {
                   O candidato deve ser selecionado a partir do cadastro de beneficiários.
                 </p>
               </div>
-              <div className="space-y-1">
+              <div className="space-y-1 md:col-span-1">
                 <Label>Status</Label>
                 <Select
                   value={statusCandidato}
@@ -709,7 +748,7 @@ export function BancoEmpregosPage() {
             </div>
             <Button
               onClick={() => void adicionarCandidato()}
-              disabled={criarCandidatoMutation.isPending || removerCandidatoMutation.isPending}
+              disabled={!vagaSelecionadaId || criarCandidatoMutation.isPending || removerCandidatoMutation.isPending}
             >
               {criarCandidatoMutation.isPending ? "Adicionando candidato..." : "Adicionar candidato"}
             </Button>

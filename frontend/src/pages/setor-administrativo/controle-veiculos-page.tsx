@@ -30,6 +30,8 @@ const abas: AdminTab[] = [
   { id: "motoristas", label: "Motoristas Autorizados", icon: ShieldCheck }
 ];
 
+const tituloTela = "Controle de veículos";
+
 const defaultVeiculo: VeiculoCadastro = { placa: "", modelo: "", marca: "", ativo: true };
 const defaultDiario: RegistroDiarioBordo = { data: new Date().toISOString().slice(0, 10), veiculoId: null };
 const defaultMotorista: MotoristaAutorizado = {
@@ -175,6 +177,8 @@ export function ControleVeiculosPage() {
         activeTab={abaAtiva}
         onChangeTab={(tabId) => setAbaAtiva(tabId as AbaId)}
         actions={acoes}
+        sectionLabel="Setor administrativo"
+        pageTitle={tituloTela}
         activeTitle={abas.find((item) => item.id === abaAtiva)?.label}
       >
         {abaAtiva === "cadastro" ? (

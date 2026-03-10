@@ -47,6 +47,7 @@ const IndicadoresPage = carregarPagina(
   () => import("@/pages/dashboard/indicadores-page"),
   "IndicadoresPage"
 );
+const PowerBiPage = carregarPagina(() => import("@/pages/dashboard/power-bi-page"), "PowerBiPage");
 const CadastroBeneficiarioPage = carregarPagina(
   () => import("@/pages/beneficiarios/cadastro-beneficiario-page"),
   "CadastroBeneficiarioPage"
@@ -204,6 +205,7 @@ export const router = createBrowserRouter([
       { index: true, element: <Navigate to="/dashboard/visao-geral" replace /> },
       { path: "/dashboard/visao-geral", element: VisaoGeralPage },
       { path: "/dashboard/indicadores", element: IndicadoresPage },
+      { path: "/dashboard/power-bi", element: PowerBiPage },
       { path: "/cadastros/beneficiarios", element: CadastroBeneficiarioPage },
       { path: "/cadastros/profissionais", element: CadastroProfissionalPage },
       { path: "/cadastros/voluntariado", element: CadastroVoluntariadoPage },

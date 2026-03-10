@@ -59,6 +59,8 @@ const abas: AdminTab[] = [
   { id: "config", label: "Configurações do painel", icon: Monitor }
 ];
 
+const tituloTela = "Chamada de senhas";
+
 function obterBeneficiarioId(beneficiario: Beneficiario | null) {
   return Number(beneficiario?.id_beneficiario ?? 0) || null;
 }
@@ -388,6 +390,8 @@ export function ChamadaSenhasPage() {
         activeTab={abaAtiva}
         onChangeTab={(tabId) => setAbaAtiva(tabId as AbaId)}
         actions={acoes}
+        sectionLabel="Atendimentos"
+        pageTitle={tituloTela}
         activeTitle={abas.find((item) => item.id === abaAtiva)?.label}
       >
         {abaAtiva === "entrada" ? (

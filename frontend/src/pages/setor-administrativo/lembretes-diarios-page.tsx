@@ -27,6 +27,8 @@ const abas: AdminTab[] = [
   { id: "lembretes", label: "Lembretes Criados", icon: List }
 ];
 
+const tituloTela = "Lembretes diários";
+
 type FormState = LembreteDiarioPayload & { id?: number };
 
 const defaultForm: FormState = {
@@ -279,6 +281,8 @@ export function LembretesDiariosPage() {
         activeTab={abaAtiva}
         onChangeTab={(tabId) => setAbaAtiva(tabId as AbaId)}
         actions={acoes}
+        sectionLabel="Setor administrativo"
+        pageTitle={tituloTela}
         activeIcon={abaAtiva === "cadastro" ? Bell : List}
         activeTitle={abaAtiva === "cadastro" ? "Cadastro De Lembretes" : "Lembretes Criados"}
         codeBadge={form.id ? `Código: ${form.id}` : "Novo"}

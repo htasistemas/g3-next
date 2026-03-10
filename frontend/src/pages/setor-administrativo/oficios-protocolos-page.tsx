@@ -35,6 +35,8 @@ const abas: AdminTab[] = [
   { id: "listagem", label: "Ofícios Registrados", icon: ListChecks }
 ];
 
+const tituloTela = "Ofícios e protocolos";
+
 const hojeIso = new Date().toISOString().slice(0, 10);
 
 const defaultForm: OficioPayload = {
@@ -292,6 +294,8 @@ export function OficiosProtocolosPage() {
         activeTab={abaAtiva}
         onChangeTab={(tabId) => setAbaAtiva(tabId as AbaId)}
         actions={acoes}
+        sectionLabel="Setor administrativo"
+        pageTitle={tituloTela}
         activeTitle={abas.find((item) => item.id === abaAtiva)?.label}
         codeBadge={form.id ? `Código: ${form.id}` : "Novo"}
       >

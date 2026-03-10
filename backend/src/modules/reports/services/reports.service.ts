@@ -510,7 +510,7 @@ export class ReportsService {
       titulo: "Ficha Cadastral de Beneficiário",
       metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),
       fotoUrl: beneficiario.foto_3x4,
-      fotoAjuste: "contain",
+      fotoAjuste: "cover",
       blocos: this.montarBlocosFichaBeneficiario(beneficiario),
       cabecalho: contexto.cabecalho,
       rodape: contexto.rodape

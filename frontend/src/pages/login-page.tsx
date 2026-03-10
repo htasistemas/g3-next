@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,7 +8,7 @@ import { authService } from "@/services/auth.service";
 
 const FOTO_LATERAL_URL = "/images/loguim.jpg";
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim() || undefined;
-const GOOGLE_ALLOWED_ORIGINS = new Set(
+const GOOGLE_CONFIGURED_ORIGINS = new Set(
   (import.meta.env.VITE_GOOGLE_ALLOWED_ORIGINS ?? "")
     .split(",")
     .map((origem: string) => origem.trim())
@@ -64,7 +64,7 @@ function BandeiraBrasilIcon() {
 }
 
 export function LoginPage() {
-  const [modalAberto, setModalAberto] = useState<"termos" | "politica" | null>(null);
+  const [modalAberto, setModalAberto] = useState<"termos" | "politica" | "acesso" | null>(null);
   const [popupEsqueciSenhaAberto, setPopupEsqueciSenhaAberto] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -82,16 +82,11 @@ export function LoginPage() {
   const versaoSistema = import.meta.env.VITE_APP_VERSION ?? "1.00.13";
   const googleButtonRef = useRef<HTMLDivElement | null>(null);
   const origemAtual = typeof window === "undefined" ? "" : window.location.origin;
-  const hostnameAtual = typeof window === "undefined" ? "" : window.location.hostname;
-  const ambienteLocal =
-    hostnameAtual === "localhost" || hostnameAtual === "127.0.0.1" || hostnameAtual === "0.0.0.0";
   const googleAviso = !GOOGLE_CLIENT_ID
     ? "Login com Google indisponível: client ID não configurado."
-    : GOOGLE_ALLOWED_ORIGINS.size === 0 && ambienteLocal
-      ? "Login com Google indisponível neste ambiente: origem não configurada."
-      : GOOGLE_ALLOWED_ORIGINS.size > 0 && !GOOGLE_ALLOWED_ORIGINS.has(origemAtual)
-        ? "Login com Google indisponível neste ambiente."
-        : null;
+    : GOOGLE_CONFIGURED_ORIGINS.size > 0 && !GOOGLE_CONFIGURED_ORIGINS.has(origemAtual)
+      ? "Login com Google indisponível neste ambiente."
+      : null;
   const googleDisponivel = googleAviso === null;
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -311,8 +306,14 @@ export function LoginPage() {
 
               <div className="space-y-2 border-t border-slate-100 pt-4 text-center text-sm">
                 <p className="text-slate-700">Precisa de acesso?</p>
-                <Button asChild variant="outline" size="sm" className="mx-auto">
-                  <Link to="/criar-conta">Solicitar acesso</Link>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mx-auto"
+                  onClick={() => setModalAberto("acesso")}
+                >
+                  Solicitar acesso
                 </Button>
                 <p className="text-slate-600">
                   Ao continuar, você concorda com os {" "}
@@ -354,14 +355,27 @@ export function LoginPage() {
           >
             <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
               <h3 className="text-base font-semibold text-slate-900">
-                {modalAberto === "termos" ? "Termos de uso" : "Política de privacidade"}
+                {modalAberto === "acesso"
+                  ? "Solicitar acesso"
+                  : modalAberto === "termos"
+                    ? "Termos de uso"
+                    : "Política de privacidade"}
               </h3>
               <Button variant="ghost" size="sm" onClick={() => setModalAberto(null)}>
                 Fechar
               </Button>
             </div>
             <div className="space-y-3 px-5 py-4 text-sm text-slate-700">
-              {modalAberto === "termos" ? (
+              {modalAberto === "acesso" ? (
+                <>
+                  <p>O acesso ao G3 Next é administrado pela equipe responsável pelo sistema.</p>
+                  <p>
+                    Novos usuários devem solicitar liberação de conta e permissões ao administrador
+                    institucional.
+                  </p>
+                  <p>O cadastro público direto não fica disponível nesta tela.</p>
+                </>
+              ) : modalAberto === "termos" ? (
                 <>
                   <p>Este sistema é destinado ao uso institucional da equipe autorizada para gestão social.</p>
                   <p>

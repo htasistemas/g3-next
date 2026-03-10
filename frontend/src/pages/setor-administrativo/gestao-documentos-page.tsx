@@ -50,6 +50,8 @@ const abas: AdminTab[] = [
   { id: "relatorios", label: "Relatórios / Dashboard", icon: Bell }
 ];
 
+const tituloTela = "Gestão de documentos";
+
 type FormState = DocumentoInstituicaoPayload & { id?: string };
 
 const defaultForm: FormState = {
@@ -353,7 +355,9 @@ export function GestaoDocumentosPage() {
         activeTab={abaAtiva}
         onChangeTab={(tabId) => setAbaAtiva(tabId as AbaId)}
         actions={acoes}
-        activeTitle={abas.find((item) => item.id === abaAtiva)?.label}
+        sectionLabel="Setor administrativo"
+        pageTitle={tituloTela}
+        activeTitle={abaAtiva === "lista" ? "Listagem" : abas.find((item) => item.id === abaAtiva)?.label}
         codeBadge={form.id ? `Código: ${form.id}` : "Novo"}
       >
         {abaAtiva === "lista" ? (

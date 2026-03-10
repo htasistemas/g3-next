@@ -43,6 +43,8 @@ const abas: AdminTab[] = [
   { id: "movimentacoes", label: "Movimentações", icon: ClipboardList }
 ];
 
+const tituloTela = "Almoxarifado";
+
 const defaultItem: ItemAlmoxarifado = {
   codigo: "",
   descricao: "",
@@ -231,6 +233,8 @@ export function AlmoxarifadoPage() {
         activeTab={abaAtiva}
         onChangeTab={(tabId) => setAbaAtiva(tabId as AbaId)}
         actions={acoes}
+        sectionLabel="Setor administrativo"
+        pageTitle={tituloTela}
         activeTitle={abas.find((item) => item.id === abaAtiva)?.label}
         codeBadge={itemForm.id_item ? `Código: ${itemForm.codigo}` : "Novo"}
       >

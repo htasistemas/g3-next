@@ -95,6 +95,7 @@ const subzonaEnderecoOptions = [
   { value: "ZONA_OESTE", label: "Zona Oeste" },
   { value: "ZONA_CENTRAL", label: "Zona Central" }
 ] as const;
+const tituloTela = "Cadastro de profissionais";
 
 function formatarCpf(valor?: string) {
   if (!valor) return "---";
@@ -685,13 +686,24 @@ export function CadastroProfissionalPage() {
   return (
     <main className={classesTelaPadraoBeneficiario.container}>
       <section className={classesTelaPadraoBeneficiario.barraAcoes} data-print="toolbar">
-        <div className={classesTelaPadraoBeneficiario.gradeAcoes}>
-          {acoesNaOrdemPadrao.map((acao) => (
-            <Button key={acao.label} type="button" variant={acao.variant} size="sm" className={classesTelaPadraoBeneficiario.botaoAcao} onClick={acao.onClick} disabled={bloqueadoAcao || (acao.label === "Excluir" && !idSelecionado)}>
-              <acao.icon className="mr-1.5 h-3.5 w-3.5" />
-              {acao.label}
-            </Button>
-          ))}
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--g3-muted)]">
+              Cadastros
+            </p>
+            <h1 className="text-sm font-semibold tracking-tight text-[var(--g3-foreground)] sm:text-base">
+              {tituloTela}
+            </h1>
+          </div>
+
+          <div className={classesTelaPadraoBeneficiario.gradeAcoes}>
+            {acoesNaOrdemPadrao.map((acao) => (
+              <Button key={acao.label} type="button" variant={acao.variant} size="sm" className={classesTelaPadraoBeneficiario.botaoAcao} onClick={acao.onClick} disabled={bloqueadoAcao || (acao.label === "Excluir" && !idSelecionado)}>
+                <acao.icon className="mr-1.5 h-3.5 w-3.5" />
+                {acao.label}
+              </Button>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -711,7 +723,9 @@ export function CadastroProfissionalPage() {
           <CardHeader className={classesTelaPadraoBeneficiario.cabecalhoConteudo}>
             <div className={classesTelaPadraoBeneficiario.tituloAba}>
               <IconeAbaAtiva className="h-4 w-4" />
-              <CardTitle className={classesTelaPadraoBeneficiario.tituloAbaTexto}>{abaAtual?.label}</CardTitle>
+              <CardTitle className={classesTelaPadraoBeneficiario.tituloAbaTexto}>
+                {abaAtiva === "listagem" ? "Listagem" : abaAtual?.label}
+              </CardTitle>
             </div>
           </CardHeader>
           <CardContent className="p-3 space-y-3">

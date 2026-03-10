@@ -596,24 +596,35 @@ export function CadastroVinculoFamiliarPage() {
   return (
     <main className={classesTelaPadraoBeneficiario.container}>
       <section className={classesTelaPadraoBeneficiario.barraAcoes} data-print="toolbar">
-        <div className={classesTelaPadraoBeneficiario.gradeAcoes}>
-          {acoesNaOrdemPadrao.map((acao) => (
-            <Button
-              key={acao.label}
-              type="button"
-              variant={acao.variant}
-              size="sm"
-              className={classesTelaPadraoBeneficiario.botaoAcao}
-              onClick={acao.onClick}
-              disabled={
-                bloqueadoAcao ||
-                ((acao.label === "Excluir" || acao.label === "Imprimir") && !familiaSelecionadaId)
-              }
-            >
-              <acao.icon className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
-              {acao.label}
-            </Button>
-          ))}
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--g3-muted)]">
+              Cadastros
+            </p>
+            <h1 className="text-sm font-semibold tracking-tight text-[var(--g3-foreground)] sm:text-base">
+              {tituloTela}
+            </h1>
+          </div>
+
+          <div className={classesTelaPadraoBeneficiario.gradeAcoes}>
+            {acoesNaOrdemPadrao.map((acao) => (
+              <Button
+                key={acao.label}
+                type="button"
+                variant={acao.variant}
+                size="sm"
+                className={classesTelaPadraoBeneficiario.botaoAcao}
+                onClick={acao.onClick}
+                disabled={
+                  bloqueadoAcao ||
+                  ((acao.label === "Excluir" || acao.label === "Imprimir") && !familiaSelecionadaId)
+                }
+              >
+                <acao.icon className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                {acao.label}
+              </Button>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -641,7 +652,7 @@ export function CadastroVinculoFamiliarPage() {
             <div className={classesTelaPadraoBeneficiario.tituloAba}>
               <IconeAbaAtiva className="h-4 w-4" aria-hidden="true" />
               <CardTitle className={classesTelaPadraoBeneficiario.tituloAbaTexto}>
-                {tituloAbaAtiva}
+                {abaAtiva === "listagem" ? "Listagem" : tituloAbaAtiva}
               </CardTitle>
             </div>
 

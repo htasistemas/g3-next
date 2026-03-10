@@ -39,6 +39,8 @@ const abas: AdminTab[] = [
   { id: "dashboard", label: "Dashboard E Alertas", icon: BarChart3 }
 ];
 
+const tituloTela = "Tarefas e pendências";
+
 type ChecklistDraft = {
   id?: number;
   titulo: string;
@@ -380,7 +382,9 @@ export function TarefasPendenciasPage() {
         activeTab={abaAtiva}
         onChangeTab={(tabId) => setAbaAtiva(tabId as AbaId)}
         actions={acoes}
-        activeTitle={abas.find((item) => item.id === abaAtiva)?.label}
+        sectionLabel="Setor administrativo"
+        pageTitle={tituloTela}
+        activeTitle={abaAtiva === "listagem" ? "Listagem" : abas.find((item) => item.id === abaAtiva)?.label}
         codeBadge={form.id ? `Código: ${form.id}` : "Novo"}
       >
         {abaAtiva === "cadastro" ? (

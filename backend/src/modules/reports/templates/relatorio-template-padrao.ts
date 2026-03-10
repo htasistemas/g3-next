@@ -235,18 +235,19 @@ export class RelatorioTemplatePadrao {
               margin: 0;
             }
             .foto-destaque__box {
-              width: 128px;
+              width: 132px;
               border: 1px solid #cbd5e1;
               border-radius: 8px;
-              padding: 4px;
+              padding: 0;
+              overflow: hidden;
               text-align: center;
               background: #fff;
             }
             .foto-destaque__box img {
               width: 100%;
-              height: 160px;
+              height: 172px;
               object-fit: contain;
-              border-radius: 4px;
+              border-radius: 0;
             }
             .bloco {
               margin-top: 10px;

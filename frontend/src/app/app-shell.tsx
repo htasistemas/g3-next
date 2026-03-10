@@ -75,7 +75,14 @@ const menuSections: MenuSection[] = [
     icon: LayoutDashboard,
     itens: [
       { id: "dashboard-visao-geral", to: "/dashboard/visao-geral", label: "Visão geral", icon: ChartPie },
-      { id: "dashboard-indicadores", to: "/dashboard/indicadores", label: "Indicadores", icon: ChartColumn }
+      { id: "dashboard-indicadores", to: "/dashboard/indicadores", label: "Indicadores", icon: ChartColumn },
+      {
+        id: "dashboard-power-bi",
+        to: "/dashboard/power-bi",
+        label: "Power BI",
+        icon: ChartColumn,
+        requiredPermissions: ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"]
+      }
     ]
   },
   {
@@ -322,6 +329,7 @@ const menuSections: MenuSection[] = [
 function obterTitulo(pathname: string): string {
   if (pathname === "/" || pathname.startsWith("/dashboard/visao-geral")) return "Visão geral";
   if (pathname.startsWith("/dashboard/indicadores")) return "Indicadores";
+  if (pathname.startsWith("/dashboard/power-bi")) return "Power BI";
   if (pathname.startsWith("/cadastros/beneficiarios")) return "Cadastro de beneficiários";
   if (pathname.startsWith("/cadastros/profissionais")) return "Cadastro de profissionais";
   if (pathname.startsWith("/cadastros/voluntariado")) return "Cadastro de voluntariado";
@@ -356,6 +364,20 @@ function obterTitulo(pathname: string): string {
   return "Painel de migração";
 }
 
+function ocultarTituloTopo(pathname: string) {
+  return (
+    pathname.startsWith("/cadastros/") ||
+    pathname.startsWith("/dashboard/power-bi") ||
+    pathname.startsWith("/atendimentos/banco-empregos") ||
+    pathname.startsWith("/atendimentos/biblioteca") ||
+    pathname.startsWith("/atendimentos/registro-visitas") ||
+    pathname.startsWith("/atendimentos/ocorrencias") ||
+    pathname.startsWith("/atendimentos/chamada-senhas") ||
+    pathname.startsWith("/setor-financeiro/") ||
+    pathname.startsWith("/setor-administrativo/")
+  );
+}
+
 function itemEstaAtivo(pathname: string, item: MenuItem) {
   if (!item.to) return false;
   return pathname === item.to || pathname.startsWith(`${item.to}/`);
@@ -366,6 +388,7 @@ export function AppShell() {
   const { data: unidadeAtualData } = useUnidadeAssistencialAtual();
   const location = useLocation();
   const titulo = obterTitulo(location.pathname);
+  const semTituloNoTopo = ocultarTituloTopo(location.pathname);
   const versaoSistema = import.meta.env.VITE_APP_VERSION ?? "1.00.13";
   const [sidebarRecolhida, setSidebarRecolhida] = useState(false);
   const [gruposAbertos, setGruposAbertos] = useState<Record<string, boolean>>({});
@@ -589,9 +612,13 @@ export function AppShell() {
         <header className="border-b border-[var(--g3-header-border)] bg-[var(--g3-header-bg)]/95 backdrop-blur">
           <div className="mx-auto w-full max-w-[1440px] px-4 py-1.5 lg:px-8">
             <div className="flex min-h-9 flex-wrap items-center justify-between gap-2">
-              <div className="min-w-0">
-                <h1 className="truncate text-sm font-semibold text-[var(--g3-foreground)] sm:text-base">{titulo}</h1>
-              </div>
+              {semTituloNoTopo ? <div className="min-h-0 min-w-0" /> : (
+                <div className="min-w-0">
+                  <h1 className="truncate text-sm font-semibold text-[var(--g3-foreground)] sm:text-base">
+                    {titulo}
+                  </h1>
+                </div>
+              )}
               <div className="flex items-center gap-1.5 sm:gap-2">
                 <span className="rounded-full bg-[var(--g3-primary-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--g3-active)]">
                   G3 Next

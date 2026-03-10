@@ -66,6 +66,8 @@ const abas: AdminTab[] = [
   { id: "eventos", label: "Eventos", icon: CalendarDays }
 ];
 
+const tituloTela = "Empréstimo para eventos";
+
 const statusOpcoes: Array<{ value: StatusEmprestimoEvento; label: string }> = [
   { value: "RASCUNHO", label: "Rascunho" },
   { value: "AGENDADO", label: "Agendado" },
@@ -383,7 +385,7 @@ export function EmprestimoEventosPage() {
 
   return (
     <>
-      <AdminPageLayout tabs={abas} activeTab={abaAtiva} onChangeTab={(id) => setAbaAtiva(id as AbaId)} actions={acoes} activeTitle={abas.find((a) => a.id === abaAtiva)?.label} codeBadge={form.id ? `Código: ${form.id}` : "Novo"}>
+      <AdminPageLayout tabs={abas} activeTab={abaAtiva} onChangeTab={(id) => setAbaAtiva(id as AbaId)} actions={acoes} sectionLabel="Setor administrativo" pageTitle={tituloTela} activeTitle={abas.find((a) => a.id === abaAtiva)?.label} codeBadge={form.id ? `Código: ${form.id}` : "Novo"}>
         {abaAtiva === "listagem" ? (
           <section className="space-y-3">
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">

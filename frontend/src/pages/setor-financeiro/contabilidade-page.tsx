@@ -58,6 +58,8 @@ const abas: AdminTab[] = [
   { id: "emendas", label: "Emendas", icon: BookOpenText }
 ];
 
+const tituloTela = "Contabilidade";
+
 const contaVazia: ContaBancariaPayload = {
   banco: "",
   numero: "",
@@ -350,6 +352,8 @@ export function ContabilidadePage() {
         activeTab={abaAtiva}
         onChangeTab={(tabId) => setAbaAtiva(tabId as AbaId)}
         actions={acoes}
+        sectionLabel="Setor financeiro"
+        pageTitle={tituloTela}
         activeTitle={abas.find((item) => item.id === abaAtiva)?.label}
         codeBadge={abaAtiva === "contas" && contaSelecionadaId ? `Conta: ${contaSelecionadaId}` : undefined}
       >

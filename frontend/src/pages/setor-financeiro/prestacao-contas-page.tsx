@@ -45,6 +45,8 @@ const abas: AdminTab[] = [
   { id: "comprovantes", label: "Comprovantes E Checklist", icon: FileCheck }
 ];
 
+const tituloTela = "Prestação de contas";
+
 const registroVazio: PrestacaoContasPayload = {
   recebimentos: [],
   destinacoes: [],
@@ -239,6 +241,8 @@ export function PrestacaoContasPage() {
         activeTab={abaAtiva}
         onChangeTab={(tabId) => setAbaAtiva(tabId as AbaId)}
         actions={acoes}
+        sectionLabel="Setor financeiro"
+        pageTitle={tituloTela}
         activeTitle={abas.find((item) => item.id === abaAtiva)?.label}
         codeBadge={registroSelecionadoId ? `Código: ${registroSelecionadoId}` : "Novo"}
       >

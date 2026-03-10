@@ -50,6 +50,8 @@ const abas: AdminTab[] = [
   { id: "reserva", label: "Reserva Bancária", icon: Banknote }
 ];
 
+const tituloTela = "Autorização de compras";
+
 const autorizacaoVazia: AutorizacaoCompraPayload = {
   titulo: "",
   tipo: "Compra",
@@ -294,7 +296,9 @@ export function AutorizacaoComprasPage() {
         activeTab={abaAtiva}
         onChangeTab={(tabId) => setAbaAtiva(tabId as AbaId)}
         actions={acoes}
-        activeTitle={abas.find((item) => item.id === abaAtiva)?.label}
+        sectionLabel="Setor financeiro"
+        pageTitle={tituloTela}
+        activeTitle={abaAtiva === "listagem" ? "Listagem" : abas.find((item) => item.id === abaAtiva)?.label}
         codeBadge={autorizacaoSelecionadaId ? `Código: ${autorizacaoSelecionadaId}` : "Novo"}
       >
         {abaAtiva === "listagem" ? (
