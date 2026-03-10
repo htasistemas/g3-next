@@ -56,12 +56,12 @@ export function AdminPageLayout({
         <div
           className={
             sectionLabel || pageTitle
-              ? "flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"
+              ? "flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between"
               : undefined
           }
         >
           {sectionLabel || pageTitle ? (
-            <div className="min-w-0">
+            <div className="min-w-0 lg:flex-1">
               {sectionLabel ? (
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--g3-muted)]">
                   {sectionLabel}

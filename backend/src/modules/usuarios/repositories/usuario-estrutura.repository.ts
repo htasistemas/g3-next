@@ -21,7 +21,19 @@ const sqlEstruturaUsuarios: string[] = [
   "CREATE INDEX IF NOT EXISTS usuarios_status_idx ON usuarios(status)",
   "CREATE INDEX IF NOT EXISTS usuarios_setor_idx ON usuarios(setor)",
   "CREATE INDEX IF NOT EXISTS usuarios_unidade_idx ON usuarios(unidade)",
-  "CREATE INDEX IF NOT EXISTS usuarios_cpf_idx ON usuarios(cpf)"
+  "CREATE INDEX IF NOT EXISTS usuarios_cpf_idx ON usuarios(cpf)",
+  `
+  INSERT INTO permissao (nome)
+  VALUES
+    ('MENSAGENS_PERSONALIZADAS_VISUALIZAR'),
+    ('MENSAGENS_PERSONALIZADAS_CADASTRAR'),
+    ('MENSAGENS_PERSONALIZADAS_EDITAR'),
+    ('MENSAGENS_PERSONALIZADAS_EXCLUIR'),
+    ('MENSAGENS_PERSONALIZADAS_ENVIAR'),
+    ('MENSAGENS_PERSONALIZADAS_ENVIAR_LOTE'),
+    ('MENSAGENS_PERSONALIZADAS_HISTORICO')
+  ON CONFLICT (nome) DO NOTHING
+  `
 ];
 
 let estruturaInicializada = false;

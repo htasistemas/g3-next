@@ -342,20 +342,44 @@ export function PowerBiPage() {
                 Última atualização: {data ? formatarDataHora(data.atualizadoEm) : "carregando..."}
               </p>
             </div>
-            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
-              <Button type="button" size="sm" className="bg-white text-emerald-800 hover:bg-emerald-50" onClick={() => void refetch()} disabled={isFetching}>
+            <div className="grid gap-2 sm:grid-cols-2 xl:min-w-[240px] xl:grid-cols-1">
+              <Button
+                type="button"
+                size="sm"
+                className="justify-start bg-white text-emerald-800 hover:bg-emerald-50"
+                onClick={() => void refetch()}
+                disabled={isFetching}
+              >
                 <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />
                 Atualizar indicadores
               </Button>
-              <Button type="button" size="sm" variant="outline" className="border-white/30 text-white hover:bg-white/10" onClick={exportarPdf}>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="justify-start border-white/30 bg-white/10 text-white hover:bg-white/20"
+                onClick={exportarPdf}
+              >
                 <Download className="mr-1.5 h-3.5 w-3.5" />
                 Exportar PDF
               </Button>
-              <Button type="button" size="sm" variant="outline" className="border-white/30 text-white hover:bg-white/10" onClick={exportarAbaAtualExcel}>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="justify-start border-white/30 bg-white/10 text-white hover:bg-white/20"
+                onClick={exportarAbaAtualExcel}
+              >
                 <Download className="mr-1.5 h-3.5 w-3.5" />
                 Exportar Excel
               </Button>
-              <Button type="button" size="sm" variant="outline" className="border-white/30 text-white hover:bg-white/10" onClick={() => void alternarTelaCheia()}>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="justify-start border-white/30 bg-white/10 text-white hover:bg-white/20"
+                onClick={() => void alternarTelaCheia()}
+              >
                 <Maximize2 className="mr-1.5 h-3.5 w-3.5" />
                 Modo tela cheia
               </Button>
@@ -363,14 +387,14 @@ export function PowerBiPage() {
                 type="button"
                 size="sm"
                 variant="outline"
-                className="border-white/30 text-white hover:bg-white/10"
+                className="justify-start border-white/30 bg-white/10 text-white hover:bg-white/20"
                 onClick={() => {
                   setMostrarFiltros((atual) => !atual);
                   filtrosRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
                 }}
               >
                 <Filter className="mr-1.5 h-3.5 w-3.5" />
-                Configurar filtros
+                {mostrarFiltros ? "Recolher filtros" : "Expandir filtros"}
               </Button>
             </div>
           </div>
@@ -378,6 +402,23 @@ export function PowerBiPage() {
 
         <div ref={filtrosRef}>
           <Card className="border-[var(--g3-border)] bg-[var(--g3-card)] shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--g3-border)] px-4 py-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">Filtros gerais</p>
+                <p className="text-xs text-[var(--g3-muted)]">
+                  Expanda para ajustar o recorte analítico e recolha quando quiser focar nos gráficos.
+                </p>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setMostrarFiltros((atual) => !atual)}
+              >
+                <Filter className="mr-1.5 h-3.5 w-3.5" />
+                {mostrarFiltros ? "Recolher filtros" : "Expandir filtros"}
+              </Button>
+            </div>
             <CardContent className={`space-y-4 p-4 ${mostrarFiltros ? "" : "hidden"}`}>
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <div className="space-y-1">

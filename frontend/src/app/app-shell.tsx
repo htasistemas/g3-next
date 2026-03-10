@@ -31,6 +31,7 @@ import {
   Link2,
   ListFilter,
   Monitor,
+  MailPlus,
   Package,
   Settings2,
   SlidersHorizontal,
@@ -306,8 +307,19 @@ const menuSections: MenuSection[] = [
     id: "configuracoes-gerais",
     secao: "Configurações gerais",
     icon: Settings2,
-    requiredPermissions: ["ADMINISTRADOR"],
     itens: [
+      {
+        id: "configuracoes-mensagens-personalizadas",
+        to: "/configuracoes/mensagens-personalizadas",
+        label: "Mensagens personalizadas",
+        icon: MailPlus,
+        requiredPermissions: [
+          "ADMINISTRADOR",
+          "OPERADOR",
+          "LEITURA_APENAS",
+          "MENSAGENS_PERSONALIZADAS_VISUALIZAR"
+        ]
+      },
       {
         id: "configuracoes-parametros-sistema",
         to: "/configuracoes/parametros-sistema",
@@ -344,6 +356,7 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/cadastros/unidades-assistenciais")) return "Cadastro de unidade assistencial";
   if (pathname.startsWith("/cadastros/vinculo-familiar")) return "Cadastro de vínculo familiar";
   if (pathname.startsWith("/configuracoes/parametros-sistema")) return "Parâmetros do sistema";
+  if (pathname.startsWith("/configuracoes/mensagens-personalizadas")) return "Mensagens personalizadas";
   if (pathname.startsWith("/configuracoes/usuarios")) return "Usuários";
   if (pathname.startsWith("/setor-rh/registro-ponto")) return "Registro de ponto";
   if (pathname.startsWith("/setor-administrativo/almoxarifado")) return "Almoxarifado";
@@ -368,6 +381,7 @@ function ocultarTituloTopo(pathname: string) {
   return (
     pathname.startsWith("/cadastros/") ||
     pathname.startsWith("/dashboard/power-bi") ||
+    pathname.startsWith("/configuracoes/mensagens-personalizadas") ||
     pathname.startsWith("/atendimentos/banco-empregos") ||
     pathname.startsWith("/atendimentos/biblioteca") ||
     pathname.startsWith("/atendimentos/registro-visitas") ||

@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { MensagemAcoesRapidas } from "@/components/mensagens-personalizadas/mensagem-acoes-rapidas";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -224,6 +225,12 @@ export function CadastroVoluntariadoPage() {
   });
 
   const cepAtual = watch("cep") || "";
+  const nomeCompletoAtual = watch("nome_completo") || "";
+  const cpfAtual = watch("cpf") || "";
+  const emailAtual = watch("email") || "";
+  const telefoneAtual = watch("telefone") || "";
+  const cidadeContatoAtual = watch("cidade") || "";
+  const estadoContatoAtual = watch("estado") || "";
   const logradouroAtual = watch("logradouro") || "";
   const numeroAtual = watch("numero") || "";
   const bairroAtual = watch("bairro") || "";
@@ -771,7 +778,42 @@ export function CadastroVoluntariadoPage() {
                     </div>
                   </section>
                 )}
-                {abaAtiva === "contato" && <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-12"><div className="xl:col-span-4"><Label>E-mail*</Label><Input type="email" {...register("email")} />{errors.email && <p className="mt-1 text-xs text-red-600">{errors.email.message}</p>}</div><div className="xl:col-span-3"><Label>Telefone</Label><Input {...register("telefone")} /></div><div className="xl:col-span-3"><Label>Cidade</Label><Input {...register("cidade")} onBlurCapture={() => aplicarFormatacaoCampo("cidade")} /></div><div className="xl:col-span-2"><Label>Estado (UF)</Label><Input maxLength={2} {...register("estado")} /></div><div className="xl:col-span-6"><Label>Área de interesse</Label><Input {...register("area_interesse")} onBlurCapture={() => aplicarFormatacaoCampo("area_interesse")} /></div><div className="xl:col-span-6"><Label>Idiomas</Label><Input {...register("idiomas")} onBlurCapture={() => aplicarFormatacaoCampo("idiomas")} /></div><div className="xl:col-span-6"><Label>Habilidades</Label><Textarea {...register("habilidades")} rows={2} onBlurCapture={() => aplicarFormatacaoCampo("habilidades")} /></div><div className="xl:col-span-6"><Label>LinkedIn</Label><Input {...register("linkedin")} /></div></section>}
+                {abaAtiva === "contato" && (
+                  <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-12">
+                    <div className="xl:col-span-4"><Label>E-mail*</Label><Input type="email" {...register("email")} />{errors.email && <p className="mt-1 text-xs text-red-600">{errors.email.message}</p>}</div>
+                    <div className="xl:col-span-3"><Label>Telefone</Label><Input {...register("telefone")} /></div>
+                    <div className="xl:col-span-3"><Label>Cidade</Label><Input {...register("cidade")} onBlurCapture={() => aplicarFormatacaoCampo("cidade")} /></div>
+                    <div className="xl:col-span-2"><Label>Estado (UF)</Label><Input maxLength={2} {...register("estado")} /></div>
+                    <div className="xl:col-span-6"><Label>Área de interesse</Label><Input {...register("area_interesse")} onBlurCapture={() => aplicarFormatacaoCampo("area_interesse")} /></div>
+                    <div className="xl:col-span-6"><Label>Idiomas</Label><Input {...register("idiomas")} onBlurCapture={() => aplicarFormatacaoCampo("idiomas")} /></div>
+                    <div className="xl:col-span-6"><Label>Habilidades</Label><Textarea {...register("habilidades")} rows={2} onBlurCapture={() => aplicarFormatacaoCampo("habilidades")} /></div>
+                    <div className="xl:col-span-6"><Label>LinkedIn</Label><Input {...register("linkedin")} /></div>
+                    <div className="sm:col-span-2 xl:col-span-12">
+                      <MensagemAcoesRapidas
+                        titulo="Mensagens do voluntário"
+                        destinatarioTipo="VOLUNTARIO"
+                        destinatario={{
+                          id: idSelecionado,
+                          nome: nomeCompletoAtual.trim() || undefined,
+                          email: emailAtual.trim() || undefined,
+                          telefone: telefoneAtual.trim() || undefined,
+                          documento: somenteDigitos(cpfAtual) || undefined,
+                          detalhe:
+                            cidadeContatoAtual && estadoContatoAtual
+                              ? `${cidadeContatoAtual} / ${estadoContatoAtual}`
+                              : cidadeContatoAtual || undefined
+                        }}
+                        contextoExtra={{ voluntarioId: idSelecionado }}
+                        onFeedback={({ tipo, texto }) =>
+                          setMensagem({
+                            tipo: tipo === "sucesso" ? "sucesso" : "erro",
+                            texto
+                          })
+                        }
+                      />
+                    </div>
+                  </section>
+                )}
                 {abaAtiva === "endereco" && <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-12"><div className="xl:col-span-3"><Label>CEP</Label><Input {...register("cep")} />{carregandoCep && <p className="mt-1 text-xs text-slate-500">Consultando CEP...</p>}</div><div className="xl:col-span-6"><Label>Endereço</Label><Input {...register("logradouro")} onBlurCapture={() => aplicarFormatacaoCampo("logradouro")} /></div><div className="xl:col-span-3"><Label>Número</Label><Input {...register("numero")} /></div><div className="xl:col-span-4"><Label>Complemento</Label><Input {...register("complemento")} onBlurCapture={() => aplicarFormatacaoCampo("complemento")} /></div><div className="xl:col-span-4"><Label>Bairro</Label><Input {...register("bairro")} onBlurCapture={() => aplicarFormatacaoCampo("bairro")} /></div><div className="xl:col-span-4"><Label>Ponto de referência</Label><Input {...register("ponto_referencia")} onBlurCapture={() => aplicarFormatacaoCampo("ponto_referencia")} /></div><div className="xl:col-span-4"><Label>Município</Label><Input {...register("municipio")} onBlurCapture={() => aplicarFormatacaoCampo("municipio")} /></div><div className="xl:col-span-2"><Label>UF</Label><Input maxLength={2} {...register("uf")} /></div><div className="xl:col-span-3"><Label>Zona</Label><Input {...register("zona")} /></div><div className="xl:col-span-3"><Label>Subzona</Label><Input {...register("subzona")} /></div><div className="sm:col-span-2 xl:col-span-12"><Button type="button" variant="outline" onClick={abrirMapa} disabled={!possuiEnderecoParaMapa}>Ver no Google Maps</Button></div></section>}
                 {abaAtiva === "disponibilidade" && <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-12"><div className="xl:col-span-3"><Label>Status</Label><Select {...register("status")}>{voluntarioStatusOptions.map((status) => <option key={status} value={status}>{status}</option>)}</Select></div><div className="xl:col-span-3"><Label>Carga horária semanal</Label><Input {...register("carga_horaria_semanal")} onBlurCapture={() => aplicarFormatacaoCampo("carga_horaria_semanal")} /></div><div className="xl:col-span-3"><Label>Início previsto</Label><Input type="date" {...register("inicio_previsto")} /></div><label className="xl:col-span-2 flex items-center gap-2 text-sm"><Checkbox {...register("presencial")} checked={!!watch("presencial")} />Presencial</label><label className="xl:col-span-2 flex items-center gap-2 text-sm"><Checkbox {...register("remoto")} checked={!!watch("remoto")} />Remoto</label><div className="sm:col-span-2 xl:col-span-6"><Label>Dias disponíveis</Label><div className="mt-2 flex flex-wrap gap-3">{diasOptions.map((item) => <label key={item} className="inline-flex items-center gap-2 text-sm"><Checkbox checked={watch("disponibilidade_dias")?.includes(item)} onChange={() => alternarLista("disponibilidade_dias", item)} />{item}</label>)}</div></div><div className="sm:col-span-2 xl:col-span-6"><Label>Períodos</Label><div className="mt-2 flex flex-wrap gap-3">{periodosOptions.map((item) => <label key={item} className="inline-flex items-center gap-2 text-sm"><Checkbox checked={watch("disponibilidade_periodos")?.includes(item)} onChange={() => alternarLista("disponibilidade_periodos", item)} />{item}</label>)}</div></div><div className="xl:col-span-12"><Label>Observações</Label><Textarea {...register("observacoes")} rows={2} onBlurCapture={() => aplicarFormatacaoCampo("observacoes")} /></div></section>}
                 {abaAtiva === "termos" && <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-12"><label className="xl:col-span-4 flex items-center gap-2 text-sm"><Checkbox {...register("aceite_voluntariado")} checked={!!watch("aceite_voluntariado")} />Aceite de voluntariado</label><label className="xl:col-span-4 flex items-center gap-2 text-sm"><Checkbox {...register("aceite_imagem")} checked={!!watch("aceite_imagem")} />Aceite de uso de imagem</label><div className="xl:col-span-12"><Label>Documento de identificação</Label><Textarea {...register("documento_identificacao")} rows={2} /></div><div className="xl:col-span-12"><Label>Comprovante de endereço</Label><Textarea {...register("comprovante_endereco")} rows={2} /></div><div className="xl:col-span-12"><Label>Assinatura digital</Label><Input {...register("assinatura_digital")} /></div></section>}

@@ -36,6 +36,7 @@ import { autorizacaoComprasRoutes } from "../modules/autorizacao-compras/routes/
 import { contabilidadeRoutes } from "../modules/contabilidade/routes/contabilidade.routes.js";
 import { transparenciasRoutes } from "../modules/transparencias/routes/transparencias.routes.js";
 import { rhContratacaoRoutes } from "../modules/rh-contratacao/routes/rh-contratacao.routes.js";
+import { mensagensPersonalizadasRoutes } from "../modules/mensagens-personalizadas/routes/mensagens-personalizadas.routes.js";
 export const appRoutes = Router();
 appRoutes.get("/health", (_request, response) => {
     response.json({ status: "ok", service: "g3-backend-node" });
@@ -79,5 +80,6 @@ appRoutes.use("/api/rh/contratacao", rhContratacaoRoutes);
 appRoutes.use("/api/dashboard", dashboardRoutes);
 appRoutes.use("/api/configuracoes/parametros", parametrosSistemaRoutes);
 appRoutes.use("/api/usuarios", usuarioRoutes);
+appRoutes.use("/api/mensagens-personalizadas", mensagensPersonalizadasRoutes);
 appRoutes.use("/api/email", ensureAuthenticated, ensurePermissions(["ADMINISTRADOR", "OPERADOR"]), emailRoutes);
 appRoutes.use("/api/reports", ensureAuthenticated, ensurePermissions(["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"]), reportsRoutes);

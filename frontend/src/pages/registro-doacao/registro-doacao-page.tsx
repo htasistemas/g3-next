@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { MensagemAcoesRapidas } from "@/components/mensagens-personalizadas/mensagem-acoes-rapidas";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -164,6 +165,12 @@ export function RegistroDoacaoPage() {
   const registros = listaData?.registros ?? [];
   const doadores = doadoresData?.doadores ?? [];
   const recorrente = !!watch("recorrente");
+  const doadorSelecionadoId = watch("doador_id") || "";
+  const doadorContatoAtual =
+    doadores.find((item) => item.id_doador === doadorSelecionadoId) ??
+    (doadorSelecionadoId && doadorForm.nome
+      ? { ...doadorForm, id_doador: doadorSelecionadoId }
+      : undefined);
   const acaoEmAndamento =
     salvarMutation.isPending || removerMutation.isPending || carregandoDetalhes || criarDoadorMutation.isPending;
 
@@ -457,6 +464,31 @@ export function RegistroDoacaoPage() {
                     <div className="space-y-1"><Label>UF</Label><Input value={doadorForm.uf ?? ""} maxLength={2} onChange={(e) => setDoadorForm((a) => ({ ...a, uf: e.target.value.toUpperCase() }))} /></div>
                   </div>
                   <div className="flex justify-end"><Button type="button" onClick={() => void salvarDoador()} disabled={criarDoadorMutation.isPending}>{criarDoadorMutation.isPending ? "Salvando..." : "Cadastrar doador"}</Button></div>
+                  <MensagemAcoesRapidas
+                    titulo="Mensagens do doador"
+                    destinatarioTipo="DOADOR"
+                    destinatario={{
+                      id:
+                        typeof doadorContatoAtual?.id_doador === "string"
+                          ? doadorContatoAtual.id_doador
+                          : undefined,
+                      nome: doadorContatoAtual?.nome?.trim() || undefined,
+                      email: doadorContatoAtual?.email?.trim() || undefined,
+                      telefone: doadorContatoAtual?.telefone?.trim() || undefined,
+                      documento: doadorContatoAtual?.documento?.trim() || undefined,
+                      detalhe: doadorContatoAtual?.cidade
+                        ? [doadorContatoAtual.cidade, doadorContatoAtual.uf].filter(Boolean).join(" / ")
+                        : undefined
+                    }}
+                    contextoExtra={{ doadorId: doadorContatoAtual?.id_doador }}
+                    onFeedback={({ tipo, texto }) =>
+                      setPopupMensagem({
+                        tipo,
+                        titulo: tipo === "sucesso" ? "Confirmação" : tipo === "aviso" ? "Atenção" : "Erro",
+                        texto
+                      })
+                    }
+                  />
 
                   <div className="space-y-2 rounded-lg border border-[var(--g3-border)] p-3">
                     <Label>Buscar doadores</Label>
@@ -466,7 +498,7 @@ export function RegistroDoacaoPage() {
                       <div className="max-h-40 overflow-y-auto space-y-1">
                         {doadores.map((doador) => (
                           <div key={doador.id_doador} className="flex items-center justify-between rounded border border-[var(--g3-border)] px-2 py-1 text-sm">
-                            <button type="button" className="text-left" onClick={() => { setValue("doador_id", doador.id_doador ?? "", { shouldDirty: true, shouldValidate: true }); setAbaAtiva("dados"); }}>
+                            <button type="button" className="text-left" onClick={() => { setValue("doador_id", doador.id_doador ?? "", { shouldDirty: true, shouldValidate: true }); setDoadorForm(doador); setAbaAtiva("dados"); }}>
                               {doador.nome} {doador.documento ? `- ${doador.documento}` : ""}
                             </button>
                             <Button type="button" variant="ghost" onClick={() => void excluirDoador(doador.id_doador)} disabled={removerDoadorMutation.isPending}><Trash2 className="h-4 w-4 text-rose-600" /></Button>
@@ -486,7 +518,7 @@ export function RegistroDoacaoPage() {
                     {doadores.length ? (
                       <div className="max-h-28 overflow-y-auto rounded border border-[var(--g3-border)] p-1">
                         {doadores.map((item) => (
-                          <button key={item.id_doador} type="button" className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-[var(--g3-primary-soft)]" onClick={() => setValue("doador_id", item.id_doador ?? "", { shouldDirty: true, shouldValidate: true })}>{item.nome}</button>
+                          <button key={item.id_doador} type="button" className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-[var(--g3-primary-soft)]" onClick={() => { setValue("doador_id", item.id_doador ?? "", { shouldDirty: true, shouldValidate: true }); setDoadorForm(item); }}>{item.nome}</button>
                         ))}
                       </div>
                     ) : null}

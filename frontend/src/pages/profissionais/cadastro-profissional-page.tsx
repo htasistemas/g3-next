@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { MensagemAcoesRapidas } from "@/components/mensagens-personalizadas/mensagem-acoes-rapidas";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -255,6 +256,10 @@ export function CadastroProfissionalPage() {
   });
 
   const cepAtual = watch("cep") || "";
+  const nomeCompletoAtual = watch("nome_completo") || "";
+  const cpfAtual = watch("cpf") || "";
+  const emailAtual = watch("email") || "";
+  const telefoneAtual = watch("telefone") || "";
   const logradouroAtual = watch("logradouro") || "";
   const numeroAtual = watch("numero") || "";
   const bairroAtual = watch("bairro") || "";
@@ -1010,7 +1015,38 @@ export function CadastroProfissionalPage() {
                     </div>
                   </section>
                 )}
-                {abaAtiva === "perfil" && <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-12"><div className="xl:col-span-3"><Label>Vínculo</Label><Select {...register("vinculo")}><option value="">Selecione</option>{vinculosOptions.map((item) => <option key={item} value={item}>{item}</option>)}</Select></div><div className="xl:col-span-4"><Label>Registro em conselho</Label><Input {...register("registro_conselho")} onBlurCapture={() => aplicarFormatacaoCampo("registro_conselho")} /></div><div className="xl:col-span-5"><Label>Especialidade</Label><Input {...register("especialidade")} onBlurCapture={() => aplicarFormatacaoCampo("especialidade")} /></div><div className="xl:col-span-4"><Label>E-mail</Label><Input type="email" {...register("email")} /></div><div className="xl:col-span-3"><Label>Telefone</Label><Input {...register("telefone")} /></div></section>}
+                {abaAtiva === "perfil" && (
+                  <>
+                    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-12">
+                      <div className="xl:col-span-3"><Label>Vínculo</Label><Select {...register("vinculo")}><option value="">Selecione</option>{vinculosOptions.map((item) => <option key={item} value={item}>{item}</option>)}</Select></div>
+                      <div className="xl:col-span-4"><Label>Registro em conselho</Label><Input {...register("registro_conselho")} onBlurCapture={() => aplicarFormatacaoCampo("registro_conselho")} /></div>
+                      <div className="xl:col-span-5"><Label>Especialidade</Label><Input {...register("especialidade")} onBlurCapture={() => aplicarFormatacaoCampo("especialidade")} /></div>
+                      <div className="xl:col-span-4"><Label>E-mail</Label><Input type="email" {...register("email")} /></div>
+                      <div className="xl:col-span-3"><Label>Telefone</Label><Input {...register("telefone")} /></div>
+                      <div className="sm:col-span-2 xl:col-span-12">
+                        <MensagemAcoesRapidas
+                          titulo="Mensagens do profissional"
+                          destinatarioTipo="PROFISSIONAL"
+                          destinatario={{
+                            id: idSelecionado,
+                            nome: nomeCompletoAtual.trim() || undefined,
+                            email: emailAtual.trim() || undefined,
+                            telefone: telefoneAtual.trim() || undefined,
+                            documento: somenteDigitos(cpfAtual) || undefined,
+                            detalhe: municipioAtual && ufAtual ? `${municipioAtual} / ${ufAtual}` : municipioAtual || undefined
+                          }}
+                          contextoExtra={{ profissionalId: idSelecionado }}
+                          onFeedback={({ tipo, texto }) =>
+                            setMensagem({
+                              tipo: tipo === "sucesso" ? "sucesso" : "erro",
+                              texto
+                            })
+                          }
+                        />
+                      </div>
+                    </section>
+                  </>
+                )}
                 {abaAtiva === "agenda" && (
                   <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-12">
                     <div className="xl:col-span-5">

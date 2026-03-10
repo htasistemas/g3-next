@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { MensagemAcoesRapidas } from "@/components/mensagens-personalizadas/mensagem-acoes-rapidas";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -276,6 +277,10 @@ export function CadastroUnidadeAssistencialPage() {
   });
 
   const cepAtual = watch("cep") || "";
+  const nomeFantasiaAtual = watch("nome_fantasia") || "";
+  const cnpjAtual = watch("cnpj") || "";
+  const telefoneAtual = watch("telefone") || "";
+  const emailAtual = watch("email") || "";
   const logradouroAtual = watch("logradouro") || "";
   const numeroAtual = watch("numero") || "";
   const bairroAtual = watch("bairro") || "";
@@ -953,6 +958,28 @@ export function CadastroUnidadeAssistencialPage() {
                     <div className="xl:col-span-4">
                       <Label htmlFor="site">Site</Label>
                       <Input id="site" {...register("site")} placeholder="https://..." />
+                    </div>
+
+                    <div className="sm:col-span-2 xl:col-span-12">
+                      <MensagemAcoesRapidas
+                        titulo="Mensagens da instituição"
+                        destinatarioTipo="INSTITUICAO"
+                        destinatario={{
+                          id: unidadeSelecionadaId,
+                          nome: nomeFantasiaAtual.trim() || undefined,
+                          email: emailAtual.trim() || undefined,
+                          telefone: telefoneAtual.trim() || undefined,
+                          documento: somenteDigitos(cnpjAtual) || undefined,
+                          detalhe: cidadeAtual && estadoAtual ? `${cidadeAtual} / ${estadoAtual}` : cidadeAtual || undefined
+                        }}
+                        contextoExtra={{ unidadeId: unidadeSelecionadaId }}
+                        onFeedback={({ tipo, texto }) =>
+                          setMensagem({
+                            tipo: tipo === "sucesso" ? "sucesso" : "erro",
+                            texto
+                          })
+                        }
+                      />
                     </div>
 
                     <div className="sm:col-span-2 xl:col-span-6">

@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
 import { Bar, BarChart, Tooltip, XAxis, YAxis } from "recharts";
 import { ResponsiveChart } from "@/components/charts/responsive-chart";
+import { MensagemAcoesRapidas } from "@/components/mensagens-personalizadas/mensagem-acoes-rapidas";
 import type { LucideIcon } from "lucide-react";
 import {
   Search,
@@ -497,6 +498,10 @@ export function CadastroBeneficiarioPage() {
   const campoEmail = register("email");
 
   const foto3x4Atual = watch("foto_3x4") || "";
+  const nomeCompletoAtual = watch("nome_completo") || "";
+  const cpfAtual = watch("cpf") || "";
+  const telefonePrincipalAtual = watch("telefone_principal") || "";
+  const emailAtual = watch("email") || "";
   const cepAtual = watch("cep") || "";
   const logradouroAtual = watch("logradouro") || "";
   const numeroAtual = watch("numero") || "";
@@ -2051,6 +2056,33 @@ export function CadastroBeneficiarioPage() {
                         }}
                       />
                       {errors.email && <p className="mt-1 text-xs text-red-600">{errors.email.message}</p>}
+                    </div>
+                    <div className="sm:col-span-2">
+                      <MensagemAcoesRapidas
+                        titulo="Mensagens do beneficiário"
+                        destinatarioTipo="BENEFICIARIO"
+                        destinatario={{
+                          id: beneficiarioSelecionadoId,
+                          nome: nomeCompletoAtual.trim() || undefined,
+                          email:
+                            typeof emailAtual === "string"
+                              ? normalizarEmailDigitado(emailAtual) || undefined
+                              : undefined,
+                          telefone:
+                            typeof telefonePrincipalAtual === "string"
+                              ? formatarTelefoneInput(telefonePrincipalAtual) || undefined
+                              : undefined,
+                          documento: somenteDigitos(cpfAtual) || undefined,
+                          detalhe: municipioAtual && ufAtual ? `${municipioAtual} / ${ufAtual}` : municipioAtual || undefined
+                        }}
+                        contextoExtra={{ beneficiarioId: beneficiarioSelecionadoId }}
+                        onFeedback={({ tipo, texto }) =>
+                          setMensagem({
+                            tipo: tipo === "sucesso" ? "sucesso" : "erro",
+                            texto
+                          })
+                        }
+                      />
                     </div>
                     <div className="sm:col-span-2 grid grid-cols-2 gap-3 rounded-md border border-slate-200 p-3">
                       <label className="flex items-center gap-2 text-sm text-slate-700">

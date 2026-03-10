@@ -172,6 +172,10 @@ const UsuariosPage = carregarPagina(
   () => import("@/pages/configuracoes/usuarios-page"),
   "UsuariosPage"
 );
+const MensagensPersonalizadasPage = carregarPagina(
+  () => import("@/pages/configuracoes/mensagens-personalizadas-page"),
+  "MensagensPersonalizadasPage"
+);
 
 export const router = createBrowserRouter([
   {
@@ -248,6 +252,21 @@ export const router = createBrowserRouter([
         element: (
           <RequirePermission permissions={["ADMINISTRADOR"]}>
             {UsuariosPage}
+          </RequirePermission>
+        )
+      },
+      {
+        path: "/configuracoes/mensagens-personalizadas",
+        element: (
+          <RequirePermission
+            permissions={[
+              "ADMINISTRADOR",
+              "OPERADOR",
+              "LEITURA_APENAS",
+              "MENSAGENS_PERSONALIZADAS_VISUALIZAR"
+            ]}
+          >
+            {MensagensPersonalizadasPage}
           </RequirePermission>
         )
       }
