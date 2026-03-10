@@ -35,12 +35,12 @@ const estruturaSql = [
   CREATE TABLE IF NOT EXISTS banco_empregos_candidatos (
     id BIGSERIAL PRIMARY KEY,
     emprego_id BIGINT NOT NULL REFERENCES banco_empregos(id) ON DELETE CASCADE,
-    beneficiario_id TEXT,
-    beneficiario_nome TEXT NOT NULL,
+    beneficiario_id BIGINT REFERENCES cadastro_beneficiario(id) ON DELETE SET NULL,
+    beneficiario_nome VARCHAR(200) NOT NULL,
     necessidades_profissionais TEXT,
-    status TEXT,
-    curriculo_nome TEXT,
-    curriculo_tipo TEXT,
+    status VARCHAR(40) NOT NULL DEFAULT 'EM_ANALISE',
+    curriculo_nome VARCHAR(255),
+    curriculo_tipo VARCHAR(120),
     curriculo_conteudo TEXT,
     criado_em TIMESTAMP NOT NULL DEFAULT NOW()
   )
@@ -99,6 +99,19 @@ export class BancoEmpregosRepository {
     const nomesColunas = new Set(colunas.map((coluna) => coluna.column_name));
     this.estruturaBanco = nomesColunas.has("dados_vaga") ? "json" : "legacy";
     return this.estruturaBanco;
+  }
+
+  private normalizarBeneficiarioId(rawId?: string | null) {
+    if (!rawId) {
+      return null;
+    }
+
+    const parsed = Number(rawId);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      throw new AppError("Beneficiario invalido para a vaga.", 400);
+    }
+
+    return BigInt(parsed);
   }
 
   private async listarJson() {
@@ -526,7 +539,7 @@ export class BancoEmpregosRepository {
       SELECT
         id,
         emprego_id,
-        beneficiario_id,
+        beneficiario_id::text AS beneficiario_id,
         beneficiario_nome,
         necessidades_profissionais,
         status,
@@ -543,6 +556,7 @@ export class BancoEmpregosRepository {
   async criarCandidato(empregoId: bigint, input: JobCandidatoInput) {
     await this.garantirEstrutura();
     await this.obterOuFalhar(empregoId);
+    const beneficiarioId = this.normalizarBeneficiarioId(input.beneficiarioId);
 
     const inserted = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
       INSERT INTO banco_empregos_candidatos (
@@ -558,10 +572,10 @@ export class BancoEmpregosRepository {
         atualizado_em
       ) VALUES (
         ${empregoId},
-        ${input.beneficiarioId ?? null},
+        ${beneficiarioId},
         ${input.beneficiarioNome},
         ${input.necessidadesProfissionais ?? null},
-        ${input.status ?? null},
+        ${input.status ?? "EM_ANALISE"},
         ${input.curriculoNome ?? null},
         ${input.curriculoTipo ?? null},
         ${input.curriculoConteudo ?? null},
@@ -580,7 +594,7 @@ export class BancoEmpregosRepository {
       SELECT
         id,
         emprego_id,
-        beneficiario_id,
+        beneficiario_id::text AS beneficiario_id,
         beneficiario_nome,
         necessidades_profissionais,
         status,

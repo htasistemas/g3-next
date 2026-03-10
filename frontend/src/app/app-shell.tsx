@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { useUnidadeAssistencialAtual } from "@/features/unidades-assistenciais/use-unidades-assistenciais";
 import {
-  Bell,
-  BookOpenCheck,
+  AlarmClockCheck,
+  BadgeDollarSign,
+  BriefcaseBusiness,
   Building2,
   CalendarRange,
   CarFront,
@@ -17,27 +18,40 @@ import {
   ChevronDown,
   ChevronRight,
   ClipboardPenLine,
+  CircleDollarSign,
   DollarSign,
   FileText,
   Files,
+  FolderKanban,
   FolderOpen,
   Gift,
+  GraduationCap,
   HandHeart,
   HandCoins,
-  Handshake,
+  HeartHandshake,
   ImageIcon,
+  LibraryBig,
   Landmark,
   LayoutDashboard,
   Link2,
   ListFilter,
-  Monitor,
   MailPlus,
-  Package,
+  MapPinned,
+  MonitorDot,
+  Presentation,
+  Scale,
+  ScrollText,
   Settings2,
+  ShieldUser,
+  Siren,
   SlidersHorizontal,
   Stethoscope,
+  Ticket,
+  Package,
   UserRound,
+  UserCog,
   UsersRound,
+  WalletCards,
   type LucideIcon
 } from "lucide-react";
 
@@ -81,7 +95,7 @@ const menuSections: MenuSection[] = [
         id: "dashboard-power-bi",
         to: "/dashboard/power-bi",
         label: "Power BI",
-        icon: ChartColumn,
+        icon: Presentation,
         requiredPermissions: ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"]
       }
     ]
@@ -121,55 +135,55 @@ const menuSections: MenuSection[] = [
   {
     id: "atendimentos",
     secao: "Atendimentos",
-    icon: Handshake,
+    icon: HeartHandshake,
     itens: [
       {
         id: "atendimentos-matriculas",
         to: "/atendimentos/matriculas",
         label: "Matrículas",
-        icon: BookOpenCheck
+        icon: GraduationCap
       },
       {
         id: "atendimentos-banco-empregos",
         to: "/atendimentos/banco-empregos",
         label: "Banco de empregos",
-        icon: Handshake
+        icon: BriefcaseBusiness
       },
       {
         id: "atendimentos-biblioteca",
         to: "/atendimentos/biblioteca",
         label: "Biblioteca",
-        icon: FileText
+        icon: LibraryBig
       },
       {
         id: "atendimentos-registro-visitas",
         to: "/atendimentos/registro-visitas",
         label: "Registro de visitas",
-        icon: ClipboardPenLine
+        icon: MapPinned
       },
       {
         id: "atendimentos-ocorrencias",
         to: "/atendimentos/ocorrencias",
         label: "Ocorrências",
-        icon: Bell
+        icon: Siren
       },
       {
         id: "atendimentos-chamada-senhas",
         to: "/atendimentos/chamada-senhas",
         label: "Chamada de senhas",
-        icon: Clock3
+        icon: Ticket
       },
       {
         id: "atendimentos-painel-senhas",
         to: "/senhas/painel",
         label: "Painel de senhas",
-        icon: Monitor
+        icon: MonitorDot
       },
       {
         id: "atendimentos-registro-doacao",
         to: "/financeiro/registro-doacao",
         label: "Recebimento de doações",
-        icon: DollarSign
+        icon: CircleDollarSign
       },
       {
         id: "atendimentos-doacoes-realizadas",
@@ -182,7 +196,7 @@ const menuSections: MenuSection[] = [
   {
     id: "setor-administrativo",
     secao: "Setor administrativo",
-    icon: FileText,
+    icon: FolderKanban,
     itens: [
       {
         id: "setor-administrativo-almoxarifado",
@@ -218,7 +232,7 @@ const menuSections: MenuSection[] = [
         id: "setor-administrativo-oficios-protocolos",
         to: "/setor-administrativo/oficios-protocolos",
         label: "Ofícios e protocolos",
-        icon: ClipboardPenLine
+        icon: ScrollText
       },
       {
         id: "setor-administrativo-patrimonio",
@@ -236,14 +250,14 @@ const menuSections: MenuSection[] = [
         id: "setor-administrativo-lembretes-diarios",
         to: "/setor-administrativo/lembretes-diarios",
         label: "Lembretes diários",
-        icon: Bell
+        icon: AlarmClockCheck
       }
     ]
   },
   {
     id: "setor-juridico",
     secao: "Setor jurídico",
-    icon: FileText,
+    icon: Scale,
     itens: [
       {
         id: "setor-juridico-plano-trabalho",
@@ -262,7 +276,7 @@ const menuSections: MenuSection[] = [
   {
     id: "financeiro",
     secao: "Setor financeiro",
-    icon: HandCoins,
+    icon: WalletCards,
     itens: [
       {
         id: "setor-financeiro-autorizacao-compras",
@@ -280,14 +294,14 @@ const menuSections: MenuSection[] = [
         id: "setor-financeiro-prestacao-contas",
         to: "/setor-financeiro/prestacao-contas",
         label: "Prestação de contas",
-        icon: ChartPie
+        icon: BadgeDollarSign
       }
     ]
   },
   {
     id: "setor-rh",
     secao: "Setor RH",
-    icon: UsersRound,
+    icon: UserCog,
     itens: [
       {
         id: "setor-rh-registro-ponto",
@@ -299,7 +313,7 @@ const menuSections: MenuSection[] = [
         id: "setor-rh-contratacao",
         to: "/setor-rh/contratacao",
         label: "Contratação",
-        icon: UsersRound
+        icon: ShieldUser
       }
     ]
   },
