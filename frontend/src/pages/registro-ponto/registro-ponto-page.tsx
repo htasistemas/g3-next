@@ -27,6 +27,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
 import { imprimirConteudoAtual } from "@/lib/report-utils";
+import { toLocalDateISO } from "@/lib/date-utils";
 import {
   classeBotaoAbaLateral,
   classeNumeroAbaLateral,
@@ -41,7 +42,6 @@ import {
 import {
   useAdicionarOcorrenciaPonto,
   useAjustarRegistroPonto,
-  useCatalogoUsuariosRegistroPonto,
   useEspelhoPonto,
   useHistoricoRegistroPonto,
   useMarcarPonto,
@@ -56,7 +56,7 @@ import type {
 
 const abas = [
   { id: "listagem", label: "Listagem", icon: Search },
-  { id: "marcacao", label: "Marcação", icon: Fingerprint },
+  { id: "marcacao", label: "Registrar ponto", icon: Fingerprint },
   { id: "espelho", label: "Espelho de ponto", icon: CalendarDays },
   { id: "ocorrencias", label: "Ocorrências", icon: AlertCircle },
   { id: "historico", label: "Histórico", icon: History },
@@ -108,6 +108,36 @@ function formatarMinutos(totalMinutos?: number) {
   return `${sinal}${horas}h ${String(minutos).padStart(2, "0")}m`;
 }
 
+function extrairNumero(valor: unknown) {
+  if (typeof valor === "number" && Number.isFinite(valor)) return valor;
+  if (typeof valor === "string" && valor.trim()) {
+    const parsed = Number(valor);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
+}
+
+function formatarLocalizacaoHistorico(item: { dados_depois?: Record<string, unknown>; acao?: string }) {
+  const origem = item.dados_depois ?? {};
+  const latitude = extrairNumero(origem.latitude);
+  const longitude = extrairNumero(origem.longitude);
+  const accuracy = extrairNumero(origem.accuracy_metros);
+
+  if (typeof latitude === "number" && typeof longitude === "number") {
+    const texto = `Lat ${latitude.toFixed(5)}, Lon ${longitude.toFixed(5)}`;
+    if (typeof accuracy === "number") {
+      return `${texto} (±${Math.round(accuracy)} m)`;
+    }
+    return texto;
+  }
+
+  if (item.acao === "MARCACAO") {
+    return "Localização não registrada";
+  }
+
+  return undefined;
+}
+
 function badgeStatusClasse(status: RegistroPontoStatus) {
   if (status === "COMPLETO") {
     return "border-emerald-200 bg-emerald-50 text-emerald-700";
@@ -154,19 +184,18 @@ export function RegistroPontoPage() {
   const [abaAtiva, setAbaAtiva] = useState<(typeof abas)[number]["id"]>("listagem");
   const [filtroDraft, setFiltroDraft] = useState<RegistroPontoFiltro>({ ...filtroRegistroPontoPadrao });
   const [filtros, setFiltros] = useState<RegistroPontoFiltro>({ ...filtroRegistroPontoPadrao });
-  const [termoUsuario, setTermoUsuario] = useState("");
   const [registroSelecionadoId, setRegistroSelecionadoId] = useState<string | undefined>();
   const [mensagem, setMensagem] = useState<{ tipo: "sucesso" | "erro"; texto: string } | null>(null);
   const [popupMarcarAberto, setPopupMarcarAberto] = useState(false);
   const [popupAjusteAberto, setPopupAjusteAberto] = useState(false);
-  const [validarLocalizacaoMarcacao, setValidarLocalizacaoMarcacao] = useState(true);
+  const [confirmacaoLogin, setConfirmacaoLogin] = useState("");
+  const [confirmacaoSenha, setConfirmacaoSenha] = useState("");
   const [etapaMarcacao, setEtapaMarcacao] = useState<"idle" | "localizacao" | "registro">("idle");
   const [ocorrenciaTipo, setOcorrenciaTipo] = useState<RegistroPontoOcorrenciaTipo>("OBSERVACAO_OPERACIONAL");
   const [ocorrenciaDescricao, setOcorrenciaDescricao] = useState("");
 
   const { data: listaData, isLoading: carregandoLista } = useRegistrosPonto(filtros);
   const { data: espelhoData, isLoading: carregandoEspelho } = useEspelhoPonto(filtros);
-  const { data: usuariosCatalogoData } = useCatalogoUsuariosRegistroPonto(termoUsuario);
   const { data: historicoData, isLoading: carregandoHistorico } = useHistoricoRegistroPonto(registroSelecionadoId);
 
   const marcarMutation = useMarcarPonto();
@@ -200,9 +229,12 @@ export function RegistroPontoPage() {
   );
 
   const registroHojeUsuario = useMemo(() => {
-    const hoje = new Date().toISOString().slice(0, 10);
+    const hoje = toLocalDateISO();
     return registros.find((item) => item.usuario_id === usuario?.id && item.data === hoje);
   }, [registros, usuario?.id]);
+
+  const unidadeAtiva =
+    registroHojeUsuario?.unidade ?? registros[0]?.unidade ?? "Unidade do usuário";
 
   useEffect(() => {
     if (!registros.length) {
@@ -219,8 +251,6 @@ export function RegistroPontoPage() {
   }, [registros]);
 
   useEffect(() => {
-    if (isAdmin) return;
-
     const usuarioId = usuario?.id;
     if (!usuarioId) return;
 
@@ -232,7 +262,18 @@ export function RegistroPontoPage() {
       ...prev,
       usuario_id: usuarioId
     }));
-  }, [isAdmin, usuario?.id]);
+  }, [usuario?.id]);
+
+  useEffect(() => {
+    setConfirmacaoLogin(usuario?.nomeUsuario ?? "");
+  }, [usuario?.nomeUsuario]);
+
+  useEffect(() => {
+    if (popupMarcarAberto) {
+      setConfirmacaoLogin(usuario?.nomeUsuario ?? "");
+      setConfirmacaoSenha("");
+    }
+  }, [popupMarcarAberto, usuario?.nomeUsuario]);
 
   useEffect(() => {
     if (!registroSelecionado) {
@@ -260,13 +301,15 @@ export function RegistroPontoPage() {
   }, [ajusteForm, registroSelecionado]);
 
   function aplicarBusca() {
+    if (filtrosTravados) return;
     setFiltros({ ...filtroDraft });
   }
 
   function limparParaNovo() {
+    if (filtrosTravados) return;
     const padrao: RegistroPontoFiltro = {
       ...filtroRegistroPontoPadrao,
-      usuario_id: isAdmin ? "" : usuario?.id
+      usuario_id: usuario?.id
     };
 
     setFiltroDraft(padrao);
@@ -306,21 +349,36 @@ export function RegistroPontoPage() {
 
   async function executarMarcacao() {
     try {
-      setEtapaMarcacao(validarLocalizacaoMarcacao ? "localizacao" : "registro");
-      const localizacao = validarLocalizacaoMarcacao ? await capturarLocalizacaoAtual() : undefined;
+      if (!confirmacaoLogin.trim() || !confirmacaoSenha.trim()) {
+        setMensagem({ tipo: "erro", texto: "Informe usuário e senha para confirmar a marcação." });
+        return;
+      }
+
+      setPopupMarcarAberto(false);
+      setEtapaMarcacao("localizacao");
+      const localizacao = await capturarLocalizacaoAtual();
+      if (!localizacao) {
+        setMensagem({
+          tipo: "erro",
+          texto: "Não foi possível obter a localização para registrar o ponto. Verifique as permissões do navegador."
+        });
+        return;
+      }
       setEtapaMarcacao("registro");
       const response = await marcarMutation.mutateAsync({
+        usuario_login: confirmacaoLogin.trim(),
+        senha: confirmacaoSenha,
         latitude: localizacao?.latitude,
         longitude: localizacao?.longitude,
         accuracy_metros: localizacao?.accuracy_metros,
-        validar_localizacao: validarLocalizacaoMarcacao
+        validar_localizacao: false
       });
 
       setMensagem({
         tipo: "sucesso",
         texto: response.mensagem
       });
-      setPopupMarcarAberto(false);
+      setConfirmacaoSenha("");
     } catch (error: unknown) {
       const apiError = error as { response?: { data?: { message?: string } } };
       setMensagem({
@@ -428,11 +486,12 @@ export function RegistroPontoPage() {
   const marcacaoEmAndamento = marcarMutation.isPending || etapaMarcacao !== "idle";
   const acoesDesabilitadas =
     marcacaoEmAndamento || ajusteMutation.isPending || ocorrenciaMutation.isPending;
+  const filtrosTravados = true;
 
   function obterTextoBotaoMarcacao() {
     if (etapaMarcacao === "localizacao") return "Obtendo localização...";
     if (marcacaoEmAndamento) return "Registrando...";
-    return "Registrar Ponto Agora";
+    return "Registrar ponto agora";
   }
 
   function renderFiltros() {
@@ -447,7 +506,8 @@ export function RegistroPontoPage() {
             <Input
               type="date"
               value={filtroDraft.data_inicial ?? ""}
-              onChange={(event) => setFiltroDraft((prev) => ({ ...prev, data_inicial: event.target.value }))}
+              readOnly
+              disabled
             />
           </div>
 
@@ -456,7 +516,8 @@ export function RegistroPontoPage() {
             <Input
               type="date"
               value={filtroDraft.data_final ?? ""}
-              onChange={(event) => setFiltroDraft((prev) => ({ ...prev, data_final: event.target.value }))}
+              readOnly
+              disabled
             />
           </div>
 
@@ -486,42 +547,9 @@ export function RegistroPontoPage() {
             />
           </div>
 
-          {isAdmin && (
-            <>
-              <div>
-                <Label>Buscar usuário</Label>
-                <Input
-                  value={termoUsuario}
-                  onChange={(event) => setTermoUsuario(event.target.value)}
-                  placeholder="Digite pelo menos 2 letras"
-                />
-              </div>
-
-              <div>
-                <Label>Usuário</Label>
-                <Select
-                  value={filtroDraft.usuario_id ?? ""}
-                  onChange={(event) => setFiltroDraft((prev) => ({ ...prev, usuario_id: event.target.value || "" }))}
-                >
-                  <option value="">Todos</option>
-                  {(usuariosCatalogoData?.usuarios ?? []).map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.nome} ({item.login})
-                    </option>
-                  ))}
-                </Select>
-              </div>
-            </>
-          )}
-
           <div>
             <Label>Unidade</Label>
-            <Input
-              value={filtroDraft.unidade ?? ""}
-              onChange={(event) => setFiltroDraft((prev) => ({ ...prev, unidade: event.target.value }))}
-              placeholder="Unidade"
-              disabled={!isAdmin}
-            />
+            <Input value={unidadeAtiva} readOnly />
           </div>
 
           <label className="flex items-center gap-2 pt-7 text-sm text-slate-700">
@@ -634,22 +662,14 @@ export function RegistroPontoPage() {
               <p className="text-sm text-slate-700">
                 O horário da marcação é controlado pelo servidor e não pode ser editado manualmente.
               </p>
-              <label className="flex items-center gap-2 text-sm text-slate-700">
-                <Checkbox
-                  checked={validarLocalizacaoMarcacao}
-                  onChange={(event) => setValidarLocalizacaoMarcacao(event.target.checked)}
-                  disabled={marcacaoEmAndamento}
-                />
-                Validar localização da instituição
-              </label>
               <p className="text-xs text-[var(--g3-muted)]">
-                Se desativado, o sistema não bloqueará a marcação por validação geográfica nesta batida.
+                Validação de localização desativada para esta marcação.
               </p>
 
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-primary-soft)] p-3">
                   <p className="text-xs text-[var(--g3-muted)]">Hoje</p>
-                  <p className="text-sm font-semibold text-[var(--g3-active)]">{formatarData(new Date().toISOString().slice(0, 10))}</p>
+                  <p className="text-sm font-semibold text-[var(--g3-active)]">{formatarData(toLocalDateISO())}</p>
                 </div>
                 <div className="rounded-lg border border-[var(--g3-border)] bg-white p-3">
                   <p className="text-xs text-[var(--g3-muted)]">Próxima batida</p>
@@ -772,6 +792,11 @@ export function RegistroPontoPage() {
                         <p className="text-xs text-[var(--g3-muted)]">{formatarDataHora(item.criado_em)}</p>
                       </div>
                       <p className="text-xs text-[var(--g3-muted)]">Usuário: {item.usuario_nome ?? "---"}</p>
+                      {formatarLocalizacaoHistorico(item) && (
+                        <p className="text-xs text-[var(--g3-muted)]">
+                          Localização: {formatarLocalizacaoHistorico(item)}
+                        </p>
+                      )}
                       {item.justificativa && <p className="text-xs text-[var(--g3-muted)]">Justificativa: {item.justificativa}</p>}
                       {item.observacao && <p className="text-xs text-[var(--g3-muted)]">Observação: {item.observacao}</p>}
                     </div>
@@ -826,8 +851,8 @@ export function RegistroPontoPage() {
         <Card className={classesTelaPadraoBeneficiario.barraAcoes} data-print="toolbar">
           <CardContent className="p-0">
             <div className={classesTelaPadraoBeneficiario.gradeAcoes}>
-              <Button type="button" variant="outline" className={classesTelaPadraoBeneficiario.botaoAcao} onClick={aplicarBusca} disabled={acoesDesabilitadas}><Search className="mr-2 h-4 w-4" />Buscar</Button>
-              <Button type="button" variant="outline" className={classesTelaPadraoBeneficiario.botaoAcao} onClick={limparParaNovo} disabled={acoesDesabilitadas}><Plus className="mr-2 h-4 w-4" />Novo</Button>
+              <Button type="button" variant="outline" className={classesTelaPadraoBeneficiario.botaoAcao} onClick={aplicarBusca} disabled={acoesDesabilitadas || filtrosTravados}><Search className="mr-2 h-4 w-4" />Buscar</Button>
+              <Button type="button" variant="outline" className={classesTelaPadraoBeneficiario.botaoAcao} onClick={limparParaNovo} disabled={acoesDesabilitadas || filtrosTravados}><Plus className="mr-2 h-4 w-4" />Novo</Button>
               <Button type="button" className={classesTelaPadraoBeneficiario.botaoAcao} onClick={acaoSalvar} disabled={acoesDesabilitadas}><Save className="mr-2 h-4 w-4" />Salvar</Button>
               <Button type="button" variant="outline" className={classesTelaPadraoBeneficiario.botaoAcao} onClick={cancelarEdicao} disabled={acoesDesabilitadas}><Undo2 className="mr-2 h-4 w-4" />Cancelar</Button>
               <Button type="button" variant="danger" className={classesTelaPadraoBeneficiario.botaoAcao} onClick={acaoExcluir} disabled={acoesDesabilitadas}><Trash2 className="mr-2 h-4 w-4" />Excluir</Button>
@@ -905,8 +930,27 @@ export function RegistroPontoPage() {
             <div className="border-b border-slate-100 px-5 py-4"><h3 className="text-base font-semibold text-slate-900">Confirmar marcação</h3></div>
             <div className="space-y-2 px-5 py-4">
               <p className="text-sm text-slate-700">Deseja registrar a próxima batida de ponto agora?</p>
+              <div className="grid gap-3">
+                <div>
+                  <Label>Usuário</Label>
+                  <Input
+                    value={confirmacaoLogin}
+                    onChange={(event) => setConfirmacaoLogin(event.target.value)}
+                    disabled={marcacaoEmAndamento}
+                  />
+                </div>
+                <div>
+                  <Label>Senha</Label>
+                  <Input
+                    type="password"
+                    value={confirmacaoSenha}
+                    onChange={(event) => setConfirmacaoSenha(event.target.value)}
+                    disabled={marcacaoEmAndamento}
+                  />
+                </div>
+              </div>
               <p className="text-xs text-[var(--g3-muted)]">
-                Validação de localização: {validarLocalizacaoMarcacao ? "ativada" : "desativada"}.
+                A localização será registrada no momento da marcação.
               </p>
             </div>
             <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3">

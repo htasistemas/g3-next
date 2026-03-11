@@ -20,6 +20,12 @@ export type SenhaFinalizarInput = {
   chamadaId: string;
 };
 
+export type SenhaAvisoSonoroItemInput = {
+  id: string;
+  nome: string;
+  url: string;
+};
+
 export type SenhasConfigInput = {
   fraseFala: string;
   rssUrl: string;
@@ -30,6 +36,8 @@ export type SenhasConfigInput = {
   unidadePainelId?: number | null;
   tituloTela?: string | null;
   descricaoTela?: string | null;
+  avisosSonoros?: SenhaAvisoSonoroItemInput[] | null;
+  avisoSonoroAtivoId?: string | null;
 };
 
 export type SenhaFilaRow = {
@@ -66,5 +74,9 @@ export type SenhasConfigRow = {
   unidade_painel_id: bigint | null;
   titulo_tela: string | null;
   descricao_tela: string | null;
+  avisos_sonoros_json: string | null;
+  aviso_sonoro_ativo_id: string | null;
+  aviso_sonoro_url: string | null;
+  aviso_sonoro_nome: string | null;
   atualizado_em: Date;
 };

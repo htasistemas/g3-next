@@ -74,6 +74,10 @@ const CAMPOS_HORARIO = ["entrada_1", "saida_1", "entrada_2", "saida_2"] as const
 const JORNADA_PADRAO_MINUTOS = 8 * 60;
 const ESPERA_BATIDA_SEGUNDOS = 15;
 
+function safeStringify(value: unknown) {
+  return JSON.stringify(value, (_key, item) => (typeof item === "bigint" ? item.toString() : item));
+}
+
 function normalizarIp(ip?: string | null): string | undefined {
   if (!ip) return undefined;
   const valor = ip.trim();
@@ -194,21 +198,13 @@ export class RegistroPontoRepository {
     await ensureRegistroPontoEstrutura(prisma);
 
     const usuarioId = ator.id;
-    const isAdmin = this.isAdmin(ator);
-    if (!isAdmin && !usuarioId) {
+    if (!usuarioId) {
       throw new AppError("Usuario autenticado invalido.", 401);
     }
 
     const where: Prisma.Sql[] = [];
 
-    if (!isAdmin && usuarioId) {
-      where.push(Prisma.sql`AND r.usuario_id = ${usuarioId}`);
-    }
-
-    if (filters.usuario_id && isAdmin) {
-      const usuarioFiltroId = this.parseId(filters.usuario_id, "Usuario");
-      where.push(Prisma.sql`AND r.usuario_id = ${usuarioFiltroId}`);
-    }
+    where.push(Prisma.sql`AND r.usuario_id = ${usuarioId}`);
 
     if (filters.data_inicial) {
       where.push(Prisma.sql`AND r.data_referencia >= ${new Date(`${filters.data_inicial}T00:00:00.000Z`)}`);
@@ -218,9 +214,6 @@ export class RegistroPontoRepository {
       where.push(Prisma.sql`AND r.data_referencia <= ${new Date(`${filters.data_final}T00:00:00.000Z`)}`);
     }
 
-    if (filters.unidade && isAdmin) {
-      where.push(Prisma.sql`AND COALESCE(u.unidade, '') ILIKE ${`%${filters.unidade}%`}`);
-    }
 
     if (filters.somente_alterados) {
       where.push(Prisma.sql`AND r.alterado_manualmente = TRUE`);
@@ -512,7 +505,10 @@ export class RegistroPontoRepository {
         dados_depois: {
           horario: horaBatida,
           origem_validada: validacaoOrigem.origem_validada,
-          unidade_validada: usuario.unidade_nome
+          unidade_validada: usuario.unidade_nome,
+          latitude: origem.latitude ?? null,
+          longitude: origem.longitude ?? null,
+          accuracy_metros: origem.accuracy_metros ?? null
         }
       });
 
@@ -1243,10 +1239,10 @@ export class RegistroPontoRepository {
     }
   ) {
     const dadosAntesSql = payload.dados_antes
-      ? Prisma.sql`CAST(${JSON.stringify(payload.dados_antes)} AS JSONB)`
+      ? Prisma.sql`CAST(${safeStringify(payload.dados_antes)} AS JSONB)`
       : Prisma.sql`NULL::JSONB`;
     const dadosDepoisSql = payload.dados_depois
-      ? Prisma.sql`CAST(${JSON.stringify(payload.dados_depois)} AS JSONB)`
+      ? Prisma.sql`CAST(${safeStringify(payload.dados_depois)} AS JSONB)`
       : Prisma.sql`NULL::JSONB`;
 
     await tx.$executeRaw(Prisma.sql`
@@ -1298,7 +1294,7 @@ export class RegistroPontoRepository {
           ${payload.acao},
           'registro_ponto',
           ${payload.registro_ponto_id ? payload.registro_ponto_id.toString() : null},
-          CAST(${JSON.stringify(dadosJsonAuditoria)} AS JSONB),
+          CAST(${safeStringify(dadosJsonAuditoria)} AS JSONB),
           NOW()
         )
       `);

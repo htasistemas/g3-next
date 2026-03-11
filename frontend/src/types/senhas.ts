@@ -43,6 +43,12 @@ export type SenhaFinalizarRequest = {
   chamadaId: string;
 };
 
+export type SenhaAvisoSonoro = {
+  id: string;
+  nome: string;
+  url: string;
+};
+
 export type SenhasConfigResponse = {
   fraseFala: string;
   rssUrl: string;
@@ -53,6 +59,8 @@ export type SenhasConfigResponse = {
   unidadePainelId?: number | null;
   tituloTela?: string | null;
   descricaoTela?: string | null;
+  avisosSonoros?: SenhaAvisoSonoro[] | null;
+  avisoSonoroAtivoId?: string | null;
 };
 
 export type SenhasConfigRequest = SenhasConfigResponse;

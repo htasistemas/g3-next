@@ -1,7 +1,9 @@
 ﻿import { useEffect, useMemo, useState } from "react";
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
+import { useLembretesDiarios } from "@/features/lembretes-diarios/use-lembretes-diarios";
+import { useTarefasAdministrativas } from "@/features/tarefas-administrativas/use-tarefas-administrativas";
 import { useUnidadeAssistencialAtual } from "@/features/unidades-assistenciais/use-unidades-assistenciais";
 import {
   AlarmClockCheck,
@@ -9,6 +11,7 @@ import {
   BriefcaseBusiness,
   Building2,
   CalendarRange,
+  Bell,
   CarFront,
   ChartColumn,
   ChartPie,
@@ -34,6 +37,7 @@ import {
   Landmark,
   LayoutDashboard,
   Link2,
+  ListTodo,
   ListFilter,
   MailPlus,
   MapPinned,
@@ -414,12 +418,18 @@ function itemEstaAtivo(pathname: string, item: MenuItem) {
 export function AppShell() {
   const { usuario, logout } = useAuth();
   const { data: unidadeAtualData } = useUnidadeAssistencialAtual();
+  const usuarioId = usuario?.id ? Number(usuario.id) : undefined;
+  const { data: lembretesData } = useLembretesDiarios(usuarioId);
+  const { data: tarefasData } = useTarefasAdministrativas();
   const location = useLocation();
+  const navigate = useNavigate();
   const titulo = obterTitulo(location.pathname);
   const semTituloNoTopo = ocultarTituloTopo(location.pathname);
   const versaoSistema = import.meta.env.VITE_APP_VERSION ?? "1.00.13";
   const [sidebarRecolhida, setSidebarRecolhida] = useState(false);
   const [gruposAbertos, setGruposAbertos] = useState<Record<string, boolean>>({});
+  const [lembreteAlertaAtivo, setLembreteAlertaAtivo] = useState(false);
+  const [agora, setAgora] = useState(() => Date.now());
   const logomarcaInstituicao = unidadeAtualData?.unidade?.logomarca;
   const nomeInstituicao =
     unidadeAtualData?.unidade?.nome_fantasia ??
@@ -427,6 +437,44 @@ export function AppShell() {
     "Sistema G3";
 
   const permissoesUsuario = usuario?.permissoes ?? [];
+  const lembretesPendentes = useMemo(
+    () => (lembretesData ?? []).filter((item) => item.status !== "CONCLUIDO"),
+    [lembretesData]
+  );
+  const obterExecucaoMs = (item: (typeof lembretesPendentes)[number]) => {
+    if (item.proximaExecucaoEm) {
+      return new Date(item.proximaExecucaoEm).getTime();
+    }
+
+    if (!item.dataInicial) return Number.NaN;
+    const [ano, mes, dia] = item.dataInicial.split("-").map(Number);
+    if (!ano || !mes || !dia) return Number.NaN;
+
+    const [hora, minuto] = (item.horaAviso ?? "09:00").split(":").map(Number);
+    return new Date(ano, mes - 1, dia, hora || 0, minuto || 0, 0, 0).getTime();
+  };
+  const lembretesVencidos = useMemo(() => {
+    return lembretesPendentes.filter((item) => {
+      const proximaExecucao = obterExecucaoMs(item);
+      return Number.isFinite(proximaExecucao) && proximaExecucao <= agora;
+    });
+  }, [lembretesPendentes, agora]);
+  const tarefasPendentes = useMemo(
+    () => (tarefasData ?? []).filter((item) => item.status !== "Concluida"),
+    [tarefasData]
+  );
+  const tarefasEmAtraso = useMemo(
+    () => (tarefasData ?? []).filter((item) => item.status === "Em atraso"),
+    [tarefasData]
+  );
+  const totalPendentes = lembretesPendentes.length;
+  const totalVencidos = lembretesVencidos.length;
+  const lembreteAlertaVisivel = lembreteAlertaAtivo || totalVencidos > 0;
+  const lembretePisca = totalVencidos > 0;
+  const totalTarefasPendentes = tarefasPendentes.length;
+  const totalTarefasEmAtraso = tarefasEmAtraso.length;
+  const tarefaAlertaVisivel = totalTarefasPendentes > 0;
+  const tarefaPisca = totalTarefasEmAtraso > 0;
   const possuiPermissao = useMemo(
     () =>
       (permissoesNecessarias?: string[]) => {
@@ -473,6 +521,54 @@ export function AppShell() {
       return proximoEstado;
     });
   }, [menuSectionsVisiveis, secaoAtivaId]);
+
+  useEffect(() => {
+    const atualizarAlerta = () => {
+      setLembreteAlertaAtivo(localStorage.getItem("g3_lembrete_alerta") === "1");
+    };
+
+    atualizarAlerta();
+
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === "g3_lembrete_alerta") {
+        atualizarAlerta();
+      }
+    };
+
+    const onCustom = () => atualizarAlerta();
+
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("g3-lembrete-alerta", onCustom);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("g3-lembrete-alerta", onCustom);
+    };
+  }, []);
+
+  useEffect(() => {
+    const intervalo = window.setInterval(() => {
+      setAgora(Date.now());
+    }, 30000);
+
+    return () => window.clearInterval(intervalo);
+  }, []);
+
+  useEffect(() => {
+    if (totalPendentes === 0 && lembreteAlertaAtivo) {
+      localStorage.removeItem("g3_lembrete_alerta");
+      setLembreteAlertaAtivo(false);
+    }
+  }, [totalPendentes, lembreteAlertaAtivo]);
+
+  function abrirLembretes() {
+    localStorage.removeItem("g3_lembrete_alerta");
+    setLembreteAlertaAtivo(false);
+    navigate("/setor-administrativo/lembretes-diarios?tab=lembretes");
+  }
+
+  function abrirTarefas() {
+    navigate("/setor-administrativo/tarefas-pendencias?tab=listagem");
+  }
 
   function alternarSidebar() {
     setSidebarRecolhida((valorAtual) => !valorAtual);
@@ -642,12 +738,52 @@ export function AppShell() {
             <div className="flex min-h-9 flex-wrap items-center justify-between gap-2">
               {semTituloNoTopo ? <div className="min-h-0 min-w-0" /> : (
                 <div className="min-w-0">
-                  <h1 className="truncate text-sm font-semibold text-[var(--g3-foreground)] sm:text-base">
-                    {titulo}
-                  </h1>
+                  <div className="flex items-center gap-2">
+                    <h1 className="truncate text-sm font-semibold text-[var(--g3-foreground)] sm:text-base">
+                      {titulo}
+                    </h1>
+                  </div>
                 </div>
               )}
               <div className="flex items-center gap-1.5 sm:gap-2">
+                {lembreteAlertaVisivel && (
+                  <button
+                    type="button"
+                    className={`inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase text-amber-700 ${
+                      lembretePisca ? "animate-pulse" : ""
+                    }`}
+                    onClick={abrirLembretes}
+                    aria-label="Abrir lembretes diários"
+                    title="Abrir lembretes diários"
+                  >
+                    <Bell className="h-3.5 w-3.5" />
+                    Lembrete
+                    {totalPendentes > 0 && (
+                      <span className="ml-1 rounded-full bg-amber-600 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                        {totalPendentes}
+                      </span>
+                    )}
+                  </button>
+                )}
+                {tarefaAlertaVisivel && (
+                  <button
+                    type="button"
+                    className={`inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold uppercase text-sky-700 ${
+                      tarefaPisca ? "animate-pulse" : ""
+                    }`}
+                    onClick={abrirTarefas}
+                    aria-label="Abrir tarefas e pendências"
+                    title="Abrir tarefas e pendências"
+                  >
+                    <ListTodo className="h-3.5 w-3.5" />
+                    Tarefas
+                    {totalTarefasPendentes > 0 && (
+                      <span className="ml-1 rounded-full bg-sky-600 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                        {totalTarefasPendentes}
+                      </span>
+                    )}
+                  </button>
+                )}
                 <span className="rounded-full bg-[var(--g3-primary-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--g3-active)]">
                   G3 Next
                 </span>

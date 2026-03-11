@@ -3532,6 +3532,18 @@ ALTER TABLE senha_config
 ALTER TABLE senha_config
   ADD COLUMN IF NOT EXISTS noticias_manuais TEXT;
 
+ALTER TABLE senha_config
+  ADD COLUMN IF NOT EXISTS aviso_sonoro_url TEXT;
+
+ALTER TABLE senha_config
+  ADD COLUMN IF NOT EXISTS aviso_sonoro_nome VARCHAR(255);
+
+ALTER TABLE senha_config
+  ADD COLUMN IF NOT EXISTS avisos_sonoros_json TEXT;
+
+ALTER TABLE senha_config
+  ADD COLUMN IF NOT EXISTS aviso_sonoro_ativo_id VARCHAR(80);
+
 UPDATE senha_config
 SET quantidade_ultimas_chamadas = 4
 WHERE quantidade_ultimas_chamadas IS NULL;

@@ -1,4 +1,6 @@
-﻿import { AppError } from "../../../shared/errors/app-error.js";
+﻿import bcrypt from "bcryptjs";
+import { prisma } from "../../../database/prisma.js";
+import { AppError } from "../../../shared/errors/app-error.js";
 import {
   registroPontoAjusteSchema,
   registroPontoFiltersSchema,
@@ -37,6 +39,7 @@ export class RegistroPontoService {
   async marcarPonto(rawInput: unknown, atorRaw: AtorRaw, origem: RegistroPontoOrigem) {
     const input = registroPontoMarcarSchema.parse(rawInput ?? {});
     const ator = this.parseAtor(atorRaw);
+    await this.validarConfirmacaoUsuario(input.usuario_login, input.senha, ator);
     return this.repository.marcarPonto(input, ator, origem);
   }
 
@@ -85,4 +88,45 @@ export class RegistroPontoService {
       permissoes: atorRaw.permissoes ?? []
     };
   }
+
+  private async validarConfirmacaoUsuario(
+    login: string,
+    senha: string,
+    ator: { id?: bigint; nome_usuario: string }
+  ) {
+    if (!ator.id) {
+      throw new AppError("Usuario autenticado invalido.", 401);
+    }
+
+    const usuario = await prisma.usuario.findUnique({
+      where: { id: ator.id },
+      select: {
+        nomeUsuario: true,
+        email: true,
+        senhaHash: true
+      }
+    });
+
+    if (!usuario) {
+      throw new AppError("Usuario autenticado nao encontrado.", 404);
+    }
+
+    const loginNormalizado = login.trim().toLowerCase();
+    const nomeUsuarioNormalizado = usuario.nomeUsuario.trim().toLowerCase();
+    const emailNormalizado = usuario.email?.trim().toLowerCase();
+
+    const loginConfere =
+      loginNormalizado === nomeUsuarioNormalizado ||
+      (emailNormalizado ? loginNormalizado === emailNormalizado : false);
+
+    if (!loginConfere) {
+      throw new AppError("Usuario ou senha invalidos para confirmar o registro de ponto.", 401);
+    }
+
+    const senhaConfere = await bcrypt.compare(senha, usuario.senhaHash);
+    if (!senhaConfere) {
+      throw new AppError("Usuario ou senha invalidos para confirmar o registro de ponto.", 401);
+    }
+  }
 }
+

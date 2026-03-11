@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { type ChangeEvent, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   BellRing,
@@ -49,6 +49,7 @@ import { imprimirConteudoAtual } from "@/lib/report-utils";
 import { beneficiariosService } from "@/services/beneficiarios.service";
 import { unidadesAssistenciaisService } from "@/services/unidades-assistenciais.service";
 import type { Beneficiario } from "@/types/beneficiario";
+import type { SenhaAvisoSonoro } from "@/types/senhas";
 import type { UnidadeAssistencial } from "@/types/unidade-assistencial";
 
 type AbaId = "entrada" | "fila" | "config";
@@ -60,6 +61,54 @@ const abas: AdminTab[] = [
 ];
 
 const tituloTela = "Chamada de senhas";
+
+function tocarAvisoSonoro() {
+  try {
+    if (!("AudioContext" in window || "webkitAudioContext" in window)) return;
+    const AudioCtx =
+      window.AudioContext ||
+      (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const context = new AudioCtx();
+    const now = context.currentTime;
+    const beepDuration = 0.55;
+    const gap = 0.22;
+
+    const agendarBeep = (start: number, baseFreq: number) => {
+      const gain = context.createGain();
+      const osc1 = context.createOscillator();
+      const osc2 = context.createOscillator();
+
+      gain.gain.value = 0.0001;
+      osc1.type = "sine";
+      osc2.type = "sine";
+      osc1.frequency.value = baseFreq;
+      osc2.frequency.value = baseFreq * 1.5;
+
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(context.destination);
+
+      gain.gain.exponentialRampToValueAtTime(0.16, start + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + beepDuration);
+
+      osc1.start(start);
+      osc2.start(start + 0.03);
+      osc1.stop(start + beepDuration);
+      osc2.stop(start + beepDuration);
+    };
+
+    agendarBeep(now, 960);
+    agendarBeep(now + beepDuration + gap, 840);
+    agendarBeep(now + (beepDuration + gap) * 2, 720);
+
+    const timeoutId = window.setTimeout(() => {
+      void context.close();
+      window.clearTimeout(timeoutId);
+    }, 2200);
+  } catch {
+    // Sem áudio disponível ou bloqueado.
+  }
+}
 
 function obterBeneficiarioId(beneficiario: Beneficiario | null) {
   return Number(beneficiario?.id_beneficiario ?? 0) || null;
@@ -95,6 +144,8 @@ export function ChamadaSenhasPage() {
   const [configTitulo, setConfigTitulo] = useState("Chamada de senhas");
   const [configDescricao, setConfigDescricao] = useState("Controle da fila de atendimento.");
   const [configUnidadePainelId, setConfigUnidadePainelId] = useState<number | null>(null);
+  const [configAvisosSonoros, setConfigAvisosSonoros] = useState<SenhaAvisoSonoro[]>([]);
+  const [configAvisoSonoroAtivoId, setConfigAvisoSonoroAtivoId] = useState<string | null>(null);
 
   useEffect(() => {
     void unidadesAssistenciaisService.listar().then((res) => {
@@ -148,6 +199,8 @@ export function ChamadaSenhasPage() {
       configQuery.data.descricaoTela ?? "Controle da fila de atendimento."
     );
     setConfigUnidadePainelId(configQuery.data.unidadePainelId ?? null);
+    setConfigAvisosSonoros(configQuery.data.avisosSonoros ?? []);
+    setConfigAvisoSonoroAtivoId(configQuery.data.avisoSonoroAtivoId ?? null);
   }, [configQuery.data]);
 
   const beneficiarioSelecionadoId = obterBeneficiarioId(beneficiarioSelecionado);
@@ -310,7 +363,9 @@ export function ChamadaSenhasPage() {
         quantidadeUltimasChamadas: configQuantidade,
         unidadePainelId: configUnidadePainelId,
         tituloTela: configTitulo,
-        descricaoTela: configDescricao
+        descricaoTela: configDescricao,
+        avisosSonoros: configAvisosSonoros,
+        avisoSonoroAtivoId: configAvisoSonoroAtivoId
       });
 
       setPopup({
@@ -325,6 +380,85 @@ export function ChamadaSenhasPage() {
         texto: error?.response?.data?.message ?? "Não foi possível salvar configurações."
       });
     }
+  }
+
+  function selecionarAvisoSonoro(event: ChangeEvent<HTMLInputElement>) {
+    const arquivo = event.target.files?.[0];
+    if (!arquivo) return;
+
+    if (!arquivo.type.startsWith("audio/")) {
+      setPopup({
+        tipo: "aviso",
+        titulo: "Validação",
+        texto: "Selecione um arquivo de áudio válido."
+      });
+      event.target.value = "";
+      return;
+    }
+
+    if (arquivo.size > 1_500_000) {
+      setPopup({
+        tipo: "aviso",
+        titulo: "Validação",
+        texto: "O aviso sonoro deve ter no máximo 1,5 MB."
+      });
+      event.target.value = "";
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const resultado = typeof reader.result === "string" ? reader.result : null;
+      if (!resultado) return;
+      const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      setConfigAvisosSonoros((atual) => [
+        ...atual,
+        {
+          id,
+          nome: arquivo.name,
+          url: resultado
+        }
+      ]);
+      setConfigAvisoSonoroAtivoId((atual) => atual ?? id);
+    };
+    reader.onerror = () => {
+      setPopup({
+        tipo: "erro",
+        titulo: "Erro",
+        texto: "Não foi possível ler o arquivo de áudio."
+      });
+    };
+    reader.readAsDataURL(arquivo);
+    event.target.value = "";
+  }
+
+  function removerAvisoSonoro(id: string) {
+    const proximaLista = configAvisosSonoros.filter((item) => item.id !== id);
+    setConfigAvisosSonoros(proximaLista);
+    setConfigAvisoSonoroAtivoId((atual) => {
+      if (atual && atual !== id) return atual;
+      return proximaLista[0]?.id ?? null;
+    });
+  }
+
+  function testarAvisoSonoro() {
+    destravarSinteseVoz();
+    const avisoAtivo =
+      configAvisosSonoros.find((item) => item.id === configAvisoSonoroAtivoId) ??
+      configAvisosSonoros[0];
+    if (!avisoAtivo?.url) {
+      tocarAvisoSonoro();
+      return;
+    }
+
+    const audio = new Audio(avisoAtivo.url);
+    void audio.play().catch(() => {
+      setPopup({
+        tipo: "erro",
+        titulo: "Erro",
+        texto: "Não foi possível reproduzir o aviso sonoro selecionado."
+      });
+    });
   }
 
   function imprimir() {
@@ -737,6 +871,67 @@ export function ChamadaSenhasPage() {
                   </option>
                 ))}
               </Select>
+            </div>
+
+            <div className="space-y-2 md:col-span-2 xl:col-span-4">
+              <Label htmlFor="config-aviso-sonoro">Aviso sonoro do painel</Label>
+              <Input
+                id="config-aviso-sonoro"
+                type="file"
+                accept="audio/*"
+                onChange={selecionarAvisoSonoro}
+                disabled={atualizarConfigMutation.isPending}
+              />
+              <p className="text-xs text-[var(--g3-muted)]">
+                Selecione um arquivo MP3 ou WAV de até 1,5 MB para tocar antes da chamada.
+              </p>
+              <div className="space-y-2 rounded-lg border border-[var(--g3-border)] p-3">
+                {configAvisosSonoros.length ? (
+                  configAvisosSonoros.map((item) => (
+                    <label
+                      key={item.id}
+                      className="flex flex-col gap-2 rounded-md border border-[var(--g3-border)] bg-[var(--g3-card)] px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <span className="flex items-center gap-2 text-sm">
+                        <input
+                          type="radio"
+                          name="aviso-sonoro-ativo"
+                          checked={configAvisoSonoroAtivoId === item.id}
+                          onChange={() => setConfigAvisoSonoroAtivoId(item.id)}
+                        />
+                        {item.nome}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => removerAvisoSonoro(item.id)}
+                        disabled={atualizarConfigMutation.isPending}
+                      >
+                        Remover
+                      </Button>
+                    </label>
+                  ))
+                ) : (
+                  <p className="text-sm text-[var(--g3-muted)]">
+                    Nenhum aviso sonoro cadastrado.
+                  </p>
+                )}
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                <span className="rounded-md border border-[var(--g3-border)] bg-[var(--g3-card)] px-3 py-2 text-sm">
+                  {configAvisosSonoros.find((item) => item.id === configAvisoSonoroAtivoId)?.nome ??
+                    "Aviso padrão do sistema"}
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={testarAvisoSonoro}
+                  disabled={atualizarConfigMutation.isPending}
+                >
+                  <Volume2 className="mr-2 h-4 w-4" />
+                  Testar aviso sonoro
+                </Button>
+              </div>
             </div>
 
             <div className="flex flex-col gap-2 md:col-span-2 xl:col-span-4 sm:flex-row sm:flex-wrap">

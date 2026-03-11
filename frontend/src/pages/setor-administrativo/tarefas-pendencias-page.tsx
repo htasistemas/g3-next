@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Activity,
   BarChart3,
@@ -62,6 +62,7 @@ const defaultForm: FormState = {
 
 export function TarefasPendenciasPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [abaAtiva, setAbaAtiva] = useState<AbaId>("cadastro");
   const [busca, setBusca] = useState("");
   const [form, setForm] = useState<FormState>(defaultForm);
@@ -78,6 +79,14 @@ export function TarefasPendenciasPage() {
   const historicoMutation = useAdicionarHistoricoTarefaAdministrativa();
 
   const tarefas = data ?? [];
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const aba = params.get("tab");
+    if (aba === "listagem") {
+      setAbaAtiva("listagem");
+    }
+  }, [location.search]);
 
   const tarefasFiltradas = useMemo(() => {
     const termo = busca.trim().toLowerCase();

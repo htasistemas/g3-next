@@ -65,6 +65,8 @@ export type RegistroPontoFiltro = {
 };
 
 export type RegistroPontoMarcarPayload = {
+  usuario_login: string;
+  senha: string;
   latitude?: number;
   longitude?: number;
   accuracy_metros?: number;

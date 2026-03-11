@@ -1,5 +1,6 @@
 ﻿import { z } from "zod";
 import type { RegistroPontoFiltro, RegistroPontoOcorrenciaTipo } from "@/types/registro-ponto";
+import { endOfMonthLocalISO, startOfMonthLocalISO } from "@/lib/date-utils";
 
 const optionalTrimmedString = z.preprocess((value) => {
   if (typeof value !== "string") return value;
@@ -47,8 +48,8 @@ export type RegistroPontoOcorrenciaFormValues = {
 };
 
 export const filtroRegistroPontoPadrao: RegistroPontoFiltro = {
-  data_inicial: new Date().toISOString().slice(0, 10),
-  data_final: new Date().toISOString().slice(0, 10),
+  data_inicial: startOfMonthLocalISO(),
+  data_final: endOfMonthLocalISO(),
   usuario_id: "",
   status: undefined,
   ocorrencia: "",

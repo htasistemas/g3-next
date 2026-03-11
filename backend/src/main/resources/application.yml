@@ -3,9 +3,9 @@ spring:
     exclude:
       - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
   datasource:
-    url: jdbc:postgresql://localhost:5432/g3
-    username: postgres
-    password: admin
+    url: jdbc:postgresql://localhost:5432/g3n
+    username: g3n
+    password: admin@123
   mail:
     host: ${MAIL_HOST:}
     port: ${MAIL_PORT:587}

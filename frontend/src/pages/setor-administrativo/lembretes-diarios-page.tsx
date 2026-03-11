@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Bell, CheckCircle2, Printer, Save, Search, Trash2, Undo2, X, Plus, List } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -42,6 +42,7 @@ const defaultForm: FormState = {
 
 export function LembretesDiariosPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { usuario } = useAuth();
   const [abaAtiva, setAbaAtiva] = useState<AbaId>("cadastro");
   const [filtroStatus, setFiltroStatus] = useState<FiltroStatus>("pendentes");
@@ -60,6 +61,14 @@ export function LembretesDiariosPage() {
   const adiarMutation = useAdiarLembreteDiario();
 
   const lembretes = data ?? [];
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const aba = params.get("tab");
+    if (aba === "lembretes") {
+      setAbaAtiva("lembretes");
+    }
+  }, [location.search]);
 
   const lembretesFiltrados = useMemo(() => {
     const termo = busca.trim().toLowerCase();
@@ -101,6 +110,7 @@ export function LembretesDiariosPage() {
     }
 
     try {
+      const criandoNovo = !form.id;
       const payload: LembreteDiarioPayload = {
         titulo: form.titulo.trim(),
         descricao: form.descricao?.trim() || undefined,
@@ -129,6 +139,11 @@ export function LembretesDiariosPage() {
       setSnapshot(proximo);
       setPopupMensagem({ tipo: "sucesso", titulo: "Confirmação", texto: "Lembrete salvo com sucesso." });
       setAbaAtiva("lembretes");
+
+      if (criandoNovo) {
+        localStorage.setItem("g3_lembrete_alerta", "1");
+        window.dispatchEvent(new Event("g3-lembrete-alerta"));
+      }
     } catch (error: any) {
       setPopupMensagem({
         tipo: "erro",

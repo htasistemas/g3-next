@@ -13,6 +13,24 @@ import {
 import { unidadesAssistenciaisService } from "@/services/unidades-assistenciais.service";
 import type { SenhaChamadaResponse } from "@/types/senhas";
 
+function criarAudioContext(): AudioContext | null {
+  if (!("AudioContext" in window || "webkitAudioContext" in window)) return null;
+  const AudioCtx =
+    window.AudioContext ||
+    (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+  return new AudioCtx();
+}
+
+function tocarArquivoAviso(url: string) {
+  return new Promise<void>((resolve, reject) => {
+    const audio = new Audio(url);
+    audio.preload = "auto";
+    audio.onended = () => resolve();
+    audio.onerror = () => reject(new Error("Falha ao reproduzir aviso sonoro."));
+    void audio.play().catch(reject);
+  });
+}
+
 const NoticiasTicker = memo(function NoticiasTicker({
   noticias,
   velocidadeTicker
@@ -49,6 +67,7 @@ export function PainelSenhasPage() {
   const [agora, setAgora] = useState(() => new Date());
   const [logomarcaUnidade, setLogomarcaUnidade] = useState("");
   const [audioHabilitado, setAudioHabilitado] = useState(() => audioPainelJaLiberado());
+  const audioContextRef = useRef<AudioContext | null>(null);
   const [chamadaRecebida, setChamadaRecebida] = useState<SenhaChamadaResponse | null>(null);
   const ultimaChamadaIdRef = useRef<string | null>(null);
   const chamadaEmAndamentoRef = useRef<string | null>(null);
@@ -70,7 +89,7 @@ export function PainelSenhasPage() {
       .map((item) => item.trim())
       .filter(Boolean);
 
-    return lista.length ? lista : ["Aguardando novas notícias da assistência social."];
+    return lista.length ? lista : ["Aguardando novas noticias da assistencia social."];
   }, [configQuery.data?.noticiasManuais]);
 
   useEffect(() => {
@@ -105,6 +124,12 @@ export function PainelSenhasPage() {
   useEffect(() => {
     const habilitarAudio = () => {
       destravarSinteseVoz();
+      if (!audioContextRef.current) {
+        audioContextRef.current = criarAudioContext();
+      }
+      if (audioContextRef.current?.state === "suspended") {
+        void audioContextRef.current.resume();
+      }
       setAudioHabilitado(true);
     };
 
@@ -116,6 +141,72 @@ export function PainelSenhasPage() {
       window.removeEventListener("keydown", habilitarAudio);
     };
   }, []);
+
+  const tocarAvisoSonoroPadrao = () => {
+    try {
+      if (!audioContextRef.current) {
+        audioContextRef.current = criarAudioContext();
+      }
+      const context = audioContextRef.current;
+      if (!context) return;
+      if (context.state === "suspended") {
+        void context.resume();
+      }
+
+      const now = context.currentTime;
+      const beepDuration = 0.55;
+      const gap = 0.22;
+
+      const agendarBeep = (start: number, baseFreq: number) => {
+        const gain = context.createGain();
+        const osc1 = context.createOscillator();
+        const osc2 = context.createOscillator();
+
+        gain.gain.value = 0.0001;
+        osc1.type = "sine";
+        osc2.type = "sine";
+        osc1.frequency.value = baseFreq;
+        osc2.frequency.value = baseFreq * 1.5;
+
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(context.destination);
+
+        gain.gain.exponentialRampToValueAtTime(0.16, start + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + beepDuration);
+
+        osc1.start(start);
+        osc2.start(start + 0.03);
+        osc1.stop(start + beepDuration);
+        osc2.stop(start + beepDuration);
+      };
+
+      agendarBeep(now, 960);
+      agendarBeep(now + beepDuration + gap, 840);
+      agendarBeep(now + (beepDuration + gap) * 2, 720);
+    } catch {
+      // Sem audio disponivel ou bloqueado.
+    }
+  };
+
+  async function tocarAvisoSonoro() {
+    const avisosSonoros = configQuery.data?.avisosSonoros ?? [];
+    const avisoAtivo =
+      avisosSonoros.find((item) => item.id === configQuery.data?.avisoSonoroAtivoId) ??
+      avisosSonoros[0];
+
+    if (avisoAtivo?.url) {
+      try {
+        await tocarArquivoAviso(avisoAtivo.url);
+        return;
+      } catch {
+        // Cai para o aviso padrao.
+      }
+    }
+
+    tocarAvisoSonoroPadrao();
+    await new Promise((resolve) => window.setTimeout(resolve, 1900));
+  }
 
   useEffect(() => {
     atualizarHeartbeatPainel(audioHabilitado);
@@ -131,11 +222,7 @@ export function PainelSenhasPage() {
   useEffect(() => {
     return ouvirEventoPainelChamada((payload) => {
       const ultimoEvento = ultimoEventoRecebidoRef.current;
-      if (
-        ultimoEvento &&
-        ultimoEvento.id === payload.id &&
-        Date.now() - ultimoEvento.em < 1500
-      ) {
+      if (ultimoEvento && ultimoEvento.id === payload.id && Date.now() - ultimoEvento.em < 1500) {
         return;
       }
 
@@ -172,23 +259,35 @@ export function PainelSenhasPage() {
       return;
     }
 
+    let cancelado = false;
     ultimaChamadaIdRef.current = chamadaParaAnunciar.id;
     chamadaEmAndamentoRef.current = chamadaParaAnunciar.id;
 
-    falarChamadaNavegador({
-      frase: fraseFala,
-      beneficiario: chamadaParaAnunciar.nomeBeneficiario,
-      sala: chamadaParaAnunciar.localAtendimento,
-      onStart: () => {
-        chamadaEmAndamentoRef.current = null;
-        registrarChamadaFalando(chamadaParaAnunciar.id);
-        setAudioHabilitado(true);
-      },
-      onError: () => {
-        chamadaEmAndamentoRef.current = null;
-      }
-    });
-  }, [chamadaParaAnunciar, fraseFala]);
+    const executar = async () => {
+      await tocarAvisoSonoro();
+      if (cancelado) return;
+
+      falarChamadaNavegador({
+        frase: fraseFala,
+        beneficiario: chamadaParaAnunciar.nomeBeneficiario,
+        sala: chamadaParaAnunciar.localAtendimento,
+        onStart: () => {
+          chamadaEmAndamentoRef.current = null;
+          registrarChamadaFalando(chamadaParaAnunciar.id);
+          setAudioHabilitado(true);
+        },
+        onError: () => {
+          chamadaEmAndamentoRef.current = null;
+        }
+      });
+    };
+
+    void executar();
+
+    return () => {
+      cancelado = true;
+    };
+  }, [chamadaParaAnunciar, fraseFala, configQuery.data?.avisoSonoroAtivoId, configQuery.data?.avisosSonoros]);
 
   useEffect(() => {
     if (!("speechSynthesis" in window)) {
@@ -209,9 +308,9 @@ export function PainelSenhasPage() {
   }, [senhaAtualQuery.refetch]);
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,#1f8f66_0%,#0f5a43_30%,#072c21_100%)] px-3 py-3 text-white sm:px-4 lg:px-6">
-      <div className="mx-auto flex min-h-[calc(100vh-1.5rem)] w-full max-w-[1600px] flex-col gap-4">
-        <header className="rounded-[28px] border border-white/20 bg-white/10 px-4 py-4 shadow-[0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur sm:px-6">
+    <main className="h-[100dvh] overflow-hidden bg-[radial-gradient(circle_at_top,#1f8f66_0%,#0f5a43_30%,#072c21_100%)] px-3 py-2 text-white sm:px-4 lg:px-6">
+      <div className="mx-auto flex h-full w-full max-w-[1600px] flex-col gap-3">
+        <header className="rounded-[28px] border border-white/20 bg-white/10 px-4 py-3 shadow-[0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur sm:px-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0 text-center lg:text-left">
               <p className="text-xs uppercase tracking-[0.24em] text-white/70">Sistema G3</p>
@@ -250,8 +349,8 @@ export function PainelSenhasPage() {
           </div>
         </header>
 
-        <section className="grid flex-1 gap-4 xl:min-h-0 xl:grid-cols-[minmax(0,2.45fr)_380px]">
-          <article className="relative flex min-h-[54vh] flex-col items-center justify-center overflow-hidden rounded-[34px] border border-white/20 bg-[linear-gradient(155deg,rgba(255,255,255,0.20),rgba(255,255,255,0.07))] px-5 py-8 text-center shadow-[0_30px_90px_rgba(0,0,0,0.28)] backdrop-blur sm:px-8 lg:px-12 xl:min-h-full">
+        <section className="grid flex-1 min-h-0 gap-3 xl:grid-cols-[minmax(0,2.45fr)_380px]">
+          <article className="relative flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden rounded-[34px] border border-white/20 bg-[linear-gradient(155deg,rgba(255,255,255,0.20),rgba(255,255,255,0.07))] px-5 py-6 text-center shadow-[0_30px_90px_rgba(0,0,0,0.28)] backdrop-blur sm:px-8 lg:px-10">
             <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-emerald-200 via-emerald-400 to-teal-200" />
             <span className="rounded-full border border-white/20 bg-white/12 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/75">
               Chamada atual
@@ -262,7 +361,7 @@ export function PainelSenhasPage() {
                 <p className="max-w-5xl text-5xl font-black leading-[0.95] tracking-tight text-white drop-shadow-[0_10px_30px_rgba(0,0,0,0.35)] sm:text-6xl lg:text-7xl xl:text-[6.5rem]">
                   {chamadaAtual.nomeBeneficiario}
                 </p>
-                <p className="mt-6 rounded-full bg-amber-300/16 px-6 py-3 text-2xl font-black text-amber-100 shadow-[0_14px_40px_rgba(245,158,11,0.18)] sm:text-3xl lg:text-5xl xl:text-6xl">
+                <p className="mt-6 rounded-full bg-amber-300/16 px-6 py-3 text-2xl font-black text-amber-100 sm:text-3xl lg:text-5xl xl:text-6xl">
                   Dirija-se a {chamadaAtual.localAtendimento}
                 </p>
                 <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
@@ -287,8 +386,8 @@ export function PainelSenhasPage() {
             )}
           </article>
 
-          <div className="flex flex-col gap-4 xl:min-h-0">
-            <article className="rounded-[30px] border border-white/20 bg-black/20 p-4 shadow-[0_22px_70px_rgba(0,0,0,0.22)] backdrop-blur sm:p-5 xl:flex-1">
+          <div className="flex min-h-0 flex-col gap-3">
+            <article className="flex min-h-0 flex-1 flex-col rounded-[30px] border border-white/20 bg-black/20 p-4 shadow-[0_22px_70px_rgba(0,0,0,0.22)] backdrop-blur sm:p-5">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
                   <p className="text-[11px] uppercase tracking-[0.18em] text-white/60">
@@ -301,7 +400,7 @@ export function PainelSenhasPage() {
                 </span>
               </div>
 
-              <ul className="space-y-3">
+              <ul className="min-h-0 flex-1 space-y-3 overflow-hidden">
                 {chamadas.slice(0, limite).map((item, index) => (
                   <li
                     key={item.id}

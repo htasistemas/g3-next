@@ -49,6 +49,10 @@ const estruturaSql = [
     unidade_painel_id BIGINT,
     titulo_tela TEXT,
     descricao_tela TEXT,
+    avisos_sonoros_json TEXT,
+    aviso_sonoro_ativo_id TEXT,
+    aviso_sonoro_url TEXT,
+    aviso_sonoro_nome TEXT,
     atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
   )
   `,
@@ -71,6 +75,26 @@ export class SenhasRepository {
       INSERT INTO senhas_config (id)
       SELECT 1
       WHERE NOT EXISTS (SELECT 1 FROM senhas_config WHERE id = 1)
+    `);
+
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE senhas_config
+      ADD COLUMN IF NOT EXISTS avisos_sonoros_json TEXT
+    `);
+
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE senhas_config
+      ADD COLUMN IF NOT EXISTS aviso_sonoro_ativo_id TEXT
+    `);
+
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE senhas_config
+      ADD COLUMN IF NOT EXISTS aviso_sonoro_url TEXT
+    `);
+
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE senhas_config
+      ADD COLUMN IF NOT EXISTS aviso_sonoro_nome TEXT
     `);
 
     this.estruturaGarantida = true;
@@ -361,6 +385,10 @@ export class SenhasRepository {
         unidade_painel_id,
         titulo_tela,
         descricao_tela,
+        avisos_sonoros_json,
+        aviso_sonoro_ativo_id,
+        aviso_sonoro_url,
+        aviso_sonoro_nome,
         atualizado_em
       FROM senhas_config
       ORDER BY id ASC
@@ -384,6 +412,10 @@ export class SenhasRepository {
         unidade_painel_id = ${input.unidadePainelId ? BigInt(input.unidadePainelId) : null},
         titulo_tela = ${input.tituloTela ?? null},
         descricao_tela = ${input.descricaoTela ?? null},
+        avisos_sonoros_json = ${JSON.stringify(input.avisosSonoros ?? [])},
+        aviso_sonoro_ativo_id = ${input.avisoSonoroAtivoId ?? null},
+        aviso_sonoro_url = NULL,
+        aviso_sonoro_nome = NULL,
         atualizado_em = NOW()
       WHERE id = 1
     `);
