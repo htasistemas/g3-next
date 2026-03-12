@@ -49,7 +49,11 @@ jobs:
           chmod 700 "$HOME/.ssh"
           printf '%s\n' "$DEPLOY_SSH_KEY" > "$HOME/.ssh/id_ed25519"
           chmod 600 "$HOME/.ssh/id_ed25519"
-          ssh-keyscan -p "$DEPLOY_PORT" -H "$DEPLOY_HOST" >> "$HOME/.ssh/known_hosts"
+          if ! ssh-keyscan -T 10 -p "$DEPLOY_PORT" -H "$DEPLOY_HOST" >> "$HOME/.ssh/known_hosts"; then
+            echo "::error::Não foi possível alcançar $DEPLOY_HOST:$DEPLOY_PORT a partir do GitHub Actions."
+            echo "::error::Verifique IP público, porta SSH exposta e firewall liberando acesso externo."
+            exit 1
+          fi
           chmod 644 "$HOME/.ssh/known_hosts"
 
       - name: Executar deploy no servidor
