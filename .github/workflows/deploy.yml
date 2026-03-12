@@ -1,4 +1,4 @@
-name: Build G3 Next
+name: Deploy G3 Next
 
 on:
   push:
@@ -6,21 +6,72 @@ on:
       - main
   workflow_dispatch:
 
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
-      - name: Baixar codigo
-        uses: actions/checkout@v4
-
-      - name: Configurar Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Verificar estrutura
+      - name: Verificar secrets obrigatórios
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
         run: |
-          pwd
-          ls -la
-          echo "GitHub Actions funcionando"
+          set -euo pipefail
+
+          faltando=0
+          for secret_name in DEPLOY_HOST DEPLOY_USER DEPLOY_PORT DEPLOY_SSH_KEY; do
+            if [ -z "${!secret_name}" ]; then
+              echo "::error::Secret ${secret_name} não configurado."
+              faltando=1
+            fi
+          done
+
+          if [ "$faltando" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Configurar chave SSH
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -p "$DEPLOY_PORT" -H "$DEPLOY_HOST" >> "$HOME/.ssh/known_hosts"
+          chmod 644 "$HOME/.ssh/known_hosts"
+
+      - name: Executar deploy no servidor
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          ssh \
+            -i "$HOME/.ssh/id_ed25519" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -p "$DEPLOY_PORT" \
+            "$DEPLOY_USER@$DEPLOY_HOST" <<EOF
+          set -euo pipefail
+          cd /home/srv/g3
+          echo "Deploy do commit $GITHUB_SHA"
+          git fetch origin main
+          git checkout main
+          git pull --ff-only origin main
+          bash ./scripts/deploy-g3.sh
+          EOF
