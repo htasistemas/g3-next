@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { HandHeart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
+import { APP_VERSION } from "@/lib/app-version";
 import { authService } from "@/services/auth.service";
 
 const FOTO_LATERAL_URL = "/images/loguim.jpg";
@@ -79,7 +81,7 @@ export function LoginPage() {
   const [aviso, setAviso] = useState<string | null>(null);
   const [mensagemRecuperacao, setMensagemRecuperacao] = useState<string | null>(null);
   const [googleBotaoPronto, setGoogleBotaoPronto] = useState(false);
-  const versaoSistema = import.meta.env.VITE_APP_VERSION ?? "1.00.13";
+  const versaoSistema = APP_VERSION;
   const googleButtonRef = useRef<HTMLDivElement | null>(null);
   const origemAtual = typeof window === "undefined" ? "" : window.location.origin;
   const googleAviso = !GOOGLE_CLIENT_ID
@@ -209,26 +211,40 @@ export function LoginPage() {
       <div className="absolute inset-0 bg-[linear-gradient(180deg,#d9f7e5_0%,#bdeed1_100%)]" />
       <section className="relative z-10 w-full max-w-6xl overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-2xl shadow-emerald-300/35">
         <div className="grid min-h-[620px] lg:grid-cols-[1.05fr_1fr]">
-          <aside className="relative hidden lg:block">
-            <img src={FOTO_LATERAL_URL} alt="Crianças brincando" className="h-full w-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-b from-emerald-900/50 via-emerald-900/35 to-emerald-950/75" />
-            <div className="absolute inset-x-0 bottom-0 space-y-3 p-8 text-white">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-100">Sistema G3</p>
-              <h1 className="text-3xl font-semibold leading-tight">
-                Gestão social moderna, organizada e preparada para crescer.
-              </h1>
-              <p className="text-sm text-emerald-50/90">
-                Plataforma integrada para cadastro, acompanhamento e atendimento de beneficiários.
-              </p>
+          <aside className="hidden bg-[linear-gradient(180deg,#064e3b_0%,#022c22_100%)] lg:order-2 lg:flex lg:flex-col">
+            <div className="px-8 pt-8">
+              <div className="overflow-hidden rounded-[28px] border border-emerald-800 bg-emerald-900 shadow-xl shadow-emerald-950/30">
+                <img
+                  src={FOTO_LATERAL_URL}
+                  alt="Crianças brincando"
+                  className="h-56 w-full object-cover xl:h-64"
+                />
+              </div>
+            </div>
+            <div className="flex flex-1 items-end px-8 pb-8 pt-6">
+              <div className="space-y-3 rounded-[28px] border border-emerald-800 bg-emerald-950 px-7 py-8 text-white shadow-2xl shadow-emerald-950/30">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-100">Sistema G3</p>
+                <h1 className="text-3xl font-semibold leading-tight">
+                  Gestão social moderna, organizada e preparada para crescer.
+                </h1>
+                <p className="text-sm leading-6 text-emerald-50/90">
+                  Plataforma integrada para cadastro, acompanhamento e atendimento de beneficiários.
+                </p>
+              </div>
             </div>
           </aside>
 
-          <section className="flex items-center">
+          <section className="flex items-center lg:order-1">
             <div className="w-full space-y-6 bg-white px-5 py-7 shadow-[inset_0_0_80px_rgba(16,185,129,0.04)] sm:px-10">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Acesso ao sistema</p>
-                  <h2 className="text-2xl font-semibold text-slate-900">Entrar no G3 Next</h2>
+                  <div className="mt-1 flex items-center gap-2">
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-emerald-100 text-emerald-800">
+                      <HandHeart className="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <h2 className="text-2xl font-semibold text-slate-900">Entrar no G3 Next</h2>
+                  </div>
                 </div>
                 <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
                   <span className="inline-flex h-5 w-5 overflow-hidden rounded-full ring-1 ring-slate-200">
@@ -257,16 +273,16 @@ export function LoginPage() {
                   />
                 </div>
 
-                <div className="flex justify-end">
+                <div className="flex justify-center">
                   <button
                     type="button"
-                    className="text-xs font-medium text-emerald-700 underline decoration-emerald-300 underline-offset-2 hover:text-emerald-800"
+                    className="text-center text-xs font-medium leading-relaxed text-emerald-700 underline decoration-emerald-300 underline-offset-2 hover:text-emerald-800"
                     onClick={() => {
                       setPopupEsqueciSenhaAberto(true);
                       setMensagemRecuperacao(null);
                     }}
                   >
-                    Esqueci minha senha
+                    Esqueceu sua senha? Vou te ajudar, clique aqui para recuperar.
                   </button>
                 </div>
 
@@ -315,25 +331,27 @@ export function LoginPage() {
                 >
                   Solicitar acesso
                 </Button>
-                <p className="text-slate-600">
-                  Ao continuar, você concorda com os {" "}
-                  <button
-                    type="button"
-                    className="font-medium text-slate-900 underline decoration-slate-300 underline-offset-2 hover:text-emerald-700"
-                    onClick={() => setModalAberto("termos")}
-                  >
-                    Termos de uso
-                  </button>{" "}
-                  e a {" "}
-                  <button
-                    type="button"
-                    className="font-medium text-slate-900 underline decoration-slate-300 underline-offset-2 hover:text-emerald-700"
-                    onClick={() => setModalAberto("politica")}
-                  >
-                    Política de privacidade
-                  </button>
-                  .
-                </p>
+                <div className="space-y-1 text-xs text-slate-600 sm:text-sm">
+                  <p className="whitespace-nowrap">Ao acessar, você concorda com os</p>
+                  <p className="whitespace-nowrap">
+                    <button
+                      type="button"
+                      className="font-medium text-slate-900 underline decoration-slate-300 underline-offset-2 hover:text-emerald-700"
+                      onClick={() => setModalAberto("termos")}
+                    >
+                      termos de uso
+                    </button>{" "}
+                    e a{" "}
+                    <button
+                      type="button"
+                      className="font-medium text-slate-900 underline decoration-slate-300 underline-offset-2 hover:text-emerald-700"
+                      onClick={() => setModalAberto("politica")}
+                    >
+                      política de privacidade
+                    </button>
+                    .
+                  </p>
+                </div>
               </div>
 
               <p className="text-center text-xs text-slate-500">Versão do sistema: {versaoSistema}</p>

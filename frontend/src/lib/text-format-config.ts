@@ -222,6 +222,28 @@ export const mapaCamposTextoDoadorForm: Record<string, TipoFormatacaoTexto> = {
   observacoes: "textoCurto"
 };
 
+export const mapaCamposTextoBancoEmpregosForm: Record<string, TipoFormatacaoTexto> = {
+  titulo: "textoCurto",
+  area: "textoCurto",
+  tipo: "textoCurto",
+  nivel: "textoCurto",
+  modelo: "textoCurto",
+  tipoContrato: "textoCurto",
+  cargaHoraria: "textoCurto",
+  beneficios: "textoCurto",
+  nomeEmpresa: "instituicao",
+  responsavel: "nomePessoa",
+  endereco: "endereco",
+  bairro: "endereco",
+  cidade: "endereco",
+  escolaridade: "textoCurto",
+  experiencia: "textoCurto",
+  habilidades: "textoCurto",
+  requisitos: "textoCurto",
+  descricao: "textoCurto",
+  observacoes: "textoCurto"
+};
+
 export const mapaCamposTextoRegistroDoacaoForm: Record<string, TipoFormatacaoTexto> = {
   tipo_doacao: "textoCurto",
   descricao: "textoCurto",

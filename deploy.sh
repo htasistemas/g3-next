@@ -48,6 +48,8 @@ if [ -f "$TUNNEL_COMPOSE" ]; then
 fi
 
 log "Deploy g3 stack"
+APP_VERSION="$(bash ./scripts/bump-version.sh)"
+log "Version set to $APP_VERSION"
 docker compose -f "$APP_COMPOSE" build backend frontend
 docker compose -f "$APP_COMPOSE" up -d --force-recreate backend frontend
 

@@ -4,6 +4,7 @@ export type JobEncaminhamentoInput = {
   id?: string;
   beneficiarioId?: string | null;
   beneficiarioNome: string;
+  beneficiarioTelefone?: string | null;
   data: string;
   status: string;
   observacoes?: string | null;

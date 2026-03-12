@@ -28,6 +28,7 @@
 
 ### Capitalização UI
 
+- Toda tela criada ou alterada deve seguir obrigatoriamente este padrão de capitalização.
 - Usar sentence case em labels, títulos, abas, botões e mensagens.
 - Usar maiúsculas apenas para siglas (CPF, CNPJ, LGPD, CEP, UF).
 
@@ -35,6 +36,151 @@
 
 - Antes de alterar estrutura: analisar impacto e registrar diagnóstico.
 - Priorizar compatibilidade com estrutura existente.
+
+---
+
+## MÁSCARAS, VALIDAÇÕES E NORMALIZAÇÃO DE CAMPOS
+
+### Regra geral
+
+- MUST aplicar máscara visual apenas no front-end quando necessário.
+- MUST validar os campos no front-end e no back-end.
+- MUST normalizar os dados antes de salvar no banco.
+- MUST salvar no banco sem máscara, salvo quando a natureza do campo exigir formato literal.
+- MUST criar funções/utilitários centralizados para máscara, validação e normalização.
+- MUST evitar regras duplicadas em telas diferentes.
+- MUST padronizar mensagens de erro de forma clara e amigável.
+- MUST destacar visualmente campos inválidos.
+- MUST revalidar no submit mesmo que já tenha validado no blur.
+- MUST impedir persistência de dados inválidos.
+- MUST garantir que filtros, buscas, importações e integrações usem o valor normalizado.
+- MUST criar testes unitários e de integração para validações críticas.
+- MUST manter compatibilidade com a arquitetura existente do sistema.
+- MUST seguir o padrão visual e técnico do G3 / G3-Next.
+
+### CPF
+
+- MUST usar máscara visual `000.000.000-00`.
+- MUST aceitar apenas números na regra atual.
+- MUST remover máscara antes de salvar.
+- MUST validar CPF com 11 dígitos.
+- MUST validar os dígitos verificadores.
+- MUST rejeitar sequências repetidas como `00000000000`, `11111111111` e equivalentes.
+- MUST impedir gravação de CPF inválido quando informado.
+- MUST impedir gravação quando o campo for obrigatório e estiver vazio.
+- MUST padronizar buscas e comparações com CPF sem máscara.
+
+### CNPJ
+
+- MUST usar máscara visual `00.000.000/0000-00`.
+- MUST remover máscara antes de salvar.
+- MUST validar CNPJ com 14 posições na regra vigente.
+- MUST validar os dígitos verificadores.
+- MUST rejeitar sequências repetidas inválidas.
+- MUST impedir gravação de CNPJ inválido quando informado.
+- MUST impedir gravação quando o campo for obrigatório e estiver vazio.
+- MUST padronizar buscas e comparações com CNPJ sem máscara.
+- MUST deixar a arquitetura preparada para futura evolução do CNPJ alfanumérico sem retrabalho estrutural.
+
+### E-mail
+
+- MUST não usar máscara visual.
+- MUST remover espaços em branco desnecessários no início e no fim.
+- MUST converter para minúsculo antes de salvar, salvo exceção tecnicamente justificada.
+- MUST validar estrutura mínima de e-mail.
+- MUST rejeitar e-mails sem `@`, sem domínio ou com espaços inválidos.
+- MUST impedir persistência de e-mail inválido quando o campo for obrigatório.
+- MUST padronizar busca e comparação com e-mail normalizado.
+
+### Telefone fixo
+
+- MUST usar máscara visual `(00) 0000-0000` quando o número possuir 10 dígitos.
+- MUST salvar apenas números.
+- MUST validar DDD e quantidade de dígitos.
+- MUST normalizar antes de persistir.
+
+### Celular
+
+- MUST usar máscara visual `(00) 00000-0000` quando o número possuir 11 dígitos.
+- MUST salvar apenas números.
+- MUST validar DDD e quantidade de dígitos.
+- MUST normalizar antes de persistir.
+
+### WhatsApp
+
+- MUST seguir a regra de celular quando nacional.
+- MUST permitir arquitetura preparada para formato internacional com DDI.
+- MUST salvar apenas números no formato normalizado.
+- MUST padronizar integrações usando número limpo.
+
+### CEP
+
+- MUST usar máscara visual `00000-000`.
+- MUST salvar apenas números.
+- MUST validar quantidade de 8 dígitos.
+- MUST normalizar antes de persistir.
+
+### Data
+
+- MUST usar máscara visual `00/00/0000` quando houver digitação manual.
+- MUST validar datas inexistentes, como dia 31 em mês incompatível.
+- MUST armazenar no formato de data adequado no banco.
+- MUST padronizar uso de formato ISO em integrações e APIs sempre que aplicável.
+
+### Valores monetários
+
+- MUST usar máscara visual compatível com moeda brasileira no front-end.
+- MUST armazenar valor sem símbolo monetário e sem formatação visual.
+- MUST usar tipo numérico apropriado no banco.
+- MUST evitar salvar valores monetários como texto.
+- MUST padronizar arredondamento e precisão decimal.
+
+### Percentuais
+
+- MUST usar máscara visual apenas para facilitar digitação.
+- MUST salvar valor numérico limpo.
+- MUST padronizar regra de casas decimais.
+
+### Normalização obrigatória
+
+- MUST centralizar funções como:
+  - `normalizarCpf`
+  - `validarCpf`
+  - `formatarCpf`
+  - `normalizarCnpj`
+  - `validarCnpj`
+  - `formatarCnpj`
+  - `normalizarEmail`
+  - `validarEmail`
+  - `normalizarTelefone`
+  - `formatarTelefone`
+  - `normalizarCep`
+  - `formatarCep`
+- MUST usar essas funções em todas as telas e endpoints relacionados.
+- MUST evitar implementação isolada por componente quando já existir utilitário central.
+
+### UX obrigatória
+
+- MUST validar no blur e no submit.
+- MUST exibir mensagem clara abaixo do campo com erro.
+- MUST marcar visualmente o campo inválido.
+- MUST impedir que o usuário finalize cadastros com dados críticos inválidos.
+- MUST manter comportamento consistente em todas as telas.
+
+### Banco de dados e integridade
+
+- MUST revisar tamanho de colunas para suportar os formatos corretos.
+- MUST evitar duplicidade causada por diferença de máscara.
+- MUST comparar documentos e telefones sempre na forma normalizada.
+- MUST garantir consistência entre front-end, back-end e banco.
+
+### Testes obrigatórios
+
+- MUST criar testes para casos válidos e inválidos.
+- MUST testar campos com máscara e sem máscara.
+- MUST testar campos obrigatórios e opcionais.
+- MUST testar normalização antes da persistência.
+- MUST testar compatibilidade com filtros, buscas e integrações.
 
 ---
 

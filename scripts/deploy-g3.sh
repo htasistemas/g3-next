@@ -57,6 +57,9 @@ wait_healthy() {
   done
 }
 
+APP_VERSION="$(bash ./scripts/bump-version.sh)"
+echo "Versao definida para $APP_VERSION"
+
 $COMPOSE up -d --build backend frontend
 
 echo "Aguardando backend..."

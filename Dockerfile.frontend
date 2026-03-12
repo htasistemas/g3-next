@@ -6,6 +6,7 @@ COPY frontend/package*.json ./
 RUN npm ci
 
 COPY frontend .
+COPY backend/src/main/resources/static/version.txt ./.g3-version
 
 RUN npm run build
 

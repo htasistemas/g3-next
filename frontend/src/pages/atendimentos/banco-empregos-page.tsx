@@ -2,8 +2,6 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Briefcase,
-  Building2,
-  FileText,
   List,
   Plus,
   Printer,
@@ -40,32 +38,40 @@ import {
 } from "@/features/banco-empregos/use-banco-empregos";
 import { useBeneficiarios } from "@/features/beneficiarios/use-beneficiarios";
 import { imprimirConteudoAtual } from "@/lib/report-utils";
+import { mapaCamposTextoBancoEmpregosForm } from "@/lib/text-format-config";
+import { formatarTextoPorCampo, normalizarObjetoTexto } from "@/lib/text-formatter";
+import { somenteDigitos } from "@/lib/validators";
 import type { JobPayload, JobRecord } from "@/types/banco-empregos";
 import type { Beneficiario } from "@/types/beneficiario";
 
 type AbaId =
   | "listagemVagas"
   | "dadosVaga"
-  | "empresaLocal"
-  | "requisitos"
   | "encaminhamentos"
   | "candidatos";
 
 type BeneficiarioSelecionado = {
   id: string;
   nome: string;
+  telefone?: string;
 };
 
 const abas: AdminTab[] = [
   { id: "listagemVagas", label: "Listagem de vagas", icon: List },
   { id: "dadosVaga", label: "Dados da vaga", icon: Briefcase },
-  { id: "empresaLocal", label: "Empresa e local", icon: Building2 },
-  { id: "requisitos", label: "Requisitos e descrição", icon: FileText },
   { id: "encaminhamentos", label: "Encaminhamentos", icon: Send },
   { id: "candidatos", label: "Candidatos da vaga", icon: Users }
 ];
 
 const tituloTela = "Banco de empregos";
+const statusEncaminhamentoOpcoes = [
+  { value: "AGUARDANDO", label: "Aguardando" },
+  { value: "EM_ANALISE", label: "Em análise" },
+  { value: "ENCAMINHADO", label: "Encaminhado" },
+  { value: "RETORNADO", label: "Retornado" },
+  { value: "CONTRATADO", label: "Contratado" },
+  { value: "NAO_APROVADO", label: "Não aprovado" }
+] as const;
 
 function criarFormularioVazio(): JobPayload {
   return {
@@ -76,6 +82,8 @@ function criarFormularioVazio(): JobPayload {
     },
     empresaLocal: {
       nomeEmpresa: "",
+      responsavel: "",
+      telefone: "",
       cidade: ""
     },
     requisitos: {
@@ -100,6 +108,10 @@ function localizarBeneficiarioPorNome(beneficiarios: Beneficiario[], nome: strin
   );
 }
 
+function obterTelefoneBeneficiario(item: Beneficiario | null) {
+  return item?.telefone_principal?.trim() || item?.telefone_recado_numero?.trim() || "";
+}
+
 function mapearBeneficiarioSelecionado(item: Beneficiario | null): BeneficiarioSelecionado | null {
   if (!item?.id_beneficiario) {
     return null;
@@ -107,7 +119,58 @@ function mapearBeneficiarioSelecionado(item: Beneficiario | null): BeneficiarioS
 
   return {
     id: item.id_beneficiario,
-    nome: item.nome_completo
+    nome: item.nome_completo,
+    telefone: obterTelefoneBeneficiario(item)
+  };
+}
+
+function formatarTelefoneListagem(valor?: string) {
+  const digitos = somenteDigitos(valor);
+
+  if (digitos.length === 11) {
+    return `(${digitos.slice(0, 2)}) ${digitos.slice(2, 7)}-${digitos.slice(7)}`;
+  }
+
+  if (digitos.length === 10) {
+    return `(${digitos.slice(0, 2)}) ${digitos.slice(2, 6)}-${digitos.slice(6)}`;
+  }
+
+  return valor?.trim() || "---";
+}
+
+function formatarDataEncaminhamento(valor?: string) {
+  if (!valor) {
+    return "---";
+  }
+
+  const valorLimpo = valor.trim();
+  const correspondenciaIso = valorLimpo.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (correspondenciaIso) {
+    const [, ano, mes, dia] = correspondenciaIso;
+    return `${dia}-${mes}-${ano}`;
+  }
+
+  const data = new Date(valorLimpo);
+  if (Number.isNaN(data.getTime())) {
+    return valorLimpo;
+  }
+
+  const dia = String(data.getDate()).padStart(2, "0");
+  const mes = String(data.getMonth() + 1).padStart(2, "0");
+  const ano = String(data.getFullYear());
+  return `${dia}-${mes}-${ano}`;
+}
+
+function normalizarFormularioVaga(payload: JobPayload): JobPayload {
+  return {
+    ...payload,
+    dadosVaga: normalizarObjetoTexto(payload.dadosVaga, mapaCamposTextoBancoEmpregosForm),
+    empresaLocal: payload.empresaLocal
+      ? normalizarObjetoTexto(payload.empresaLocal, mapaCamposTextoBancoEmpregosForm)
+      : payload.empresaLocal,
+    requisitos: payload.requisitos
+      ? normalizarObjetoTexto(payload.requisitos, mapaCamposTextoBancoEmpregosForm)
+      : payload.requisitos
   };
 }
 
@@ -127,6 +190,7 @@ export function BancoEmpregosPage() {
   const [candidatoSelecionado, setCandidatoSelecionado] =
     useState<BeneficiarioSelecionado | null>(null);
   const [statusCandidato, setStatusCandidato] = useState("EM_ANALISE");
+  const [encaminhamentoAtualizandoId, setEncaminhamentoAtualizandoId] = useState<string | null>(null);
 
   const vagasQuery = useVagasBancoEmpregos();
   const salvarMutation = useSalvarVagaBancoEmpregos();
@@ -213,6 +277,28 @@ export function BancoEmpregosPage() {
     setAbaAtiva("candidatos");
   }
 
+  function selecionarVagaParaEncaminhamentos(vagaId: string) {
+    if (!vagaId) {
+      setVagaSelecionadaId(undefined);
+      limparSelecoesAuxiliares();
+      setAbaAtiva("encaminhamentos");
+      return;
+    }
+
+    const vaga = vagas.find((item) => item.id === vagaId);
+    if (!vaga) {
+      setVagaSelecionadaId(undefined);
+      limparSelecoesAuxiliares();
+      return;
+    }
+
+    setVagaSelecionadaId(vaga.id);
+    setForm(vaga);
+    setSnapshot(vaga);
+    limparSelecoesAuxiliares();
+    setAbaAtiva("encaminhamentos");
+  }
+
   function atualizarBeneficiarioEncaminhamento(valor: string) {
     setNomeEncaminhamento(valor);
     setEncaminhamentoSelecionado(
@@ -225,6 +311,83 @@ export function BancoEmpregosPage() {
     setCandidatoSelecionado(
       mapearBeneficiarioSelecionado(localizarBeneficiarioPorNome(sugestoesCandidatos, valor))
     );
+  }
+
+  function aplicarFormatacaoDadosVaga(campo: keyof JobPayload["dadosVaga"]) {
+    setForm((atual) => {
+      const valorAtual = atual.dadosVaga[campo];
+      const valorFormatado = formatarTextoPorCampo(
+        String(campo),
+        valorAtual,
+        mapaCamposTextoBancoEmpregosForm
+      );
+
+      if (typeof valorAtual !== "string" || typeof valorFormatado !== "string" || valorAtual === valorFormatado) {
+        return atual;
+      }
+
+      return {
+        ...atual,
+        dadosVaga: {
+          ...atual.dadosVaga,
+          [campo]: valorFormatado
+        } as JobPayload["dadosVaga"]
+      };
+    });
+  }
+
+  function aplicarFormatacaoEmpresaLocal(campo: keyof NonNullable<JobPayload["empresaLocal"]>) {
+    setForm((atual) => {
+      if (!atual.empresaLocal) {
+        return atual;
+      }
+
+      const valorAtual = atual.empresaLocal[campo];
+      const valorFormatado = formatarTextoPorCampo(
+        String(campo),
+        valorAtual,
+        mapaCamposTextoBancoEmpregosForm
+      );
+
+      if (typeof valorAtual !== "string" || typeof valorFormatado !== "string" || valorAtual === valorFormatado) {
+        return atual;
+      }
+
+      return {
+        ...atual,
+        empresaLocal: {
+          ...atual.empresaLocal,
+          [campo]: valorFormatado
+        } as JobPayload["empresaLocal"]
+      };
+    });
+  }
+
+  function aplicarFormatacaoRequisitos(campo: keyof NonNullable<JobPayload["requisitos"]>) {
+    setForm((atual) => {
+      if (!atual.requisitos) {
+        return atual;
+      }
+
+      const valorAtual = atual.requisitos[campo];
+      const valorFormatado = formatarTextoPorCampo(
+        String(campo),
+        valorAtual,
+        mapaCamposTextoBancoEmpregosForm
+      );
+
+      if (typeof valorAtual !== "string" || typeof valorFormatado !== "string" || valorAtual === valorFormatado) {
+        return atual;
+      }
+
+      return {
+        ...atual,
+        requisitos: {
+          ...atual.requisitos,
+          [campo]: valorFormatado
+        } as JobPayload["requisitos"]
+      };
+    });
   }
 
   async function salvar() {
@@ -243,11 +406,12 @@ export function BancoEmpregosPage() {
     }
 
     try {
+      const payloadNormalizado = normalizarFormularioVaga(form);
       const response = await salvarMutation.mutateAsync({
         id: vagaSelecionadaId,
         payload: {
-          ...form,
-          encaminhamentos: (form.encaminhamentos ?? []).filter((item) =>
+          ...payloadNormalizado,
+          encaminhamentos: (payloadNormalizado.encaminhamentos ?? []).filter((item) =>
             item.beneficiarioNome?.trim()
           )
         }
@@ -315,14 +479,59 @@ export function BancoEmpregosPage() {
           id: `enc-${Date.now()}`,
           beneficiarioId: beneficiario?.id ?? "",
           beneficiarioNome: beneficiario?.nome ?? nomeInformado,
+          beneficiarioTelefone: beneficiario?.telefone ?? "",
           data: new Date().toISOString().slice(0, 10),
-          status: "Aguardando contato"
+          status: "AGUARDANDO"
         },
         ...(atual.encaminhamentos ?? [])
       ]
     }));
     setNomeEncaminhamento("");
     setEncaminhamentoSelecionado(null);
+  }
+
+  async function atualizarStatusEncaminhamento(encaminhamentoId: string, novoStatus: string) {
+    const encaminhamentosAtuais = form.encaminhamentos ?? [];
+    const proximosEncaminhamentos = encaminhamentosAtuais.map((item) =>
+      String(item.id) === encaminhamentoId ? { ...item, status: novoStatus } : item
+    );
+
+    setForm((atual) => ({
+      ...atual,
+      encaminhamentos: proximosEncaminhamentos
+    }));
+
+    if (!vagaSelecionadaId) {
+      return;
+    }
+
+    setEncaminhamentoAtualizandoId(encaminhamentoId);
+
+    try {
+      const response = await salvarMutation.mutateAsync({
+        id: vagaSelecionadaId,
+        payload: {
+          ...form,
+          encaminhamentos: proximosEncaminhamentos.filter((item) => item.beneficiarioNome?.trim())
+        }
+      });
+
+      setVagaSelecionadaId(response.id);
+      setForm(response);
+      setSnapshot(response);
+    } catch (error: any) {
+      setForm((atual) => ({
+        ...atual,
+        encaminhamentos: encaminhamentosAtuais
+      }));
+      setPopup({
+        tipo: "erro",
+        titulo: "Erro",
+        texto: error?.response?.data?.message ?? "Não foi possível atualizar o status."
+      });
+    } finally {
+      setEncaminhamentoAtualizandoId(null);
+    }
   }
 
   async function adicionarCandidato() {
@@ -456,7 +665,6 @@ export function BancoEmpregosPage() {
                     <th className="px-3 py-2 text-left">Título</th>
                     <th className="px-3 py-2 text-left">Empresa</th>
                     <th className="px-3 py-2 text-left">Status</th>
-                    <th className="px-3 py-2 text-right">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -466,21 +674,26 @@ export function BancoEmpregosPage() {
                         key={item.id}
                         className={`border-t border-[var(--g3-border)] ${
                           index % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35"
-                        }`}
+                        } cursor-pointer transition-colors hover:bg-emerald-50 focus-within:bg-emerald-50`}
+                        onClick={() => selecionar(item)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            selecionar(item);
+                          }
+                        }}
+                        tabIndex={0}
+                        role="button"
+                        aria-label={`Selecionar vaga ${item.dadosVaga.titulo}`}
                       >
                         <td className="px-3 py-2 font-medium">{item.dadosVaga.titulo}</td>
                         <td className="px-3 py-2">{item.empresaLocal?.nomeEmpresa ?? "---"}</td>
                         <td className="px-3 py-2">{item.dadosVaga.status}</td>
-                        <td className="px-3 py-2 text-right">
-                          <Button variant="outline" size="sm" onClick={() => selecionar(item)}>
-                            Selecionar
-                          </Button>
-                        </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={4} className="px-3 py-4 text-center">
+                      <td colSpan={3} className="px-3 py-4 text-center">
                         {vagasQuery.isLoading ? "Carregando vagas..." : "Nenhuma vaga encontrada."}
                       </td>
                     </tr>
@@ -492,139 +705,196 @@ export function BancoEmpregosPage() {
         ) : null}
 
         {abaAtiva === "dadosVaga" ? (
-          <section className="grid gap-3 md:grid-cols-2">
-            <div className="space-y-1 md:col-span-2">
-              <Label>Título da vaga *</Label>
-              <Input
-                value={form.dadosVaga.titulo}
-                onChange={(event) =>
-                  setForm((atual) => ({
-                    ...atual,
-                    dadosVaga: { ...atual.dadosVaga, titulo: event.target.value }
-                  }))
-                }
-              />
+          <section className="space-y-4">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <div className="space-y-1 md:col-span-2 xl:col-span-2">
+                <Label>Título da vaga *</Label>
+                <Input
+                  value={form.dadosVaga.titulo}
+                  onChange={(event) =>
+                    setForm((atual) => ({
+                      ...atual,
+                      dadosVaga: { ...atual.dadosVaga, titulo: event.target.value }
+                    }))
+                  }
+                  onBlur={() => aplicarFormatacaoDadosVaga("titulo")}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Status *</Label>
+                <Select
+                  value={form.dadosVaga.status}
+                  onChange={(event) =>
+                    setForm((atual) => ({
+                      ...atual,
+                      dadosVaga: {
+                        ...atual.dadosVaga,
+                        status: event.target.value as JobPayload["dadosVaga"]["status"]
+                      }
+                    }))
+                  }
+                >
+                  <option value="Aberta">Aberta</option>
+                  <option value="Pausada">Pausada</option>
+                  <option value="Encerrada">Encerrada</option>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>Data de abertura</Label>
+                <Input
+                  type="date"
+                  value={form.dadosVaga.dataAbertura ?? ""}
+                  onChange={(event) =>
+                    setForm((atual) => ({
+                      ...atual,
+                      dadosVaga: { ...atual.dadosVaga, dataAbertura: event.target.value }
+                    }))
+                  }
+                />
+              </div>
             </div>
-            <div className="space-y-1">
-              <Label>Status *</Label>
-              <Select
-                value={form.dadosVaga.status}
-                onChange={(event) =>
-                  setForm((atual) => ({
-                    ...atual,
-                    dadosVaga: {
-                      ...atual.dadosVaga,
-                      status: event.target.value as JobPayload["dadosVaga"]["status"]
-                    }
-                  }))
-                }
-              >
-                <option value="Aberta">Aberta</option>
-                <option value="Pausada">Pausada</option>
-                <option value="Encerrada">Encerrada</option>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>Data de abertura</Label>
-              <Input
-                type="date"
-                value={form.dadosVaga.dataAbertura ?? ""}
-                onChange={(event) =>
-                  setForm((atual) => ({
-                    ...atual,
-                    dadosVaga: { ...atual.dadosVaga, dataAbertura: event.target.value }
-                  }))
-                }
-              />
-            </div>
-          </section>
-        ) : null}
 
-        {abaAtiva === "empresaLocal" ? (
-          <section className="grid gap-3 md:grid-cols-2">
-            <div className="space-y-1 md:col-span-2">
-              <Label>Nome da empresa *</Label>
-              <Input
-                value={form.empresaLocal?.nomeEmpresa ?? ""}
-                onChange={(event) =>
-                  setForm((atual) => ({
-                    ...atual,
-                    empresaLocal: {
-                      ...atual.empresaLocal,
-                      nomeEmpresa: event.target.value
-                    } as JobPayload["empresaLocal"]
-                  }))
-                }
-              />
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <div className="space-y-1 md:col-span-2 xl:col-span-2">
+                <Label>Nome da empresa *</Label>
+                <Input
+                  value={form.empresaLocal?.nomeEmpresa ?? ""}
+                  onChange={(event) =>
+                    setForm((atual) => ({
+                      ...atual,
+                      empresaLocal: {
+                        ...atual.empresaLocal,
+                        nomeEmpresa: event.target.value
+                      } as JobPayload["empresaLocal"]
+                    }))
+                  }
+                  onBlur={() => aplicarFormatacaoEmpresaLocal("nomeEmpresa")}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Responsável</Label>
+                <Input
+                  value={form.empresaLocal?.responsavel ?? ""}
+                  onChange={(event) =>
+                    setForm((atual) => ({
+                      ...atual,
+                      empresaLocal: {
+                        ...atual.empresaLocal,
+                        responsavel: event.target.value
+                      } as JobPayload["empresaLocal"]
+                    }))
+                  }
+                  onBlur={() => aplicarFormatacaoEmpresaLocal("responsavel")}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Telefone</Label>
+                <Input
+                  type="tel"
+                  value={form.empresaLocal?.telefone ?? ""}
+                  onChange={(event) =>
+                    setForm((atual) => ({
+                      ...atual,
+                      empresaLocal: {
+                        ...atual.empresaLocal,
+                        telefone: event.target.value
+                      } as JobPayload["empresaLocal"]
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Cidade *</Label>
+                <Input
+                  value={form.empresaLocal?.cidade ?? ""}
+                  onChange={(event) =>
+                    setForm((atual) => ({
+                      ...atual,
+                      empresaLocal: {
+                        ...atual.empresaLocal,
+                        cidade: event.target.value
+                      } as JobPayload["empresaLocal"]
+                    }))
+                  }
+                  onBlur={() => aplicarFormatacaoEmpresaLocal("cidade")}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>CNPJ</Label>
+                <Input
+                  value={form.empresaLocal?.cnpj ?? ""}
+                  onChange={(event) =>
+                    setForm((atual) => ({
+                      ...atual,
+                      empresaLocal: {
+                        ...atual.empresaLocal,
+                        cnpj: event.target.value
+                      } as JobPayload["empresaLocal"]
+                    }))
+                  }
+                />
+              </div>
             </div>
-            <div className="space-y-1">
-              <Label>Cidade *</Label>
-              <Input
-                value={form.empresaLocal?.cidade ?? ""}
-                onChange={(event) =>
-                  setForm((atual) => ({
-                    ...atual,
-                    empresaLocal: {
-                      ...atual.empresaLocal,
-                      cidade: event.target.value
-                    } as JobPayload["empresaLocal"]
-                  }))
-                }
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>CNPJ</Label>
-              <Input
-                value={form.empresaLocal?.cnpj ?? ""}
-                onChange={(event) =>
-                  setForm((atual) => ({
-                    ...atual,
-                    empresaLocal: {
-                      ...atual.empresaLocal,
-                      cnpj: event.target.value
-                    } as JobPayload["empresaLocal"]
-                  }))
-                }
-              />
-            </div>
-          </section>
-        ) : null}
 
-        {abaAtiva === "requisitos" ? (
-          <section className="space-y-2">
-            <Label>Descrição *</Label>
-            <Textarea
-              rows={4}
-              value={form.requisitos?.descricao ?? ""}
-              onChange={(event) =>
-                setForm((atual) => ({
-                  ...atual,
-                  requisitos: {
-                    ...atual.requisitos,
-                    descricao: event.target.value
-                  } as JobPayload["requisitos"]
-                }))
-              }
-            />
-            <Label>Requisitos</Label>
-            <Textarea
-              rows={3}
-              value={form.requisitos?.requisitos ?? ""}
-              onChange={(event) =>
-                setForm((atual) => ({
-                  ...atual,
-                  requisitos: {
-                    ...atual.requisitos,
-                    requisitos: event.target.value
-                  } as JobPayload["requisitos"]
-                }))
-              }
-            />
+            <div className="grid gap-3 xl:grid-cols-2">
+              <div className="space-y-1">
+              <Label>Descrição *</Label>
+              <Textarea
+                rows={3}
+                value={form.requisitos?.descricao ?? ""}
+                onChange={(event) =>
+                  setForm((atual) => ({
+                    ...atual,
+                    requisitos: {
+                      ...atual.requisitos,
+                      descricao: event.target.value
+                    } as JobPayload["requisitos"]
+                  }))
+                }
+                onBlur={() => aplicarFormatacaoRequisitos("descricao")}
+              />
+              </div>
+              <div className="space-y-1">
+              <Label>Requisitos</Label>
+              <Textarea
+                rows={3}
+                value={form.requisitos?.requisitos ?? ""}
+                onChange={(event) =>
+                  setForm((atual) => ({
+                    ...atual,
+                    requisitos: {
+                      ...atual.requisitos,
+                      requisitos: event.target.value
+                    } as JobPayload["requisitos"]
+                  }))
+                }
+                onBlur={() => aplicarFormatacaoRequisitos("requisitos")}
+              />
+              </div>
+            </div>
           </section>
         ) : null}
 
         {abaAtiva === "encaminhamentos" ? (
           <section className="space-y-3">
+            <div className="space-y-1 md:max-w-2xl">
+              <Label>Vaga *</Label>
+              <Select
+                value={vagaSelecionadaId ?? ""}
+                onChange={(event) => selecionarVagaParaEncaminhamentos(event.target.value)}
+                disabled={carregandoAcoes || encaminhamentoAtualizandoId !== null}
+              >
+                <option value="">Selecione a vaga</option>
+                {vagas.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.dadosVaga.titulo} - {item.empresaLocal?.nomeEmpresa ?? "Sem empresa"}
+                  </option>
+                ))}
+              </Select>
+              <p className="text-xs text-slate-500">
+                Selecione a vaga para definir para qual oportunidade o beneficiário será encaminhado.
+              </p>
+            </div>
             <div className="flex flex-col gap-2 sm:flex-row">
               <div className="flex-1 space-y-1">
                 <Label>Beneficiário</Label>
@@ -634,7 +904,7 @@ export function BancoEmpregosPage() {
                   value={nomeEncaminhamento}
                   onChange={(event) => atualizarBeneficiarioEncaminhamento(event.target.value)}
                   onBlur={(event) => atualizarBeneficiarioEncaminhamento(event.target.value)}
-                  disabled={carregandoAcoes}
+                  disabled={carregandoAcoes || encaminhamentoAtualizandoId !== null}
                 />
                 <datalist id="catalogo-beneficiarios-encaminhamentos">
                   {sugestoesEncaminhamento.map((item) => (
@@ -648,7 +918,10 @@ export function BancoEmpregosPage() {
                 </p>
               </div>
               <div className="self-end">
-                <Button onClick={adicionarEncaminhamento} disabled={carregandoAcoes}>
+                <Button
+                  onClick={adicionarEncaminhamento}
+                  disabled={carregandoAcoes || encaminhamentoAtualizandoId !== null}
+                >
                   Adicionar
                 </Button>
               </div>
@@ -658,6 +931,8 @@ export function BancoEmpregosPage() {
                 <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]">
                   <tr>
                     <th className="px-3 py-2 text-left">Beneficiário</th>
+                    <th className="px-3 py-2 text-left">Vaga</th>
+                    <th className="px-3 py-2 text-left">Telefone</th>
                     <th className="px-3 py-2 text-left">Data</th>
                     <th className="px-3 py-2 text-left">Status</th>
                   </tr>
@@ -672,13 +947,30 @@ export function BancoEmpregosPage() {
                         }`}
                       >
                         <td className="px-3 py-2">{item.beneficiarioNome}</td>
-                        <td className="px-3 py-2">{item.data}</td>
-                        <td className="px-3 py-2">{item.status}</td>
+                        <td className="px-3 py-2">{form.dadosVaga.titulo?.trim() || "---"}</td>
+                        <td className="px-3 py-2">{formatarTelefoneListagem(item.beneficiarioTelefone)}</td>
+                        <td className="px-3 py-2">{formatarDataEncaminhamento(item.data)}</td>
+                        <td className="px-3 py-2">
+                          <Select
+                            value={item.status}
+                            onChange={(event) =>
+                              void atualizarStatusEncaminhamento(String(item.id), event.target.value)
+                            }
+                            disabled={carregandoAcoes || encaminhamentoAtualizandoId !== null}
+                            aria-label={`Status do encaminhamento de ${item.beneficiarioNome}`}
+                          >
+                            {statusEncaminhamentoOpcoes.map((status) => (
+                              <option key={status.value} value={status.value}>
+                                {status.label}
+                              </option>
+                            ))}
+                          </Select>
+                        </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={3} className="px-3 py-4 text-center">
+                      <td colSpan={5} className="px-3 py-4 text-center">
                         Nenhum encaminhamento adicionado.
                       </td>
                     </tr>

@@ -4,6 +4,7 @@ export type JobEncaminhamento = {
   id: string;
   beneficiarioId: string;
   beneficiarioNome: string;
+  beneficiarioTelefone?: string;
   data: string;
   status: string;
   observacoes?: string;
@@ -64,4 +65,3 @@ export type JobRecord = JobPayload & {
   criadoEm: string;
   atualizadoEm?: string;
 };
-

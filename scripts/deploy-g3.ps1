@@ -1,5 +1,4 @@
-# Deploy G3 com tunel Cloudflare usando config.yml
-Continue = 'Stop'
+$ErrorActionPreference = 'Stop'
 
 Write-Host 'Iniciando deploy do G3...' -ForegroundColor Cyan
 
@@ -8,29 +7,31 @@ if (!(Test-Path -Path ".\docker\cloudflared\config.yml")) {
   exit 1
 }
 
-# Sempre recria containers garantindo o entrypoint do tunel
+$novaVersao = & .\scripts\bump-version.ps1
+Write-Host "Versao definida para $novaVersao" -ForegroundColor Yellow
+
 Write-Host 'Subindo stack via docker compose...' -ForegroundColor Cyan
 
-# Compatibilidade: docker compose (plugin) ou docker-compose (binario)
- = 
+$composeCommand = $null
 if (Get-Command docker -ErrorAction SilentlyContinue) {
   try {
     docker compose version | Out-Null
-     = 'docker compose'
+    $composeCommand = 'docker compose'
   } catch {
-     = 
+    $composeCommand = $null
   }
 }
-if (-not  -and (Get-Command docker-compose -ErrorAction SilentlyContinue)) {
-   = 'docker-compose'
+
+if (-not $composeCommand -and (Get-Command docker-compose -ErrorAction SilentlyContinue)) {
+  $composeCommand = 'docker-compose'
 }
 
-if (-not ) {
+if (-not $composeCommand) {
   Write-Error 'Docker Compose nao encontrado.'
   exit 1
 }
 
-Invoke-Expression " down"
-Invoke-Expression " up -d --build"
+Invoke-Expression "$composeCommand down"
+Invoke-Expression "$composeCommand up -d --build"
 
 Write-Host 'Deploy finalizado.' -ForegroundColor Green

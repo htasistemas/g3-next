@@ -2,6 +2,7 @@
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
+import { APP_VERSION } from "@/lib/app-version";
 import { useLembretesDiarios } from "@/features/lembretes-diarios/use-lembretes-diarios";
 import { useTarefasAdministrativas } from "@/features/tarefas-administrativas/use-tarefas-administrativas";
 import { useUnidadeAssistencialAtual } from "@/features/unidades-assistenciais/use-unidades-assistenciais";
@@ -64,6 +65,7 @@ type MenuItem = {
   to?: string;
   label: string;
   icon: LucideIcon;
+  abrirEmNovaAba?: boolean;
   requiredPermissions?: string[];
   emMigracao?: boolean;
 };
@@ -181,7 +183,8 @@ const menuSections: MenuSection[] = [
         id: "atendimentos-painel-senhas",
         to: "/senhas/painel",
         label: "Painel de senhas",
-        icon: MonitorDot
+        icon: MonitorDot,
+        abrirEmNovaAba: true
       },
       {
         id: "atendimentos-registro-doacao",
@@ -425,7 +428,7 @@ export function AppShell() {
   const navigate = useNavigate();
   const titulo = obterTitulo(location.pathname);
   const semTituloNoTopo = ocultarTituloTopo(location.pathname);
-  const versaoSistema = import.meta.env.VITE_APP_VERSION ?? "1.00.13";
+  const versaoSistema = APP_VERSION;
   const [sidebarRecolhida, setSidebarRecolhida] = useState(false);
   const [gruposAbertos, setGruposAbertos] = useState<Record<string, boolean>>({});
   const [lembreteAlertaAtivo, setLembreteAlertaAtivo] = useState(false);
@@ -691,7 +694,12 @@ export function AppShell() {
                   >
                     {secao.itens.map((item) =>
                       item.to ? (
-                        <NavLink key={item.id} to={item.to}>
+                        <NavLink
+                          key={item.id}
+                          to={item.to}
+                          target={item.abrirEmNovaAba ? "_blank" : undefined}
+                          rel={item.abrirEmNovaAba ? "noreferrer" : undefined}
+                        >
                           {({ isActive }) => (
                             <span
                               className={`flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors ${
@@ -804,7 +812,12 @@ export function AppShell() {
               {menuSectionsVisiveis.flatMap((secao) =>
                 secao.itens.map((item) =>
                   item.to ? (
-                    <NavLink key={item.id} to={item.to}>
+                    <NavLink
+                      key={item.id}
+                      to={item.to}
+                      target={item.abrirEmNovaAba ? "_blank" : undefined}
+                      rel={item.abrirEmNovaAba ? "noreferrer" : undefined}
+                    >
                       {({ isActive }) => (
                         <span
                           className={`inline-flex rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
