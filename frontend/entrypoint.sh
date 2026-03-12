@@ -11,6 +11,6 @@ if [ -f "$CONFIG_FILE" ]; then
 fi
 
 find /usr/share/nginx/html -type f -name "*.js" -exec \
-  sed -i "s|http://localhost:8080|${API_BASE_URL}|g" {} +
+  sh -c "sed -i \"s|http://localhost:8080|${API_BASE_URL}|g; s|http://localhost:3333|${API_BASE_URL}|g\" \"\\$1\"" _ {} \;
 
 exec nginx -g 'daemon off;'

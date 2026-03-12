@@ -2358,15 +2358,15 @@ CREATE TABLE IF NOT EXISTS g3_auditoria_info_admin (
   detalhes TEXT
 );
 
-ALTER TABLE rh_ponto_marcacao
+ALTER TABLE IF EXISTS rh_ponto_marcacao
   ALTER COLUMN latitude DROP NOT NULL;
-ALTER TABLE rh_ponto_marcacao
+ALTER TABLE IF EXISTS rh_ponto_marcacao
   ALTER COLUMN longitude DROP NOT NULL;
-ALTER TABLE rh_ponto_marcacao
+ALTER TABLE IF EXISTS rh_ponto_marcacao
   ALTER COLUMN accuracy DROP NOT NULL;
-ALTER TABLE rh_ponto_marcacao
+ALTER TABLE IF EXISTS rh_ponto_marcacao
   ALTER COLUMN distancia_metros DROP NOT NULL;
-ALTER TABLE rh_ponto_marcacao
+ALTER TABLE IF EXISTS rh_ponto_marcacao
   ALTER COLUMN dentro_perimetro DROP NOT NULL;
 CREATE INDEX IF NOT EXISTS prontuario_registros_tipo_idx
   ON prontuario_registros (tipo);
@@ -3866,19 +3866,19 @@ CREATE TABLE IF NOT EXISTS rh_ponto_auditoria (
   FOREIGN KEY (ponto_marcacao_id) REFERENCES rh_ponto_marcacao(id) ON DELETE SET NULL
 );
 
-ALTER TABLE rh_ponto_marcacao
+ALTER TABLE IF EXISTS rh_ponto_marcacao
   ALTER COLUMN latitude DROP NOT NULL;
 
-ALTER TABLE rh_ponto_marcacao
+ALTER TABLE IF EXISTS rh_ponto_marcacao
   ALTER COLUMN longitude DROP NOT NULL;
 
-ALTER TABLE rh_ponto_marcacao
+ALTER TABLE IF EXISTS rh_ponto_marcacao
   ALTER COLUMN accuracy DROP NOT NULL;
 
-ALTER TABLE rh_ponto_marcacao
+ALTER TABLE IF EXISTS rh_ponto_marcacao
   ALTER COLUMN distancia_metros DROP NOT NULL;
 
-ALTER TABLE rh_ponto_marcacao
+ALTER TABLE IF EXISTS rh_ponto_marcacao
   ALTER COLUMN dentro_perimetro DROP NOT NULL;
 
 ALTER TABLE rh_ponto_auditoria

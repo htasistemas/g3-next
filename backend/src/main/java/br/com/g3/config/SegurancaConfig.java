@@ -35,7 +35,8 @@ public class SegurancaConfig {
             auth ->
                 auth.requestMatchers(HttpMethod.OPTIONS, "/**")
                     .permitAll()
-                    .requestMatchers("/api/auth/**", "/actuator/health", "/api/config/versao/arquivo")
+                    .requestMatchers(
+                        "/api/auth/**", "/actuator/health", "/health", "/api/config/versao/arquivo")
                     .permitAll()
                     .anyRequest()
                     .authenticated())

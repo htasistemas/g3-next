@@ -1,4 +1,4 @@
-name: Deploy G3 Next
+name: Deploy G3N
 
 on:
   push:
@@ -84,10 +84,10 @@ jobs:
             -p "$DEPLOY_PORT" \
             "$DEPLOY_USER@$SSH_TARGET_HOST" <<EOF
           set -euo pipefail
-          cd /home/srv/g3
+          cd /home/srv/g3n
           echo "Deploy do commit $GITHUB_SHA"
           git fetch origin main
           git checkout main
           git pull --ff-only origin main
-          bash ./scripts/deploy-g3.sh
+          bash ./deploy.sh
           EOF

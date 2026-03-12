@@ -14,7 +14,8 @@ public class CorsConfig implements WebMvcConfigurer {
                 "http://localhost:4200",
                 "http://localhost:4201",
                 "http://127.0.0.1:4201",
-                "https://g3.htasistemas.com.br"
+                "https://g3.htasistemas.com.br",
+                "https://g3n.htasistemas.com.br"
             )
             .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
             .allowedHeaders("authorization", "content-type", "accept", "cache-control", "x-requested-with")

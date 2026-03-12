@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_COMPOSE="/home/srv/g3/docker-compose.yml"
+APP_COMPOSE="/home/srv/g3n/docker-compose.yml"
 
 log() { printf "[%s] %s\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
 
@@ -56,16 +56,12 @@ fi
 
 wait_healthy frontend 180
 
-log "Start nginx-g3 after dependencies are healthy"
-docker compose -f "$APP_COMPOSE" up -d --force-recreate nginx-g3
-wait_healthy nginx-g3 120
-
 log "Ensure g3 tunnel is up"
 docker compose -f "$APP_COMPOSE" up -d --force-recreate g3-tunnel
 
-if [ -x /home/srv/g3/scripts/deploy-check.sh ]; then
+if [ -x /home/srv/g3n/scripts/deploy-check.sh ]; then
   log "Post-restart checks"
-  /home/srv/g3/scripts/deploy-check.sh
+  /home/srv/g3n/scripts/deploy-check.sh
 else
   log "Post-restart checks skipped (script not found)"
 fi

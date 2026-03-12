@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd /home/srv/g3
+cd /home/srv/g3n
 
 if [ ! -f "docker/cloudflared/config.yml" ]; then
   echo "Arquivo docker/cloudflared/config.yml nao encontrado."

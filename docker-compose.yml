@@ -1,36 +1,38 @@
+
 services:
   db:
     image: postgres:15
-    container_name: g3-db
+    container_name: g3n-db
     restart: unless-stopped
     environment:
-      - POSTGRES_USER=${DB_USERNAME:-g3}
+      - POSTGRES_USER=${DB_USERNAME:-g3n}
       - POSTGRES_PASSWORD=${DB_PASSWORD:-admin}
-      - POSTGRES_DB=${DB_NAME:-g3}
+      - POSTGRES_DB=${DB_NAME:-g3n}
     volumes:
-      - db_data:/var/lib/postgresql/data
+      - g3n_db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-g3} -d $${POSTGRES_DB:-g3}"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-g3n} -d $${POSTGRES_DB:-g3n}"]
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 10s
     networks:
-      - g3_net
+      - g3n_net
 
   backend:
     build:
       context: .
       dockerfile: Dockerfile.backend
-    container_name: g3-backend
+    container_name: g3n-backend
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:8081:8080"
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://g3-db:5432/${DB_NAME:-g3}
-      - SPRING_DATASOURCE_USERNAME=${DB_USERNAME:-g3}
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://g3n-db:5432/${DB_NAME:-g3n}
+      - SPRING_DATASOURCE_USERNAME=${DB_USERNAME:-g3n}
       - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-admin}
       - APP_AUTH_TOKEN_SECRET=${APP_AUTH_TOKEN_SECRET}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
     volumes:
       - backend_storage:/app/storage
     depends_on:
@@ -43,20 +45,24 @@ services:
       retries: 12
       start_period: 20s
     networks:
-      - g3_net
-      - hta_public_net
+      - g3n_net
 
   frontend:
     build:
       context: .
       dockerfile: Dockerfile.frontend
-    container_name: g3-frontend
+      args:
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID}
+        VITE_GOOGLE_ALLOWED_ORIGINS: ${VITE_GOOGLE_ALLOWED_ORIGINS}
+        VITE_API_URL: ${VITE_API_URL}
+    container_name: g3n-frontend
     restart: unless-stopped
     environment:
-      - API_BASE_URL=https://g3.htasistemas.com.br
+      - API_BASE_URL=${API_BASE_URL}
+    ports:
+      - "127.0.0.1:3200:80"
     depends_on:
-      backend:
-        condition: service_healthy
+      - backend
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost/ > /dev/null || exit 1"]
       interval: 10s
@@ -64,29 +70,7 @@ services:
       retries: 12
       start_period: 20s
     networks:
-      - g3_net
-      - hta_public_net
-
-  nginx-g3:
-    image: nginx:alpine
-    container_name: nginx-g3
-    restart: unless-stopped
-    volumes:
-      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
-    depends_on:
-      backend:
-        condition: service_healthy
-      frontend:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ > /dev/null || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 6
-      start_period: 10s
-    networks:
-      - g3_net
-      - hta_public_net
+      - g3n_net
 
   g3-tunnel:
     image: cloudflare/cloudflared:2024.2.1
@@ -94,18 +78,18 @@ services:
     restart: unless-stopped
     command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN}
     depends_on:
-      nginx-g3:
+      backend:
         condition: service_healthy
+      frontend:
+        condition: service_healthy
+    volumes:
+      - ./docker/cloudflared/config.yml:/etc/cloudflared/config.yml:ro
     networks:
-      - g3_net
+      - g3n_net
 
 networks:
-  g3_net:
-    name: g3_g3_net
-    external: true
-  hta_public_net:
-    external: true
+  g3n_net:
 
 volumes:
-  db_data:
+  g3n_db_data:
   backend_storage:
