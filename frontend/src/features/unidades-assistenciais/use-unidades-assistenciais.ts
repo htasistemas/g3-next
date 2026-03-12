@@ -2,6 +2,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { unidadesAssistenciaisService } from "@/services/unidades-assistenciais.service";
 import type { UnidadeAssistencial, UnidadeAssistencialFiltro } from "@/types/unidade-assistencial";
 
+type ResumoQueryOptions = {
+  enabled?: boolean;
+};
+
 export function useUnidadesAssistenciais(filtros: UnidadeAssistencialFiltro) {
   return useQuery({
     queryKey: ["unidades-assistenciais", filtros],
@@ -17,10 +21,12 @@ export function useUnidadeAssistencial(id?: string) {
   });
 }
 
-export function useUnidadeAssistencialAtual() {
+export function useUnidadeAssistencialAtual(options?: ResumoQueryOptions) {
   return useQuery({
     queryKey: ["unidade-assistencial", "atual"],
-    queryFn: () => unidadesAssistenciaisService.buscarAtual()
+    queryFn: () => unidadesAssistenciaisService.buscarAtual(),
+    enabled: options?.enabled ?? true,
+    staleTime: 300_000
   });
 }
 

@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-API_BASE_URL="${API_BASE_URL:-http://localhost:8080}"
+API_BASE_URL="${API_BASE_URL:-https://g3n.htasistemas.com.br}"
 export API_BASE_URL
 
 CONFIG_FILE="/usr/share/nginx/html/assets/config.json"

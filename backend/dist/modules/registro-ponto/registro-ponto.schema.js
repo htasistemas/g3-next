@@ -6,6 +6,10 @@ const optionalTrimmedString = z.preprocess((value) => {
     const trimmed = value.trim();
     return trimmed.length ? trimmed : undefined;
 }, z.string().optional());
+const requiredTrimmedString = (message) => z
+    .string()
+    .trim()
+    .min(1, message);
 const optionalIsoDate = z.preprocess((value) => {
     if (typeof value !== "string")
         return value;
@@ -52,6 +56,8 @@ export const registroPontoFiltersSchema = z.object({
     somente_inconsistencias: optionalBoolean
 });
 export const registroPontoMarcarSchema = z.object({
+    usuario_login: requiredTrimmedString("Informe o usuario."),
+    senha: requiredTrimmedString("Informe a senha."),
     latitude: optionalNumber,
     longitude: optionalNumber,
     accuracy_metros: optionalNumber,

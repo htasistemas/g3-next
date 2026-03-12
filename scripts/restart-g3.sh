@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_COMPOSE="/home/srv/g3n/docker-compose.yml"
+APP_DIR="${APP_DIR:-/home/srv/g3n}"
+APP_COMPOSE="$APP_DIR/docker-compose.yml"
 
 log() { printf "[%s] %s\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
 
@@ -40,28 +41,36 @@ wait_healthy() {
   done
 }
 
-log "Restart g3 stack"
+log "Restart g3-next stack"
+cd "$APP_DIR"
 
-# Start core services (no rebuild) and let DB settle first
 log "Start db, backend, frontend"
-docker compose -f "$APP_COMPOSE" up -d db backend frontend
+docker compose -f "$APP_COMPOSE" up -d g3n-db g3n-backend g3n-frontend
 
-wait_healthy db 120
+wait_healthy g3n-db 120
 
-if ! wait_healthy backend 180; then
+if ! wait_healthy g3n-backend 180; then
   log "Backend failed healthcheck. Restarting backend..."
-  docker compose -f "$APP_COMPOSE" up -d --force-recreate backend
-  wait_healthy backend 200
+  docker compose -f "$APP_COMPOSE" up -d --force-recreate g3n-backend
+  wait_healthy g3n-backend 200
 fi
 
-wait_healthy frontend 180
+wait_healthy g3n-frontend 180
 
-log "Ensure g3 tunnel is up"
-docker compose -f "$APP_COMPOSE" up -d --force-recreate g3-tunnel
+log "Start nginx-g3n after dependencies are healthy"
+docker compose -f "$APP_COMPOSE" up -d --force-recreate nginx-g3n
+wait_healthy nginx-g3n 120
 
-if [ -x /home/srv/g3n/scripts/deploy-check.sh ]; then
+if [[ -n "${TUNNEL_TOKEN:-}" ]]; then
+  log "Ensure g3n tunnel is up"
+  docker compose -f "$APP_COMPOSE" up -d --force-recreate g3n-tunnel
+else
+  log "Skipping g3n tunnel (TUNNEL_TOKEN not set)"
+fi
+
+if [ -x "$APP_DIR/scripts/deploy-check.sh" ]; then
   log "Post-restart checks"
-  /home/srv/g3n/scripts/deploy-check.sh
+  APP_DIR="$APP_DIR" "$APP_DIR/scripts/deploy-check.sh"
 else
   log "Post-restart checks skipped (script not found)"
 fi

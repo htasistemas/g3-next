@@ -19,6 +19,7 @@ const estruturaSql = [
     emprego_id BIGINT NOT NULL REFERENCES banco_empregos(id) ON DELETE CASCADE,
     beneficiario_id BIGINT,
     beneficiario_nome VARCHAR(200),
+    beneficiario_telefone VARCHAR(40),
     data_encaminhamento DATE NOT NULL,
     status VARCHAR(40) NOT NULL,
     observacoes TEXT
@@ -49,6 +50,7 @@ export class BancoEmpregosRepository {
             await prisma.$executeRawUnsafe(comando);
         }
         await prisma.$executeRawUnsafe("ALTER TABLE banco_empregos_candidatos ADD COLUMN IF NOT EXISTS atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()");
+        await prisma.$executeRawUnsafe("ALTER TABLE banco_empregos_encaminhamentos ADD COLUMN IF NOT EXISTS beneficiario_telefone VARCHAR(40)");
         const estrutura = await this.detectarEstruturaBanco();
         if (estrutura === "json") {
             await prisma.$executeRawUnsafe("CREATE INDEX IF NOT EXISTS banco_empregos_dados_vaga_gin_idx ON banco_empregos USING GIN (dados_vaga)");
@@ -163,6 +165,7 @@ export class BancoEmpregosRepository {
                 'id', enc.id,
                 'beneficiarioId', enc.beneficiario_id,
                 'beneficiarioNome', enc.beneficiario_nome,
+                'beneficiarioTelefone', enc.beneficiario_telefone,
                 'data', TO_CHAR(enc.data_encaminhamento, 'YYYY-MM-DD'),
                 'status', enc.status,
                 'observacoes', enc.observacoes
@@ -261,6 +264,7 @@ export class BancoEmpregosRepository {
                 'id', enc.id,
                 'beneficiarioId', enc.beneficiario_id,
                 'beneficiarioNome', enc.beneficiario_nome,
+                'beneficiarioTelefone', enc.beneficiario_telefone,
                 'data', TO_CHAR(enc.data_encaminhamento, 'YYYY-MM-DD'),
                 'status', enc.status,
                 'observacoes', enc.observacoes
@@ -291,6 +295,7 @@ export class BancoEmpregosRepository {
           emprego_id,
           beneficiario_id,
           beneficiario_nome,
+          beneficiario_telefone,
           data_encaminhamento,
           status,
           observacoes
@@ -298,6 +303,7 @@ export class BancoEmpregosRepository {
           ${empregoId},
           ${item.beneficiarioId ? BigInt(item.beneficiarioId) : null},
           ${item.beneficiarioNome || null},
+          ${item.beneficiarioTelefone ?? null},
           CAST(${item.data || null} AS DATE),
           ${item.status || null},
           ${item.observacoes ?? null}

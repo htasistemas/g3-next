@@ -1,7 +1,8 @@
+import { env } from "../../../config/env.js";
 import { AppError } from "../../../shared/errors/app-error.js";
 import { AuthService } from "../services/auth.service.js";
 const authService = new AuthService();
-const AUTH_COOKIE_NAME = "g3_auth_token";
+const AUTH_COOKIE_NAME = env.APP_AUTH_COOKIE_NAME;
 function obterTokenDaRequisicao(request) {
     const authHeader = request.headers.authorization;
     if (authHeader?.startsWith("Bearer ")) {

@@ -1,5 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { startTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { APP_VERSION } from "@/lib/app-version";
@@ -420,10 +421,13 @@ function itemEstaAtivo(pathname: string, item: MenuItem) {
 
 export function AppShell() {
   const { usuario, logout } = useAuth();
-  const { data: unidadeAtualData } = useUnidadeAssistencialAtual();
+  const [carregarResumoInicial, setCarregarResumoInicial] = useState(false);
   const usuarioId = usuario?.id ? Number(usuario.id) : undefined;
-  const { data: lembretesData } = useLembretesDiarios(usuarioId);
-  const { data: tarefasData } = useTarefasAdministrativas();
+  const { data: unidadeAtualData } = useUnidadeAssistencialAtual({ enabled: carregarResumoInicial });
+  const { data: lembretesData } = useLembretesDiarios(usuarioId, {
+    enabled: carregarResumoInicial && typeof usuarioId === "number"
+  });
+  const { data: tarefasData } = useTarefasAdministrativas({ enabled: carregarResumoInicial });
   const location = useLocation();
   const navigate = useNavigate();
   const titulo = obterTitulo(location.pathname);
@@ -507,6 +511,16 @@ export function AppShell() {
     }
     return undefined;
   }, [location.pathname, menuSectionsVisiveis]);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      startTransition(() => {
+        setCarregarResumoInicial(true);
+      });
+    }, 150);
+
+    return () => window.clearTimeout(timeoutId);
+  }, []);
 
   useEffect(() => {
     setGruposAbertos(() => {

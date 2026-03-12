@@ -1,28 +1,31 @@
-# Deploy G3
+# Deploy G3-Next
 
-Use somente o compose principal para evitar instabilidade do tunnel.
+Use somente o stack do `g3n` para evitar qualquer mistura com o G3 legado.
 
-Comandos recomendados:
+Diretorio do deploy:
 
 ```bash
 cd /home/srv/g3n
-docker compose up -d --build --remove-orphans
+```
+
+Comando recomendado:
+
+```bash
+bash ./deploy.sh
 ```
 
 Checklist rapido:
 - `docker compose ps`
-- O backend expõe a porta localmente no host (`127.0.0.1:8081:8080`) apenas para o healthcheck do runner.
-- `curl -fsS http://localhost:8081/health`
-- `curl -fsS http://localhost:3200/`
+- Backend Node exposto apenas localmente em `127.0.0.1:3333`
+- Frontend React exposto apenas localmente em `127.0.0.1:3200`
+- `curl -fsS http://127.0.0.1:3333/health`
+- `curl -fsS http://127.0.0.1:3200/`
 
-Cloudflare Tunnel (obrigatorio para acesso externo):
-- Preencha o `.env` com `TUNNEL_TOKEN` e `API_BASE_URL`.
-  - Exemplo: `API_BASE_URL=https://g3.seudominio.com.br`
-- Confirme os hostnames em `docker/cloudflared/config.yml`.
-  - `g3.seudominio.com.br -> http://frontend:80`
-  - `apig3.seudominio.com.br -> http://backend:8080`
-- No painel do Cloudflare Zero Trust, crie o tunnel e gere o token.
-  - Garanta que os DNS dos hostnames estejam apontando para o tunnel (CNAME).
+Cloudflare Tunnel:
+- Preencha o `.env` com `TUNNEL_TOKEN`.
+- `g3n.htasistemas.com.br` deve apontar para `http://nginx-g3n:80`.
+- `apig3n.htasistemas.com.br` deve apontar para `http://g3n-backend:3333`.
 
-Observacao:
-- Nao use `docker-compose.tunnel.yml` (arquivo removido). O tunnel correto esta no `docker-compose.yml`.
+Observacoes:
+- Nao use `docker-compose.tunnel.yml` em paralelo com este fluxo.
+- O `deploy.sh` incrementa a versao antes do build.

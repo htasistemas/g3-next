@@ -6,13 +6,19 @@ import { AuthService } from "../services/auth.service.js";
 const authService = new AuthService();
 
 function authCookieOptions(): CookieOptions {
-  return {
+  const cookieOptions: CookieOptions = {
     httpOnly: true,
     sameSite: "lax",
     secure: env.NODE_ENV === "production",
     maxAge: env.APP_AUTH_TOKEN_EXPIRATION_MINUTES * 60 * 1000,
     path: "/"
   };
+
+  if (env.APP_AUTH_COOKIE_DOMAIN) {
+    cookieOptions.domain = env.APP_AUTH_COOKIE_DOMAIN;
+  }
+
+  return cookieOptions;
 }
 
 export class AuthController {

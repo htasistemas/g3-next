@@ -1,13 +1,12 @@
-
 services:
-  db:
+  g3n-db:
     image: postgres:15
     container_name: g3n-db
     restart: unless-stopped
     environment:
-      - POSTGRES_USER=${DB_USERNAME:-g3n}
-      - POSTGRES_PASSWORD=${DB_PASSWORD:-admin}
-      - POSTGRES_DB=${DB_NAME:-g3n}
+      POSTGRES_USER: ${DB_USERNAME:-g3n}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-admin}
+      POSTGRES_DB: ${DB_NAME:-g3n}
     volumes:
       - g3n_db_data:/var/lib/postgresql/data
     healthcheck:
@@ -19,27 +18,39 @@ services:
     networks:
       - g3n_net
 
-  backend:
+  g3n-backend:
     build:
       context: .
       dockerfile: Dockerfile.backend
     container_name: g3n-backend
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8081:8080"
+      - "127.0.0.1:${HOST_API_PORT:-3333}:3333"
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://g3n-db:5432/${DB_NAME:-g3n}
-      - SPRING_DATASOURCE_USERNAME=${DB_USERNAME:-g3n}
-      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-admin}
-      - APP_AUTH_TOKEN_SECRET=${APP_AUTH_TOKEN_SECRET}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      NODE_ENV: production
+      API_PORT: 3333
+      API_HOST: 0.0.0.0
+      DATABASE_URL: postgresql://${DB_USERNAME:-g3n}:${DB_PASSWORD:-admin}@g3n-db:5432/${DB_NAME:-g3n}?schema=public
+      CORS_ORIGIN: ${CORS_ORIGIN:-https://g3n.htasistemas.com.br,https://apig3n.htasistemas.com.br,http://localhost:5173,http://127.0.0.1:5173,http://0.0.0.0:5173,http://localhost:4200,http://127.0.0.1:4200,http://0.0.0.0:4200}
+      APP_AUTH_TOKEN_SECRET: ${APP_AUTH_TOKEN_SECRET:-g3-next-dev-token-secret-2026}
+      APP_AUTH_TOKEN_EXPIRATION_MINUTES: ${APP_AUTH_TOKEN_EXPIRATION_MINUTES:-480}
+      APP_AUTH_COOKIE_NAME: ${APP_AUTH_COOKIE_NAME:-g3n_auth_token}
+      APP_AUTH_COOKIE_DOMAIN: ${APP_AUTH_COOKIE_DOMAIN:-}
+      APP_GOOGLE_CLIENT_ID: ${APP_GOOGLE_CLIENT_ID:-}
+      APP_EMAIL_HABILITADO: ${APP_EMAIL_HABILITADO:-true}
+      APP_EMAIL_REMETENTE: ${APP_EMAIL_REMETENTE:-htasistemas@gmail.com}
+      APP_EMAIL_NOME: ${APP_EMAIL_NOME:-HTA Sistemas}
+      MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USER: ${MAIL_USER:-htasistemas@gmail.com}
+      MAIL_PASS: ${MAIL_PASS:-alterar-em-producao}
     volumes:
-      - backend_storage:/app/storage
+      - g3n_backend_storage:/app/storage
     depends_on:
-      db:
+      g3n-db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health || exit 1"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3333/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -47,22 +58,23 @@ services:
     networks:
       - g3n_net
 
-  frontend:
+  g3n-frontend:
     build:
       context: .
       dockerfile: Dockerfile.frontend
       args:
-        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID}
-        VITE_GOOGLE_ALLOWED_ORIGINS: ${VITE_GOOGLE_ALLOWED_ORIGINS}
-        VITE_API_URL: ${VITE_API_URL}
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
+        VITE_GOOGLE_ALLOWED_ORIGINS: ${VITE_GOOGLE_ALLOWED_ORIGINS:-}
+        VITE_API_URL: ${VITE_API_URL:-}
     container_name: g3n-frontend
     restart: unless-stopped
     environment:
-      - API_BASE_URL=${API_BASE_URL}
+      API_BASE_URL: ${API_BASE_URL:-https://g3n.htasistemas.com.br}
     ports:
-      - "127.0.0.1:3200:80"
+      - "127.0.0.1:${HOST_FRONTEND_PORT:-3200}:80"
     depends_on:
-      - backend
+      g3n-backend:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost/ > /dev/null || exit 1"]
       interval: 10s
@@ -72,24 +84,50 @@ services:
     networks:
       - g3n_net
 
-  g3-tunnel:
-    image: cloudflare/cloudflared:2024.2.1
-    container_name: g3-tunnel
+  nginx-g3n:
+    image: nginx:1.27-alpine
+    container_name: nginx-g3n
     restart: unless-stopped
-    command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN}
+    environment:
+      APP_PUBLIC_HOST: ${APP_PUBLIC_HOST:-g3n.htasistemas.com.br}
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:-https://g3n.htasistemas.com.br}
+      APP_FRONTEND_UPSTREAM: ${APP_FRONTEND_UPSTREAM:-g3n-frontend:80}
+      APP_API_UPSTREAM: ${APP_API_UPSTREAM:-g3n-backend:3333}
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/templates/default.conf.template:ro
     depends_on:
-      backend:
+      g3n-backend:
         condition: service_healthy
-      frontend:
+      g3n-frontend:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    networks:
+      - g3n_net
+
+  g3n-tunnel:
+    image: cloudflare/cloudflared:2024.2.1
+    container_name: g3n-tunnel
+    restart: unless-stopped
+    command: tunnel --config /etc/cloudflared/config.yml --no-autoupdate run --token ${TUNNEL_TOKEN}
     volumes:
       - ./docker/cloudflared/config.yml:/etc/cloudflared/config.yml:ro
+    depends_on:
+      nginx-g3n:
+        condition: service_healthy
+      g3n-backend:
+        condition: service_healthy
     networks:
       - g3n_net
 
 networks:
   g3n_net:
+    name: g3n_net
 
 volumes:
   g3n_db_data:
-  backend_storage:
+  g3n_backend_storage:

@@ -5,6 +5,28 @@ const optionalTrimmedString = z.preprocess((value) => {
     const trimmed = value.trim();
     return trimmed.length ? trimmed : undefined;
 }, z.string().optional());
+const optionalTrimmedString255 = z.preprocess((value) => {
+    if (typeof value !== "string")
+        return value;
+    const trimmed = value.trim();
+    return trimmed.length ? trimmed : undefined;
+}, z.string().max(255).optional());
+const optionalTrimmedLongString = z.preprocess((value) => {
+    if (typeof value !== "string")
+        return value;
+    const trimmed = value.trim();
+    return trimmed.length ? trimmed : undefined;
+}, z.string().max(2_000_000).optional());
+const avisoSonoroItemSchema = z.object({
+    id: z.string().trim().min(1).max(80),
+    nome: z.string().trim().min(1).max(255),
+    url: z.preprocess((value) => {
+        if (typeof value !== "string")
+            return value;
+        const trimmed = value.trim();
+        return trimmed.length ? trimmed : value;
+    }, z.string().max(2_000_000))
+});
 export const senhaEmitirInputSchema = z.object({
     beneficiarioId: z.coerce.number().int().positive(),
     prioridade: z.coerce.number().int().min(0).max(99).nullable().optional(),
@@ -30,5 +52,7 @@ export const senhasConfigInputSchema = z.object({
     quantidadeUltimasChamadas: z.coerce.number().int().min(1).max(30),
     unidadePainelId: z.coerce.number().int().positive().nullable().optional(),
     tituloTela: optionalTrimmedString.nullable().optional(),
-    descricaoTela: optionalTrimmedString.nullable().optional()
+    descricaoTela: optionalTrimmedString.nullable().optional(),
+    avisosSonoros: z.array(avisoSonoroItemSchema).max(20).nullable().optional(),
+    avisoSonoroAtivoId: optionalTrimmedString255.nullable().optional()
 });

@@ -3,13 +3,17 @@ import { AUTH_COOKIE_NAME } from "../middlewares/auth.middleware.js";
 import { AuthService } from "../services/auth.service.js";
 const authService = new AuthService();
 function authCookieOptions() {
-    return {
+    const cookieOptions = {
         httpOnly: true,
         sameSite: "lax",
         secure: env.NODE_ENV === "production",
         maxAge: env.APP_AUTH_TOKEN_EXPIRATION_MINUTES * 60 * 1000,
         path: "/"
     };
+    if (env.APP_AUTH_COOKIE_DOMAIN) {
+        cookieOptions.domain = env.APP_AUTH_COOKIE_DOMAIN;
+    }
+    return cookieOptions;
 }
 export class AuthController {
     async login(request, response) {

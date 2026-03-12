@@ -28,7 +28,13 @@ export function toOptionalDate(value) {
     const normalized = value.trim();
     if (!normalized)
         return undefined;
-    const parsed = new Date(`${normalized}T00:00:00.000Z`);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+        const [year, month, day] = normalized.split("-").map(Number);
+        if (!year || !month || !day)
+            return undefined;
+        return new Date(year, month - 1, day, 0, 0, 0, 0);
+    }
+    const parsed = new Date(normalized);
     return Number.isNaN(parsed.getTime()) ? undefined : parsed;
 }
 export function toIsoDate(value) {

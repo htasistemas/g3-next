@@ -2,10 +2,16 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { tarefasAdministrativasService } from "@/services/tarefas-administrativas.service";
 import type { TarefaAdministrativaPayload } from "@/types/tarefa-administrativa";
 
-export function useTarefasAdministrativas() {
+type ResumoQueryOptions = {
+  enabled?: boolean;
+};
+
+export function useTarefasAdministrativas(options?: ResumoQueryOptions) {
   return useQuery({
     queryKey: ["tarefas-administrativas"],
-    queryFn: () => tarefasAdministrativasService.listar()
+    queryFn: () => tarefasAdministrativasService.listar(),
+    enabled: options?.enabled ?? true,
+    staleTime: 60_000
   });
 }
 

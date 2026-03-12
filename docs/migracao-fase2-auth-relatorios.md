@@ -10,7 +10,7 @@
 - Comportamento:
   - Login valida usuario em `usuarios` e senha `bcrypt` (`senha_hash`).
   - Token JWT assinado com `APP_AUTH_TOKEN_SECRET`.
-  - Token armazenado em cookie `HttpOnly` (`g3_auth_token`), sem necessidade de `localStorage`.
+  - Token armazenado em cookie `HttpOnly` (`g3n_auth_token`), sem necessidade de `localStorage`.
   - Middleware de autenticacao para ler token via cookie ou `Authorization: Bearer`.
   - Middleware de autorizacao por permissao:
     - `ADMINISTRADOR`

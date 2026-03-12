@@ -56,6 +56,7 @@ export const jobPayloadSchema = z.object({
         id: optionalTrimmedString.optional(),
         beneficiarioId: optionalTrimmedString.nullable().optional(),
         beneficiarioNome: z.string().trim().min(2, "Informe o nome do beneficiario."),
+        beneficiarioTelefone: optionalTrimmedString.nullable().optional(),
         data: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/),
         status: z.string().trim().min(2, "Informe o status do encaminhamento."),
         observacoes: optionalTrimmedString.nullable().optional()

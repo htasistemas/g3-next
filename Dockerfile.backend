@@ -1,26 +1,26 @@
-FROM maven:3.9.9-eclipse-temurin-21 AS build
-
-WORKDIR /workspace
-
-COPY backend/pom.xml backend/mvnw backend/mvnw.cmd ./
-COPY backend/.mvn ./.mvn
-
-RUN mvn -q -e -DskipTests dependency:go-offline
-
-COPY backend/src ./src
-
-RUN mvn -q -DskipTests package
-
-FROM eclipse-temurin:21-jre
+FROM node:20-alpine AS build
 
 WORKDIR /app
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl postgresql-client \
-    && rm -rf /var/lib/apt/lists/*
+COPY backend/package*.json ./
+RUN npm ci
 
-COPY --from=build /workspace/target/*.jar /app/app.jar
+COPY backend ./
+RUN npm run prisma:generate && npm run build
 
-EXPOSE 8080
+FROM node:20-alpine
 
-CMD ["java", "-jar", "/app/app.jar"]
+WORKDIR /app
+
+RUN apk add --no-cache curl
+
+ENV NODE_ENV=production
+
+COPY --from=build /app/package*.json ./
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/prisma ./prisma
+COPY --from=build /app/dist ./dist
+
+EXPOSE 3333
+
+CMD ["node", "dist/server.js"]

@@ -2,10 +2,16 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { lembretesDiariosService } from "@/services/lembretes-diarios.service";
 import type { LembreteDiarioPayload } from "@/types/lembrete-diario";
 
-export function useLembretesDiarios(usuarioId?: number) {
+type ResumoQueryOptions = {
+  enabled?: boolean;
+};
+
+export function useLembretesDiarios(usuarioId?: number, options?: ResumoQueryOptions) {
   return useQuery({
     queryKey: ["lembretes-diarios", usuarioId ?? "todos"],
-    queryFn: () => lembretesDiariosService.listar(usuarioId)
+    queryFn: () => lembretesDiariosService.listar(usuarioId),
+    enabled: options?.enabled ?? true,
+    staleTime: 60_000
   });
 }
 

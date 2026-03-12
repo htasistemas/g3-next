@@ -1,6 +1,6 @@
 ingress:
   - hostname: g3n.htasistemas.com.br
-    service: http://frontend:80
+    service: http://nginx-g3n:80
   - hostname: apig3n.htasistemas.com.br
-    service: http://backend:8080
+    service: http://g3n-backend:3333
   - service: http_status:404

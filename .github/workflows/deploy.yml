@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: deploy-main
+  group: deploy-g3-next-main
   cancel-in-progress: false
 
 jobs:
@@ -73,9 +73,12 @@ jobs:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_APP_DIR: ${{ secrets.DEPLOY_APP_DIR }}
           GITHUB_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
+
+          APP_DIR="${DEPLOY_APP_DIR:-/home/srv/g3n}"
 
           ssh \
             -i "$HOME/.ssh/id_ed25519" \
@@ -84,10 +87,11 @@ jobs:
             -p "$DEPLOY_PORT" \
             "$DEPLOY_USER@$SSH_TARGET_HOST" <<EOF
           set -euo pipefail
-          cd /home/srv/g3n
+          APP_DIR="$APP_DIR"
+          cd "$APP_DIR"
           echo "Deploy do commit $GITHUB_SHA"
           git fetch origin main
           git checkout main
           git pull --ff-only origin main
-          bash ./deploy.sh
+          APP_DIR="$APP_DIR" bash ./deploy.sh
           EOF

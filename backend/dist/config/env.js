@@ -20,10 +20,12 @@ const envSchema = z.object({
     CORS_ORIGIN: z
         .string()
         .min(1)
-        .default("http://localhost:5173,http://127.0.0.1:5173,http://0.0.0.0:5173,http://localhost:4200,http://127.0.0.1:4200,http://0.0.0.0:4200"),
+        .default("https://g3n.htasistemas.com.br,http://localhost:5173,http://127.0.0.1:5173,http://0.0.0.0:5173,http://localhost:4200,http://127.0.0.1:4200,http://0.0.0.0:4200"),
     DATABASE_URL: z.string().min(1, "DATABASE_URL nao configurada"),
     APP_AUTH_TOKEN_SECRET: z.string().min(16).default("g3-next-dev-token-secret-2026"),
     APP_AUTH_TOKEN_EXPIRATION_MINUTES: z.coerce.number().int().positive().default(480),
+    APP_AUTH_COOKIE_NAME: z.string().trim().min(1).default("g3n_auth_token"),
+    APP_AUTH_COOKIE_DOMAIN: z.string().trim().min(1).optional(),
     APP_GOOGLE_CLIENT_ID: z.string().trim().min(1).optional(),
     APP_EMAIL_HABILITADO: booleanFromEnv.default(true),
     APP_EMAIL_REMETENTE: z.string().min(1).default("htasistemas@gmail.com"),

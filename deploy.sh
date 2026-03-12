@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_COMPOSE="/home/srv/g3n/docker-compose.yml"
-TUNNEL_COMPOSE="/home/srv/g3n/docker-compose.tunnel.yml"
+APP_DIR="${APP_DIR:-/home/srv/g3n}"
+APP_COMPOSE="$APP_DIR/docker-compose.yml"
+TUNNEL_COMPOSE="$APP_DIR/docker-compose.tunnel.yml"
 
 log() { printf "[%s] %s\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
 
@@ -47,33 +48,41 @@ if [ -f "$TUNNEL_COMPOSE" ]; then
   exit 1
 fi
 
-log "Deploy g3 stack"
+cd "$APP_DIR"
+
+log "Deploy g3n stack"
 APP_VERSION="$(bash ./scripts/bump-version.sh)"
 log "Version set to $APP_VERSION"
-docker compose -f "$APP_COMPOSE" build backend frontend
-docker compose -f "$APP_COMPOSE" up -d --force-recreate backend frontend
 
-wait_healthy db 120
+docker compose -f "$APP_COMPOSE" up -d g3n-db
+wait_healthy g3n-db 120
 
-if ! wait_healthy backend 180; then
+docker compose -f "$APP_COMPOSE" build g3n-backend g3n-frontend
+docker compose -f "$APP_COMPOSE" up -d --force-recreate g3n-backend g3n-frontend
+
+if ! wait_healthy g3n-backend 180; then
   log "Backend failed healthcheck. Rebuilding without cache..."
-  docker compose -f "$APP_COMPOSE" build --no-cache backend
-  docker compose -f "$APP_COMPOSE" up -d --force-recreate backend
-  wait_healthy backend 200
+  docker compose -f "$APP_COMPOSE" build --no-cache g3n-backend
+  docker compose -f "$APP_COMPOSE" up -d --force-recreate g3n-backend
+  wait_healthy g3n-backend 200
 fi
 
-wait_healthy frontend 180
+wait_healthy g3n-frontend 180
+
+log "Start nginx-g3n after dependencies are healthy"
+docker compose -f "$APP_COMPOSE" up -d --force-recreate nginx-g3n
+wait_healthy nginx-g3n 120
 
 if [[ -n "${TUNNEL_TOKEN:-}" ]]; then
-  log "Ensure g3 tunnel is up"
-  docker compose -f "$APP_COMPOSE" up -d --force-recreate g3-tunnel
+  log "Ensure g3n tunnel is up"
+  docker compose -f "$APP_COMPOSE" up -d --force-recreate g3n-tunnel
 else
-  log "Skipping g3 tunnel (TUNNEL_TOKEN not set)"
+  log "Skipping g3n tunnel (TUNNEL_TOKEN not set)"
 fi
 
-if [ -x /home/srv/g3n/scripts/deploy-check.sh ]; then
+if [ -x "$APP_DIR/scripts/deploy-check.sh" ]; then
   log "Post-deploy checks"
-  /home/srv/g3n/scripts/deploy-check.sh
+  APP_DIR="$APP_DIR" "$APP_DIR/scripts/deploy-check.sh"
 else
   log "Post-deploy checks skipped (script not found)"
 fi
