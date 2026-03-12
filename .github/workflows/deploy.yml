@@ -49,11 +49,23 @@ jobs:
           chmod 700 "$HOME/.ssh"
           printf '%s\n' "$DEPLOY_SSH_KEY" > "$HOME/.ssh/id_ed25519"
           chmod 600 "$HOME/.ssh/id_ed25519"
-          if ! ssh-keyscan -T 10 -p "$DEPLOY_PORT" -H "$DEPLOY_HOST" >> "$HOME/.ssh/known_hosts"; then
+
+          ssh_keyscan_args=()
+          ssh_target_host="$DEPLOY_HOST"
+          if [[ "$DEPLOY_HOST" == *:* ]]; then
+            ssh_keyscan_args+=("-6")
+            ssh_target_host="[$DEPLOY_HOST]"
+          else
+            ssh_keyscan_args+=("-4")
+          fi
+
+          if ! ssh-keyscan "${ssh_keyscan_args[@]}" -T 10 -p "$DEPLOY_PORT" -H "$DEPLOY_HOST" >> "$HOME/.ssh/known_hosts"; then
             echo "::error::Não foi possível alcançar $DEPLOY_HOST:$DEPLOY_PORT a partir do GitHub Actions."
             echo "::error::Verifique IP público, porta SSH exposta e firewall liberando acesso externo."
             exit 1
           fi
+
+          echo "SSH_TARGET_HOST=$ssh_target_host" >> "$GITHUB_ENV"
           chmod 644 "$HOME/.ssh/known_hosts"
 
       - name: Executar deploy no servidor
@@ -70,7 +82,7 @@ jobs:
             -o BatchMode=yes \
             -o StrictHostKeyChecking=yes \
             -p "$DEPLOY_PORT" \
-            "$DEPLOY_USER@$DEPLOY_HOST" <<EOF
+            "$DEPLOY_USER@$SSH_TARGET_HOST" <<EOF
           set -euo pipefail
           cd /home/srv/g3
           echo "Deploy do commit $GITHUB_SHA"
