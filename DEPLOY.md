@@ -24,7 +24,6 @@ Checklist rapido:
 Cloudflare Tunnel:
 - Preencha o `.env` com `TUNNEL_TOKEN`.
 - `g3n.htasistemas.com.br` deve apontar para `http://nginx-g3n:80`.
-- `apig3n.htasistemas.com.br` deve apontar para `http://g3n-backend:3333`.
 
 Observacoes:
 - Nao use `docker-compose.tunnel.yml` em paralelo com este fluxo.

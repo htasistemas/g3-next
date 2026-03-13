@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-API_URL="${API_BASE_URL:-http://localhost:8080}"
+API_URL="${API_BASE_URL:-https://g3n.htasistemas.com.br}"
 case "$API_URL" in
   http://*|https://*) ;;
   *) API_URL="https://$API_URL" ;;

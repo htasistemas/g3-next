@@ -31,7 +31,7 @@ services:
       API_PORT: 3333
       API_HOST: 0.0.0.0
       DATABASE_URL: postgresql://${DB_USERNAME:-g3n}:${DB_PASSWORD:-admin}@g3n-db:5432/${DB_NAME:-g3n}?schema=public
-      CORS_ORIGIN: ${CORS_ORIGIN:-https://g3n.htasistemas.com.br,https://apig3n.htasistemas.com.br,http://localhost:5173,http://127.0.0.1:5173,http://0.0.0.0:5173,http://localhost:4200,http://127.0.0.1:4200,http://0.0.0.0:4200}
+      CORS_ORIGIN: ${CORS_ORIGIN:-https://g3n.htasistemas.com.br,http://localhost:5173,http://127.0.0.1:5173,http://0.0.0.0:5173,http://localhost:4200,http://127.0.0.1:4200,http://0.0.0.0:4200}
       APP_AUTH_TOKEN_SECRET: ${APP_AUTH_TOKEN_SECRET:-g3-next-dev-token-secret-2026}
       APP_AUTH_TOKEN_EXPIRATION_MINUTES: ${APP_AUTH_TOKEN_EXPIRATION_MINUTES:-480}
       APP_AUTH_COOKIE_NAME: ${APP_AUTH_COOKIE_NAME:-g3n_auth_token}

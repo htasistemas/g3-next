@@ -1,8 +1,8 @@
 (function (window) {
   window.__env = window.__env || {};
 
-  // URL base da API. Se nao for informada, a aplicacao usa a origem atual.
-  window.__env.apiUrl = "https://apig3n.htasistemas.com.br";
+  // URL base da API. Em producao, o G3-Next usa a mesma origem do frontend.
+  window.__env.apiUrl = window.location.origin;
 
   // Caso queira controlar multiplos valores, adicione novas chaves aqui.
   // window.__env.appVersion = "1.0.0";
