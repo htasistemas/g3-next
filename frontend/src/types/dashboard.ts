@@ -60,6 +60,9 @@ export type DashboardCadastros = {
   voluntarios: number;
   familias: number;
   bensPatrimonio: number;
+  itensAlmoxarifado: number;
+  livrosDisponiveis: number;
+  veiculos: number;
 };
 
 export type DashboardAssistenciaResponse = {

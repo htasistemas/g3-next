@@ -42,6 +42,9 @@ export class DashboardService {
       totalVoluntarios,
       totalFamiliasCadastradas,
       totalBensPatrimonio,
+      totalItensAlmoxarifado,
+      totalLivrosDisponiveis,
+      totalVeiculos,
       beneficiariosPeriodo,
       porStatus,
       cadastrosCompletos,
@@ -73,6 +76,9 @@ export class DashboardService {
       this.repository.contarVoluntarios(),
       this.repository.contarFamilias(),
       this.repository.contarBensPatrimonio(),
+      this.repository.contarItensAlmoxarifado(),
+      this.repository.somarLivrosDisponiveis(),
+      this.repository.contarVeiculos(),
       this.repository.contarBeneficiariosPeriodo(filters.startDate, filters.endDate),
       this.repository.contarBeneficiariosPorStatus(),
       this.repository.contarCadastroCompleto(),
@@ -133,7 +139,10 @@ export class DashboardService {
         profissionais: totalProfissionais,
         voluntarios: totalVoluntarios,
         familias: totalFamiliasCadastradas,
-        bensPatrimonio: totalBensPatrimonio
+        bensPatrimonio: totalBensPatrimonio,
+        itensAlmoxarifado: totalItensAlmoxarifado,
+        livrosDisponiveis: totalLivrosDisponiveis,
+        veiculos: totalVeiculos
       },
       top12: {
         beneficiariosAtendidosPeriodo: beneficiariosPeriodo,

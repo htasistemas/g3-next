@@ -20,6 +20,9 @@ export type DashboardAssistenciaResponse = {
     voluntarios: number;
     familias: number;
     bensPatrimonio: number;
+    itensAlmoxarifado: number;
+    livrosDisponiveis: number;
+    veiculos: number;
   };
   top12: {
     beneficiariosAtendidosPeriodo: number;

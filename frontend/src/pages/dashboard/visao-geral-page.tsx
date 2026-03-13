@@ -51,6 +51,9 @@ export function VisaoGeralPage() {
   const dadosCadastros = useMemo(() => {
     if (!data) return [];
     return [
+      { nome: "Almoxarifado", valor: data.cadastros.itensAlmoxarifado },
+      { nome: "Biblioteca", valor: data.cadastros.livrosDisponiveis },
+      { nome: "Veículos", valor: data.cadastros.veiculos },
       { nome: "Beneficiários", valor: data.cadastros.beneficiarios },
       { nome: "Profissionais", valor: data.cadastros.profissionais },
       { nome: "Voluntários", valor: data.cadastros.voluntarios },
@@ -238,17 +241,24 @@ export function VisaoGeralPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+              <div className="space-y-4">
                 <div className="min-w-0 rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] p-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
                     Cadastros por tipo
                   </p>
-                  <div className="mt-3 h-72">
-                    <ResponsiveChart minWidth={0} minHeight={220}>
-                      <BarChart data={dadosCadastros}>
-                        <XAxis dataKey="nome" stroke="var(--g3-muted)" fontSize={11} />
-                        <YAxis stroke="var(--g3-muted)" fontSize={11} allowDecimals={false} />
+                  <div className="mt-3 h-[28rem]">
+                    <ResponsiveChart minWidth={0} minHeight={320}>
+                      <BarChart data={dadosCadastros} layout="vertical" margin={{ left: 12, right: 16 }}>
+                        <XAxis type="number" stroke="var(--g3-muted)" fontSize={11} allowDecimals={false} />
+                        <YAxis
+                          dataKey="nome"
+                          type="category"
+                          width={120}
+                          stroke="var(--g3-muted)"
+                          fontSize={12}
+                        />
                         <Tooltip
+                          formatter={(value) => Number(value ?? 0).toLocaleString("pt-BR")}
                           cursor={{ fill: "var(--g3-primary-soft)" }}
                           contentStyle={{
                             borderRadius: 10,
@@ -256,7 +266,7 @@ export function VisaoGeralPage() {
                             backgroundColor: "var(--g3-card)"
                           }}
                         />
-                        <Bar dataKey="valor" fill="var(--g3-primary)" radius={[6, 6, 0, 0]} />
+                        <Bar dataKey="valor" fill="var(--g3-primary)" radius={[0, 6, 6, 0]} maxBarSize={26} />
                       </BarChart>
                     </ResponsiveChart>
                   </div>

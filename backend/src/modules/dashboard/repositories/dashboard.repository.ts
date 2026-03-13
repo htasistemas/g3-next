@@ -54,6 +54,36 @@ export class DashboardRepository {
     return this.contarTabela("patrimonio_item");
   }
 
+  async contarItensAlmoxarifado() {
+    return this.contarTabela("almoxarifado_item");
+  }
+
+  async somarLivrosDisponiveis() {
+    const tabelaBiblioteca = await this.primeiraTabelaExistente(["biblioteca_livro", "biblioteca_livros"]);
+    if (!tabelaBiblioteca) return 0;
+
+    const possuiQuantidadeDisponivel = await this.colunaExiste(tabelaBiblioteca, "quantidade_disponivel");
+    if (!possuiQuantidadeDisponivel) return 0;
+
+    const possuiStatus = await this.colunaExiste(tabelaBiblioteca, "status");
+    const filtroStatus = possuiStatus
+      ? "WHERE COALESCE(UPPER(TRIM(status)), 'ATIVO') <> 'INATIVO'"
+      : "";
+
+    return this.consultarTotal(
+      `
+      SELECT COALESCE(SUM(GREATEST(COALESCE(quantidade_disponivel, 0), 0)), 0) AS total
+      FROM ${tabelaBiblioteca}
+      ${filtroStatus}
+      `,
+      []
+    );
+  }
+
+  async contarVeiculos() {
+    return this.contarTabela("controle_veiculos");
+  }
+
   async contarBeneficiariosPorStatus() {
     const possuiTabela = await this.tabelaExiste("cadastro_beneficiario");
     if (!possuiTabela) return {} as Record<string, number>;
@@ -624,6 +654,16 @@ export class DashboardRepository {
   private async verificarColunas(tabela: string, colunas: string[]) {
     const resultados = await Promise.all(colunas.map((coluna) => this.colunaExiste(tabela, coluna)));
     return resultados.every(Boolean);
+  }
+
+  private async primeiraTabelaExistente(tabelas: string[]) {
+    for (const tabela of tabelas) {
+      if (await this.tabelaExiste(tabela)) {
+        return tabela;
+      }
+    }
+
+    return null;
   }
 
   private async tabelaExiste(tabela: string) {
