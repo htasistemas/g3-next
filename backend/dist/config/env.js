@@ -13,6 +13,12 @@ const booleanFromEnv = z.preprocess((value) => {
         return false;
     return value;
 }, z.boolean());
+const optionalTrimmedStringFromEnv = z.preprocess((value) => {
+    if (typeof value !== "string")
+        return value;
+    const normalized = value.trim();
+    return normalized.length > 0 ? normalized : undefined;
+}, z.string().min(1).optional());
 const envSchema = z.object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
     API_PORT: z.coerce.number().int().positive().default(3333),
@@ -25,8 +31,8 @@ const envSchema = z.object({
     APP_AUTH_TOKEN_SECRET: z.string().min(16).default("g3-next-dev-token-secret-2026"),
     APP_AUTH_TOKEN_EXPIRATION_MINUTES: z.coerce.number().int().positive().default(480),
     APP_AUTH_COOKIE_NAME: z.string().trim().min(1).default("g3n_auth_token"),
-    APP_AUTH_COOKIE_DOMAIN: z.string().trim().min(1).optional(),
-    APP_GOOGLE_CLIENT_ID: z.string().trim().min(1).optional(),
+    APP_AUTH_COOKIE_DOMAIN: optionalTrimmedStringFromEnv,
+    APP_GOOGLE_CLIENT_ID: optionalTrimmedStringFromEnv,
     APP_EMAIL_HABILITADO: booleanFromEnv.default(true),
     APP_EMAIL_REMETENTE: z.string().min(1).default("htasistemas@gmail.com"),
     APP_EMAIL_NOME: z.string().min(1).default("HTA Sistemas"),
