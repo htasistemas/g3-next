@@ -9,6 +9,12 @@ STATE_VERSION_FILE="$DEPLOY_STATE_DIR/version.txt"
 
 log() { printf "[%s] %s\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
 
+print_container_logs() {
+  local name="$1"
+  log "Recent logs for $name"
+  docker compose -f "$APP_COMPOSE" logs --tail=200 "$name" || true
+}
+
 container_health() {
   local name="$1"
   local id
@@ -64,16 +70,25 @@ docker compose -f "$APP_COMPOSE" up -d --remove-orphans g3n-db
 wait_healthy g3n-db 120
 
 docker compose -f "$APP_COMPOSE" build g3n-backend g3n-frontend
-docker compose -f "$APP_COMPOSE" up -d --remove-orphans --force-recreate g3n-backend g3n-frontend
+docker compose -f "$APP_COMPOSE" up -d --remove-orphans --force-recreate g3n-backend
 
 if ! wait_healthy g3n-backend 180; then
   log "Backend failed healthcheck. Rebuilding without cache..."
+  print_container_logs g3n-backend
   docker compose -f "$APP_COMPOSE" build --no-cache g3n-backend
   docker compose -f "$APP_COMPOSE" up -d --force-recreate g3n-backend
-  wait_healthy g3n-backend 200
+  if ! wait_healthy g3n-backend 200; then
+    print_container_logs g3n-backend
+    exit 1
+  fi
 fi
 
-wait_healthy g3n-frontend 180
+docker compose -f "$APP_COMPOSE" up -d --remove-orphans --force-recreate g3n-frontend
+if ! wait_healthy g3n-frontend 180; then
+  print_container_logs g3n-frontend
+  print_container_logs g3n-backend
+  exit 1
+fi
 
 log "Start nginx-g3n after dependencies are healthy"
 docker compose -f "$APP_COMPOSE" up -d --remove-orphans --force-recreate nginx-g3n
