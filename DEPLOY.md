@@ -28,3 +28,4 @@ Cloudflare Tunnel:
 Observacoes:
 - Nao use `docker-compose.tunnel.yml` em paralelo com este fluxo.
 - O `deploy.sh` incrementa a versao antes do build.
+- O estado local de deploy fica em `~/.g3n-deploy`, incluindo backups do checkout e o ultimo numero de versao aplicado.

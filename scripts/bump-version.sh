@@ -2,17 +2,72 @@
 set -euo pipefail
 
 VERSION_FILE="${1:-backend/src/main/resources/static/version.txt}"
+STATE_VERSION_FILE="${STATE_VERSION_FILE:-}"
+
+trim_value() {
+  printf "%s" "$1" | tr -d '\r' | xargs
+}
+
+read_version_file() {
+  local file_path="$1"
+
+  if [ ! -f "$file_path" ]; then
+    return 1
+  fi
+
+  local raw_version
+  raw_version="$(sed -n '1p' "$file_path" || true)"
+  trim_value "$raw_version"
+}
+
+is_valid_version() {
+  local value="$1"
+  [[ "$value" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+}
+
+compare_versions() {
+  local left="$1"
+  local right="$2"
+  local left_major left_minor left_patch
+  local right_major right_minor right_patch
+
+  IFS='.' read -r left_major left_minor left_patch <<< "$left"
+  IFS='.' read -r right_major right_minor right_patch <<< "$right"
+
+  if (( 10#$left_major > 10#$right_major )); then
+    return 0
+  fi
+  if (( 10#$left_major < 10#$right_major )); then
+    return 1
+  fi
+
+  if (( 10#$left_minor > 10#$right_minor )); then
+    return 0
+  fi
+  if (( 10#$left_minor < 10#$right_minor )); then
+    return 1
+  fi
+
+  (( 10#$left_patch >= 10#$right_patch ))
+}
 
 if [ ! -f "$VERSION_FILE" ]; then
   echo "Arquivo de versao nao encontrado: $VERSION_FILE" >&2
   exit 1
 fi
 
-version="$(sed -n '1p' "$VERSION_FILE" | tr -d '\r' | xargs)"
+version="$(read_version_file "$VERSION_FILE")"
 
-if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+if ! is_valid_version "$version"; then
   echo "Formato de versao invalido: $version" >&2
   exit 1
+fi
+
+if [ -n "$STATE_VERSION_FILE" ] && [ -f "$STATE_VERSION_FILE" ]; then
+  state_version="$(read_version_file "$STATE_VERSION_FILE" || true)"
+  if [ -n "${state_version:-}" ] && is_valid_version "$state_version" && compare_versions "$state_version" "$version"; then
+    version="$state_version"
+  fi
 fi
 
 IFS='.' read -r major minor patch <<< "$version"
@@ -29,4 +84,8 @@ new_version="$(
 )"
 
 printf "%s\n" "$new_version" > "$VERSION_FILE"
+if [ -n "$STATE_VERSION_FILE" ]; then
+  mkdir -p "$(dirname "$STATE_VERSION_FILE")"
+  printf "%s\n" "$new_version" > "$STATE_VERSION_FILE"
+fi
 printf "%s\n" "$new_version"

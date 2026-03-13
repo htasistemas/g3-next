@@ -4,6 +4,8 @@ set -euo pipefail
 APP_DIR="${APP_DIR:-/home/srv/g3n}"
 APP_COMPOSE="$APP_DIR/docker-compose.yml"
 TUNNEL_COMPOSE="$APP_DIR/docker-compose.tunnel.yml"
+DEPLOY_STATE_DIR="${DEPLOY_STATE_DIR:-$HOME/.g3n-deploy}"
+STATE_VERSION_FILE="$DEPLOY_STATE_DIR/version.txt"
 
 log() { printf "[%s] %s\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
 
@@ -49,9 +51,10 @@ if [ -f "$TUNNEL_COMPOSE" ]; then
 fi
 
 cd "$APP_DIR"
+mkdir -p "$DEPLOY_STATE_DIR"
 
 log "Deploy g3n stack"
-APP_VERSION="$(bash ./scripts/bump-version.sh)"
+APP_VERSION="$(STATE_VERSION_FILE="$STATE_VERSION_FILE" bash ./scripts/bump-version.sh)"
 log "Version set to $APP_VERSION"
 
 docker compose -f "$APP_COMPOSE" up -d g3n-db
