@@ -57,11 +57,14 @@ log "Deploy g3n stack"
 APP_VERSION="$(STATE_VERSION_FILE="$STATE_VERSION_FILE" bash ./scripts/bump-version.sh)"
 log "Version set to $APP_VERSION"
 
-docker compose -f "$APP_COMPOSE" up -d g3n-db
+log "Stopping previous g3n containers"
+docker compose -f "$APP_COMPOSE" down --remove-orphans || true
+
+docker compose -f "$APP_COMPOSE" up -d --remove-orphans g3n-db
 wait_healthy g3n-db 120
 
 docker compose -f "$APP_COMPOSE" build g3n-backend g3n-frontend
-docker compose -f "$APP_COMPOSE" up -d --force-recreate g3n-backend g3n-frontend
+docker compose -f "$APP_COMPOSE" up -d --remove-orphans --force-recreate g3n-backend g3n-frontend
 
 if ! wait_healthy g3n-backend 180; then
   log "Backend failed healthcheck. Rebuilding without cache..."
@@ -73,12 +76,12 @@ fi
 wait_healthy g3n-frontend 180
 
 log "Start nginx-g3n after dependencies are healthy"
-docker compose -f "$APP_COMPOSE" up -d --force-recreate nginx-g3n
+docker compose -f "$APP_COMPOSE" up -d --remove-orphans --force-recreate nginx-g3n
 wait_healthy nginx-g3n 120
 
 if [[ -n "${TUNNEL_TOKEN:-}" ]]; then
   log "Ensure g3n tunnel is up"
-  docker compose -f "$APP_COMPOSE" up -d --force-recreate g3n-tunnel
+  docker compose -f "$APP_COMPOSE" up -d --remove-orphans --force-recreate g3n-tunnel
 else
   log "Skipping g3n tunnel (TUNNEL_TOKEN not set)"
 fi
