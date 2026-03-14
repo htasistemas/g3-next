@@ -43,6 +43,62 @@ contabilidadeRoutes.delete(
 );
 
 contabilidadeRoutes.get(
+  "/categorias",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.listarCategorias.bind(controller))
+);
+
+contabilidadeRoutes.post(
+  "/categorias",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.criarCategoria.bind(controller))
+);
+
+contabilidadeRoutes.put(
+  "/categorias/:id",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.atualizarCategoria.bind(controller))
+);
+
+contabilidadeRoutes.delete(
+  "/categorias/:id",
+  ensureAuthenticated,
+  ensurePermissions(permissaoExclusao),
+  asyncHandler(controller.removerCategoria.bind(controller))
+);
+
+contabilidadeRoutes.get(
+  "/centros-custo",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.listarCentrosCusto.bind(controller))
+);
+
+contabilidadeRoutes.post(
+  "/centros-custo",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.criarCentroCusto.bind(controller))
+);
+
+contabilidadeRoutes.put(
+  "/centros-custo/:id",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.atualizarCentroCusto.bind(controller))
+);
+
+contabilidadeRoutes.delete(
+  "/centros-custo/:id",
+  ensureAuthenticated,
+  ensurePermissions(permissaoExclusao),
+  asyncHandler(controller.removerCentroCusto.bind(controller))
+);
+
+contabilidadeRoutes.get(
   "/lancamentos",
   ensureAuthenticated,
   ensurePermissions(permissoesLeitura),
@@ -75,6 +131,13 @@ contabilidadeRoutes.post(
   ensureAuthenticated,
   ensurePermissions(permissoesEscrita),
   asyncHandler(controller.pagarLancamento.bind(controller))
+);
+
+contabilidadeRoutes.patch(
+  "/lancamentos/:id/estorno",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.estornarLancamento.bind(controller))
 );
 
 contabilidadeRoutes.delete(
@@ -110,6 +173,69 @@ contabilidadeRoutes.delete(
   ensureAuthenticated,
   ensurePermissions(permissaoExclusao),
   asyncHandler(controller.removerMovimentacao.bind(controller))
+);
+
+contabilidadeRoutes.get(
+  "/transferencias",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.listarTransferencias.bind(controller))
+);
+
+contabilidadeRoutes.post(
+  "/transferencias",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.criarTransferencia.bind(controller))
+);
+
+contabilidadeRoutes.patch(
+  "/transferencias/:id/estorno",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.estornarTransferencia.bind(controller))
+);
+
+contabilidadeRoutes.get(
+  "/conciliacoes",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.listarConciliacoes.bind(controller))
+);
+
+contabilidadeRoutes.post(
+  "/conciliacoes",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.criarConciliacao.bind(controller))
+);
+
+contabilidadeRoutes.patch(
+  "/conciliacoes/:id/situacao",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.atualizarSituacaoConciliacao.bind(controller))
+);
+
+contabilidadeRoutes.get(
+  "/historico",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.listarHistorico.bind(controller))
+);
+
+contabilidadeRoutes.get(
+  "/compras-integradas",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.listarComprasIntegradas.bind(controller))
+);
+
+contabilidadeRoutes.post(
+  "/compras-integradas/:id/gerar-obrigacao",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.gerarObrigacaoFinanceiraPorCompra.bind(controller))
 );
 
 contabilidadeRoutes.get(

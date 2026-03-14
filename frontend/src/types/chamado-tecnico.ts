@@ -156,6 +156,8 @@ export type ChamadoTecnicoListaResponse = {
 
 export type ChamadoTecnicoCatalogo = {
   parametros: Record<string, ChamadoParametro[]>;
+  tipos?: ChamadoParametro[];
+  prioridades?: ChamadoParametro[];
   usuarios: ChamadoUsuarioResumo[];
 };
 

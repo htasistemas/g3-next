@@ -507,6 +507,8 @@ export function PlanoTrabalhoPage() {
   return (
     <>
       <AdminPageLayout
+        sectionLabel="Setor jurídico"
+        pageTitle="Plano de trabalho"
         tabs={abas}
         activeTab={abaAtiva}
         onChangeTab={(tabId) => setAbaAtiva(tabId as AbaId)}

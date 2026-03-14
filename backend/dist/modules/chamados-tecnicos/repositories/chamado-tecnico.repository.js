@@ -218,6 +218,9 @@ export class ChamadoTecnicoRepository {
         for (const comando of estruturaSql) {
             await prisma.$executeRawUnsafe(comando);
         }
+        estruturaGarantida = true;
+    }
+    async garantirParametrosIniciais() {
         for (const parametro of parametrosIniciaisChamadoTecnico) {
             await prisma.$executeRaw(Prisma.sql `
           INSERT INTO g3n_chamado_tecnico_parametro (tipo, chave, nome, cor, ordem, padrao, sla_horas, ativo, criado_em, atualizado_em)
@@ -243,10 +246,10 @@ export class ChamadoTecnicoRepository {
             atualizado_em = NOW()
         `);
         }
-        estruturaGarantida = true;
     }
     async listarParametros(tipo) {
         await this.garantirEstrutura();
+        await this.garantirParametrosIniciais();
         return prisma.$queryRaw(Prisma.sql `
       SELECT id, tipo, chave, nome, descricao, cor, ordem, padrao, sla_horas, ativo, metadados_json, criado_em, atualizado_em
       FROM g3n_chamado_tecnico_parametro
@@ -256,6 +259,7 @@ export class ChamadoTecnicoRepository {
     }
     async buscarParametroPorId(id) {
         await this.garantirEstrutura();
+        await this.garantirParametrosIniciais();
         const rows = await prisma.$queryRaw(Prisma.sql `
       SELECT id, tipo, chave, nome, descricao, cor, ordem, padrao, sla_horas, ativo, metadados_json, criado_em, atualizado_em
       FROM g3n_chamado_tecnico_parametro
@@ -266,6 +270,7 @@ export class ChamadoTecnicoRepository {
     }
     async buscarParametroPorChave(tipo, chave) {
         await this.garantirEstrutura();
+        await this.garantirParametrosIniciais();
         const rows = await prisma.$queryRaw(Prisma.sql `
       SELECT id, tipo, chave, nome, descricao, cor, ordem, padrao, sla_horas, ativo, metadados_json, criado_em, atualizado_em
       FROM g3n_chamado_tecnico_parametro

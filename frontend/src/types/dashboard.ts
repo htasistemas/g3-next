@@ -65,6 +65,16 @@ export type DashboardCadastros = {
   veiculos: number;
 };
 
+export type DashboardFinanceiroConta = {
+  id: string;
+  nome: string;
+  banco?: string | null;
+  numero?: string | null;
+  tipo?: string | null;
+  categoria: "Caixa" | "Banco";
+  saldo: number;
+};
+
 export type DashboardAssistenciaResponse = {
   filters: {
     startDate: string | null;
@@ -79,6 +89,7 @@ export type DashboardAssistenciaResponse = {
     valoresAReceber: number;
     valoresEmCaixa: number;
     valoresEmBanco: number;
+    contas: DashboardFinanceiroConta[];
   };
 };
 

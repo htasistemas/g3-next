@@ -38,7 +38,9 @@ export const requiredStorageDirectories = [
     "eventos/fotos",
     "chamados-tecnicos/anexos",
     "ocorrencias/anexos",
-    "oficios/documentos"
+    "oficios/documentos",
+    "compras/anexos",
+    "contabilidade/anexos"
 ];
 export const storagePolicies = {
     beneficiario_foto: {
@@ -180,6 +182,24 @@ export const storagePolicies = {
         allowedExtensions: documentExtensions,
         allowedMimeTypes: documentMimeTypes,
         maxSizeBytes: 20 * 1024 * 1024,
+        generateThumbnail: true
+    },
+    autorizacao_compra_anexo: {
+        entidadeTipo: "autorizacao_compra",
+        categoria: "anexo",
+        subdirectory: "compras/anexos",
+        allowedExtensions: attachmentExtensions,
+        allowedMimeTypes: attachmentMimeTypes,
+        maxSizeBytes: 25 * 1024 * 1024,
+        generateThumbnail: true
+    },
+    contabilidade_lancamento_anexo: {
+        entidadeTipo: "contabilidade_lancamento",
+        categoria: "anexo",
+        subdirectory: "contabilidade/anexos",
+        allowedExtensions: attachmentExtensions,
+        allowedMimeTypes: attachmentMimeTypes,
+        maxSizeBytes: 25 * 1024 * 1024,
         generateThumbnail: true
     },
     geral_outro: {

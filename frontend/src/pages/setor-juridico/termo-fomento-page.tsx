@@ -262,6 +262,8 @@ export function TermoFomentoPage() {
   return (
     <>
       <AdminPageLayout
+        sectionLabel="Setor jurídico"
+        pageTitle="Termo de fomento"
         tabs={abas}
         activeTab={abaAtiva}
         onChangeTab={(tabId) => setAbaAtiva(tabId as AbaId)}

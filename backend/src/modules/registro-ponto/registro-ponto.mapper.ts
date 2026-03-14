@@ -71,6 +71,20 @@ function normalizarHora(value: string | null) {
   return normalized;
 }
 
+function pad2(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+function formatarTimestampLocalBrasilia(value: Date) {
+  const ano = value.getFullYear();
+  const mes = pad2(value.getMonth() + 1);
+  const dia = pad2(value.getDate());
+  const hora = pad2(value.getHours());
+  const minuto = pad2(value.getMinutes());
+  const segundo = pad2(value.getSeconds());
+  return `${ano}-${mes}-${dia}T${hora}:${minuto}:${segundo}-03:00`;
+}
+
 function obterProximaBatida(item: {
   entrada_1?: string;
   saida_1?: string;
@@ -111,8 +125,8 @@ export function mapRegistroPontoRowToResponse(row: ListaRow): RegistroPontoLista
     status: row.status_registro,
     proxima_batida: obterProximaBatida({ entrada_1, saida_1, entrada_2, saida_2 }),
     total_trabalhado_minutos: toNumber(row.total_trabalhado_minutos),
-    criado_em: row.criado_em.toISOString(),
-    atualizado_em: row.atualizado_em.toISOString()
+    criado_em: formatarTimestampLocalBrasilia(row.criado_em),
+    atualizado_em: formatarTimestampLocalBrasilia(row.atualizado_em)
   };
 }
 
@@ -127,7 +141,7 @@ export function mapHistoricoRowToResponse(row: HistoricoRow): RegistroPontoHisto
     ip_origem: row.ip_origem ?? undefined,
     dados_antes: row.dados_antes ?? undefined,
     dados_depois: row.dados_depois ?? undefined,
-    criado_em: row.criado_em.toISOString()
+    criado_em: formatarTimestampLocalBrasilia(row.criado_em)
   };
 }
 
@@ -138,7 +152,7 @@ export function mapOcorrenciaRowToResponse(row: OcorrenciaRow) {
     descricao: row.descricao ?? undefined,
     origem: row.origem,
     criado_por_nome: row.criado_por_nome ?? undefined,
-    criado_em: row.criado_em.toISOString()
+    criado_em: formatarTimestampLocalBrasilia(row.criado_em)
   };
 }
 

@@ -1,7 +1,18 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Cell, Pie, PieChart, Tooltip } from "recharts";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  LabelList,
+  Pie,
+  PieChart,
+  Tooltip,
+  XAxis,
+  YAxis
+} from "recharts";
 import { ResponsiveChart } from "@/components/charts/responsive-chart";
 import {
   BanknoteArrowUp,
@@ -30,6 +41,11 @@ function formatarMoeda(valor: number) {
 
 function formatarPercentual(valor: number) {
   return `${Number.isFinite(valor) ? valor.toFixed(1) : "0.0"}%`;
+}
+
+function encurtarRotuloGrafico(texto: string, limite = 20) {
+  if (texto.length <= limite) return texto;
+  return `${texto.slice(0, limite - 1)}…`;
 }
 
 const coresCadastros = ["#0f766e", "#14b8a6", "#38bdf8", "#3b82f6", "#6366f1", "#f59e0b", "#ef4444"];
@@ -73,9 +89,24 @@ export function VisaoGeralPage() {
     ];
   }, [data]);
 
+  const dadosFinanceiroContas = useMemo(() => {
+    if (!data?.financeiro.contas?.length) return [];
+    return data.financeiro.contas.map((conta) => ({
+      ...conta,
+      nomeCurto: encurtarRotuloGrafico(conta.nome),
+      saldoFormatado: formatarMoeda(conta.saldo),
+      cor: conta.categoria === "Caixa" ? "var(--g3-success)" : "var(--g3-active)"
+    }));
+  }, [data]);
+
   const totalCadastrosMonitorados = useMemo(
     () => dadosCadastros.reduce((total, item) => total + item.valor, 0),
     [dadosCadastros]
+  );
+
+  const totalFinanceiroMonitorado = useMemo(
+    () => dadosFinanceiro.reduce((total, item) => total + item.valor, 0),
+    [dadosFinanceiro]
   );
 
   const cardsResumo = useMemo(() => {
@@ -271,8 +302,8 @@ export function VisaoGeralPage() {
                     </div>
                   </div>
 
-                  <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
-                    <div className="relative h-72 rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-2">
+                  <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
+                    <div className="relative h-72 rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-3">
                       <ResponsiveChart minWidth={0} minHeight={220}>
                         <PieChart>
                           <Pie
@@ -281,8 +312,8 @@ export function VisaoGeralPage() {
                             nameKey="nome"
                             cx="50%"
                             cy="50%"
-                            innerRadius={52}
-                            outerRadius={92}
+                            innerRadius={64}
+                            outerRadius={96}
                             paddingAngle={2}
                             stroke="var(--g3-card)"
                             strokeWidth={3}
@@ -310,12 +341,12 @@ export function VisaoGeralPage() {
                           />
                         </PieChart>
                       </ResponsiveChart>
-                      <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                        <div className="rounded-full bg-white/92 px-5 py-4 text-center shadow-sm ring-1 ring-slate-200">
+                      <div className="pointer-events-none absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/95 shadow-sm ring-1 ring-slate-200">
+                        <div className="flex h-full w-full flex-col items-center justify-center text-center">
                           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--g3-muted)]">
                             Tipos
                           </p>
-                          <p className="mt-1 text-2xl font-semibold text-[var(--g3-foreground)]">
+                          <p className="mt-1 text-2xl font-semibold leading-none text-[var(--g3-foreground)]">
                             {dadosCadastros.length}
                           </p>
                         </div>
@@ -349,9 +380,14 @@ export function VisaoGeralPage() {
                                   </p>
                                 </div>
                               </div>
-                              <span className="rounded-full bg-[var(--g3-card)] px-2.5 py-1 text-sm font-semibold text-[var(--g3-active)]">
-                                {item.valor.toLocaleString("pt-BR")}
-                              </span>
+                              <div className="min-w-[72px] rounded-xl bg-[var(--g3-card)] px-3 py-2 text-right shadow-sm">
+                                <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
+                                  Total
+                                </p>
+                                <p className="text-2xl font-bold leading-none text-[var(--g3-active)]">
+                                  {item.valor.toLocaleString("pt-BR")}
+                                </p>
+                              </div>
                             </div>
                           </div>
                         );
@@ -364,50 +400,104 @@ export function VisaoGeralPage() {
                   <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
                     Composição financeira
                   </p>
-                  <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
-                    <div className="h-56">
-                      <ResponsiveChart minWidth={0} minHeight={180}>
-                        <PieChart>
-                          <Pie
-                            data={dadosFinanceiro}
-                            dataKey="valor"
-                            nameKey="nome"
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={42}
-                            outerRadius={75}
-                            paddingAngle={2}
-                          >
-                            {dadosFinanceiro.map((entry) => (
-                              <Cell key={entry.nome} fill={entry.cor} />
-                            ))}
-                          </Pie>
-                          <Tooltip
-                            formatter={(value) => formatarMoeda(Number(value ?? 0))}
-                            contentStyle={{
-                              borderRadius: 10,
-                              borderColor: "var(--g3-border)",
-                              backgroundColor: "var(--g3-card)"
-                            }}
+                  <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3">
+                    {dadosFinanceiro.map((item) => (
+                      <div
+                        key={item.nome}
+                        className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card-soft)] px-3 py-3 shadow-sm"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-xs font-semibold text-[var(--g3-muted)]">{item.nome}</p>
+                            <p className="mt-1 text-2xl font-bold leading-tight text-[var(--g3-foreground)]">
+                              {formatarMoeda(item.valor)}
+                            </p>
+                          </div>
+                          <span
+                            className="mt-1 inline-flex h-3.5 w-3.5 rounded-full"
+                            style={{ backgroundColor: item.cor }}
+                            aria-hidden="true"
                           />
-                        </PieChart>
-                      </ResponsiveChart>
-                    </div>
-                    <div className="space-y-2">
-                      {dadosFinanceiro.map((item) => (
-                        <div
-                          key={item.nome}
-                          className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card-soft)] px-3 py-2"
-                        >
-                          <p className="text-xs font-semibold text-[var(--g3-muted)]">
-                            {item.nome}
-                          </p>
-                          <p className="text-sm font-semibold text-[var(--g3-foreground)]">
-                            {formatarMoeda(item.valor)}
-                          </p>
                         </div>
-                      ))}
+                        <p className="mt-2 text-[11px] text-[var(--g3-muted)]">
+                          {totalFinanceiroMonitorado > 0
+                            ? `${formatarPercentual((item.valor / totalFinanceiroMonitorado) * 100)} do total monitorado`
+                            : "Sem valores registrados"}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-3 rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold text-[var(--g3-foreground)]">
+                          Saldos por conta
+                        </p>
+                        <p className="text-xs text-[var(--g3-muted)]">
+                          Distribuição atual dos recursos em caixa e banco.
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card)] px-3 py-2 text-right">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
+                          Total em contas
+                        </p>
+                        <p className="text-lg font-semibold text-[var(--g3-foreground)]">
+                          {formatarMoeda(
+                            dadosFinanceiroContas.reduce((total, item) => total + item.saldo, 0)
+                          )}
+                        </p>
+                      </div>
                     </div>
+                    {dadosFinanceiroContas.length ? (
+                      <div
+                        className="mt-3"
+                        style={{ height: `${Math.max(260, dadosFinanceiroContas.length * 52)}px` }}
+                      >
+                        <ResponsiveChart minWidth={0} minHeight={240}>
+                          <BarChart
+                            data={dadosFinanceiroContas}
+                            layout="vertical"
+                            margin={{ top: 4, right: 36, bottom: 4, left: 8 }}
+                          >
+                            <CartesianGrid horizontal={false} stroke="var(--g3-border)" opacity={0.35} />
+                            <XAxis type="number" hide />
+                            <YAxis
+                              type="category"
+                              dataKey="nomeCurto"
+                              width={118}
+                              tick={{ fill: "var(--g3-muted)", fontSize: 12 }}
+                              axisLine={false}
+                              tickLine={false}
+                            />
+                            <Tooltip
+                              formatter={(value, _name, payload) => [
+                                formatarMoeda(Number(value ?? 0)),
+                                String(payload?.payload?.nome ?? "Conta")
+                              ]}
+                              contentStyle={{
+                                borderRadius: 10,
+                                borderColor: "var(--g3-border)",
+                                backgroundColor: "var(--g3-card)"
+                              }}
+                            />
+                            <Bar dataKey="saldo" radius={[0, 10, 10, 0]}>
+                              {dadosFinanceiroContas.map((item) => (
+                                <Cell key={item.id} fill={item.cor} />
+                              ))}
+                              <LabelList
+                                dataKey="saldoFormatado"
+                                position="right"
+                                style={{ fill: "var(--g3-foreground)", fontSize: 12, fontWeight: 600 }}
+                              />
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveChart>
+                      </div>
+                    ) : (
+                      <div className="mt-3 rounded-lg border border-dashed border-[var(--g3-border)] bg-[var(--g3-card)] px-3 py-4 text-sm text-[var(--g3-muted)]">
+                        Nenhuma conta com saldo disponível foi encontrada para montar o gráfico financeiro.
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

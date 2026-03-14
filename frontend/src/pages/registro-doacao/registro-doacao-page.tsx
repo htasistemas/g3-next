@@ -90,6 +90,9 @@ type PopupMensagemState = {
   texto: string;
 };
 
+const secaoTela = "Setor financeiro";
+const tituloTela = "Recebimento de doações";
+
 function formatarData(data?: string) {
   if (!data) return "---";
   const parsed = new Date(data);
@@ -382,25 +385,36 @@ export function RegistroDoacaoPage() {
       <div className={classesTelaPadraoBeneficiario.container}>
         <Card className={classesTelaPadraoBeneficiario.barraAcoes} data-print="toolbar">
           <CardContent className="p-0">
-            <div className={classesTelaPadraoBeneficiario.gradeAcoes}>
-              {ordemAcoesCrudPadrao.map((ordem) => {
-                const acao = acoes.find((item) => item.label === ordem);
-                if (!acao) return null;
-                const Icone = acao.icon;
-                return (
-                  <Button
-                    key={acao.label}
-                    type="button"
-                    variant={acao.variant}
-                    onClick={acao.onClick}
-                    disabled={acao.disabled}
-                    className={`${classesTelaPadraoBeneficiario.botaoAcao} h-8 px-3 py-1 text-xs`}
-                  >
-                    <Icone className="h-3.5 w-3.5" />
-                    {acao.label}
-                  </Button>
-                );
-              })}
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--g3-muted)]">
+                  {secaoTela}
+                </p>
+                <h1 className="text-sm font-semibold tracking-tight text-[var(--g3-foreground)] sm:text-base">
+                  {tituloTela}
+                </h1>
+              </div>
+
+              <div className={classesTelaPadraoBeneficiario.gradeAcoes}>
+                {ordemAcoesCrudPadrao.map((ordem) => {
+                  const acao = acoes.find((item) => item.label === ordem);
+                  if (!acao) return null;
+                  const Icone = acao.icon;
+                  return (
+                    <Button
+                      key={acao.label}
+                      type="button"
+                      variant={acao.variant}
+                      onClick={acao.onClick}
+                      disabled={acao.disabled}
+                      className={`${classesTelaPadraoBeneficiario.botaoAcao} h-8 px-3 py-1 text-xs`}
+                    >
+                      <Icone className="h-3.5 w-3.5" />
+                      {acao.label}
+                    </Button>
+                  );
+                })}
+              </div>
             </div>
           </CardContent>
         </Card>

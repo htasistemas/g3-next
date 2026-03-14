@@ -19,6 +19,8 @@ export type ArquivoEntidadeTipo =
   | "chamado_tecnico"
   | "ocorrencia_crianca"
   | "oficio"
+  | "autorizacao_compra"
+  | "contabilidade_lancamento"
   | "geral";
 
 export type ArquivoMetadataRow = {

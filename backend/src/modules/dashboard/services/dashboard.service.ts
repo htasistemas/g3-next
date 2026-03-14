@@ -4,14 +4,32 @@ import { dashboardFiltrosSchema } from "../dashboard.schema.js";
 import { DashboardRepository } from "../repositories/dashboard.repository.js";
 import type {
   DashboardAssistenciaResponse,
+  DashboardFinanceiroConta,
   DashboardFiltros,
   DashboardTermoAlerta
 } from "../dashboard.types.js";
 
 type FaixaEtaria = Record<string, number>;
+type DashboardFinanceiroContaRow = {
+  id: bigint | number | string;
+  banco: string | null;
+  numero: string | null;
+  tipo: string | null;
+  recebimento_local: boolean | null;
+  saldo: unknown;
+};
+type DashboardLancamentoFinanceiroRow = {
+  tipo: string | null;
+  situacao: string | null;
+  valor: unknown;
+};
 
 function arredondarUmaCasa(valor: number): number {
   return Math.round(valor * 10) / 10;
+}
+
+function arredondarDuasCasas(valor: number): number {
+  return Math.round(valor * 100) / 100;
 }
 
 function calcularIdade(dataNascimento: Date, dataReferencia = new Date()): number {
@@ -69,9 +87,8 @@ export class DashboardService {
       termosAtivos,
       termosValorTotal,
       termosAlertas,
-      valoresAReceber,
-      valoresEmCaixa,
-      valoresEmBanco,
+      contasFinanceirasRows,
+      lancamentosFinanceirosRows,
       cursosAtivos,
       taxaMediaOcupacaoCursos,
       certificadosEmitidos,
@@ -103,9 +120,8 @@ export class DashboardService {
       this.repository.contarTermosAtivos(),
       this.repository.somarValorTotalTermosAtivos(),
       this.repository.listarAlertasTermos(),
-      this.repository.somarValoresAReceber(),
-      this.repository.somarValoresEmCaixa(),
-      this.repository.somarValoresEmBanco(),
+      this.repository.listarContasFinanceiras(),
+      this.repository.listarLancamentosFinanceiros(),
       this.repository.contarCursosAtivos(),
       this.repository.calcularTaxaMediaOcupacaoCursos(),
       this.repository.contarCertificadosEmitidos(),
@@ -137,6 +153,14 @@ export class DashboardService {
     const mediaPessoas = mediaPessoasBanco || 0;
     const rendaPerCapitaMedia = mediaPessoas > 0 ? rendaMediaFamiliar / mediaPessoas : 0;
     const faixaRenda = this.calcularFaixaRenda(rendas);
+    const contasFinanceiras = this.mapearContasFinanceiras(contasFinanceirasRows);
+    const valoresEmCaixa = contasFinanceiras
+      .filter((item) => item.categoria === "Caixa")
+      .reduce((total, item) => total + item.saldo, 0);
+    const valoresEmBanco = contasFinanceiras
+      .filter((item) => item.categoria === "Banco")
+      .reduce((total, item) => total + item.saldo, 0);
+    const valoresAReceber = this.calcularValoresAReceber(lancamentosFinanceirosRows);
 
     const familiasExtremaPobreza = faixaRenda["Ate 200"] ?? 0;
 
@@ -199,9 +223,13 @@ export class DashboardService {
         alertas: this.normalizarAlertasTermos(termosAlertas)
       },
       financeiro: {
-        valoresAReceber: arredondarUmaCasa(valoresAReceber),
-        valoresEmCaixa: arredondarUmaCasa(valoresEmCaixa),
-        valoresEmBanco: arredondarUmaCasa(valoresEmBanco)
+        valoresAReceber: arredondarDuasCasas(valoresAReceber),
+        valoresEmCaixa: arredondarDuasCasas(valoresEmCaixa),
+        valoresEmBanco: arredondarDuasCasas(valoresEmBanco),
+        contas: contasFinanceiras.map((item) => ({
+          ...item,
+          saldo: arredondarDuasCasas(item.saldo)
+        }))
       }
     };
   }
@@ -248,6 +276,97 @@ export class DashboardService {
     }
 
     return faixas;
+  }
+
+  private mapearContasFinanceiras(rows: DashboardFinanceiroContaRow[]): DashboardFinanceiroConta[] {
+    return rows
+      .map((row) => {
+        const banco = row.banco?.trim() || null;
+        const numero = row.numero?.trim() || null;
+        const tipo = row.tipo?.trim() || null;
+        const saldo = this.toNumber(row.saldo);
+        const categoria = this.classificarContaFinanceira(tipo, row.recebimento_local);
+
+        const partesNome = [
+          banco,
+          numero ? `Conta ${numero}` : null,
+          !banco && !numero ? categoria : null
+        ].filter((item): item is string => Boolean(item));
+
+        return {
+          id: String(row.id),
+          nome: partesNome.join(" - "),
+          banco,
+          numero,
+          tipo,
+          categoria,
+          saldo
+        };
+      })
+      .filter((item) => item.saldo > 0)
+      .sort((a, b) => b.saldo - a.saldo || a.nome.localeCompare(b.nome, "pt-BR"));
+  }
+
+  private calcularValoresAReceber(rows: DashboardLancamentoFinanceiroRow[]) {
+    return rows
+      .filter((row) => this.ehLancamentoAReceber(row.tipo) && !this.ehSituacaoLiquidada(row.situacao))
+      .reduce((total, row) => total + this.toNumber(row.valor), 0);
+  }
+
+  private classificarContaFinanceira(tipo?: string | null, recebimentoLocal?: boolean | null) {
+    if (recebimentoLocal) {
+      return "Caixa" as const;
+    }
+
+    const tipoNormalizado = this.normalizarTexto(tipo);
+    return tipoNormalizado.includes("caixa") ? ("Caixa" as const) : ("Banco" as const);
+  }
+
+  private ehLancamentoAReceber(tipo?: string | null) {
+    const tipoNormalizado = this.normalizarTexto(tipo);
+    return (
+      tipoNormalizado === "receber" ||
+      tipoNormalizado === "a receber" ||
+      tipoNormalizado === "receita" ||
+      tipoNormalizado === "entrada" ||
+      tipoNormalizado === "credito" ||
+      tipoNormalizado.includes("receber") ||
+      tipoNormalizado.startsWith("receita") ||
+      tipoNormalizado.includes("entrada") ||
+      tipoNormalizado.includes("credito")
+    );
+  }
+
+  private ehSituacaoLiquidada(situacao?: string | null) {
+    const situacaoNormalizada = this.normalizarTexto(situacao);
+    return [
+      "pago",
+      "paga",
+      "recebido",
+      "recebida",
+      "liquidado",
+      "liquidada",
+      "concluido",
+      "concluida"
+    ].includes(situacaoNormalizada);
+  }
+
+  private normalizarTexto(valor?: string | null) {
+    return String(valor ?? "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLocaleLowerCase("pt-BR")
+      .trim();
+  }
+
+  private toNumber(value: unknown) {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "bigint") return Number(value);
+    if (typeof value === "string") {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+    return 0;
   }
 
   private calcularIdades(datasNascimento: Date[]) {

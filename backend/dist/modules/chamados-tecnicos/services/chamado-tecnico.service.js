@@ -5,6 +5,7 @@ import { toStringId, trimOrUndefined } from "../../../utils/string-utils.js";
 import { StorageService } from "../../arquivos/services/storage.service.js";
 import { EmailService } from "../../email/services/email.service.js";
 import { chamadoTecnicoComentarioInputSchema, chamadoTecnicoFiltroSalvoInputSchema, chamadoTecnicoInputSchema, chamadoTecnicoListaFiltrosSchema, chamadoTecnicoParametroInputSchema, chamadoTecnicoStatusInputSchema, chamadoTecnicoVinculoInputSchema } from "../chamado-tecnico.schema.js";
+import { chamadoParametroTipoValues } from "../chamado-tecnico.types.js";
 import { ChamadoTecnicoRepository } from "../repositories/chamado-tecnico.repository.js";
 const transicoesPermitidas = {
     ABERTO: ["EM_ANALISE", "CANCELADO", "NAO_SERA_IMPLEMENTADO"],
@@ -117,6 +118,8 @@ export class ChamadoTecnicoService {
         const contexto = await this.carregarCatalogos();
         return {
             parametros: contexto.parametrosAgrupados,
+            tipos: this.listarParametrosCatalogoPorTipo(contexto, "TIPO"),
+            prioridades: this.listarParametrosCatalogoPorTipo(contexto, "PRIORIDADE"),
             usuarios: contexto.usuarios
         };
     }
@@ -357,13 +360,19 @@ export class ChamadoTecnicoService {
                 ativo: item.ativo
             }
         ]));
-        const parametrosAgrupados = parametros.reduce((acc, item) => {
-            const chave = item.tipo.toLowerCase();
-            const atual = acc[chave] ?? [];
-            atual.push(parametrosById.get(toStringId(item.id)));
-            acc[chave] = atual;
+        const parametrosAgrupados = chamadoParametroTipoValues.reduce((acc, tipo) => {
+            acc[tipo.trim().toLowerCase()] = [];
             return acc;
         }, {});
+        parametros.forEach((item) => {
+            const chave = item.tipo.trim().toLowerCase();
+            const atual = parametrosAgrupados[chave] ?? [];
+            const parametro = parametrosById.get(toStringId(item.id));
+            if (parametro) {
+                atual.push(parametro);
+            }
+            parametrosAgrupados[chave] = atual;
+        });
         const usuariosMapeados = usuarios.map((item) => ({
             id: toStringId(item.id),
             nome: trimOrUndefined(item.nome_exibicao) ??
@@ -378,6 +387,24 @@ export class ChamadoTecnicoService {
             parametrosAgrupados,
             usuarios: usuariosMapeados
         };
+    }
+    listarParametrosCatalogoPorTipo(contexto, tipo) {
+        const chave = tipo.trim().toLowerCase();
+        const listaDireta = (contexto.parametrosAgrupados[chave] ?? []).filter(Boolean);
+        if (listaDireta.length > 0) {
+            return [...listaDireta].sort((itemA, itemB) => {
+                if (itemA.ordem !== itemB.ordem)
+                    return itemA.ordem - itemB.ordem;
+                return itemA.nome.localeCompare(itemB.nome, "pt-BR");
+            });
+        }
+        return [...contexto.parametrosById.values()]
+            .filter((item) => String(item.tipo ?? "").trim().toUpperCase() === tipo.trim().toUpperCase())
+            .sort((itemA, itemB) => {
+            if (itemA.ordem !== itemB.ordem)
+                return itemA.ordem - itemB.ordem;
+            return itemA.nome.localeCompare(itemB.nome, "pt-BR");
+        });
     }
     mapParametro(id, contexto) {
         return id ? (contexto.parametrosById.get(toStringId(id)) ?? null) : null;

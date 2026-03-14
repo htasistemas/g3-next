@@ -11,6 +11,19 @@ type TermoAlertaRow = {
   vigencia_fim: Date | string | null;
   status: string | null;
 };
+type DashboardFinanceiroContaRow = {
+  id: bigint | number | string;
+  banco: string | null;
+  numero: string | null;
+  tipo: string | null;
+  recebimento_local: boolean | null;
+  saldo: unknown;
+};
+type DashboardLancamentoFinanceiroRow = {
+  tipo: string | null;
+  situacao: string | null;
+  valor: unknown;
+};
 
 function toNumber(value: unknown): number {
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -301,6 +314,34 @@ export class DashboardRepository {
     );
   }
 
+  async listarContasFinanceiras() {
+    const possuiTabela = await this.tabelaExiste("conta_bancaria");
+    const possuiSaldo = await this.colunaExiste("conta_bancaria", "saldo");
+    if (!possuiTabela || !possuiSaldo) return [] as DashboardFinanceiroContaRow[];
+
+    const possuiBanco = await this.colunaExiste("conta_bancaria", "banco");
+    const possuiNumero = await this.colunaExiste("conta_bancaria", "numero");
+    const possuiTipo = await this.colunaExiste("conta_bancaria", "tipo");
+    const possuiRecebimentoLocal = await this.colunaExiste("conta_bancaria", "recebimento_local");
+
+    return this.consultarRows<DashboardFinanceiroContaRow>(
+      `
+      SELECT
+        id,
+        ${possuiBanco ? "banco" : "NULL::text"} AS banco,
+        ${possuiNumero ? "numero" : "NULL::text"} AS numero,
+        ${possuiTipo ? "tipo" : "NULL::text"} AS tipo,
+        ${possuiRecebimentoLocal ? "recebimento_local" : "NULL::boolean"} AS recebimento_local,
+        saldo
+      FROM conta_bancaria
+      ORDER BY COALESCE(NULLIF(TRIM(${possuiBanco ? "banco" : "''"}), ''), 'Conta') ASC,
+               COALESCE(NULLIF(TRIM(${possuiNumero ? "numero" : "''"}), ''), '0') ASC,
+               id ASC
+      `,
+      []
+    );
+  }
+
   async somarValoresEmCaixa() {
     const possuiTabela = await this.tabelaExiste("conta_bancaria");
     const possuiSaldo = await this.colunaExiste("conta_bancaria", "saldo");
@@ -364,6 +405,20 @@ export class DashboardRepository {
       SELECT COALESCE(SUM(saldo), 0) AS total
       FROM conta_bancaria
       WHERE ${filtroBanco}
+      `,
+      []
+    );
+  }
+
+  async listarLancamentosFinanceiros() {
+    const possuiTabela = await this.tabelaExiste("lancamento_financeiro");
+    const colunas = await this.verificarColunas("lancamento_financeiro", ["tipo", "situacao", "valor"]);
+    if (!possuiTabela || !colunas) return [] as DashboardLancamentoFinanceiroRow[];
+
+    return this.consultarRows<DashboardLancamentoFinanceiroRow>(
+      `
+      SELECT tipo, situacao, valor
+      FROM lancamento_financeiro
       `,
       []
     );

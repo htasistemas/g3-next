@@ -15,6 +15,27 @@ const permissoesEscrita = ["ADMINISTRADOR", "OPERADOR"];
 const permissaoExclusao = ["ADMINISTRADOR"];
 
 autorizacaoComprasRoutes.get(
+  "/indicadores",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.listarIndicadores.bind(controller))
+);
+
+autorizacaoComprasRoutes.get(
+  "/catalogo/setores-solicitantes",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.listarSetoresSolicitantes.bind(controller))
+);
+
+autorizacaoComprasRoutes.get(
+  "/fornecedores/cnpj/:cnpj",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.buscarFornecedorPorCnpj.bind(controller))
+);
+
+autorizacaoComprasRoutes.get(
   "/",
   ensureAuthenticated,
   ensurePermissions(permissoesLeitura),
@@ -26,6 +47,13 @@ autorizacaoComprasRoutes.post(
   ensureAuthenticated,
   ensurePermissions(permissoesEscrita),
   asyncHandler(controller.criar.bind(controller))
+);
+
+autorizacaoComprasRoutes.get(
+  "/:id",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.buscarDetalhe.bind(controller))
 );
 
 autorizacaoComprasRoutes.put(
@@ -40,6 +68,20 @@ autorizacaoComprasRoutes.delete(
   ensureAuthenticated,
   ensurePermissions(permissaoExclusao),
   asyncHandler(controller.excluir.bind(controller))
+);
+
+autorizacaoComprasRoutes.post(
+  "/:id/enviar-aprovacao",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.enviarParaAprovacao.bind(controller))
+);
+
+autorizacaoComprasRoutes.post(
+  "/:id/aprovacoes",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.registrarAprovacao.bind(controller))
 );
 
 autorizacaoComprasRoutes.get(
@@ -59,22 +101,15 @@ autorizacaoComprasRoutes.post(
 autorizacaoComprasRoutes.delete(
   "/:id/cotacoes/:quoteId",
   ensureAuthenticated,
-  ensurePermissions(permissaoExclusao),
+  ensurePermissions(permissoesEscrita),
   asyncHandler(controller.excluirCotacao.bind(controller))
 );
 
-autorizacaoComprasRoutes.get(
-  "/fornecedores/cnpj/:cnpj",
-  ensureAuthenticated,
-  ensurePermissions(permissoesLeitura),
-  asyncHandler(controller.buscarFornecedorPorCnpj.bind(controller))
-);
-
 autorizacaoComprasRoutes.post(
-  "/:id/reservas-bancarias",
+  "/:id/fornecedor-vencedor",
   ensureAuthenticated,
   ensurePermissions(permissoesEscrita),
-  asyncHandler(controller.registrarReservaBancaria.bind(controller))
+  asyncHandler(controller.definirFornecedor.bind(controller))
 );
 
 autorizacaoComprasRoutes.get(
@@ -84,10 +119,17 @@ autorizacaoComprasRoutes.get(
   asyncHandler(controller.listarReservas.bind(controller))
 );
 
-autorizacaoComprasRoutes.delete(
-  "/:id/reservas-bancarias/:contaId",
+autorizacaoComprasRoutes.post(
+  "/:id/reservas-bancarias",
   ensureAuthenticated,
-  ensurePermissions(permissaoExclusao),
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.registrarReservaBancaria.bind(controller))
+);
+
+autorizacaoComprasRoutes.delete(
+  "/:id/reservas-bancarias/:reservaId",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
   asyncHandler(controller.removerReservaBancaria.bind(controller))
 );
 

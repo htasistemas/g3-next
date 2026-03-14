@@ -14,6 +14,8 @@ export type StorageScopeKey =
   | "chamado_tecnico_anexo"
   | "ocorrencia_anexo"
   | "oficio_documento"
+  | "autorizacao_compra_anexo"
+  | "contabilidade_lancamento_anexo"
   | "geral_outro";
 
 export type StoragePolicy = {
@@ -68,7 +70,9 @@ export const requiredStorageDirectories = [
   "eventos/fotos",
   "chamados-tecnicos/anexos",
   "ocorrencias/anexos",
-  "oficios/documentos"
+  "oficios/documentos",
+  "compras/anexos",
+  "contabilidade/anexos"
 ] as const;
 
 export const storagePolicies: Record<StorageScopeKey, StoragePolicy> = {
@@ -211,6 +215,24 @@ export const storagePolicies: Record<StorageScopeKey, StoragePolicy> = {
     allowedExtensions: documentExtensions,
     allowedMimeTypes: documentMimeTypes,
     maxSizeBytes: 20 * 1024 * 1024,
+    generateThumbnail: true
+  },
+  autorizacao_compra_anexo: {
+    entidadeTipo: "autorizacao_compra",
+    categoria: "anexo",
+    subdirectory: "compras/anexos",
+    allowedExtensions: attachmentExtensions,
+    allowedMimeTypes: attachmentMimeTypes,
+    maxSizeBytes: 25 * 1024 * 1024,
+    generateThumbnail: true
+  },
+  contabilidade_lancamento_anexo: {
+    entidadeTipo: "contabilidade_lancamento",
+    categoria: "anexo",
+    subdirectory: "contabilidade/anexos",
+    allowedExtensions: attachmentExtensions,
+    allowedMimeTypes: attachmentMimeTypes,
+    maxSizeBytes: 25 * 1024 * 1024,
     generateThumbnail: true
   },
   geral_outro: {

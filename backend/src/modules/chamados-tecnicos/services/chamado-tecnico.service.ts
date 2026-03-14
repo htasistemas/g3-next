@@ -13,6 +13,7 @@ import {
   chamadoTecnicoStatusInputSchema,
   chamadoTecnicoVinculoInputSchema
 } from "../chamado-tecnico.schema.js";
+import { chamadoParametroTipoValues } from "../chamado-tecnico.types.js";
 import { ChamadoTecnicoRepository } from "../repositories/chamado-tecnico.repository.js";
 
 type CatalogoContexto = {
@@ -149,6 +150,8 @@ export class ChamadoTecnicoService {
     const contexto = await this.carregarCatalogos();
     return {
       parametros: contexto.parametrosAgrupados,
+      tipos: this.listarParametrosCatalogoPorTipo(contexto, "TIPO"),
+      prioridades: this.listarParametrosCatalogoPorTipo(contexto, "PRIORIDADE"),
       usuarios: contexto.usuarios
     };
   }
@@ -431,13 +434,20 @@ export class ChamadoTecnicoService {
       ])
     );
 
-    const parametrosAgrupados = parametros.reduce<Record<string, any[]>>((acc, item) => {
-      const chave = item.tipo.toLowerCase();
-      const atual = acc[chave] ?? [];
-      atual.push(parametrosById.get(toStringId(item.id)));
-      acc[chave] = atual;
+    const parametrosAgrupados = chamadoParametroTipoValues.reduce<Record<string, any[]>>((acc, tipo) => {
+      acc[tipo.trim().toLowerCase()] = [];
       return acc;
     }, {});
+
+    parametros.forEach((item) => {
+      const chave = item.tipo.trim().toLowerCase();
+      const atual = parametrosAgrupados[chave] ?? [];
+      const parametro = parametrosById.get(toStringId(item.id));
+      if (parametro) {
+        atual.push(parametro);
+      }
+      parametrosAgrupados[chave] = atual;
+    });
 
     const usuariosMapeados = usuarios.map((item) => ({
       id: toStringId(item.id),
@@ -455,6 +465,24 @@ export class ChamadoTecnicoService {
       parametrosAgrupados,
       usuarios: usuariosMapeados
     };
+  }
+
+  private listarParametrosCatalogoPorTipo(contexto: CatalogoContexto, tipo: string) {
+    const chave = tipo.trim().toLowerCase();
+    const listaDireta = (contexto.parametrosAgrupados[chave] ?? []).filter(Boolean);
+    if (listaDireta.length > 0) {
+      return [...listaDireta].sort((itemA, itemB) => {
+        if (itemA.ordem !== itemB.ordem) return itemA.ordem - itemB.ordem;
+        return itemA.nome.localeCompare(itemB.nome, "pt-BR");
+      });
+    }
+
+    return [...contexto.parametrosById.values()]
+      .filter((item) => String(item.tipo ?? "").trim().toUpperCase() === tipo.trim().toUpperCase())
+      .sort((itemA, itemB) => {
+        if (itemA.ordem !== itemB.ordem) return itemA.ordem - itemB.ordem;
+        return itemA.nome.localeCompare(itemB.nome, "pt-BR");
+      });
   }
 
   private mapParametro(id: bigint | null, contexto: CatalogoContexto) {

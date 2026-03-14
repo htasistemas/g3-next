@@ -8,6 +8,17 @@ const SEQUENCIA_BATIDAS = ["ENTRADA_1", "SAIDA_1", "ENTRADA_2", "SAIDA_2"];
 const CAMPOS_HORARIO = ["entrada_1", "saida_1", "entrada_2", "saida_2"];
 const JORNADA_PADRAO_MINUTOS = 8 * 60;
 const ESPERA_BATIDA_SEGUNDOS = 15;
+const BRASILIA_TIME_ZONE = "America/Sao_Paulo";
+const formatterBrasilia = new Intl.DateTimeFormat("en-CA", {
+    timeZone: BRASILIA_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23"
+});
 function safeStringify(value) {
     return JSON.stringify(value, (_key, item) => (typeof item === "bigint" ? item.toString() : item));
 }
@@ -81,8 +92,22 @@ function toMinutes(hora) {
         return null;
     return hh * 60 + mm;
 }
-function formatTimeFromDate(date) {
-    return date.toTimeString().slice(0, 8);
+function toComparableLocalMs(date) {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate(), date.getHours(), date.getMinutes(), date.getSeconds(), date.getMilliseconds()).getTime();
+}
+function obterCarimboBrasilia(baseDate = new Date()) {
+    const partes = formatterBrasilia.formatToParts(baseDate);
+    const valores = Object.fromEntries(partes
+        .filter((item) => item.type !== "literal")
+        .map((item) => [item.type, item.value]));
+    const data = `${valores.year}-${valores.month}-${valores.day}`;
+    const hora = `${valores.hour}:${valores.minute}:${valores.second}`;
+    return {
+        data,
+        hora,
+        timestamp: `${data} ${hora}`,
+        comparavelMs: new Date(Number(valores.year), Number(valores.month) - 1, Number(valores.day), Number(valores.hour), Number(valores.minute), Number(valores.second), 0).getTime()
+    };
 }
 function normalizarHorarioCurto(value) {
     if (!value)
@@ -350,12 +375,7 @@ export class RegistroPontoRepository {
         if (!ator.id) {
             throw new AppError("Usuario autenticado invalido.", 401);
         }
-        const [agoraRow] = await prisma.$queryRaw(Prisma.sql `
-      SELECT CURRENT_DATE AS data_referencia, NOW() AS agora
-    `);
-        if (!agoraRow) {
-            return { exibir_alerta: false };
-        }
+        const agoraBrasilia = obterCarimboBrasilia();
         const usuario = await this.buscarHorarioUsuarioTx(prisma, ator.id);
         if (!usuario) {
             throw new AppError("Usuario autenticado nao encontrado.", 404);
@@ -381,10 +401,10 @@ export class RegistroPontoRepository {
         observacoes
       FROM registro_ponto
       WHERE usuario_id = ${ator.id}
-        AND data_referencia = CURRENT_DATE
+        AND data_referencia = CAST(${agoraBrasilia.data} AS DATE)
       LIMIT 1
     `);
-        const horaAtualMinutos = toMinutes(formatTimeFromDate(agoraRow.agora));
+        const horaAtualMinutos = toMinutes(agoraBrasilia.hora);
         if (horaAtualMinutos === null) {
             return { exibir_alerta: false };
         }
@@ -395,10 +415,9 @@ export class RegistroPontoRepository {
                 continue;
             }
             if (horaAtualMinutos >= horarioPrevistoMinutos) {
-                const dataReferencia = toIsoDate(agoraRow.data_referencia) ?? undefined;
                 return {
                     exibir_alerta: true,
-                    data_referencia: dataReferencia,
+                    data_referencia: agoraBrasilia.data,
                     campo: item.campo,
                     rotulo_batida: item.rotulo,
                     horario_previsto: item.horario,
@@ -418,6 +437,7 @@ export class RegistroPontoRepository {
             if (!usuario) {
                 throw new AppError("Usuario autenticado nao encontrado.", 404);
             }
+            const agoraBrasilia = obterCarimboBrasilia();
             const validarLocalizacao = input.validar_localizacao !== false;
             const validacaoOrigem = this.validarOrigemMarcacao(usuario, origem, validarLocalizacao);
             if (!validacaoOrigem.permitido) {
@@ -442,23 +462,21 @@ export class RegistroPontoRepository {
             }
             const ultimoRegistro = batidas[batidas.length - 1];
             if (ultimoRegistro) {
-                const agoraMs = Date.now();
-                const ultimoMs = new Date(ultimoRegistro.horario_servidor).getTime();
-                if (agoraMs - ultimoMs < ESPERA_BATIDA_SEGUNDOS * 1000) {
+                const ultimoMs = toComparableLocalMs(ultimoRegistro.horario_servidor);
+                if (agoraBrasilia.comparavelMs - ultimoMs < ESPERA_BATIDA_SEGUNDOS * 1000) {
                     throw new AppError("Aguarde alguns segundos antes de registrar uma nova batida.", 409);
                 }
             }
-            const [{ agora }] = await tx.$queryRaw(Prisma.sql `SELECT NOW() AS agora`);
-            const horaBatida = formatTimeFromDate(agora);
+            const horaBatida = agoraBrasilia.hora;
             const sequencia = batidas.length + 1;
             const tipo = SEQUENCIA_BATIDAS[sequencia - 1];
             const campo = CAMPOS_HORARIO[sequencia - 1];
             await tx.$executeRawUnsafe(`
         UPDATE registro_ponto
         SET ${campo} = CAST($2 AS TIME),
-            atualizado_em = NOW()
+            atualizado_em = CAST($3 AS TIMESTAMP)
         WHERE id = $1
-      `, registroId, horaBatida);
+      `, registroId, horaBatida, agoraBrasilia.timestamp);
             const insertedBatida = await tx.$queryRaw(Prisma.sql `
         INSERT INTO registro_ponto_batida (
           registro_ponto_id,
@@ -477,7 +495,7 @@ export class RegistroPontoRepository {
           ${registroId},
           ${sequencia},
           ${tipo},
-          ${agora},
+          CAST(${agoraBrasilia.timestamp} AS TIMESTAMP),
           ${normalizarIp(origem.ip) ?? null},
           ${origem.user_agent?.slice(0, 300) ?? null},
           ${validacaoOrigem.origem_validada},
@@ -485,7 +503,7 @@ export class RegistroPontoRepository {
           ${input.longitude ?? null},
           ${typeof input.accuracy_metros === "number" ? Math.round(input.accuracy_metros) : null},
           CAST(${JSON.stringify(validacaoOrigem.detalhes)} AS JSONB),
-          NOW()
+          CAST(${agoraBrasilia.timestamp} AS TIMESTAMP)
         ) RETURNING id
       `);
             const batidaId = insertedBatida[0]?.id ?? null;
@@ -509,7 +527,10 @@ export class RegistroPontoRepository {
                     unidade_validada: usuario.unidade_nome,
                     latitude: origem.latitude ?? null,
                     longitude: origem.longitude ?? null,
-                    accuracy_metros: origem.accuracy_metros ?? null
+                    accuracy_metros: origem.accuracy_metros ?? null,
+                    localizacao_obtida: typeof origem.latitude === "number" && typeof origem.longitude === "number",
+                    localizacao_status: validacaoOrigem.detalhes.localizacao_status ?? null,
+                    origem_manual: origem.origem_manual ?? null
                 }
             });
             const listaRow = await this.buscarListaRowPorIdTx(tx, registroId);
@@ -534,6 +555,7 @@ export class RegistroPontoRepository {
         const registroId = this.parseId(registroIdRaw, "Registro de ponto");
         return prisma.$transaction(async (tx) => {
             const registroAtual = await this.buscarRegistroParaAtualizacaoTx(tx, registroId);
+            const agoraBrasilia = obterCarimboBrasilia();
             const ajusteCompleto = {
                 entrada_1: input.entrada_1 ?? registroAtual.entrada_1 ?? undefined,
                 saida_1: input.saida_1 ?? registroAtual.saida_1 ?? undefined,
@@ -552,7 +574,7 @@ export class RegistroPontoRepository {
           saida_2 = COALESCE(CAST(${input.saida_2 ?? null} AS TIME), saida_2),
           observacoes = ${input.observacoes ?? registroAtual.observacoes},
           alterado_manualmente = TRUE,
-          atualizado_em = NOW()
+          atualizado_em = CAST(${agoraBrasilia.timestamp} AS TIMESTAMP)
         WHERE id = ${registroId}
       `);
             await this.registrarOcorrenciaTx(tx, {
@@ -681,6 +703,7 @@ export class RegistroPontoRepository {
         };
     }
     async ensureRegistroHojeTx(tx, usuarioId, unidadeId) {
+        const agoraBrasilia = obterCarimboBrasilia();
         const rows = await tx.$queryRaw(Prisma.sql `
       INSERT INTO registro_ponto (
         usuario_id,
@@ -691,14 +714,14 @@ export class RegistroPontoRepository {
       ) VALUES (
         ${usuarioId},
         ${unidadeId ?? null},
-        CURRENT_DATE,
-        NOW(),
-        NOW()
+        CAST(${agoraBrasilia.data} AS DATE),
+        CAST(${agoraBrasilia.timestamp} AS TIMESTAMP),
+        CAST(${agoraBrasilia.timestamp} AS TIMESTAMP)
       )
       ON CONFLICT (usuario_id, data_referencia)
       DO UPDATE SET
         unidade_id = COALESCE(registro_ponto.unidade_id, EXCLUDED.unidade_id),
-        atualizado_em = NOW()
+        atualizado_em = CAST(${agoraBrasilia.timestamp} AS TIMESTAMP)
       RETURNING id
     `);
         const registroId = rows[0]?.id;
@@ -888,18 +911,34 @@ export class RegistroPontoRepository {
             ipsPermitidos.some((permitido) => normalizarIp(permitido) === ipCliente);
         const redePermitida = !!ipCliente &&
             redesPermitidas.some((rede) => ipDentroDaRede(ipCliente, rede));
-        let geoPermitido = false;
-        let geoDetalhes = { geo_aplicado: false };
         const latitudeUnidade = toNumber(usuario.latitude);
         const longitudeUnidade = toNumber(usuario.longitude);
         const latitudeUsuario = origem.latitude;
         const longitudeUsuario = origem.longitude;
         const accuracyUsuario = origem.accuracy_metros;
+        const localizacaoUsuarioDisponivel = typeof latitudeUsuario === "number" && typeof longitudeUsuario === "number";
+        const localizacaoUnidadeDisponivel = typeof latitudeUnidade === "number" && typeof longitudeUnidade === "number";
+        const localizacaoStatus = !validarLocalizacao
+            ? localizacaoUsuarioDisponivel
+                ? "capturada_validacao_desativada"
+                : "nao_obtida_validacao_desativada"
+            : !localizacaoUsuarioDisponivel
+                ? "nao_obtida"
+                : !localizacaoUnidadeDisponivel
+                    ? "instituicao_sem_coordenadas"
+                    : "capturada";
+        let geoPermitido = false;
+        let geoDetalhes = {
+            geo_aplicado: false,
+            localizacao_obtida: localizacaoUsuarioDisponivel,
+            localizacao_status: localizacaoStatus,
+            localizacao_usuario_disponivel: localizacaoUsuarioDisponivel,
+            localizacao_instituicao_disponivel: localizacaoUnidadeDisponivel,
+            origem_manual: origem.origem_manual ?? null
+        };
         if (validarLocalizacao &&
-            typeof latitudeUnidade === "number" &&
-            typeof longitudeUnidade === "number" &&
-            typeof latitudeUsuario === "number" &&
-            typeof longitudeUsuario === "number") {
+            localizacaoUnidadeDisponivel &&
+            localizacaoUsuarioDisponivel) {
             const distancia = calcularDistanciaMetros(latitudeUnidade, longitudeUnidade, latitudeUsuario, longitudeUsuario);
             const raioMaximo = usuario.raio_ponto_metros ?? 100;
             const accuracyMaximo = usuario.accuracy_max_ponto_metros ?? 80;
@@ -911,12 +950,14 @@ export class RegistroPontoRepository {
                 raio_maximo_metros: raioMaximo,
                 accuracy_metros: accuracyUsuario,
                 accuracy_maximo_metros: accuracyMaximo,
-                accuracy_ok: accuracyOk
+                accuracy_ok: accuracyOk,
+                localizacao_obtida: true,
+                localizacao_status: "capturada"
             };
         }
         else if (!validarLocalizacao) {
             geoDetalhes = {
-                geo_aplicado: false,
+                ...geoDetalhes,
                 validacao_localizacao_ativa: false
             };
         }
@@ -1006,10 +1047,11 @@ export class RegistroPontoRepository {
         const atrasos = entrada1Minutos === null ? 0 : Math.max(0, entrada1Minutos - atrasoReferencia);
         const bancoHoras = totalTrabalhado - JORNADA_PADRAO_MINUTOS;
         const horasExtras = Math.max(0, bancoHoras);
-        const hojeIso = toIsoDate(new Date()) ?? "";
+        const hojeIso = obterCarimboBrasilia().data;
         const registroIso = toIsoDate(registro.data_referencia) ?? "";
         const diaFechado = !!registroIso && registroIso < hojeIso;
         const faltas = diaFechado ? Math.max(0, JORNADA_PADRAO_MINUTOS - totalTrabalhado) : 0;
+        const agoraBrasilia = obterCarimboBrasilia();
         await tx.$executeRaw(Prisma.sql `
       UPDATE registro_ponto
       SET
@@ -1017,7 +1059,7 @@ export class RegistroPontoRepository {
         banco_horas_minutos = ${bancoHoras},
         faltas_minutos = ${faltas},
         atrasos_minutos = ${atrasos},
-        atualizado_em = NOW()
+        atualizado_em = CAST(${agoraBrasilia.timestamp} AS TIMESTAMP)
       WHERE id = ${registroId}
     `);
         await this.reconstruirOcorrenciasSistemaTx(tx, registroId, {
@@ -1096,6 +1138,7 @@ export class RegistroPontoRepository {
         }
     }
     async registrarOcorrenciaTx(tx, payload) {
+        const agoraBrasilia = obterCarimboBrasilia();
         await tx.$executeRaw(Prisma.sql `
       INSERT INTO registro_ponto_ocorrencia (
         registro_ponto_id,
@@ -1112,11 +1155,12 @@ export class RegistroPontoRepository {
         ${payload.origem},
         ${payload.criado_por_id ?? null},
         ${payload.criado_por_nome ?? null},
-        NOW()
+        CAST(${agoraBrasilia.timestamp} AS TIMESTAMP)
       )
     `);
     }
     async registrarAuditoriaTx(tx, payload) {
+        const agoraBrasilia = obterCarimboBrasilia();
         const dadosAntesSql = payload.dados_antes
             ? Prisma.sql `CAST(${safeStringify(payload.dados_antes)} AS JSONB)`
             : Prisma.sql `NULL::JSONB`;
@@ -1147,7 +1191,7 @@ export class RegistroPontoRepository {
         ${payload.observacao ?? null},
         ${dadosAntesSql},
         ${dadosDepoisSql},
-        NOW()
+        CAST(${agoraBrasilia.timestamp} AS TIMESTAMP)
       )
     `);
         try {
@@ -1171,7 +1215,7 @@ export class RegistroPontoRepository {
           'registro_ponto',
           ${payload.registro_ponto_id ? payload.registro_ponto_id.toString() : null},
           CAST(${safeStringify(dadosJsonAuditoria)} AS JSONB),
-          NOW()
+          CAST(${agoraBrasilia.timestamp} AS TIMESTAMP)
         )
       `);
         }

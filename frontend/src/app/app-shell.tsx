@@ -423,12 +423,18 @@ function ocultarTituloTopo(pathname: string) {
     pathname.startsWith("/dashboard/power-bi") ||
     pathname.startsWith("/configuracoes/chamado-tecnico") ||
     pathname.startsWith("/configuracoes/mensagens-personalizadas") ||
+    pathname.startsWith("/atendimentos/matriculas") ||
     pathname.startsWith("/atendimentos/banco-empregos") ||
     pathname.startsWith("/atendimentos/biblioteca") ||
     pathname.startsWith("/atendimentos/registro-visitas") ||
     pathname.startsWith("/atendimentos/ocorrencias") ||
     pathname.startsWith("/atendimentos/chamada-senhas") ||
+    pathname.startsWith("/setor-rh/contratacao") ||
+    pathname.startsWith("/setor-rh/registro-ponto") ||
+    pathname.startsWith("/financeiro/") ||
     pathname.startsWith("/setor-financeiro/") ||
+    pathname.startsWith("/setor-juridico/plano-trabalho") ||
+    pathname.startsWith("/setor-juridico/termo-fomento") ||
     pathname.startsWith("/setor-administrativo/")
   );
 }

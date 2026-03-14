@@ -101,6 +101,9 @@ type PopupMensagemState = {
   texto: string;
 };
 
+const secaoTela = "Atendimentos";
+const tituloTela = "Matrículas";
+
 function formatarStatus(status?: string) {
   if (!status) return "Não informado";
   const texto = status.toLowerCase().replaceAll("_", " ");
@@ -1930,25 +1933,36 @@ export function CadastroMatriculasPage() {
       <div className={`${classesTelaPadraoBeneficiario.container} !mx-0 !max-w-none !px-2 !pb-3 !pt-2 sm:!px-3 lg:!px-4`}>
         <Card className={classesTelaPadraoBeneficiario.barraAcoes} data-print="toolbar">
           <CardContent className="p-0">
-            <div className={classesTelaPadraoBeneficiario.gradeAcoes}>
-              {ordemAcoesCrudPadrao.map((ordem) => {
-                const acao = acoes.find((item) => item.label === ordem);
-                if (!acao) return null;
-                const Icone = acao.icon;
-                return (
-                  <Button
-                    key={acao.label}
-                    type="button"
-                    variant={acao.variant}
-                    onClick={acao.onClick}
-                    disabled={acao.disabled}
-                    className={`${classesTelaPadraoBeneficiario.botaoAcao} h-8 px-3 py-1 text-xs`}
-                  >
-                    <Icone className="h-3.5 w-3.5" />
-                    {acao.label}
-                  </Button>
-                );
-              })}
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--g3-muted)]">
+                  {secaoTela}
+                </p>
+                <h1 className="text-sm font-semibold tracking-tight text-[var(--g3-foreground)] sm:text-base">
+                  {tituloTela}
+                </h1>
+              </div>
+
+              <div className={classesTelaPadraoBeneficiario.gradeAcoes}>
+                {ordemAcoesCrudPadrao.map((ordem) => {
+                  const acao = acoes.find((item) => item.label === ordem);
+                  if (!acao) return null;
+                  const Icone = acao.icon;
+                  return (
+                    <Button
+                      key={acao.label}
+                      type="button"
+                      variant={acao.variant}
+                      onClick={acao.onClick}
+                      disabled={acao.disabled}
+                      className={`${classesTelaPadraoBeneficiario.botaoAcao} h-8 px-3 py-1 text-xs`}
+                    >
+                      <Icone className="h-3.5 w-3.5" />
+                      {acao.label}
+                    </Button>
+                  );
+                })}
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -1977,7 +1991,9 @@ export function CadastroMatriculasPage() {
             <CardHeader className={classesTelaPadraoBeneficiario.cabecalhoConteudo}>
               <CardTitle className={classesTelaPadraoBeneficiario.tituloAba}>
                 {abaAtual?.icon ? <abaAtual.icon className="h-4 w-4" /> : <CalendarClock className="h-4 w-4" />}
-                <span className={classesTelaPadraoBeneficiario.tituloAbaTexto}>{abaAtual?.label ?? "Matrículas"}</span>
+                <span className={classesTelaPadraoBeneficiario.tituloAbaTexto}>
+                  {abaAtual?.id === "listagem" ? "Listagem" : abaAtual?.label ?? tituloTela}
+                </span>
               </CardTitle>
               <span className="rounded-full border border-[var(--g3-border)] bg-[var(--g3-card)] px-2 py-1 text-xs text-[var(--g3-muted)]">
                 Código: {getValues("id_matricula") ?? "---"}
@@ -2977,6 +2993,248 @@ export function CadastroMatriculasPage() {
                         </Button>
                       </div>
 
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="rounded-lg border border-[var(--g3-border)] p-3">
+                      <div className="mb-3 flex items-center justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-semibold text-[var(--g3-foreground)]">Inscritos</p>
+                          <p className="text-xs text-[var(--g3-muted)]">
+                            Beneficiários vinculados ao curso ou atendimento selecionado.
+                          </p>
+                        </div>
+                        <div className="rounded-md border border-[var(--g3-border)] bg-[var(--g3-card-soft)] px-3 py-2 text-right">
+                          <p className="text-[11px] text-[var(--g3-muted)]">Total</p>
+                          <p className="text-lg font-semibold text-[var(--g3-foreground)]">
+                            {inscricoesAtivas.length}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]">
+                        <table className="min-w-full text-sm">
+                          <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]">
+                            <tr>
+                              <th className="px-3 py-2 text-left font-semibold">Beneficiário</th>
+                              <th className="px-3 py-2 text-left font-semibold">CPF</th>
+                              <th className="px-3 py-2 text-left font-semibold">Matrícula</th>
+                              <th className="px-3 py-2 text-left font-semibold">Status</th>
+                              <th className="px-3 py-2 text-left font-semibold">Agendamento</th>
+                              <th className="px-3 py-2 text-left font-semibold">Profissional</th>
+                              <th className="px-3 py-2 text-right font-semibold">Ações</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {inscricoesAtivas.length ? (
+                              inscricoesAtivas.map((inscricao, index) => (
+                                <tr
+                                  key={obterChaveInscricao(inscricao, index)}
+                                  className={`border-t border-[var(--g3-border)] ${
+                                    index % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35"
+                                  }`}
+                                >
+                                  <td className="px-3 py-2">{inscricao.beneficiario_nome}</td>
+                                  <td className="px-3 py-2">{formatarCpf(inscricao.cpf)}</td>
+                                  <td className="px-3 py-2">{formatarData(inscricao.data_matricula)}</td>
+                                  <td className="px-3 py-2">{formatarStatus(inscricao.status)}</td>
+                                  <td className="px-3 py-2">
+                                    {inscricao.data_agendada
+                                      ? `${formatarData(inscricao.data_agendada)} ${inscricao.hora_agendada ?? ""}`.trim()
+                                      : "---"}
+                                  </td>
+                                  <td className="px-3 py-2">{inscricao.profissional_nome ?? "---"}</td>
+                                  <td className="px-3 py-2 text-right">
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="danger"
+                                      onClick={() => removerInscricao(index)}
+                                    >
+                                      Remover
+                                    </Button>
+                                  </td>
+                                </tr>
+                              ))
+                            ) : (
+                              <tr>
+                                <td colSpan={7} className="px-3 py-4 text-center text-[var(--g3-muted)]">
+                                  Nenhum inscrito listado para o curso ou atendimento selecionado.
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="rounded-lg border border-[var(--g3-border)] p-3">
+                        <div className="mb-3 flex items-center justify-between gap-2">
+                          <div>
+                            <p className="text-sm font-semibold text-[var(--g3-foreground)]">Lista de espera</p>
+                            <p className="text-xs text-[var(--g3-muted)]">
+                              Cadastre beneficiários quando não houver vagas disponíveis.
+                            </p>
+                          </div>
+                          <div className="rounded-md border border-[var(--g3-border)] bg-[var(--g3-card-soft)] px-3 py-2 text-right">
+                            <p className="text-[11px] text-[var(--g3-muted)]">Fila</p>
+                            <p className="text-lg font-semibold text-[var(--g3-foreground)]">
+                              {filaEspera.length}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="grid gap-3">
+                          <div className="space-y-1">
+                            <Label htmlFor="fila-nome">Nome do beneficiário *</Label>
+                            <Input
+                              id="fila-nome"
+                              value={novoFilaEspera.beneficiario_nome ?? ""}
+                              onChange={(event) => {
+                                const valor = event.target.value;
+                                setNovoFilaEspera((atual) => ({ ...atual, beneficiario_nome: valor }));
+                                setTermoCatalogoFilaEspera(valor);
+                                setMostrarSugestoesFilaEspera(true);
+                              }}
+                              onFocus={() => {
+                                setTermoCatalogoFilaEspera(novoFilaEspera.beneficiario_nome ?? "");
+                                setMostrarSugestoesFilaEspera(true);
+                              }}
+                              onBlur={(event) => {
+                                const valorFormatado = formatarTextoPadrao(event.target.value);
+                                setNovoFilaEspera((atual) => ({
+                                  ...atual,
+                                  beneficiario_nome: valorFormatado
+                                }));
+                                setTermoCatalogoFilaEspera(valorFormatado);
+                                setTimeout(() => setMostrarSugestoesFilaEspera(false), 120);
+                              }}
+                              placeholder="Nome completo"
+                            />
+                            {mostrarSugestoesFilaEspera &&
+                              termoCatalogoFilaEspera.trim().length > 0 &&
+                              termoCatalogoFilaEspera.trim().length < 2 && (
+                                <p className="text-[11px] text-[var(--g3-muted)]">
+                                  Digite pelo menos 2 caracteres para buscar.
+                                </p>
+                              )}
+                            {mostrarSugestoesFilaEspera &&
+                              (carregandoBeneficiariosFilaCatalogo || beneficiariosFilaCatalogo.length > 0) &&
+                              termoCatalogoFilaEspera.trim().length >= 2 && (
+                                <div className="max-h-28 overflow-y-auto rounded-md border border-[var(--g3-border)] bg-[var(--g3-card)] p-1">
+                                  {carregandoBeneficiariosFilaCatalogo ? (
+                                    <p className="px-2 py-1 text-xs text-[var(--g3-muted)]">
+                                      Buscando beneficiários...
+                                    </p>
+                                  ) : (
+                                    beneficiariosFilaCatalogo.map((item) => (
+                                      <button
+                                        key={item.id_beneficiario}
+                                        type="button"
+                                        className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-[var(--g3-primary-soft)]"
+                                        onMouseDown={(event) => event.preventDefault()}
+                                        onClick={() => preencherFilaEsperaComBeneficiario(item)}
+                                      >
+                                        {item.nome_completo} {item.cpf ? `(${formatarCpf(item.cpf)})` : ""}
+                                      </button>
+                                    ))
+                                  )}
+                                </div>
+                              )}
+                          </div>
+                          <div className="grid gap-3 md:grid-cols-2">
+                            <div className="space-y-1">
+                              <Label htmlFor="fila-cpf">CPF</Label>
+                              <Input
+                                id="fila-cpf"
+                                value={novoFilaEspera.cpf ?? ""}
+                                onChange={(event) =>
+                                  setNovoFilaEspera((atual) => ({ ...atual, cpf: event.target.value }))
+                                }
+                                placeholder="000.000.000-00"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label htmlFor="fila-telefone">Telefone</Label>
+                              <Input
+                                id="fila-telefone"
+                                value={novoFilaEspera.telefone ?? ""}
+                                onChange={(event) =>
+                                  setNovoFilaEspera((atual) => ({ ...atual, telefone: event.target.value }))
+                                }
+                                placeholder="(00) 00000-0000"
+                              />
+                            </div>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={adicionarFilaEspera}
+                            disabled={!podeAdicionarFilaEspera}
+                          >
+                            Adicionar à lista de espera
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="rounded-lg border border-[var(--g3-border)] p-3">
+                        <div className="mb-3 flex items-center justify-between gap-2">
+                          <p className="text-sm font-semibold text-[var(--g3-foreground)]">
+                            Pessoas aguardando vaga
+                          </p>
+                          <p className="text-xs text-[var(--g3-muted)]">
+                            {filaEspera.length ? "Use Matricular quando surgir vaga." : "Sem fila registrada."}
+                          </p>
+                        </div>
+
+                        <div className="space-y-2">
+                          {filaEspera.length ? (
+                            filaEspera.map((item, index) => (
+                              <div
+                                key={item.id_fila_espera ?? `${item.beneficiario_nome}-${index}`}
+                                className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-3"
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="space-y-1">
+                                    <p className="text-sm font-semibold text-[var(--g3-foreground)]">
+                                      {item.beneficiario_nome}
+                                    </p>
+                                    <p className="text-xs text-[var(--g3-muted)]">
+                                      CPF: {formatarCpf(item.cpf)} - Entrada: {formatarData(item.data_entrada)}
+                                    </p>
+                                    <p className="text-xs text-[var(--g3-muted)]">
+                                      Telefone: {formatarTelefone(item.telefone)}
+                                    </p>
+                                  </div>
+                                  <div className="flex flex-col gap-2">
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      onClick={() => matricularFilaEspera(index)}
+                                      disabled={vagasDisponiveisInscricao <= 0}
+                                    >
+                                      Matricular
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="danger"
+                                      onClick={() => removerFilaEspera(index)}
+                                    >
+                                      Remover
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="rounded-lg border border-dashed border-[var(--g3-border)] bg-[var(--g3-card-soft)] px-3 py-4 text-sm text-[var(--g3-muted)]">
+                              Nenhum beneficiário aguardando vaga neste curso ou atendimento.
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>

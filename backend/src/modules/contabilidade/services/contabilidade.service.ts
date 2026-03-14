@@ -2,19 +2,32 @@ import { AppError } from "../../../shared/errors/app-error.js";
 import { mapaCamposTextoContabilidade } from "../../../utils/text-format-config.js";
 import { normalizarObjetoTexto } from "../../../utils/text-formatter.js";
 import {
+  mapCategoriaFinanceiraToResponse,
+  mapCentroCustoToResponse,
+  mapCompraIntegradaToResponse,
+  mapConciliacaoToResponse,
   mapContaBancariaToResponse,
   mapEmendaToResponse,
+  mapHistoricoContabilToResponse,
   mapLancamentoToResponse,
-  mapMovimentacaoToResponse
+  mapMovimentacaoToResponse,
+  mapTransferenciaToResponse
 } from "../contabilidade.mapper.js";
 import {
+  categoriaFinanceiraInputSchema,
+  centroCustoInputSchema,
+  conciliacaoFinanceiraInputSchema,
   contaBancariaInputSchema,
   emendaImpositivaInputSchema,
   lancamentoFinanceiroInputSchema,
   movimentacaoFinanceiraInputSchema,
   pagamentoInputSchema,
-  statusInputSchema
+  situacaoConciliacaoInputSchema,
+  statusInputSchema,
+  statusLivreInputSchema,
+  transferenciaFinanceiraInputSchema
 } from "../contabilidade.schema.js";
+import type { ContabilidadeAtor } from "../contabilidade.types.js";
 import { ContabilidadeRepository } from "../repositories/contabilidade.repository.js";
 
 export class ContabilidadeService {
@@ -25,22 +38,68 @@ export class ContabilidadeService {
     return rows.map(mapContaBancariaToResponse);
   }
 
-  async criarContaBancaria(rawInput: unknown) {
+  async criarContaBancaria(rawInput: unknown, ator?: ContabilidadeAtor) {
     const input = contaBancariaInputSchema.parse(this.normalizarPayload(rawInput));
-    const row = await this.repository.criarContaBancaria(input);
+    const row = await this.repository.criarContaBancaria(input, ator);
     return mapContaBancariaToResponse(row);
   }
 
-  async atualizarContaBancaria(rawId: string, rawInput: unknown) {
+  async atualizarContaBancaria(rawId: string, rawInput: unknown, ator?: ContabilidadeAtor) {
     const id = this.parseId(rawId);
     const input = contaBancariaInputSchema.parse(this.normalizarPayload(rawInput));
-    const row = await this.repository.atualizarContaBancaria(id, input);
+    const row = await this.repository.atualizarContaBancaria(id, input, ator);
     return mapContaBancariaToResponse(row);
   }
 
-  async removerContaBancaria(rawId: string) {
+  async removerContaBancaria(rawId: string, ator?: ContabilidadeAtor) {
     const id = this.parseId(rawId);
-    await this.repository.removerContaBancaria(id);
+    await this.repository.removerContaBancaria(id, ator);
+  }
+
+  async listarCategorias() {
+    const rows = await this.repository.listarCategorias();
+    return rows.map(mapCategoriaFinanceiraToResponse);
+  }
+
+  async criarCategoria(rawInput: unknown, ator?: ContabilidadeAtor) {
+    const input = categoriaFinanceiraInputSchema.parse(this.normalizarPayload(rawInput));
+    const row = await this.repository.criarCategoria(input, ator);
+    return mapCategoriaFinanceiraToResponse(row);
+  }
+
+  async atualizarCategoria(rawId: string, rawInput: unknown, ator?: ContabilidadeAtor) {
+    const id = this.parseId(rawId);
+    const input = categoriaFinanceiraInputSchema.parse(this.normalizarPayload(rawInput));
+    const row = await this.repository.atualizarCategoria(id, input, ator);
+    return mapCategoriaFinanceiraToResponse(row);
+  }
+
+  async removerCategoria(rawId: string, ator?: ContabilidadeAtor) {
+    const id = this.parseId(rawId);
+    await this.repository.removerCategoria(id, ator);
+  }
+
+  async listarCentrosCusto() {
+    const rows = await this.repository.listarCentrosCusto();
+    return rows.map(mapCentroCustoToResponse);
+  }
+
+  async criarCentroCusto(rawInput: unknown, ator?: ContabilidadeAtor) {
+    const input = centroCustoInputSchema.parse(this.normalizarPayload(rawInput));
+    const row = await this.repository.criarCentroCusto(input, ator);
+    return mapCentroCustoToResponse(row);
+  }
+
+  async atualizarCentroCusto(rawId: string, rawInput: unknown, ator?: ContabilidadeAtor) {
+    const id = this.parseId(rawId);
+    const input = centroCustoInputSchema.parse(this.normalizarPayload(rawInput));
+    const row = await this.repository.atualizarCentroCusto(id, input, ator);
+    return mapCentroCustoToResponse(row);
+  }
+
+  async removerCentroCusto(rawId: string, ator?: ContabilidadeAtor) {
+    const id = this.parseId(rawId);
+    await this.repository.removerCentroCusto(id, ator);
   }
 
   async listarLancamentos() {
@@ -48,39 +107,41 @@ export class ContabilidadeService {
     return rows.map(mapLancamentoToResponse);
   }
 
-  async criarLancamento(rawInput: unknown) {
+  async criarLancamento(rawInput: unknown, ator?: ContabilidadeAtor) {
     const input = lancamentoFinanceiroInputSchema.parse(this.normalizarPayload(rawInput));
-    const row = await this.repository.criarLancamento(input);
+    const row = await this.repository.criarLancamento(input, ator);
     return mapLancamentoToResponse(row);
   }
 
-  async atualizarLancamento(rawId: string, rawInput: unknown) {
+  async atualizarLancamento(rawId: string, rawInput: unknown, ator?: ContabilidadeAtor) {
     const id = this.parseId(rawId);
     const input = lancamentoFinanceiroInputSchema.parse(this.normalizarPayload(rawInput));
-    const row = await this.repository.atualizarLancamento(id, input);
+    const row = await this.repository.atualizarLancamento(id, input, ator);
     return mapLancamentoToResponse(row);
   }
 
-  async atualizarSituacaoLancamento(rawId: string, rawInput: unknown) {
+  async atualizarSituacaoLancamento(rawId: string, rawInput: unknown, ator?: ContabilidadeAtor) {
     const id = this.parseId(rawId);
     const { status } = statusInputSchema.parse(this.normalizarPayload(rawInput));
-    const row = await this.repository.atualizarSituacaoLancamento(id, status);
+    const row = await this.repository.atualizarSituacaoLancamento(id, status, ator);
     return mapLancamentoToResponse(row);
   }
 
-  async pagarLancamento(rawId: string, rawInput: unknown) {
+  async pagarLancamento(rawId: string, rawInput: unknown, ator?: ContabilidadeAtor) {
     const id = this.parseId(rawId);
     const input = pagamentoInputSchema.parse(this.normalizarPayload(rawInput));
-    const recibo = await this.repository.pagarLancamento(id, input.data);
-    return {
-      ...recibo,
-      responsavel: input.responsavel ?? undefined
-    };
+    return this.repository.pagarLancamento(id, input, ator);
   }
 
-  async removerLancamento(rawId: string) {
+  async estornarLancamento(rawId: string, ator?: ContabilidadeAtor) {
     const id = this.parseId(rawId);
-    await this.repository.removerLancamento(id);
+    const row = await this.repository.estornarLancamento(id, ator);
+    return mapLancamentoToResponse(row);
+  }
+
+  async removerLancamento(rawId: string, ator?: ContabilidadeAtor) {
+    const id = this.parseId(rawId);
+    await this.repository.removerLancamento(id, ator);
   }
 
   async listarMovimentacoes() {
@@ -88,22 +149,73 @@ export class ContabilidadeService {
     return rows.map(mapMovimentacaoToResponse);
   }
 
-  async criarMovimentacao(rawInput: unknown) {
+  async criarMovimentacao(rawInput: unknown, ator?: ContabilidadeAtor) {
     const input = movimentacaoFinanceiraInputSchema.parse(this.normalizarPayload(rawInput));
-    const row = await this.repository.criarMovimentacao(input);
+    const row = await this.repository.criarMovimentacao(input, ator);
     return mapMovimentacaoToResponse(row);
   }
 
-  async atualizarMovimentacao(rawId: string, rawInput: unknown) {
+  async atualizarMovimentacao(rawId: string, rawInput: unknown, ator?: ContabilidadeAtor) {
     const id = this.parseId(rawId);
     const input = movimentacaoFinanceiraInputSchema.parse(this.normalizarPayload(rawInput));
-    const row = await this.repository.atualizarMovimentacao(id, input);
+    const row = await this.repository.atualizarMovimentacao(id, input, ator);
     return mapMovimentacaoToResponse(row);
   }
 
-  async removerMovimentacao(rawId: string) {
+  async removerMovimentacao(rawId: string, ator?: ContabilidadeAtor) {
     const id = this.parseId(rawId);
-    await this.repository.removerMovimentacao(id);
+    await this.repository.removerMovimentacao(id, ator);
+  }
+
+  async listarTransferencias() {
+    const rows = await this.repository.listarTransferencias();
+    return rows.map(mapTransferenciaToResponse);
+  }
+
+  async criarTransferencia(rawInput: unknown, ator?: ContabilidadeAtor) {
+    const input = transferenciaFinanceiraInputSchema.parse(this.normalizarPayload(rawInput));
+    const row = await this.repository.criarTransferencia(input, ator);
+    return mapTransferenciaToResponse(row);
+  }
+
+  async estornarTransferencia(rawId: string, ator?: ContabilidadeAtor) {
+    const id = this.parseId(rawId);
+    const row = await this.repository.estornarTransferencia(id, ator);
+    return mapTransferenciaToResponse(row);
+  }
+
+  async listarConciliacoes() {
+    const rows = await this.repository.listarConciliacoes();
+    return rows.map(mapConciliacaoToResponse);
+  }
+
+  async criarConciliacao(rawInput: unknown, ator?: ContabilidadeAtor) {
+    const input = conciliacaoFinanceiraInputSchema.parse(this.normalizarPayload(rawInput));
+    const row = await this.repository.criarConciliacao(input, ator);
+    return mapConciliacaoToResponse(row);
+  }
+
+  async atualizarSituacaoConciliacao(rawId: string, rawInput: unknown, ator?: ContabilidadeAtor) {
+    const id = this.parseId(rawId);
+    const { situacao } = situacaoConciliacaoInputSchema.parse(this.normalizarPayload(rawInput));
+    const row = await this.repository.atualizarSituacaoConciliacao(id, situacao, ator);
+    return mapConciliacaoToResponse(row);
+  }
+
+  async listarHistorico() {
+    const rows = await this.repository.listarHistorico();
+    return rows.map(mapHistoricoContabilToResponse);
+  }
+
+  async listarComprasIntegradas() {
+    const rows = await this.repository.listarComprasIntegradas();
+    return rows.map(mapCompraIntegradaToResponse);
+  }
+
+  async gerarObrigacaoFinanceiraPorCompra(rawCompraId: string, ator?: ContabilidadeAtor) {
+    const compraId = this.parseId(rawCompraId);
+    const row = await this.repository.gerarObrigacaoFinanceiraPorCompra(compraId, ator);
+    return mapLancamentoToResponse(row);
   }
 
   async listarEmendas() {
@@ -119,7 +231,7 @@ export class ContabilidadeService {
 
   async atualizarStatusEmenda(rawId: string, rawInput: unknown) {
     const id = this.parseId(rawId);
-    const { status } = statusInputSchema.parse(this.normalizarPayload(rawInput));
+    const { status } = statusLivreInputSchema.parse(this.normalizarPayload(rawInput));
     const row = await this.repository.atualizarStatusEmenda(id, status);
     return mapEmendaToResponse(row);
   }
@@ -133,7 +245,10 @@ export class ContabilidadeService {
   }
 
   private normalizarPayload(rawInput: unknown) {
-    if (!rawInput || typeof rawInput !== "object") return rawInput;
+    if (!rawInput || typeof rawInput !== "object") {
+      return rawInput;
+    }
+
     return normalizarObjetoTexto(
       rawInput as Record<string, unknown>,
       mapaCamposTextoContabilidade

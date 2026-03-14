@@ -86,6 +86,7 @@ const tiposOcorrenciaOptions: RegistroPontoOcorrenciaTipo[] = [
 ];
 
 const tituloTela = "Registro de ponto";
+const secaoTela = "Setor RH";
 
 function normalizarAbaRegistroPonto(valor: string | null | undefined): AbaRegistroPonto {
   if (abas.some((aba) => aba.id === valor)) {
@@ -107,7 +108,8 @@ function formatarDataHora(valor?: string) {
   if (Number.isNaN(parsed.getTime())) return valor;
   return parsed.toLocaleString("pt-BR", {
     dateStyle: "short",
-    timeStyle: "short"
+    timeStyle: "short",
+    timeZone: "America/Sao_Paulo"
   });
 }
 
@@ -174,6 +176,7 @@ function formatarLocalizacaoHistorico(item: {
   usuario_nome?: string;
   criado_em?: string;
 }) {
+  const dadosDepois = item.dados_depois ?? {};
   const origem = extrairLocalizacaoHistorico(item);
 
   if (origem) {
@@ -184,8 +187,17 @@ function formatarLocalizacaoHistorico(item: {
     return texto;
   }
 
-  if (item.acao === "MARCACAO") {
-    return "Localizacao nao registrada";
+  const localizacaoStatus =
+    typeof dadosDepois.localizacao_status === "string" ? dadosDepois.localizacao_status : undefined;
+
+  if (item.acao === "MARCACAO" || dadosDepois.localizacao_obtida === false) {
+    if (localizacaoStatus === "instituicao_sem_coordenadas") {
+      return "Localização da instituição não configurada";
+    }
+    if (localizacaoStatus?.includes("nao_obtida")) {
+      return "Localização não obtida";
+    }
+    return "Localização não registrada";
   }
 
   return undefined;
@@ -466,13 +478,7 @@ export function RegistroPontoPage() {
       setPopupMarcarAberto(false);
       setEtapaMarcacao("localizacao");
       const localizacao = await capturarLocalizacaoAtual();
-      if (!localizacao) {
-        setMensagem({
-          tipo: "erro",
-          texto: "Não foi possível obter a localização para registrar o ponto. Verifique as permissões do navegador."
-        });
-        return;
-      }
+      const marcouSemLocalizacao = !localizacao;
       setEtapaMarcacao("registro");
       const response = await marcarMutation.mutateAsync({
         usuario_login: confirmacaoLogin.trim(),
@@ -480,12 +486,17 @@ export function RegistroPontoPage() {
         latitude: localizacao?.latitude,
         longitude: localizacao?.longitude,
         accuracy_metros: localizacao?.accuracy_metros,
+        origem_manual: marcouSemLocalizacao
+          ? "Localização do dispositivo não obtida no momento da marcação."
+          : undefined,
         validar_localizacao: false
       });
 
       setMensagem({
         tipo: "sucesso",
-        texto: response.mensagem
+        texto: marcouSemLocalizacao
+          ? `${response.mensagem} A marcação foi registrada sem localização.`
+          : response.mensagem
       });
       setConfirmacaoSenha("");
     } catch (error: unknown) {
@@ -832,7 +843,7 @@ export function RegistroPontoPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-emerald-200 bg-emerald-50/80">
             <CardHeader>
               <CardTitle>Horários de trabalho</CardTitle>
             </CardHeader>
@@ -1048,23 +1059,37 @@ export function RegistroPontoPage() {
   }
 
   return (
-    <section className="px-4 py-4 lg:px-8">
+    <section className="mx-auto w-full max-w-[1440px] px-4 py-4 lg:px-8">
       <div className={classesTelaPadraoBeneficiario.container}>
         <Card className={classesTelaPadraoBeneficiario.barraAcoes} data-print="toolbar">
           <CardContent className="p-0">
-            <div className={classesTelaPadraoBeneficiario.gradeAcoes}>
-              <Button type="button" variant="outline" className={classesTelaPadraoBeneficiario.botaoAcao} onClick={aplicarBusca} disabled={acoesDesabilitadas || filtrosTravados}><Search className="mr-2 h-4 w-4" />Buscar</Button>
-              <Button type="button" variant="outline" className={classesTelaPadraoBeneficiario.botaoAcao} onClick={limparParaNovo} disabled={acoesDesabilitadas || filtrosTravados}><Plus className="mr-2 h-4 w-4" />Novo</Button>
-              <Button type="button" className={classesTelaPadraoBeneficiario.botaoAcao} onClick={acaoSalvar} disabled={acoesDesabilitadas}><Save className="mr-2 h-4 w-4" />Salvar</Button>
-              <Button type="button" variant="outline" className={classesTelaPadraoBeneficiario.botaoAcao} onClick={cancelarEdicao} disabled={acoesDesabilitadas}><Undo2 className="mr-2 h-4 w-4" />Cancelar</Button>
-              <Button type="button" variant="danger" className={classesTelaPadraoBeneficiario.botaoAcao} onClick={acaoExcluir} disabled={acoesDesabilitadas}><Trash2 className="mr-2 h-4 w-4" />Excluir</Button>
-              <Button type="button" variant="outline" className={classesTelaPadraoBeneficiario.botaoAcao} onClick={acaoImprimir} disabled={acoesDesabilitadas}><Printer className="mr-2 h-4 w-4" />Imprimir</Button>
-              <Button type="button" variant="outline" className={classesTelaPadraoBeneficiario.botaoAcao} onClick={acaoFechar} disabled={acoesDesabilitadas}><X className="mr-2 h-4 w-4" />Fechar</Button>
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--g3-muted)]">
+                  {secaoTela}
+                </p>
+                <h1 className="text-sm font-semibold tracking-tight text-[var(--g3-foreground)] sm:text-base">
+                  {tituloTela}
+                </h1>
+              </div>
+
+              <div className={classesTelaPadraoBeneficiario.gradeAcoes}>
+                <Button type="button" variant="outline" className={classesTelaPadraoBeneficiario.botaoAcao} onClick={aplicarBusca} disabled={acoesDesabilitadas || filtrosTravados}><Search className="mr-2 h-4 w-4" />Buscar</Button>
+                <Button type="button" variant="outline" className={classesTelaPadraoBeneficiario.botaoAcao} onClick={limparParaNovo} disabled={acoesDesabilitadas || filtrosTravados}><Plus className="mr-2 h-4 w-4" />Novo</Button>
+                <Button type="button" className={classesTelaPadraoBeneficiario.botaoAcao} onClick={acaoSalvar} disabled={acoesDesabilitadas}><Save className="mr-2 h-4 w-4" />Salvar</Button>
+                <Button type="button" variant="outline" className={classesTelaPadraoBeneficiario.botaoAcao} onClick={cancelarEdicao} disabled={acoesDesabilitadas}><Undo2 className="mr-2 h-4 w-4" />Cancelar</Button>
+                <Button type="button" variant="danger" className={classesTelaPadraoBeneficiario.botaoAcao} onClick={acaoExcluir} disabled={acoesDesabilitadas}><Trash2 className="mr-2 h-4 w-4" />Excluir</Button>
+                <Button type="button" variant="outline" className={classesTelaPadraoBeneficiario.botaoAcao} onClick={acaoImprimir} disabled={acoesDesabilitadas}><Printer className="mr-2 h-4 w-4" />Imprimir</Button>
+                <Button type="button" variant="outline" className={classesTelaPadraoBeneficiario.botaoAcao} onClick={acaoFechar} disabled={acoesDesabilitadas}><X className="mr-2 h-4 w-4" />Fechar</Button>
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        <div className={classesTelaPadraoBeneficiario.gradePrincipal} data-print="layout-grid">
+        <div
+          className={`${classesTelaPadraoBeneficiario.gradePrincipal} lg:grid-cols-[220px_minmax(0,1fr)] xl:grid-cols-[240px_minmax(0,1fr)]`}
+          data-print="layout-grid"
+        >
           <Card className={classesTelaPadraoBeneficiario.cardAbas} data-print="tabs">
             <CardContent className={classesTelaPadraoBeneficiario.conteudoAbas}>
               {abas
@@ -1077,7 +1102,7 @@ export function RegistroPontoPage() {
                     onClick={() => selecionarAba(aba.id)}
                   >
                     <span className={classeNumeroAbaLateral(abaAtiva === aba.id)}>{index + 1}</span>
-                    <span>{aba.label}</span>
+                    <span className="min-w-0 break-words">{aba.label}</span>
                   </button>
                 ))}
             </CardContent>

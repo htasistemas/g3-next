@@ -190,6 +190,21 @@ export function ChamadoTecnicoPage() {
   const cards = listagem.data?.resumo.cards;
   const chamados = listagem.data?.chamados ?? [];
   const chamadoAtual = detalhe.data?.chamado;
+  const parametrosTipo = useMemo(() => {
+    const listaExplicita = (catalogo.data?.tipos ?? []).filter(Boolean);
+    return listaExplicita.length > 0 ? listaExplicita : obterParametrosCatalogo(parametros, "TIPO");
+  }, [catalogo.data?.tipos, parametros]);
+  const parametrosPrioridade = useMemo(() => {
+    const listaExplicita = (catalogo.data?.prioridades ?? []).filter(Boolean);
+    return listaExplicita.length > 0 ? listaExplicita : obterParametrosCatalogo(parametros, "PRIORIDADE");
+  }, [catalogo.data?.prioridades, parametros]);
+  const parametrosSistema = useMemo(() => obterParametrosCatalogo(parametros, "SISTEMA"), [parametros]);
+  const parametrosOrigem = useMemo(() => obterParametrosCatalogo(parametros, "ORIGEM"), [parametros]);
+  const parametrosSituacao = useMemo(() => obterParametrosCatalogo(parametros, "SITUACAO"), [parametros]);
+  const parametrosMotivoReabertura = useMemo(
+    () => obterParametrosCatalogo(parametros, "MOTIVO_REABERTURA"),
+    [parametros]
+  );
 
   const nomeSolicitante = (usuario?.nome ?? usuario?.nomeUsuario ?? "").trim();
   const clientePadrao =
@@ -198,20 +213,20 @@ export function ChamadoTecnicoPage() {
     "";
 
   const sistemaPadrao = useMemo(
-    () => (parametros.sistema ?? []).find((item) => item.chave === "G3_NEXT"),
-    [parametros.sistema]
+    () => parametrosSistema.find((item) => item.chave === "G3_NEXT"),
+    [parametrosSistema]
   );
   const origemManual = useMemo(
-    () => (parametros.origem ?? []).find((item) => item.chave === "MANUAL"),
-    [parametros.origem]
+    () => parametrosOrigem.find((item) => item.chave === "MANUAL"),
+    [parametrosOrigem]
   );
   const urgente = useMemo(
-    () => (parametros.prioridade ?? []).find((item) => item.chave === "URGENTE"),
-    [parametros.prioridade]
+    () => parametrosPrioridade.find((item) => item.chave === "URGENTE"),
+    [parametrosPrioridade]
   );
   const situacaoFechado = useMemo(
-    () => (parametros.situacao ?? []).find((item) => item.chave === "FECHADO"),
-    [parametros.situacao]
+    () => parametrosSituacao.find((item) => item.chave === "FECHADO"),
+    [parametrosSituacao]
   );
 
   const podeDesenvolver =
@@ -257,18 +272,21 @@ export function ChamadoTecnicoPage() {
     [chamados]
   );
   const tiposDisponiveis = useMemo(
-    () => filtrarParametros(parametros.tipo ?? [], tiposPermitidos),
-    [parametros.tipo]
+    () => filtrarParametros(parametrosTipo, tiposPermitidos),
+    [parametrosTipo]
   );
   const prioridadesDisponiveis = useMemo(
-    () => filtrarParametros(parametros.prioridade ?? [], prioridadesPermitidas),
-    [parametros.prioridade]
+    () => filtrarParametros(parametrosPrioridade, prioridadesPermitidas),
+    [parametrosPrioridade]
   );
+  const catalogoEssencialCarregando = catalogo.isLoading || catalogo.isFetching;
+  const semTiposDisponiveis = !catalogoEssencialCarregando && !tiposDisponiveis.length;
+  const semPrioridadesDisponiveis = !catalogoEssencialCarregando && !prioridadesDisponiveis.length;
   const situacoesDesenvolvimento = useMemo(
-    () => filtrarParametros(parametros.situacao ?? [], situacoesDesenvolvimentoPermitidas),
-    [parametros.situacao]
+    () => filtrarParametros(parametrosSituacao, situacoesDesenvolvimentoPermitidas),
+    [parametrosSituacao]
   );
-  const motivoReaberturaOptions = parametros.motivo_reabertura ?? [];
+  const motivoReaberturaOptions = parametrosMotivoReabertura;
 
   const chips = useMemo(
     () => [
@@ -558,10 +576,10 @@ export function ChamadoTecnicoPage() {
                   <Campo label="Busca textual" value={filtros.texto ?? ""} onChange={(value) => atualizarFiltros(setFiltros, "texto", value || undefined)} />
                   <Campo label="Código" value={filtros.codigo ?? ""} onChange={(value) => atualizarFiltros(setFiltros, "codigo", value || undefined)} />
                   <Campo label="Cliente" value={filtros.cliente ?? ""} onChange={(value) => atualizarFiltros(setFiltros, "cliente", value || undefined)} />
-                  <CampoSelect label="Situação" value={filtros.situacao_id ?? ""} options={parametros.situacao ?? []} onChange={(value) => atualizarFiltros(setFiltros, "situacao_id", value || undefined)} />
+                  <CampoSelect label="Situação" value={filtros.situacao_id ?? ""} options={parametrosSituacao} onChange={(value) => atualizarFiltros(setFiltros, "situacao_id", value || undefined)} />
                   <CampoSelect label="Tipo" value={filtros.tipo_id ?? ""} options={tiposDisponiveis} onChange={(value) => atualizarFiltros(setFiltros, "tipo_id", value || undefined)} />
                   <CampoSelect label="Prioridade" value={filtros.prioridade_id ?? ""} options={prioridadesDisponiveis} onChange={(value) => atualizarFiltros(setFiltros, "prioridade_id", value || undefined)} />
-                  <CampoSelect label="Sistema" value={filtros.sistema_id ?? ""} options={parametros.sistema ?? []} onChange={(value) => atualizarFiltros(setFiltros, "sistema_id", value || undefined)} />
+                  <CampoSelect label="Sistema" value={filtros.sistema_id ?? ""} options={parametrosSistema} onChange={(value) => atualizarFiltros(setFiltros, "sistema_id", value || undefined)} />
                   <Campo label="Data de criação inicial" value={filtros.data_criacao_inicio ?? ""} type="date" onChange={(value) => atualizarFiltros(setFiltros, "data_criacao_inicio", value || undefined)} />
                   <Campo label="Data de criação final" value={filtros.data_criacao_fim ?? ""} type="date" onChange={(value) => atualizarFiltros(setFiltros, "data_criacao_fim", value || undefined)} />
                   <Campo label="Inatividade superior a X dias" value={filtros.inatividade_dias ? String(filtros.inatividade_dias) : ""} onChange={(value) => atualizarFiltros(setFiltros, "inatividade_dias", value ? Number(value) : undefined)} />
@@ -646,11 +664,30 @@ export function ChamadoTecnicoPage() {
                 <Campo label="Solicitante" value={form.solicitante} onChange={(value) => atualizarCampo(setForm, "solicitante", value)} disabled />
                 <Campo label="Cliente" value={form.cliente ?? ""} onChange={(value) => atualizarCampo(setForm, "cliente", value)} disabled />
                 <Campo label="Sistema" value={sistemaPadrao?.nome ?? "G3-Next Terceiro Setor"} onChange={() => undefined} disabled />
-                <CampoSelect label="Tipo" value={form.tipo_id} options={tiposDisponiveis} onChange={(value) => atualizarCampo(setForm, "tipo_id", value)} placeholder="Selecione" />
-                <CampoSelect label="Prioridade" value={form.prioridade_id} options={prioridadesDisponiveis} onChange={(value) => atualizarCampo(setForm, "prioridade_id", value)} placeholder="Selecione" />
+                <CampoSelect
+                  label="Tipo"
+                  value={form.tipo_id}
+                  options={tiposDisponiveis}
+                  onChange={(value) => atualizarCampo(setForm, "tipo_id", value)}
+                  placeholder={catalogoEssencialCarregando ? "Carregando..." : "Selecione"}
+                  disabled={catalogoEssencialCarregando || semTiposDisponiveis}
+                />
+                <CampoSelect
+                  label="Prioridade"
+                  value={form.prioridade_id}
+                  options={prioridadesDisponiveis}
+                  onChange={(value) => atualizarCampo(setForm, "prioridade_id", value)}
+                  placeholder={catalogoEssencialCarregando ? "Carregando..." : "Selecione"}
+                  disabled={catalogoEssencialCarregando || semPrioridadesDisponiveis}
+                />
                 <CampoSelect label="Menu" value={form.menu_nome ?? ""} options={menuOptions} onChange={(value) => { atualizarCampo(setForm, "menu_nome", value); const submenuAtual = submenuOptions.find((item) => item.rota === form.submenu_rota); if (submenuAtual && submenuAtual.menu !== value) atualizarCampo(setForm, "submenu_rota", ""); }} placeholder="Selecione" />
                 <CampoSelect label="Submenu" value={form.submenu_rota ?? ""} options={submenuOptionsFiltradas} onChange={(value) => { const selecionado = submenuOptions.find((item) => item.rota === value); atualizarCampo(setForm, "submenu_rota", value); atualizarCampo(setForm, "menu_nome", selecionado?.menu ?? form.menu_nome ?? ""); }} placeholder="Selecione" />
                 <Info label="Rota do submenu" value={form.submenu_rota || "Selecione um submenu para identificar a rota"} />
+                {(semTiposDisponiveis || semPrioridadesDisponiveis) ? (
+                  <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 md:col-span-2 xl:col-span-4">
+                    Não foi possível carregar todas as opções de catálogo. Atualize a tela e, se persistir, verifique os parâmetros de tipo e prioridade no backend.
+                  </div>
+                ) : null}
               </CardContent>
             </Card>
 
@@ -1197,6 +1234,23 @@ function filtrarParametros(parametros: ChamadoParametro[], chaves: string[]) {
     if (itemA.ordem !== itemB.ordem) return itemA.ordem - itemB.ordem;
     return itemA.nome.localeCompare(itemB.nome, "pt-BR");
   });
+}
+
+function obterParametrosCatalogo(parametros: Record<string, ChamadoParametro[]>, tipo: string) {
+  const chaveNormalizada = normalizarChaveParametro(tipo).toLowerCase();
+  const listaDireta = (parametros[chaveNormalizada] ?? []).filter(Boolean);
+  if (listaDireta.length > 0) {
+    return listaDireta;
+  }
+
+  return Object.values(parametros)
+    .flatMap((item) => item ?? [])
+    .filter((item): item is ChamadoParametro => !!item)
+    .filter((item) => normalizarChaveParametro(item.tipo) === normalizarChaveParametro(tipo))
+    .sort((itemA, itemB) => {
+      if (itemA.ordem !== itemB.ordem) return itemA.ordem - itemB.ordem;
+      return itemA.nome.localeCompare(itemB.nome, "pt-BR");
+    });
 }
 
 function normalizarChaveParametro(valor?: string) {
