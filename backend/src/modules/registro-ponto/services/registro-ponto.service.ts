@@ -4,6 +4,7 @@ import { AppError } from "../../../shared/errors/app-error.js";
 import {
   registroPontoAjusteSchema,
   registroPontoFiltersSchema,
+  registroPontoHorarioUsuarioSchema,
   registroPontoMarcarSchema,
   registroPontoOcorrenciaSchema
 } from "../registro-ponto.schema.js";
@@ -34,6 +35,22 @@ export class RegistroPontoService {
   async listarUsuarios(rawTermo: unknown) {
     const termo = typeof rawTermo === "string" ? rawTermo : undefined;
     return this.repository.listarUsuarios(termo);
+  }
+
+  async buscarHorarioUsuario(atorRaw: AtorRaw) {
+    const ator = this.parseAtor(atorRaw);
+    return this.repository.buscarHorarioUsuario(ator);
+  }
+
+  async salvarHorarioUsuario(rawInput: unknown, atorRaw: AtorRaw, origem: RegistroPontoOrigem) {
+    const input = registroPontoHorarioUsuarioSchema.parse(rawInput ?? {});
+    const ator = this.parseAtor(atorRaw);
+    return this.repository.salvarHorarioUsuario(input, ator, origem);
+  }
+
+  async buscarAlertaPendencia(atorRaw: AtorRaw) {
+    const ator = this.parseAtor(atorRaw);
+    return this.repository.buscarAlertaPendencia(ator);
   }
 
   async marcarPonto(rawInput: unknown, atorRaw: AtorRaw, origem: RegistroPontoOrigem) {

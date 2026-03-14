@@ -2,7 +2,7 @@ import "leaflet/dist/leaflet.css";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Circle, CircleMarker, MapContainer, Popup, TileLayer } from "react-leaflet";
 import {
   ClipboardCheck,
@@ -38,16 +38,22 @@ import {
 import {
   filtroRegistroPontoPadrao,
   registroPontoAjusteSchema,
+  registroPontoHorarioTrabalhoPadrao,
+  registroPontoHorarioTrabalhoSchema,
   type RegistroPontoAjusteFormInput,
-  type RegistroPontoAjusteFormValues
+  type RegistroPontoAjusteFormValues,
+  type RegistroPontoHorarioTrabalhoFormInput,
+  type RegistroPontoHorarioTrabalhoFormValues
 } from "@/features/registro-ponto/registro-ponto.schema";
 import {
   useAdicionarOcorrenciaPonto,
   useAjustarRegistroPonto,
+  useConfiguracaoRegistroPonto,
   useEspelhoPonto,
   useHistoricoRegistroPonto,
   useMarcarPonto,
-  useRegistrosPonto
+  useRegistrosPonto,
+  useSalvarConfiguracaoRegistroPonto
 } from "@/features/registro-ponto/use-registro-ponto";
 import type {
   RegistroPontoFiltro,
@@ -65,6 +71,8 @@ const abas = [
   { id: "ajuste", label: "Ajuste administrativo", icon: ShieldCheck }
 ] as const;
 
+type AbaRegistroPonto = (typeof abas)[number]["id"];
+
 const tiposOcorrenciaOptions: RegistroPontoOcorrenciaTipo[] = [
   "AJUSTE_MANUAL",
   "ATRASO",
@@ -78,6 +86,13 @@ const tiposOcorrenciaOptions: RegistroPontoOcorrenciaTipo[] = [
 ];
 
 const tituloTela = "Registro de ponto";
+
+function normalizarAbaRegistroPonto(valor: string | null | undefined): AbaRegistroPonto {
+  if (abas.some((aba) => aba.id === valor)) {
+    return valor as AbaRegistroPonto;
+  }
+  return "listagem";
+}
 
 function formatarData(valor?: string) {
   if (!valor) return "---";
@@ -215,11 +230,12 @@ async function capturarLocalizacaoAtual() {
 
 export function RegistroPontoPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { usuario } = useAuth();
 
   const isAdmin = (usuario?.permissoes ?? []).includes("ADMINISTRADOR");
 
-  const [abaAtiva, setAbaAtiva] = useState<(typeof abas)[number]["id"]>("listagem");
+  const [abaAtiva, setAbaAtiva] = useState<AbaRegistroPonto>(() => normalizarAbaRegistroPonto(searchParams.get("aba")));
   const [filtroDraft, setFiltroDraft] = useState<RegistroPontoFiltro>({ ...filtroRegistroPontoPadrao });
   const [filtros, setFiltros] = useState<RegistroPontoFiltro>({ ...filtroRegistroPontoPadrao });
   const [registroSelecionadoId, setRegistroSelecionadoId] = useState<string | undefined>();
@@ -236,10 +252,12 @@ export function RegistroPontoPage() {
   const { data: listaData, isLoading: carregandoLista } = useRegistrosPonto(filtros);
   const { data: espelhoData, isLoading: carregandoEspelho } = useEspelhoPonto(filtros);
   const { data: historicoData, isLoading: carregandoHistorico } = useHistoricoRegistroPonto(registroSelecionadoId);
+  const { data: configuracaoHorarioData, isLoading: carregandoConfiguracaoHorario } = useConfiguracaoRegistroPonto();
 
   const marcarMutation = useMarcarPonto();
   const ajusteMutation = useAjustarRegistroPonto();
   const ocorrenciaMutation = useAdicionarOcorrenciaPonto();
+  const salvarConfiguracaoHorarioMutation = useSalvarConfiguracaoRegistroPonto();
 
   const ajusteForm = useForm<
     RegistroPontoAjusteFormInput,
@@ -256,6 +274,15 @@ export function RegistroPontoPage() {
       justificativa: "",
       observacao: ""
     }
+  });
+
+  const configuracaoHorarioForm = useForm<
+    RegistroPontoHorarioTrabalhoFormInput,
+    unknown,
+    RegistroPontoHorarioTrabalhoFormValues
+  >({
+    resolver: zodResolver(registroPontoHorarioTrabalhoSchema),
+    defaultValues: registroPontoHorarioTrabalhoPadrao
   });
 
   const registros = listaData?.registros ?? [];
@@ -304,6 +331,11 @@ export function RegistroPontoPage() {
   }, [usuario?.id]);
 
   useEffect(() => {
+    const abaDaUrl = normalizarAbaRegistroPonto(searchParams.get("aba"));
+    setAbaAtiva((atual) => (atual === abaDaUrl ? atual : abaDaUrl));
+  }, [searchParams]);
+
+  useEffect(() => {
     setConfirmacaoLogin(usuario?.nomeUsuario ?? "");
   }, [usuario?.nomeUsuario]);
 
@@ -338,6 +370,20 @@ export function RegistroPontoPage() {
       observacao: ""
     });
   }, [ajusteForm, registroSelecionado]);
+
+  useEffect(() => {
+    if (!configuracaoHorarioData) {
+      configuracaoHorarioForm.reset(registroPontoHorarioTrabalhoPadrao);
+      return;
+    }
+
+    configuracaoHorarioForm.reset({
+      horario_entrada_1: configuracaoHorarioData.horario_entrada_1 ?? "",
+      horario_saida_1: configuracaoHorarioData.horario_saida_1 ?? "",
+      horario_entrada_2: configuracaoHorarioData.horario_entrada_2 ?? "",
+      horario_saida_2: configuracaoHorarioData.horario_saida_2 ?? ""
+    });
+  }, [configuracaoHorarioData, configuracaoHorarioForm]);
 
   function aplicarBusca() {
     if (filtrosTravados) return;
@@ -385,6 +431,30 @@ export function RegistroPontoPage() {
     setOcorrenciaDescricao("");
     setMensagem({ tipo: "sucesso", texto: "Formulário restaurado." });
   }
+
+  function selecionarAba(aba: AbaRegistroPonto) {
+    setAbaAtiva(aba);
+    const proximosParams = new URLSearchParams(searchParams);
+    if (aba === "listagem") {
+      proximosParams.delete("aba");
+    } else {
+      proximosParams.set("aba", aba);
+    }
+    setSearchParams(proximosParams, { replace: true });
+  }
+
+  const submitConfiguracaoHorario = configuracaoHorarioForm.handleSubmit(async (values) => {
+    try {
+      await salvarConfiguracaoHorarioMutation.mutateAsync(values);
+      setMensagem({ tipo: "sucesso", texto: "Horários de trabalho salvos com sucesso." });
+    } catch (error: unknown) {
+      const apiError = error as { response?: { data?: { message?: string } } };
+      setMensagem({
+        tipo: "erro",
+        texto: apiError.response?.data?.message ?? "Não foi possível salvar os horários de trabalho."
+      });
+    }
+  });
 
   async function executarMarcacao() {
     try {
@@ -480,6 +550,11 @@ export function RegistroPontoPage() {
   }
 
   function acaoSalvar() {
+    if (abaAtiva === "marcacao") {
+      void submitConfiguracaoHorario();
+      return;
+    }
+
     if (abaAtiva === "ajuste") {
       if (!isAdmin) {
         setMensagem({ tipo: "erro", texto: "Apenas administrador pode salvar ajustes." });
@@ -615,7 +690,7 @@ export function RegistroPontoPage() {
     );
   }
 
-  function renderTabelaRegistros(registrosLista: RegistroPontoItem[]) {
+  function renderTabelaRegistros(registrosLista: RegistroPontoItem[], exibirOcorrencias = false) {
     return (
       <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]">
         <table className="min-w-[1080px] text-xs sm:text-sm">
@@ -632,7 +707,7 @@ export function RegistroPontoPage() {
               <th className="px-2 py-2 text-left">Atraso</th>
               <th className="px-2 py-2 text-left">Falta</th>
               <th className="px-2 py-2 text-left">Status</th>
-              <th className="px-2 py-2 text-left">Ocorrências</th>
+              {exibirOcorrencias ? <th className="px-2 py-2 text-left">Ocorrências</th> : null}
             </tr>
           </thead>
           <tbody>
@@ -663,13 +738,13 @@ export function RegistroPontoPage() {
                     {item.status === "COMPLETO" ? "Completo" : "Incompleto"}
                   </span>
                 </td>
-                <td className="px-2 py-2">{item.ocorrencias.join(", ") || "---"}</td>
+                {exibirOcorrencias ? <td className="px-2 py-2">{item.ocorrencias.join(", ") || "---"}</td> : null}
               </tr>
             ))}
 
             {!registrosLista.length && (
               <tr>
-                <td colSpan={12} className="px-2 py-8 text-center text-sm text-[var(--g3-muted)]">
+                <td colSpan={exibirOcorrencias ? 12 : 11} className="px-2 py-8 text-center text-sm text-[var(--g3-muted)]">
                   Nenhum registro encontrado para os filtros informados.
                 </td>
               </tr>
@@ -685,7 +760,7 @@ export function RegistroPontoPage() {
       return (
         <section className="space-y-3">
           {renderFiltros()}
-          {renderTabelaRegistros(registros)}
+          {renderTabelaRegistros(registros, false)}
         </section>
       );
     }
@@ -756,6 +831,76 @@ export function RegistroPontoPage() {
               )}
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Horários de trabalho</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-slate-700">
+                Informe os horários previstos para o sistema verificar se alguma batida obrigatória ficou pendente ao entrar no G3-Next.
+              </p>
+
+              {carregandoConfiguracaoHorario ? (
+                <p className="text-sm text-[var(--g3-muted)]">Carregando horários...</p>
+              ) : (
+                <>
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <div>
+                      <Label htmlFor="horario_entrada_1">Entrada 1</Label>
+                      <Input id="horario_entrada_1" type="time" {...configuracaoHorarioForm.register("horario_entrada_1")} />
+                      {configuracaoHorarioForm.formState.errors.horario_entrada_1 ? (
+                        <p className="mt-1 text-xs text-red-600">
+                          {configuracaoHorarioForm.formState.errors.horario_entrada_1.message}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div>
+                      <Label htmlFor="horario_saida_1">Saída 1</Label>
+                      <Input id="horario_saida_1" type="time" {...configuracaoHorarioForm.register("horario_saida_1")} />
+                      {configuracaoHorarioForm.formState.errors.horario_saida_1 ? (
+                        <p className="mt-1 text-xs text-red-600">
+                          {configuracaoHorarioForm.formState.errors.horario_saida_1.message}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div>
+                      <Label htmlFor="horario_entrada_2">Entrada 2</Label>
+                      <Input id="horario_entrada_2" type="time" {...configuracaoHorarioForm.register("horario_entrada_2")} />
+                      {configuracaoHorarioForm.formState.errors.horario_entrada_2 ? (
+                        <p className="mt-1 text-xs text-red-600">
+                          {configuracaoHorarioForm.formState.errors.horario_entrada_2.message}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div>
+                      <Label htmlFor="horario_saida_2">Saída 2</Label>
+                      <Input id="horario_saida_2" type="time" {...configuracaoHorarioForm.register("horario_saida_2")} />
+                      {configuracaoHorarioForm.formState.errors.horario_saida_2 ? (
+                        <p className="mt-1 text-xs text-red-600">
+                          {configuracaoHorarioForm.formState.errors.horario_saida_2.message}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  {configuracaoHorarioForm.formState.errors.root?.message ? (
+                    <p className="text-xs text-red-600">{configuracaoHorarioForm.formState.errors.root.message}</p>
+                  ) : null}
+
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      onClick={() => void submitConfiguracaoHorario()}
+                      disabled={salvarConfiguracaoHorarioMutation.isPending}
+                    >
+                      {salvarConfiguracaoHorarioMutation.isPending ? "Salvando..." : "Salvar horários"}
+                    </Button>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
         </section>
       );
     }
@@ -772,7 +917,7 @@ export function RegistroPontoPage() {
             <Card><CardContent className="p-3"><p className="text-xs text-[var(--g3-muted)]">Faltas</p><p className="text-lg font-semibold">{formatarMinutos(totaisEspelho?.faltas_minutos ?? 0)}</p></CardContent></Card>
             <Card><CardContent className="p-3"><p className="text-xs text-[var(--g3-muted)]">Ajustes</p><p className="text-lg font-semibold">{totaisEspelho?.total_ajustes ?? 0}</p></CardContent></Card>
           </div>
-          {carregandoEspelho ? <p className="text-sm text-[var(--g3-muted)]">Carregando espelho...</p> : renderTabelaRegistros(espelho)}
+          {carregandoEspelho ? <p className="text-sm text-[var(--g3-muted)]">Carregando espelho...</p> : renderTabelaRegistros(espelho, true)}
         </section>
       );
     }
@@ -929,7 +1074,7 @@ export function RegistroPontoPage() {
                     key={aba.id}
                     type="button"
                     className={classeBotaoAbaLateral(abaAtiva === aba.id)}
-                    onClick={() => setAbaAtiva(aba.id)}
+                    onClick={() => selecionarAba(aba.id)}
                   >
                     <span className={classeNumeroAbaLateral(abaAtiva === aba.id)}>{index + 1}</span>
                     <span>{aba.label}</span>

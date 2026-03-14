@@ -3,6 +3,10 @@
 type DatabaseLike = PrismaClient | Prisma.TransactionClient;
 
 const sqlEstruturaRegistroPonto: string[] = [
+  "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS horario_entrada_1 TIME",
+  "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS horario_saida_1 TIME",
+  "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS horario_entrada_2 TIME",
+  "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS horario_saida_2 TIME",
   `
   CREATE TABLE IF NOT EXISTS registro_ponto (
     id BIGSERIAL PRIMARY KEY,

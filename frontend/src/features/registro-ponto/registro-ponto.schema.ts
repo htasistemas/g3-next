@@ -1,5 +1,9 @@
 ﻿import { z } from "zod";
-import type { RegistroPontoFiltro, RegistroPontoOcorrenciaTipo } from "@/types/registro-ponto";
+import type {
+  RegistroPontoFiltro,
+  RegistroPontoHorarioTrabalhoPayload,
+  RegistroPontoOcorrenciaTipo
+} from "@/types/registro-ponto";
 import { endOfMonthLocalISO, startOfMonthLocalISO } from "@/lib/date-utils";
 
 const optionalTrimmedString = z.preprocess((value) => {
@@ -26,6 +30,59 @@ export const registroPontoAjusteSchema = z.object({
 
 export type RegistroPontoAjusteFormInput = z.input<typeof registroPontoAjusteSchema>;
 export type RegistroPontoAjusteFormValues = z.output<typeof registroPontoAjusteSchema>;
+
+export const registroPontoHorarioTrabalhoSchema = z
+  .object({
+    horario_entrada_1: optionalTime,
+    horario_saida_1: optionalTime,
+    horario_entrada_2: optionalTime,
+    horario_saida_2: optionalTime
+  })
+  .superRefine((value, context) => {
+    if ((value.horario_entrada_1 && !value.horario_saida_1) || (!value.horario_entrada_1 && value.horario_saida_1)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["horario_saida_1"],
+        message: "Informe entrada e saída do primeiro turno."
+      });
+    }
+
+    if ((value.horario_entrada_2 && !value.horario_saida_2) || (!value.horario_entrada_2 && value.horario_saida_2)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["horario_saida_2"],
+        message: "Informe entrada e saída do segundo turno."
+      });
+    }
+
+    const horarios = [
+      value.horario_entrada_1,
+      value.horario_saida_1,
+      value.horario_entrada_2,
+      value.horario_saida_2
+    ].filter((item): item is string => !!item);
+
+    for (let index = 1; index < horarios.length; index += 1) {
+      if (horarios[index] < horarios[index - 1]) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["horario_entrada_1"],
+          message: "A sequência dos horários de trabalho é inválida."
+        });
+        break;
+      }
+    }
+  });
+
+export type RegistroPontoHorarioTrabalhoFormInput = z.input<typeof registroPontoHorarioTrabalhoSchema>;
+export type RegistroPontoHorarioTrabalhoFormValues = z.output<typeof registroPontoHorarioTrabalhoSchema>;
+
+export const registroPontoHorarioTrabalhoPadrao: RegistroPontoHorarioTrabalhoPayload = {
+  horario_entrada_1: "",
+  horario_saida_1: "",
+  horario_entrada_2: "",
+  horario_saida_2: ""
+};
 
 export const registroPontoOcorrenciaSchema = z.object({
   tipo: z.enum([

@@ -3,6 +3,7 @@ import { registroPontoService } from "@/services/registro-ponto.service";
 import type {
   RegistroPontoAjustePayload,
   RegistroPontoFiltro,
+  RegistroPontoHorarioTrabalhoPayload,
   RegistroPontoMarcarPayload,
   RegistroPontoOcorrenciaPayload
 } from "@/types/registro-ponto";
@@ -26,6 +27,13 @@ export function useCatalogoUsuariosRegistroPonto(termo?: string) {
     queryKey: ["registro-ponto", "usuarios", termo ?? ""],
     queryFn: () => registroPontoService.listarUsuarios(termo),
     enabled: (termo?.trim().length ?? 0) >= 2
+  });
+}
+
+export function useConfiguracaoRegistroPonto() {
+  return useQuery({
+    queryKey: ["registro-ponto", "configuracao"],
+    queryFn: () => registroPontoService.buscarConfiguracao()
   });
 }
 
@@ -72,5 +80,16 @@ export function useHistoricoRegistroPonto(id?: string) {
     queryKey: ["registro-ponto", "historico", id],
     queryFn: () => registroPontoService.buscarHistorico(id as string),
     enabled: !!id
+  });
+}
+
+export function useSalvarConfiguracaoRegistroPonto() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: RegistroPontoHorarioTrabalhoPayload) => registroPontoService.salvarConfiguracao(payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["registro-ponto", "configuracao"] });
+    }
   });
 }

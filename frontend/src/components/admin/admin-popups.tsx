@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import type { ButtonProps } from "@/components/ui/button";
 
 export type PopupMensagemState = {
   tipo: "sucesso" | "erro" | "aviso";
@@ -55,7 +56,9 @@ export function PopupConfirmacao({
   processando,
   onCancel,
   onConfirm,
-  confirmarTexto = "Confirmar"
+  confirmarTexto = "Confirmar",
+  cancelarTexto = "Cancelar",
+  confirmarVariant = "danger"
 }: {
   aberto: boolean;
   titulo: string;
@@ -64,6 +67,8 @@ export function PopupConfirmacao({
   onCancel: () => void;
   onConfirm: () => void;
   confirmarTexto?: string;
+  cancelarTexto?: string;
+  confirmarVariant?: ButtonProps["variant"];
 }) {
   if (!aberto) return null;
 
@@ -86,9 +91,9 @@ export function PopupConfirmacao({
         </div>
         <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3">
           <Button type="button" variant="outline" disabled={processando} onClick={onCancel}>
-            Cancelar
+            {cancelarTexto}
           </Button>
-          <Button type="button" variant="danger" disabled={processando} onClick={onConfirm}>
+          <Button type="button" variant={confirmarVariant} disabled={processando} onClick={onConfirm}>
             {processando ? "Processando..." : confirmarTexto}
           </Button>
         </div>

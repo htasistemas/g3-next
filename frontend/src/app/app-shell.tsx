@@ -1,13 +1,16 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { startTransition } from "react";
+import { PopupConfirmacao } from "@/components/admin/admin-popups";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { APP_VERSION } from "@/lib/app-version";
 import { resolverUrlArquivo } from "@/lib/arquivos";
 import { useLembretesDiarios } from "@/features/lembretes-diarios/use-lembretes-diarios";
+import { registroPontoService } from "@/services/registro-ponto.service";
 import { useTarefasAdministrativas } from "@/features/tarefas-administrativas/use-tarefas-administrativas";
 import { useUnidadeAssistencialAtual } from "@/features/unidades-assistenciais/use-unidades-assistenciais";
+import type { RegistroPontoAlertaPendente } from "@/types/registro-ponto";
 import {
   AlarmClockCheck,
   BadgeDollarSign,
@@ -438,6 +441,8 @@ function itemEstaAtivo(pathname: string, item: MenuItem) {
 export function AppShell() {
   const { usuario, logout } = useAuth();
   const [carregarResumoInicial, setCarregarResumoInicial] = useState(false);
+  const [popupPontoPendente, setPopupPontoPendente] = useState<RegistroPontoAlertaPendente | null>(null);
+  const [usuarioVerificadoPontoId, setUsuarioVerificadoPontoId] = useState<string | null>(null);
   const usuarioId = usuario?.id ? Number(usuario.id) : undefined;
   const { data: unidadeAtualData } = useUnidadeAssistencialAtual({ enabled: carregarResumoInicial });
   const { data: lembretesData } = useLembretesDiarios(usuarioId, {
@@ -593,6 +598,41 @@ export function AppShell() {
     }
   }, [totalPendentes, lembreteAlertaAtivo]);
 
+  useEffect(() => {
+    if (!usuario?.id) {
+      setPopupPontoPendente(null);
+      setUsuarioVerificadoPontoId(null);
+      return;
+    }
+
+    if (usuarioVerificadoPontoId === usuario.id) {
+      return;
+    }
+
+    let ativo = true;
+
+    void (async () => {
+      try {
+        const alerta = await registroPontoService.buscarAlertaPendente();
+        if (ativo && alerta.exibir_alerta) {
+          setPopupPontoPendente(alerta);
+        }
+      } catch {
+        if (ativo) {
+          setPopupPontoPendente(null);
+        }
+      } finally {
+        if (ativo) {
+          setUsuarioVerificadoPontoId(usuario.id);
+        }
+      }
+    })();
+
+    return () => {
+      ativo = false;
+    };
+  }, [usuario?.id, usuarioVerificadoPontoId]);
+
   function abrirLembretes() {
     localStorage.removeItem("g3_lembrete_alerta");
     setLembreteAlertaAtivo(false);
@@ -601,6 +641,11 @@ export function AppShell() {
 
   function abrirTarefas() {
     navigate("/setor-administrativo/tarefas-pendencias?tab=listagem");
+  }
+
+  function confirmarPopupPontoPendente() {
+    setPopupPontoPendente(null);
+    navigate("/setor-rh/registro-ponto?aba=marcacao");
   }
 
   function alternarSidebar() {
@@ -869,6 +914,20 @@ export function AppShell() {
 
         <Outlet />
       </div>
+
+      <PopupConfirmacao
+        aberto={!!popupPontoPendente?.exibir_alerta}
+        titulo="Ponto pendente"
+        texto={
+          popupPontoPendente?.mensagem ??
+          "O ponto previsto para este horário ainda não foi registrado. Deseja registrar agora?"
+        }
+        onCancel={() => setPopupPontoPendente(null)}
+        onConfirm={confirmarPopupPontoPendente}
+        confirmarTexto="Sim"
+        cancelarTexto="Não"
+        confirmarVariant="default"
+      />
     </div>
   );
 }

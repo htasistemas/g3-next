@@ -48,6 +48,13 @@ export type RegistroPontoOcorrenciaInput = {
   descricao?: string;
 };
 
+export type RegistroPontoHorarioUsuarioInput = {
+  horario_entrada_1?: string;
+  horario_saida_1?: string;
+  horario_entrada_2?: string;
+  horario_saida_2?: string;
+};
+
 export type RegistroPontoAtor = {
   id?: bigint;
   nome_usuario: string;
@@ -138,4 +145,21 @@ export type RegistroPontoStatusBatida = {
   registro: RegistroPontoListaItem;
   mensagem: string;
   bloqueado?: boolean;
+};
+
+export type RegistroPontoHorarioUsuario = {
+  horario_entrada_1?: string;
+  horario_saida_1?: string;
+  horario_entrada_2?: string;
+  horario_saida_2?: string;
+  jornada_configurada: boolean;
+};
+
+export type RegistroPontoAlertaPendencia = {
+  exibir_alerta: boolean;
+  data_referencia?: string;
+  campo?: "entrada_1" | "saida_1" | "entrada_2" | "saida_2";
+  rotulo_batida?: string;
+  horario_previsto?: string;
+  mensagem?: string;
 };

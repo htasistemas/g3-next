@@ -15,10 +15,31 @@ const permissoesMarcacao = ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"];
 const permissoesAjuste = ["ADMINISTRADOR"];
 
 registroPontoRoutes.get(
+  "/alerta-pendente",
+  ensureAuthenticated,
+  ensurePermissions(permissoesMarcacao),
+  asyncHandler(controller.buscarAlertaPendencia.bind(controller))
+);
+
+registroPontoRoutes.get(
   "/catalogo/usuarios",
   ensureAuthenticated,
   ensurePermissions(permissoesLeitura),
   asyncHandler(controller.listarUsuarios.bind(controller))
+);
+
+registroPontoRoutes.get(
+  "/configuracao",
+  ensureAuthenticated,
+  ensurePermissions(permissoesMarcacao),
+  asyncHandler(controller.buscarHorarioUsuario.bind(controller))
+);
+
+registroPontoRoutes.put(
+  "/configuracao",
+  ensureAuthenticated,
+  ensurePermissions(permissoesMarcacao),
+  asyncHandler(controller.salvarHorarioUsuario.bind(controller))
 );
 
 registroPontoRoutes.get(

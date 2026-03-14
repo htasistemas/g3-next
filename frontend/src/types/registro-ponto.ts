@@ -129,3 +129,27 @@ export type RegistroPontoUsuarioCatalogoItem = {
   login: string;
   unidade?: string;
 };
+
+export type RegistroPontoHorarioTrabalho = {
+  horario_entrada_1?: string;
+  horario_saida_1?: string;
+  horario_entrada_2?: string;
+  horario_saida_2?: string;
+  jornada_configurada: boolean;
+};
+
+export type RegistroPontoHorarioTrabalhoPayload = {
+  horario_entrada_1?: string;
+  horario_saida_1?: string;
+  horario_entrada_2?: string;
+  horario_saida_2?: string;
+};
+
+export type RegistroPontoAlertaPendente = {
+  exibir_alerta: boolean;
+  data_referencia?: string;
+  campo?: "entrada_1" | "saida_1" | "entrada_2" | "saida_2";
+  rotulo_batida?: string;
+  horario_previsto?: string;
+  mensagem?: string;
+};

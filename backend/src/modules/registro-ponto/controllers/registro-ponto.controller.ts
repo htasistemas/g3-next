@@ -47,6 +47,22 @@ export class RegistroPontoController {
     return response.json({ usuarios });
   }
 
+  async buscarHorarioUsuario(request: AuthenticatedRequest, response: Response) {
+    const configuracao = await service.buscarHorarioUsuario(request.authUser ?? {});
+    return response.json(configuracao);
+  }
+
+  async salvarHorarioUsuario(request: AuthenticatedRequest, response: Response) {
+    const origem = obterOrigem(request);
+    const configuracao = await service.salvarHorarioUsuario(request.body, request.authUser ?? {}, origem);
+    return response.json(configuracao);
+  }
+
+  async buscarAlertaPendencia(request: AuthenticatedRequest, response: Response) {
+    const alerta = await service.buscarAlertaPendencia(request.authUser ?? {});
+    return response.json(alerta);
+  }
+
   async marcarPonto(request: AuthenticatedRequest, response: Response) {
     const origem = obterOrigem(request);
     const registro = await service.marcarPonto(request.body, request.authUser ?? {}, origem);

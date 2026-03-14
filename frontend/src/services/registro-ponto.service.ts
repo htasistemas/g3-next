@@ -1,8 +1,11 @@
 ﻿import { httpClient } from "./http-client";
 import type {
+  RegistroPontoAlertaPendente,
   RegistroPontoAjustePayload,
   RegistroPontoEspelhoResponse,
   RegistroPontoFiltro,
+  RegistroPontoHorarioTrabalho,
+  RegistroPontoHorarioTrabalhoPayload,
   RegistroPontoHistoricoResponse,
   RegistroPontoListaResponse,
   RegistroPontoMarcarPayload,
@@ -33,6 +36,21 @@ export const registroPontoService = {
         params: { termo }
       }
     );
+    return data;
+  },
+
+  async buscarConfiguracao(): Promise<RegistroPontoHorarioTrabalho> {
+    const { data } = await httpClient.get<RegistroPontoHorarioTrabalho>("/api/registro-ponto/configuracao");
+    return data;
+  },
+
+  async salvarConfiguracao(payload: RegistroPontoHorarioTrabalhoPayload): Promise<RegistroPontoHorarioTrabalho> {
+    const { data } = await httpClient.put<RegistroPontoHorarioTrabalho>("/api/registro-ponto/configuracao", payload);
+    return data;
+  },
+
+  async buscarAlertaPendente(): Promise<RegistroPontoAlertaPendente> {
+    const { data } = await httpClient.get<RegistroPontoAlertaPendente>("/api/registro-ponto/alerta-pendente");
     return data;
   },
 

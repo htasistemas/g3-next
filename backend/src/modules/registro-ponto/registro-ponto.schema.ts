@@ -78,3 +78,53 @@ export const registroPontoOcorrenciaSchema = z.object({
   tipo: z.enum(registroPontoOcorrenciaTipos),
   descricao: optionalTrimmedString
 });
+
+export const registroPontoHorarioUsuarioSchema = z
+  .object({
+    horario_entrada_1: optionalTime,
+    horario_saida_1: optionalTime,
+    horario_entrada_2: optionalTime,
+    horario_saida_2: optionalTime
+  })
+  .superRefine((value, context) => {
+    const entrada1 = value.horario_entrada_1;
+    const saida1 = value.horario_saida_1;
+    const entrada2 = value.horario_entrada_2;
+    const saida2 = value.horario_saida_2;
+
+    if ((entrada1 && !saida1) || (!entrada1 && saida1)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["horario_saida_1"],
+        message: "Informe entrada e saída do primeiro turno."
+      });
+    }
+
+    if ((entrada2 && !saida2) || (!entrada2 && saida2)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["horario_saida_2"],
+        message: "Informe entrada e saída do segundo turno."
+      });
+    }
+
+    const horarios = [
+      value.horario_entrada_1,
+      value.horario_saida_1,
+      value.horario_entrada_2,
+      value.horario_saida_2
+    ]
+      .filter((item): item is string => !!item)
+      .map((item) => item.slice(0, 5));
+
+    for (let index = 1; index < horarios.length; index += 1) {
+      if (horarios[index] < horarios[index - 1]) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["horario_entrada_1"],
+          message: "A sequência dos horários de trabalho é inválida."
+        });
+        break;
+      }
+    }
+  });
