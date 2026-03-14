@@ -1,5 +1,3 @@
-// @vitest-environment jsdom
-
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   audioPainelJaLiberado,
@@ -11,6 +9,26 @@ import {
   registrarAudioLiberado,
   registrarChamadaFalando
 } from "../senhas-voz";
+
+class MockStorage {
+  private readonly valores = new Map<string, string>();
+
+  clear() {
+    this.valores.clear();
+  }
+
+  getItem(chave: string) {
+    return this.valores.has(chave) ? this.valores.get(chave) ?? null : null;
+  }
+
+  removeItem(chave: string) {
+    this.valores.delete(chave);
+  }
+
+  setItem(chave: string, valor: string) {
+    this.valores.set(chave, String(valor));
+  }
+}
 
 class MockSpeechSynthesisUtterance {
   text: string;
@@ -28,9 +46,28 @@ class MockSpeechSynthesisUtterance {
 }
 
 describe("senhas-voz", () => {
+  const windowOriginal = Object.getOwnPropertyDescriptor(globalThis, "window");
+  const utteranceOriginal = Object.getOwnPropertyDescriptor(
+    globalThis,
+    "SpeechSynthesisUtterance"
+  );
+
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-03-09T10:00:00.000Z"));
+    const localStorage = new MockStorage();
+    const sessionStorage = new MockStorage();
+
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {
+        localStorage,
+        sessionStorage,
+        setTimeout: globalThis.setTimeout.bind(globalThis),
+        clearTimeout: globalThis.clearTimeout.bind(globalThis)
+      }
+    });
+
     window.localStorage.clear();
     window.sessionStorage.clear();
     Object.defineProperty(globalThis, "SpeechSynthesisUtterance", {
@@ -42,8 +79,18 @@ describe("senhas-voz", () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
-    window.localStorage.clear();
-    window.sessionStorage.clear();
+
+    if (windowOriginal) {
+      Object.defineProperty(globalThis, "window", windowOriginal);
+    } else {
+      Reflect.deleteProperty(globalThis, "window");
+    }
+
+    if (utteranceOriginal) {
+      Object.defineProperty(globalThis, "SpeechSynthesisUtterance", utteranceOriginal);
+    } else {
+      Reflect.deleteProperty(globalThis, "SpeechSynthesisUtterance");
+    }
   });
 
   it("monta a frase com beneficiario e sala", () => {
