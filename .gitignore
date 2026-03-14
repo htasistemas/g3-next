@@ -27,3 +27,4 @@ tmp_edit.py
 .env
 actions-runner
 configuracao servidor email.txt
+backend/storage/
