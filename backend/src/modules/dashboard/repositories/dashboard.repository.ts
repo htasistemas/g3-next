@@ -30,6 +30,10 @@ function toIsoDateOrNull(value: Date | string | null | undefined): string | null
   return parsed.toISOString().slice(0, 10);
 }
 
+function normalizarTextoSql(coluna: string) {
+  return `LOWER(translate(COALESCE(${coluna}, ''), 'ÁÀÃÂÄÉÈÊËÍÌÎÏÓÒÕÔÖÚÙÛÜÇáàãâäéèêëíìîïóòõôöúùûüç', 'AAAAAEEEEIIIIOOOOOUUUUCaaaaaeeeeiiiiooooouuuuc'))`;
+}
+
 export class DashboardRepository {
   private readonly tabelaCache = new Map<string, boolean>();
   private readonly colunaCache = new Map<string, boolean>();
@@ -277,12 +281,21 @@ export class DashboardRepository {
     const colunas = await this.verificarColunas("lancamento_financeiro", ["tipo", "situacao", "valor"]);
     if (!possuiTabela || !colunas) return 0;
 
+    const tipoNormalizado = normalizarTextoSql("tipo");
+    const situacaoNormalizada = normalizarTextoSql("situacao");
+
     return this.consultarTotal(
       `
       SELECT COALESCE(SUM(valor), 0) AS total
       FROM lancamento_financeiro
-      WHERE LOWER(COALESCE(tipo, '')) = 'receber'
-        AND LOWER(COALESCE(situacao, '')) <> 'pago'
+      WHERE (
+          ${tipoNormalizado} IN ('receber', 'a receber', 'receita', 'entrada', 'credito')
+          OR ${tipoNormalizado} LIKE '%receber%'
+          OR ${tipoNormalizado} LIKE 'receita%'
+          OR ${tipoNormalizado} LIKE '%entrada%'
+          OR ${tipoNormalizado} LIKE '%credito%'
+        )
+        AND ${situacaoNormalizada} NOT IN ('pago', 'paga', 'recebido', 'recebida', 'liquidado', 'liquidada', 'concluido', 'concluida')
       `,
       []
     );
@@ -290,14 +303,31 @@ export class DashboardRepository {
 
   async somarValoresEmCaixa() {
     const possuiTabela = await this.tabelaExiste("conta_bancaria");
-    const colunas = await this.verificarColunas("conta_bancaria", ["tipo", "saldo"]);
-    if (!possuiTabela || !colunas) return 0;
+    const possuiSaldo = await this.colunaExiste("conta_bancaria", "saldo");
+    const possuiTipo = await this.colunaExiste("conta_bancaria", "tipo");
+    const possuiRecebimentoLocal = await this.colunaExiste("conta_bancaria", "recebimento_local");
+    if (!possuiTabela || !possuiSaldo) return 0;
+
+    const tipoNormalizado = possuiTipo ? normalizarTextoSql("tipo") : "''";
+    const condicoes: string[] = [];
+
+    if (possuiRecebimentoLocal) {
+      condicoes.push("COALESCE(recebimento_local, FALSE) = TRUE");
+    }
+
+    if (possuiTipo) {
+      condicoes.push(`${tipoNormalizado} LIKE '%caixa%'`);
+    }
+
+    if (!condicoes.length) {
+      return 0;
+    }
 
     return this.consultarTotal(
       `
       SELECT COALESCE(SUM(saldo), 0) AS total
       FROM conta_bancaria
-      WHERE LOWER(COALESCE(tipo, '')) = 'corrente'
+      WHERE ${condicoes.map((condicao) => `(${condicao})`).join(" OR ")}
       `,
       []
     );
@@ -305,14 +335,35 @@ export class DashboardRepository {
 
   async somarValoresEmBanco() {
     const possuiTabela = await this.tabelaExiste("conta_bancaria");
-    const colunas = await this.verificarColunas("conta_bancaria", ["tipo", "saldo"]);
-    if (!possuiTabela || !colunas) return 0;
+    const possuiSaldo = await this.colunaExiste("conta_bancaria", "saldo");
+    const possuiTipo = await this.colunaExiste("conta_bancaria", "tipo");
+    const possuiRecebimentoLocal = await this.colunaExiste("conta_bancaria", "recebimento_local");
+    if (!possuiTabela || !possuiSaldo) return 0;
+
+    const tipoNormalizado = possuiTipo ? normalizarTextoSql("tipo") : "''";
+    const condicoes: string[] = [];
+
+    if (possuiRecebimentoLocal) {
+      condicoes.push("COALESCE(recebimento_local, FALSE) = FALSE");
+    }
+
+    if (possuiTipo) {
+      condicoes.push(`${tipoNormalizado} NOT LIKE '%caixa%'`);
+    }
+
+    const filtroBanco = possuiRecebimentoLocal && possuiTipo
+      ? "(COALESCE(recebimento_local, FALSE) = FALSE AND " + `${tipoNormalizado} NOT LIKE '%caixa%'` + ")"
+      : possuiRecebimentoLocal
+        ? "COALESCE(recebimento_local, FALSE) = FALSE"
+        : possuiTipo
+          ? `${tipoNormalizado} NOT LIKE '%caixa%'`
+          : "TRUE";
 
     return this.consultarTotal(
       `
       SELECT COALESCE(SUM(saldo), 0) AS total
       FROM conta_bancaria
-      WHERE LOWER(COALESCE(tipo, '')) <> 'corrente'
+      WHERE ${filtroBanco}
       `,
       []
     );
@@ -548,6 +599,9 @@ export class DashboardRepository {
     const colunas = await this.verificarColunas("lancamento_financeiro", ["tipo", "situacao", "valor"]);
     if (!possuiTabela || !colunas) return 0;
 
+    const tipoNormalizado = normalizarTextoSql("tipo");
+    const situacaoNormalizada = normalizarTextoSql("situacao");
+
     return this.consultarTotal(
       `
       SELECT
@@ -559,13 +613,25 @@ export class DashboardRepository {
         (
           SELECT COALESCE(SUM(valor), 0)::numeric AS total
           FROM lancamento_financeiro
-          WHERE LOWER(COALESCE(tipo, '')) = 'receber'
+          WHERE (
+            ${tipoNormalizado} IN ('receber', 'a receber', 'receita', 'entrada', 'credito')
+            OR ${tipoNormalizado} LIKE '%receber%'
+            OR ${tipoNormalizado} LIKE 'receita%'
+            OR ${tipoNormalizado} LIKE '%entrada%'
+            OR ${tipoNormalizado} LIKE '%credito%'
+          )
         ) total_receber,
         (
           SELECT COALESCE(SUM(valor), 0)::numeric AS total
           FROM lancamento_financeiro
-          WHERE LOWER(COALESCE(tipo, '')) = 'receber'
-            AND LOWER(COALESCE(situacao, '')) = 'pago'
+          WHERE (
+            ${tipoNormalizado} IN ('receber', 'a receber', 'receita', 'entrada', 'credito')
+            OR ${tipoNormalizado} LIKE '%receber%'
+            OR ${tipoNormalizado} LIKE 'receita%'
+            OR ${tipoNormalizado} LIKE '%entrada%'
+            OR ${tipoNormalizado} LIKE '%credito%'
+          )
+            AND ${situacaoNormalizada} IN ('pago', 'paga', 'recebido', 'recebida', 'liquidado', 'liquidada', 'concluido', 'concluida')
         ) total_pago
       `,
       []

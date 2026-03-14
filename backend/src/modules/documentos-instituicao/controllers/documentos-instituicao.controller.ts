@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import type { AuthenticatedRequest } from "../../auth/middlewares/auth.middleware.js";
 import { DocumentosInstituicaoService } from "../services/documentos-instituicao.service.js";
 
 const service = new DocumentosInstituicaoService();
@@ -30,7 +31,11 @@ export class DocumentosInstituicaoController {
   }
 
   async adicionarAnexo(request: Request, response: Response) {
-    const anexo = await service.adicionarAnexo(request.params.id, request.body);
+    const anexo = await service.adicionarAnexo(
+      request.params.id,
+      request.body,
+      (request as AuthenticatedRequest).authUser?.id
+    );
     return response.status(201).json(anexo);
   }
 

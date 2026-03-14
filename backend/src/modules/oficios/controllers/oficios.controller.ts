@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import type { AuthenticatedRequest } from "../../auth/middlewares/auth.middleware.js";
 import { OficiosService } from "../services/oficios.service.js";
 
 const service = new OficiosService();
@@ -25,12 +26,16 @@ export class OficiosController {
   }
 
   async excluir(request: Request, response: Response) {
-    await service.remover(request.params.id);
+    await service.remover(request.params.id, (request as AuthenticatedRequest).authUser?.id);
     return response.status(204).send();
   }
 
   async salvarPdfAssinado(request: Request, response: Response) {
-    const oficio = await service.salvarPdfAssinado(request.params.id, request.body);
+    const oficio = await service.salvarPdfAssinado(
+      request.params.id,
+      request.body,
+      (request as AuthenticatedRequest).authUser?.id
+    );
     return response.json(oficio);
   }
 
@@ -40,7 +45,10 @@ export class OficiosController {
   }
 
   async removerPdfAssinado(request: Request, response: Response) {
-    await service.removerPdfAssinado(request.params.id);
+    await service.removerPdfAssinado(
+      request.params.id,
+      (request as AuthenticatedRequest).authUser?.id
+    );
     return response.status(204).send();
   }
 
@@ -50,12 +58,20 @@ export class OficiosController {
   }
 
   async adicionarImagem(request: Request, response: Response) {
-    const imagem = await service.adicionarImagem(request.params.id, request.body);
+    const imagem = await service.adicionarImagem(
+      request.params.id,
+      request.body,
+      (request as AuthenticatedRequest).authUser?.id
+    );
     return response.status(201).json(imagem);
   }
 
   async removerImagem(request: Request, response: Response) {
-    await service.removerImagem(request.params.id, request.params.imagemId);
+    await service.removerImagem(
+      request.params.id,
+      request.params.imagemId,
+      (request as AuthenticatedRequest).authUser?.id
+    );
     return response.status(204).send();
   }
 }

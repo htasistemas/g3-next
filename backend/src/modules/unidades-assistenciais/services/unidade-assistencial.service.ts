@@ -11,6 +11,7 @@ import {
   mapaSalaUnidade
 } from "../../../utils/text-format-config.js";
 import { normalizarObjetoTexto } from "../../../utils/text-formatter.js";
+import { storageService } from "../../arquivos/services/storage-instance.js";
 
 export class UnidadeAssistencialService {
   private readonly repository = new UnidadeAssistencialRepository();
@@ -43,24 +44,61 @@ export class UnidadeAssistencialService {
     return unidade ? mapUnidadeAssistencialToResponse(unidade) : null;
   }
 
-  async criar(rawInput: unknown) {
+  async criar(rawInput: unknown, rawUsuarioId?: string) {
     const inputNormalizado = this.normalizarPayload(rawInput);
     const input = unidadeAssistencialInputSchema.parse(inputNormalizado);
-    const unidade = await this.repository.criar(input);
-    return mapUnidadeAssistencialToResponse(unidade);
+    const usuarioId = this.parseUsuarioId(rawUsuarioId);
+    const preparado = await this.prepararImagens(input, usuarioId);
+
+    try {
+      const unidade = await this.repository.criar(preparado.input);
+      await this.vincularArquivos(preparado.novosCaminhos, unidade.id);
+      return mapUnidadeAssistencialToResponse(unidade);
+    } catch (error) {
+      await storageService.rollbackArquivos(preparado.novosCaminhos);
+      throw error;
+    }
   }
 
-  async atualizar(rawId: string, rawInput: unknown) {
+  async atualizar(rawId: string, rawInput: unknown, rawUsuarioId?: string) {
     const id = this.parseId(rawId);
     const inputNormalizado = this.normalizarPayload(rawInput);
     const input = unidadeAssistencialInputSchema.parse(inputNormalizado);
-    const unidade = await this.repository.atualizar(id, input);
-    return mapUnidadeAssistencialToResponse(unidade);
+    const usuarioId = this.parseUsuarioId(rawUsuarioId);
+    const existente = await this.repository.buscarPorIdOuFalhar(id);
+    const preparado = await this.prepararImagens(input, usuarioId, id);
+
+    try {
+      const unidade = await this.repository.atualizar(id, preparado.input);
+      await this.vincularArquivos(preparado.novosCaminhos, id);
+      await this.limparArquivosSubstituidos(
+        [existente.imagemUnidade?.logomarca, existente.imagemUnidade?.logomarcaRelatorio].filter((item) =>
+          this.isManagedStoragePath(item)
+        ) as string[],
+        [unidade.imagemUnidade?.logomarca, unidade.imagemUnidade?.logomarcaRelatorio].filter((item) =>
+          this.isManagedStoragePath(item)
+        ) as string[],
+        usuarioId
+      );
+      return mapUnidadeAssistencialToResponse(unidade);
+    } catch (error) {
+      await storageService.rollbackArquivos(preparado.novosCaminhos);
+      throw error;
+    }
   }
 
-  async remover(rawId: string) {
+  async remover(rawId: string, rawUsuarioId?: string) {
     const id = this.parseId(rawId);
+    const usuarioId = this.parseUsuarioId(rawUsuarioId);
+    const existente = await this.repository.buscarPorIdOuFalhar(id);
     await this.repository.remover(id);
+    await this.limparArquivosSubstituidos(
+      [existente.imagemUnidade?.logomarca, existente.imagemUnidade?.logomarcaRelatorio].filter((item) =>
+        this.isManagedStoragePath(item)
+      ) as string[],
+      [],
+      usuarioId
+    );
   }
 
   private parseId(rawId: string): bigint {
@@ -96,5 +134,84 @@ export class UnidadeAssistencialService {
     }
 
     return inputBase;
+  }
+
+  private async prepararImagens(
+    input: ReturnType<typeof unidadeAssistencialInputSchema.parse>,
+    usuarioId?: bigint,
+    entidadeId?: bigint
+  ) {
+    const novosCaminhos: string[] = [];
+
+    const logomarca = await storageService.persistirCampo({
+      scope: "instituicao_imagem",
+      valor: input.logomarca,
+      nomeOriginal: `${input.nome_fantasia.replace(/\s+/g, "-").toLowerCase()}-logomarca.jpg`,
+      mimeType: "image/jpeg",
+      entidadeId,
+      usuarioUploadId: usuarioId,
+      observacao: "Logomarca da instituicao"
+    });
+
+    if (logomarca.registro && logomarca.caminhoArquivo) {
+      novosCaminhos.push(logomarca.caminhoArquivo);
+    }
+
+    const logomarcaRelatorio = await storageService.persistirCampo({
+      scope: "instituicao_imagem",
+      valor: input.logomarca_relatorio,
+      nomeOriginal: `${input.nome_fantasia.replace(/\s+/g, "-").toLowerCase()}-logomarca-relatorio.jpg`,
+      mimeType: "image/jpeg",
+      entidadeId,
+      usuarioUploadId: usuarioId,
+      observacao: "Logomarca de relatorio da instituicao"
+    });
+
+    if (logomarcaRelatorio.registro && logomarcaRelatorio.caminhoArquivo) {
+      novosCaminhos.push(logomarcaRelatorio.caminhoArquivo);
+    }
+
+    return {
+      input: {
+        ...input,
+        logomarca: logomarca.caminhoArquivo,
+        logomarca_relatorio: logomarcaRelatorio.caminhoArquivo
+      },
+      novosCaminhos
+    };
+  }
+
+  private async vincularArquivos(caminhos: string[], entidadeId: bigint) {
+    for (const caminho of caminhos) {
+      await storageService.vincularEntidade(caminho, entidadeId);
+    }
+  }
+
+  private async limparArquivosSubstituidos(
+    caminhosAntigos: string[],
+    caminhosAtuais: string[],
+    usuarioId?: bigint
+  ) {
+    const atuais = new Set(caminhosAtuais);
+    for (const caminho of caminhosAntigos) {
+      if (!atuais.has(caminho)) {
+        await storageService.desativarPorCaminho(caminho, usuarioId);
+      }
+    }
+  }
+
+  private isManagedStoragePath(valor?: string | null) {
+    if (!valor?.trim()) return false;
+    const normalized = valor.trim();
+    return !normalized.startsWith("data:") && !/^https?:\/\//i.test(normalized);
+  }
+
+  private parseUsuarioId(rawUsuarioId?: string) {
+    if (!rawUsuarioId) return undefined;
+    const parsed = Number(rawUsuarioId);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      return undefined;
+    }
+    return BigInt(parsed);
   }
 }

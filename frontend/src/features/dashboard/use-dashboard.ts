@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { dashboardService } from "@/services/dashboard.service";
 import type { DashboardFiltros } from "@/types/dashboard";
 import type { PowerBiFiltros } from "@/types/power-bi";
@@ -31,5 +31,25 @@ export function useDashboardPowerBi(
     queryFn: () => dashboardService.obterPowerBi(filtros),
     staleTime: 60_000,
     refetchInterval: options.autoRefresh ? refreshIntervalMs : false
+  });
+}
+
+export function useDashboardVulnerabilidade(options: UseDashboardOptions = {}) {
+  const refreshIntervalMs = options.refreshIntervalMs ?? 120_000;
+  return useQuery({
+    queryKey: ["dashboard", "vulnerabilidade"],
+    queryFn: () => dashboardService.obterVulnerabilidade(),
+    staleTime: 60_000,
+    refetchInterval: options.autoRefresh ? refreshIntervalMs : false
+  });
+}
+
+export function useGeocodificarPendenciasVulnerabilidade() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (limite?: number) => dashboardService.geocodificarPendenciasVulnerabilidade(limite),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["dashboard", "vulnerabilidade"] });
+    }
   });
 }

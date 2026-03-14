@@ -1,4 +1,5 @@
 ﻿import type { Request, Response } from "express";
+import type { AuthenticatedRequest } from "../../auth/middlewares/auth.middleware.js";
 import { OcorrenciasCriancaService } from "../services/ocorrencias-crianca.service.js";
 
 const service = new OcorrenciasCriancaService();
@@ -35,12 +36,20 @@ export class OcorrenciasCriancaController {
   }
 
   async adicionarAnexo(request: Request, response: Response) {
-    const anexo = await service.adicionarAnexo(request.params.id, request.body);
+    const anexo = await service.adicionarAnexo(
+      request.params.id,
+      request.body,
+      (request as AuthenticatedRequest).authUser?.id
+    );
     return response.status(201).json(anexo);
   }
 
   async removerAnexo(request: Request, response: Response) {
-    await service.removerAnexo(request.params.id, request.params.anexoId);
+    await service.removerAnexo(
+      request.params.id,
+      request.params.anexoId,
+      (request as AuthenticatedRequest).authUser?.id
+    );
     return response.status(204).send();
   }
 

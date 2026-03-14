@@ -51,6 +51,7 @@ import { somenteDigitos } from "@/lib/validators";
 import { formatarTextoPorCampo, normalizarObjetoTexto } from "@/lib/text-formatter";
 import { mapaCamposTextoVoluntarioForm } from "@/lib/text-format-config";
 import { abrirRelatorioPdf } from "@/lib/report-utils";
+import { resolverUrlArquivo } from "@/lib/arquivos";
 import {
   ajustarParaFotoTresPorQuatro,
   capturarFotoTresPorQuatroDoVideo,
@@ -675,7 +676,7 @@ export function CadastroVoluntariadoPage() {
                       <Label>Foto 4x3</Label>
                       <div className="w-full max-w-[170px] aspect-[4/3] overflow-hidden rounded-md border border-[var(--g3-border)] bg-[var(--g3-card-soft)]">
                         {watch("foto_3x4") ? (
-                          <img src={watch("foto_3x4")} alt="Foto do voluntário" className="h-full w-full object-cover" />
+                          <img src={resolverUrlArquivo(watch("foto_3x4"))} alt="Foto do voluntário" className="h-full w-full object-cover" />
                         ) : (
                           <div className="flex h-full items-center justify-center text-xs text-[var(--g3-muted)]">Sem foto</div>
                         )}

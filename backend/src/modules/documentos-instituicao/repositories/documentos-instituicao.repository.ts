@@ -34,8 +34,9 @@ function calcularSituacao(input: DocumentoInstituicaoInput): DocumentoSituacao {
   return "valido";
 }
 
-function montarDataUri(conteudoBase64: string, tipoMime?: string | null) {
+function montarCaminhoOuDataUri(conteudoBase64: string, tipoMime?: string | null) {
   if (conteudoBase64.startsWith("data:")) return conteudoBase64;
+  if (!/^[a-zA-Z0-9+/=\r\n]+$/.test(conteudoBase64)) return conteudoBase64;
   const mime = trimOrUndefined(tipoMime) ?? "application/octet-stream";
   return `data:${mime};base64,${conteudoBase64}`;
 }
@@ -264,7 +265,7 @@ export class DocumentosInstituicaoRepository {
         ${input.tipo},
         ${trimOrUndefined(input.tipoMime ?? undefined)},
         ${trimOrUndefined(input.tamanho ?? undefined)},
-        ${montarDataUri(input.conteudoBase64, input.tipoMime)},
+        ${montarCaminhoOuDataUri(input.conteudoBase64, input.tipoMime)},
         ${toOptionalDate(input.dataUpload ?? undefined) ?? new Date()},
         ${input.usuario},
         NOW()

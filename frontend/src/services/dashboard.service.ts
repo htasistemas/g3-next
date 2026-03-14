@@ -1,5 +1,10 @@
 import { httpClient } from "./http-client";
-import type { DashboardAssistenciaResponse, DashboardFiltros } from "@/types/dashboard";
+import type {
+  DashboardAssistenciaResponse,
+  DashboardFiltros,
+  DashboardVulnerabilidadeGeocodingResponse,
+  DashboardVulnerabilidadeResponse
+} from "@/types/dashboard";
 import type { PowerBiFiltros, PowerBiResponse } from "@/types/power-bi";
 
 export const dashboardService = {
@@ -36,6 +41,23 @@ export const dashboardService = {
       }
     });
 
+    return data;
+  },
+
+  async obterVulnerabilidade(): Promise<DashboardVulnerabilidadeResponse> {
+    const { data } = await httpClient.get<DashboardVulnerabilidadeResponse>(
+      "/api/dashboard/vulnerabilidade"
+    );
+    return data;
+  },
+
+  async geocodificarPendenciasVulnerabilidade(
+    limite = 15
+  ): Promise<DashboardVulnerabilidadeGeocodingResponse> {
+    const { data } = await httpClient.post<DashboardVulnerabilidadeGeocodingResponse>(
+      "/api/dashboard/vulnerabilidade/geocodificar-pendentes",
+      { limite }
+    );
     return data;
   }
 };

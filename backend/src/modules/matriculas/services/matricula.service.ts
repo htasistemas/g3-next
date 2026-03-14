@@ -8,6 +8,7 @@ import {
   mapProfissionalCatalogoToResponse,
   mapSalaCatalogoToResponse
 } from "../matricula.mapper.js";
+import { storageService } from "../../arquivos/services/storage-instance.js";
 import {
   matriculaFiltersSchema,
   matriculaInputSchema,
@@ -49,24 +50,55 @@ export class MatriculaService {
     return mapCursoToResponse(registro.curso, registro.matriculas, registro.filaEspera);
   }
 
-  async criar(rawInput: unknown) {
+  async criar(rawInput: unknown, rawUsuarioId?: string) {
     const inputNormalizado = this.normalizarPayload(rawInput);
     const input = matriculaInputSchema.parse(inputNormalizado);
-    const registro = await this.repository.criar(input);
-    return mapCursoToResponse(registro.curso, registro.matriculas, registro.filaEspera);
+    const usuarioId = this.parseUsuarioId(rawUsuarioId);
+    const imagem = await this.prepararImagem(input.imagem, input.nome, usuarioId);
+
+    try {
+      const registro = await this.repository.criar({ ...input, imagem: imagem.caminhoArquivo });
+      if (imagem.novoCaminho) {
+        await storageService.vincularEntidade(imagem.novoCaminho, registro.curso.id);
+      }
+      return mapCursoToResponse(registro.curso, registro.matriculas, registro.filaEspera);
+    } catch (error) {
+      await storageService.rollbackArquivos([imagem.novoCaminho]);
+      throw error;
+    }
   }
 
-  async atualizar(rawId: string, rawInput: unknown) {
+  async atualizar(rawId: string, rawInput: unknown, rawUsuarioId?: string) {
     const id = this.parseId(rawId);
     const inputNormalizado = this.normalizarPayload(rawInput);
     const input = matriculaInputSchema.parse(inputNormalizado);
-    const registro = await this.repository.atualizar(id, input);
-    return mapCursoToResponse(registro.curso, registro.matriculas, registro.filaEspera);
+    const usuarioId = this.parseUsuarioId(rawUsuarioId);
+    const existente = await this.repository.buscarPorIdOuFalhar(id);
+    const imagem = await this.prepararImagem(input.imagem, input.nome, usuarioId, id);
+
+    try {
+      const registro = await this.repository.atualizar(id, { ...input, imagem: imagem.caminhoArquivo });
+      if (imagem.novoCaminho) {
+        await storageService.vincularEntidade(imagem.novoCaminho, id);
+      }
+      if (this.isManagedStoragePath(existente.curso.imagem) && existente.curso.imagem !== registro.curso.imagem) {
+        await storageService.desativarPorCaminho(existente.curso.imagem, usuarioId);
+      }
+      return mapCursoToResponse(registro.curso, registro.matriculas, registro.filaEspera);
+    } catch (error) {
+      await storageService.rollbackArquivos([imagem.novoCaminho]);
+      throw error;
+    }
   }
 
-  async remover(rawId: string) {
+  async remover(rawId: string, rawUsuarioId?: string) {
     const id = this.parseId(rawId);
+    const usuarioId = this.parseUsuarioId(rawUsuarioId);
+    const existente = await this.repository.buscarPorIdOuFalhar(id);
     await this.repository.remover(id);
+    if (this.isManagedStoragePath(existente.curso.imagem)) {
+      await storageService.desativarPorCaminho(existente.curso.imagem, usuarioId);
+    }
   }
 
   async listarBeneficiarios(rawTermo?: unknown) {
@@ -215,5 +247,42 @@ export class MatriculaService {
       rawInput as Record<string, unknown>,
       mapaCamposTextoMatricula
     );
+  }
+
+  private async prepararImagem(
+    valor?: string,
+    nome?: string,
+    usuarioId?: bigint,
+    entidadeId?: bigint
+  ) {
+    const arquivo = await storageService.persistirCampo({
+      scope: "curso_imagem",
+      valor,
+      nomeOriginal: `${nome?.replace(/\s+/g, "-").toLowerCase() || "curso"}-imagem.jpg`,
+      mimeType: "image/jpeg",
+      entidadeId,
+      usuarioUploadId: usuarioId,
+      observacao: "Imagem principal do curso"
+    });
+
+    return {
+      caminhoArquivo: arquivo.caminhoArquivo,
+      novoCaminho: arquivo.registro ? arquivo.caminhoArquivo : undefined
+    };
+  }
+
+  private isManagedStoragePath(valor?: string | null) {
+    if (!valor?.trim()) return false;
+    const normalized = valor.trim();
+    return !normalized.startsWith("data:") && !/^https?:\/\//i.test(normalized);
+  }
+
+  private parseUsuarioId(rawUsuarioId?: string) {
+    if (!rawUsuarioId) return undefined;
+    const parsed = Number(rawUsuarioId);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      return undefined;
+    }
+    return BigInt(parsed);
   }
 }

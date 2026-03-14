@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import type { AuthenticatedRequest } from "../../auth/middlewares/auth.middleware.js";
 import { UnidadeAssistencialService } from "../services/unidade-assistencial.service.js";
 
 const service = new UnidadeAssistencialService();
@@ -20,17 +21,24 @@ export class UnidadeAssistencialController {
   }
 
   async criar(request: Request, response: Response) {
-    const unidade = await service.criar(request.body);
+    const unidade = await service.criar(
+      request.body,
+      (request as AuthenticatedRequest).authUser?.id
+    );
     return response.status(201).json({ unidade });
   }
 
   async atualizar(request: Request, response: Response) {
-    const unidade = await service.atualizar(request.params.id, request.body);
+    const unidade = await service.atualizar(
+      request.params.id,
+      request.body,
+      (request as AuthenticatedRequest).authUser?.id
+    );
     return response.json({ unidade });
   }
 
   async remover(request: Request, response: Response) {
-    await service.remover(request.params.id);
+    await service.remover(request.params.id, (request as AuthenticatedRequest).authUser?.id);
     return response.status(204).send();
   }
 }

@@ -1,4 +1,5 @@
-﻿import type { Request, Response } from "express";
+import type { Request, Response } from "express";
+import type { AuthenticatedRequest } from "../../auth/middlewares/auth.middleware.js";
 import { BibliotecaService } from "../services/biblioteca.service.js";
 
 const service = new BibliotecaService();
@@ -20,17 +21,24 @@ export class BibliotecaController {
   }
 
   async criarLivro(request: Request, response: Response) {
-    const livro = await service.criarLivro(request.body);
+    const livro = await service.criarLivro(
+      request.body,
+      (request as AuthenticatedRequest).authUser?.id
+    );
     return response.status(201).json({ livro });
   }
 
   async atualizarLivro(request: Request, response: Response) {
-    const livro = await service.atualizarLivro(request.params.id, request.body);
+    const livro = await service.atualizarLivro(
+      request.params.id,
+      request.body,
+      (request as AuthenticatedRequest).authUser?.id
+    );
     return response.json({ livro });
   }
 
   async excluirLivro(request: Request, response: Response) {
-    await service.excluirLivro(request.params.id);
+    await service.excluirLivro(request.params.id, (request as AuthenticatedRequest).authUser?.id);
     return response.status(204).send();
   }
 

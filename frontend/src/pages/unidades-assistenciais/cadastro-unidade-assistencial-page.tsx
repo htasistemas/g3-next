@@ -58,6 +58,7 @@ import {
 } from "@/lib/text-format-config";
 import { formatarTextoPorCampo, normalizarObjetoTexto } from "@/lib/text-formatter";
 import { abrirRelatorioPdf } from "@/lib/report-utils";
+import { resolverUrlArquivo } from "@/lib/arquivos";
 import { fotoMaximaBytes, lerArquivoComoDataUrl } from "@/lib/foto-3x4";
 import { useAuth } from "@/hooks/use-auth";
 import type {
@@ -847,7 +848,7 @@ export function CadastroUnidadeAssistencialPage() {
                       <div className="mt-2 flex aspect-[4/3] w-full max-w-[170px] items-center justify-center overflow-hidden rounded-md border border-emerald-800 bg-emerald-900">
                         {logomarcaAtual ? (
                           <img
-                            src={logomarcaAtual}
+                            src={resolverUrlArquivo(logomarcaAtual)}
                             alt="Logomarca da unidade vazado"
                             className="h-full w-full object-contain"
                           />
@@ -893,7 +894,7 @@ export function CadastroUnidadeAssistencialPage() {
                       <div className="mt-2 flex aspect-[4/3] w-full max-w-[170px] items-center justify-center overflow-hidden rounded-md border border-[var(--g3-border)] bg-[var(--g3-card-soft)]">
                         {logomarcaRelatorioAtual ? (
                           <img
-                            src={logomarcaRelatorioAtual}
+                            src={resolverUrlArquivo(logomarcaRelatorioAtual)}
                             alt="Logomarca do relatório"
                             className="h-full w-full object-contain"
                           />

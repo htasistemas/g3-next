@@ -10,6 +10,7 @@ import {
   registrarChamadaFalando,
   ouvirEventoPainelChamada
 } from "@/lib/senhas-voz";
+import { resolverUrlArquivo } from "@/lib/arquivos";
 import { unidadesAssistenciaisService } from "@/services/unidades-assistenciais.service";
 import type { SenhaChamadaResponse } from "@/types/senhas";
 
@@ -325,7 +326,7 @@ export function PainelSenhasPage() {
             {logomarcaUnidade ? (
               <div className="flex justify-center lg:flex-1">
                 <img
-                  src={logomarcaUnidade}
+                  src={resolverUrlArquivo(logomarcaUnidade)}
                   alt="Logomarca da unidade"
                   className="max-h-20 w-auto object-contain sm:max-h-24 lg:max-h-28"
                 />

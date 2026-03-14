@@ -31,8 +31,14 @@ export function useSalvarBeneficiario() {
       }
       return beneficiariosService.criar(payload);
     },
-    onSuccess: async () => {
+    onSuccess: async (data, variables) => {
+      const beneficiarioId = data.beneficiario.id_beneficiario ?? variables.id_beneficiario;
       await queryClient.invalidateQueries({ queryKey: ["beneficiarios"] });
+      if (beneficiarioId) {
+        await queryClient.invalidateQueries({ queryKey: ["beneficiario", beneficiarioId] });
+      } else {
+        await queryClient.invalidateQueries({ queryKey: ["beneficiario"] });
+      }
     }
   });
 }
@@ -41,8 +47,9 @@ export function useRemoverBeneficiario() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => beneficiariosService.remover(id),
-    onSuccess: async () => {
+    onSuccess: async (_data, id) => {
       await queryClient.invalidateQueries({ queryKey: ["beneficiarios"] });
+      await queryClient.removeQueries({ queryKey: ["beneficiario", id] });
     }
   });
 }

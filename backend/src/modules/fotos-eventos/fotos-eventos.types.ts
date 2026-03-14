@@ -2,6 +2,7 @@ export type FotoUploadInput = {
   nomeArquivo: string;
   contentType: string;
   conteudo: string;
+  tamanhoBytes?: number | null;
 };
 
 export type FotoEventoInput = {

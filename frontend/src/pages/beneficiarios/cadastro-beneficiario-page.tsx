@@ -58,7 +58,8 @@ import {
   mapaDocumentoBeneficiarioForm
 } from "@/lib/text-format-config";
 import { formatarTextoPorCampo, normalizarObjetoTexto } from "@/lib/text-formatter";
-import { abrirRelatorioPdf } from "@/lib/report-utils";
+import { reservarJanelaRelatorio } from "@/lib/report-utils";
+import { obterUrlArquivoAutenticado } from "@/lib/arquivos";
 import {
   classeBotaoAbaLateral,
   classeNumeroAbaLateral,
@@ -81,6 +82,12 @@ const abas = [
 
 const documentosConfig = [
   { id: "cpf", nome: "CPF", obrigatorio: true, permiteIgnorar: false },
+  {
+    id: "comprovante_endereco",
+    nome: "Comprovante de endereço",
+    obrigatorio: true,
+    permiteIgnorar: false
+  },
   { id: "cnh", nome: "CNH", obrigatorio: false, permiteIgnorar: true },
   {
     id: "certidao_nascimento",
@@ -106,13 +113,16 @@ const documentosConfig = [
     obrigatorio: false,
     permiteIgnorar: true
   },
-  { id: "cartao_sus", nome: "Cartão do SUS", obrigatorio: false, permiteIgnorar: true },
-  {
-    id: "comprovante_endereco",
-    nome: "Comprovante de endereço",
-    obrigatorio: false,
-    permiteIgnorar: true
-  }
+  { id: "cartao_sus", nome: "Cartão do SUS", obrigatorio: false, permiteIgnorar: true }
+] as const;
+
+const opcaoAutoDeclaracaoResidencia = "Auto declaração de residência";
+
+const opcoesComprovanteEndereco = [
+  "Conta de água",
+  "Conta de energia",
+  "Contrato de aluguel",
+  opcaoAutoDeclaracaoResidencia
 ] as const;
 
 const subzonaEnderecoOptions = [
@@ -136,6 +146,19 @@ type DocumentoCadastro = {
   obrigatorio: boolean;
   permiteIgnorar: boolean;
 };
+
+function documentoEhComprovanteEndereco(documento: DocumentoCadastro) {
+  return documento.id === "comprovante_endereco";
+}
+
+function normalizarTipoComprovanteEndereco(tipo?: string) {
+  if (!tipo?.trim()) return "";
+  const valor = tipo.trim();
+  if (valor === "Declaração de residência") {
+    return opcaoAutoDeclaracaoResidencia;
+  }
+  return valor;
+}
 
 const tituloTela = "Cadastro de beneficiários";
 type AbaFormularioId = (typeof abas)[number]["id"];
@@ -279,7 +302,9 @@ function mapearDocumentosDoBeneficiario(item: Beneficiario): DocumentoCadastro[]
 
     return {
       ...documento,
-      numeroDocumento,
+      numeroDocumento: documentoEhComprovanteEndereco(documento)
+        ? normalizarTipoComprovanteEndereco(numeroDocumento)
+        : numeroDocumento,
       nomeArquivo: anexo?.nomeArquivo,
       caminhoArquivo: anexo?.caminhoArquivo,
       contentType: anexo?.contentType,
@@ -343,11 +368,8 @@ async function prepararUrlDocumento(documento: DocumentoCadastro) {
   }
 
   if (!caminhoArquivo.startsWith("data:")) {
-    return {
-      url: caminhoArquivo,
-      isPdf: isDocumentoPdf(documento),
-      revoke: undefined as (() => void) | undefined
-    };
+    const arquivoResolvido = await obterUrlArquivoAutenticado(caminhoArquivo);
+    return { ...arquivoResolvido, isPdf: isDocumentoPdf(documento) };
   }
 
   const response = await fetch(caminhoArquivo);
@@ -364,6 +386,53 @@ async function prepararUrlDocumento(documento: DocumentoCadastro) {
 function agendarLimpezaUrlDocumento(revoke?: () => void) {
   if (!revoke) return;
   window.setTimeout(() => revoke(), 60_000);
+}
+
+function abrirJanelaDocumento(titulo: string) {
+  const janela = window.open("", "_blank", "width=1200,height=900");
+
+  if (!janela) {
+    throw new Error("Não foi possível abrir a visualização do documento.");
+  }
+
+  try {
+    janela.opener = null;
+  } catch {
+    // Alguns navegadores não permitem ajustar opener.
+  }
+
+  janela.document.write(`<!doctype html>
+    <html lang="pt-BR">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>${titulo.replaceAll("<", "&lt;").replaceAll(">", "&gt;")}</title>
+        <style>
+          body {
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            background: #f8fafc;
+            color: #0f172a;
+            font-family: Arial, sans-serif;
+          }
+        </style>
+      </head>
+      <body>Carregando documento...</body>
+    </html>`);
+  janela.document.close();
+
+  return janela;
+}
+
+function documentoTemConteudoPersistivel(documento: DocumentoCadastro) {
+  return !!(
+    documento.ignorado ||
+    documento.numeroDocumento.trim().length > 0 ||
+    documento.nomeArquivo?.trim() ||
+    documento.caminhoArquivo?.trim()
+  );
 }
 
 function statusVariant(status?: BeneficiarioStatus) {
@@ -454,8 +523,10 @@ export function CadastroBeneficiarioPage() {
   const [popupSalvarAberto, setPopupSalvarAberto] = useState(false);
   const [popupExcluirAberto, setPopupExcluirAberto] = useState(false);
   const [popupImprimirAberto, setPopupImprimirAberto] = useState(false);
+  const [popupDeclaracaoResidenciaAberto, setPopupDeclaracaoResidenciaAberto] = useState(false);
   const [imprimindoRelatorio, setImprimindoRelatorio] = useState(false);
   const [popupExcluirDocumentoId, setPopupExcluirDocumentoId] = useState<DocumentoCadastroId | null>(null);
+  const [foto3x4PreviewUrl, setFoto3x4PreviewUrl] = useState("");
   const [webcamAberta, setWebcamAberta] = useState(false);
   const [carregandoWebcam, setCarregandoWebcam] = useState(false);
   const [carregandoCep, setCarregandoCep] = useState(false);
@@ -655,6 +726,42 @@ export function CadastroBeneficiarioPage() {
     };
   }, []);
 
+  useEffect(() => {
+    let ativo = true;
+    let revokeAtual: (() => void) | undefined;
+
+    if (!foto3x4Atual.trim()) {
+      setFoto3x4PreviewUrl("");
+      return;
+    }
+
+    if (foto3x4Atual.startsWith("data:") || foto3x4Atual.startsWith("blob:")) {
+      setFoto3x4PreviewUrl(foto3x4Atual);
+      return;
+    }
+
+    void (async () => {
+      try {
+        const arquivo = await obterUrlArquivoAutenticado(foto3x4Atual);
+        if (!ativo) {
+          arquivo.revoke?.();
+          return;
+        }
+
+        revokeAtual = arquivo.revoke;
+        setFoto3x4PreviewUrl(arquivo.url);
+      } catch {
+        if (!ativo) return;
+        setFoto3x4PreviewUrl("");
+      }
+    })();
+
+    return () => {
+      ativo = false;
+      revokeAtual?.();
+    };
+  }, [foto3x4Atual]);
+
   const beneficiarios = listaData?.beneficiarios ?? [];
   const abaAtual = abas.find((aba) => aba.id === abaAtiva);
   const tituloAbaAtiva = abaAtual?.label ?? tituloTela;
@@ -713,18 +820,20 @@ export function CadastroBeneficiarioPage() {
         return;
       }
 
-      const documentosPayload = documentos.map((documento) => {
-        const documentoNormalizado = normalizarObjetoTexto(documento, mapaDocumentoBeneficiarioForm);
-        return {
-          nome: String(documentoNormalizado.nome ?? documento.nome),
-          numeroDocumento: documento.numeroDocumento || undefined,
-          nomeArquivo: documento.nomeArquivo,
-          caminhoArquivo: documento.caminhoArquivo,
-          contentType: documento.contentType,
-          obrigatorio: documento.obrigatorio,
-          ignorado: documento.permiteIgnorar ? documento.ignorado : false
-        };
-      });
+      const documentosPayload = documentos
+        .filter((documento) => documentoTemConteudoPersistivel(documento))
+        .map((documento) => {
+          const documentoNormalizado = normalizarObjetoTexto(documento, mapaDocumentoBeneficiarioForm);
+          return {
+            nome: String(documentoNormalizado.nome ?? documento.nome),
+            numeroDocumento: documento.numeroDocumento || undefined,
+            nomeArquivo: documento.nomeArquivo,
+            caminhoArquivo: documento.caminhoArquivo,
+            contentType: documento.contentType,
+            obrigatorio: documento.obrigatorio,
+            ignorado: documento.permiteIgnorar ? documento.ignorado : false
+          };
+        });
 
       const numeroCnh = documentos.find((documento) => documento.id === "cnh")?.numeroDocumento;
       const numeroTituloEleitor = documentos.find(
@@ -761,8 +870,12 @@ export function CadastroBeneficiarioPage() {
 
       try {
         const response = await salvarMutation.mutateAsync(payload);
-        const id = response.beneficiario.id_beneficiario;
+        const beneficiarioAtualizado = response.beneficiario;
+        const id = beneficiarioAtualizado.id_beneficiario;
         setBeneficiarioSelecionadoId(id);
+        reset(mapearBeneficiarioParaFormulario(beneficiarioAtualizado));
+        setDocumentos(mapearDocumentosDoBeneficiario(beneficiarioAtualizado));
+        setPopupExcluirDocumentoId(null);
         setMensagem(null);
         setPopupSalvarAberto(true);
         setFiltros((prev) => ({ ...prev }));
@@ -944,18 +1057,15 @@ export function CadastroBeneficiarioPage() {
       return;
     }
 
-    const novaJanela = window.open("", "_blank", "noopener,noreferrer");
-    if (!novaJanela) {
-      setMensagem({ tipo: "erro", texto: "Não foi possível abrir a visualização do documento." });
-      return;
-    }
+    let novaJanela: Window | null = null;
 
     try {
+      novaJanela = abrirJanelaDocumento(documento.nome);
       const fonteDocumento = await prepararUrlDocumento(documento);
       novaJanela.location.replace(fonteDocumento.url);
       agendarLimpezaUrlDocumento(fonteDocumento.revoke);
     } catch (error: any) {
-      novaJanela.close();
+      novaJanela?.close();
       setMensagem({
         tipo: "erro",
         texto: error?.message ?? "Não foi possível abrir o documento."
@@ -969,13 +1079,10 @@ export function CadastroBeneficiarioPage() {
       return;
     }
 
-    const novaJanela = window.open("", "_blank", "noopener,noreferrer");
-    if (!novaJanela) {
-      setMensagem({ tipo: "erro", texto: "Não foi possível abrir a visualização para impressão." });
-      return;
-    }
+    let novaJanela: Window | null = null;
 
     try {
+      novaJanela = abrirJanelaDocumento(documento.nome);
       const documentoEscapado = documento.nome.replaceAll("\"", "'");
       const fonteDocumento = await prepararUrlDocumento(documento);
 
@@ -999,12 +1106,12 @@ export function CadastroBeneficiarioPage() {
 
       novaJanela.document.close();
       window.setTimeout(() => {
-        novaJanela.focus();
-        novaJanela.print();
+        novaJanela?.focus();
+        novaJanela?.print();
       }, 500);
       agendarLimpezaUrlDocumento(fonteDocumento.revoke);
     } catch (error: any) {
-      novaJanela.close();
+      novaJanela?.close();
       setMensagem({
         tipo: "erro",
         texto: error?.message ?? "Não foi possível preparar o documento para impressão."
@@ -1041,6 +1148,17 @@ export function CadastroBeneficiarioPage() {
     });
     setPopupExcluirDocumentoId(null);
     setMensagem({ tipo: "sucesso", texto: "Documento excluído com sucesso." });
+  }
+
+  function selecionarTipoComprovanteEndereco(tipo: (typeof opcoesComprovanteEndereco)[number]) {
+    atualizarDocumento("comprovante_endereco", {
+      numeroDocumento: tipo,
+      ignorado: false
+    });
+
+    if (tipo === opcaoAutoDeclaracaoResidencia) {
+      setPopupDeclaracaoResidenciaAberto(true);
+    }
   }
 
   function acaoBuscar() {
@@ -1104,14 +1222,15 @@ export function CadastroBeneficiarioPage() {
     }
   }
 
-  function abrirPdfComFallback(blob: Blob) {
+  async function abrirPdfComJanelaReservada(titulo: string, gerarBlob: () => Promise<Blob>) {
+    const janela = reservarJanelaRelatorio(titulo);
+
     try {
-      abrirRelatorioPdf(blob);
-    } catch {
-      setMensagem({
-        tipo: "erro",
-        texto: "Não foi possível abrir o relatório. Verifique se o navegador bloqueou pop-up."
-      });
+      const blob = await gerarBlob();
+      janela.publicar(blob);
+    } catch (error) {
+      janela.fechar();
+      throw error;
     }
   }
 
@@ -1223,17 +1342,19 @@ export function CadastroBeneficiarioPage() {
   }
 
   async function imprimirFichaBeneficiario(item: Beneficiario) {
-    const blob = await reportsService.gerarFichaBeneficiario({
-      beneficiarioId: item.id_beneficiario as string,
-      usuarioEmissor: usuario?.nome || usuario?.nomeUsuario || "Sistema G3-Next"
-    });
-    abrirPdfComFallback(blob);
+    await abrirPdfComJanelaReservada("Gerando ficha cadastral", () =>
+      reportsService.gerarFichaBeneficiario({
+        beneficiarioId: item.id_beneficiario as string,
+        usuarioEmissor: usuario?.nome || usuario?.nomeUsuario || "Sistema G3-Next"
+      })
+    );
   }
 
   async function imprimirTermoConsentimento(item: Beneficiario) {
     const payload = montarPayloadTermoConsentimento(item);
-    const blob = await reportsService.gerarTermoAutorizacao(payload);
-    abrirPdfComFallback(blob);
+    await abrirPdfComJanelaReservada("Gerando termo de consentimento", () =>
+      reportsService.gerarTermoAutorizacao(payload)
+    );
   }
 
   function acaoImprimir() {
@@ -1541,7 +1662,10 @@ export function CadastroBeneficiarioPage() {
                   {formatarStatus(detalhesData.beneficiario.status)}
                 </Badge>
               )}
-              <Badge variant={classesTelaPadraoBeneficiario.badgeCodigo}>
+              <Badge
+                variant={classesTelaPadraoBeneficiario.badgeCodigo}
+                className="rounded-md border border-emerald-200 bg-emerald-100 px-3 py-1.5 text-sm font-bold tracking-[0.12em] text-emerald-800 shadow-sm"
+              >
                 Código {detalhesData?.beneficiario?.codigo ?? proximoCodigoData?.codigo ?? "---"}
               </Badge>
             </div>
@@ -1710,9 +1834,9 @@ export function CadastroBeneficiarioPage() {
                     <div className="sm:col-span-2 xl:col-span-12 rounded-lg border border-emerald-200 bg-emerald-50/40 p-3">
                       <div className="flex flex-col gap-4 md:flex-row md:items-center">
                         <div className="mx-auto flex aspect-[4/3] w-44 items-center justify-center overflow-hidden rounded-md border border-emerald-200 bg-white">
-                          {foto3x4Atual ? (
+                          {foto3x4PreviewUrl ? (
                             <img
-                              src={foto3x4Atual}
+                              src={foto3x4PreviewUrl}
                               alt="Foto 4x3 do beneficiário"
                               className="h-full w-full object-cover"
                             />
@@ -2281,7 +2405,7 @@ export function CadastroBeneficiarioPage() {
                 {abaAtiva === "documentos" && (
                   <section className="space-y-3">
                     <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
-                      CPF é obrigatório. Documentos sem envio ficam com status pendente, exceto quando
+                      CPF e comprovante de endereço são obrigatórios. Documentos sem envio ficam com status pendente, exceto quando
                       marcados como ignorados.
                     </div>
 
@@ -2296,7 +2420,11 @@ export function CadastroBeneficiarioPage() {
                         return (
                           <article
                             key={documento.id}
-                            className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm"
+                            className={`rounded-lg border p-3 shadow-sm ${
+                              documento.id === "cpf" || documento.id === "comprovante_endereco"
+                                ? "border-emerald-300 bg-emerald-100/80"
+                                : "border-slate-200 bg-white"
+                            }`}
                           >
                             <input
                               ref={(elemento) => {
@@ -2311,7 +2439,7 @@ export function CadastroBeneficiarioPage() {
                             <div className="mb-3 flex flex-wrap items-center gap-2">
                               <h4 className="text-sm font-semibold text-slate-900">
                                 {documento.nome}
-                                {documento.id === "cpf" ? "*" : ""}
+                                {documento.obrigatorio ? "*" : ""}
                               </h4>
                               <Badge variant={statusDocumento.variant}>{statusDocumento.texto}</Badge>
                               <span className="text-xs text-slate-500">
@@ -2323,26 +2451,53 @@ export function CadastroBeneficiarioPage() {
 
                             <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto]">
                               <div className="space-y-2">
-                                <div>
-                                  <Label htmlFor={`documento-numero-${documento.id}`}>
-                                    Número do documento{documento.id === "cpf" ? "*" : ""}
-                                  </Label>
-                                  <Input
-                                    id={`documento-numero-${documento.id}`}
-                                    value={documento.numeroDocumento}
-                                    onChange={(event) =>
-                                      atualizarDocumento(documento.id, {
-                                        numeroDocumento: event.target.value,
-                                        ignorado: false
-                                      })
-                                    }
-                                    placeholder={
-                                      documento.id === "cpf"
-                                        ? "000.000.000-00"
-                                        : "Informe o número do documento"
-                                    }
-                                  />
-                                </div>
+                                {documentoEhComprovanteEndereco(documento) ? (
+                                  <div className="space-y-2">
+                                    <Label>Tipo do comprovante*</Label>
+                                    <div className="grid gap-2 sm:grid-cols-2">
+                                      {opcoesComprovanteEndereco.map((opcao) => (
+                                        <label
+                                          key={opcao}
+                                          className={`flex cursor-pointer items-start gap-2 rounded-md border px-3 py-2 text-xs transition ${
+                                            documento.numeroDocumento === opcao
+                                              ? "border-emerald-300 bg-emerald-100 text-emerald-900"
+                                              : "border-slate-200 bg-white text-slate-700 hover:border-emerald-200 hover:bg-emerald-50"
+                                          }`}
+                                        >
+                                          <input
+                                            type="radio"
+                                            name={`tipo-comprovante-${documento.id}`}
+                                            checked={documento.numeroDocumento === opcao}
+                                            onChange={() => selecionarTipoComprovanteEndereco(opcao)}
+                                            className="mt-0.5 h-4 w-4 border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                                          />
+                                          <span className="leading-4">{opcao}</span>
+                                        </label>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div>
+                                    <Label htmlFor={`documento-numero-${documento.id}`}>
+                                      Número do documento{documento.obrigatorio ? "*" : ""}
+                                    </Label>
+                                    <Input
+                                      id={`documento-numero-${documento.id}`}
+                                      value={documento.numeroDocumento}
+                                      onChange={(event) =>
+                                        atualizarDocumento(documento.id, {
+                                          numeroDocumento: event.target.value,
+                                          ignorado: false
+                                        })
+                                      }
+                                      placeholder={
+                                        documento.id === "cpf"
+                                          ? "000.000.000-00"
+                                          : "Informe o número do documento"
+                                      }
+                                    />
+                                  </div>
+                                )}
 
                                 {cpfInvalido && (
                                   <p className="text-xs text-red-600">Informe um CPF válido.</p>
@@ -2613,6 +2768,65 @@ export function CadastroBeneficiarioPage() {
                 disabled={imprimindoRelatorio}
               >
                 Cancelar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {popupDeclaracaoResidenciaAberto && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/45 px-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setPopupDeclaracaoResidenciaAberto(false)}
+        >
+          <div
+            className="w-full max-w-2xl rounded-xl border border-slate-200 bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="border-b border-slate-100 px-5 py-4">
+              <h3 className="text-base font-semibold text-slate-900">Auto declaração de residência</h3>
+            </div>
+            <div className="space-y-4 px-5 py-4 text-sm text-slate-700">
+              <p>
+                A declaração de residência é o documento feito à mão pelo beneficiário para comprovar onde mora.
+              </p>
+              <p>
+                Ela é utilizada quando o morador não possui comprovantes formais no próprio nome, como conta de luz,
+                água ou contrato de aluguel.
+              </p>
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+                <p className="font-semibold text-amber-900">Principais características</p>
+                <div className="mt-2 space-y-2">
+                  <p>
+                    <strong>De próprio punho:</strong> deve ser escrita à mão e assinada pelo declarante.
+                  </p>
+                  <p>
+                    <strong>Valor legal:</strong> é baseada na Lei nº 7.115/1983, que torna a declaração firmada pelo
+                    interessado presumida verdadeira, sob pena de falsidade ideológica.
+                  </p>
+                  <p>
+                    <strong>Reconhecimento de firma:</strong> em muitos casos, para ter validade, a instituição exige
+                    que a assinatura seja reconhecida em cartório ou assinada digitalmente pelo gov.br.
+                  </p>
+                </div>
+              </div>
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
+                <p className="font-semibold text-emerald-900">A declaração deve constar</p>
+                <div className="mt-2 space-y-2">
+                  <p>Nome completo do declarante.</p>
+                  <p>Número de RG e CPF.</p>
+                  <p>Endereço completo: rua, número, bairro, cidade, estado e CEP.</p>
+                  <p>Uma frase afirmando que reside no local.</p>
+                  <p>Data, local e assinatura.</p>
+                  <p className="font-medium text-emerald-900">Todas as informações devem ser do próprio punho.</p>
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end border-t border-slate-100 px-5 py-3">
+              <Button type="button" onClick={() => setPopupDeclaracaoResidenciaAberto(false)}>
+                OK
               </Button>
             </div>
           </div>

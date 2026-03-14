@@ -8,7 +8,7 @@
     "build": "tsc -p tsconfig.node.json",
     "start": "node dist/server.js",
     "typecheck": "tsc -p tsconfig.node.json --noEmit",
-    "test:text": "tsx --test src/utils/__tests__/text-formatter.test.ts src/modules/__tests__/text-normalization.integration.test.ts",
+    "test:text": "tsx --test src/config/__tests__/google-client-ids.test.ts src/utils/__tests__/text-formatter.test.ts src/modules/__tests__/text-normalization.integration.test.ts src/modules/arquivos/services/__tests__/storage-utils.test.ts src/modules/beneficiarios/__tests__/beneficiario.schema.test.ts",
     "normalize:text": "tsx scripts/normalize-text-data.ts",
     "normalize:text:dry-run": "tsx scripts/normalize-text-data.ts --dry-run",
     "prisma:generate": "prisma generate",
@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@prisma/client": "^6.6.0",
+    "@types/multer": "^2.1.0",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
@@ -26,8 +27,10 @@
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
+    "multer": "^2.1.1",
     "nodemailer": "^8.0.1",
     "pdfkit": "^0.15.0",
+    "sharp": "^0.34.5",
     "zod": "^3.24.2"
   },
   "devDependencies": {

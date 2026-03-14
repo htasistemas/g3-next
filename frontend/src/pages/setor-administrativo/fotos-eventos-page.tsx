@@ -30,6 +30,7 @@ import {
   useRemoverFotoItemEvento,
   useSalvarFotoEvento
 } from "@/features/fotos-eventos/use-fotos-eventos";
+import { resolverUrlArquivo } from "@/lib/arquivos";
 import { imprimirConteudoAtual } from "@/lib/report-utils";
 import type { FotoEventoPayload, FotoUploadPayload } from "@/types/fotos-eventos";
 
@@ -565,7 +566,7 @@ export function FotosEventosPage() {
                     <div className="aspect-video w-full bg-slate-100">
                       {item.arquivoUrl ? (
                         <img
-                          src={item.arquivoUrl}
+                          src={resolverUrlArquivo(item.arquivoUrl)}
                           alt={item.legenda ?? "Foto do evento"}
                           className="h-full w-full object-cover"
                         />

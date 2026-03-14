@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import type { AuthenticatedRequest } from "../../auth/middlewares/auth.middleware.js";
 import { FotosEventosService } from "../services/fotos-eventos.service.js";
 
 const service = new FotosEventosService();
@@ -20,22 +21,33 @@ export class FotosEventosController {
   }
 
   async criar(request: Request, response: Response) {
-    const evento = await service.criar(request.body);
+    const evento = await service.criar(
+      request.body,
+      (request as AuthenticatedRequest).authUser?.id
+    );
     return response.status(201).json(evento);
   }
 
   async atualizar(request: Request, response: Response) {
-    const evento = await service.atualizar(request.params.id, request.body);
+    const evento = await service.atualizar(
+      request.params.id,
+      request.body,
+      (request as AuthenticatedRequest).authUser?.id
+    );
     return response.json(evento);
   }
 
   async remover(request: Request, response: Response) {
-    await service.remover(request.params.id);
+    await service.remover(request.params.id, (request as AuthenticatedRequest).authUser?.id);
     return response.status(204).send();
   }
 
   async adicionarFoto(request: Request, response: Response) {
-    const foto = await service.adicionarFoto(request.params.id, request.body);
+    const foto = await service.adicionarFoto(
+      request.params.id,
+      request.body,
+      (request as AuthenticatedRequest).authUser?.id
+    );
     return response.status(201).json(foto);
   }
 
@@ -45,7 +57,11 @@ export class FotosEventosController {
   }
 
   async removerFoto(request: Request, response: Response) {
-    await service.removerFoto(request.params.id, request.params.fotoId);
+    await service.removerFoto(
+      request.params.id,
+      request.params.fotoId,
+      (request as AuthenticatedRequest).authUser?.id
+    );
     return response.status(204).send();
   }
 

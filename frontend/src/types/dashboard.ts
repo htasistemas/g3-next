@@ -81,3 +81,51 @@ export type DashboardAssistenciaResponse = {
     valoresEmBanco: number;
   };
 };
+
+export type DashboardVulnerabilidadePoint = {
+  id: string;
+  camada: string;
+  titulo: string;
+  subtitulo?: string;
+  bairro?: string;
+  cidade?: string;
+  latitude?: number;
+  longitude?: number;
+  dataReferencia?: string;
+};
+
+export type DashboardVulnerabilidadeLayer = {
+  total: number;
+  geolocalizados: number;
+  pendentesGeolocalizacao: number;
+  pontos: DashboardVulnerabilidadePoint[];
+};
+
+export type DashboardVulnerabilidadeResponse = {
+  unidadePrincipal: {
+    id: string;
+    nome: string;
+    cidade?: string;
+    estado?: string;
+    latitude?: number;
+    longitude?: number;
+    raioMetros?: number;
+  } | null;
+  camadas: {
+    cestaBasica: DashboardVulnerabilidadeLayer;
+    familiasCadastradas: DashboardVulnerabilidadeLayer;
+    situacaoViolencia: DashboardVulnerabilidadeLayer;
+  };
+  sugestoes: Array<{
+    id: string;
+    titulo: string;
+    descricao: string;
+  }>;
+};
+
+export type DashboardVulnerabilidadeGeocodingResponse = {
+  processados: number;
+  atualizados: number;
+  naoEncontrados: number;
+  restanteEstimado: number;
+};

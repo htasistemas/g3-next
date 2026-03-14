@@ -1,8 +1,49 @@
-﻿import { AppError } from "../../../shared/errors/app-error.js";
+import { AppError } from "../../../shared/errors/app-error.js";
+import { detectarMimeTypePorAssinatura, mimeToExt } from "../../arquivos/services/storage-utils.js";
+import { storageService } from "../../arquivos/services/storage-instance.js";
 import { mapEmprestimoRowToResponse, mapLivroRowToResponse } from "../biblioteca.mapper.js";
 import { bibliotecaEmprestimoInputSchema, bibliotecaLivroInputSchema } from "../biblioteca.schema.js";
 import { BibliotecaRepository } from "../repositories/biblioteca.repository.js";
-import type { BibliotecaLivroIsbnConsulta } from "../biblioteca.types.js";
+import type { BibliotecaLivroInput, BibliotecaLivroIsbnConsulta } from "../biblioteca.types.js";
+
+type OpenLibraryBook = {
+  title?: string;
+  subtitle?: string;
+  authors?: Array<{ name?: string }>;
+  publishers?: Array<{ name?: string }>;
+  publish_date?: string;
+  subjects?: Array<{ name?: string }>;
+  by_statement?: string;
+  description?: string | { value?: string };
+  notes?: string | { value?: string };
+  excerpt?: string | { value?: string };
+  cover?: {
+    large?: string;
+    medium?: string;
+    small?: string;
+  };
+};
+
+type GoogleBookItem = {
+  volumeInfo?: {
+    title?: string;
+    subtitle?: string;
+    authors?: string[];
+    publisher?: string;
+    publishedDate?: string;
+    categories?: string[];
+    description?: string;
+    imageLinks?: {
+      thumbnail?: string;
+      smallThumbnail?: string;
+    };
+  };
+};
+
+type ImagemRemota = {
+  buffer: Buffer;
+  mimeType: string;
+};
 
 export class BibliotecaService {
   private readonly repository = new BibliotecaRepository();
@@ -18,74 +59,60 @@ export class BibliotecaService {
   }
 
   async consultarLivroPorIsbn(rawIsbn: string): Promise<BibliotecaLivroIsbnConsulta> {
-    const isbn = rawIsbn.replace(/[^0-9Xx]/g, "").toUpperCase();
-    if (isbn.length !== 10 && isbn.length !== 13) {
-      throw new AppError("Informe um ISBN válido com 10 ou 13 caracteres.", 400);
+    const isbn = this.normalizarIsbn(rawIsbn);
+    const livro =
+      (await this.consultarOpenLibrary(isbn)) ?? (await this.consultarGoogleBooks(isbn));
+
+    if (!livro) {
+      throw new AppError("ISBN nao encontrado nas bases publicas consultadas.", 404);
     }
 
-    const response = await fetch(`https://brasilapi.com.br/api/isbn/v1/${encodeURIComponent(isbn)}`);
-
-    if (response.status === 404) {
-      throw new AppError("ISBN não encontrado na BrasilAPI.", 404);
+    if (livro.capaUrl) {
+      livro.capaUrl = await this.converterCapaParaDataUrl(livro.capaUrl);
     }
 
-    if (!response.ok) {
-      throw new AppError("Não foi possível consultar a BrasilAPI no momento.", 502);
-    }
-
-    const payload = (await response.json()) as {
-      isbn?: string;
-      title?: string;
-      subtitle?: string;
-      authors?: string[];
-      publisher?: string;
-      synopsis?: string;
-      year?: number;
-      subjects?: string[];
-      cover_url?: string;
-    };
-
-    const titulo = String(payload.title ?? "").trim();
-    const autores = Array.isArray(payload.authors)
-      ? payload.authors.map((item) => String(item).trim()).filter(Boolean)
-      : [];
-
-    if (!titulo || !autores.length) {
-      throw new AppError("A BrasilAPI retornou dados incompletos para este ISBN.", 502);
-    }
-
-    return {
-      isbn: String(payload.isbn ?? isbn),
-      titulo,
-      subtitulo: payload.subtitle?.trim() || undefined,
-      autor: autores.join("; "),
-      autores,
-      editora: payload.publisher?.trim() || undefined,
-      anoPublicacao: typeof payload.year === "number" ? payload.year : undefined,
-      categoria: Array.isArray(payload.subjects)
-        ? payload.subjects.map((item) => String(item).trim()).find(Boolean)
-        : undefined,
-      sinopse: payload.synopsis?.trim() || undefined,
-      capaUrl: payload.cover_url?.trim() || undefined
-    };
+    return livro;
   }
 
-  async criarLivro(rawInput: unknown) {
+  async criarLivro(rawInput: unknown, rawUsuarioId?: string) {
     const input = bibliotecaLivroInputSchema.parse(rawInput);
-    const row = await this.repository.criarLivro(input);
-    return mapLivroRowToResponse(row);
+    const usuarioId = this.parseUsuarioId(rawUsuarioId);
+    const preparado = await this.prepararLivroPayload(input, usuarioId);
+
+    try {
+      const row = await this.repository.criarLivro(preparado.input);
+      await this.vincularArquivos(preparado.novosCaminhos, row.id);
+      return mapLivroRowToResponse(row);
+    } catch (error) {
+      await storageService.rollbackArquivos(preparado.novosCaminhos);
+      throw error;
+    }
   }
 
-  async atualizarLivro(rawId: string, rawInput: unknown) {
+  async atualizarLivro(rawId: string, rawInput: unknown, rawUsuarioId?: string) {
     const id = this.parseId(rawId);
     const input = bibliotecaLivroInputSchema.parse(rawInput);
-    const row = await this.repository.atualizarLivro(id, input);
-    return mapLivroRowToResponse(row);
+    const usuarioId = this.parseUsuarioId(rawUsuarioId);
+    const existente = await this.repository.obterLivroOuFalhar(id);
+    const preparado = await this.prepararLivroPayload(input, usuarioId, id);
+
+    try {
+      const row = await this.repository.atualizarLivro(id, preparado.input);
+      await this.vincularArquivos(preparado.novosCaminhos, id);
+      await this.limparCapaSubstituida(existente.capa_url, row.capa_url, usuarioId);
+      return mapLivroRowToResponse(row);
+    } catch (error) {
+      await storageService.rollbackArquivos(preparado.novosCaminhos);
+      throw error;
+    }
   }
 
-  async excluirLivro(rawId: string) {
+  async excluirLivro(rawId: string, rawUsuarioId?: string) {
     const id = this.parseId(rawId);
+    const usuarioId = this.parseUsuarioId(rawUsuarioId);
+    const existente = await this.repository.obterLivroOuFalhar(id);
     await this.repository.removerLivro(id);
+    await this.limparCapaSubstituida(existente.capa_url, undefined, usuarioId);
   }
 
   async listarEmprestimos() {
@@ -114,7 +141,9 @@ export class BibliotecaService {
   async registrarDevolucao(rawId: string, rawInput: unknown) {
     const id = this.parseId(rawId);
     const input =
-      typeof rawInput === "object" && rawInput && "dataDevolucaoReal" in (rawInput as Record<string, unknown>)
+      typeof rawInput === "object" &&
+      rawInput &&
+      "dataDevolucaoReal" in (rawInput as Record<string, unknown>)
         ? String((rawInput as { dataDevolucaoReal: string }).dataDevolucaoReal ?? "")
         : "";
 
@@ -138,10 +167,257 @@ export class BibliotecaService {
     }));
   }
 
+  private async prepararLivroPayload(
+    input: BibliotecaLivroInput,
+    usuarioId?: bigint,
+    entidadeId?: bigint
+  ) {
+    const capa = await this.persistirCapaLivro(input, usuarioId, entidadeId);
+
+    return {
+      input: {
+        ...input,
+        capaUrl: capa.caminhoArquivo ?? null
+      },
+      novosCaminhos: capa.novoCaminho ? [capa.novoCaminho] : []
+    };
+  }
+
+  private async persistirCapaLivro(
+    input: BibliotecaLivroInput,
+    usuarioId?: bigint,
+    entidadeId?: bigint
+  ) {
+    const capaUrl = input.capaUrl?.trim();
+    if (!capaUrl) {
+      return { caminhoArquivo: undefined, novoCaminho: undefined as string | undefined };
+    }
+
+    if (/^https?:\/\//i.test(capaUrl)) {
+      const imagem = await this.baixarImagemRemota(capaUrl);
+      const resultado = await storageService.salvarArquivo({
+        scope: "biblioteca_capa",
+        conteudo: imagem.buffer.toString("base64"),
+        nomeOriginal: this.gerarNomeArquivoCapa(input, imagem.mimeType),
+        mimeType: imagem.mimeType,
+        entidadeId,
+        usuarioUploadId: usuarioId,
+        observacao: `Capa do livro ${input.titulo}`
+      });
+
+      return {
+        caminhoArquivo: resultado.caminhoArquivo,
+        novoCaminho: resultado.caminhoArquivo
+      };
+    }
+
+    const arquivo = await storageService.persistirCampo({
+      scope: "biblioteca_capa",
+      valor: capaUrl,
+      nomeOriginal: this.gerarNomeArquivoCapa(input),
+      mimeType: "image/jpeg",
+      entidadeId,
+      usuarioUploadId: usuarioId,
+      observacao: `Capa do livro ${input.titulo}`
+    });
+
+    return {
+      caminhoArquivo: arquivo.caminhoArquivo,
+      novoCaminho: arquivo.registro && arquivo.caminhoArquivo ? arquivo.caminhoArquivo : undefined
+    };
+  }
+
+  private async vincularArquivos(caminhos: string[], entidadeId: bigint) {
+    for (const caminho of caminhos) {
+      await storageService.vincularEntidade(caminho, entidadeId);
+    }
+  }
+
+  private async limparCapaSubstituida(
+    caminhoAnterior?: string | null,
+    caminhoAtual?: string | null,
+    usuarioId?: bigint
+  ) {
+    if (!this.isManagedStoragePath(caminhoAnterior)) {
+      return;
+    }
+
+    if (caminhoAnterior === caminhoAtual) {
+      return;
+    }
+
+    await storageService.desativarPorCaminho(caminhoAnterior, usuarioId);
+  }
+
+  private async consultarOpenLibrary(isbn: string): Promise<BibliotecaLivroIsbnConsulta | null> {
+    const response = await fetch(
+      `https://openlibrary.org/api/books?bibkeys=ISBN:${encodeURIComponent(isbn)}&format=json&jscmd=data`,
+      { signal: AbortSignal.timeout(15000) }
+    );
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const payload = (await response.json()) as Record<string, OpenLibraryBook>;
+    const item = payload[`ISBN:${isbn}`];
+    if (!item) {
+      return null;
+    }
+
+    const titulo = item.title?.trim() || "";
+    const autores = (item.authors ?? [])
+      .map((autor) => autor.name?.trim() || "")
+      .filter(Boolean);
+    const autoresNormalizados = autores.length
+      ? autores
+      : item.by_statement?.trim()
+        ? [item.by_statement.trim()]
+        : [];
+
+    if (!titulo) {
+      return null;
+    }
+
+    return {
+      isbn,
+      titulo,
+      subtitulo: item.subtitle?.trim() || undefined,
+      autor: autoresNormalizados.join("; "),
+      autores: autoresNormalizados,
+      editora: item.publishers?.map((editora) => editora.name?.trim() || "").find(Boolean),
+      anoPublicacao: this.extrairAnoPublicacao(item.publish_date),
+      categoria: item.subjects?.map((assunto) => assunto.name?.trim() || "").find(Boolean),
+      sinopse:
+        this.extrairTextoDetalhe(item.description) ??
+        this.extrairTextoDetalhe(item.excerpt) ??
+        this.extrairTextoDetalhe(item.notes),
+      capaUrl: item.cover?.large ?? item.cover?.medium ?? item.cover?.small
+    };
+  }
+
+  private async consultarGoogleBooks(isbn: string): Promise<BibliotecaLivroIsbnConsulta | null> {
+    const response = await fetch(
+      `https://www.googleapis.com/books/v1/volumes?q=isbn:${encodeURIComponent(isbn)}`,
+      { signal: AbortSignal.timeout(15000) }
+    );
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const payload = (await response.json()) as { items?: GoogleBookItem[] };
+    const item = payload.items?.[0]?.volumeInfo;
+    if (!item?.title?.trim()) {
+      return null;
+    }
+
+    const autores = (item.authors ?? []).map((autor) => autor.trim()).filter(Boolean);
+
+    return {
+      isbn,
+      titulo: item.title.trim(),
+      subtitulo: item.subtitle?.trim() || undefined,
+      autor: autores.join("; "),
+      autores,
+      editora: item.publisher?.trim() || undefined,
+      anoPublicacao: this.extrairAnoPublicacao(item.publishedDate),
+      categoria: item.categories?.map((categoria) => categoria.trim()).find(Boolean),
+      sinopse: item.description?.trim() || undefined,
+      capaUrl: item.imageLinks?.thumbnail ?? item.imageLinks?.smallThumbnail
+    };
+  }
+
+  private async converterCapaParaDataUrl(capaUrl: string) {
+    if (!/^https?:\/\//i.test(capaUrl)) {
+      return capaUrl;
+    }
+
+    try {
+      const imagem = await this.baixarImagemRemota(capaUrl);
+      return `data:${imagem.mimeType};base64,${imagem.buffer.toString("base64")}`;
+    } catch {
+      return capaUrl;
+    }
+  }
+
+  private async baixarImagemRemota(url: string): Promise<ImagemRemota> {
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(15000),
+      headers: {
+        "User-Agent": "G3-Next/1.0"
+      }
+    });
+
+    if (!response.ok) {
+      throw new AppError("Nao foi possivel baixar a capa do livro no momento.", 502);
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    if (!buffer.length) {
+      throw new AppError("A capa retornada pelo servico externo esta vazia.", 502);
+    }
+
+    const mimeHeader = response.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase();
+    const mimeType = detectarMimeTypePorAssinatura(buffer) ?? mimeHeader ?? "application/octet-stream";
+    if (!mimeType.startsWith("image/")) {
+      throw new AppError("A capa retornada pelo servico externo nao e uma imagem valida.", 502);
+    }
+
+    return { buffer, mimeType };
+  }
+
+  private gerarNomeArquivoCapa(input: BibliotecaLivroInput, mimeType = "image/jpeg") {
+    const referencia =
+      input.isbn?.trim() || input.codigo?.trim() || input.titulo?.trim() || "livro";
+    const extensao = mimeToExt(mimeType) ?? "jpg";
+    return `livro-${referencia}-capa.${extensao}`;
+  }
+
+  private extrairAnoPublicacao(valor?: string | null) {
+    if (!valor) return undefined;
+    const match = valor.match(/\b(1[0-9]{3}|20[0-9]{2}|2100)\b/);
+    return match ? Number(match[1]) : undefined;
+  }
+
+  private extrairTextoDetalhe(valor?: string | { value?: string } | null) {
+    if (!valor) return undefined;
+    if (typeof valor === "string") {
+      const trimmed = valor.trim();
+      return trimmed || undefined;
+    }
+    const trimmed = valor.value?.trim();
+    return trimmed || undefined;
+  }
+
+  private isManagedStoragePath(valor?: string | null) {
+    if (!valor?.trim()) return false;
+    const normalized = valor.trim();
+    return !normalized.startsWith("data:") && !/^https?:\/\//i.test(normalized);
+  }
+
+  private normalizarIsbn(rawIsbn: string) {
+    const isbn = rawIsbn.replace(/[^0-9Xx]/g, "").toUpperCase();
+    if (isbn.length !== 10 && isbn.length !== 13) {
+      throw new AppError("Informe um ISBN valido com 10 ou 13 caracteres.", 400);
+    }
+    return isbn;
+  }
+
   private parseId(rawId: string): bigint {
     const parsed = Number(rawId);
     if (!Number.isInteger(parsed) || parsed <= 0) {
       throw new AppError("Identificador invalido.", 400);
+    }
+    return BigInt(parsed);
+  }
+
+  private parseUsuarioId(rawUsuarioId?: string) {
+    if (!rawUsuarioId) return undefined;
+    const parsed = Number(rawUsuarioId);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      return undefined;
     }
     return BigInt(parsed);
   }

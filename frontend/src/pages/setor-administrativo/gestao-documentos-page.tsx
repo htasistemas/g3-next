@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
   Bell,
+  Eye,
   FileStack,
   FolderOpen,
   History,
@@ -32,6 +33,7 @@ import {
   useHistoricoDocumentoInstituicao,
   useSalvarDocumentoInstituicao
 } from "@/features/documentos-instituicao/use-documentos-instituicao";
+import { resolverUrlArquivo } from "@/lib/arquivos";
 import { imprimirConteudoAtual } from "@/lib/report-utils";
 import type {
   DocumentoInstituicao,
@@ -600,6 +602,19 @@ export function GestaoDocumentosPage() {
                         <p className="text-xs text-[var(--g3-muted)]">
                           {item.tipoMime ?? item.tipo} - {item.tamanho ?? "---"}
                         </p>
+                        {item.arquivoUrl ? (
+                          <div className="mt-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => window.open(resolverUrlArquivo(item.arquivoUrl), "_blank", "noopener")}
+                            >
+                              <Eye className="mr-1.5 h-3.5 w-3.5" />
+                              Abrir anexo
+                            </Button>
+                          </div>
+                        ) : null}
                       </article>
                     ))
                   ) : (

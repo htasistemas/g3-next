@@ -7,6 +7,7 @@ export type BibliotecaLivro = {
   titulo: string;
   autor: string;
   isbn?: string;
+  capaUrl?: string;
   editora?: string;
   anoPublicacao?: number;
   categoria?: string;
@@ -25,6 +26,7 @@ export type BibliotecaLivroCadastro = {
   titulo: string;
   autor: string;
   isbn?: string | null;
+  capaUrl?: string | null;
   editora?: string | null;
   anoPublicacao?: number | null;
   categoria?: string | null;

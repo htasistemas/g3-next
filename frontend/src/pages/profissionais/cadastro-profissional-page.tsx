@@ -53,6 +53,7 @@ import { somenteDigitos } from "@/lib/validators";
 import { formatarTextoPorCampo, normalizarObjetoTexto } from "@/lib/text-formatter";
 import { mapaCamposTextoProfissionalForm } from "@/lib/text-format-config";
 import { abrirRelatorioPdf } from "@/lib/report-utils";
+import { resolverUrlArquivo } from "@/lib/arquivos";
 import {
   ajustarParaFotoTresPorQuatro,
   capturarFotoTresPorQuatroDoVideo,
@@ -768,7 +769,7 @@ export function CadastroProfissionalPage() {
                       <div className="w-full max-w-[170px] aspect-[4/3] overflow-hidden rounded-md border border-[var(--g3-border)] bg-[var(--g3-card-soft)]">
                         {watch("foto_3x4") ? (
                           <img
-                            src={watch("foto_3x4")}
+                            src={resolverUrlArquivo(watch("foto_3x4"))}
                             alt="Foto do profissional"
                             className="h-full w-full object-cover"
                           />

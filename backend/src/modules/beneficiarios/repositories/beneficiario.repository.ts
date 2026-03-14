@@ -642,6 +642,8 @@ export class BeneficiarioRepository {
     }
 
     for (const doc of input.documentos_obrigatorios ?? []) {
+      const nomeDocumento = trimOrUndefined(doc.nome);
+      const numeroDocumento = trimOrUndefined(doc.numeroDocumento);
       const contentType = trimOrUndefined(doc.contentType);
       const caminhoArquivoInformado = trimOrUndefined(doc.caminhoArquivo);
       const conteudoInformado = trimOrUndefined(doc.conteudo);
@@ -654,13 +656,19 @@ export class BeneficiarioRepository {
               ? `data:${contentType};base64,${conteudoInformado}`
               : conteudoInformado
           : undefined);
+      const nomeArquivo = trimOrUndefined(doc.nomeArquivo);
+      const possuiConteudo = !!(numeroDocumento || nomeArquivo || caminhoArquivo || doc.ignorado);
+
+      if (!nomeDocumento || !possuiConteudo) {
+        continue;
+      }
 
       documentos.push({
         beneficiarioId,
         tipoDocumento: "ANEXO",
-        nomeDocumento: trimOrUndefined(doc.nome),
-        numeroDocumento: trimOrUndefined(doc.numeroDocumento),
-        nomeArquivo: trimOrUndefined(doc.nomeArquivo),
+        nomeDocumento,
+        numeroDocumento,
+        nomeArquivo,
         caminhoArquivo,
         contentType,
         obrigatorio: doc.ignorado ? false : (doc.obrigatorio ?? true),

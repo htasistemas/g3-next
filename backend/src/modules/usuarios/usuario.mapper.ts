@@ -54,6 +54,11 @@ const permissaoCatalogoFixo: Record<
     modulo: "Operacao",
     tela: "Consultas",
     acao: "Somente leitura"
+  },
+  CHAMADO_TECNICO_DESENVOLVIMENTO: {
+    modulo: "Configuracoes gerais",
+    tela: "Chamado tecnico",
+    acao: "Desenvolvimento"
   }
 };
 

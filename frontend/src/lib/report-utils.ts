@@ -1,13 +1,96 @@
 export function abrirRelatorioPdf(blob: Blob) {
   const url = URL.createObjectURL(blob);
-  const novaAba = window.open(url, "_blank", "noopener,noreferrer");
+  const novaAba = window.open(url, "_blank");
 
   if (!novaAba) {
     URL.revokeObjectURL(url);
     throw new Error("O navegador bloqueou a abertura do relatório em nova guia.");
   }
 
+  try {
+    novaAba.opener = null;
+  } catch {
+    // Alguns navegadores não permitem ajustar opener em todas as combinações.
+  }
+
   window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+}
+
+export type JanelaRelatorioReservada = {
+  publicar: (blob: Blob) => void;
+  fechar: () => void;
+};
+
+export function reservarJanelaRelatorio(titulo = "Gerando relatório"): JanelaRelatorioReservada {
+  const janela = window.open("", "_blank", "width=1200,height=900");
+
+  if (!janela) {
+    throw new Error("O navegador bloqueou a abertura do relatório em nova guia.");
+  }
+
+  janela.document.write(`<!doctype html>
+    <html lang="pt-BR">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>${escapeHtml(titulo)}</title>
+        <style>
+          body {
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            font-family: Arial, sans-serif;
+            color: #0f172a;
+            background: #f8fafc;
+          }
+
+          .g3-relatorio-loading {
+            padding: 24px 28px;
+            border: 1px solid #cbd5e1;
+            border-radius: 16px;
+            background: #fff;
+            box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+            text-align: center;
+          }
+
+          .g3-relatorio-loading strong {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 16px;
+          }
+
+          .g3-relatorio-loading span {
+            font-size: 13px;
+            color: #475569;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="g3-relatorio-loading">
+          <strong>${escapeHtml(titulo)}</strong>
+          <span>Aguarde enquanto o PDF é preparado.</span>
+        </div>
+      </body>
+    </html>`);
+  janela.document.close();
+
+  return {
+    publicar(blob: Blob) {
+      const url = URL.createObjectURL(blob);
+      try {
+        janela.location.replace(url);
+      } catch {
+        janela.location.href = url;
+      }
+      window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    },
+    fechar() {
+      if (!janela.closed) {
+        janela.close();
+      }
+    }
+  };
 }
 
 type ImprimirConteudoOptions = {

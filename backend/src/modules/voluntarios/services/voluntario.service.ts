@@ -7,6 +7,7 @@ import { mapVoluntarioToResponse } from "../voluntario.mapper.js";
 import { VoluntarioRepository } from "../repositories/voluntario.repository.js";
 import { mapaCamposTextoVoluntario } from "../../../utils/text-format-config.js";
 import { normalizarObjetoTexto } from "../../../utils/text-formatter.js";
+import { storageService } from "../../arquivos/services/storage-instance.js";
 
 export class VoluntarioService {
   private readonly repository = new VoluntarioRepository();
@@ -34,24 +35,58 @@ export class VoluntarioService {
     return mapVoluntarioToResponse(voluntario);
   }
 
-  async criar(rawInput: unknown) {
+  async criar(rawInput: unknown, rawUsuarioId?: string) {
     const inputNormalizado = this.normalizarPayload(rawInput);
     const input = voluntarioInputSchema.parse(inputNormalizado);
-    const voluntario = await this.repository.criar(input);
-    return mapVoluntarioToResponse(voluntario);
+    const usuarioId = this.parseUsuarioId(rawUsuarioId);
+    const foto = await this.prepararFoto(input.foto_3x4, input.nome_completo, usuarioId);
+
+    try {
+      const voluntario = await this.repository.criar({ ...input, foto_3x4: foto.caminhoArquivo });
+      if (foto.novoCaminho) {
+        await storageService.vincularEntidade(foto.novoCaminho, voluntario.id);
+      }
+      return mapVoluntarioToResponse(voluntario);
+    } catch (error) {
+      await storageService.rollbackArquivos([foto.novoCaminho]);
+      throw error;
+    }
   }
 
-  async atualizar(rawId: string, rawInput: unknown) {
+  async atualizar(rawId: string, rawInput: unknown, rawUsuarioId?: string) {
     const id = this.parseId(rawId);
     const inputNormalizado = this.normalizarPayload(rawInput);
     const input = voluntarioInputSchema.parse(inputNormalizado);
-    const voluntario = await this.repository.atualizar(id, input);
-    return mapVoluntarioToResponse(voluntario);
+    const usuarioId = this.parseUsuarioId(rawUsuarioId);
+    const existente = await this.repository.buscarPorIdOuFalhar(id);
+    const foto = await this.prepararFoto(input.foto_3x4, input.nome_completo, usuarioId, id);
+
+    try {
+      const voluntario = await this.repository.atualizar(id, { ...input, foto_3x4: foto.caminhoArquivo });
+      if (foto.novoCaminho) {
+        await storageService.vincularEntidade(foto.novoCaminho, id);
+      }
+      if (
+        this.isManagedStoragePath(existente.foto3x4) &&
+        existente.foto3x4 !== voluntario.foto3x4
+      ) {
+        await storageService.desativarPorCaminho(existente.foto3x4, usuarioId);
+      }
+      return mapVoluntarioToResponse(voluntario);
+    } catch (error) {
+      await storageService.rollbackArquivos([foto.novoCaminho]);
+      throw error;
+    }
   }
 
-  async remover(rawId: string) {
+  async remover(rawId: string, rawUsuarioId?: string) {
     const id = this.parseId(rawId);
+    const usuarioId = this.parseUsuarioId(rawUsuarioId);
+    const existente = await this.repository.buscarPorIdOuFalhar(id);
     await this.repository.remover(id);
+    if (this.isManagedStoragePath(existente.foto3x4)) {
+      await storageService.desativarPorCaminho(existente.foto3x4, usuarioId);
+    }
   }
 
   private parseId(rawId: string): bigint {
@@ -71,5 +106,42 @@ export class VoluntarioService {
       rawInput as Record<string, unknown>,
       mapaCamposTextoVoluntario
     );
+  }
+
+  private async prepararFoto(
+    valor?: string,
+    nomeCompleto?: string,
+    usuarioId?: bigint,
+    entidadeId?: bigint
+  ) {
+    const arquivo = await storageService.persistirCampo({
+      scope: "colaborador_foto",
+      valor,
+      nomeOriginal: `${nomeCompleto?.replace(/\s+/g, "-").toLowerCase() || "voluntario"}-foto.jpg`,
+      mimeType: "image/jpeg",
+      entidadeId,
+      usuarioUploadId: usuarioId,
+      observacao: "Foto de colaborador"
+    });
+
+    return {
+      caminhoArquivo: arquivo.caminhoArquivo,
+      novoCaminho: arquivo.registro ? arquivo.caminhoArquivo : undefined
+    };
+  }
+
+  private isManagedStoragePath(valor?: string | null) {
+    if (!valor?.trim()) return false;
+    const normalized = valor.trim();
+    return !normalized.startsWith("data:") && !/^https?:\/\//i.test(normalized);
+  }
+
+  private parseUsuarioId(rawUsuarioId?: string) {
+    if (!rawUsuarioId) return undefined;
+    const parsed = Number(rawUsuarioId);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      return undefined;
+    }
+    return BigInt(parsed);
   }
 }

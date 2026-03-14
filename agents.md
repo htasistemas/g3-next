@@ -37,6 +37,39 @@
 - Antes de alterar estrutura: analisar impacto e registrar diagnóstico.
 - Priorizar compatibilidade com estrutura existente.
 
+### Versionamento do sistema
+
+- MUST manter a versão do sistema em sequência crescente, sem reutilizar nem regredir numeração.
+- MUST atualizar o arquivo oficial de versão do sistema a cada entrega que exigir bump de versão.
+
+### Armazenamento de Fotos, Imagens e Documentos
+
+#### Regra obrigatória de armazenamento de arquivos
+
+- MUST NOT salvar fotos, imagens, PDFs ou documentos binários diretamente no banco de dados.
+- MUST NOT salvar arquivos em base64 no banco de dados.
+- MUST armazenar no banco apenas os metadados do arquivo e seu caminho físico ou lógico.
+- MUST armazenar os arquivos físicos em pasta estruturada no servidor ou em serviço de storage compatível.
+- MUST manter a implementação preparada para futura migração para storage externo sem reescrita da regra de negócio.
+
+#### Estrutura padrão de armazenamento
+
+- MUST usar uma pasta raiz de armazenamento, preferencialmente `/storage`.
+- MUST organizar os arquivos por entidade e categoria.
+- MUST seguir, como padrão inicial, a estrutura:
+
+```text
+/storage/beneficiarios/fotos
+/storage/beneficiarios/documentos
+/storage/colaboradores/fotos
+/storage/colaboradores/documentos
+/storage/instituicoes/documentos
+/storage/doacoes/comprovantes
+/storage/cursos/comprovantes
+/storage/almoxarifado/anexos
+/storage/geral/outros
+```
+
 ---
 
 ## MÁSCARAS, VALIDAÇÕES E NORMALIZAÇÃO DE CAMPOS
@@ -124,6 +157,7 @@
 
 - MUST usar máscara visual `00/00/0000` quando houver digitação manual.
 - MUST validar datas inexistentes, como dia 31 em mês incompatível.
+- MUST exibir datas em `dd-mm-aaaa` na interface e nos relatórios, salvo exigência técnica explícita de integração.
 - MUST armazenar no formato de data adequado no banco.
 - MUST padronizar uso de formato ISO em integrações e APIs sempre que aplicável.
 

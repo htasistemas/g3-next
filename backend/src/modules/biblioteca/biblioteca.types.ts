@@ -6,6 +6,7 @@ export type BibliotecaLivroInput = {
   titulo: string;
   autor: string;
   isbn?: string | null;
+  capaUrl?: string | null;
   editora?: string | null;
   anoPublicacao?: number | null;
   categoria?: string | null;
@@ -36,6 +37,7 @@ export type BibliotecaLivroRow = {
   titulo: string;
   autor: string;
   isbn: string | null;
+  capa_url: string | null;
   editora: string | null;
   ano_publicacao: number | null;
   categoria: string | null;

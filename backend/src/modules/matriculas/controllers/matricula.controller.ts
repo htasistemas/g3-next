@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import type { AuthenticatedRequest } from "../../auth/middlewares/auth.middleware.js";
 import { MatriculaService } from "../services/matricula.service.js";
 
 const service = new MatriculaService();
@@ -15,17 +16,24 @@ export class MatriculaController {
   }
 
   async criar(request: Request, response: Response) {
-    const matricula = await service.criar(request.body);
+    const matricula = await service.criar(
+      request.body,
+      (request as AuthenticatedRequest).authUser?.id
+    );
     return response.status(201).json({ matricula });
   }
 
   async atualizar(request: Request, response: Response) {
-    const matricula = await service.atualizar(request.params.id, request.body);
+    const matricula = await service.atualizar(
+      request.params.id,
+      request.body,
+      (request as AuthenticatedRequest).authUser?.id
+    );
     return response.json({ matricula });
   }
 
   async remover(request: Request, response: Response) {
-    await service.remover(request.params.id);
+    await service.remover(request.params.id, (request as AuthenticatedRequest).authUser?.id);
     return response.status(204).send();
   }
 

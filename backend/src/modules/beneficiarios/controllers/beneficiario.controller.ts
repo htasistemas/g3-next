@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import type { AuthenticatedRequest } from "../../auth/middlewares/auth.middleware.js";
 import { BeneficiarioService } from "../services/beneficiario.service.js";
 
 const service = new BeneficiarioService();
@@ -15,17 +16,24 @@ export class BeneficiarioController {
   }
 
   async criar(request: Request, response: Response) {
-    const beneficiario = await service.criar(request.body);
+    const beneficiario = await service.criar(
+      request.body,
+      (request as AuthenticatedRequest).authUser?.id
+    );
     return response.status(201).json({ beneficiario });
   }
 
   async atualizar(request: Request, response: Response) {
-    const beneficiario = await service.atualizar(request.params.id, request.body);
+    const beneficiario = await service.atualizar(
+      request.params.id,
+      request.body,
+      (request as AuthenticatedRequest).authUser?.id
+    );
     return response.json({ beneficiario });
   }
 
   async remover(request: Request, response: Response) {
-    await service.remover(request.params.id);
+    await service.remover(request.params.id, (request as AuthenticatedRequest).authUser?.id);
     return response.status(204).send();
   }
 

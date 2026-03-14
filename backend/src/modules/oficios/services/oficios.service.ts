@@ -8,6 +8,7 @@ import {
   oficioPdfAssinadoInputSchema
 } from "../oficios.schema.js";
 import { OficiosRepository } from "../repositories/oficios.repository.js";
+import { storageService } from "../../arquivos/services/storage-instance.js";
 
 export class OficiosService {
   private readonly repository = new OficiosRepository();
@@ -36,16 +37,46 @@ export class OficiosService {
     return mapOficioToResponse(registro.oficio, registro.tramites);
   }
 
-  async remover(rawId: string) {
+  async remover(rawId: string, rawUsuarioId?: string) {
     const id = this.parseId(rawId);
+    const usuarioId = this.parseUsuarioId(rawUsuarioId);
+    const registro = await this.repository.buscarPorIdOuFalhar(id);
+    const imagens = await this.repository.listarImagens(id);
     await this.repository.remover(id);
+    await this.limparArquivo(registro.oficio.pdf_assinado_conteudo, usuarioId);
+    for (const imagem of imagens) {
+      await this.limparArquivo(imagem.conteudo_base64, usuarioId);
+    }
   }
 
-  async salvarPdfAssinado(rawId: string, rawInput: unknown) {
+  async salvarPdfAssinado(rawId: string, rawInput: unknown, rawUsuarioId?: string) {
     const id = this.parseId(rawId);
     const input = oficioPdfAssinadoInputSchema.parse(this.normalizarPayload(rawInput));
-    const registro = await this.repository.salvarPdfAssinado(id, input);
-    return mapOficioToResponse(registro.oficio, registro.tramites);
+    const usuarioId = this.parseUsuarioId(rawUsuarioId);
+    const existente = await this.repository.buscarPorIdOuFalhar(id);
+    const arquivo = await storageService.salvarArquivo({
+      scope: "oficio_documento",
+      conteudo: input.conteudoBase64,
+      nomeOriginal: input.nomeArquivo,
+      mimeType: input.tipoMime,
+      entidadeId: id,
+      usuarioUploadId: usuarioId,
+      observacao: "PDF assinado do oficio"
+    });
+
+    try {
+      const registro = await this.repository.salvarPdfAssinado(id, {
+        ...input,
+        conteudoBase64: arquivo.caminhoArquivo,
+        tipoMime: arquivo.registro.mime_type
+      });
+      await storageService.vincularEntidade(arquivo.caminhoArquivo, id);
+      await this.limparArquivo(existente.oficio.pdf_assinado_conteudo, usuarioId, arquivo.caminhoArquivo);
+      return mapOficioToResponse(registro.oficio, registro.tramites);
+    } catch (error) {
+      await storageService.rollbackArquivos([arquivo.caminhoArquivo]);
+      throw error;
+    }
   }
 
   async obterPdfAssinado(rawId: string) {
@@ -57,9 +88,12 @@ export class OficiosService {
     return pdf;
   }
 
-  async removerPdfAssinado(rawId: string) {
+  async removerPdfAssinado(rawId: string, rawUsuarioId?: string) {
     const id = this.parseId(rawId);
+    const usuarioId = this.parseUsuarioId(rawUsuarioId);
+    const pdf = await this.repository.obterPdfAssinado(id);
     await this.repository.removerPdfAssinado(id);
+    await this.limparArquivo(pdf.conteudo, usuarioId);
   }
 
   async listarImagens(rawId: string) {
@@ -68,17 +102,42 @@ export class OficiosService {
     return imagens.map(mapOficioImagemToResponse);
   }
 
-  async adicionarImagem(rawId: string, rawInput: unknown) {
+  async adicionarImagem(rawId: string, rawInput: unknown, rawUsuarioId?: string) {
     const id = this.parseId(rawId);
     const input = oficioImagemInputSchema.parse(this.normalizarPayload(rawInput));
-    const imagem = await this.repository.adicionarImagem(id, input);
-    return mapOficioImagemToResponse(imagem);
+    const usuarioId = this.parseUsuarioId(rawUsuarioId);
+    const arquivo = await storageService.salvarArquivo({
+      scope: "oficio_documento",
+      conteudo: input.conteudoBase64,
+      nomeOriginal: input.nomeArquivo,
+      mimeType: input.tipoMime,
+      entidadeId: id,
+      usuarioUploadId: usuarioId,
+      observacao: "Imagem do oficio"
+    });
+
+    try {
+      const imagem = await this.repository.adicionarImagem(id, {
+        ...input,
+        conteudoBase64: arquivo.caminhoArquivo,
+        tipoMime: arquivo.registro.mime_type
+      });
+      await storageService.vincularEntidade(arquivo.caminhoArquivo, id);
+      return mapOficioImagemToResponse(imagem);
+    } catch (error) {
+      await storageService.rollbackArquivos([arquivo.caminhoArquivo]);
+      throw error;
+    }
   }
 
-  async removerImagem(rawId: string, rawImagemId: string) {
+  async removerImagem(rawId: string, rawImagemId: string, rawUsuarioId?: string) {
     const id = this.parseId(rawId);
     const imagemId = this.parseId(rawImagemId);
+    const usuarioId = this.parseUsuarioId(rawUsuarioId);
+    const imagens = await this.repository.listarImagens(id);
+    const imagem = imagens.find((item) => item.id === imagemId);
     await this.repository.removerImagem(id, imagemId);
+    await this.limparArquivo(imagem?.conteudo_base64, usuarioId);
   }
 
   private parseId(rawId: string): bigint {
@@ -92,5 +151,32 @@ export class OficiosService {
   private normalizarPayload(rawInput: unknown) {
     if (!rawInput || typeof rawInput !== "object") return rawInput;
     return normalizarObjetoTexto(rawInput as Record<string, unknown>, mapaCamposTextoOficios);
+  }
+
+  private isManagedStoragePath(valor?: string | null) {
+    if (!valor?.trim()) return false;
+    const normalized = valor.trim();
+    return !normalized.startsWith("data:") && !/^https?:\/\//i.test(normalized);
+  }
+
+  private async limparArquivo(valor?: string | null, usuarioId?: bigint, ignorarCaminho?: string) {
+    if (!this.isManagedStoragePath(valor)) {
+      return;
+    }
+
+    if (valor === ignorarCaminho) {
+      return;
+    }
+
+    await storageService.desativarPorCaminho(valor, usuarioId);
+  }
+
+  private parseUsuarioId(rawUsuarioId?: string) {
+    if (!rawUsuarioId) return undefined;
+    const parsed = Number(rawUsuarioId);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      return undefined;
+    }
+    return BigInt(parsed);
   }
 }

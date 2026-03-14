@@ -4,6 +4,7 @@ import { startTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { APP_VERSION } from "@/lib/app-version";
+import { resolverUrlArquivo } from "@/lib/arquivos";
 import { useLembretesDiarios } from "@/features/lembretes-diarios/use-lembretes-diarios";
 import { useTarefasAdministrativas } from "@/features/tarefas-administrativas/use-tarefas-administrativas";
 import { useUnidadeAssistencialAtual } from "@/features/unidades-assistenciais/use-unidades-assistenciais";
@@ -61,7 +62,7 @@ import {
   type LucideIcon
 } from "lucide-react";
 
-type MenuItem = {
+export type MenuItem = {
   id: string;
   to?: string;
   label: string;
@@ -71,7 +72,7 @@ type MenuItem = {
   emMigracao?: boolean;
 };
 
-type MenuSection = {
+export type MenuSection = {
   id: string;
   secao: string;
   icon: LucideIcon;
@@ -90,7 +91,7 @@ function ordenarItensMenu<T extends { label: string }>(itens: T[]) {
   );
 }
 
-const menuSections: MenuSection[] = [
+export const menuSections: MenuSection[] = [
   {
     id: "dashboard",
     secao: "Dashboard",
@@ -98,6 +99,12 @@ const menuSections: MenuSection[] = [
     itens: [
       { id: "dashboard-visao-geral", to: "/dashboard/visao-geral", label: "Visão geral", icon: ChartPie },
       { id: "dashboard-indicadores", to: "/dashboard/indicadores", label: "Indicadores", icon: ChartColumn },
+      {
+        id: "dashboard-vulnerabilidade",
+        to: "/dashboard/vulnerabilidade",
+        label: "Georeferenciamento",
+        icon: MapPinned
+      },
       {
         id: "dashboard-power-bi",
         to: "/dashboard/power-bi",
@@ -331,6 +338,12 @@ const menuSections: MenuSection[] = [
     icon: Settings2,
     itens: [
       {
+        id: "configuracoes-chamado-tecnico",
+        to: "/configuracoes/chamado-tecnico",
+        label: "Chamado técnico",
+        icon: ListFilter
+      },
+      {
         id: "configuracoes-mensagens-personalizadas",
         to: "/configuracoes/mensagens-personalizadas",
         label: "Mensagens personalizadas",
@@ -363,6 +376,7 @@ const menuSections: MenuSection[] = [
 function obterTitulo(pathname: string): string {
   if (pathname === "/" || pathname.startsWith("/dashboard/visao-geral")) return "Visão geral";
   if (pathname.startsWith("/dashboard/indicadores")) return "Indicadores";
+  if (pathname.startsWith("/dashboard/vulnerabilidade")) return "Georeferenciamento";
   if (pathname.startsWith("/dashboard/power-bi")) return "Power BI";
   if (pathname.startsWith("/cadastros/beneficiarios")) return "Cadastro de beneficiários";
   if (pathname.startsWith("/cadastros/profissionais")) return "Cadastro de profissionais";
@@ -378,6 +392,7 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/cadastros/unidades-assistenciais")) return "Cadastro de unidade assistencial";
   if (pathname.startsWith("/cadastros/vinculo-familiar")) return "Cadastro de vínculo familiar";
   if (pathname.startsWith("/configuracoes/parametros-sistema")) return "Parâmetros do sistema";
+  if (pathname.startsWith("/configuracoes/chamado-tecnico")) return "Chamado técnico";
   if (pathname.startsWith("/configuracoes/mensagens-personalizadas")) return "Mensagens personalizadas";
   if (pathname.startsWith("/configuracoes/usuarios")) return "Usuários";
   if (pathname.startsWith("/setor-rh/registro-ponto")) return "Registro de ponto";
@@ -403,6 +418,7 @@ function ocultarTituloTopo(pathname: string) {
   return (
     pathname.startsWith("/cadastros/") ||
     pathname.startsWith("/dashboard/power-bi") ||
+    pathname.startsWith("/configuracoes/chamado-tecnico") ||
     pathname.startsWith("/configuracoes/mensagens-personalizadas") ||
     pathname.startsWith("/atendimentos/banco-empregos") ||
     pathname.startsWith("/atendimentos/biblioteca") ||
@@ -634,7 +650,7 @@ export function AppShell() {
               <div className="w-full text-center">
                 {logomarcaInstituicao ? (
                   <img
-                    src={logomarcaInstituicao}
+                    src={resolverUrlArquivo(logomarcaInstituicao)}
                     alt={`Logomarca da instituição ${nomeInstituicao}`}
                     className="mx-auto h-10 w-auto max-w-[170px] object-contain"
                   />

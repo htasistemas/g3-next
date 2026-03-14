@@ -48,6 +48,10 @@ const IndicadoresPage = carregarPagina(
   "IndicadoresPage"
 );
 const PowerBiPage = carregarPagina(() => import("@/pages/dashboard/power-bi-page"), "PowerBiPage");
+const VulnerabilidadePage = carregarPagina(
+  () => import("@/pages/dashboard/vulnerabilidade-page"),
+  "VulnerabilidadePage"
+);
 const CadastroBeneficiarioPage = carregarPagina(
   () => import("@/pages/beneficiarios/cadastro-beneficiario-page"),
   "CadastroBeneficiarioPage"
@@ -176,6 +180,10 @@ const MensagensPersonalizadasPage = carregarPagina(
   () => import("@/pages/configuracoes/mensagens-personalizadas-page"),
   "MensagensPersonalizadasPage"
 );
+const ChamadoTecnicoPage = carregarPagina(
+  () => import("@/pages/configuracoes/chamado-tecnico-page"),
+  "ChamadoTecnicoPage"
+);
 
 export const router = createBrowserRouter([
   {
@@ -209,6 +217,7 @@ export const router = createBrowserRouter([
       { index: true, element: <Navigate to="/dashboard/visao-geral" replace /> },
       { path: "/dashboard/visao-geral", element: VisaoGeralPage },
       { path: "/dashboard/indicadores", element: IndicadoresPage },
+      { path: "/dashboard/vulnerabilidade", element: VulnerabilidadePage },
       { path: "/dashboard/power-bi", element: PowerBiPage },
       { path: "/cadastros/beneficiarios", element: CadastroBeneficiarioPage },
       { path: "/cadastros/profissionais", element: CadastroProfissionalPage },
@@ -254,6 +263,10 @@ export const router = createBrowserRouter([
             {UsuariosPage}
           </RequirePermission>
         )
+      },
+      {
+        path: "/configuracoes/chamado-tecnico",
+        element: ChamadoTecnicoPage
       },
       {
         path: "/configuracoes/mensagens-personalizadas",

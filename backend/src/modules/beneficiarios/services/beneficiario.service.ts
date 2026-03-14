@@ -12,6 +12,7 @@ import {
 } from "../../../utils/text-format-config.js";
 import { normalizarObjetoTexto } from "../../../utils/text-formatter.js";
 import type { BeneficiarioInput } from "../beneficiario.types.js";
+import { storageService } from "../../arquivos/services/storage-instance.js";
 
 export class BeneficiarioService {
   private readonly repository = new BeneficiarioRepository();
@@ -39,26 +40,52 @@ export class BeneficiarioService {
     return mapBeneficiarioToResponse(beneficiario);
   }
 
-  async criar(rawInput: unknown) {
+  async criar(rawInput: unknown, rawUsuarioId?: string) {
     const inputNormalizado = this.normalizarPayload(rawInput);
     const input = beneficiarioInputSchema.parse(inputNormalizado);
     await this.validarDuplicidadeCadastro(input);
-    const beneficiario = await this.repository.criar(input);
-    return mapBeneficiarioToResponse(beneficiario);
+    const usuarioId = this.parseUsuarioId(rawUsuarioId);
+    const preparado = await this.prepararArquivosPayload(input, usuarioId);
+
+    try {
+      const beneficiario = await this.repository.criar(preparado.input);
+      await this.vincularArquivos(preparado.novosCaminhos, beneficiario.id);
+      return mapBeneficiarioToResponse(beneficiario);
+    } catch (error) {
+      await storageService.rollbackArquivos(preparado.novosCaminhos);
+      throw error;
+    }
   }
 
-  async atualizar(rawId: string, rawInput: unknown) {
+  async atualizar(rawId: string, rawInput: unknown, rawUsuarioId?: string) {
     const id = this.parseId(rawId);
     const inputNormalizado = this.normalizarPayload(rawInput);
     const input = beneficiarioInputSchema.parse(inputNormalizado);
-    await this.validarDuplicidadeCadastro(input, id);
-    const beneficiario = await this.repository.atualizar(id, input);
-    return mapBeneficiarioToResponse(beneficiario);
+    const usuarioId = this.parseUsuarioId(rawUsuarioId);
+    const existente = await this.repository.buscarPorIdOuFalhar(id);
+    const preparado = await this.prepararArquivosPayload(input, usuarioId, id);
+
+    try {
+      const beneficiario = await this.repository.atualizar(id, preparado.input);
+      await this.vincularArquivos(preparado.novosCaminhos, id);
+      await this.limparArquivosSubstituidos(
+        this.coletarCaminhosRegistro(existente),
+        this.coletarCaminhosRegistro(beneficiario),
+        usuarioId
+      );
+      return mapBeneficiarioToResponse(beneficiario);
+    } catch (error) {
+      await storageService.rollbackArquivos(preparado.novosCaminhos);
+      throw error;
+    }
   }
 
-  async remover(rawId: string) {
+  async remover(rawId: string, rawUsuarioId?: string) {
     const id = this.parseId(rawId);
+    const usuarioId = this.parseUsuarioId(rawUsuarioId);
+    const existente = await this.repository.buscarPorIdOuFalhar(id);
     await this.repository.remover(id);
+    await this.limparArquivosSubstituidos(this.coletarCaminhosRegistro(existente), [], usuarioId);
   }
 
   async obterProximoCodigo() {
@@ -115,5 +142,114 @@ export class BeneficiarioService {
       `Já existe um beneficiário cadastrado com os mesmos dados${sufixo}.`,
       409
     );
+  }
+
+  private async prepararArquivosPayload(
+    input: BeneficiarioInput,
+    usuarioId?: bigint,
+    entidadeId?: bigint
+  ) {
+    const novosCaminhos: string[] = [];
+
+    const foto = await storageService.persistirCampo({
+      scope: "beneficiario_foto",
+      valor: input.foto_3x4,
+      nomeOriginal: `beneficiario-${input.codigo ?? "sem-codigo"}-foto.jpg`,
+      mimeType: "image/jpeg",
+      entidadeId,
+      usuarioUploadId: usuarioId,
+      observacao: "Foto 3x4 do beneficiario"
+    });
+
+    if (foto.registro && foto.caminhoArquivo) {
+      novosCaminhos.push(foto.caminhoArquivo);
+    }
+
+    const documentosObrigatorios = await Promise.all(
+      (input.documentos_obrigatorios ?? []).map(async (documento) => {
+        const arquivo = await storageService.persistirCampo({
+          scope: "beneficiario_documento",
+          valor: documento.caminhoArquivo ?? documento.conteudo,
+          nomeOriginal:
+            documento.nomeArquivo ??
+            `${documento.nome?.replace(/\s+/g, "-").toLowerCase() || "documento"}.pdf`,
+          mimeType: documento.contentType,
+          entidadeId,
+          usuarioUploadId: usuarioId,
+          observacao: documento.nome
+        });
+
+        if (arquivo.registro && arquivo.caminhoArquivo) {
+          novosCaminhos.push(arquivo.caminhoArquivo);
+        }
+
+        return {
+          ...documento,
+          caminhoArquivo: arquivo.caminhoArquivo,
+          conteudo: undefined,
+          contentType: documento.contentType ?? arquivo.registro?.mime_type,
+          nomeArquivo: documento.nomeArquivo ?? arquivo.registro?.nome_original
+        };
+      })
+    );
+
+    return {
+      input: {
+        ...input,
+        foto_3x4: foto.caminhoArquivo,
+        documentos_obrigatorios: documentosObrigatorios
+      },
+      novosCaminhos
+    };
+  }
+
+  private coletarCaminhosRegistro(registro: Awaited<ReturnType<BeneficiarioRepository["buscarPorIdOuFalhar"]>>) {
+    const caminhos = new Set<string>();
+
+    if (this.isManagedStoragePath(registro.foto3x4)) {
+      caminhos.add(registro.foto3x4!);
+    }
+
+    for (const documento of registro.documentos) {
+      if (this.isManagedStoragePath(documento.caminhoArquivo)) {
+        caminhos.add(documento.caminhoArquivo!);
+      }
+    }
+
+    return [...caminhos];
+  }
+
+  private async vincularArquivos(caminhos: string[], entidadeId: bigint) {
+    for (const caminho of caminhos) {
+      await storageService.vincularEntidade(caminho, entidadeId);
+    }
+  }
+
+  private async limparArquivosSubstituidos(
+    caminhosAntigos: string[],
+    caminhosAtuais: string[],
+    usuarioId?: bigint
+  ) {
+    const atuais = new Set(caminhosAtuais);
+    for (const caminho of caminhosAntigos) {
+      if (!atuais.has(caminho)) {
+        await storageService.desativarPorCaminho(caminho, usuarioId);
+      }
+    }
+  }
+
+  private isManagedStoragePath(valor?: string | null) {
+    if (!valor?.trim()) return false;
+    const normalized = valor.trim();
+    return !normalized.startsWith("data:") && !/^https?:\/\//i.test(normalized);
+  }
+
+  private parseUsuarioId(rawUsuarioId?: string) {
+    if (!rawUsuarioId) return undefined;
+    const parsed = Number(rawUsuarioId);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      return undefined;
+    }
+    return BigInt(parsed);
   }
 }

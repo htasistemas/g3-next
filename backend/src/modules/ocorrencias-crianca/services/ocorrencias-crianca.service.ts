@@ -9,6 +9,7 @@ import {
   ocorrenciaCriancaInputSchema
 } from "../ocorrencias-crianca.schema.js";
 import { OcorrenciasCriancaRepository } from "../repositories/ocorrencias-crianca.repository.js";
+import { storageService } from "../../arquivos/services/storage-instance.js";
 
 export class OcorrenciasCriancaService {
   private readonly repository = new OcorrenciasCriancaRepository();
@@ -48,17 +49,43 @@ export class OcorrenciasCriancaService {
     return rows.map(mapOcorrenciaCriancaAnexoRowToResponse);
   }
 
-  async adicionarAnexo(rawId: string, rawInput: unknown) {
+  async adicionarAnexo(rawId: string, rawInput: unknown, rawUsuarioId?: string) {
     const id = this.parseId(rawId);
     const input = ocorrenciaCriancaAnexoInputSchema.parse(rawInput);
-    const row = await this.repository.adicionarAnexo(id, input);
-    return mapOcorrenciaCriancaAnexoRowToResponse(row);
+    const usuarioId = this.parseUsuarioId(rawUsuarioId);
+    const arquivo = await storageService.salvarArquivo({
+      scope: "ocorrencia_anexo",
+      conteudo: input.conteudoBase64,
+      nomeOriginal: input.nomeArquivo,
+      mimeType: input.tipoMime,
+      entidadeId: id,
+      usuarioUploadId: usuarioId,
+      observacao: "Anexo de ocorrencia"
+    });
+
+    try {
+      const row = await this.repository.adicionarAnexo(id, {
+        ...input,
+        conteudoBase64: arquivo.caminhoArquivo,
+        tipoMime: arquivo.registro.mime_type
+      });
+      return mapOcorrenciaCriancaAnexoRowToResponse(row);
+    } catch (error) {
+      await storageService.rollbackArquivos([arquivo.caminhoArquivo]);
+      throw error;
+    }
   }
 
-  async removerAnexo(rawId: string, rawAnexoId: string) {
+  async removerAnexo(rawId: string, rawAnexoId: string, rawUsuarioId?: string) {
     const id = this.parseId(rawId);
     const anexoId = this.parseId(rawAnexoId);
+    const usuarioId = this.parseUsuarioId(rawUsuarioId);
+    const anexos = await this.repository.listarAnexos(id);
+    const anexo = anexos.find((item) => item.id === anexoId);
     await this.repository.removerAnexo(id, anexoId);
+    if (this.isManagedStoragePath(anexo?.conteudo_base64)) {
+      await storageService.desativarPorCaminho(anexo?.conteudo_base64, usuarioId);
+    }
   }
 
   async gerarPdfDenuncia(rawId: string) {
@@ -119,6 +146,21 @@ export class OcorrenciasCriancaService {
     const parsed = Number(rawId);
     if (!Number.isInteger(parsed) || parsed <= 0) {
       throw new AppError("Identificador invalido.", 400);
+    }
+    return BigInt(parsed);
+  }
+
+  private isManagedStoragePath(valor?: string | null) {
+    if (!valor?.trim()) return false;
+    const normalized = valor.trim();
+    return !normalized.startsWith("data:") && !/^https?:\/\//i.test(normalized);
+  }
+
+  private parseUsuarioId(rawUsuarioId?: string) {
+    if (!rawUsuarioId) return undefined;
+    const parsed = Number(rawUsuarioId);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      return undefined;
     }
     return BigInt(parsed);
   }

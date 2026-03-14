@@ -1,8 +1,9 @@
-
+import "leaflet/dist/leaflet.css";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
+import { Circle, CircleMarker, MapContainer, Popup, TileLayer } from "react-leaflet";
 import {
   ClipboardCheck,
   Search,
@@ -16,7 +17,8 @@ import {
   CalendarDays,
   History,
   ShieldCheck,
-  AlertCircle
+  AlertCircle,
+  MapPinned
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -117,22 +119,58 @@ function extrairNumero(valor: unknown) {
   return undefined;
 }
 
-function formatarLocalizacaoHistorico(item: { dados_depois?: Record<string, unknown>; acao?: string }) {
+type LocalizacaoHistoricoMapa = {
+  latitude: number;
+  longitude: number;
+  accuracy_metros?: number;
+  acao: string;
+  usuario?: string;
+  criadoEm?: string;
+};
+
+function extrairLocalizacaoHistorico(item: {
+  dados_depois?: Record<string, unknown>;
+  acao?: string;
+  usuario_nome?: string;
+  criado_em?: string;
+}): LocalizacaoHistoricoMapa | undefined {
   const origem = item.dados_depois ?? {};
   const latitude = extrairNumero(origem.latitude);
   const longitude = extrairNumero(origem.longitude);
   const accuracy = extrairNumero(origem.accuracy_metros);
 
-  if (typeof latitude === "number" && typeof longitude === "number") {
-    const texto = `Lat ${latitude.toFixed(5)}, Lon ${longitude.toFixed(5)}`;
-    if (typeof accuracy === "number") {
-      return `${texto} (±${Math.round(accuracy)} m)`;
+  if (typeof latitude !== "number" || typeof longitude !== "number") {
+    return undefined;
+  }
+
+  return {
+    latitude,
+    longitude,
+    accuracy_metros: typeof accuracy === "number" ? accuracy : undefined,
+    acao: item.acao ?? "Acao",
+    usuario: item.usuario_nome,
+    criadoEm: item.criado_em
+  };
+}
+
+function formatarLocalizacaoHistorico(item: {
+  dados_depois?: Record<string, unknown>;
+  acao?: string;
+  usuario_nome?: string;
+  criado_em?: string;
+}) {
+  const origem = extrairLocalizacaoHistorico(item);
+
+  if (origem) {
+    const texto = `Lat ${origem.latitude.toFixed(5)}, Lon ${origem.longitude.toFixed(5)}`;
+    if (typeof origem.accuracy_metros === "number") {
+      return `${texto} (+/-${Math.round(origem.accuracy_metros)} m)`;
     }
     return texto;
   }
 
   if (item.acao === "MARCACAO") {
-    return "Localização não registrada";
+    return "Localizacao nao registrada";
   }
 
   return undefined;
@@ -188,6 +226,7 @@ export function RegistroPontoPage() {
   const [mensagem, setMensagem] = useState<{ tipo: "sucesso" | "erro"; texto: string } | null>(null);
   const [popupMarcarAberto, setPopupMarcarAberto] = useState(false);
   const [popupAjusteAberto, setPopupAjusteAberto] = useState(false);
+  const [localizacaoHistoricoSelecionada, setLocalizacaoHistoricoSelecionada] = useState<LocalizacaoHistoricoMapa | null>(null);
   const [confirmacaoLogin, setConfirmacaoLogin] = useState("");
   const [confirmacaoSenha, setConfirmacaoSenha] = useState("");
   const [etapaMarcacao, setEtapaMarcacao] = useState<"idle" | "localizacao" | "registro">("idle");
@@ -785,22 +824,40 @@ export function RegistroPontoPage() {
 
               {historicoData?.historico?.length ? (
                 <div className="space-y-2">
-                  {historicoData.historico.map((item) => (
-                    <div key={item.id} className="rounded-lg border border-[var(--g3-border)] bg-white p-3">
+                  {historicoData.historico.map((item) => {
+                    const textoLocalizacao = formatarLocalizacaoHistorico(item);
+                    const localizacaoHistorico = extrairLocalizacaoHistorico(item);
+
+                    return (
+                      <div key={item.id} className="rounded-lg border border-[var(--g3-border)] bg-white p-3">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="text-sm font-semibold text-[var(--g3-foreground)]">{item.acao}</p>
                         <p className="text-xs text-[var(--g3-muted)]">{formatarDataHora(item.criado_em)}</p>
                       </div>
                       <p className="text-xs text-[var(--g3-muted)]">Usuário: {item.usuario_nome ?? "---"}</p>
-                      {formatarLocalizacaoHistorico(item) && (
-                        <p className="text-xs text-[var(--g3-muted)]">
-                          Localização: {formatarLocalizacaoHistorico(item)}
-                        </p>
+                      {textoLocalizacao && (
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--g3-muted)]">
+                          <span>Localização: {textoLocalizacao}</span>
+                          {localizacaoHistorico ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-7 w-7 px-0"
+                              aria-label="Ver localizacao no mapa"
+                              title="Ver localizacao no mapa"
+                              onClick={() => setLocalizacaoHistoricoSelecionada(localizacaoHistorico)}
+                            >
+                              <MapPinned className="h-3.5 w-3.5" />
+                            </Button>
+                          ) : null}
+                        </div>
                       )}
                       {item.justificativa && <p className="text-xs text-[var(--g3-muted)]">Justificativa: {item.justificativa}</p>}
                       {item.observacao && <p className="text-xs text-[var(--g3-muted)]">Observação: {item.observacao}</p>}
-                    </div>
-                  ))}
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 !carregandoHistorico && <p className="text-sm text-[var(--g3-muted)]">Sem histórico para o registro selecionado.</p>
@@ -969,6 +1026,68 @@ export function RegistroPontoPage() {
             <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3">
               <Button type="button" variant="outline" onClick={() => setPopupAjusteAberto(false)} disabled={ajusteMutation.isPending}>Cancelar</Button>
               <Button type="button" onClick={() => void submitAjuste()} disabled={ajusteMutation.isPending}>{ajusteMutation.isPending ? "Salvando..." : "Salvar ajuste"}</Button>
+            </div>
+          </div>
+        </div>
+      )}
+      {localizacaoHistoricoSelecionada && (
+        <div
+          className="fixed inset-0 z-[72] flex items-center justify-center bg-slate-900/45 px-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setLocalizacaoHistoricoSelecionada(null)}
+        >
+          <div
+            className="w-full max-w-4xl rounded-xl border border-slate-200 bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
+              <div className="space-y-1">
+                <h3 className="text-base font-semibold text-slate-900">Localizacao registrada</h3>
+                <p className="text-xs text-slate-500">
+                  {localizacaoHistoricoSelecionada.acao}
+                  {localizacaoHistoricoSelecionada.usuario ? ` | ${localizacaoHistoricoSelecionada.usuario}` : ""}
+                  {localizacaoHistoricoSelecionada.criadoEm ? ` | ${formatarDataHora(localizacaoHistoricoSelecionada.criadoEm)}` : ""}
+                </p>
+              </div>
+              <Button type="button" variant="outline" onClick={() => setLocalizacaoHistoricoSelecionada(null)}>
+                Fechar
+              </Button>
+            </div>
+            <div className="space-y-3 px-5 py-4">
+              <p className="text-sm text-slate-700">
+                Latitude {localizacaoHistoricoSelecionada.latitude.toFixed(6)} | Longitude {localizacaoHistoricoSelecionada.longitude.toFixed(6)}
+                {typeof localizacaoHistoricoSelecionada.accuracy_metros === "number"
+                  ? ` | Precisao aproximada de ${Math.round(localizacaoHistoricoSelecionada.accuracy_metros)} m`
+                  : ""}
+              </p>
+              <div className="overflow-hidden rounded-xl border border-[var(--g3-border)]">
+                <MapContainer
+                  center={[localizacaoHistoricoSelecionada.latitude, localizacaoHistoricoSelecionada.longitude]}
+                  zoom={16}
+                  style={{ height: 360, width: "100%" }}
+                  scrollWheelZoom
+                >
+                  <TileLayer
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  />
+                  <CircleMarker
+                    center={[localizacaoHistoricoSelecionada.latitude, localizacaoHistoricoSelecionada.longitude]}
+                    radius={10}
+                    pathOptions={{ color: "#0f766e", fillColor: "#14b8a6", fillOpacity: 0.78 }}
+                  >
+                    <Popup>Origem da localizacao do registro de ponto</Popup>
+                  </CircleMarker>
+                  {typeof localizacaoHistoricoSelecionada.accuracy_metros === "number" ? (
+                    <Circle
+                      center={[localizacaoHistoricoSelecionada.latitude, localizacaoHistoricoSelecionada.longitude]}
+                      radius={localizacaoHistoricoSelecionada.accuracy_metros}
+                      pathOptions={{ color: "#0f766e", fillColor: "#14b8a6", fillOpacity: 0.1 }}
+                    />
+                  ) : null}
+                </MapContainer>
+              </div>
             </div>
           </div>
         </div>

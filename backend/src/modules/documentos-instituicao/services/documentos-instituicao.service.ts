@@ -12,6 +12,7 @@ import {
   documentoInstituicaoInputSchema
 } from "../documentos-instituicao.schema.js";
 import { DocumentosInstituicaoRepository } from "../repositories/documentos-instituicao.repository.js";
+import { storageService } from "../../arquivos/services/storage-instance.js";
 
 export class DocumentosInstituicaoService {
   private readonly repository = new DocumentosInstituicaoRepository();
@@ -45,11 +46,32 @@ export class DocumentosInstituicaoService {
     return anexos.map(mapDocumentoInstituicaoAnexoToResponse);
   }
 
-  async adicionarAnexo(rawDocumentoId: string, rawInput: unknown) {
+  async adicionarAnexo(rawDocumentoId: string, rawInput: unknown, rawUsuarioId?: string) {
     const documentoId = this.parseId(rawDocumentoId);
     const input = documentoInstituicaoAnexoInputSchema.parse(this.normalizarPayload(rawInput));
-    const anexo = await this.repository.adicionarAnexo(documentoId, input);
-    return mapDocumentoInstituicaoAnexoToResponse(anexo);
+    const usuarioId = this.parseIdOpcional(rawUsuarioId);
+    const arquivo = await storageService.salvarArquivo({
+      scope: "instituicao_documento",
+      conteudo: input.conteudoBase64,
+      nomeOriginal: input.nomeArquivo,
+      mimeType: input.tipoMime,
+      entidadeId: documentoId,
+      usuarioUploadId: usuarioId,
+      observacao: input.tipo
+    });
+
+    try {
+      const anexo = await this.repository.adicionarAnexo(documentoId, {
+        ...input,
+        conteudoBase64: arquivo.caminhoArquivo,
+        nomeArquivo: input.nomeArquivo || arquivo.registro.nome_original,
+        tipoMime: input.tipoMime || arquivo.registro.mime_type
+      });
+      return mapDocumentoInstituicaoAnexoToResponse(anexo);
+    } catch (error) {
+      await storageService.rollbackArquivos([arquivo.caminhoArquivo]);
+      throw error;
+    }
   }
 
   async obterArquivoAnexo(rawDocumentoId: string, rawAnexoId: string) {
@@ -81,6 +103,15 @@ export class DocumentosInstituicaoService {
     const parsed = Number(rawId);
     if (!Number.isInteger(parsed) || parsed <= 0) {
       throw new AppError("Identificador invalido.", 400);
+    }
+    return BigInt(parsed);
+  }
+
+  private parseIdOpcional(rawId?: string) {
+    if (!rawId) return undefined;
+    const parsed = Number(rawId);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      return undefined;
     }
     return BigInt(parsed);
   }
