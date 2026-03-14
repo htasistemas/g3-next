@@ -15,6 +15,16 @@ export function useTarefasAdministrativas(options?: ResumoQueryOptions) {
   });
 }
 
+export function useResumoTarefasAdministrativas(options?: ResumoQueryOptions) {
+  return useQuery({
+    queryKey: ["tarefas-administrativas", "resumo"],
+    queryFn: () => tarefasAdministrativasService.obterResumo(),
+    enabled: options?.enabled ?? true,
+    staleTime: 60_000,
+    refetchInterval: options?.enabled ?? true ? 60_000 : false
+  });
+}
+
 export function useTarefaAdministrativa(id?: string) {
   return useQuery({
     queryKey: ["tarefas-administrativas", id ?? ""],

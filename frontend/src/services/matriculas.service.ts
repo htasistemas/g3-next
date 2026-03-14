@@ -8,6 +8,7 @@ import type {
   MatriculaPresencaData,
   MatriculaPresencaResponse,
   MatriculaProfissionalCatalogo,
+  MatriculaResumoCatalogo,
   MatriculaSalaCatalogo
 } from "@/types/matricula";
 
@@ -17,6 +18,11 @@ export const matriculasService = {
       params: filtros
     });
     return data;
+  },
+
+  async obterResumoCatalogo() {
+    const { data } = await httpClient.get<{ resumo: MatriculaResumoCatalogo }>("/api/matriculas/resumo");
+    return data.resumo;
   },
 
   async buscarPorId(id: string): Promise<MatriculaItemResponse> {

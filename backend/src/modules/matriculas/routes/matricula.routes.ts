@@ -32,6 +32,12 @@ matriculaRoutes.get(
   ensurePermissions(permissoesLeitura),
   asyncHandler(controller.listarSalas.bind(controller))
 );
+matriculaRoutes.get(
+  "/resumo",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.obterResumoCatalogo.bind(controller))
+);
 
 matriculaRoutes.get(
   "/:id/presencas/datas",

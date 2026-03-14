@@ -23,6 +23,19 @@ export class LembreteDiarioService {
     return registros.map(mapLembreteDiarioToResponse);
   }
 
+  async obterResumo(rawUsuarioId?: unknown) {
+    const usuarioId =
+      typeof rawUsuarioId === "string" && rawUsuarioId.trim()
+        ? Number(rawUsuarioId)
+        : typeof rawUsuarioId === "number"
+          ? rawUsuarioId
+          : undefined;
+
+    return this.repository.obterResumo(
+      Number.isInteger(usuarioId) && (usuarioId as number) > 0 ? (usuarioId as number) : undefined
+    );
+  }
+
   async criar(rawInput: unknown) {
     const input = lembreteDiarioInputSchema.parse(rawInput);
     const registro = await this.repository.criar(input);

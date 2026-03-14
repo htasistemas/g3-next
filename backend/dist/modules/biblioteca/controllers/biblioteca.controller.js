@@ -14,15 +14,15 @@ export class BibliotecaController {
         return response.json({ livro });
     }
     async criarLivro(request, response) {
-        const livro = await service.criarLivro(request.body);
+        const livro = await service.criarLivro(request.body, request.authUser?.id);
         return response.status(201).json({ livro });
     }
     async atualizarLivro(request, response) {
-        const livro = await service.atualizarLivro(request.params.id, request.body);
+        const livro = await service.atualizarLivro(request.params.id, request.body, request.authUser?.id);
         return response.json({ livro });
     }
     async excluirLivro(request, response) {
-        await service.excluirLivro(request.params.id);
+        await service.excluirLivro(request.params.id, request.authUser?.id);
         return response.status(204).send();
     }
     async listarEmprestimos(_request, response) {

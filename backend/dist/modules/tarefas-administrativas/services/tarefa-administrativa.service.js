@@ -10,6 +10,9 @@ export class TarefaAdministrativaService {
         const registros = await this.repository.listar();
         return registros.map((item) => mapTarefaAdministrativaToResponse(item.tarefa, item.checklist, item.historico));
     }
+    async obterResumo() {
+        return this.repository.obterResumo();
+    }
     async buscarPorId(rawId) {
         const id = this.parseId(rawId);
         const registro = await this.repository.buscarPorIdOuFalhar(id);

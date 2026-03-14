@@ -14,15 +14,15 @@ export class UnidadeAssistencialController {
         return response.json({ unidade });
     }
     async criar(request, response) {
-        const unidade = await service.criar(request.body);
+        const unidade = await service.criar(request.body, request.authUser?.id);
         return response.status(201).json({ unidade });
     }
     async atualizar(request, response) {
-        const unidade = await service.atualizar(request.params.id, request.body);
+        const unidade = await service.atualizar(request.params.id, request.body, request.authUser?.id);
         return response.json({ unidade });
     }
     async remover(request, response) {
-        await service.remover(request.params.id);
+        await service.remover(request.params.id, request.authUser?.id);
         return response.status(204).send();
     }
 }

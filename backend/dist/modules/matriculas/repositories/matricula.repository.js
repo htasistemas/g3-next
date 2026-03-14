@@ -107,6 +107,26 @@ export class MatriculaRepository {
     `);
         return cursos;
     }
+    async obterResumoCatalogo() {
+        const rows = await prisma.$queryRaw(Prisma.sql `
+      SELECT
+        COUNT(*)::BIGINT AS cursos_no_catalogo,
+        COALESCE(SUM(COALESCE(c.vagas_totais, 0)), 0)::BIGINT AS total_vagas,
+        COALESCE(SUM(COALESCE(c.vagas_disponiveis, 0)), 0)::BIGINT AS vagas_disponiveis,
+        (
+          SELECT COUNT(*)::BIGINT
+          FROM cursos_atendimentos_matriculas
+        ) AS inscricoes_ativas
+      FROM cursos_atendimentos c
+    `);
+        const row = rows[0];
+        return {
+            cursosNoCatalogo: Number(row?.cursos_no_catalogo ?? 0),
+            totalVagas: Number(row?.total_vagas ?? 0),
+            vagasDisponiveis: Number(row?.vagas_disponiveis ?? 0),
+            inscricoesAtivas: Number(row?.inscricoes_ativas ?? 0)
+        };
+    }
     async buscarPorId(id) {
         const cursos = await prisma.$queryRaw(Prisma.sql `
       SELECT

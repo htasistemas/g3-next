@@ -1,0 +1,242 @@
+import { randomUUID } from "node:crypto";
+import sharp from "sharp";
+import { AppError } from "../../../shared/errors/app-error.js";
+import { toStringId } from "../../../utils/string-utils.js";
+import { ArquivosRepository } from "../repositories/arquivos.repository.js";
+import { getStoragePolicy } from "./storage-policy.js";
+import { LocalStorageProvider } from "./local-storage.provider.js";
+import { detectarMimeTypePorAssinatura, ehUrlExterna, ehValorInlineDeArquivo, extrairExtensao, extToMime, formatarTamanhoBytes, garantirExtensaoPermitida, garantirMimeTypePermitido, mimeToExt, normalizarCaminhoLogico, normalizarNomeArquivo, parseBase64Payload } from "./storage-utils.js";
+export class StorageService {
+    repository = new ArquivosRepository();
+    provider = new LocalStorageProvider();
+    async listar(rawFilters) {
+        const entidadeId = rawFilters.entidadeId ? BigInt(rawFilters.entidadeId) : undefined;
+        const ativo = rawFilters.ativo === undefined ? undefined : ["true", "1", "yes"].includes(rawFilters.ativo);
+        return this.repository.listar({
+            entidadeTipo: rawFilters.entidadeTipo?.trim() || undefined,
+            entidadeId,
+            categoria: rawFilters.categoria?.trim() || undefined,
+            ativo
+        });
+    }
+    async obterPorId(rawId) {
+        return this.repository.buscarPorIdOuFalhar(this.parseId(rawId));
+    }
+    async obterConteudoPorId(rawId, usuarioId) {
+        const arquivo = await this.repository.buscarPorIdOuFalhar(this.parseId(rawId));
+        return this.obterConteudoPorCaminhoInterno(arquivo.caminho_arquivo, arquivo, usuarioId, "VIEW");
+    }
+    async obterConteudoPorCaminho(rawPath, usuarioId) {
+        if (!rawPath?.trim()) {
+            throw new AppError("Caminho do arquivo nao informado.", 400);
+        }
+        const caminhoArquivo = this.provider.normalizePath(rawPath);
+        const arquivo = await this.repository.buscarAtivoPorCaminho(caminhoArquivo);
+        return this.obterConteudoPorCaminhoInterno(caminhoArquivo, arquivo ?? undefined, usuarioId, "VIEW");
+    }
+    async excluirLogico(rawId, usuarioId) {
+        const id = this.parseId(rawId);
+        const arquivo = await this.repository.buscarPorIdOuFalhar(id);
+        await this.repository.desativarPorId(id);
+        await this.provider.remover(arquivo.caminho_arquivo);
+        if (arquivo.thumbnail_caminho) {
+            await this.provider.remover(arquivo.thumbnail_caminho);
+        }
+        await this.repository.registrarAuditoria({
+            atorId: usuarioId,
+            acao: "DELETE",
+            entidadeId: toStringId(id),
+            dados: {
+                caminhoArquivo: arquivo.caminho_arquivo,
+                nomeArquivo: arquivo.nome_arquivo
+            }
+        });
+    }
+    async vincularEntidade(caminhoArquivo, entidadeId) {
+        await this.repository.vincularEntidadePorCaminho(this.provider.normalizePath(caminhoArquivo), entidadeId);
+    }
+    async desativarPorCaminho(caminhoArquivo, usuarioId) {
+        if (!caminhoArquivo?.trim()) {
+            return;
+        }
+        const caminhoLogico = this.provider.normalizePath(caminhoArquivo);
+        const arquivo = await this.repository.buscarAtivoPorCaminho(caminhoLogico);
+        await this.repository.desativarPorCaminho(caminhoLogico);
+        await this.provider.remover(caminhoLogico);
+        if (arquivo?.thumbnail_caminho) {
+            await this.provider.remover(arquivo.thumbnail_caminho);
+        }
+        await this.repository.registrarAuditoria({
+            atorId: usuarioId,
+            acao: "DELETE",
+            entidadeId: arquivo ? toStringId(arquivo.id) : caminhoLogico,
+            dados: {
+                caminhoArquivo: caminhoLogico
+            }
+        });
+    }
+    async rollbackArquivos(caminhosArquivos) {
+        for (const caminhoArquivo of caminhosArquivos) {
+            if (!caminhoArquivo)
+                continue;
+            await this.desativarPorCaminho(caminhoArquivo);
+        }
+    }
+    async persistirCampo(input) {
+        const valor = input.valor?.trim();
+        if (!valor) {
+            return { caminhoArquivo: undefined, registro: undefined };
+        }
+        if (ehUrlExterna(valor)) {
+            return { caminhoArquivo: valor, registro: undefined };
+        }
+        if (!ehValorInlineDeArquivo(valor)) {
+            return {
+                caminhoArquivo: this.provider.normalizePath(valor),
+                registro: undefined
+            };
+        }
+        const resultado = await this.salvarArquivo({
+            ...input,
+            conteudo: valor
+        });
+        return {
+            caminhoArquivo: resultado.caminhoArquivo,
+            registro: resultado.registro
+        };
+    }
+    async salvarUpload(file, input) {
+        const conteudo = file.buffer.toString("base64");
+        return this.salvarArquivo({
+            ...input,
+            conteudo,
+            nomeOriginal: file.originalname,
+            mimeType: file.mimetype,
+            tamanhoBytes: file.size
+        });
+    }
+    async salvarArquivo(input) {
+        const policy = getStoragePolicy(input.scope);
+        const parsed = parseBase64Payload(input.conteudo, input.mimeType);
+        const mimeAssinado = detectarMimeTypePorAssinatura(parsed.buffer);
+        const nomeOriginal = normalizarNomeArquivo(input.nomeOriginal);
+        const extensaoInferida = mimeToExt(mimeAssinado) ??
+            mimeToExt(parsed.mimeType) ??
+            extrairExtensao(nomeOriginal) ??
+            "bin";
+        const mimeType = mimeAssinado ?? parsed.mimeType ?? extToMime(extensaoInferida) ?? "application/octet-stream";
+        garantirExtensaoPermitida(extensaoInferida, policy.allowedExtensions);
+        garantirMimeTypePermitido(mimeType, policy.allowedMimeTypes);
+        if (parsed.buffer.length > policy.maxSizeBytes) {
+            throw new AppError(`O arquivo excede o tamanho maximo permitido de ${formatarTamanhoBytes(policy.maxSizeBytes)}.`, 400);
+        }
+        let principalBuffer = parsed.buffer;
+        let thumbnailBuffer;
+        const processarImagem = mimeType.startsWith("image/");
+        if (policy.imageOnly && !processarImagem) {
+            throw new AppError("Esta categoria aceita apenas imagens.", 400);
+        }
+        if (processarImagem) {
+            principalBuffer = await sharp(parsed.buffer)
+                .rotate()
+                .resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true })
+                .toFormat(mimeType === "image/png" ? "png" : mimeType === "image/webp" ? "webp" : "jpeg", {
+                quality: 88
+            })
+                .toBuffer();
+            if (policy.generateThumbnail) {
+                thumbnailBuffer = await sharp(principalBuffer)
+                    .rotate()
+                    .resize({ width: 480, height: 480, fit: "inside", withoutEnlargement: true })
+                    .toFormat(mimeType === "image/png" ? "png" : mimeType === "image/webp" ? "webp" : "jpeg", {
+                    quality: 82
+                })
+                    .toBuffer();
+            }
+        }
+        const data = new Date();
+        const baseName = nomeOriginal.replace(/\.[^.]+$/, "") || "arquivo";
+        const uniqueName = `${data.getFullYear()}${String(data.getMonth() + 1).padStart(2, "0")}${String(data.getDate()).padStart(2, "0")}-${randomUUID()}-${baseName}`.slice(0, 120);
+        const fileName = `${uniqueName}.${extensaoInferida}`;
+        const relativeDir = `${policy.subdirectory}/${data.getFullYear()}/${String(data.getMonth() + 1).padStart(2, "0")}`;
+        const caminhoArquivo = normalizarCaminhoLogico(`${relativeDir}/${fileName}`);
+        const thumbnailCaminho = thumbnailBuffer
+            ? normalizarCaminhoLogico(`${policy.subdirectory}/thumbs/${data.getFullYear()}/${String(data.getMonth() + 1).padStart(2, "0")}/${fileName}`)
+            : undefined;
+        await this.provider.salvar(caminhoArquivo, principalBuffer);
+        if (thumbnailBuffer && thumbnailCaminho) {
+            await this.provider.salvar(thumbnailCaminho, thumbnailBuffer);
+        }
+        try {
+            const registro = await this.repository.criar({
+                entidadeTipo: input.entidadeTipo ?? policy.entidadeTipo,
+                entidadeId: input.entidadeId ?? null,
+                categoria: policy.categoria,
+                nomeOriginal: input.nomeOriginal?.trim() || fileName,
+                nomeArquivo: fileName,
+                caminhoArquivo,
+                thumbnailCaminho,
+                mimeType,
+                extensao: extensaoInferida,
+                tamanhoBytes: principalBuffer.length,
+                usuarioUploadId: input.usuarioUploadId ?? null,
+                observacao: input.observacao ?? null,
+                metadadosJson: input.metadadosJson ?? null
+            });
+            await this.repository.registrarAuditoria({
+                atorId: input.usuarioUploadId ?? undefined,
+                acao: "UPLOAD",
+                entidadeId: toStringId(registro.id),
+                dados: {
+                    entidadeTipo: registro.entidade_tipo,
+                    entidadeId: registro.entidade_id ? toStringId(registro.entidade_id) : null,
+                    categoria: registro.categoria,
+                    caminhoArquivo: registro.caminho_arquivo
+                }
+            });
+            return {
+                registro,
+                caminhoArquivo,
+                thumbnailCaminho
+            };
+        }
+        catch (error) {
+            await this.provider.remover(caminhoArquivo);
+            if (thumbnailCaminho) {
+                await this.provider.remover(thumbnailCaminho);
+            }
+            throw error;
+        }
+    }
+    async obterConteudoPorCaminhoInterno(caminhoArquivo, arquivo, usuarioId, acao = "VIEW") {
+        const normalizedPath = this.provider.normalizePath(caminhoArquivo);
+        const exists = await this.provider.existe(normalizedPath);
+        if (!exists) {
+            throw new AppError("Arquivo fisico nao encontrado.", 404);
+        }
+        if (arquivo) {
+            await this.repository.registrarAuditoria({
+                atorId: usuarioId,
+                acao,
+                entidadeId: toStringId(arquivo.id),
+                dados: {
+                    caminhoArquivo: arquivo.caminho_arquivo,
+                    nomeArquivo: arquivo.nome_arquivo
+                }
+            });
+        }
+        return {
+            caminhoArquivo: normalizedPath,
+            mimeType: arquivo?.mime_type ?? extToMime(extrairExtensao(normalizedPath)) ?? "application/octet-stream",
+            nomeArquivo: arquivo?.nome_original ?? normalizedPath.split("/").pop() ?? "arquivo",
+            stream: this.provider.criarLeitura(normalizedPath)
+        };
+    }
+    parseId(rawId) {
+        const parsed = Number(rawId);
+        if (!Number.isInteger(parsed) || parsed <= 0) {
+            throw new AppError("Identificador de arquivo invalido.", 400);
+        }
+        return BigInt(parsed);
+    }
+}

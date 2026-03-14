@@ -10,15 +10,15 @@ export class VoluntarioController {
         return response.json({ voluntario });
     }
     async criar(request, response) {
-        const voluntario = await service.criar(request.body);
+        const voluntario = await service.criar(request.body, request.authUser?.id);
         return response.status(201).json({ voluntario });
     }
     async atualizar(request, response) {
-        const voluntario = await service.atualizar(request.params.id, request.body);
+        const voluntario = await service.atualizar(request.params.id, request.body, request.authUser?.id);
         return response.json({ voluntario });
     }
     async remover(request, response) {
-        await service.remover(request.params.id);
+        await service.remover(request.params.id, request.authUser?.id);
         return response.status(204).send();
     }
 }

@@ -37,6 +37,8 @@ import { contabilidadeRoutes } from "../modules/contabilidade/routes/contabilida
 import { transparenciasRoutes } from "../modules/transparencias/routes/transparencias.routes.js";
 import { rhContratacaoRoutes } from "../modules/rh-contratacao/routes/rh-contratacao.routes.js";
 import { mensagensPersonalizadasRoutes } from "../modules/mensagens-personalizadas/routes/mensagens-personalizadas.routes.js";
+import { arquivosRoutes } from "../modules/arquivos/routes/arquivos.routes.js";
+import { chamadoTecnicoRoutes } from "../modules/chamados-tecnicos/routes/chamado-tecnico.routes.js";
 export const appRoutes = Router();
 appRoutes.get("/health", (_request, response) => {
     response.json({ status: "ok", service: "g3-backend-node" });
@@ -77,7 +79,9 @@ appRoutes.use("/api/financeiro/contabilidade", contabilidadeRoutes);
 appRoutes.use("/api/transparencias", transparenciasRoutes);
 appRoutes.use("/api/financeiro/prestacao-contas", transparenciasRoutes);
 appRoutes.use("/api/rh/contratacao", rhContratacaoRoutes);
+appRoutes.use("/api/arquivos", arquivosRoutes);
 appRoutes.use("/api/dashboard", dashboardRoutes);
+appRoutes.use("/api/chamados-tecnicos", chamadoTecnicoRoutes);
 appRoutes.use("/api/configuracoes/parametros", parametrosSistemaRoutes);
 appRoutes.use("/api/usuarios", usuarioRoutes);
 appRoutes.use("/api/mensagens-personalizadas", mensagensPersonalizadasRoutes);

@@ -44,6 +44,10 @@ export class MatriculaService {
     );
   }
 
+  async obterResumoCatalogo() {
+    return this.repository.obterResumoCatalogo();
+  }
+
   async buscarPorId(rawId: string) {
     const id = this.parseId(rawId);
     const registro = await this.repository.buscarPorIdOuFalhar(id);

@@ -18,11 +18,11 @@ export class OficiosController {
         return response.json(oficio);
     }
     async excluir(request, response) {
-        await service.remover(request.params.id);
+        await service.remover(request.params.id, request.authUser?.id);
         return response.status(204).send();
     }
     async salvarPdfAssinado(request, response) {
-        const oficio = await service.salvarPdfAssinado(request.params.id, request.body);
+        const oficio = await service.salvarPdfAssinado(request.params.id, request.body, request.authUser?.id);
         return response.json(oficio);
     }
     async obterPdfAssinado(request, response) {
@@ -30,7 +30,7 @@ export class OficiosController {
         return response.json(pdf);
     }
     async removerPdfAssinado(request, response) {
-        await service.removerPdfAssinado(request.params.id);
+        await service.removerPdfAssinado(request.params.id, request.authUser?.id);
         return response.status(204).send();
     }
     async listarImagens(request, response) {
@@ -38,11 +38,11 @@ export class OficiosController {
         return response.json(imagens);
     }
     async adicionarImagem(request, response) {
-        const imagem = await service.adicionarImagem(request.params.id, request.body);
+        const imagem = await service.adicionarImagem(request.params.id, request.body, request.authUser?.id);
         return response.status(201).json(imagem);
     }
     async removerImagem(request, response) {
-        await service.removerImagem(request.params.id, request.params.imagemId);
+        await service.removerImagem(request.params.id, request.params.imagemId, request.authUser?.id);
         return response.status(204).send();
     }
 }

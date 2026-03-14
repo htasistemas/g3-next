@@ -33,6 +33,30 @@ export class LembreteDiarioRepository {
       ORDER BY proxima_execucao_em ASC, id DESC
     `);
     }
+    async obterResumo(usuarioId) {
+        const filtroUsuario = usuarioId
+            ? Prisma.sql `AND (usuario_id = ${BigInt(usuarioId)} OR todos_usuarios = TRUE)`
+            : Prisma.empty;
+        const rows = await prisma.$queryRaw(Prisma.sql `
+      SELECT
+        COUNT(*) FILTER (WHERE status IS DISTINCT FROM 'CONCLUIDO')::BIGINT AS total_pendentes,
+        COUNT(*) FILTER (
+          WHERE status IS DISTINCT FROM 'CONCLUIDO'
+            AND COALESCE(
+              proxima_execucao_em,
+              data_inicial + COALESCE(hora_aviso, TIME '09:00')
+            ) <= NOW()
+        )::BIGINT AS total_vencidos
+      FROM lembretes_diarios
+      WHERE deletado_em IS NULL
+      ${filtroUsuario}
+    `);
+        const row = rows[0];
+        return {
+            totalPendentes: Number(row?.total_pendentes ?? 0),
+            totalVencidos: Number(row?.total_vencidos ?? 0)
+        };
+    }
     async buscarPorId(id) {
         const rows = await prisma.$queryRaw(Prisma.sql `
       SELECT

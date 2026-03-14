@@ -18,6 +18,10 @@ export class TarefaAdministrativaService {
     );
   }
 
+  async obterResumo() {
+    return this.repository.obterResumo();
+  }
+
   async buscarPorId(rawId: string) {
     const id = this.parseId(rawId);
     const registro = await this.repository.buscarPorIdOuFalhar(id);

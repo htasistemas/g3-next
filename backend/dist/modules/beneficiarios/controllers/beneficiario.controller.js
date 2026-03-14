@@ -10,15 +10,15 @@ export class BeneficiarioController {
         return response.json({ beneficiario });
     }
     async criar(request, response) {
-        const beneficiario = await service.criar(request.body);
+        const beneficiario = await service.criar(request.body, request.authUser?.id);
         return response.status(201).json({ beneficiario });
     }
     async atualizar(request, response) {
-        const beneficiario = await service.atualizar(request.params.id, request.body);
+        const beneficiario = await service.atualizar(request.params.id, request.body, request.authUser?.id);
         return response.json({ beneficiario });
     }
     async remover(request, response) {
-        await service.remover(request.params.id);
+        await service.remover(request.params.id, request.authUser?.id);
         return response.status(204).send();
     }
     async obterProximoCodigo(_request, response) {

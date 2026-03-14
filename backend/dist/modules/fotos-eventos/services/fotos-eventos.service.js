@@ -4,6 +4,7 @@ import { normalizarObjetoTexto } from "../../../utils/text-formatter.js";
 import { mapFotoEventoItemToResponse, mapFotoEventoToResponse } from "../fotos-eventos.mapper.js";
 import { fotoEventoFotoAtualizacaoSchema, fotoEventoFotoInputSchema, fotoEventoInputSchema } from "../fotos-eventos.schema.js";
 import { FotosEventosRepository } from "../repositories/fotos-eventos.repository.js";
+import { storageService } from "../../arquivos/services/storage-instance.js";
 export class FotosEventosService {
     repository = new FotosEventosRepository();
     async listar(rawQuery) {
@@ -36,28 +37,58 @@ export class FotosEventosService {
             fotos: registro.fotos.map(mapFotoEventoItemToResponse)
         };
     }
-    async criar(rawInput) {
+    async criar(rawInput, rawUsuarioId) {
         const input = fotoEventoInputSchema.parse(this.normalizarPayload(rawInput));
-        const registro = await this.repository.criar(input);
-        const fotoPrincipal = registro.fotos.find((item) => registro.evento.foto_principal_id && item.id === registro.evento.foto_principal_id);
-        return mapFotoEventoToResponse(registro.evento, registro.fotos.length, fotoPrincipal?.arquivo);
+        const usuarioId = this.parseUsuarioId(rawUsuarioId);
+        const preparado = await this.prepararFotoPrincipal(input, usuarioId);
+        try {
+            const registro = await this.repository.criar(preparado.input);
+            await this.vincularFotos(registro.evento.id, preparado.novosCaminhos);
+            const fotoPrincipal = registro.fotos.find((item) => registro.evento.foto_principal_id && item.id === registro.evento.foto_principal_id);
+            return mapFotoEventoToResponse(registro.evento, registro.fotos.length, fotoPrincipal?.arquivo);
+        }
+        catch (error) {
+            await storageService.rollbackArquivos(preparado.novosCaminhos);
+            throw error;
+        }
     }
-    async atualizar(rawId, rawInput) {
+    async atualizar(rawId, rawInput, rawUsuarioId) {
         const id = this.parseId(rawId);
         const input = fotoEventoInputSchema.parse(this.normalizarPayload(rawInput));
-        const registro = await this.repository.atualizar(id, input);
-        const fotoPrincipal = registro.fotos.find((item) => registro.evento.foto_principal_id && item.id === registro.evento.foto_principal_id);
-        return mapFotoEventoToResponse(registro.evento, registro.fotos.length, fotoPrincipal?.arquivo);
+        const usuarioId = this.parseUsuarioId(rawUsuarioId);
+        const preparado = await this.prepararFotoPrincipal(input, usuarioId, id);
+        try {
+            const registro = await this.repository.atualizar(id, preparado.input);
+            await this.vincularFotos(id, preparado.novosCaminhos);
+            const fotoPrincipal = registro.fotos.find((item) => registro.evento.foto_principal_id && item.id === registro.evento.foto_principal_id);
+            return mapFotoEventoToResponse(registro.evento, registro.fotos.length, fotoPrincipal?.arquivo);
+        }
+        catch (error) {
+            await storageService.rollbackArquivos(preparado.novosCaminhos);
+            throw error;
+        }
     }
-    async remover(rawId) {
+    async remover(rawId, rawUsuarioId) {
         const id = this.parseId(rawId);
+        const usuarioId = this.parseUsuarioId(rawUsuarioId);
+        const registro = await this.repository.buscarPorIdOuFalhar(id);
         await this.repository.remover(id);
+        await this.removerCaminhos(registro.fotos.map((item) => item.arquivo).filter((item) => this.isManagedStoragePath(item)), usuarioId);
     }
-    async adicionarFoto(rawEventoId, rawInput) {
+    async adicionarFoto(rawEventoId, rawInput, rawUsuarioId) {
         const eventoId = this.parseId(rawEventoId);
         const input = fotoEventoFotoInputSchema.parse(this.normalizarPayload(rawInput));
-        const foto = await this.repository.adicionarFoto(eventoId, input);
-        return mapFotoEventoItemToResponse(foto);
+        const usuarioId = this.parseUsuarioId(rawUsuarioId);
+        const preparado = await this.prepararFotoItem(input, usuarioId, eventoId);
+        try {
+            const foto = await this.repository.adicionarFoto(eventoId, preparado.input);
+            await this.vincularFotos(eventoId, preparado.novosCaminhos);
+            return mapFotoEventoItemToResponse(foto);
+        }
+        catch (error) {
+            await storageService.rollbackArquivos(preparado.novosCaminhos);
+            throw error;
+        }
     }
     async atualizarFoto(rawEventoId, rawFotoId, rawInput) {
         const eventoId = this.parseId(rawEventoId);
@@ -66,10 +97,15 @@ export class FotosEventosService {
         const foto = await this.repository.atualizarFoto(eventoId, fotoId, input);
         return mapFotoEventoItemToResponse(foto);
     }
-    async removerFoto(rawEventoId, rawFotoId) {
+    async removerFoto(rawEventoId, rawFotoId, rawUsuarioId) {
         const eventoId = this.parseId(rawEventoId);
         const fotoId = this.parseId(rawFotoId);
+        const usuarioId = this.parseUsuarioId(rawUsuarioId);
+        const foto = await this.repository.buscarFotoPorIdOuFalhar(eventoId, fotoId);
         await this.repository.removerFoto(eventoId, fotoId);
+        if (this.isManagedStoragePath(foto.arquivo)) {
+            await storageService.desativarPorCaminho(foto.arquivo, usuarioId);
+        }
     }
     async obterArquivoFoto(rawEventoId, rawFotoId) {
         const eventoId = this.parseId(rawEventoId);
@@ -100,5 +136,79 @@ export class FotosEventosService {
         if (!rawInput || typeof rawInput !== "object")
             return rawInput;
         return normalizarObjetoTexto(rawInput, mapaCamposTextoFotosEventos);
+    }
+    async prepararFotoPrincipal(input, usuarioId, entidadeId) {
+        if (!input.fotoPrincipalUpload) {
+            return { input, novosCaminhos: [] };
+        }
+        const arquivo = await storageService.salvarArquivo({
+            scope: "evento_foto",
+            conteudo: input.fotoPrincipalUpload.conteudo,
+            nomeOriginal: input.fotoPrincipalUpload.nomeArquivo,
+            mimeType: input.fotoPrincipalUpload.contentType,
+            entidadeId,
+            usuarioUploadId: usuarioId,
+            observacao: "Foto principal do evento"
+        });
+        return {
+            input: {
+                ...input,
+                fotoPrincipalUpload: {
+                    ...input.fotoPrincipalUpload,
+                    conteudo: arquivo.caminhoArquivo,
+                    contentType: arquivo.registro.mime_type,
+                    tamanhoBytes: Number(arquivo.registro.tamanho_bytes)
+                }
+            },
+            novosCaminhos: [arquivo.caminhoArquivo]
+        };
+    }
+    async prepararFotoItem(input, usuarioId, entidadeId) {
+        const arquivo = await storageService.salvarArquivo({
+            scope: "evento_foto",
+            conteudo: input.arquivo.conteudo,
+            nomeOriginal: input.arquivo.nomeArquivo,
+            mimeType: input.arquivo.contentType,
+            entidadeId,
+            usuarioUploadId: usuarioId,
+            observacao: input.legenda ?? "Foto do evento"
+        });
+        return {
+            input: {
+                ...input,
+                arquivo: {
+                    ...input.arquivo,
+                    conteudo: arquivo.caminhoArquivo,
+                    contentType: arquivo.registro.mime_type,
+                    tamanhoBytes: Number(arquivo.registro.tamanho_bytes)
+                }
+            },
+            novosCaminhos: [arquivo.caminhoArquivo]
+        };
+    }
+    async vincularFotos(eventoId, caminhos) {
+        for (const caminho of caminhos) {
+            await storageService.vincularEntidade(caminho, eventoId);
+        }
+    }
+    async removerCaminhos(caminhos, usuarioId) {
+        for (const caminho of caminhos) {
+            await storageService.desativarPorCaminho(caminho, usuarioId);
+        }
+    }
+    isManagedStoragePath(valor) {
+        if (!valor?.trim())
+            return false;
+        const normalized = valor.trim();
+        return !normalized.startsWith("data:") && !/^https?:\/\//i.test(normalized);
+    }
+    parseUsuarioId(rawUsuarioId) {
+        if (!rawUsuarioId)
+            return undefined;
+        const parsed = Number(rawUsuarioId);
+        if (!Number.isInteger(parsed) || parsed <= 0) {
+            return undefined;
+        }
+        return BigInt(parsed);
     }
 }

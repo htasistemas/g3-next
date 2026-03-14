@@ -21,6 +21,12 @@ tarefaAdministrativaRoutes.get(
   asyncHandler(controller.listar.bind(controller))
 );
 tarefaAdministrativaRoutes.get(
+  "/resumo",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.obterResumo.bind(controller))
+);
+tarefaAdministrativaRoutes.get(
   "/:id",
   ensureAuthenticated,
   ensurePermissions(permissoesLeitura),

@@ -4,6 +4,7 @@ import { normalizarObjetoTexto } from "../../../utils/text-formatter.js";
 import { mapArquivo, mapAuditoria, mapCandidatoDetalhe, mapCartaBanco, mapDocumento, mapEntrevista, mapFicha, mapPpd, mapProcesso, mapResumoCandidato, mapTermo } from "../rh-contratacao.mapper.js";
 import { rhArquivoInputSchema, rhCandidatoInputSchema, rhCartaBancoInputSchema, rhDocumentoInputSchema, rhEntrevistaInputSchema, rhFichaInputSchema, rhPpdInputSchema, rhStatusProcessoInputSchema, rhTermoInputSchema } from "../rh-contratacao.schema.js";
 import { RhContratacaoRepository } from "../repositories/rh-contratacao.repository.js";
+import { storageService } from "../../arquivos/services/storage-instance.js";
 export class RhContratacaoService {
     repository = new RhContratacaoRepository();
     async listarCandidatos(termo) {
@@ -98,6 +99,33 @@ export class RhContratacaoService {
         const processoId = this.parseId(rawProcessoId);
         const input = rhArquivoInputSchema.parse(this.normalizarPayload(rawInput));
         const usuarioId = this.parseOptionalId(rawUsuarioId);
+        if (input.conteudoBase64) {
+            const arquivo = await storageService.salvarArquivo({
+                scope: "colaborador_documento",
+                conteudo: input.conteudoBase64,
+                nomeOriginal: input.nomeArquivo,
+                mimeType: input.mimeType,
+                entidadeId: processoId,
+                entidadeTipo: "colaborador",
+                usuarioUploadId: usuarioId ?? undefined,
+                observacao: input.categoria
+            });
+            try {
+                const row = await this.repository.adicionarArquivo(processoId, {
+                    ...input,
+                    caminhoArquivo: arquivo.caminhoArquivo,
+                    conteudoBase64: null,
+                    mimeType: arquivo.registro.mime_type,
+                    tamanhoBytes: Number(arquivo.registro.tamanho_bytes)
+                }, usuarioId);
+                await storageService.vincularEntidade(arquivo.caminhoArquivo, processoId);
+                return mapArquivo(row);
+            }
+            catch (error) {
+                await storageService.rollbackArquivos([arquivo.caminhoArquivo]);
+                throw error;
+            }
+        }
         const row = await this.repository.adicionarArquivo(processoId, input, usuarioId);
         return mapArquivo(row);
     }

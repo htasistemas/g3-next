@@ -15,6 +15,16 @@ export function useLembretesDiarios(usuarioId?: number, options?: ResumoQueryOpt
   });
 }
 
+export function useResumoLembretesDiarios(usuarioId?: number, options?: ResumoQueryOptions) {
+  return useQuery({
+    queryKey: ["lembretes-diarios", "resumo", usuarioId ?? "atual"],
+    queryFn: () => lembretesDiariosService.obterResumo(),
+    enabled: options?.enabled ?? true,
+    staleTime: 60_000,
+    refetchInterval: options?.enabled ?? true ? 60_000 : false
+  });
+}
+
 export function useSalvarLembreteDiario() {
   const queryClient = useQueryClient();
   return useMutation({

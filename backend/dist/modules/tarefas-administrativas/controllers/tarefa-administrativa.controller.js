@@ -5,6 +5,10 @@ export class TarefaAdministrativaController {
         const tarefas = await service.listar();
         return response.json(tarefas);
     }
+    async obterResumo(_request, response) {
+        const resumo = await service.obterResumo();
+        return response.json({ resumo });
+    }
     async buscarPorId(request, response) {
         const tarefa = await service.buscarPorId(request.params.id);
         return response.json(tarefa);

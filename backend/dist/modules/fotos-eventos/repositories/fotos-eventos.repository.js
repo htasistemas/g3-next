@@ -11,12 +11,17 @@ function normalizarTags(tags) {
         .filter(Boolean);
 }
 function calcularTamanhoBytes(base64) {
+    if (!/^[a-zA-Z0-9+/=\r\n]+$/.test(base64) && !base64.startsWith("data:")) {
+        return 0;
+    }
     const semPrefixo = base64.includes(",") ? base64.split(",")[1] : base64;
     const tamanho = Math.ceil((semPrefixo.length * 3) / 4);
     return Number.isFinite(tamanho) ? tamanho : 0;
 }
-function montarArquivoDataUri(upload) {
+function montarArquivoPersistido(upload) {
     if (upload.conteudo.startsWith("data:"))
+        return upload.conteudo;
+    if (!/^[a-zA-Z0-9+/=\r\n]+$/.test(upload.conteudo))
         return upload.conteudo;
     return `data:${upload.contentType};base64,${upload.conteudo}`;
 }
@@ -318,8 +323,8 @@ export class FotosEventosRepository {
         });
     }
     async inserirFoto(tx, eventoId, input) {
-        const arquivo = montarArquivoDataUri(input.arquivo);
-        const tamanhoBytes = calcularTamanhoBytes(input.arquivo.conteudo);
+        const arquivo = montarArquivoPersistido(input.arquivo);
+        const tamanhoBytes = input.arquivo.tamanhoBytes ?? calcularTamanhoBytes(input.arquivo.conteudo);
         const inserted = await tx.$queryRaw(Prisma.sql `
       INSERT INTO fotos_eventos_itens (
         evento_id,

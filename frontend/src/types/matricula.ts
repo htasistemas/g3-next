@@ -92,6 +92,13 @@ export type MatriculaSalaCatalogo = {
   unidade_nome?: string;
 };
 
+export type MatriculaResumoCatalogo = {
+  cursosNoCatalogo: number;
+  totalVagas: number;
+  vagasDisponiveis: number;
+  inscricoesAtivas: number;
+};
+
 export type MatriculaPresencaStatus = "PRESENTE" | "AUSENTE";
 export type MatriculaPresencaDataStatus = "GERADA" | "PREENCHIDA" | "CANCELADA";
 

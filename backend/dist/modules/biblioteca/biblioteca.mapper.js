@@ -5,6 +5,7 @@ export function mapLivroRowToResponse(row) {
         titulo: row.titulo,
         autor: row.autor,
         isbn: row.isbn ?? undefined,
+        capaUrl: row.capa_url ?? undefined,
         editora: row.editora ?? undefined,
         anoPublicacao: row.ano_publicacao ?? undefined,
         categoria: row.categoria ?? undefined,

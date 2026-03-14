@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { dashboardService } from "@/services/dashboard.service";
 import type { DashboardFiltros } from "@/types/dashboard";
-import type { PowerBiFiltros } from "@/types/power-bi";
+import type { PowerBiDetalheTabela, PowerBiFiltros } from "@/types/power-bi";
 
 type UseDashboardOptions = {
   autoRefresh?: boolean;
@@ -31,6 +31,19 @@ export function useDashboardPowerBi(
     queryFn: () => dashboardService.obterPowerBi(filtros),
     staleTime: 60_000,
     refetchInterval: options.autoRefresh ? refreshIntervalMs : false
+  });
+}
+
+export function useDashboardPowerBiDetalhamento(
+  detalhamentoId: string | null,
+  filtros: PowerBiFiltros = {},
+  options: { enabled?: boolean } = {}
+) {
+  return useQuery<PowerBiDetalheTabela>({
+    queryKey: ["dashboard", "power-bi", "detalhamento", detalhamentoId, filtros],
+    queryFn: () => dashboardService.obterPowerBiDetalhamento(String(detalhamentoId), filtros),
+    enabled: (options.enabled ?? true) && Boolean(detalhamentoId),
+    staleTime: 120_000
   });
 }
 

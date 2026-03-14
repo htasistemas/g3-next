@@ -75,6 +75,10 @@ export class ReportsService {
             return texto;
         return this.dateFormatter.format(data);
     }
+    formatarDataComHifen(valor) {
+        const dataFormatada = this.formatarData(valor);
+        return dataFormatada === "---" ? dataFormatada : dataFormatada.replaceAll("/", "-");
+    }
     formatarDataHora(valor) {
         const texto = this.normalizarTexto(valor);
         if (!texto)
@@ -777,27 +781,50 @@ export class ReportsService {
             .filter((valor) => !!valor)
             .join("-");
         const cidadeUfBeneficiario = cidadeUf || "Não informado";
-        const textoTermo = [
-            `Pelo presente instrumento, eu, ${nomeBeneficiario}, portador(a) do documento de identidade RG nº ${rgBeneficiario} e CPF nº ${cpfBeneficiario}, residente e domiciliado(a) na ${enderecoBeneficiario}, na cidade de ${cidadeUfBeneficiario} (ou o responsável legal, se aplicável), doravante denominado(a) TITULAR, declaro que consinto, de forma livre, informada e inequívoca, com o tratamento dos meus dados pessoais e com o uso da minha imagem pela instituição ${nomeInstituicao}, inscrita no CNPJ sob o nº ${cnpjInstituicao}, doravante denominada CONTROLADOR(A).`,
-            "",
-            "DA FINALIDADE DO TRATAMENTO E USO",
-            `Tratamento de Dados Pessoais: ${payload.finalidadeDados || "Coleta, armazenamento e processamento de dados (como nome, CPF, endereço, renda, composição familiar e informações de saúde, se pertinentes) para fins de cadastro, análise de elegibilidade para programas sociais, acompanhamento familiar e emissão de relatórios a órgãos públicos."}`,
-            `Uso de Imagem: ${payload.finalidadeImagem || "Utilização de imagem, voz e/ou depoimento (em fotos, vídeos e áudios) para fins de divulgação institucional, prestação de contas a parceiros, campanhas de conscientização e publicações em canais oficiais."}`,
-            "",
-            "DA FORMA DE DIVULGAÇÃO (PARA USO DE IMAGEM)",
-            "A autorização para uso de imagem abrange a divulgação em todo território nacional e, se necessário, no exterior, por meio de mídias impressas (cartazes, folders e relatórios) e digitais (website, e-mail marketing e redes sociais), sem finalidade comercial.",
-            "",
-            "DA GRATUIDADE E VIGÊNCIA",
-            "A presente autorização é concedida a título gratuito (sem qualquer remuneração) e por prazo indeterminado.",
-            "",
-            "DOS DIREITOS DO TITULAR",
-            `Estou ciente de que a Lei nº 13.709/2018 (LGPD) garante direitos como acesso aos dados, correção, anonimização, bloqueio ou eliminação de dados desnecessários ou excessivos. A qualquer momento, posso revogar este consentimento, mediante manifestação expressa, por escrito, junto à instituição ${nomeInstituicao}.`,
-            "",
-            "DA SEGURANÇA E RESPONSABILIDADES",
-            "O(A) CONTROLADOR(A) se compromete a adotar medidas de segurança, técnicas e administrativas, aptas a proteger os dados pessoais e a imagem de acessos não autorizados e de situações acidentais ou ilícitas de destruição, perda, alteração, comunicação ou difusão.",
-            "",
-            "Por estar de acordo com os termos e condições acima, firmo o presente documento."
-        ].join("\n");
+        const dataAssinatura = this.formatarDataComHifen(payload.dataAssinatura);
+        const secoesTermo = [
+            {
+                titulo: "Declaração do titular",
+                conteudo: `Pelo presente instrumento, eu, ${nomeBeneficiario}, portador(a) do documento de identidade RG nº ${rgBeneficiario} e CPF nº ${cpfBeneficiario}, residente e domiciliado(a) na ${enderecoBeneficiario}, na cidade de ${cidadeUfBeneficiario} (ou o responsável legal, se aplicável), doravante denominado(a) TITULAR, declaro que consinto, de forma livre, informada e inequívoca, com o tratamento dos meus dados pessoais e com o uso da minha imagem pela instituição ${nomeInstituicao}, inscrita no CNPJ sob o nº ${cnpjInstituicao}, doravante denominada CONTROLADOR(A).`
+            },
+            {
+                titulo: "Finalidade do tratamento e uso",
+                conteudo: [
+                    `Tratamento de dados pessoais: ${payload.finalidadeDados || "Coleta, armazenamento e processamento de dados (como nome, CPF, endereço, renda, composição familiar e informações de saúde, se pertinentes) para fins de cadastro, análise de elegibilidade para programas sociais, acompanhamento familiar e emissão de relatórios a órgãos públicos."}`,
+                    `Uso de imagem: ${payload.finalidadeImagem || "Utilização de imagem, voz e/ou depoimento (em fotos, vídeos e áudios) para fins de divulgação institucional, prestação de contas a parceiros, campanhas de conscientização e publicações em canais oficiais."}`
+                ].join("\n\n")
+            },
+            {
+                titulo: "Forma de divulgação",
+                conteudo: "A autorização para uso de imagem abrange a divulgação em todo território nacional e, se necessário, no exterior, por meio de mídias impressas (cartazes, folders e relatórios) e digitais (website, e-mail marketing e redes sociais), sem finalidade comercial."
+            },
+            {
+                titulo: "Gratuidade e vigência",
+                conteudo: `A presente autorização é concedida a título gratuito (sem qualquer remuneração). Vigência: ${payload.vigencia || "Prazo indeterminado."}`
+            },
+            {
+                titulo: "Direitos do titular",
+                conteudo: `Estou ciente de que a Lei nº 13.709/2018 (LGPD) garante direitos como acesso aos dados, correção, anonimização, bloqueio ou eliminação de dados desnecessários ou excessivos. A qualquer momento, posso revogar este consentimento, mediante manifestação expressa, por escrito, junto à instituição ${nomeInstituicao}.`
+            },
+            {
+                titulo: "Segurança e responsabilidades",
+                conteudo: "O(A) CONTROLADOR(A) se compromete a adotar medidas de segurança, técnicas e administrativas, aptas a proteger os dados pessoais e a imagem de acessos não autorizados e de situações acidentais ou ilícitas de destruição, perda, alteração, comunicação ou difusão."
+            },
+            {
+                titulo: "Assinaturas",
+                conteudo: [
+                    [payload.localAssinatura, dataAssinatura].filter(Boolean).join(", "),
+                    "",
+                    "",
+                    "",
+                    "________________________________________",
+                    "Assinatura do beneficiário / responsável legal",
+                    `${payload.responsavelNome || nomeBeneficiario}`,
+                    `CPF: ${payload.responsavelCpf || cpfBeneficiario}`,
+                    `${payload.responsavelRelacao || "Titular dos dados / responsável legal"}`
+                ].join("\n")
+            }
+        ];
         const relatorioInput = {
             titulo: "Termo de Consentimento para Uso de Dados Pessoais e Imagem",
             metadadosTopo: this.montarMetadadosTopo(payload.issuedBy),
@@ -825,21 +852,14 @@ export class ReportsService {
                     colunas: 2,
                     campos: [
                         this.campo("Local da assinatura", payload.localAssinatura),
-                        this.campo("Data da assinatura", payload.dataAssinatura),
+                        this.campo("Data da assinatura", dataAssinatura),
                         this.campo("Responsável legal", payload.responsavelNome),
                         this.campo("CPF do responsável", payload.responsavelCpf),
-                        this.campo("Relação com o beneficiário", payload.responsavelRelacao),
-                        this.campo("Representante institucional", payload.representanteNome),
-                        this.campo("Cargo do representante", payload.representanteCargo)
+                        this.campo("Relação com o beneficiário", payload.responsavelRelacao)
                     ]
                 }
             ],
-            secoes: [
-                {
-                    titulo: "Termo de consentimento",
-                    conteudo: textoTermo
-                }
-            ],
+            secoes: secoesTermo,
             cabecalho: contexto.cabecalho,
             rodape: contexto.rodape
         };

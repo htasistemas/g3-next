@@ -1,4 +1,5 @@
 import { prisma } from "../../../database/prisma.js";
+import { AppError } from "../../../shared/errors/app-error.js";
 function toNumber(value) {
     if (typeof value === "number" && Number.isFinite(value))
         return value;
@@ -954,6 +955,30 @@ export class DashboardPowerBiRepository {
             alertas,
             convenios
         };
+    }
+    async obterDetalhamento(detalhamentoId, filters, mascararIdentificacao) {
+        if (detalhamentoId === "beneficiarios") {
+            return this.listarTabelaBeneficiarios(filters, mascararIdentificacao);
+        }
+        if (detalhamentoId === "familias") {
+            return this.listarTabelaFamilias(filters, mascararIdentificacao);
+        }
+        if (detalhamentoId === "atendimentos") {
+            return this.listarTabelaAtendimentos(filters, mascararIdentificacao);
+        }
+        if (detalhamentoId === "beneficios") {
+            return this.listarTabelaBeneficios(filters, mascararIdentificacao);
+        }
+        if (detalhamentoId === "encaminhamentos") {
+            return this.listarTabelaEncaminhamentos(filters, mascararIdentificacao);
+        }
+        if (detalhamentoId === "alertas") {
+            return this.listarTabelaAlertas(filters);
+        }
+        if (detalhamentoId === "convenios") {
+            return this.listarTabelaConvenios();
+        }
+        throw new AppError("Detalhamento do Power BI nao encontrado.", 404);
     }
     async listarTabelaBeneficiarios(filters, mascararIdentificacao) {
         const query = this.montarFiltroCadastros(filters, true);

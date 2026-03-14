@@ -20,6 +20,12 @@ lembreteDiarioRoutes.get(
   ensurePermissions(permissoesLeitura),
   asyncHandler(controller.listar.bind(controller))
 );
+lembreteDiarioRoutes.get(
+  "/resumo",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.obterResumo.bind(controller))
+);
 lembreteDiarioRoutes.post(
   "/",
   ensureAuthenticated,

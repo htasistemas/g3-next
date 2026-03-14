@@ -16,6 +16,7 @@ export const bibliotecaLivroInputSchema = z.object({
     titulo: z.string().trim().min(2, "Informe o titulo."),
     autor: z.string().trim().min(2, "Informe o autor."),
     isbn: optionalTrimmedString.nullable().optional(),
+    capaUrl: optionalTrimmedString.nullable().optional(),
     editora: optionalTrimmedString.nullable().optional(),
     anoPublicacao: z.coerce.number().int().min(0).max(9999).nullable().optional(),
     categoria: optionalTrimmedString.nullable().optional(),

@@ -84,6 +84,11 @@ function toMinutes(hora) {
 function formatTimeFromDate(date) {
     return date.toTimeString().slice(0, 8);
 }
+function normalizarHorarioCurto(value) {
+    if (!value)
+        return undefined;
+    return value.slice(0, 5);
+}
 function diferencaMinutos(inicio, fim) {
     const inicioMinutos = toMinutes(inicio);
     const fimMinutos = toMinutes(fim);
@@ -265,6 +270,143 @@ export class RegistroPontoRepository {
       LIMIT 50
     `);
         return rows.map(mapUsuarioCatalogoRowToResponse);
+    }
+    async buscarHorarioUsuario(ator) {
+        await ensureRegistroPontoEstrutura(prisma);
+        if (!ator.id) {
+            throw new AppError("Usuario autenticado invalido.", 401);
+        }
+        const usuario = await this.buscarHorarioUsuarioTx(prisma, ator.id);
+        if (!usuario) {
+            throw new AppError("Usuario autenticado nao encontrado.", 404);
+        }
+        return {
+            horario_entrada_1: normalizarHorarioCurto(usuario.horario_entrada_1),
+            horario_saida_1: normalizarHorarioCurto(usuario.horario_saida_1),
+            horario_entrada_2: normalizarHorarioCurto(usuario.horario_entrada_2),
+            horario_saida_2: normalizarHorarioCurto(usuario.horario_saida_2),
+            jornada_configurada: !!(usuario.horario_entrada_1 ||
+                usuario.horario_saida_1 ||
+                usuario.horario_entrada_2 ||
+                usuario.horario_saida_2)
+        };
+    }
+    async salvarHorarioUsuario(input, ator, origem) {
+        await ensureRegistroPontoEstrutura(prisma);
+        if (!ator.id) {
+            throw new AppError("Usuario autenticado invalido.", 401);
+        }
+        return prisma.$transaction(async (tx) => {
+            const antes = await this.buscarHorarioUsuarioTx(tx, ator.id);
+            if (!antes) {
+                throw new AppError("Usuario autenticado nao encontrado.", 404);
+            }
+            await tx.$executeRaw(Prisma.sql `
+        UPDATE usuarios
+        SET
+          horario_entrada_1 = CAST(${input.horario_entrada_1 ?? null} AS TIME),
+          horario_saida_1 = CAST(${input.horario_saida_1 ?? null} AS TIME),
+          horario_entrada_2 = CAST(${input.horario_entrada_2 ?? null} AS TIME),
+          horario_saida_2 = CAST(${input.horario_saida_2 ?? null} AS TIME)
+        WHERE id = ${ator.id}
+      `);
+            const depois = await this.buscarHorarioUsuarioTx(tx, ator.id);
+            if (!depois) {
+                throw new AppError("Usuario autenticado nao encontrado.", 404);
+            }
+            const resposta = {
+                horario_entrada_1: normalizarHorarioCurto(depois.horario_entrada_1),
+                horario_saida_1: normalizarHorarioCurto(depois.horario_saida_1),
+                horario_entrada_2: normalizarHorarioCurto(depois.horario_entrada_2),
+                horario_saida_2: normalizarHorarioCurto(depois.horario_saida_2),
+                jornada_configurada: !!(depois.horario_entrada_1 ||
+                    depois.horario_saida_1 ||
+                    depois.horario_entrada_2 ||
+                    depois.horario_saida_2)
+            };
+            await this.registrarAuditoriaTx(tx, {
+                registro_ponto_id: null,
+                registro_ponto_batida_id: null,
+                acao: "CONFIGURACAO_HORARIO_TRABALHO",
+                ator,
+                origem,
+                justificativa: undefined,
+                observacao: "Atualizacao dos horarios de trabalho do usuario.",
+                dados_antes: antes
+                    ? {
+                        horario_entrada_1: normalizarHorarioCurto(antes.horario_entrada_1),
+                        horario_saida_1: normalizarHorarioCurto(antes.horario_saida_1),
+                        horario_entrada_2: normalizarHorarioCurto(antes.horario_entrada_2),
+                        horario_saida_2: normalizarHorarioCurto(antes.horario_saida_2)
+                    }
+                    : null,
+                dados_depois: resposta
+            });
+            return resposta;
+        });
+    }
+    async buscarAlertaPendencia(ator) {
+        await ensureRegistroPontoEstrutura(prisma);
+        if (!ator.id) {
+            throw new AppError("Usuario autenticado invalido.", 401);
+        }
+        const [agoraRow] = await prisma.$queryRaw(Prisma.sql `
+      SELECT CURRENT_DATE AS data_referencia, NOW() AS agora
+    `);
+        if (!agoraRow) {
+            return { exibir_alerta: false };
+        }
+        const usuario = await this.buscarHorarioUsuarioTx(prisma, ator.id);
+        if (!usuario) {
+            throw new AppError("Usuario autenticado nao encontrado.", 404);
+        }
+        const agenda = [
+            { campo: "entrada_1", rotulo: "Entrada 1", horario: normalizarHorarioCurto(usuario.horario_entrada_1) },
+            { campo: "saida_1", rotulo: "Saída 1", horario: normalizarHorarioCurto(usuario.horario_saida_1) },
+            { campo: "entrada_2", rotulo: "Entrada 2", horario: normalizarHorarioCurto(usuario.horario_entrada_2) },
+            { campo: "saida_2", rotulo: "Saída 2", horario: normalizarHorarioCurto(usuario.horario_saida_2) }
+        ].filter((item) => !!item.horario);
+        if (!agenda.length) {
+            return { exibir_alerta: false };
+        }
+        const [registroHoje] = await prisma.$queryRaw(Prisma.sql `
+      SELECT
+        id,
+        usuario_id,
+        data_referencia,
+        entrada_1::text,
+        saida_1::text,
+        entrada_2::text,
+        saida_2::text,
+        observacoes
+      FROM registro_ponto
+      WHERE usuario_id = ${ator.id}
+        AND data_referencia = CURRENT_DATE
+      LIMIT 1
+    `);
+        const horaAtualMinutos = toMinutes(formatTimeFromDate(agoraRow.agora));
+        if (horaAtualMinutos === null) {
+            return { exibir_alerta: false };
+        }
+        for (const item of agenda) {
+            const horarioPrevistoMinutos = toMinutes(item.horario);
+            const valorRegistrado = registroHoje?.[item.campo];
+            if (horarioPrevistoMinutos === null || valorRegistrado) {
+                continue;
+            }
+            if (horaAtualMinutos >= horarioPrevistoMinutos) {
+                const dataReferencia = toIsoDate(agoraRow.data_referencia) ?? undefined;
+                return {
+                    exibir_alerta: true,
+                    data_referencia: dataReferencia,
+                    campo: item.campo,
+                    rotulo_batida: item.rotulo,
+                    horario_previsto: item.horario,
+                    mensagem: `O ponto de ${item.rotulo.toLowerCase()} previsto para ${item.horario} ainda não foi registrado. Deseja registrar agora?`
+                };
+            }
+        }
+        return { exibir_alerta: false };
     }
     async marcarPonto(input, ator, origem) {
         await ensureRegistroPontoEstrutura(prisma);
@@ -655,6 +797,19 @@ export class RegistroPontoRepository {
     `);
         return rows[0] ?? null;
     }
+    async buscarHorarioUsuarioTx(tx, usuarioId) {
+        const rows = await tx.$queryRaw(Prisma.sql `
+      SELECT
+        horario_entrada_1::text,
+        horario_saida_1::text,
+        horario_entrada_2::text,
+        horario_saida_2::text
+      FROM usuarios
+      WHERE id = ${usuarioId}
+      LIMIT 1
+    `);
+        return rows[0] ?? null;
+    }
     async buscarContextoUsuarioTx(tx, usuarioId) {
         const rows = await tx.$queryRaw(Prisma.sql `
       WITH usuario_atual AS (
@@ -662,7 +817,11 @@ export class RegistroPontoRepository {
           u.id,
           u.nome_usuario,
           u.nome,
-          u.unidade
+          u.unidade,
+          u.horario_entrada_1::text,
+          u.horario_saida_1::text,
+          u.horario_entrada_2::text,
+          u.horario_saida_2::text
         FROM usuarios u
         WHERE u.id = ${usuarioId}
         LIMIT 1
@@ -672,6 +831,10 @@ export class RegistroPontoRepository {
         ua.nome_usuario,
         ua.nome,
         ua.unidade,
+        ua.horario_entrada_1,
+        ua.horario_saida_1,
+        ua.horario_entrada_2,
+        ua.horario_saida_2,
         uni.id AS unidade_id,
         COALESCE(uni.nome_fantasia, uni.razao_social) AS unidade_nome,
         uni.modo_validacao_ponto,

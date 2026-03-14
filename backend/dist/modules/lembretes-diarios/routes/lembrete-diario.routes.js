@@ -8,6 +8,7 @@ const permissoesLeitura = ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"];
 const permissoesEscrita = ["ADMINISTRADOR", "OPERADOR"];
 const permissaoExclusao = ["ADMINISTRADOR"];
 lembreteDiarioRoutes.get("/", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.listar.bind(controller)));
+lembreteDiarioRoutes.get("/resumo", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.obterResumo.bind(controller)));
 lembreteDiarioRoutes.post("/", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.criar.bind(controller)));
 lembreteDiarioRoutes.put("/:id", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.atualizar.bind(controller)));
 lembreteDiarioRoutes.patch("/:id/concluir", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.concluir.bind(controller)));

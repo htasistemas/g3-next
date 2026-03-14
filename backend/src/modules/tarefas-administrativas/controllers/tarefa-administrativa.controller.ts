@@ -9,6 +9,11 @@ export class TarefaAdministrativaController {
     return response.json(tarefas);
   }
 
+  async obterResumo(_request: Request, response: Response) {
+    const resumo = await service.obterResumo();
+    return response.json({ resumo });
+  }
+
   async buscarPorId(request: Request, response: Response) {
     const tarefa = await service.buscarPorId(request.params.id);
     return response.json(tarefa);

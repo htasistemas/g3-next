@@ -1,4 +1,5 @@
 import { UnidadeAssistencialRepository } from "../../unidades-assistenciais/repositories/unidade-assistencial.repository.js";
+import { TtlCache } from "../../../shared/cache/ttl-cache.js";
 import { DashboardVulnerabilidadeRepository } from "../repositories/dashboard-vulnerabilidade.repository.js";
 import { DashboardGeocodingService } from "./dashboard-geocoding.service.js";
 
@@ -54,8 +55,13 @@ export class DashboardVulnerabilidadeService {
   private readonly unidadeRepository = new UnidadeAssistencialRepository();
   private readonly repository = new DashboardVulnerabilidadeRepository();
   private readonly geocodingService = new DashboardGeocodingService();
+  private readonly cache = new TtlCache<ReturnType<DashboardVulnerabilidadeService["montarMapa"]> extends Promise<infer T> ? T : never>(90_000, 4);
 
   async obterMapa() {
+    return this.cache.getOrSet("mapa", async () => this.montarMapa());
+  }
+
+  private async montarMapa() {
     const unidade = await this.unidadeRepository.buscarAtual();
     const [cestaBasica, familias, violencia] = await Promise.all([
       this.repository.listarCestaBasica(),
@@ -129,6 +135,8 @@ export class DashboardVulnerabilidadeService {
       atualizados += 1;
       await this.geocodingService.aguardarJanelaRateLimit();
     }
+
+    this.cache.clear();
 
     return {
       processados,

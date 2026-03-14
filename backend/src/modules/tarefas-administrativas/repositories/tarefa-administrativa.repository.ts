@@ -10,6 +10,10 @@ import type {
 } from "../tarefa-administrativa.types.js";
 
 type TransactionClient = Prisma.TransactionClient;
+type TarefaResumoRow = {
+  total_pendentes: bigint | number | null;
+  total_em_atraso: bigint | number | null;
+};
 
 export class TarefaAdministrativaRepository {
   async listar() {
@@ -30,12 +34,49 @@ export class TarefaAdministrativaRepository {
 
     const checklist = await this.listarChecklist();
     const historico = await this.listarHistorico();
+    const checklistPorTarefa = new Map<string, TarefaAdministrativaChecklistRow[]>();
+    const historicoPorTarefa = new Map<string, TarefaAdministrativaHistoricoRow[]>();
+
+    checklist.forEach((item) => {
+      const chave = item.tarefa_id.toString();
+      const itens = checklistPorTarefa.get(chave);
+      if (itens) {
+        itens.push(item);
+        return;
+      }
+      checklistPorTarefa.set(chave, [item]);
+    });
+
+    historico.forEach((item) => {
+      const chave = item.tarefa_id.toString();
+      const itens = historicoPorTarefa.get(chave);
+      if (itens) {
+        itens.push(item);
+        return;
+      }
+      historicoPorTarefa.set(chave, [item]);
+    });
 
     return tarefas.map((tarefa) => ({
       tarefa,
-      checklist: checklist.filter((item) => item.tarefa_id === tarefa.id),
-      historico: historico.filter((item) => item.tarefa_id === tarefa.id)
+      checklist: checklistPorTarefa.get(tarefa.id.toString()) ?? [],
+      historico: historicoPorTarefa.get(tarefa.id.toString()) ?? []
     }));
+  }
+
+  async obterResumo() {
+    const rows = await prisma.$queryRaw<TarefaResumoRow[]>(Prisma.sql`
+      SELECT
+        COUNT(*) FILTER (WHERE status IS DISTINCT FROM 'Concluida')::BIGINT AS total_pendentes,
+        COUNT(*) FILTER (WHERE COALESCE(status, '') = 'Em atraso')::BIGINT AS total_em_atraso
+      FROM tarefas_pendencias
+    `);
+
+    const row = rows[0];
+    return {
+      totalPendentes: Number(row?.total_pendentes ?? 0),
+      totalEmAtraso: Number(row?.total_em_atraso ?? 0)
+    };
   }
 
   async buscarPorId(id: bigint) {

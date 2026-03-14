@@ -10,6 +10,7 @@ const permissaoExclusao = ["ADMINISTRADOR"];
 matriculaRoutes.get("/catalogo/beneficiarios", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.listarBeneficiarios.bind(controller)));
 matriculaRoutes.get("/catalogo/profissionais", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.listarProfissionais.bind(controller)));
 matriculaRoutes.get("/catalogo/salas", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.listarSalas.bind(controller)));
+matriculaRoutes.get("/resumo", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.obterResumoCatalogo.bind(controller)));
 matriculaRoutes.get("/:id/presencas/datas", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.listarPresencaDatas.bind(controller)));
 matriculaRoutes.post("/:id/presencas/datas", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.criarPresencaData.bind(controller)));
 matriculaRoutes.put("/:id/presencas/datas/:presencaDataId", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.atualizarPresencaData.bind(controller)));

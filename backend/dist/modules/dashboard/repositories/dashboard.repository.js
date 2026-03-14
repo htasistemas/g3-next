@@ -20,6 +20,9 @@ function toIsoDateOrNull(value) {
         return null;
     return parsed.toISOString().slice(0, 10);
 }
+function normalizarTextoSql(coluna) {
+    return `LOWER(translate(COALESCE(${coluna}, ''), 'ÁÀÃÂÄÉÈÊËÍÌÎÏÓÒÕÔÖÚÙÛÜÇáàãâäéèêëíìîïóòõôöúùûüç', 'AAAAAEEEEIIIIOOOOOUUUUCaaaaaeeeeiiiiooooouuuuc'))`;
+}
 export class DashboardRepository {
     tabelaCache = new Map();
     colunaCache = new Map();
@@ -37,6 +40,29 @@ export class DashboardRepository {
     }
     async contarBensPatrimonio() {
         return this.contarTabela("patrimonio_item");
+    }
+    async contarItensAlmoxarifado() {
+        return this.contarTabela("almoxarifado_item");
+    }
+    async somarLivrosDisponiveis() {
+        const tabelaBiblioteca = await this.primeiraTabelaExistente(["biblioteca_livro", "biblioteca_livros"]);
+        if (!tabelaBiblioteca)
+            return 0;
+        const possuiQuantidadeDisponivel = await this.colunaExiste(tabelaBiblioteca, "quantidade_disponivel");
+        if (!possuiQuantidadeDisponivel)
+            return 0;
+        const possuiStatus = await this.colunaExiste(tabelaBiblioteca, "status");
+        const filtroStatus = possuiStatus
+            ? "WHERE COALESCE(UPPER(TRIM(status)), 'ATIVO') <> 'INATIVO'"
+            : "";
+        return this.consultarTotal(`
+      SELECT COALESCE(SUM(GREATEST(COALESCE(quantidade_disponivel, 0), 0)), 0) AS total
+      FROM ${tabelaBiblioteca}
+      ${filtroStatus}
+      `, []);
+    }
+    async contarVeiculos() {
+        return this.contarTabela("controle_veiculos");
     }
     async contarBeneficiariosPorStatus() {
         const possuiTabela = await this.tabelaExiste("cadastro_beneficiario");
@@ -187,33 +213,71 @@ export class DashboardRepository {
         const colunas = await this.verificarColunas("lancamento_financeiro", ["tipo", "situacao", "valor"]);
         if (!possuiTabela || !colunas)
             return 0;
+        const tipoNormalizado = normalizarTextoSql("tipo");
+        const situacaoNormalizada = normalizarTextoSql("situacao");
         return this.consultarTotal(`
       SELECT COALESCE(SUM(valor), 0) AS total
       FROM lancamento_financeiro
-      WHERE LOWER(COALESCE(tipo, '')) = 'receber'
-        AND LOWER(COALESCE(situacao, '')) <> 'pago'
+      WHERE (
+          ${tipoNormalizado} IN ('receber', 'a receber', 'receita', 'entrada', 'credito')
+          OR ${tipoNormalizado} LIKE '%receber%'
+          OR ${tipoNormalizado} LIKE 'receita%'
+          OR ${tipoNormalizado} LIKE '%entrada%'
+          OR ${tipoNormalizado} LIKE '%credito%'
+        )
+        AND ${situacaoNormalizada} NOT IN ('pago', 'paga', 'recebido', 'recebida', 'liquidado', 'liquidada', 'concluido', 'concluida')
       `, []);
     }
     async somarValoresEmCaixa() {
         const possuiTabela = await this.tabelaExiste("conta_bancaria");
-        const colunas = await this.verificarColunas("conta_bancaria", ["tipo", "saldo"]);
-        if (!possuiTabela || !colunas)
+        const possuiSaldo = await this.colunaExiste("conta_bancaria", "saldo");
+        const possuiTipo = await this.colunaExiste("conta_bancaria", "tipo");
+        const possuiRecebimentoLocal = await this.colunaExiste("conta_bancaria", "recebimento_local");
+        if (!possuiTabela || !possuiSaldo)
             return 0;
+        const tipoNormalizado = possuiTipo ? normalizarTextoSql("tipo") : "''";
+        const condicoes = [];
+        if (possuiRecebimentoLocal) {
+            condicoes.push("COALESCE(recebimento_local, FALSE) = TRUE");
+        }
+        if (possuiTipo) {
+            condicoes.push(`${tipoNormalizado} LIKE '%caixa%'`);
+        }
+        if (!condicoes.length) {
+            return 0;
+        }
         return this.consultarTotal(`
       SELECT COALESCE(SUM(saldo), 0) AS total
       FROM conta_bancaria
-      WHERE LOWER(COALESCE(tipo, '')) = 'corrente'
+      WHERE ${condicoes.map((condicao) => `(${condicao})`).join(" OR ")}
       `, []);
     }
     async somarValoresEmBanco() {
         const possuiTabela = await this.tabelaExiste("conta_bancaria");
-        const colunas = await this.verificarColunas("conta_bancaria", ["tipo", "saldo"]);
-        if (!possuiTabela || !colunas)
+        const possuiSaldo = await this.colunaExiste("conta_bancaria", "saldo");
+        const possuiTipo = await this.colunaExiste("conta_bancaria", "tipo");
+        const possuiRecebimentoLocal = await this.colunaExiste("conta_bancaria", "recebimento_local");
+        if (!possuiTabela || !possuiSaldo)
             return 0;
+        const tipoNormalizado = possuiTipo ? normalizarTextoSql("tipo") : "''";
+        const condicoes = [];
+        if (possuiRecebimentoLocal) {
+            condicoes.push("COALESCE(recebimento_local, FALSE) = FALSE");
+        }
+        if (possuiTipo) {
+            condicoes.push(`${tipoNormalizado} NOT LIKE '%caixa%'`);
+        }
+        const filtroBanco = possuiRecebimentoLocal && possuiTipo
+            ? "(COALESCE(recebimento_local, FALSE) = FALSE AND " + `${tipoNormalizado} NOT LIKE '%caixa%'` + ")"
+            : possuiRecebimentoLocal
+                ? "COALESCE(recebimento_local, FALSE) = FALSE"
+                : possuiTipo
+                    ? `${tipoNormalizado} NOT LIKE '%caixa%'`
+                    : "TRUE";
         return this.consultarTotal(`
       SELECT COALESCE(SUM(saldo), 0) AS total
       FROM conta_bancaria
-      WHERE LOWER(COALESCE(tipo, '')) <> 'corrente'
+      WHERE ${filtroBanco}
       `, []);
     }
     async contarCursosAtivos() {
@@ -401,6 +465,8 @@ export class DashboardRepository {
         const colunas = await this.verificarColunas("lancamento_financeiro", ["tipo", "situacao", "valor"]);
         if (!possuiTabela || !colunas)
             return 0;
+        const tipoNormalizado = normalizarTextoSql("tipo");
+        const situacaoNormalizada = normalizarTextoSql("situacao");
         return this.consultarTotal(`
       SELECT
         CASE
@@ -411,13 +477,25 @@ export class DashboardRepository {
         (
           SELECT COALESCE(SUM(valor), 0)::numeric AS total
           FROM lancamento_financeiro
-          WHERE LOWER(COALESCE(tipo, '')) = 'receber'
+          WHERE (
+            ${tipoNormalizado} IN ('receber', 'a receber', 'receita', 'entrada', 'credito')
+            OR ${tipoNormalizado} LIKE '%receber%'
+            OR ${tipoNormalizado} LIKE 'receita%'
+            OR ${tipoNormalizado} LIKE '%entrada%'
+            OR ${tipoNormalizado} LIKE '%credito%'
+          )
         ) total_receber,
         (
           SELECT COALESCE(SUM(valor), 0)::numeric AS total
           FROM lancamento_financeiro
-          WHERE LOWER(COALESCE(tipo, '')) = 'receber'
-            AND LOWER(COALESCE(situacao, '')) = 'pago'
+          WHERE (
+            ${tipoNormalizado} IN ('receber', 'a receber', 'receita', 'entrada', 'credito')
+            OR ${tipoNormalizado} LIKE '%receber%'
+            OR ${tipoNormalizado} LIKE 'receita%'
+            OR ${tipoNormalizado} LIKE '%entrada%'
+            OR ${tipoNormalizado} LIKE '%credito%'
+          )
+            AND ${situacaoNormalizada} IN ('pago', 'paga', 'recebido', 'recebida', 'liquidado', 'liquidada', 'concluido', 'concluida')
         ) total_pago
       `, []);
     }
@@ -487,6 +565,14 @@ export class DashboardRepository {
     async verificarColunas(tabela, colunas) {
         const resultados = await Promise.all(colunas.map((coluna) => this.colunaExiste(tabela, coluna)));
         return resultados.every(Boolean);
+    }
+    async primeiraTabelaExistente(tabelas) {
+        for (const tabela of tabelas) {
+            if (await this.tabelaExiste(tabela)) {
+                return tabela;
+            }
+        }
+        return null;
     }
     async tabelaExiste(tabela) {
         if (this.tabelaCache.has(tabela)) {

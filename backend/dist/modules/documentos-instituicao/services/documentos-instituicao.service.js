@@ -4,6 +4,7 @@ import { normalizarObjetoTexto } from "../../../utils/text-formatter.js";
 import { mapDocumentoInstituicaoAnexoToResponse, mapDocumentoInstituicaoHistoricoToResponse, mapDocumentoInstituicaoToResponse } from "../documentos-instituicao.mapper.js";
 import { documentoInstituicaoAnexoInputSchema, documentoInstituicaoHistoricoInputSchema, documentoInstituicaoInputSchema } from "../documentos-instituicao.schema.js";
 import { DocumentosInstituicaoRepository } from "../repositories/documentos-instituicao.repository.js";
+import { storageService } from "../../arquivos/services/storage-instance.js";
 export class DocumentosInstituicaoService {
     repository = new DocumentosInstituicaoRepository();
     async listar() {
@@ -30,11 +31,32 @@ export class DocumentosInstituicaoService {
         const anexos = await this.repository.listarAnexos(documentoId);
         return anexos.map(mapDocumentoInstituicaoAnexoToResponse);
     }
-    async adicionarAnexo(rawDocumentoId, rawInput) {
+    async adicionarAnexo(rawDocumentoId, rawInput, rawUsuarioId) {
         const documentoId = this.parseId(rawDocumentoId);
         const input = documentoInstituicaoAnexoInputSchema.parse(this.normalizarPayload(rawInput));
-        const anexo = await this.repository.adicionarAnexo(documentoId, input);
-        return mapDocumentoInstituicaoAnexoToResponse(anexo);
+        const usuarioId = this.parseIdOpcional(rawUsuarioId);
+        const arquivo = await storageService.salvarArquivo({
+            scope: "instituicao_documento",
+            conteudo: input.conteudoBase64,
+            nomeOriginal: input.nomeArquivo,
+            mimeType: input.tipoMime,
+            entidadeId: documentoId,
+            usuarioUploadId: usuarioId,
+            observacao: input.tipo
+        });
+        try {
+            const anexo = await this.repository.adicionarAnexo(documentoId, {
+                ...input,
+                conteudoBase64: arquivo.caminhoArquivo,
+                nomeArquivo: input.nomeArquivo || arquivo.registro.nome_original,
+                tipoMime: input.tipoMime || arquivo.registro.mime_type
+            });
+            return mapDocumentoInstituicaoAnexoToResponse(anexo);
+        }
+        catch (error) {
+            await storageService.rollbackArquivos([arquivo.caminhoArquivo]);
+            throw error;
+        }
     }
     async obterArquivoAnexo(rawDocumentoId, rawAnexoId) {
         const documentoId = this.parseId(rawDocumentoId);
@@ -60,6 +82,15 @@ export class DocumentosInstituicaoService {
         const parsed = Number(rawId);
         if (!Number.isInteger(parsed) || parsed <= 0) {
             throw new AppError("Identificador invalido.", 400);
+        }
+        return BigInt(parsed);
+    }
+    parseIdOpcional(rawId) {
+        if (!rawId)
+            return undefined;
+        const parsed = Number(rawId);
+        if (!Number.isInteger(parsed) || parsed <= 0) {
+            return undefined;
         }
         return BigInt(parsed);
     }

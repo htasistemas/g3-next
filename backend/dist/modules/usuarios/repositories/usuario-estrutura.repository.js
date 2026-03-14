@@ -21,6 +21,7 @@ const sqlEstruturaUsuarios = [
     `
   INSERT INTO permissao (nome)
   VALUES
+    ('CHAMADO_TECNICO_DESENVOLVIMENTO'),
     ('MENSAGENS_PERSONALIZADAS_VISUALIZAR'),
     ('MENSAGENS_PERSONALIZADAS_CADASTRAR'),
     ('MENSAGENS_PERSONALIZADAS_EDITAR'),
@@ -32,11 +33,20 @@ const sqlEstruturaUsuarios = [
   `
 ];
 let estruturaInicializada = false;
+let estruturaInicializando = null;
 export async function ensureUsuariosGestaoEstrutura(db) {
     if (estruturaInicializada)
         return;
-    for (const sql of sqlEstruturaUsuarios) {
-        await db.$executeRawUnsafe(sql);
+    if (!estruturaInicializando) {
+        estruturaInicializando = (async () => {
+            for (const sql of sqlEstruturaUsuarios) {
+                await db.$executeRawUnsafe(sql);
+            }
+            estruturaInicializada = true;
+        })().catch((error) => {
+            estruturaInicializando = null;
+            throw error;
+        });
     }
-    estruturaInicializada = true;
+    await estruturaInicializando;
 }

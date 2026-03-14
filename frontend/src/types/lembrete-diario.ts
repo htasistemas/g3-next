@@ -23,3 +23,8 @@ export type LembreteDiarioPayload = {
   todosUsuarios?: boolean;
   horaAviso?: string | null;
 };
+
+export type LembreteDiarioResumo = {
+  totalPendentes: number;
+  totalVencidos: number;
+};

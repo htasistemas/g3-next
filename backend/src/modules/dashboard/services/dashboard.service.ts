@@ -1,4 +1,5 @@
 import { AppError } from "../../../shared/errors/app-error.js";
+import { TtlCache } from "../../../shared/cache/ttl-cache.js";
 import { dashboardFiltrosSchema } from "../dashboard.schema.js";
 import { DashboardRepository } from "../repositories/dashboard.repository.js";
 import type {
@@ -31,11 +32,21 @@ function calcularIdade(dataNascimento: Date, dataReferencia = new Date()): numbe
 
 export class DashboardService {
   private readonly repository = new DashboardRepository();
+  private readonly cache = new TtlCache<DashboardAssistenciaResponse>(20_000, 24);
 
   async obterAssistencia(rawFilters: unknown): Promise<DashboardAssistenciaResponse> {
     const filters = dashboardFiltrosSchema.parse(rawFilters);
     this.validarPeriodo(filters);
 
+    const cacheKey = JSON.stringify({
+      startDate: filters.startDate ?? null,
+      endDate: filters.endDate ?? null
+    });
+
+    return this.cache.getOrSet(cacheKey, async () => this.gerarAssistencia(filters));
+  }
+
+  private async gerarAssistencia(filters: DashboardFiltros): Promise<DashboardAssistenciaResponse> {
     const [
       totalBeneficiarios,
       totalProfissionais,

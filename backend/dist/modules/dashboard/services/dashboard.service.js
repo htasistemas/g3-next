@@ -1,4 +1,5 @@
 import { AppError } from "../../../shared/errors/app-error.js";
+import { TtlCache } from "../../../shared/cache/ttl-cache.js";
 import { dashboardFiltrosSchema } from "../dashboard.schema.js";
 import { DashboardRepository } from "../repositories/dashboard.repository.js";
 function arredondarUmaCasa(valor) {
@@ -19,15 +20,26 @@ function calcularIdade(dataNascimento, dataReferencia = new Date()) {
 }
 export class DashboardService {
     repository = new DashboardRepository();
+    cache = new TtlCache(20_000, 24);
     async obterAssistencia(rawFilters) {
         const filters = dashboardFiltrosSchema.parse(rawFilters);
         this.validarPeriodo(filters);
-        const [totalBeneficiarios, totalProfissionais, totalVoluntarios, totalFamiliasCadastradas, totalBensPatrimonio, beneficiariosPeriodo, porStatus, cadastrosCompletos, datasNascimento, totalSituacaoSocial, mediaPessoasBanco, rendasFamiliares, bairros, vulnerabilidades, insegurancaAlimentar, termosAtivos, termosValorTotal, termosAlertas, valoresAReceber, valoresEmCaixa, valoresEmBanco, cursosAtivos, taxaMediaOcupacaoCursos, certificadosEmitidos, doacoesPeriodo, itensDoadoResumo, visitasDomiciliares, termosVencendo, execucaoFinanceira, absenteismo] = await Promise.all([
+        const cacheKey = JSON.stringify({
+            startDate: filters.startDate ?? null,
+            endDate: filters.endDate ?? null
+        });
+        return this.cache.getOrSet(cacheKey, async () => this.gerarAssistencia(filters));
+    }
+    async gerarAssistencia(filters) {
+        const [totalBeneficiarios, totalProfissionais, totalVoluntarios, totalFamiliasCadastradas, totalBensPatrimonio, totalItensAlmoxarifado, totalLivrosDisponiveis, totalVeiculos, beneficiariosPeriodo, porStatus, cadastrosCompletos, datasNascimento, totalSituacaoSocial, mediaPessoasBanco, rendasFamiliares, bairros, vulnerabilidades, insegurancaAlimentar, termosAtivos, termosValorTotal, termosAlertas, valoresAReceber, valoresEmCaixa, valoresEmBanco, cursosAtivos, taxaMediaOcupacaoCursos, certificadosEmitidos, doacoesPeriodo, itensDoadoResumo, visitasDomiciliares, termosVencendo, execucaoFinanceira, absenteismo] = await Promise.all([
             this.repository.contarBeneficiarios(),
             this.repository.contarProfissionais(),
             this.repository.contarVoluntarios(),
             this.repository.contarFamilias(),
             this.repository.contarBensPatrimonio(),
+            this.repository.contarItensAlmoxarifado(),
+            this.repository.somarLivrosDisponiveis(),
+            this.repository.contarVeiculos(),
             this.repository.contarBeneficiariosPeriodo(filters.startDate, filters.endDate),
             this.repository.contarBeneficiariosPorStatus(),
             this.repository.contarCadastroCompleto(),
@@ -78,7 +90,10 @@ export class DashboardService {
                 profissionais: totalProfissionais,
                 voluntarios: totalVoluntarios,
                 familias: totalFamiliasCadastradas,
-                bensPatrimonio: totalBensPatrimonio
+                bensPatrimonio: totalBensPatrimonio,
+                itensAlmoxarifado: totalItensAlmoxarifado,
+                livrosDisponiveis: totalLivrosDisponiveis,
+                veiculos: totalVeiculos
             },
             top12: {
                 beneficiariosAtendidosPeriodo: beneficiariosPeriodo,

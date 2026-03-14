@@ -27,6 +27,12 @@ const optionalIsoDate = z.preprocess((value) => {
     const trimmed = value.trim();
     return trimmed.length ? trimmed : undefined;
 }, z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional());
+const optionalEmail = z.preprocess((value) => {
+    if (typeof value !== "string")
+        return value;
+    const normalized = value.trim().toLowerCase();
+    return normalized.length ? normalized : undefined;
+}, z.string().email("E-mail invalido.").optional());
 export const beneficiarioInputSchema = z.object({
     codigo: optionalTrimmedString,
     status: z.enum(beneficiarioStatusValues).default("EM_ANALISE"),
@@ -69,7 +75,7 @@ export const beneficiarioInputSchema = z.object({
     telefone_secundario: optionalTrimmedString,
     telefone_recado_nome: optionalTrimmedString,
     telefone_recado_numero: optionalTrimmedString,
-    email: z.union([z.string().trim().email("E-mail invalido."), z.undefined()]).optional(),
+    email: optionalEmail,
     permite_contato_tel: optionalBoolean,
     permite_contato_whatsapp: optionalBoolean,
     permite_contato_sms: optionalBoolean,

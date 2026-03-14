@@ -13,6 +13,14 @@ export class LembreteDiarioService {
         const registros = await this.repository.listar(Number.isInteger(usuarioId) && usuarioId > 0 ? usuarioId : undefined);
         return registros.map(mapLembreteDiarioToResponse);
     }
+    async obterResumo(rawUsuarioId) {
+        const usuarioId = typeof rawUsuarioId === "string" && rawUsuarioId.trim()
+            ? Number(rawUsuarioId)
+            : typeof rawUsuarioId === "number"
+                ? rawUsuarioId
+                : undefined;
+        return this.repository.obterResumo(Number.isInteger(usuarioId) && usuarioId > 0 ? usuarioId : undefined);
+    }
     async criar(rawInput) {
         const input = lembreteDiarioInputSchema.parse(rawInput);
         const registro = await this.repository.criar(input);

@@ -40,16 +40,9 @@ export function VisaoGeralPage() {
     {},
     { autoRefresh: true }
   );
-  const { data: matriculasCatalogoData, isFetching: atualizandoResumoMatriculas } = useQuery({
+  const { data: matriculasResumoData, isFetching: atualizandoResumoMatriculas } = useQuery({
     queryKey: ["dashboard", "visao-geral", "matriculas-resumo"],
-    queryFn: () =>
-      matriculasService.listar({
-        nome: "",
-        tipo: "",
-        status: "",
-        profissional: "",
-        beneficiario: ""
-      }),
+    queryFn: () => matriculasService.obterResumoCatalogo(),
     staleTime: 60_000
   });
 
@@ -134,19 +127,13 @@ export function VisaoGeralPage() {
   }, [data]);
 
   const resumoCatalogoVagas = useMemo(() => {
-    const lista = matriculasCatalogoData?.matriculas ?? [];
-    const cursosNoCatalogo = lista.length;
-    const totalVagas = lista.reduce((total, item) => total + (item.vagas_totais ?? 0), 0);
-    const vagasDisponiveis = lista.reduce((total, item) => total + (item.vagas_disponiveis ?? 0), 0);
-    const inscricoesAtivas = lista.reduce((total, item) => total + (item.total_matriculas ?? 0), 0);
-
     return {
-      cursosNoCatalogo,
-      totalVagas,
-      vagasDisponiveis,
-      inscricoesAtivas
+      cursosNoCatalogo: matriculasResumoData?.cursosNoCatalogo ?? 0,
+      totalVagas: matriculasResumoData?.totalVagas ?? 0,
+      vagasDisponiveis: matriculasResumoData?.vagasDisponiveis ?? 0,
+      inscricoesAtivas: matriculasResumoData?.inscricoesAtivas ?? 0
     };
-  }, [matriculasCatalogoData]);
+  }, [matriculasResumoData]);
 
   return (
     <main className={classesTelaPadraoBeneficiario.container}>

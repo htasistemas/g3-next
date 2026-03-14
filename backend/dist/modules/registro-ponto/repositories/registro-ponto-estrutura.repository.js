@@ -1,4 +1,8 @@
 const sqlEstruturaRegistroPonto = [
+    "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS horario_entrada_1 TIME",
+    "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS horario_saida_1 TIME",
+    "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS horario_entrada_2 TIME",
+    "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS horario_saida_2 TIME",
     `
   CREATE TABLE IF NOT EXISTS registro_ponto (
     id BIGSERIAL PRIMARY KEY,
@@ -85,11 +89,20 @@ const sqlEstruturaRegistroPonto = [
     "CREATE INDEX IF NOT EXISTS registro_ponto_auditoria_criado_idx ON registro_ponto_auditoria(criado_em)"
 ];
 let estruturaInicializada = false;
+let estruturaInicializando = null;
 export async function ensureRegistroPontoEstrutura(db) {
     if (estruturaInicializada)
         return;
-    for (const sql of sqlEstruturaRegistroPonto) {
-        await db.$executeRawUnsafe(sql);
+    if (!estruturaInicializando) {
+        estruturaInicializando = (async () => {
+            for (const sql of sqlEstruturaRegistroPonto) {
+                await db.$executeRawUnsafe(sql);
+            }
+            estruturaInicializada = true;
+        })().catch((error) => {
+            estruturaInicializando = null;
+            throw error;
+        });
     }
-    estruturaInicializada = true;
+    await estruturaInicializando;
 }

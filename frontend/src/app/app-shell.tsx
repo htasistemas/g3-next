@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { APP_VERSION } from "@/lib/app-version";
 import { resolverUrlArquivo } from "@/lib/arquivos";
-import { useLembretesDiarios } from "@/features/lembretes-diarios/use-lembretes-diarios";
+import { useResumoLembretesDiarios } from "@/features/lembretes-diarios/use-lembretes-diarios";
 import { registroPontoService } from "@/services/registro-ponto.service";
-import { useTarefasAdministrativas } from "@/features/tarefas-administrativas/use-tarefas-administrativas";
+import { useResumoTarefasAdministrativas } from "@/features/tarefas-administrativas/use-tarefas-administrativas";
 import { useUnidadeAssistencialAtual } from "@/features/unidades-assistenciais/use-unidades-assistenciais";
 import type { RegistroPontoAlertaPendente } from "@/types/registro-ponto";
 import {
@@ -445,10 +445,10 @@ export function AppShell() {
   const [usuarioVerificadoPontoId, setUsuarioVerificadoPontoId] = useState<string | null>(null);
   const usuarioId = usuario?.id ? Number(usuario.id) : undefined;
   const { data: unidadeAtualData } = useUnidadeAssistencialAtual({ enabled: carregarResumoInicial });
-  const { data: lembretesData } = useLembretesDiarios(usuarioId, {
+  const { data: lembretesResumoData, isFetched: lembretesResumoCarregado } = useResumoLembretesDiarios(usuarioId, {
     enabled: carregarResumoInicial && typeof usuarioId === "number"
   });
-  const { data: tarefasData } = useTarefasAdministrativas({ enabled: carregarResumoInicial });
+  const { data: tarefasResumoData } = useResumoTarefasAdministrativas({ enabled: carregarResumoInicial });
   const location = useLocation();
   const navigate = useNavigate();
   const titulo = obterTitulo(location.pathname);
@@ -457,7 +457,6 @@ export function AppShell() {
   const [sidebarRecolhida, setSidebarRecolhida] = useState(false);
   const [gruposAbertos, setGruposAbertos] = useState<Record<string, boolean>>({});
   const [lembreteAlertaAtivo, setLembreteAlertaAtivo] = useState(false);
-  const [agora, setAgora] = useState(() => Date.now());
   const logomarcaInstituicao = unidadeAtualData?.unidade?.logomarca;
   const nomeInstituicao =
     unidadeAtualData?.unidade?.nome_fantasia ??
@@ -465,42 +464,12 @@ export function AppShell() {
     "Sistema G3";
 
   const permissoesUsuario = usuario?.permissoes ?? [];
-  const lembretesPendentes = useMemo(
-    () => (lembretesData ?? []).filter((item) => item.status !== "CONCLUIDO"),
-    [lembretesData]
-  );
-  const obterExecucaoMs = (item: (typeof lembretesPendentes)[number]) => {
-    if (item.proximaExecucaoEm) {
-      return new Date(item.proximaExecucaoEm).getTime();
-    }
-
-    if (!item.dataInicial) return Number.NaN;
-    const [ano, mes, dia] = item.dataInicial.split("-").map(Number);
-    if (!ano || !mes || !dia) return Number.NaN;
-
-    const [hora, minuto] = (item.horaAviso ?? "09:00").split(":").map(Number);
-    return new Date(ano, mes - 1, dia, hora || 0, minuto || 0, 0, 0).getTime();
-  };
-  const lembretesVencidos = useMemo(() => {
-    return lembretesPendentes.filter((item) => {
-      const proximaExecucao = obterExecucaoMs(item);
-      return Number.isFinite(proximaExecucao) && proximaExecucao <= agora;
-    });
-  }, [lembretesPendentes, agora]);
-  const tarefasPendentes = useMemo(
-    () => (tarefasData ?? []).filter((item) => item.status !== "Concluida"),
-    [tarefasData]
-  );
-  const tarefasEmAtraso = useMemo(
-    () => (tarefasData ?? []).filter((item) => item.status === "Em atraso"),
-    [tarefasData]
-  );
-  const totalPendentes = lembretesPendentes.length;
-  const totalVencidos = lembretesVencidos.length;
+  const totalPendentes = lembretesResumoData?.totalPendentes ?? 0;
+  const totalVencidos = lembretesResumoData?.totalVencidos ?? 0;
   const lembreteAlertaVisivel = lembreteAlertaAtivo || totalVencidos > 0;
   const lembretePisca = totalVencidos > 0;
-  const totalTarefasPendentes = tarefasPendentes.length;
-  const totalTarefasEmAtraso = tarefasEmAtraso.length;
+  const totalTarefasPendentes = tarefasResumoData?.totalPendentes ?? 0;
+  const totalTarefasEmAtraso = tarefasResumoData?.totalEmAtraso ?? 0;
   const tarefaAlertaVisivel = totalTarefasPendentes > 0;
   const tarefaPisca = totalTarefasEmAtraso > 0;
   const possuiPermissao = useMemo(
@@ -584,19 +553,15 @@ export function AppShell() {
   }, []);
 
   useEffect(() => {
-    const intervalo = window.setInterval(() => {
-      setAgora(Date.now());
-    }, 30000);
+    if (!lembretesResumoCarregado) {
+      return;
+    }
 
-    return () => window.clearInterval(intervalo);
-  }, []);
-
-  useEffect(() => {
     if (totalPendentes === 0 && lembreteAlertaAtivo) {
       localStorage.removeItem("g3_lembrete_alerta");
       setLembreteAlertaAtivo(false);
     }
-  }, [totalPendentes, lembreteAlertaAtivo]);
+  }, [totalPendentes, lembreteAlertaAtivo, lembretesResumoCarregado]);
 
   useEffect(() => {
     if (!usuario?.id) {

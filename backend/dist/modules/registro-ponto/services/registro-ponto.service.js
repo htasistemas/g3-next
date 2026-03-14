@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import { prisma } from "../../../database/prisma.js";
 import { AppError } from "../../../shared/errors/app-error.js";
-import { registroPontoAjusteSchema, registroPontoFiltersSchema, registroPontoMarcarSchema, registroPontoOcorrenciaSchema } from "../registro-ponto.schema.js";
+import { registroPontoAjusteSchema, registroPontoFiltersSchema, registroPontoHorarioUsuarioSchema, registroPontoMarcarSchema, registroPontoOcorrenciaSchema } from "../registro-ponto.schema.js";
 import { RegistroPontoRepository } from "../repositories/registro-ponto.repository.js";
 export class RegistroPontoService {
     repository = new RegistroPontoRepository();
@@ -18,6 +18,19 @@ export class RegistroPontoService {
     async listarUsuarios(rawTermo) {
         const termo = typeof rawTermo === "string" ? rawTermo : undefined;
         return this.repository.listarUsuarios(termo);
+    }
+    async buscarHorarioUsuario(atorRaw) {
+        const ator = this.parseAtor(atorRaw);
+        return this.repository.buscarHorarioUsuario(ator);
+    }
+    async salvarHorarioUsuario(rawInput, atorRaw, origem) {
+        const input = registroPontoHorarioUsuarioSchema.parse(rawInput ?? {});
+        const ator = this.parseAtor(atorRaw);
+        return this.repository.salvarHorarioUsuario(input, ator, origem);
+    }
+    async buscarAlertaPendencia(atorRaw) {
+        const ator = this.parseAtor(atorRaw);
+        return this.repository.buscarAlertaPendencia(ator);
     }
     async marcarPonto(rawInput, atorRaw, origem) {
         const input = registroPontoMarcarSchema.parse(rawInput ?? {});

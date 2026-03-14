@@ -1,10 +1,21 @@
 import { httpClient } from "./http-client";
-import type { TarefaAdministrativa, TarefaAdministrativaPayload } from "@/types/tarefa-administrativa";
+import type {
+  TarefaAdministrativa,
+  TarefaAdministrativaPayload,
+  TarefaAdministrativaResumo
+} from "@/types/tarefa-administrativa";
 
 export const tarefasAdministrativasService = {
   async listar() {
     const { data } = await httpClient.get<TarefaAdministrativa[]>("/api/administrativo/tarefas");
     return data;
+  },
+
+  async obterResumo() {
+    const { data } = await httpClient.get<{ resumo: TarefaAdministrativaResumo }>(
+      "/api/administrativo/tarefas/resumo"
+    );
+    return data.resumo;
   },
 
   async buscarPorId(id: string) {

@@ -376,21 +376,13 @@ export class HtmlPdfRenderer {
                     const tituloSecao = toSafeText(secao.titulo);
                     const linhas = secao.conteudo
                         .split(/\r?\n/)
-                        .map((linha) => linha.trim())
-                        .filter(Boolean);
-                    if (!tituloSecao || !linhas.length)
+                        .map((linha) => linha.trim());
+                    if (!tituloSecao || !linhas.some(Boolean))
                         continue;
                     const alturaTitulo = 16;
-                    const alturaLinhas = linhas.reduce((acc, linha) => acc + doc.heightOfString(linha, { width: pageWidth() - 20 }), 0);
-                    const alturaSecao = alturaTitulo + alturaLinhas + 16;
-                    garantirEspaco(alturaSecao);
+                    garantirEspaco(alturaTitulo + 10);
                     const x = left();
                     const y = doc.y;
-                    doc
-                        .rect(x, y, pageWidth(), alturaSecao)
-                        .lineWidth(0.8)
-                        .strokeColor("#cbd5e1")
-                        .fillAndStroke("#ffffff", "#cbd5e1");
                     doc
                         .rect(x, y, pageWidth(), alturaTitulo)
                         .lineWidth(0.8)
@@ -400,15 +392,24 @@ export class HtmlPdfRenderer {
                         width: pageWidth() - 16,
                         align: "left"
                     });
-                    let yTexto = y + alturaTitulo + 6;
+                    doc.y = y + alturaTitulo + 6;
                     for (const linha of linhas) {
-                        doc.font(fonteRegular).fontSize(9.5).fillColor("#111827").text(linha, x + 8, yTexto, {
+                        if (!linha) {
+                            doc.moveDown(0.35);
+                            continue;
+                        }
+                        const alturaLinha = doc.heightOfString(linha, {
+                            width: pageWidth() - 16,
+                            align: "left"
+                        }) + 2;
+                        garantirEspaco(alturaLinha);
+                        doc.font(fonteRegular).fontSize(9.5).fillColor("#111827").text(linha, x + 8, doc.y, {
                             width: pageWidth() - 16,
                             align: "left"
                         });
-                        yTexto = doc.y + 1;
+                        doc.moveDown(0.15);
                     }
-                    doc.y = y + alturaSecao + 6;
+                    doc.moveDown(0.45);
                 }
             };
             doc.on("pageAdded", () => {

@@ -5,6 +5,10 @@ export class LembreteDiarioController {
         const lembretes = await service.listar(request.query.usuario_id);
         return response.json(lembretes);
     }
+    async obterResumo(request, response) {
+        const resumo = await service.obterResumo(request.authUser?.id);
+        return response.json({ resumo });
+    }
     async criar(request, response) {
         const lembrete = await service.criar(request.body);
         return response.status(201).json(lembrete);

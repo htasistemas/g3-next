@@ -1,5 +1,6 @@
 import { config } from "dotenv";
 import { z } from "zod";
+import { parseGoogleClientIds } from "./google-client-ids.js";
 config();
 const booleanFromEnv = z.preprocess((value) => {
     if (typeof value === "boolean")
@@ -23,6 +24,10 @@ const envSchema = z.object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
     API_PORT: z.coerce.number().int().positive().default(3333),
     API_HOST: z.string().min(1).default("0.0.0.0"),
+    APP_STORAGE_DRIVER: z.enum(["local"]).default("local"),
+    APP_STORAGE_ROOT: z.string().trim().min(1).default("storage"),
+    APP_GEOCODING_USER_AGENT: z.string().trim().min(1).default("G3-Next/1.0"),
+    APP_EMAIL_DESTINO_CHAMADOS: z.string().trim().min(1).default("htasistemas@gmail.com"),
     CORS_ORIGIN: z
         .string()
         .min(1)
@@ -33,6 +38,7 @@ const envSchema = z.object({
     APP_AUTH_COOKIE_NAME: z.string().trim().min(1).default("g3n_auth_token"),
     APP_AUTH_COOKIE_DOMAIN: optionalTrimmedStringFromEnv,
     APP_GOOGLE_CLIENT_ID: optionalTrimmedStringFromEnv,
+    GOOGLE_CLIENT_ID: optionalTrimmedStringFromEnv,
     APP_EMAIL_HABILITADO: booleanFromEnv.default(true),
     APP_EMAIL_REMETENTE: z.string().min(1).default("htasistemas@gmail.com"),
     APP_EMAIL_NOME: z.string().min(1).default("HTA Sistemas"),
@@ -45,7 +51,10 @@ const parsedEnv = envSchema.parse(process.env);
 const corsOrigins = parsedEnv.CORS_ORIGIN.split(",")
     .map((origin) => origin.trim())
     .filter((origin) => origin.length > 0);
+const googleClientIds = parseGoogleClientIds(parsedEnv.APP_GOOGLE_CLIENT_ID, parsedEnv.GOOGLE_CLIENT_ID);
 export const env = {
     ...parsedEnv,
+    APP_GOOGLE_CLIENT_ID: googleClientIds[0],
+    APP_GOOGLE_CLIENT_IDS: googleClientIds,
     CORS_ORIGINS: corsOrigins
 };

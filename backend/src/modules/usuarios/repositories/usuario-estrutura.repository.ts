@@ -38,15 +38,23 @@ const sqlEstruturaUsuarios: string[] = [
 ];
 
 let estruturaInicializada = false;
+let estruturaInicializando: Promise<void> | null = null;
 
 export async function ensureUsuariosGestaoEstrutura(
   db: DatabaseLike
 ) {
   if (estruturaInicializada) return;
-
-  for (const sql of sqlEstruturaUsuarios) {
-    await db.$executeRawUnsafe(sql);
+  if (!estruturaInicializando) {
+    estruturaInicializando = (async () => {
+      for (const sql of sqlEstruturaUsuarios) {
+        await db.$executeRawUnsafe(sql);
+      }
+      estruturaInicializada = true;
+    })().catch((error) => {
+      estruturaInicializando = null;
+      throw error;
+    });
   }
 
-  estruturaInicializada = true;
+  await estruturaInicializando;
 }

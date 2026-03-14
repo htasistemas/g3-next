@@ -5,20 +5,24 @@ export class MatriculaController {
         const matriculas = await service.listar(request.query);
         return response.json({ matriculas });
     }
+    async obterResumoCatalogo(_request, response) {
+        const resumo = await service.obterResumoCatalogo();
+        return response.json({ resumo });
+    }
     async buscarPorId(request, response) {
         const matricula = await service.buscarPorId(request.params.id);
         return response.json({ matricula });
     }
     async criar(request, response) {
-        const matricula = await service.criar(request.body);
+        const matricula = await service.criar(request.body, request.authUser?.id);
         return response.status(201).json({ matricula });
     }
     async atualizar(request, response) {
-        const matricula = await service.atualizar(request.params.id, request.body);
+        const matricula = await service.atualizar(request.params.id, request.body, request.authUser?.id);
         return response.json({ matricula });
     }
     async remover(request, response) {
-        await service.remover(request.params.id);
+        await service.remover(request.params.id, request.authUser?.id);
         return response.status(204).send();
     }
     async listarBeneficiarios(request, response) {

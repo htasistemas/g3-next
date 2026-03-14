@@ -26,11 +26,11 @@ export class OcorrenciasCriancaController {
         return response.json(anexos);
     }
     async adicionarAnexo(request, response) {
-        const anexo = await service.adicionarAnexo(request.params.id, request.body);
+        const anexo = await service.adicionarAnexo(request.params.id, request.body, request.authUser?.id);
         return response.status(201).json(anexo);
     }
     async removerAnexo(request, response) {
-        await service.removerAnexo(request.params.id, request.params.anexoId);
+        await service.removerAnexo(request.params.id, request.params.anexoId, request.authUser?.id);
         return response.status(204).send();
     }
     async pdfDenuncia(request, response) {

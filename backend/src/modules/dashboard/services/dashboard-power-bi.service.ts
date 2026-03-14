@@ -1,9 +1,11 @@
 import { AppError } from "../../../shared/errors/app-error.js";
+import { TtlCache } from "../../../shared/cache/ttl-cache.js";
 import { dashboardPowerBiFiltrosSchema } from "../power-bi.schema.js";
 import { DashboardPowerBiRepository } from "../repositories/dashboard-power-bi.repository.js";
 import type {
   DashboardPowerBiCard,
   DashboardPowerBiCardTrend,
+  DashboardPowerBiDetalheTabela,
   DashboardPowerBiFiltros,
   DashboardPowerBiResponse
 } from "../power-bi.types.js";
@@ -37,6 +39,8 @@ function diferencaDias(inicio: string, fim: string) {
 
 export class DashboardPowerBiService {
   private readonly repository = new DashboardPowerBiRepository();
+  private readonly cache = new TtlCache<DashboardPowerBiResponse>(120_000, 40);
+  private readonly detalhamentoCache = new TtlCache<DashboardPowerBiDetalheTabela>(120_000, 120);
 
   async obterPowerBi(
     rawFilters: unknown,
@@ -44,9 +48,7 @@ export class DashboardPowerBiService {
   ): Promise<DashboardPowerBiResponse> {
     const filtros = this.normalizarFiltros(rawFilters);
     const filtrosPeriodoAnterior = this.calcularPeriodoAnterior(filtros);
-    const mascararIdentificacao = !(usuario?.permissoes ?? []).some((permissao) =>
-      ["ADMINISTRADOR", "OPERADOR"].includes(permissao)
-    );
+    const mascararIdentificacao = this.deveMascararIdentificacao(usuario);
 
     console.info("[dashboard/power-bi] acesso", {
       usuarioId: usuario?.id ?? null,
@@ -56,6 +58,33 @@ export class DashboardPowerBiService {
       endDate: filtros.endDate
     });
 
+    const cacheKey = this.criarCacheKey(filtros, mascararIdentificacao);
+
+    return this.cache.getOrSet(
+      cacheKey,
+      async () => this.gerarPowerBi(filtros, filtrosPeriodoAnterior, mascararIdentificacao)
+    );
+  }
+
+  async obterDetalhamento(
+    detalhamentoId: string,
+    rawFilters: unknown,
+    usuario?: AuthUser
+  ): Promise<DashboardPowerBiDetalheTabela> {
+    const filtros = this.normalizarFiltros(rawFilters);
+    const mascararIdentificacao = this.deveMascararIdentificacao(usuario);
+    const cacheKey = this.criarCacheKey(filtros, mascararIdentificacao, detalhamentoId);
+
+    return this.detalhamentoCache.getOrSet(cacheKey, async () =>
+      this.repository.obterDetalhamento(detalhamentoId, filtros, mascararIdentificacao)
+    );
+  }
+
+  private async gerarPowerBi(
+    filtros: Required<DashboardPowerBiFiltros>,
+    filtrosPeriodoAnterior: Required<DashboardPowerBiFiltros>,
+    mascararIdentificacao: boolean
+  ): Promise<DashboardPowerBiResponse> {
     const [
       filtrosDisponiveis,
       totalFamilias,
@@ -79,8 +108,6 @@ export class DashboardPowerBiService {
       seriesCadastros,
       seriesAtendimentos,
       statusDistribuicao,
-      territorial,
-      rankingUnidades,
       familiasPorBairro,
       beneficiariosPorFaixaEtaria,
       beneficiariosPorGenero,
@@ -138,8 +165,6 @@ export class DashboardPowerBiService {
       this.repository.listarAtendimentosPorMes(filtros),
       this.repository.listarBeneficiariosPorStatus(filtros),
       this.repository.listarFamiliasPorBairro(filtros),
-      this.repository.listarAtendimentosPorUnidade(filtros),
-      this.repository.listarFamiliasPorBairro(filtros),
       this.repository.listarBeneficiariosPorFaixaEtaria(filtros),
       this.repository.listarBeneficiariosPorGenero(filtros),
       this.repository.listarBeneficiariosPorTerritorio(filtros),
@@ -164,7 +189,7 @@ export class DashboardPowerBiService {
       this.repository.listarConveniosPorVencimento(),
       this.repository.listarPendenciasCriticas(filtros),
       this.repository.calcularIndicadoresResumo(filtros),
-      this.repository.listarDetalhamentos(filtros, mascararIdentificacao),
+      Promise.resolve({} as Record<string, DashboardPowerBiDetalheTabela>),
       this.repository.contarFamilias(filtrosPeriodoAnterior),
       this.repository.contarBeneficiarios(filtrosPeriodoAnterior),
       this.repository.contarNovosCadastros(filtrosPeriodoAnterior),
@@ -173,6 +198,9 @@ export class DashboardPowerBiService {
       this.repository.contarBeneficios(filtrosPeriodoAnterior),
       this.repository.contarPendencias(filtrosPeriodoAnterior)
     ]);
+
+    const territorial = familiasPorBairro;
+    const rankingUnidades = porUnidade;
 
     const cardsGerenciais: DashboardPowerBiCard[] = [
       this.criarCard("familias", "Total de famílias cadastradas", totalFamilias, totalFamiliasAnterior, "Famílias acompanhadas no recorte atual.", "users-round", "familias"),
@@ -339,6 +367,37 @@ export class DashboardPowerBiService {
       },
       detalhamentos
     };
+  }
+
+  private deveMascararIdentificacao(usuario?: AuthUser) {
+    return !(usuario?.permissoes ?? []).some((permissao) =>
+      ["ADMINISTRADOR", "OPERADOR"].includes(permissao)
+    );
+  }
+
+  private criarCacheKey(
+    filtros: Required<DashboardPowerBiFiltros>,
+    mascararIdentificacao: boolean,
+    detalhamentoId?: string
+  ) {
+    return JSON.stringify({
+      mascararIdentificacao,
+      detalhamentoId: detalhamentoId ?? null,
+      filtros: {
+        ...filtros,
+        unidades: [...filtros.unidades].sort(),
+        municipios: [...filtros.municipios].sort(),
+        bairros: [...filtros.bairros].sort(),
+        programas: [...filtros.programas].sort(),
+        situacoesCadastro: [...filtros.situacoesCadastro].sort(),
+        faixasEtarias: [...filtros.faixasEtarias].sort(),
+        generos: [...filtros.generos].sort(),
+        responsaveisTecnicos: [...filtros.responsaveisTecnicos].sort(),
+        tiposAtendimento: [...filtros.tiposAtendimento].sort(),
+        origensEncaminhamento: [...filtros.origensEncaminhamento].sort(),
+        statusAcompanhamento: [...filtros.statusAcompanhamento].sort()
+      }
+    });
   }
 
   private normalizarFiltros(rawFilters: unknown): Required<DashboardPowerBiFiltros> {

@@ -10,6 +10,11 @@ export class MatriculaController {
     return response.json({ matriculas });
   }
 
+  async obterResumoCatalogo(_request: Request, response: Response) {
+    const resumo = await service.obterResumoCatalogo();
+    return response.json({ resumo });
+  }
+
   async buscarPorId(request: Request, response: Response) {
     const matricula = await service.buscarPorId(request.params.id);
     return response.json({ matricula });

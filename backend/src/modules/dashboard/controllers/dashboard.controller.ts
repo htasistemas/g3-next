@@ -19,6 +19,16 @@ export class DashboardController {
     return response.json(dashboard);
   }
 
+  async obterDetalhamentoPowerBi(request: AuthenticatedRequest, response: Response) {
+    const detalhamentoId = String(request.params.id ?? "");
+    const detalhamento = await powerBiService.obterDetalhamento(
+      detalhamentoId,
+      request.query,
+      request.authUser
+    );
+    return response.json(detalhamento);
+  }
+
   async obterVulnerabilidade(_request: AuthenticatedRequest, response: Response) {
     const dashboard = await vulnerabilidadeService.obterMapa();
     return response.json(dashboard);

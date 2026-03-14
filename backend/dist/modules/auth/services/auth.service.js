@@ -38,11 +38,11 @@ export class AuthService {
         };
     }
     async loginGoogle(rawInput) {
-        if (!env.APP_GOOGLE_CLIENT_ID) {
+        if (env.APP_GOOGLE_CLIENT_IDS.length === 0) {
             throw new AppError("Login com Google nao configurado no servidor.", 503);
         }
         const input = authGoogleSchema.parse(rawInput);
-        const ticket = await this.validarIdTokenGoogle(input.idToken, env.APP_GOOGLE_CLIENT_ID);
+        const ticket = await this.validarIdTokenGoogle(input.idToken, env.APP_GOOGLE_CLIENT_IDS);
         const payload = ticket.getPayload();
         if (!payload?.sub || !payload?.email) {
             throw new AppError("Token Google invalido.", 401);

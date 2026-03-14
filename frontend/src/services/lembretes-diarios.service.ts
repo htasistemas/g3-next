@@ -1,5 +1,9 @@
 import { httpClient } from "./http-client";
-import type { LembreteDiario, LembreteDiarioPayload } from "@/types/lembrete-diario";
+import type {
+  LembreteDiario,
+  LembreteDiarioPayload,
+  LembreteDiarioResumo
+} from "@/types/lembrete-diario";
 
 export const lembretesDiariosService = {
   async listar(usuarioId?: number) {
@@ -7,6 +11,11 @@ export const lembretesDiariosService = {
       params: usuarioId ? { usuario_id: usuarioId } : undefined
     });
     return data;
+  },
+
+  async obterResumo() {
+    const { data } = await httpClient.get<{ resumo: LembreteDiarioResumo }>("/api/lembretes-diarios/resumo");
+    return data.resumo;
   },
 
   async criar(payload: LembreteDiarioPayload) {

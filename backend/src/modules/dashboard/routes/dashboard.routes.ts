@@ -25,6 +25,13 @@ dashboardRoutes.get(
 );
 
 dashboardRoutes.get(
+  "/power-bi/detalhamentos/:id",
+  ensureAuthenticated,
+  ensurePermissions(["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"]),
+  asyncHandler(controller.obterDetalhamentoPowerBi.bind(controller))
+);
+
+dashboardRoutes.get(
   "/vulnerabilidade",
   ensureAuthenticated,
   ensurePermissions(["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"]),

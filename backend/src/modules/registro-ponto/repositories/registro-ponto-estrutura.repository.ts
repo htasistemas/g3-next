@@ -94,13 +94,21 @@ const sqlEstruturaRegistroPonto: string[] = [
 ];
 
 let estruturaInicializada = false;
+let estruturaInicializando: Promise<void> | null = null;
 
 export async function ensureRegistroPontoEstrutura(db: DatabaseLike) {
   if (estruturaInicializada) return;
-
-  for (const sql of sqlEstruturaRegistroPonto) {
-    await db.$executeRawUnsafe(sql);
+  if (!estruturaInicializando) {
+    estruturaInicializando = (async () => {
+      for (const sql of sqlEstruturaRegistroPonto) {
+        await db.$executeRawUnsafe(sql);
+      }
+      estruturaInicializada = true;
+    })().catch((error) => {
+      estruturaInicializando = null;
+      throw error;
+    });
   }
 
-  estruturaInicializada = true;
+  await estruturaInicializando;
 }

@@ -41,3 +41,8 @@ export type TarefaAdministrativaPayload = {
     ordem?: number;
   }>;
 };
+
+export type TarefaAdministrativaResumo = {
+  totalPendentes: number;
+  totalEmAtraso: number;
+};

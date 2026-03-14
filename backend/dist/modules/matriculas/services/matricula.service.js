@@ -3,6 +3,7 @@ import { mapaCamposTextoMatricula } from "../../../utils/text-format-config.js";
 import { normalizarObjetoTexto } from "../../../utils/text-formatter.js";
 import { toIsoDate, toStringId } from "../../../utils/string-utils.js";
 import { mapBeneficiarioCatalogoToResponse, mapCursoToResponse, mapProfissionalCatalogoToResponse, mapSalaCatalogoToResponse } from "../matricula.mapper.js";
+import { storageService } from "../../arquivos/services/storage-instance.js";
 import { matriculaFiltersSchema, matriculaInputSchema, matriculaPresencaDataCreateSchema, matriculaPresencaDataUpdateSchema, matriculaPresencaSalvarSchema } from "../matricula.schema.js";
 import { MatriculaRepository } from "../repositories/matricula.repository.js";
 export class MatriculaService {
@@ -21,27 +22,61 @@ export class MatriculaService {
         const registros = await this.repository.listar(filters);
         return registros.map((curso) => mapCursoToResponse(curso, [], []));
     }
+    async obterResumoCatalogo() {
+        return this.repository.obterResumoCatalogo();
+    }
     async buscarPorId(rawId) {
         const id = this.parseId(rawId);
         const registro = await this.repository.buscarPorIdOuFalhar(id);
         return mapCursoToResponse(registro.curso, registro.matriculas, registro.filaEspera);
     }
-    async criar(rawInput) {
+    async criar(rawInput, rawUsuarioId) {
         const inputNormalizado = this.normalizarPayload(rawInput);
         const input = matriculaInputSchema.parse(inputNormalizado);
-        const registro = await this.repository.criar(input);
-        return mapCursoToResponse(registro.curso, registro.matriculas, registro.filaEspera);
+        const usuarioId = this.parseUsuarioId(rawUsuarioId);
+        const imagem = await this.prepararImagem(input.imagem, input.nome, usuarioId);
+        try {
+            const registro = await this.repository.criar({ ...input, imagem: imagem.caminhoArquivo });
+            if (imagem.novoCaminho) {
+                await storageService.vincularEntidade(imagem.novoCaminho, registro.curso.id);
+            }
+            return mapCursoToResponse(registro.curso, registro.matriculas, registro.filaEspera);
+        }
+        catch (error) {
+            await storageService.rollbackArquivos([imagem.novoCaminho]);
+            throw error;
+        }
     }
-    async atualizar(rawId, rawInput) {
+    async atualizar(rawId, rawInput, rawUsuarioId) {
         const id = this.parseId(rawId);
         const inputNormalizado = this.normalizarPayload(rawInput);
         const input = matriculaInputSchema.parse(inputNormalizado);
-        const registro = await this.repository.atualizar(id, input);
-        return mapCursoToResponse(registro.curso, registro.matriculas, registro.filaEspera);
+        const usuarioId = this.parseUsuarioId(rawUsuarioId);
+        const existente = await this.repository.buscarPorIdOuFalhar(id);
+        const imagem = await this.prepararImagem(input.imagem, input.nome, usuarioId, id);
+        try {
+            const registro = await this.repository.atualizar(id, { ...input, imagem: imagem.caminhoArquivo });
+            if (imagem.novoCaminho) {
+                await storageService.vincularEntidade(imagem.novoCaminho, id);
+            }
+            if (this.isManagedStoragePath(existente.curso.imagem) && existente.curso.imagem !== registro.curso.imagem) {
+                await storageService.desativarPorCaminho(existente.curso.imagem, usuarioId);
+            }
+            return mapCursoToResponse(registro.curso, registro.matriculas, registro.filaEspera);
+        }
+        catch (error) {
+            await storageService.rollbackArquivos([imagem.novoCaminho]);
+            throw error;
+        }
     }
-    async remover(rawId) {
+    async remover(rawId, rawUsuarioId) {
         const id = this.parseId(rawId);
+        const usuarioId = this.parseUsuarioId(rawUsuarioId);
+        const existente = await this.repository.buscarPorIdOuFalhar(id);
         await this.repository.remover(id);
+        if (this.isManagedStoragePath(existente.curso.imagem)) {
+            await storageService.desativarPorCaminho(existente.curso.imagem, usuarioId);
+        }
     }
     async listarBeneficiarios(rawTermo) {
         const termo = typeof rawTermo === "string" ? rawTermo : undefined;
@@ -167,5 +202,35 @@ export class MatriculaService {
             return rawInput;
         }
         return normalizarObjetoTexto(rawInput, mapaCamposTextoMatricula);
+    }
+    async prepararImagem(valor, nome, usuarioId, entidadeId) {
+        const arquivo = await storageService.persistirCampo({
+            scope: "curso_imagem",
+            valor,
+            nomeOriginal: `${nome?.replace(/\s+/g, "-").toLowerCase() || "curso"}-imagem.jpg`,
+            mimeType: "image/jpeg",
+            entidadeId,
+            usuarioUploadId: usuarioId,
+            observacao: "Imagem principal do curso"
+        });
+        return {
+            caminhoArquivo: arquivo.caminhoArquivo,
+            novoCaminho: arquivo.registro ? arquivo.caminhoArquivo : undefined
+        };
+    }
+    isManagedStoragePath(valor) {
+        if (!valor?.trim())
+            return false;
+        const normalized = valor.trim();
+        return !normalized.startsWith("data:") && !/^https?:\/\//i.test(normalized);
+    }
+    parseUsuarioId(rawUsuarioId) {
+        if (!rawUsuarioId)
+            return undefined;
+        const parsed = Number(rawUsuarioId);
+        if (!Number.isInteger(parsed) || parsed <= 0) {
+            return undefined;
+        }
+        return BigInt(parsed);
     }
 }

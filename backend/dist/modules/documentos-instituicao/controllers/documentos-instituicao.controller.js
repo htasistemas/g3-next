@@ -22,7 +22,7 @@ export class DocumentosInstituicaoController {
         return response.json(anexos);
     }
     async adicionarAnexo(request, response) {
-        const anexo = await service.adicionarAnexo(request.params.id, request.body);
+        const anexo = await service.adicionarAnexo(request.params.id, request.body, request.authUser?.id);
         return response.status(201).json(anexo);
     }
     async obterArquivoAnexo(request, response) {

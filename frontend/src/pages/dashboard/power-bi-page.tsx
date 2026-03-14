@@ -34,7 +34,10 @@ import { PowerBiActiveFilters } from "@/components/dashboard/power-bi/power-bi-a
 import { PowerBiChartPanel } from "@/components/dashboard/power-bi/power-bi-chart-panel";
 import { PowerBiDetailModal } from "@/components/dashboard/power-bi/power-bi-detail-modal";
 import { PowerBiKpiCard } from "@/components/dashboard/power-bi/power-bi-kpi-card";
-import { useDashboardPowerBi } from "@/features/dashboard/use-dashboard";
+import {
+  useDashboardPowerBi,
+  useDashboardPowerBiDetalhamento
+} from "@/features/dashboard/use-dashboard";
 import { useAuth } from "@/hooks/use-auth";
 import { imprimirConteudoAtual } from "@/lib/report-utils";
 import { classesTelaPadraoBeneficiario } from "@/lib/tela-padrao-beneficiario";
@@ -209,12 +212,18 @@ export function PowerBiPage() {
   const [filtrosForm, setFiltrosForm] = useState<PowerBiFiltros>({ periodPreset: "ultimos30dias" });
   const [filtrosAplicados, setFiltrosAplicados] = useState<PowerBiFiltros>({ periodPreset: "ultimos30dias" });
   const [mostrarFiltros, setMostrarFiltros] = useState(true);
-  const [detalheAberto, setDetalheAberto] = useState<PowerBiDetalheTabela | null>(null);
+  const [detalheAbertoId, setDetalheAbertoId] = useState<string | null>(null);
 
   const { data, isLoading, isFetching, isError, error, refetch } = useDashboardPowerBi(filtrosAplicados, {
     autoRefresh: true,
     refreshIntervalMs: 180_000
   });
+  const {
+    data: detalheAberto,
+    isLoading: isLoadingDetalhe,
+    isFetching: isFetchingDetalhe,
+    isError: isErrorDetalhe
+  } = useDashboardPowerBiDetalhamento(detalheAbertoId, filtrosAplicados);
 
   const filtrosAtivos = useMemo(() => {
     if (!data) return [];
@@ -277,8 +286,8 @@ export function PowerBiPage() {
   }
 
   function abrirDetalhamentoPorId(id?: string) {
-    if (!id || !data?.detalhamentos[id]) return;
-    setDetalheAberto(data.detalhamentos[id]);
+    if (!id) return;
+    setDetalheAbertoId(id);
   }
 
   async function alternarTelaCheia() {
@@ -553,7 +562,14 @@ export function PowerBiPage() {
         )}
       </main>
 
-      <PowerBiDetailModal aberto={!!detalheAberto} tabela={detalheAberto} onClose={() => setDetalheAberto(null)} onExportCsv={exportarCsvTabela} />
+      <PowerBiDetailModal
+        aberto={!!detalheAbertoId}
+        tabela={detalheAberto}
+        carregando={isLoadingDetalhe || isFetchingDetalhe}
+        erro={isErrorDetalhe ? "Não foi possível carregar o detalhamento agora." : undefined}
+        onClose={() => setDetalheAbertoId(null)}
+        onExportCsv={exportarCsvTabela}
+      />
     </>
   );
 }

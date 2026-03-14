@@ -5,7 +5,28 @@ import type {
   DashboardVulnerabilidadeGeocodingResponse,
   DashboardVulnerabilidadeResponse
 } from "@/types/dashboard";
-import type { PowerBiFiltros, PowerBiResponse } from "@/types/power-bi";
+import type { PowerBiDetalheTabela, PowerBiFiltros, PowerBiResponse } from "@/types/power-bi";
+
+function montarPowerBiParams(filtros: PowerBiFiltros = {}) {
+  return {
+    periodPreset: filtros.periodPreset,
+    startDate: filtros.startDate,
+    endDate: filtros.endDate,
+    unidades: filtros.unidades,
+    municipios: filtros.municipios,
+    bairros: filtros.bairros,
+    programas: filtros.programas,
+    situacoesCadastro: filtros.situacoesCadastro,
+    faixasEtarias: filtros.faixasEtarias,
+    generos: filtros.generos,
+    responsaveisTecnicos: filtros.responsaveisTecnicos,
+    tiposAtendimento: filtros.tiposAtendimento,
+    origensEncaminhamento: filtros.origensEncaminhamento,
+    statusAcompanhamento: filtros.statusAcompanhamento,
+    familiaBeneficiario: filtros.familiaBeneficiario,
+    tecnicoUsuario: filtros.tecnicoUsuario
+  };
+}
 
 export const dashboardService = {
   async obterAssistencia(filtros: DashboardFiltros = {}): Promise<DashboardAssistenciaResponse> {
@@ -21,25 +42,22 @@ export const dashboardService = {
 
   async obterPowerBi(filtros: PowerBiFiltros = {}): Promise<PowerBiResponse> {
     const { data } = await httpClient.get<PowerBiResponse>("/api/dashboard/power-bi", {
-      params: {
-        periodPreset: filtros.periodPreset,
-        startDate: filtros.startDate,
-        endDate: filtros.endDate,
-        unidades: filtros.unidades,
-        municipios: filtros.municipios,
-        bairros: filtros.bairros,
-        programas: filtros.programas,
-        situacoesCadastro: filtros.situacoesCadastro,
-        faixasEtarias: filtros.faixasEtarias,
-        generos: filtros.generos,
-        responsaveisTecnicos: filtros.responsaveisTecnicos,
-        tiposAtendimento: filtros.tiposAtendimento,
-        origensEncaminhamento: filtros.origensEncaminhamento,
-        statusAcompanhamento: filtros.statusAcompanhamento,
-        familiaBeneficiario: filtros.familiaBeneficiario,
-        tecnicoUsuario: filtros.tecnicoUsuario
-      }
+      params: montarPowerBiParams(filtros)
     });
+
+    return data;
+  },
+
+  async obterPowerBiDetalhamento(
+    detalhamentoId: string,
+    filtros: PowerBiFiltros = {}
+  ): Promise<PowerBiDetalheTabela> {
+    const { data } = await httpClient.get<PowerBiDetalheTabela>(
+      `/api/dashboard/power-bi/detalhamentos/${encodeURIComponent(detalhamentoId)}`,
+      {
+        params: montarPowerBiParams(filtros)
+      }
+    );
 
     return data;
   },

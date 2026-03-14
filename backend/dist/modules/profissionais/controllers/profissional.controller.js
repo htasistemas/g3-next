@@ -10,15 +10,15 @@ export class ProfissionalController {
         return response.json({ profissional });
     }
     async criar(request, response) {
-        const profissional = await service.criar(request.body);
+        const profissional = await service.criar(request.body, request.authUser?.id);
         return response.status(201).json({ profissional });
     }
     async atualizar(request, response) {
-        const profissional = await service.atualizar(request.params.id, request.body);
+        const profissional = await service.atualizar(request.params.id, request.body, request.authUser?.id);
         return response.json({ profissional });
     }
     async remover(request, response) {
-        await service.remover(request.params.id);
+        await service.remover(request.params.id, request.authUser?.id);
         return response.status(204).send();
     }
 }

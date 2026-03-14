@@ -14,19 +14,19 @@ export class FotosEventosController {
         return response.json({ arquivo });
     }
     async criar(request, response) {
-        const evento = await service.criar(request.body);
+        const evento = await service.criar(request.body, request.authUser?.id);
         return response.status(201).json(evento);
     }
     async atualizar(request, response) {
-        const evento = await service.atualizar(request.params.id, request.body);
+        const evento = await service.atualizar(request.params.id, request.body, request.authUser?.id);
         return response.json(evento);
     }
     async remover(request, response) {
-        await service.remover(request.params.id);
+        await service.remover(request.params.id, request.authUser?.id);
         return response.status(204).send();
     }
     async adicionarFoto(request, response) {
-        const foto = await service.adicionarFoto(request.params.id, request.body);
+        const foto = await service.adicionarFoto(request.params.id, request.body, request.authUser?.id);
         return response.status(201).json(foto);
     }
     async atualizarFoto(request, response) {
@@ -34,7 +34,7 @@ export class FotosEventosController {
         return response.json(foto);
     }
     async removerFoto(request, response) {
-        await service.removerFoto(request.params.id, request.params.fotoId);
+        await service.removerFoto(request.params.id, request.params.fotoId, request.authUser?.id);
         return response.status(204).send();
     }
     async obterArquivoFoto(request, response) {
