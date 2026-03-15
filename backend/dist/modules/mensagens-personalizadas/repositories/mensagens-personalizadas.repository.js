@@ -84,7 +84,7 @@ const estruturaSql = [
   `,
     "CREATE INDEX IF NOT EXISTS mensagens_personalizadas_auditoria_data_idx ON mensagens_personalizadas_auditoria(criado_em DESC)"
 ];
-let estruturaGarantida = false;
+let estruturaPromise = null;
 function toJsonText(value) {
     return JSON.stringify(value ?? []);
 }
@@ -105,12 +105,7 @@ function actorName(actor) {
 }
 export class MensagensPersonalizadasRepository {
     async garantirEstrutura() {
-        if (estruturaGarantida)
-            return;
-        for (const comando of estruturaSql) {
-            await prisma.$executeRawUnsafe(comando);
-        }
-        estruturaGarantida = true;
+        await ensureMensagensPersonalizadasEstrutura();
     }
     async listarTaxonomias() {
         await this.garantirEstrutura();
@@ -889,4 +884,14 @@ export class MensagensPersonalizadasRepository {
         }
         return row;
     }
+}
+export async function ensureMensagensPersonalizadasEstrutura() {
+    if (!estruturaPromise) {
+        estruturaPromise = (async () => {
+            for (const comando of estruturaSql) {
+                await prisma.$executeRawUnsafe(comando);
+            }
+        })();
+    }
+    await estruturaPromise;
 }

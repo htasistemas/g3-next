@@ -2,7 +2,7 @@ import { env } from "../../../config/env.js";
 import { AppError } from "../../../shared/errors/app-error.js";
 import { EmailService } from "../../email/services/email.service.js";
 import { mensagemDestinatarioBuscaSchema, mensagemEnvioInputSchema, mensagemHistoricoFiltrosSchema, mensagemModeloFiltrosSchema, mensagemModeloInputSchema, mensagemPreviewInputSchema, mensagemTaxonomiaInputSchema } from "../mensagens-personalizadas.schema.js";
-import { MensagensPersonalizadasRepository } from "../repositories/mensagens-personalizadas.repository.js";
+import { MensagensPersonalizadasRepository, ensureMensagensPersonalizadasEstrutura } from "../repositories/mensagens-personalizadas.repository.js";
 const placeholdersDisponiveis = [
     { chave: "nome", rotulo: "Nome", descricao: "Primeiro nome do destinatário.", exemplo: "Maria" },
     {
@@ -218,10 +218,10 @@ function serializarSeguro(value) {
         return JSON.stringify(null);
     }
 }
+let basePromise = null;
 export class MensagensPersonalizadasService {
     repository = new MensagensPersonalizadasRepository();
     emailService = new EmailService();
-    baseGarantida = false;
     async obterSuporte() {
         await this.garantirBase();
         return {
@@ -628,21 +628,7 @@ export class MensagensPersonalizadasService {
         };
     }
     async garantirBase() {
-        if (this.baseGarantida)
-            return;
-        await this.repository.garantirEstrutura();
-        for (const taxonomia of taxonomiasBase) {
-            await this.repository.upsertTaxonomiaSeed(taxonomia);
-        }
-        const taxonomias = await this.repository.listarTaxonomias();
-        const resolverId = (tipo, nome) => {
-            const item = taxonomias.find((taxonomia) => taxonomia.tipo === tipo && taxonomia.nome === nome);
-            return item?.id.toString() ?? null;
-        };
-        for (const modelo of modelosBase(resolverId)) {
-            await this.repository.inserirModeloSeedSeAusente(modelo);
-        }
-        this.baseGarantida = true;
+        await ensureMensagensPersonalizadasBase();
     }
     async resolverModeloPreview(modeloId, input) {
         if (!modeloId) {
@@ -710,6 +696,26 @@ export class MensagensPersonalizadasService {
         }
         return BigInt(parsed);
     }
+}
+export async function ensureMensagensPersonalizadasBase() {
+    await ensureMensagensPersonalizadasEstrutura();
+    if (!basePromise) {
+        basePromise = (async () => {
+            const repository = new MensagensPersonalizadasRepository();
+            for (const taxonomia of taxonomiasBase) {
+                await repository.upsertTaxonomiaSeed(taxonomia);
+            }
+            const taxonomias = await repository.listarTaxonomias();
+            const resolverId = (tipo, nome) => {
+                const item = taxonomias.find((taxonomia) => taxonomia.tipo === tipo && taxonomia.nome === nome);
+                return item?.id.toString() ?? null;
+            };
+            for (const modelo of modelosBase(resolverId)) {
+                await repository.inserirModeloSeedSeAusente(modelo);
+            }
+        })();
+    }
+    await basePromise;
 }
 const modelosBaseParte1 = (taxonomiaId) => [
     {

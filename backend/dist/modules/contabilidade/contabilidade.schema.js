@@ -95,6 +95,7 @@ export const movimentacaoFinanceiraInputSchema = z.object({
     contraparte: optionalTrimmedString.nullable().optional(),
     categoria: optionalTrimmedString.nullable().optional(),
     contaBancariaId: z.coerce.number().int().positive().optional().nullable(),
+    centroCustoId: z.coerce.number().int().positive().optional().nullable(),
     dataMovimentacao: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/),
     valor: decimal.refine((value) => value > 0, "Informe um valor maior que zero."),
     origem: optionalTrimmedString.nullable().optional(),

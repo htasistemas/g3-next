@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -83,6 +83,8 @@ import {
   useTransferenciasContabeis,
   useUploadArquivoLancamentoContabil
 } from '@/features/contabilidade/use-contabilidade';
+import { usePlanosTrabalho } from '@/features/planos-trabalho/use-planos-trabalho';
+import { useUnidadeAssistencialAtual } from '@/features/unidades-assistenciais/use-unidades-assistenciais';
 import type {
   CategoriaFinanceira,
   CategoriaFinanceiraPayload,
@@ -153,6 +155,38 @@ const abas: AdminTab[] = [
 ];
 
 const coresGraficos = ['#0f766e', '#2563eb', '#f59e0b', '#dc2626', '#9333ea', '#0ea5e9'];
+const bancosPrincipais = [
+  'Banco do Brasil',
+  'Caixa Econômica Federal',
+  'Bradesco',
+  'Itaú',
+  'Santander',
+  'Sicredi',
+  'Sicoob',
+  'Nubank',
+  'Inter',
+  'Safra',
+  'C6 Bank',
+  'BTG Pactual',
+  'Banrisul',
+  'Mercado Pago',
+  'PagBank'
+];
+const tiposChavePixDisponiveis = ['CPF', 'CNPJ', 'E-mail', 'Telefone', 'Chave aleatória'];
+const statusFluxoDisponiveis = [
+  'PREVISTO',
+  'PENDENTE',
+  'PAGO',
+  'RECEBIDO',
+  'VENCIDO',
+  'ATRASADO',
+  'CANCELADO',
+  'CONCILIADO',
+  'ESTORNADO',
+  'AGUARDANDO_PAGAMENTO',
+  'AGUARDANDO_RECEBIMENTO',
+  'RENEGOCIADO'
+];
 const formatarDataInput = (data: Date) => data.toISOString().slice(0, 10);
 const hoje = formatarDataInput(new Date());
 const periodoInicialPadrao = (() => {
@@ -305,6 +339,15 @@ const emendaVazia: EmendaImpositivaPayload = {
 
 function formatarMoeda(valor: number) {
   return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function formatarMoedaInput(valor: number | null | undefined) {
+  return formatarMoeda(Number(valor ?? 0));
+}
+
+function parseMoedaInput(valor: string) {
+  const apenasDigitos = valor.replace(/\D/g, '');
+  return Number(apenasDigitos || '0') / 100;
 }
 
 function formatarData(valor?: string) {
@@ -643,6 +686,8 @@ export function ContabilidadePage() {
   const [arquivoObservacao, setArquivoObservacao] = useState('');
 
   const contasQuery = useContasBancarias();
+  const planosTrabalhoQuery = usePlanosTrabalho();
+  const unidadeAtualQuery = useUnidadeAssistencialAtual();
   const categoriasQuery = useCategoriasFinanceiras();
   const centrosQuery = useCentrosCustoContabeis();
   const lancamentosQuery = useLancamentosContabeis();
@@ -688,8 +733,43 @@ export function ContabilidadePage() {
   const historico = historicoQuery.data ?? [];
   const emendas = emendasQuery.data ?? [];
   const arquivos = arquivosQuery.data ?? [];
+  const planosTrabalho = planosTrabalhoQuery.data ?? [];
+  const titularContaPadrao = unidadeAtualQuery.data?.unidade?.nome_fantasia?.trim() ?? '';
+
+  const bancosDisponiveis = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          [...bancosPrincipais, ...contas.map((item) => item.banco?.trim() ?? ''), contaForm.banco?.trim() ?? '']
+            .map((item) => item.trim())
+            .filter(Boolean)
+        )
+      ).sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    [contas, contaForm.banco]
+  );
+
+  const projetosVinculadosDisponiveis = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          [
+            ...planosTrabalho.map((item) => item.titulo?.trim() ?? ''),
+            ...contas.map((item) => item.projetoVinculado?.trim() ?? ''),
+            contaForm.projetoVinculado?.trim() ?? ''
+          ].filter(Boolean)
+        )
+      ).sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    [planosTrabalho, contas, contaForm.projetoVinculado]
+  );
 
   const termoBusca = normalizarBusca(filtroBusca);
+
+  useEffect(() => {
+    if (!titularContaPadrao) return;
+    setContaForm((atual) =>
+      atual.titular === titularContaPadrao ? atual : { ...atual, titular: titularContaPadrao }
+    );
+  }, [titularContaPadrao]);
 
   const lancamentosFiltrados = useMemo(
     () =>
@@ -929,7 +1009,17 @@ export function ContabilidadePage() {
           setPopup({ tipo: 'aviso', titulo: 'Validação', texto: 'Informe banco, número e nome da conta.' });
           return;
         }
-        const resposta = await salvarContaMutation.mutateAsync({ id: contaSelecionadaId, payload: contaForm });
+        if (!titularContaPadrao && !contaForm.titular?.trim()) {
+          setPopup({ tipo: 'aviso', titulo: 'Validação', texto: 'Defina a unidade assistencial ativa para preencher o titular da conta.' });
+          return;
+        }
+        const resposta = await salvarContaMutation.mutateAsync({
+          id: contaSelecionadaId,
+          payload: {
+            ...contaForm,
+            titular: titularContaPadrao || contaForm.titular || ''
+          }
+        });
         setContaSelecionadaId(resposta.id);
         setContaForm(toContaForm(resposta));
         setPopup({ tipo: 'sucesso', titulo: 'Conta salva', texto: 'A conta bancária foi salva com sucesso.' });
@@ -1097,7 +1187,7 @@ export function ContabilidadePage() {
           <div className="space-y-1"><Label>Conta</Label><Select value={filtroContaId ? String(filtroContaId) : ''} onChange={(event) => setFiltroContaId(Number(event.target.value) || undefined)}><option value="">Todas</option>{contas.map((conta) => <option key={conta.id} value={conta.id}>{conta.nomeConta}</option>)}</Select></div>
           <div className="space-y-1"><Label>Categoria</Label><Select value={filtroCategoriaId ? String(filtroCategoriaId) : ''} onChange={(event) => setFiltroCategoriaId(Number(event.target.value) || undefined)}><option value="">Todas</option>{categorias.map((categoria) => <option key={categoria.id} value={categoria.id}>{categoria.nome}</option>)}</Select></div>
           <div className="space-y-1"><Label>Centro de custo</Label><Select value={filtroCentroId ? String(filtroCentroId) : ''} onChange={(event) => setFiltroCentroId(Number(event.target.value) || undefined)}><option value="">Todos</option>{centrosCusto.map((centro) => <option key={centro.id} value={centro.id}>{centro.nome}</option>)}</Select></div>
-          <div className="space-y-1"><Label>Status</Label><Input value={filtroStatus} onChange={(event) => setFiltroStatus(event.target.value.toUpperCase())} placeholder="Ex.: PENDENTE" /></div>
+          <div className="space-y-1"><Label>Status</Label><Select value={filtroStatus} onChange={(event) => setFiltroStatus(event.target.value)}><option value="">Todos</option>{statusFluxoDisponiveis.map((status) => <option key={status} value={status}>{formatarStatus(status)}</option>)}</Select></div>
           <div className="space-y-1 xl:col-span-2"><Label>Origem</Label><Input value={filtroOrigem} onChange={(event) => setFiltroOrigem(event.target.value.toUpperCase())} placeholder="Ex.: COMPRA" /></div>
           <div className="space-y-1 xl:col-span-4"><Label>Busca rápida</Label><Input value={filtroBusca} onChange={(event) => setFiltroBusca(event.target.value)} placeholder="Descrição, conta, fornecedor, documento ou observação" /></div>
         </div>
@@ -1281,13 +1371,14 @@ export function ContabilidadePage() {
         {renderFiltros()}
         <Bloco titulo="Ajuste manual de fluxo" descricao="Registre entradas, saídas e ajustes que ainda não nasceram de um lançamento.">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <div className="space-y-1"><Label>Tipo</Label><Input value={movimentacaoForm.tipo} onChange={(event) => setMovimentacaoForm((atual) => ({ ...atual, tipo: event.target.value }))} /></div>
+            <div className="space-y-1"><Label>Tipo</Label><Select value={movimentacaoForm.tipo} onChange={(event) => setMovimentacaoForm((atual) => ({ ...atual, tipo: event.target.value }))}><option value="ENTRADA">Entrada</option><option value="SAIDA">Saída</option></Select></div>
             <div className="space-y-1"><Label>Conta</Label><Select value={movimentacaoForm.contaBancariaId ? String(movimentacaoForm.contaBancariaId) : ''} onChange={(event) => setMovimentacaoForm((atual) => ({ ...atual, contaBancariaId: Number(event.target.value) || undefined }))}><option value="">Selecione</option>{contas.map((conta) => <option key={conta.id} value={conta.id}>{conta.nomeConta}</option>)}</Select></div>
             <div className="space-y-1"><Label>Data</Label><Input type="date" value={movimentacaoForm.dataMovimentacao} onChange={(event) => setMovimentacaoForm((atual) => ({ ...atual, dataMovimentacao: event.target.value }))} /></div>
             <div className="space-y-1"><Label>Valor</Label><Input type="number" min={0} step="0.01" value={movimentacaoForm.valor} onChange={(event) => setMovimentacaoForm((atual) => ({ ...atual, valor: Number(event.target.value) || 0 }))} /></div>
             <div className="space-y-1 xl:col-span-2"><Label>Descrição</Label><Input value={movimentacaoForm.descricao} onChange={(event) => setMovimentacaoForm((atual) => ({ ...atual, descricao: event.target.value }))} /></div>
             <div className="space-y-1"><Label>Contraparte</Label><Input value={movimentacaoForm.contraparte ?? ''} onChange={(event) => setMovimentacaoForm((atual) => ({ ...atual, contraparte: event.target.value }))} /></div>
             <div className="space-y-1"><Label>Categoria textual</Label><Input value={movimentacaoForm.categoria ?? ''} onChange={(event) => setMovimentacaoForm((atual) => ({ ...atual, categoria: event.target.value }))} /></div>
+            <div className="space-y-1"><Label>Centro de custo</Label><Select value={movimentacaoForm.centroCustoId ? String(movimentacaoForm.centroCustoId) : ''} onChange={(event) => setMovimentacaoForm((atual) => ({ ...atual, centroCustoId: Number(event.target.value) || undefined }))}><option value="">Selecione</option>{centrosCusto.map((centro) => <option key={centro.id} value={centro.id}>{centro.nome}</option>)}</Select></div>
           </div>
         </Bloco>
 
@@ -1480,21 +1571,21 @@ export function ContabilidadePage() {
             As contas e movimentações bancárias já existentes no legado são carregadas automaticamente das tabelas financeiras do banco.
           </div>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <div className="space-y-1"><Label>Banco</Label><Input value={contaForm.banco} onChange={(event) => setContaForm((atual) => ({ ...atual, banco: event.target.value }))} /></div>
+            <div className="space-y-1"><Label>Banco</Label><Select value={contaForm.banco} onChange={(event) => setContaForm((atual) => ({ ...atual, banco: event.target.value }))}><option value="">Selecione</option>{bancosDisponiveis.map((banco) => <option key={banco} value={banco}>{banco}</option>)}</Select></div>
             <div className="space-y-1"><Label>Agência</Label><Input value={contaForm.agencia ?? ''} onChange={(event) => setContaForm((atual) => ({ ...atual, agencia: event.target.value }))} /></div>
             <div className="space-y-1"><Label>Número</Label><Input value={contaForm.numero} onChange={(event) => setContaForm((atual) => ({ ...atual, numero: event.target.value }))} /></div>
             <div className="space-y-1"><Label>Dígito</Label><Input value={contaForm.digito ?? ''} onChange={(event) => setContaForm((atual) => ({ ...atual, digito: event.target.value }))} /></div>
             <div className="space-y-1"><Label>Nome da conta</Label><Input value={contaForm.nomeConta} onChange={(event) => setContaForm((atual) => ({ ...atual, nomeConta: event.target.value }))} /></div>
             <div className="space-y-1"><Label>Tipo</Label><Select value={contaForm.tipo} onChange={(event) => setContaForm((atual) => ({ ...atual, tipo: event.target.value as ContaBancaria['tipo'] }))}><option value="CONTA_CORRENTE">Conta corrente</option><option value="POUPANCA">Poupança</option><option value="APLICACAO">Aplicação</option><option value="CAIXA_INTERNO">Caixa interno</option></Select></div>
-            <div className="space-y-1"><Label>Titular</Label><Input value={contaForm.titular ?? ''} onChange={(event) => setContaForm((atual) => ({ ...atual, titular: event.target.value }))} /></div>
+            <div className="space-y-1"><Label>Titular</Label><Input value={titularContaPadrao || contaForm.titular || ''} readOnly /></div>
             <div className="space-y-1"><Label>Status</Label><Select value={contaForm.status ?? 'ATIVA'} onChange={(event) => setContaForm((atual) => ({ ...atual, status: event.target.value as ContaBancaria['status'] }))}><option value="ATIVA">Ativa</option><option value="INATIVA">Inativa</option></Select></div>
-            <div className="space-y-1"><Label>Projeto vinculado</Label><Input value={contaForm.projetoVinculado ?? ''} onChange={(event) => setContaForm((atual) => ({ ...atual, projetoVinculado: event.target.value }))} /></div>
-            <div className="space-y-1"><Label>Pix</Label><Select value={contaForm.pixVinculado ? 'SIM' : 'NAO'} onChange={(event) => setContaForm((atual) => ({ ...atual, pixVinculado: event.target.value === 'SIM' }))}><option value="SIM">Habilitado</option><option value="NAO">Não habilitado</option></Select></div>
-            <div className="space-y-1"><Label>Tipo da chave Pix</Label><Input value={contaForm.tipoChavePix ?? ''} onChange={(event) => setContaForm((atual) => ({ ...atual, tipoChavePix: event.target.value }))} /></div>
-            <div className="space-y-1"><Label>Chave Pix</Label><Input value={contaForm.chavePix ?? ''} onChange={(event) => setContaForm((atual) => ({ ...atual, chavePix: event.target.value }))} /></div>
-            <div className="space-y-1"><Label>Saldo inicial</Label><Input type="number" min={0} step="0.01" value={contaForm.saldoInicial} onChange={(event) => setContaForm((atual) => ({ ...atual, saldoInicial: Number(event.target.value) || 0 }))} /></div>
+            <div className="space-y-1"><Label>Projeto vinculado</Label><Select value={contaForm.projetoVinculado ?? ''} onChange={(event) => setContaForm((atual) => ({ ...atual, projetoVinculado: event.target.value }))}><option value="">Selecione</option>{projetosVinculadosDisponiveis.map((projeto) => <option key={projeto} value={projeto}>{projeto}</option>)}</Select></div>
+            <div className="space-y-1"><Label>Pix</Label><Select value={contaForm.pixVinculado ? 'SIM' : 'NAO'} onChange={(event) => setContaForm((atual) => ({ ...atual, pixVinculado: event.target.value === 'SIM', tipoChavePix: event.target.value === 'SIM' ? atual.tipoChavePix : '', chavePix: event.target.value === 'SIM' ? atual.chavePix : '' }))}><option value="SIM">Habilitado</option><option value="NAO">Não habilitado</option></Select></div>
+            <div className="space-y-1"><Label>Tipo da chave Pix</Label><Select value={contaForm.tipoChavePix ?? ''} onChange={(event) => setContaForm((atual) => ({ ...atual, tipoChavePix: event.target.value }))} disabled={!contaForm.pixVinculado}><option value="">Selecione</option>{tiposChavePixDisponiveis.map((tipo) => <option key={tipo} value={tipo}>{tipo}</option>)}</Select></div>
+            <div className="space-y-1"><Label>Chave Pix</Label><Input value={contaForm.chavePix ?? ''} onChange={(event) => setContaForm((atual) => ({ ...atual, chavePix: event.target.value }))} disabled={!contaForm.pixVinculado} /></div>
+            <div className="space-y-1"><Label>Saldo inicial</Label><Input inputMode="decimal" value={formatarMoedaInput(contaForm.saldoInicial)} onChange={(event) => setContaForm((atual) => ({ ...atual, saldoInicial: parseMoedaInput(event.target.value) }))} /></div>
             <div className="space-y-1"><Label>Data do saldo inicial</Label><Input type="date" value={contaForm.dataSaldoInicial} onChange={(event) => setContaForm((atual) => ({ ...atual, dataSaldoInicial: event.target.value }))} /></div>
-            <div className="space-y-1"><Label>Alerta de saldo mínimo</Label><Input type="number" min={0} step="0.01" value={contaForm.limiteMinimoAlerta ?? 0} onChange={(event) => setContaForm((atual) => ({ ...atual, limiteMinimoAlerta: Number(event.target.value) || 0 }))} /></div>
+            <div className="space-y-1"><Label>Alerta de saldo mínimo</Label><Input inputMode="decimal" value={formatarMoedaInput(contaForm.limiteMinimoAlerta ?? 0)} onChange={(event) => setContaForm((atual) => ({ ...atual, limiteMinimoAlerta: parseMoedaInput(event.target.value) }))} /></div>
             <div className="space-y-1"><Label>Movimentação</Label><Select value={contaForm.permiteMovimentacao === false ? 'NAO' : 'SIM'} onChange={(event) => setContaForm((atual) => ({ ...atual, permiteMovimentacao: event.target.value === 'SIM' }))}><option value="SIM">Permite movimentação</option><option value="NAO">Somente consulta</option></Select></div>
             <div className="space-y-1 md:col-span-2 xl:col-span-4"><Label>Observação</Label><Textarea rows={2} value={contaForm.observacao ?? ''} onChange={(event) => setContaForm((atual) => ({ ...atual, observacao: event.target.value }))} /></div>
           </div>

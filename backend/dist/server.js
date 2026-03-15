@@ -7,23 +7,26 @@ import { ensureBancoEmpregosEstrutura } from "./modules/banco-empregos/repositor
 import { ensureBibliotecaEstrutura } from "./modules/biblioteca/repositories/biblioteca.repository.js";
 import { ensureChamadoTecnicoParametrosIniciais } from "./modules/chamados-tecnicos/repositories/chamado-tecnico.repository.js";
 import { ensureContabilidadeEstrutura } from "./modules/contabilidade/repositories/contabilidade.repository.js";
-import { MensagensPersonalizadasRepository } from "./modules/mensagens-personalizadas/repositories/mensagens-personalizadas.repository.js";
+import { ensureParametrosSistemaEstrutura } from "./modules/configuracoes-gerais/repositories/parametros-sistema.repository.js";
+import { ensureMensagensPersonalizadasBase } from "./modules/mensagens-personalizadas/services/mensagens-personalizadas.service.js";
 import { ensureOcorrenciasCriancaEstrutura } from "./modules/ocorrencias-crianca/repositories/ocorrencias-crianca.repository.js";
 import { ensureRegistroPontoEstrutura } from "./modules/registro-ponto/repositories/registro-ponto-estrutura.repository.js";
 import { ensureSenhasEstrutura } from "./modules/senhas/repositories/senhas.repository.js";
 import { ensureUsuariosGestaoEstrutura } from "./modules/usuarios/repositories/usuario-estrutura.repository.js";
+import { ensureVisitasDomiciliaresEstrutura } from "./modules/visitas-domiciliares/repositories/visitas-domiciliares.repository.js";
 async function aquecerEstruturasDeTela() {
-    const mensagensRepository = new MensagensPersonalizadasRepository();
     const aquecimentos = [
         { nome: "arquivos", promise: ensureArquivosEstrutura(prisma) },
+        { nome: "parametros-sistema", promise: ensureParametrosSistemaEstrutura() },
         { nome: "contabilidade", promise: ensureContabilidadeEstrutura() },
         { nome: "autorizacao-compras", promise: ensureAutorizacaoComprasEstrutura() },
         { nome: "banco-empregos", promise: ensureBancoEmpregosEstrutura() },
         { nome: "biblioteca", promise: ensureBibliotecaEstrutura() },
         { nome: "ocorrencias-crianca", promise: ensureOcorrenciasCriancaEstrutura() },
+        { nome: "visitas-domiciliares", promise: ensureVisitasDomiciliaresEstrutura() },
         { nome: "senhas", promise: ensureSenhasEstrutura() },
         { nome: "chamados-tecnicos", promise: ensureChamadoTecnicoParametrosIniciais() },
-        { nome: "mensagens-personalizadas", promise: mensagensRepository.garantirEstrutura() }
+        { nome: "mensagens-personalizadas", promise: ensureMensagensPersonalizadasBase() }
     ];
     const resultados = await Promise.allSettled(aquecimentos.map((item) => item.promise));
     resultados.forEach((resultado, indice) => {

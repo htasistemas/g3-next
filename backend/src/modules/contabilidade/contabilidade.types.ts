@@ -123,6 +123,7 @@ export type MovimentacaoFinanceiraInput = {
   contraparte?: string | null;
   categoria?: string | null;
   contaBancariaId?: number | null;
+  centroCustoId?: number | null;
   dataMovimentacao: string;
   valor: number;
   origem?: string | null;

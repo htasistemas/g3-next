@@ -148,6 +148,7 @@ export type MovimentacaoFinanceiraPayload = {
   contraparte?: string;
   categoria?: string;
   contaBancariaId?: number;
+  centroCustoId?: number;
   dataMovimentacao: string;
   valor: number;
   origem?: string;
