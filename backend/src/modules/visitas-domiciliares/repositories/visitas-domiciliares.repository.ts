@@ -37,16 +37,25 @@ const estruturaSql = [
   "CREATE INDEX IF NOT EXISTS visita_domiciliar_beneficiario_idx ON visita_domiciliar(beneficiario_id)"
 ];
 
+let estruturaPromise: Promise<void> | null = null;
+
+export async function ensureVisitasDomiciliaresEstrutura() {
+  if (!estruturaPromise) {
+    estruturaPromise = (async () => {
+      for (const comando of estruturaSql) {
+        await prisma.$executeRawUnsafe(comando);
+      }
+    })();
+  }
+
+  await estruturaPromise;
+}
+
 export class VisitasDomiciliaresRepository {
-  private estruturaGarantida = false;
   private schemaInfoPromise: Promise<VisitaSchemaInfo> | null = null;
 
   private async garantirEstrutura() {
-    if (this.estruturaGarantida) return;
-    for (const comando of estruturaSql) {
-      await prisma.$executeRawUnsafe(comando);
-    }
-    this.estruturaGarantida = true;
+    await ensureVisitasDomiciliaresEstrutura();
   }
 
   private async obterNomeBeneficiario(beneficiarioId: number) {

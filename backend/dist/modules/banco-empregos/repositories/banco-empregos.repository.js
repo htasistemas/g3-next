@@ -40,41 +40,49 @@ const estruturaSql = [
   )
   `
 ];
+let estruturaPromise = null;
+let estruturaBancoCache = null;
+async function detectarEstruturaBanco() {
+    if (estruturaBancoCache) {
+        return estruturaBancoCache;
+    }
+    const colunas = await prisma.$queryRaw(Prisma.sql `
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema = current_schema()
+      AND table_name = 'banco_empregos'
+  `);
+    const nomesColunas = new Set(colunas.map((coluna) => coluna.column_name));
+    estruturaBancoCache = nomesColunas.has("dados_vaga") ? "json" : "legacy";
+    return estruturaBancoCache;
+}
+export async function ensureBancoEmpregosEstrutura() {
+    if (!estruturaPromise) {
+        estruturaPromise = (async () => {
+            for (const comando of estruturaSql) {
+                await prisma.$executeRawUnsafe(comando);
+            }
+            await prisma.$executeRawUnsafe("ALTER TABLE banco_empregos_candidatos ADD COLUMN IF NOT EXISTS atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()");
+            await prisma.$executeRawUnsafe("ALTER TABLE banco_empregos_encaminhamentos ADD COLUMN IF NOT EXISTS beneficiario_telefone VARCHAR(40)");
+            const estrutura = await detectarEstruturaBanco();
+            if (estrutura === "json") {
+                await prisma.$executeRawUnsafe("CREATE INDEX IF NOT EXISTS banco_empregos_dados_vaga_gin_idx ON banco_empregos USING GIN (dados_vaga)");
+            }
+            else {
+                await prisma.$executeRawUnsafe("CREATE INDEX IF NOT EXISTS banco_empregos_status_idx ON banco_empregos (status)");
+                await prisma.$executeRawUnsafe("CREATE INDEX IF NOT EXISTS banco_empregos_encaminhamentos_emprego_idx ON banco_empregos_encaminhamentos (emprego_id)");
+            }
+            estruturaBancoCache = estrutura;
+        })();
+    }
+    await estruturaPromise;
+}
 export class BancoEmpregosRepository {
-    estruturaGarantida = false;
-    estruturaBanco = null;
     async garantirEstrutura() {
-        if (this.estruturaGarantida)
-            return;
-        for (const comando of estruturaSql) {
-            await prisma.$executeRawUnsafe(comando);
-        }
-        await prisma.$executeRawUnsafe("ALTER TABLE banco_empregos_candidatos ADD COLUMN IF NOT EXISTS atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()");
-        await prisma.$executeRawUnsafe("ALTER TABLE banco_empregos_encaminhamentos ADD COLUMN IF NOT EXISTS beneficiario_telefone VARCHAR(40)");
-        const estrutura = await this.detectarEstruturaBanco();
-        if (estrutura === "json") {
-            await prisma.$executeRawUnsafe("CREATE INDEX IF NOT EXISTS banco_empregos_dados_vaga_gin_idx ON banco_empregos USING GIN (dados_vaga)");
-        }
-        else {
-            await prisma.$executeRawUnsafe("CREATE INDEX IF NOT EXISTS banco_empregos_status_idx ON banco_empregos (status)");
-            await prisma.$executeRawUnsafe("CREATE INDEX IF NOT EXISTS banco_empregos_encaminhamentos_emprego_idx ON banco_empregos_encaminhamentos (emprego_id)");
-        }
-        this.estruturaBanco = estrutura;
-        this.estruturaGarantida = true;
+        await ensureBancoEmpregosEstrutura();
     }
     async detectarEstruturaBanco() {
-        if (this.estruturaBanco) {
-            return this.estruturaBanco;
-        }
-        const colunas = await prisma.$queryRaw(Prisma.sql `
-      SELECT column_name
-      FROM information_schema.columns
-      WHERE table_schema = current_schema()
-        AND table_name = 'banco_empregos'
-    `);
-        const nomesColunas = new Set(colunas.map((coluna) => coluna.column_name));
-        this.estruturaBanco = nomesColunas.has("dados_vaga") ? "json" : "legacy";
-        return this.estruturaBanco;
+        return detectarEstruturaBanco();
     }
     normalizarBeneficiarioId(rawId) {
         if (!rawId) {

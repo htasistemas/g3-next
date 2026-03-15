@@ -64,7 +64,7 @@ const COMPRA_SELECT = Prisma.sql `
   FROM autorizacao_compras
 `;
 let estruturaPromise = null;
-async function ensureAutorizacaoComprasEstrutura() {
+export async function ensureAutorizacaoComprasEstrutura() {
     if (!estruturaPromise) {
         estruturaPromise = (async () => {
             await ensureArquivosEstrutura(prisma);

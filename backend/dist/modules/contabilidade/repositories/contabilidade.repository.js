@@ -68,7 +68,7 @@ const MOVIMENTACAO_SELECT = Prisma.sql `
   LEFT JOIN financeiro_categoria cat ON cat.id = m.categoria_financeira_id
   LEFT JOIN financeiro_centro_custo cc ON cc.id = m.centro_custo_id
 `;
-async function ensureContabilidadeEstrutura() {
+export async function ensureContabilidadeEstrutura() {
     if (!estruturaPromise) {
         estruturaPromise = (async () => {
             await ensureArquivosEstrutura(prisma);

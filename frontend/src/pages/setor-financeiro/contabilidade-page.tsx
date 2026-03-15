@@ -104,6 +104,7 @@ import type {
 
 type AbaId =
   | 'painel'
+  | 'resumoContas'
   | 'lancamentos'
   | 'fluxoCaixa'
   | 'contas'
@@ -135,6 +136,7 @@ type ExclusaoTipo =
 
 const abas: AdminTab[] = [
   { id: 'painel', label: 'Painel financeiro', icon: List },
+  { id: 'resumoContas', label: 'Resumo de contas', icon: PiggyBank },
   { id: 'lancamentos', label: 'Lançamentos', icon: ReceiptText },
   { id: 'fluxoCaixa', label: 'Fluxo de caixa', icon: ArrowRightLeft },
   { id: 'contas', label: 'Contas bancárias e caixa', icon: Landmark },
@@ -326,6 +328,120 @@ function formatarStatus(valor?: string | null) {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+function formatarAgenciaConta(conta: ContaBancaria) {
+  const agencia = conta.agencia?.trim() ? conta.agencia.trim() : 'Não informada';
+  const numero = conta.digito?.trim() ? `${conta.numero}-${conta.digito.trim()}` : conta.numero;
+  return { agencia, numero };
+}
+
+function formatarTituloResumoConta(conta: ContaBancaria, identificacao: { agencia: string; numero: string }) {
+  const nomeConta = conta.nomeConta?.trim();
+  const banco = conta.banco?.trim();
+
+  if (!nomeConta) {
+    return `Conta: ${identificacao.numero}`;
+  }
+
+  if (banco && normalizarBusca(nomeConta).startsWith(normalizarBusca(banco))) {
+    const nomeSemBanco = nomeConta.slice(banco.length).replace(/^[-\s]+/u, '').trim();
+    return `Conta: ${nomeSemBanco || identificacao.numero}`;
+  }
+
+  return `Conta: ${nomeConta}`;
+}
+
+function formatarPixConta(conta: ContaBancaria) {
+  if (!conta.pixVinculado) return 'Não habilitado';
+  if (conta.tipoChavePix && conta.chavePix) {
+    return `${formatarStatus(conta.tipoChavePix)}: ${conta.chavePix}`;
+  }
+  if (conta.chavePix) return conta.chavePix;
+  return 'Habilitado';
+}
+
+function obterEstiloContaPorBanco(banco?: string | null) {
+  const bancoNormalizado = normalizarBusca(banco);
+
+  if (bancoNormalizado.includes('bradesco')) {
+    return {
+      fundo: 'from-rose-100 via-red-50 to-white',
+      borda: 'border-rose-200',
+      selo: 'bg-rose-100 text-rose-700',
+      valor: 'text-rose-700'
+    };
+  }
+
+  if (bancoNormalizado.includes('itau')) {
+    return {
+      fundo: 'from-orange-100 via-amber-50 to-white',
+      borda: 'border-orange-200',
+      selo: 'bg-orange-100 text-orange-700',
+      valor: 'text-orange-700'
+    };
+  }
+
+  if (bancoNormalizado.includes('santander')) {
+    return {
+      fundo: 'from-red-100 via-rose-50 to-white',
+      borda: 'border-red-200',
+      selo: 'bg-red-100 text-red-700',
+      valor: 'text-red-700'
+    };
+  }
+
+  if (bancoNormalizado.includes('caixa')) {
+    return {
+      fundo: 'from-sky-100 via-cyan-50 to-white',
+      borda: 'border-sky-200',
+      selo: 'bg-sky-100 text-sky-700',
+      valor: 'text-sky-700'
+    };
+  }
+
+  if (bancoNormalizado.includes('bb') || bancoNormalizado.includes('banco do brasil')) {
+    return {
+      fundo: 'from-yellow-100 via-amber-50 to-white',
+      borda: 'border-yellow-200',
+      selo: 'bg-yellow-100 text-yellow-800',
+      valor: 'text-yellow-700'
+    };
+  }
+
+  if (bancoNormalizado.includes('sicredi')) {
+    return {
+      fundo: 'from-emerald-100 via-green-50 to-white',
+      borda: 'border-emerald-200',
+      selo: 'bg-emerald-100 text-emerald-700',
+      valor: 'text-emerald-700'
+    };
+  }
+
+  if (bancoNormalizado.includes('sicoob')) {
+    return {
+      fundo: 'from-teal-100 via-cyan-50 to-white',
+      borda: 'border-teal-200',
+      selo: 'bg-teal-100 text-teal-700',
+      valor: 'text-teal-700'
+    };
+  }
+
+  if (bancoNormalizado.includes('nubank') || bancoNormalizado === 'nu' || bancoNormalizado.includes('nu pagamentos')) {
+    return {
+      fundo: 'from-fuchsia-100 via-purple-50 to-white',
+      borda: 'border-fuchsia-200',
+      selo: 'bg-fuchsia-100 text-fuchsia-700',
+      valor: 'text-fuchsia-700'
+    };
+  }
+
+  return {
+    fundo: 'from-slate-100 via-zinc-50 to-white',
+    borda: 'border-slate-200',
+    selo: 'bg-slate-100 text-slate-700',
+    valor: 'text-slate-700'
+  };
+}
+
 function normalizarBusca(valor?: string | null) {
   return (valor ?? '')
     .normalize('NFD')
@@ -450,20 +566,24 @@ function ResumoCard({
   titulo,
   valor,
   destaque = 'var(--g3-active)',
-  subtitulo
+  subtitulo,
+  className,
+  centralizado = false
 }: {
   titulo: string;
   valor: string;
   destaque?: string;
   subtitulo?: string;
+  className?: string;
+  centralizado?: boolean;
 }) {
   return (
-    <div className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] p-3 shadow-sm">
-      <p className="text-xs font-semibold text-[var(--g3-muted)]">{titulo}</p>
-      <p className="mt-1 text-2xl font-bold" style={{ color: destaque }}>
+    <div className={`rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] p-3 shadow-sm ${className ?? ''}`}>
+      <p className={`text-xs font-semibold text-[var(--g3-muted)] ${centralizado ? 'text-center' : ''}`}>{titulo}</p>
+      <p className={`mt-1 text-2xl font-bold ${centralizado ? 'text-center' : ''}`} style={{ color: destaque }}>
         {valor}
       </p>
-      {subtitulo ? <p className="mt-1 text-xs text-[var(--g3-muted)]">{subtitulo}</p> : null}
+      {subtitulo ? <p className={`mt-1 text-xs text-[var(--g3-muted)] ${centralizado ? 'text-center' : ''}`}>{subtitulo}</p> : null}
     </div>
   );
 }
@@ -649,6 +769,15 @@ export function ContabilidadePage() {
         .slice(0, 8),
     [movimentacoes]
   );
+  const resumoContas = useMemo(
+    () => ({
+      total: contas.length,
+      ativas: contas.filter((item) => item.status === 'ATIVA').length,
+      comProjeto: contas.filter((item) => item.projetoVinculado?.trim()).length,
+      comPix: contas.filter((item) => item.pixVinculado).length
+    }),
+    [contas]
+  );
 
   const saldoGeral = useMemo(() => contas.reduce((acc, item) => acc + item.saldoAtual, 0), [contas]);
   const saldoBancos = useMemo(() => contas.filter((item) => item.tipo !== 'CAIXA_INTERNO').reduce((acc, item) => acc + item.saldoAtual, 0), [contas]);
@@ -707,13 +836,28 @@ export function ContabilidadePage() {
     criarConciliacaoMutation.isPending ||
     atualizarSituacaoConciliacaoMutation.isPending ||
     gerarObrigacaoMutation.isPending ||
-    criarEmendaMutation.isPending ||
-    atualizarStatusEmendaMutation.isPending ||
-    uploadArquivoMutation.isPending ||
-    excluirArquivoMutation.isPending;
+  criarEmendaMutation.isPending ||
+  atualizarStatusEmendaMutation.isPending ||
+  uploadArquivoMutation.isPending ||
+  excluirArquivoMutation.isPending;
+
+  function abrirContaParaEdicao(conta: ContaBancaria) {
+    setContaSelecionadaId(conta.id);
+    setContaForm(toContaForm(conta));
+    setAbaAtiva('contas');
+  }
+
+  function solicitarExclusaoConta(conta: ContaBancaria) {
+    setContaSelecionadaId(conta.id);
+    setTipoExclusao('conta');
+    setConfirmarExclusao(true);
+  }
 
   function limparFormularioAtual() {
     switch (abaAtiva) {
+      case 'resumoContas':
+        setContaSelecionadaId(undefined);
+        return;
       case 'contas':
         setContaSelecionadaId(undefined);
         setContaForm(contaVazia);
@@ -861,7 +1005,7 @@ export function ContabilidadePage() {
         return;
       }
 
-      if (['painel', 'compras', 'historico', 'anexos', 'relatorios', 'impressoes'].includes(abaAtiva)) {
+      if (['painel', 'resumoContas', 'compras', 'historico', 'anexos', 'relatorios', 'impressoes'].includes(abaAtiva)) {
         setPopup({ tipo: 'aviso', titulo: 'Ação indisponível', texto: 'Use as ações específicas desta aba.' });
         return;
       }
@@ -881,6 +1025,7 @@ export function ContabilidadePage() {
   }
 
   function solicitarExclusao() {
+    if (abaAtiva === 'resumoContas' && contaSelecionadaId) return setTipoExclusao('conta'), setConfirmarExclusao(true);
     if (abaAtiva === 'contas' && contaSelecionadaId) return setTipoExclusao('conta'), setConfirmarExclusao(true);
     if (abaAtiva === 'categorias' && categoriaSelecionadaId) return setTipoExclusao('categoria'), setConfirmarExclusao(true);
     if (abaAtiva === 'centros' && centroSelecionadoId) return setTipoExclusao('centro'), setConfirmarExclusao(true);
@@ -1194,6 +1339,136 @@ export function ContabilidadePage() {
     );
   }
 
+  function renderResumoContas() {
+    return (
+      <section className="space-y-4">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <ResumoCard
+            titulo="Total de contas"
+            valor={String(resumoContas.total)}
+            centralizado
+            className="bg-gradient-to-br from-slate-50 via-white to-slate-100"
+          />
+          <ResumoCard
+            titulo="Contas ativas"
+            valor={String(resumoContas.ativas)}
+            destaque="#0f766e"
+            centralizado
+            className="bg-gradient-to-br from-emerald-50 via-white to-teal-50"
+          />
+          <ResumoCard
+            titulo="Com projeto vinculado"
+            valor={String(resumoContas.comProjeto)}
+            destaque="#2563eb"
+            centralizado
+            className="bg-gradient-to-br from-sky-50 via-white to-blue-50"
+          />
+          <ResumoCard
+            titulo="Com Pix habilitado"
+            valor={String(resumoContas.comPix)}
+            destaque="#9333ea"
+            centralizado
+            className="bg-gradient-to-br from-fuchsia-50 via-white to-violet-50"
+          />
+        </div>
+
+        <Bloco
+          titulo="Resumo de contas"
+          descricao="Visualize cada conta bancária com dados principais, saldo destacado, projeto vinculado e atalho rápido para editar ou excluir."
+        >
+          {contas.length ? (
+            <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
+              {contas.map((conta) => {
+                const estilo = obterEstiloContaPorBanco(conta.banco);
+                const identificacao = formatarAgenciaConta(conta);
+                const tituloConta = formatarTituloResumoConta(conta, identificacao);
+                return (
+                  <article
+                    key={conta.id}
+                    className={`rounded-xl border bg-gradient-to-br p-3 shadow-sm ${estilo.borda} ${estilo.fundo}`}
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="flex-1 space-y-1.5">
+                        <div className="flex justify-center">
+                          <span className={`inline-flex rounded-full px-3 py-1.5 text-sm font-semibold ${estilo.selo}`}>
+                            {conta.banco || 'Banco não informado'}
+                          </span>
+                        </div>
+                        <div>
+                          <h3 className="text-base font-semibold text-[var(--g3-foreground)]">{tituloConta}</h3>
+                          <p className="text-xs text-[var(--g3-muted)]">
+                            Agência {identificacao.agencia}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="rounded-lg bg-white/80 px-3 py-2 text-center shadow-sm">
+                        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--g3-muted)]">Saldo atual</p>
+                        <p className={`mt-1 text-2xl font-bold ${estilo.valor}`}>{formatarMoeda(conta.saldoAtual)}</p>
+                        <p className="mt-0.5 text-[11px] text-[var(--g3-muted)]">
+                          Atualizado em {formatarDataHora(conta.dataAtualizacao)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 grid gap-2.5 md:grid-cols-2">
+                      <div className="rounded-lg border border-white/70 bg-white/70 p-2.5">
+                        <p className="text-xs font-semibold text-[var(--g3-muted)]">Agência</p>
+                        <p className="mt-1 text-sm font-medium text-[var(--g3-foreground)]">{identificacao.agencia}</p>
+                      </div>
+                      <div className="rounded-lg border border-white/70 bg-white/70 p-2.5">
+                        <p className="text-xs font-semibold text-[var(--g3-muted)]">Conta</p>
+                        <p className="mt-1 text-sm font-medium text-[var(--g3-foreground)]">{identificacao.numero}</p>
+                      </div>
+                      <div className="rounded-lg border border-white/70 bg-white/70 p-2.5">
+                        <p className="text-xs font-semibold text-[var(--g3-muted)]">Tipo e status</p>
+                        <p className="mt-1 text-sm font-medium text-[var(--g3-foreground)]">
+                          {formatarStatus(conta.tipo)} - {formatarStatus(conta.status)}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-white/70 bg-white/70 p-2.5">
+                        <p className="text-xs font-semibold text-[var(--g3-muted)]">Projeto vinculado</p>
+                        <p className="mt-1 text-sm font-medium text-[var(--g3-foreground)]">
+                          {conta.projetoVinculado?.trim() || 'Sem projeto vinculado'}
+                        </p>
+                      </div>
+                      <div className="min-w-0 rounded-lg border border-white/70 bg-white/70 p-3 md:col-span-2 md:min-h-[88px]">
+                        <p className="text-xs font-semibold text-[var(--g3-muted)]">Pix</p>
+                        <p className="mt-1 break-all text-sm font-medium leading-relaxed text-[var(--g3-foreground)]">{formatarPixConta(conta)}</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex flex-wrap gap-2 text-xs text-[var(--g3-muted)]">
+                        <span className="rounded-full bg-white/75 px-2.5 py-1">
+                          {conta.permiteMovimentacao ? 'Movimentação habilitada' : 'Somente consulta'}
+                        </span>
+                        <span className="rounded-full bg-white/75 px-2.5 py-1">
+                          {conta.recebimentoLocal ? 'Recebimento local' : 'Sem recebimento local'}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="button" variant="outline" size="sm" onClick={() => abrirContaParaEdicao(conta)}>
+                          Editar
+                        </Button>
+                        <Button type="button" variant="danger" size="sm" onClick={() => solicitarExclusaoConta(conta)}>
+                          Excluir
+                        </Button>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/30 p-6 text-center text-sm text-[var(--g3-muted)]">
+              Nenhuma conta bancária encontrada para resumir.
+            </div>
+          )}
+        </Bloco>
+      </section>
+    );
+  }
+
   function renderContas() {
     return (
       <section className="space-y-4">
@@ -1213,6 +1488,10 @@ export function ContabilidadePage() {
             <div className="space-y-1"><Label>Tipo</Label><Select value={contaForm.tipo} onChange={(event) => setContaForm((atual) => ({ ...atual, tipo: event.target.value as ContaBancaria['tipo'] }))}><option value="CONTA_CORRENTE">Conta corrente</option><option value="POUPANCA">Poupança</option><option value="APLICACAO">Aplicação</option><option value="CAIXA_INTERNO">Caixa interno</option></Select></div>
             <div className="space-y-1"><Label>Titular</Label><Input value={contaForm.titular ?? ''} onChange={(event) => setContaForm((atual) => ({ ...atual, titular: event.target.value }))} /></div>
             <div className="space-y-1"><Label>Status</Label><Select value={contaForm.status ?? 'ATIVA'} onChange={(event) => setContaForm((atual) => ({ ...atual, status: event.target.value as ContaBancaria['status'] }))}><option value="ATIVA">Ativa</option><option value="INATIVA">Inativa</option></Select></div>
+            <div className="space-y-1"><Label>Projeto vinculado</Label><Input value={contaForm.projetoVinculado ?? ''} onChange={(event) => setContaForm((atual) => ({ ...atual, projetoVinculado: event.target.value }))} /></div>
+            <div className="space-y-1"><Label>Pix</Label><Select value={contaForm.pixVinculado ? 'SIM' : 'NAO'} onChange={(event) => setContaForm((atual) => ({ ...atual, pixVinculado: event.target.value === 'SIM' }))}><option value="SIM">Habilitado</option><option value="NAO">Não habilitado</option></Select></div>
+            <div className="space-y-1"><Label>Tipo da chave Pix</Label><Input value={contaForm.tipoChavePix ?? ''} onChange={(event) => setContaForm((atual) => ({ ...atual, tipoChavePix: event.target.value }))} /></div>
+            <div className="space-y-1"><Label>Chave Pix</Label><Input value={contaForm.chavePix ?? ''} onChange={(event) => setContaForm((atual) => ({ ...atual, chavePix: event.target.value }))} /></div>
             <div className="space-y-1"><Label>Saldo inicial</Label><Input type="number" min={0} step="0.01" value={contaForm.saldoInicial} onChange={(event) => setContaForm((atual) => ({ ...atual, saldoInicial: Number(event.target.value) || 0 }))} /></div>
             <div className="space-y-1"><Label>Data do saldo inicial</Label><Input type="date" value={contaForm.dataSaldoInicial} onChange={(event) => setContaForm((atual) => ({ ...atual, dataSaldoInicial: event.target.value }))} /></div>
             <div className="space-y-1"><Label>Alerta de saldo mínimo</Label><Input type="number" min={0} step="0.01" value={contaForm.limiteMinimoAlerta ?? 0} onChange={(event) => setContaForm((atual) => ({ ...atual, limiteMinimoAlerta: Number(event.target.value) || 0 }))} /></div>
@@ -1228,7 +1507,7 @@ export function ContabilidadePage() {
         <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]">
           <table className="min-w-full text-sm">
             <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"><tr><th className="px-3 py-2 text-left">Conta</th><th className="px-3 py-2 text-left">Banco</th><th className="px-3 py-2 text-left">Tipo</th><th className="px-3 py-2 text-left">Status</th><th className="px-3 py-2 text-left">Saldo</th><th className="px-3 py-2 text-right">Ações</th></tr></thead>
-            <tbody>{contas.length ? contas.map((item, index) => <tr key={item.id} className={`border-t border-[var(--g3-border)] ${index % 2 === 0 ? 'bg-[var(--g3-card)]' : 'bg-[var(--g3-primary-soft)]/35'}`}><td className="px-3 py-2">{item.nomeConta}</td><td className="px-3 py-2">{item.banco}</td><td className="px-3 py-2">{formatarStatus(item.tipo)}</td><td className="px-3 py-2">{formatarStatus(item.status)}</td><td className="px-3 py-2">{formatarMoeda(item.saldoAtual)}</td><td className="px-3 py-2 text-right"><Button size="sm" variant="outline" onClick={() => { setContaSelecionadaId(item.id); setContaForm(toContaForm(item)); }}>Selecionar</Button></td></tr>) : <tr><td colSpan={6} className="px-3 py-4 text-center text-[var(--g3-muted)]">Nenhuma conta cadastrada.</td></tr>}</tbody>
+            <tbody>{contas.length ? contas.map((item, index) => <tr key={item.id} className={`border-t border-[var(--g3-border)] ${index % 2 === 0 ? 'bg-[var(--g3-card)]' : 'bg-[var(--g3-primary-soft)]/35'}`}><td className="px-3 py-2">{item.nomeConta}</td><td className="px-3 py-2">{item.banco}</td><td className="px-3 py-2">{formatarStatus(item.tipo)}</td><td className="px-3 py-2">{formatarStatus(item.status)}</td><td className="px-3 py-2">{formatarMoeda(item.saldoAtual)}</td><td className="px-3 py-2 text-right"><div className="flex flex-wrap justify-end gap-2"><Button size="sm" variant="outline" onClick={() => { setContaSelecionadaId(item.id); setContaForm(toContaForm(item)); }}>Editar</Button><Button size="sm" variant="danger" onClick={() => solicitarExclusaoConta(item)}>Excluir</Button></div></td></tr>) : <tr><td colSpan={6} className="px-3 py-4 text-center text-[var(--g3-muted)]">Nenhuma conta cadastrada.</td></tr>}</tbody>
           </table>
         </div>
 
@@ -1420,7 +1699,7 @@ export function ContabilidadePage() {
   ];
 
   const codeBadge =
-    abaAtiva === 'contas' && contaSelecionadaId
+    ['resumoContas', 'contas'].includes(abaAtiva) && contaSelecionadaId
       ? `Conta ${contaSelecionadaId}`
       : ['lancamentos', 'anexos'].includes(abaAtiva) && lancamentoSelecionadoId
         ? `Lançamento ${lancamentoSelecionadoId}`
@@ -1443,6 +1722,7 @@ export function ContabilidadePage() {
         codeBadge={codeBadge}
       >
         {abaAtiva === 'painel' ? renderPainel() : null}
+        {abaAtiva === 'resumoContas' ? renderResumoContas() : null}
         {abaAtiva === 'lancamentos' ? renderFormularioLancamentos() : null}
         {abaAtiva === 'fluxoCaixa' ? renderFluxoCaixa() : null}
         {abaAtiva === 'contas' ? renderContas() : null}

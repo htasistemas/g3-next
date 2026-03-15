@@ -52,36 +52,41 @@ const estruturaSql = [
     "CREATE INDEX IF NOT EXISTS senhas_chamadas_unidade_idx ON senhas_chamadas(unidade_id)",
     "CREATE INDEX IF NOT EXISTS senhas_chamadas_data_idx ON senhas_chamadas(data_hora_chamada DESC)"
 ];
+let estruturaPromise = null;
+export async function ensureSenhasEstrutura() {
+    if (!estruturaPromise) {
+        estruturaPromise = (async () => {
+            for (const comando of estruturaSql) {
+                await prisma.$executeRawUnsafe(comando);
+            }
+            await prisma.$executeRawUnsafe(`
+        INSERT INTO senhas_config (id)
+        SELECT 1
+        WHERE NOT EXISTS (SELECT 1 FROM senhas_config WHERE id = 1)
+      `);
+            await prisma.$executeRawUnsafe(`
+        ALTER TABLE senhas_config
+        ADD COLUMN IF NOT EXISTS avisos_sonoros_json TEXT
+      `);
+            await prisma.$executeRawUnsafe(`
+        ALTER TABLE senhas_config
+        ADD COLUMN IF NOT EXISTS aviso_sonoro_ativo_id TEXT
+      `);
+            await prisma.$executeRawUnsafe(`
+        ALTER TABLE senhas_config
+        ADD COLUMN IF NOT EXISTS aviso_sonoro_url TEXT
+      `);
+            await prisma.$executeRawUnsafe(`
+        ALTER TABLE senhas_config
+        ADD COLUMN IF NOT EXISTS aviso_sonoro_nome TEXT
+      `);
+        })();
+    }
+    await estruturaPromise;
+}
 export class SenhasRepository {
-    estruturaGarantida = false;
     async garantirEstrutura() {
-        if (this.estruturaGarantida)
-            return;
-        for (const comando of estruturaSql) {
-            await prisma.$executeRawUnsafe(comando);
-        }
-        await prisma.$executeRawUnsafe(`
-      INSERT INTO senhas_config (id)
-      SELECT 1
-      WHERE NOT EXISTS (SELECT 1 FROM senhas_config WHERE id = 1)
-    `);
-        await prisma.$executeRawUnsafe(`
-      ALTER TABLE senhas_config
-      ADD COLUMN IF NOT EXISTS avisos_sonoros_json TEXT
-    `);
-        await prisma.$executeRawUnsafe(`
-      ALTER TABLE senhas_config
-      ADD COLUMN IF NOT EXISTS aviso_sonoro_ativo_id TEXT
-    `);
-        await prisma.$executeRawUnsafe(`
-      ALTER TABLE senhas_config
-      ADD COLUMN IF NOT EXISTS aviso_sonoro_url TEXT
-    `);
-        await prisma.$executeRawUnsafe(`
-      ALTER TABLE senhas_config
-      ADD COLUMN IF NOT EXISTS aviso_sonoro_nome TEXT
-    `);
-        this.estruturaGarantida = true;
+        await ensureSenhasEstrutura();
     }
     async obterNomeBeneficiario(beneficiarioId) {
         const rows = await prisma.$queryRaw(Prisma.sql `

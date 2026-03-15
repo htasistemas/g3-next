@@ -116,7 +116,7 @@ type DestinatarioRow = {
   observacao: string | null;
 };
 
-let estruturaGarantida = false;
+let estruturaPromise: Promise<void> | null = null;
 
 function toJsonText(value: unknown) {
   return JSON.stringify(value ?? []);
@@ -141,11 +141,7 @@ function actorName(actor?: MensagemAtor) {
 
 export class MensagensPersonalizadasRepository {
   async garantirEstrutura() {
-    if (estruturaGarantida) return;
-    for (const comando of estruturaSql) {
-      await prisma.$executeRawUnsafe(comando);
-    }
-    estruturaGarantida = true;
+    await ensureMensagensPersonalizadasEstrutura();
   }
 
   async listarTaxonomias() {
@@ -1003,4 +999,16 @@ export class MensagensPersonalizadasRepository {
     }
     return row;
   }
+}
+
+export async function ensureMensagensPersonalizadasEstrutura() {
+  if (!estruturaPromise) {
+    estruturaPromise = (async () => {
+      for (const comando of estruturaSql) {
+        await prisma.$executeRawUnsafe(comando);
+      }
+    })();
+  }
+
+  await estruturaPromise;
 }

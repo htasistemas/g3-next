@@ -159,7 +159,8 @@ type ListaResponse = {
   resumo: Record<string, unknown>;
 };
 
-let estruturaGarantida = false;
+let estruturaPromise: Promise<void> | null = null;
+let parametrosIniciaisPromise: Promise<void> | null = null;
 
 function parseDate(value?: string) {
   if (!value) return null;
@@ -222,46 +223,64 @@ function buildOrderBy(ordenacao?: ChamadoOrdenacao, direcao: "asc" | "desc" = "d
   }
 }
 
+export async function ensureChamadoTecnicoEstrutura() {
+  if (!estruturaPromise) {
+    estruturaPromise = (async () => {
+      await ensureArquivosEstrutura(prisma);
+      for (const comando of estruturaSql) {
+        await prisma.$executeRawUnsafe(comando);
+      }
+    })();
+  }
+
+  await estruturaPromise;
+}
+
+export async function ensureChamadoTecnicoParametrosIniciais() {
+  await ensureChamadoTecnicoEstrutura();
+
+  if (!parametrosIniciaisPromise) {
+    parametrosIniciaisPromise = (async () => {
+      for (const parametro of parametrosIniciaisChamadoTecnico) {
+        await prisma.$executeRaw(
+          Prisma.sql`
+            INSERT INTO g3n_chamado_tecnico_parametro (tipo, chave, nome, cor, ordem, padrao, sla_horas, ativo, criado_em, atualizado_em)
+            VALUES (
+              ${parametro.tipo},
+              ${parametro.chave},
+              ${parametro.nome},
+              ${parametro.cor ?? null},
+              ${parametro.ordem},
+              ${"padrao" in parametro ? parametro.padrao : false},
+              ${"slaHoras" in parametro ? parametro.slaHoras : null},
+              TRUE,
+              NOW(),
+              NOW()
+            )
+            ON CONFLICT (tipo, chave)
+            DO UPDATE SET
+              nome = EXCLUDED.nome,
+              cor = COALESCE(EXCLUDED.cor, g3n_chamado_tecnico_parametro.cor),
+              ordem = EXCLUDED.ordem,
+              padrao = EXCLUDED.padrao,
+              sla_horas = COALESCE(EXCLUDED.sla_horas, g3n_chamado_tecnico_parametro.sla_horas),
+              atualizado_em = NOW()
+          `
+        );
+      }
+    })();
+  }
+
+  await parametrosIniciaisPromise;
+}
+
 export class ChamadoTecnicoRepository {
   private async garantirEstrutura() {
-    if (estruturaGarantida) return;
-
-    await ensureArquivosEstrutura(prisma);
-    for (const comando of estruturaSql) {
-      await prisma.$executeRawUnsafe(comando);
-    }
-
-    estruturaGarantida = true;
+    await ensureChamadoTecnicoEstrutura();
   }
 
   private async garantirParametrosIniciais() {
-    for (const parametro of parametrosIniciaisChamadoTecnico) {
-      await prisma.$executeRaw(
-        Prisma.sql`
-          INSERT INTO g3n_chamado_tecnico_parametro (tipo, chave, nome, cor, ordem, padrao, sla_horas, ativo, criado_em, atualizado_em)
-          VALUES (
-            ${parametro.tipo},
-            ${parametro.chave},
-            ${parametro.nome},
-            ${parametro.cor ?? null},
-            ${parametro.ordem},
-            ${"padrao" in parametro ? parametro.padrao : false},
-            ${"slaHoras" in parametro ? parametro.slaHoras : null},
-            TRUE,
-            NOW(),
-            NOW()
-          )
-          ON CONFLICT (tipo, chave)
-          DO UPDATE SET
-            nome = EXCLUDED.nome,
-            cor = COALESCE(EXCLUDED.cor, g3n_chamado_tecnico_parametro.cor),
-            ordem = EXCLUDED.ordem,
-            padrao = EXCLUDED.padrao,
-            sla_horas = COALESCE(EXCLUDED.sla_horas, g3n_chamado_tecnico_parametro.sla_horas),
-            atualizado_em = NOW()
-        `
-      );
-    }
+    await ensureChamadoTecnicoParametrosIniciais();
   }
 
   async listarParametros(tipo?: string) {

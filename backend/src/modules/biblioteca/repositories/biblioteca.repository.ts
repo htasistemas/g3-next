@@ -53,15 +53,23 @@ const estruturaSql = [
   "CREATE INDEX IF NOT EXISTS biblioteca_emprestimo_status_idx ON biblioteca_emprestimo(status)"
 ];
 
-export class BibliotecaRepository {
-  private estruturaGarantida = false;
+let estruturaPromise: Promise<void> | null = null;
 
+export async function ensureBibliotecaEstrutura() {
+  if (!estruturaPromise) {
+    estruturaPromise = (async () => {
+      for (const comando of estruturaSql) {
+        await prisma.$executeRawUnsafe(comando);
+      }
+    })();
+  }
+
+  await estruturaPromise;
+}
+
+export class BibliotecaRepository {
   private async garantirEstrutura() {
-    if (this.estruturaGarantida) return;
-    for (const comando of estruturaSql) {
-      await prisma.$executeRawUnsafe(comando);
-    }
-    this.estruturaGarantida = true;
+    await ensureBibliotecaEstrutura();
   }
 
   async listarLivros() {

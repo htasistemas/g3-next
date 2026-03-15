@@ -25,15 +25,20 @@ const estruturaSql = [
     "CREATE INDEX IF NOT EXISTS ocorrencias_crianca_data_idx ON ocorrencias_crianca ((payload->>'dataPreenchimento'))",
     "CREATE INDEX IF NOT EXISTS ocorrencias_crianca_anexo_ocorrencia_idx ON ocorrencias_crianca_anexo(ocorrencia_id)"
 ];
+let estruturaPromise = null;
+export async function ensureOcorrenciasCriancaEstrutura() {
+    if (!estruturaPromise) {
+        estruturaPromise = (async () => {
+            for (const comando of estruturaSql) {
+                await prisma.$executeRawUnsafe(comando);
+            }
+        })();
+    }
+    await estruturaPromise;
+}
 export class OcorrenciasCriancaRepository {
-    estruturaGarantida = false;
     async garantirEstrutura() {
-        if (this.estruturaGarantida)
-            return;
-        for (const comando of estruturaSql) {
-            await prisma.$executeRawUnsafe(comando);
-        }
-        this.estruturaGarantida = true;
+        await ensureOcorrenciasCriancaEstrutura();
     }
     async listar() {
         await this.garantirEstrutura();

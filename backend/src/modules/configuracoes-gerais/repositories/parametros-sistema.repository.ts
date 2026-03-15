@@ -19,9 +19,9 @@ const criarTabelaSql = `
   );
 `;
 
-export class ParametrosSistemaRepository {
-  private estruturaInicializada = false;
+let estruturaPromise: Promise<void> | null = null;
 
+export class ParametrosSistemaRepository {
   async buscarPersonalizacao() {
     await this.ensureEstrutura();
 
@@ -69,8 +69,14 @@ export class ParametrosSistemaRepository {
   }
 
   private async ensureEstrutura() {
-    if (this.estruturaInicializada) return;
-    await prisma.$executeRawUnsafe(criarTabelaSql);
-    this.estruturaInicializada = true;
+    await ensureParametrosSistemaEstrutura();
   }
+}
+
+export async function ensureParametrosSistemaEstrutura() {
+  if (!estruturaPromise) {
+    estruturaPromise = prisma.$executeRawUnsafe(criarTabelaSql).then(() => undefined);
+  }
+
+  await estruturaPromise;
 }

@@ -25,7 +25,7 @@ function carregarVersaoSistema() {
     }
   }
 
-  return "1.00.137";
+  return "1.00.145";
 }
 
 const appVersion = carregarVersaoSistema();
