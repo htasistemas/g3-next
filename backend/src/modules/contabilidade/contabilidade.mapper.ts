@@ -1,4 +1,12 @@
 import { toIsoDate } from "../../utils/string-utils.js";
+import {
+  normalizarStatusConta,
+  normalizarStatusLancamento,
+  normalizarStatusTransferencia,
+  normalizarSituacaoConciliacao,
+  normalizarTipoConta,
+  normalizarTipoLancamento
+} from "./contabilidade.workflow.js";
 import type {
   CategoriaFinanceiraRow,
   CentroCustoRow,
@@ -20,7 +28,7 @@ export function mapContaBancariaToResponse(row: ContaBancariaRow) {
     numero: row.numero,
     digito: row.digito ?? undefined,
     nomeConta: row.nome_conta ?? `${row.banco} - ${row.numero}`,
-    tipo: row.tipo,
+    tipo: normalizarTipoConta(row.tipo),
     titular: row.titular ?? undefined,
     projetoVinculado: row.projeto_vinculado ?? undefined,
     pixVinculado: row.pix_vinculado,
@@ -31,7 +39,7 @@ export function mapContaBancariaToResponse(row: ContaBancariaRow) {
     dataSaldoInicial: toIsoDate(row.data_saldo_inicial) ?? "",
     saldoAtual: row.saldo,
     limiteMinimoAlerta: row.limite_minimo_alerta ?? 0,
-    status: row.status ?? "ATIVA",
+    status: normalizarStatusConta(row.status),
     permiteMovimentacao: row.permite_movimentacao,
     observacao: row.observacao ?? undefined,
     dataAtualizacao: toIsoDate(row.data_atualizacao) ?? ""
@@ -65,11 +73,12 @@ export function mapCentroCustoToResponse(row: CentroCustoRow) {
 }
 
 export function mapLancamentoToResponse(row: LancamentoFinanceiroRow) {
+  const tipo = normalizarTipoLancamento(row.tipo);
   return {
     id: Number(row.id),
     dataLancamento: toIsoDate(row.data_lancamento) ?? "",
-    tipo: row.tipo,
-    natureza: row.natureza ?? row.tipo,
+    tipo,
+    natureza: row.natureza ?? tipo,
     contaBancariaId: row.conta_bancaria_id ? Number(row.conta_bancaria_id) : undefined,
     categoriaId: row.categoria_financeira_id ? Number(row.categoria_financeira_id) : undefined,
     centroCustoId: row.centro_custo_id ? Number(row.centro_custo_id) : undefined,
@@ -81,7 +90,7 @@ export function mapLancamentoToResponse(row: LancamentoFinanceiroRow) {
     vencimento: toIsoDate(row.vencimento) ?? "",
     valor: row.valor,
     formaPagamento: row.forma_pagamento ?? undefined,
-    status: row.situacao,
+    status: normalizarStatusLancamento(row.situacao, tipo),
     origem: row.origem ?? "MANUAL",
     observacao: row.observacao ?? undefined,
     dataBaixa: toIsoDate(row.data_baixa) ?? undefined,
@@ -132,7 +141,7 @@ export function mapTransferenciaToResponse(row: TransferenciaFinanceiraRow) {
     descricao: row.descricao,
     responsavel: row.responsavel ?? undefined,
     observacao: row.observacao ?? undefined,
-    status: row.status,
+    status: normalizarStatusTransferencia(row.status),
     movimentacaoSaidaId: row.movimentacao_saida_id ? Number(row.movimentacao_saida_id) : undefined,
     movimentacaoEntradaId: row.movimentacao_entrada_id ? Number(row.movimentacao_entrada_id) : undefined,
     contaOrigemNome: row.conta_origem_nome ?? undefined,
@@ -149,7 +158,7 @@ export function mapConciliacaoToResponse(row: ConciliacaoFinanceiraRow) {
     valorExtrato: row.valor_extrato,
     lancamentoFinanceiroId: row.lancamento_financeiro_id ? Number(row.lancamento_financeiro_id) : undefined,
     movimentacaoFinanceiraId: row.movimentacao_financeira_id ? Number(row.movimentacao_financeira_id) : undefined,
-    situacao: row.situacao,
+    situacao: normalizarSituacaoConciliacao(row.situacao),
     diferenca: row.diferenca ?? 0,
     observacao: row.observacao ?? undefined,
     contaBancariaNome: row.conta_bancaria_nome ?? undefined,

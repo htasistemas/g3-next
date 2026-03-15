@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ClipboardCheck,
@@ -25,6 +25,7 @@ import {
   useAuditoriaRh,
   useAtualizarDocumentoRh,
   useAtualizarStatusProcessoRh,
+  useCandidatoRh,
   useCandidatosRh,
   useDocumentosRh,
   useEntrevistasRh,
@@ -33,7 +34,7 @@ import {
   useSalvarCandidatoRh,
   useSalvarEntrevistaRh
 } from "@/features/rh-contratacao/use-rh-contratacao";
-import type { RhCandidatoPayload, RhEntrevistaPayload } from "@/types/rh-contratacao";
+import type { RhCandidatoDetalhe, RhCandidatoPayload, RhEntrevistaPayload } from "@/types/rh-contratacao";
 
 type AbaId = "listagem" | "dadosCandidato" | "processo" | "entrevistas" | "documentos" | "auditoria";
 
@@ -56,6 +57,42 @@ const entrevistaVazia: RhEntrevistaPayload = {
   dataEntrevista: new Date().toISOString().slice(0, 10)
 };
 
+function mapDetalheParaPayload(candidato: RhCandidatoDetalhe, statusProcesso?: string): RhCandidatoPayload {
+  return {
+    nomeCompleto: candidato.nomeCompleto,
+    cpf: candidato.cpf,
+    rg: candidato.rg,
+    pis: candidato.pis,
+    dataNascimento: candidato.dataNascimento,
+    naturalidade: candidato.naturalidade,
+    estadoCivil: candidato.estadoCivil,
+    nomeMae: candidato.nomeMae,
+    nomeConjuge: candidato.nomeConjuge,
+    vagaPretendida: candidato.vagaPretendida,
+    dataPreenchimento: candidato.dataPreenchimento,
+    filhosPossui: candidato.filhosPossui,
+    filhos: candidato.filhos,
+    deficienciaPossui: candidato.deficienciaPossui,
+    deficienciaTipo: candidato.deficienciaTipo,
+    deficienciaDescricao: candidato.deficienciaDescricao,
+    endereco: candidato.endereco,
+    telefone: candidato.telefone,
+    whatsapp: candidato.whatsapp,
+    anexos: candidato.anexos,
+    statusProcesso
+  };
+}
+
+function renderizarJsonLegado(valor: unknown) {
+  if (valor == null) return "Não informado.";
+  if (typeof valor === "string") return valor;
+  try {
+    return JSON.stringify(valor, null, 2);
+  } catch {
+    return String(valor);
+  }
+}
+
 export function ContratacaoPage() {
   const navigate = useNavigate();
   const [abaAtiva, setAbaAtiva] = useState<AbaId>("listagem");
@@ -68,6 +105,7 @@ export function ContratacaoPage() {
   const [confirmarInativacao, setConfirmarInativacao] = useState(false);
 
   const candidatosQuery = useCandidatosRh(filtro);
+  const candidatoDetalheQuery = useCandidatoRh(candidatoSelecionadoId);
   const processoQuery = useProcessoRh(candidatoSelecionadoId);
   const entrevistasQuery = useEntrevistasRh(processoQuery.data?.id);
   const documentosQuery = useDocumentosRh(processoQuery.data?.id);
@@ -81,6 +119,7 @@ export function ContratacaoPage() {
 
   const candidatos = candidatosQuery.data ?? [];
   const processo = processoQuery.data;
+  const candidatoDetalhado = candidatoDetalheQuery.data;
   const entrevistas = entrevistasQuery.data ?? [];
   const documentos = documentosQuery.data ?? [];
   const auditoria = auditoriaQuery.data ?? [];
@@ -97,6 +136,13 @@ export function ContratacaoPage() {
     salvarEntrevistaMutation.isPending ||
     atualizarDocumentoMutation.isPending;
 
+  useEffect(() => {
+    if (!candidatoDetalhado) return;
+    const payload = mapDetalheParaPayload(candidatoDetalhado, processo?.status ?? form.statusProcesso);
+    setForm(payload);
+    setSnapshot(payload);
+  }, [candidatoDetalhado, processo?.status]);
+
   function novo() {
     setCandidatoSelecionadoId(undefined);
     setForm(candidatoVazio);
@@ -107,17 +153,18 @@ export function ContratacaoPage() {
 
   function selecionarCandidato(candidatoId: number) {
     const candidato = candidatos.find((item) => item.candidatoId === candidatoId);
-    if (!candidato) return;
-    setCandidatoSelecionadoId(candidato.candidatoId);
-    const payload: RhCandidatoPayload = {
-      nomeCompleto: candidato.nomeCompleto,
-      cpf: candidato.cpf,
-      telefone: candidato.telefone,
-      vagaPretendida: candidato.vagaPretendida,
-      statusProcesso: candidato.status
-    };
-    setForm(payload);
-    setSnapshot(payload);
+    setCandidatoSelecionadoId(candidatoId);
+    if (candidato) {
+      const payload: RhCandidatoPayload = {
+        nomeCompleto: candidato.nomeCompleto,
+        cpf: candidato.cpf,
+        telefone: candidato.telefone,
+        vagaPretendida: candidato.vagaPretendida,
+        statusProcesso: candidato.status
+      };
+      setForm(payload);
+      setSnapshot(payload);
+    }
     setAbaAtiva("dadosCandidato");
   }
 
@@ -302,12 +349,46 @@ export function ContratacaoPage() {
         ) : null}
 
         {abaAtiva === "dadosCandidato" ? (
-          <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <div className="space-y-1 md:col-span-2"><Label>Nome completo *</Label><Input value={form.nomeCompleto} onChange={(event) => setForm((atual) => ({ ...atual, nomeCompleto: event.target.value }))} /></div>
-            <div className="space-y-1"><Label>CPF</Label><Input value={form.cpf ?? ""} onChange={(event) => setForm((atual) => ({ ...atual, cpf: event.target.value }))} /></div>
-            <div className="space-y-1"><Label>Telefone</Label><Input value={form.telefone ?? ""} onChange={(event) => setForm((atual) => ({ ...atual, telefone: event.target.value }))} /></div>
-            <div className="space-y-1"><Label>Vaga pretendida</Label><Input value={form.vagaPretendida ?? ""} onChange={(event) => setForm((atual) => ({ ...atual, vagaPretendida: event.target.value }))} /></div>
-            <div className="space-y-1"><Label>Status inicial do processo</Label><Select value={form.statusProcesso ?? "TRIAGEM"} onChange={(event) => setForm((atual) => ({ ...atual, statusProcesso: event.target.value }))}><option value="TRIAGEM">Triagem</option><option value="ENTREVISTA">Entrevista</option><option value="DOCUMENTACAO">Documentação</option><option value="APROVADO">Aprovado</option><option value="REPROVADO">Reprovado</option><option value="ADMITIDO">Admitido</option></Select></div>
+          <section className="space-y-4">
+            {candidatoSelecionadoId && candidatoDetalheQuery.isLoading ? (
+              <div className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/35 p-3 text-sm text-[var(--g3-muted)]">
+                Carregando dados completos do legado...
+              </div>
+            ) : null}
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <div className="space-y-1 md:col-span-2"><Label>Nome completo *</Label><Input value={form.nomeCompleto} onChange={(event) => setForm((atual) => ({ ...atual, nomeCompleto: event.target.value }))} /></div>
+              <div className="space-y-1"><Label>CPF</Label><Input value={form.cpf ?? ""} onChange={(event) => setForm((atual) => ({ ...atual, cpf: event.target.value }))} /></div>
+              <div className="space-y-1"><Label>RG</Label><Input value={form.rg ?? ""} onChange={(event) => setForm((atual) => ({ ...atual, rg: event.target.value }))} /></div>
+              <div className="space-y-1"><Label>PIS</Label><Input value={form.pis ?? ""} onChange={(event) => setForm((atual) => ({ ...atual, pis: event.target.value }))} /></div>
+              <div className="space-y-1"><Label>Data de nascimento</Label><Input type="date" value={form.dataNascimento ?? ""} onChange={(event) => setForm((atual) => ({ ...atual, dataNascimento: event.target.value }))} /></div>
+              <div className="space-y-1"><Label>Naturalidade</Label><Input value={form.naturalidade ?? ""} onChange={(event) => setForm((atual) => ({ ...atual, naturalidade: event.target.value }))} /></div>
+              <div className="space-y-1"><Label>Estado civil</Label><Input value={form.estadoCivil ?? ""} onChange={(event) => setForm((atual) => ({ ...atual, estadoCivil: event.target.value }))} /></div>
+              <div className="space-y-1"><Label>Telefone</Label><Input value={form.telefone ?? ""} onChange={(event) => setForm((atual) => ({ ...atual, telefone: event.target.value }))} /></div>
+              <div className="space-y-1"><Label>WhatsApp</Label><Input value={form.whatsapp ?? ""} onChange={(event) => setForm((atual) => ({ ...atual, whatsapp: event.target.value }))} /></div>
+              <div className="space-y-1"><Label>Vaga pretendida</Label><Input value={form.vagaPretendida ?? ""} onChange={(event) => setForm((atual) => ({ ...atual, vagaPretendida: event.target.value }))} /></div>
+              <div className="space-y-1"><Label>Data de preenchimento</Label><Input type="date" value={form.dataPreenchimento ?? ""} onChange={(event) => setForm((atual) => ({ ...atual, dataPreenchimento: event.target.value }))} /></div>
+              <div className="space-y-1"><Label>Status inicial do processo</Label><Select value={form.statusProcesso ?? "TRIAGEM"} onChange={(event) => setForm((atual) => ({ ...atual, statusProcesso: event.target.value }))}><option value="TRIAGEM">Triagem</option><option value="ENTREVISTA">Entrevista</option><option value="DOCUMENTACAO">Documentação</option><option value="APROVADO">Aprovado</option><option value="REPROVADO">Reprovado</option><option value="ADMITIDO">Admitido</option></Select></div>
+              <div className="space-y-1 md:col-span-2"><Label>Nome da mãe</Label><Input value={form.nomeMae ?? ""} onChange={(event) => setForm((atual) => ({ ...atual, nomeMae: event.target.value }))} /></div>
+              <div className="space-y-1 md:col-span-2"><Label>Nome do cônjuge</Label><Input value={form.nomeConjuge ?? ""} onChange={(event) => setForm((atual) => ({ ...atual, nomeConjuge: event.target.value }))} /></div>
+              <div className="space-y-1"><Label>Possui filhos?</Label><Select value={form.filhosPossui ? "SIM" : "NAO"} onChange={(event) => setForm((atual) => ({ ...atual, filhosPossui: event.target.value === "SIM" }))}><option value="NAO">Não</option><option value="SIM">Sim</option></Select></div>
+              <div className="space-y-1"><Label>Possui deficiência?</Label><Select value={form.deficienciaPossui ? "SIM" : "NAO"} onChange={(event) => setForm((atual) => ({ ...atual, deficienciaPossui: event.target.value === "SIM" }))}><option value="NAO">Não</option><option value="SIM">Sim</option></Select></div>
+              <div className="space-y-1"><Label>Tipo de deficiência</Label><Input value={form.deficienciaTipo ?? ""} onChange={(event) => setForm((atual) => ({ ...atual, deficienciaTipo: event.target.value }))} /></div>
+              <div className="space-y-1"><Label>Descrição da deficiência</Label><Input value={form.deficienciaDescricao ?? ""} onChange={(event) => setForm((atual) => ({ ...atual, deficienciaDescricao: event.target.value }))} /></div>
+            </div>
+            <div className="grid gap-3 xl:grid-cols-3">
+              <div className="space-y-1 rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card)] p-3">
+                <Label>Endereço legado</Label>
+                <pre className="max-h-56 overflow-auto whitespace-pre-wrap text-xs text-[var(--g3-muted)]">{renderizarJsonLegado(form.endereco)}</pre>
+              </div>
+              <div className="space-y-1 rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card)] p-3">
+                <Label>Filhos / dependentes</Label>
+                <pre className="max-h-56 overflow-auto whitespace-pre-wrap text-xs text-[var(--g3-muted)]">{renderizarJsonLegado(form.filhos)}</pre>
+              </div>
+              <div className="space-y-1 rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card)] p-3">
+                <Label>Anexos legados</Label>
+                <pre className="max-h-56 overflow-auto whitespace-pre-wrap text-xs text-[var(--g3-muted)]">{renderizarJsonLegado(form.anexos)}</pre>
+              </div>
+            </div>
           </section>
         ) : null}
 

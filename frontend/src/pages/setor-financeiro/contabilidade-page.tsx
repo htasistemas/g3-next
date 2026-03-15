@@ -105,10 +105,6 @@ import type {
 type AbaId =
   | 'painel'
   | 'lancamentos'
-  | 'receitas'
-  | 'despesas'
-  | 'contasPagar'
-  | 'contasReceber'
   | 'fluxoCaixa'
   | 'contas'
   | 'transferencias'
@@ -122,6 +118,13 @@ type AbaId =
   | 'impressoes'
   | 'emendas';
 
+type LancamentoVisaoId =
+  | 'todos'
+  | 'receitas'
+  | 'despesas'
+  | 'contasPagar'
+  | 'contasReceber';
+
 type ExclusaoTipo =
   | 'conta'
   | 'categoria'
@@ -133,10 +136,6 @@ type ExclusaoTipo =
 const abas: AdminTab[] = [
   { id: 'painel', label: 'Painel financeiro', icon: List },
   { id: 'lancamentos', label: 'Lançamentos', icon: ReceiptText },
-  { id: 'receitas', label: 'Receitas', icon: Banknote },
-  { id: 'despesas', label: 'Despesas', icon: Wallet },
-  { id: 'contasPagar', label: 'Contas a pagar', icon: HandCoins },
-  { id: 'contasReceber', label: 'Contas a receber', icon: PiggyBank },
   { id: 'fluxoCaixa', label: 'Fluxo de caixa', icon: ArrowRightLeft },
   { id: 'contas', label: 'Contas bancárias e caixa', icon: Landmark },
   { id: 'transferencias', label: 'Transferências', icon: ArrowRightLeft },
@@ -152,8 +151,13 @@ const abas: AdminTab[] = [
 ];
 
 const coresGraficos = ['#0f766e', '#2563eb', '#f59e0b', '#dc2626', '#9333ea', '#0ea5e9'];
-const hoje = new Date().toISOString().slice(0, 10);
-const inicioMesAtual = `${hoje.slice(0, 8)}01`;
+const formatarDataInput = (data: Date) => data.toISOString().slice(0, 10);
+const hoje = formatarDataInput(new Date());
+const periodoInicialPadrao = (() => {
+  const data = new Date();
+  data.setMonth(data.getMonth() - 12);
+  return formatarDataInput(data);
+})();
 const statusEmAberto = new Set([
   'PREVISTO',
   'PENDENTE',
@@ -163,6 +167,20 @@ const statusEmAberto = new Set([
   'AGUARDANDO_RECEBIMENTO',
   'RENEGOCIADO'
 ]);
+
+const visoesLancamento: Array<{
+  id: LancamentoVisaoId;
+  label: string;
+  descricao: string;
+  icon: typeof ReceiptText;
+  destaque: string;
+}> = [
+  { id: 'todos', label: 'Todos', descricao: 'Visão consolidada de receitas e despesas.', icon: ReceiptText, destaque: '#2563eb' },
+  { id: 'receitas', label: 'Receitas', descricao: 'Entradas e recebimentos previstos.', icon: Banknote, destaque: '#0f766e' },
+  { id: 'despesas', label: 'Despesas', descricao: 'Saídas e pagamentos registrados.', icon: Wallet, destaque: '#dc2626' },
+  { id: 'contasPagar', label: 'Contas a pagar', descricao: 'Obrigações em aberto e vencimentos.', icon: HandCoins, destaque: '#b45309' },
+  { id: 'contasReceber', label: 'Contas a receber', descricao: 'Títulos e receitas pendentes.', icon: PiggyBank, destaque: '#7c3aed' }
+];
 
 const contaVazia: ContaBancariaPayload = {
   banco: '',
@@ -204,28 +222,41 @@ const centroVazio: CentroCustoPayload = {
   status: 'ATIVA'
 };
 
-const lancamentoVazio: LancamentoFinanceiroPayload = {
-  dataLancamento: hoje,
-  tipo: 'DESPESA',
-  natureza: '',
-  contaBancariaId: undefined,
-  categoriaId: undefined,
-  centroCustoId: undefined,
-  setor: '',
-  contraparte: '',
-  documento: '',
-  historico: '',
-  valor: 0,
-  formaPagamento: '',
-  status: 'PENDENTE',
-  origem: 'MANUAL',
-  observacao: '',
-  vencimento: hoje,
-  dataBaixa: '',
-  responsavel: '',
-  projeto: '',
-  compraId: undefined
-};
+function tipoPadraoPorVisaoLancamento(visao: LancamentoVisaoId): LancamentoFinanceiro['tipo'] {
+  if (visao === 'receitas' || visao === 'contasReceber') return 'RECEITA';
+  return 'DESPESA';
+}
+
+function statusPadraoPorVisaoLancamento(visao: LancamentoVisaoId): LancamentoFinanceiro['status'] {
+  if (visao === 'contasReceber') return 'AGUARDANDO_RECEBIMENTO';
+  if (visao === 'contasPagar') return 'AGUARDANDO_PAGAMENTO';
+  return 'PENDENTE';
+}
+
+function criarLancamentoVazio(visao: LancamentoVisaoId = 'todos'): LancamentoFinanceiroPayload {
+  return {
+    dataLancamento: hoje,
+    tipo: tipoPadraoPorVisaoLancamento(visao),
+    natureza: '',
+    contaBancariaId: undefined,
+    categoriaId: undefined,
+    centroCustoId: undefined,
+    setor: '',
+    contraparte: '',
+    documento: '',
+    historico: '',
+    valor: 0,
+    formaPagamento: '',
+    status: statusPadraoPorVisaoLancamento(visao),
+    origem: 'MANUAL',
+    observacao: '',
+    vencimento: hoje,
+    dataBaixa: '',
+    responsavel: '',
+    projeto: '',
+    compraId: undefined
+  };
+}
 
 const movimentacaoVazia: MovimentacaoFinanceiraPayload = {
   tipo: 'AJUSTE',
@@ -461,8 +492,9 @@ export function ContabilidadePage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [abaAtiva, setAbaAtiva] = useState<AbaId>('painel');
+  const [visaoLancamentos, setVisaoLancamentos] = useState<LancamentoVisaoId>('todos');
   const [filtroBusca, setFiltroBusca] = useState('');
-  const [periodoInicial, setPeriodoInicial] = useState(inicioMesAtual);
+  const [periodoInicial, setPeriodoInicial] = useState(periodoInicialPadrao);
   const [periodoFinal, setPeriodoFinal] = useState(hoje);
   const [filtroContaId, setFiltroContaId] = useState<number | undefined>();
   const [filtroCategoriaId, setFiltroCategoriaId] = useState<number | undefined>();
@@ -482,7 +514,7 @@ export function ContabilidadePage() {
   const [contaForm, setContaForm] = useState<ContaBancariaPayload>(contaVazia);
   const [categoriaForm, setCategoriaForm] = useState<CategoriaFinanceiraPayload>(categoriaVazia);
   const [centroForm, setCentroForm] = useState<CentroCustoPayload>(centroVazio);
-  const [lancamentoForm, setLancamentoForm] = useState<LancamentoFinanceiroPayload>(lancamentoVazio);
+  const [lancamentoForm, setLancamentoForm] = useState<LancamentoFinanceiroPayload>(criarLancamentoVazio());
   const [movimentacaoForm, setMovimentacaoForm] = useState<MovimentacaoFinanceiraPayload>(movimentacaoVazia);
   const [transferenciaForm, setTransferenciaForm] = useState<TransferenciaFinanceiraPayload>(transferenciaVazia);
   const [conciliacaoForm, setConciliacaoForm] = useState<ConciliacaoFinanceiraPayload>(conciliacaoVazia);
@@ -574,6 +606,49 @@ export function ContabilidadePage() {
   const despesas = useMemo(() => lancamentosFiltrados.filter((item) => item.tipo === 'DESPESA'), [lancamentosFiltrados]);
   const contasPagar = useMemo(() => despesas.filter((item) => statusEmAberto.has(item.status)), [despesas]);
   const contasReceber = useMemo(() => receitas.filter((item) => statusEmAberto.has(item.status)), [receitas]);
+  const listaLancamentosAtiva = useMemo(() => {
+    switch (visaoLancamentos) {
+      case 'receitas':
+        return receitas;
+      case 'despesas':
+        return despesas;
+      case 'contasPagar':
+        return contasPagar;
+      case 'contasReceber':
+        return contasReceber;
+      default:
+        return lancamentosFiltrados;
+    }
+  }, [contasPagar, contasReceber, despesas, receitas, lancamentosFiltrados, visaoLancamentos]);
+  const resumoVisoesLancamento = useMemo(
+    () =>
+      visoesLancamento.map((visao) => {
+        const lista =
+          visao.id === 'receitas'
+            ? receitas
+            : visao.id === 'despesas'
+              ? despesas
+              : visao.id === 'contasPagar'
+                ? contasPagar
+                : visao.id === 'contasReceber'
+                  ? contasReceber
+                  : lancamentosFiltrados;
+        return {
+          ...visao,
+          quantidade: lista.length,
+          valorTotal: lista.reduce((acc, item) => acc + item.valor, 0)
+        };
+      }),
+    [contasPagar, contasReceber, despesas, receitas, lancamentosFiltrados]
+  );
+  const ultimasMovimentacoesBancarias = useMemo(
+    () =>
+      [...movimentacoes]
+        .filter((item) => item.contaBancariaId)
+        .sort((itemA, itemB) => (itemB.dataMovimentacao || '').localeCompare(itemA.dataMovimentacao || '') || itemB.id - itemA.id)
+        .slice(0, 8),
+    [movimentacoes]
+  );
 
   const saldoGeral = useMemo(() => contas.reduce((acc, item) => acc + item.saldoAtual, 0), [contas]);
   const saldoBancos = useMemo(() => contas.filter((item) => item.tipo !== 'CAIXA_INTERNO').reduce((acc, item) => acc + item.saldoAtual, 0), [contas]);
@@ -666,8 +741,14 @@ export function ContabilidadePage() {
         return;
       default:
         setLancamentoSelecionadoId(undefined);
-        setLancamentoForm(lancamentoVazio);
+        setLancamentoForm(criarLancamentoVazio(visaoLancamentos));
     }
+  }
+
+  function mudarVisaoLancamentos(visao: LancamentoVisaoId) {
+    setVisaoLancamentos(visao);
+    setLancamentoSelecionadoId(undefined);
+    setLancamentoForm(criarLancamentoVazio(visao));
   }
 
   async function atualizarDados() {
@@ -680,14 +761,18 @@ export function ContabilidadePage() {
   }
 
   function lancamentoAjustado(): LancamentoFinanceiroPayload {
-    if (abaAtiva === 'receitas' || abaAtiva === 'contasReceber') {
-      return { ...lancamentoForm, tipo: 'RECEITA', status: lancamentoForm.status || 'PENDENTE' };
+    if (visaoLancamentos === 'receitas' || visaoLancamentos === 'contasReceber') {
+      return {
+        ...lancamentoForm,
+        tipo: 'RECEITA',
+        status: visaoLancamentos === 'contasReceber' ? 'AGUARDANDO_RECEBIMENTO' : lancamentoForm.status || 'PENDENTE'
+      };
     }
-    if (abaAtiva === 'despesas' || abaAtiva === 'contasPagar') {
+    if (visaoLancamentos === 'despesas' || visaoLancamentos === 'contasPagar') {
       return {
         ...lancamentoForm,
         tipo: 'DESPESA',
-        status: abaAtiva === 'contasPagar' ? 'AGUARDANDO_PAGAMENTO' : lancamentoForm.status || 'PENDENTE'
+        status: visaoLancamentos === 'contasPagar' ? 'AGUARDANDO_PAGAMENTO' : lancamentoForm.status || 'PENDENTE'
       };
     }
     return lancamentoForm;
@@ -799,7 +884,7 @@ export function ContabilidadePage() {
     if (abaAtiva === 'contas' && contaSelecionadaId) return setTipoExclusao('conta'), setConfirmarExclusao(true);
     if (abaAtiva === 'categorias' && categoriaSelecionadaId) return setTipoExclusao('categoria'), setConfirmarExclusao(true);
     if (abaAtiva === 'centros' && centroSelecionadoId) return setTipoExclusao('centro'), setConfirmarExclusao(true);
-    if (['lancamentos', 'receitas', 'despesas', 'contasPagar', 'contasReceber'].includes(abaAtiva) && lancamentoSelecionadoId) return setTipoExclusao('lancamento'), setConfirmarExclusao(true);
+    if (abaAtiva === 'lancamentos' && lancamentoSelecionadoId) return setTipoExclusao('lancamento'), setConfirmarExclusao(true);
     if (abaAtiva === 'fluxoCaixa' && movimentacaoSelecionadaId) return setTipoExclusao('movimentacao'), setConfirmarExclusao(true);
     setPopup({ tipo: 'aviso', titulo: 'Seleção necessária', texto: 'Selecione um registro válido para excluir.' });
   }
@@ -933,13 +1018,48 @@ export function ContabilidadePage() {
     );
   }
 
-  function renderFormularioLancamentos(titulo: string, descricao: string, lista: LancamentoFinanceiro[]) {
+  function renderFormularioLancamentos() {
+    const visaoAtual = resumoVisoesLancamento.find((item) => item.id === visaoLancamentos) ?? resumoVisoesLancamento[0];
     return (
       <section className="space-y-4">
         {renderFiltros()}
-        <Bloco titulo={titulo} descricao={descricao}>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          {resumoVisoesLancamento.map((item) => {
+            const Icone = item.icon;
+            const selecionado = item.id === visaoLancamentos;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => mudarVisaoLancamentos(item.id)}
+                className={`rounded-xl border p-4 text-left transition ${
+                  selecionado
+                    ? 'border-[var(--g3-active)] bg-[var(--g3-primary-soft)] shadow-sm'
+                    : 'border-[var(--g3-border)] bg-[var(--g3-card)] hover:border-[var(--g3-active)]/40'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--g3-muted)]">{item.label}</p>
+                    <p className="mt-1 text-2xl font-bold" style={{ color: item.destaque }}>
+                      {formatarMoeda(item.valorTotal)}
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--g3-muted)]">{item.quantidade} registro(s)</p>
+                  </div>
+                  <span className="rounded-full bg-white/80 p-2 text-[var(--g3-active)] shadow-sm">
+                    <Icone className="h-4 w-4" />
+                  </span>
+                </div>
+                <p className="mt-3 text-xs text-[var(--g3-muted)]">{item.descricao}</p>
+              </button>
+            );
+          })}
+        </div>
+
+        <Bloco titulo="Lançamentos" descricao={visaoAtual.descricao}>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <div className="space-y-1"><Label>Data</Label><Input type="date" value={lancamentoForm.dataLancamento} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, dataLancamento: event.target.value }))} /></div>
+            <div className="space-y-1"><Label>Tipo do lançamento</Label><Select value={lancamentoForm.tipo} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, tipo: event.target.value as LancamentoFinanceiro['tipo'] }))}><option value="RECEITA">Receita</option><option value="DESPESA">Despesa</option><option value="AJUSTE">Ajuste</option><option value="ESTORNO">Estorno</option></Select></div>
             <div className="space-y-1"><Label>Conta</Label><Select value={lancamentoForm.contaBancariaId ? String(lancamentoForm.contaBancariaId) : ''} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, contaBancariaId: Number(event.target.value) || undefined }))}><option value="">Selecione</option>{contas.map((conta) => <option key={conta.id} value={conta.id}>{conta.nomeConta}</option>)}</Select></div>
             <div className="space-y-1"><Label>Categoria</Label><Select value={lancamentoForm.categoriaId ? String(lancamentoForm.categoriaId) : ''} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, categoriaId: Number(event.target.value) || undefined }))}><option value="">Selecione</option>{categorias.map((categoria) => <option key={categoria.id} value={categoria.id}>{categoria.nome}</option>)}</Select></div>
             <div className="space-y-1"><Label>Centro de custo</Label><Select value={lancamentoForm.centroCustoId ? String(lancamentoForm.centroCustoId) : ''} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, centroCustoId: Number(event.target.value) || undefined }))}><option value="">Selecione</option>{centrosCusto.map((centro) => <option key={centro.id} value={centro.id}>{centro.nome}</option>)}</Select></div>
@@ -949,7 +1069,7 @@ export function ContabilidadePage() {
             <div className="space-y-1"><Label>Vencimento</Label><Input type="date" value={lancamentoForm.vencimento} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, vencimento: event.target.value }))} /></div>
             <div className="space-y-1"><Label>Valor</Label><Input type="number" min={0} step="0.01" value={lancamentoForm.valor} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, valor: Number(event.target.value) || 0 }))} /></div>
             <div className="space-y-1"><Label>Forma de pagamento</Label><Input value={lancamentoForm.formaPagamento ?? ''} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, formaPagamento: event.target.value }))} /></div>
-            <div className="space-y-1"><Label>Status</Label><Input value={lancamentoForm.status} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, status: event.target.value.toUpperCase() as LancamentoFinanceiro['status'] }))} /></div>
+            <div className="space-y-1"><Label>Status</Label><Select value={lancamentoForm.status} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, status: event.target.value as LancamentoFinanceiro['status'] }))}><option value="PENDENTE">Pendente</option><option value="AGUARDANDO_PAGAMENTO">Aguardando pagamento</option><option value="AGUARDANDO_RECEBIMENTO">Aguardando recebimento</option><option value="PREVISTO">Previsto</option><option value="VENCIDO">Vencido</option><option value="ATRASADO">Atrasado</option><option value="PAGO">Pago</option><option value="RECEBIDO">Recebido</option><option value="CANCELADO">Cancelado</option><option value="RENEGOCIADO">Renegociado</option></Select></div>
             <div className="space-y-1"><Label>Origem</Label><Input value={lancamentoForm.origem ?? ''} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, origem: event.target.value }))} disabled={!!lancamentoForm.compraId} /></div>
             <div className="space-y-1 md:col-span-2 xl:col-span-4"><Label>Histórico</Label><Textarea rows={3} value={lancamentoForm.historico} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, historico: event.target.value }))} /></div>
             <div className="space-y-1 md:col-span-2 xl:col-span-4"><Label>Observação</Label><Textarea rows={2} value={lancamentoForm.observacao ?? ''} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, observacao: event.target.value }))} /></div>
@@ -961,20 +1081,24 @@ export function ContabilidadePage() {
             <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]">
               <tr>
                 <th className="px-3 py-2 text-left">Data</th>
+                <th className="px-3 py-2 text-left">Tipo</th>
                 <th className="px-3 py-2 text-left">Histórico</th>
                 <th className="px-3 py-2 text-left">Favorecido / pagador</th>
+                <th className="px-3 py-2 text-left">Conta</th>
                 <th className="px-3 py-2 text-left">Status</th>
                 <th className="px-3 py-2 text-left">Valor</th>
                 <th className="px-3 py-2 text-right">Ações</th>
               </tr>
             </thead>
             <tbody>
-              {lista.length ? (
-                lista.map((item, index) => (
+              {listaLancamentosAtiva.length ? (
+                listaLancamentosAtiva.map((item, index) => (
                   <tr key={item.id} className={`border-t border-[var(--g3-border)] ${index % 2 === 0 ? 'bg-[var(--g3-card)]' : 'bg-[var(--g3-primary-soft)]/35'}`}>
                     <td className="px-3 py-2">{formatarData(item.dataLancamento)}</td>
+                    <td className="px-3 py-2">{formatarStatus(item.tipo)}</td>
                     <td className="px-3 py-2">{item.historico}</td>
                     <td className="px-3 py-2">{item.contraparte}</td>
+                    <td className="px-3 py-2">{item.contaBancariaNome ?? 'Sem conta'}</td>
                     <td className="px-3 py-2">{formatarStatus(item.status)}</td>
                     <td className="px-3 py-2">{formatarMoeda(item.valor)}</td>
                     <td className="px-3 py-2 text-right">
@@ -997,7 +1121,7 @@ export function ContabilidadePage() {
                   </tr>
                 ))
               ) : (
-                <tr><td colSpan={6} className="px-3 py-4 text-center text-[var(--g3-muted)]">Nenhum lançamento encontrado.</td></tr>
+                <tr><td colSpan={8} className="px-3 py-4 text-center text-[var(--g3-muted)]">Nenhum lançamento encontrado.</td></tr>
               )}
             </tbody>
           </table>
@@ -1071,19 +1195,52 @@ export function ContabilidadePage() {
   }
 
   function renderContas() {
-    return renderListaSimples(
-      'Contas bancárias e caixa',
-      'Cadastre contas, defina saldo inicial, saldo mínimo e permissão de movimentação.',
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <div className="space-y-1"><Label>Banco</Label><Input value={contaForm.banco} onChange={(event) => setContaForm((atual) => ({ ...atual, banco: event.target.value }))} /></div>
-        <div className="space-y-1"><Label>Número</Label><Input value={contaForm.numero} onChange={(event) => setContaForm((atual) => ({ ...atual, numero: event.target.value }))} /></div>
-        <div className="space-y-1"><Label>Nome da conta</Label><Input value={contaForm.nomeConta} onChange={(event) => setContaForm((atual) => ({ ...atual, nomeConta: event.target.value }))} /></div>
-        <div className="space-y-1"><Label>Saldo inicial</Label><Input type="number" min={0} step="0.01" value={contaForm.saldoInicial} onChange={(event) => setContaForm((atual) => ({ ...atual, saldoInicial: Number(event.target.value) || 0 }))} /></div>
-      </div>,
-      <table className="min-w-full text-sm">
-        <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"><tr><th className="px-3 py-2 text-left">Conta</th><th className="px-3 py-2 text-left">Banco</th><th className="px-3 py-2 text-left">Tipo</th><th className="px-3 py-2 text-left">Saldo</th><th className="px-3 py-2 text-right">Ações</th></tr></thead>
-        <tbody>{contas.length ? contas.map((item, index) => <tr key={item.id} className={`border-t border-[var(--g3-border)] ${index % 2 === 0 ? 'bg-[var(--g3-card)]' : 'bg-[var(--g3-primary-soft)]/35'}`}><td className="px-3 py-2">{item.nomeConta}</td><td className="px-3 py-2">{item.banco}</td><td className="px-3 py-2">{formatarStatus(item.tipo)}</td><td className="px-3 py-2">{formatarMoeda(item.saldoAtual)}</td><td className="px-3 py-2 text-right"><Button size="sm" variant="outline" onClick={() => { setContaSelecionadaId(item.id); setContaForm(toContaForm(item)); }}>Selecionar</Button></td></tr>) : <tr><td colSpan={5} className="px-3 py-4 text-center text-[var(--g3-muted)]">Nenhuma conta cadastrada.</td></tr>}</tbody>
-      </table>
+    return (
+      <section className="space-y-4">
+        <Bloco
+          titulo="Contas bancárias e caixa"
+          descricao="Cadastre novas contas, edite as já existentes e visualize os dados financeiros herdados do legado no mesmo lugar."
+        >
+          <div className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/35 p-3 text-xs text-[var(--g3-muted)]">
+            As contas e movimentações bancárias já existentes no legado são carregadas automaticamente das tabelas financeiras do banco.
+          </div>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="space-y-1"><Label>Banco</Label><Input value={contaForm.banco} onChange={(event) => setContaForm((atual) => ({ ...atual, banco: event.target.value }))} /></div>
+            <div className="space-y-1"><Label>Agência</Label><Input value={contaForm.agencia ?? ''} onChange={(event) => setContaForm((atual) => ({ ...atual, agencia: event.target.value }))} /></div>
+            <div className="space-y-1"><Label>Número</Label><Input value={contaForm.numero} onChange={(event) => setContaForm((atual) => ({ ...atual, numero: event.target.value }))} /></div>
+            <div className="space-y-1"><Label>Dígito</Label><Input value={contaForm.digito ?? ''} onChange={(event) => setContaForm((atual) => ({ ...atual, digito: event.target.value }))} /></div>
+            <div className="space-y-1"><Label>Nome da conta</Label><Input value={contaForm.nomeConta} onChange={(event) => setContaForm((atual) => ({ ...atual, nomeConta: event.target.value }))} /></div>
+            <div className="space-y-1"><Label>Tipo</Label><Select value={contaForm.tipo} onChange={(event) => setContaForm((atual) => ({ ...atual, tipo: event.target.value as ContaBancaria['tipo'] }))}><option value="CONTA_CORRENTE">Conta corrente</option><option value="POUPANCA">Poupança</option><option value="APLICACAO">Aplicação</option><option value="CAIXA_INTERNO">Caixa interno</option></Select></div>
+            <div className="space-y-1"><Label>Titular</Label><Input value={contaForm.titular ?? ''} onChange={(event) => setContaForm((atual) => ({ ...atual, titular: event.target.value }))} /></div>
+            <div className="space-y-1"><Label>Status</Label><Select value={contaForm.status ?? 'ATIVA'} onChange={(event) => setContaForm((atual) => ({ ...atual, status: event.target.value as ContaBancaria['status'] }))}><option value="ATIVA">Ativa</option><option value="INATIVA">Inativa</option></Select></div>
+            <div className="space-y-1"><Label>Saldo inicial</Label><Input type="number" min={0} step="0.01" value={contaForm.saldoInicial} onChange={(event) => setContaForm((atual) => ({ ...atual, saldoInicial: Number(event.target.value) || 0 }))} /></div>
+            <div className="space-y-1"><Label>Data do saldo inicial</Label><Input type="date" value={contaForm.dataSaldoInicial} onChange={(event) => setContaForm((atual) => ({ ...atual, dataSaldoInicial: event.target.value }))} /></div>
+            <div className="space-y-1"><Label>Alerta de saldo mínimo</Label><Input type="number" min={0} step="0.01" value={contaForm.limiteMinimoAlerta ?? 0} onChange={(event) => setContaForm((atual) => ({ ...atual, limiteMinimoAlerta: Number(event.target.value) || 0 }))} /></div>
+            <div className="space-y-1"><Label>Movimentação</Label><Select value={contaForm.permiteMovimentacao === false ? 'NAO' : 'SIM'} onChange={(event) => setContaForm((atual) => ({ ...atual, permiteMovimentacao: event.target.value === 'SIM' }))}><option value="SIM">Permite movimentação</option><option value="NAO">Somente consulta</option></Select></div>
+            <div className="space-y-1 md:col-span-2 xl:col-span-4"><Label>Observação</Label><Textarea rows={2} value={contaForm.observacao ?? ''} onChange={(event) => setContaForm((atual) => ({ ...atual, observacao: event.target.value }))} /></div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" onClick={limparFormularioAtual} disabled={processando}>Nova conta</Button>
+            <Button type="button" onClick={() => void salvarAtual()} disabled={processando}>{contaSelecionadaId ? 'Salvar alterações' : 'Cadastrar conta'}</Button>
+          </div>
+        </Bloco>
+
+        <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]">
+          <table className="min-w-full text-sm">
+            <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"><tr><th className="px-3 py-2 text-left">Conta</th><th className="px-3 py-2 text-left">Banco</th><th className="px-3 py-2 text-left">Tipo</th><th className="px-3 py-2 text-left">Status</th><th className="px-3 py-2 text-left">Saldo</th><th className="px-3 py-2 text-right">Ações</th></tr></thead>
+            <tbody>{contas.length ? contas.map((item, index) => <tr key={item.id} className={`border-t border-[var(--g3-border)] ${index % 2 === 0 ? 'bg-[var(--g3-card)]' : 'bg-[var(--g3-primary-soft)]/35'}`}><td className="px-3 py-2">{item.nomeConta}</td><td className="px-3 py-2">{item.banco}</td><td className="px-3 py-2">{formatarStatus(item.tipo)}</td><td className="px-3 py-2">{formatarStatus(item.status)}</td><td className="px-3 py-2">{formatarMoeda(item.saldoAtual)}</td><td className="px-3 py-2 text-right"><Button size="sm" variant="outline" onClick={() => { setContaSelecionadaId(item.id); setContaForm(toContaForm(item)); }}>Selecionar</Button></td></tr>) : <tr><td colSpan={6} className="px-3 py-4 text-center text-[var(--g3-muted)]">Nenhuma conta cadastrada.</td></tr>}</tbody>
+          </table>
+        </div>
+
+        <Bloco titulo="Últimas movimentações bancárias" descricao="Movimentações já encontradas nas tabelas financeiras do legado e do módulo atual.">
+          <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]">
+            <table className="min-w-full text-sm">
+              <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"><tr><th className="px-3 py-2 text-left">Data</th><th className="px-3 py-2 text-left">Conta</th><th className="px-3 py-2 text-left">Descrição</th><th className="px-3 py-2 text-left">Origem</th><th className="px-3 py-2 text-left">Valor</th></tr></thead>
+              <tbody>{ultimasMovimentacoesBancarias.length ? ultimasMovimentacoesBancarias.map((item, index) => <tr key={item.id} className={`border-t border-[var(--g3-border)] ${index % 2 === 0 ? 'bg-[var(--g3-card)]' : 'bg-[var(--g3-primary-soft)]/35'}`}><td className="px-3 py-2">{formatarData(item.dataMovimentacao)}</td><td className="px-3 py-2">{item.contaBancariaNome ?? 'Sem conta'}</td><td className="px-3 py-2">{item.descricao}</td><td className="px-3 py-2">{formatarStatus(item.origem)}</td><td className="px-3 py-2">{formatarMoeda(item.valor)}</td></tr>) : <tr><td colSpan={5} className="px-3 py-4 text-center text-[var(--g3-muted)]">Nenhuma movimentação bancária encontrada.</td></tr>}</tbody>
+            </table>
+          </div>
+        </Bloco>
+      </section>
     );
   }
 
@@ -1265,7 +1422,7 @@ export function ContabilidadePage() {
   const codeBadge =
     abaAtiva === 'contas' && contaSelecionadaId
       ? `Conta ${contaSelecionadaId}`
-      : ['lancamentos', 'receitas', 'despesas', 'contasPagar', 'contasReceber', 'anexos'].includes(abaAtiva) && lancamentoSelecionadoId
+      : ['lancamentos', 'anexos'].includes(abaAtiva) && lancamentoSelecionadoId
         ? `Lançamento ${lancamentoSelecionadoId}`
         : abaAtiva === 'categorias' && categoriaSelecionadaId
           ? `Categoria ${categoriaSelecionadaId}`
@@ -1286,11 +1443,7 @@ export function ContabilidadePage() {
         codeBadge={codeBadge}
       >
         {abaAtiva === 'painel' ? renderPainel() : null}
-        {abaAtiva === 'lancamentos' ? renderFormularioLancamentos('Lançamentos', 'Central principal das movimentações financeiras.', lancamentosFiltrados) : null}
-        {abaAtiva === 'receitas' ? renderFormularioLancamentos('Receitas', 'Cadastre entradas, confirme recebimentos e acompanhe atrasos.', receitas) : null}
-        {abaAtiva === 'despesas' ? renderFormularioLancamentos('Despesas', 'Controle saídas, documentos fiscais e responsáveis.', despesas) : null}
-        {abaAtiva === 'contasPagar' ? renderFormularioLancamentos('Contas a pagar', 'Organize obrigações futuras e pagamentos aguardando execução.', contasPagar) : null}
-        {abaAtiva === 'contasReceber' ? renderFormularioLancamentos('Contas a receber', 'Acompanhe títulos a receber e receitas em aberto.', contasReceber) : null}
+        {abaAtiva === 'lancamentos' ? renderFormularioLancamentos() : null}
         {abaAtiva === 'fluxoCaixa' ? renderFluxoCaixa() : null}
         {abaAtiva === 'contas' ? renderContas() : null}
         {abaAtiva === 'transferencias' ? renderTransferencias() : null}

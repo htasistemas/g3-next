@@ -60,18 +60,23 @@ export function normalizarTipoConta(valor) {
         return "APLICACAO";
     if (normalizado === "CAIXA_INTERNO" || normalizado === "CAIXA")
         return "CAIXA_INTERNO";
+    if (["CORRENTE", "CONTA_CORRENTE", "PROJETO", "CONTA_PROJETO"].includes(normalizado)) {
+        return "CONTA_CORRENTE";
+    }
     return "CONTA_CORRENTE";
 }
 export function normalizarStatusConta(valor) {
-    return normalizarTextoEnum(valor) === "INATIVA" ? "INATIVA" : "ATIVA";
+    return ["INATIVA", "INATIVO"].includes(normalizarTextoEnum(valor)) ? "INATIVA" : "ATIVA";
 }
 export function normalizarTipoCategoria(valor) {
     return normalizarTextoEnum(valor) === "RECEITA" ? "RECEITA" : "DESPESA";
 }
 export function normalizarTipoLancamento(valor) {
     const normalizado = normalizarTextoEnum(valor);
-    if (normalizado === "RECEITA")
+    if (["RECEITA", "RECEBER", "ENTRADA", "CREDITO", "CREDITO"].includes(normalizado))
         return "RECEITA";
+    if (["DESPESA", "PAGAR", "SAIDA", "DEBITO", "DEBITO"].includes(normalizado))
+        return "DESPESA";
     if (normalizado === "TRANSFERENCIA")
         return "TRANSFERENCIA";
     if (normalizado === "AJUSTE")
@@ -82,10 +87,20 @@ export function normalizarTipoLancamento(valor) {
 }
 export function normalizarStatusLancamento(valor, tipo) {
     const normalizado = normalizarTextoEnum(valor);
+    const tipoNormalizado = tipo ?? "DESPESA";
+    if (["ABERTO", "EM_ABERTO", "A_PAGAR", "A_RECEBER"].includes(normalizado)) {
+        return statusPendentePorTipo(tipoNormalizado);
+    }
+    if (["PAGO", "PAGA", "QUITADO", "LIQUIDADO", "BAIXADO", "COMPENSADO"].includes(normalizado)) {
+        return statusBaixadoPorTipo(tipoNormalizado);
+    }
+    if (["RECEBIDO", "RECEBIDA"].includes(normalizado)) {
+        return "RECEBIDO";
+    }
     if (LANCAMENTO_FINANCEIRO_STATUS.includes(normalizado)) {
         return normalizado;
     }
-    return tipo === "RECEITA" ? "AGUARDANDO_RECEBIMENTO" : "AGUARDANDO_PAGAMENTO";
+    return statusPendentePorTipo(tipoNormalizado);
 }
 export function normalizarStatusTransferencia(valor) {
     const normalizado = normalizarTextoEnum(valor);

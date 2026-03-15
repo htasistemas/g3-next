@@ -284,17 +284,21 @@ async function ensureContabilidadeEstrutura() {
         )
       `);
 
-      await prisma.$executeRawUnsafe(`
-        CREATE INDEX IF NOT EXISTS conta_bancaria_status_idx ON conta_bancaria(status, ativo);
-        CREATE INDEX IF NOT EXISTS financeiro_categoria_tipo_idx ON financeiro_categoria(tipo, status, ativo);
-        CREATE INDEX IF NOT EXISTS financeiro_centro_custo_status_idx ON financeiro_centro_custo(status, ativo);
-        CREATE INDEX IF NOT EXISTS lancamento_financeiro_status_idx ON lancamento_financeiro(situacao, tipo, ativo);
-        CREATE INDEX IF NOT EXISTS lancamento_financeiro_compra_idx ON lancamento_financeiro(compra_id);
-        CREATE INDEX IF NOT EXISTS movimentacao_financeira_conta_data_idx ON movimentacao_financeira(conta_bancaria_id, data_movimentacao);
-        CREATE INDEX IF NOT EXISTS financeiro_transferencia_status_idx ON financeiro_transferencia(status, data_transferencia);
-        CREATE INDEX IF NOT EXISTS financeiro_conciliacao_situacao_idx ON financeiro_conciliacao(situacao, conta_bancaria_id);
-        CREATE INDEX IF NOT EXISTS financeiro_historico_aba_idx ON financeiro_historico(aba, criado_em DESC);
-      `);
+      const comandosIndices = [
+        `CREATE INDEX IF NOT EXISTS conta_bancaria_status_idx ON conta_bancaria(status, ativo)`,
+        `CREATE INDEX IF NOT EXISTS financeiro_categoria_tipo_idx ON financeiro_categoria(tipo, status, ativo)`,
+        `CREATE INDEX IF NOT EXISTS financeiro_centro_custo_status_idx ON financeiro_centro_custo(status, ativo)`,
+        `CREATE INDEX IF NOT EXISTS lancamento_financeiro_status_idx ON lancamento_financeiro(situacao, tipo, ativo)`,
+        `CREATE INDEX IF NOT EXISTS lancamento_financeiro_compra_idx ON lancamento_financeiro(compra_id)`,
+        `CREATE INDEX IF NOT EXISTS movimentacao_financeira_conta_data_idx ON movimentacao_financeira(conta_bancaria_id, data_movimentacao)`,
+        `CREATE INDEX IF NOT EXISTS financeiro_transferencia_status_idx ON financeiro_transferencia(status, data_transferencia)`,
+        `CREATE INDEX IF NOT EXISTS financeiro_conciliacao_situacao_idx ON financeiro_conciliacao(situacao, conta_bancaria_id)`,
+        `CREATE INDEX IF NOT EXISTS financeiro_historico_aba_idx ON financeiro_historico(aba, criado_em DESC)`,
+      ];
+
+      for (const comandoIndice of comandosIndices) {
+        await prisma.$executeRawUnsafe(comandoIndice);
+      }
 
       await prisma.$executeRawUnsafe(`
         INSERT INTO financeiro_categoria (codigo, nome, tipo, grupo, subgrupo, status)

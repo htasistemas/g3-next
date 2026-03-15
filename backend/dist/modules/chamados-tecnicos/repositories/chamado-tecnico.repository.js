@@ -200,7 +200,7 @@ function buildOrderBy(ordenacao, direcao = "desc") {
         case "situacao":
             return Prisma.sql `COALESCE(sit.ordem, 999) ${orderDirection}, c.ultima_atualizacao DESC`;
         case "responsavel":
-            return Prisma.sql `LOWER(COALESCE(resp.nome_exibicao, resp.nome_completo, resp.nome_usuario, '')) ${orderDirection}, c.ultima_atualizacao DESC`;
+            return Prisma.sql `LOWER(COALESCE(resp.nome_exibicao, resp.nome, resp.nome_usuario, '')) ${orderDirection}, c.ultima_atualizacao DESC`;
         case "cliente":
             return Prisma.sql `LOWER(COALESCE(c.cliente, '')) ${orderDirection}, c.ultima_atualizacao DESC`;
         case "sistema":
@@ -250,10 +250,15 @@ export class ChamadoTecnicoRepository {
     async listarParametros(tipo) {
         await this.garantirEstrutura();
         await this.garantirParametrosIniciais();
+        const filtroTipo = tipo
+            ? Prisma.sql `
+          WHERE tipo = ${tipo}
+        `
+            : Prisma.empty;
         return prisma.$queryRaw(Prisma.sql `
       SELECT id, tipo, chave, nome, descricao, cor, ordem, padrao, sla_horas, ativo, metadados_json, criado_em, atualizado_em
       FROM g3n_chamado_tecnico_parametro
-      WHERE (${tipo ?? null} IS NULL OR tipo = ${tipo ?? null})
+      ${filtroTipo}
       ORDER BY tipo ASC, ordem ASC, nome ASC
     `);
     }
@@ -283,19 +288,24 @@ export class ChamadoTecnicoRepository {
     async listarUsuariosCatalogo() {
         await this.garantirEstrutura();
         return prisma.$queryRaw(Prisma.sql `
-      SELECT id, nome_usuario, nome_completo, nome_exibicao, email, status
+      SELECT id, nome_usuario, nome AS nome_completo, nome_exibicao, email, status
       FROM usuarios
-      ORDER BY COALESCE(nome_exibicao, nome_completo, nome_usuario) ASC
+      ORDER BY COALESCE(nome_exibicao, nome, nome_usuario) ASC
     `);
     }
     async salvarParametro(input, id) {
         await this.garantirEstrutura();
         if (input.padrao) {
+            const filtroExclusaoId = id
+                ? Prisma.sql `
+            AND id <> ${id}
+          `
+                : Prisma.empty;
             await prisma.$executeRaw(Prisma.sql `
         UPDATE g3n_chamado_tecnico_parametro
         SET padrao = FALSE, atualizado_em = NOW()
         WHERE tipo = ${input.tipo}
-          AND (${id ?? null} IS NULL OR id <> ${id ?? null})
+        ${filtroExclusaoId}
       `);
         }
         if (id) {
@@ -692,11 +702,16 @@ export class ChamadoTecnicoRepository {
     async salvarFiltroSalvo(usuarioId, input, id) {
         await this.garantirEstrutura();
         if (input.padrao) {
+            const filtroExclusaoId = id
+                ? Prisma.sql `
+            AND id <> ${id}
+          `
+                : Prisma.empty;
             await prisma.$executeRaw(Prisma.sql `
         UPDATE g3n_chamado_tecnico_filtro_salvo
         SET padrao = FALSE, atualizado_em = NOW()
         WHERE usuario_id = ${usuarioId}
-          AND (${id ?? null} IS NULL OR id <> ${id ?? null})
+        ${filtroExclusaoId}
       `);
         }
         if (id) {

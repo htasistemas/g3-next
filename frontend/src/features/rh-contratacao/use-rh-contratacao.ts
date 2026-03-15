@@ -16,6 +16,14 @@ export function useCandidatosRh(termo: string) {
   });
 }
 
+export function useCandidatoRh(candidatoId?: number) {
+  return useQuery({
+    queryKey: ["rh-contratacao", "candidato", candidatoId],
+    queryFn: () => rhContratacaoService.buscarCandidato(candidatoId as number),
+    enabled: !!candidatoId
+  });
+}
+
 export function useProcessoRh(candidatoId?: number) {
   return useQuery({
     queryKey: ["rh-contratacao", "processo", candidatoId],
@@ -57,6 +65,7 @@ export function useSalvarCandidatoRh() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["rh-contratacao", "candidatos"] });
+      await queryClient.invalidateQueries({ queryKey: ["rh-contratacao", "candidato"] });
     }
   });
 }
@@ -67,6 +76,7 @@ export function useInativarCandidatoRh() {
     mutationFn: (id: number) => rhContratacaoService.inativarCandidato(id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["rh-contratacao", "candidatos"] });
+      await queryClient.invalidateQueries({ queryKey: ["rh-contratacao", "candidato"] });
     }
   });
 }
