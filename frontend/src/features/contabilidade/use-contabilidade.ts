@@ -15,77 +15,91 @@ import type {
 
 const baseKey = ['contabilidade'] as const;
 
+type QueryOptions = {
+  enabled?: boolean;
+};
+
 async function invalidarTudoContabilidade(queryClient: ReturnType<typeof useQueryClient>) {
   await queryClient.invalidateQueries({ queryKey: baseKey });
 }
 
-export function useContasBancarias() {
+export function useContasBancarias(options?: QueryOptions) {
   return useQuery({
     queryKey: [...baseKey, 'contas-bancarias'],
-    queryFn: () => contabilidadeService.listarContasBancarias()
+    queryFn: () => contabilidadeService.listarContasBancarias(),
+    enabled: options?.enabled ?? true
   });
 }
 
-export function useCategoriasFinanceiras() {
+export function useCategoriasFinanceiras(options?: QueryOptions) {
   return useQuery({
     queryKey: [...baseKey, 'categorias'],
-    queryFn: () => contabilidadeService.listarCategorias()
+    queryFn: () => contabilidadeService.listarCategorias(),
+    enabled: options?.enabled ?? true
   });
 }
 
-export function useCentrosCustoContabeis() {
+export function useCentrosCustoContabeis(options?: QueryOptions) {
   return useQuery({
     queryKey: [...baseKey, 'centros-custo'],
-    queryFn: () => contabilidadeService.listarCentrosCusto()
+    queryFn: () => contabilidadeService.listarCentrosCusto(),
+    enabled: options?.enabled ?? true
   });
 }
 
-export function useLancamentosContabeis() {
+export function useLancamentosContabeis(options?: QueryOptions) {
   return useQuery({
     queryKey: [...baseKey, 'lancamentos'],
-    queryFn: () => contabilidadeService.listarLancamentos()
+    queryFn: () => contabilidadeService.listarLancamentos(),
+    enabled: options?.enabled ?? true
   });
 }
 
-export function useMovimentacoesContabeis() {
+export function useMovimentacoesContabeis(options?: QueryOptions) {
   return useQuery({
     queryKey: [...baseKey, 'movimentacoes'],
-    queryFn: () => contabilidadeService.listarMovimentacoes()
+    queryFn: () => contabilidadeService.listarMovimentacoes(),
+    enabled: options?.enabled ?? true
   });
 }
 
-export function useTransferenciasContabeis() {
+export function useTransferenciasContabeis(options?: QueryOptions) {
   return useQuery({
     queryKey: [...baseKey, 'transferencias'],
-    queryFn: () => contabilidadeService.listarTransferencias()
+    queryFn: () => contabilidadeService.listarTransferencias(),
+    enabled: options?.enabled ?? true
   });
 }
 
-export function useConciliacoesContabeis() {
+export function useConciliacoesContabeis(options?: QueryOptions) {
   return useQuery({
     queryKey: [...baseKey, 'conciliacoes'],
-    queryFn: () => contabilidadeService.listarConciliacoes()
+    queryFn: () => contabilidadeService.listarConciliacoes(),
+    enabled: options?.enabled ?? true
   });
 }
 
-export function useHistoricoContabil() {
+export function useHistoricoContabil(options?: QueryOptions) {
   return useQuery({
     queryKey: [...baseKey, 'historico'],
-    queryFn: () => contabilidadeService.listarHistorico()
+    queryFn: () => contabilidadeService.listarHistorico(),
+    enabled: options?.enabled ?? true
   });
 }
 
-export function useComprasIntegradasContabilidade() {
+export function useComprasIntegradasContabilidade(options?: QueryOptions) {
   return useQuery({
     queryKey: [...baseKey, 'compras-integradas'],
-    queryFn: () => contabilidadeService.listarComprasIntegradas()
+    queryFn: () => contabilidadeService.listarComprasIntegradas(),
+    enabled: options?.enabled ?? true
   });
 }
 
-export function useEmendasContabeis() {
+export function useEmendasContabeis(options?: QueryOptions) {
   return useQuery({
     queryKey: [...baseKey, 'emendas'],
-    queryFn: () => contabilidadeService.listarEmendas()
+    queryFn: () => contabilidadeService.listarEmendas(),
+    enabled: options?.enabled ?? true
   });
 }
 

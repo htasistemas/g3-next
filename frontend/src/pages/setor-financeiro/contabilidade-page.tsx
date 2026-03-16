@@ -154,6 +154,10 @@ const abas: AdminTab[] = [
   { id: 'emendas', label: 'Emendas', icon: BookOpenText }
 ];
 
+function abaEstaNaLista(abaAtual: AbaId, abasPermitidas: AbaId[]) {
+  return abasPermitidas.includes(abaAtual);
+}
+
 const coresGraficos = ['#0f766e', '#2563eb', '#f59e0b', '#dc2626', '#9333ea', '#0ea5e9'];
 const bancosPrincipais = [
   'Banco do Brasil',
@@ -685,18 +689,40 @@ export function ContabilidadePage() {
   const [arquivoSelecionado, setArquivoSelecionado] = useState<File | null>(null);
   const [arquivoObservacao, setArquivoObservacao] = useState('');
 
-  const contasQuery = useContasBancarias();
-  const planosTrabalhoQuery = usePlanosTrabalho();
-  const unidadeAtualQuery = useUnidadeAssistencialAtual();
-  const categoriasQuery = useCategoriasFinanceiras();
-  const centrosQuery = useCentrosCustoContabeis();
-  const lancamentosQuery = useLancamentosContabeis();
-  const movimentacoesQuery = useMovimentacoesContabeis();
-  const transferenciasQuery = useTransferenciasContabeis();
-  const conciliacoesQuery = useConciliacoesContabeis();
-  const comprasQuery = useComprasIntegradasContabilidade();
-  const historicoQuery = useHistoricoContabil();
-  const emendasQuery = useEmendasContabeis();
+  const carregarContas = abaEstaNaLista(abaAtiva, [
+    'painel',
+    'resumoContas',
+    'lancamentos',
+    'fluxoCaixa',
+    'contas',
+    'transferencias',
+    'conciliacao',
+    'compras',
+    'relatorios'
+  ]);
+  const carregarCategorias = abaEstaNaLista(abaAtiva, ['painel', 'lancamentos', 'compras']);
+  const carregarCentros = abaEstaNaLista(abaAtiva, ['painel', 'lancamentos', 'fluxoCaixa', 'compras']);
+  const carregarLancamentos = abaEstaNaLista(abaAtiva, ['painel', 'lancamentos', 'anexos', 'relatorios']);
+  const carregarMovimentacoes = abaEstaNaLista(abaAtiva, ['painel', 'fluxoCaixa', 'relatorios']);
+  const carregarTransferencias = abaAtiva === 'transferencias';
+  const carregarConciliacoes = abaAtiva === 'conciliacao';
+  const carregarCompras = abaEstaNaLista(abaAtiva, ['painel', 'compras']);
+  const carregarHistorico = abaAtiva === 'historico';
+  const carregarEmendas = abaAtiva === 'emendas';
+  const carregarDadosConta = abaAtiva === 'contas';
+
+  const contasQuery = useContasBancarias({ enabled: carregarContas });
+  const planosTrabalhoQuery = usePlanosTrabalho({ enabled: carregarDadosConta });
+  const unidadeAtualQuery = useUnidadeAssistencialAtual({ enabled: carregarDadosConta });
+  const categoriasQuery = useCategoriasFinanceiras({ enabled: carregarCategorias });
+  const centrosQuery = useCentrosCustoContabeis({ enabled: carregarCentros });
+  const lancamentosQuery = useLancamentosContabeis({ enabled: carregarLancamentos });
+  const movimentacoesQuery = useMovimentacoesContabeis({ enabled: carregarMovimentacoes });
+  const transferenciasQuery = useTransferenciasContabeis({ enabled: carregarTransferencias });
+  const conciliacoesQuery = useConciliacoesContabeis({ enabled: carregarConciliacoes });
+  const comprasQuery = useComprasIntegradasContabilidade({ enabled: carregarCompras });
+  const historicoQuery = useHistoricoContabil({ enabled: carregarHistorico });
+  const emendasQuery = useEmendasContabeis({ enabled: carregarEmendas });
   const arquivosQuery = useArquivosLancamentoContabil(lancamentoSelecionadoId);
 
   const salvarContaMutation = useSalvarContaBancaria();
@@ -916,10 +942,63 @@ export function ContabilidadePage() {
     criarConciliacaoMutation.isPending ||
     atualizarSituacaoConciliacaoMutation.isPending ||
     gerarObrigacaoMutation.isPending ||
-  criarEmendaMutation.isPending ||
-  atualizarStatusEmendaMutation.isPending ||
-  uploadArquivoMutation.isPending ||
-  excluirArquivoMutation.isPending;
+    criarEmendaMutation.isPending ||
+    atualizarStatusEmendaMutation.isPending ||
+    uploadArquivoMutation.isPending ||
+    excluirArquivoMutation.isPending;
+
+  const carregandoAbaAtiva = (() => {
+    switch (abaAtiva) {
+      case 'painel':
+        return (
+          contasQuery.isLoading ||
+          categoriasQuery.isLoading ||
+          centrosQuery.isLoading ||
+          lancamentosQuery.isLoading ||
+          movimentacoesQuery.isLoading ||
+          comprasQuery.isLoading
+        );
+      case 'resumoContas':
+        return contasQuery.isLoading;
+      case 'lancamentos':
+        return (
+          contasQuery.isLoading ||
+          categoriasQuery.isLoading ||
+          centrosQuery.isLoading ||
+          lancamentosQuery.isLoading
+        );
+      case 'fluxoCaixa':
+        return contasQuery.isLoading || centrosQuery.isLoading || movimentacoesQuery.isLoading;
+      case 'contas':
+        return contasQuery.isLoading || planosTrabalhoQuery.isLoading || unidadeAtualQuery.isLoading;
+      case 'transferencias':
+        return contasQuery.isLoading || transferenciasQuery.isLoading;
+      case 'categorias':
+        return categoriasQuery.isLoading;
+      case 'centros':
+        return centrosQuery.isLoading;
+      case 'conciliacao':
+        return contasQuery.isLoading || conciliacoesQuery.isLoading;
+      case 'compras':
+        return (
+          contasQuery.isLoading ||
+          categoriasQuery.isLoading ||
+          centrosQuery.isLoading ||
+          comprasQuery.isLoading
+        );
+      case 'historico':
+        return historicoQuery.isLoading;
+      case 'anexos':
+        return lancamentosQuery.isLoading || (!!lancamentoSelecionadoId && arquivosQuery.isLoading);
+      case 'relatorios':
+        return contasQuery.isLoading || lancamentosQuery.isLoading || movimentacoesQuery.isLoading;
+      case 'emendas':
+        return emendasQuery.isLoading;
+      case 'impressoes':
+      default:
+        return false;
+    }
+  })();
 
   function abrirContaParaEdicao(conta: ContaBancaria) {
     setContaSelecionadaId(conta.id);
@@ -1779,6 +1858,14 @@ export function ContabilidadePage() {
     );
   }
 
+  function renderCarregandoAba() {
+    return (
+      <div className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] px-4 py-10 text-center text-sm text-[var(--g3-muted)]">
+        Carregando dados da aba...
+      </div>
+    );
+  }
+
   const acoes: AdminAction[] = [
     { label: 'Atualizar', icon: Search, onClick: () => void atualizarDados(), variant: 'outline', disabled: processando },
     { label: 'Novo', icon: Plus, onClick: limparFormularioAtual, variant: 'default', disabled: processando },
@@ -1812,21 +1899,22 @@ export function ContabilidadePage() {
         activeTitle={abas.find((item) => item.id === abaAtiva)?.label}
         codeBadge={codeBadge}
       >
-        {abaAtiva === 'painel' ? renderPainel() : null}
-        {abaAtiva === 'resumoContas' ? renderResumoContas() : null}
-        {abaAtiva === 'lancamentos' ? renderFormularioLancamentos() : null}
-        {abaAtiva === 'fluxoCaixa' ? renderFluxoCaixa() : null}
-        {abaAtiva === 'contas' ? renderContas() : null}
-        {abaAtiva === 'transferencias' ? renderTransferencias() : null}
-        {abaAtiva === 'categorias' ? renderCategorias() : null}
-        {abaAtiva === 'centros' ? renderCentros() : null}
-        {abaAtiva === 'conciliacao' ? renderConciliacao() : null}
-        {abaAtiva === 'compras' ? renderCompras() : null}
-        {abaAtiva === 'historico' ? renderHistorico() : null}
-        {abaAtiva === 'anexos' ? renderAnexos() : null}
-        {abaAtiva === 'relatorios' ? renderRelatorios() : null}
-        {abaAtiva === 'impressoes' ? renderImpressoes() : null}
-        {abaAtiva === 'emendas' ? renderEmendas() : null}
+        {carregandoAbaAtiva ? renderCarregandoAba() : null}
+        {!carregandoAbaAtiva && abaAtiva === 'painel' ? renderPainel() : null}
+        {!carregandoAbaAtiva && abaAtiva === 'resumoContas' ? renderResumoContas() : null}
+        {!carregandoAbaAtiva && abaAtiva === 'lancamentos' ? renderFormularioLancamentos() : null}
+        {!carregandoAbaAtiva && abaAtiva === 'fluxoCaixa' ? renderFluxoCaixa() : null}
+        {!carregandoAbaAtiva && abaAtiva === 'contas' ? renderContas() : null}
+        {!carregandoAbaAtiva && abaAtiva === 'transferencias' ? renderTransferencias() : null}
+        {!carregandoAbaAtiva && abaAtiva === 'categorias' ? renderCategorias() : null}
+        {!carregandoAbaAtiva && abaAtiva === 'centros' ? renderCentros() : null}
+        {!carregandoAbaAtiva && abaAtiva === 'conciliacao' ? renderConciliacao() : null}
+        {!carregandoAbaAtiva && abaAtiva === 'compras' ? renderCompras() : null}
+        {!carregandoAbaAtiva && abaAtiva === 'historico' ? renderHistorico() : null}
+        {!carregandoAbaAtiva && abaAtiva === 'anexos' ? renderAnexos() : null}
+        {!carregandoAbaAtiva && abaAtiva === 'relatorios' ? renderRelatorios() : null}
+        {!carregandoAbaAtiva && abaAtiva === 'impressoes' ? renderImpressoes() : null}
+        {!carregandoAbaAtiva && abaAtiva === 'emendas' ? renderEmendas() : null}
       </AdminPageLayout>
 
       {popup ? <PopupMensagem popup={popup} onClose={() => setPopup(null)} /> : null}

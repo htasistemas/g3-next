@@ -3,13 +3,18 @@ import { Navigate, createBrowserRouter } from "react-router-dom";
 import { AppShell } from "@/app/app-shell";
 import { RequireAuth } from "@/app/require-auth";
 import { RequirePermission } from "@/app/require-permission";
+import { carregarModuloRota, obterLoaderRota } from "@/routes/route-modules";
 
-function carregarPagina<TModule, TExport extends keyof TModule & string>(
-  loader: () => Promise<TModule>,
-  exportName: TExport
-) {
+function carregarPagina(path: string, exportName: string) {
+  if (!obterLoaderRota(path)) {
+    throw new Error(`Rota sem loader registrado: ${path}`);
+  }
+
   const LazyPage = lazy(async () => {
-    const module = await loader();
+    const module = await carregarModuloRota(path);
+    if (!module) {
+      throw new Error(`Modulo da rota nao encontrado: ${path}`);
+    }
     return { default: module[exportName] as ComponentType };
   });
 
@@ -28,162 +33,81 @@ function RouteLoadingFallback() {
   );
 }
 
-const LoginPage = carregarPagina(() => import("@/pages/login-page"), "LoginPage");
-const CriarContaPage = carregarPagina(() => import("@/pages/criar-conta-page"), "CriarContaPage");
-const TermosUsoPage = carregarPagina(() => import("@/pages/termos-uso-page"), "TermosUsoPage");
-const PoliticaPrivacidadePage = carregarPagina(
-  () => import("@/pages/politica-privacidade-page"),
-  "PoliticaPrivacidadePage"
-);
-const PainelSenhasPage = carregarPagina(
-  () => import("@/pages/atendimentos/painel-senhas-page"),
-  "PainelSenhasPage"
-);
-const VisaoGeralPage = carregarPagina(
-  () => import("@/pages/dashboard/visao-geral-page"),
-  "VisaoGeralPage"
-);
-const IndicadoresPage = carregarPagina(
-  () => import("@/pages/dashboard/indicadores-page"),
-  "IndicadoresPage"
-);
-const PowerBiPage = carregarPagina(() => import("@/pages/dashboard/power-bi-page"), "PowerBiPage");
-const VulnerabilidadePage = carregarPagina(
-  () => import("@/pages/dashboard/vulnerabilidade-page"),
-  "VulnerabilidadePage"
-);
-const CadastroBeneficiarioPage = carregarPagina(
-  () => import("@/pages/beneficiarios/cadastro-beneficiario-page"),
-  "CadastroBeneficiarioPage"
-);
-const CadastroProfissionalPage = carregarPagina(
-  () => import("@/pages/profissionais/cadastro-profissional-page"),
-  "CadastroProfissionalPage"
-);
-const CadastroVoluntariadoPage = carregarPagina(
-  () => import("@/pages/voluntarios/cadastro-voluntariado-page"),
-  "CadastroVoluntariadoPage"
-);
-const CadastroMatriculasPage = carregarPagina(
-  () => import("@/pages/matriculas/cadastro-matriculas-page"),
-  "CadastroMatriculasPage"
-);
-const BancoEmpregosPage = carregarPagina(
-  () => import("@/pages/atendimentos/banco-empregos-page"),
-  "BancoEmpregosPage"
-);
-const BibliotecaPage = carregarPagina(
-  () => import("@/pages/atendimentos/biblioteca-page"),
-  "BibliotecaPage"
-);
-const RegistroVisitasPage = carregarPagina(
-  () => import("@/pages/atendimentos/registro-visitas-page"),
-  "RegistroVisitasPage"
-);
-const OcorrenciasPage = carregarPagina(
-  () => import("@/pages/atendimentos/ocorrencias-page"),
-  "OcorrenciasPage"
-);
-const ChamadaSenhasPage = carregarPagina(
-  () => import("@/pages/atendimentos/chamada-senhas-page"),
-  "ChamadaSenhasPage"
-);
-const RegistroDoacaoPage = carregarPagina(
-  () => import("@/pages/registro-doacao/registro-doacao-page"),
-  "RegistroDoacaoPage"
-);
-const DoacoesRealizadasPage = carregarPagina(
-  () => import("@/pages/doacoes-realizadas/doacoes-realizadas-page"),
-  "DoacoesRealizadasPage"
-);
-const RegistroPontoPage = carregarPagina(
-  () => import("@/pages/registro-ponto/registro-ponto-page"),
-  "RegistroPontoPage"
-);
-const ContratacaoPage = carregarPagina(
-  () => import("@/pages/setor-rh/contratacao-page"),
-  "ContratacaoPage"
-);
-const AlmoxarifadoPage = carregarPagina(
-  () => import("@/pages/setor-administrativo/almoxarifado-page"),
-  "AlmoxarifadoPage"
-);
+const LoginPage = carregarPagina("/login", "LoginPage");
+const CriarContaPage = carregarPagina("/criar-conta", "CriarContaPage");
+const TermosUsoPage = carregarPagina("/termos-de-uso", "TermosUsoPage");
+const PoliticaPrivacidadePage = carregarPagina("/politica-de-privacidade", "PoliticaPrivacidadePage");
+const PainelSenhasPage = carregarPagina("/senhas/painel", "PainelSenhasPage");
+const VisaoGeralPage = carregarPagina("/dashboard/visao-geral", "VisaoGeralPage");
+const IndicadoresPage = carregarPagina("/dashboard/indicadores", "IndicadoresPage");
+const PowerBiPage = carregarPagina("/dashboard/power-bi", "PowerBiPage");
+const VulnerabilidadePage = carregarPagina("/dashboard/vulnerabilidade", "VulnerabilidadePage");
+const CadastroBeneficiarioPage = carregarPagina("/cadastros/beneficiarios", "CadastroBeneficiarioPage");
+const CadastroProfissionalPage = carregarPagina("/cadastros/profissionais", "CadastroProfissionalPage");
+const CadastroVoluntariadoPage = carregarPagina("/cadastros/voluntariado", "CadastroVoluntariadoPage");
+const CadastroMatriculasPage = carregarPagina("/atendimentos/matriculas", "CadastroMatriculasPage");
+const BancoEmpregosPage = carregarPagina("/atendimentos/banco-empregos", "BancoEmpregosPage");
+const BibliotecaPage = carregarPagina("/atendimentos/biblioteca", "BibliotecaPage");
+const RegistroVisitasPage = carregarPagina("/atendimentos/registro-visitas", "RegistroVisitasPage");
+const OcorrenciasPage = carregarPagina("/atendimentos/ocorrencias", "OcorrenciasPage");
+const ChamadaSenhasPage = carregarPagina("/atendimentos/chamada-senhas", "ChamadaSenhasPage");
+const RegistroDoacaoPage = carregarPagina("/financeiro/registro-doacao", "RegistroDoacaoPage");
+const DoacoesRealizadasPage = carregarPagina("/financeiro/doacoes-realizadas", "DoacoesRealizadasPage");
+const RegistroPontoPage = carregarPagina("/setor-rh/registro-ponto", "RegistroPontoPage");
+const ContratacaoPage = carregarPagina("/setor-rh/contratacao", "ContratacaoPage");
+const AlmoxarifadoPage = carregarPagina("/setor-administrativo/almoxarifado", "AlmoxarifadoPage");
 const ControleVeiculosPage = carregarPagina(
-  () => import("@/pages/setor-administrativo/controle-veiculos-page"),
+  "/setor-administrativo/controle-veiculos",
   "ControleVeiculosPage"
 );
 const EmprestimoEventosPage = carregarPagina(
-  () => import("@/pages/setor-administrativo/emprestimo-eventos-page"),
+  "/setor-administrativo/emprestimo-eventos",
   "EmprestimoEventosPage"
 );
-const FotosEventosPage = carregarPagina(
-  () => import("@/pages/setor-administrativo/fotos-eventos-page"),
-  "FotosEventosPage"
-);
+const FotosEventosPage = carregarPagina("/setor-administrativo/fotos-eventos", "FotosEventosPage");
 const GestaoDocumentosPage = carregarPagina(
-  () => import("@/pages/setor-administrativo/gestao-documentos-page"),
+  "/setor-administrativo/gestao-documentos",
   "GestaoDocumentosPage"
 );
 const OficiosProtocolosPage = carregarPagina(
-  () => import("@/pages/setor-administrativo/oficios-protocolos-page"),
+  "/setor-administrativo/oficios-protocolos",
   "OficiosProtocolosPage"
 );
-const PatrimonioPage = carregarPagina(
-  () => import("@/pages/setor-administrativo/patrimonio-page"),
-  "PatrimonioPage"
-);
+const PatrimonioPage = carregarPagina("/setor-administrativo/patrimonio", "PatrimonioPage");
 const TarefasPendenciasPage = carregarPagina(
-  () => import("@/pages/setor-administrativo/tarefas-pendencias-page"),
+  "/setor-administrativo/tarefas-pendencias",
   "TarefasPendenciasPage"
 );
 const LembretesDiariosPage = carregarPagina(
-  () => import("@/pages/setor-administrativo/lembretes-diarios-page"),
+  "/setor-administrativo/lembretes-diarios",
   "LembretesDiariosPage"
 );
-const PlanoTrabalhoPage = carregarPagina(
-  () => import("@/pages/setor-juridico/plano-trabalho-page-next"),
-  "PlanoTrabalhoPage"
-);
-const TermoFomentoPage = carregarPagina(
-  () => import("@/pages/setor-juridico/termo-fomento-page"),
-  "TermoFomentoPage"
-);
+const PlanoTrabalhoPage = carregarPagina("/setor-juridico/plano-trabalho", "PlanoTrabalhoPage");
+const TermoFomentoPage = carregarPagina("/setor-juridico/termo-fomento", "TermoFomentoPage");
 const AutorizacaoComprasPage = carregarPagina(
-  () => import("@/pages/setor-financeiro/autorizacao-compras-page"),
+  "/setor-financeiro/autorizacao-compras",
   "AutorizacaoComprasPage"
 );
-const ContabilidadePage = carregarPagina(
-  () => import("@/pages/setor-financeiro/contabilidade-page"),
-  "ContabilidadePage"
-);
-const PrestacaoContasPage = carregarPagina(
-  () => import("@/pages/setor-financeiro/prestacao-contas-page"),
-  "PrestacaoContasPage"
-);
+const ContabilidadePage = carregarPagina("/setor-financeiro/contabilidade", "ContabilidadePage");
+const PrestacaoContasPage = carregarPagina("/setor-financeiro/prestacao-contas", "PrestacaoContasPage");
 const CadastroUnidadeAssistencialPage = carregarPagina(
-  () => import("@/pages/unidades-assistenciais/cadastro-unidade-assistencial-page"),
+  "/cadastros/unidades-assistenciais",
   "CadastroUnidadeAssistencialPage"
 );
 const CadastroVinculoFamiliarPage = carregarPagina(
-  () => import("@/pages/familias/cadastro-vinculo-familiar-page"),
+  "/cadastros/vinculo-familiar",
   "CadastroVinculoFamiliarPage"
 );
 const ParametrosSistemaPage = carregarPagina(
-  () => import("@/pages/configuracoes/parametros-sistema-page"),
+  "/configuracoes/parametros-sistema",
   "ParametrosSistemaPage"
 );
-const UsuariosPage = carregarPagina(
-  () => import("@/pages/configuracoes/usuarios-page"),
-  "UsuariosPage"
-);
+const UsuariosPage = carregarPagina("/configuracoes/usuarios", "UsuariosPage");
 const MensagensPersonalizadasPage = carregarPagina(
-  () => import("@/pages/configuracoes/mensagens-personalizadas-page"),
+  "/configuracoes/mensagens-personalizadas",
   "MensagensPersonalizadasPage"
 );
-const ChamadoTecnicoPage = carregarPagina(
-  () => import("@/pages/configuracoes/chamado-tecnico-page"),
-  "ChamadoTecnicoPage"
-);
+const ChamadoTecnicoPage = carregarPagina("/configuracoes/chamado-tecnico", "ChamadoTecnicoPage");
 
 export const router = createBrowserRouter([
   {

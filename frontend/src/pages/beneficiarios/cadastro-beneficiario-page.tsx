@@ -1,9 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
-import { Bar, BarChart, Tooltip, XAxis, YAxis } from "recharts";
-import { ResponsiveChart } from "@/components/charts/responsive-chart";
 import { MensagemAcoesRapidas } from "@/components/mensagens-personalizadas/mensagem-acoes-rapidas";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -66,6 +64,11 @@ import {
   classesTelaPadraoBeneficiario,
   ordemAcoesCrudPadrao
 } from "@/lib/tela-padrao-beneficiario";
+
+const BeneficiariosStatusChart = lazy(async () => {
+  const module = await import("@/components/beneficiarios/beneficiarios-status-chart");
+  return { default: module.BeneficiariosStatusChart };
+});
 
 const abas = [
   { id: "listagem", label: "Listagem de beneficiários", icon: ListFilter },
@@ -1816,14 +1819,15 @@ export function CadastroBeneficiarioPage() {
                 </div>
 
                 <div className="h-52 min-w-0 rounded-md border border-slate-200 bg-slate-50 p-2">
-                  <ResponsiveChart minWidth={0} minHeight={180}>
-                    <BarChart data={dadosGrafico}>
-                      <XAxis dataKey="status" hide />
-                      <YAxis allowDecimals={false} width={24} />
-                      <Tooltip />
-                      <Bar dataKey="total" fill="var(--g3-primary)" radius={[6, 6, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveChart>
+                  <Suspense
+                    fallback={
+                      <div className="flex h-full items-center justify-center text-sm text-slate-500">
+                        Carregando gráfico...
+                      </div>
+                    }
+                  >
+                    <BeneficiariosStatusChart dados={dadosGrafico} />
+                  </Suspense>
                 </div>
               </section>
             ) : (

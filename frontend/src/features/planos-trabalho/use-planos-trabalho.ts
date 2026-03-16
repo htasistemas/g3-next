@@ -2,10 +2,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { planoTrabalhoService } from "@/services/plano-trabalho.service";
 import type { PlanoTrabalhoPayload } from "@/types/plano-trabalho";
 
-export function usePlanosTrabalho() {
+type QueryOptions = {
+  enabled?: boolean;
+};
+
+export function usePlanosTrabalho(options?: QueryOptions) {
   return useQuery({
     queryKey: ["planos-trabalho", "lista"],
-    queryFn: () => planoTrabalhoService.listar()
+    queryFn: () => planoTrabalhoService.listar(),
+    enabled: options?.enabled ?? true
   });
 }
 

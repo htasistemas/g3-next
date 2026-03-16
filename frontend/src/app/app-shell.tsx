@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { APP_VERSION } from "@/lib/app-version";
 import { resolverUrlArquivo } from "@/lib/arquivos";
+import { precarregarRota, precarregarRotas } from "@/routes/route-modules";
 import { useResumoLembretesDiarios } from "@/features/lembretes-diarios/use-lembretes-diarios";
 import { registroPontoService } from "@/services/registro-ponto.service";
 import { useResumoTarefasAdministrativas } from "@/features/tarefas-administrativas/use-tarefas-administrativas";
@@ -92,6 +93,23 @@ function ordenarItensMenu<T extends { label: string }>(itens: T[]) {
   return [...itens].sort((itemA, itemB) =>
     comparadorItensMenu.compare(itemA.label.trim(), itemB.label.trim())
   );
+}
+
+function listarRotasMenuParaPrecarregar(secoes: MenuSection[], rotaAtual: string) {
+  return Array.from(
+    new Set(
+      secoes.flatMap((secao) =>
+        secao.itens.flatMap((item) =>
+          item.to && !item.abrirEmNovaAba && item.to !== rotaAtual ? [item.to] : []
+        )
+      )
+    )
+  );
+}
+
+function agendarQuandoOcioso(callback: () => void) {
+  const timeoutId = globalThis.setTimeout(callback, 600);
+  return () => globalThis.clearTimeout(timeoutId);
 }
 
 export const menuSections: MenuSection[] = [
@@ -509,6 +527,19 @@ export function AppShell() {
   }, [location.pathname, menuSectionsVisiveis]);
 
   useEffect(() => {
+    const rotas = listarRotasMenuParaPrecarregar(menuSectionsVisiveis, location.pathname);
+    if (rotas.length === 0) {
+      return;
+    }
+
+    const cancelarAgendamento = agendarQuandoOcioso(() => {
+      void precarregarRotas(rotas);
+    });
+
+    return cancelarAgendamento;
+  }, [location.pathname, menuSectionsVisiveis]);
+
+  useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       startTransition(() => {
         setCarregarResumoInicial(true);
@@ -617,6 +648,14 @@ export function AppShell() {
   function confirmarPopupPontoPendente() {
     setPopupPontoPendente(null);
     navigate("/setor-rh/registro-ponto?aba=marcacao");
+  }
+
+  function precarregarItemMenu(item: MenuItem) {
+    if (!item.to || item.abrirEmNovaAba) {
+      return;
+    }
+
+    void precarregarRota(item.to);
   }
 
   function alternarSidebar() {
@@ -745,6 +784,9 @@ export function AppShell() {
                           to={item.to}
                           target={item.abrirEmNovaAba ? "_blank" : undefined}
                           rel={item.abrirEmNovaAba ? "noreferrer" : undefined}
+                          onMouseEnter={() => precarregarItemMenu(item)}
+                          onFocus={() => precarregarItemMenu(item)}
+                          onTouchStart={() => precarregarItemMenu(item)}
                         >
                           {({ isActive }) => (
                             <span
@@ -863,6 +905,9 @@ export function AppShell() {
                       to={item.to}
                       target={item.abrirEmNovaAba ? "_blank" : undefined}
                       rel={item.abrirEmNovaAba ? "noreferrer" : undefined}
+                      onMouseEnter={() => precarregarItemMenu(item)}
+                      onFocus={() => precarregarItemMenu(item)}
+                      onTouchStart={() => precarregarItemMenu(item)}
                     >
                       {({ isActive }) => (
                         <span

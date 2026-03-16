@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
 import { APP_VERSION } from "@/lib/app-version";
+import { precarregarRota } from "@/routes/route-modules";
 import { authService } from "@/services/auth.service";
 
 const FOTO_LATERAL_URL = "/images/loguim.jpg";
@@ -97,9 +98,10 @@ export function LoginPage() {
     setAviso(null);
     setCarregando(true);
     try {
-      await login(nomeUsuario, senha);
       const from = (location.state as { from?: string } | null)?.from;
-      navigate(from || "/cadastros/beneficiarios", { replace: true });
+      const destino = from || "/cadastros/beneficiarios";
+      await Promise.all([login(nomeUsuario, senha), precarregarRota(destino)]);
+      navigate(destino, { replace: true });
     } catch (error: any) {
       setErro(error?.response?.data?.message ?? "Não foi possível autenticar.");
     } finally {
@@ -112,9 +114,10 @@ export function LoginPage() {
     setAviso(null);
     setCarregandoGoogle(true);
     try {
-      await loginGoogle(idToken);
       const from = (location.state as { from?: string } | null)?.from;
-      navigate(from || "/cadastros/beneficiarios", { replace: true });
+      const destino = from || "/cadastros/beneficiarios";
+      await Promise.all([loginGoogle(idToken), precarregarRota(destino)]);
+      navigate(destino, { replace: true });
     } catch (error: any) {
       setErro(error?.response?.data?.message ?? "Não foi possível autenticar com Google.");
     } finally {
