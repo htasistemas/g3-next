@@ -957,9 +957,7 @@ export class ReportsService {
         titulo: "Assinaturas",
         conteudo: [
           [payload.localAssinatura, dataAssinatura].filter(Boolean).join(", "),
-          "",
-          "",
-          "",
+          "[[espaco:5]]",
           "________________________________________",
           "Assinatura do beneficiário / responsável legal",
           `${payload.responsavelNome || nomeBeneficiario}`,

@@ -123,7 +123,7 @@ export const menuSections: MenuSection[] = [
       {
         id: "dashboard-vulnerabilidade",
         to: "/dashboard/vulnerabilidade",
-        label: "Georeferenciamento",
+        label: "Georreferenciamento",
         icon: MapPinned
       },
       {
@@ -397,7 +397,7 @@ export const menuSections: MenuSection[] = [
 function obterTitulo(pathname: string): string {
   if (pathname === "/" || pathname.startsWith("/dashboard/visao-geral")) return "Visão geral";
   if (pathname.startsWith("/dashboard/indicadores")) return "Indicadores";
-  if (pathname.startsWith("/dashboard/vulnerabilidade")) return "Georeferenciamento";
+  if (pathname.startsWith("/dashboard/vulnerabilidade")) return "Georreferenciamento";
   if (pathname.startsWith("/dashboard/power-bi")) return "Power BI";
   if (pathname.startsWith("/cadastros/beneficiarios")) return "Cadastro de beneficiários";
   if (pathname.startsWith("/cadastros/profissionais")) return "Cadastro de profissionais";

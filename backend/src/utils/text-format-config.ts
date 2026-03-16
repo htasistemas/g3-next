@@ -521,3 +521,38 @@ export const mapaCamposTextoContratacao: Record<string, TipoFormatacaoTexto> = {
   statusAssinatura: "textoCurto",
   responsavel: "nomePessoa"
 };
+
+export const mapaCamposTextoBancoEmpregos: Record<string, TipoFormatacaoTexto> = {
+  nomeCompleto: "nomePessoa",
+  sexo: "textoCurto",
+  estadoCivil: "textoCurto",
+  endereco: "endereco",
+  bairro: "endereco",
+  cidade: "endereco",
+  escolaridade: "textoCurto",
+  cursos: "textoCurto",
+  formacaoComplementar: "textoCurto",
+  areaInteresse: "textoCurto",
+  cargoPretendido: "textoCurto",
+  disponibilidade: "textoCurto",
+  ultimaEmpresa: "instituicao",
+  funcaoExercida: "textoCurto",
+  tempoExperiencia: "textoCurto",
+  resumoProfissional: "textoCurto",
+  observacoes: "textoCurto",
+  empresaNome: "instituicao",
+  area: "textoCurto",
+  requisitos: "textoCurto",
+  escolaridadeMinima: "textoCurto",
+  experienciaMinima: "textoCurto",
+  tipoContratacao: "textoCurto",
+  jornada: "textoCurto",
+  faixaSalarial: "textoCurto",
+  beneficios: "textoCurto",
+  projetoServico: "textoCurto",
+  unidadeReferencia: "instituicao",
+  descricao: "textoCurto",
+  categoria: "textoCurto",
+  criterio: "textoCurto",
+  responsavelNome: "nomePessoa"
+};

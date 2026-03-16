@@ -49,6 +49,11 @@ function encurtarRotuloGrafico(texto: string, limite = 20) {
 }
 
 const coresCadastros = ["#0f766e", "#14b8a6", "#38bdf8", "#3b82f6", "#6366f1", "#f59e0b", "#ef4444"];
+const classeCardVerde =
+  "rounded-xl border border-emerald-200/80 bg-[linear-gradient(180deg,rgba(247,252,249,0.98)_0%,rgba(229,245,234,0.98)_100%)] shadow-[0_18px_40px_-26px_rgba(22,101,52,0.35)]";
+const classeCardVerdeInterativo = `${classeCardVerde} transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-[0_22px_48px_-22px_rgba(22,101,52,0.42)]`;
+const classeCardVerdeSuave =
+  "rounded-xl border border-emerald-100/90 bg-[rgba(255,255,255,0.72)] shadow-[0_14px_32px_-26px_rgba(22,101,52,0.28)] backdrop-blur-[2px]";
 
 export function VisaoGeralPage() {
   const navigate = useNavigate();
@@ -207,7 +212,7 @@ export function VisaoGeralPage() {
                   <button
                     key={card.label}
                     type="button"
-                    className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] px-3 py-3 text-left shadow-sm transition hover:border-[var(--g3-active)] hover:bg-[var(--g3-primary-soft)]"
+                    className={`${classeCardVerdeInterativo} px-3 py-3 text-left`}
                     onClick={() => navigate(card.rota)}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -228,7 +233,7 @@ export function VisaoGeralPage() {
                 ))}
               </div>
 
-              <div className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] p-3">
+              <div className={`${classeCardVerde} p-3`}>
                 <div className="mb-3 flex items-center justify-between gap-2">
                   <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
                     Catálogo e vagas de matrículas
@@ -240,7 +245,7 @@ export function VisaoGeralPage() {
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
                   <button
                     type="button"
-                    className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-3 text-left transition hover:border-[var(--g3-active)] hover:bg-[var(--g3-primary-soft)]"
+                    className={`${classeCardVerdeInterativo} rounded-lg p-3 text-left`}
                     onClick={() => navigate("/atendimentos/matriculas")}
                   >
                     <p className="text-xs text-[var(--g3-muted)]">Cursos no catálogo</p>
@@ -250,7 +255,7 @@ export function VisaoGeralPage() {
                   </button>
                   <button
                     type="button"
-                    className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-3 text-left transition hover:border-[var(--g3-active)] hover:bg-[var(--g3-primary-soft)]"
+                    className={`${classeCardVerdeInterativo} rounded-lg p-3 text-left`}
                     onClick={() => navigate("/atendimentos/matriculas")}
                   >
                     <p className="text-xs text-[var(--g3-muted)]">Total de vagas</p>
@@ -260,7 +265,7 @@ export function VisaoGeralPage() {
                   </button>
                   <button
                     type="button"
-                    className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-3 text-left transition hover:border-[var(--g3-active)] hover:bg-[var(--g3-primary-soft)]"
+                    className={`${classeCardVerdeInterativo} rounded-lg p-3 text-left`}
                     onClick={() => navigate("/atendimentos/matriculas")}
                   >
                     <p className="text-xs text-[var(--g3-muted)]">Vagas disponíveis</p>
@@ -270,7 +275,7 @@ export function VisaoGeralPage() {
                   </button>
                   <button
                     type="button"
-                    className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-3 text-left transition hover:border-[var(--g3-active)] hover:bg-[var(--g3-primary-soft)]"
+                    className={`${classeCardVerdeInterativo} rounded-lg p-3 text-left`}
                     onClick={() => navigate("/atendimentos/matriculas")}
                   >
                     <p className="text-xs text-[var(--g3-muted)]">Inscrições ativas</p>
@@ -282,7 +287,7 @@ export function VisaoGeralPage() {
               </div>
 
               <div className="space-y-4">
-                <div className="min-w-0 rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] p-3">
+                <div className={`${classeCardVerde} min-w-0 p-3`}>
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
@@ -292,7 +297,7 @@ export function VisaoGeralPage() {
                         Distribuição dos cadastros monitorados na operação atual.
                       </p>
                     </div>
-                    <div className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card-soft)] px-3 py-2 text-right">
+                    <div className={`${classeCardVerdeSuave} rounded-lg px-3 py-2 text-right`}>
                       <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
                         Total
                       </p>
@@ -303,7 +308,7 @@ export function VisaoGeralPage() {
                   </div>
 
                   <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
-                    <div className="relative h-72 rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-3">
+                    <div className={`${classeCardVerdeSuave} relative h-72 p-3`}>
                       <ResponsiveChart minWidth={0} minHeight={220}>
                         <PieChart>
                           <Pie
@@ -341,7 +346,7 @@ export function VisaoGeralPage() {
                           />
                         </PieChart>
                       </ResponsiveChart>
-                      <div className="pointer-events-none absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/95 shadow-sm ring-1 ring-slate-200">
+                      <div className="pointer-events-none absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/92 shadow-[0_18px_34px_-24px_rgba(22,101,52,0.35)] ring-1 ring-emerald-100">
                         <div className="flex h-full w-full flex-col items-center justify-center text-center">
                           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--g3-muted)]">
                             Tipos
@@ -363,7 +368,7 @@ export function VisaoGeralPage() {
                         return (
                           <div
                             key={item.nome}
-                            className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-3"
+                            className={`${classeCardVerdeSuave} p-3`}
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div className="flex items-center gap-2">
@@ -380,7 +385,7 @@ export function VisaoGeralPage() {
                                   </p>
                                 </div>
                               </div>
-                              <div className="min-w-[72px] rounded-xl bg-[var(--g3-card)] px-3 py-2 text-right shadow-sm">
+                              <div className="min-w-[72px] rounded-xl bg-white/90 px-3 py-2 text-right shadow-[0_16px_28px_-24px_rgba(22,101,52,0.35)]">
                                 <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
                                   Total
                                 </p>
@@ -396,7 +401,7 @@ export function VisaoGeralPage() {
                   </div>
                 </div>
 
-                <div className="min-w-0 rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] p-3">
+                <div className={`${classeCardVerde} min-w-0 p-3`}>
                   <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
                     Composição financeira
                   </p>
@@ -404,7 +409,7 @@ export function VisaoGeralPage() {
                     {dadosFinanceiro.map((item) => (
                       <div
                         key={item.nome}
-                        className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card-soft)] px-3 py-3 shadow-sm"
+                        className={`${classeCardVerdeSuave} px-3 py-3`}
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div>
@@ -427,7 +432,7 @@ export function VisaoGeralPage() {
                       </div>
                     ))}
                   </div>
-                  <div className="mt-3 rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-3">
+                  <div className={`${classeCardVerdeSuave} mt-3 p-3`}>
                     <div className="flex items-center justify-between gap-2">
                       <div>
                         <p className="text-sm font-semibold text-[var(--g3-foreground)]">
@@ -437,7 +442,7 @@ export function VisaoGeralPage() {
                           Distribuição atual dos recursos em caixa e banco.
                         </p>
                       </div>
-                      <div className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card)] px-3 py-2 text-right">
+                      <div className="rounded-lg border border-emerald-100/90 bg-white/88 px-3 py-2 text-right shadow-[0_16px_28px_-24px_rgba(22,101,52,0.35)]">
                         <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
                           Total em contas
                         </p>
@@ -494,7 +499,7 @@ export function VisaoGeralPage() {
                         </ResponsiveChart>
                       </div>
                     ) : (
-                      <div className="mt-3 rounded-lg border border-dashed border-[var(--g3-border)] bg-[var(--g3-card)] px-3 py-4 text-sm text-[var(--g3-muted)]">
+                      <div className="mt-3 rounded-lg border border-dashed border-emerald-200 bg-white/80 px-3 py-4 text-sm text-[var(--g3-muted)]">
                         Nenhuma conta com saldo disponível foi encontrada para montar o gráfico financeiro.
                       </div>
                     )}
@@ -503,7 +508,7 @@ export function VisaoGeralPage() {
               </div>
 
               <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                <div className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] px-3 py-3">
+                <div className={`${classeCardVerde} px-3 py-3`}>
                   <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
                     Execução financeira
                   </p>
@@ -511,7 +516,7 @@ export function VisaoGeralPage() {
                     {formatarPercentual(data.top12.execucaoFinanceira)}
                   </p>
                 </div>
-                <div className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] px-3 py-3">
+                <div className={`${classeCardVerde} px-3 py-3`}>
                   <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
                     Absenteísmo
                   </p>
@@ -519,7 +524,7 @@ export function VisaoGeralPage() {
                     {formatarPercentual(data.top12.absenteismo)}
                   </p>
                 </div>
-                <div className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] px-3 py-3">
+                <div className={`${classeCardVerde} px-3 py-3`}>
                   <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
                     Valores a receber
                   </p>

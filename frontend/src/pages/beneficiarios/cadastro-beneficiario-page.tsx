@@ -573,6 +573,7 @@ export function CadastroBeneficiarioPage() {
 
   const foto3x4Atual = watch("foto_3x4") || "";
   const nomeCompletoAtual = watch("nome_completo") || "";
+  const dataNascimentoAtual = watch("data_nascimento") || "";
   const cpfAtual = watch("cpf") || "";
   const telefonePrincipalAtual = watch("telefone_principal") || "";
   const emailAtual = watch("email") || "";
@@ -583,6 +584,7 @@ export function CadastroBeneficiarioPage() {
   const municipioAtual = watch("municipio") || "";
   const ufAtual = watch("uf") || "";
   const subzonaAtual = watch("subzona") || "";
+  const idadeAtual = calcularIdade(dataNascimentoAtual);
   const possuiEnderecoParaMapa = [
     logradouroAtual,
     numeroAtual,
@@ -1837,18 +1839,20 @@ export function CadastroBeneficiarioPage() {
                     <input type="hidden" {...register("foto_3x4")} />
                     <div className="sm:col-span-2 xl:col-span-12 rounded-lg border border-emerald-200 bg-emerald-50/40 p-3">
                       <div className="flex flex-col gap-4 md:flex-row md:items-center">
-                        <div className="mx-auto flex aspect-[4/3] w-44 items-center justify-center overflow-hidden rounded-md border border-emerald-200 bg-white">
-                          {foto3x4PreviewUrl ? (
-                            <img
-                              src={foto3x4PreviewUrl}
-                              alt="Foto 4x3 do beneficiário"
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            <span className="px-2 text-center text-xs font-medium text-slate-500">
-                              Foto 4x3
-                            </span>
-                          )}
+                        <div className="mx-auto flex w-44">
+                          <div className="flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-md border border-emerald-200 bg-white">
+                            {foto3x4PreviewUrl ? (
+                              <img
+                                src={foto3x4PreviewUrl}
+                                alt="Foto 4x3 do beneficiário"
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <span className="px-2 text-center text-xs font-medium text-slate-500">
+                                Foto 4x3
+                              </span>
+                            )}
+                          </div>
                         </div>
 
                         <div className="flex-1 space-y-3">
@@ -1866,7 +1870,7 @@ export function CadastroBeneficiarioPage() {
                               variant="outline"
                               onClick={() => inputArquivoRef.current?.click()}
                             >
-                              Enviar Foto
+                              Enviar foto
                             </Button>
                             <Button
                               type="button"
@@ -1874,7 +1878,7 @@ export function CadastroBeneficiarioPage() {
                               onClick={() => void abrirWebcam()}
                               disabled={carregandoWebcam}
                             >
-                              {carregandoWebcam ? "Abrindo Webcam..." : "Capturar Pela Webcam"}
+                              {carregandoWebcam ? "Abrindo webcam..." : "Capturar pela webcam"}
                             </Button>
                             <Button
                               type="button"
@@ -1882,11 +1886,18 @@ export function CadastroBeneficiarioPage() {
                               onClick={removerFoto}
                               disabled={!foto3x4Atual}
                             >
-                              Remover Foto
+                              Remover foto
                             </Button>
                           </div>
                           <p className="text-xs text-slate-600">
-                            A Foto Será Ajustada Automaticamente No Formato 4x3.
+                            A foto será ajustada automaticamente no formato 4x3.
+                          </p>
+                        </div>
+
+                        <div className="w-32 self-end rounded-md border border-emerald-200 bg-white px-2 py-1.5 text-center md:ml-auto md:w-36 md:self-center">
+                          <p className="text-[10px] font-medium text-emerald-700">Idade</p>
+                          <p className="text-xs font-semibold text-slate-900">
+                            {idadeAtual === "---" ? "Informe a data" : idadeAtual}
                           </p>
                         </div>
                       </div>

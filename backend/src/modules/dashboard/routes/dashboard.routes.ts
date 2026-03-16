@@ -44,3 +44,45 @@ dashboardRoutes.post(
   ensurePermissions(["ADMINISTRADOR", "OPERADOR"]),
   asyncHandler(controller.geocodificarVulnerabilidade.bind(controller))
 );
+
+dashboardRoutes.get(
+  "/georreferenciamento/opcoes",
+  ensureAuthenticated,
+  ensurePermissions(["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"]),
+  asyncHandler(controller.listarOpcoesGeorreferenciamento.bind(controller))
+);
+
+dashboardRoutes.post(
+  "/georreferenciamento/consulta",
+  ensureAuthenticated,
+  ensurePermissions(["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"]),
+  asyncHandler(controller.consultarGeorreferenciamento.bind(controller))
+);
+
+dashboardRoutes.get(
+  "/georreferenciamento/detalhe/:id",
+  ensureAuthenticated,
+  ensurePermissions(["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"]),
+  asyncHandler(controller.obterDetalheGeorreferenciamento.bind(controller))
+);
+
+dashboardRoutes.get(
+  "/georreferenciamento/vinculos",
+  ensureAuthenticated,
+  ensurePermissions(["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"]),
+  asyncHandler(controller.buscarVinculosGeorreferenciamento.bind(controller))
+);
+
+dashboardRoutes.post(
+  "/georreferenciamento/marcacoes",
+  ensureAuthenticated,
+  ensurePermissions(["ADMINISTRADOR", "OPERADOR"]),
+  asyncHandler(controller.salvarMarcacaoGeorreferenciamento.bind(controller))
+);
+
+dashboardRoutes.post(
+  "/georreferenciamento/geocodificar-pendentes",
+  ensureAuthenticated,
+  ensurePermissions(["ADMINISTRADOR", "OPERADOR"]),
+  asyncHandler(controller.geocodificarGeorreferenciamento.bind(controller))
+);

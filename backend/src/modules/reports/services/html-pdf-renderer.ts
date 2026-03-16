@@ -62,6 +62,15 @@ function drawCenteredSingleLine(
   doc.text(texto, x, y, { lineBreak: false });
 }
 
+function extractSectionSpacerLines(value: string): number | null {
+  const match = value.trim().match(/^\[\[espaco:(\d+(?:\.\d+)?)\]\]$/i);
+  if (!match) return null;
+
+  const lines = Number(match[1]);
+  if (!Number.isFinite(lines) || lines <= 0) return null;
+  return lines;
+}
+
 export class HtmlPdfRenderer {
   async render(html: string, rodape: RodapeRender, layout?: RelatorioHtmlInput): Promise<Buffer> {
     if (!layout) {
@@ -467,6 +476,14 @@ export class HtmlPdfRenderer {
 
           doc.y = y + alturaTitulo + 6;
           for (const linha of linhas) {
+            const spacerLines = extractSectionSpacerLines(linha);
+            if (spacerLines) {
+              doc.font(fonteRegular).fontSize(9.5);
+              garantirEspaco(doc.currentLineHeight(true) * spacerLines);
+              doc.moveDown(spacerLines);
+              continue;
+            }
+
             if (!linha) {
               doc.moveDown(0.35);
               continue;

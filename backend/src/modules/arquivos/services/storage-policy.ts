@@ -1,6 +1,7 @@
 export type StorageScopeKey =
   | "beneficiario_foto"
   | "beneficiario_documento"
+  | "banco_empregos_documento"
   | "biblioteca_capa"
   | "colaborador_foto"
   | "colaborador_documento"
@@ -57,6 +58,7 @@ const attachmentMimeTypes = [...documentMimeTypes, "video/mp4", "video/webm", "v
 export const requiredStorageDirectories = [
   "beneficiarios/fotos",
   "beneficiarios/documentos",
+  "banco-empregos/candidatos/documentos",
   "biblioteca/capas",
   "colaboradores/fotos",
   "colaboradores/documentos",
@@ -93,6 +95,15 @@ export const storagePolicies: Record<StorageScopeKey, StoragePolicy> = {
     allowedExtensions: documentExtensions,
     allowedMimeTypes: documentMimeTypes,
     maxSizeBytes: 15 * 1024 * 1024,
+    generateThumbnail: true
+  },
+  banco_empregos_documento: {
+    entidadeTipo: "banco_empregos_candidato",
+    categoria: "documento",
+    subdirectory: "banco-empregos/candidatos/documentos",
+    allowedExtensions: documentExtensions,
+    allowedMimeTypes: documentMimeTypes,
+    maxSizeBytes: 20 * 1024 * 1024,
     generateThumbnail: true
   },
   biblioteca_capa: {
