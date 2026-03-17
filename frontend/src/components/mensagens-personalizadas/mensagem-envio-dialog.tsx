@@ -24,8 +24,9 @@ type MensagemEnvioFeedback = {
 };
 
 type Props = {
-  aberto: boolean;
-  onClose: () => void;
+  aberto?: boolean;
+  inline?: boolean;
+  onClose?: () => void;
   onFeedback?: (retorno: MensagemEnvioFeedback) => void;
   tipoDestinatarioInicial?: MensagemDestinatarioTipo;
   canalInicial?: MensagemCanalEnvio;
@@ -42,7 +43,8 @@ function deduplicarDestinatarios(destinatarios: MensagemDestinatario[]) {
 }
 
 export function MensagemEnvioDialog({
-  aberto,
+  aberto = true,
+  inline = false,
   onClose,
   onFeedback,
   tipoDestinatarioInicial = "BENEFICIARIO",
@@ -52,7 +54,7 @@ export function MensagemEnvioDialog({
 }: Props) {
   const destinatariosTravados = destinatariosFixos?.length ? deduplicarDestinatarios(destinatariosFixos) : [];
   const [tipoDestinatario, setTipoDestinatario] = useState<MensagemDestinatarioTipo>(tipoDestinatarioInicial);
-  const [canal, setCanal] = useState<MensagemCanalEnvio>("WHATSAPP");
+  const [canal, setCanal] = useState<MensagemCanalEnvio>(canalInicial);
   const [buscaDestinatario, setBuscaDestinatario] = useState("");
   const [destinatariosSelecionados, setDestinatariosSelecionados] = useState<MensagemDestinatario[]>(
     destinatariosTravados
@@ -153,6 +155,18 @@ export function MensagemEnvioDialog({
     setBuscaDestinatario("");
   }
 
+  function marcarTodos() {
+    if (sugestoesDestinatarios.length) {
+      setDestinatariosSelecionados((atual) => deduplicarDestinatarios([...atual, ...sugestoesDestinatarios]));
+    }
+  }
+
+  function desmarcarTodos() {
+    if (!possuiDestinatarioFixo) {
+      setDestinatariosSelecionados([]);
+    }
+  }
+
   function removerDestinatario(id: string) {
     if (possuiDestinatarioFixo) return;
     setDestinatariosSelecionados((atual) => atual.filter((item) => item.id !== id));
@@ -190,7 +204,7 @@ export function MensagemEnvioDialog({
         tipo: "sucesso",
         texto: `Envio concluído: ${resultado.resumo.enviados} enviados, ${resultado.resumo.preparados} preparados e ${resultado.resumo.erros} com erro.`
       });
-      onClose();
+      onClose?.();
     } catch (error: any) {
       onFeedback?.({
         tipo: "erro",
@@ -201,196 +215,239 @@ export function MensagemEnvioDialog({
 
   if (!aberto) return null;
 
+  const content = (
+    <div className={`grid gap-5 xl:grid-cols-[1.2fr_0.8fr] ${inline ? "" : "flex-1 overflow-y-auto p-5"}`}>
+      <section className="space-y-4 xl:min-w-0">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="space-y-1">
+            <Label>Canal</Label>
+            <Select value={canal} onChange={(event) => setCanal(event.target.value as MensagemCanalEnvio)}>
+              <option value="WHATSAPP">WhatsApp</option>
+              <option value="EMAIL">E-mail</option>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
+            <Label>Tipo de destinatário</Label>
+            <Select
+              value={tipoDestinatario}
+              onChange={(event) => {
+                const novoTipo = event.target.value as MensagemDestinatarioTipo;
+                setTipoDestinatario(novoTipo);
+                if (!possuiDestinatarioFixo) {
+                  setDestinatariosSelecionados([]);
+                }
+                setModeloId("");
+              }}
+              disabled={possuiDestinatarioFixo}
+            >
+              <option value="BENEFICIARIO">Beneficiários</option>
+              <option value="PROFISSIONAL">Profissionais</option>
+              <option value="COLABORADOR">Colaboradores / Equipe</option>
+              <option value="VOLUNTARIO">Voluntários</option>
+              <option value="DOADOR">Doadores</option>
+              <option value="INSTITUICAO">Instituições / Parceiros</option>
+            </Select>
+          </div>
+
+          <div className="space-y-1 md:col-span-2">
+            <Label>Mensagem base</Label>
+            <Select value={modeloId} onChange={(event) => setModeloId(event.target.value)}>
+              <option value="">Selecione uma mensagem pré-pronta</option>
+              {modelos.map((modelo) => (
+                <option key={modelo.id} value={modelo.id}>
+                  {modelo.titulo}
+                </option>
+              ))}
+            </Select>
+          </div>
+        </div>
+
+        <div className="space-y-2 rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] p-4">
+          <div className="flex items-center justify-between gap-3">
+            <Label className="text-sm font-semibold text-slate-900 uppercase tracking-wider">
+              Seleção de Público
+            </Label>
+            <span className="text-xs font-medium text-[var(--g3-active)] bg-[var(--g3-primary-soft)] px-2 py-0.5 rounded-full">
+              {resumoEnvio}
+            </span>
+          </div>
+
+          {!possuiDestinatarioFixo ? (
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <Input
+                  value={buscaDestinatario}
+                  onChange={(event) => setBuscaDestinatario(event.target.value)}
+                  placeholder={`Buscar ${tipoDestinatario.toLowerCase()} por nome, documento ou código...`}
+                  className="flex-1"
+                />
+                <Button type="button" variant="outline" size="sm" onClick={marcarTodos} disabled={!sugestoesDestinatarios.length}>
+                  Marcar todos
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={desmarcarTodos} disabled={!destinatariosSelecionados.length}>
+                  Limpar
+                </Button>
+              </div>
+
+              <div className="max-h-36 overflow-y-auto rounded-lg border border-[var(--g3-border)] bg-white shadow-inner">
+                {buscarDestinatariosMutation.isPending ? (
+                  <div className="flex items-center gap-2 px-3 py-3 text-sm text-[var(--g3-muted)]">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Buscando na base de dados...
+                  </div>
+                ) : sugestoesDestinatarios.length ? (
+                  sugestoesDestinatarios.map((item) => (
+                    <button
+                      key={`${item.tipo}-${item.id}`}
+                      type="button"
+                      className="flex w-full items-center justify-between border-b border-slate-100 px-3 py-2 text-left last:border-b-0 hover:bg-[var(--g3-primary-soft)] transition-colors"
+                      onClick={() => adicionarDestinatario(item)}
+                    >
+                      <span>
+                        <span className="block text-sm font-medium text-slate-900">{item.nome}</span>
+                        <span className="block text-xs text-[var(--g3-muted)]">
+                          {[item.detalhe, item.documento].filter(Boolean).join(" • ")}
+                        </span>
+                      </span>
+                      <Plus className="h-4 w-4 text-[var(--g3-active)]" />
+                    </button>
+                  ))
+                ) : (
+                  <p className="px-3 py-3 text-sm text-[var(--g3-muted)] italic">
+                    {buscaDestinatario.trim().length >= 2 
+                      ? "Nenhum resultado encontrado para esta busca." 
+                      : "Digite o nome ou documento para buscar destinatários."}
+                  </p>
+                )}
+              </div>
+            </div>
+          ) : null}
+
+          {destinatariosSelecionados.length > 0 && (
+            <div className="flex flex-wrap gap-2 pt-2">
+              {destinatariosSelecionados.map((item) => (
+                <span
+                  key={`${item.tipo}-${item.id}`}
+                  className="inline-flex items-center gap-2 rounded-full border border-[var(--g3-border)] bg-white px-3 py-1 text-xs font-medium text-slate-700 shadow-sm"
+                >
+                  {item.nome}
+                  {!possuiDestinatarioFixo ? (
+                    <button
+                      type="button"
+                      onClick={() => removerDestinatario(item.id)}
+                      className="text-slate-400 hover:text-red-500 transition-colors"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  ) : null}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="grid gap-4">
+          <div className="space-y-1">
+            <Label>Assunto (exclusivo para e-mail)</Label>
+            <Input 
+              value={assuntoEditado} 
+              onChange={(event) => setAssuntoEditado(event.target.value)} 
+              placeholder="Digite o assunto da mensagem..."
+              disabled={canal === "WHATSAPP"}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <Label>Conteúdo da mensagem</Label>
+              <span className="text-[10px] text-[var(--g3-muted)]">Placeholders serão substituídos automaticamente</span>
+            </div>
+            <Textarea
+              rows={8}
+              value={mensagemEditada}
+              onChange={(event) => setMensagemEditada(event.target.value)}
+              placeholder="Escreva sua mensagem aqui ou selecione um modelo acima..."
+              className="resize-none"
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-4 xl:min-w-0">
+        <div className="sticky top-0 space-y-4">
+          <MensagemPreviewCard canal={canal} preview={preview} />
+
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const primeiro = destinatariosSelecionados[0];
+                if (!modeloId || !primeiro) return;
+                void previewMutation.mutateAsync({
+                  modeloId,
+                  canal,
+                  destinatarioTipo: tipoDestinatario,
+                  destinatarioId: primeiro.id,
+                  assuntoEditado,
+                  mensagemEditada,
+                  contextoExtra
+                });
+              }}
+              disabled={!modeloId || !destinatariosSelecionados.length || previewMutation.isPending}
+            >
+              <RefreshCcw className={`mr-1.5 h-3.5 w-3.5 ${previewMutation.isPending ? "animate-spin" : ""}`} />
+              Atualizar prévia
+            </Button>
+
+            <Button
+              size="sm"
+              className="bg-[var(--g3-primary-button)] hover:bg-[var(--g3-primary-button-hover)]"
+              onClick={() => void confirmarEnvio()}
+              disabled={!modeloId || !destinatariosSelecionados.length || enviarMutation.isPending}
+            >
+              {enviarMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  Enviando...
+                </>
+              ) : (
+                <>
+                  {canal === "WHATSAPP" ? (
+                    <MessageCircle className="mr-1.5 h-3.5 w-3.5" />
+                  ) : (
+                    <Mail className="mr-1.5 h-3.5 w-3.5" />
+                  )}
+                  {canal === "WHATSAPP" ? "Preparar envio WhatsApp" : "Enviar E-mail agora"}
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+
+  if (inline) {
+    return <div className="space-y-4">{content}</div>;
+  }
+
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/55 px-4 py-6">
       <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
           <div>
-            <h3 className="text-base font-semibold text-slate-900">Enviar mensagem</h3>
+            <h3 className="text-base font-semibold text-slate-900">Central de Envio de Mensagens</h3>
             <p className="text-sm text-[var(--g3-muted)]">
-              Selecione destinatário, canal, modelo e revise a mensagem final antes do envio.
+              Selecione público, canal e modelo para realizar comunicações em massa ou individuais.
             </p>
           </div>
           <Button variant="ghost" size="sm" onClick={onClose}>
             <X className="h-4 w-4" />
           </Button>
         </div>
-
-        <div className="grid flex-1 gap-5 overflow-y-auto p-5 xl:grid-cols-[1.2fr_0.8fr]">
-          <section className="space-y-4 xl:min-w-0">
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <div className="space-y-1">
-                <Label>Canal</Label>
-                <Select value={canal} onChange={(event) => setCanal(event.target.value as MensagemCanalEnvio)}>
-                  <option value="WHATSAPP">WhatsApp</option>
-                  <option value="EMAIL">E-mail</option>
-                </Select>
-              </div>
-
-              <div className="space-y-1">
-                <Label>Tipo de destinatário</Label>
-                <Select
-                  value={tipoDestinatario}
-                  onChange={(event) => setTipoDestinatario(event.target.value as MensagemDestinatarioTipo)}
-                  disabled={possuiDestinatarioFixo}
-                >
-                  <option value="BENEFICIARIO">Beneficiário</option>
-                  <option value="PROFISSIONAL">Profissional</option>
-                  <option value="COLABORADOR">Colaborador</option>
-                  <option value="VOLUNTARIO">Voluntário</option>
-                  <option value="DOADOR">Doador</option>
-                  <option value="INSTITUICAO">Instituição</option>
-                </Select>
-              </div>
-
-              <div className="space-y-1 md:col-span-2">
-                <Label>Mensagem</Label>
-                <Select value={modeloId} onChange={(event) => setModeloId(event.target.value)}>
-                  <option value="">Selecione</option>
-                  {modelos.map((modelo) => (
-                    <option key={modelo.id} value={modelo.id}>
-                      {modelo.titulo}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-            </div>
-
-            <div className="space-y-2 rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] p-4">
-              <div className="flex items-center justify-between gap-3">
-                <Label className="text-sm font-semibold text-slate-900">Destinatários</Label>
-                <span className="text-xs text-[var(--g3-muted)]">{resumoEnvio}</span>
-              </div>
-
-              {!possuiDestinatarioFixo ? (
-                <>
-                  <Input
-                    value={buscaDestinatario}
-                    onChange={(event) => setBuscaDestinatario(event.target.value)}
-                    placeholder="Digite nome, documento, código ou referência"
-                  />
-
-                  <div className="max-h-36 overflow-y-auto rounded-lg border border-[var(--g3-border)] bg-white">
-                    {buscarDestinatariosMutation.isPending ? (
-                      <div className="flex items-center gap-2 px-3 py-3 text-sm text-[var(--g3-muted)]">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Buscando destinatários...
-                      </div>
-                    ) : sugestoesDestinatarios.length ? (
-                      sugestoesDestinatarios.map((item) => (
-                        <button
-                          key={`${item.tipo}-${item.id}`}
-                          type="button"
-                          className="flex w-full items-center justify-between border-b border-slate-100 px-3 py-2 text-left last:border-b-0 hover:bg-[var(--g3-primary-soft)]"
-                          onClick={() => adicionarDestinatario(item)}
-                        >
-                          <span>
-                            <span className="block text-sm font-medium text-slate-900">{item.nome}</span>
-                            <span className="block text-xs text-[var(--g3-muted)]">
-                              {[item.detalhe, item.documento].filter(Boolean).join(" • ")}
-                            </span>
-                          </span>
-                          <Plus className="h-4 w-4 text-[var(--g3-active)]" />
-                        </button>
-                      ))
-                    ) : (
-                      <p className="px-3 py-3 text-sm text-[var(--g3-muted)]">
-                        Digite ao menos 2 caracteres para buscar.
-                      </p>
-                    )}
-                  </div>
-                </>
-              ) : null}
-
-              <div className="flex flex-wrap gap-2">
-                {destinatariosSelecionados.map((item) => (
-                  <span
-                    key={`${item.tipo}-${item.id}`}
-                    className="inline-flex items-center gap-2 rounded-full bg-[var(--g3-primary-soft)] px-3 py-1 text-xs font-medium text-[var(--g3-active)]"
-                  >
-                    {item.nome}
-                    {!possuiDestinatarioFixo ? (
-                      <button
-                        type="button"
-                        onClick={() => removerDestinatario(item.id)}
-                        className="text-[var(--g3-muted)]"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    ) : null}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            <div className="grid gap-3">
-              <div className="space-y-1">
-                <Label>Assunto final</Label>
-                <Input value={assuntoEditado} onChange={(event) => setAssuntoEditado(event.target.value)} />
-              </div>
-
-              <div className="space-y-1">
-                <Label>Mensagem final</Label>
-                <Textarea
-                  rows={8}
-                  value={mensagemEditada}
-                  onChange={(event) => setMensagemEditada(event.target.value)}
-                />
-              </div>
-            </div>
-          </section>
-
-          <section className="space-y-4 xl:min-w-0">
-            <MensagemPreviewCard canal={canal} preview={preview} />
-
-            <div className="flex flex-wrap justify-end gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const primeiro = destinatariosSelecionados[0];
-                  if (!modeloId || !primeiro) return;
-                  void previewMutation.mutateAsync({
-                    modeloId,
-                    canal,
-                    destinatarioTipo: tipoDestinatario,
-                    destinatarioId: primeiro.id,
-                    assuntoEditado,
-                    mensagemEditada,
-                    contextoExtra
-                  });
-                }}
-                disabled={!modeloId || !destinatariosSelecionados.length || previewMutation.isPending}
-              >
-                <RefreshCcw className="mr-1.5 h-3.5 w-3.5" />
-                Atualizar prévia
-              </Button>
-
-              <Button
-                size="sm"
-                onClick={() => void confirmarEnvio()}
-                disabled={!modeloId || !destinatariosSelecionados.length || enviarMutation.isPending}
-              >
-                {enviarMutation.isPending ? (
-                  <>
-                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                    Enviando...
-                  </>
-                ) : (
-                  <>
-                    {canal === "WHATSAPP" ? (
-                      <MessageCircle className="mr-1.5 h-3.5 w-3.5" />
-                    ) : (
-                      <Mail className="mr-1.5 h-3.5 w-3.5" />
-                    )}
-                    <Send className="mr-1.5 h-3.5 w-3.5" />
-                    {canal === "WHATSAPP" ? "Preparar envio" : "Enviar"}
-                  </>
-                )}
-              </Button>
-            </div>
-          </section>
-        </div>
+        {content}
       </div>
     </div>
   );

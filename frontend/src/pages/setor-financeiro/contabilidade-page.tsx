@@ -748,11 +748,6 @@ export function ContabilidadePage() {
   const uploadArquivoMutation = useUploadArquivoLancamentoContabil(lancamentoSelecionadoId);
   const excluirArquivoMutation = useExcluirArquivoLancamentoContabil(lancamentoSelecionadoId);
 
-  const contas = contasQuery.data ?? [];
-  const categorias = categoriasQuery.data ?? [];
-  const centrosCusto = centrosQuery.data ?? [];
-  const lancamentos = lancamentosQuery.data ?? [];
-  const movimentacoes = movimentacoesQuery.data ?? [];
   const transferencias = transferenciasQuery.data ?? [];
   const conciliacoes = conciliacoesQuery.data ?? [];
   const comprasIntegradas = comprasQuery.data ?? [];
@@ -761,6 +756,16 @@ export function ContabilidadePage() {
   const arquivos = arquivosQuery.data ?? [];
   const planosTrabalho = planosTrabalhoQuery.data ?? [];
   const titularContaPadrao = unidadeAtualQuery.data?.unidade?.nome_fantasia?.trim() ?? '';
+
+  const categorias = categoriasQuery.data ?? [];
+  const centrosCusto = centrosQuery.data ?? [];
+  const lancamentos = lancamentosQuery.data ?? [];
+  const movimentacoes = movimentacoesQuery.data ?? [];
+
+  const contas = useMemo(() => {
+    const lista = contasQuery.data ?? [];
+    return [...lista].sort((a, b) => b.saldoAtual - a.saldoAtual);
+  }, [contasQuery.data]);
 
   const bancosDisponiveis = useMemo(
     () =>

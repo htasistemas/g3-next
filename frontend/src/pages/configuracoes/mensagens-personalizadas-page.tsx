@@ -48,10 +48,28 @@ import type {
 } from "@/types/mensagens-personalizadas";
 
 const abas: AdminTab[] = [
+  { id: "envio", label: "Envio de mensagens", icon: MailPlus },
   { id: "pre-prontas", label: "Mensagens pré-prontas", icon: BookText },
   { id: "sugestoes-ia", label: "Sugestões da IA", icon: Sparkles },
   { id: "categorias", label: "Categorias e assuntos", icon: Tags },
   { id: "historico", label: "Histórico / utilização", icon: History }
+];
+
+const tonsVozIA = [
+  { id: "acolhedor", label: "Acolhedor", descricao: "Empático e caloroso" },
+  { id: "formal", label: "Formal", descricao: "Profissional e sério" },
+  { id: "institucional", label: "Institucional", descricao: "Padrão oficial da organização" },
+  { id: "motivacional", label: "Motivacional", descricao: "Inspirador e enérgico" },
+  { id: "informativo", label: "Informativo", descricao: "Direto e objetivo" }
+];
+
+const objetivosIA = [
+  { id: "boas-vindas", label: "Boas-vindas" },
+  { id: "lembrete", label: "Lembrete de compromisso" },
+  { id: "agradecimento-doacao", label: "Agradecimento por doação" },
+  { id: "convite-evento", label: "Convite para evento" },
+  { id: "comunicado-urgente", label: "Comunicado importante" },
+  { id: "atualizacao-cadastral", label: "Atualização cadastral" }
 ];
 
 const modeloVazio: MensagemModeloForm = {
@@ -367,7 +385,7 @@ function ModeloDialog({
 
 export function MensagensPersonalizadasPage() {
   const { usuario } = useAuth();
-  const [abaAtiva, setAbaAtiva] = useState<AbaId>("pre-prontas");
+  const [abaAtiva, setAbaAtiva] = useState<AbaId>("envio");
   const [filtros, setFiltros] = useState<MensagemModeloFiltros>({
     busca: "",
     status: undefined,
@@ -387,7 +405,6 @@ export function MensagensPersonalizadasPage() {
   });
   const [popup, setPopup] = useState<PopupMensagemState | null>(null);
   const [dialogAberto, setDialogAberto] = useState(false);
-  const [envioAberto, setEnvioAberto] = useState(false);
   const [modoDialog, setModoDialog] = useState<ModeloModo>("criar");
   const [modeloAtual, setModeloAtual] = useState<MensagemModelo | undefined>();
   const [confirmarExclusaoId, setConfirmarExclusaoId] = useState<string>();
@@ -439,7 +456,6 @@ export function MensagensPersonalizadasPage() {
       variant: "default",
       disabled: !podeEditar
     },
-    { label: "Preparar envio", icon: MailPlus, onClick: () => setEnvioAberto(true), variant: "outline" },
     {
       label: "Atualizar",
       icon: RefreshCcw,
@@ -512,108 +528,192 @@ export function MensagensPersonalizadasPage() {
       <AdminPageLayout tabs={abas} activeTab={abaAtiva} onChangeTab={(tab) => setAbaAtiva(tab as AbaId)} actions={acoes} sectionLabel="Configurações gerais" pageTitle="Mensagens personalizadas" activeTitle={abas.find((item) => item.id === abaAtiva)?.label}>
         <Card className="border-dashed">
           <CardContent className="py-4 text-sm text-[var(--g3-muted)]">
-            Centralize mensagens reutilizáveis para WhatsApp e e-mail, com sugestões iniciais, organização por categorias e rastreio de uso.
+            Central de comunicação inteligente: envie mensagens para beneficiários, voluntários e doadores via WhatsApp ou E-mail, organize modelos reutilizáveis e acompanhe o histórico.
           </CardContent>
         </Card>
-        <div className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] p-4">
-          <div className="grid gap-3 md:grid-cols-4">
-            <div className="space-y-1"><Label>Buscar</Label><Input value={filtros.busca ?? ""} onChange={(e) => setFiltros((v) => ({ ...v, busca: e.target.value }))} placeholder="Título, assunto ou conteúdo" /></div>
-            <div className="space-y-1"><Label>Status</Label><Select value={filtros.status ?? ""} onChange={(e) => setFiltros((v) => ({ ...v, status: e.target.value ? (e.target.value as MensagemStatus) : undefined }))}><option value="">Todos</option><option value="ATIVA">Ativa</option><option value="INATIVA">Inativa</option></Select></div>
-            <div className="space-y-1"><Label>Categoria</Label><Select value={filtros.categoriaId ?? ""} onChange={(e) => setFiltros((v) => ({ ...v, categoriaId: e.target.value || undefined }))}><option value="">Todas</option>{taxonomias.filter((i) => i.tipo === "CATEGORIA").map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}</Select></div>
-            <div className="space-y-1"><Label>Canal</Label><Select value={filtros.canal ?? ""} onChange={(e) => setFiltros((v) => ({ ...v, canal: e.target.value ? (e.target.value as any) : undefined }))}><option value="">Todos</option><option value="WHATSAPP">WhatsApp</option><option value="EMAIL">E-mail</option></Select></div>
-          </div>
-        </div>
-        <div className="overflow-x-auto rounded-xl border border-[var(--g3-border)]">
-          <table className="min-w-full text-sm">
-            <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]">
-              <tr>
-                <th className="px-3 py-2 text-left">Título</th>
-                <th className="px-3 py-2 text-left">Assunto</th>
-                <th className="px-3 py-2 text-left">Categoria</th>
-                <th className="px-3 py-2 text-left">Destinatário</th>
-                <th className="px-3 py-2 text-left">Canal</th>
-                <th className="px-3 py-2 text-left">Situação</th>
-                <th className="px-3 py-2 text-left">Atualização</th>
-                <th className="px-3 py-2 text-right">Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(abaAtiva === "sugestoes-ia" ? sugestoesIa : modelos).map((item, index) => (
-                <tr key={item.id} className={`border-t border-[var(--g3-border)] ${index % 2 === 0 ? "bg-white" : "bg-[var(--g3-primary-soft)]/25"}`}>
-                  <td className="px-3 py-2">{item.titulo}</td>
-                  <td className="px-3 py-2">{item.assunto ?? "---"}</td>
-                  <td className="px-3 py-2">{item.categoria ?? "---"}</td>
-                  <td className="px-3 py-2">{item.tiposDestinatario.join(", ")}</td>
-                  <td className="px-3 py-2">{item.canalPermitido}</td>
-                  <td className="px-3 py-2">{rotuloStatus(item.status)}</td>
-                  <td className="px-3 py-2">{formatarDataHora(item.atualizado_em)}</td>
-                  <td className="px-3 py-2 text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button size="sm" variant="outline" onClick={() => { setModoDialog("visualizar"); setModeloAtual(item); setDialogAberto(true); }}>Visualizar</Button>
-                      <Button size="sm" variant="outline" onClick={() => { setModoDialog("editar"); setModeloAtual(item); setDialogAberto(true); }} disabled={!podeEditar}><Pencil className="h-3.5 w-3.5" /></Button>
-                      <Button size="sm" variant="outline" onClick={() => void duplicarMutation.mutateAsync(item.id)} disabled={!podeEditar}><Plus className="h-3.5 w-3.5" /></Button>
-                      <Button size="sm" variant="outline" onClick={() => void statusMutation.mutateAsync({ id: item.id, status: item.status === "ATIVA" ? "INATIVA" : "ATIVA" })} disabled={!podeEditar}>{item.status === "ATIVA" ? "Inativar" : "Ativar"}</Button>
-                      <Button size="sm" variant="danger" onClick={() => setConfirmarExclusaoId(item.id)} disabled={!podeEditar}><Trash2 className="h-3.5 w-3.5" /></Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {abaAtiva === "categorias" ? (
-          <div className="grid gap-4 xl:grid-cols-[0.42fr_0.58fr]">
-            <Card>
-              <CardHeader><CardTitle className="text-sm">Cadastro de taxonomia</CardTitle></CardHeader>
-              <CardContent className="space-y-3">
-                <div className="space-y-1"><Label>Tipo</Label><Select value={taxonomiaForm.tipo} onChange={(e) => setTaxonomiaForm((v) => ({ ...v, tipo: e.target.value as MensagemTaxonomiaTipo }))}><option value="CATEGORIA">Categoria</option><option value="ASSUNTO">Assunto</option><option value="TIPO_COMUNICACAO">Tipo de comunicação</option><option value="TAG">Tag</option></Select></div>
-                <div className="space-y-1"><Label>Nome</Label><Input value={taxonomiaForm.nome} onChange={(e) => setTaxonomiaForm((v) => ({ ...v, nome: e.target.value }))} /></div>
-                <div className="space-y-1"><Label>Descrição</Label><Textarea rows={3} value={taxonomiaForm.descricao} onChange={(e) => setTaxonomiaForm((v) => ({ ...v, descricao: e.target.value }))} /></div>
-                <div className="space-y-1"><Label>Status</Label><Select value={taxonomiaForm.status} onChange={(e) => setTaxonomiaForm((v) => ({ ...v, status: e.target.value as MensagemStatus }))}><option value="ATIVA">Ativa</option><option value="INATIVA">Inativa</option></Select></div>
-                <div className="flex justify-end gap-2">
-                  <Button variant="outline" onClick={() => { setTaxonomiaEdicao(null); setTaxonomiaForm({ tipo: "CATEGORIA", nome: "", descricao: "", status: "ATIVA" }); }}>Limpar</Button>
-                  <Button onClick={() => void salvarTaxonomiaMutation.mutateAsync({ id: taxonomiaEdicao?.id, payload: taxonomiaForm })}>{taxonomiaEdicao ? "Atualizar" : "Cadastrar"}</Button>
+
+        {abaAtiva === "envio" && (
+          <MensagemEnvioDialog
+            inline
+            onFeedback={({ tipo, texto }) =>
+              setPopup({ tipo, titulo: "Mensagens personalizadas", texto })
+            }
+          />
+        )}
+
+        {abaAtiva === "sugestoes-ia" && (
+          <div className="space-y-4">
+            <Card className="bg-slate-50">
+              <CardContent className="py-4">
+                <div className="grid gap-4 md:grid-cols-4">
+                  <div className="space-y-1">
+                    <Label>Público alvo</Label>
+                    <Select value={filtros.destinatario ?? ""} onChange={(e) => setFiltros(v => ({...v, destinatario: e.target.value as any}))}>
+                      <option value="">Selecione</option>
+                      <option value="BENEFICIARIO">Beneficiários</option>
+                      <option value="VOLUNTARIO">Voluntários</option>
+                      <option value="DOADOR">Doadores</option>
+                      <option value="PROFISSIONAL">Profissionais</option>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Objetivo</Label>
+                    <Select>
+                      {objetivosIA.map(obj => <option key={obj.id} value={obj.id}>{obj.label}</option>)}
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Tom da mensagem</Label>
+                    <Select>
+                      {tonsVozIA.map(tom => <option key={tom.id} value={tom.id}>{tom.label}</option>)}
+                    </Select>
+                  </div>
+                  <div className="flex items-end">
+                    <Button className="w-full bg-indigo-600 hover:bg-indigo-700">
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      Gerar sugestão com IA
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
+
             <div className="grid gap-4 md:grid-cols-2">
-              {(["CATEGORIA", "ASSUNTO", "TIPO_COMUNICACAO", "TAG"] as MensagemTaxonomiaTipo[]).map((tipo) => (
-                <Card key={tipo}>
-                  <CardHeader><CardTitle className="text-sm">{rotuloTaxonomia(tipo)}</CardTitle></CardHeader>
-                  <CardContent className="space-y-2">
-                    {taxonomias.filter((item) => item.tipo === tipo).map((item) => (
-                      <div key={item.id} className="flex items-center justify-between rounded-lg border border-[var(--g3-border)] px-3 py-2 text-sm">
-                        <div><p className="font-medium text-slate-900">{item.nome}</p><p className="text-xs text-[var(--g3-muted)]">{rotuloStatus(item.status)}</p></div>
-                        <div className="flex gap-2">
-                          <Button size="sm" variant="outline" onClick={() => { setTaxonomiaEdicao(item); setTaxonomiaForm({ tipo: item.tipo, nome: item.nome, descricao: item.descricao ?? "", status: item.status }); }}>Editar</Button>
-                          <Button size="sm" variant="danger" onClick={() => void removerTaxonomiaMutation.mutateAsync(item.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
-                        </div>
+              {sugestoesIa.length ? sugestoesIa.map((item) => (
+                <Card key={item.id} className="group relative overflow-hidden transition-all hover:border-indigo-300 hover:shadow-md">
+                  <div className="absolute top-0 left-0 h-1 w-full bg-indigo-500 opacity-0 transition-opacity group-hover:opacity-100" />
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base font-bold text-slate-900">{item.titulo}</CardTitle>
+                      <div className="flex gap-1">
+                        <Button size="sm" variant="ghost" onClick={() => void duplicarModelo(item.id)} title="Transformar em pré-pronta">
+                          <Plus className="h-4 w-4 text-indigo-600" />
+                        </Button>
                       </div>
-                    ))}
+                    </div>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600 uppercase">{item.canalPermitido}</span>
+                      <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-600 uppercase">{item.categoria ?? "Informativo"}</span>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="line-clamp-4 rounded-lg bg-slate-50 p-3 text-sm text-slate-700 italic border border-slate-100">
+                      "{item.mensagemBase}"
+                    </div>
+                    <div className="mt-4 flex justify-end gap-2">
+                      <Button size="sm" variant="outline" onClick={() => { setModoDialog("visualizar"); setModeloAtual(item); setDialogAberto(true); }}>Visualizar tudo</Button>
+                      <Button size="sm" className="bg-indigo-600" onClick={() => { setModoDialog("editar"); setModeloAtual(item); setDialogAberto(true); }}>Editar e Salvar</Button>
+                    </div>
                   </CardContent>
                 </Card>
-              ))}
+              )) : (
+                <div className="col-span-2 flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 py-12 text-slate-400">
+                  <Sparkles className="mb-3 h-12 w-12 opacity-20" />
+                  <p>Defina o público e o tom acima para gerar sugestões inteligentes.</p>
+                </div>
+              )}
             </div>
           </div>
-        ) : null}
-        {abaAtiva === "historico" ? (
-          <div className="overflow-x-auto rounded-xl border border-[var(--g3-border)]">
-            <table className="min-w-full text-sm">
-              <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"><tr><th className="px-3 py-2 text-left">Data/Hora</th><th className="px-3 py-2 text-left">Canal</th><th className="px-3 py-2 text-left">Destinatário</th><th className="px-3 py-2 text-left">Mensagem</th><th className="px-3 py-2 text-left">Usuário</th><th className="px-3 py-2 text-left">Tipo</th><th className="px-3 py-2 text-left">Status</th></tr></thead>
-              <tbody>{historico.map((item, index) => <tr key={item.id} className={`border-t border-[var(--g3-border)] ${index % 2 === 0 ? "bg-white" : "bg-[var(--g3-primary-soft)]/25"}`}><td className="px-3 py-2">{formatarDataHora(item.criado_em)}</td><td className="px-3 py-2">{item.canal}</td><td className="px-3 py-2">{item.destinatarioNome ?? "---"}</td><td className="px-3 py-2">{item.nomeMensagem}</td><td className="px-3 py-2">{item.usuarioNome ?? "---"}</td><td className="px-3 py-2">{item.tipoEnvio}</td><td className="px-3 py-2">{item.status}</td></tr>)}</tbody>
-            </table>
+        )}
+
+        {abaAtiva === "historico" && (
+          <div className="space-y-4">
+            <Card className="bg-slate-50">
+              <CardContent className="py-4">
+                <div className="grid gap-3 md:grid-cols-5">
+                  <div className="space-y-1">
+                    <Label>Início</Label>
+                    <Input type="date" value={filtrosHistorico.dataInicio} onChange={e => setFiltrosHistorico(v => ({...v, dataInicio: e.target.value}))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Fim</Label>
+                    <Input type="date" value={filtrosHistorico.dataFim} onChange={e => setFiltrosHistorico(v => ({...v, dataFim: e.target.value}))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Status</Label>
+                    <Select value={filtrosHistorico.status} onChange={e => setFiltrosHistorico(v => ({...v, status: e.target.value as any}))}>
+                      <option value="">Todos</option>
+                      <option value="ENVIADO">Enviado</option>
+                      <option value="ERRO">Falha</option>
+                      <option value="PREPARADO">Preparado</option>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Canal</Label>
+                    <Select value={filtrosHistorico.canal} onChange={e => setFiltrosHistorico(v => ({...v, canal: e.target.value as any}))}>
+                      <option value="">Todos</option>
+                      <option value="WHATSAPP">WhatsApp</option>
+                      <option value="EMAIL">E-mail</option>
+                    </Select>
+                  </div>
+                  <div className="flex items-end">
+                    <Button variant="outline" className="w-full" onClick={() => setFiltrosHistorico({busca: "", canal: undefined, destinatarioTipo: undefined, usuario: "", status: undefined, dataInicio: "", dataFim: ""})}>
+                      <FilterX className="mr-2 h-4 w-4" />
+                      Limpar filtros
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="overflow-hidden rounded-xl border border-[var(--g3-border)] bg-white shadow-sm">
+              <table className="min-w-full text-sm">
+                <thead className="bg-[var(--g3-primary-soft)]/60 text-[var(--g3-active)]">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-bold">Data/Hora</th>
+                    <th className="px-4 py-3 text-left font-bold">Destinatário</th>
+                    <th className="px-4 py-3 text-left font-bold">Canal</th>
+                    <th className="px-4 py-3 text-left font-bold">Mensagem</th>
+                    <th className="px-4 py-3 text-left font-bold">Status</th>
+                    <th className="px-4 py-3 text-right font-bold">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--g3-border)]">
+                  {historico.length ? historico.map((item, index) => (
+                    <tr key={item.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-4 py-3 font-medium text-slate-600">{formatarDataHora(item.criado_em)}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-slate-900">{item.destinatarioNome ?? "---"}</span>
+                          <span className="text-xs text-[var(--g3-muted)] uppercase">{item.destinatarioTipo}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1.5">
+                          {item.canal === "WHATSAPP" ? <MessageCircle className="h-4 w-4 text-emerald-600" /> : <Mail className="h-4 w-4 text-blue-600" />}
+                          <span className="text-xs font-medium">{item.canal}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">{item.nomeMensagem}</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
+                          item.status === "ENVIADO" ? "bg-emerald-50 text-emerald-700" : 
+                          item.status === "ERRO" ? "bg-rose-50 text-rose-700" : "bg-blue-50 text-blue-700"
+                        }`}>
+                          {item.status === "ERRO" ? "FALHA" : item.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button size="sm" variant="ghost" className="h-8 w-8 p-0" title="Ver detalhes"><Search className="h-4 w-4" /></Button>
+                          <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-indigo-600" title="Reenviar"><RefreshCcw className="h-4 w-4" /></Button>
+                        </div>
+                      </td>
+                    </tr>
+                  )) : (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-8 text-center text-slate-400 italic">Nenhum registro de envio encontrado para os filtros selecionados.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        ) : null}
+        )}
       </AdminPageLayout>
 
       <ModeloDialog aberto={dialogAberto} modo={modoDialog} modelo={modeloAtual} placeholders={placeholders} taxonomias={taxonomias} salvando={salvarMutation.isPending} onClose={() => setDialogAberto(false)} onSalvar={salvarModelo} />
-      <MensagemEnvioDialog
-        aberto={envioAberto}
-        onClose={() => setEnvioAberto(false)}
-        onFeedback={({ tipo, texto }) =>
-          setPopup({ tipo, titulo: "Mensagens personalizadas", texto })
-        }
-      />
+      
       <PopupConfirmacao aberto={!!confirmarExclusaoId} titulo="Confirmar exclusão" texto="Esta ação é irreversível. Deseja continuar?" processando={removerMutation.isPending} onCancel={() => setConfirmarExclusaoId(undefined)} onConfirm={() => { if (!confirmarExclusaoId) return; void removerMutation.mutateAsync(confirmarExclusaoId).then(() => setConfirmarExclusaoId(undefined)); }} confirmarTexto="Excluir" />
       {popup ? <PopupMensagem popup={popup} onClose={() => setPopup(null)} /> : null}
     </>

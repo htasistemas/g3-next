@@ -4,6 +4,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
 import type { LucideIcon } from "lucide-react";
 import {
+  ChevronDown,
+  ChevronRight,
   History,
   KeyRound,
   ListFilter,
@@ -257,6 +259,9 @@ export function UsuariosPage() {
   });
 
   const permissoesSelecionadasValue = watch("permissoes");
+  const emailUsuarioAtual = watch("email");
+  const ehAdminImutavel = emailUsuarioAtual?.toLowerCase() === "htasistemas@gmail.com";
+  
   const permissoesSelecionadas = Array.isArray(permissoesSelecionadasValue)
     ? permissoesSelecionadasValue
     : typeof permissoesSelecionadasValue === "string"
@@ -272,10 +277,53 @@ export function UsuariosPage() {
     resetarSenhaMutation.isPending ||
     removerMutation.isPending;
 
-  const gruposPermissoes = useMemo(
-    () => ordenarPermissoesPorModulo(permissoesData?.permissoes ?? []),
-    [permissoesData]
-  );
+  const [modulosExpandidos, setModulosExpandidos] = useState<string[]>([]);
+  const [buscaPermissao, setBuscaPermissao] = useState("");
+
+  const gruposPermissoes = useMemo(() => {
+    const todos = ordenarPermissoesPorModulo(permissoesData?.permissoes ?? []);
+    if (!buscaPermissao) return todos;
+
+    const termo = buscaPermissao.toLowerCase();
+    return todos
+      .map((grupo) => ({
+        ...grupo,
+        itens: grupo.itens.filter(
+          (item) =>
+            item.nome.toLowerCase().includes(termo) ||
+            item.modulo.toLowerCase().includes(termo) ||
+            item.tela.toLowerCase().includes(termo)
+        )
+      }))
+      .filter((grupo) => grupo.itens.length > 0);
+  }, [permissoesData, buscaPermissao]);
+
+  const alternarModulo = (modulo: string) => {
+    setModulosExpandidos((prev) =>
+      prev.includes(modulo) ? prev.filter((m) => m !== modulo) : [...prev, modulo]
+    );
+  };
+
+  const expandirTodos = () => {
+    setModulosExpandidos(gruposPermissoes.map((g) => g.modulo));
+  };
+
+  const recolherTodos = () => {
+    setModulosExpandidos([]);
+  };
+
+  const marcarTudo = () => {
+    if (ehAdminImutavel) return;
+    const todasPermissoes = gruposPermissoes.flatMap((g) => g.itens.map((i) => i.nome));
+    const novas = Array.from(new Set([...permissoesSelecionadas, ...todasPermissoes]));
+    setValue("permissoes", novas, { shouldDirty: true, shouldValidate: true });
+  };
+
+  const desmarcarTudo = () => {
+    if (ehAdminImutavel) return;
+    setValue("permissoes", [], { shouldDirty: true, shouldValidate: true });
+    setValue("perfil_acesso", "", { shouldDirty: true, shouldValidate: true });
+  };
 
   const permissoesDisponiveis = useMemo(
     () => (permissoesData?.permissoes ?? []).map((item) => item.nome).sort((a, b) => a.localeCompare(b)),
@@ -823,30 +871,187 @@ export function UsuariosPage() {
             )}
 
             {abaAtiva === "permissoes" && (
-              <section className="space-y-3">
+              <section className="space-y-4">
+                <div className="flex items-center gap-3 border-b border-[var(--g3-border)] pb-4">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-[var(--g3-muted)]" />
+                    <Input
+                      placeholder="Buscar permissão, módulo ou tela..."
+                      className="pl-9"
+                      value={buscaPermissao}
+                      onChange={(e) => setBuscaPermissao(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={expandirTodos}>
+                      Expandir todos
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" onClick={recolherTodos}>
+                      Recolher todos
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" onClick={marcarTudo} disabled={ehAdminImutavel}>
+                      Marcar tudo
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" onClick={desmarcarTudo} disabled={ehAdminImutavel}>
+                      Desmarcar tudo
+                    </Button>
+                  </div>
+                </div>
+
                 {carregandoPermissoes && <p className="text-sm text-[var(--g3-muted)]">Carregando permissões...</p>}
                 {!carregandoPermissoes && !gruposPermissoes.length && <p className="text-sm text-[var(--g3-muted)]">Nenhuma permissão cadastrada.</p>}
-                {gruposPermissoes.map((grupo) => (
-                  <Card key={grupo.modulo} className="border border-[var(--g3-border)]">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm text-[var(--g3-active)]">{grupo.modulo}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                      {grupo.itens.map((item) => {
-                        const marcada = permissoesSelecionadas.includes(item.nome);
-                        return (
-                          <label key={item.nome} className={`flex cursor-pointer items-start gap-2 rounded-md border px-3 py-2 text-sm ${marcada ? "border-[var(--g3-active)] bg-[var(--g3-primary-soft)]" : "border-[var(--g3-border)] bg-white"}`}>
-                            <Checkbox checked={marcada} onChange={() => trocarPermissao(item.nome)} />
-                            <span>
-                              <span className="block font-semibold">{item.nome}</span>
-                              <span className="block text-xs text-[var(--g3-muted)]">{item.tela} - {item.acao}</span>
-                            </span>
-                          </label>
-                        );
-                      })}
-                    </CardContent>
-                  </Card>
-                ))}
+                
+                {ehAdminImutavel && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                    <p className="font-semibold">Usuário Administrador Restrito</p>
+                    <p>As permissões deste usuário não podem ser alteradas pois ele possui acesso total ao sistema.</p>
+                  </div>
+                )}
+
+                {gruposPermissoes.map((grupo) => {
+                  const expandido = modulosExpandidos.includes(grupo.modulo);
+
+                  // Agrupar itens por tela dentro do módulo
+                  const telasMap = new Map<
+                    string,
+                    {
+                      visualizar?: string;
+                      editar?: string;
+                      excluir?: string;
+                      aprovar?: string;
+                      imprimir?: string;
+                      exportar?: string;
+                      configurar?: string;
+                    }
+                  >();
+                  
+                  grupo.itens.forEach(item => {
+                    const info = telasMap.get(item.tela) ?? {};
+                    const acao = item.acao.toLowerCase();
+                    if (acao.includes("visualizar") || acao.includes("leitura") || acao.includes("acesso")) info.visualizar = item.nome;
+                    if (acao.includes("editar") || acao.includes("cadastrar") || acao.includes("alterar")) info.editar = item.nome;
+                    if (acao.includes("excluir") || acao.includes("remover") || acao.includes("deletar")) info.excluir = item.nome;
+                    if (acao.includes("aprovar") || acao.includes("autorizar")) info.aprovar = item.nome;
+                    if (acao.includes("imprimir")) info.imprimir = item.nome;
+                    if (acao.includes("exportar")) info.exportar = item.nome;
+                    if (acao.includes("configurar")) info.configurar = item.nome;
+                    telasMap.set(item.tela, info);
+                  });
+
+                  const telas = Array.from(telasMap.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+
+                  return (
+                    <Card key={grupo.modulo} className="overflow-hidden border border-[var(--g3-border)] shadow-sm">
+                      <CardHeader 
+                        className="bg-[var(--g3-primary-soft)]/50 py-3 cursor-pointer hover:bg-[var(--g3-primary-soft)]/70 transition-colors flex flex-row items-center justify-between"
+                        onClick={() => alternarModulo(grupo.modulo)}
+                      >
+                        <CardTitle className="text-sm font-bold text-[var(--g3-active)] uppercase tracking-wider">
+                          {grupo.modulo}
+                        </CardTitle>
+                        {expandido ? <ChevronDown className="h-4 w-4 text-[var(--g3-active)]" /> : <ChevronRight className="h-4 w-4 text-[var(--g3-active)]" />}
+                      </CardHeader>
+                      
+                      {expandido && (
+                        <CardContent className="p-0 border-t border-[var(--g3-border)]">
+                          <div className="overflow-x-auto">
+                            <table className="min-w-full text-sm">
+                              <thead className="bg-[var(--g3-primary-soft)]/30 text-[var(--g3-active)]">
+                                <tr>
+                                  <th className="px-4 py-2 text-left font-semibold">Tela / Submenu</th>
+                                  <th className="w-20 px-2 py-2 text-center font-semibold text-[11px]">Visualizar</th>
+                                  <th className="w-20 px-2 py-2 text-center font-semibold text-[11px]">Editar</th>
+                                  <th className="w-20 px-2 py-2 text-center font-semibold text-[11px]">Excluir</th>
+                                  <th className="w-20 px-2 py-2 text-center font-semibold text-[11px]">Aprovar</th>
+                                  <th className="w-20 px-2 py-2 text-center font-semibold text-[11px]">Imprimir</th>
+                                  <th className="w-20 px-2 py-2 text-center font-semibold text-[11px]">Exportar</th>
+                                  <th className="w-20 px-2 py-2 text-center font-semibold text-[11px]">Configurar</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-[var(--g3-border)]">
+                                {telas.map(([tela, acoes]) => (
+                                  <tr key={tela} className="hover:bg-[var(--g3-primary-soft)]/10 transition-colors">
+                                    <td className="px-4 py-2.5 font-medium text-[var(--g3-foreground)]">{tela}</td>
+                                    <td className="px-2 py-2.5 text-center">
+                                      {acoes.visualizar && (
+                                        <Checkbox
+                                          checked={permissoesSelecionadas.includes(acoes.visualizar)}
+                                          onChange={() => trocarPermissao(acoes.visualizar!)}
+                                          disabled={ehAdminImutavel}
+                                          className="mx-auto"
+                                        />
+                                      )}
+                                    </td>
+                                    <td className="px-2 py-2.5 text-center">
+                                      {acoes.editar && (
+                                        <Checkbox
+                                          checked={permissoesSelecionadas.includes(acoes.editar)}
+                                          onChange={() => trocarPermissao(acoes.editar!)}
+                                          disabled={ehAdminImutavel}
+                                          className="mx-auto"
+                                        />
+                                      )}
+                                    </td>
+                                    <td className="px-2 py-2.5 text-center">
+                                      {acoes.excluir && (
+                                        <Checkbox
+                                          checked={permissoesSelecionadas.includes(acoes.excluir)}
+                                          onChange={() => trocarPermissao(acoes.excluir!)}
+                                          disabled={ehAdminImutavel}
+                                          className="mx-auto"
+                                        />
+                                      )}
+                                    </td>
+                                    <td className="px-2 py-2.5 text-center">
+                                      {acoes.aprovar && (
+                                        <Checkbox
+                                          checked={permissoesSelecionadas.includes(acoes.aprovar)}
+                                          onChange={() => trocarPermissao(acoes.aprovar!)}
+                                          disabled={ehAdminImutavel}
+                                          className="mx-auto"
+                                        />
+                                      )}
+                                    </td>
+                                    <td className="px-2 py-2.5 text-center">
+                                      {acoes.imprimir && (
+                                        <Checkbox
+                                          checked={permissoesSelecionadas.includes(acoes.imprimir)}
+                                          onChange={() => trocarPermissao(acoes.imprimir!)}
+                                          disabled={ehAdminImutavel}
+                                          className="mx-auto"
+                                        />
+                                      )}
+                                    </td>
+                                    <td className="px-2 py-2.5 text-center">
+                                      {acoes.exportar && (
+                                        <Checkbox
+                                          checked={permissoesSelecionadas.includes(acoes.exportar)}
+                                          onChange={() => trocarPermissao(acoes.exportar!)}
+                                          disabled={ehAdminImutavel}
+                                          className="mx-auto"
+                                        />
+                                      )}
+                                    </td>
+                                    <td className="px-2 py-2.5 text-center">
+                                      {acoes.configurar && (
+                                        <Checkbox
+                                          checked={permissoesSelecionadas.includes(acoes.configurar)}
+                                          onChange={() => trocarPermissao(acoes.configurar!)}
+                                          disabled={ehAdminImutavel}
+                                          className="mx-auto"
+                                        />
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </CardContent>
+                      )}
+                    </Card>
+                  );
+                })}
               </section>
             )}
 
