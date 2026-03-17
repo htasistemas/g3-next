@@ -98,4 +98,10 @@ export class ReportsController {
     const resultado = await service.gerarRelacaoDoacoesRealizadas(request.body);
     return responderRelatorio(response, resultado, formato);
   }
+
+  async reciboDoacaoRealizada(request: Request, response: Response) {
+    const formato = formatoRelatorioSchema.parse(request.query.formato);
+    const resultado = await service.gerarReciboDoacaoRealizada(request.body);
+    return responderRelatorio(response, resultado, formato);
+  }
 }

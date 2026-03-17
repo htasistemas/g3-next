@@ -2,6 +2,12 @@ export type DoacaoRealizadaItemInput = {
   item_id: number;
   quantidade: number;
   observacoes?: string;
+  fora_carencia?: boolean;
+  carencia_dias_aplicada?: number;
+  autorizado_por_usuario_id?: number;
+  autorizado_por_nome?: string;
+  autorizacao_carencia_em?: string;
+  ultima_entrega_em?: string;
 };
 
 export type DoacaoRealizadaInput = {
@@ -12,6 +18,8 @@ export type DoacaoRealizadaInput = {
   responsavel?: string;
   observacoes?: string;
   data_doacao: string;
+  autorizar_fora_carencia?: boolean;
+  senha_administrativa?: string;
   itens: DoacaoRealizadaItemInput[];
 };
 

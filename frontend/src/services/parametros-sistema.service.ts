@@ -26,6 +26,17 @@ type PersonalizacaoResponse = {
   atualizado_em: string | null;
 };
 
+type CarenciaDoacaoRealizadaResponse = {
+  carencia: {
+    tempo_carencia_dias: number;
+  };
+  atualizado_em: string | null;
+};
+
+export type CarenciaDoacaoRealizadaSettings = {
+  tempoCarenciaDias: number;
+};
+
 function mapModoApiParaUI(modo: PersonalizacaoResponse["personalizacao"]["modo"]): ThemeSettings["modo"] {
   if (modo === "ESCURO") return "escuro";
   if (modo === "AUTOMATICO") return "automatico";
@@ -102,5 +113,32 @@ export const parametrosSistemaService = {
       toApi(settings)
     );
     return fromApi(data);
+  },
+
+  async obterCarenciaDoacoesRealizadas(): Promise<CarenciaDoacaoRealizadaSettings> {
+    const { data } = await httpClient.get<CarenciaDoacaoRealizadaResponse>(
+      "/api/configuracoes/parametros/carencia/doacoes-realizadas"
+    );
+
+    return {
+      tempoCarenciaDias: Number(data.carencia?.tempo_carencia_dias ?? 0)
+    };
+  },
+
+  async salvarCarenciaDoacoesRealizadas(
+    settings: CarenciaDoacaoRealizadaSettings
+  ): Promise<CarenciaDoacaoRealizadaSettings> {
+    const { data } = await httpClient.put<CarenciaDoacaoRealizadaResponse>(
+      "/api/configuracoes/parametros/carencia/doacoes-realizadas",
+      {
+        carencia: {
+          tempo_carencia_dias: Number(settings.tempoCarenciaDias ?? 0)
+        }
+      }
+    );
+
+    return {
+      tempoCarenciaDias: Number(data.carencia?.tempo_carencia_dias ?? 0)
+    };
   }
 };

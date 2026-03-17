@@ -19,6 +19,7 @@ import {
   beneficiarioRelacaoRequestSchema,
   comprovanteMatriculaRequestSchema,
   comprovantePreMatriculaEsperaRequestSchema,
+  doacaoRealizadaReciboRequestSchema,
   doacaoRealizadaRelacaoRequestSchema,
   matriculasRelacaoRequestSchema,
   profissionalFichaRequestSchema,
@@ -883,6 +884,81 @@ export class ReportsService {
     const html = this.template.montarHtml(relatorioInput);
     const pdf = await this.renderer.render(html, contexto.rodape, relatorioInput);
     return { html, pdf, filename: "relacao-doacoes-realizadas.pdf" };
+  }
+
+  async gerarReciboDoacaoRealizada(rawPayload: unknown): Promise<RelatorioResultado> {
+    const payload = doacaoRealizadaReciboRequestSchema.parse(rawPayload);
+    const doacao = await this.doacaoRealizadaService.buscarPorId(payload.doacaoRealizadaId);
+    const contexto = await this.montarContextoInstitucional();
+    const beneficiarioFamilia = doacao.beneficiario_nome || doacao.familia_nome || "---";
+    const possuiBeneficiario = !!this.normalizarTexto(doacao.beneficiario_nome);
+    const blocos = [
+      this.blocoComCampos(
+        "Identificação da entrega",
+        2,
+        [
+          this.campo("Recibo", doacao.id_doacao_realizada),
+          this.campo("Data da entrega", this.formatarDataComHifen(doacao.data_doacao)),
+          this.campo("Destinatário", beneficiarioFamilia),
+          this.campo("Tipo de destinatário", possuiBeneficiario ? "Beneficiário" : "Família"),
+          this.campo("Tipo de doação", doacao.tipo_doacao),
+          this.campo("Situação", doacao.situacao)
+        ],
+        true
+      ),
+      this.blocoComCampos(
+        "Responsável pelo registro",
+        2,
+        [
+          this.campo("Responsável", doacao.responsavel),
+          this.campo("Quantidade de itens", String(doacao.total_itens ?? doacao.itens.length))
+        ]
+      ),
+      this.blocoComCampos(
+        "Observações",
+        1,
+        [this.campoPreenchido("Observações", doacao.observacoes)]
+      )
+    ].filter((bloco): bloco is RelatorioBloco => !!bloco);
+
+    const relatorioInput: RelatorioHtmlInput = {
+      titulo: "Recibo de doação entregue",
+      metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),
+      descricao: "Recibo emitido com base nos parâmetros institucionais cadastrados no sistema.",
+      blocos,
+      tabela: {
+        colunas: [
+          { titulo: "Item", largura: "46%" },
+          { titulo: "Unidade", largura: "14%" },
+          { titulo: "Quantidade", largura: "12%" },
+          { titulo: "Observações", largura: "28%" }
+        ],
+        linhas: doacao.itens.map((item) => [
+          item.descricao_item || item.codigo_item || `Item ${item.item_id}`,
+          item.unidade_item || "---",
+          String(item.quantidade),
+          item.observacoes || "---"
+        ])
+      },
+      secoes: [
+        {
+          titulo: "Declaração",
+          conteudo:
+            "Declaramos, para os devidos fins, que a entrega acima foi registrada no sistema G3-Next para o destinatário informado neste recibo."
+        },
+        {
+          titulo: "Assinaturas",
+          conteudo:
+            "Responsável pela entrega: ________________________________________________\n\nRecebedor: ______________________________________________________________"
+        }
+      ],
+      cabecalho: contexto.cabecalho,
+      rodape: contexto.rodape
+    };
+
+    const html = this.template.montarHtml(relatorioInput);
+    const pdf = await this.renderer.render(html, contexto.rodape, relatorioInput);
+    return { html, pdf, filename: `recibo-doacao-realizada-${doacao.id_doacao_realizada}.pdf` };
   }
 
   async gerarFichaVoluntario(rawPayload: unknown): Promise<RelatorioResultado> {

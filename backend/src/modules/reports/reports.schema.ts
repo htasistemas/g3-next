@@ -138,3 +138,8 @@ export const doacaoRealizadaRelacaoRequestSchema = z.object({
   data_final: optionalString,
   usuarioEmissor: optionalString
 });
+
+export const doacaoRealizadaReciboRequestSchema = z.object({
+  doacaoRealizadaId: z.string().trim().min(1, "doacaoRealizadaId e obrigatorio."),
+  usuarioEmissor: optionalString
+});

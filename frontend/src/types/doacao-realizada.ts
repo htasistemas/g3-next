@@ -6,6 +6,11 @@ export type DoacaoRealizadaItem = {
   unidade_item?: string;
   quantidade: number;
   observacoes?: string;
+  fora_carencia?: boolean;
+  carencia_dias_aplicada?: number;
+  autorizado_por_nome?: string;
+  autorizacao_carencia_em?: string;
+  ultima_entrega_em?: string;
 };
 
 export type DoacaoRealizada = {
@@ -20,6 +25,9 @@ export type DoacaoRealizada = {
   observacoes?: string;
   data_doacao: string;
   total_itens?: number;
+  possui_item_fora_carencia?: boolean;
+  autorizar_fora_carencia?: boolean;
+  senha_administrativa?: string;
   itens: DoacaoRealizadaItem[];
   data_cadastro?: string;
   data_atualizacao?: string;

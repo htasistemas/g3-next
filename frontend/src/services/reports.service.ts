@@ -90,5 +90,12 @@ export const reportsService = {
       responseType: "blob"
     });
     return data as Blob;
+  },
+
+  async gerarReciboDoacaoRealizada(payload: { doacaoRealizadaId: string; usuarioEmissor?: string }) {
+    const { data } = await httpClient.post("/api/reports/doacoes-realizadas/recibo", payload, {
+      responseType: "blob"
+    });
+    return data as Blob;
   }
 };

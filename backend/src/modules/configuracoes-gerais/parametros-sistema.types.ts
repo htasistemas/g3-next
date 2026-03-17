@@ -23,3 +23,7 @@ export type PersonalizacaoSistema = {
   preset?: string;
   paleta: PaletaTema;
 };
+
+export type CarenciaDoacaoRealizadaSistema = {
+  tempo_carencia_dias: number;
+};

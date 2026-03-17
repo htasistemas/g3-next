@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import type { AuthenticatedRequest } from "../../auth/middlewares/auth.middleware.js";
 import { DoacaoRealizadaService } from "../services/doacao-realizada.service.js";
 
 const service = new DoacaoRealizadaService();
@@ -14,13 +15,13 @@ export class DoacaoRealizadaController {
     return response.json({ doacao });
   }
 
-  async criar(request: Request, response: Response) {
-    const doacao = await service.criar(request.body);
+  async criar(request: AuthenticatedRequest, response: Response) {
+    const doacao = await service.criar(request.body, request.authUser);
     return response.status(201).json({ doacao });
   }
 
-  async atualizar(request: Request, response: Response) {
-    const doacao = await service.atualizar(request.params.id, request.body);
+  async atualizar(request: AuthenticatedRequest, response: Response) {
+    const doacao = await service.atualizar(request.params.id, request.body, request.authUser);
     return response.json({ doacao });
   }
 

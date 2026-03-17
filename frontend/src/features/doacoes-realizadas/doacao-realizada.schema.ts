@@ -23,7 +23,7 @@ export type DoacaoRealizadaFormValues = z.infer<typeof doacaoRealizadaFormSchema
 export const doacaoRealizadaDefaultValues: DoacaoRealizadaFormValues = {
   beneficiario_id: "",
   vinculo_familiar_id: "",
-  tipo_doacao: "",
+  tipo_doacao: "Doação entregue",
   situacao: "Entregue",
   responsavel: "",
   observacoes: "",

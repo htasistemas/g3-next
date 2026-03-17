@@ -1,7 +1,11 @@
 import { prisma } from "../../../database/prisma.js";
-import type { PersonalizacaoSistema } from "../parametros-sistema.types.js";
+import type {
+  CarenciaDoacaoRealizadaSistema,
+  PersonalizacaoSistema
+} from "../parametros-sistema.types.js";
 
 const CHAVE_PERSONALIZACAO = "PERSONALIZACAO_VISUAL";
+const CHAVE_CARENCIA_DOACAO_REALIZADA = "DOACAO_REALIZADA_CARENCIA";
 
 type RegistroParametroSistema = {
   valor_json: unknown;
@@ -23,6 +27,29 @@ let estruturaPromise: Promise<void> | null = null;
 
 export class ParametrosSistemaRepository {
   async buscarPersonalizacao() {
+    return this.buscarPorChave<PersonalizacaoSistema>(CHAVE_PERSONALIZACAO);
+  }
+
+  async salvarPersonalizacao(valor: PersonalizacaoSistema, usuarioAtualizacao: string) {
+    return this.salvarPorChave(CHAVE_PERSONALIZACAO, valor, usuarioAtualizacao);
+  }
+
+  async buscarCarenciaDoacaoRealizada() {
+    return this.buscarPorChave<CarenciaDoacaoRealizadaSistema>(CHAVE_CARENCIA_DOACAO_REALIZADA);
+  }
+
+  async salvarCarenciaDoacaoRealizada(
+    valor: CarenciaDoacaoRealizadaSistema,
+    usuarioAtualizacao: string
+  ) {
+    return this.salvarPorChave(CHAVE_CARENCIA_DOACAO_REALIZADA, valor, usuarioAtualizacao);
+  }
+
+  private async ensureEstrutura() {
+    await ensureParametrosSistemaEstrutura();
+  }
+
+  private async buscarPorChave<T>(chave: string) {
     await this.ensureEstrutura();
 
     const rows = await prisma.$queryRawUnsafe<RegistroParametroSistema[]>(
@@ -32,18 +59,18 @@ export class ParametrosSistemaRepository {
         WHERE chave = $1
         LIMIT 1
       `,
-      CHAVE_PERSONALIZACAO
+      chave
     );
 
     if (!rows.length) return null;
 
     return {
-      valor: rows[0].valor_json as PersonalizacaoSistema,
+      valor: rows[0].valor_json as T,
       atualizado_em: rows[0].atualizado_em
     };
   }
 
-  async salvarPersonalizacao(valor: PersonalizacaoSistema, usuarioAtualizacao: string) {
+  private async salvarPorChave<T>(chave: string, valor: T, usuarioAtualizacao: string) {
     await this.ensureEstrutura();
 
     const rows = await prisma.$queryRawUnsafe<RegistroParametroSistema[]>(
@@ -57,19 +84,15 @@ export class ParametrosSistemaRepository {
           atualizado_em = NOW()
         RETURNING valor_json, atualizado_em
       `,
-      CHAVE_PERSONALIZACAO,
+      chave,
       JSON.stringify(valor),
       usuarioAtualizacao
     );
 
     return {
-      valor: rows[0].valor_json as PersonalizacaoSistema,
+      valor: rows[0].valor_json as T,
       atualizado_em: rows[0].atualizado_em
     };
-  }
-
-  private async ensureEstrutura() {
-    await ensureParametrosSistemaEstrutura();
   }
 }
 

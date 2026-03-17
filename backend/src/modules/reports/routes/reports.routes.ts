@@ -52,3 +52,7 @@ reportsRoutes.post(
   "/doacoes-realizadas/relacao",
   asyncHandler(controller.relacaoDoacoesRealizadas.bind(controller))
 );
+reportsRoutes.post(
+  "/doacoes-realizadas/recibo",
+  asyncHandler(controller.reciboDoacaoRealizada.bind(controller))
+);
