@@ -1750,6 +1750,12 @@ CREATE TABLE IF NOT EXISTS contato_beneficiario (
   atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE IF EXISTS contato_beneficiario
+  ADD COLUMN IF NOT EXISTS preferencia_canal_comunicacao VARCHAR(30);
+
+ALTER TABLE IF EXISTS contato_beneficiario
+  ADD COLUMN IF NOT EXISTS aceite_comunicacao_mensagens BOOLEAN;
+
 CREATE TABLE IF NOT EXISTS documentos (
   id BIGSERIAL PRIMARY KEY,
   beneficiario_id BIGINT NOT NULL REFERENCES cadastro_beneficiario(id) ON DELETE CASCADE,

@@ -13,9 +13,27 @@ import type {
   BeneficiarioInput
 } from "../beneficiario.types.js";
 
+const beneficiarioContatoSelect = {
+  telefonePrincipal: true,
+  telefonePrincipalWhatsapp: true,
+  telefoneSecundario: true,
+  telefoneRecadoNome: true,
+  telefoneRecadoNumero: true,
+  email: true,
+  permiteContatoTel: true,
+  permiteContatoWhatsapp: true,
+  permiteContatoSms: true,
+  permiteContatoEmail: true,
+  horarioPreferencial: true
+} satisfies Prisma.ContatoBeneficiarioSelect;
+
 const beneficiarioInclude = {
   endereco: true,
-  contatos: { orderBy: { atualizadoEm: "desc" }, take: 1 },
+  contatos: {
+    select: beneficiarioContatoSelect,
+    orderBy: { atualizadoEm: "desc" },
+    take: 1
+  },
   documentos: { orderBy: { atualizadoEm: "desc" } },
   situacoesSociais: { orderBy: { atualizadoEm: "desc" }, take: 1 },
   escolaridades: { orderBy: { atualizadoEm: "desc" }, take: 1 },

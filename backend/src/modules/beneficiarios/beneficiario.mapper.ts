@@ -1,10 +1,23 @@
 import type { Prisma } from "@prisma/client";
 import { splitSemicolonList, toIsoDate, toStringId } from "../../utils/string-utils.js";
 
+type BeneficiarioContatoRecord = {
+  telefonePrincipal: string | null;
+  telefonePrincipalWhatsapp: boolean | null;
+  telefoneSecundario: string | null;
+  telefoneRecadoNome: string | null;
+  telefoneRecadoNumero: string | null;
+  email: string | null;
+  permiteContatoTel: boolean | null;
+  permiteContatoWhatsapp: boolean | null;
+  permiteContatoSms: boolean | null;
+  permiteContatoEmail: boolean | null;
+  horarioPreferencial: string | null;
+};
+
 export type BeneficiarioDbRecord = Prisma.CadastroBeneficiarioGetPayload<{
   include: {
     endereco: true;
-    contatos: true;
     documentos: true;
     situacoesSociais: true;
     escolaridades: true;
@@ -12,7 +25,7 @@ export type BeneficiarioDbRecord = Prisma.CadastroBeneficiarioGetPayload<{
     beneficios: true;
     observacoes: true;
   };
-}>;
+}> & { contatos: BeneficiarioContatoRecord[] };
 
 function findDocByType(docs: BeneficiarioDbRecord["documentos"], type: string) {
   return docs.find((doc) => doc.tipoDocumento === type);
