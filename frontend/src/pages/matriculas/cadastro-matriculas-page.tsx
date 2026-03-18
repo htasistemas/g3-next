@@ -52,6 +52,7 @@ import {
 } from "@/features/matriculas/use-matriculas";
 import { reportsService } from "@/services/reports.service";
 import { matriculasService } from "@/services/matriculas.service";
+import { resolverUrlArquivo } from "@/lib/arquivos";
 import { abrirRelatorioPdf } from "@/lib/report-utils";
 import { formatarTextoPadrao, formatarTextoPorCampo } from "@/lib/text-formatter";
 import { mapaCamposTextoMatriculaForm } from "@/lib/text-format-config";
@@ -392,6 +393,8 @@ export function CadastroMatriculasPage() {
   const [mostrarSugestoesProfissionalResponsavel, setMostrarSugestoesProfissionalResponsavel] = useState(false);
   const [termoCatalogoAgendaProfissional, setTermoCatalogoAgendaProfissional] = useState("");
   const [mostrarSugestoesAgendaProfissional, setMostrarSugestoesAgendaProfissional] = useState(false);
+  const [termoAgendaBeneficiario, setTermoAgendaBeneficiario] = useState("");
+  const [mostrarSugestoesAgendaBeneficiario, setMostrarSugestoesAgendaBeneficiario] = useState(false);
   const [profissionaisAtendimentoSelecionados, setProfissionaisAtendimentoSelecionados] = useState<string[]>([]);
   const [agendaDataSelecionada, setAgendaDataSelecionada] = useState("");
   const [agendaStatusFiltro, setAgendaStatusFiltro] = useState("");
@@ -491,6 +494,10 @@ export function CadastroMatriculasPage() {
   const ehTipoAtendimento = tipoMatriculaAtual.trim().toUpperCase() === "ATENDIMENTO";
   const abaAtual = abas.find((aba) => aba.id === abaAtiva);
   const inscricoesAtivas = inscricoes.filter((item) => (item.status ?? "ATIVO") !== "CANCELADO");
+  const horaPadraoAgenda = useMemo(
+    () => String(cursoSelecionadoInscricao?.horario_inicial ?? getValues("horario_inicial") ?? "").trim(),
+    [cursoSelecionadoInscricao?.horario_inicial, getValues]
+  );
   const agendamentosDoDia = obterAgendamentosDoDia();
   const agendamentosPorData = Object.entries(
     agendamentosDoDia.reduce<Record<string, Array<{ chave: string; item: MatriculaInscricao }>>>((acc, atual) => {
@@ -585,6 +592,37 @@ export function CadastroMatriculasPage() {
     const totalInscritosAtivos = inscricoes.filter((item) => (item.status ?? "ATIVO").trim().toUpperCase() === "ATIVO").length;
     return Math.max(vagasTotaisCurso - totalInscritosAtivos, 0);
   }, [idSelecionado, matriculaIdFormulario, matriculas, vagasTotaisFormulario, inscricoes]);
+  const inscricoesAgendaCatalogo = useMemo(() => {
+    const termo = formatarTextoPadrao(termoAgendaBeneficiario);
+    const termoNome = normalizarNomeComparacaoTexto(termo);
+    const termoCpf = somenteDigitos(termo);
+
+    return inscricoesAtivas
+      .map((item, index) => ({
+        chave: obterChaveInscricao(item, index),
+        item
+      }))
+      .filter(({ item }) => {
+        if (!termoNome && !termoCpf) return true;
+
+        const nome = normalizarNomeComparacaoTexto(item.beneficiario_nome);
+        const cpf = somenteDigitos(item.cpf);
+
+        return (termoNome && nome.includes(termoNome)) || (termoCpf && !!cpf && cpf.includes(termoCpf));
+      })
+      .sort((a, b) => a.item.beneficiario_nome.localeCompare(b.item.beneficiario_nome, "pt-BR"))
+      .slice(0, 20);
+  }, [inscricoesAtivas, termoAgendaBeneficiario]);
+  const inscricaoAgendaSelecionada = useMemo(
+    () =>
+      inscricoesAtivas
+        .map((item, index) => ({
+          chave: obterChaveInscricao(item, index),
+          item
+        }))
+        .find((item) => item.chave === agendaForm.chave_inscricao) ?? null,
+    [agendaForm.chave_inscricao, inscricoesAtivas]
+  );
 
   useEffect(() => {
     if (!detalhesData?.matricula) return;
@@ -611,6 +649,20 @@ export function CadastroMatriculasPage() {
     void carregarPresencaDatas();
   }, [abaAtiva, idSelecionado]);
 
+  useEffect(() => {
+    if (!horaPadraoAgenda) return;
+    setAgendaForm((atual) => {
+      if (String(atual.hora_agendada ?? "").trim()) {
+        return atual;
+      }
+
+      return {
+        ...atual,
+        hora_agendada: horaPadraoAgenda
+      };
+    });
+  }, [horaPadraoAgenda]);
+
   function aplicarFormatacaoCampo(campo: keyof MatriculaFormValues) {
     const valorAtual = getValues(campo);
     const valorFormatado = formatarTextoPorCampo(campo, valorAtual, mapaCamposTextoMatriculaForm);
@@ -629,7 +681,17 @@ export function CadastroMatriculasPage() {
   }
 
   function selecionarMatricula(matriculaId: string) {
+    const cursoSelecionado = matriculas.find((item) => item.id_matricula === matriculaId);
     setIdSelecionado(matriculaId);
+    setTermoAgendaBeneficiario("");
+    setMostrarSugestoesAgendaBeneficiario(false);
+    setAgendaForm({
+      chave_inscricao: "",
+      data_agendada: obterDataAtualIso(),
+      hora_agendada: String(cursoSelecionado?.horario_inicial ?? "").trim(),
+      profissional_nome: "",
+      status_agendamento: "AGUARDANDO"
+    });
     setAbaAtiva("dados");
   }
 
@@ -650,6 +712,15 @@ export function CadastroMatriculasPage() {
       status_agendamento: ""
     }));
     setIdSelecionado(matriculaId);
+    setTermoAgendaBeneficiario("");
+    setMostrarSugestoesAgendaBeneficiario(false);
+    setAgendaForm({
+      chave_inscricao: "",
+      data_agendada: obterDataAtualIso(),
+      hora_agendada: String(cursoSelecionado?.horario_inicial ?? "").trim(),
+      profissional_nome: profissionalPadrao,
+      status_agendamento: "AGUARDANDO"
+    });
     setAbaAtiva("inscricoes");
   }
 
@@ -686,6 +757,8 @@ export function CadastroMatriculasPage() {
     setMostrarSugestoesFilaEspera(false);
     setTermoCatalogoAgendaProfissional("");
     setMostrarSugestoesAgendaProfissional(false);
+    setTermoAgendaBeneficiario("");
+    setMostrarSugestoesAgendaBeneficiario(false);
     setInscricoes([]);
     setFilaEspera([]);
     setNovaInscricao({
@@ -732,6 +805,8 @@ export function CadastroMatriculasPage() {
       setMostrarSugestoesFilaEspera(false);
       setTermoCatalogoAgendaProfissional("");
       setMostrarSugestoesAgendaProfissional(false);
+      setTermoAgendaBeneficiario("");
+      setMostrarSugestoesAgendaBeneficiario(false);
       setInscricoes([]);
       setFilaEspera([]);
       setAgendaCopiaOrigem("");
@@ -747,6 +822,8 @@ export function CadastroMatriculasPage() {
     setMostrarSugestoesFilaEspera(false);
     setTermoCatalogoAgendaProfissional("");
     setMostrarSugestoesAgendaProfissional(false);
+    setTermoAgendaBeneficiario("");
+    setMostrarSugestoesAgendaBeneficiario(false);
     setInscricoes(detalhesData?.matricula?.matriculas ?? []);
     setFilaEspera(detalhesData?.matricula?.fila_espera ?? []);
     setAgendaDataSelecionada("");
@@ -757,7 +834,7 @@ export function CadastroMatriculasPage() {
     setAgendaForm({
       chave_inscricao: "",
       data_agendada: obterDataAtualIso(),
-      hora_agendada: "",
+      hora_agendada: String(detalhesData?.matricula?.horario_inicial ?? snapshot?.horario_inicial ?? "").trim(),
       profissional_nome: "",
       status_agendamento: "AGUARDANDO"
     });
@@ -1042,15 +1119,21 @@ export function CadastroMatriculasPage() {
       cursoSelecionadoInscricao?.horario_inicial ||
       String(getValues("horario_inicial") ?? "").trim() ||
       "";
+    const profissionalPadraoAgenda =
+      formatarTextoPadrao(selecionado.item.profissional_nome ?? "") ||
+      formatarTextoPadrao(agendaForm.profissional_nome ?? "") ||
+      obterProfissionalUnico(cursoSelecionadoInscricao?.profissional);
 
     setAgendaForm((atual) => ({
       ...atual,
       chave_inscricao: chave,
       data_agendada: selecionado.item.data_agendada || agendaDataSelecionada || obterDataAtualIso(),
       hora_agendada: horaPadraoAgenda,
-      profissional_nome: selecionado.item.profissional_nome ?? "",
+      profissional_nome: profissionalPadraoAgenda,
       status_agendamento: selecionado.item.status_agendamento ?? "AGUARDANDO"
     }));
+    setTermoAgendaBeneficiario(formatarTextoPadrao(selecionado.item.beneficiario_nome));
+    setMostrarSugestoesAgendaBeneficiario(false);
   }
 
   function preencherAgendaComProfissional(item: MatriculaProfissionalCatalogo) {
@@ -2297,7 +2380,7 @@ export function CadastroMatriculasPage() {
                       <div className="mt-2 flex aspect-[4/3] w-full max-w-[260px] items-center justify-center overflow-hidden rounded-md border border-[var(--g3-border)] bg-[var(--g3-card-soft)]">
                         {imagemAtual ? (
                           <img
-                            src={imagemAtual}
+                            src={resolverUrlArquivo(imagemAtual)}
                             alt="Foto do curso ou atendimento"
                             className="h-full w-full object-cover"
                           />
@@ -2595,7 +2678,7 @@ export function CadastroMatriculasPage() {
                               <div className="relative mb-5 flex aspect-[4/3] w-full max-w-[220px] items-center justify-center overflow-visible rounded-md border border-[var(--g3-border)] bg-[var(--g3-card-soft)] shadow-sm">
                                 {item.imagem ? (
                                   <img
-                                    src={item.imagem}
+                                    src={resolverUrlArquivo(item.imagem)}
                                     alt={`Foto de ${item.nome}`}
                                     className="h-full w-full rounded-md object-cover"
                                   />
@@ -3245,6 +3328,75 @@ export function CadastroMatriculasPage() {
                 <div className="space-y-3">
                   <div className="rounded-lg border border-[var(--g3-border)] p-3">
                     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-12">
+                      <div className="space-y-1 xl:col-span-6">
+                        <Label htmlFor="agenda-beneficiario">Beneficiário inscrito</Label>
+                        <Input
+                          id="agenda-beneficiario"
+                          value={termoAgendaBeneficiario}
+                          onChange={(event) => {
+                            const valor = event.target.value;
+                            setTermoAgendaBeneficiario(valor);
+                            setMostrarSugestoesAgendaBeneficiario(true);
+                            setAgendaForm((atual) => ({ ...atual, chave_inscricao: "" }));
+                          }}
+                          onFocus={() => setMostrarSugestoesAgendaBeneficiario(true)}
+                          onBlur={(event) => {
+                            const valorFormatado = formatarTextoPadrao(event.target.value);
+                            setTermoAgendaBeneficiario(valorFormatado);
+                            setTimeout(() => setMostrarSugestoesAgendaBeneficiario(false), 120);
+                          }}
+                          placeholder={
+                            cursoSelecionadoInscricao
+                              ? "Digite para buscar entre os beneficiários inscritos"
+                              : "Selecione uma matrícula para listar os inscritos"
+                          }
+                          disabled={!cursoSelecionadoInscricao || inscricoesAtivas.length === 0}
+                        />
+                        {!cursoSelecionadoInscricao ? (
+                          <p className="text-[11px] text-[var(--g3-muted)]">
+                            Selecione uma matrícula para trazer os beneficiários inscritos.
+                          </p>
+                        ) : inscricoesAtivas.length === 0 ? (
+                          <p className="text-[11px] text-[var(--g3-muted)]">
+                            Não há beneficiários inscritos disponíveis para agendamento.
+                          </p>
+                        ) : null}
+                        {mostrarSugestoesAgendaBeneficiario && cursoSelecionadoInscricao && inscricoesAtivas.length > 0 && (
+                          <div className="max-h-40 overflow-y-auto rounded-md border border-[var(--g3-border)] bg-[var(--g3-card)] p-1">
+                            {inscricoesAgendaCatalogo.length ? (
+                              inscricoesAgendaCatalogo.map(({ chave, item }) => (
+                                <button
+                                  key={chave}
+                                  type="button"
+                                  className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-[var(--g3-primary-soft)]"
+                                  onMouseDown={(event) => event.preventDefault()}
+                                  onClick={() => preencherAgendaPorInscricao(chave)}
+                                >
+                                  <span className="font-medium text-[var(--g3-foreground)]">{item.beneficiario_nome}</span>
+                                  <span className="block text-[11px] text-[var(--g3-muted)]">
+                                    {formatarCpf(item.cpf)}
+                                    {item.data_agendada
+                                      ? ` • Agendado em ${formatarData(item.data_agendada)} ${item.hora_agendada ?? ""}`.trim()
+                                      : " • Sem agendamento"}
+                                  </span>
+                                </button>
+                              ))
+                            ) : (
+                              <p className="px-2 py-1 text-xs text-[var(--g3-muted)]">
+                                Nenhum beneficiário inscrito encontrado.
+                              </p>
+                            )}
+                          </div>
+                        )}
+                        {inscricaoAgendaSelecionada && (
+                          <p className="text-[11px] text-emerald-700">
+                            Selecionado: {inscricaoAgendaSelecionada.item.beneficiario_nome}
+                            {inscricaoAgendaSelecionada.item.cpf
+                              ? ` • CPF ${formatarCpf(inscricaoAgendaSelecionada.item.cpf)}`
+                              : ""}
+                          </p>
+                        )}
+                      </div>
 
                       <div className="space-y-1 xl:col-span-2">
                         <Label htmlFor="agenda-data">Data</Label>
@@ -3287,7 +3439,7 @@ export function CadastroMatriculasPage() {
                         </Select>
                       </div>
 
-                      <div className="space-y-1 xl:col-span-8">
+                      <div className="space-y-1 xl:col-span-9">
                         <Label htmlFor="agenda-profissional">Profissional responsável</Label>
                         <Input
                           id="agenda-profissional"
@@ -3342,7 +3494,7 @@ export function CadastroMatriculasPage() {
                             </div>
                           )}
                       </div>
-                      <div className="flex items-end xl:col-span-4">
+                      <div className="flex items-end xl:col-span-3">
                         <Button type="button" className="w-full" onClick={agendarAtendimento}>
                           <CalendarClock className="h-4 w-4" />
                           Agendar
