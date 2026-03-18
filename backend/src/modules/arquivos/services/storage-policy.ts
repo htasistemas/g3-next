@@ -12,6 +12,7 @@ export type StorageScopeKey =
   | "curso_imagem"
   | "almoxarifado_anexo"
   | "veiculo_foto"
+  | "veiculo_documento"
   | "evento_foto"
   | "chamado_tecnico_anexo"
   | "ocorrencia_anexo"
@@ -68,6 +69,7 @@ export const requiredStorageDirectories = [
   "cursos/comprovantes",
   "almoxarifado/anexos",
   "veiculos/fotos",
+  "veiculos/documentos",
   "geral/outros",
   "instituicoes/imagens",
   "cursos/imagens",
@@ -201,6 +203,15 @@ export const storagePolicies: Record<StorageScopeKey, StoragePolicy> = {
     allowedMimeTypes: imageMimeTypes,
     maxSizeBytes: 8 * 1024 * 1024,
     imageOnly: true,
+    generateThumbnail: true
+  },
+  veiculo_documento: {
+    entidadeTipo: "controle_veiculo",
+    categoria: "documento",
+    subdirectory: "veiculos/documentos",
+    allowedExtensions: documentExtensions,
+    allowedMimeTypes: documentMimeTypes,
+    maxSizeBytes: 15 * 1024 * 1024,
     generateThumbnail: true
   },
   evento_foto: {

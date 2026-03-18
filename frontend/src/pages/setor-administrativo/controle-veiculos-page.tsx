@@ -14,6 +14,7 @@ import {
   Undo2,
   X
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -59,8 +60,9 @@ const abas: AdminTab[] = [
 
 const tituloTela = "Controle de veículos";
 const classeCardDashboard =
-  "border-emerald-200 bg-emerald-100 shadow-[0_18px_40px_-24px_rgba(22,101,52,0.42)]";
+  "border-emerald-200 bg-emerald-100 shadow-[0_14px_30px_-24px_rgba(22,101,52,0.32)]";
 const hojeBr = formatarDataPtBr(new Date().toISOString().slice(0, 10));
+const documentoVeiculoMaximoBytes = 15 * 1024 * 1024;
 const combustiveis = ["Gasolina", "Etanol", "Flex", "Diesel", "GNV", "Elétrico", "Híbrido"];
 
 const defaultVeiculo: VeiculoCadastro = {
@@ -73,7 +75,8 @@ const defaultVeiculo: VeiculoCadastro = {
   capacidadeTanqueLitros: null,
   observacoes: "",
   ativo: true,
-  fotoFrente: null
+  fotoFrente: null,
+  documentoVeiculoPdf: null
 };
 
 const defaultDiario: RegistroDiarioBordo = {
@@ -170,6 +173,47 @@ function escapeHtml(valor: string) {
     .replaceAll("'", "&#39;");
 }
 
+function formatarPlacaVisual(valor?: string | null) {
+  return String(valor ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "")
+    .slice(0, 8);
+}
+
+function obterNomeArquivo(valor?: string | null) {
+  const texto = String(valor ?? "").trim();
+  if (!texto) return "";
+  const partes = texto.split("/");
+  return partes[partes.length - 1] ?? texto;
+}
+
+function arquivoEhPdf(arquivo: File) {
+  return arquivo.type === "application/pdf" || arquivo.name.toLowerCase().endsWith(".pdf");
+}
+
+function PlacaVeiculoVisual({ placa }: { placa?: string | null }) {
+  const placaFormatada = formatarPlacaVisual(placa);
+
+  if (!placaFormatada) {
+    return <span className="text-sm text-[var(--g3-muted)]">---</span>;
+  }
+
+  return (
+    <div className="inline-flex w-[146px] overflow-hidden rounded-md border border-slate-300 bg-white shadow-sm">
+      <div className="w-full">
+        <div className="flex items-center justify-between bg-[#0f4fa8] px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-white">
+          <span>Brasil</span>
+          <span>Mercosul</span>
+        </div>
+        <div className="flex min-h-[42px] items-center justify-center px-3 py-2 font-mono text-base font-black tracking-[0.28em] text-slate-900">
+          {placaFormatada}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function ControleVeiculosPage() {
   const navigate = useNavigate();
   const [abaAtiva, setAbaAtiva] = useState<AbaId>("dashboard");
@@ -183,6 +227,8 @@ export function ControleVeiculosPage() {
   const [fotoVeiculoArquivo, setFotoVeiculoArquivo] = useState<File | null>(null);
   const [fotoVeiculoPreview, setFotoVeiculoPreview] = useState("");
   const [enviandoFotoVeiculo, setEnviandoFotoVeiculo] = useState(false);
+  const [documentoVeiculoArquivo, setDocumentoVeiculoArquivo] = useState<File | null>(null);
+  const [enviandoDocumentoVeiculo, setEnviandoDocumentoVeiculo] = useState(false);
 
   const { data: veiculosData } = useVeiculos();
   const { data: diarioData } = useDiarioBordo();
@@ -219,7 +265,8 @@ export function ControleVeiculosPage() {
     removerDiarioMutation.isPending ||
     removerLocalDestinoMutation.isPending ||
     removerMotoristaMutation.isPending ||
-    enviandoFotoVeiculo;
+    enviandoFotoVeiculo ||
+    enviandoDocumentoVeiculo;
 
   const veiculoSelecionadoDiario = veiculos.find((item) => item.id === diarioForm.veiculoId) ?? null;
 
@@ -249,7 +296,7 @@ export function ControleVeiculosPage() {
 
   const rotasRecentes = useMemo(() => diarios.slice(0, 6), [diarios]);
 
-  async function salvarVeiculoComFoto(payloadBase: VeiculoCadastro) {
+  async function salvarVeiculoComArquivos(payloadBase: VeiculoCadastro) {
     let salvo = await salvarVeiculoMutation.mutateAsync(payloadBase);
 
     if (fotoVeiculoArquivo) {
@@ -267,6 +314,23 @@ export function ControleVeiculosPage() {
         setFotoVeiculoPreview("");
       } finally {
         setEnviandoFotoVeiculo(false);
+      }
+    }
+
+    if (documentoVeiculoArquivo) {
+      setEnviandoDocumentoVeiculo(true);
+      try {
+        const caminhoDocumento = await controleVeiculosService.uploadDocumentoVeiculo(
+          documentoVeiculoArquivo,
+          salvo.id ?? null
+        );
+        salvo = await salvarVeiculoMutation.mutateAsync({
+          ...salvo,
+          documentoVeiculoPdf: caminhoDocumento
+        });
+        setDocumentoVeiculoArquivo(null);
+      } finally {
+        setEnviandoDocumentoVeiculo(false);
       }
     }
 
@@ -298,7 +362,7 @@ export function ControleVeiculosPage() {
           return;
         }
 
-        const response = await salvarVeiculoComFoto({
+        const response = await salvarVeiculoComArquivos({
           ...veiculoForm,
           placa: String(veiculoForm.placa ?? "").trim().toUpperCase()
         });
@@ -433,6 +497,7 @@ export function ControleVeiculosPage() {
       setVeiculoForm(defaultVeiculo);
       setFotoVeiculoArquivo(null);
       setFotoVeiculoPreview("");
+      setDocumentoVeiculoArquivo(null);
       return;
     }
     if (abaAtiva === "diario") {
@@ -477,6 +542,7 @@ export function ControleVeiculosPage() {
         setVeiculoForm(defaultVeiculo);
         setFotoVeiculoArquivo(null);
         setFotoVeiculoPreview("");
+        setDocumentoVeiculoArquivo(null);
       }
       if (abaAtiva === "diario" && diarioForm.id) {
         await removerDiarioMutation.mutateAsync(diarioForm.id);
@@ -630,6 +696,47 @@ export function ControleVeiculosPage() {
     reader.readAsDataURL(arquivo);
   }
 
+  function selecionarDocumentoVeiculo(arquivo?: File | null) {
+    if (!arquivo) {
+      setDocumentoVeiculoArquivo(null);
+      return;
+    }
+
+    if (!arquivoEhPdf(arquivo)) {
+      setPopupMensagem({
+        tipo: "aviso",
+        titulo: "Validação",
+        texto: "Envie apenas arquivo PDF para o documento do veículo."
+      });
+      return;
+    }
+
+    if (arquivo.size > documentoVeiculoMaximoBytes) {
+      setPopupMensagem({
+        tipo: "aviso",
+        titulo: "Validação",
+        texto: "O PDF do documento do veículo deve ter no máximo 15 MB."
+      });
+      return;
+    }
+
+    setDocumentoVeiculoArquivo(arquivo);
+  }
+
+  function abrirDocumentoVeiculo(caminhoArquivo?: string | null) {
+    const url = resolverUrlArquivo(caminhoArquivo);
+    if (!url) {
+      setPopupMensagem({
+        tipo: "aviso",
+        titulo: "Atenção",
+        texto: "Nenhum documento do veículo foi enviado."
+      });
+      return;
+    }
+
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
   const acoes: AdminAction[] = [
     {
       label: "Buscar",
@@ -670,13 +777,13 @@ export function ControleVeiculosPage() {
       >
         {abaAtiva === "dashboard" ? (
           <section className="space-y-4">
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              <Card className={classeCardDashboard}><CardHeader className="items-center pb-2 text-center"><CardTitle className="text-sm font-medium text-emerald-900">Total de veículos</CardTitle></CardHeader><CardContent className="text-center text-3xl font-semibold text-emerald-950">{dashboard.totalVeiculos}</CardContent></Card>
-              <Card className={classeCardDashboard}><CardHeader className="items-center pb-2 text-center"><CardTitle className="text-sm font-medium text-emerald-900">Veículos ativos</CardTitle></CardHeader><CardContent className="text-center text-3xl font-semibold text-emerald-950">{dashboard.veiculosAtivos}</CardContent></Card>
-              <Card className={classeCardDashboard}><CardHeader className="items-center pb-2 text-center"><CardTitle className="text-sm font-medium text-emerald-900">Rotas registradas</CardTitle></CardHeader><CardContent className="text-center text-3xl font-semibold text-emerald-950">{dashboard.totalRotas}</CardContent></Card>
-              <Card className={classeCardDashboard}><CardHeader className="items-center pb-2 text-center"><CardTitle className="text-sm font-medium text-emerald-900">Km rodados</CardTitle></CardHeader><CardContent className="text-center text-3xl font-semibold text-emerald-950">{dashboard.kmTotalRodado}</CardContent></Card>
-              <Card className={classeCardDashboard}><CardHeader className="items-center pb-2 text-center"><CardTitle className="text-sm font-medium text-emerald-900">Locais de destino</CardTitle></CardHeader><CardContent className="text-center text-3xl font-semibold text-emerald-950">{dashboard.locaisDestino}</CardContent></Card>
-              <Card className={classeCardDashboard}><CardHeader className="items-center pb-2 text-center"><CardTitle className="text-sm font-medium text-emerald-900">Motoristas autorizados</CardTitle></CardHeader><CardContent className="text-center text-3xl font-semibold text-emerald-950">{dashboard.motoristasAutorizados}</CardContent></Card>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+              <Card className={classeCardDashboard}><CardHeader className="items-center px-3 pb-1 pt-3 text-center"><CardTitle className="text-[11px] font-semibold tracking-[0.02em] text-emerald-900">Total de veículos</CardTitle></CardHeader><CardContent className="px-3 pb-3 pt-0 text-center text-xl font-semibold text-emerald-950">{dashboard.totalVeiculos}</CardContent></Card>
+              <Card className={classeCardDashboard}><CardHeader className="items-center px-3 pb-1 pt-3 text-center"><CardTitle className="text-[11px] font-semibold tracking-[0.02em] text-emerald-900">Veículos ativos</CardTitle></CardHeader><CardContent className="px-3 pb-3 pt-0 text-center text-xl font-semibold text-emerald-950">{dashboard.veiculosAtivos}</CardContent></Card>
+              <Card className={classeCardDashboard}><CardHeader className="items-center px-3 pb-1 pt-3 text-center"><CardTitle className="text-[11px] font-semibold tracking-[0.02em] text-emerald-900">Rotas registradas</CardTitle></CardHeader><CardContent className="px-3 pb-3 pt-0 text-center text-xl font-semibold text-emerald-950">{dashboard.totalRotas}</CardContent></Card>
+              <Card className={classeCardDashboard}><CardHeader className="items-center px-3 pb-1 pt-3 text-center"><CardTitle className="text-[11px] font-semibold tracking-[0.02em] text-emerald-900">Km rodados</CardTitle></CardHeader><CardContent className="px-3 pb-3 pt-0 text-center text-xl font-semibold text-emerald-950">{dashboard.kmTotalRodado}</CardContent></Card>
+              <Card className={classeCardDashboard}><CardHeader className="items-center px-3 pb-1 pt-3 text-center"><CardTitle className="text-[11px] font-semibold tracking-[0.02em] text-emerald-900">Locais de destino</CardTitle></CardHeader><CardContent className="px-3 pb-3 pt-0 text-center text-xl font-semibold text-emerald-950">{dashboard.locaisDestino}</CardContent></Card>
+              <Card className={classeCardDashboard}><CardHeader className="items-center px-3 pb-1 pt-3 text-center"><CardTitle className="text-[11px] font-semibold tracking-[0.02em] text-emerald-900">Motoristas autorizados</CardTitle></CardHeader><CardContent className="px-3 pb-3 pt-0 text-center text-xl font-semibold text-emerald-950">{dashboard.motoristasAutorizados}</CardContent></Card>
             </div>
             <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]">
               <table className="min-w-full text-sm">
@@ -704,13 +811,23 @@ export function ControleVeiculosPage() {
               <div className="space-y-3 rounded-lg border border-[var(--g3-border)] p-3">
                 <div className="space-y-1"><Label>Foto do veículo</Label><Input type="file" accept="image/*" onChange={(event) => selecionarFotoVeiculo(event.target.files?.[0] ?? null)} /></div>
                 <div className="overflow-hidden rounded-lg border border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/20">{fotoVeiculoPreview || veiculoForm.fotoFrente ? <img src={fotoVeiculoPreview || resolverUrlArquivo(veiculoForm.fotoFrente)} alt="Foto do veículo" className="h-56 w-full object-cover" /> : <div className="flex h-56 items-center justify-center text-sm text-[var(--g3-muted)]">Nenhuma foto selecionada.</div>}</div>
-                <p className="text-xs text-[var(--g3-muted)]">A foto é enviada no storage do sistema e vinculada ao cadastro do veículo.</p>
+                <div className="space-y-1"><Label>Documento do veículo (PDF)</Label><Input type="file" accept="application/pdf,.pdf" onChange={(event) => selecionarDocumentoVeiculo(event.target.files?.[0] ?? null)} /></div>
+                <div className="rounded-lg border border-dashed border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/15 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-[var(--g3-active)]">{documentoVeiculoArquivo ? documentoVeiculoArquivo.name : obterNomeArquivo(veiculoForm.documentoVeiculoPdf) || "Nenhum PDF selecionado."}</p>
+                      <p className="text-xs text-[var(--g3-muted)]">Envie o documento do veículo em PDF com até 15 MB.</p>
+                    </div>
+                    <Button type="button" variant="outline" className="shrink-0" disabled={!veiculoForm.documentoVeiculoPdf} onClick={() => abrirDocumentoVeiculo(veiculoForm.documentoVeiculoPdf)}>Abrir PDF</Button>
+                  </div>
+                </div>
+                <p className="text-xs text-[var(--g3-muted)]">A foto e o documento são enviados no storage do sistema e vinculados ao cadastro do veículo.</p>
               </div>
             </div>
             <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]">
               <table className="min-w-full text-sm">
                 <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"><tr><th className="px-3 py-2 text-left">Foto</th><th className="px-3 py-2 text-left">Placa</th><th className="px-3 py-2 text-left">Modelo</th><th className="px-3 py-2 text-left">Marca</th><th className="px-3 py-2 text-left">Ano</th><th className="px-3 py-2 text-left">Status</th></tr></thead>
-                <tbody>{veiculos.length ? veiculos.map((item, index) => <tr key={item.id ?? `${item.placa}-${index}`} className={`cursor-pointer border-t border-[var(--g3-border)] ${index % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35"}`} onClick={() => { setVeiculoForm(item); setFotoVeiculoArquivo(null); setFotoVeiculoPreview(""); }}><td className="px-3 py-2">{item.fotoFrente ? <img src={resolverUrlArquivo(item.fotoFrente)} alt={item.placa ?? "Foto do veículo"} className="h-12 w-16 rounded object-cover" /> : "---"}</td><td className="px-3 py-2">{item.placa ?? "---"}</td><td className="px-3 py-2">{item.modelo ?? "---"}</td><td className="px-3 py-2">{item.marca ?? "---"}</td><td className="px-3 py-2">{item.ano ?? "---"}</td><td className="px-3 py-2">{item.ativo ? "Ativo" : "Inativo"}</td></tr>) : <tr><td className="px-3 py-4 text-center" colSpan={6}>Nenhum veículo cadastrado.</td></tr>}</tbody>
+                <tbody>{veiculos.length ? veiculos.map((item, index) => <tr key={item.id ?? `${item.placa}-${index}`} className={`cursor-pointer border-t border-[var(--g3-border)] ${index % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35"}`} onClick={() => { setVeiculoForm(item); setFotoVeiculoArquivo(null); setFotoVeiculoPreview(""); setDocumentoVeiculoArquivo(null); }}><td className="px-3 py-2">{item.fotoFrente ? <img src={resolverUrlArquivo(item.fotoFrente)} alt={item.placa ?? "Foto do veículo"} className="h-12 w-16 rounded object-cover" /> : "---"}</td><td className="px-3 py-2"><PlacaVeiculoVisual placa={item.placa} /></td><td className="px-3 py-2">{item.modelo ?? "---"}</td><td className="px-3 py-2">{item.marca ?? "---"}</td><td className="px-3 py-2">{item.ano ?? "---"}</td><td className="px-3 py-2">{item.ativo ? "Ativo" : "Inativo"}</td></tr>) : <tr><td className="px-3 py-4 text-center" colSpan={6}>Nenhum veículo cadastrado.</td></tr>}</tbody>
               </table>
             </div>
           </section>

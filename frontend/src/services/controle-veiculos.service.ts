@@ -133,5 +133,27 @@ export const controleVeiculosService = {
     );
 
     return data.arquivo.caminho_arquivo;
+  },
+
+  async uploadDocumentoVeiculo(arquivo: File, veiculoId?: number | null) {
+    const formData = new FormData();
+    formData.append("scope", "veiculo_documento");
+    formData.append("entidadeTipo", "controle_veiculo");
+    if (veiculoId) {
+      formData.append("entidadeId", String(veiculoId));
+    }
+    formData.append("arquivo", arquivo);
+
+    const { data } = await httpClient.post<{ arquivo: { caminho_arquivo: string } }>(
+      "/api/arquivos/upload",
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data"
+        }
+      }
+    );
+
+    return data.arquivo.caminho_arquivo;
   }
 };
