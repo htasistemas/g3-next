@@ -64,6 +64,13 @@ export const reportsService = {
     return data as Blob;
   },
 
+  async gerarListaPresencaMatricula(payload: Record<string, unknown>) {
+    const { data } = await httpClient.post("/api/reports/matriculas/lista-presenca", payload, {
+      responseType: "blob"
+    });
+    return data as Blob;
+  },
+
   async gerarComprovanteMatricula(payload: Record<string, unknown>) {
     const { data } = await httpClient.post("/api/reports/matriculas/comprovante", payload, {
       responseType: "blob"

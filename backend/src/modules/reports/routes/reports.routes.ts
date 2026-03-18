@@ -37,6 +37,10 @@ reportsRoutes.post(
   asyncHandler(controller.relacaoMatriculas.bind(controller))
 );
 reportsRoutes.post(
+  "/matriculas/lista-presenca",
+  asyncHandler(controller.listaPresencaMatricula.bind(controller))
+);
+reportsRoutes.post(
   "/matriculas/comprovante",
   asyncHandler(controller.comprovanteMatricula.bind(controller))
 );

@@ -21,6 +21,7 @@ import {
   comprovantePreMatriculaEsperaRequestSchema,
   doacaoRealizadaReciboRequestSchema,
   doacaoRealizadaRelacaoRequestSchema,
+  matriculaListaPresencaRequestSchema,
   matriculasRelacaoRequestSchema,
   profissionalFichaRequestSchema,
   profissionalRelacaoRequestSchema,
@@ -130,6 +131,18 @@ export class ReportsService {
     if (Number.isNaN(data.getTime())) return texto;
 
     return this.dateTimeFormatter.format(data);
+  }
+
+  private formatarPeriodoCurso(dataInicial?: string, dataFinal?: string): string | undefined {
+    const inicio = this.normalizarTexto(dataInicial);
+    const fim = this.normalizarTexto(dataFinal);
+
+    if (!inicio && !fim) return undefined;
+    if (inicio && fim) {
+      return `${this.formatarDataComHifen(inicio)} a ${this.formatarDataComHifen(fim)}`;
+    }
+
+    return this.formatarDataComHifen(inicio ?? fim);
   }
 
   private formatarStatus(valor?: string): string {
@@ -685,6 +698,130 @@ export class ReportsService {
     return { html, pdf, filename: "relacao-matriculas.pdf" };
   }
 
+  async gerarListaPresencaMatricula(rawPayload: unknown): Promise<RelatorioResultado> {
+    const payload = matriculaListaPresencaRequestSchema.parse(rawPayload);
+    const matricula = await this.matriculaService.buscarPorId(payload.matriculaId);
+    const contexto = await this.montarContextoInstitucional();
+    const participantes = [...(matricula.matriculas ?? [])]
+      .filter((item) => (item.status ?? "ATIVO").trim().toUpperCase() !== "CANCELADO")
+      .sort((a, b) => (a.beneficiario_nome || "").localeCompare(b.beneficiario_nome || "", "pt-BR"));
+    const exibirCpf = payload.exibirCpf !== false;
+    const horario =
+      matricula.horario_inicial && matricula.duracao_horas
+        ? `${matricula.horario_inicial} (${matricula.duracao_horas}h)`
+        : matricula.horario_inicial ?? undefined;
+    const tabela = {
+      colunas: exibirCpf
+        ? [
+            { titulo: "Nº", largura: "8%" },
+            { titulo: "Participante", largura: "54%" },
+            { titulo: "CPF", largura: "22%" },
+            { titulo: "P", largura: "8%" },
+            { titulo: "A", largura: "8%" }
+          ]
+        : [
+            { titulo: "Nº", largura: "8%" },
+            { titulo: "Participante", largura: "72%" },
+            { titulo: "P", largura: "10%" },
+            { titulo: "A", largura: "10%" }
+          ],
+      linhas: participantes.length
+        ? participantes.map((item, index) =>
+            exibirCpf
+              ? [String(index + 1), item.beneficiario_nome || "---", item.cpf || "---", " ", " "]
+              : [String(index + 1), item.beneficiario_nome || "---", " ", " "]
+          )
+        : [
+            exibirCpf
+              ? ["1", "Nenhum participante inscrito.", "---", " ", " "]
+              : ["1", "Nenhum participante inscrito.", " ", " "]
+          ]
+    };
+
+    const relatorioInput: RelatorioHtmlInput = {
+      titulo: "Lista de presença do curso/atendimento",
+      metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),
+      descricao:
+        "Relatório completo para acompanhamento de frequência, com identificação do curso/atendimento e espaço para marcação manual de presença.",
+      blocos: [
+        {
+          titulo: "Identificação do curso/atendimento",
+          colunas: 2,
+          destaque: true,
+          campos: [
+            this.campo("Curso/atendimento", matricula.nome),
+            this.campo("Tipo", matricula.tipo),
+            this.campo("Status", this.formatarStatus(matricula.status)),
+            this.campo(
+              "Data da aula",
+              this.normalizarTexto(payload.dataAula) ? this.formatarDataComHifen(payload.dataAula) : "Não definida"
+            )
+          ]
+        },
+        {
+          titulo: "Organização da turma",
+          colunas: 3,
+          campos: [
+            this.campo("Profissional responsável", matricula.profissional),
+            this.campo("Sala", matricula.sala_nome),
+            this.campo("Instituição parceira", matricula.instituicao_parceira),
+            this.campo("Horário", horario),
+            this.campo("Dias", matricula.dias_semana?.length ? matricula.dias_semana.join(", ") : undefined),
+            this.campo("Período", this.formatarPeriodoCurso(matricula.data_triagem, matricula.data_conclusao)),
+            this.campo("Carga horária", matricula.carga_horaria ? `${matricula.carga_horaria}h` : undefined),
+            this.campo("Duração prevista", matricula.duracao_horas ? `${matricula.duracao_horas}h` : undefined),
+            this.campo("Faixa etária", matricula.faixa_etaria?.length ? matricula.faixa_etaria.join(", ") : undefined)
+          ]
+        },
+        {
+          titulo: "Participantes e critérios",
+          colunas: 3,
+          campos: [
+            this.campo("Participantes inscritos", String(participantes.length)),
+            this.campo("Vagas totais", String(matricula.vagas_totais ?? 0)),
+            this.campo("Vagas disponíveis", String(matricula.vagas_disponiveis ?? 0)),
+            this.campo(
+              "Sexo permitido",
+              matricula.sexo_permitido ? this.formatarValorEnumerado(matricula.sexo_permitido) : "Todos"
+            ),
+            this.campo("Fila de espera", String(matricula.total_fila_espera ?? 0)),
+            this.campo("Preferencial para idosos", this.formatarSimNao(matricula.vaga_preferencial_idosos))
+          ]
+        },
+        this.blocoComCampos("Descrição e restrições", 1, [
+          this.campoPreenchido("Descrição", matricula.descricao),
+          this.campoPreenchido("Restrições", matricula.restricoes)
+        ])
+      ].filter((bloco): bloco is RelatorioBloco => !!bloco),
+      tabela,
+      secoes: [
+        {
+          titulo: "Orientação de preenchimento",
+          conteudo:
+            "Utilize a coluna P para presente e a coluna A para ausente. A marcação deve ser feita manualmente no momento da aula ou atendimento."
+        },
+        {
+          titulo: "Assinatura do profissional responsável",
+          conteudo: [
+            `Profissional responsável: ${this.normalizarTexto(matricula.profissional) ?? "Não informado"}`,
+            "[[espaco:3.2]]",
+            "_______________________________________________________________"
+          ].join("\n")
+        }
+      ],
+      cabecalho: contexto.cabecalho,
+      rodape: contexto.rodape
+    };
+
+    const html = this.template.montarHtml(relatorioInput);
+    const pdf = await this.renderer.render(html, contexto.rodape, relatorioInput);
+    return {
+      html,
+      pdf,
+      filename: `lista-presenca-matricula-${matricula.id_matricula ?? payload.matriculaId}.pdf`
+    };
+  }
+
   async gerarComprovanteMatricula(rawPayload: unknown): Promise<RelatorioResultado> {
     const payload = comprovanteMatriculaRequestSchema.parse(rawPayload);
     const contexto = await this.montarContextoInstitucional();
@@ -943,13 +1080,12 @@ export class ReportsService {
       secoes: [
         {
           titulo: "Declaração",
-          conteudo:
-            "Declaramos, para os devidos fins, que a entrega acima foi registrada no sistema G3-Next para o destinatário informado neste recibo."
+          conteudo: "Declaro ter recebido gratuitamente os serviços ou benefícios constantes neste recibo."
         },
         {
           titulo: "Assinaturas",
           conteudo:
-            "Responsável pela entrega: ________________________________________________\n\nRecebedor: ______________________________________________________________"
+            "Responsável pela entrega:\n[[espaco:2.8]]\n_______________________________________________________________\n\nRecebedor:\n[[espaco:2.8]]\n_______________________________________________________________"
         }
       ],
       cabecalho: contexto.cabecalho,

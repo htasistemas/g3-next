@@ -896,6 +896,34 @@ export function CadastroMatriculasPage() {
     }
   }
 
+  async function imprimirListaPresenca() {
+    const cursoId = idSelecionado ?? getValues("id_matricula");
+    if (!cursoId) {
+      setPopupMensagem({
+        tipo: "aviso",
+        titulo: "Atenção",
+        texto: "Selecione uma matrícula para imprimir a lista de presença."
+      });
+      return;
+    }
+
+    try {
+      const blob = await reportsService.gerarListaPresencaMatricula({
+        matriculaId: cursoId,
+        dataAula: (presencaDataSelecionada?.data_aula ?? dataPresencaSelecionada) || undefined,
+        exibirCpf: presencaExibirCpf,
+        usuarioEmissor: usuario?.nomeUsuario
+      });
+      abrirRelatorioPdf(blob);
+    } catch (error: any) {
+      setPopupMensagem({
+        tipo: "erro",
+        titulo: "Erro",
+        texto: error?.message ?? "Não foi possível gerar a lista de presença."
+      });
+    }
+  }
+
   function obterDadosCursoComprovante(cursoId?: string) {
     const curso =
       matriculas.find((item) => item.id_matricula === cursoId) ??
@@ -3726,7 +3754,7 @@ export function CadastroMatriculasPage() {
                           {presencaSalvando ? "Processando..." : "Gerar data de presença"}
                         </Button>
                       </div>
-                      <div className="flex items-end xl:col-span-4">
+                      <div className="flex items-end xl:col-span-2">
                         <Button
                           type="button"
                           className="w-full"
@@ -3734,6 +3762,12 @@ export function CadastroMatriculasPage() {
                           disabled={presencaSalvando || !presencaDataSelecionada || !presencaPendente}
                         >
                           {presencaSalvando ? "Salvando..." : "Salvar presenças"}
+                        </Button>
+                      </div>
+                      <div className="flex items-end xl:col-span-2">
+                        <Button type="button" variant="outline" className="w-full" onClick={() => void imprimirListaPresenca()}>
+                          <Printer className="h-4 w-4" />
+                          Imprimir lista
                         </Button>
                       </div>
                     </div>

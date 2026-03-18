@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Boxes,
@@ -44,6 +44,49 @@ const abas: AdminTab[] = [
 ];
 
 const tituloTela = "Almoxarifado";
+const classeCardDashboardAlmoxarifado =
+  "mx-auto w-full max-w-[220px] border-emerald-200 bg-emerald-100 shadow-[0_14px_28px_-22px_rgba(22,101,52,0.42)]";
+const categoriasSugeridas = [
+  "Alimentos",
+  "Higiene pessoal",
+  "Limpeza",
+  "Cama, mesa e banho",
+  "Vestuário",
+  "Calçados",
+  "Material escolar",
+  "Material de escritório",
+  "Utensílios domésticos",
+  "Brinquedos"
+];
+const unidadesSugeridas = [
+  "Unidade",
+  "Caixa",
+  "Pacote",
+  "Fardo",
+  "Saco",
+  "Kit",
+  "Par",
+  "Litro",
+  "Mililitro",
+  "Quilograma",
+  "Grama",
+  "Metro",
+  "Rolo"
+];
+const formatadorMoedaBr = new Intl.NumberFormat("pt-BR", {
+  style: "currency",
+  currency: "BRL"
+});
+
+function formatarMoedaBr(valor: number) {
+  return formatadorMoedaBr.format(Number.isFinite(valor) ? valor : 0);
+}
+
+function converterMoedaParaNumero(valor: string) {
+  const somenteDigitos = valor.replace(/\D/g, "");
+  if (!somenteDigitos) return 0;
+  return Number(somenteDigitos) / 100;
+}
 
 const defaultItem: ItemAlmoxarifado = {
   codigo: "",
@@ -108,6 +151,15 @@ export function AlmoxarifadoPage() {
   }, [itens]);
 
   const carregandoAcoes = salvarMutation.isPending || removerMutation.isPending || movimentarMutation.isPending;
+
+  useEffect(() => {
+    const proximoCodigo = proximoCodigoData?.codigo?.trim();
+    if (!proximoCodigo || itemForm.id_item || itemForm.codigo) return;
+
+    setItemForm((atual) => ({ ...atual, codigo: proximoCodigo }));
+    setItemSnapshot((atual) => (atual.id_item || atual.codigo ? atual : { ...atual, codigo: proximoCodigo }));
+    setMovimentoForm((atual) => (atual.codigo_item ? atual : { ...atual, codigo_item: proximoCodigo }));
+  }, [itemForm.codigo, itemForm.id_item, proximoCodigoData?.codigo]);
 
   function novo() {
     const codigo = proximoCodigoData?.codigo ?? "";
@@ -239,26 +291,94 @@ export function AlmoxarifadoPage() {
         codeBadge={itemForm.id_item ? `Código: ${itemForm.codigo}` : "Novo"}
       >
         {abaAtiva === "dashboards" ? (
-          <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <Card className="border-[var(--g3-border)]"><CardHeader className="pb-2"><CardTitle className="text-sm">Total De Itens</CardTitle></CardHeader><CardContent className="text-3xl font-semibold text-[var(--g3-active)]">{dashboard.total}</CardContent></Card>
-            <Card className="border-[var(--g3-border)]"><CardHeader className="pb-2"><CardTitle className="text-sm">Abaixo Do Mínimo</CardTitle></CardHeader><CardContent className="text-3xl font-semibold text-[var(--g3-danger)]">{dashboard.abaixoMinimo}</CardContent></Card>
-            <Card className="border-[var(--g3-border)]"><CardHeader className="pb-2"><CardTitle className="text-sm">Kits</CardTitle></CardHeader><CardContent className="text-3xl font-semibold text-[var(--g3-active)]">{dashboard.kits}</CardContent></Card>
-            <Card className="border-[var(--g3-border)]"><CardHeader className="pb-2"><CardTitle className="text-sm">Valor Total</CardTitle></CardHeader><CardContent className="text-3xl font-semibold text-[var(--g3-active)]">{dashboard.valorTotal.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</CardContent></Card>
+          <section className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+            <Card className={classeCardDashboardAlmoxarifado}>
+              <CardHeader className="items-center px-3 pb-1.5 pt-3 text-center">
+                <CardTitle className="text-xs font-medium text-emerald-900">Total de itens</CardTitle>
+              </CardHeader>
+              <CardContent className="px-3 pb-3 text-center text-2xl font-semibold text-emerald-950">{dashboard.total}</CardContent>
+            </Card>
+            <Card className={classeCardDashboardAlmoxarifado}>
+              <CardHeader className="items-center px-3 pb-1.5 pt-3 text-center">
+                <CardTitle className="text-xs font-medium text-emerald-900">{"Abaixo do m\u00ednimo"}</CardTitle>
+              </CardHeader>
+              <CardContent className="px-3 pb-3 text-center text-2xl font-semibold text-emerald-950">
+                {dashboard.abaixoMinimo}
+              </CardContent>
+            </Card>
+            <Card className={classeCardDashboardAlmoxarifado}>
+              <CardHeader className="items-center px-3 pb-1.5 pt-3 text-center">
+                <CardTitle className="text-xs font-medium text-emerald-900">Kits</CardTitle>
+              </CardHeader>
+              <CardContent className="px-3 pb-3 text-center text-2xl font-semibold text-emerald-950">{dashboard.kits}</CardContent>
+            </Card>
+            <Card className={classeCardDashboardAlmoxarifado}>
+              <CardHeader className="items-center px-3 pb-1.5 pt-3 text-center">
+                <CardTitle className="text-xs font-medium text-emerald-900">Valor total</CardTitle>
+              </CardHeader>
+              <CardContent className="px-3 pb-3 text-center text-2xl font-semibold text-emerald-950">
+                {formatarMoedaBr(dashboard.valorTotal)}
+              </CardContent>
+            </Card>
           </section>
         ) : null}
 
         {abaAtiva === "cadastro" ? (
           <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <div className="space-y-1"><Label>Código *</Label><Input value={itemForm.codigo} onChange={(event) => setItemForm((atual) => ({ ...atual, codigo: event.target.value }))} /></div>
-            <div className="space-y-1 xl:col-span-2"><Label>Descrição *</Label><Input value={itemForm.descricao} onChange={(event) => setItemForm((atual) => ({ ...atual, descricao: event.target.value }))} /></div>
-            <div className="space-y-1"><Label>Categoria *</Label><Input value={itemForm.categoria} onChange={(event) => setItemForm((atual) => ({ ...atual, categoria: event.target.value }))} /></div>
-            <div className="space-y-1"><Label>Unidade *</Label><Input value={itemForm.unidade} onChange={(event) => setItemForm((atual) => ({ ...atual, unidade: event.target.value }))} /></div>
-            <div className="space-y-1"><Label>Estoque Atual</Label><Input type="number" min={0} value={itemForm.estoque_atual} onChange={(event) => setItemForm((atual) => ({ ...atual, estoque_atual: Number(event.target.value) || 0 }))} /></div>
-            <div className="space-y-1"><Label>Estoque Mínimo</Label><Input type="number" min={0} value={itemForm.estoque_minimo} onChange={(event) => setItemForm((atual) => ({ ...atual, estoque_minimo: Number(event.target.value) || 0 }))} /></div>
-            <div className="space-y-1"><Label>Valor Unitário</Label><Input type="number" min={0} step="0.01" value={itemForm.valor_unitario} onChange={(event) => setItemForm((atual) => ({ ...atual, valor_unitario: Number(event.target.value) || 0 }))} /></div>
-            <div className="space-y-1"><Label>Situação</Label><Select value={itemForm.situacao} onChange={(event) => setItemForm((atual) => ({ ...atual, situacao: event.target.value }))}><option value="Ativo">Ativo</option><option value="Inativo">Inativo</option><option value="Bloqueado">Bloqueado</option></Select></div>
-            <label className="inline-flex items-center gap-2 text-sm"><input type="checkbox" checked={!!itemForm.is_kit} onChange={(event) => setItemForm((atual) => ({ ...atual, is_kit: event.target.checked }))} />Item É Kit</label>
-            <div className="space-y-1 md:col-span-2 xl:col-span-4"><Label>Observações</Label><Textarea rows={2} value={itemForm.observacoes ?? ""} onChange={(event) => setItemForm((atual) => ({ ...atual, observacoes: event.target.value }))} /></div>
+            <datalist id="almoxarifado-categorias">
+              {categoriasSugeridas.map((categoria) => (
+                <option key={categoria} value={categoria} />
+              ))}
+            </datalist>
+            <datalist id="almoxarifado-unidades">
+              {unidadesSugeridas.map((unidade) => (
+                <option key={unidade} value={unidade} />
+              ))}
+            </datalist>
+            <div className="space-y-1">
+              <Label>{"C\u00f3digo *"}</Label>
+              <Input readOnly value={itemForm.codigo} />
+            </div>
+            <div className="space-y-1 xl:col-span-2">
+              <Label>{"Descri\u00e7\u00e3o *"}</Label>
+              <Input value={itemForm.descricao} onChange={(event) => setItemForm((atual) => ({ ...atual, descricao: event.target.value }))} />
+            </div>
+            <div className="space-y-1">
+              <Label>Categoria *</Label>
+              <Input
+                list="almoxarifado-categorias"
+                placeholder="Selecione ou digite outra categoria"
+                value={itemForm.categoria}
+                onChange={(event) => setItemForm((atual) => ({ ...atual, categoria: event.target.value }))}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Unidade *</Label>
+              <Input
+                list="almoxarifado-unidades"
+                placeholder="Selecione a unidade"
+                value={itemForm.unidade}
+                onChange={(event) => setItemForm((atual) => ({ ...atual, unidade: event.target.value }))}
+              />
+            </div>
+            <div className="space-y-1"><Label>Estoque atual</Label><Input type="number" min={0} value={itemForm.estoque_atual} onChange={(event) => setItemForm((atual) => ({ ...atual, estoque_atual: Number(event.target.value) || 0 }))} /></div>
+            <div className="space-y-1"><Label>{"Estoque m\u00ednimo"}</Label><Input type="number" min={0} value={itemForm.estoque_minimo} onChange={(event) => setItemForm((atual) => ({ ...atual, estoque_minimo: Number(event.target.value) || 0 }))} /></div>
+            <div className="space-y-1">
+              <Label>{"Valor unit\u00e1rio"}</Label>
+              <Input
+                inputMode="numeric"
+                value={formatarMoedaBr(Number(itemForm.valor_unitario || 0))}
+                onChange={(event) =>
+                  setItemForm((atual) => ({
+                    ...atual,
+                    valor_unitario: converterMoedaParaNumero(event.target.value)
+                  }))
+                }
+              />
+            </div>
+            <div className="space-y-1"><Label>{"Situa\u00e7\u00e3o"}</Label><Select value={itemForm.situacao} onChange={(event) => setItemForm((atual) => ({ ...atual, situacao: event.target.value }))}><option value="Ativo">Ativo</option><option value="Inativo">Inativo</option><option value="Bloqueado">Bloqueado</option></Select></div>
+            <label className="inline-flex items-center gap-2 text-sm"><input type="checkbox" checked={!!itemForm.is_kit} onChange={(event) => setItemForm((atual) => ({ ...atual, is_kit: event.target.checked }))} />{"Item \u00e9 kit"}</label>
+            <div className="space-y-1 md:col-span-2 xl:col-span-4"><Label>{"Observa\u00e7\u00f5es"}</Label><Textarea rows={2} value={itemForm.observacoes ?? ""} onChange={(event) => setItemForm((atual) => ({ ...atual, observacoes: event.target.value }))} /></div>
           </section>
         ) : null}
 

@@ -8,8 +8,10 @@ export type OcorrenciaCriancaPayload = {
   violenciaPraticadaPor?: string[];
   violenciaPraticadaOutro?: string;
   outrasViolacoes?: string[];
+  vitimaBeneficiarioId?: string;
   vitimaNome: string;
   vitimaIdade: number | null;
+  vitimaSexo?: string;
   vitimaRacaCor?: string;
   vitimaIdentidadeGenero?: string;
   vitimaOrientacaoSexual?: string;
@@ -22,6 +24,7 @@ export type OcorrenciaCriancaPayload = {
   vitimaEnderecoComplemento?: string;
   vitimaEnderecoBairro?: string;
   vitimaEnderecoMunicipio?: string;
+  vitimaEnderecoUf?: string;
   autorNome?: string;
   autorIdade?: number | null;
   autorNaoConsta?: boolean;
@@ -61,4 +64,3 @@ export type OcorrenciaCriancaAnexoPayload = {
   criadoEm?: string;
   atualizadoEm?: string;
 };
-

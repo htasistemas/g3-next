@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AdminPageLayout, type AdminAction, type AdminTab } from "@/components/admin/admin-page-layout";
 import { PopupConfirmacao, PopupMensagem, type PopupMensagemState } from "@/components/admin/admin-popups";
+import { useBeneficiario, useBeneficiarios } from "@/features/beneficiarios/use-beneficiarios";
 import {
   useAdicionarAnexoOcorrenciaCrianca,
   useAnexosOcorrenciaCrianca,
@@ -29,8 +30,10 @@ import {
   useRemoverOcorrenciaCrianca,
   useSalvarOcorrenciaCrianca
 } from "@/features/ocorrencias-crianca/use-ocorrencias-crianca";
+import { calcularIdade, formatarTelefone } from "@/lib/br-utils";
 import { somenteDigitos } from "@/lib/validators";
 import { ocorrenciasCriancaService } from "@/services/ocorrencias-crianca.service";
+import type { Beneficiario } from "@/types/beneficiario";
 import type { OcorrenciaCriancaPayload } from "@/types/ocorrencia-crianca";
 
 type AbaId = "ocorrencia" | "vitima" | "autor" | "classificacao" | "relato";
@@ -49,8 +52,8 @@ type Opcao = {
 };
 
 const abas: AdminTab[] = [
-  { id: "ocorrencia", label: "Ocorrência", icon: AlertTriangle },
   { id: "vitima", label: "Vítima", icon: User },
+  { id: "ocorrencia", label: "Ocorrência", icon: AlertTriangle },
   { id: "autor", label: "Possível autor", icon: UserSearch },
   { id: "classificacao", label: "Classificação", icon: List },
   { id: "relato", label: "Relato e encaminhamento", icon: FileText }
@@ -101,6 +104,12 @@ const opcoesRacaCor: Opcao[] = [
   { value: "Parda", label: "Parda" },
   { value: "Indigena", label: "Indígena" },
   { value: "Amarela", label: "Amarela" }
+];
+
+const opcoesSexo: Opcao[] = [
+  { value: "Feminino", label: "Feminino" },
+  { value: "Masculino", label: "Masculino" },
+  { value: "Outro", label: "Outro" }
 ];
 
 const opcoesIdentidadeGenero: Opcao[] = [
@@ -224,6 +233,93 @@ function trimToUndefined(valor?: string | null) {
   return texto ? texto : undefined;
 }
 
+function normalizarTextoBusca(valor?: string | null) {
+  return String(valor ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function adicionarOpcaoAtual(opcoes: Opcao[], valor?: string | null) {
+  const texto = trimToUndefined(valor);
+  if (!texto) return opcoes;
+
+  const valorNormalizado = normalizarTextoBusca(texto);
+  if (opcoes.some((opcao) => normalizarTextoBusca(opcao.value) === valorNormalizado)) {
+    return opcoes;
+  }
+
+  return [...opcoes, { value: texto, label: texto }];
+}
+
+function mapearOpcaoPorTexto(valor: string | undefined, opcoes: Opcao[]) {
+  const texto = normalizarTextoBusca(valor);
+  if (!texto) return undefined;
+
+  return (
+    opcoes.find((opcao) => normalizarTextoBusca(opcao.value) === texto)?.value ??
+    opcoes.find((opcao) => normalizarTextoBusca(opcao.label) === texto)?.value ??
+    opcoes.find((opcao) => {
+      const opcaoNormalizada = normalizarTextoBusca(opcao.value);
+      return texto.includes(opcaoNormalizada) || opcaoNormalizada.includes(texto);
+    })?.value
+  );
+}
+
+function mapearSexoBeneficiario(valor?: string | null) {
+  const texto = normalizarTextoBusca(valor);
+  if (!texto) return undefined;
+  if (texto.includes("femin")) return "Feminino";
+  if (texto.includes("mascul")) return "Masculino";
+  return "Outro";
+}
+
+function mapearEscolaridadeBeneficiario(valor?: string | null) {
+  const texto = normalizarTextoBusca(valor);
+  if (!texto) return undefined;
+
+  const opcaoDireta = mapearOpcaoPorTexto(valor ?? undefined, opcoesEscolaridade);
+  if (opcaoDireta) return opcaoDireta;
+  if (texto.includes("creche")) return "Creche (0-3)";
+  if (texto.includes("pre escola") || texto.includes("prescola")) return "Pre-escola (4-5)";
+
+  const anoMatch = texto.match(/\b([1-9])\b/);
+  const ano = anoMatch?.[1];
+  if (!ano) return trimToUndefined(valor);
+
+  if (texto.includes("medio") || texto.includes("médio") || texto.includes("em")) {
+    return `${ano}º EM`;
+  }
+  if (texto.includes("fundamental") || texto.includes("ef")) {
+    return `${ano}º EF`;
+  }
+
+  return trimToUndefined(valor);
+}
+
+function mapearIdentidadeGeneroBeneficiario(beneficiario: Beneficiario) {
+  const identidade = mapearOpcaoPorTexto(beneficiario.identidade_genero, opcoesIdentidadeGenero);
+  if (identidade) return identidade;
+
+  const sexo = mapearSexoBeneficiario(beneficiario.sexo_biologico);
+  if (sexo === "Masculino") return "Masculino Cisgenero";
+  if (sexo === "Feminino") return "Feminino Cisgenero";
+  return undefined;
+}
+
+function obterNomeResponsavelBeneficiario(beneficiario: Beneficiario | null, tipo?: string | null) {
+  if (!beneficiario) return undefined;
+  if (tipo === "Mae") return trimToUndefined(beneficiario.nome_mae);
+  if (tipo === "Pai") return trimToUndefined(beneficiario.nome_pai);
+  return undefined;
+}
+
+function montarLogradouroVitima(beneficiario: Beneficiario) {
+  return trimToUndefined([beneficiario.logradouro, beneficiario.numero].filter(Boolean).join(", "));
+}
+
 async function arquivoParaBase64(arquivo: File) {
   const buffer = await arquivo.arrayBuffer();
   const bytes = new Uint8Array(buffer);
@@ -337,7 +433,7 @@ function GrupoMultiplaEscolha({
 
 export function OcorrenciasPage() {
   const navigate = useNavigate();
-  const [abaAtiva, setAbaAtiva] = useState<AbaId>("ocorrencia");
+  const [abaAtiva, setAbaAtiva] = useState<AbaId>("vitima");
   const [form, setForm] = useState<OcorrenciaCriancaPayload>(() => criarFormularioPadrao());
   const [snapshot, setSnapshot] = useState<OcorrenciaCriancaPayload>(() => criarFormularioPadrao());
   const [popup, setPopup] = useState<PopupMensagemState | null>(null);
@@ -345,6 +441,9 @@ export function OcorrenciasPage() {
   const [abrirBusca, setAbrirBusca] = useState(false);
   const [termoBusca, setTermoBusca] = useState("");
   const [abrirImpressao, setAbrirImpressao] = useState(false);
+  const [termoBuscaVitima, setTermoBuscaVitima] = useState("");
+  const [mostrarSugestoesVitima, setMostrarSugestoesVitima] = useState(false);
+  const [beneficiarioVitimaSelecionado, setBeneficiarioVitimaSelecionado] = useState<Beneficiario | null>(null);
 
   const ocorrenciasQuery = useOcorrenciasCrianca();
   const salvarMutation = useSalvarOcorrenciaCrianca();
@@ -353,6 +452,17 @@ export function OcorrenciasPage() {
   const adicionarAnexoMutation = useAdicionarAnexoOcorrenciaCrianca(form.id);
   const removerAnexoMutation = useRemoverAnexoOcorrenciaCrianca(form.id);
   const anexos = anexosQuery.data ?? [];
+  const buscaVitimaHabilitada = termoBuscaVitima.trim().length >= 2;
+  const beneficiariosVitimaQuery = useBeneficiarios(
+    {
+      nome: termoBuscaVitima.trim()
+    },
+    {
+      enabled: buscaVitimaHabilitada
+    }
+  );
+  const beneficiarioVitimaDetalheQuery = useBeneficiario(form.vitimaBeneficiarioId);
+  const beneficiarioVitimaAtual = beneficiarioVitimaSelecionado ?? beneficiarioVitimaDetalheQuery.data?.beneficiario ?? null;
 
   const carregandoAcoes =
     salvarMutation.isPending ||
@@ -366,12 +476,126 @@ export function OcorrenciasPage() {
       `${item.vitimaNome} ${item.dataPreenchimento}`.toLowerCase().includes(termo)
     );
   }, [ocorrenciasQuery.data, termoBusca]);
+  const beneficiariosVitima = useMemo(() => {
+    const termoNome = normalizarTextoBusca(termoBuscaVitima);
+    const termoDigitos = somenteDigitos(termoBuscaVitima);
+
+    return (beneficiariosVitimaQuery.data?.beneficiarios ?? [])
+      .filter((item) => {
+        if (!termoNome && !termoDigitos) return true;
+
+        const nome = normalizarTextoBusca(item.nome_completo);
+        const codigo = normalizarTextoBusca(item.codigo);
+        const cpf = somenteDigitos(item.cpf);
+
+        return (
+          (termoNome && (nome.includes(termoNome) || codigo.includes(termoNome))) ||
+          (termoDigitos && !!cpf && cpf.includes(termoDigitos))
+        );
+      })
+      .slice(0, 8);
+  }, [beneficiariosVitimaQuery.data?.beneficiarios, termoBuscaVitima]);
+  const opcoesSexoVitima = useMemo(() => adicionarOpcaoAtual(opcoesSexo, form.vitimaSexo), [form.vitimaSexo]);
+  const opcoesRacaCorVitima = useMemo(() => adicionarOpcaoAtual(opcoesRacaCor, form.vitimaRacaCor), [form.vitimaRacaCor]);
+  const opcoesIdentidadeGeneroVitima = useMemo(
+    () => adicionarOpcaoAtual(opcoesIdentidadeGenero, form.vitimaIdentidadeGenero),
+    [form.vitimaIdentidadeGenero]
+  );
+  const opcoesEscolaridadeVitima = useMemo(
+    () => adicionarOpcaoAtual(opcoesEscolaridade, form.vitimaEscolaridade),
+    [form.vitimaEscolaridade]
+  );
+
+  useEffect(() => {
+    const beneficiario = beneficiarioVitimaDetalheQuery.data?.beneficiario;
+    if (!beneficiario || !form.vitimaBeneficiarioId) return;
+    if (beneficiario.id_beneficiario !== form.vitimaBeneficiarioId) return;
+    setBeneficiarioVitimaSelecionado(beneficiario);
+  }, [beneficiarioVitimaDetalheQuery.data?.beneficiario, form.vitimaBeneficiarioId]);
 
   function atualizarCampo<K extends keyof OcorrenciaCriancaPayload>(
     campo: K,
     valor: OcorrenciaCriancaPayload[K]
   ) {
     setForm((atual) => ({ ...atual, [campo]: valor }));
+  }
+
+  function sincronizarBuscaVitima(payload: OcorrenciaCriancaPayload) {
+    setTermoBuscaVitima(payload.vitimaNome ?? "");
+    setMostrarSugestoesVitima(false);
+    if (!payload.vitimaBeneficiarioId || beneficiarioVitimaSelecionado?.id_beneficiario !== payload.vitimaBeneficiarioId) {
+      setBeneficiarioVitimaSelecionado(null);
+    }
+  }
+
+  function preencherVitimaComBeneficiario(beneficiario: Beneficiario) {
+    setBeneficiarioVitimaSelecionado(beneficiario);
+    setTermoBuscaVitima(beneficiario.nome_completo ?? "");
+    setMostrarSugestoesVitima(false);
+
+    setForm((atual) => {
+      const responsavelTipoAtual =
+        atual.vitimaResponsavelTipo ?? (beneficiario.nome_mae ? "Mae" : beneficiario.nome_pai ? "Pai" : undefined);
+      const telefoneResponsavel = formatarTelefone(beneficiario.telefone_principal || beneficiario.telefone_secundario);
+
+      return {
+        ...atual,
+        vitimaBeneficiarioId: beneficiario.id_beneficiario,
+        vitimaNome: beneficiario.nome_completo ?? atual.vitimaNome,
+        vitimaIdade: calcularIdade(beneficiario.data_nascimento) ?? atual.vitimaIdade,
+        vitimaSexo: mapearSexoBeneficiario(beneficiario.sexo_biologico) ?? atual.vitimaSexo,
+        vitimaRacaCor: mapearOpcaoPorTexto(beneficiario.cor_raca, opcoesRacaCor) ?? atual.vitimaRacaCor,
+        vitimaIdentidadeGenero:
+          mapearIdentidadeGeneroBeneficiario(beneficiario) ?? atual.vitimaIdentidadeGenero,
+        vitimaEscolaridade:
+          mapearEscolaridadeBeneficiario(beneficiario.nivel_escolaridade) ?? atual.vitimaEscolaridade,
+        vitimaResponsavelTipo: responsavelTipoAtual,
+        vitimaResponsavelNome:
+          responsavelTipoAtual === "Outro"
+            ? atual.vitimaResponsavelNome ?? ""
+            : obterNomeResponsavelBeneficiario(beneficiario, responsavelTipoAtual) ?? atual.vitimaResponsavelNome,
+        vitimaTelefoneResponsavel: telefoneResponsavel || atual.vitimaTelefoneResponsavel,
+        vitimaEnderecoLogradouro: montarLogradouroVitima(beneficiario) ?? atual.vitimaEnderecoLogradouro,
+        vitimaEnderecoComplemento: trimToUndefined(beneficiario.complemento) ?? atual.vitimaEnderecoComplemento,
+        vitimaEnderecoBairro: trimToUndefined(beneficiario.bairro) ?? atual.vitimaEnderecoBairro,
+        vitimaEnderecoMunicipio: trimToUndefined(beneficiario.municipio) ?? atual.vitimaEnderecoMunicipio,
+        vitimaEnderecoUf: trimToUndefined(beneficiario.uf) ?? atual.vitimaEnderecoUf
+      };
+    });
+  }
+
+  function atualizarNomeVitima(valor: string) {
+    const nomeBeneficiarioAtual = normalizarTextoBusca(beneficiarioVitimaAtual?.nome_completo);
+    const mudouSelecao = !!nomeBeneficiarioAtual && normalizarTextoBusca(valor) !== nomeBeneficiarioAtual;
+
+    if (mudouSelecao) {
+      setBeneficiarioVitimaSelecionado(null);
+    }
+
+    setTermoBuscaVitima(valor);
+    setMostrarSugestoesVitima(true);
+    setForm((atual) => ({
+      ...atual,
+      vitimaNome: valor,
+      vitimaBeneficiarioId: mudouSelecao ? undefined : atual.vitimaBeneficiarioId
+    }));
+  }
+
+  function atualizarResponsavelVitima(tipo?: string) {
+    setForm((atual) => {
+      const nomeResponsavel = obterNomeResponsavelBeneficiario(beneficiarioVitimaAtual, tipo);
+      const telefoneResponsavel = formatarTelefone(
+        beneficiarioVitimaAtual?.telefone_principal || beneficiarioVitimaAtual?.telefone_secundario
+      );
+
+      return {
+        ...atual,
+        vitimaResponsavelTipo: tipo,
+        vitimaResponsavelNome:
+          tipo === "Outro" ? "" : nomeResponsavel ?? atual.vitimaResponsavelNome,
+        vitimaTelefoneResponsavel: telefoneResponsavel || atual.vitimaTelefoneResponsavel
+      };
+    });
   }
 
   function alternarLista(campo: CampoLista, valor: string) {
@@ -392,17 +616,21 @@ export function OcorrenciasPage() {
     const base = criarFormularioPadrao();
     setForm(base);
     setSnapshot(base);
-    setAbaAtiva("ocorrencia");
+    setBeneficiarioVitimaSelecionado(null);
+    sincronizarBuscaVitima(base);
+    setAbaAtiva("vitima");
   }
 
   function cancelar() {
     setForm(snapshot);
+    sincronizarBuscaVitima(snapshot);
   }
 
   function selecionar(item: OcorrenciaCriancaPayload) {
     setForm(item);
     setSnapshot(item);
-    setAbaAtiva("ocorrencia");
+    sincronizarBuscaVitima(item);
+    setAbaAtiva("vitima");
     setAbrirBusca(false);
   }
 
@@ -422,7 +650,9 @@ export function OcorrenciasPage() {
           ? trimToUndefined(payload.violenciaPraticadaOutro)
           : undefined,
       outrasViolacoes: (payload.outrasViolacoes ?? []).filter(Boolean),
+      vitimaBeneficiarioId: trimToUndefined(payload.vitimaBeneficiarioId),
       vitimaNome: payload.vitimaNome.trim(),
+      vitimaSexo: trimToUndefined(payload.vitimaSexo),
       vitimaRacaCor: trimToUndefined(payload.vitimaRacaCor),
       vitimaIdentidadeGenero: trimToUndefined(payload.vitimaIdentidadeGenero),
       vitimaOrientacaoSexual: trimToUndefined(payload.vitimaOrientacaoSexual),
@@ -436,6 +666,7 @@ export function OcorrenciasPage() {
       vitimaEnderecoComplemento: trimToUndefined(payload.vitimaEnderecoComplemento),
       vitimaEnderecoBairro: trimToUndefined(payload.vitimaEnderecoBairro),
       vitimaEnderecoMunicipio: trimToUndefined(payload.vitimaEnderecoMunicipio),
+      vitimaEnderecoUf: trimToUndefined(payload.vitimaEnderecoUf),
       autorNome: payload.autorNaoConsta ? undefined : trimToUndefined(payload.autorNome),
       autorIdade: payload.autorNaoConsta ? null : payload.autorIdade ?? null,
       autorParentesco: trimToUndefined(payload.autorParentesco),
@@ -518,6 +749,7 @@ export function OcorrenciasPage() {
       const response = await salvarMutation.mutateAsync({ id: form.id, payload });
       setForm(response);
       setSnapshot(response);
+      sincronizarBuscaVitima(response);
       setPopup({ tipo: "sucesso", titulo: "Confirmação", texto: "Ocorrência salva com sucesso." });
     } catch (error: any) {
       setPopup({
@@ -723,16 +955,65 @@ export function OcorrenciasPage() {
 
         {abaAtiva === "vitima" ? (
           <div className="space-y-3">
-            <BlocoFormulario titulo="Identificação da vítima">
+            <BlocoFormulario
+              titulo="Identificação da vítima"
+              descricao="Busque o nome no cadastro de beneficiário para preencher automaticamente os dados já cadastrados."
+            >
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="space-y-1">
                   <Label htmlFor="vitima-nome">Nome *</Label>
                   <Input
                     id="vitima-nome"
-                    value={form.vitimaNome}
-                    onChange={(event) => atualizarCampo("vitimaNome", event.target.value)}
-                    placeholder="Informe o nome da vítima"
+                    value={termoBuscaVitima}
+                    onChange={(event) => atualizarNomeVitima(event.target.value)}
+                    onFocus={() => setMostrarSugestoesVitima(true)}
+                    onBlur={(event) => {
+                      setTermoBuscaVitima(event.target.value);
+                      setTimeout(() => setMostrarSugestoesVitima(false), 120);
+                    }}
+                    placeholder="Digite para buscar no cadastro de beneficiário"
+                    autoComplete="off"
                   />
+                  {mostrarSugestoesVitima ? (
+                    <div className="max-h-48 overflow-y-auto rounded-md border border-[var(--g3-border)] bg-[var(--g3-card)] p-1">
+                      {buscaVitimaHabilitada ? (
+                        beneficiariosVitimaQuery.isFetching ? (
+                          <p className="px-2 py-1 text-xs text-[var(--g3-muted)]">Buscando beneficiários...</p>
+                        ) : beneficiariosVitima.length ? (
+                          beneficiariosVitima.map((beneficiario) => (
+                            <button
+                              key={beneficiario.id_beneficiario}
+                              type="button"
+                              className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-[var(--g3-primary-soft)]"
+                              onMouseDown={(event) => event.preventDefault()}
+                              onClick={() => preencherVitimaComBeneficiario(beneficiario)}
+                            >
+                              <span className="font-medium text-[var(--g3-foreground)]">
+                                {beneficiario.nome_completo}
+                              </span>
+                              <span className="block text-[11px] text-[var(--g3-muted)]">
+                                {beneficiario.codigo ? `Código ${beneficiario.codigo}` : "Sem código"}
+                                {beneficiario.cpf ? ` • CPF ${beneficiario.cpf}` : ""}
+                              </span>
+                            </button>
+                          ))
+                        ) : (
+                          <p className="px-2 py-1 text-xs text-[var(--g3-muted)]">
+                            Nenhum beneficiário encontrado.
+                          </p>
+                        )
+                      ) : (
+                        <p className="px-2 py-1 text-xs text-[var(--g3-muted)]">
+                          Digite pelo menos 2 caracteres para buscar.
+                        </p>
+                      )}
+                    </div>
+                  ) : null}
+                  {beneficiarioVitimaAtual?.id_beneficiario ? (
+                    <p className="text-[11px] text-emerald-700">
+                      Beneficiário selecionado: {beneficiarioVitimaAtual.nome_completo}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="vitima-idade">Idade *</Label>
@@ -752,16 +1033,23 @@ export function OcorrenciasPage() {
             <BlocoFormulario titulo="Perfil da vítima">
               <div className="space-y-3">
                 <GrupoEscolhaUnica
+                  label="Sexo"
+                  value={form.vitimaSexo}
+                  options={opcoesSexoVitima}
+                  onChange={(value) => atualizarCampo("vitimaSexo", value)}
+                  columns="sm:grid-cols-3"
+                />
+                <GrupoEscolhaUnica
                   label="Raça/cor"
                   value={form.vitimaRacaCor}
-                  options={opcoesRacaCor}
+                  options={opcoesRacaCorVitima}
                   onChange={(value) => atualizarCampo("vitimaRacaCor", value)}
                   columns="sm:grid-cols-2 xl:grid-cols-5"
                 />
                 <GrupoEscolhaUnica
                   label="Identidade de gênero"
                   value={form.vitimaIdentidadeGenero}
-                  options={opcoesIdentidadeGenero}
+                  options={opcoesIdentidadeGeneroVitima}
                   onChange={(value) => atualizarCampo("vitimaIdentidadeGenero", value)}
                 />
                 <GrupoEscolhaUnica
@@ -784,7 +1072,7 @@ export function OcorrenciasPage() {
                 <GrupoEscolhaUnica
                   label="Escolaridade"
                   value={form.vitimaEscolaridade}
-                  options={opcoesEscolaridade}
+                  options={opcoesEscolaridadeVitima}
                   onChange={(value) => atualizarCampo("vitimaEscolaridade", value)}
                   columns="sm:grid-cols-2 xl:grid-cols-4"
                 />
@@ -797,7 +1085,7 @@ export function OcorrenciasPage() {
                   label="Responsável"
                   value={form.vitimaResponsavelTipo}
                   options={opcoesResponsavelVitima}
-                  onChange={(value) => atualizarCampo("vitimaResponsavelTipo", value)}
+                  onChange={(value) => atualizarResponsavelVitima(value)}
                   columns="sm:grid-cols-3"
                 />
                 <div className="grid gap-3 md:grid-cols-2">
@@ -807,7 +1095,24 @@ export function OcorrenciasPage() {
                       id="vitima-responsavel-nome"
                       value={form.vitimaResponsavelNome ?? ""}
                       onChange={(event) => atualizarCampo("vitimaResponsavelNome", event.target.value)}
+                      readOnly={
+                        !!beneficiarioVitimaAtual &&
+                        !!form.vitimaResponsavelTipo &&
+                        form.vitimaResponsavelTipo !== "Outro"
+                      }
+                      placeholder={
+                        form.vitimaResponsavelTipo === "Outro"
+                          ? "Informe o nome do responsável"
+                          : "Selecione mãe, pai ou outro"
+                      }
                     />
+                    {!!beneficiarioVitimaAtual &&
+                    !!form.vitimaResponsavelTipo &&
+                    form.vitimaResponsavelTipo !== "Outro" ? (
+                      <p className="text-[11px] text-[var(--g3-muted)]">
+                        Nome preenchido automaticamente pelo cadastro do beneficiário.
+                      </p>
+                    ) : null}
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="vitima-responsavel-telefone">Telefone do responsável</Label>
@@ -817,6 +1122,11 @@ export function OcorrenciasPage() {
                       onChange={(event) => atualizarCampo("vitimaTelefoneResponsavel", event.target.value)}
                       placeholder="(00) 00000-0000"
                     />
+                    {!!beneficiarioVitimaAtual ? (
+                      <p className="text-[11px] text-[var(--g3-muted)]">
+                        Telefone sugerido automaticamente a partir do cadastro do beneficiário.
+                      </p>
+                    ) : null}
                   </div>
                 </div>
               </div>
@@ -854,6 +1164,14 @@ export function OcorrenciasPage() {
                     id="vitima-municipio"
                     value={form.vitimaEnderecoMunicipio ?? ""}
                     onChange={(event) => atualizarCampo("vitimaEnderecoMunicipio", event.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="vitima-uf">UF</Label>
+                  <Input
+                    id="vitima-uf"
+                    value={form.vitimaEnderecoUf ?? ""}
+                    onChange={(event) => atualizarCampo("vitimaEnderecoUf", event.target.value)}
                   />
                 </div>
               </div>

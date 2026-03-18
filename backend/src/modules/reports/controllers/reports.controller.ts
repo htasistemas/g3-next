@@ -75,6 +75,12 @@ export class ReportsController {
     return responderRelatorio(response, resultado, formato);
   }
 
+  async listaPresencaMatricula(request: Request, response: Response) {
+    const formato = formatoRelatorioSchema.parse(request.query.formato);
+    const resultado = await service.gerarListaPresencaMatricula(request.body);
+    return responderRelatorio(response, resultado, formato);
+  }
+
   async comprovanteMatricula(request: Request, response: Response) {
     const formato = formatoRelatorioSchema.parse(request.query.formato);
     const resultado = await service.gerarComprovanteMatricula(request.body);

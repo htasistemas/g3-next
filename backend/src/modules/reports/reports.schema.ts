@@ -6,6 +6,17 @@ const optionalString = z.preprocess((value) => {
   return trimmed.length ? trimmed : undefined;
 }, z.string().optional());
 
+const optionalBoolean = z.preprocess((value) => {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const normalizado = value.trim().toLowerCase();
+    if (["true", "1", "sim"].includes(normalizado)) return true;
+    if (["false", "0", "nao", "não"].includes(normalizado)) return false;
+  }
+  return value;
+}, z.boolean().optional());
+
 export const formatoRelatorioSchema = z.enum(["pdf", "html"]).default("pdf");
 
 export const beneficiarioRelacaoRequestSchema = z.object({
@@ -83,6 +94,13 @@ export const matriculasRelacaoRequestSchema = z.object({
   status: optionalString,
   profissional: optionalString,
   beneficiario: optionalString,
+  usuarioEmissor: optionalString
+});
+
+export const matriculaListaPresencaRequestSchema = z.object({
+  matriculaId: z.string().trim().min(1, "matriculaId e obrigatorio."),
+  dataAula: optionalString,
+  exibirCpf: optionalBoolean,
   usuarioEmissor: optionalString
 });
 

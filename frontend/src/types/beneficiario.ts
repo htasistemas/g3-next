@@ -29,6 +29,7 @@ export type Beneficiario = {
   nome_mae: string;
   nome_pai?: string;
   sexo_biologico?: string;
+  identidade_genero?: string;
   cor_raca?: string;
   estado_civil?: string;
   nacionalidade?: string;
