@@ -47,6 +47,59 @@ function montarCaminhoOuDataUri(conteudoBase64: string, tipoMime?: string | null
 }
 
 export class DocumentosInstituicaoRepository {
+  private anexosSchemaReady?: Promise<void>;
+
+  private async garantirSchemaAnexos() {
+    if (!this.anexosSchemaReady) {
+      this.anexosSchemaReady = (async () => {
+        await prisma.$executeRaw(Prisma.sql`
+          CREATE TABLE IF NOT EXISTS documentos_instituicao_anexos (
+            id BIGSERIAL PRIMARY KEY,
+            documento_id BIGINT NOT NULL REFERENCES documentos_instituicao(id) ON DELETE CASCADE,
+            nome_arquivo VARCHAR(200) NOT NULL,
+            tipo VARCHAR(30) NOT NULL,
+            tipo_mime VARCHAR(120),
+            tamanho VARCHAR(40),
+            caminho_arquivo TEXT,
+            data_upload DATE NOT NULL,
+            usuario VARCHAR(120) NOT NULL,
+            criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+          )
+        `);
+
+        await prisma.$executeRaw(Prisma.sql`
+          ALTER TABLE IF EXISTS documentos_instituicao_anexos
+            ADD COLUMN IF NOT EXISTS tipo_mime VARCHAR(120)
+        `);
+
+        await prisma.$executeRaw(Prisma.sql`
+          ALTER TABLE IF EXISTS documentos_instituicao_anexos
+            ADD COLUMN IF NOT EXISTS caminho_arquivo TEXT
+        `);
+
+        await prisma.$executeRaw(Prisma.sql`
+          ALTER TABLE IF EXISTS documentos_instituicao_anexos
+            ALTER COLUMN nome_arquivo TYPE VARCHAR(200),
+            ALTER COLUMN tipo TYPE VARCHAR(30),
+            ALTER COLUMN tipo_mime TYPE VARCHAR(120),
+            ALTER COLUMN tamanho TYPE VARCHAR(40),
+            ALTER COLUMN caminho_arquivo TYPE TEXT,
+            ALTER COLUMN usuario TYPE VARCHAR(120)
+        `);
+
+        await prisma.$executeRaw(Prisma.sql`
+          CREATE INDEX IF NOT EXISTS documentos_instituicao_anexos_documento_idx
+            ON documentos_instituicao_anexos (documento_id)
+        `);
+      })().catch((error) => {
+        this.anexosSchemaReady = undefined;
+        throw error;
+      });
+    }
+
+    await this.anexosSchemaReady;
+  }
+
   async listar() {
     return prisma.$queryRaw<DocumentoInstituicaoRow[]>(Prisma.sql`
       SELECT
@@ -204,6 +257,7 @@ export class DocumentosInstituicaoRepository {
   }
 
   async listarAnexos(documentoId: bigint) {
+    await this.garantirSchemaAnexos();
     await this.buscarPorIdOuFalhar(documentoId);
     return prisma.$queryRaw<DocumentoInstituicaoAnexoRow[]>(Prisma.sql`
       SELECT
@@ -224,6 +278,7 @@ export class DocumentosInstituicaoRepository {
   }
 
   async buscarAnexoPorId(documentoId: bigint, anexoId: bigint) {
+    await this.garantirSchemaAnexos();
     const rows = await prisma.$queryRaw<DocumentoInstituicaoAnexoRow[]>(Prisma.sql`
       SELECT
         id,
@@ -253,6 +308,7 @@ export class DocumentosInstituicaoRepository {
   }
 
   async adicionarAnexo(documentoId: bigint, input: DocumentoInstituicaoAnexoInput) {
+    await this.garantirSchemaAnexos();
     await this.buscarPorIdOuFalhar(documentoId);
 
     const inserted = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
@@ -288,6 +344,7 @@ export class DocumentosInstituicaoRepository {
   }
 
   async atualizarAnexo(documentoId: bigint, anexoId: bigint, input: DocumentoInstituicaoAnexoInput) {
+    await this.garantirSchemaAnexos();
     await this.buscarAnexoPorIdOuFalhar(documentoId, anexoId);
 
     await prisma.$executeRaw(Prisma.sql`

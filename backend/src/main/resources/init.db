@@ -3091,6 +3091,14 @@ ALTER TABLE documentos_instituicao_anexos
 ALTER TABLE documentos_instituicao_anexos
   ADD COLUMN IF NOT EXISTS caminho_arquivo TEXT;
 
+ALTER TABLE IF EXISTS documentos_instituicao_anexos
+  ALTER COLUMN nome_arquivo TYPE VARCHAR(200),
+  ALTER COLUMN tipo TYPE VARCHAR(30),
+  ALTER COLUMN tipo_mime TYPE VARCHAR(120),
+  ALTER COLUMN tamanho TYPE VARCHAR(40),
+  ALTER COLUMN caminho_arquivo TYPE TEXT,
+  ALTER COLUMN usuario TYPE VARCHAR(120);
+
 CREATE TABLE IF NOT EXISTS documentos_instituicao_historico (
   id BIGSERIAL PRIMARY KEY,
   documento_id BIGINT NOT NULL REFERENCES documentos_instituicao(id) ON DELETE CASCADE,
