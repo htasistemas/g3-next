@@ -6,8 +6,34 @@ APP_COMPOSE="$APP_DIR/docker-compose.yml"
 TUNNEL_COMPOSE="$APP_DIR/docker-compose.tunnel.yml"
 DEPLOY_STATE_DIR="${DEPLOY_STATE_DIR:-$HOME/.g3n-deploy}"
 STATE_VERSION_FILE="$DEPLOY_STATE_DIR/version.txt"
+MAINTENANCE_DIR="${MAINTENANCE_DIR:-$APP_DIR/docker/runtime}"
+MAINTENANCE_FLAG="${APP_MAINTENANCE_FLAG_PATH:-$MAINTENANCE_DIR/maintenance.enable}"
+DEPLOY_OK=0
 
 log() { printf "[%s] %s\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
+
+enable_maintenance() {
+  mkdir -p "$(dirname "$MAINTENANCE_FLAG")"
+  cat > "$MAINTENANCE_FLAG" <<EOF
+enabled_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+version=${APP_VERSION:-indefinida}
+EOF
+}
+
+disable_maintenance() {
+  rm -f "$MAINTENANCE_FLAG"
+}
+
+cleanup() {
+  if [[ "$DEPLOY_OK" -eq 1 ]]; then
+    disable_maintenance
+    log "Maintenance mode disabled"
+  else
+    log "Deploy not completed successfully. Maintenance mode remains enabled at $MAINTENANCE_FLAG"
+  fi
+}
+
+trap cleanup EXIT
 
 print_container_logs() {
   local name="$1"
@@ -63,11 +89,12 @@ log "Deploy g3n stack"
 APP_VERSION="$(STATE_VERSION_FILE="$STATE_VERSION_FILE" bash ./scripts/bump-version.sh)"
 log "Version set to $APP_VERSION"
 
-log "Stopping previous g3n containers"
-docker compose -f "$APP_COMPOSE" down --remove-orphans || true
+enable_maintenance
+log "Maintenance mode enabled"
 
-docker compose -f "$APP_COMPOSE" up -d --remove-orphans g3n-db
+docker compose -f "$APP_COMPOSE" up -d --remove-orphans g3n-db nginx-g3n
 wait_healthy g3n-db 120
+wait_healthy nginx-g3n 120
 
 docker compose -f "$APP_COMPOSE" build g3n-backend g3n-frontend
 docker compose -f "$APP_COMPOSE" up -d --remove-orphans --force-recreate g3n-backend
@@ -90,7 +117,7 @@ if ! wait_healthy g3n-frontend 180; then
   exit 1
 fi
 
-log "Start nginx-g3n after dependencies are healthy"
+log "Refresh nginx-g3n after dependencies are healthy"
 docker compose -f "$APP_COMPOSE" up -d --remove-orphans --force-recreate nginx-g3n
 wait_healthy nginx-g3n 120
 
@@ -108,4 +135,5 @@ else
   log "Post-deploy checks skipped (script not found)"
 fi
 
+DEPLOY_OK=1
 log "Done"

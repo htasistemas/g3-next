@@ -35,6 +35,7 @@ function RouteLoadingFallback() {
 
 const LoginPage = carregarPagina("/login", "LoginPage");
 const CriarContaPage = carregarPagina("/criar-conta", "CriarContaPage");
+const MaintenancePreviewPage = carregarPagina("/manutencao", "MaintenancePreviewPage");
 const TermosUsoPage = carregarPagina("/termos-de-uso", "TermosUsoPage");
 const PoliticaPrivacidadePage = carregarPagina("/politica-de-privacidade", "PoliticaPrivacidadePage");
 const PainelSenhasPage = carregarPagina("/senhas/painel", "PainelSenhasPage");
@@ -121,6 +122,10 @@ export const router = createBrowserRouter([
   {
     path: "/criar-conta",
     element: CriarContaPage
+  },
+  {
+    path: "/manutencao",
+    element: MaintenancePreviewPage
   },
   {
     path: "/termos-de-uso",

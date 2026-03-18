@@ -30,6 +30,7 @@ services:
       NODE_ENV: production
       API_PORT: 3333
       API_HOST: 0.0.0.0
+      APP_MAINTENANCE_FLAG_PATH: ${APP_MAINTENANCE_FLAG_PATH:-/var/run/g3n/maintenance.enable}
       DATABASE_URL: postgresql://${DB_USERNAME:-g3n}:${DB_PASSWORD:-admin}@g3n-db:5432/${DB_NAME:-g3n}?schema=public
       CORS_ORIGIN: ${CORS_ORIGIN:-https://g3n.htasistemas.com.br,http://localhost:5173,http://127.0.0.1:5173,http://0.0.0.0:5173,http://localhost:4200,http://127.0.0.1:4200,http://0.0.0.0:4200}
       APP_AUTH_TOKEN_SECRET: ${APP_AUTH_TOKEN_SECRET:-g3-next-dev-token-secret-2026}
@@ -49,6 +50,7 @@ services:
       MAIL_PASS: ${MAIL_PASS:-alterar-em-producao}
     volumes:
       - g3n_backend_storage:/app/storage
+      - ./docker/runtime:/var/run/g3n
     depends_on:
       g3n-db:
         condition: service_healthy
@@ -99,13 +101,11 @@ services:
       APP_API_UPSTREAM: ${APP_API_UPSTREAM:-g3n-backend:3333}
     volumes:
       - ./nginx/default.conf:/etc/nginx/templates/default.conf.template:ro
-    depends_on:
-      g3n-backend:
-        condition: service_healthy
-      g3n-frontend:
-        condition: service_healthy
+      - ./frontend/public/maintenance.html:/usr/share/nginx/html/maintenance.html:ro
+      - ./frontend/public/maintenance.css:/usr/share/nginx/html/maintenance.css:ro
+      - ./docker/runtime:/var/run/g3n
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ > /dev/null || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz > /dev/null || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 6

@@ -9,6 +9,7 @@ type RouteModuleDefinition = {
 const routeModules: RouteModuleDefinition[] = [
   { path: "/login", loader: () => import("@/pages/login-page") },
   { path: "/criar-conta", loader: () => import("@/pages/criar-conta-page") },
+  { path: "/manutencao", loader: () => import("@/pages/maintenance-preview-page") },
   { path: "/termos-de-uso", loader: () => import("@/pages/termos-uso-page") },
   { path: "/politica-de-privacidade", loader: () => import("@/pages/politica-privacidade-page") },
   { path: "/senhas/painel", loader: () => import("@/pages/atendimentos/painel-senhas-page") },

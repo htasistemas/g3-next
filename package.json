@@ -1,3 +1,8 @@
 {
-  "name": "jsreport-server"
+  "name": "jsreport-server",
+  "scripts": {
+    "maintenance:on": "node scripts/maintenance-mode.mjs on",
+    "maintenance:off": "node scripts/maintenance-mode.mjs off",
+    "maintenance:status": "node scripts/maintenance-mode.mjs status"
+  }
 }

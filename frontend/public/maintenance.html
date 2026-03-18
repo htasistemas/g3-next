@@ -1,45 +1,83 @@
 <!doctype html>
-<html lang="pt-br">
+<html lang="pt-BR">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Servidor indisponivel</title>
-    <style>
-      body {
-        font-family: Arial, Helvetica, sans-serif;
-        background: #f8fafc;
-        color: #0f172a;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        min-height: 100vh;
-        margin: 0;
-        padding: 1.5rem;
-      }
-      .box {
-        max-width: 640px;
-        text-align: center;
-        background: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        padding: 2rem;
-        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
-      }
-      h1 {
-        margin: 0 0 0.5rem;
-        font-size: 1.5rem;
-        font-weight: 800;
-      }
-      p {
-        margin: 0;
-        font-size: 1rem;
-      }
-    </style>
+    <meta name="robots" content="noindex, nofollow" />
+    <title>G3N | Sistema em atualização</title>
+    <link rel="stylesheet" href="/maintenance.css" />
   </head>
   <body>
-    <div class="box">
-      <h1>SERVIDOR INDISPONIVEL NO MOMENTO, FAVOR AGUARDAR</h1>
-      <p>Estamos atualizando o sistema. Tente novamente em alguns instantes.</p>
-    </div>
+    <main class="maintenance-shell" aria-labelledby="maintenance-title">
+      <div class="maintenance-glow maintenance-glow--left" aria-hidden="true"></div>
+      <div class="maintenance-glow maintenance-glow--right" aria-hidden="true"></div>
+
+      <section class="maintenance-card" role="status" aria-live="polite">
+        <header class="maintenance-header">
+          <div class="maintenance-brand">
+            <div class="maintenance-brand__mark">G3N</div>
+            <div class="maintenance-brand__content">
+              <p class="maintenance-brand__eyebrow">HTA Sistemas</p>
+              <p class="maintenance-brand__subtitle">Sistema de gestão do terceiro setor</p>
+            </div>
+          </div>
+
+          <div class="maintenance-loading" aria-hidden="true">
+            <span class="maintenance-loading__ring"></span>
+            <span class="maintenance-loading__ring maintenance-loading__ring--delay"></span>
+          </div>
+        </header>
+
+        <div class="maintenance-status-row">
+          <button class="maintenance-status-pill" type="button" disabled>
+            Atualização em andamento
+          </button>
+          <span class="maintenance-status-hint">Não feche esta página.</span>
+        </div>
+
+        <div class="maintenance-copy">
+          <h1 id="maintenance-title">Sistema em atualização</h1>
+          <p class="maintenance-copy__lead">
+            Estamos aplicando melhorias no G3N para oferecer mais estabilidade e desempenho.
+          </p>
+          <p class="maintenance-copy__sublead">
+            Em instantes o sistema estará disponível novamente. Aguarde um momento.
+          </p>
+        </div>
+
+        <section class="maintenance-notes" aria-label="Informações da atualização">
+          <article class="maintenance-note">
+            <span class="maintenance-note__label">Status</span>
+            <p class="maintenance-note__value">
+              Atualização controlada em andamento com retorno automático ao fim do deploy.
+            </p>
+          </article>
+
+          <article class="maintenance-note">
+            <span class="maintenance-note__label">Orientação</span>
+            <p class="maintenance-note__value">
+              Aguarde nesta página enquanto concluímos a atualização em segurança.
+            </p>
+          </article>
+        </section>
+
+        <section class="maintenance-future" hidden aria-hidden="true">
+          <article class="maintenance-note">
+            <span class="maintenance-note__label">Previsão</span>
+            <p class="maintenance-note__value">Em breve</p>
+          </article>
+          <article class="maintenance-note">
+            <span class="maintenance-note__label">Resumo da atualização</span>
+            <p class="maintenance-note__value">
+              Espaço reservado para changelog resumido e status detalhado.
+            </p>
+          </article>
+        </section>
+
+        <footer class="maintenance-footer">
+          HTA Sistemas • G3N – Sistema de gestão do terceiro setor
+        </footer>
+      </section>
+    </main>
   </body>
 </html>

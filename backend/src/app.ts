@@ -5,6 +5,7 @@ import helmet from "helmet";
 import morgan from "morgan";
 import { env } from "./config/env.js";
 import { errorHandler } from "./middlewares/error-handler.js";
+import { maintenanceModeMiddleware } from "./middlewares/maintenance-mode.js";
 import { notFoundHandler } from "./middlewares/not-found.js";
 import { appRoutes } from "./routes/index.js";
 
@@ -31,6 +32,7 @@ app.use(
 app.use(express.json({ limit: "10mb" }));
 app.use(cookieParser());
 app.use(morgan("dev"));
+app.use(maintenanceModeMiddleware);
 
 app.use(appRoutes);
 app.use(notFoundHandler);
