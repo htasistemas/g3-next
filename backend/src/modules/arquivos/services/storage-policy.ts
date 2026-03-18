@@ -143,9 +143,9 @@ export const storagePolicies: Record<StorageScopeKey, StoragePolicy> = {
     entidadeTipo: "instituicao",
     categoria: "documento",
     subdirectory: "instituicoes/documentos",
-    allowedExtensions: documentExtensions,
-    allowedMimeTypes: documentMimeTypes,
-    maxSizeBytes: 20 * 1024 * 1024,
+    allowedExtensions: ["*"],
+    allowedMimeTypes: ["*"],
+    maxSizeBytes: 100 * 1024 * 1024,
     generateThumbnail: true
   },
   instituicao_imagem: {

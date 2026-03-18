@@ -57,7 +57,7 @@ export const documentosInstituicaoService = {
     const { data } = await httpClient.post<DocumentoInstituicaoAnexo>(
       `/api/documentos-instituicao/${id}/anexos`,
       payload,
-      { timeout: 120000 }
+      { timeout: 300000 }
     );
     return data;
   },
@@ -66,7 +66,7 @@ export const documentosInstituicaoService = {
     const { data } = await httpClient.put<DocumentoInstituicaoAnexo>(
       `/api/documentos-instituicao/${id}/anexos/${anexoId}`,
       payload,
-      { timeout: 120000 }
+      { timeout: 300000 }
     );
     return data;
   },
@@ -82,7 +82,7 @@ export const documentosInstituicaoService = {
     const { data } = await httpClient.post<UploadAnexoDocumentoResponse>(
       "/api/arquivos/upload",
       formData,
-      { timeout: 120000 }
+      { timeout: 300000 }
     );
 
     return {

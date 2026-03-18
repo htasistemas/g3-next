@@ -139,6 +139,10 @@ export function garantirExtensaoPermitida(extensao: string, permitidas: string[]
     throw new AppError("Tipo de arquivo nao permitido.", 400);
   }
 
+  if (permitidas.includes("*")) {
+    return;
+  }
+
   if (!permitidas.includes(normalized)) {
     throw new AppError("Extensao de arquivo nao permitida.", 400);
   }
@@ -146,6 +150,10 @@ export function garantirExtensaoPermitida(extensao: string, permitidas: string[]
 
 export function garantirMimeTypePermitido(mimeType: string, permitidos: string[]) {
   const normalized = mimeType.toLowerCase();
+  if (permitidos.includes("*")) {
+    return;
+  }
+
   if (!permitidos.includes(normalized)) {
     throw new AppError("Tipo MIME do arquivo nao permitido.", 400);
   }

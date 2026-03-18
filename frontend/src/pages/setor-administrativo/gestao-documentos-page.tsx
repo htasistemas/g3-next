@@ -175,9 +175,8 @@ function obterTipoAnexoArquivo(file: File) {
   return valor || "ARQUIVO";
 }
 
-function ehArquivoPdf(file: File) {
-  const nome = file.name.trim().toLowerCase();
-  return file.type === "application/pdf" || nome.endsWith(".pdf");
+function ehArquivoPermitido(file: File) {
+  return file.size > 0;
 }
 
 function formatarSituacaoDocumento(situacao?: string | null) {
@@ -445,11 +444,11 @@ export function GestaoDocumentosPage() {
   }
 
   async function subirAnexo(file: File) {
-    if (!ehArquivoPdf(file)) {
+    if (!ehArquivoPermitido(file)) {
       setPopupMensagem({
         tipo: "aviso",
         titulo: "Validação",
-        texto: "Envie apenas arquivos em PDF."
+        texto: "Selecione um arquivo válido para envio."
       });
       return;
     }
@@ -530,11 +529,11 @@ export function GestaoDocumentosPage() {
   }
 
   async function substituirAnexoExistente(anexoId: string, file: File) {
-    if (!ehArquivoPdf(file)) {
+    if (!ehArquivoPermitido(file)) {
       setPopupMensagem({
         tipo: "aviso",
         titulo: "Validação",
-        texto: "Envie apenas arquivos em PDF."
+        texto: "Selecione um arquivo válido para envio."
       });
       setAnexoParaSubstituirId(null);
       return;
@@ -831,7 +830,6 @@ export function GestaoDocumentosPage() {
             <input
               id="arquivoDocumento"
               type="file"
-              accept=".pdf,application/pdf"
               className="hidden"
               onChange={(event) => {
                 const file = event.target.files?.[0];
@@ -844,7 +842,6 @@ export function GestaoDocumentosPage() {
             <input
               id="arquivoDocumentoSubstituicao"
               type="file"
-              accept=".pdf,application/pdf"
               className="hidden"
               onChange={(event) => {
                 const file = event.target.files?.[0];
@@ -1005,9 +1002,9 @@ export function GestaoDocumentosPage() {
                 <CardHeader className="pb-2">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="space-y-1">
-                      <CardTitle className="text-sm">Documento em PDF</CardTitle>
+                      <CardTitle className="text-sm">Arquivo do documento</CardTitle>
                       <p className="text-xs text-[var(--g3-muted)]">
-                        Envie o PDF principal deste cadastro para visualizar, imprimir, substituir ou excluir.
+                        Envie o arquivo principal deste cadastro para visualizar, imprimir, substituir ou excluir.
                       </p>
                     </div>
                     <Button
@@ -1021,14 +1018,14 @@ export function GestaoDocumentosPage() {
                       disabled={!form.id || carregandoAcoes || anexoProcessandoId === anexoPrincipal?.id}
                     >
                       <Upload className="mr-1.5 h-3.5 w-3.5" />
-                      {anexoPrincipal ? "Substituir PDF" : "Enviar PDF"}
+                      {anexoPrincipal ? "Substituir arquivo" : "Enviar arquivo"}
                     </Button>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {!form.id ? (
                     <div className="rounded-md border border-dashed border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/20 p-4 text-sm text-[var(--g3-muted)]">
-                      Salve o documento primeiro para habilitar o envio do PDF.
+                      Salve o documento primeiro para habilitar o envio do arquivo.
                     </div>
                   ) : carregandoAnexo ? (
                     <div className="rounded-md border border-dashed border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/15 p-4 text-sm text-[var(--g3-muted)]">
@@ -1102,9 +1099,9 @@ export function GestaoDocumentosPage() {
                           <FileText className="h-5 w-5" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-semibold">Nenhum PDF enviado</p>
+                          <p className="text-sm font-semibold">Nenhum arquivo enviado</p>
                           <p className="text-xs text-[var(--g3-muted)]">
-                            Use o botão acima para anexar o PDF principal deste documento.
+                            Use o botão acima para anexar o arquivo principal deste documento.
                           </p>
                         </div>
                       </div>
