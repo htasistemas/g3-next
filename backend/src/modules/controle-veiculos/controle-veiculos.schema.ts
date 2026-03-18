@@ -34,11 +34,12 @@ const optionalHour = z.preprocess((value) => {
 }, z.string().regex(/^\d{2}:\d{2}$/).optional());
 
 export const veiculoInputSchema = z.object({
-  placa: optionalTrimmedString,
-  modelo: optionalTrimmedString,
-  marca: optionalTrimmedString,
+  placa: optionalTrimmedString.nullable().optional(),
+  modelo: optionalTrimmedString.nullable().optional(),
+  marca: optionalTrimmedString.nullable().optional(),
+  cor: optionalTrimmedString.nullable().optional(),
   ano: optionalInteger.nullable().optional(),
-  tipoCombustivel: optionalTrimmedString,
+  tipoCombustivel: optionalTrimmedString.nullable().optional(),
   mediaConsumoPadrao: optionalNumber.nullable().optional(),
   capacidadeTanqueLitros: optionalNumber.nullable().optional(),
   observacoes: optionalTrimmedString.nullable().optional(),

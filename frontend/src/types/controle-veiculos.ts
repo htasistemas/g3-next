@@ -3,6 +3,7 @@ export type VeiculoCadastro = {
   placa?: string | null;
   modelo?: string | null;
   marca?: string | null;
+  cor?: string | null;
   ano?: number | null;
   tipoCombustivel?: string | null;
   mediaConsumoPadrao?: number | null;

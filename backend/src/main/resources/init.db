@@ -3261,6 +3261,7 @@ CREATE TABLE IF NOT EXISTS controle_veiculos (
   placa VARCHAR(20),
   modelo VARCHAR(120),
   marca VARCHAR(120),
+  cor VARCHAR(80),
   ano INTEGER,
   tipo_combustivel VARCHAR(60),
   media_consumo_padrao NUMERIC(12, 2),
@@ -3352,6 +3353,7 @@ ALTER TABLE controle_veiculos ALTER COLUMN ano DROP NOT NULL;
 ALTER TABLE controle_veiculos ALTER COLUMN tipo_combustivel DROP NOT NULL;
 ALTER TABLE controle_veiculos ALTER COLUMN ativo DROP NOT NULL;
 
+ALTER TABLE controle_veiculos ADD COLUMN IF NOT EXISTS cor VARCHAR(80);
 ALTER TABLE controle_veiculos ADD COLUMN IF NOT EXISTS media_consumo_padrao NUMERIC(12, 2);
 ALTER TABLE controle_veiculos ADD COLUMN IF NOT EXISTS capacidade_tanque_litros NUMERIC(12, 2);
 

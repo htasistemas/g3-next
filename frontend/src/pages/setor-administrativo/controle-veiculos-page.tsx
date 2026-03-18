@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   List,
   MapPinned,
+  Pencil,
   Plus,
   Printer,
   Save,
@@ -76,6 +77,7 @@ const defaultVeiculo: VeiculoCadastro = {
   placa: "",
   modelo: "",
   marca: "",
+  cor: "",
   ano: null,
   tipoCombustivel: "",
   mediaConsumoPadrao: null,
@@ -547,6 +549,24 @@ export function ControleVeiculosPage() {
     novo();
   }
 
+  function editarVeiculoSelecionado() {
+    const veiculoSelecionado = veiculoSelecionadoListagem;
+    if (!veiculoSelecionado) {
+      setPopupMensagem({
+        tipo: "aviso",
+        titulo: "Atenção",
+        texto: "Selecione um veículo para editar."
+      });
+      return;
+    }
+
+    setVeiculoForm(veiculoSelecionado);
+    setFotoVeiculoArquivo(null);
+    setFotoVeiculoPreview("");
+    setDocumentoVeiculoArquivo(null);
+    setAbaAtiva("cadastro");
+  }
+
   function excluir() {
     const possuiId =
       ((abaAtiva === "cadastro" || abaAtiva === "listagem") && !!veiculoForm.id) ||
@@ -903,7 +923,13 @@ export function ControleVeiculosPage() {
       variant: "outline"
     },
     { label: "Novo", icon: Plus, onClick: novo, variant: "default", disabled: carregandoAcoes },
-    { label: "Salvar", icon: Save, onClick: () => void salvar(), variant: "default", disabled: carregandoAcoes },
+    {
+      label: abaAtiva === "listagem" ? "Editar veículo" : "Salvar",
+      icon: abaAtiva === "listagem" ? Pencil : Save,
+      onClick: abaAtiva === "listagem" ? editarVeiculoSelecionado : () => void salvar(),
+      variant: "default",
+      disabled: carregandoAcoes || (abaAtiva === "listagem" && !veiculoSelecionadoListagem)
+    },
     { label: "Cancelar", icon: Undo2, onClick: cancelar, variant: "outline", disabled: carregandoAcoes },
     { label: "Excluir", icon: Trash2, onClick: excluir, variant: "danger", disabled: carregandoAcoes },
     { label: "Imprimir", icon: Printer, onClick: imprimir, variant: "outline", disabled: carregandoAcoes },
@@ -974,6 +1000,7 @@ export function ControleVeiculosPage() {
                   <div className="space-y-1"><Label>Placa *</Label><Input value={veiculoForm.placa ?? ""} onChange={(event) => setVeiculoForm((atual) => ({ ...atual, placa: event.target.value.toUpperCase() }))} /></div>
                   <div className="space-y-1"><Label>Modelo *</Label><Input value={veiculoForm.modelo ?? ""} onChange={(event) => setVeiculoForm((atual) => ({ ...atual, modelo: event.target.value }))} /></div>
                   <div className="space-y-1"><Label>Marca *</Label><Input value={veiculoForm.marca ?? ""} onChange={(event) => setVeiculoForm((atual) => ({ ...atual, marca: event.target.value }))} /></div>
+                  <div className="space-y-1"><Label>Cor do veículo</Label><Input value={veiculoForm.cor ?? ""} onChange={(event) => setVeiculoForm((atual) => ({ ...atual, cor: event.target.value }))} /></div>
                   <div className="space-y-1"><Label>Ano</Label><Input type="number" min={1900} max={2100} value={veiculoForm.ano ?? ""} onChange={(event) => setVeiculoForm((atual) => ({ ...atual, ano: Number(event.target.value) || null }))} /></div>
                   <div className="space-y-1"><Label>Combustível</Label><Select value={veiculoForm.tipoCombustivel ?? ""} onChange={(event) => setVeiculoForm((atual) => ({ ...atual, tipoCombustivel: event.target.value }))}><option value="">Selecione</option>{combustiveis.map((item) => <option key={item} value={item}>{item}</option>)}</Select></div>
                   <div className="space-y-1"><Label>Média de consumo (km/l)</Label><Input type="number" min={0} step="0.01" value={veiculoForm.mediaConsumoPadrao ?? ""} onChange={(event) => setVeiculoForm((atual) => ({ ...atual, mediaConsumoPadrao: Number(event.target.value) || null }))} /></div>
@@ -1052,7 +1079,13 @@ export function ControleVeiculosPage() {
                       <CardHeader className="px-4 pb-2 pt-4">
                         <CardTitle className="flex flex-wrap items-center justify-between gap-2 text-sm text-[var(--g3-active)]">
                           <span>Informações do veículo</span>
-                          <PlacaVeiculoVisual placa={veiculoSelecionadoListagem.placa} />
+                          <div className="flex flex-wrap items-center justify-end gap-2">
+                            <Button type="button" variant="outline" className="h-9 px-3" onClick={editarVeiculoSelecionado}>
+                              <Pencil className="mr-2 h-4 w-4" />
+                              Editar cadastro
+                            </Button>
+                            <PlacaVeiculoVisual placa={veiculoSelecionadoListagem.placa} />
+                          </div>
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-3 px-4 pb-4">
@@ -1060,6 +1093,7 @@ export function ControleVeiculosPage() {
                           <div className="rounded-lg border border-[var(--g3-border)] p-2.5"><p className="text-[11px] text-[var(--g3-muted)]">Tipo de placa</p><p className="mt-1 text-sm font-semibold text-[var(--g3-active)]">{veiculoSelecionadoListagem.placa?.length === 7 ? "Mercosul" : "Normal"}</p></div>
                           <div className="rounded-lg border border-[var(--g3-border)] p-2.5"><p className="text-[11px] text-[var(--g3-muted)]">Modelo</p><p className="mt-1 text-sm font-semibold text-[var(--g3-active)]">{veiculoSelecionadoListagem.modelo || "---"}</p></div>
                           <div className="rounded-lg border border-[var(--g3-border)] p-2.5"><p className="text-[11px] text-[var(--g3-muted)]">Marca</p><p className="mt-1 text-sm font-semibold text-[var(--g3-active)]">{veiculoSelecionadoListagem.marca || "---"}</p></div>
+                          <div className="rounded-lg border border-[var(--g3-border)] p-2.5"><p className="text-[11px] text-[var(--g3-muted)]">Cor</p><p className="mt-1 text-sm font-semibold text-[var(--g3-active)]">{veiculoSelecionadoListagem.cor || "---"}</p></div>
                           <div className="rounded-lg border border-[var(--g3-border)] p-2.5"><p className="text-[11px] text-[var(--g3-muted)]">Ano</p><p className="mt-1 text-sm font-semibold text-[var(--g3-active)]">{veiculoSelecionadoListagem.ano || "---"}</p></div>
                           <div className="rounded-lg border border-[var(--g3-border)] p-2.5"><p className="text-[11px] text-[var(--g3-muted)]">Combustível</p><p className="mt-1 text-sm font-semibold text-[var(--g3-active)]">{veiculoSelecionadoListagem.tipoCombustivel || "---"}</p></div>
                           <div className="rounded-lg border border-[var(--g3-border)] p-2.5"><p className="text-[11px] text-[var(--g3-muted)]">Status</p><p className="mt-1 text-sm font-semibold text-[var(--g3-active)]">{veiculoSelecionadoListagem.ativo ? "Ativo" : "Inativo"}</p></div>

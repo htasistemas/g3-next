@@ -21,6 +21,7 @@ export function mapVeiculoToResponse(row: VeiculoRow) {
     placa: row.placa,
     modelo: row.modelo,
     marca: row.marca,
+    cor: row.cor,
     ano: row.ano,
     tipoCombustivel: row.tipo_combustivel,
     mediaConsumoPadrao: row.media_consumo_padrao,

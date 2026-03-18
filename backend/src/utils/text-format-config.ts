@@ -288,6 +288,7 @@ export const mapaCamposTextoControleVeiculos: Record<string, TipoFormatacaoTexto
   placa: "textoCurto",
   modelo: "instituicao",
   marca: "instituicao",
+  cor: "textoCurto",
   tipoCombustivel: "textoCurto",
   observacoes: "textoCurto",
   nome: "instituicao",

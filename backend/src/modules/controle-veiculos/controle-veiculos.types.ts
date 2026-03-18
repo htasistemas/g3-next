@@ -1,9 +1,10 @@
 export type VeiculoInput = {
-  placa?: string;
-  modelo?: string;
-  marca?: string;
+  placa?: string | null;
+  modelo?: string | null;
+  marca?: string | null;
+  cor?: string | null;
   ano?: number | null;
-  tipoCombustivel?: string;
+  tipoCombustivel?: string | null;
   mediaConsumoPadrao?: number | null;
   capacidadeTanqueLitros?: number | null;
   observacoes?: string | null;
@@ -54,6 +55,7 @@ export type VeiculoRow = {
   placa: string | null;
   modelo: string | null;
   marca: string | null;
+  cor: string | null;
   ano: number | null;
   tipo_combustivel: string | null;
   media_consumo_padrao: number | null;

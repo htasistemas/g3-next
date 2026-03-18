@@ -34,6 +34,7 @@ function calcularMediaConsumo(
 }
 
 const controleVeiculosEstruturaStatements = [
+  "ALTER TABLE controle_veiculos ADD COLUMN IF NOT EXISTS cor VARCHAR(80)",
   `
     CREATE TABLE IF NOT EXISTS controle_veiculos_local_destino (
       id BIGSERIAL PRIMARY KEY,
@@ -129,6 +130,7 @@ export class ControleVeiculosRepository {
         placa,
         modelo,
         marca,
+        cor,
         ano,
         tipo_combustivel,
         media_consumo_padrao::float8 AS media_consumo_padrao,
@@ -153,6 +155,7 @@ export class ControleVeiculosRepository {
         placa,
         modelo,
         marca,
+        cor,
         ano,
         tipo_combustivel,
         media_consumo_padrao::float8 AS media_consumo_padrao,
@@ -186,6 +189,7 @@ export class ControleVeiculosRepository {
         placa,
         modelo,
         marca,
+        cor,
         ano,
         tipo_combustivel,
         media_consumo_padrao,
@@ -203,6 +207,7 @@ export class ControleVeiculosRepository {
         ${trimOrUndefined(input.placa)},
         ${trimOrUndefined(input.modelo)},
         ${trimOrUndefined(input.marca)},
+        ${trimOrUndefined(input.cor)},
         ${input.ano ?? null},
         ${trimOrUndefined(input.tipoCombustivel)},
         ${input.mediaConsumoPadrao ?? null},
@@ -236,6 +241,7 @@ export class ControleVeiculosRepository {
         placa = ${trimOrUndefined(input.placa)},
         modelo = ${trimOrUndefined(input.modelo)},
         marca = ${trimOrUndefined(input.marca)},
+        cor = ${trimOrUndefined(input.cor)},
         ano = ${input.ano ?? null},
         tipo_combustivel = ${trimOrUndefined(input.tipoCombustivel)},
         media_consumo_padrao = ${input.mediaConsumoPadrao ?? null},
