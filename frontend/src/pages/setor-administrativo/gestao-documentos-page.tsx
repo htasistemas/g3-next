@@ -477,7 +477,7 @@ export function GestaoDocumentosPage() {
     if (!form.id) {
       setPopupMensagem({
         tipo: "aviso",
-        titulo: "AtenÃ§Ã£o",
+        titulo: "Atenção",
         texto: "Selecione um documento antes de substituir o anexo."
       });
       return;
@@ -499,7 +499,7 @@ export function GestaoDocumentosPage() {
       conteudoBase64,
       tamanho: `${Math.round(file.size / 1024)} KB`,
       dataUpload: new Date().toISOString().slice(0, 10),
-      usuario: responsavelLogado || "UsuÃ¡rio"
+      usuario: responsavelLogado || "Usuário"
     };
 
     setAnexoProcessandoId(anexoId);
@@ -507,14 +507,14 @@ export function GestaoDocumentosPage() {
       await substituirAnexoMutation.mutateAsync({ id: form.id, anexoId, payload });
       setPopupMensagem({
         tipo: "sucesso",
-        titulo: "ConfirmaÃ§Ã£o",
-        texto: "Anexo substituÃ­do com sucesso."
+        titulo: "Confirmação",
+        texto: "Anexo substituído com sucesso."
       });
     } catch (error: any) {
       setPopupMensagem({
         tipo: "erro",
         titulo: "Erro",
-        texto: error?.response?.data?.message ?? "NÃ£o foi possÃ­vel substituir o anexo."
+        texto: error?.response?.data?.message ?? "Não foi possível substituir o anexo."
       });
     } finally {
       setAnexoProcessandoId(null);
@@ -529,7 +529,7 @@ export function GestaoDocumentosPage() {
       setPopupMensagem({
         tipo: "erro",
         titulo: "Erro",
-        texto: error?.message ?? "NÃ£o foi possÃ­vel visualizar o anexo."
+        texto: error?.message ?? "Não foi possível visualizar o anexo."
       });
     }
   }
@@ -542,7 +542,7 @@ export function GestaoDocumentosPage() {
       setPopupMensagem({
         tipo: "erro",
         titulo: "Erro",
-        texto: error?.message ?? "NÃ£o foi possÃ­vel imprimir o anexo."
+        texto: error?.message ?? "Não foi possível imprimir o anexo."
       });
     } finally {
       setAnexoProcessandoId(null);
