@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isValidPhone } from "../../utils/validators.js";
 
 const optionalTrimmedString = z.preprocess((value) => {
   if (typeof value !== "string") return value;
@@ -78,6 +79,10 @@ export const motoristaAutorizadoInputSchema = z.object({
 export const localDestinoInputSchema = z.object({
   nome: optionalTrimmedString.nullable().optional(),
   endereco: optionalTrimmedString.nullable().optional(),
+  telefone: optionalTrimmedString
+    .nullable()
+    .optional()
+    .refine((value) => !value || isValidPhone(value), "Informe um telefone valido."),
   observacoes: optionalTrimmedString.nullable().optional(),
   ativo: z.boolean().nullable().optional()
 });

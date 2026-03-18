@@ -40,6 +40,7 @@ export type LocalDestinoVeiculo = {
   id?: number;
   nome?: string | null;
   endereco?: string | null;
+  telefone?: string | null;
   observacoes?: string | null;
   ativo?: boolean | null;
   criadoEm?: string | null;

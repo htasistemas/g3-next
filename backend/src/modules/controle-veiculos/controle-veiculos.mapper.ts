@@ -64,6 +64,7 @@ export function mapLocalDestinoToResponse(row: LocalDestinoRow) {
     idInterno: toStringId(row.id),
     nome: row.nome,
     endereco: row.endereco,
+    telefone: row.telefone,
     observacoes: row.observacoes,
     ativo: row.ativo,
     criadoEm: row.criado_em.toISOString(),

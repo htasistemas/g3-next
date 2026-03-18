@@ -1,4 +1,5 @@
 import { AppError } from "../../../shared/errors/app-error.js";
+import { normalizarTelefone } from "../../../utils/br-utils.js";
 import { mapaCamposTextoControleVeiculos } from "../../../utils/text-format-config.js";
 import { normalizarObjetoTexto } from "../../../utils/text-formatter.js";
 import {
@@ -70,7 +71,9 @@ export class ControleVeiculosService {
   }
 
   async criarLocalDestino(rawInput: unknown) {
-    const input = localDestinoInputSchema.parse(this.normalizarPayload(rawInput));
+    const input = this.normalizarLocalDestinoInput(
+      localDestinoInputSchema.parse(this.normalizarPayload(rawInput))
+    );
     if (!input.nome) {
       throw new AppError("Informe o nome do local de destino.", 400);
     }
@@ -80,7 +83,9 @@ export class ControleVeiculosService {
 
   async atualizarLocalDestino(rawId: string, rawInput: unknown) {
     const id = this.parseId(rawId);
-    const input = localDestinoInputSchema.parse(this.normalizarPayload(rawInput));
+    const input = this.normalizarLocalDestinoInput(
+      localDestinoInputSchema.parse(this.normalizarPayload(rawInput))
+    );
     if (!input.nome) {
       throw new AppError("Informe o nome do local de destino.", 400);
     }
@@ -149,5 +154,18 @@ export class ControleVeiculosService {
       rawInput as Record<string, unknown>,
       mapaCamposTextoControleVeiculos
     );
+  }
+
+  private normalizarLocalDestinoInput(input: {
+    nome?: string | null;
+    endereco?: string | null;
+    telefone?: string | null;
+    observacoes?: string | null;
+    ativo?: boolean | null;
+  }) {
+    return {
+      ...input,
+      telefone: input.telefone ? normalizarTelefone(input.telefone) : undefined
+    };
   }
 }

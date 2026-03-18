@@ -34,6 +34,7 @@ export type DiarioBordoInput = {
 export type LocalDestinoInput = {
   nome?: string | null;
   endereco?: string | null;
+  telefone?: string | null;
   observacoes?: string | null;
   ativo?: boolean | null;
 };
@@ -90,6 +91,7 @@ export type LocalDestinoRow = {
   id: bigint;
   nome: string | null;
   endereco: string | null;
+  telefone: string | null;
   observacoes: string | null;
   ativo: boolean | null;
   criado_em: Date;

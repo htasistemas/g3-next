@@ -3284,6 +3284,7 @@ CREATE TABLE IF NOT EXISTS controle_veiculos_local_destino (
   id BIGSERIAL PRIMARY KEY,
   nome VARCHAR(200) NOT NULL,
   endereco VARCHAR(255),
+  telefone VARCHAR(30),
   observacoes TEXT,
   ativo BOOLEAN NOT NULL DEFAULT TRUE,
   criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -3292,6 +3293,8 @@ CREATE TABLE IF NOT EXISTS controle_veiculos_local_destino (
 
 CREATE INDEX IF NOT EXISTS controle_veiculos_local_destino_nome_idx
   ON controle_veiculos_local_destino (LOWER(nome));
+
+ALTER TABLE controle_veiculos_local_destino ADD COLUMN IF NOT EXISTS telefone VARCHAR(30);
 
 
 CREATE TABLE IF NOT EXISTS controle_veiculos_diario (

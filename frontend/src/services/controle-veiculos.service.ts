@@ -124,12 +124,7 @@ export const controleVeiculosService = {
 
     const { data } = await httpClient.post<{ arquivo: { caminho_arquivo: string } }>(
       "/api/arquivos/upload",
-      formData,
-      {
-        headers: {
-          "Content-Type": "multipart/form-data"
-        }
-      }
+      formData
     );
 
     return data.arquivo.caminho_arquivo;
@@ -146,12 +141,7 @@ export const controleVeiculosService = {
 
     const { data } = await httpClient.post<{ arquivo: { caminho_arquivo: string } }>(
       "/api/arquivos/upload",
-      formData,
-      {
-        headers: {
-          "Content-Type": "multipart/form-data"
-        }
-      }
+      formData
     );
 
     return data.arquivo.caminho_arquivo;

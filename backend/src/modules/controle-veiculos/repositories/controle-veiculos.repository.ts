@@ -39,12 +39,14 @@ const controleVeiculosEstruturaStatements = [
       id BIGSERIAL PRIMARY KEY,
       nome VARCHAR(160) NOT NULL,
       endereco VARCHAR(220),
+      telefone VARCHAR(30),
       observacoes TEXT,
       ativo BOOLEAN NOT NULL DEFAULT TRUE,
       criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
       atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
     )
   `,
+  "ALTER TABLE controle_veiculos_local_destino ADD COLUMN IF NOT EXISTS telefone VARCHAR(30)",
   "ALTER TABLE controle_veiculos_diario ADD COLUMN IF NOT EXISTS data_saida DATE",
   "ALTER TABLE controle_veiculos_diario ADD COLUMN IF NOT EXISTS data_chegada DATE",
   "ALTER TABLE controle_veiculos_diario ADD COLUMN IF NOT EXISTS local_destino_id BIGINT",
@@ -596,6 +598,7 @@ export class ControleVeiculosRepository {
         id,
         nome,
         endereco,
+        telefone,
         observacoes,
         ativo,
         criado_em,
@@ -612,6 +615,7 @@ export class ControleVeiculosRepository {
         id,
         nome,
         endereco,
+        telefone,
         observacoes,
         ativo,
         criado_em,
@@ -637,6 +641,7 @@ export class ControleVeiculosRepository {
       INSERT INTO controle_veiculos_local_destino (
         nome,
         endereco,
+        telefone,
         observacoes,
         ativo,
         criado_em,
@@ -644,6 +649,7 @@ export class ControleVeiculosRepository {
       ) VALUES (
         ${trimOrUndefined(input.nome ?? undefined)},
         ${trimOrUndefined(input.endereco ?? undefined)},
+        ${trimOrUndefined(input.telefone ?? undefined)},
         ${trimOrUndefined(input.observacoes ?? undefined)},
         ${input.ativo ?? true},
         NOW(),
@@ -667,6 +673,7 @@ export class ControleVeiculosRepository {
       SET
         nome = ${trimOrUndefined(input.nome ?? undefined)},
         endereco = ${trimOrUndefined(input.endereco ?? undefined)},
+        telefone = ${trimOrUndefined(input.telefone ?? undefined)},
         observacoes = ${trimOrUndefined(input.observacoes ?? undefined)},
         ativo = ${input.ativo ?? true},
         atualizado_em = NOW()

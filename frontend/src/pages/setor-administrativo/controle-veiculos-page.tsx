@@ -4,6 +4,7 @@ import {
   Car,
   ClipboardList,
   LayoutDashboard,
+  List,
   MapPinned,
   Plus,
   Printer,
@@ -38,7 +39,12 @@ import {
   useVeiculos
 } from "@/features/controle-veiculos/use-controle-veiculos";
 import { resolverUrlArquivo } from "@/lib/arquivos";
-import { formatarDataPtBr } from "@/lib/br-utils";
+import {
+  formatarDataPtBr,
+  formatarTelefone,
+  mascararTelefoneInput,
+  normalizarTelefone
+} from "@/lib/br-utils";
 import { imprimirConteudoAtual } from "@/lib/report-utils";
 import { controleVeiculosService } from "@/services/controle-veiculos.service";
 import type {
@@ -48,11 +54,12 @@ import type {
   VeiculoCadastro
 } from "@/types/controle-veiculos";
 
-type AbaId = "dashboard" | "cadastro" | "diario" | "destinos" | "motoristas";
+type AbaId = "dashboard" | "cadastro" | "listagem" | "diario" | "destinos" | "motoristas";
 
 const abas: AdminTab[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "cadastro", label: "Cadastro de veículo", icon: Car },
+  { id: "listagem", label: "Listagem de veículos", icon: List },
   { id: "diario", label: "Mapa de bordo", icon: ClipboardList },
   { id: "destinos", label: "Locais de destino", icon: MapPinned },
   { id: "motoristas", label: "Motoristas autorizados", icon: ShieldCheck }
@@ -98,6 +105,7 @@ const defaultDiario: RegistroDiarioBordo = {
 const defaultLocalDestino: LocalDestinoVeiculo = {
   nome: "",
   endereco: "",
+  telefone: "",
   observacoes: "",
   ativo: true
 };
@@ -269,6 +277,8 @@ export function ControleVeiculosPage() {
     enviandoDocumentoVeiculo;
 
   const veiculoSelecionadoDiario = veiculos.find((item) => item.id === diarioForm.veiculoId) ?? null;
+  const veiculoSelecionadoListagem =
+    veiculos.find((item) => item.id === veiculoForm.id) ?? veiculos[0] ?? null;
 
   const kmRodadosFormulario = useMemo(
     () => calcularKmRodados(diarioForm.kmInicial, diarioForm.kmFinal),
@@ -339,7 +349,7 @@ export function ControleVeiculosPage() {
 
   async function salvar() {
     try {
-      if (abaAtiva === "dashboard") {
+      if (abaAtiva === "dashboard" || abaAtiva === "listagem") {
         setPopupMensagem({
           tipo: "aviso",
           titulo: "Atenção",
@@ -436,7 +446,20 @@ export function ControleVeiculosPage() {
           return;
         }
 
-        const response = await salvarLocalDestinoMutation.mutateAsync(localDestinoForm);
+        const telefoneLocalDestino = normalizarTelefone(localDestinoForm.telefone);
+        if (String(localDestinoForm.telefone ?? "").trim() && ![10, 11].includes(telefoneLocalDestino.length)) {
+          setPopupMensagem({
+            tipo: "aviso",
+            titulo: "Validação",
+            texto: "Informe um telefone com 10 ou 11 dígitos."
+          });
+          return;
+        }
+
+        const response = await salvarLocalDestinoMutation.mutateAsync({
+          ...localDestinoForm,
+          telefone: telefoneLocalDestino || undefined
+        });
         setLocalDestinoForm(response);
         setPopupMensagem({
           tipo: "sucesso",
@@ -500,6 +523,14 @@ export function ControleVeiculosPage() {
       setDocumentoVeiculoArquivo(null);
       return;
     }
+    if (abaAtiva === "listagem") {
+      setVeiculoForm(defaultVeiculo);
+      setFotoVeiculoArquivo(null);
+      setFotoVeiculoPreview("");
+      setDocumentoVeiculoArquivo(null);
+      setAbaAtiva("cadastro");
+      return;
+    }
     if (abaAtiva === "diario") {
       setDiarioForm(defaultDiario);
       return;
@@ -518,7 +549,7 @@ export function ControleVeiculosPage() {
 
   function excluir() {
     const possuiId =
-      (abaAtiva === "cadastro" && !!veiculoForm.id) ||
+      ((abaAtiva === "cadastro" || abaAtiva === "listagem") && !!veiculoForm.id) ||
       (abaAtiva === "diario" && !!diarioForm.id) ||
       (abaAtiva === "destinos" && !!localDestinoForm.id) ||
       (abaAtiva === "motoristas" && !!motoristaForm.id);
@@ -537,7 +568,7 @@ export function ControleVeiculosPage() {
 
   async function confirmarExclusao() {
     try {
-      if (abaAtiva === "cadastro" && veiculoForm.id) {
+      if ((abaAtiva === "cadastro" || abaAtiva === "listagem") && veiculoForm.id) {
         await removerVeiculoMutation.mutateAsync(veiculoForm.id);
         setVeiculoForm(defaultVeiculo);
         setFotoVeiculoArquivo(null);
@@ -574,91 +605,203 @@ export function ControleVeiculosPage() {
     }
   }
 
-  function imprimirMapaBordoCompleto() {
-    if (!diarioForm.veiculoId) {
-      setPopupMensagem({
-        tipo: "aviso",
-        titulo: "Atenção",
-        texto: "Selecione o veículo do mapa de bordo para imprimir as rotas."
-      });
-      return;
-    }
-
-    const veiculo = veiculos.find((item) => item.id === diarioForm.veiculoId);
-    const rotas = diarios.filter((item) => item.veiculoId === diarioForm.veiculoId);
-
-    if (!veiculo || !rotas.length) {
-      setPopupMensagem({
-        tipo: "aviso",
-        titulo: "Atenção",
-        texto: "Não há rotas registradas para o veículo selecionado."
-      });
-      return;
-    }
-
-    const totalKm = rotas.reduce(
-      (total, item) => total + (item.kmRodados ?? calcularKmRodados(item.kmInicial, item.kmFinal)),
-      0
-    );
-    const fotoVeiculo = veiculo.fotoFrente ? resolverUrlArquivo(veiculo.fotoFrente) : "";
-    const janela = window.open("", "_blank", "noopener,noreferrer,width=1200,height=900");
+  function imprimirDiarioBordoVeiculo() {
+    const veiculoSelecionado =
+      veiculos.find((item) => item.id === diarioForm.veiculoId) ??
+      veiculos.find((item) => item.id === veiculoForm.id) ??
+      null;
+    const janela = window.open("", "_blank", "noopener,noreferrer,width=1400,height=900");
 
     if (!janela) {
       setPopupMensagem({
         tipo: "erro",
         titulo: "Erro",
-        texto: "O navegador bloqueou a abertura da impressão do mapa de bordo."
+        texto: "O navegador bloqueou a abertura da impressão do diário de bordo."
       });
       return;
     }
 
-    const linhas = rotas
-      .map((item) => {
-        const kmRodados = item.kmRodados ?? calcularKmRodados(item.kmInicial, item.kmFinal);
-        return `
-          <tr>
-            <td>${escapeHtml(formatarDataPtBr(item.dataSaida || item.data))}</td>
-            <td>${escapeHtml(item.horarioSaida || "---")}</td>
-            <td>${escapeHtml(formatarDataPtBr(item.dataChegada || item.data))}</td>
-            <td>${escapeHtml(item.horarioChegada || "---")}</td>
-            <td>${escapeHtml(item.condutor || "---")}</td>
-            <td>${escapeHtml(item.localDestinoNome || item.destino || "---")}</td>
-            <td>${item.kmInicial ?? "---"}</td>
-            <td>${item.kmFinal ?? "---"}</td>
-            <td>${kmRodados}</td>
-          </tr>
-        `;
-      })
-      .join("");
+    const linhas = Array.from(
+      { length: 16 },
+      () => `
+        <tr>
+          <td>&nbsp;</td>
+          <td>&nbsp;</td>
+          <td>&nbsp;</td>
+          <td>&nbsp;</td>
+          <td>&nbsp;</td>
+          <td>&nbsp;</td>
+          <td>&nbsp;</td>
+        </tr>
+      `
+    ).join("");
+    const preencherCampo = (valor?: string | number | null) => {
+      const texto = String(valor ?? "").trim();
+      return texto ? escapeHtml(texto) : "&nbsp;";
+    };
+    const dataEmissao = formatarDataPtBr(new Date().toISOString().slice(0, 10));
+    const veiculoDescricao = veiculoSelecionado
+      ? `${veiculoSelecionado.placa ?? ""}${veiculoSelecionado.modelo ? ` - ${veiculoSelecionado.modelo}` : ""}`
+      : "";
 
     janela.document.write(`<!doctype html>
       <html lang="pt-BR">
-        <head><meta charset="utf-8" /><title>Mapa de bordo</title>
+        <head><meta charset="utf-8" /><title>Diário de bordo de veículo</title>
           <style>
-            body { font-family: Arial, sans-serif; margin: 24px; color: #0f172a; }
-            .cabecalho { display: flex; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
-            .foto { width: 220px; height: 140px; border: 1px solid #cbd5e1; border-radius: 12px; overflow: hidden; background: #f8fafc; display: flex; align-items: center; justify-content: center; }
-            .foto img { width: 100%; height: 100%; object-fit: cover; }
-            table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-            th, td { border: 1px solid #cbd5e1; padding: 8px 10px; text-align: left; font-size: 12px; }
-            th { background: #dcfce7; color: #14532d; }
-            .rodape { margin-top: 16px; font-size: 13px; font-weight: 700; color: #14532d; }
+            @page { size: A4 landscape; margin: 10mm; }
+            * { box-sizing: border-box; }
+            body { font-family: Arial, sans-serif; margin: 0; color: #0f172a; background: #fff; }
+            .folha { padding: 18px; }
+            .topo {
+              border: 1px solid #bbf7d0;
+              border-radius: 18px;
+              padding: 18px 20px;
+              background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 100%);
+              margin-bottom: 16px;
+            }
+            .marca {
+              font-size: 11px;
+              font-weight: 700;
+              letter-spacing: 0.18em;
+              text-transform: uppercase;
+              color: #166534;
+            }
+            h1 {
+              margin: 8px 0 6px;
+              font-size: 24px;
+              line-height: 1.1;
+              letter-spacing: 0.08em;
+              text-transform: uppercase;
+              color: #14532d;
+            }
+            .subtitulo { margin: 0; font-size: 12px; color: #475569; }
+            .meta-grid {
+              display: grid;
+              grid-template-columns: repeat(4, minmax(0, 1fr));
+              gap: 10px;
+              margin-top: 16px;
+            }
+            .meta-item {
+              min-height: 74px;
+              border: 1px solid #cbd5e1;
+              border-radius: 14px;
+              background: #fff;
+              padding: 10px 12px;
+            }
+            .meta-item strong {
+              display: block;
+              font-size: 11px;
+              text-transform: uppercase;
+              letter-spacing: 0.05em;
+              color: #166534;
+            }
+            .meta-linha {
+              display: block;
+              min-height: 20px;
+              margin-top: 14px;
+              border-bottom: 1px solid #0f172a;
+              font-size: 12px;
+            }
+            .tabela-wrap {
+              overflow: hidden;
+              border: 1px solid #cbd5e1;
+              border-radius: 18px;
+            }
+            table { width: 100%; border-collapse: collapse; }
+            th {
+              background: #166534;
+              color: #fff;
+              padding: 10px 8px;
+              border: 1px solid #166534;
+              font-size: 11px;
+              text-align: left;
+              text-transform: uppercase;
+              letter-spacing: 0.04em;
+            }
+            td {
+              height: 34px;
+              border: 1px solid #cbd5e1;
+              padding: 8px;
+              font-size: 12px;
+            }
+            .assinaturas {
+              display: grid;
+              grid-template-columns: repeat(2, minmax(0, 1fr));
+              gap: 24px;
+              margin-top: 24px;
+            }
+            .assinatura {
+              padding-top: 30px;
+              border-top: 1px solid #0f172a;
+              text-align: center;
+              font-size: 12px;
+            }
+            .rodape {
+              margin-top: 12px;
+              text-align: right;
+              font-size: 11px;
+              color: #64748b;
+            }
           </style>
         </head>
         <body>
-          <div class="cabecalho">
-            <div>
-              <h1>Mapa de bordo completo</h1>
-              <p><strong>Veículo:</strong> ${escapeHtml(`${veiculo.placa ?? "---"} - ${veiculo.modelo ?? "---"}`)}</p>
-              <p><strong>Marca:</strong> ${escapeHtml(veiculo.marca ?? "---")}</p>
-              <p><strong>Ano:</strong> ${veiculo.ano ?? "---"}</p>
-              <p><strong>Combustível:</strong> ${escapeHtml(veiculo.tipoCombustivel ?? "---")}</p>
+          <div class="folha">
+            <div class="topo">
+              <div class="marca">Sistema G3N</div>
+              <h1>DIÁRIO DE BORDO DE VEÍCULO</h1>
+              <p class="subtitulo">Relatório em branco para preenchimento manual e posterior lançamento no sistema.</p>
+              <div class="meta-grid">
+                <div class="meta-item">
+                  <strong>Veículo</strong>
+                  <span class="meta-linha">${preencherCampo(veiculoDescricao)}</span>
+                </div>
+                <div class="meta-item">
+                  <strong>Placa</strong>
+                  <span class="meta-linha">${preencherCampo(veiculoSelecionado?.placa)}</span>
+                </div>
+                <div class="meta-item">
+                  <strong>Marca / modelo</strong>
+                  <span class="meta-linha">${preencherCampo(
+                    veiculoSelecionado
+                      ? `${veiculoSelecionado.marca ?? ""}${veiculoSelecionado.modelo ? ` / ${veiculoSelecionado.modelo}` : ""}`
+                      : ""
+                  )}</span>
+                </div>
+                <div class="meta-item">
+                  <strong>Emitido em</strong>
+                  <span class="meta-linha">${preencherCampo(dataEmissao)}</span>
+                </div>
+              </div>
             </div>
-            <div class="foto">${fotoVeiculo ? `<img src="${fotoVeiculo}" alt="Foto do veículo" />` : "Sem foto"}</div>
+            <div class="tabela-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Data</th>
+                    <th>Condutor</th>
+                    <th>Horário de saída</th>
+                    <th>Km inicial</th>
+                    <th>Horário de chegada</th>
+                    <th>Km final</th>
+                    <th>Destino</th>
+                  </tr>
+                </thead>
+                <tbody>${linhas}</tbody>
+              </table>
+            </div>
+            <div class="assinaturas">
+              <div class="assinatura">Assinatura do condutor</div>
+              <div class="assinatura">Assinatura do responsável</div>
+            </div>
+            <p class="rodape">Documento gerado em ${escapeHtml(dataEmissao)}.</p>
           </div>
-          <table><thead><tr><th>Data de saída</th><th>Hora de saída</th><th>Data de chegada</th><th>Hora de chegada</th><th>Condutor</th><th>Destino</th><th>Km inicial</th><th>Km final</th><th>Km rodados</th></tr></thead><tbody>${linhas}</tbody></table>
-          <p class="rodape">Total rodado no período: ${totalKm} km</p>
-          <script>window.onload = () => window.print();</script>
+          <script>
+            window.onload = () => {
+              window.focus();
+              window.print();
+            };
+            window.onafterprint = () => window.close();
+          </script>
         </body>
       </html>`);
     janela.document.close();
@@ -666,7 +809,7 @@ export function ControleVeiculosPage() {
 
   function imprimir() {
     if (abaAtiva === "diario") {
-      imprimirMapaBordoCompleto();
+      imprimirDiarioBordoVeiculo();
       return;
     }
 
@@ -737,6 +880,21 @@ export function ControleVeiculosPage() {
     window.open(url, "_blank", "noopener,noreferrer");
   }
 
+  function abrirLocalDestinoNoGoogleMaps(endereco?: string | null) {
+    const enderecoInformado = String(endereco ?? "").trim();
+    if (!enderecoInformado) {
+      setPopupMensagem({
+        tipo: "aviso",
+        titulo: "Atenção",
+        texto: "Informe o endereço do destino para localizar no Google Maps."
+      });
+      return;
+    }
+
+    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(enderecoInformado)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
   const acoes: AdminAction[] = [
     {
       label: "Buscar",
@@ -755,6 +913,8 @@ export function ControleVeiculosPage() {
   const codeBadge =
     abaAtiva === "cadastro" && veiculoForm.placa
       ? `Placa: ${veiculoForm.placa}`
+      : abaAtiva === "listagem" && veiculoSelecionadoListagem?.placa
+        ? `Placa: ${veiculoSelecionadoListagem.placa}`
       : abaAtiva === "diario" && diarioForm.id
         ? `Mapa: ${diarioForm.id}`
         : abaAtiva === "destinos" && localDestinoForm.nome
@@ -768,7 +928,16 @@ export function ControleVeiculosPage() {
       <AdminPageLayout
         tabs={abas}
         activeTab={abaAtiva}
-        onChangeTab={(tabId) => setAbaAtiva(tabId as AbaId)}
+        onChangeTab={(tabId) => {
+          const proximaAba = tabId as AbaId;
+          if (proximaAba === "listagem" && !veiculoForm.id && veiculos[0]) {
+            setVeiculoForm(veiculos[0]);
+            setFotoVeiculoArquivo(null);
+            setFotoVeiculoPreview("");
+            setDocumentoVeiculoArquivo(null);
+          }
+          setAbaAtiva(proximaAba);
+        }}
         actions={acoes}
         sectionLabel="Setor administrativo"
         pageTitle={tituloTela}
@@ -796,40 +965,146 @@ export function ControleVeiculosPage() {
 
         {abaAtiva === "cadastro" ? (
           <section className="space-y-4">
-            <div className="grid gap-4 xl:grid-cols-[1.2fr_320px]">
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <div className="space-y-1"><Label>Placa *</Label><Input value={veiculoForm.placa ?? ""} onChange={(event) => setVeiculoForm((atual) => ({ ...atual, placa: event.target.value.toUpperCase() }))} /></div>
-                <div className="space-y-1"><Label>Modelo *</Label><Input value={veiculoForm.modelo ?? ""} onChange={(event) => setVeiculoForm((atual) => ({ ...atual, modelo: event.target.value }))} /></div>
-                <div className="space-y-1"><Label>Marca *</Label><Input value={veiculoForm.marca ?? ""} onChange={(event) => setVeiculoForm((atual) => ({ ...atual, marca: event.target.value }))} /></div>
-                <div className="space-y-1"><Label>Ano</Label><Input type="number" min={1900} max={2100} value={veiculoForm.ano ?? ""} onChange={(event) => setVeiculoForm((atual) => ({ ...atual, ano: Number(event.target.value) || null }))} /></div>
-                <div className="space-y-1"><Label>Combustível</Label><Select value={veiculoForm.tipoCombustivel ?? ""} onChange={(event) => setVeiculoForm((atual) => ({ ...atual, tipoCombustivel: event.target.value }))}><option value="">Selecione</option>{combustiveis.map((item) => <option key={item} value={item}>{item}</option>)}</Select></div>
-                <div className="space-y-1"><Label>Média de consumo (km/l)</Label><Input type="number" min={0} step="0.01" value={veiculoForm.mediaConsumoPadrao ?? ""} onChange={(event) => setVeiculoForm((atual) => ({ ...atual, mediaConsumoPadrao: Number(event.target.value) || null }))} /></div>
-                <div className="space-y-1"><Label>Capacidade do tanque (litros)</Label><Input type="number" min={0} step="0.01" value={veiculoForm.capacidadeTanqueLitros ?? ""} onChange={(event) => setVeiculoForm((atual) => ({ ...atual, capacidadeTanqueLitros: Number(event.target.value) || null }))} /></div>
-                <label className="inline-flex items-center gap-2 text-sm"><input type="checkbox" checked={!!veiculoForm.ativo} onChange={(event) => setVeiculoForm((atual) => ({ ...atual, ativo: event.target.checked }))} />Veículo ativo</label>
-                <div className="space-y-1 md:col-span-2 xl:col-span-4"><Label>Observações</Label><Textarea rows={3} value={veiculoForm.observacoes ?? ""} onChange={(event) => setVeiculoForm((atual) => ({ ...atual, observacoes: event.target.value }))} /></div>
-              </div>
-              <div className="space-y-3 rounded-lg border border-[var(--g3-border)] p-3">
-                <div className="space-y-1"><Label>Foto do veículo</Label><Input type="file" accept="image/*" onChange={(event) => selecionarFotoVeiculo(event.target.files?.[0] ?? null)} /></div>
-                <div className="overflow-hidden rounded-lg border border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/20">{fotoVeiculoPreview || veiculoForm.fotoFrente ? <img src={fotoVeiculoPreview || resolverUrlArquivo(veiculoForm.fotoFrente)} alt="Foto do veículo" className="h-56 w-full object-cover" /> : <div className="flex h-56 items-center justify-center text-sm text-[var(--g3-muted)]">Nenhuma foto selecionada.</div>}</div>
-                <div className="space-y-1"><Label>Documento do veículo (PDF)</Label><Input type="file" accept="application/pdf,.pdf" onChange={(event) => selecionarDocumentoVeiculo(event.target.files?.[0] ?? null)} /></div>
-                <div className="rounded-lg border border-dashed border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/15 p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium text-[var(--g3-active)]">{documentoVeiculoArquivo ? documentoVeiculoArquivo.name : obterNomeArquivo(veiculoForm.documentoVeiculoPdf) || "Nenhum PDF selecionado."}</p>
-                      <p className="text-xs text-[var(--g3-muted)]">Envie o documento do veículo em PDF com até 15 MB.</p>
-                    </div>
-                    <Button type="button" variant="outline" className="shrink-0" disabled={!veiculoForm.documentoVeiculoPdf} onClick={() => abrirDocumentoVeiculo(veiculoForm.documentoVeiculoPdf)}>Abrir PDF</Button>
-                  </div>
+            <Card className="border-[var(--g3-border)]">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base text-[var(--g3-active)]">Dados do veículo</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <div className="space-y-1"><Label>Placa *</Label><Input value={veiculoForm.placa ?? ""} onChange={(event) => setVeiculoForm((atual) => ({ ...atual, placa: event.target.value.toUpperCase() }))} /></div>
+                  <div className="space-y-1"><Label>Modelo *</Label><Input value={veiculoForm.modelo ?? ""} onChange={(event) => setVeiculoForm((atual) => ({ ...atual, modelo: event.target.value }))} /></div>
+                  <div className="space-y-1"><Label>Marca *</Label><Input value={veiculoForm.marca ?? ""} onChange={(event) => setVeiculoForm((atual) => ({ ...atual, marca: event.target.value }))} /></div>
+                  <div className="space-y-1"><Label>Ano</Label><Input type="number" min={1900} max={2100} value={veiculoForm.ano ?? ""} onChange={(event) => setVeiculoForm((atual) => ({ ...atual, ano: Number(event.target.value) || null }))} /></div>
+                  <div className="space-y-1"><Label>Combustível</Label><Select value={veiculoForm.tipoCombustivel ?? ""} onChange={(event) => setVeiculoForm((atual) => ({ ...atual, tipoCombustivel: event.target.value }))}><option value="">Selecione</option>{combustiveis.map((item) => <option key={item} value={item}>{item}</option>)}</Select></div>
+                  <div className="space-y-1"><Label>Média de consumo (km/l)</Label><Input type="number" min={0} step="0.01" value={veiculoForm.mediaConsumoPadrao ?? ""} onChange={(event) => setVeiculoForm((atual) => ({ ...atual, mediaConsumoPadrao: Number(event.target.value) || null }))} /></div>
+                  <div className="space-y-1"><Label>Capacidade do tanque (litros)</Label><Input type="number" min={0} step="0.01" value={veiculoForm.capacidadeTanqueLitros ?? ""} onChange={(event) => setVeiculoForm((atual) => ({ ...atual, capacidadeTanqueLitros: Number(event.target.value) || null }))} /></div>
+                  <label className="inline-flex items-center gap-2 pt-7 text-sm"><input type="checkbox" checked={!!veiculoForm.ativo} onChange={(event) => setVeiculoForm((atual) => ({ ...atual, ativo: event.target.checked }))} />Veículo ativo</label>
+                  <div className="space-y-1 md:col-span-2 xl:col-span-4"><Label>Observações</Label><Textarea rows={3} value={veiculoForm.observacoes ?? ""} onChange={(event) => setVeiculoForm((atual) => ({ ...atual, observacoes: event.target.value }))} /></div>
                 </div>
-                <p className="text-xs text-[var(--g3-muted)]">A foto e o documento são enviados no storage do sistema e vinculados ao cadastro do veículo.</p>
-              </div>
+              </CardContent>
+            </Card>
+            <div className="grid gap-4 xl:grid-cols-2">
+              <Card className="border-[var(--g3-border)]">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base text-[var(--g3-active)]">Foto do veículo</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="space-y-1"><Label>Arquivo de imagem</Label><Input type="file" accept="image/*" onChange={(event) => selecionarFotoVeiculo(event.target.files?.[0] ?? null)} /></div>
+                  <div className="overflow-hidden rounded-lg border border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/20">{fotoVeiculoPreview || veiculoForm.fotoFrente ? <img src={fotoVeiculoPreview || resolverUrlArquivo(veiculoForm.fotoFrente)} alt="Foto do veículo" className="h-56 w-full object-cover" /> : <div className="flex h-56 items-center justify-center text-sm text-[var(--g3-muted)]">Nenhuma foto selecionada.</div>}</div>
+                  <p className="text-xs text-[var(--g3-muted)]">A foto é enviada no storage do sistema e vinculada ao cadastro do veículo.</p>
+                </CardContent>
+              </Card>
+              <Card className="border-[var(--g3-border)]">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base text-[var(--g3-active)]">Documento do veículo</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="space-y-1"><Label>Arquivo PDF</Label><Input type="file" accept="application/pdf,.pdf" onChange={(event) => selecionarDocumentoVeiculo(event.target.files?.[0] ?? null)} /></div>
+                  <div className="rounded-lg border border-dashed border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/15 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-[var(--g3-active)]">{documentoVeiculoArquivo ? documentoVeiculoArquivo.name : obterNomeArquivo(veiculoForm.documentoVeiculoPdf) || "Nenhum PDF selecionado."}</p>
+                        <p className="text-xs text-[var(--g3-muted)]">Envie o documento do veículo em PDF com até 15 MB.</p>
+                      </div>
+                      <Button type="button" variant="outline" className="shrink-0" disabled={!veiculoForm.documentoVeiculoPdf} onClick={() => abrirDocumentoVeiculo(veiculoForm.documentoVeiculoPdf)}>Abrir PDF</Button>
+                    </div>
+                  </div>
+                  <div className="flex h-56 items-center justify-center rounded-lg border border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/20 px-4 text-center text-sm text-[var(--g3-muted)]">
+                    O documento em PDF fica disponível para consulta e vínculo direto no cadastro do veículo.
+                  </div>
+                </CardContent>
+              </Card>
             </div>
-            <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]">
-              <table className="min-w-full text-sm">
-                <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"><tr><th className="px-3 py-2 text-left">Foto</th><th className="px-3 py-2 text-left">Placa</th><th className="px-3 py-2 text-left">Modelo</th><th className="px-3 py-2 text-left">Marca</th><th className="px-3 py-2 text-left">Ano</th><th className="px-3 py-2 text-left">Status</th></tr></thead>
-                <tbody>{veiculos.length ? veiculos.map((item, index) => <tr key={item.id ?? `${item.placa}-${index}`} className={`cursor-pointer border-t border-[var(--g3-border)] ${index % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35"}`} onClick={() => { setVeiculoForm(item); setFotoVeiculoArquivo(null); setFotoVeiculoPreview(""); setDocumentoVeiculoArquivo(null); }}><td className="px-3 py-2">{item.fotoFrente ? <img src={resolverUrlArquivo(item.fotoFrente)} alt={item.placa ?? "Foto do veículo"} className="h-12 w-16 rounded object-cover" /> : "---"}</td><td className="px-3 py-2"><PlacaVeiculoVisual placa={item.placa} /></td><td className="px-3 py-2">{item.modelo ?? "---"}</td><td className="px-3 py-2">{item.marca ?? "---"}</td><td className="px-3 py-2">{item.ano ?? "---"}</td><td className="px-3 py-2">{item.ativo ? "Ativo" : "Inativo"}</td></tr>) : <tr><td className="px-3 py-4 text-center" colSpan={6}>Nenhum veículo cadastrado.</td></tr>}</tbody>
-              </table>
-            </div>
+          </section>
+        ) : null}
+
+        {abaAtiva === "listagem" ? (
+          <section className="space-y-4 xl:max-w-[1120px]">
+            {veiculos.length ? (
+              <>
+                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                  {veiculos.map((item, index) => {
+                    const selecionado = item.id === veiculoSelecionadoListagem?.id;
+                    return (
+                      <Button
+                        key={item.id ?? `${item.placa}-${index}`}
+                        type="button"
+                        variant={selecionado ? "default" : "outline"}
+                        className="h-auto min-h-[58px] justify-start rounded-lg px-3 py-2 text-left"
+                        onClick={() => {
+                          setVeiculoForm(item);
+                          setFotoVeiculoArquivo(null);
+                          setFotoVeiculoPreview("");
+                          setDocumentoVeiculoArquivo(null);
+                        }}
+                      >
+                        <span className="block leading-tight">
+                          <span className="block text-sm font-semibold">{item.placa || "Sem placa"}</span>
+                          <span className="block text-[11px] opacity-80">{item.modelo || "Sem modelo"}</span>
+                        </span>
+                      </Button>
+                    );
+                  })}
+                </div>
+                {veiculoSelecionadoListagem ? (
+                  <div className="grid gap-3 xl:grid-cols-[minmax(0,1.45fr)_290px]">
+                    <Card className="border-[var(--g3-border)]">
+                      <CardHeader className="px-4 pb-2 pt-4">
+                        <CardTitle className="flex flex-wrap items-center justify-between gap-2 text-sm text-[var(--g3-active)]">
+                          <span>Informações do veículo</span>
+                          <PlacaVeiculoVisual placa={veiculoSelecionadoListagem.placa} />
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3 px-4 pb-4">
+                        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                          <div className="rounded-lg border border-[var(--g3-border)] p-2.5"><p className="text-[11px] text-[var(--g3-muted)]">Tipo de placa</p><p className="mt-1 text-sm font-semibold text-[var(--g3-active)]">{veiculoSelecionadoListagem.placa?.length === 7 ? "Mercosul" : "Normal"}</p></div>
+                          <div className="rounded-lg border border-[var(--g3-border)] p-2.5"><p className="text-[11px] text-[var(--g3-muted)]">Modelo</p><p className="mt-1 text-sm font-semibold text-[var(--g3-active)]">{veiculoSelecionadoListagem.modelo || "---"}</p></div>
+                          <div className="rounded-lg border border-[var(--g3-border)] p-2.5"><p className="text-[11px] text-[var(--g3-muted)]">Marca</p><p className="mt-1 text-sm font-semibold text-[var(--g3-active)]">{veiculoSelecionadoListagem.marca || "---"}</p></div>
+                          <div className="rounded-lg border border-[var(--g3-border)] p-2.5"><p className="text-[11px] text-[var(--g3-muted)]">Ano</p><p className="mt-1 text-sm font-semibold text-[var(--g3-active)]">{veiculoSelecionadoListagem.ano || "---"}</p></div>
+                          <div className="rounded-lg border border-[var(--g3-border)] p-2.5"><p className="text-[11px] text-[var(--g3-muted)]">Combustível</p><p className="mt-1 text-sm font-semibold text-[var(--g3-active)]">{veiculoSelecionadoListagem.tipoCombustivel || "---"}</p></div>
+                          <div className="rounded-lg border border-[var(--g3-border)] p-2.5"><p className="text-[11px] text-[var(--g3-muted)]">Status</p><p className="mt-1 text-sm font-semibold text-[var(--g3-active)]">{veiculoSelecionadoListagem.ativo ? "Ativo" : "Inativo"}</p></div>
+                          <div className="rounded-lg border border-[var(--g3-border)] p-2.5"><p className="text-[11px] text-[var(--g3-muted)]">Média de consumo</p><p className="mt-1 text-sm font-semibold text-[var(--g3-active)]">{veiculoSelecionadoListagem.mediaConsumoPadrao ?? "---"} km/l</p></div>
+                          <div className="rounded-lg border border-[var(--g3-border)] p-2.5"><p className="text-[11px] text-[var(--g3-muted)]">Capacidade do tanque</p><p className="mt-1 text-sm font-semibold text-[var(--g3-active)]">{veiculoSelecionadoListagem.capacidadeTanqueLitros ?? "---"} litros</p></div>
+                          <div className="rounded-lg border border-[var(--g3-border)] p-2.5"><p className="text-[11px] text-[var(--g3-muted)]">Documento</p><p className="mt-1 truncate text-sm font-semibold text-[var(--g3-active)]">{obterNomeArquivo(veiculoSelecionadoListagem.documentoVeiculoPdf) || "---"}</p></div>
+                        </div>
+                        <div className="rounded-lg border border-[var(--g3-border)] p-2.5">
+                          <p className="text-[11px] text-[var(--g3-muted)]">Observações</p>
+                          <p className="mt-1.5 text-sm text-[var(--g3-active)]">{veiculoSelecionadoListagem.observacoes || "Nenhuma observação cadastrada."}</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <div className="grid gap-3">
+                      <Card className="border-[var(--g3-border)]">
+                        <CardHeader className="px-4 pb-2 pt-4">
+                          <CardTitle className="text-sm text-[var(--g3-active)]">Foto do veículo</CardTitle>
+                        </CardHeader>
+                        <CardContent className="px-4 pb-4">
+                          <div className="overflow-hidden rounded-lg border border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/20">{veiculoSelecionadoListagem.fotoFrente ? <img src={resolverUrlArquivo(veiculoSelecionadoListagem.fotoFrente)} alt={veiculoSelecionadoListagem.placa ?? "Foto do veículo"} className="h-48 w-full object-cover" /> : <div className="flex h-48 items-center justify-center px-4 text-center text-sm text-[var(--g3-muted)]">Nenhuma foto cadastrada.</div>}</div>
+                        </CardContent>
+                      </Card>
+                      <Card className="border-[var(--g3-border)]">
+                        <CardHeader className="px-4 pb-2 pt-4">
+                          <CardTitle className="text-sm text-[var(--g3-active)]">Documento do veículo</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3 px-4 pb-4">
+                          <div className="rounded-lg border border-dashed border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/15 p-2.5">
+                            <p className="truncate text-sm font-medium text-[var(--g3-active)]">{obterNomeArquivo(veiculoSelecionadoListagem.documentoVeiculoPdf) || "Nenhum PDF cadastrado."}</p>
+                            <p className="mt-1 text-[11px] text-[var(--g3-muted)]">Consulte o documento vinculado ao veículo selecionado.</p>
+                          </div>
+                          <Button type="button" variant="outline" className="h-9 w-full" disabled={!veiculoSelecionadoListagem.documentoVeiculoPdf} onClick={() => abrirDocumentoVeiculo(veiculoSelecionadoListagem.documentoVeiculoPdf)}>Abrir PDF</Button>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <Card className="border-[var(--g3-border)]">
+                <CardContent className="py-8 text-center text-sm text-[var(--g3-muted)]">
+                  Nenhum veículo cadastrado.
+                </CardContent>
+              </Card>
+            )}
           </section>
         ) : null}
         {abaAtiva === "diario" ? (
@@ -842,7 +1117,7 @@ export function ControleVeiculosPage() {
               <div className="space-y-1"><Label>Data de chegada</Label><Input placeholder="dd-mm-aaaa" value={diarioForm.dataChegada ?? ""} onChange={(event) => setDiarioForm((atual) => ({ ...atual, dataChegada: mascararDataHifen(event.target.value) }))} /></div>
               <div className="space-y-1"><Label>Hora de chegada</Label><Input type="time" value={diarioForm.horarioChegada ?? ""} onChange={(event) => setDiarioForm((atual) => ({ ...atual, horarioChegada: event.target.value }))} /></div>
               <div className="space-y-1"><Label>Condutor *</Label><Select value={diarioForm.condutor ?? ""} disabled={!diarioForm.veiculoId} onChange={(event) => setDiarioForm((atual) => ({ ...atual, condutor: event.target.value }))}><option value="">{diarioForm.veiculoId ? "Selecione" : "Escolha o veículo"}</option>{motoristasVeiculo.map((item) => <option key={item.id} value={item.nomeMotorista ?? ""}>{item.nomeMotorista}</option>)}</Select></div>
-              <div className="space-y-1"><Label>Destino *</Label><Select value={String(diarioForm.localDestinoId ?? "")} onChange={(event) => { const localDestinoId = Number(event.target.value) || null; const localSelecionado = locaisDestinoAtivos.find((item) => item.id === localDestinoId) ?? null; setDiarioForm((atual) => ({ ...atual, localDestinoId, destino: montarRotuloDestino(localSelecionado) })); }}><option value="">Selecione</option>{locaisDestinoAtivos.map((item) => <option key={item.id} value={item.id}>{montarRotuloDestino(item)}</option>)}</Select></div>
+              <div className="space-y-1 md:col-span-2 xl:col-span-4"><Label>Destino *</Label><Select value={String(diarioForm.localDestinoId ?? "")} onChange={(event) => { const localDestinoId = Number(event.target.value) || null; const localSelecionado = locaisDestinoAtivos.find((item) => item.id === localDestinoId) ?? null; setDiarioForm((atual) => ({ ...atual, localDestinoId, destino: montarRotuloDestino(localSelecionado) })); }}><option value="">Selecione</option>{locaisDestinoAtivos.map((item) => <option key={item.id} value={item.id}>{montarRotuloDestino(item)}</option>)}</Select></div>
               <div className="space-y-1"><Label>Km inicial</Label><Input type="number" min={0} value={diarioForm.kmInicial ?? ""} onChange={(event) => setDiarioForm((atual) => ({ ...atual, kmInicial: Number(event.target.value) || null }))} /></div>
               <div className="space-y-1"><Label>Km final</Label><Input type="number" min={0} value={diarioForm.kmFinal ?? ""} onChange={(event) => setDiarioForm((atual) => ({ ...atual, kmFinal: Number(event.target.value) || null }))} /></div>
               <div className="space-y-1"><Label>Km rodados</Label><Input value={kmRodadosFormulario ? String(kmRodadosFormulario) : "0"} readOnly /></div>
@@ -862,13 +1137,35 @@ export function ControleVeiculosPage() {
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <div className="space-y-1"><Label>Nome do local *</Label><Input value={localDestinoForm.nome ?? ""} onChange={(event) => setLocalDestinoForm((atual) => ({ ...atual, nome: event.target.value }))} /></div>
               <div className="space-y-1 xl:col-span-2"><Label>Endereço ou referência</Label><Input value={localDestinoForm.endereco ?? ""} onChange={(event) => setLocalDestinoForm((atual) => ({ ...atual, endereco: event.target.value }))} /></div>
+              <div className="space-y-1">
+                <Label>Telefone</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    placeholder="(00) 00000-0000"
+                    value={mascararTelefoneInput(localDestinoForm.telefone)}
+                    onChange={(event) => setLocalDestinoForm((atual) => ({ ...atual, telefone: event.target.value }))}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="shrink-0 px-3"
+                    title="Localizar no Google Maps"
+                    aria-label="Localizar no Google Maps"
+                    disabled={!String(localDestinoForm.endereco ?? "").trim()}
+                    onClick={() => abrirLocalDestinoNoGoogleMaps(localDestinoForm.endereco)}
+                  >
+                    <MapPinned className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
               <label className="inline-flex items-center gap-2 text-sm"><input type="checkbox" checked={localDestinoForm.ativo !== false} onChange={(event) => setLocalDestinoForm((atual) => ({ ...atual, ativo: event.target.checked }))} />Local ativo</label>
               <div className="space-y-1 md:col-span-2 xl:col-span-4"><Label>Observações</Label><Textarea rows={2} value={localDestinoForm.observacoes ?? ""} onChange={(event) => setLocalDestinoForm((atual) => ({ ...atual, observacoes: event.target.value }))} /></div>
             </div>
+            <p className="text-xs text-[var(--g3-muted)]">Clique em uma linha da lista para alterar ou excluir o destino selecionado.</p>
             <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]">
               <table className="min-w-full text-sm">
-                <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"><tr><th className="px-3 py-2 text-left">Local</th><th className="px-3 py-2 text-left">Endereço</th><th className="px-3 py-2 text-left">Status</th></tr></thead>
-                <tbody>{locaisDestino.length ? locaisDestino.map((item, index) => <tr key={item.id ?? `${item.nome}-${index}`} className={`cursor-pointer border-t border-[var(--g3-border)] ${index % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35"}`} onClick={() => setLocalDestinoForm(item)}><td className="px-3 py-2">{item.nome ?? "---"}</td><td className="px-3 py-2">{item.endereco ?? "---"}</td><td className="px-3 py-2">{item.ativo ? "Ativo" : "Inativo"}</td></tr>) : <tr><td className="px-3 py-4 text-center" colSpan={3}>Nenhum local de destino cadastrado.</td></tr>}</tbody>
+                <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"><tr><th className="px-3 py-2 text-left">Local</th><th className="px-3 py-2 text-left">Endereço</th><th className="px-3 py-2 text-left">Telefone</th><th className="px-3 py-2 text-left">Status</th><th className="px-3 py-2 text-left">Mapa</th></tr></thead>
+                <tbody>{locaisDestino.length ? locaisDestino.map((item, index) => <tr key={item.id ?? `${item.nome}-${index}`} className={`cursor-pointer border-t border-[var(--g3-border)] ${index % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35"}`} onClick={() => setLocalDestinoForm(item)}><td className="px-3 py-2">{item.nome ?? "---"}</td><td className="px-3 py-2">{item.endereco ?? "---"}</td><td className="px-3 py-2">{formatarTelefone(item.telefone) || "---"}</td><td className="px-3 py-2">{item.ativo ? "Ativo" : "Inativo"}</td><td className="px-3 py-2"><Button type="button" variant="outline" className="h-8 px-2" title="Abrir no Google Maps" aria-label="Abrir no Google Maps" disabled={!String(item.endereco ?? "").trim()} onClick={(event) => { event.stopPropagation(); abrirLocalDestinoNoGoogleMaps(item.endereco); }}><MapPinned className="h-4 w-4" /></Button></td></tr>) : <tr><td className="px-3 py-4 text-center" colSpan={5}>Nenhum local de destino cadastrado.</td></tr>}</tbody>
               </table>
             </div>
           </section>
