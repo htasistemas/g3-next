@@ -247,6 +247,7 @@ export function GestaoDocumentosPage() {
   const [popupMensagem, setPopupMensagem] = useState<PopupMensagemState | null>(null);
   const [confirmarExcluir, setConfirmarExcluir] = useState(false);
   const [historicoTexto, setHistoricoTexto] = useState("");
+  const [anexoPrincipalLocal, setAnexoPrincipalLocal] = useState<DocumentoInstituicaoAnexo | null>(null);
   const [anexoParaSubstituirId, setAnexoParaSubstituirId] = useState<string | null>(null);
   const [anexoProcessandoId, setAnexoProcessandoId] = useState<string | null>(null);
 
@@ -287,8 +288,9 @@ export function GestaoDocumentosPage() {
   }, [documentos]);
 
   const anexos = anexosQuery.data ?? [];
-  const anexoPrincipal = anexos[0] ?? null;
-  const anexosOcultos = Math.max(0, anexos.length - 1);
+  const anexoPrincipal = anexos[0] ?? anexoPrincipalLocal;
+  const anexosOcultos = Math.max(0, anexos.length > 0 ? anexos.length - 1 : 0);
+  const carregandoAnexo = Boolean(form.id) && (anexosQuery.isLoading || anexosQuery.isFetching) && !anexoPrincipal;
   const historico = historicoQuery.data ?? [];
 
   useEffect(() => {
@@ -308,9 +310,13 @@ export function GestaoDocumentosPage() {
         : {
             ...atual,
             responsavelInterno: responsavelLogado
-          }
+        }
     );
   }, [responsavelLogado]);
+
+  useEffect(() => {
+    setAnexoPrincipalLocal(null);
+  }, [form.id]);
 
   const tiposDocumentoOptions = useMemo(
     () => mesclarOpcaoAtual(tiposDocumentoTerceiroSetor, form.tipoDocumento),
@@ -461,7 +467,8 @@ export function GestaoDocumentosPage() {
           usuario: responsavelLogado || "Usuário"
         };
 
-        await anexoMutation.mutateAsync({ id: form.id, payload });
+        const anexo = await anexoMutation.mutateAsync({ id: form.id, payload });
+        setAnexoPrincipalLocal(anexo);
         setPopupMensagem({
           tipo: "sucesso",
           titulo: "Confirmação",
@@ -506,7 +513,8 @@ export function GestaoDocumentosPage() {
     };
 
     try {
-      await anexoMutation.mutateAsync({ id: form.id, payload });
+      const anexo = await anexoMutation.mutateAsync({ id: form.id, payload });
+      setAnexoPrincipalLocal(anexo);
       setPopupMensagem({
         tipo: "sucesso",
         titulo: "Confirmação",
@@ -546,7 +554,8 @@ export function GestaoDocumentosPage() {
           usuario: responsavelLogado || "Usuário"
         };
 
-        await substituirAnexoMutation.mutateAsync({ id: form.id, anexoId, payload });
+        const anexo = await substituirAnexoMutation.mutateAsync({ id: form.id, anexoId, payload });
+        setAnexoPrincipalLocal(anexo);
         setPopupMensagem({
           tipo: "sucesso",
           titulo: "Confirmação",
@@ -658,6 +667,7 @@ export function GestaoDocumentosPage() {
     setAnexoProcessandoId(item.id);
     try {
       await excluirAnexoMutation.mutateAsync({ id: form.id, anexoId: item.id });
+      setAnexoPrincipalLocal(null);
       setPopupMensagem({
         tipo: "sucesso",
         titulo: "Confirmação",
@@ -1019,6 +1029,10 @@ export function GestaoDocumentosPage() {
                   {!form.id ? (
                     <div className="rounded-md border border-dashed border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/20 p-4 text-sm text-[var(--g3-muted)]">
                       Salve o documento primeiro para habilitar o envio do PDF.
+                    </div>
+                  ) : carregandoAnexo ? (
+                    <div className="rounded-md border border-dashed border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/15 p-4 text-sm text-[var(--g3-muted)]">
+                      Carregando PDF enviado...
                     </div>
                   ) : anexoPrincipal ? (
                     <div className="space-y-3">
