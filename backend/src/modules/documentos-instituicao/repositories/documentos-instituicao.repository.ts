@@ -20,6 +20,11 @@ function calcularSituacao(input: DocumentoInstituicaoInput): DocumentoSituacao {
     return "sem_vencimento";
   }
 
+  const diasAlerta = Math.max(
+    0,
+    ...(input.diasAntecedencia ?? []).filter((item) => Number.isFinite(item) && item >= 0)
+  );
+
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
   const validade = new Date(`${input.validade}T00:00:00.000Z`);
@@ -28,7 +33,7 @@ function calcularSituacao(input: DocumentoInstituicaoInput): DocumentoSituacao {
   if (validade < hoje) return "vencido";
 
   const alerta = new Date(hoje);
-  alerta.setDate(alerta.getDate() + 30);
+  alerta.setDate(alerta.getDate() + (diasAlerta || 30));
   if (validade <= alerta) return "vence_em_breve";
 
   return "valido";
@@ -108,6 +113,7 @@ export class DocumentosInstituicaoRepository {
 
   async criar(input: DocumentoInstituicaoInput) {
     const situacao = calcularSituacao(input);
+    const diasAntecedencia = JSON.stringify(input.diasAntecedencia ?? []);
     const inserted = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
       INSERT INTO documentos_instituicao (
         tipo_documento,
@@ -139,7 +145,7 @@ export class DocumentosInstituicaoRepository {
         ${trimOrUndefined(input.modoRenovacao ?? undefined)},
         ${trimOrUndefined(input.observacaoRenovacao ?? undefined)},
         ${input.gerarAlerta ?? true},
-        ${JSON.stringify(input.diasAntecedencia ?? [])},
+        CAST(${diasAntecedencia} AS JSONB),
         ${trimOrUndefined(input.formaAlerta ?? undefined)},
         ${input.emRenovacao ?? false},
         ${input.semVencimento ?? false},
@@ -161,6 +167,7 @@ export class DocumentosInstituicaoRepository {
   async atualizar(id: bigint, input: DocumentoInstituicaoInput) {
     await this.buscarPorIdOuFalhar(id);
     const situacao = calcularSituacao(input);
+    const diasAntecedencia = JSON.stringify(input.diasAntecedencia ?? []);
 
     await prisma.$executeRaw(Prisma.sql`
       UPDATE documentos_instituicao
@@ -175,7 +182,7 @@ export class DocumentosInstituicaoRepository {
         modo_renovacao = ${trimOrUndefined(input.modoRenovacao ?? undefined)},
         observacao_renovacao = ${trimOrUndefined(input.observacaoRenovacao ?? undefined)},
         gerar_alerta = ${input.gerarAlerta ?? true},
-        dias_antecedencia = ${JSON.stringify(input.diasAntecedencia ?? [])},
+        dias_antecedencia = CAST(${diasAntecedencia} AS JSONB),
         forma_alerta = ${trimOrUndefined(input.formaAlerta ?? undefined)},
         em_renovacao = ${input.emRenovacao ?? false},
         sem_vencimento = ${input.semVencimento ?? false},

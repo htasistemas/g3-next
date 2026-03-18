@@ -1,8 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
   Bell,
+  CheckCircle2,
+  Clock3,
   Eye,
   FileStack,
   FolderOpen,
@@ -34,6 +36,7 @@ import {
   useSalvarDocumentoInstituicao
 } from "@/features/documentos-instituicao/use-documentos-instituicao";
 import { resolverUrlArquivo } from "@/lib/arquivos";
+import { formatarDataPtBr } from "@/lib/br-utils";
 import { imprimirConteudoAtual } from "@/lib/report-utils";
 import type {
   DocumentoInstituicao,
@@ -45,14 +48,66 @@ import { useAuth } from "@/hooks/use-auth";
 type AbaId = "lista" | "cadastro" | "anexos" | "alertas" | "relatorios";
 
 const abas: AdminTab[] = [
-  { id: "lista", label: "Lista De Documentos", icon: FolderOpen },
-  { id: "cadastro", label: "Cadastro / Edição", icon: FileStack },
-  { id: "anexos", label: "Anexos E Histórico", icon: History },
-  { id: "alertas", label: "Alertas E Vencimentos", icon: AlertTriangle },
-  { id: "relatorios", label: "Relatórios / Dashboard", icon: Bell }
+  { id: "lista", label: "Lista de documentos", icon: FolderOpen },
+  { id: "cadastro", label: "Cadastro e edição", icon: FileStack },
+  { id: "anexos", label: "Anexos e histórico", icon: History },
+  { id: "alertas", label: "Alertas e vencimentos", icon: AlertTriangle },
+  { id: "relatorios", label: "Relatórios e dashboard", icon: Bell }
 ];
 
 const tituloTela = "Gestão de documentos";
+
+const tiposDocumentoTerceiroSetor = [
+  "Estatuto social",
+  "Ata de fundação",
+  "Ata de eleição da diretoria",
+  "Ata de posse da diretoria",
+  "Regimento interno",
+  "Cartão do CNPJ",
+  "Comprovante de inscrição municipal",
+  "Comprovante de inscrição estadual",
+  "Alvará de funcionamento",
+  "AVCB ou CLCB",
+  "Licença sanitária",
+  "Licença ambiental",
+  "Certidão negativa federal",
+  "Certidão negativa estadual",
+  "Certidão negativa municipal",
+  "Certidão do FGTS",
+  "Certidão trabalhista",
+  "Balanço patrimonial",
+  "Demonstração do resultado",
+  "Plano de trabalho",
+  "Termo de fomento ou colaboração",
+  "Prestação de contas",
+  "Procuração",
+  "Apólice de seguro",
+  "Contrato de locação",
+  "Contrato de prestação de serviços",
+  "Certificado digital",
+  "Política de proteção de dados",
+  "Manual de compliance",
+  "Certificado de utilidade pública",
+  "Qualificação OSCIP",
+  "Certificado CEBAS"
+] as const;
+
+const categoriasDocumentoInstitucional = [
+  "Governança institucional",
+  "Jurídica",
+  "Fiscal e tributária",
+  "Contábil e financeira",
+  "Trabalhista e RH",
+  "Parcerias e convênios",
+  "Certidões e regularidade",
+  "Licenças e alvarás",
+  "Patrimonial e seguros",
+  "Compliance e políticas internas",
+  "Operacional",
+  "Prestação de contas"
+] as const;
+
+const formasAlertaOptions = ["Sistema", "E-mail", "WhatsApp", "Ambos"] as const;
 
 type FormState = DocumentoInstituicaoPayload & { id?: string };
 
@@ -60,7 +115,7 @@ const defaultForm: FormState = {
   tipoDocumento: "",
   orgaoEmissor: "",
   descricao: "",
-  categoria: "Fiscal",
+  categoria: "Fiscal e tributária",
   emissao: "",
   validade: "",
   responsavelInterno: "",
@@ -74,13 +129,92 @@ const defaultForm: FormState = {
   vencimentoIndeterminado: false
 };
 
+function criarFormularioPadrao(responsavelInterno = ""): FormState {
+  return {
+    ...defaultForm,
+    responsavelInterno
+  };
+}
+
+function obterNomeUsuarioLogado(
+  usuario?: ReturnType<typeof useAuth>["usuario"] | null
+) {
+  return usuario?.nome?.trim() || usuario?.nomeUsuario?.trim() || "";
+}
+
+function mesclarOpcaoAtual(opcoes: readonly string[], valorAtual?: string | null) {
+  const valor = String(valorAtual ?? "").trim();
+  if (!valor) return [...opcoes];
+  if (opcoes.some((item) => item.toLowerCase() === valor.toLowerCase())) {
+    return [...opcoes];
+  }
+  return [valor, ...opcoes];
+}
+
+function formatarSituacaoDocumento(situacao?: string | null) {
+  switch (situacao) {
+    case "vencido":
+      return "Vencido";
+    case "vence_em_breve":
+      return "Vence em breve";
+    case "em_renovacao":
+      return "Em renovação";
+    case "sem_vencimento":
+      return "Sem vencimento";
+    case "valido":
+      return "Válido";
+    default:
+      return "---";
+  }
+}
+
+function obterClasseLinhaDocumento(situacao?: string | null, indice = 0) {
+  if (situacao === "vencido") {
+    return "bg-red-100";
+  }
+  if (situacao === "vence_em_breve") {
+    return "bg-amber-100";
+  }
+  return indice % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35";
+}
+
+function obterClasseSeloSituacao(situacao?: string | null) {
+  if (situacao === "vencido") {
+    return "bg-red-200 text-red-900";
+  }
+  if (situacao === "vence_em_breve") {
+    return "bg-amber-200 text-amber-900";
+  }
+  if (situacao === "valido") {
+    return "bg-emerald-100 text-emerald-800";
+  }
+  if (situacao === "em_renovacao") {
+    return "bg-sky-100 text-sky-800";
+  }
+  return "bg-slate-100 text-slate-700";
+}
+
+function IconeSituacaoDocumento({ situacao }: { situacao?: string | null }) {
+  if (situacao === "vencido") {
+    return <AlertTriangle className="h-4 w-4" />;
+  }
+  if (situacao === "vence_em_breve") {
+    return <Clock3 className="h-4 w-4" />;
+  }
+  if (situacao === "valido") {
+    return <CheckCircle2 className="h-4 w-4" />;
+  }
+  return null;
+}
+
 export function GestaoDocumentosPage() {
   const navigate = useNavigate();
   const { usuario } = useAuth();
+  const responsavelLogado = useMemo(() => obterNomeUsuarioLogado(usuario), [usuario]);
   const [abaAtiva, setAbaAtiva] = useState<AbaId>("lista");
   const [busca, setBusca] = useState("");
-  const [form, setForm] = useState<FormState>(defaultForm);
-  const [snapshot, setSnapshot] = useState<FormState>(defaultForm);
+  const [form, setForm] = useState<FormState>(() => criarFormularioPadrao(responsavelLogado));
+  const [snapshot, setSnapshot] = useState<FormState>(() => criarFormularioPadrao(responsavelLogado));
   const [popupMensagem, setPopupMensagem] = useState<PopupMensagemState | null>(null);
   const [confirmarExcluir, setConfirmarExcluir] = useState(false);
   const [historicoTexto, setHistoricoTexto] = useState("");
@@ -122,6 +256,36 @@ export function GestaoDocumentosPage() {
   const anexos = anexosQuery.data ?? [];
   const historico = historicoQuery.data ?? [];
 
+  useEffect(() => {
+    if (!responsavelLogado) return;
+
+    setForm((atual) =>
+      atual.responsavelInterno?.trim()
+        ? atual
+        : {
+            ...atual,
+            responsavelInterno: responsavelLogado
+          }
+    );
+    setSnapshot((atual) =>
+      atual.responsavelInterno?.trim()
+        ? atual
+        : {
+            ...atual,
+            responsavelInterno: responsavelLogado
+          }
+    );
+  }, [responsavelLogado]);
+
+  const tiposDocumentoOptions = useMemo(
+    () => mesclarOpcaoAtual(tiposDocumentoTerceiroSetor, form.tipoDocumento),
+    [form.tipoDocumento]
+  );
+  const categoriasDocumentoOptions = useMemo(
+    () => mesclarOpcaoAtual(categoriasDocumentoInstitucional, form.categoria),
+    [form.categoria]
+  );
+
   const carregandoAcoes =
     salvarMutation.isPending ||
     excluirMutation.isPending ||
@@ -129,8 +293,9 @@ export function GestaoDocumentosPage() {
     historicoMutation.isPending;
 
   function novo() {
-    setForm(defaultForm);
-    setSnapshot(defaultForm);
+    const proximo = criarFormularioPadrao(responsavelLogado);
+    setForm(proximo);
+    setSnapshot(proximo);
     setHistoricoTexto("");
     setAbaAtiva("cadastro");
   }
@@ -144,7 +309,7 @@ export function GestaoDocumentosPage() {
       categoria: item.categoria ?? "",
       emissao: item.emissao ?? "",
       validade: item.validade ?? "",
-      responsavelInterno: item.responsavelInterno ?? "",
+      responsavelInterno: responsavelLogado || item.responsavelInterno || "",
       modoRenovacao: item.modoRenovacao ?? "Manual",
       observacaoRenovacao: item.observacaoRenovacao ?? "",
       gerarAlerta: !!item.gerarAlerta,
@@ -184,7 +349,7 @@ export function GestaoDocumentosPage() {
         descricao: form.descricao?.trim() || undefined,
         categoria: form.categoria?.trim() || undefined,
         validade: form.semVencimento ? undefined : form.validade || undefined,
-        responsavelInterno: form.responsavelInterno?.trim() || undefined,
+        responsavelInterno: form.responsavelInterno?.trim() || responsavelLogado || undefined,
         modoRenovacao: form.modoRenovacao?.trim() || undefined,
         observacaoRenovacao: form.observacaoRenovacao?.trim() || undefined,
         formaAlerta: form.formaAlerta?.trim() || undefined
@@ -262,7 +427,7 @@ export function GestaoDocumentosPage() {
       conteudoBase64,
       tamanho: `${Math.round(file.size / 1024)} KB`,
       dataUpload: new Date().toISOString().slice(0, 10),
-      usuario: usuario?.nomeUsuario ?? "Usuário"
+      usuario: responsavelLogado || "Usuário"
     };
 
     try {
@@ -303,7 +468,7 @@ export function GestaoDocumentosPage() {
       await historicoMutation.mutateAsync({
         id: form.id,
         payload: {
-          usuario: usuario?.nomeUsuario ?? "Usuário",
+          usuario: responsavelLogado || "Usuário",
           tipoAlteracao: "Atualização",
           observacao: historicoTexto.trim(),
           dataHora: new Date().toISOString()
@@ -359,13 +524,13 @@ export function GestaoDocumentosPage() {
         actions={acoes}
         sectionLabel="Setor administrativo"
         pageTitle={tituloTela}
-        activeTitle={abaAtiva === "lista" ? "Listagem" : abas.find((item) => item.id === abaAtiva)?.label}
+        activeTitle={abaAtiva === "lista" ? "Lista de documentos" : abas.find((item) => item.id === abaAtiva)?.label}
         codeBadge={form.id ? `Código: ${form.id}` : "Novo"}
       >
         {abaAtiva === "lista" ? (
           <section className="space-y-3">
             <div className="space-y-1">
-              <Label>Buscar Documento</Label>
+              <Label>Buscar documento</Label>
               <Input
                 placeholder="Tipo, órgão emissor, categoria ou situação"
                 value={busca}
@@ -378,17 +543,16 @@ export function GestaoDocumentosPage() {
                 <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]">
                   <tr>
                     <th className="px-3 py-2 text-left">Tipo</th>
-                    <th className="px-3 py-2 text-left">órgão Emissor</th>
+                    <th className="px-3 py-2 text-left">Órgão emissor</th>
                     <th className="px-3 py-2 text-left">Emissão</th>
                     <th className="px-3 py-2 text-left">Validade</th>
                     <th className="px-3 py-2 text-left">Situação</th>
-                    <th className="px-3 py-2 text-right">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
                   {isLoading ? (
                     <tr>
-                      <td colSpan={6} className="px-3 py-4 text-center">
+                      <td colSpan={5} className="px-3 py-4 text-center">
                         Carregando documentos...
                       </td>
                     </tr>
@@ -396,25 +560,24 @@ export function GestaoDocumentosPage() {
                     documentosFiltrados.map((item, index) => (
                       <tr
                         key={item.id}
-                        className={`border-t border-[var(--g3-border)] ${
-                          index % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35"
-                        }`}
+                        className={`cursor-pointer border-t border-[var(--g3-border)] transition-colors hover:bg-[var(--g3-primary-soft)]/45 ${form.id === item.id ? "ring-1 ring-inset ring-[var(--g3-active)]" : ""} ${obterClasseLinhaDocumento(item.situacao, index)}`}
+                        onClick={() => selecionar(item)}
                       >
                         <td className="px-3 py-2 font-medium">{item.tipoDocumento}</td>
                         <td className="px-3 py-2">{item.orgaoEmissor}</td>
-                        <td className="px-3 py-2">{item.emissao ?? "---"}</td>
-                        <td className="px-3 py-2">{item.validade ?? "---"}</td>
-                        <td className="px-3 py-2">{item.situacao ?? "---"}</td>
-                        <td className="px-3 py-2 text-right">
-                          <Button variant="outline" size="sm" onClick={() => selecionar(item)}>
-                            Selecionar
-                          </Button>
+                        <td className="px-3 py-2">{item.emissao ? formatarDataPtBr(item.emissao) : "---"}</td>
+                        <td className="px-3 py-2">{item.validade ? formatarDataPtBr(item.validade) : "---"}</td>
+                        <td className="px-3 py-2">
+                          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${obterClasseSeloSituacao(item.situacao)}`}>
+                            <IconeSituacaoDocumento situacao={item.situacao} />
+                            {formatarSituacaoDocumento(item.situacao)}
+                          </span>
                         </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={6} className="px-3 py-4 text-center">
+                      <td colSpan={5} className="px-3 py-4 text-center">
                         Nenhum documento encontrado.
                       </td>
                     </tr>
@@ -428,16 +591,23 @@ export function GestaoDocumentosPage() {
         {abaAtiva === "cadastro" ? (
           <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <div className="space-y-1">
-              <Label>Tipo De Documento *</Label>
-              <Input
+              <Label>Tipo de documento *</Label>
+              <Select
                 value={form.tipoDocumento}
                 onChange={(event) =>
                   setForm((atual) => ({ ...atual, tipoDocumento: event.target.value }))
                 }
-              />
+              >
+                <option value="">Selecione</option>
+                {tiposDocumentoOptions.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </Select>
             </div>
             <div className="space-y-1">
-              <Label>órgão Emissor *</Label>
+              <Label>Órgão emissor *</Label>
               <Input
                 value={form.orgaoEmissor}
                 onChange={(event) =>
@@ -447,22 +617,28 @@ export function GestaoDocumentosPage() {
             </div>
             <div className="space-y-1">
               <Label>Categoria</Label>
-              <Input
+              <Select
                 value={form.categoria ?? ""}
                 onChange={(event) => setForm((atual) => ({ ...atual, categoria: event.target.value }))}
-              />
+              >
+                <option value="">Selecione</option>
+                {categoriasDocumentoOptions.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </Select>
             </div>
             <div className="space-y-1">
-              <Label>Responsável Interno</Label>
+              <Label>Responsável interno</Label>
               <Input
-                value={form.responsavelInterno ?? ""}
-                onChange={(event) =>
-                  setForm((atual) => ({ ...atual, responsavelInterno: event.target.value }))
-                }
+                value={form.responsavelInterno ?? responsavelLogado}
+                readOnly
+                className="bg-[var(--g3-primary-soft)]/20"
               />
             </div>
             <div className="space-y-1">
-              <Label>Data De Emissão *</Label>
+              <Label>Data de emissão *</Label>
               <Input
                 type="date"
                 value={form.emissao}
@@ -479,7 +655,7 @@ export function GestaoDocumentosPage() {
               />
             </div>
             <div className="space-y-1">
-              <Label>Modo De Renovação</Label>
+              <Label>Modo de renovação</Label>
               <Select
                 value={form.modoRenovacao ?? "Manual"}
                 onChange={(event) =>
@@ -491,16 +667,18 @@ export function GestaoDocumentosPage() {
               </Select>
             </div>
             <div className="space-y-1">
-              <Label>Forma De Alerta</Label>
+              <Label>Forma de alerta</Label>
               <Select
                 value={form.formaAlerta ?? "Sistema"}
                 onChange={(event) =>
                   setForm((atual) => ({ ...atual, formaAlerta: event.target.value }))
                 }
               >
-                <option value="Sistema">Sistema</option>
-                <option value="E-mail">E-mail</option>
-                <option value="WhatsApp">WhatsApp</option>
+                {formasAlertaOptions.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
               </Select>
             </div>
             <label className="inline-flex items-center gap-2 text-sm md:col-span-2">
@@ -511,7 +689,7 @@ export function GestaoDocumentosPage() {
                   setForm((atual) => ({ ...atual, gerarAlerta: event.target.checked }))
                 }
               />
-              Gerar Alerta
+              Gerar alerta
             </label>
             <label className="inline-flex items-center gap-2 text-sm">
               <input
@@ -525,7 +703,7 @@ export function GestaoDocumentosPage() {
                   }))
                 }
               />
-              Sem Vencimento
+              Sem vencimento
             </label>
             <label className="inline-flex items-center gap-2 text-sm">
               <input
@@ -535,7 +713,7 @@ export function GestaoDocumentosPage() {
                   setForm((atual) => ({ ...atual, emRenovacao: event.target.checked }))
                 }
               />
-              Em Renovação
+              Em renovação
             </label>
             <div className="space-y-1 md:col-span-2 xl:col-span-4">
               <Label>Descrição</Label>
@@ -546,7 +724,7 @@ export function GestaoDocumentosPage() {
               />
             </div>
             <div className="space-y-1 md:col-span-2 xl:col-span-4">
-              <Label>Observação De Renovação</Label>
+              <Label>Observação de renovação</Label>
               <Textarea
                 rows={2}
                 value={form.observacaoRenovacao ?? ""}
@@ -670,7 +848,7 @@ export function GestaoDocumentosPage() {
                   <tr>
                     <th className="px-3 py-2 text-left">Documento</th>
                     <th className="px-3 py-2 text-left">Validade</th>
-                    <th className="px-3 py-2 text-left">Dias Para Vencer</th>
+                    <th className="px-3 py-2 text-left">Dias para vencer</th>
                     <th className="px-3 py-2 text-left">Situação</th>
                   </tr>
                 </thead>
@@ -679,14 +857,17 @@ export function GestaoDocumentosPage() {
                     alertas.map((item, index) => (
                       <tr
                         key={item.id}
-                        className={`border-t border-[var(--g3-border)] ${
-                          index % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35"
-                        }`}
+                        className={`border-t border-[var(--g3-border)] ${obterClasseLinhaDocumento(item.situacao, index)}`}
                       >
                         <td className="px-3 py-2 font-medium">{item.tipoDocumento}</td>
-                        <td className="px-3 py-2">{item.validade ?? "---"}</td>
+                        <td className="px-3 py-2">{item.validade ? formatarDataPtBr(item.validade) : "---"}</td>
                         <td className="px-3 py-2">{item.diasParaVencer}</td>
-                        <td className="px-3 py-2">{item.situacao ?? "---"}</td>
+                        <td className="px-3 py-2">
+                          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${obterClasseSeloSituacao(item.situacao)}`}>
+                            <IconeSituacaoDocumento situacao={item.situacao} />
+                            {formatarSituacaoDocumento(item.situacao)}
+                          </span>
+                        </td>
                       </tr>
                     ))
                   ) : (
@@ -706,7 +887,7 @@ export function GestaoDocumentosPage() {
           <section className="grid gap-3 md:grid-cols-3">
             <Card className="border-[var(--g3-border)]">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Total De Documentos</CardTitle>
+                <CardTitle className="text-sm">Total de documentos</CardTitle>
               </CardHeader>
               <CardContent className="text-3xl font-semibold text-[var(--g3-active)]">
                 {documentos.length}
@@ -714,7 +895,7 @@ export function GestaoDocumentosPage() {
             </Card>
             <Card className="border-[var(--g3-border)]">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Em Renovação</CardTitle>
+                <CardTitle className="text-sm">Em renovação</CardTitle>
               </CardHeader>
               <CardContent className="text-3xl font-semibold text-amber-600">
                 {documentos.filter((item) => item.emRenovacao).length}

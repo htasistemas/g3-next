@@ -1087,7 +1087,7 @@ export function ControleVeiculosPage() {
                   })}
                 </div>
                 {veiculoSelecionadoListagem ? (
-                  <div className="grid gap-3 2xl:grid-cols-[minmax(0,1.52fr)_minmax(0,268px)]">
+                  <div className="space-y-3">
                     <Card className="min-w-0 border-[var(--g3-border)]">
                       <CardHeader className="px-4 pb-2 pt-4">
                         <CardTitle className="flex flex-wrap items-center justify-between gap-2 text-sm text-[var(--g3-active)]">
@@ -1120,13 +1120,13 @@ export function ControleVeiculosPage() {
                         </div>
                       </CardContent>
                     </Card>
-                    <div className="grid min-w-0 gap-3">
+                    <div className="grid min-w-0 gap-3 lg:grid-cols-2">
                       <Card className="min-w-0 border-[var(--g3-border)]">
                         <CardHeader className="px-4 pb-2 pt-4">
                           <CardTitle className="text-sm text-[var(--g3-active)]">Foto do veículo</CardTitle>
                         </CardHeader>
                         <CardContent className="px-4 pb-4">
-                          <div className="overflow-hidden rounded-lg border border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/20">{veiculoSelecionadoListagem.fotoFrente ? <img src={resolverUrlArquivo(veiculoSelecionadoListagem.fotoFrente)} alt={veiculoSelecionadoListagem.placa ?? "Foto do veículo"} className="h-40 w-full object-cover xl:h-44" /> : <div className="flex h-40 items-center justify-center px-4 text-center text-sm text-[var(--g3-muted)] xl:h-44">Nenhuma foto cadastrada.</div>}</div>
+                          <div className="overflow-hidden rounded-lg border border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/20">{veiculoSelecionadoListagem.fotoFrente ? <img src={resolverUrlArquivo(veiculoSelecionadoListagem.fotoFrente)} alt={veiculoSelecionadoListagem.placa ?? "Foto do veículo"} className="h-36 w-full object-cover sm:h-40" /> : <div className="flex h-36 items-center justify-center px-4 text-center text-sm text-[var(--g3-muted)] sm:h-40">Nenhuma foto cadastrada.</div>}</div>
                         </CardContent>
                       </Card>
                       <Card className="min-w-0 border-[var(--g3-border)]">
