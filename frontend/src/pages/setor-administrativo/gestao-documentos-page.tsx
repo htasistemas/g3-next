@@ -33,13 +33,15 @@ import {
   useDocumentosInstituicao,
   useExcluirDocumentoInstituicao,
   useHistoricoDocumentoInstituicao,
-  useSalvarDocumentoInstituicao
+  useSalvarDocumentoInstituicao,
+  useSubstituirAnexoDocumentoInstituicao
 } from "@/features/documentos-instituicao/use-documentos-instituicao";
-import { resolverUrlArquivo } from "@/lib/arquivos";
+import { abrirArquivoAutenticado, imprimirArquivoAutenticado } from "@/lib/arquivos";
 import { formatarDataPtBr } from "@/lib/br-utils";
 import { imprimirConteudoAtual } from "@/lib/report-utils";
 import type {
   DocumentoInstituicao,
+  DocumentoInstituicaoAnexo,
   DocumentoInstituicaoAnexoPayload,
   DocumentoInstituicaoPayload
 } from "@/types/documentos-instituicao";
@@ -151,6 +153,27 @@ function mesclarOpcaoAtual(opcoes: readonly string[], valorAtual?: string | null
   return [valor, ...opcoes];
 }
 
+function obterTipoAnexoArquivo(file: File) {
+  const nome = file.name.trim().toLowerCase();
+  const indiceExtensao = nome.lastIndexOf(".");
+  if (indiceExtensao >= 0 && indiceExtensao < nome.length - 1) {
+    return nome.slice(indiceExtensao + 1).toUpperCase().slice(0, 30);
+  }
+
+  const mime = file.type.trim().toLowerCase();
+  if (!mime) return "ARQUIVO";
+
+  const tipoCurto = mime.includes("/") ? mime.split("/").at(-1) ?? mime : mime;
+  const valor = tipoCurto
+    .replace(/[\s._/-]+/g, " ")
+    .replace(/[^a-z0-9 ]+/g, "")
+    .trim()
+    .toUpperCase()
+    .slice(0, 30);
+
+  return valor || "ARQUIVO";
+}
+
 function formatarSituacaoDocumento(situacao?: string | null) {
   switch (situacao) {
     case "vencido":
@@ -218,6 +241,8 @@ export function GestaoDocumentosPage() {
   const [popupMensagem, setPopupMensagem] = useState<PopupMensagemState | null>(null);
   const [confirmarExcluir, setConfirmarExcluir] = useState(false);
   const [historicoTexto, setHistoricoTexto] = useState("");
+  const [anexoParaSubstituirId, setAnexoParaSubstituirId] = useState<string | null>(null);
+  const [anexoProcessandoId, setAnexoProcessandoId] = useState<string | null>(null);
 
   const { data, isLoading } = useDocumentosInstituicao();
   const anexosQuery = useAnexosDocumentoInstituicao(form.id);
@@ -225,6 +250,7 @@ export function GestaoDocumentosPage() {
   const salvarMutation = useSalvarDocumentoInstituicao();
   const excluirMutation = useExcluirDocumentoInstituicao();
   const anexoMutation = useAdicionarAnexoDocumentoInstituicao();
+  const substituirAnexoMutation = useSubstituirAnexoDocumentoInstituicao();
   const historicoMutation = useAdicionarHistoricoDocumentoInstituicao();
 
   const documentos = data ?? [];
@@ -290,6 +316,7 @@ export function GestaoDocumentosPage() {
     salvarMutation.isPending ||
     excluirMutation.isPending ||
     anexoMutation.isPending ||
+    substituirAnexoMutation.isPending ||
     historicoMutation.isPending;
 
   function novo() {
@@ -422,7 +449,7 @@ export function GestaoDocumentosPage() {
 
     const payload: DocumentoInstituicaoAnexoPayload = {
       nomeArquivo: file.name,
-      tipo: file.type || "arquivo",
+      tipo: obterTipoAnexoArquivo(file),
       tipoMime: file.type || "application/octet-stream",
       conteudoBase64,
       tamanho: `${Math.round(file.size / 1024)} KB`,
@@ -444,6 +471,87 @@ export function GestaoDocumentosPage() {
         texto: error?.response?.data?.message ?? "Não foi possível enviar o anexo."
       });
     }
+  }
+
+  async function substituirAnexoExistente(anexoId: string, file: File) {
+    if (!form.id) {
+      setPopupMensagem({
+        tipo: "aviso",
+        titulo: "AtenÃ§Ã£o",
+        texto: "Selecione um documento antes de substituir o anexo."
+      });
+      return;
+    }
+
+    const conteudoBase64 = await file.arrayBuffer().then((buffer) => {
+      const bytes = new Uint8Array(buffer);
+      let binary = "";
+      bytes.forEach((byte) => {
+        binary += String.fromCharCode(byte);
+      });
+      return btoa(binary);
+    });
+
+    const payload: DocumentoInstituicaoAnexoPayload = {
+      nomeArquivo: file.name,
+      tipo: obterTipoAnexoArquivo(file),
+      tipoMime: file.type || "application/octet-stream",
+      conteudoBase64,
+      tamanho: `${Math.round(file.size / 1024)} KB`,
+      dataUpload: new Date().toISOString().slice(0, 10),
+      usuario: responsavelLogado || "UsuÃ¡rio"
+    };
+
+    setAnexoProcessandoId(anexoId);
+    try {
+      await substituirAnexoMutation.mutateAsync({ id: form.id, anexoId, payload });
+      setPopupMensagem({
+        tipo: "sucesso",
+        titulo: "ConfirmaÃ§Ã£o",
+        texto: "Anexo substituÃ­do com sucesso."
+      });
+    } catch (error: any) {
+      setPopupMensagem({
+        tipo: "erro",
+        titulo: "Erro",
+        texto: error?.response?.data?.message ?? "NÃ£o foi possÃ­vel substituir o anexo."
+      });
+    } finally {
+      setAnexoProcessandoId(null);
+      setAnexoParaSubstituirId(null);
+    }
+  }
+
+  async function abrirAnexo(item: DocumentoInstituicaoAnexo) {
+    try {
+      await abrirArquivoAutenticado(item.arquivoUrl, item.nomeArquivo);
+    } catch (error: any) {
+      setPopupMensagem({
+        tipo: "erro",
+        titulo: "Erro",
+        texto: error?.message ?? "NÃ£o foi possÃ­vel visualizar o anexo."
+      });
+    }
+  }
+
+  async function imprimirAnexo(item: DocumentoInstituicaoAnexo) {
+    setAnexoProcessandoId(item.id);
+    try {
+      await imprimirArquivoAutenticado(item.arquivoUrl, item.nomeArquivo);
+    } catch (error: any) {
+      setPopupMensagem({
+        tipo: "erro",
+        titulo: "Erro",
+        texto: error?.message ?? "NÃ£o foi possÃ­vel imprimir o anexo."
+      });
+    } finally {
+      setAnexoProcessandoId(null);
+    }
+  }
+
+  function solicitarSubstituicaoAnexo(anexoId: string) {
+    setAnexoParaSubstituirId(anexoId);
+    document.getElementById("arquivoDocumentoSubstituicao")?.click();
   }
 
   async function adicionarHistorico() {
@@ -751,6 +859,21 @@ export function GestaoDocumentosPage() {
                   event.target.value = "";
                 }}
               />
+              <input
+                id="arquivoDocumentoSubstituicao"
+                type="file"
+                className="hidden"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  const anexoId = anexoParaSubstituirId;
+                  if (file && anexoId) {
+                    void substituirAnexoExistente(anexoId, file);
+                  } else {
+                    setAnexoParaSubstituirId(null);
+                  }
+                  event.target.value = "";
+                }}
+              />
               <Button
                 variant="outline"
                 onClick={() => document.getElementById("arquivoDocumento")?.click()}
@@ -781,15 +904,35 @@ export function GestaoDocumentosPage() {
                           {item.tipoMime ?? item.tipo} - {item.tamanho ?? "---"}
                         </p>
                         {item.arquivoUrl ? (
-                          <div className="mt-2">
+                          <div className="mt-2 flex flex-wrap gap-2">
                             <Button
                               type="button"
                               variant="outline"
                               size="sm"
-                              onClick={() => window.open(resolverUrlArquivo(item.arquivoUrl), "_blank", "noopener")}
+                              onClick={() => void abrirAnexo(item)}
                             >
                               <Eye className="mr-1.5 h-3.5 w-3.5" />
-                              Abrir anexo
+                              Visualizar
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => void imprimirAnexo(item)}
+                              disabled={anexoProcessandoId === item.id}
+                            >
+                              <Printer className="mr-1.5 h-3.5 w-3.5" />
+                              Imprimir
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => solicitarSubstituicaoAnexo(item.id)}
+                              disabled={substituirAnexoMutation.isPending}
+                            >
+                              <Upload className="mr-1.5 h-3.5 w-3.5" />
+                              Substituir
                             </Button>
                           </div>
                         ) : null}

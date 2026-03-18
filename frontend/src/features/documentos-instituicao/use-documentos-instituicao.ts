@@ -62,6 +62,33 @@ export function useAdicionarAnexoDocumentoInstituicao() {
       await queryClient.invalidateQueries({
         queryKey: ["documentos-instituicao", vars.id, "anexos"]
       });
+      await queryClient.invalidateQueries({
+        queryKey: ["documentos-instituicao", vars.id, "historico"]
+      });
+    }
+  });
+}
+
+export function useSubstituirAnexoDocumentoInstituicao() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      anexoId,
+      payload
+    }: {
+      id: string;
+      anexoId: string;
+      payload: DocumentoInstituicaoAnexoPayload;
+    }) => documentosInstituicaoService.substituirAnexo(id, anexoId, payload),
+    onSuccess: async (_response, vars) => {
+      await queryClient.invalidateQueries({ queryKey: ["documentos-instituicao"] });
+      await queryClient.invalidateQueries({
+        queryKey: ["documentos-instituicao", vars.id, "anexos"]
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["documentos-instituicao", vars.id, "historico"]
+      });
     }
   });
 }

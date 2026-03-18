@@ -49,6 +49,14 @@ export const documentosInstituicaoService = {
     return data;
   },
 
+  async substituirAnexo(id: string, anexoId: string, payload: DocumentoInstituicaoAnexoPayload) {
+    const { data } = await httpClient.put<DocumentoInstituicaoAnexo>(
+      `/api/documentos-instituicao/${id}/anexos/${anexoId}`,
+      payload
+    );
+    return data;
+  },
+
   async listarHistorico(id: string) {
     const { data } = await httpClient.get<DocumentoInstituicaoHistorico[]>(
       `/api/documentos-instituicao/${id}/historico`

@@ -5,6 +5,15 @@ function normalizarBaseUrl(baseUrl?: string) {
   return String(baseUrl).replace(/\/+$/, "");
 }
 
+function escapeHtml(valor: string) {
+  return valor
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 export function resolverUrlArquivo(valor?: string | null) {
   if (!valor?.trim()) return "";
 
@@ -20,7 +29,7 @@ export function resolverUrlArquivo(valor?: string | null) {
   const apiBaseUrl = normalizarBaseUrl(httpClient.defaults.baseURL as string | undefined);
   const path = normalized.startsWith("/") ? normalized : `/${normalized}`;
 
-  if (normalized.startsWith("/api/arquivos/") || normalized.startsWith("api/arquivos/")) {
+  if (normalized.startsWith("/api/") || normalized.startsWith("api/")) {
     return `${apiBaseUrl}${path}`;
   }
 
@@ -41,7 +50,7 @@ export async function obterUrlArquivoAutenticado(valor?: string | null) {
     return { url: normalized, revoke: undefined as (() => void) | undefined };
   }
 
-  const resposta = normalized.startsWith("/api/arquivos/") || normalized.startsWith("api/arquivos/")
+  const resposta = normalized.startsWith("/api/") || normalized.startsWith("api/")
     ? await httpClient.get<Blob>(normalized.startsWith("/") ? normalized : `/${normalized}`, {
         responseType: "blob"
       })
@@ -57,4 +66,119 @@ export async function obterUrlArquivoAutenticado(valor?: string | null) {
     url,
     revoke: () => URL.revokeObjectURL(url)
   };
+}
+
+export async function abrirArquivoAutenticado(valor?: string | null, titulo = "Arquivo") {
+  const janela = window.open("", "_blank", "width=1200,height=900");
+  if (!janela) {
+    throw new Error("O navegador bloqueou a abertura do arquivo.");
+  }
+
+  try {
+    janela.opener = null;
+  } catch {
+    // Alguns navegadores podem bloquear o ajuste do opener.
+  }
+
+  janela.document.write(`<!doctype html>
+    <html lang="pt-BR">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>${escapeHtml(titulo)}</title>
+        <style>
+          body {
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            background: #f8fafc;
+            color: #0f172a;
+            font-family: Arial, sans-serif;
+          }
+        </style>
+      </head>
+      <body>Carregando arquivo...</body>
+    </html>`);
+  janela.document.close();
+
+  const arquivo = await obterUrlArquivoAutenticado(valor);
+  if (!arquivo.url) {
+    janela.close();
+    throw new Error("Arquivo nao disponivel para visualizacao.");
+  }
+
+  try {
+    janela.location.replace(arquivo.url);
+  } catch {
+    janela.location.href = arquivo.url;
+  }
+
+  window.setTimeout(() => arquivo.revoke?.(), 60_000);
+}
+
+export async function imprimirArquivoAutenticado(valor?: string | null, titulo = "Documento") {
+  const janela = window.open("", "_blank", "width=1200,height=900");
+  if (!janela) {
+    throw new Error("O navegador bloqueou a abertura da impressao.");
+  }
+
+  try {
+    janela.opener = null;
+  } catch {
+    // Alguns navegadores podem bloquear o ajuste do opener.
+  }
+
+  const arquivo = await obterUrlArquivoAutenticado(valor);
+  if (!arquivo.url) {
+    janela.close();
+    throw new Error("Arquivo nao disponivel para impressao.");
+  }
+
+  janela.document.write(`<!doctype html>
+    <html lang="pt-BR">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>${escapeHtml(titulo)}</title>
+        <style>
+          html, body {
+            margin: 0;
+            height: 100%;
+            background: #e2e8f0;
+          }
+
+          iframe {
+            width: 100%;
+            height: 100%;
+            border: 0;
+            background: white;
+          }
+        </style>
+      </head>
+      <body>
+        <iframe id="g3-print-frame" title="${escapeHtml(titulo)}"></iframe>
+        <script>
+          const frame = document.getElementById("g3-print-frame");
+          frame.src = ${JSON.stringify(arquivo.url)};
+          frame.addEventListener("load", () => {
+            window.setTimeout(() => {
+              try {
+                window.focus();
+                frame.contentWindow?.focus();
+                frame.contentWindow?.print();
+              } catch {
+                window.print();
+              }
+            }, 700);
+          });
+        </script>
+      </body>
+    </html>`);
+  janela.document.close();
+
+  const limpar = () => arquivo.revoke?.();
+  janela.addEventListener("afterprint", limpar, { once: true });
+  janela.addEventListener("beforeunload", limpar, { once: true });
+  window.setTimeout(limpar, 60_000);
 }

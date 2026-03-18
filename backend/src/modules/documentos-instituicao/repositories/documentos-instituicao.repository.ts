@@ -287,6 +287,40 @@ export class DocumentosInstituicaoRepository {
     return this.buscarAnexoPorIdOuFalhar(documentoId, id);
   }
 
+  async atualizarAnexo(documentoId: bigint, anexoId: bigint, input: DocumentoInstituicaoAnexoInput) {
+    await this.buscarAnexoPorIdOuFalhar(documentoId, anexoId);
+
+    await prisma.$executeRaw(Prisma.sql`
+      UPDATE documentos_instituicao_anexos
+      SET
+        nome_arquivo = ${input.nomeArquivo},
+        tipo = ${input.tipo},
+        tipo_mime = ${trimOrUndefined(input.tipoMime ?? undefined)},
+        tamanho = ${trimOrUndefined(input.tamanho ?? undefined)},
+        caminho_arquivo = ${montarCaminhoOuDataUri(input.conteudoBase64, input.tipoMime)},
+        data_upload = ${toOptionalDate(input.dataUpload ?? undefined) ?? new Date()},
+        usuario = ${input.usuario}
+      WHERE documento_id = ${documentoId}
+        AND id = ${anexoId}
+    `);
+
+    return this.buscarAnexoPorIdOuFalhar(documentoId, anexoId);
+  }
+
+  async existeHistoricoAlertaEmail(documentoId: bigint, observacao: string) {
+    const rows = await prisma.$queryRaw<Array<{ existe: boolean }>>(Prisma.sql`
+      SELECT EXISTS (
+        SELECT 1
+        FROM documentos_instituicao_historico
+        WHERE documento_id = ${documentoId}
+          AND tipo_alteracao = 'Alerta por e-mail'
+          AND observacao = ${observacao}
+      ) AS existe
+    `);
+
+    return Boolean(rows[0]?.existe);
+  }
+
   async listarHistorico(documentoId: bigint) {
     await this.buscarPorIdOuFalhar(documentoId);
     return prisma.$queryRaw<DocumentoInstituicaoHistoricoRow[]>(Prisma.sql`

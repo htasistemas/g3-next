@@ -31,6 +31,18 @@ export function errorHandler(
   }
 
   if (
+    error instanceof Error &&
+    typeof error === "object" &&
+    error !== null &&
+    "type" in error &&
+    (error as { type?: string }).type === "entity.too.large"
+  ) {
+    return response
+      .status(413)
+      .json({ message: "O arquivo enviado excede o tamanho maximo permitido." });
+  }
+
+  if (
     error instanceof SyntaxError &&
     typeof error === "object" &&
     error !== null &&

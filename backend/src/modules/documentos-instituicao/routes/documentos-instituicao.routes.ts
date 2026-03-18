@@ -39,6 +39,12 @@ documentosInstituicaoRoutes.post(
   ensurePermissions(permissoesEscrita),
   asyncHandler(controller.adicionarAnexo.bind(controller))
 );
+documentosInstituicaoRoutes.put(
+  "/:id/anexos/:anexoId",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.substituirAnexo.bind(controller))
+);
 documentosInstituicaoRoutes.get(
   "/:id/anexos/:anexoId/arquivo",
   ensureAuthenticated,

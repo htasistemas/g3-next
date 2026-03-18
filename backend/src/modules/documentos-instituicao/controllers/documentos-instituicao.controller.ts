@@ -39,6 +39,16 @@ export class DocumentosInstituicaoController {
     return response.status(201).json(anexo);
   }
 
+  async substituirAnexo(request: Request, response: Response) {
+    const anexo = await service.substituirAnexo(
+      request.params.id,
+      request.params.anexoId,
+      request.body,
+      (request as AuthenticatedRequest).authUser?.id
+    );
+    return response.json(anexo);
+  }
+
   async obterArquivoAnexo(request: Request, response: Response) {
     const arquivo = await service.obterArquivoAnexo(request.params.id, request.params.anexoId);
     return response.json({ arquivo });
