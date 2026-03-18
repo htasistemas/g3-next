@@ -31,6 +31,7 @@ import {
   useAdicionarHistoricoDocumentoInstituicao,
   useAnexosDocumentoInstituicao,
   useDocumentosInstituicao,
+  useExcluirAnexoDocumentoInstituicao,
   useExcluirDocumentoInstituicao,
   useHistoricoDocumentoInstituicao,
   useSalvarDocumentoInstituicao,
@@ -39,6 +40,7 @@ import {
 import { abrirArquivoAutenticado, imprimirArquivoAutenticado } from "@/lib/arquivos";
 import { formatarDataPtBr } from "@/lib/br-utils";
 import { imprimirConteudoAtual } from "@/lib/report-utils";
+import { documentosInstituicaoService } from "@/services/documentos-instituicao.service";
 import type {
   DocumentoInstituicao,
   DocumentoInstituicaoAnexo,
@@ -251,6 +253,7 @@ export function GestaoDocumentosPage() {
   const excluirMutation = useExcluirDocumentoInstituicao();
   const anexoMutation = useAdicionarAnexoDocumentoInstituicao();
   const substituirAnexoMutation = useSubstituirAnexoDocumentoInstituicao();
+  const excluirAnexoMutation = useExcluirAnexoDocumentoInstituicao();
   const historicoMutation = useAdicionarHistoricoDocumentoInstituicao();
 
   const documentos = data ?? [];
@@ -317,6 +320,7 @@ export function GestaoDocumentosPage() {
     excluirMutation.isPending ||
     anexoMutation.isPending ||
     substituirAnexoMutation.isPending ||
+    excluirAnexoMutation.isPending ||
     historicoMutation.isPending;
 
   function novo() {
@@ -429,6 +433,35 @@ export function GestaoDocumentosPage() {
   }
 
   async function subirAnexo(file: File) {
+    if (form.id) {
+      try {
+        const upload = await documentosInstituicaoService.uploadArquivoAnexo(form.id, file);
+        const payload: DocumentoInstituicaoAnexoPayload = {
+          nomeArquivo: upload.nomeOriginal || file.name,
+          tipo: obterTipoAnexoArquivo(file),
+          tipoMime: upload.mimeType || file.type || "application/octet-stream",
+          conteudoBase64: upload.caminhoArquivo,
+          tamanho: `${Math.round((upload.tamanhoBytes ?? file.size) / 1024)} KB`,
+          dataUpload: new Date().toISOString().slice(0, 10),
+          usuario: responsavelLogado || "Usuário"
+        };
+
+        await anexoMutation.mutateAsync({ id: form.id, payload });
+        setPopupMensagem({
+          tipo: "sucesso",
+          titulo: "Confirmação",
+          texto: "Anexo enviado com sucesso."
+        });
+      } catch (error: any) {
+        setPopupMensagem({
+          tipo: "erro",
+          titulo: "Erro",
+          texto: error?.response?.data?.message ?? "Não foi possível enviar o anexo."
+        });
+      }
+      return;
+    }
+
     if (!form.id) {
       setPopupMensagem({
         tipo: "aviso",
@@ -474,6 +507,39 @@ export function GestaoDocumentosPage() {
   }
 
   async function substituirAnexoExistente(anexoId: string, file: File) {
+    if (form.id) {
+      setAnexoProcessandoId(anexoId);
+      try {
+        const upload = await documentosInstituicaoService.uploadArquivoAnexo(form.id, file);
+        const payload: DocumentoInstituicaoAnexoPayload = {
+          nomeArquivo: upload.nomeOriginal || file.name,
+          tipo: obterTipoAnexoArquivo(file),
+          tipoMime: upload.mimeType || file.type || "application/octet-stream",
+          conteudoBase64: upload.caminhoArquivo,
+          tamanho: `${Math.round((upload.tamanhoBytes ?? file.size) / 1024)} KB`,
+          dataUpload: new Date().toISOString().slice(0, 10),
+          usuario: responsavelLogado || "Usuário"
+        };
+
+        await substituirAnexoMutation.mutateAsync({ id: form.id, anexoId, payload });
+        setPopupMensagem({
+          tipo: "sucesso",
+          titulo: "Confirmação",
+          texto: "Anexo substituído com sucesso."
+        });
+      } catch (error: any) {
+        setPopupMensagem({
+          tipo: "erro",
+          titulo: "Erro",
+          texto: error?.response?.data?.message ?? "Não foi possível substituir o anexo."
+        });
+      } finally {
+        setAnexoProcessandoId(null);
+        setAnexoParaSubstituirId(null);
+      }
+      return;
+    }
+
     if (!form.id) {
       setPopupMensagem({
         tipo: "aviso",
@@ -552,6 +618,35 @@ export function GestaoDocumentosPage() {
   function solicitarSubstituicaoAnexo(anexoId: string) {
     setAnexoParaSubstituirId(anexoId);
     document.getElementById("arquivoDocumentoSubstituicao")?.click();
+  }
+
+  async function excluirAnexoExistente(item: DocumentoInstituicaoAnexo) {
+    if (!form.id) {
+      setPopupMensagem({
+        tipo: "aviso",
+        titulo: "Atenção",
+        texto: "Selecione um documento antes de excluir o anexo."
+      });
+      return;
+    }
+
+    setAnexoProcessandoId(item.id);
+    try {
+      await excluirAnexoMutation.mutateAsync({ id: form.id, anexoId: item.id });
+      setPopupMensagem({
+        tipo: "sucesso",
+        titulo: "Confirmação",
+        texto: "Anexo excluído com sucesso."
+      });
+    } catch (error: any) {
+      setPopupMensagem({
+        tipo: "erro",
+        titulo: "Erro",
+        texto: error?.response?.data?.message ?? "Não foi possível excluir o anexo."
+      });
+    } finally {
+      setAnexoProcessandoId(null);
+    }
   }
 
   async function adicionarHistorico() {
@@ -929,10 +1024,20 @@ export function GestaoDocumentosPage() {
                               variant="outline"
                               size="sm"
                               onClick={() => solicitarSubstituicaoAnexo(item.id)}
-                              disabled={substituirAnexoMutation.isPending}
+                              disabled={substituirAnexoMutation.isPending || anexoProcessandoId === item.id}
                             >
                               <Upload className="mr-1.5 h-3.5 w-3.5" />
                               Substituir
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="danger"
+                              size="sm"
+                              onClick={() => void excluirAnexoExistente(item)}
+                              disabled={excluirAnexoMutation.isPending || anexoProcessandoId === item.id}
+                            >
+                              <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                              Excluir
                             </Button>
                           </div>
                         ) : null}

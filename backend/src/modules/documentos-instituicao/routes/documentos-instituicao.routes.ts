@@ -45,6 +45,12 @@ documentosInstituicaoRoutes.put(
   ensurePermissions(permissoesEscrita),
   asyncHandler(controller.substituirAnexo.bind(controller))
 );
+documentosInstituicaoRoutes.delete(
+  "/:id/anexos/:anexoId",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.excluirAnexo.bind(controller))
+);
 documentosInstituicaoRoutes.get(
   "/:id/anexos/:anexoId/arquivo",
   ensureAuthenticated,

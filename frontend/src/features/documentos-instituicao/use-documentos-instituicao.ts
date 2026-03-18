@@ -93,6 +93,23 @@ export function useSubstituirAnexoDocumentoInstituicao() {
   });
 }
 
+export function useExcluirAnexoDocumentoInstituicao() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, anexoId }: { id: string; anexoId: string }) =>
+      documentosInstituicaoService.excluirAnexo(id, anexoId),
+    onSuccess: async (_response, vars) => {
+      await queryClient.invalidateQueries({ queryKey: ["documentos-instituicao"] });
+      await queryClient.invalidateQueries({
+        queryKey: ["documentos-instituicao", vars.id, "anexos"]
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["documentos-instituicao", vars.id, "historico"]
+      });
+    }
+  });
+}
+
 export function useAdicionarHistoricoDocumentoInstituicao() {
   const queryClient = useQueryClient();
   return useMutation({

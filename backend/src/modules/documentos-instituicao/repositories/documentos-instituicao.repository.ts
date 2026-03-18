@@ -69,12 +69,42 @@ export class DocumentosInstituicaoRepository {
 
         await prisma.$executeRaw(Prisma.sql`
           ALTER TABLE IF EXISTS documentos_instituicao_anexos
+            ADD COLUMN IF NOT EXISTS nome_arquivo VARCHAR(200)
+        `);
+
+        await prisma.$executeRaw(Prisma.sql`
+          ALTER TABLE IF EXISTS documentos_instituicao_anexos
+            ADD COLUMN IF NOT EXISTS tipo VARCHAR(30)
+        `);
+
+        await prisma.$executeRaw(Prisma.sql`
+          ALTER TABLE IF EXISTS documentos_instituicao_anexos
             ADD COLUMN IF NOT EXISTS tipo_mime VARCHAR(120)
         `);
 
         await prisma.$executeRaw(Prisma.sql`
           ALTER TABLE IF EXISTS documentos_instituicao_anexos
+            ADD COLUMN IF NOT EXISTS tamanho VARCHAR(40)
+        `);
+
+        await prisma.$executeRaw(Prisma.sql`
+          ALTER TABLE IF EXISTS documentos_instituicao_anexos
             ADD COLUMN IF NOT EXISTS caminho_arquivo TEXT
+        `);
+
+        await prisma.$executeRaw(Prisma.sql`
+          ALTER TABLE IF EXISTS documentos_instituicao_anexos
+            ADD COLUMN IF NOT EXISTS data_upload DATE DEFAULT CURRENT_DATE
+        `);
+
+        await prisma.$executeRaw(Prisma.sql`
+          ALTER TABLE IF EXISTS documentos_instituicao_anexos
+            ADD COLUMN IF NOT EXISTS usuario VARCHAR(120) DEFAULT 'Sistema'
+        `);
+
+        await prisma.$executeRaw(Prisma.sql`
+          ALTER TABLE IF EXISTS documentos_instituicao_anexos
+            ADD COLUMN IF NOT EXISTS criado_em TIMESTAMP NOT NULL DEFAULT NOW()
         `);
 
         await prisma.$executeRaw(Prisma.sql`
@@ -362,6 +392,19 @@ export class DocumentosInstituicaoRepository {
     `);
 
     return this.buscarAnexoPorIdOuFalhar(documentoId, anexoId);
+  }
+
+  async excluirAnexo(documentoId: bigint, anexoId: bigint) {
+    await this.garantirSchemaAnexos();
+    const anexo = await this.buscarAnexoPorIdOuFalhar(documentoId, anexoId);
+
+    await prisma.$executeRaw(Prisma.sql`
+      DELETE FROM documentos_instituicao_anexos
+      WHERE documento_id = ${documentoId}
+        AND id = ${anexoId}
+    `);
+
+    return anexo;
   }
 
   async existeHistoricoAlertaEmail(documentoId: bigint, observacao: string) {

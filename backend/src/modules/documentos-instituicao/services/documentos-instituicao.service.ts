@@ -64,9 +64,9 @@ export class DocumentosInstituicaoService {
     const input = documentoInstituicaoAnexoInputSchema.parse(this.normalizarPayload(rawInput));
     const usuarioId = this.parseIdOpcional(rawUsuarioId);
     const tipoAnexo = normalizarTipoAnexoDocumento(input);
-    const arquivo = await storageService.salvarArquivo({
+    const arquivo = await storageService.persistirCampo({
       scope: "instituicao_documento",
-      conteudo: input.conteudoBase64,
+      valor: input.conteudoBase64,
       nomeOriginal: input.nomeArquivo,
       mimeType: input.tipoMime,
       entidadeId: documentoId,
@@ -78,9 +78,9 @@ export class DocumentosInstituicaoService {
       const anexo = await this.repository.adicionarAnexo(documentoId, {
         ...input,
         tipo: tipoAnexo,
-        conteudoBase64: arquivo.caminhoArquivo,
-        nomeArquivo: input.nomeArquivo || arquivo.registro.nome_original,
-        tipoMime: input.tipoMime || arquivo.registro.mime_type
+        conteudoBase64: arquivo.caminhoArquivo ?? input.conteudoBase64,
+        nomeArquivo: input.nomeArquivo || arquivo.registro?.nome_original || "anexo",
+        tipoMime: input.tipoMime || arquivo.registro?.mime_type
       });
       await this.registrarHistoricoAutomatico(
         documentoId,
@@ -90,7 +90,7 @@ export class DocumentosInstituicaoService {
       );
       return mapDocumentoInstituicaoAnexoToResponse(anexo);
     } catch (error) {
-      await storageService.rollbackArquivos([arquivo.caminhoArquivo]);
+      await storageService.rollbackArquivos([arquivo.registro ? arquivo.caminhoArquivo : undefined]);
       throw error;
     }
   }
@@ -108,9 +108,9 @@ export class DocumentosInstituicaoService {
     const anexoAnterior = await this.repository.buscarAnexoPorIdOuFalhar(documentoId, anexoId);
     const tipoAnexo = normalizarTipoAnexoDocumento(input);
 
-    const arquivo = await storageService.salvarArquivo({
+    const arquivo = await storageService.persistirCampo({
       scope: "instituicao_documento",
-      conteudo: input.conteudoBase64,
+      valor: input.conteudoBase64,
       nomeOriginal: input.nomeArquivo,
       mimeType: input.tipoMime,
       entidadeId: documentoId,
@@ -122,9 +122,9 @@ export class DocumentosInstituicaoService {
       const anexo = await this.repository.atualizarAnexo(documentoId, anexoId, {
         ...input,
         tipo: tipoAnexo,
-        conteudoBase64: arquivo.caminhoArquivo,
-        nomeArquivo: input.nomeArquivo || arquivo.registro.nome_original,
-        tipoMime: input.tipoMime || arquivo.registro.mime_type
+        conteudoBase64: arquivo.caminhoArquivo ?? input.conteudoBase64,
+        nomeArquivo: input.nomeArquivo || arquivo.registro?.nome_original || "anexo",
+        tipoMime: input.tipoMime || arquivo.registro?.mime_type
       });
 
       if (anexoAnterior.caminho_arquivo && anexoAnterior.caminho_arquivo !== arquivo.caminhoArquivo) {
@@ -140,9 +140,27 @@ export class DocumentosInstituicaoService {
 
       return mapDocumentoInstituicaoAnexoToResponse(anexo);
     } catch (error) {
-      await storageService.rollbackArquivos([arquivo.caminhoArquivo]);
+      await storageService.rollbackArquivos([arquivo.registro ? arquivo.caminhoArquivo : undefined]);
       throw error;
     }
+  }
+
+  async excluirAnexo(rawDocumentoId: string, rawAnexoId: string, rawUsuarioId?: string) {
+    const documentoId = this.parseId(rawDocumentoId);
+    const anexoId = this.parseId(rawAnexoId);
+    const usuarioId = this.parseIdOpcional(rawUsuarioId);
+    const anexo = await this.repository.excluirAnexo(documentoId, anexoId);
+
+    if (this.isManagedStoragePath(anexo.caminho_arquivo)) {
+      await storageService.desativarPorCaminho(anexo.caminho_arquivo, usuarioId);
+    }
+
+    await this.registrarHistoricoAutomatico(
+      documentoId,
+      "Sistema",
+      "Anexo excluido",
+      `Arquivo ${anexo.nome_arquivo} removido do documento.`
+    );
   }
 
   async obterArquivoAnexo(rawDocumentoId: string, rawAnexoId: string) {
@@ -298,5 +316,11 @@ export class DocumentosInstituicaoService {
     void this.processarAlertasEmailPendentes(documentoIds).catch((error) => {
       console.warn("[documentos-instituicao] falha ao processar alerta automatico por email", error);
     });
+  }
+
+  private isManagedStoragePath(valor?: string | null) {
+    if (!valor?.trim()) return false;
+    const normalized = valor.trim();
+    return !normalized.startsWith("data:") && !/^https?:\/\//i.test(normalized);
   }
 }

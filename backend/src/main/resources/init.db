@@ -3086,10 +3086,28 @@ CREATE TABLE IF NOT EXISTS documentos_instituicao_anexos (
 );
 
 ALTER TABLE documentos_instituicao_anexos
+  ADD COLUMN IF NOT EXISTS nome_arquivo VARCHAR(200);
+
+ALTER TABLE documentos_instituicao_anexos
+  ADD COLUMN IF NOT EXISTS tipo VARCHAR(30);
+
+ALTER TABLE documentos_instituicao_anexos
   ADD COLUMN IF NOT EXISTS tipo_mime VARCHAR(120);
 
 ALTER TABLE documentos_instituicao_anexos
+  ADD COLUMN IF NOT EXISTS tamanho VARCHAR(40);
+
+ALTER TABLE documentos_instituicao_anexos
   ADD COLUMN IF NOT EXISTS caminho_arquivo TEXT;
+
+ALTER TABLE documentos_instituicao_anexos
+  ADD COLUMN IF NOT EXISTS data_upload DATE DEFAULT CURRENT_DATE;
+
+ALTER TABLE documentos_instituicao_anexos
+  ADD COLUMN IF NOT EXISTS usuario VARCHAR(120) DEFAULT 'Sistema';
+
+ALTER TABLE documentos_instituicao_anexos
+  ADD COLUMN IF NOT EXISTS criado_em TIMESTAMP NOT NULL DEFAULT NOW();
 
 ALTER TABLE IF EXISTS documentos_instituicao_anexos
   ALTER COLUMN nome_arquivo TYPE VARCHAR(200),
