@@ -93,6 +93,21 @@ export class ControleVeiculosRepository {
     possuiVoluntarios: boolean;
   }> | null = null;
 
+  private tratarErroPersistenciaVeiculo(error: unknown): never {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      const rawCode =
+        typeof error.meta?.code === "string" ? error.meta.code : undefined;
+      const rawMessage =
+        typeof error.meta?.message === "string" ? error.meta.message : error.message;
+
+      if ((error.code === "P2002" || (error.code === "P2010" && rawCode === "23505")) && /\bplaca\b/i.test(rawMessage)) {
+        throw new AppError("Ja existe um veiculo cadastrado com esta placa.", 409);
+      }
+    }
+
+    throw error;
+  }
+
   private async obterFontesMotoristas() {
     if (!this.fontesMotoristasPromise) {
       this.fontesMotoristasPromise = prisma
@@ -184,46 +199,51 @@ export class ControleVeiculosRepository {
 
   async criarVeiculo(input: VeiculoInput) {
     await this.ensureEstrutura();
-    const inserted = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
-      INSERT INTO controle_veiculos (
-        placa,
-        modelo,
-        marca,
-        cor,
-        ano,
-        tipo_combustivel,
-        media_consumo_padrao,
-        capacidade_tanque_litros,
-        observacoes,
-        ativo,
-        foto_frente,
-        foto_lateral_esquerda,
-        foto_lateral_direita,
-        foto_traseira,
-        documento_veiculo_pdf,
-        criado_em,
-        atualizado_em
-      ) VALUES (
-        ${trimOrUndefined(input.placa)},
-        ${trimOrUndefined(input.modelo)},
-        ${trimOrUndefined(input.marca)},
-        ${trimOrUndefined(input.cor)},
-        ${input.ano ?? null},
-        ${trimOrUndefined(input.tipoCombustivel)},
-        ${input.mediaConsumoPadrao ?? null},
-        ${input.capacidadeTanqueLitros ?? null},
-        ${trimOrUndefined(input.observacoes ?? undefined)},
-        ${input.ativo ?? true},
-        ${trimOrUndefined(input.fotoFrente ?? undefined)},
-        ${trimOrUndefined(input.fotoLateralEsquerda ?? undefined)},
-        ${trimOrUndefined(input.fotoLateralDireita ?? undefined)},
-        ${trimOrUndefined(input.fotoTraseira ?? undefined)},
-        ${trimOrUndefined(input.documentoVeiculoPdf ?? undefined)},
-        NOW(),
-        NOW()
-      )
-      RETURNING id
-    `);
+    let inserted: Array<{ id: bigint }>;
+    try {
+      inserted = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+        INSERT INTO controle_veiculos (
+          placa,
+          modelo,
+          marca,
+          cor,
+          ano,
+          tipo_combustivel,
+          media_consumo_padrao,
+          capacidade_tanque_litros,
+          observacoes,
+          ativo,
+          foto_frente,
+          foto_lateral_esquerda,
+          foto_lateral_direita,
+          foto_traseira,
+          documento_veiculo_pdf,
+          criado_em,
+          atualizado_em
+        ) VALUES (
+          ${trimOrUndefined(input.placa)},
+          ${trimOrUndefined(input.modelo)},
+          ${trimOrUndefined(input.marca)},
+          ${trimOrUndefined(input.cor)},
+          ${input.ano ?? null},
+          ${trimOrUndefined(input.tipoCombustivel)},
+          ${input.mediaConsumoPadrao ?? null},
+          ${input.capacidadeTanqueLitros ?? null},
+          ${trimOrUndefined(input.observacoes ?? undefined)},
+          ${input.ativo ?? true},
+          ${trimOrUndefined(input.fotoFrente ?? undefined)},
+          ${trimOrUndefined(input.fotoLateralEsquerda ?? undefined)},
+          ${trimOrUndefined(input.fotoLateralDireita ?? undefined)},
+          ${trimOrUndefined(input.fotoTraseira ?? undefined)},
+          ${trimOrUndefined(input.documentoVeiculoPdf ?? undefined)},
+          NOW(),
+          NOW()
+        )
+        RETURNING id
+      `);
+    } catch (error) {
+      this.tratarErroPersistenciaVeiculo(error);
+    }
 
     const id = inserted[0]?.id;
     if (!id) {
@@ -235,27 +255,31 @@ export class ControleVeiculosRepository {
   async atualizarVeiculo(id: bigint, input: VeiculoInput) {
     await this.ensureEstrutura();
     await this.buscarVeiculoPorIdOuFalhar(id);
-    await prisma.$executeRaw(Prisma.sql`
-      UPDATE controle_veiculos
-      SET
-        placa = ${trimOrUndefined(input.placa)},
-        modelo = ${trimOrUndefined(input.modelo)},
-        marca = ${trimOrUndefined(input.marca)},
-        cor = ${trimOrUndefined(input.cor)},
-        ano = ${input.ano ?? null},
-        tipo_combustivel = ${trimOrUndefined(input.tipoCombustivel)},
-        media_consumo_padrao = ${input.mediaConsumoPadrao ?? null},
-        capacidade_tanque_litros = ${input.capacidadeTanqueLitros ?? null},
-        observacoes = ${trimOrUndefined(input.observacoes ?? undefined)},
-        ativo = ${input.ativo ?? true},
-        foto_frente = ${trimOrUndefined(input.fotoFrente ?? undefined)},
-        foto_lateral_esquerda = ${trimOrUndefined(input.fotoLateralEsquerda ?? undefined)},
-        foto_lateral_direita = ${trimOrUndefined(input.fotoLateralDireita ?? undefined)},
-        foto_traseira = ${trimOrUndefined(input.fotoTraseira ?? undefined)},
-        documento_veiculo_pdf = ${trimOrUndefined(input.documentoVeiculoPdf ?? undefined)},
-        atualizado_em = NOW()
-      WHERE id = ${id}
-    `);
+    try {
+      await prisma.$executeRaw(Prisma.sql`
+        UPDATE controle_veiculos
+        SET
+          placa = ${trimOrUndefined(input.placa)},
+          modelo = ${trimOrUndefined(input.modelo)},
+          marca = ${trimOrUndefined(input.marca)},
+          cor = ${trimOrUndefined(input.cor)},
+          ano = ${input.ano ?? null},
+          tipo_combustivel = ${trimOrUndefined(input.tipoCombustivel)},
+          media_consumo_padrao = ${input.mediaConsumoPadrao ?? null},
+          capacidade_tanque_litros = ${input.capacidadeTanqueLitros ?? null},
+          observacoes = ${trimOrUndefined(input.observacoes ?? undefined)},
+          ativo = ${input.ativo ?? true},
+          foto_frente = ${trimOrUndefined(input.fotoFrente ?? undefined)},
+          foto_lateral_esquerda = ${trimOrUndefined(input.fotoLateralEsquerda ?? undefined)},
+          foto_lateral_direita = ${trimOrUndefined(input.fotoLateralDireita ?? undefined)},
+          foto_traseira = ${trimOrUndefined(input.fotoTraseira ?? undefined)},
+          documento_veiculo_pdf = ${trimOrUndefined(input.documentoVeiculoPdf ?? undefined)},
+          atualizado_em = NOW()
+        WHERE id = ${id}
+      `);
+    } catch (error) {
+      this.tratarErroPersistenciaVeiculo(error);
+    }
     return this.buscarVeiculoPorIdOuFalhar(id);
   }
 

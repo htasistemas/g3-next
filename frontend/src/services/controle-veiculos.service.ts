@@ -7,6 +7,20 @@ import type {
   VeiculoCadastro
 } from "@/types/controle-veiculos";
 
+type UploadArquivoResponse = {
+  arquivo: {
+    registro?: {
+      id: number;
+    };
+    caminhoArquivo: string;
+  };
+};
+
+export type UploadVeiculoResultado = {
+  id?: number;
+  caminhoArquivo: string;
+};
+
 export const controleVeiculosService = {
   async listarVeiculos() {
     const { data } = await httpClient.get<VeiculoCadastro[]>("/api/controle-veiculos/veiculos");
@@ -122,12 +136,15 @@ export const controleVeiculosService = {
     }
     formData.append("arquivo", arquivo);
 
-    const { data } = await httpClient.post<{ arquivo: { caminho_arquivo: string } }>(
+    const { data } = await httpClient.post<UploadArquivoResponse>(
       "/api/arquivos/upload",
       formData
     );
 
-    return data.arquivo.caminho_arquivo;
+    return {
+      id: data.arquivo.registro?.id,
+      caminhoArquivo: data.arquivo.caminhoArquivo
+    } satisfies UploadVeiculoResultado;
   },
 
   async uploadDocumentoVeiculo(arquivo: File, veiculoId?: number | null) {
@@ -139,11 +156,14 @@ export const controleVeiculosService = {
     }
     formData.append("arquivo", arquivo);
 
-    const { data } = await httpClient.post<{ arquivo: { caminho_arquivo: string } }>(
+    const { data } = await httpClient.post<UploadArquivoResponse>(
       "/api/arquivos/upload",
       formData
     );
 
-    return data.arquivo.caminho_arquivo;
+    return {
+      id: data.arquivo.registro?.id,
+      caminhoArquivo: data.arquivo.caminhoArquivo
+    } satisfies UploadVeiculoResultado;
   }
 };

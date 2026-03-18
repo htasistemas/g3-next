@@ -1,6 +1,10 @@
 import multer from "multer";
 import type { Request, Response } from "express";
 import type { AuthenticatedRequest } from "../../auth/middlewares/auth.middleware.js";
+import {
+  mapArquivoMetadataToResponse,
+  mapArquivoUploadToResponse
+} from "../arquivos.mapper.js";
 import { ArquivosService } from "../services/arquivos.service.js";
 
 const service = new ArquivosService();
@@ -15,17 +19,17 @@ export const arquivosUploadMiddleware = multer({
 export class ArquivosController {
   async listar(request: Request, response: Response) {
     const arquivos = await service.listar(request.query as Record<string, unknown>);
-    return response.json({ arquivos });
+    return response.json({ arquivos: arquivos.map(mapArquivoMetadataToResponse) });
   }
 
   async upload(request: Request, response: Response) {
     const arquivo = await service.upload(request as AuthenticatedRequest & { file?: Express.Multer.File });
-    return response.status(201).json({ arquivo });
+    return response.status(201).json({ arquivo: mapArquivoUploadToResponse(arquivo) });
   }
 
   async obterPorId(request: Request, response: Response) {
     const arquivo = await service.obterPorId(request.params.id);
-    return response.json({ arquivo });
+    return response.json({ arquivo: mapArquivoMetadataToResponse(arquivo) });
   }
 
   async obterConteudoPorId(request: Request, response: Response) {

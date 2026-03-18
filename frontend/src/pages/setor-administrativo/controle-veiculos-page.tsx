@@ -47,6 +47,7 @@ import {
   normalizarTelefone
 } from "@/lib/br-utils";
 import { imprimirConteudoAtual } from "@/lib/report-utils";
+import { arquivosService } from "@/services/arquivos.service";
 import { controleVeiculosService } from "@/services/controle-veiculos.service";
 import type {
   LocalDestinoVeiculo,
@@ -309,44 +310,56 @@ export function ControleVeiculosPage() {
   const rotasRecentes = useMemo(() => diarios.slice(0, 6), [diarios]);
 
   async function salvarVeiculoComArquivos(payloadBase: VeiculoCadastro) {
-    let salvo = await salvarVeiculoMutation.mutateAsync(payloadBase);
+    const arquivosTemporariosCriados: number[] = [];
+    let payloadFinal: VeiculoCadastro = { ...payloadBase };
 
-    if (fotoVeiculoArquivo) {
-      setEnviandoFotoVeiculo(true);
-      try {
-        const caminhoFoto = await controleVeiculosService.uploadFotoVeiculo(
+    try {
+      if (fotoVeiculoArquivo) {
+        setEnviandoFotoVeiculo(true);
+        const uploadFoto = await controleVeiculosService.uploadFotoVeiculo(
           fotoVeiculoArquivo,
-          salvo.id ?? null
+          payloadBase.id ?? null
         );
-        salvo = await salvarVeiculoMutation.mutateAsync({
-          ...salvo,
-          fotoFrente: caminhoFoto
-        });
-        setFotoVeiculoArquivo(null);
-        setFotoVeiculoPreview("");
-      } finally {
-        setEnviandoFotoVeiculo(false);
+        if (uploadFoto.id) {
+          arquivosTemporariosCriados.push(uploadFoto.id);
+        }
+        payloadFinal = {
+          ...payloadFinal,
+          fotoFrente: uploadFoto.caminhoArquivo
+        };
       }
-    }
 
-    if (documentoVeiculoArquivo) {
-      setEnviandoDocumentoVeiculo(true);
-      try {
-        const caminhoDocumento = await controleVeiculosService.uploadDocumentoVeiculo(
+      if (documentoVeiculoArquivo) {
+        setEnviandoDocumentoVeiculo(true);
+        const uploadDocumento = await controleVeiculosService.uploadDocumentoVeiculo(
           documentoVeiculoArquivo,
-          salvo.id ?? null
+          payloadBase.id ?? null
         );
-        salvo = await salvarVeiculoMutation.mutateAsync({
-          ...salvo,
-          documentoVeiculoPdf: caminhoDocumento
-        });
-        setDocumentoVeiculoArquivo(null);
-      } finally {
-        setEnviandoDocumentoVeiculo(false);
+        if (uploadDocumento.id) {
+          arquivosTemporariosCriados.push(uploadDocumento.id);
+        }
+        payloadFinal = {
+          ...payloadFinal,
+          documentoVeiculoPdf: uploadDocumento.caminhoArquivo
+        };
       }
-    }
 
-    return salvo;
+      const salvo = await salvarVeiculoMutation.mutateAsync(payloadFinal);
+      setFotoVeiculoArquivo(null);
+      setFotoVeiculoPreview("");
+      setDocumentoVeiculoArquivo(null);
+      return salvo;
+    } catch (error) {
+      for (const arquivoId of arquivosTemporariosCriados) {
+        try {
+          await arquivosService.excluir(arquivoId);
+        } catch {}
+      }
+      throw error;
+    } finally {
+      setEnviandoFotoVeiculo(false);
+      setEnviandoDocumentoVeiculo(false);
+    }
   }
 
   async function salvar() {

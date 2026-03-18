@@ -1,4 +1,5 @@
 import { AppError } from "../../../shared/errors/app-error.js";
+import { storageService } from "../../arquivos/services/storage-instance.js";
 import { normalizarTelefone } from "../../../utils/br-utils.js";
 import { mapaCamposTextoControleVeiculos } from "../../../utils/text-format-config.js";
 import { normalizarObjetoTexto } from "../../../utils/text-formatter.js";
@@ -32,14 +33,43 @@ export class ControleVeiculosService {
 
   async atualizarVeiculo(rawId: string, rawInput: unknown) {
     const id = this.parseId(rawId);
+    const registroAtual = await this.repository.buscarVeiculoPorIdOuFalhar(id);
     const input = veiculoInputSchema.parse(this.normalizarPayload(rawInput));
     const registro = await this.repository.atualizarVeiculo(id, input);
+    await storageService.rollbackArquivos([
+      registroAtual.foto_frente && registroAtual.foto_frente !== registro.foto_frente
+        ? registroAtual.foto_frente
+        : undefined,
+      registroAtual.foto_lateral_esquerda &&
+      registroAtual.foto_lateral_esquerda !== registro.foto_lateral_esquerda
+        ? registroAtual.foto_lateral_esquerda
+        : undefined,
+      registroAtual.foto_lateral_direita &&
+      registroAtual.foto_lateral_direita !== registro.foto_lateral_direita
+        ? registroAtual.foto_lateral_direita
+        : undefined,
+      registroAtual.foto_traseira && registroAtual.foto_traseira !== registro.foto_traseira
+        ? registroAtual.foto_traseira
+        : undefined,
+      registroAtual.documento_veiculo_pdf &&
+      registroAtual.documento_veiculo_pdf !== registro.documento_veiculo_pdf
+        ? registroAtual.documento_veiculo_pdf
+        : undefined
+    ]);
     return mapVeiculoToResponse(registro);
   }
 
   async removerVeiculo(rawId: string) {
     const id = this.parseId(rawId);
+    const registro = await this.repository.buscarVeiculoPorIdOuFalhar(id);
     await this.repository.removerVeiculo(id);
+    await storageService.rollbackArquivos([
+      registro.foto_frente ?? undefined,
+      registro.foto_lateral_esquerda ?? undefined,
+      registro.foto_lateral_direita ?? undefined,
+      registro.foto_traseira ?? undefined,
+      registro.documento_veiculo_pdf ?? undefined
+    ]);
   }
 
   async listarDiario() {
