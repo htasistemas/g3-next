@@ -180,6 +180,33 @@ const tableConfigs: TableConfig[] = [
 ];
 
 const dryRun = process.argv.includes("--dry-run");
+const tablesArg = process.argv.find((arg) => arg.startsWith("--tables="));
+
+function obterTabelasSelecionadas() {
+  if (!tablesArg) {
+    return null;
+  }
+
+  const tabelas = tablesArg
+    .slice("--tables=".length)
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (!tabelas.length) {
+    throw new Error("Informe ao menos uma tabela valida em --tables.");
+  }
+
+  const tabelasDisponiveis = new Set(tableConfigs.map((config) => config.table));
+  const invalidas = tabelas.filter((tabela) => !tabelasDisponiveis.has(tabela));
+  if (invalidas.length) {
+    throw new Error(`Tabelas invalidas em --tables: ${invalidas.join(", ")}.`);
+  }
+
+  return new Set(tabelas);
+}
+
+const tabelasSelecionadas = obterTabelasSelecionadas();
 
 async function tabelaExiste(tabela: string) {
   const rows = await prisma.$queryRawUnsafe<{ existe: boolean }[]>(
@@ -300,9 +327,18 @@ async function processarTabela(config: TableConfig): Promise<TableSummary> {
 
 async function main() {
   console.log(`[normalize-text] Modo: ${dryRun ? "dry-run" : "aplicacao"}`);
+  console.log(
+    `[normalize-text] Escopo: ${
+      tabelasSelecionadas ? [...tabelasSelecionadas].join(", ") : "todas as tabelas configuradas"
+    }`
+  );
   const summaries: TableSummary[] = [];
 
   for (const config of tableConfigs) {
+    if (tabelasSelecionadas && !tabelasSelecionadas.has(config.table)) {
+      continue;
+    }
+
     const summary = await processarTabela(config);
     summaries.push(summary);
     if (summary.ignorada) {

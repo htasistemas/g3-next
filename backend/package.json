@@ -11,6 +11,8 @@
     "test:text": "tsx --test src/config/__tests__/google-client-ids.test.ts src/utils/__tests__/text-formatter.test.ts src/modules/__tests__/text-normalization.integration.test.ts src/modules/arquivos/services/__tests__/storage-utils.test.ts src/modules/beneficiarios/__tests__/beneficiario.schema.test.ts src/modules/autorizacao-compras/__tests__/autorizacao-compras.workflow.test.ts src/modules/contabilidade/__tests__/contabilidade.workflow.test.ts",
     "normalize:text": "tsx scripts/normalize-text-data.ts",
     "normalize:text:dry-run": "tsx scripts/normalize-text-data.ts --dry-run",
+    "normalize:beneficiarios": "tsx scripts/normalize-text-data.ts --tables=cadastro_beneficiario,contato_beneficiario",
+    "normalize:beneficiarios:dry-run": "tsx scripts/normalize-text-data.ts --dry-run --tables=cadastro_beneficiario,contato_beneficiario",
     "prisma:generate": "prisma generate",
     "prisma:studio": "prisma studio",
     "dev:seed-admin": "tsx scripts/seed-dev-admin.ts"

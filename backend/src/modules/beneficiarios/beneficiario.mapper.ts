@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { formatarTextoPorTipo } from "../../utils/text-formatter.js";
 import { splitSemicolonList, toIsoDate, toStringId } from "../../utils/string-utils.js";
 
 type BeneficiarioContatoRecord = {
@@ -29,6 +30,12 @@ export type BeneficiarioDbRecord = Prisma.CadastroBeneficiarioGetPayload<{
 
 function findDocByType(docs: BeneficiarioDbRecord["documentos"], type: string) {
   return docs.find((doc) => doc.tipoDocumento === type);
+}
+
+function formatarNomePessoaOpcional(valor?: string | null) {
+  if (!valor) return undefined;
+  const formatado = formatarTextoPorTipo(valor, "nomePessoa");
+  return formatado || undefined;
 }
 
 export function mapBeneficiarioToResponse(record: BeneficiarioDbRecord) {
@@ -67,9 +74,9 @@ export function mapBeneficiarioToResponse(record: BeneficiarioDbRecord) {
   return {
     id_beneficiario: toStringId(record.id),
     codigo: record.codigo ?? undefined,
-    nome_completo: record.nomeCompleto,
-    nome_social: record.nomeSocial ?? undefined,
-    apelido: record.apelido ?? undefined,
+    nome_completo: formatarNomePessoaOpcional(record.nomeCompleto) ?? record.nomeCompleto,
+    nome_social: formatarNomePessoaOpcional(record.nomeSocial),
+    apelido: formatarNomePessoaOpcional(record.apelido),
     data_nascimento: toIsoDate(record.dataNascimento),
     foto_3x4: record.foto3x4 ?? undefined,
     sexo_biologico: record.sexoBiologico ?? undefined,
@@ -79,8 +86,8 @@ export function mapBeneficiarioToResponse(record: BeneficiarioDbRecord) {
     nacionalidade: record.nacionalidade ?? undefined,
     naturalidade_cidade: record.naturalidadeCidade ?? undefined,
     naturalidade_uf: record.naturalidadeUf ?? undefined,
-    nome_mae: record.nomeMae,
-    nome_pai: record.nomePai ?? undefined,
+    nome_mae: formatarNomePessoaOpcional(record.nomeMae) ?? record.nomeMae,
+    nome_pai: formatarNomePessoaOpcional(record.nomePai),
     status: record.status ?? "EM_ANALISE",
     opta_receber_cesta_basica: record.optaReceberCestaBasica ?? undefined,
     apto_receber_cesta_basica: record.aptoReceberCestaBasica ?? undefined,
@@ -99,7 +106,7 @@ export function mapBeneficiarioToResponse(record: BeneficiarioDbRecord) {
     telefone_principal: contato?.telefonePrincipal ?? undefined,
     telefone_principal_whatsapp: contato?.telefonePrincipalWhatsapp ?? undefined,
     telefone_secundario: contato?.telefoneSecundario ?? undefined,
-    telefone_recado_nome: contato?.telefoneRecadoNome ?? undefined,
+    telefone_recado_nome: formatarNomePessoaOpcional(contato?.telefoneRecadoNome),
     telefone_recado_numero: contato?.telefoneRecadoNumero ?? undefined,
     email: contato?.email ?? undefined,
     permite_contato_tel: contato?.permiteContatoTel ?? undefined,
