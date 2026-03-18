@@ -42,6 +42,7 @@ import { rhContratacaoRoutes } from "../modules/rh-contratacao/routes/rh-contrat
 import { mensagensPersonalizadasRoutes } from "../modules/mensagens-personalizadas/routes/mensagens-personalizadas.routes.js";
 import { arquivosRoutes } from "../modules/arquivos/routes/arquivos.routes.js";
 import { chamadoTecnicoRoutes } from "../modules/chamados-tecnicos/routes/chamado-tecnico.routes.js";
+import { atualizacaoSistemaRoutes } from "../modules/atualizacao-sistema/routes/atualizacao-sistema.routes.js";
 
 export const appRoutes = Router();
 
@@ -89,6 +90,7 @@ appRoutes.use("/api/arquivos", arquivosRoutes);
 appRoutes.use("/api/dashboard", dashboardRoutes);
 appRoutes.use("/api/chamados-tecnicos", chamadoTecnicoRoutes);
 appRoutes.use("/api/configuracoes/parametros", parametrosSistemaRoutes);
+appRoutes.use("/api/configuracoes/atualizar-sistema", atualizacaoSistemaRoutes);
 appRoutes.use("/api/usuarios", usuarioRoutes);
 appRoutes.use("/api/mensagens-personalizadas", mensagensPersonalizadasRoutes);
 appRoutes.use(

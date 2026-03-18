@@ -18,13 +18,24 @@ export type VeiculoInput = {
 export type DiarioBordoInput = {
   veiculoId?: number | null;
   data?: string | null;
+  dataSaida?: string | null;
+  dataChegada?: string | null;
   condutor?: string | null;
   horarioSaida?: string | null;
   kmInicial?: number | null;
   horarioChegada?: string | null;
   kmFinal?: number | null;
+  localDestinoId?: number | null;
   destino?: string | null;
+  combustivelConsumidoLitros?: number | null;
   observacoes?: string | null;
+};
+
+export type LocalDestinoInput = {
+  nome?: string | null;
+  endereco?: string | null;
+  observacoes?: string | null;
+  ativo?: boolean | null;
 };
 
 export type MotoristaAutorizadoInput = {
@@ -59,16 +70,30 @@ export type DiarioBordoRow = {
   id: bigint;
   veiculo_id: bigint | null;
   data: Date | null;
+  data_saida: Date | null;
+  data_chegada: Date | null;
   condutor: string | null;
   horario_saida: Date | string | null;
   km_inicial: number | null;
   horario_chegada: Date | string | null;
   km_final: number | null;
+  local_destino_id: bigint | null;
+  local_destino_nome: string | null;
   destino: string | null;
   combustivel_consumido_litros: number | null;
   km_rodados: number | null;
   media_consumo: number | null;
   observacoes: string | null;
+};
+
+export type LocalDestinoRow = {
+  id: bigint;
+  nome: string | null;
+  endereco: string | null;
+  observacoes: string | null;
+  ativo: boolean | null;
+  criado_em: Date;
+  atualizado_em: Date;
 };
 
 export type MotoristaAutorizadoRow = {

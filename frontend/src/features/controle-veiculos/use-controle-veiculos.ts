@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { controleVeiculosService } from "@/services/controle-veiculos.service";
 import type {
+  LocalDestinoVeiculo,
   MotoristaAutorizado,
   RegistroDiarioBordo,
   VeiculoCadastro
@@ -17,6 +18,13 @@ export function useDiarioBordo() {
   return useQuery({
     queryKey: ["controle-veiculos", "diario-bordo"],
     queryFn: () => controleVeiculosService.listarDiario()
+  });
+}
+
+export function useLocaisDestinoVeiculo() {
+  return useQuery({
+    queryKey: ["controle-veiculos", "locais-destino"],
+    queryFn: () => controleVeiculosService.listarLocaisDestino()
   });
 }
 
@@ -76,6 +84,32 @@ export function useRemoverDiarioBordo() {
   return useMutation({
     mutationFn: (id: number) => controleVeiculosService.removerDiario(id),
     onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["controle-veiculos", "diario-bordo"] });
+    }
+  });
+}
+
+export function useSalvarLocalDestinoVeiculo() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: LocalDestinoVeiculo) => {
+      if (payload.id) {
+        return controleVeiculosService.atualizarLocalDestino(payload.id, payload);
+      }
+      return controleVeiculosService.criarLocalDestino(payload);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["controle-veiculos", "locais-destino"] });
+    }
+  });
+}
+
+export function useRemoverLocalDestinoVeiculo() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => controleVeiculosService.removerLocalDestino(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["controle-veiculos", "locais-destino"] });
       await queryClient.invalidateQueries({ queryKey: ["controle-veiculos", "diario-bordo"] });
     }
   });

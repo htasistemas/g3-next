@@ -52,12 +52,16 @@ export const veiculoInputSchema = z.object({
 export const diarioBordoInputSchema = z.object({
   veiculoId: optionalInteger.nullable().optional(),
   data: optionalIsoDate.nullable().optional(),
+  dataSaida: optionalIsoDate.nullable().optional(),
+  dataChegada: optionalIsoDate.nullable().optional(),
   condutor: optionalTrimmedString.nullable().optional(),
   horarioSaida: optionalHour.nullable().optional(),
   kmInicial: optionalNumber.nullable().optional(),
   horarioChegada: optionalHour.nullable().optional(),
   kmFinal: optionalNumber.nullable().optional(),
+  localDestinoId: optionalInteger.nullable().optional(),
   destino: optionalTrimmedString.nullable().optional(),
+  combustivelConsumidoLitros: optionalNumber.nullable().optional(),
   observacoes: optionalTrimmedString.nullable().optional()
 });
 
@@ -69,4 +73,11 @@ export const motoristaAutorizadoInputSchema = z.object({
   categoriaCarteira: optionalTrimmedString.nullable().optional(),
   vencimentoCarteira: optionalIsoDate.nullable().optional(),
   arquivoCarteiraPdf: optionalTrimmedString.nullable().optional()
+});
+
+export const localDestinoInputSchema = z.object({
+  nome: optionalTrimmedString.nullable().optional(),
+  endereco: optionalTrimmedString.nullable().optional(),
+  observacoes: optionalTrimmedString.nullable().optional(),
+  ativo: z.boolean().nullable().optional()
 });

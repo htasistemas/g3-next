@@ -3,11 +3,13 @@ import { mapaCamposTextoControleVeiculos } from "../../../utils/text-format-conf
 import { normalizarObjetoTexto } from "../../../utils/text-formatter.js";
 import {
   mapDiarioBordoToResponse,
+  mapLocalDestinoToResponse,
   mapMotoristaAutorizadoToResponse,
   mapVeiculoToResponse
 } from "../controle-veiculos.mapper.js";
 import {
   diarioBordoInputSchema,
+  localDestinoInputSchema,
   motoristaAutorizadoInputSchema,
   veiculoInputSchema
 } from "../controle-veiculos.schema.js";
@@ -60,6 +62,35 @@ export class ControleVeiculosService {
   async removerDiario(rawId: string) {
     const id = this.parseId(rawId);
     await this.repository.removerDiario(id);
+  }
+
+  async listarLocaisDestino() {
+    const registros = await this.repository.listarLocaisDestino();
+    return registros.map(mapLocalDestinoToResponse);
+  }
+
+  async criarLocalDestino(rawInput: unknown) {
+    const input = localDestinoInputSchema.parse(this.normalizarPayload(rawInput));
+    if (!input.nome) {
+      throw new AppError("Informe o nome do local de destino.", 400);
+    }
+    const registro = await this.repository.criarLocalDestino(input);
+    return mapLocalDestinoToResponse(registro);
+  }
+
+  async atualizarLocalDestino(rawId: string, rawInput: unknown) {
+    const id = this.parseId(rawId);
+    const input = localDestinoInputSchema.parse(this.normalizarPayload(rawInput));
+    if (!input.nome) {
+      throw new AppError("Informe o nome do local de destino.", 400);
+    }
+    const registro = await this.repository.atualizarLocalDestino(id, input);
+    return mapLocalDestinoToResponse(registro);
+  }
+
+  async removerLocalDestino(rawId: string) {
+    const id = this.parseId(rawId);
+    await this.repository.removerLocalDestino(id);
   }
 
   async listarMotoristasDisponiveis(rawNome?: unknown) {

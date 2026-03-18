@@ -5,6 +5,8 @@ import { toOptionalDate, trimOrUndefined } from "../../../utils/string-utils.js"
 import type {
   DiarioBordoInput,
   DiarioBordoRow,
+  LocalDestinoInput,
+  LocalDestinoRow,
   MotoristaAutorizadoInput,
   MotoristaAutorizadoRow,
   VeiculoInput,
@@ -29,6 +31,57 @@ function calcularMediaConsumo(
   if (!kmRodados || !combustivelConsumidoLitros) return null;
   if (combustivelConsumidoLitros <= 0) return null;
   return Number((kmRodados / combustivelConsumidoLitros).toFixed(2));
+}
+
+const controleVeiculosEstruturaStatements = [
+  `
+    CREATE TABLE IF NOT EXISTS controle_veiculos_local_destino (
+      id BIGSERIAL PRIMARY KEY,
+      nome VARCHAR(160) NOT NULL,
+      endereco VARCHAR(220),
+      observacoes TEXT,
+      ativo BOOLEAN NOT NULL DEFAULT TRUE,
+      criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+      atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+  `,
+  "ALTER TABLE controle_veiculos_diario ADD COLUMN IF NOT EXISTS data_saida DATE",
+  "ALTER TABLE controle_veiculos_diario ADD COLUMN IF NOT EXISTS data_chegada DATE",
+  "ALTER TABLE controle_veiculos_diario ADD COLUMN IF NOT EXISTS local_destino_id BIGINT",
+  `
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.table_constraints
+        WHERE constraint_name = 'controle_veiculos_diario_local_destino_fk'
+          AND table_name = 'controle_veiculos_diario'
+      ) THEN
+        ALTER TABLE controle_veiculos_diario
+        ADD CONSTRAINT controle_veiculos_diario_local_destino_fk
+        FOREIGN KEY (local_destino_id) REFERENCES controle_veiculos_local_destino(id);
+      END IF;
+    END $$;
+  `,
+  "CREATE INDEX IF NOT EXISTS controle_veiculos_diario_local_destino_idx ON controle_veiculos_diario(local_destino_id)",
+  "CREATE INDEX IF NOT EXISTS controle_veiculos_local_destino_nome_idx ON controle_veiculos_local_destino(nome)"
+] as const;
+
+let ensureControleVeiculosEstruturaPromise: Promise<void> | null = null;
+
+export async function ensureControleVeiculosEstrutura() {
+  if (!ensureControleVeiculosEstruturaPromise) {
+    ensureControleVeiculosEstruturaPromise = (async () => {
+      for (const statement of controleVeiculosEstruturaStatements) {
+        await prisma.$executeRawUnsafe(statement);
+      }
+    })().catch((error) => {
+      ensureControleVeiculosEstruturaPromise = null;
+      throw error;
+    });
+  }
+
+  await ensureControleVeiculosEstruturaPromise;
 }
 
 export class ControleVeiculosRepository {
@@ -62,7 +115,12 @@ export class ControleVeiculosRepository {
     return this.fontesMotoristasPromise;
   }
 
+  private async ensureEstrutura() {
+    await ensureControleVeiculosEstrutura();
+  }
+
   async listarVeiculos() {
+    await this.ensureEstrutura();
     return prisma.$queryRaw<VeiculoRow[]>(Prisma.sql`
       SELECT
         id,
@@ -86,6 +144,7 @@ export class ControleVeiculosRepository {
   }
 
   async buscarVeiculoPorId(id: bigint) {
+    await this.ensureEstrutura();
     const rows = await prisma.$queryRaw<VeiculoRow[]>(Prisma.sql`
       SELECT
         id,
@@ -119,6 +178,7 @@ export class ControleVeiculosRepository {
   }
 
   async criarVeiculo(input: VeiculoInput) {
+    await this.ensureEstrutura();
     const inserted = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
       INSERT INTO controle_veiculos (
         placa,
@@ -166,6 +226,7 @@ export class ControleVeiculosRepository {
   }
 
   async atualizarVeiculo(id: bigint, input: VeiculoInput) {
+    await this.ensureEstrutura();
     await this.buscarVeiculoPorIdOuFalhar(id);
     await prisma.$executeRaw(Prisma.sql`
       UPDATE controle_veiculos
@@ -191,6 +252,7 @@ export class ControleVeiculosRepository {
   }
 
   async removerVeiculo(id: bigint) {
+    await this.ensureEstrutura();
     await this.buscarVeiculoPorIdOuFalhar(id);
     await prisma.$executeRaw(Prisma.sql`
       DELETE FROM controle_veiculos
@@ -199,44 +261,56 @@ export class ControleVeiculosRepository {
   }
 
   async listarDiario() {
+    await this.ensureEstrutura();
     return prisma.$queryRaw<DiarioBordoRow[]>(Prisma.sql`
       SELECT
-        id,
-        veiculo_id,
-        data,
-        condutor,
-        horario_saida,
-        km_inicial::float8 AS km_inicial,
-        horario_chegada,
-        km_final::float8 AS km_final,
-        destino,
-        combustivel_consumido_litros::float8 AS combustivel_consumido_litros,
-        km_rodados::float8 AS km_rodados,
-        media_consumo::float8 AS media_consumo,
-        observacoes
-      FROM controle_veiculos_diario
-      ORDER BY data DESC NULLS LAST, id DESC
+        d.id,
+        d.veiculo_id,
+        d.data,
+        d.data_saida,
+        d.data_chegada,
+        d.condutor,
+        d.horario_saida,
+        d.km_inicial::float8 AS km_inicial,
+        d.horario_chegada,
+        d.km_final::float8 AS km_final,
+        d.local_destino_id,
+        ld.nome AS local_destino_nome,
+        d.destino,
+        d.combustivel_consumido_litros::float8 AS combustivel_consumido_litros,
+        d.km_rodados::float8 AS km_rodados,
+        d.media_consumo::float8 AS media_consumo,
+        d.observacoes
+      FROM controle_veiculos_diario d
+      LEFT JOIN controle_veiculos_local_destino ld ON ld.id = d.local_destino_id
+      ORDER BY d.data DESC NULLS LAST, d.id DESC
     `);
   }
 
   async buscarDiarioPorId(id: bigint) {
+    await this.ensureEstrutura();
     const rows = await prisma.$queryRaw<DiarioBordoRow[]>(Prisma.sql`
       SELECT
-        id,
-        veiculo_id,
-        data,
-        condutor,
-        horario_saida,
-        km_inicial::float8 AS km_inicial,
-        horario_chegada,
-        km_final::float8 AS km_final,
-        destino,
-        combustivel_consumido_litros::float8 AS combustivel_consumido_litros,
-        km_rodados::float8 AS km_rodados,
-        media_consumo::float8 AS media_consumo,
-        observacoes
-      FROM controle_veiculos_diario
-      WHERE id = ${id}
+        d.id,
+        d.veiculo_id,
+        d.data,
+        d.data_saida,
+        d.data_chegada,
+        d.condutor,
+        d.horario_saida,
+        d.km_inicial::float8 AS km_inicial,
+        d.horario_chegada,
+        d.km_final::float8 AS km_final,
+        d.local_destino_id,
+        ld.nome AS local_destino_nome,
+        d.destino,
+        d.combustivel_consumido_litros::float8 AS combustivel_consumido_litros,
+        d.km_rodados::float8 AS km_rodados,
+        d.media_consumo::float8 AS media_consumo,
+        d.observacoes
+      FROM controle_veiculos_diario d
+      LEFT JOIN controle_veiculos_local_destino ld ON ld.id = d.local_destino_id
+      WHERE d.id = ${id}
       LIMIT 1
     `);
     return rows[0] ?? null;
@@ -251,17 +325,21 @@ export class ControleVeiculosRepository {
   }
 
   async criarDiario(input: DiarioBordoInput) {
+    await this.ensureEstrutura();
     const kmRodados = calcularKmRodados(input.kmInicial, input.kmFinal);
-    const mediaConsumo = calcularMediaConsumo(kmRodados, null);
+    const mediaConsumo = calcularMediaConsumo(kmRodados, input.combustivelConsumidoLitros);
     const inserted = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
       INSERT INTO controle_veiculos_diario (
         veiculo_id,
         data,
+        data_saida,
+        data_chegada,
         condutor,
         horario_saida,
         km_inicial,
         horario_chegada,
         km_final,
+        local_destino_id,
         destino,
         combustivel_consumido_litros,
         km_rodados,
@@ -271,14 +349,17 @@ export class ControleVeiculosRepository {
         atualizado_em
       ) VALUES (
         ${input.veiculoId ? BigInt(input.veiculoId) : null},
-        ${toOptionalDate(input.data ?? undefined)},
+        ${toOptionalDate(input.data ?? input.dataSaida ?? undefined)},
+        ${toOptionalDate(input.dataSaida ?? input.data ?? undefined)},
+        ${toOptionalDate(input.dataChegada ?? undefined)},
         ${trimOrUndefined(input.condutor ?? undefined)},
         CAST(${toOptionalTime(input.horarioSaida ?? undefined)} AS TIME),
         ${input.kmInicial ?? null},
         CAST(${toOptionalTime(input.horarioChegada ?? undefined)} AS TIME),
         ${input.kmFinal ?? null},
+        ${input.localDestinoId ? BigInt(input.localDestinoId) : null},
         ${trimOrUndefined(input.destino ?? undefined)},
-        NULL,
+        ${input.combustivelConsumidoLitros ?? null},
         ${kmRodados},
         ${mediaConsumo},
         ${trimOrUndefined(input.observacoes ?? undefined)},
@@ -296,21 +377,26 @@ export class ControleVeiculosRepository {
   }
 
   async atualizarDiario(id: bigint, input: DiarioBordoInput) {
+    await this.ensureEstrutura();
     await this.buscarDiarioPorIdOuFalhar(id);
     const kmRodados = calcularKmRodados(input.kmInicial, input.kmFinal);
-    const mediaConsumo = calcularMediaConsumo(kmRodados, null);
+    const mediaConsumo = calcularMediaConsumo(kmRodados, input.combustivelConsumidoLitros);
 
     await prisma.$executeRaw(Prisma.sql`
       UPDATE controle_veiculos_diario
       SET
         veiculo_id = ${input.veiculoId ? BigInt(input.veiculoId) : null},
-        data = ${toOptionalDate(input.data ?? undefined)},
+        data = ${toOptionalDate(input.data ?? input.dataSaida ?? undefined)},
+        data_saida = ${toOptionalDate(input.dataSaida ?? input.data ?? undefined)},
+        data_chegada = ${toOptionalDate(input.dataChegada ?? undefined)},
         condutor = ${trimOrUndefined(input.condutor ?? undefined)},
         horario_saida = CAST(${toOptionalTime(input.horarioSaida ?? undefined)} AS TIME),
         km_inicial = ${input.kmInicial ?? null},
         horario_chegada = CAST(${toOptionalTime(input.horarioChegada ?? undefined)} AS TIME),
         km_final = ${input.kmFinal ?? null},
+        local_destino_id = ${input.localDestinoId ? BigInt(input.localDestinoId) : null},
         destino = ${trimOrUndefined(input.destino ?? undefined)},
+        combustivel_consumido_litros = ${input.combustivelConsumidoLitros ?? null},
         km_rodados = ${kmRodados},
         media_consumo = ${mediaConsumo},
         observacoes = ${trimOrUndefined(input.observacoes ?? undefined)},
@@ -322,6 +408,7 @@ export class ControleVeiculosRepository {
   }
 
   async removerDiario(id: bigint) {
+    await this.ensureEstrutura();
     await this.buscarDiarioPorIdOuFalhar(id);
     await prisma.$executeRaw(Prisma.sql`
       DELETE FROM controle_veiculos_diario
@@ -330,6 +417,7 @@ export class ControleVeiculosRepository {
   }
 
   async listarMotoristasDisponiveis(nome?: string) {
+    await this.ensureEstrutura();
     const termo = trimOrUndefined(nome);
     const { tabelaProfissionais, possuiVoluntarios } = await this.obterFontesMotoristas();
     const fontes: string[] = [];
@@ -367,6 +455,7 @@ export class ControleVeiculosRepository {
   }
 
   async listarMotoristasAutorizados(veiculoId?: number | null) {
+    await this.ensureEstrutura();
     const filtroVeiculo = veiculoId
       ? Prisma.sql`AND ma.veiculo_id = ${BigInt(veiculoId)}`
       : Prisma.empty;
@@ -394,6 +483,7 @@ export class ControleVeiculosRepository {
   }
 
   async buscarMotoristaAutorizadoPorId(id: bigint) {
+    await this.ensureEstrutura();
     const rows = await prisma.$queryRaw<MotoristaAutorizadoRow[]>(Prisma.sql`
       SELECT
         ma.id,
@@ -425,6 +515,7 @@ export class ControleVeiculosRepository {
   }
 
   async criarMotoristaAutorizado(input: MotoristaAutorizadoInput) {
+    await this.ensureEstrutura();
     await this.buscarVeiculoPorIdOuFalhar(BigInt(input.veiculoId));
     const nomeMotorista = await this.buscarNomeMotorista(input.tipoOrigem, input.motoristaId);
 
@@ -465,6 +556,7 @@ export class ControleVeiculosRepository {
   }
 
   async atualizarMotoristaAutorizado(id: bigint, input: MotoristaAutorizadoInput) {
+    await this.ensureEstrutura();
     await this.buscarMotoristaAutorizadoPorIdOuFalhar(id);
     await this.buscarVeiculoPorIdOuFalhar(BigInt(input.veiculoId));
     const nomeMotorista = await this.buscarNomeMotorista(input.tipoOrigem, input.motoristaId);
@@ -489,9 +581,110 @@ export class ControleVeiculosRepository {
   }
 
   async removerMotoristaAutorizado(id: bigint) {
+    await this.ensureEstrutura();
     await this.buscarMotoristaAutorizadoPorIdOuFalhar(id);
     await prisma.$executeRaw(Prisma.sql`
       DELETE FROM controle_veiculos_motoristas_autorizados
+      WHERE id = ${id}
+    `);
+  }
+
+  async listarLocaisDestino() {
+    await this.ensureEstrutura();
+    return prisma.$queryRaw<LocalDestinoRow[]>(Prisma.sql`
+      SELECT
+        id,
+        nome,
+        endereco,
+        observacoes,
+        ativo,
+        criado_em,
+        atualizado_em
+      FROM controle_veiculos_local_destino
+      ORDER BY ativo DESC, nome ASC, id DESC
+    `);
+  }
+
+  async buscarLocalDestinoPorId(id: bigint) {
+    await this.ensureEstrutura();
+    const rows = await prisma.$queryRaw<LocalDestinoRow[]>(Prisma.sql`
+      SELECT
+        id,
+        nome,
+        endereco,
+        observacoes,
+        ativo,
+        criado_em,
+        atualizado_em
+      FROM controle_veiculos_local_destino
+      WHERE id = ${id}
+      LIMIT 1
+    `);
+    return rows[0] ?? null;
+  }
+
+  async buscarLocalDestinoPorIdOuFalhar(id: bigint) {
+    const registro = await this.buscarLocalDestinoPorId(id);
+    if (!registro) {
+      throw new AppError("Local de destino nao encontrado.", 404);
+    }
+    return registro;
+  }
+
+  async criarLocalDestino(input: LocalDestinoInput) {
+    await this.ensureEstrutura();
+    const inserted = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+      INSERT INTO controle_veiculos_local_destino (
+        nome,
+        endereco,
+        observacoes,
+        ativo,
+        criado_em,
+        atualizado_em
+      ) VALUES (
+        ${trimOrUndefined(input.nome ?? undefined)},
+        ${trimOrUndefined(input.endereco ?? undefined)},
+        ${trimOrUndefined(input.observacoes ?? undefined)},
+        ${input.ativo ?? true},
+        NOW(),
+        NOW()
+      )
+      RETURNING id
+    `);
+
+    const id = inserted[0]?.id;
+    if (!id) {
+      throw new AppError("Nao foi possivel criar o local de destino.", 500);
+    }
+    return this.buscarLocalDestinoPorIdOuFalhar(id);
+  }
+
+  async atualizarLocalDestino(id: bigint, input: LocalDestinoInput) {
+    await this.ensureEstrutura();
+    await this.buscarLocalDestinoPorIdOuFalhar(id);
+    await prisma.$executeRaw(Prisma.sql`
+      UPDATE controle_veiculos_local_destino
+      SET
+        nome = ${trimOrUndefined(input.nome ?? undefined)},
+        endereco = ${trimOrUndefined(input.endereco ?? undefined)},
+        observacoes = ${trimOrUndefined(input.observacoes ?? undefined)},
+        ativo = ${input.ativo ?? true},
+        atualizado_em = NOW()
+      WHERE id = ${id}
+    `);
+    return this.buscarLocalDestinoPorIdOuFalhar(id);
+  }
+
+  async removerLocalDestino(id: bigint) {
+    await this.ensureEstrutura();
+    await this.buscarLocalDestinoPorIdOuFalhar(id);
+    await prisma.$executeRaw(Prisma.sql`
+      UPDATE controle_veiculos_diario
+      SET local_destino_id = NULL
+      WHERE local_destino_id = ${id}
+    `);
+    await prisma.$executeRaw(Prisma.sql`
+      DELETE FROM controle_veiculos_local_destino
       WHERE id = ${id}
     `);
   }

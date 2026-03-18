@@ -1,5 +1,6 @@
 import { httpClient } from "./http-client";
 import type {
+  LocalDestinoVeiculo,
   MotoristaAutorizado,
   MotoristaDisponivel,
   RegistroDiarioBordo,
@@ -54,6 +55,28 @@ export const controleVeiculosService = {
     await httpClient.delete(`/api/controle-veiculos/diario-bordo/${id}`);
   },
 
+  async listarLocaisDestino() {
+    const { data } = await httpClient.get<LocalDestinoVeiculo[]>("/api/controle-veiculos/locais-destino");
+    return data;
+  },
+
+  async criarLocalDestino(payload: LocalDestinoVeiculo) {
+    const { data } = await httpClient.post<LocalDestinoVeiculo>("/api/controle-veiculos/locais-destino", payload);
+    return data;
+  },
+
+  async atualizarLocalDestino(id: number, payload: LocalDestinoVeiculo) {
+    const { data } = await httpClient.put<LocalDestinoVeiculo>(
+      `/api/controle-veiculos/locais-destino/${id}`,
+      payload
+    );
+    return data;
+  },
+
+  async removerLocalDestino(id: number) {
+    await httpClient.delete(`/api/controle-veiculos/locais-destino/${id}`);
+  },
+
   async listarMotoristasDisponiveis(nome?: string) {
     const { data } = await httpClient.get<MotoristaDisponivel[]>(
       "/api/controle-veiculos/motoristas-disponiveis",
@@ -88,5 +111,27 @@ export const controleVeiculosService = {
 
   async removerMotoristaAutorizado(id: number) {
     await httpClient.delete(`/api/controle-veiculos/motoristas-autorizados/${id}`);
+  },
+
+  async uploadFotoVeiculo(arquivo: File, veiculoId?: number | null) {
+    const formData = new FormData();
+    formData.append("scope", "veiculo_foto");
+    formData.append("entidadeTipo", "controle_veiculo");
+    if (veiculoId) {
+      formData.append("entidadeId", String(veiculoId));
+    }
+    formData.append("arquivo", arquivo);
+
+    const { data } = await httpClient.post<{ arquivo: { caminho_arquivo: string } }>(
+      "/api/arquivos/upload",
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data"
+        }
+      }
+    );
+
+    return data.arquivo.caminho_arquivo;
   }
 };

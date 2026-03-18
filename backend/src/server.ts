@@ -12,6 +12,8 @@ import { ensureMensagensPersonalizadasBase } from "./modules/mensagens-personali
 import { ensureOcorrenciasCriancaEstrutura } from "./modules/ocorrencias-crianca/repositories/ocorrencias-crianca.repository.js";
 import { ensureRegistroPontoEstrutura } from "./modules/registro-ponto/repositories/registro-ponto-estrutura.repository.js";
 import { ensureSenhasEstrutura } from "./modules/senhas/repositories/senhas.repository.js";
+import { ensureAtualizacaoSistemaEstrutura } from "./modules/atualizacao-sistema/repositories/atualizacao-sistema.repository.js";
+import { iniciarAtualizacaoSistemaScheduler } from "./modules/atualizacao-sistema/services/atualizacao-sistema.scheduler.js";
 import { ensureUsuariosGestaoEstrutura } from "./modules/usuarios/repositories/usuario-estrutura.repository.js";
 import { ensureVisitasDomiciliaresEstrutura } from "./modules/visitas-domiciliares/repositories/visitas-domiciliares.repository.js";
 
@@ -19,6 +21,7 @@ async function aquecerEstruturasDeTela() {
   const aquecimentos: Array<{ nome: string; promise: Promise<unknown> }> = [
     { nome: "arquivos", promise: ensureArquivosEstrutura(prisma) },
     { nome: "parametros-sistema", promise: ensureParametrosSistemaEstrutura() },
+    { nome: "atualizacao-sistema", promise: ensureAtualizacaoSistemaEstrutura() },
     { nome: "contabilidade", promise: ensureContabilidadeEstrutura() },
     { nome: "autorizacao-compras", promise: ensureAutorizacaoComprasEstrutura() },
     { nome: "banco-empregos", promise: ensureBancoEmpregosEstrutura() },
@@ -53,6 +56,7 @@ async function bootstrap() {
       `[g3-backend-node] executando em http://${env.API_HOST}:${env.API_PORT}`
     );
     void aquecerEstruturasDeTela();
+    iniciarAtualizacaoSistemaScheduler();
   });
 }
 

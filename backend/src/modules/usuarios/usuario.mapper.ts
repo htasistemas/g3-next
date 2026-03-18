@@ -59,6 +59,21 @@ const permissaoCatalogoFixo: Record<
     modulo: "Configuracoes gerais",
     tela: "Chamado tecnico",
     acao: "Desenvolvimento"
+  },
+  CONFIG_ATUALIZAR_SISTEMA: {
+    modulo: "Configuracoes gerais",
+    tela: "Atualizar sistema",
+    acao: "Atualizar sistema"
+  },
+  CONFIG_ALTERAR_MODO_ATUALIZACAO: {
+    modulo: "Configuracoes gerais",
+    tela: "Atualizar sistema",
+    acao: "Alterar modo"
+  },
+  CONFIG_EXECUTAR_ROLLBACK: {
+    modulo: "Configuracoes gerais",
+    tela: "Atualizar sistema",
+    acao: "Executar rollback"
   }
 };
 

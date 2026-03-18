@@ -44,6 +44,26 @@ export class ControleVeiculosController {
     return response.status(204).send();
   }
 
+  async listarLocaisDestino(_request: Request, response: Response) {
+    const locais = await service.listarLocaisDestino();
+    return response.json(locais);
+  }
+
+  async criarLocalDestino(request: Request, response: Response) {
+    const local = await service.criarLocalDestino(request.body);
+    return response.status(201).json(local);
+  }
+
+  async atualizarLocalDestino(request: Request, response: Response) {
+    const local = await service.atualizarLocalDestino(request.params.id, request.body);
+    return response.json(local);
+  }
+
+  async removerLocalDestino(request: Request, response: Response) {
+    await service.removerLocalDestino(request.params.id);
+    return response.status(204).send();
+  }
+
   async listarMotoristasDisponiveis(request: Request, response: Response) {
     const motoristas = await service.listarMotoristasDisponiveis(request.query.nome);
     return response.json(motoristas);

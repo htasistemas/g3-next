@@ -65,6 +65,31 @@ controleVeiculosRoutes.delete(
 );
 
 controleVeiculosRoutes.get(
+  "/locais-destino",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.listarLocaisDestino.bind(controller))
+);
+controleVeiculosRoutes.post(
+  "/locais-destino",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.criarLocalDestino.bind(controller))
+);
+controleVeiculosRoutes.put(
+  "/locais-destino/:id",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.atualizarLocalDestino.bind(controller))
+);
+controleVeiculosRoutes.delete(
+  "/locais-destino/:id",
+  ensureAuthenticated,
+  ensurePermissions(permissaoExclusao),
+  asyncHandler(controller.removerLocalDestino.bind(controller))
+);
+
+controleVeiculosRoutes.get(
   "/motoristas-disponiveis",
   ensureAuthenticated,
   ensurePermissions(permissoesLeitura),

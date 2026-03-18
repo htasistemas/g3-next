@@ -124,6 +124,10 @@ const routeModules: RouteModuleDefinition[] = [
     path: "/configuracoes/parametros-sistema",
     loader: () => import("@/pages/configuracoes/parametros-sistema-page")
   },
+  {
+    path: "/configuracoes/atualizar-sistema",
+    loader: () => import("@/pages/configuracoes/atualizar-sistema-page")
+  },
   { path: "/configuracoes/usuarios", loader: () => import("@/pages/configuracoes/usuarios-page") },
   {
     path: "/configuracoes/mensagens-personalizadas",

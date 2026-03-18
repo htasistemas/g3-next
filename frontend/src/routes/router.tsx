@@ -102,6 +102,10 @@ const ParametrosSistemaPage = carregarPagina(
   "/configuracoes/parametros-sistema",
   "ParametrosSistemaPage"
 );
+const AtualizarSistemaPage = carregarPagina(
+  "/configuracoes/atualizar-sistema",
+  "AtualizarSistemaPage"
+);
 const UsuariosPage = carregarPagina("/configuracoes/usuarios", "UsuariosPage");
 const MensagensPersonalizadasPage = carregarPagina(
   "/configuracoes/mensagens-personalizadas",
@@ -177,6 +181,21 @@ export const router = createBrowserRouter([
         element: (
           <RequirePermission permissions={["ADMINISTRADOR"]}>
             {ParametrosSistemaPage}
+          </RequirePermission>
+        )
+      },
+      {
+        path: "/configuracoes/atualizar-sistema",
+        element: (
+          <RequirePermission
+            permissions={[
+              "ADMINISTRADOR",
+              "CONFIG_ATUALIZAR_SISTEMA",
+              "CONFIG_ALTERAR_MODO_ATUALIZACAO",
+              "CONFIG_EXECUTAR_ROLLBACK"
+            ]}
+          >
+            {AtualizarSistemaPage}
           </RequirePermission>
         )
       },

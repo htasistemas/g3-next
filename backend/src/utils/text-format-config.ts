@@ -290,6 +290,8 @@ export const mapaCamposTextoControleVeiculos: Record<string, TipoFormatacaoTexto
   marca: "instituicao",
   tipoCombustivel: "textoCurto",
   observacoes: "textoCurto",
+  nome: "instituicao",
+  endereco: "endereco",
   condutor: "nomePessoa",
   destino: "endereco",
   tipoOrigem: "textoCurto",

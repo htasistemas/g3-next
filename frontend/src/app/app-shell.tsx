@@ -50,6 +50,7 @@ import {
   MapPinned,
   MonitorDot,
   Presentation,
+  RefreshCcw,
   Scale,
   ScrollText,
   Settings2,
@@ -377,6 +378,18 @@ export const menuSections: MenuSection[] = [
         ]
       },
       {
+        id: "configuracoes-atualizar-sistema",
+        to: "/configuracoes/atualizar-sistema",
+        label: "Atualizar sistema",
+        icon: RefreshCcw,
+        requiredPermissions: [
+          "ADMINISTRADOR",
+          "CONFIG_ATUALIZAR_SISTEMA",
+          "CONFIG_ALTERAR_MODO_ATUALIZACAO",
+          "CONFIG_EXECUTAR_ROLLBACK"
+        ]
+      },
+      {
         id: "configuracoes-parametros-sistema",
         to: "/configuracoes/parametros-sistema",
         label: "Parâmetros do sistema",
@@ -413,6 +426,7 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/cadastros/unidades-assistenciais")) return "Cadastro de unidade assistencial";
   if (pathname.startsWith("/cadastros/vinculo-familiar")) return "Cadastro de vínculo familiar";
   if (pathname.startsWith("/configuracoes/parametros-sistema")) return "Parâmetros do sistema";
+  if (pathname.startsWith("/configuracoes/atualizar-sistema")) return "Atualizar sistema";
   if (pathname.startsWith("/configuracoes/chamado-tecnico")) return "Chamado técnico";
   if (pathname.startsWith("/configuracoes/mensagens-personalizadas")) return "Mensagens personalizadas";
   if (pathname.startsWith("/configuracoes/usuarios")) return "Usuários";

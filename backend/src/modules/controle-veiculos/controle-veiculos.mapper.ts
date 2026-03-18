@@ -1,6 +1,7 @@
 import { toIsoDate, toStringId } from "../../utils/string-utils.js";
 import type {
   DiarioBordoRow,
+  LocalDestinoRow,
   MotoristaAutorizadoRow,
   VeiculoRow
 } from "./controle-veiculos.types.js";
@@ -40,16 +41,33 @@ export function mapDiarioBordoToResponse(row: DiarioBordoRow) {
     idInterno: toStringId(row.id),
     veiculoId: row.veiculo_id ? Number(row.veiculo_id) : null,
     data: toIsoDate(row.data),
+    dataSaida: toIsoDate(row.data_saida),
+    dataChegada: toIsoDate(row.data_chegada),
     condutor: row.condutor,
     horarioSaida: formatarHora(row.horario_saida),
     kmInicial: row.km_inicial,
     horarioChegada: formatarHora(row.horario_chegada),
     kmFinal: row.km_final,
+    localDestinoId: row.local_destino_id ? Number(row.local_destino_id) : null,
+    localDestinoNome: row.local_destino_nome,
     destino: row.destino,
     combustivelConsumidoLitros: row.combustivel_consumido_litros,
     kmRodados: row.km_rodados,
     mediaConsumo: row.media_consumo,
     observacoes: row.observacoes
+  };
+}
+
+export function mapLocalDestinoToResponse(row: LocalDestinoRow) {
+  return {
+    id: Number(row.id),
+    idInterno: toStringId(row.id),
+    nome: row.nome,
+    endereco: row.endereco,
+    observacoes: row.observacoes,
+    ativo: row.ativo,
+    criadoEm: row.criado_em.toISOString(),
+    atualizadoEm: row.atualizado_em.toISOString()
   };
 }
 

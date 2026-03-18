@@ -1,0 +1,17 @@
+{
+  "entries": [
+    {
+      "version": "1.00.170",
+      "releaseDate": "2026-03-18",
+      "title": "Mecanismo de atualização do sistema",
+      "description": "Inclusão da tela administrativa para atualização manual e automática, com histórico, logs e rollback.",
+      "changes": [
+        "Nova tela em Configurações gerais > Atualizar sistema.",
+        "Suporte a manifesto versionado, changelog, histórico e logs.",
+        "Fluxo com checksum, backup, aplicação de pacote e rollback.",
+        "Agendamento automático quando o modo estiver configurado como Automático."
+      ],
+      "releaseType": "stable"
+    }
+  ]
+}

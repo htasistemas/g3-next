@@ -20,16 +20,30 @@ export type RegistroDiarioBordo = {
   id?: number;
   veiculoId?: number | null;
   data?: string | null;
+  dataSaida?: string | null;
+  dataChegada?: string | null;
   condutor?: string | null;
   horarioSaida?: string | null;
   kmInicial?: number | null;
   horarioChegada?: string | null;
   kmFinal?: number | null;
+  localDestinoId?: number | null;
+  localDestinoNome?: string | null;
   destino?: string | null;
   combustivelConsumidoLitros?: number | null;
   kmRodados?: number | null;
   mediaConsumo?: number | null;
   observacoes?: string | null;
+};
+
+export type LocalDestinoVeiculo = {
+  id?: number;
+  nome?: string | null;
+  endereco?: string | null;
+  observacoes?: string | null;
+  ativo?: boolean | null;
+  criadoEm?: string | null;
+  atualizadoEm?: string | null;
 };
 
 export type MotoristaDisponivel = {
