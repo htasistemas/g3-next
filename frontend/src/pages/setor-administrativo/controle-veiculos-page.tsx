@@ -1059,10 +1059,10 @@ export function ControleVeiculosPage() {
         ) : null}
 
         {abaAtiva === "listagem" ? (
-          <section className="space-y-4 xl:max-w-[1120px]">
+          <section className="w-full max-w-full space-y-4 2xl:max-w-[1040px]">
             {veiculos.length ? (
               <>
-                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                   {veiculos.map((item, index) => {
                     const selecionado = item.id === veiculoSelecionadoListagem?.id;
                     return (
@@ -1087,8 +1087,8 @@ export function ControleVeiculosPage() {
                   })}
                 </div>
                 {veiculoSelecionadoListagem ? (
-                  <div className="grid gap-3 xl:grid-cols-[minmax(0,1.45fr)_290px]">
-                    <Card className="border-[var(--g3-border)]">
+                  <div className="grid gap-3 2xl:grid-cols-[minmax(0,1.52fr)_minmax(0,268px)]">
+                    <Card className="min-w-0 border-[var(--g3-border)]">
                       <CardHeader className="px-4 pb-2 pt-4">
                         <CardTitle className="flex flex-wrap items-center justify-between gap-2 text-sm text-[var(--g3-active)]">
                           <span>Informações do veículo</span>
@@ -1120,16 +1120,16 @@ export function ControleVeiculosPage() {
                         </div>
                       </CardContent>
                     </Card>
-                    <div className="grid gap-3">
-                      <Card className="border-[var(--g3-border)]">
+                    <div className="grid min-w-0 gap-3">
+                      <Card className="min-w-0 border-[var(--g3-border)]">
                         <CardHeader className="px-4 pb-2 pt-4">
                           <CardTitle className="text-sm text-[var(--g3-active)]">Foto do veículo</CardTitle>
                         </CardHeader>
                         <CardContent className="px-4 pb-4">
-                          <div className="overflow-hidden rounded-lg border border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/20">{veiculoSelecionadoListagem.fotoFrente ? <img src={resolverUrlArquivo(veiculoSelecionadoListagem.fotoFrente)} alt={veiculoSelecionadoListagem.placa ?? "Foto do veículo"} className="h-48 w-full object-cover" /> : <div className="flex h-48 items-center justify-center px-4 text-center text-sm text-[var(--g3-muted)]">Nenhuma foto cadastrada.</div>}</div>
+                          <div className="overflow-hidden rounded-lg border border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/20">{veiculoSelecionadoListagem.fotoFrente ? <img src={resolverUrlArquivo(veiculoSelecionadoListagem.fotoFrente)} alt={veiculoSelecionadoListagem.placa ?? "Foto do veículo"} className="h-40 w-full object-cover xl:h-44" /> : <div className="flex h-40 items-center justify-center px-4 text-center text-sm text-[var(--g3-muted)] xl:h-44">Nenhuma foto cadastrada.</div>}</div>
                         </CardContent>
                       </Card>
-                      <Card className="border-[var(--g3-border)]">
+                      <Card className="min-w-0 border-[var(--g3-border)]">
                         <CardHeader className="px-4 pb-2 pt-4">
                           <CardTitle className="text-sm text-[var(--g3-active)]">Documento do veículo</CardTitle>
                         </CardHeader>
