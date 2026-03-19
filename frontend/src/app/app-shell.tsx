@@ -33,7 +33,6 @@ import {
   ClipboardPenLine,
   CircleDollarSign,
   DollarSign,
-  FileSpreadsheet,
   FileText,
   Files,
   FolderKanban,
@@ -78,6 +77,7 @@ export type MenuItem = {
   icon: LucideIcon;
   abrirEmNovaAba?: boolean;
   requiredPermissions?: string[];
+  activeMatchPaths?: string[];
   emMigracao?: boolean;
 };
 
@@ -116,6 +116,32 @@ function agendarQuandoOcioso(callback: () => void) {
   const timeoutId = globalThis.setTimeout(callback, 600);
   return () => globalThis.clearTimeout(timeoutId);
 }
+
+const captacaoMenuPermissions = [
+  "ADMINISTRADOR",
+  "CAPTACAO_DASHBOARD_VISUALIZAR",
+  "CAPTACAO_DOADORES_VISUALIZAR",
+  "CAPTACAO_DOADORES_CADASTRAR",
+  "CAPTACAO_DOADORES_EDITAR",
+  "CAPTACAO_DOADORES_INATIVAR",
+  "CAPTACAO_DOACOES_VISUALIZAR",
+  "CAPTACAO_DOACOES_CADASTRAR",
+  "CAPTACAO_DOACOES_CONFIRMAR",
+  "CAPTACAO_DOACOES_CANCELAR",
+  "CAPTACAO_DOACOES_ESTORNAR",
+  "CAPTACAO_COBRANCAS_GERAR",
+  "CAPTACAO_COMPROVANTES_EMITIR",
+  "CAPTACAO_COMPROVANTES_REENVIAR",
+  "CAPTACAO_CAMPANHAS_CRIAR",
+  "CAPTACAO_CAMPANHAS_EDITAR",
+  "CAPTACAO_CAMPANHAS_PAUSAR",
+  "CAPTACAO_CAMPANHAS_ENCERRAR",
+  "CAPTACAO_PORTAL_ACESSAR",
+  "CAPTACAO_CONFIGURAR",
+  "CAPTACAO_RELATORIOS_VISUALIZAR",
+  "CAPTACAO_RELATORIOS_EXPORTAR",
+  "CAPTACAO_DADOS_SENSIVEIS_VISUALIZAR"
+];
 
 export const menuSections: MenuSection[] = [
   {
@@ -336,6 +362,14 @@ export const menuSections: MenuSection[] = [
         to: "/setor-financeiro/prestacao-contas",
         label: "Prestação de contas",
         icon: BadgeDollarSign
+      },
+      {
+        id: "setor-financeiro-captacao-recursos",
+        to: "/captacao-recursos/dashboard",
+        label: "Captação de recursos",
+        icon: HandCoins,
+        activeMatchPaths: ["/captacao-recursos"],
+        requiredPermissions: captacaoMenuPermissions
       }
     ]
   },
@@ -355,99 +389,6 @@ export const menuSections: MenuSection[] = [
         to: "/setor-rh/contratacao",
         label: "Contratação",
         icon: ShieldUser
-      }
-    ]
-  },
-  {
-    id: "captacao-recursos",
-    secao: "Captação de recursos",
-    icon: HandCoins,
-    itens: [
-      {
-        id: "captacao-dashboard",
-        to: "/captacao-recursos/dashboard",
-        label: "Dashboard de captação",
-        icon: ChartColumn,
-        requiredPermissions: ["ADMINISTRADOR", "CAPTACAO_DASHBOARD_VISUALIZAR"]
-      },
-      {
-        id: "captacao-doadores",
-        to: "/captacao-recursos/doadores",
-        label: "Doadores",
-        icon: UsersRound,
-        requiredPermissions: [
-          "ADMINISTRADOR",
-          "CAPTACAO_DOADORES_VISUALIZAR",
-          "CAPTACAO_DOADORES_CADASTRAR",
-          "CAPTACAO_DOADORES_EDITAR"
-        ]
-      },
-      {
-        id: "captacao-doacoes",
-        to: "/captacao-recursos/doacoes",
-        label: "Doações",
-        icon: CircleDollarSign,
-        requiredPermissions: [
-          "ADMINISTRADOR",
-          "CAPTACAO_DOACOES_VISUALIZAR",
-          "CAPTACAO_DOACOES_CADASTRAR"
-        ]
-      },
-      {
-        id: "captacao-campanhas",
-        to: "/captacao-recursos/campanhas",
-        label: "Campanhas",
-        icon: Gift,
-        requiredPermissions: [
-          "ADMINISTRADOR",
-          "CAPTACAO_DASHBOARD_VISUALIZAR",
-          "CAPTACAO_CAMPANHAS_CRIAR",
-          "CAPTACAO_CAMPANHAS_EDITAR"
-        ]
-      },
-      {
-        id: "captacao-portal",
-        to: "/captacao-recursos/portal-doador",
-        label: "Portal doador",
-        icon: ShieldUser,
-        requiredPermissions: ["ADMINISTRADOR", "CAPTACAO_PORTAL_ACESSAR", "CAPTACAO_CONFIGURAR"]
-      },
-      {
-        id: "captacao-comprovantes",
-        to: "/captacao-recursos/comprovantes",
-        label: "Comprovantes",
-        icon: FileText,
-        requiredPermissions: [
-          "ADMINISTRADOR",
-          "CAPTACAO_DOACOES_VISUALIZAR",
-          "CAPTACAO_COMPROVANTES_EMITIR",
-          "CAPTACAO_COMPROVANTES_REENVIAR"
-        ]
-      },
-      {
-        id: "captacao-configuracoes",
-        to: "/captacao-recursos/configuracoes-pagamento",
-        label: "Configurações de pagamento",
-        icon: Settings2,
-        requiredPermissions: ["ADMINISTRADOR", "CAPTACAO_CONFIGURAR"]
-      },
-      {
-        id: "captacao-relatorios",
-        to: "/captacao-recursos/relatorios",
-        label: "Relatórios",
-        icon: FileSpreadsheet,
-        requiredPermissions: [
-          "ADMINISTRADOR",
-          "CAPTACAO_RELATORIOS_VISUALIZAR",
-          "CAPTACAO_RELATORIOS_EXPORTAR"
-        ]
-      },
-      {
-        id: "captacao-permissoes",
-        to: "/captacao-recursos/permissoes",
-        label: "Permissões do módulo",
-        icon: ShieldUser,
-        requiredPermissions: ["ADMINISTRADOR", "CAPTACAO_CONFIGURAR", "CAPTACAO_RELATORIOS_VISUALIZAR"]
       }
     ]
   },
@@ -587,8 +528,8 @@ function ocultarTituloTopo(pathname: string) {
 }
 
 function itemEstaAtivo(pathname: string, item: MenuItem) {
-  if (!item.to) return false;
-  return pathname === item.to || pathname.startsWith(`${item.to}/`);
+  const rotasAtivas = item.activeMatchPaths?.length ? item.activeMatchPaths : item.to ? [item.to] : [];
+  return rotasAtivas.some((rota) => pathname === rota || pathname.startsWith(`${rota}/`));
 }
 
 export function AppShell() {
@@ -996,10 +937,12 @@ export function AppShell() {
                           onFocus={() => precarregarItemMenu(item)}
                           onTouchStart={() => precarregarItemMenu(item)}
                         >
-                          {({ isActive }) => (
+                          {({ isActive }) => {
+                            const itemAtivo = isActive || itemEstaAtivo(location.pathname, item);
+                            return (
                             <span
                               className={`flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors ${
-                                isActive
+                                itemAtivo
                                   ? "border-[var(--g3-active)] bg-[var(--g3-card)] text-[var(--g3-active)] shadow-sm"
                                   : "border-transparent text-[var(--g3-foreground)] hover:border-[var(--g3-border)] hover:bg-[var(--g3-primary-soft-hover)]"
                               }`}
@@ -1007,7 +950,8 @@ export function AppShell() {
                               <item.icon className="h-3.5 w-3.5" />
                               {item.label}
                             </span>
-                          )}
+                          );
+                          }}
                         </NavLink>
                       ) : (
                         <span
