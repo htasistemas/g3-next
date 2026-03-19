@@ -103,6 +103,10 @@ const ParametrosSistemaPage = carregarPagina(
   "/configuracoes/parametros-sistema",
   "ParametrosSistemaPage"
 );
+const DatasComemorativasPage = carregarPagina(
+  "/configuracoes/datas-comemorativas",
+  "DatasComemorativasPage"
+);
 const AtualizarSistemaPage = carregarPagina(
   "/configuracoes/atualizar-sistema",
   "AtualizarSistemaPage"
@@ -181,6 +185,16 @@ export const router = createBrowserRouter([
       { path: "/setor-financeiro/prestacao-contas", element: PrestacaoContasPage },
       { path: "/cadastros/unidades-assistenciais", element: CadastroUnidadeAssistencialPage },
       { path: "/cadastros/vinculo-familiar", element: CadastroVinculoFamiliarPage },
+      {
+        path: "/configuracoes/datas-comemorativas",
+        element: (
+          <RequirePermission
+            permissions={["ADMINISTRADOR", "DATAS_COMEMORATIVAS_VISUALIZAR"]}
+          >
+            {DatasComemorativasPage}
+          </RequirePermission>
+        )
+      },
       {
         path: "/configuracoes/parametros-sistema",
         element: (

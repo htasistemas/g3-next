@@ -43,6 +43,7 @@ import { mensagensPersonalizadasRoutes } from "../modules/mensagens-personalizad
 import { arquivosRoutes } from "../modules/arquivos/routes/arquivos.routes.js";
 import { chamadoTecnicoRoutes } from "../modules/chamados-tecnicos/routes/chamado-tecnico.routes.js";
 import { atualizacaoSistemaRoutes } from "../modules/atualizacao-sistema/routes/atualizacao-sistema.routes.js";
+import { datasComemorativasRoutes } from "../modules/datas-comemorativas/routes/datas-comemorativas.routes.js";
 
 export const appRoutes = Router();
 
@@ -89,6 +90,7 @@ appRoutes.use("/api/rh/contratacao", rhContratacaoRoutes);
 appRoutes.use("/api/arquivos", arquivosRoutes);
 appRoutes.use("/api/dashboard", dashboardRoutes);
 appRoutes.use("/api/chamados-tecnicos", chamadoTecnicoRoutes);
+appRoutes.use("/api/datas-comemorativas", datasComemorativasRoutes);
 appRoutes.use("/api/configuracoes/parametros", parametrosSistemaRoutes);
 appRoutes.use("/api/configuracoes/atualizar-sistema", atualizacaoSistemaRoutes);
 appRoutes.use("/api/usuarios", usuarioRoutes);

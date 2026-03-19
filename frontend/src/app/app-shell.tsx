@@ -2,6 +2,7 @@
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { startTransition } from "react";
 import { PopupConfirmacao } from "@/components/admin/admin-popups";
+import { DatasComemorativasPopup } from "@/components/system/datas-comemorativas-popup";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { APP_VERSION } from "@/lib/app-version";
@@ -9,8 +10,10 @@ import { resolverUrlArquivo } from "@/lib/arquivos";
 import { precarregarRota, precarregarRotas } from "@/routes/route-modules";
 import { useResumoLembretesDiarios } from "@/features/lembretes-diarios/use-lembretes-diarios";
 import { registroPontoService } from "@/services/registro-ponto.service";
+import { datasComemorativasService } from "@/services/datas-comemorativas.service";
 import { useResumoTarefasAdministrativas } from "@/features/tarefas-administrativas/use-tarefas-administrativas";
 import { useUnidadeAssistencialAtual } from "@/features/unidades-assistenciais/use-unidades-assistenciais";
+import type { DataComemorativaPopupPayload } from "@/types/datas-comemorativas";
 import type { RegistroPontoAlertaPendente } from "@/types/registro-ponto";
 import {
   AlarmClockCheck,
@@ -390,6 +393,13 @@ export const menuSections: MenuSection[] = [
         ]
       },
       {
+        id: "configuracoes-datas-comemorativas",
+        to: "/configuracoes/datas-comemorativas",
+        label: "Datas comemorativas",
+        icon: CalendarRange,
+        requiredPermissions: ["ADMINISTRADOR", "DATAS_COMEMORATIVAS_VISUALIZAR"]
+      },
+      {
         id: "configuracoes-parametros-sistema",
         to: "/configuracoes/parametros-sistema",
         label: "Parâmetros do sistema",
@@ -426,6 +436,7 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/cadastros/unidades-assistenciais")) return "Cadastro de unidade assistencial";
   if (pathname.startsWith("/cadastros/vinculo-familiar")) return "Cadastro de vínculo familiar";
   if (pathname.startsWith("/configuracoes/parametros-sistema")) return "Parâmetros do sistema";
+  if (pathname.startsWith("/configuracoes/datas-comemorativas")) return "Datas comemorativas";
   if (pathname.startsWith("/configuracoes/atualizar-sistema")) return "Atualizar sistema";
   if (pathname.startsWith("/configuracoes/chamado-tecnico")) return "Chamado técnico";
   if (pathname.startsWith("/configuracoes/mensagens-personalizadas")) return "Mensagens personalizadas";
@@ -480,7 +491,9 @@ export function AppShell() {
   const { usuario, logout } = useAuth();
   const [carregarResumoInicial, setCarregarResumoInicial] = useState(false);
   const [popupPontoPendente, setPopupPontoPendente] = useState<RegistroPontoAlertaPendente | null>(null);
+  const [popupDatasComemorativas, setPopupDatasComemorativas] = useState<DataComemorativaPopupPayload | null>(null);
   const [usuarioVerificadoPontoId, setUsuarioVerificadoPontoId] = useState<string | null>(null);
+  const [usuarioVerificadoDatasId, setUsuarioVerificadoDatasId] = useState<string | null>(null);
   const usuarioId = usuario?.id ? Number(usuario.id) : undefined;
   const { data: unidadeAtualData } = useUnidadeAssistencialAtual({ enabled: carregarResumoInicial });
   const { data: lembretesResumoData, isFetched: lembretesResumoCarregado } = useResumoLembretesDiarios(usuarioId, {
@@ -649,6 +662,77 @@ export function AppShell() {
     };
   }, [usuario?.id, usuarioVerificadoPontoId]);
 
+  useEffect(() => {
+    if (!usuario?.id) {
+      setPopupDatasComemorativas(null);
+      setUsuarioVerificadoDatasId(null);
+      return;
+    }
+
+    if (!carregarResumoInicial) {
+      return;
+    }
+
+    const podeVisualizarDatas =
+      permissoesUsuario.includes("ADMINISTRADOR") ||
+      permissoesUsuario.includes("DATAS_COMEMORATIVAS_VISUALIZAR");
+
+    if (!podeVisualizarDatas) {
+      setPopupDatasComemorativas(null);
+      setUsuarioVerificadoDatasId(usuario.id);
+      return;
+    }
+
+    if (usuarioVerificadoDatasId === usuario.id) {
+      return;
+    }
+
+    let ativo = true;
+    const dataReferencia = formatarDataLocalIso(new Date());
+
+    void (async () => {
+      try {
+        const popup = await datasComemorativasService.obterPopupHoje({
+          data: dataReferencia,
+          uf: unidadeAtualData?.unidade?.estado,
+          municipio: unidadeAtualData?.unidade?.cidade
+        });
+
+        if (!ativo) return;
+
+        if (popup.exibirPopup && popup.eventos.length) {
+          setPopupDatasComemorativas(popup);
+          await datasComemorativasService.registrarVisualizacao({
+            data: dataReferencia,
+            eventIds: popup.eventos.map((evento) => evento.id),
+            acao: "visualizado"
+          });
+        } else {
+          setPopupDatasComemorativas(null);
+        }
+      } catch {
+        if (ativo) {
+          setPopupDatasComemorativas(null);
+        }
+      } finally {
+        if (ativo) {
+          setUsuarioVerificadoDatasId(usuario.id);
+        }
+      }
+    })();
+
+    return () => {
+      ativo = false;
+    };
+  }, [
+    carregarResumoInicial,
+    permissoesUsuario,
+    unidadeAtualData?.unidade?.cidade,
+    unidadeAtualData?.unidade?.estado,
+    usuario?.id,
+    usuarioVerificadoDatasId
+  ]);
+
   function abrirLembretes() {
     localStorage.removeItem("g3_lembrete_alerta");
     setLembreteAlertaAtivo(false);
@@ -662,6 +746,12 @@ export function AppShell() {
   function confirmarPopupPontoPendente() {
     setPopupPontoPendente(null);
     navigate("/setor-rh/registro-ponto?aba=marcacao");
+  }
+
+  function formatarDataLocalIso(data: Date) {
+    return `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, "0")}-${String(
+      data.getDate()
+    ).padStart(2, "0")}`;
   }
 
   function precarregarItemMenu(item: MenuItem) {
@@ -957,6 +1047,22 @@ export function AppShell() {
         confirmarTexto="Sim"
         cancelarTexto="Não"
         confirmarVariant="default"
+      />
+
+      <DatasComemorativasPopup
+        popup={popupDatasComemorativas}
+        onClose={() => setPopupDatasComemorativas(null)}
+        onDismissToday={() => {
+          if (!popupDatasComemorativas?.dataReferencia) return;
+          void datasComemorativasService
+            .dispensarHoje({ data: popupDatasComemorativas.dataReferencia })
+            .finally(() => setPopupDatasComemorativas(null));
+        }}
+        onViewCalendar={() => {
+          const data = popupDatasComemorativas?.dataReferencia ?? formatarDataLocalIso(new Date());
+          setPopupDatasComemorativas(null);
+          navigate(`/configuracoes/datas-comemorativas?tab=calendario&data=${data}`);
+        }}
       />
     </div>
   );

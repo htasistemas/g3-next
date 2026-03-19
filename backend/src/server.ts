@@ -14,15 +14,21 @@ import { ensureRegistroPontoEstrutura } from "./modules/registro-ponto/repositor
 import { ensureSenhasEstrutura } from "./modules/senhas/repositories/senhas.repository.js";
 import { ensureAtualizacaoSistemaEstrutura } from "./modules/atualizacao-sistema/repositories/atualizacao-sistema.repository.js";
 import { iniciarAtualizacaoSistemaScheduler } from "./modules/atualizacao-sistema/services/atualizacao-sistema.scheduler.js";
+import { ensureDatasComemorativasEstrutura } from "./modules/datas-comemorativas/repositories/datas-comemorativas.repository.js";
+import { CommemorativeImportService } from "./modules/datas-comemorativas/services/commemorative-import.service.js";
+import { iniciarDatasComemorativasScheduler } from "./modules/datas-comemorativas/services/datas-comemorativas.scheduler.js";
 import { iniciarDocumentosInstituicaoScheduler } from "./modules/documentos-instituicao/services/documentos-instituicao.scheduler.js";
 import { ensureUsuariosGestaoEstrutura } from "./modules/usuarios/repositories/usuario-estrutura.repository.js";
 import { ensureVisitasDomiciliaresEstrutura } from "./modules/visitas-domiciliares/repositories/visitas-domiciliares.repository.js";
 
 async function aquecerEstruturasDeTela() {
+  const commemorativeImportService = new CommemorativeImportService();
   const aquecimentos: Array<{ nome: string; promise: Promise<unknown> }> = [
     { nome: "arquivos", promise: ensureArquivosEstrutura(prisma) },
     { nome: "parametros-sistema", promise: ensureParametrosSistemaEstrutura() },
     { nome: "atualizacao-sistema", promise: ensureAtualizacaoSistemaEstrutura() },
+    { nome: "datas-comemorativas", promise: ensureDatasComemorativasEstrutura() },
+    { nome: "datas-comemorativas-seed", promise: commemorativeImportService.ensureSeedBase() },
     { nome: "contabilidade", promise: ensureContabilidadeEstrutura() },
     { nome: "autorizacao-compras", promise: ensureAutorizacaoComprasEstrutura() },
     { nome: "banco-empregos", promise: ensureBancoEmpregosEstrutura() },
@@ -58,6 +64,7 @@ async function bootstrap() {
     );
     void aquecerEstruturasDeTela();
     iniciarAtualizacaoSistemaScheduler();
+    iniciarDatasComemorativasScheduler();
     iniciarDocumentosInstituicaoScheduler();
   });
 }
