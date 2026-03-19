@@ -133,6 +133,46 @@ const routeModules: RouteModuleDefinition[] = [
     path: "/configuracoes/datas-comemorativas",
     loader: () => import("@/pages/configuracoes/datas-comemorativas-page")
   },
+  {
+    path: "/captacao-recursos/dashboard",
+    loader: () => import("@/pages/captacao-recursos/captacao-recursos-page")
+  },
+  {
+    path: "/captacao-recursos/doadores",
+    loader: () => import("@/pages/captacao-recursos/captacao-recursos-page")
+  },
+  {
+    path: "/captacao-recursos/doacoes",
+    loader: () => import("@/pages/captacao-recursos/captacao-recursos-page")
+  },
+  {
+    path: "/captacao-recursos/campanhas",
+    loader: () => import("@/pages/captacao-recursos/captacao-recursos-page")
+  },
+  {
+    path: "/captacao-recursos/portal-doador",
+    loader: () => import("@/pages/captacao-recursos/captacao-recursos-page")
+  },
+  {
+    path: "/captacao-recursos/comprovantes",
+    loader: () => import("@/pages/captacao-recursos/captacao-recursos-page")
+  },
+  {
+    path: "/captacao-recursos/configuracoes-pagamento",
+    loader: () => import("@/pages/captacao-recursos/captacao-recursos-page")
+  },
+  {
+    path: "/captacao-recursos/relatorios",
+    loader: () => import("@/pages/captacao-recursos/captacao-recursos-page")
+  },
+  {
+    path: "/captacao-recursos/permissoes",
+    loader: () => import("@/pages/captacao-recursos/captacao-recursos-page")
+  },
+  {
+    path: "/portal-doador",
+    loader: () => import("@/pages/captacao-recursos/portal-doador-page")
+  },
   { path: "/configuracoes/usuarios", loader: () => import("@/pages/configuracoes/usuarios-page") },
   {
     path: "/configuracoes/mensagens-personalizadas",

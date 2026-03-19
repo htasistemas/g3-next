@@ -19,6 +19,8 @@ export type StorageScopeKey =
   | "oficio_documento"
   | "autorizacao_compra_anexo"
   | "contabilidade_lancamento_anexo"
+  | "captacao_doador_anexo"
+  | "captacao_campanha_banner"
   | "geral_outro";
 
 export type StoragePolicy = {
@@ -78,7 +80,9 @@ export const requiredStorageDirectories = [
   "ocorrencias/anexos",
   "oficios/documentos",
   "compras/anexos",
-  "contabilidade/anexos"
+  "contabilidade/anexos",
+  "captacao/doadores/anexos",
+  "captacao/campanhas/banners"
 ] as const;
 
 export const storagePolicies: Record<StorageScopeKey, StoragePolicy> = {
@@ -267,6 +271,25 @@ export const storagePolicies: Record<StorageScopeKey, StoragePolicy> = {
     allowedExtensions: attachmentExtensions,
     allowedMimeTypes: attachmentMimeTypes,
     maxSizeBytes: 25 * 1024 * 1024,
+    generateThumbnail: true
+  },
+  captacao_doador_anexo: {
+    entidadeTipo: "captacao_doador",
+    categoria: "anexo",
+    subdirectory: "captacao/doadores/anexos",
+    allowedExtensions: ["*"],
+    allowedMimeTypes: ["*"],
+    maxSizeBytes: 100 * 1024 * 1024,
+    generateThumbnail: true
+  },
+  captacao_campanha_banner: {
+    entidadeTipo: "captacao_campanha",
+    categoria: "banner",
+    subdirectory: "captacao/campanhas/banners",
+    allowedExtensions: imageExtensions,
+    allowedMimeTypes: imageMimeTypes,
+    maxSizeBytes: 10 * 1024 * 1024,
+    imageOnly: true,
     generateThumbnail: true
   },
   geral_outro: {

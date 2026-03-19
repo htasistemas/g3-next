@@ -30,6 +30,47 @@ function mapArquivo(row: ArquivoApiRow): ArquivoMetadata {
 }
 
 export const arquivosService = {
+  async listarPorEntidade(entidadeTipo: string, entidadeId: string | number) {
+    const { data } = await httpClient.get<{ arquivos: ArquivoApiRow[] }>("/api/arquivos", {
+      params: {
+        entidadeTipo,
+        entidadeId,
+        ativo: true
+      }
+    });
+    return (data.arquivos ?? []).map(mapArquivo);
+  },
+
+  async uploadPorEntidade(input: {
+    scope: string;
+    entidadeTipo: string;
+    entidadeId: string | number;
+    arquivo: File;
+    observacao?: string;
+  }) {
+    const formData = new FormData();
+    formData.append("scope", input.scope);
+    formData.append("entidadeTipo", input.entidadeTipo);
+    formData.append("entidadeId", String(input.entidadeId));
+    if (input.observacao?.trim()) {
+      formData.append("observacao", input.observacao.trim());
+    }
+    formData.append("arquivo", input.arquivo);
+
+    const { data } = await httpClient.post<{ arquivo: ArquivoApiRow }>(
+      "/api/arquivos/upload",
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data"
+        },
+        timeout: 300000
+      }
+    );
+
+    return mapArquivo(data.arquivo);
+  },
+
   async listarPorCompra(compraId: string | number) {
     const { data } = await httpClient.get<{ arquivos: ArquivoApiRow[] }>("/api/arquivos", {
       params: {

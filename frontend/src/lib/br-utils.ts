@@ -6,10 +6,20 @@ export function normalizarCpf(valor?: string | null) {
   return somenteDigitos(valor);
 }
 
+export function normalizarCnpj(valor?: string | null) {
+  return somenteDigitos(valor);
+}
+
 export function formatarCpf(valor?: string | null) {
   const digitos = normalizarCpf(valor);
   if (digitos.length !== 11) return valor?.trim() || "";
   return `${digitos.slice(0, 3)}.${digitos.slice(3, 6)}.${digitos.slice(6, 9)}-${digitos.slice(9)}`;
+}
+
+export function formatarCnpj(valor?: string | null) {
+  const digitos = normalizarCnpj(valor);
+  if (digitos.length !== 14) return valor?.trim() || "";
+  return `${digitos.slice(0, 2)}.${digitos.slice(2, 5)}.${digitos.slice(5, 8)}/${digitos.slice(8, 12)}-${digitos.slice(12)}`;
 }
 
 export function normalizarTelefone(valor?: string | null) {

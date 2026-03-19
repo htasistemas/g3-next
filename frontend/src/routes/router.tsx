@@ -117,6 +117,11 @@ const MensagensPersonalizadasPage = carregarPagina(
   "MensagensPersonalizadasPage"
 );
 const ChamadoTecnicoPage = carregarPagina("/configuracoes/chamado-tecnico", "ChamadoTecnicoPage");
+const CaptacaoRecursosPage = carregarPagina(
+  "/captacao-recursos/dashboard",
+  "CaptacaoRecursosPage"
+);
+const PortalDoadorPage = carregarPagina("/portal-doador", "PortalDoadorPage");
 
 export const router = createBrowserRouter([
   {
@@ -138,6 +143,10 @@ export const router = createBrowserRouter([
   {
     path: "/politica-de-privacidade",
     element: PoliticaPrivacidadePage
+  },
+  {
+    path: "/portal-doador",
+    element: PortalDoadorPage
   },
   {
     path: "/senhas/painel",
@@ -192,6 +201,119 @@ export const router = createBrowserRouter([
             permissions={["ADMINISTRADOR", "DATAS_COMEMORATIVAS_VISUALIZAR"]}
           >
             {DatasComemorativasPage}
+          </RequirePermission>
+        )
+      },
+      {
+        path: "/captacao-recursos/dashboard",
+        element: (
+          <RequirePermission permissions={["ADMINISTRADOR", "CAPTACAO_DASHBOARD_VISUALIZAR"]}>
+            {CaptacaoRecursosPage}
+          </RequirePermission>
+        )
+      },
+      {
+        path: "/captacao-recursos/doadores",
+        element: (
+          <RequirePermission
+            permissions={[
+              "ADMINISTRADOR",
+              "CAPTACAO_DOADORES_VISUALIZAR",
+              "CAPTACAO_DOADORES_CADASTRAR",
+              "CAPTACAO_DOADORES_EDITAR"
+            ]}
+          >
+            {CaptacaoRecursosPage}
+          </RequirePermission>
+        )
+      },
+      {
+        path: "/captacao-recursos/doacoes",
+        element: (
+          <RequirePermission
+            permissions={[
+              "ADMINISTRADOR",
+              "CAPTACAO_DOACOES_VISUALIZAR",
+              "CAPTACAO_DOACOES_CADASTRAR"
+            ]}
+          >
+            {CaptacaoRecursosPage}
+          </RequirePermission>
+        )
+      },
+      {
+        path: "/captacao-recursos/campanhas",
+        element: (
+          <RequirePermission
+            permissions={[
+              "ADMINISTRADOR",
+              "CAPTACAO_DASHBOARD_VISUALIZAR",
+              "CAPTACAO_CAMPANHAS_CRIAR",
+              "CAPTACAO_CAMPANHAS_EDITAR"
+            ]}
+          >
+            {CaptacaoRecursosPage}
+          </RequirePermission>
+        )
+      },
+      {
+        path: "/captacao-recursos/portal-doador",
+        element: (
+          <RequirePermission
+            permissions={["ADMINISTRADOR", "CAPTACAO_PORTAL_ACESSAR", "CAPTACAO_CONFIGURAR"]}
+          >
+            {CaptacaoRecursosPage}
+          </RequirePermission>
+        )
+      },
+      {
+        path: "/captacao-recursos/comprovantes",
+        element: (
+          <RequirePermission
+            permissions={[
+              "ADMINISTRADOR",
+              "CAPTACAO_DOACOES_VISUALIZAR",
+              "CAPTACAO_COMPROVANTES_EMITIR",
+              "CAPTACAO_COMPROVANTES_REENVIAR"
+            ]}
+          >
+            {CaptacaoRecursosPage}
+          </RequirePermission>
+        )
+      },
+      {
+        path: "/captacao-recursos/configuracoes-pagamento",
+        element: (
+          <RequirePermission permissions={["ADMINISTRADOR", "CAPTACAO_CONFIGURAR"]}>
+            {CaptacaoRecursosPage}
+          </RequirePermission>
+        )
+      },
+      {
+        path: "/captacao-recursos/relatorios",
+        element: (
+          <RequirePermission
+            permissions={[
+              "ADMINISTRADOR",
+              "CAPTACAO_RELATORIOS_VISUALIZAR",
+              "CAPTACAO_RELATORIOS_EXPORTAR"
+            ]}
+          >
+            {CaptacaoRecursosPage}
+          </RequirePermission>
+        )
+      },
+      {
+        path: "/captacao-recursos/permissoes",
+        element: (
+          <RequirePermission
+            permissions={[
+              "ADMINISTRADOR",
+              "CAPTACAO_CONFIGURAR",
+              "CAPTACAO_RELATORIOS_VISUALIZAR"
+            ]}
+          >
+            {CaptacaoRecursosPage}
           </RequirePermission>
         )
       },

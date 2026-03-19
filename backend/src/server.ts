@@ -18,6 +18,7 @@ import { ensureDatasComemorativasEstrutura } from "./modules/datas-comemorativas
 import { CommemorativeImportService } from "./modules/datas-comemorativas/services/commemorative-import.service.js";
 import { iniciarDatasComemorativasScheduler } from "./modules/datas-comemorativas/services/datas-comemorativas.scheduler.js";
 import { iniciarDocumentosInstituicaoScheduler } from "./modules/documentos-instituicao/services/documentos-instituicao.scheduler.js";
+import { ensureCaptacaoRecursosEstrutura } from "./modules/captacao-recursos/repositories/captacao-recursos.repository.js";
 import { ensureUsuariosGestaoEstrutura } from "./modules/usuarios/repositories/usuario-estrutura.repository.js";
 import { ensureVisitasDomiciliaresEstrutura } from "./modules/visitas-domiciliares/repositories/visitas-domiciliares.repository.js";
 
@@ -29,6 +30,7 @@ async function aquecerEstruturasDeTela() {
     { nome: "atualizacao-sistema", promise: ensureAtualizacaoSistemaEstrutura() },
     { nome: "datas-comemorativas", promise: ensureDatasComemorativasEstrutura() },
     { nome: "datas-comemorativas-seed", promise: commemorativeImportService.ensureSeedBase() },
+    { nome: "captacao-recursos", promise: ensureCaptacaoRecursosEstrutura() },
     { nome: "contabilidade", promise: ensureContabilidadeEstrutura() },
     { nome: "autorizacao-compras", promise: ensureAutorizacaoComprasEstrutura() },
     { nome: "banco-empregos", promise: ensureBancoEmpregosEstrutura() },
