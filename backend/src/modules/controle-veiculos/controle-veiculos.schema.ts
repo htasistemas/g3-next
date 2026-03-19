@@ -33,6 +33,19 @@ const optionalHour = z.preprocess((value) => {
   return trimmed.length ? trimmed : undefined;
 }, z.string().regex(/^\d{2}:\d{2}$/).optional());
 
+const tipoOrigemMotorista = z.preprocess((value) => {
+  if (typeof value !== "string") return value;
+  const normalized = value
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase();
+
+  if (normalized === "PROFISSIONAL") return "PROFISSIONAL";
+  if (normalized === "VOLUNTARIO") return "VOLUNTARIO";
+  return normalized;
+}, z.enum(["PROFISSIONAL", "VOLUNTARIO"]));
+
 export const veiculoInputSchema = z.object({
   placa: optionalTrimmedString.nullable().optional(),
   modelo: optionalTrimmedString.nullable().optional(),
@@ -69,7 +82,7 @@ export const diarioBordoInputSchema = z.object({
 
 export const motoristaAutorizadoInputSchema = z.object({
   veiculoId: z.coerce.number().int().positive(),
-  tipoOrigem: z.enum(["PROFISSIONAL", "VOLUNTARIO"]),
+  tipoOrigem: tipoOrigemMotorista,
   motoristaId: z.coerce.number().int().positive(),
   numeroCarteira: optionalTrimmedString.nullable().optional(),
   categoriaCarteira: optionalTrimmedString.nullable().optional(),

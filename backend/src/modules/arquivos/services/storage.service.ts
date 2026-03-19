@@ -45,6 +45,10 @@ type SalvarArquivoInput = Omit<PersistirCampoInput, "valor"> & {
   conteudo: string;
 };
 
+type PersistirBufferInput = Omit<PersistirCampoInput, "valor"> & {
+  buffer: Buffer;
+};
+
 export class StorageService {
   private readonly repository = new ArquivosRepository();
   private readonly provider = new LocalStorageProvider();
@@ -175,10 +179,9 @@ export class StorageService {
     file: Express.Multer.File,
     input: Omit<SalvarArquivoInput, "conteudo" | "nomeOriginal" | "mimeType" | "tamanhoBytes">
   ) {
-    const conteudo = file.buffer.toString("base64");
-    return this.salvarArquivo({
+    return this.persistirBuffer({
       ...input,
-      conteudo,
+      buffer: file.buffer,
       nomeOriginal: file.originalname,
       mimeType: file.mimetype,
       tamanhoBytes: file.size
@@ -186,29 +189,38 @@ export class StorageService {
   }
 
   async salvarArquivo(input: SalvarArquivoInput): Promise<StoredFileResult> {
-    const policy = getStoragePolicy(input.scope);
     const parsed = parseBase64Payload(input.conteudo, input.mimeType);
-    const mimeAssinado = detectarMimeTypePorAssinatura(parsed.buffer);
+    return this.persistirBuffer({
+      ...input,
+      buffer: parsed.buffer,
+      mimeType: parsed.mimeType ?? input.mimeType,
+      tamanhoBytes: input.tamanhoBytes ?? parsed.buffer.length
+    });
+  }
+
+  private async persistirBuffer(input: PersistirBufferInput): Promise<StoredFileResult> {
+    const policy = getStoragePolicy(input.scope);
+    const mimeAssinado = detectarMimeTypePorAssinatura(input.buffer);
     const nomeOriginal = normalizarNomeArquivo(input.nomeOriginal);
     const extensaoInferida =
       mimeToExt(mimeAssinado) ??
-      mimeToExt(parsed.mimeType) ??
+      mimeToExt(input.mimeType) ??
       extrairExtensao(nomeOriginal) ??
       "bin";
     const mimeType =
-      mimeAssinado ?? parsed.mimeType ?? extToMime(extensaoInferida) ?? "application/octet-stream";
+      mimeAssinado ?? input.mimeType ?? extToMime(extensaoInferida) ?? "application/octet-stream";
 
     garantirExtensaoPermitida(extensaoInferida, policy.allowedExtensions);
     garantirMimeTypePermitido(mimeType, policy.allowedMimeTypes);
 
-    if (parsed.buffer.length > policy.maxSizeBytes) {
+    if (input.buffer.length > policy.maxSizeBytes) {
       throw new AppError(
         `O arquivo excede o tamanho maximo permitido de ${formatarTamanhoBytes(policy.maxSizeBytes)}.`,
         400
       );
     }
 
-    let principalBuffer = parsed.buffer;
+    let principalBuffer = input.buffer;
     let thumbnailBuffer: Buffer | undefined;
     const processarImagem = mimeType.startsWith("image/");
 
@@ -217,7 +229,7 @@ export class StorageService {
     }
 
     if (processarImagem) {
-      principalBuffer = await sharp(parsed.buffer)
+      principalBuffer = await sharp(input.buffer)
         .rotate()
         .resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true })
         .toFormat(mimeType === "image/png" ? "png" : mimeType === "image/webp" ? "webp" : "jpeg", {

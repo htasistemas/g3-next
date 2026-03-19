@@ -6,6 +6,16 @@ import type {
   VeiculoRow
 } from "./controle-veiculos.types.js";
 
+function normalizarTipoOrigemMotorista(value?: string | null) {
+  const normalized = String(value ?? "")
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase();
+
+  return normalized === "VOLUNTARIO" ? "VOLUNTARIO" : "PROFISSIONAL";
+}
+
 function formatarHora(value?: Date | string | null): string | null {
   if (!value) return null;
   if (value instanceof Date) return value.toISOString().slice(11, 16);
@@ -74,7 +84,8 @@ export function mapLocalDestinoToResponse(row: LocalDestinoRow) {
 }
 
 export function mapMotoristaAutorizadoToResponse(row: MotoristaAutorizadoRow) {
-  const motoristaId = row.tipo_origem === "PROFISSIONAL" ? row.profissional_id : row.voluntario_id;
+  const tipoOrigem = normalizarTipoOrigemMotorista(row.tipo_origem);
+  const motoristaId = tipoOrigem === "PROFISSIONAL" ? row.profissional_id : row.voluntario_id;
 
   return {
     id: Number(row.id),
@@ -82,7 +93,7 @@ export function mapMotoristaAutorizadoToResponse(row: MotoristaAutorizadoRow) {
     veiculoId: Number(row.veiculo_id),
     placaVeiculo: row.placa_veiculo,
     modeloVeiculo: row.modelo_veiculo,
-    tipoOrigem: row.tipo_origem,
+    tipoOrigem,
     motoristaId: motoristaId ? Number(motoristaId) : 0,
     nomeMotorista: row.nome_motorista,
     numeroCarteira: row.numero_carteira,
