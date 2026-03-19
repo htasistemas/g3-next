@@ -10,4 +10,13 @@ export class ParametrosSistemaController {
         const resultado = await service.atualizarPersonalizacao(request.body, usuario);
         return response.json(resultado);
     }
+    async obterCarenciaDoacaoRealizada(_request, response) {
+        const resultado = await service.obterCarenciaDoacaoRealizada();
+        return response.json(resultado);
+    }
+    async atualizarCarenciaDoacaoRealizada(request, response) {
+        const usuario = request.authUser?.nomeUsuario ?? "sistema";
+        const resultado = await service.atualizarCarenciaDoacaoRealizada(request.body, usuario);
+        return response.json(resultado);
+    }
 }

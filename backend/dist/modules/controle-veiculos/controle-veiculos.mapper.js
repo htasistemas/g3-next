@@ -1,4 +1,12 @@
 import { toIsoDate, toStringId } from "../../utils/string-utils.js";
+function normalizarTipoOrigemMotorista(value) {
+    const normalized = String(value ?? "")
+        .trim()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toUpperCase();
+    return normalized === "VOLUNTARIO" ? "VOLUNTARIO" : "PROFISSIONAL";
+}
 function formatarHora(value) {
     if (!value)
         return null;
@@ -16,6 +24,7 @@ export function mapVeiculoToResponse(row) {
         placa: row.placa,
         modelo: row.modelo,
         marca: row.marca,
+        cor: row.cor,
         ano: row.ano,
         tipoCombustivel: row.tipo_combustivel,
         mediaConsumoPadrao: row.media_consumo_padrao,
@@ -35,11 +44,15 @@ export function mapDiarioBordoToResponse(row) {
         idInterno: toStringId(row.id),
         veiculoId: row.veiculo_id ? Number(row.veiculo_id) : null,
         data: toIsoDate(row.data),
+        dataSaida: toIsoDate(row.data_saida),
+        dataChegada: toIsoDate(row.data_chegada),
         condutor: row.condutor,
         horarioSaida: formatarHora(row.horario_saida),
         kmInicial: row.km_inicial,
         horarioChegada: formatarHora(row.horario_chegada),
         kmFinal: row.km_final,
+        localDestinoId: row.local_destino_id ? Number(row.local_destino_id) : null,
+        localDestinoNome: row.local_destino_nome,
         destino: row.destino,
         combustivelConsumidoLitros: row.combustivel_consumido_litros,
         kmRodados: row.km_rodados,
@@ -47,15 +60,29 @@ export function mapDiarioBordoToResponse(row) {
         observacoes: row.observacoes
     };
 }
+export function mapLocalDestinoToResponse(row) {
+    return {
+        id: Number(row.id),
+        idInterno: toStringId(row.id),
+        nome: row.nome,
+        endereco: row.endereco,
+        telefone: row.telefone,
+        observacoes: row.observacoes,
+        ativo: row.ativo,
+        criadoEm: row.criado_em.toISOString(),
+        atualizadoEm: row.atualizado_em.toISOString()
+    };
+}
 export function mapMotoristaAutorizadoToResponse(row) {
-    const motoristaId = row.tipo_origem === "PROFISSIONAL" ? row.profissional_id : row.voluntario_id;
+    const tipoOrigem = normalizarTipoOrigemMotorista(row.tipo_origem);
+    const motoristaId = tipoOrigem === "PROFISSIONAL" ? row.profissional_id : row.voluntario_id;
     return {
         id: Number(row.id),
         idInterno: toStringId(row.id),
         veiculoId: Number(row.veiculo_id),
         placaVeiculo: row.placa_veiculo,
         modeloVeiculo: row.modelo_veiculo,
-        tipoOrigem: row.tipo_origem,
+        tipoOrigem,
         motoristaId: motoristaId ? Number(motoristaId) : 0,
         nomeMotorista: row.nome_motorista,
         numeroCarteira: row.numero_carteira,

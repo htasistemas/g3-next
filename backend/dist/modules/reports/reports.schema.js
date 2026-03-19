@@ -5,6 +5,20 @@ const optionalString = z.preprocess((value) => {
     const trimmed = value.trim();
     return trimmed.length ? trimmed : undefined;
 }, z.string().optional());
+const optionalBoolean = z.preprocess((value) => {
+    if (value === undefined || value === null || value === "")
+        return undefined;
+    if (typeof value === "boolean")
+        return value;
+    if (typeof value === "string") {
+        const normalizado = value.trim().toLowerCase();
+        if (["true", "1", "sim"].includes(normalizado))
+            return true;
+        if (["false", "0", "nao", "não"].includes(normalizado))
+            return false;
+    }
+    return value;
+}, z.boolean().optional());
 export const formatoRelatorioSchema = z.enum(["pdf", "html"]).default("pdf");
 export const beneficiarioRelacaoRequestSchema = z.object({
     nome: optionalString,
@@ -75,6 +89,12 @@ export const matriculasRelacaoRequestSchema = z.object({
     beneficiario: optionalString,
     usuarioEmissor: optionalString
 });
+export const matriculaListaPresencaRequestSchema = z.object({
+    matriculaId: z.string().trim().min(1, "matriculaId e obrigatorio."),
+    dataAula: optionalString,
+    exibirCpf: optionalBoolean,
+    usuarioEmissor: optionalString
+});
 export const comprovanteMatriculaRequestSchema = z.object({
     beneficiarioNome: z.string().trim().min(1, "beneficiarioNome e obrigatorio."),
     cpf: optionalString,
@@ -122,5 +142,9 @@ export const doacaoRealizadaRelacaoRequestSchema = z.object({
     situacao: optionalString,
     data_inicial: optionalString,
     data_final: optionalString,
+    usuarioEmissor: optionalString
+});
+export const doacaoRealizadaReciboRequestSchema = z.object({
+    doacaoRealizadaId: z.string().trim().min(1, "doacaoRealizadaId e obrigatorio."),
     usuarioEmissor: optionalString
 });

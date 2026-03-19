@@ -19,6 +19,27 @@ function parseDiasAntecedencia(value) {
     }
     return [];
 }
+function calcularSituacaoDocumento(row) {
+    if (row.em_renovacao)
+        return "em_renovacao";
+    if (row.sem_vencimento || row.vencimento_indeterminado || !row.validade) {
+        return "sem_vencimento";
+    }
+    const diasAlerta = Math.max(0, ...parseDiasAntecedencia(row.dias_antecedencia));
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    const validade = new Date(row.validade);
+    validade.setHours(0, 0, 0, 0);
+    if (Number.isNaN(validade.getTime()))
+        return "valido";
+    if (validade < hoje)
+        return "vencido";
+    const alerta = new Date(hoje);
+    alerta.setDate(alerta.getDate() + (diasAlerta || 30));
+    if (validade <= alerta)
+        return "vence_em_breve";
+    return "valido";
+}
 export function mapDocumentoInstituicaoToResponse(row) {
     return {
         id: toStringId(row.id),
@@ -37,7 +58,7 @@ export function mapDocumentoInstituicaoToResponse(row) {
         emRenovacao: row.em_renovacao,
         semVencimento: row.sem_vencimento,
         vencimentoIndeterminado: row.vencimento_indeterminado,
-        situacao: row.situacao ?? undefined,
+        situacao: calcularSituacaoDocumento(row),
         criadoEm: row.criado_em.toISOString(),
         atualizadoEm: row.atualizado_em.toISOString()
     };

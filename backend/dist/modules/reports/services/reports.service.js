@@ -8,7 +8,7 @@ import { VoluntarioService } from "../../voluntarios/services/voluntario.service
 import { ReportsRepository } from "../repositories/reports.repository.js";
 import { RelatorioTemplatePadrao } from "../templates/relatorio-template-padrao.js";
 import { HtmlPdfRenderer } from "./html-pdf-renderer.js";
-import { beneficiarioFichaRequestSchema, beneficiarioRelacaoRequestSchema, comprovanteMatriculaRequestSchema, comprovantePreMatriculaEsperaRequestSchema, doacaoRealizadaRelacaoRequestSchema, matriculasRelacaoRequestSchema, profissionalFichaRequestSchema, profissionalRelacaoRequestSchema, registroDoacaoRelacaoRequestSchema, termoAutorizacaoRequestSchema, unidadeAssistencialRelacaoRequestSchema, voluntarioFichaRequestSchema, voluntarioRelacaoRequestSchema } from "../reports.schema.js";
+import { beneficiarioFichaRequestSchema, beneficiarioRelacaoRequestSchema, comprovanteMatriculaRequestSchema, comprovantePreMatriculaEsperaRequestSchema, doacaoRealizadaReciboRequestSchema, doacaoRealizadaRelacaoRequestSchema, matriculaListaPresencaRequestSchema, matriculasRelacaoRequestSchema, profissionalFichaRequestSchema, profissionalRelacaoRequestSchema, registroDoacaoRelacaoRequestSchema, termoAutorizacaoRequestSchema, unidadeAssistencialRelacaoRequestSchema, voluntarioFichaRequestSchema, voluntarioRelacaoRequestSchema } from "../reports.schema.js";
 export class ReportsService {
     beneficiarioService = new BeneficiarioService();
     profissionalService = new ProfissionalService();
@@ -87,6 +87,16 @@ export class ReportsService {
         if (Number.isNaN(data.getTime()))
             return texto;
         return this.dateTimeFormatter.format(data);
+    }
+    formatarPeriodoCurso(dataInicial, dataFinal) {
+        const inicio = this.normalizarTexto(dataInicial);
+        const fim = this.normalizarTexto(dataFinal);
+        if (!inicio && !fim)
+            return undefined;
+        if (inicio && fim) {
+            return `${this.formatarDataComHifen(inicio)} a ${this.formatarDataComHifen(fim)}`;
+        }
+        return this.formatarDataComHifen(inicio ?? fim);
     }
     formatarStatus(valor) {
         const texto = this.normalizarTexto(valor);
@@ -566,6 +576,116 @@ export class ReportsService {
         const pdf = await this.renderer.render(html, contexto.rodape, relatorioInput);
         return { html, pdf, filename: "relacao-matriculas.pdf" };
     }
+    async gerarListaPresencaMatricula(rawPayload) {
+        const payload = matriculaListaPresencaRequestSchema.parse(rawPayload);
+        const matricula = await this.matriculaService.buscarPorId(payload.matriculaId);
+        const contexto = await this.montarContextoInstitucional();
+        const participantes = [...(matricula.matriculas ?? [])]
+            .filter((item) => (item.status ?? "ATIVO").trim().toUpperCase() !== "CANCELADO")
+            .sort((a, b) => (a.beneficiario_nome || "").localeCompare(b.beneficiario_nome || "", "pt-BR"));
+        const exibirCpf = payload.exibirCpf !== false;
+        const horario = matricula.horario_inicial && matricula.duracao_horas
+            ? `${matricula.horario_inicial} (${matricula.duracao_horas}h)`
+            : matricula.horario_inicial ?? undefined;
+        const tabela = {
+            colunas: exibirCpf
+                ? [
+                    { titulo: "Nº", largura: "8%" },
+                    { titulo: "Participante", largura: "54%" },
+                    { titulo: "CPF", largura: "22%" },
+                    { titulo: "P", largura: "8%" },
+                    { titulo: "A", largura: "8%" }
+                ]
+                : [
+                    { titulo: "Nº", largura: "8%" },
+                    { titulo: "Participante", largura: "72%" },
+                    { titulo: "P", largura: "10%" },
+                    { titulo: "A", largura: "10%" }
+                ],
+            linhas: participantes.length
+                ? participantes.map((item, index) => exibirCpf
+                    ? [String(index + 1), item.beneficiario_nome || "---", item.cpf || "---", " ", " "]
+                    : [String(index + 1), item.beneficiario_nome || "---", " ", " "])
+                : [
+                    exibirCpf
+                        ? ["1", "Nenhum participante inscrito.", "---", " ", " "]
+                        : ["1", "Nenhum participante inscrito.", " ", " "]
+                ]
+        };
+        const relatorioInput = {
+            titulo: "Lista de presença do curso/atendimento",
+            metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),
+            descricao: "Relatório completo para acompanhamento de frequência, com identificação do curso/atendimento e espaço para marcação manual de presença.",
+            blocos: [
+                {
+                    titulo: "Identificação do curso/atendimento",
+                    colunas: 2,
+                    destaque: true,
+                    campos: [
+                        this.campo("Curso/atendimento", matricula.nome),
+                        this.campo("Tipo", matricula.tipo),
+                        this.campo("Status", this.formatarStatus(matricula.status)),
+                        this.campo("Data da aula", this.normalizarTexto(payload.dataAula) ? this.formatarDataComHifen(payload.dataAula) : "Não definida")
+                    ]
+                },
+                {
+                    titulo: "Organização da turma",
+                    colunas: 3,
+                    campos: [
+                        this.campo("Profissional responsável", matricula.profissional),
+                        this.campo("Sala", matricula.sala_nome),
+                        this.campo("Instituição parceira", matricula.instituicao_parceira),
+                        this.campo("Horário", horario),
+                        this.campo("Dias", matricula.dias_semana?.length ? matricula.dias_semana.join(", ") : undefined),
+                        this.campo("Período", this.formatarPeriodoCurso(matricula.data_triagem, matricula.data_conclusao)),
+                        this.campo("Carga horária", matricula.carga_horaria ? `${matricula.carga_horaria}h` : undefined),
+                        this.campo("Duração prevista", matricula.duracao_horas ? `${matricula.duracao_horas}h` : undefined),
+                        this.campo("Faixa etária", matricula.faixa_etaria?.length ? matricula.faixa_etaria.join(", ") : undefined)
+                    ]
+                },
+                {
+                    titulo: "Participantes e critérios",
+                    colunas: 3,
+                    campos: [
+                        this.campo("Participantes inscritos", String(participantes.length)),
+                        this.campo("Vagas totais", String(matricula.vagas_totais ?? 0)),
+                        this.campo("Vagas disponíveis", String(matricula.vagas_disponiveis ?? 0)),
+                        this.campo("Sexo permitido", matricula.sexo_permitido ? this.formatarValorEnumerado(matricula.sexo_permitido) : "Todos"),
+                        this.campo("Fila de espera", String(matricula.total_fila_espera ?? 0)),
+                        this.campo("Preferencial para idosos", this.formatarSimNao(matricula.vaga_preferencial_idosos))
+                    ]
+                },
+                this.blocoComCampos("Descrição e restrições", 1, [
+                    this.campoPreenchido("Descrição", matricula.descricao),
+                    this.campoPreenchido("Restrições", matricula.restricoes)
+                ])
+            ].filter((bloco) => !!bloco),
+            tabela,
+            secoes: [
+                {
+                    titulo: "Orientação de preenchimento",
+                    conteudo: "Utilize a coluna P para presente e a coluna A para ausente. A marcação deve ser feita manualmente no momento da aula ou atendimento."
+                },
+                {
+                    titulo: "Assinatura do profissional responsável",
+                    conteudo: [
+                        `Profissional responsável: ${this.normalizarTexto(matricula.profissional) ?? "Não informado"}`,
+                        "[[espaco:3.2]]",
+                        "_______________________________________________________________"
+                    ].join("\n")
+                }
+            ],
+            cabecalho: contexto.cabecalho,
+            rodape: contexto.rodape
+        };
+        const html = this.template.montarHtml(relatorioInput);
+        const pdf = await this.renderer.render(html, contexto.rodape, relatorioInput);
+        return {
+            html,
+            pdf,
+            filename: `lista-presenca-matricula-${matricula.id_matricula ?? payload.matriculaId}.pdf`
+        };
+    }
     async gerarComprovanteMatricula(rawPayload) {
         const payload = comprovanteMatriculaRequestSchema.parse(rawPayload);
         const contexto = await this.montarContextoInstitucional();
@@ -751,6 +871,63 @@ export class ReportsService {
         const pdf = await this.renderer.render(html, contexto.rodape, relatorioInput);
         return { html, pdf, filename: "relacao-doacoes-realizadas.pdf" };
     }
+    async gerarReciboDoacaoRealizada(rawPayload) {
+        const payload = doacaoRealizadaReciboRequestSchema.parse(rawPayload);
+        const doacao = await this.doacaoRealizadaService.buscarPorId(payload.doacaoRealizadaId);
+        const contexto = await this.montarContextoInstitucional();
+        const beneficiarioFamilia = doacao.beneficiario_nome || doacao.familia_nome || "---";
+        const possuiBeneficiario = !!this.normalizarTexto(doacao.beneficiario_nome);
+        const blocos = [
+            this.blocoComCampos("Identificação da entrega", 2, [
+                this.campo("Recibo", doacao.id_doacao_realizada),
+                this.campo("Data da entrega", this.formatarDataComHifen(doacao.data_doacao)),
+                this.campo("Destinatário", beneficiarioFamilia),
+                this.campo("Tipo de destinatário", possuiBeneficiario ? "Beneficiário" : "Família"),
+                this.campo("Tipo de doação", doacao.tipo_doacao),
+                this.campo("Situação", doacao.situacao)
+            ], true),
+            this.blocoComCampos("Responsável pelo registro", 2, [
+                this.campo("Responsável", doacao.responsavel),
+                this.campo("Quantidade de itens", String(doacao.total_itens ?? doacao.itens.length))
+            ]),
+            this.blocoComCampos("Observações", 1, [this.campoPreenchido("Observações", doacao.observacoes)])
+        ].filter((bloco) => !!bloco);
+        const relatorioInput = {
+            titulo: "Recibo de doação entregue",
+            metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),
+            descricao: "Recibo emitido com base nos parâmetros institucionais cadastrados no sistema.",
+            blocos,
+            tabela: {
+                colunas: [
+                    { titulo: "Item", largura: "46%" },
+                    { titulo: "Unidade", largura: "14%" },
+                    { titulo: "Quantidade", largura: "12%" },
+                    { titulo: "Observações", largura: "28%" }
+                ],
+                linhas: doacao.itens.map((item) => [
+                    item.descricao_item || item.codigo_item || `Item ${item.item_id}`,
+                    item.unidade_item || "---",
+                    String(item.quantidade),
+                    item.observacoes || "---"
+                ])
+            },
+            secoes: [
+                {
+                    titulo: "Declaração",
+                    conteudo: "Declaro ter recebido gratuitamente os serviços ou benefícios constantes neste recibo."
+                },
+                {
+                    titulo: "Assinaturas",
+                    conteudo: "Responsável pela entrega:\n[[espaco:2.8]]\n_______________________________________________________________\n\nRecebedor:\n[[espaco:2.8]]\n_______________________________________________________________"
+                }
+            ],
+            cabecalho: contexto.cabecalho,
+            rodape: contexto.rodape
+        };
+        const html = this.template.montarHtml(relatorioInput);
+        const pdf = await this.renderer.render(html, contexto.rodape, relatorioInput);
+        return { html, pdf, filename: `recibo-doacao-realizada-${doacao.id_doacao_realizada}.pdf` };
+    }
     async gerarFichaVoluntario(rawPayload) {
         const payload = voluntarioFichaRequestSchema.parse(rawPayload);
         const voluntario = await this.voluntarioService.buscarPorId(payload.voluntarioId);
@@ -814,9 +991,7 @@ export class ReportsService {
                 titulo: "Assinaturas",
                 conteudo: [
                     [payload.localAssinatura, dataAssinatura].filter(Boolean).join(", "),
-                    "",
-                    "",
-                    "",
+                    "[[espaco:5]]",
                     "________________________________________",
                     "Assinatura do beneficiário / responsável legal",
                     `${payload.responsavelNome || nomeBeneficiario}`,

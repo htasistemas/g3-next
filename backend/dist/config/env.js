@@ -26,6 +26,7 @@ const envSchema = z.object({
     API_HOST: z.string().min(1).default("0.0.0.0"),
     APP_STORAGE_DRIVER: z.enum(["local"]).default("local"),
     APP_STORAGE_ROOT: z.string().trim().min(1).default("storage"),
+    APP_MAINTENANCE_FLAG_PATH: z.string().trim().min(1).default("/var/run/g3n/maintenance.enable"),
     APP_GEOCODING_USER_AGENT: z.string().trim().min(1).default("G3-Next/1.0"),
     APP_EMAIL_DESTINO_CHAMADOS: z.string().trim().min(1).default("htasistemas@gmail.com"),
     CORS_ORIGIN: z

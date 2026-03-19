@@ -57,6 +57,11 @@ export class ReportsController {
         const resultado = await service.gerarRelacaoMatriculas(request.body);
         return responderRelatorio(response, resultado, formato);
     }
+    async listaPresencaMatricula(request, response) {
+        const formato = formatoRelatorioSchema.parse(request.query.formato);
+        const resultado = await service.gerarListaPresencaMatricula(request.body);
+        return responderRelatorio(response, resultado, formato);
+    }
     async comprovanteMatricula(request, response) {
         const formato = formatoRelatorioSchema.parse(request.query.formato);
         const resultado = await service.gerarComprovanteMatricula(request.body);
@@ -75,6 +80,11 @@ export class ReportsController {
     async relacaoDoacoesRealizadas(request, response) {
         const formato = formatoRelatorioSchema.parse(request.query.formato);
         const resultado = await service.gerarRelacaoDoacoesRealizadas(request.body);
+        return responderRelatorio(response, resultado, formato);
+    }
+    async reciboDoacaoRealizada(request, response) {
+        const formato = formatoRelatorioSchema.parse(request.query.formato);
+        const resultado = await service.gerarReciboDoacaoRealizada(request.body);
         return responderRelatorio(response, resultado, formato);
     }
 }

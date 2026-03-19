@@ -1,4 +1,4 @@
-import { atualizarPersonalizacaoPayloadSchema, personalizacaoSistemaSchema } from "../parametros-sistema.schema.js";
+import { atualizarCarenciaDoacaoRealizadaPayloadSchema, atualizarPersonalizacaoPayloadSchema, carenciaDoacaoRealizadaSchema, personalizacaoSistemaSchema } from "../parametros-sistema.schema.js";
 import { ParametrosSistemaRepository } from "../repositories/parametros-sistema.repository.js";
 const personalizacaoPadrao = {
     modo: "CLARO",
@@ -20,6 +20,9 @@ const personalizacaoPadrao = {
         success: "#16a34a",
         info: "#0284c7"
     }
+};
+const carenciaDoacaoRealizadaPadrao = {
+    tempo_carencia_dias: 0
 };
 export class ParametrosSistemaService {
     repository = new ParametrosSistemaRepository();
@@ -62,5 +65,37 @@ export class ParametrosSistemaService {
     }
     getPersonalizacaoPadrao() {
         return personalizacaoPadrao;
+    }
+    async obterCarenciaDoacaoRealizada() {
+        const registro = await this.repository.buscarCarenciaDoacaoRealizada();
+        if (!registro) {
+            return {
+                carencia: carenciaDoacaoRealizadaPadrao,
+                atualizado_em: null
+            };
+        }
+        const normalizado = carenciaDoacaoRealizadaSchema.parse({
+            ...carenciaDoacaoRealizadaPadrao,
+            ...registro.valor
+        });
+        return {
+            carencia: normalizado,
+            atualizado_em: registro.atualizado_em.toISOString()
+        };
+    }
+    async atualizarCarenciaDoacaoRealizada(rawPayload, usuarioAtualizacao) {
+        const payload = atualizarCarenciaDoacaoRealizadaPayloadSchema.parse(rawPayload);
+        const normalizado = carenciaDoacaoRealizadaSchema.parse({
+            ...carenciaDoacaoRealizadaPadrao,
+            ...payload.carencia
+        });
+        const salvo = await this.repository.salvarCarenciaDoacaoRealizada(normalizado, usuarioAtualizacao);
+        return {
+            carencia: normalizado,
+            atualizado_em: salvo.atualizado_em.toISOString()
+        };
+    }
+    getCarenciaDoacaoRealizadaPadrao() {
+        return carenciaDoacaoRealizadaPadrao;
     }
 }

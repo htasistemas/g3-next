@@ -25,6 +25,7 @@ const attachmentMimeTypes = [...documentMimeTypes, "video/mp4", "video/webm", "v
 export const requiredStorageDirectories = [
     "beneficiarios/fotos",
     "beneficiarios/documentos",
+    "banco-empregos/candidatos/documentos",
     "biblioteca/capas",
     "colaboradores/fotos",
     "colaboradores/documentos",
@@ -32,6 +33,8 @@ export const requiredStorageDirectories = [
     "doacoes/comprovantes",
     "cursos/comprovantes",
     "almoxarifado/anexos",
+    "veiculos/fotos",
+    "veiculos/documentos",
     "geral/outros",
     "instituicoes/imagens",
     "cursos/imagens",
@@ -40,7 +43,9 @@ export const requiredStorageDirectories = [
     "ocorrencias/anexos",
     "oficios/documentos",
     "compras/anexos",
-    "contabilidade/anexos"
+    "contabilidade/anexos",
+    "captacao/doadores/anexos",
+    "captacao/campanhas/banners"
 ];
 export const storagePolicies = {
     beneficiario_foto: {
@@ -60,6 +65,15 @@ export const storagePolicies = {
         allowedExtensions: documentExtensions,
         allowedMimeTypes: documentMimeTypes,
         maxSizeBytes: 15 * 1024 * 1024,
+        generateThumbnail: true
+    },
+    banco_empregos_documento: {
+        entidadeTipo: "banco_empregos_candidato",
+        categoria: "documento",
+        subdirectory: "banco-empregos/candidatos/documentos",
+        allowedExtensions: documentExtensions,
+        allowedMimeTypes: documentMimeTypes,
+        maxSizeBytes: 20 * 1024 * 1024,
         generateThumbnail: true
     },
     biblioteca_capa: {
@@ -95,9 +109,9 @@ export const storagePolicies = {
         entidadeTipo: "instituicao",
         categoria: "documento",
         subdirectory: "instituicoes/documentos",
-        allowedExtensions: documentExtensions,
-        allowedMimeTypes: documentMimeTypes,
-        maxSizeBytes: 20 * 1024 * 1024,
+        allowedExtensions: ["*"],
+        allowedMimeTypes: ["*"],
+        maxSizeBytes: 100 * 1024 * 1024,
         generateThumbnail: true
     },
     instituicao_imagem: {
@@ -142,6 +156,25 @@ export const storagePolicies = {
         entidadeTipo: "almoxarifado",
         categoria: "anexo",
         subdirectory: "almoxarifado/anexos",
+        allowedExtensions: documentExtensions,
+        allowedMimeTypes: documentMimeTypes,
+        maxSizeBytes: 15 * 1024 * 1024,
+        generateThumbnail: true
+    },
+    veiculo_foto: {
+        entidadeTipo: "controle_veiculo",
+        categoria: "foto",
+        subdirectory: "veiculos/fotos",
+        allowedExtensions: imageExtensions,
+        allowedMimeTypes: imageMimeTypes,
+        maxSizeBytes: 8 * 1024 * 1024,
+        imageOnly: true,
+        generateThumbnail: true
+    },
+    veiculo_documento: {
+        entidadeTipo: "controle_veiculo",
+        categoria: "documento",
+        subdirectory: "veiculos/documentos",
         allowedExtensions: documentExtensions,
         allowedMimeTypes: documentMimeTypes,
         maxSizeBytes: 15 * 1024 * 1024,
@@ -200,6 +233,25 @@ export const storagePolicies = {
         allowedExtensions: attachmentExtensions,
         allowedMimeTypes: attachmentMimeTypes,
         maxSizeBytes: 25 * 1024 * 1024,
+        generateThumbnail: true
+    },
+    captacao_doador_anexo: {
+        entidadeTipo: "captacao_doador",
+        categoria: "anexo",
+        subdirectory: "captacao/doadores/anexos",
+        allowedExtensions: ["*"],
+        allowedMimeTypes: ["*"],
+        maxSizeBytes: 100 * 1024 * 1024,
+        generateThumbnail: true
+    },
+    captacao_campanha_banner: {
+        entidadeTipo: "captacao_campanha",
+        categoria: "banner",
+        subdirectory: "captacao/campanhas/banners",
+        allowedExtensions: imageExtensions,
+        allowedMimeTypes: imageMimeTypes,
+        maxSizeBytes: 10 * 1024 * 1024,
+        imageOnly: true,
         generateThumbnail: true
     },
     geral_outro: {

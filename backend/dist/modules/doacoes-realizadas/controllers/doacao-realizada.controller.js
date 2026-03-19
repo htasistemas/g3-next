@@ -10,11 +10,11 @@ export class DoacaoRealizadaController {
         return response.json({ doacao });
     }
     async criar(request, response) {
-        const doacao = await service.criar(request.body);
+        const doacao = await service.criar(request.body, request.authUser);
         return response.status(201).json({ doacao });
     }
     async atualizar(request, response) {
-        const doacao = await service.atualizar(request.params.id, request.body);
+        const doacao = await service.atualizar(request.params.id, request.body, request.authUser);
         return response.json({ doacao });
     }
     async remover(request, response) {

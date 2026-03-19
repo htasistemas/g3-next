@@ -35,6 +35,7 @@ export class UsuarioService {
     }
     async atualizar(rawId, rawInput, atorRaw) {
         const id = this.parseId(rawId);
+        await this.validarProtecaoAdmin(id);
         const inputNormalizado = this.normalizarPayload(rawInput);
         const input = atualizarUsuarioSchema.parse(inputNormalizado);
         const ator = this.parseAtor(atorRaw);
@@ -42,12 +43,14 @@ export class UsuarioService {
     }
     async atualizarStatus(rawId, rawInput, atorRaw) {
         const id = this.parseId(rawId);
+        await this.validarProtecaoAdmin(id);
         const input = atualizarStatusUsuarioSchema.parse(rawInput);
         const ator = this.parseAtor(atorRaw);
         return this.repository.atualizarStatus(id, input.status, ator);
     }
     async resetarSenha(rawId, rawInput, atorRaw) {
         const id = this.parseId(rawId);
+        await this.validarProtecaoAdmin(id);
         const input = resetarSenhaUsuarioSchema.parse(rawInput);
         const ator = this.parseAtor(atorRaw);
         const novaSenhaHash = await bcrypt.hash(input.nova_senha, 10);
@@ -55,8 +58,16 @@ export class UsuarioService {
     }
     async remover(rawId, atorRaw) {
         const id = this.parseId(rawId);
+        await this.validarProtecaoAdmin(id);
         const ator = this.parseAtor(atorRaw);
         return this.repository.remover(id, ator);
+    }
+    async validarProtecaoAdmin(id) {
+        const resultado = await this.repository.buscarPorId(id);
+        const emailAdmin = "htasistemas@gmail.com";
+        if (resultado.usuario.email?.toLowerCase() === emailAdmin) {
+            throw new AppError("Este usuario possui acesso administrador restrito e nao pode ser alterado ou removido.", 403);
+        }
     }
     parseId(rawId) {
         const id = Number(rawId);

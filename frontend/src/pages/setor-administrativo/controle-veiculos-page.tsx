@@ -73,6 +73,7 @@ const classeCardDashboard =
 const hojeBr = formatarDataPtBr(new Date().toISOString().slice(0, 10));
 const documentoVeiculoMaximoBytes = 15 * 1024 * 1024;
 const combustiveis = ["Gasolina", "Etanol", "Flex", "Diesel", "GNV", "Elétrico", "Híbrido"];
+const categoriasCarteira = ["ACC", "A", "B", "C", "D", "E", "AB", "AC", "AD", "AE"];
 
 const defaultVeiculo: VeiculoCadastro = {
   placa: "",
@@ -146,6 +147,15 @@ function converterDataHifenParaIso(valor?: string | null) {
     return undefined;
   }
   return `${ano}-${mes}-${dia}`;
+}
+
+function normalizarDataFormularioParaIso(valor?: string | null) {
+  const texto = String(valor ?? "").trim();
+  if (!texto) return undefined;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(texto)) {
+    return texto;
+  }
+  return converterDataHifenParaIso(texto);
 }
 
 function formatarDataFormulario(valor?: string | null) {
@@ -265,6 +275,13 @@ export function ControleVeiculosPage() {
   const motoristasDisponiveis = (motoristasDisponiveisData ?? []).filter(
     (item) => item.tipoOrigem === motoristaForm.tipoOrigem
   );
+  const termoMotoristaNormalizado = termoMotorista.trim().toLocaleLowerCase("pt-BR");
+  const motoristaSelecionadoNormalizado = String(motoristaForm.nomeMotorista ?? "")
+    .trim()
+    .toLocaleLowerCase("pt-BR");
+  const mostrarSugestoesMotorista =
+    termoMotoristaNormalizado.length >= 2 &&
+    termoMotoristaNormalizado !== motoristaSelecionadoNormalizado;
   const locaisDestinoAtivos = locaisDestino.filter((item) => item.ativo !== false);
 
   const carregandoAcoes =
@@ -485,7 +502,7 @@ export function ControleVeiculosPage() {
       }
 
       const vencimentoCarteira = motoristaForm.vencimentoCarteira?.trim()
-        ? converterDataHifenParaIso(motoristaForm.vencimentoCarteira)
+        ? normalizarDataFormularioParaIso(motoristaForm.vencimentoCarteira)
         : undefined;
 
       if (!motoristaForm.veiculoId || !motoristaForm.motoristaId) {
@@ -512,7 +529,7 @@ export function ControleVeiculosPage() {
       });
       setMotoristaForm({
         ...response,
-        vencimentoCarteira: formatarDataFormulario(response.vencimentoCarteira)
+        vencimentoCarteira: response.vencimentoCarteira ?? ""
       });
       setTermoMotorista(response.nomeMotorista ?? "");
       setPopupMensagem({
@@ -597,6 +614,16 @@ export function ControleVeiculosPage() {
     }
 
     setConfirmarExcluir(true);
+  }
+
+  function selecionarMotoristaDisponivel(item: { id: number; nome: string; tipoOrigem: string }) {
+    setMotoristaForm((atual) => ({
+      ...atual,
+      tipoOrigem: item.tipoOrigem === "VOLUNTARIO" ? "VOLUNTARIO" : "PROFISSIONAL",
+      motoristaId: item.id,
+      nomeMotorista: item.nome
+    }));
+    setTermoMotorista(item.nome);
   }
 
   async function confirmarExclusao() {
@@ -1222,16 +1249,48 @@ export function ControleVeiculosPage() {
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <div className="space-y-1"><Label>Veículo *</Label><Select value={String(motoristaForm.veiculoId || "")} onChange={(event) => setMotoristaForm((atual) => ({ ...atual, veiculoId: Number(event.target.value) || 0 }))}><option value="">Selecione</option>{veiculos.map((item) => <option key={item.id} value={item.id}>{item.placa} - {item.modelo}</option>)}</Select></div>
               <div className="space-y-1"><Label>Tipo de origem</Label><Select value={motoristaForm.tipoOrigem} onChange={(event) => { const tipoOrigem = event.target.value as "PROFISSIONAL" | "VOLUNTARIO"; setMotoristaForm((atual) => ({ ...atual, tipoOrigem, motoristaId: 0, nomeMotorista: "" })); setTermoMotorista(""); }}><option value="PROFISSIONAL">Profissional</option><option value="VOLUNTARIO">Voluntário</option></Select></div>
-              <div className="space-y-1"><Label>Buscar motorista</Label><Input placeholder="Digite ao menos 2 letras" value={termoMotorista} onChange={(event) => setTermoMotorista(event.target.value)} /></div>
-              <div className="space-y-1"><Label>Motorista autorizado *</Label><Select value={motoristaForm.motoristaId ? String(motoristaForm.motoristaId) : ""} onChange={(event) => { const motoristaId = Number(event.target.value) || 0; const motoristaSelecionado = motoristasDisponiveis.find((item) => item.id === motoristaId) ?? null; setMotoristaForm((atual) => ({ ...atual, motoristaId, nomeMotorista: motoristaSelecionado?.nome ?? atual.nomeMotorista ?? "" })); }}><option value="">{termoMotorista.trim().length >= 2 ? "Selecione" : "Digite para buscar"}</option>{motoristaForm.motoristaId && motoristaForm.nomeMotorista ? <option value={motoristaForm.motoristaId}>{motoristaForm.nomeMotorista}</option> : null}{motoristasDisponiveis.map((item) => <option key={`${item.tipoOrigem}-${item.id}`} value={item.id}>{item.nome}</option>)}</Select></div>
+              <div className="space-y-1 md:col-span-2 xl:col-span-2">
+                <Label>Motorista autorizado *</Label>
+                <div className="relative">
+                  <Input
+                    placeholder="Digite ao menos 2 letras e selecione"
+                    value={termoMotorista}
+                    onChange={(event) => {
+                      setTermoMotorista(event.target.value);
+                      setMotoristaForm((atual) => ({
+                        ...atual,
+                        motoristaId: 0,
+                        nomeMotorista: ""
+                      }));
+                    }}
+                  />
+                  {mostrarSugestoesMotorista ? (
+                    <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-[var(--g3-border)] bg-[var(--g3-card)] shadow-lg">
+                      {motoristasDisponiveis.length ? motoristasDisponiveis.map((item) => (
+                        <button
+                          key={`${item.tipoOrigem}-${item.id}`}
+                          type="button"
+                          className="flex w-full items-center justify-between px-3 py-2 text-left text-sm transition hover:bg-[var(--g3-primary-soft)]"
+                          onClick={() => selecionarMotoristaDisponivel(item)}
+                        >
+                          <span className="font-medium text-[var(--g3-text)]">{item.nome}</span>
+                          <span className="text-xs text-[var(--g3-muted)]">{item.tipoOrigem === "PROFISSIONAL" ? "Profissional" : "Voluntário"}</span>
+                        </button>
+                      )) : (
+                        <div className="px-3 py-2 text-sm text-[var(--g3-muted)]">Nenhum motorista encontrado.</div>
+                      )}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
               <div className="space-y-1"><Label>Número da carteira</Label><Input value={motoristaForm.numeroCarteira ?? ""} onChange={(event) => setMotoristaForm((atual) => ({ ...atual, numeroCarteira: event.target.value }))} /></div>
-              <div className="space-y-1"><Label>Categoria da carteira</Label><Input value={motoristaForm.categoriaCarteira ?? ""} onChange={(event) => setMotoristaForm((atual) => ({ ...atual, categoriaCarteira: event.target.value }))} /></div>
-              <div className="space-y-1"><Label>Vencimento da carteira</Label><Input placeholder="dd-mm-aaaa" value={motoristaForm.vencimentoCarteira ?? ""} onChange={(event) => setMotoristaForm((atual) => ({ ...atual, vencimentoCarteira: mascararDataHifen(event.target.value) }))} /></div>
+              <div className="space-y-1"><Label>Categoria da carteira</Label><Select value={motoristaForm.categoriaCarteira ?? ""} onChange={(event) => setMotoristaForm((atual) => ({ ...atual, categoriaCarteira: event.target.value }))}><option value="">Selecione</option>{categoriasCarteira.map((item) => <option key={item} value={item}>{item}</option>)}</Select></div>
+              <div className="space-y-1"><Label>Vencimento da carteira</Label><Input type="date" value={motoristaForm.vencimentoCarteira ?? ""} onChange={(event) => setMotoristaForm((atual) => ({ ...atual, vencimentoCarteira: event.target.value }))} /></div>
             </div>
             <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]">
               <table className="min-w-full text-sm">
                 <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"><tr><th className="px-3 py-2 text-left">Veículo</th><th className="px-3 py-2 text-left">Motorista</th><th className="px-3 py-2 text-left">Origem</th><th className="px-3 py-2 text-left">Carteira</th></tr></thead>
-                <tbody>{motoristasAutorizados.length ? motoristasAutorizados.map((item, index) => <tr key={item.id ?? `${item.veiculoId}-${index}`} className={`cursor-pointer border-t border-[var(--g3-border)] ${index % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35"}`} onClick={() => { setMotoristaForm({ ...item, vencimentoCarteira: formatarDataFormulario(item.vencimentoCarteira) }); setTermoMotorista(item.nomeMotorista ?? ""); }}><td className="px-3 py-2">{item.placaVeiculo ?? item.veiculoId}</td><td className="px-3 py-2">{item.nomeMotorista ?? item.motoristaId}</td><td className="px-3 py-2">{item.tipoOrigem === "PROFISSIONAL" ? "Profissional" : "Voluntário"}</td><td className="px-3 py-2">{item.numeroCarteira ?? "---"}</td></tr>) : <tr><td className="px-3 py-4 text-center" colSpan={4}>Nenhum motorista autorizado cadastrado.</td></tr>}</tbody>
+                <tbody>{motoristasAutorizados.length ? motoristasAutorizados.map((item, index) => <tr key={item.id ?? `${item.veiculoId}-${index}`} className={`cursor-pointer border-t border-[var(--g3-border)] ${index % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35"}`} onClick={() => { setMotoristaForm({ ...item, vencimentoCarteira: item.vencimentoCarteira ?? "" }); setTermoMotorista(item.nomeMotorista ?? ""); }}><td className="px-3 py-2">{item.placaVeiculo ?? item.veiculoId}</td><td className="px-3 py-2">{item.nomeMotorista ?? item.motoristaId}</td><td className="px-3 py-2">{item.tipoOrigem === "PROFISSIONAL" ? "Profissional" : "Voluntário"}</td><td className="px-3 py-2">{item.numeroCarteira ?? "---"}</td></tr>) : <tr><td className="px-3 py-4 text-center" colSpan={4}>Nenhum motorista autorizado cadastrado.</td></tr>}</tbody>
               </table>
             </div>
           </section>

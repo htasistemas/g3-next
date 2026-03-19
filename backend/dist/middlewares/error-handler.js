@@ -1,3 +1,4 @@
+import multer from "multer";
 import { ZodError } from "zod";
 import { AppError } from "../shared/errors/app-error.js";
 export function errorHandler(error, _request, response, _next) {
@@ -11,11 +12,30 @@ export function errorHandler(error, _request, response, _next) {
             details: error.issues
         });
     }
+    if (error instanceof multer.MulterError) {
+        const statusCode = error.code === "LIMIT_FILE_SIZE" ? 413 : 400;
+        const message = error.code === "LIMIT_FILE_SIZE"
+            ? "O arquivo enviado excede o tamanho maximo permitido."
+            : "Nao foi possivel processar o upload do arquivo.";
+        return response.status(statusCode).json({ message });
+    }
+    if (error instanceof Error &&
+        typeof error === "object" &&
+        error !== null &&
+        "type" in error &&
+        error.type === "entity.too.large") {
+        return response
+            .status(413)
+            .json({ message: "O arquivo enviado excede o tamanho maximo permitido." });
+    }
     if (error instanceof SyntaxError &&
         typeof error === "object" &&
         error !== null &&
         "body" in error) {
         return response.status(400).json({ message: "JSON invalido na requisicao." });
+    }
+    if (error instanceof Error && /multipart|boundary/i.test(error.message)) {
+        return response.status(400).json({ message: "Nao foi possivel processar o upload do arquivo." });
     }
     console.error(error);
     return response.status(500).json({ message: "Erro interno do servidor." });

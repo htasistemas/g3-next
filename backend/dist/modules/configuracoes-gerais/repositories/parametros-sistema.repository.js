@@ -1,5 +1,6 @@
 import { prisma } from "../../../database/prisma.js";
 const CHAVE_PERSONALIZACAO = "PERSONALIZACAO_VISUAL";
+const CHAVE_CARENCIA_DOACAO_REALIZADA = "DOACAO_REALIZADA_CARENCIA";
 const criarTabelaSql = `
   CREATE TABLE IF NOT EXISTS parametros_sistema (
     id BIGSERIAL PRIMARY KEY,
@@ -13,13 +14,28 @@ const criarTabelaSql = `
 let estruturaPromise = null;
 export class ParametrosSistemaRepository {
     async buscarPersonalizacao() {
+        return this.buscarPorChave(CHAVE_PERSONALIZACAO);
+    }
+    async salvarPersonalizacao(valor, usuarioAtualizacao) {
+        return this.salvarPorChave(CHAVE_PERSONALIZACAO, valor, usuarioAtualizacao);
+    }
+    async buscarCarenciaDoacaoRealizada() {
+        return this.buscarPorChave(CHAVE_CARENCIA_DOACAO_REALIZADA);
+    }
+    async salvarCarenciaDoacaoRealizada(valor, usuarioAtualizacao) {
+        return this.salvarPorChave(CHAVE_CARENCIA_DOACAO_REALIZADA, valor, usuarioAtualizacao);
+    }
+    async ensureEstrutura() {
+        await ensureParametrosSistemaEstrutura();
+    }
+    async buscarPorChave(chave) {
         await this.ensureEstrutura();
         const rows = await prisma.$queryRawUnsafe(`
         SELECT valor_json, atualizado_em
         FROM parametros_sistema
         WHERE chave = $1
         LIMIT 1
-      `, CHAVE_PERSONALIZACAO);
+      `, chave);
         if (!rows.length)
             return null;
         return {
@@ -27,7 +43,7 @@ export class ParametrosSistemaRepository {
             atualizado_em: rows[0].atualizado_em
         };
     }
-    async salvarPersonalizacao(valor, usuarioAtualizacao) {
+    async salvarPorChave(chave, valor, usuarioAtualizacao) {
         await this.ensureEstrutura();
         const rows = await prisma.$queryRawUnsafe(`
         INSERT INTO parametros_sistema (chave, valor_json, atualizado_por, criado_em, atualizado_em)
@@ -38,14 +54,11 @@ export class ParametrosSistemaRepository {
           atualizado_por = EXCLUDED.atualizado_por,
           atualizado_em = NOW()
         RETURNING valor_json, atualizado_em
-      `, CHAVE_PERSONALIZACAO, JSON.stringify(valor), usuarioAtualizacao);
+      `, chave, JSON.stringify(valor), usuarioAtualizacao);
         return {
             valor: rows[0].valor_json,
             atualizado_em: rows[0].atualizado_em
         };
-    }
-    async ensureEstrutura() {
-        await ensureParametrosSistemaEstrutura();
     }
 }
 export async function ensureParametrosSistemaEstrutura() {

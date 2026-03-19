@@ -2,9 +2,26 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../../database/prisma.js";
 import { AppError } from "../../../shared/errors/app-error.js";
 import { joinSemicolonList, normalizeDigits, toOptionalDate, trimOrUndefined } from "../../../utils/string-utils.js";
+const beneficiarioContatoSelect = {
+    telefonePrincipal: true,
+    telefonePrincipalWhatsapp: true,
+    telefoneSecundario: true,
+    telefoneRecadoNome: true,
+    telefoneRecadoNumero: true,
+    email: true,
+    permiteContatoTel: true,
+    permiteContatoWhatsapp: true,
+    permiteContatoSms: true,
+    permiteContatoEmail: true,
+    horarioPreferencial: true
+};
 const beneficiarioInclude = {
     endereco: true,
-    contatos: { orderBy: { atualizadoEm: "desc" }, take: 1 },
+    contatos: {
+        select: beneficiarioContatoSelect,
+        orderBy: { atualizadoEm: "desc" },
+        take: 1
+    },
     documentos: { orderBy: { atualizadoEm: "desc" } },
     situacoesSociais: { orderBy: { atualizadoEm: "desc" }, take: 1 },
     escolaridades: { orderBy: { atualizadoEm: "desc" }, take: 1 },

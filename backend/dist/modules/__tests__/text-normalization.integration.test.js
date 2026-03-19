@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { mapBeneficiarioToResponse } from "../beneficiarios/beneficiario.mapper.js";
 import { BeneficiarioService } from "../beneficiarios/services/beneficiario.service.js";
 import { FamiliaService } from "../familias/services/familia.service.js";
 import { UnidadeAssistencialService } from "../unidades-assistenciais/services/unidade-assistencial.service.js";
@@ -64,4 +65,60 @@ test("UnidadeAssistencialService normaliza unidade e diretoria", () => {
     assert.equal(normalizado.observacoes, "Atendimento no CRAS");
     assert.equal(normalizado.diretoria[0].nome_completo, "Maria de Souza Lima");
     assert.equal(normalizado.diretoria[0].funcao, "Secretaria de Assistencia Social");
+});
+test("mapBeneficiarioToResponse formata nomes legados em caixa alta", () => {
+    const response = mapBeneficiarioToResponse({
+        id: 1n,
+        codigo: "0001",
+        nomeCompleto: "MARIA DE SOUZA LIMA",
+        nomeSocial: "MARIA DA PAZ",
+        apelido: "MARIINHA",
+        dataNascimento: new Date("1990-01-02T00:00:00.000Z"),
+        foto3x4: null,
+        sexoBiologico: null,
+        identidadeGenero: null,
+        corRaca: null,
+        estadoCivil: null,
+        nacionalidade: null,
+        naturalidadeCidade: null,
+        naturalidadeUf: null,
+        nomeMae: "ANA DOS SANTOS",
+        nomePai: "JOAO DE LIMA",
+        status: "ATIVO",
+        optaReceberCestaBasica: null,
+        aptoReceberCestaBasica: null,
+        enderecoId: null,
+        criadoEm: new Date("2026-03-18T12:00:00.000Z"),
+        atualizadoEm: new Date("2026-03-18T12:00:00.000Z"),
+        endereco: null,
+        contatos: [
+            {
+                telefonePrincipal: null,
+                telefonePrincipalWhatsapp: null,
+                telefoneSecundario: null,
+                telefoneRecadoNome: "CARLOS DOS ANJOS",
+                telefoneRecadoNumero: null,
+                email: null,
+                permiteContatoTel: null,
+                permiteContatoWhatsapp: null,
+                permiteContatoSms: null,
+                permiteContatoEmail: null,
+                horarioPreferencial: null
+            }
+        ],
+        documentos: [],
+        situacoesSociais: [],
+        escolaridades: [],
+        saudes: [],
+        beneficios: [],
+        observacoes: [],
+        familiasReferencia: [],
+        familiasMembro: []
+    });
+    assert.equal(response.nome_completo, "Maria de Souza Lima");
+    assert.equal(response.nome_social, "Maria da Paz");
+    assert.equal(response.apelido, "Mariinha");
+    assert.equal(response.nome_mae, "Ana dos Santos");
+    assert.equal(response.nome_pai, "Joao de Lima");
+    assert.equal(response.telefone_recado_nome, "Carlos dos Anjos");
 });

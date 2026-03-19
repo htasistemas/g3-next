@@ -1,24 +1,25 @@
 import multer from "multer";
+import { mapArquivoMetadataToResponse, mapArquivoUploadToResponse } from "../arquivos.mapper.js";
 import { ArquivosService } from "../services/arquivos.service.js";
 const service = new ArquivosService();
 export const arquivosUploadMiddleware = multer({
     storage: multer.memoryStorage(),
     limits: {
-        fileSize: 20 * 1024 * 1024
+        fileSize: 100 * 1024 * 1024
     }
 }).single("arquivo");
 export class ArquivosController {
     async listar(request, response) {
         const arquivos = await service.listar(request.query);
-        return response.json({ arquivos });
+        return response.json({ arquivos: arquivos.map(mapArquivoMetadataToResponse) });
     }
     async upload(request, response) {
         const arquivo = await service.upload(request);
-        return response.status(201).json({ arquivo });
+        return response.status(201).json({ arquivo: mapArquivoUploadToResponse(arquivo) });
     }
     async obterPorId(request, response) {
         const arquivo = await service.obterPorId(request.params.id);
-        return response.json({ arquivo });
+        return response.json({ arquivo: mapArquivoMetadataToResponse(arquivo) });
     }
     async obterConteudoPorId(request, response) {
         const conteudo = await service.obterConteudoPorId(request.params.id, request.authUser?.id);

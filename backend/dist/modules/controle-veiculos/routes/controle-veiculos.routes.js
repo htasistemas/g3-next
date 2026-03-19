@@ -15,6 +15,10 @@ controleVeiculosRoutes.get("/diario-bordo", ensureAuthenticated, ensurePermissio
 controleVeiculosRoutes.post("/diario-bordo", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.criarDiario.bind(controller)));
 controleVeiculosRoutes.put("/diario-bordo/:id", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.atualizarDiario.bind(controller)));
 controleVeiculosRoutes.delete("/diario-bordo/:id", ensureAuthenticated, ensurePermissions(permissaoExclusao), asyncHandler(controller.removerDiario.bind(controller)));
+controleVeiculosRoutes.get("/locais-destino", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.listarLocaisDestino.bind(controller)));
+controleVeiculosRoutes.post("/locais-destino", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.criarLocalDestino.bind(controller)));
+controleVeiculosRoutes.put("/locais-destino/:id", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.atualizarLocalDestino.bind(controller)));
+controleVeiculosRoutes.delete("/locais-destino/:id", ensureAuthenticated, ensurePermissions(permissaoExclusao), asyncHandler(controller.removerLocalDestino.bind(controller)));
 controleVeiculosRoutes.get("/motoristas-disponiveis", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.listarMotoristasDisponiveis.bind(controller)));
 controleVeiculosRoutes.get("/motoristas-autorizados", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.listarMotoristasAutorizados.bind(controller)));
 controleVeiculosRoutes.post("/motoristas-autorizados", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.criarMotoristaAutorizado.bind(controller)));

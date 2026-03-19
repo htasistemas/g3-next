@@ -19,8 +19,68 @@ function calcularMediaConsumo(kmRodados, combustivelConsumidoLitros) {
         return null;
     return Number((kmRodados / combustivelConsumidoLitros).toFixed(2));
 }
+const controleVeiculosEstruturaStatements = [
+    "ALTER TABLE controle_veiculos ADD COLUMN IF NOT EXISTS cor VARCHAR(80)",
+    `
+    CREATE TABLE IF NOT EXISTS controle_veiculos_local_destino (
+      id BIGSERIAL PRIMARY KEY,
+      nome VARCHAR(160) NOT NULL,
+      endereco VARCHAR(220),
+      telefone VARCHAR(30),
+      observacoes TEXT,
+      ativo BOOLEAN NOT NULL DEFAULT TRUE,
+      criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+      atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+  `,
+    "ALTER TABLE controle_veiculos_local_destino ADD COLUMN IF NOT EXISTS telefone VARCHAR(30)",
+    "ALTER TABLE controle_veiculos_diario ADD COLUMN IF NOT EXISTS data_saida DATE",
+    "ALTER TABLE controle_veiculos_diario ADD COLUMN IF NOT EXISTS data_chegada DATE",
+    "ALTER TABLE controle_veiculos_diario ADD COLUMN IF NOT EXISTS local_destino_id BIGINT",
+    `
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.table_constraints
+        WHERE constraint_name = 'controle_veiculos_diario_local_destino_fk'
+          AND table_name = 'controle_veiculos_diario'
+      ) THEN
+        ALTER TABLE controle_veiculos_diario
+        ADD CONSTRAINT controle_veiculos_diario_local_destino_fk
+        FOREIGN KEY (local_destino_id) REFERENCES controle_veiculos_local_destino(id);
+      END IF;
+    END $$;
+  `,
+    "CREATE INDEX IF NOT EXISTS controle_veiculos_diario_local_destino_idx ON controle_veiculos_diario(local_destino_id)",
+    "CREATE INDEX IF NOT EXISTS controle_veiculos_local_destino_nome_idx ON controle_veiculos_local_destino(nome)"
+];
+let ensureControleVeiculosEstruturaPromise = null;
+export async function ensureControleVeiculosEstrutura() {
+    if (!ensureControleVeiculosEstruturaPromise) {
+        ensureControleVeiculosEstruturaPromise = (async () => {
+            for (const statement of controleVeiculosEstruturaStatements) {
+                await prisma.$executeRawUnsafe(statement);
+            }
+        })().catch((error) => {
+            ensureControleVeiculosEstruturaPromise = null;
+            throw error;
+        });
+    }
+    await ensureControleVeiculosEstruturaPromise;
+}
 export class ControleVeiculosRepository {
     fontesMotoristasPromise = null;
+    tratarErroPersistenciaVeiculo(error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError) {
+            const rawCode = typeof error.meta?.code === "string" ? error.meta.code : undefined;
+            const rawMessage = typeof error.meta?.message === "string" ? error.meta.message : error.message;
+            if ((error.code === "P2002" || (error.code === "P2010" && rawCode === "23505")) && /\bplaca\b/i.test(rawMessage)) {
+                throw new AppError("Ja existe um veiculo cadastrado com esta placa.", 409);
+            }
+        }
+        throw error;
+    }
     async obterFontesMotoristas() {
         if (!this.fontesMotoristasPromise) {
             this.fontesMotoristasPromise = prisma
@@ -44,13 +104,18 @@ export class ControleVeiculosRepository {
         }
         return this.fontesMotoristasPromise;
     }
+    async ensureEstrutura() {
+        await ensureControleVeiculosEstrutura();
+    }
     async listarVeiculos() {
+        await this.ensureEstrutura();
         return prisma.$queryRaw(Prisma.sql `
       SELECT
         id,
         placa,
         modelo,
         marca,
+        cor,
         ano,
         tipo_combustivel,
         media_consumo_padrao::float8 AS media_consumo_padrao,
@@ -67,12 +132,14 @@ export class ControleVeiculosRepository {
     `);
     }
     async buscarVeiculoPorId(id) {
+        await this.ensureEstrutura();
         const rows = await prisma.$queryRaw(Prisma.sql `
       SELECT
         id,
         placa,
         modelo,
         marca,
+        cor,
         ano,
         tipo_combustivel,
         media_consumo_padrao::float8 AS media_consumo_padrao,
@@ -98,44 +165,53 @@ export class ControleVeiculosRepository {
         return registro;
     }
     async criarVeiculo(input) {
-        const inserted = await prisma.$queryRaw(Prisma.sql `
-      INSERT INTO controle_veiculos (
-        placa,
-        modelo,
-        marca,
-        ano,
-        tipo_combustivel,
-        media_consumo_padrao,
-        capacidade_tanque_litros,
-        observacoes,
-        ativo,
-        foto_frente,
-        foto_lateral_esquerda,
-        foto_lateral_direita,
-        foto_traseira,
-        documento_veiculo_pdf,
-        criado_em,
-        atualizado_em
-      ) VALUES (
-        ${trimOrUndefined(input.placa)},
-        ${trimOrUndefined(input.modelo)},
-        ${trimOrUndefined(input.marca)},
-        ${input.ano ?? null},
-        ${trimOrUndefined(input.tipoCombustivel)},
-        ${input.mediaConsumoPadrao ?? null},
-        ${input.capacidadeTanqueLitros ?? null},
-        ${trimOrUndefined(input.observacoes ?? undefined)},
-        ${input.ativo ?? true},
-        ${trimOrUndefined(input.fotoFrente ?? undefined)},
-        ${trimOrUndefined(input.fotoLateralEsquerda ?? undefined)},
-        ${trimOrUndefined(input.fotoLateralDireita ?? undefined)},
-        ${trimOrUndefined(input.fotoTraseira ?? undefined)},
-        ${trimOrUndefined(input.documentoVeiculoPdf ?? undefined)},
-        NOW(),
-        NOW()
-      )
-      RETURNING id
-    `);
+        await this.ensureEstrutura();
+        let inserted;
+        try {
+            inserted = await prisma.$queryRaw(Prisma.sql `
+        INSERT INTO controle_veiculos (
+          placa,
+          modelo,
+          marca,
+          cor,
+          ano,
+          tipo_combustivel,
+          media_consumo_padrao,
+          capacidade_tanque_litros,
+          observacoes,
+          ativo,
+          foto_frente,
+          foto_lateral_esquerda,
+          foto_lateral_direita,
+          foto_traseira,
+          documento_veiculo_pdf,
+          criado_em,
+          atualizado_em
+        ) VALUES (
+          ${trimOrUndefined(input.placa)},
+          ${trimOrUndefined(input.modelo)},
+          ${trimOrUndefined(input.marca)},
+          ${trimOrUndefined(input.cor)},
+          ${input.ano ?? null},
+          ${trimOrUndefined(input.tipoCombustivel)},
+          ${input.mediaConsumoPadrao ?? null},
+          ${input.capacidadeTanqueLitros ?? null},
+          ${trimOrUndefined(input.observacoes ?? undefined)},
+          ${input.ativo ?? true},
+          ${trimOrUndefined(input.fotoFrente ?? undefined)},
+          ${trimOrUndefined(input.fotoLateralEsquerda ?? undefined)},
+          ${trimOrUndefined(input.fotoLateralDireita ?? undefined)},
+          ${trimOrUndefined(input.fotoTraseira ?? undefined)},
+          ${trimOrUndefined(input.documentoVeiculoPdf ?? undefined)},
+          NOW(),
+          NOW()
+        )
+        RETURNING id
+      `);
+        }
+        catch (error) {
+            this.tratarErroPersistenciaVeiculo(error);
+        }
         const id = inserted[0]?.id;
         if (!id) {
             throw new AppError("Não foi possível criar o veículo.", 500);
@@ -143,30 +219,38 @@ export class ControleVeiculosRepository {
         return this.buscarVeiculoPorIdOuFalhar(id);
     }
     async atualizarVeiculo(id, input) {
+        await this.ensureEstrutura();
         await this.buscarVeiculoPorIdOuFalhar(id);
-        await prisma.$executeRaw(Prisma.sql `
-      UPDATE controle_veiculos
-      SET
-        placa = ${trimOrUndefined(input.placa)},
-        modelo = ${trimOrUndefined(input.modelo)},
-        marca = ${trimOrUndefined(input.marca)},
-        ano = ${input.ano ?? null},
-        tipo_combustivel = ${trimOrUndefined(input.tipoCombustivel)},
-        media_consumo_padrao = ${input.mediaConsumoPadrao ?? null},
-        capacidade_tanque_litros = ${input.capacidadeTanqueLitros ?? null},
-        observacoes = ${trimOrUndefined(input.observacoes ?? undefined)},
-        ativo = ${input.ativo ?? true},
-        foto_frente = ${trimOrUndefined(input.fotoFrente ?? undefined)},
-        foto_lateral_esquerda = ${trimOrUndefined(input.fotoLateralEsquerda ?? undefined)},
-        foto_lateral_direita = ${trimOrUndefined(input.fotoLateralDireita ?? undefined)},
-        foto_traseira = ${trimOrUndefined(input.fotoTraseira ?? undefined)},
-        documento_veiculo_pdf = ${trimOrUndefined(input.documentoVeiculoPdf ?? undefined)},
-        atualizado_em = NOW()
-      WHERE id = ${id}
-    `);
+        try {
+            await prisma.$executeRaw(Prisma.sql `
+        UPDATE controle_veiculos
+        SET
+          placa = ${trimOrUndefined(input.placa)},
+          modelo = ${trimOrUndefined(input.modelo)},
+          marca = ${trimOrUndefined(input.marca)},
+          cor = ${trimOrUndefined(input.cor)},
+          ano = ${input.ano ?? null},
+          tipo_combustivel = ${trimOrUndefined(input.tipoCombustivel)},
+          media_consumo_padrao = ${input.mediaConsumoPadrao ?? null},
+          capacidade_tanque_litros = ${input.capacidadeTanqueLitros ?? null},
+          observacoes = ${trimOrUndefined(input.observacoes ?? undefined)},
+          ativo = ${input.ativo ?? true},
+          foto_frente = ${trimOrUndefined(input.fotoFrente ?? undefined)},
+          foto_lateral_esquerda = ${trimOrUndefined(input.fotoLateralEsquerda ?? undefined)},
+          foto_lateral_direita = ${trimOrUndefined(input.fotoLateralDireita ?? undefined)},
+          foto_traseira = ${trimOrUndefined(input.fotoTraseira ?? undefined)},
+          documento_veiculo_pdf = ${trimOrUndefined(input.documentoVeiculoPdf ?? undefined)},
+          atualizado_em = NOW()
+        WHERE id = ${id}
+      `);
+        }
+        catch (error) {
+            this.tratarErroPersistenciaVeiculo(error);
+        }
         return this.buscarVeiculoPorIdOuFalhar(id);
     }
     async removerVeiculo(id) {
+        await this.ensureEstrutura();
         await this.buscarVeiculoPorIdOuFalhar(id);
         await prisma.$executeRaw(Prisma.sql `
       DELETE FROM controle_veiculos
@@ -174,43 +258,55 @@ export class ControleVeiculosRepository {
     `);
     }
     async listarDiario() {
+        await this.ensureEstrutura();
         return prisma.$queryRaw(Prisma.sql `
       SELECT
-        id,
-        veiculo_id,
-        data,
-        condutor,
-        horario_saida,
-        km_inicial::float8 AS km_inicial,
-        horario_chegada,
-        km_final::float8 AS km_final,
-        destino,
-        combustivel_consumido_litros::float8 AS combustivel_consumido_litros,
-        km_rodados::float8 AS km_rodados,
-        media_consumo::float8 AS media_consumo,
-        observacoes
-      FROM controle_veiculos_diario
-      ORDER BY data DESC NULLS LAST, id DESC
+        d.id,
+        d.veiculo_id,
+        d.data,
+        d.data_saida,
+        d.data_chegada,
+        d.condutor,
+        d.horario_saida,
+        d.km_inicial::float8 AS km_inicial,
+        d.horario_chegada,
+        d.km_final::float8 AS km_final,
+        d.local_destino_id,
+        ld.nome AS local_destino_nome,
+        d.destino,
+        d.combustivel_consumido_litros::float8 AS combustivel_consumido_litros,
+        d.km_rodados::float8 AS km_rodados,
+        d.media_consumo::float8 AS media_consumo,
+        d.observacoes
+      FROM controle_veiculos_diario d
+      LEFT JOIN controle_veiculos_local_destino ld ON ld.id = d.local_destino_id
+      ORDER BY d.data DESC NULLS LAST, d.id DESC
     `);
     }
     async buscarDiarioPorId(id) {
+        await this.ensureEstrutura();
         const rows = await prisma.$queryRaw(Prisma.sql `
       SELECT
-        id,
-        veiculo_id,
-        data,
-        condutor,
-        horario_saida,
-        km_inicial::float8 AS km_inicial,
-        horario_chegada,
-        km_final::float8 AS km_final,
-        destino,
-        combustivel_consumido_litros::float8 AS combustivel_consumido_litros,
-        km_rodados::float8 AS km_rodados,
-        media_consumo::float8 AS media_consumo,
-        observacoes
-      FROM controle_veiculos_diario
-      WHERE id = ${id}
+        d.id,
+        d.veiculo_id,
+        d.data,
+        d.data_saida,
+        d.data_chegada,
+        d.condutor,
+        d.horario_saida,
+        d.km_inicial::float8 AS km_inicial,
+        d.horario_chegada,
+        d.km_final::float8 AS km_final,
+        d.local_destino_id,
+        ld.nome AS local_destino_nome,
+        d.destino,
+        d.combustivel_consumido_litros::float8 AS combustivel_consumido_litros,
+        d.km_rodados::float8 AS km_rodados,
+        d.media_consumo::float8 AS media_consumo,
+        d.observacoes
+      FROM controle_veiculos_diario d
+      LEFT JOIN controle_veiculos_local_destino ld ON ld.id = d.local_destino_id
+      WHERE d.id = ${id}
       LIMIT 1
     `);
         return rows[0] ?? null;
@@ -223,17 +319,21 @@ export class ControleVeiculosRepository {
         return registro;
     }
     async criarDiario(input) {
+        await this.ensureEstrutura();
         const kmRodados = calcularKmRodados(input.kmInicial, input.kmFinal);
-        const mediaConsumo = calcularMediaConsumo(kmRodados, null);
+        const mediaConsumo = calcularMediaConsumo(kmRodados, input.combustivelConsumidoLitros);
         const inserted = await prisma.$queryRaw(Prisma.sql `
       INSERT INTO controle_veiculos_diario (
         veiculo_id,
         data,
+        data_saida,
+        data_chegada,
         condutor,
         horario_saida,
         km_inicial,
         horario_chegada,
         km_final,
+        local_destino_id,
         destino,
         combustivel_consumido_litros,
         km_rodados,
@@ -243,14 +343,17 @@ export class ControleVeiculosRepository {
         atualizado_em
       ) VALUES (
         ${input.veiculoId ? BigInt(input.veiculoId) : null},
-        ${toOptionalDate(input.data ?? undefined)},
+        ${toOptionalDate(input.data ?? input.dataSaida ?? undefined)},
+        ${toOptionalDate(input.dataSaida ?? input.data ?? undefined)},
+        ${toOptionalDate(input.dataChegada ?? undefined)},
         ${trimOrUndefined(input.condutor ?? undefined)},
         CAST(${toOptionalTime(input.horarioSaida ?? undefined)} AS TIME),
         ${input.kmInicial ?? null},
         CAST(${toOptionalTime(input.horarioChegada ?? undefined)} AS TIME),
         ${input.kmFinal ?? null},
+        ${input.localDestinoId ? BigInt(input.localDestinoId) : null},
         ${trimOrUndefined(input.destino ?? undefined)},
-        NULL,
+        ${input.combustivelConsumidoLitros ?? null},
         ${kmRodados},
         ${mediaConsumo},
         ${trimOrUndefined(input.observacoes ?? undefined)},
@@ -266,20 +369,25 @@ export class ControleVeiculosRepository {
         return this.buscarDiarioPorIdOuFalhar(id);
     }
     async atualizarDiario(id, input) {
+        await this.ensureEstrutura();
         await this.buscarDiarioPorIdOuFalhar(id);
         const kmRodados = calcularKmRodados(input.kmInicial, input.kmFinal);
-        const mediaConsumo = calcularMediaConsumo(kmRodados, null);
+        const mediaConsumo = calcularMediaConsumo(kmRodados, input.combustivelConsumidoLitros);
         await prisma.$executeRaw(Prisma.sql `
       UPDATE controle_veiculos_diario
       SET
         veiculo_id = ${input.veiculoId ? BigInt(input.veiculoId) : null},
-        data = ${toOptionalDate(input.data ?? undefined)},
+        data = ${toOptionalDate(input.data ?? input.dataSaida ?? undefined)},
+        data_saida = ${toOptionalDate(input.dataSaida ?? input.data ?? undefined)},
+        data_chegada = ${toOptionalDate(input.dataChegada ?? undefined)},
         condutor = ${trimOrUndefined(input.condutor ?? undefined)},
         horario_saida = CAST(${toOptionalTime(input.horarioSaida ?? undefined)} AS TIME),
         km_inicial = ${input.kmInicial ?? null},
         horario_chegada = CAST(${toOptionalTime(input.horarioChegada ?? undefined)} AS TIME),
         km_final = ${input.kmFinal ?? null},
+        local_destino_id = ${input.localDestinoId ? BigInt(input.localDestinoId) : null},
         destino = ${trimOrUndefined(input.destino ?? undefined)},
+        combustivel_consumido_litros = ${input.combustivelConsumidoLitros ?? null},
         km_rodados = ${kmRodados},
         media_consumo = ${mediaConsumo},
         observacoes = ${trimOrUndefined(input.observacoes ?? undefined)},
@@ -289,6 +397,7 @@ export class ControleVeiculosRepository {
         return this.buscarDiarioPorIdOuFalhar(id);
     }
     async removerDiario(id) {
+        await this.ensureEstrutura();
         await this.buscarDiarioPorIdOuFalhar(id);
         await prisma.$executeRaw(Prisma.sql `
       DELETE FROM controle_veiculos_diario
@@ -296,6 +405,7 @@ export class ControleVeiculosRepository {
     `);
     }
     async listarMotoristasDisponiveis(nome) {
+        await this.ensureEstrutura();
         const termo = trimOrUndefined(nome);
         const { tabelaProfissionais, possuiVoluntarios } = await this.obterFontesMotoristas();
         const fontes = [];
@@ -320,6 +430,7 @@ export class ControleVeiculosRepository {
             : prisma.$queryRawUnsafe(sql);
     }
     async listarMotoristasAutorizados(veiculoId) {
+        await this.ensureEstrutura();
         const filtroVeiculo = veiculoId
             ? Prisma.sql `AND ma.veiculo_id = ${BigInt(veiculoId)}`
             : Prisma.empty;
@@ -345,6 +456,7 @@ export class ControleVeiculosRepository {
     `);
     }
     async buscarMotoristaAutorizadoPorId(id) {
+        await this.ensureEstrutura();
         const rows = await prisma.$queryRaw(Prisma.sql `
       SELECT
         ma.id,
@@ -374,6 +486,7 @@ export class ControleVeiculosRepository {
         return registro;
     }
     async criarMotoristaAutorizado(input) {
+        await this.ensureEstrutura();
         await this.buscarVeiculoPorIdOuFalhar(BigInt(input.veiculoId));
         const nomeMotorista = await this.buscarNomeMotorista(input.tipoOrigem, input.motoristaId);
         const inserted = await prisma.$queryRaw(Prisma.sql `
@@ -411,6 +524,7 @@ export class ControleVeiculosRepository {
         return this.buscarMotoristaAutorizadoPorIdOuFalhar(id);
     }
     async atualizarMotoristaAutorizado(id, input) {
+        await this.ensureEstrutura();
         await this.buscarMotoristaAutorizadoPorIdOuFalhar(id);
         await this.buscarVeiculoPorIdOuFalhar(BigInt(input.veiculoId));
         const nomeMotorista = await this.buscarNomeMotorista(input.tipoOrigem, input.motoristaId);
@@ -432,9 +546,108 @@ export class ControleVeiculosRepository {
         return this.buscarMotoristaAutorizadoPorIdOuFalhar(id);
     }
     async removerMotoristaAutorizado(id) {
+        await this.ensureEstrutura();
         await this.buscarMotoristaAutorizadoPorIdOuFalhar(id);
         await prisma.$executeRaw(Prisma.sql `
       DELETE FROM controle_veiculos_motoristas_autorizados
+      WHERE id = ${id}
+    `);
+    }
+    async listarLocaisDestino() {
+        await this.ensureEstrutura();
+        return prisma.$queryRaw(Prisma.sql `
+      SELECT
+        id,
+        nome,
+        endereco,
+        telefone,
+        observacoes,
+        ativo,
+        criado_em,
+        atualizado_em
+      FROM controle_veiculos_local_destino
+      ORDER BY ativo DESC, nome ASC, id DESC
+    `);
+    }
+    async buscarLocalDestinoPorId(id) {
+        await this.ensureEstrutura();
+        const rows = await prisma.$queryRaw(Prisma.sql `
+      SELECT
+        id,
+        nome,
+        endereco,
+        telefone,
+        observacoes,
+        ativo,
+        criado_em,
+        atualizado_em
+      FROM controle_veiculos_local_destino
+      WHERE id = ${id}
+      LIMIT 1
+    `);
+        return rows[0] ?? null;
+    }
+    async buscarLocalDestinoPorIdOuFalhar(id) {
+        const registro = await this.buscarLocalDestinoPorId(id);
+        if (!registro) {
+            throw new AppError("Local de destino nao encontrado.", 404);
+        }
+        return registro;
+    }
+    async criarLocalDestino(input) {
+        await this.ensureEstrutura();
+        const inserted = await prisma.$queryRaw(Prisma.sql `
+      INSERT INTO controle_veiculos_local_destino (
+        nome,
+        endereco,
+        telefone,
+        observacoes,
+        ativo,
+        criado_em,
+        atualizado_em
+      ) VALUES (
+        ${trimOrUndefined(input.nome ?? undefined)},
+        ${trimOrUndefined(input.endereco ?? undefined)},
+        ${trimOrUndefined(input.telefone ?? undefined)},
+        ${trimOrUndefined(input.observacoes ?? undefined)},
+        ${input.ativo ?? true},
+        NOW(),
+        NOW()
+      )
+      RETURNING id
+    `);
+        const id = inserted[0]?.id;
+        if (!id) {
+            throw new AppError("Nao foi possivel criar o local de destino.", 500);
+        }
+        return this.buscarLocalDestinoPorIdOuFalhar(id);
+    }
+    async atualizarLocalDestino(id, input) {
+        await this.ensureEstrutura();
+        await this.buscarLocalDestinoPorIdOuFalhar(id);
+        await prisma.$executeRaw(Prisma.sql `
+      UPDATE controle_veiculos_local_destino
+      SET
+        nome = ${trimOrUndefined(input.nome ?? undefined)},
+        endereco = ${trimOrUndefined(input.endereco ?? undefined)},
+        telefone = ${trimOrUndefined(input.telefone ?? undefined)},
+        observacoes = ${trimOrUndefined(input.observacoes ?? undefined)},
+        ativo = ${input.ativo ?? true},
+        atualizado_em = NOW()
+      WHERE id = ${id}
+    `);
+        return this.buscarLocalDestinoPorIdOuFalhar(id);
+    }
+    async removerLocalDestino(id) {
+        await this.ensureEstrutura();
+        await this.buscarLocalDestinoPorIdOuFalhar(id);
+        await prisma.$executeRaw(Prisma.sql `
+      UPDATE controle_veiculos_diario
+      SET local_destino_id = NULL
+      WHERE local_destino_id = ${id}
+    `);
+        await prisma.$executeRaw(Prisma.sql `
+      DELETE FROM controle_veiculos_local_destino
       WHERE id = ${id}
     `);
     }

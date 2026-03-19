@@ -2,8 +2,58 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../../database/prisma.js";
 import { AppError } from "../../../shared/errors/app-error.js";
 import { normalizeDigits, toOptionalDate, trimOrUndefined } from "../../../utils/string-utils.js";
+const estruturaDoacaoRealizadaSql = [
+    `
+    ALTER TABLE doacao_realizada_item
+    ADD COLUMN IF NOT EXISTS fora_carencia BOOLEAN NOT NULL DEFAULT FALSE
+  `,
+    `
+    ALTER TABLE doacao_realizada_item
+    ADD COLUMN IF NOT EXISTS carencia_dias INTEGER
+  `,
+    `
+    ALTER TABLE doacao_realizada_item
+    ADD COLUMN IF NOT EXISTS autorizado_por_usuario_id BIGINT
+  `,
+    `
+    ALTER TABLE doacao_realizada_item
+    ADD COLUMN IF NOT EXISTS autorizado_por_nome VARCHAR(120)
+  `,
+    `
+    ALTER TABLE doacao_realizada_item
+    ADD COLUMN IF NOT EXISTS autorizacao_carencia_em TIMESTAMP
+  `,
+    `
+    ALTER TABLE doacao_realizada_item
+    ADD COLUMN IF NOT EXISTS ultima_entrega_em DATE
+  `
+];
+let estruturaPromise = null;
+function toIsoDateInput(value) {
+    if (!value) {
+        return new Date().toISOString().slice(0, 10);
+    }
+    if (value instanceof Date) {
+        return value.toISOString().slice(0, 10);
+    }
+    const texto = String(value).trim();
+    if (!texto) {
+        return new Date().toISOString().slice(0, 10);
+    }
+    return texto.slice(0, 10);
+}
+export function calcularSaldoMovimentacaoDoacao(estoqueAtual, quantidade, tipo) {
+    if (tipo === "Entrada") {
+        return estoqueAtual + quantidade;
+    }
+    if (estoqueAtual < quantidade) {
+        throw new AppError("Estoque insuficiente para registrar a doacao.", 400);
+    }
+    return estoqueAtual - quantidade;
+}
 export class DoacaoRealizadaRepository {
     async listar(filters) {
+        await this.ensureEstrutura();
         const where = [];
         const beneficiarioNome = trimOrUndefined(filters.beneficiario_nome);
         if (beneficiarioNome) {
@@ -51,7 +101,13 @@ export class DoacaoRealizadaRepository {
           SELECT COUNT(*)
           FROM doacao_realizada_item di
           WHERE di.doacao_realizada_id = d.id
-        )::BIGINT AS total_itens
+        )::BIGINT AS total_itens,
+        EXISTS (
+          SELECT 1
+          FROM doacao_realizada_item di
+          WHERE di.doacao_realizada_id = d.id
+            AND COALESCE(di.fora_carencia, FALSE) = TRUE
+        ) AS possui_item_fora_carencia
       FROM doacao_realizada d
       LEFT JOIN cadastro_beneficiario b ON b.id = d.beneficiario_id
       LEFT JOIN vinculo_familiar vf ON vf.id = d.vinculo_familiar_id
@@ -61,6 +117,7 @@ export class DoacaoRealizadaRepository {
     `);
     }
     async buscarPorId(id) {
+        await this.ensureEstrutura();
         const registros = await prisma.$queryRaw(Prisma.sql `
       SELECT
         d.id,
@@ -79,7 +136,13 @@ export class DoacaoRealizadaRepository {
           SELECT COUNT(*)
           FROM doacao_realizada_item di
           WHERE di.doacao_realizada_id = d.id
-        )::BIGINT AS total_itens
+        )::BIGINT AS total_itens,
+        EXISTS (
+          SELECT 1
+          FROM doacao_realizada_item di
+          WHERE di.doacao_realizada_id = d.id
+            AND COALESCE(di.fora_carencia, FALSE) = TRUE
+        ) AS possui_item_fora_carencia
       FROM doacao_realizada d
       LEFT JOIN cadastro_beneficiario b ON b.id = d.beneficiario_id
       LEFT JOIN vinculo_familiar vf ON vf.id = d.vinculo_familiar_id
@@ -98,7 +161,12 @@ export class DoacaoRealizadaRepository {
         ai.descricao AS descricao_item,
         ai.unidade AS unidade_item,
         di.quantidade,
-        di.observacoes
+        di.observacoes,
+        COALESCE(di.fora_carencia, FALSE) AS fora_carencia,
+        di.carencia_dias,
+        di.autorizado_por_nome,
+        di.autorizacao_carencia_em,
+        di.ultima_entrega_em
       FROM doacao_realizada_item di
       INNER JOIN almoxarifado_item ai ON ai.id = di.almoxarifado_item_id
       WHERE di.doacao_realizada_id = ${id}
@@ -114,6 +182,7 @@ export class DoacaoRealizadaRepository {
         return registro;
     }
     async criar(input) {
+        await this.ensureEstrutura();
         const id = await prisma.$transaction(async (tx) => {
             const inserted = await tx.$queryRaw(Prisma.sql `
         INSERT INTO doacao_realizada (
@@ -143,14 +212,22 @@ export class DoacaoRealizadaRepository {
             if (!registroId) {
                 throw new AppError("Nao foi possivel criar a doacao realizada.", 500);
             }
-            await this.inserirItens(tx, registroId, input.itens);
+            await this.inserirItens(tx, registroId, input.itens, {
+                dataMovimentacao: input.data_doacao,
+                responsavel: input.responsavel
+            });
             return registroId;
         });
         return this.buscarPorIdOuFalhar(id);
     }
     async atualizar(id, input) {
-        await this.buscarPorIdOuFalhar(id);
+        await this.ensureEstrutura();
+        const atual = await this.buscarPorIdOuFalhar(id);
         await prisma.$transaction(async (tx) => {
+            await this.restaurarEstoqueItens(tx, id, {
+                dataMovimentacao: toIsoDateInput(atual.registro.data_doacao),
+                responsavel: atual.registro.responsavel ?? input.responsavel ?? undefined
+            });
             await tx.$executeRaw(Prisma.sql `
         UPDATE doacao_realizada
         SET
@@ -168,22 +245,44 @@ export class DoacaoRealizadaRepository {
         DELETE FROM doacao_realizada_item
         WHERE doacao_realizada_id = ${id}
       `);
-            await this.inserirItens(tx, id, input.itens);
+            await this.inserirItens(tx, id, input.itens, {
+                dataMovimentacao: input.data_doacao,
+                responsavel: input.responsavel
+            });
         });
         return this.buscarPorIdOuFalhar(id);
     }
     async remover(id) {
-        await this.buscarPorIdOuFalhar(id);
-        await prisma.$executeRaw(Prisma.sql `
-      DELETE FROM doacao_realizada
-      WHERE id = ${id}
-    `);
+        await this.ensureEstrutura();
+        const atual = await this.buscarPorIdOuFalhar(id);
+        await prisma.$transaction(async (tx) => {
+            await this.restaurarEstoqueItens(tx, id, {
+                dataMovimentacao: toIsoDateInput(atual.registro.data_doacao),
+                responsavel: atual.registro.responsavel ?? undefined
+            });
+            await tx.$executeRaw(Prisma.sql `
+        DELETE FROM doacao_realizada
+        WHERE id = ${id}
+      `);
+        });
     }
     async listarBeneficiarios(termo) {
         const termoSanitizado = trimOrUndefined(termo);
-        const like = termoSanitizado ? `%${termoSanitizado}%` : null;
+        const like = termoSanitizado ? `%${termoSanitizado}%` : undefined;
         const digits = termoSanitizado ? normalizeDigits(termoSanitizado) : undefined;
-        const likeCpf = digits ? `%${digits}%` : null;
+        const likeCpf = digits ? `%${digits}%` : undefined;
+        const filtros = [];
+        if (like) {
+            const filtrosBusca = [
+                Prisma.sql `b.nome_completo ILIKE ${like}`,
+                Prisma.sql `b.codigo ILIKE ${like}`
+            ];
+            if (likeCpf) {
+                filtrosBusca.push(Prisma.sql `regexp_replace(COALESCE(cpf_doc.numero_documento, ''), '\D', '', 'g') LIKE ${likeCpf}`);
+            }
+            filtros.push(Prisma.sql `(${Prisma.join(filtrosBusca, " OR ")})`);
+        }
+        const whereClause = filtros.length ? Prisma.sql `WHERE ${Prisma.join(filtros, " AND ")}` : Prisma.empty;
         return prisma.$queryRaw(Prisma.sql `
       SELECT
         b.id,
@@ -202,30 +301,29 @@ export class DoacaoRealizadaRepository {
         ORDER BY d.id DESC
         LIMIT 1
       ) cpf_doc ON TRUE
-      WHERE (
-        ${like} IS NULL
-        OR b.nome_completo ILIKE ${like}
-        OR b.codigo ILIKE ${like}
-        OR regexp_replace(COALESCE(cpf_doc.numero_documento, ''), '\\D', '', 'g') LIKE COALESCE(${likeCpf}, '%')
-      )
+      ${whereClause}
       ORDER BY b.nome_completo ASC
       LIMIT 20
     `);
     }
     async listarFamilias(termo) {
         const termoSanitizado = trimOrUndefined(termo);
-        const like = termoSanitizado ? `%${termoSanitizado}%` : null;
+        const like = termoSanitizado ? `%${termoSanitizado}%` : undefined;
+        const whereClause = like ? Prisma.sql `WHERE nome_familia ILIKE ${like}` : Prisma.empty;
         return prisma.$queryRaw(Prisma.sql `
       SELECT id, nome_familia
       FROM vinculo_familiar
-      WHERE (${like} IS NULL OR nome_familia ILIKE ${like})
+      ${whereClause}
       ORDER BY nome_familia ASC
       LIMIT 20
     `);
     }
     async listarItensEstoque(termo) {
         const termoSanitizado = trimOrUndefined(termo);
-        const like = termoSanitizado ? `%${termoSanitizado}%` : null;
+        const like = termoSanitizado ? `%${termoSanitizado}%` : undefined;
+        const whereClause = like
+            ? Prisma.sql `WHERE (codigo ILIKE ${like} OR descricao ILIKE ${like})`
+            : Prisma.empty;
         return prisma.$queryRaw(Prisma.sql `
       SELECT
         id,
@@ -234,41 +332,178 @@ export class DoacaoRealizadaRepository {
         unidade,
         estoque_atual
       FROM almoxarifado_item
-      WHERE (
-        ${like} IS NULL
-        OR codigo ILIKE ${like}
-        OR descricao ILIKE ${like}
-      )
+      ${whereClause}
       ORDER BY descricao ASC
       LIMIT 30
     `);
     }
-    async inserirItens(tx, registroId, itens) {
+    async buscarUltimaEntregaMesmoItem(payload) {
+        await this.ensureEstrutura();
+        const itemId = BigInt(payload.item_id);
+        const destinatarioClause = payload.beneficiario_id
+            ? Prisma.sql `AND d.beneficiario_id = ${BigInt(payload.beneficiario_id)}`
+            : payload.vinculo_familiar_id
+                ? Prisma.sql `AND d.vinculo_familiar_id = ${BigInt(payload.vinculo_familiar_id)}`
+                : Prisma.sql `AND 1 = 0`;
+        const ignorarClause = payload.ignorar_doacao_realizada_id
+            ? Prisma.sql `AND d.id <> ${payload.ignorar_doacao_realizada_id}`
+            : Prisma.empty;
+        const rows = await prisma.$queryRaw(Prisma.sql `
+      SELECT
+        d.id AS doacao_realizada_id,
+        d.data_doacao,
+        ai.codigo AS codigo_item,
+        ai.descricao AS descricao_item
+      FROM doacao_realizada_item di
+      INNER JOIN doacao_realizada d ON d.id = di.doacao_realizada_id
+      INNER JOIN almoxarifado_item ai ON ai.id = di.almoxarifado_item_id
+      WHERE di.almoxarifado_item_id = ${itemId}
+      ${destinatarioClause}
+      ${ignorarClause}
+      ORDER BY d.data_doacao DESC, d.id DESC
+      LIMIT 1
+    `);
+        return rows[0] ?? null;
+    }
+    async inserirItens(tx, registroId, itens, contexto) {
         for (const item of itens) {
-            const itemExistente = await tx.$queryRaw(Prisma.sql `
-        SELECT id
-        FROM almoxarifado_item
-        WHERE id = ${BigInt(item.item_id)}
-        LIMIT 1
-      `);
-            if (!itemExistente[0]) {
-                throw new AppError("Item de almoxarifado nao encontrado para doacao.", 400);
-            }
+            const itemId = BigInt(item.item_id);
+            await this.buscarItemEstoqueOuFalhar(tx, itemId);
             await tx.$executeRaw(Prisma.sql `
         INSERT INTO doacao_realizada_item (
           doacao_realizada_id,
           almoxarifado_item_id,
           quantidade,
           observacoes,
+          fora_carencia,
+          carencia_dias,
+          autorizado_por_usuario_id,
+          autorizado_por_nome,
+          autorizacao_carencia_em,
+          ultima_entrega_em,
           criado_em
         ) VALUES (
           ${registroId},
-          ${BigInt(item.item_id)},
+          ${itemId},
           ${item.quantidade},
           ${trimOrUndefined(item.observacoes)},
+          ${Boolean(item.fora_carencia)},
+          ${item.carencia_dias_aplicada ?? null},
+          ${item.autorizado_por_usuario_id ? BigInt(item.autorizado_por_usuario_id) : null},
+          ${trimOrUndefined(item.autorizado_por_nome)},
+          ${item.autorizacao_carencia_em ? new Date(item.autorizacao_carencia_em) : null},
+          ${toOptionalDate(item.ultima_entrega_em)},
           NOW()
         )
       `);
+            await this.movimentarEstoqueDoacao(tx, {
+                itemId,
+                registroId,
+                quantidade: item.quantidade,
+                tipo: "Saida",
+                dataMovimentacao: contexto.dataMovimentacao,
+                responsavel: contexto.responsavel,
+                observacoes: item.observacoes
+            });
         }
     }
+    async restaurarEstoqueItens(tx, registroId, contexto) {
+        const itens = await tx.$queryRaw(Prisma.sql `
+      SELECT
+        almoxarifado_item_id,
+        quantidade,
+        observacoes
+      FROM doacao_realizada_item
+      WHERE doacao_realizada_id = ${registroId}
+      ORDER BY id ASC
+    `);
+        for (const item of itens) {
+            await this.movimentarEstoqueDoacao(tx, {
+                itemId: item.almoxarifado_item_id,
+                registroId,
+                quantidade: item.quantidade,
+                tipo: "Entrada",
+                dataMovimentacao: contexto.dataMovimentacao,
+                responsavel: contexto.responsavel,
+                observacoes: item.observacoes ?? undefined
+            });
+        }
+    }
+    async buscarItemEstoqueOuFalhar(tx, itemId) {
+        const itens = await tx.$queryRaw(Prisma.sql `
+      SELECT
+        id,
+        codigo,
+        descricao,
+        estoque_atual::float8 AS estoque_atual
+      FROM almoxarifado_item
+      WHERE id = ${itemId}
+      LIMIT 1
+    `);
+        const item = itens[0];
+        if (!item) {
+            throw new AppError("Item de almoxarifado nao encontrado para doacao.", 400);
+        }
+        return item;
+    }
+    async movimentarEstoqueDoacao(tx, payload) {
+        const item = await this.buscarItemEstoqueOuFalhar(tx, payload.itemId);
+        const estoqueAtual = Number(item.estoque_atual ?? 0);
+        let saldoApos;
+        try {
+            saldoApos = calcularSaldoMovimentacaoDoacao(estoqueAtual, payload.quantidade, payload.tipo);
+        }
+        catch (error) {
+            if (error instanceof AppError && payload.tipo === "Saida") {
+                throw new AppError(`Estoque insuficiente para registrar a doacao do item ${item.codigo}.`, 400);
+            }
+            throw error;
+        }
+        const referencia = payload.tipo === "Saida"
+            ? `Doacao realizada ${payload.registroId}`
+            : `Estorno da doacao realizada ${payload.registroId}`;
+        const observacoes = trimOrUndefined(payload.observacoes) ??
+            (payload.tipo === "Saida"
+                ? `Baixa automatica da doacao realizada para o item ${item.codigo}.`
+                : `Estorno automatico da doacao realizada para o item ${item.codigo}.`);
+        await tx.$executeRaw(Prisma.sql `
+      INSERT INTO almoxarifado_movimentacao (
+        item_id,
+        data_movimentacao,
+        tipo,
+        quantidade,
+        saldo_apos,
+        referencia,
+        responsavel,
+        observacoes,
+        criado_em
+      ) VALUES (
+        ${payload.itemId},
+        ${toOptionalDate(payload.dataMovimentacao)},
+        ${payload.tipo},
+        ${payload.quantidade},
+        ${saldoApos},
+        ${referencia},
+        ${trimOrUndefined(payload.responsavel)},
+        ${observacoes},
+        NOW()
+      )
+    `);
+        await tx.$executeRaw(Prisma.sql `
+      UPDATE almoxarifado_item
+      SET
+        estoque_atual = ${saldoApos},
+        atualizado_em = NOW()
+      WHERE id = ${payload.itemId}
+    `);
+    }
+    async ensureEstrutura() {
+        await ensureDoacoesRealizadasEstrutura();
+    }
+}
+export async function ensureDoacoesRealizadasEstrutura() {
+    if (!estruturaPromise) {
+        estruturaPromise = Promise.all(estruturaDoacaoRealizadaSql.map((sql) => prisma.$executeRawUnsafe(sql).then(() => undefined))).then(() => undefined);
+    }
+    await estruturaPromise;
 }

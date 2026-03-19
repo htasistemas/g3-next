@@ -1,4 +1,28 @@
 export class RelatorioTemplatePadrao {
+    extrairLinhasEspacoSecao(valor) {
+        const match = valor.trim().match(/^\[\[espaco:(\d+(?:\.\d+)?)\]\]$/i);
+        if (!match)
+            return null;
+        const linhas = Number(match[1]);
+        if (!Number.isFinite(linhas) || linhas <= 0)
+            return null;
+        return linhas;
+    }
+    renderizarConteudoSecao(conteudo) {
+        return conteudo
+            .split(/\r?\n/)
+            .map((linha) => {
+            const linhasEspaco = this.extrairLinhasEspacoSecao(linha);
+            if (linhasEspaco) {
+                return `<div class="secao-espaco" style="height:${(linhasEspaco * 12).toFixed(1)}px;"></div>`;
+            }
+            if (!linha.trim()) {
+                return '<div class="secao-linha">&nbsp;</div>';
+            }
+            return `<div class="secao-linha">${this.escapeHtml(linha)}</div>`;
+        })
+            .join("");
+    }
     montarHtml(input) {
         const colgroupHtml = input.tabela?.colunas
             .map((coluna) => `<col style="width:${coluna.largura ?? "auto"};" />`)
@@ -11,7 +35,7 @@ export class RelatorioTemplatePadrao {
             ?.map((secao) => `
         <section class="secao">
           <h2>${this.escapeHtml(secao.titulo)}</h2>
-          <p>${this.escapeHtml(secao.conteudo)}</p>
+          <div class="secao-conteudo">${this.renderizarConteudoSecao(secao.conteudo)}</div>
         </section>
       `)
             .join("") ?? "";
@@ -277,10 +301,16 @@ export class RelatorioTemplatePadrao {
               text-transform: uppercase;
               color: #065f46;
             }
-            .secao p {
-              margin: 0;
-              white-space: pre-wrap;
+            .secao-conteudo {
               font-size: 11px;
+            }
+            .secao-linha {
+              min-height: 14px;
+              white-space: pre-wrap;
+            }
+            .secao-espaco {
+              display: block;
+              width: 100%;
             }
             .rodape {
               margin-top: 14px;

@@ -12,7 +12,9 @@ reportsRoutes.post("/profissionais/ficha", asyncHandler(controller.fichaProfissi
 reportsRoutes.post("/voluntarios/relacao", asyncHandler(controller.relacaoVoluntarios.bind(controller)));
 reportsRoutes.post("/voluntarios/ficha", asyncHandler(controller.fichaVoluntario.bind(controller)));
 reportsRoutes.post("/matriculas/relacao", asyncHandler(controller.relacaoMatriculas.bind(controller)));
+reportsRoutes.post("/matriculas/lista-presenca", asyncHandler(controller.listaPresencaMatricula.bind(controller)));
 reportsRoutes.post("/matriculas/comprovante", asyncHandler(controller.comprovanteMatricula.bind(controller)));
 reportsRoutes.post("/matriculas/pre-matricula-lista-espera", asyncHandler(controller.comprovantePreMatriculaEspera.bind(controller)));
 reportsRoutes.post("/registro-doacao/relacao", asyncHandler(controller.relacaoRegistroDoacao.bind(controller)));
 reportsRoutes.post("/doacoes-realizadas/relacao", asyncHandler(controller.relacaoDoacoesRealizadas.bind(controller)));
+reportsRoutes.post("/doacoes-realizadas/recibo", asyncHandler(controller.reciboDoacaoRealizada.bind(controller)));

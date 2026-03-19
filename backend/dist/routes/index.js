@@ -39,6 +39,9 @@ import { rhContratacaoRoutes } from "../modules/rh-contratacao/routes/rh-contrat
 import { mensagensPersonalizadasRoutes } from "../modules/mensagens-personalizadas/routes/mensagens-personalizadas.routes.js";
 import { arquivosRoutes } from "../modules/arquivos/routes/arquivos.routes.js";
 import { chamadoTecnicoRoutes } from "../modules/chamados-tecnicos/routes/chamado-tecnico.routes.js";
+import { atualizacaoSistemaRoutes } from "../modules/atualizacao-sistema/routes/atualizacao-sistema.routes.js";
+import { datasComemorativasRoutes } from "../modules/datas-comemorativas/routes/datas-comemorativas.routes.js";
+import { captacaoRecursosRoutes } from "../modules/captacao-recursos/routes/captacao-recursos.routes.js";
 export const appRoutes = Router();
 appRoutes.get("/health", (_request, response) => {
     response.json({ status: "ok", service: "g3-backend-node" });
@@ -82,7 +85,10 @@ appRoutes.use("/api/rh/contratacao", rhContratacaoRoutes);
 appRoutes.use("/api/arquivos", arquivosRoutes);
 appRoutes.use("/api/dashboard", dashboardRoutes);
 appRoutes.use("/api/chamados-tecnicos", chamadoTecnicoRoutes);
+appRoutes.use("/api/datas-comemorativas", datasComemorativasRoutes);
+appRoutes.use("/api/captacao-recursos", captacaoRecursosRoutes);
 appRoutes.use("/api/configuracoes/parametros", parametrosSistemaRoutes);
+appRoutes.use("/api/configuracoes/atualizar-sistema", atualizacaoSistemaRoutes);
 appRoutes.use("/api/usuarios", usuarioRoutes);
 appRoutes.use("/api/mensagens-personalizadas", mensagensPersonalizadasRoutes);
 appRoutes.use("/api/email", ensureAuthenticated, ensurePermissions(["ADMINISTRADOR", "OPERADOR"]), emailRoutes);

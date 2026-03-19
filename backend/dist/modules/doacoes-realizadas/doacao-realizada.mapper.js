@@ -15,6 +15,7 @@ function formatDate(value) {
     return toIsoDate(data);
 }
 export function mapDoacaoRealizadaToResponse(row, itens) {
+    const possuiItemForaCarencia = Boolean(row.possui_item_fora_carencia);
     return {
         id_doacao_realizada: toStringId(row.id),
         beneficiario_id: row.beneficiario_id ? toStringId(row.beneficiario_id) : undefined,
@@ -22,11 +23,12 @@ export function mapDoacaoRealizadaToResponse(row, itens) {
         beneficiario_nome: row.beneficiario_nome ?? undefined,
         familia_nome: row.familia_nome ?? undefined,
         tipo_doacao: row.tipo_doacao,
-        situacao: row.situacao,
+        situacao: possuiItemForaCarencia ? `${row.situacao} | Fora da carencia` : row.situacao,
         responsavel: row.responsavel ?? undefined,
         observacoes: row.observacoes ?? undefined,
         data_doacao: formatDate(row.data_doacao),
         total_itens: typeof row.total_itens === "bigint" ? Number(row.total_itens) : row.total_itens ?? itens.length,
+        possui_item_fora_carencia: possuiItemForaCarencia,
         itens: itens.map((item) => ({
             id_item_doacao: toStringId(item.id),
             item_id: toStringId(item.almoxarifado_item_id),
@@ -34,7 +36,12 @@ export function mapDoacaoRealizadaToResponse(row, itens) {
             descricao_item: item.descricao_item,
             unidade_item: item.unidade_item,
             quantidade: item.quantidade,
-            observacoes: item.observacoes ?? undefined
+            observacoes: item.observacoes ?? undefined,
+            fora_carencia: Boolean(item.fora_carencia),
+            carencia_dias_aplicada: item.carencia_dias ?? undefined,
+            autorizado_por_nome: item.autorizado_por_nome ?? undefined,
+            autorizacao_carencia_em: item.autorizacao_carencia_em?.toISOString() ?? undefined,
+            ultima_entrega_em: formatDate(item.ultima_entrega_em)
         })),
         data_cadastro: row.criado_em.toISOString(),
         data_atualizacao: row.atualizado_em.toISOString()

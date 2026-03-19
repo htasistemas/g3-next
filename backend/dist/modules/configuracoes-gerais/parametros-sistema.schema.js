@@ -30,3 +30,17 @@ export const personalizacaoSistemaSchema = z.object({
 export const atualizarPersonalizacaoPayloadSchema = z.object({
     personalizacao: personalizacaoSistemaSchema
 });
+export const carenciaDoacaoRealizadaSchema = z.object({
+    tempo_carencia_dias: z.preprocess((value) => {
+        if (value === null || value === undefined || value === "")
+            return 0;
+        if (typeof value === "number")
+            return value;
+        if (typeof value === "string")
+            return Number(value);
+        return value;
+    }, z.number().int().min(0, "Informe um numero de dias valido.").max(3650, "Informe um numero de dias valido."))
+});
+export const atualizarCarenciaDoacaoRealizadaPayloadSchema = z.object({
+    carencia: carenciaDoacaoRealizadaSchema
+});
