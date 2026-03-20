@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ClipboardList,
   Eye,
@@ -49,6 +49,21 @@ import type { Profissional } from "@/types/profissional";
 type AbaId = "dashboard" | "identificacao" | "conteudo" | "tramitacao" | "listagem";
 type CampoObrigatorio = "setorOrigem" | "responsavel" | "razaoSocial" | "assunto" | "corpo";
 type ErrosFormulario = Partial<Record<CampoObrigatorio, string>>;
+type ImportacaoLoteItem = {
+  id: string;
+  nomeArquivo: string;
+  status: "sucesso" | "erro" | "rascunho_criado";
+  importacao?: OficioImportacaoResultado;
+  erro?: string;
+  oficioId?: string;
+  numeroGerado?: string;
+};
+type PreenchimentoLotePadrao = {
+  setorOrigem: string;
+  razaoSocial: string;
+  para: string;
+  cargoPara: string;
+};
 
 const abas: AdminTab[] = [
   { id: "dashboard", label: "Dashboard", icon: ClipboardList },
@@ -59,6 +74,8 @@ const abas: AdminTab[] = [
 ];
 
 const tituloTela = "Ofícios e protocolos";
+const LIMITE_IMPORTACAO_LOTE = 10;
+const SALA_PADRAO_IMPORTACAO = "Administração geral";
 const statusOptions = ["Rascunho", "Em preparacao", "Enviado", "Recebido", "Em analise", "Arquivado"];
 const meiosEnvio = ["Sistema G3", "E-mail", "Correio", "Entrega presencial"];
 const finalizacaoPadrao =
@@ -249,6 +266,15 @@ function montarRotuloSala(sala: MatriculaSalaCatalogo) {
   return sala.unidade_nome?.trim() ? `${sala.nome} • ${sala.unidade_nome}` : sala.nome;
 }
 
+function obterSalaPadraoImportacao(salas: MatriculaSalaCatalogo[]) {
+  const alvo = normalizarBusca(SALA_PADRAO_IMPORTACAO);
+  const sala =
+    salas.find((item) => normalizarBusca(item.nome) === alvo) ??
+    salas.find((item) => normalizarBusca(montarRotuloSala(item)).includes(alvo));
+
+  return sala ? montarValorSala(sala) : SALA_PADRAO_IMPORTACAO;
+}
+
 function criarTramitePadrao(responsavel = "", origem = ""): OficioTramite {
   return {
     data: obterHojeIso(),
@@ -340,10 +366,21 @@ function resumirTextoImportado(valor?: string, limite = 140) {
   return `${texto.slice(0, limite).trimEnd()}...`;
 }
 
+function criarPreenchimentoLotePadrao(): PreenchimentoLotePadrao {
+  return {
+    setorOrigem: "",
+    razaoSocial: "",
+    para: "",
+    cargoPara: ""
+  };
+}
+
 export function OficiosProtocolosPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { usuario } = useAuth();
   const importacaoArquivoRef = useRef<HTMLInputElement | null>(null);
+  const importacaoLoteArquivoRef = useRef<HTMLInputElement | null>(null);
   const responsavelLogado = useMemo(() => obterNomeUsuarioLogado(usuario), [usuario]);
 
   const [abaAtiva, setAbaAtiva] = useState<AbaId>("dashboard");
@@ -357,6 +394,20 @@ export function OficiosProtocolosPage() {
   const [termoBuscaCopia, setTermoBuscaCopia] = useState("");
   const [previaAberta, setPreviaAberta] = useState(false);
   const [ultimaImportacao, setUltimaImportacao] = useState<OficioImportacaoResultado | null>(null);
+  const [importacoesLote, setImportacoesLote] = useState<ImportacaoLoteItem[]>([]);
+  const [preenchimentoLotePadrao, setPreenchimentoLotePadrao] = useState<PreenchimentoLotePadrao>(
+    () => criarPreenchimentoLotePadrao()
+  );
+  const [progressoImportacaoLote, setProgressoImportacaoLote] = useState<{
+    atual: number;
+    total: number;
+    arquivo: string;
+  } | null>(null);
+  const [progressoCriacaoLote, setProgressoCriacaoLote] = useState<{
+    atual: number;
+    total: number;
+    arquivo: string;
+  } | null>(null);
   const [form, setForm] = useState<OficioPayload>(() => criarFormularioVazio(""));
   const [snapshot, setSnapshot] = useState<OficioPayload>(() => criarFormularioVazio(""));
   const [tramite, setTramite] = useState<OficioTramite>(() => criarTramitePadrao(""));
@@ -367,6 +418,8 @@ export function OficiosProtocolosPage() {
   const importarConteudoMutation = useImportarConteudoOficio();
   const salvarMutation = useSalvarOficio();
   const excluirMutation = useExcluirOficio();
+  const importandoLote = !!progressoImportacaoLote;
+  const criandoRascunhosLote = !!progressoCriacaoLote;
 
   const { data: salasData, isLoading: carregandoSalas } = useQuery({
     queryKey: ["matriculas", "catalogo", "salas"],
@@ -391,6 +444,7 @@ export function OficiosProtocolosPage() {
     () => [...(profissionaisData?.profissionais ?? [])].sort((a, b) => a.nome_completo.localeCompare(b.nome_completo, "pt-BR")),
     [profissionaisData?.profissionais]
   );
+  const setorOrigemImportacaoPadrao = useMemo(() => obterSalaPadraoImportacao(salas), [salas]);
 
   const oficiosOrdenados = useMemo(() => {
     return [...oficios].sort((a, b) => {
@@ -458,6 +512,52 @@ export function OficiosProtocolosPage() {
       return alvo.includes(termo);
     });
   }, [anoListagem, busca, oficiosOrdenados]);
+
+  const itensLotePendentes = useMemo(
+    () =>
+      importacoesLote.filter(
+        (item): item is ImportacaoLoteItem & { importacao: OficioImportacaoResultado } =>
+          item.status === "sucesso" && !!item.importacao
+      ),
+    [importacoesLote]
+  );
+
+  const resumoPendenciasLote = useMemo(() => {
+    return itensLotePendentes.reduce(
+      (acumulado, item) => {
+        const importacao = item.importacao;
+        const destinatario =
+          importacao.conteudo.identificacao.destinatario?.trim() ||
+          importacao.conteudo.conteudo.razaoSocial?.trim() ||
+          preenchimentoLotePadrao.razaoSocial.trim();
+        const destinatarioResponsavel =
+          importacao.conteudo.identificacao.destinatarioResponsavel?.trim() ||
+          importacao.conteudo.conteudo.para?.trim() ||
+          preenchimentoLotePadrao.para.trim();
+        const destinatarioCargo =
+          importacao.conteudo.identificacao.destinatarioCargo?.trim() ||
+          importacao.conteudo.conteudo.cargoPara?.trim() ||
+          preenchimentoLotePadrao.cargoPara.trim();
+
+        if (!preenchimentoLotePadrao.setorOrigem.trim()) acumulado.semSala += 1;
+        if (!destinatario) acumulado.semDestinatario += 1;
+        if (!destinatarioResponsavel) acumulado.semAosCuidados += 1;
+        if (!destinatarioCargo) acumulado.semCargo += 1;
+        if (!importacao.conteudo.conteudo.assunto?.trim()) acumulado.semAssunto += 1;
+        if (!importacao.conteudo.conteudo.corpo?.trim()) acumulado.semCorpo += 1;
+
+        return acumulado;
+      },
+      {
+        semSala: 0,
+        semDestinatario: 0,
+        semAosCuidados: 0,
+        semCargo: 0,
+        semAssunto: 0,
+        semCorpo: 0
+      }
+    );
+  }, [itensLotePendentes, preenchimentoLotePadrao]);
 
   const dashboard = useMemo(
     () => ({
@@ -687,6 +787,8 @@ export function OficiosProtocolosPage() {
     setTermoBuscaCopia("");
     setPreviaAberta(false);
     setUltimaImportacao(null);
+    setImportacoesLote([]);
+    setPreenchimentoLotePadrao(criarPreenchimentoLotePadrao());
     setErros({});
     setAbaAtiva("identificacao");
   }
@@ -700,6 +802,8 @@ export function OficiosProtocolosPage() {
     setTermoBuscaCopia("");
     setPreviaAberta(false);
     setUltimaImportacao(null);
+    setImportacoesLote([]);
+    setPreenchimentoLotePadrao(criarPreenchimentoLotePadrao());
     setErros({});
     setAbaAtiva("identificacao");
   }
@@ -716,6 +820,8 @@ export function OficiosProtocolosPage() {
     setTermoBuscaCopia("");
     setPreviaAberta(false);
     setUltimaImportacao(null);
+    setImportacoesLote([]);
+    setPreenchimentoLotePadrao(criarPreenchimentoLotePadrao());
     setErros({});
   }
 
@@ -734,56 +840,7 @@ export function OficiosProtocolosPage() {
     }
 
     try {
-      const payload: OficioPayload = {
-        ...form,
-        criadoPor: Number(usuario?.id) || form.criadoPor || undefined,
-        identificacao: {
-          ...form.identificacao,
-          numero: form.id ? form.identificacao.numero.trim() : "",
-          data: form.identificacao.data || obterHojeIso(),
-          setorOrigem: form.identificacao.setorOrigem.trim(),
-          responsavel: (form.identificacao.responsavel || responsavelLogado).trim(),
-          destinatario: form.conteudo.razaoSocial.trim(),
-          destinatarioResponsavel: form.conteudo.para?.trim() || undefined,
-          destinatarioCargo: form.conteudo.cargoPara?.trim() || undefined,
-          meioEnvio: form.identificacao.meioEnvio.trim(),
-          prazoResposta: form.identificacao.prazoResposta?.trim() || undefined,
-          classificacao: form.identificacao.classificacao?.trim() || undefined
-        },
-        conteudo: {
-          ...form.conteudo,
-          razaoSocial: form.conteudo.razaoSocial.trim(),
-          para: form.conteudo.para?.trim() || undefined,
-          cargoPara: form.conteudo.cargoPara?.trim() || undefined,
-          assunto: form.conteudo.assunto.trim(),
-          corpo: form.conteudo.corpo.trim(),
-          finalizacao: form.conteudo.finalizacao?.trim() || undefined,
-          assinaturaNome: form.conteudo.assinaturaNome?.trim() || undefined,
-          assinaturaCargo: form.conteudo.assinaturaCargo?.trim() || undefined,
-          rodape: ""
-        },
-        protocolo: {
-          ...form.protocolo,
-          status: form.protocolo.status.trim(),
-          protocoloEnvio: form.protocolo.protocoloEnvio?.trim() || undefined,
-          dataEnvio: form.protocolo.dataEnvio?.trim() || undefined,
-          protocoloRecebimento: form.protocolo.protocoloRecebimento?.trim() || undefined,
-          dataRecebimento: form.protocolo.dataRecebimento?.trim() || undefined,
-          proximoDestino: form.protocolo.proximoDestino?.trim() || undefined,
-          observacoes: form.protocolo.observacoes?.trim() || undefined
-        },
-        tramites: (form.tramites ?? [])
-          .map((item) => ({
-            ...item,
-            data: item.data?.trim() || undefined,
-            origem: item.origem?.trim() || undefined,
-            destino: item.destino?.trim() || undefined,
-            responsavel: item.responsavel?.trim() || undefined,
-            acao: item.acao.trim(),
-            observacoes: item.observacoes?.trim() || undefined
-          }))
-          .filter((item) => item.acao.length >= 2)
-      };
+      const payload = montarPayloadPersistencia(form);
 
       const response = await salvarMutation.mutateAsync(payload);
       const clonado = clonarOficio(response);
@@ -948,13 +1005,158 @@ export function OficiosProtocolosPage() {
     });
   }
 
-  function aplicarImportacaoAoFormulario(importacao: OficioImportacaoResultado) {
-    const assinaturaImportadaNome = importacao.conteudo.conteudo.assinaturaNome?.trim() ?? "";
+  function atualizarPreenchimentoLote<K extends keyof PreenchimentoLotePadrao>(
+    campo: K,
+    valor: PreenchimentoLotePadrao[K]
+  ) {
+    setPreenchimentoLotePadrao((atual) => ({
+      ...atual,
+      [campo]: valor
+    }));
+  }
+
+  function montarImportacaoComPreenchimentoLote(importacao: OficioImportacaoResultado) {
+    const destinatarioEfetivo =
+      importacao.conteudo.identificacao.destinatario?.trim() ||
+      importacao.conteudo.conteudo.razaoSocial?.trim() ||
+      preenchimentoLotePadrao.razaoSocial.trim();
+    const destinatarioResponsavelEfetivo =
+      importacao.conteudo.identificacao.destinatarioResponsavel?.trim() ||
+      importacao.conteudo.conteudo.para?.trim() ||
+      preenchimentoLotePadrao.para.trim();
+    const destinatarioCargoEfetivo =
+      importacao.conteudo.identificacao.destinatarioCargo?.trim() ||
+      importacao.conteudo.conteudo.cargoPara?.trim() ||
+      preenchimentoLotePadrao.cargoPara.trim();
+
+    return {
+      ...importacao,
+      conteudo: {
+        ...importacao.conteudo,
+        identificacao: {
+          ...importacao.conteudo.identificacao,
+          destinatario: destinatarioEfetivo || undefined,
+          destinatarioResponsavel: destinatarioResponsavelEfetivo || undefined,
+          destinatarioCargo: destinatarioCargoEfetivo || undefined
+        },
+        conteudo: {
+          ...importacao.conteudo.conteudo,
+          razaoSocial: destinatarioEfetivo || undefined,
+          para: destinatarioResponsavelEfetivo || undefined,
+          cargoPara: destinatarioCargoEfetivo || undefined
+        }
+      }
+    };
+  }
+
+  function montarPayloadPersistencia(oficioBase: OficioPayload): OficioPayload {
+    return {
+      ...oficioBase,
+      criadoPor: Number(usuario?.id) || oficioBase.criadoPor || undefined,
+      identificacao: {
+        ...oficioBase.identificacao,
+        numero: oficioBase.id ? oficioBase.identificacao.numero.trim() : "",
+        data: oficioBase.identificacao.data || obterHojeIso(),
+        setorOrigem: oficioBase.identificacao.setorOrigem.trim(),
+        responsavel: (oficioBase.identificacao.responsavel || responsavelLogado).trim(),
+        destinatario: oficioBase.conteudo.razaoSocial.trim(),
+        destinatarioResponsavel: oficioBase.conteudo.para?.trim() || undefined,
+        destinatarioCargo: oficioBase.conteudo.cargoPara?.trim() || undefined,
+        meioEnvio: oficioBase.identificacao.meioEnvio.trim(),
+        prazoResposta: oficioBase.identificacao.prazoResposta?.trim() || undefined,
+        classificacao: oficioBase.identificacao.classificacao?.trim() || undefined
+      },
+      conteudo: {
+        ...oficioBase.conteudo,
+        razaoSocial: oficioBase.conteudo.razaoSocial.trim(),
+        para: oficioBase.conteudo.para?.trim() || undefined,
+        cargoPara: oficioBase.conteudo.cargoPara?.trim() || undefined,
+        assunto: oficioBase.conteudo.assunto.trim(),
+        corpo: oficioBase.conteudo.corpo.trim(),
+        finalizacao: oficioBase.conteudo.finalizacao?.trim() || undefined,
+        assinaturaNome: oficioBase.conteudo.assinaturaNome?.trim() || undefined,
+        assinaturaCargo: oficioBase.conteudo.assinaturaCargo?.trim() || undefined,
+        rodape: ""
+      },
+      protocolo: {
+        ...oficioBase.protocolo,
+        status: oficioBase.protocolo.status.trim(),
+        protocoloEnvio: oficioBase.protocolo.protocoloEnvio?.trim() || undefined,
+        dataEnvio: oficioBase.protocolo.dataEnvio?.trim() || undefined,
+        protocoloRecebimento: oficioBase.protocolo.protocoloRecebimento?.trim() || undefined,
+        dataRecebimento: oficioBase.protocolo.dataRecebimento?.trim() || undefined,
+        proximoDestino: oficioBase.protocolo.proximoDestino?.trim() || undefined,
+        observacoes: oficioBase.protocolo.observacoes?.trim() || undefined
+      },
+      tramites: (oficioBase.tramites ?? [])
+        .map((item) => ({
+          ...item,
+          data: item.data?.trim() || undefined,
+          origem: item.origem?.trim() || undefined,
+          destino: item.destino?.trim() || undefined,
+          responsavel: item.responsavel?.trim() || undefined,
+          acao: item.acao.trim(),
+          observacoes: item.observacoes?.trim() || undefined
+        }))
+        .filter((item) => item.acao.length >= 2)
+    };
+  }
+
+  function montarPayloadRascunhoLote(importacao: OficioImportacaoResultado): OficioPayload {
+    const importacaoEfetiva = montarImportacaoComPreenchimentoLote(importacao);
+    const assinaturaPadraoProfissional = encontrarProfissionalPorNome(profissionais, responsavelLogado);
+    const assinaturaPadraoNome =
+      form.conteudo.assinaturaNome?.trim() || assinaturaPadraoProfissional?.nome_completo || "";
+    const assinaturaPadraoCargo =
+      form.conteudo.assinaturaCargo?.trim() || extrairCargoProfissional(assinaturaPadraoProfissional) || "";
+    const base = criarFormularioVazio(responsavelLogado);
+
+    return {
+      ...base,
+      identificacao: {
+        ...base.identificacao,
+        tipo: "emissao",
+        data: importacaoEfetiva.conteudo.identificacao.data || obterHojeIso(),
+        setorOrigem: preenchimentoLotePadrao.setorOrigem.trim(),
+        responsavel: (form.identificacao.responsavel || responsavelLogado).trim(),
+        destinatario: importacaoEfetiva.conteudo.identificacao.destinatario || "",
+        destinatarioResponsavel: importacaoEfetiva.conteudo.identificacao.destinatarioResponsavel || "",
+        destinatarioCargo: importacaoEfetiva.conteudo.identificacao.destinatarioCargo || "",
+        meioEnvio: form.identificacao.meioEnvio || base.identificacao.meioEnvio,
+        prazoResposta: form.identificacao.prazoResposta || "",
+        classificacao: form.identificacao.classificacao || ""
+      },
+      conteudo: {
+        ...base.conteudo,
+        razaoSocial: importacaoEfetiva.conteudo.conteudo.razaoSocial || "",
+        saudacao: importacaoEfetiva.conteudo.conteudo.saudacao || "",
+        para: importacaoEfetiva.conteudo.conteudo.para || "",
+        cargoPara: importacaoEfetiva.conteudo.conteudo.cargoPara || "",
+        assunto: importacaoEfetiva.conteudo.conteudo.assunto || "",
+        corpo: importacaoEfetiva.conteudo.conteudo.corpo || "",
+        finalizacao:
+          importacaoEfetiva.conteudo.conteudo.finalizacao || form.conteudo.finalizacao || finalizacaoPadrao,
+        assinaturaNome: importacaoEfetiva.conteudo.conteudo.assinaturaNome || assinaturaPadraoNome,
+        assinaturaCargo: importacaoEfetiva.conteudo.conteudo.assinaturaCargo || assinaturaPadraoCargo,
+        rodape: ""
+      },
+      protocolo: {
+        ...base.protocolo,
+        status: "Rascunho"
+      },
+      unidadeId: form.unidadeId ?? null,
+      criadoPor: Number(usuario?.id) || form.criadoPor || undefined
+    };
+  }
+
+  function aplicarImportacaoAoFormulario(importacao: OficioImportacaoResultado, usarPreenchimentoLote = false) {
+    const importacaoEfetiva = usarPreenchimentoLote ? montarImportacaoComPreenchimentoLote(importacao) : importacao;
+    const assinaturaImportadaNome = importacaoEfetiva.conteudo.conteudo.assinaturaNome?.trim() ?? "";
     const assinaturaImportadaProfissional = assinaturaImportadaNome
       ? encontrarProfissionalPorNome(profissionais, assinaturaImportadaNome)
       : undefined;
     const assinaturaImportadaCargo =
-      importacao.conteudo.conteudo.assinaturaCargo?.trim() ||
+      importacaoEfetiva.conteudo.conteudo.assinaturaCargo?.trim() ||
       extrairCargoProfissional(assinaturaImportadaProfissional) ||
       "";
 
@@ -962,65 +1164,79 @@ export function OficiosProtocolosPage() {
       ...atual,
       identificacao: {
         ...atual.identificacao,
-        data: importacao.conteudo.identificacao.data || atual.identificacao.data,
+        data: importacaoEfetiva.conteudo.identificacao.data || atual.identificacao.data,
+        setorOrigem:
+          atual.identificacao.setorOrigem ||
+          (usarPreenchimentoLote ? preenchimentoLotePadrao.setorOrigem.trim() : setorOrigemImportacaoPadrao),
         destinatario:
-          importacao.conteudo.identificacao.destinatario ||
-          importacao.conteudo.conteudo.razaoSocial ||
+          importacaoEfetiva.conteudo.identificacao.destinatario ||
+          importacaoEfetiva.conteudo.conteudo.razaoSocial ||
           atual.identificacao.destinatario,
         destinatarioResponsavel:
-          importacao.conteudo.identificacao.destinatarioResponsavel ||
-          importacao.conteudo.conteudo.para ||
+          importacaoEfetiva.conteudo.identificacao.destinatarioResponsavel ||
+          importacaoEfetiva.conteudo.conteudo.para ||
           atual.identificacao.destinatarioResponsavel,
         destinatarioCargo:
-          importacao.conteudo.identificacao.destinatarioCargo ||
-          importacao.conteudo.conteudo.cargoPara ||
+          importacaoEfetiva.conteudo.identificacao.destinatarioCargo ||
+          importacaoEfetiva.conteudo.conteudo.cargoPara ||
           atual.identificacao.destinatarioCargo
       },
       conteudo: {
         ...atual.conteudo,
-        razaoSocial: importacao.conteudo.conteudo.razaoSocial || atual.conteudo.razaoSocial,
-        saudacao: importacao.conteudo.conteudo.saudacao || atual.conteudo.saudacao,
-        para: importacao.conteudo.conteudo.para || atual.conteudo.para,
-        cargoPara: importacao.conteudo.conteudo.cargoPara || atual.conteudo.cargoPara,
-        assunto: importacao.conteudo.conteudo.assunto || atual.conteudo.assunto,
-        corpo: importacao.conteudo.conteudo.corpo || atual.conteudo.corpo,
-        finalizacao: importacao.conteudo.conteudo.finalizacao || atual.conteudo.finalizacao,
+        razaoSocial: importacaoEfetiva.conteudo.conteudo.razaoSocial || atual.conteudo.razaoSocial,
+        saudacao: importacaoEfetiva.conteudo.conteudo.saudacao || atual.conteudo.saudacao,
+        para: importacaoEfetiva.conteudo.conteudo.para || atual.conteudo.para,
+        cargoPara: importacaoEfetiva.conteudo.conteudo.cargoPara || atual.conteudo.cargoPara,
+        assunto: importacaoEfetiva.conteudo.conteudo.assunto || atual.conteudo.assunto,
+        corpo: importacaoEfetiva.conteudo.conteudo.corpo || atual.conteudo.corpo,
+        finalizacao: importacaoEfetiva.conteudo.conteudo.finalizacao || atual.conteudo.finalizacao,
         assinaturaNome: assinaturaImportadaNome || atual.conteudo.assinaturaNome,
         assinaturaCargo: assinaturaImportadaNome
           ? assinaturaImportadaCargo
-          : importacao.conteudo.conteudo.assinaturaCargo || atual.conteudo.assinaturaCargo
+          : importacaoEfetiva.conteudo.conteudo.assinaturaCargo || atual.conteudo.assinaturaCargo
       },
       protocolo: {
         ...atual.protocolo,
-        observacoes: importacao.conteudo.protocolo.observacoes || atual.protocolo.observacoes
+        observacoes: importacaoEfetiva.conteudo.protocolo.observacoes || atual.protocolo.observacoes
       }
     }));
 
-    if (importacao.conteudo.conteudo.razaoSocial) {
-      atualizarErroCampo("razaoSocial", importacao.conteudo.conteudo.razaoSocial);
+    if (importacaoEfetiva.conteudo.conteudo.razaoSocial) {
+      atualizarErroCampo("razaoSocial", importacaoEfetiva.conteudo.conteudo.razaoSocial);
     }
-    if (importacao.conteudo.conteudo.assunto) {
-      atualizarErroCampo("assunto", importacao.conteudo.conteudo.assunto);
+    if (usarPreenchimentoLote && preenchimentoLotePadrao.setorOrigem.trim()) {
+      atualizarErroCampo("setorOrigem", preenchimentoLotePadrao.setorOrigem);
     }
-    if (importacao.conteudo.conteudo.corpo) {
-      atualizarErroCampo("corpo", importacao.conteudo.conteudo.corpo);
+    if (!usarPreenchimentoLote && setorOrigemImportacaoPadrao.trim()) {
+      atualizarErroCampo("setorOrigem", setorOrigemImportacaoPadrao);
+    }
+    if (importacaoEfetiva.conteudo.conteudo.assunto) {
+      atualizarErroCampo("assunto", importacaoEfetiva.conteudo.conteudo.assunto);
+    }
+    if (importacaoEfetiva.conteudo.conteudo.corpo) {
+      atualizarErroCampo("corpo", importacaoEfetiva.conteudo.conteudo.corpo);
     }
 
     const referencias = [
-      importacao.referencia.numeroOficio ? `Número identificado: ${importacao.referencia.numeroOficio}` : "",
-      importacao.referencia.cidadeUf ? `Cidade/UF identificada: ${importacao.referencia.cidadeUf}` : ""
+      importacaoEfetiva.referencia.numeroOficio ? `Número identificado: ${importacaoEfetiva.referencia.numeroOficio}` : "",
+      importacaoEfetiva.referencia.cidadeUf ? `Cidade/UF identificada: ${importacaoEfetiva.referencia.cidadeUf}` : ""
     ].filter(Boolean);
 
     const mensagens = [
-      `${importacao.nomeArquivo} foi lido e os campos do ofício foram preenchidos.`,
+      `${importacaoEfetiva.nomeArquivo} foi lido e os campos do ofício foram preenchidos.`,
       referencias.length ? referencias.join(" | ") : "",
-      importacao.avisos.length ? `Atenção: ${importacao.avisos.join(" | ")}` : ""
+      importacaoEfetiva.avisos.length ? `Atenção: ${importacaoEfetiva.avisos.join(" | ")}` : "",
+      usarPreenchimentoLote && preenchimentoLotePadrao.setorOrigem.trim()
+        ? `Sala aplicada ao lote: ${preenchimentoLotePadrao.setorOrigem}.`
+        : !usarPreenchimentoLote && setorOrigemImportacaoPadrao.trim()
+          ? `Sala padrão aplicada: ${setorOrigemImportacaoPadrao}.`
+        : ""
     ].filter(Boolean);
 
-    setUltimaImportacao(importacao);
+    setUltimaImportacao(importacaoEfetiva);
     setPopupMensagem({
-      tipo: importacao.avisos.length ? "aviso" : "sucesso",
-      titulo: importacao.avisos.length ? "Importação concluída com revisão" : "Importação concluída",
+      tipo: importacaoEfetiva.avisos.length ? "aviso" : "sucesso",
+      titulo: importacaoEfetiva.avisos.length ? "Importação concluída com revisão" : "Importação concluída",
       texto: mensagens.join(" ")
     });
   }
@@ -1043,6 +1259,179 @@ export function OficiosProtocolosPage() {
       if (importacaoArquivoRef.current) {
         importacaoArquivoRef.current.value = "";
       }
+    }
+  }
+
+  async function importarArquivosOficioLote(listaArquivos?: FileList | File[] | null) {
+    const arquivosSelecionados = Array.from(listaArquivos ?? []);
+    if (!arquivosSelecionados.length) {
+      return;
+    }
+
+    const excedeuLimite = arquivosSelecionados.length > LIMITE_IMPORTACAO_LOTE;
+    const arquivos = arquivosSelecionados.slice(0, LIMITE_IMPORTACAO_LOTE);
+    const resultados: ImportacaoLoteItem[] = [];
+
+    setPreenchimentoLotePadrao((atual) => ({
+      ...atual,
+      setorOrigem: atual.setorOrigem || form.identificacao.setorOrigem || setorOrigemImportacaoPadrao
+    }));
+
+    setProgressoImportacaoLote({
+      atual: 0,
+      total: arquivos.length,
+      arquivo: arquivos[0]?.name ?? ""
+    });
+
+    try {
+      for (let index = 0; index < arquivos.length; index += 1) {
+        const arquivo = arquivos[index];
+        setProgressoImportacaoLote({
+          atual: index + 1,
+          total: arquivos.length,
+          arquivo: arquivo.name
+        });
+
+        try {
+          const importacao = await oficiosService.importarConteudoArquivo(arquivo);
+          resultados.push({
+            id: `${arquivo.name}-${arquivo.size}-${arquivo.lastModified}-${index}`,
+            nomeArquivo: arquivo.name,
+            status: "sucesso",
+            importacao
+          });
+        } catch (error: any) {
+          resultados.push({
+            id: `${arquivo.name}-${arquivo.size}-${arquivo.lastModified}-${index}`,
+            nomeArquivo: arquivo.name,
+            status: "erro",
+            erro: error?.response?.data?.message ?? "Não foi possível ler o arquivo enviado."
+          });
+        }
+      }
+
+      setImportacoesLote(resultados);
+
+      const totalSucesso = resultados.filter((item) => item.status === "sucesso").length;
+      const totalErro = resultados.length - totalSucesso;
+      const mensagens = [
+        excedeuLimite
+          ? `O lote aceita até ${LIMITE_IMPORTACAO_LOTE} arquivos por vez. Foram processados os ${arquivos.length} primeiros.`
+          : "",
+        totalSucesso
+          ? `${totalSucesso} arquivo(s) ficaram prontos para aplicação no formulário atual.`
+          : "Nenhum arquivo do lote pôde ser aproveitado automaticamente.",
+        totalErro ? `${totalErro} arquivo(s) precisam de revisão manual.` : "",
+        totalSucesso ? "Escolha um item da lista abaixo para aplicar ao ofício." : ""
+      ].filter(Boolean);
+
+      setPopupMensagem({
+        tipo: totalErro ? "aviso" : "sucesso",
+        titulo: "Lote processado",
+        texto: mensagens.join(" ")
+      });
+    } finally {
+      setProgressoImportacaoLote(null);
+      if (importacaoLoteArquivoRef.current) {
+        importacaoLoteArquivoRef.current.value = "";
+      }
+    }
+  }
+
+  async function criarRascunhosAutomaticamenteDoLote() {
+    if (!itensLotePendentes.length) {
+      setPopupMensagem({
+        tipo: "aviso",
+        titulo: "Lote",
+        texto: "Importe um lote com arquivos válidos antes de criar os rascunhos."
+      });
+      return;
+    }
+
+    const pendenciasCriticas = [];
+    if (resumoPendenciasLote.semSala > 0) {
+      pendenciasCriticas.push("defina a sala de atendimento para o lote");
+    }
+    if (resumoPendenciasLote.semDestinatario > 0) {
+      pendenciasCriticas.push("informe o destinatário padrão para os itens sem identificação");
+    }
+    if (resumoPendenciasLote.semAssunto > 0) {
+      pendenciasCriticas.push("revise os itens que ainda estão sem assunto");
+    }
+    if (resumoPendenciasLote.semCorpo > 0) {
+      pendenciasCriticas.push("revise os itens que ainda estão sem corpo");
+    }
+
+    if (pendenciasCriticas.length) {
+      setPopupMensagem({
+        tipo: "aviso",
+        titulo: "Preenchimento do lote",
+        texto: `Antes de criar os rascunhos, ${pendenciasCriticas.join("; ")}.`
+      });
+      return;
+    }
+
+    let criados = 0;
+    let falhas = 0;
+    const atualizados = [...importacoesLote];
+
+    setProgressoCriacaoLote({
+      atual: 0,
+      total: itensLotePendentes.length,
+      arquivo: itensLotePendentes[0]?.nomeArquivo ?? ""
+    });
+
+    try {
+      for (let index = 0; index < itensLotePendentes.length; index += 1) {
+        const item = itensLotePendentes[index];
+        setProgressoCriacaoLote({
+          atual: index + 1,
+          total: itensLotePendentes.length,
+          arquivo: item.nomeArquivo
+        });
+
+        try {
+          const payload = montarPayloadPersistencia(montarPayloadRascunhoLote(item.importacao));
+          const response = await oficiosService.criar(payload);
+          const indice = atualizados.findIndex((atual) => atual.id === item.id);
+          if (indice >= 0) {
+            atualizados[indice] = {
+              ...atualizados[indice],
+              status: "rascunho_criado",
+              oficioId: response.id,
+              numeroGerado: response.identificacao.numero
+            };
+          }
+          criados += 1;
+        } catch (error: any) {
+          const indice = atualizados.findIndex((atual) => atual.id === item.id);
+          if (indice >= 0) {
+            atualizados[indice] = {
+              ...atualizados[indice],
+              status: "erro",
+              erro: error?.response?.data?.message ?? "Não foi possível criar o rascunho automaticamente."
+            };
+          }
+          falhas += 1;
+        }
+      }
+
+      setImportacoesLote(atualizados);
+      await queryClient.invalidateQueries({ queryKey: ["oficios"] });
+
+      setPopupMensagem({
+        tipo: falhas ? "aviso" : "sucesso",
+        titulo: "Rascunhos criados",
+        texto: [
+          criados ? `${criados} rascunho(s) foram criados automaticamente a partir do lote.` : "",
+          falhas ? `${falhas} arquivo(s) não puderam ser convertidos em rascunho.` : "",
+          criados ? "Os itens criados continuam identificados na lista para conferência." : ""
+        ]
+          .filter(Boolean)
+          .join(" ")
+      });
+    } finally {
+      setProgressoCriacaoLote(null);
     }
   }
 
@@ -1493,6 +1882,66 @@ export function OficiosProtocolosPage() {
 
         {abaAtiva === "conteudo" ? (
           <section className="space-y-4">
+            <div className="space-y-1">
+              <Label htmlFor="oficio-importacao-arquivo">Enviar arquivo do ofício</Label>
+              <div className="rounded-xl border border-[var(--g3-border)] p-3">
+                <input
+                  ref={importacaoArquivoRef}
+                  id="oficio-importacao-arquivo"
+                  type="file"
+                  accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  className="hidden"
+                  onChange={(event) => void importarArquivoOficio(event.target.files?.[0] ?? null)}
+                />
+                <input
+                  ref={importacaoLoteArquivoRef}
+                  id="oficio-importacao-lote-arquivo"
+                  type="file"
+                  accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  multiple
+                  className="hidden"
+                  onChange={(event) => void importarArquivosOficioLote(event.target.files)}
+                />
+                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => importacaoArquivoRef.current?.click()}
+                    disabled={importarConteudoMutation.isPending || importandoLote}
+                  >
+                    <Upload className="mr-1.5 h-3.5 w-3.5" />
+                    {importarConteudoMutation.isPending ? "Lendo arquivo..." : "Enviar Word/PDF"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => importacaoLoteArquivoRef.current?.click()}
+                    disabled={importarConteudoMutation.isPending || importandoLote}
+                  >
+                    <Upload className="mr-1.5 h-3.5 w-3.5" />
+                    {importandoLote && progressoImportacaoLote
+                      ? `Processando lote ${progressoImportacaoLote.atual}/${progressoImportacaoLote.total}`
+                      : "Enviar lote"}
+                  </Button>
+                  <p className="text-xs text-[var(--g3-muted)]">
+                    Arquivo único: preenche o formulário atual. Lote: aceita até {LIMITE_IMPORTACAO_LOTE} arquivos por vez
+                    para conferência e aplicação individual.
+                  </p>
+                </div>
+                {importandoLote && progressoImportacaoLote ? (
+                  <p className="mt-2 text-xs text-[var(--g3-active)]">
+                    Lendo {progressoImportacaoLote.arquivo} ({progressoImportacaoLote.atual} de{" "}
+                    {progressoImportacaoLote.total}).
+                  </p>
+                ) : (
+                  <p className="mt-2 text-xs text-[var(--g3-muted)]">
+                    Prefira .docx ou PDF com texto selecionável. A sala entra como {SALA_PADRAO_IMPORTACAO} e pode ser
+                    alterada depois. Arquivos escaneados podem exigir revisão após o OCR.
+                  </p>
+                )}
+              </div>
+            </div>
+
             <div className="grid gap-3 md:grid-cols-2">
               <div className="space-y-1 md:col-span-2">
                 <Label htmlFor="oficio-para">Para</Label>
@@ -1550,34 +1999,6 @@ export function OficiosProtocolosPage() {
                   onBlur={() => atualizarErroCampo("assunto", form.conteudo.assunto)}
                 />
                 {erros.assunto ? <p className="text-xs text-rose-700">{erros.assunto}</p> : null}
-              </div>
-
-              <div className="space-y-1 md:col-span-2">
-                <Label htmlFor="oficio-importacao-arquivo">Enviar arquivo do ofício</Label>
-                <div className="rounded-xl border border-[var(--g3-border)] p-3">
-                  <input
-                    ref={importacaoArquivoRef}
-                    id="oficio-importacao-arquivo"
-                    type="file"
-                    accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    className="hidden"
-                    onChange={(event) => void importarArquivoOficio(event.target.files?.[0] ?? null)}
-                  />
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => importacaoArquivoRef.current?.click()}
-                      disabled={importarConteudoMutation.isPending}
-                    >
-                      <Upload className="mr-1.5 h-3.5 w-3.5" />
-                      {importarConteudoMutation.isPending ? "Lendo arquivo..." : "Enviar Word/PDF"}
-                    </Button>
-                    <p className="text-xs text-[var(--g3-muted)]">
-                      O sistema lê o conteúdo do arquivo e preenche a redação automaticamente. Prefira .docx ou PDF com texto selecionável.
-                    </p>
-                  </div>
-                </div>
               </div>
 
               {ultimaImportacao ? (
@@ -1681,6 +2102,274 @@ export function OficiosProtocolosPage() {
                         Importação concluída sem alertas. Ainda assim, vale conferir a redação e a assinatura antes de salvar.
                       </p>
                     )}
+                  </div>
+                </div>
+              ) : null}
+
+              {importacoesLote.length ? (
+                <div className="space-y-2 md:col-span-2">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="space-y-1">
+                      <Label>Lote importado para conferência</Label>
+                      <p className="text-xs text-[var(--g3-muted)]">
+                        Defina os dados comuns do lote e depois crie vários rascunhos automaticamente ou aplique um item
+                        específico no formulário atual.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setImportacoesLote([]);
+                        setPreenchimentoLotePadrao(criarPreenchimentoLotePadrao());
+                      }}
+                    >
+                      Limpar lote
+                    </Button>
+                  </div>
+
+                  <div className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] p-3">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                      <div className="space-y-1">
+                        <p className="text-sm font-semibold text-[var(--g3-foreground)]">Preenchimento em lote</p>
+                        <p className="text-xs text-[var(--g3-muted)]">
+                          Esses campos entram automaticamente nos itens do lote apenas quando a importação não conseguir
+                          identificar o valor.
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => void criarRascunhosAutomaticamenteDoLote()}
+                        disabled={criandoRascunhosLote || importandoLote || !itensLotePendentes.length}
+                      >
+                        {criandoRascunhosLote && progressoCriacaoLote
+                          ? `Criando rascunhos ${progressoCriacaoLote.atual}/${progressoCriacaoLote.total}`
+                          : "Criar rascunhos automaticamente"}
+                      </Button>
+                    </div>
+
+                    <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                      <div className="space-y-1">
+                        <Label htmlFor="oficio-lote-setor-origem">Sala de origem do lote</Label>
+                        <Select
+                          id="oficio-lote-setor-origem"
+                          value={preenchimentoLotePadrao.setorOrigem}
+                          onChange={(event) => atualizarPreenchimentoLote("setorOrigem", event.target.value)}
+                        >
+                          <option value="">Selecione uma sala para o lote</option>
+                          {salas.map((sala) => (
+                            <option key={`${sala.unidade_nome || "sem-unidade"}-${sala.id_sala}`} value={montarValorSala(sala)}>
+                              {montarRotuloSala(sala)}
+                            </option>
+                          ))}
+                        </Select>
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label htmlFor="oficio-lote-destinatario">Destinatário padrão</Label>
+                        <Input
+                          id="oficio-lote-destinatario"
+                          value={preenchimentoLotePadrao.razaoSocial}
+                          placeholder="Aplicar quando o destinatário vier vazio"
+                          onChange={(event) => atualizarPreenchimentoLote("razaoSocial", event.target.value)}
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label htmlFor="oficio-lote-aos-cuidados">Aos cuidados de</Label>
+                        <Input
+                          id="oficio-lote-aos-cuidados"
+                          value={preenchimentoLotePadrao.para}
+                          placeholder="Pessoa responsável no destino"
+                          onChange={(event) => atualizarPreenchimentoLote("para", event.target.value)}
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label htmlFor="oficio-lote-cargo-destinatario">Cargo do destinatário</Label>
+                        <Input
+                          id="oficio-lote-cargo-destinatario"
+                          value={preenchimentoLotePadrao.cargoPara}
+                          placeholder="Cargo padrão para itens sem identificação"
+                          onChange={(event) => atualizarPreenchimentoLote("cargoPara", event.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-3 grid gap-2 md:grid-cols-3 xl:grid-cols-6">
+                      <div className="rounded-lg border border-[var(--g3-border)] bg-white/85 p-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--g3-muted)]">
+                          Sem sala
+                        </p>
+                        <p className="mt-1 text-sm font-semibold text-[var(--g3-foreground)]">
+                          {resumoPendenciasLote.semSala}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-[var(--g3-border)] bg-white/85 p-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--g3-muted)]">
+                          Sem destinatário
+                        </p>
+                        <p className="mt-1 text-sm font-semibold text-[var(--g3-foreground)]">
+                          {resumoPendenciasLote.semDestinatario}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-[var(--g3-border)] bg-white/85 p-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--g3-muted)]">
+                          Sem aos cuidados
+                        </p>
+                        <p className="mt-1 text-sm font-semibold text-[var(--g3-foreground)]">
+                          {resumoPendenciasLote.semAosCuidados}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-[var(--g3-border)] bg-white/85 p-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--g3-muted)]">
+                          Sem cargo
+                        </p>
+                        <p className="mt-1 text-sm font-semibold text-[var(--g3-foreground)]">
+                          {resumoPendenciasLote.semCargo}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-[var(--g3-border)] bg-white/85 p-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--g3-muted)]">
+                          Sem assunto
+                        </p>
+                        <p className="mt-1 text-sm font-semibold text-[var(--g3-foreground)]">
+                          {resumoPendenciasLote.semAssunto}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-[var(--g3-border)] bg-white/85 p-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--g3-muted)]">
+                          Sem corpo
+                        </p>
+                        <p className="mt-1 text-sm font-semibold text-[var(--g3-foreground)]">
+                          {resumoPendenciasLote.semCorpo}
+                        </p>
+                      </div>
+                    </div>
+
+                    {criandoRascunhosLote && progressoCriacaoLote ? (
+                      <p className="mt-3 text-xs text-[var(--g3-active)]">
+                        Criando rascunho para {progressoCriacaoLote.arquivo} ({progressoCriacaoLote.atual} de{" "}
+                        {progressoCriacaoLote.total}).
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div className="space-y-2">
+                    {importacoesLote.map((item, index) => (
+                      <div
+                        key={item.id}
+                        className={`rounded-xl border p-3 ${
+                          item.status === "sucesso"
+                            ? "border-emerald-200 bg-[linear-gradient(180deg,#f8fffa_0%,#eefaf2_100%)]"
+                            : item.status === "rascunho_criado"
+                              ? "border-sky-200 bg-sky-50/80"
+                            : "border-rose-200 bg-rose-50/80"
+                        }`}
+                      >
+                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                          <div className="space-y-1">
+                            <p className="text-sm font-semibold text-[var(--g3-foreground)]">
+                              {index + 1}. {item.nomeArquivo}
+                            </p>
+                            <p
+                              className={`text-xs font-medium ${
+                                item.status === "sucesso"
+                                  ? "text-emerald-800"
+                                  : item.status === "rascunho_criado"
+                                    ? "text-sky-800"
+                                    : "text-rose-700"
+                              }`}
+                            >
+                              {item.status === "sucesso"
+                                ? "Pronto para aplicação no formulário"
+                                : item.status === "rascunho_criado"
+                                  ? `Rascunho criado${item.numeroGerado ? ` com número ${item.numeroGerado}` : ""}`
+                                  : "Arquivo com falha na leitura automática"}
+                            </p>
+                          </div>
+
+                          {item.status === "sucesso" && item.importacao ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                aplicarImportacaoAoFormulario(item.importacao as OficioImportacaoResultado, true)
+                              }
+                            >
+                              Aplicar neste formulário
+                            </Button>
+                          ) : null}
+                        </div>
+
+                        {(item.status === "sucesso" || item.status === "rascunho_criado") && item.importacao ? (
+                          <>
+                            <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                              <div className="rounded-lg border border-emerald-100 bg-white/85 p-3">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-emerald-700">
+                                  Número
+                                </p>
+                                <p className="mt-1 text-sm text-slate-800">
+                                  {item.importacao.referencia.numeroOficio || "Não identificado"}
+                                </p>
+                              </div>
+
+                              <div className="rounded-lg border border-emerald-100 bg-white/85 p-3">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-emerald-700">
+                                  Destinatário
+                                </p>
+                                <p className="mt-1 text-sm text-slate-800">
+                                  {resumirTextoImportado(
+                                    item.importacao.conteudo.identificacao.destinatario ||
+                                      item.importacao.conteudo.conteudo.razaoSocial ||
+                                      preenchimentoLotePadrao.razaoSocial,
+                                    90
+                                  )}
+                                </p>
+                              </div>
+
+                              <div className="rounded-lg border border-emerald-100 bg-white/85 p-3">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-emerald-700">
+                                  Assunto
+                                </p>
+                                <p className="mt-1 text-sm text-slate-800">
+                                  {resumirTextoImportado(item.importacao.conteudo.conteudo.assunto, 110)}
+                                </p>
+                              </div>
+
+                              <div className="rounded-lg border border-emerald-100 bg-white/85 p-3">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-emerald-700">
+                                  Situação
+                                </p>
+                                <p className="mt-1 text-sm text-slate-800">
+                                  {item.status === "rascunho_criado"
+                                    ? "Rascunho já criado no sistema"
+                                    : item.importacao.avisos.length
+                                    ? `${item.importacao.avisos.length} ponto(s) para revisar`
+                                    : "Leitura sem alertas"}
+                                </p>
+                              </div>
+                            </div>
+
+                            {item.importacao.avisos.length ? (
+                              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                                <p className="text-xs font-semibold text-amber-900">Revisar antes de salvar</p>
+                                <ul className="mt-1 space-y-1 text-xs text-amber-900">
+                                  {item.importacao.avisos.map((aviso) => (
+                                    <li key={`${item.id}-${aviso}`}>- {aviso}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            ) : null}
+                          </>
+                        ) : (
+                          <p className="mt-3 text-sm text-rose-800">{item.erro || "Falha ao ler este arquivo."}</p>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
               ) : null}
@@ -1997,14 +2686,27 @@ export function OficiosProtocolosPage() {
                     oficiosFiltrados.map((item, index) => (
                       <tr
                         key={item.id ?? `${item.identificacao.numero}-${index}`}
-                        className={`border-t border-[var(--g3-border)] ${
-                          index % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => selecionar(item)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            selecionar(item);
+                          }
+                        }}
+                        className={`border-t border-[var(--g3-border)] transition hover:bg-emerald-50 ${
+                          form.id === item.id
+                            ? "bg-emerald-100 ring-1 ring-inset ring-emerald-500"
+                            : index % 2 === 0
+                              ? "bg-[var(--g3-card)]"
+                              : "bg-[var(--g3-primary-soft)]/35"
                         }`}
                       >
                         <td className="px-3 py-2 font-medium text-[var(--g3-foreground)]">
                           {item.identificacao.numero}
                         </td>
-                        <td className="px-3 py-2">{formatarDataInterface(item.identificacao.data)}</td>
+                        <td className="whitespace-nowrap px-3 py-2">{formatarDataInterface(item.identificacao.data)}</td>
                         <td className="px-3 py-2">{item.conteudo.razaoSocial}</td>
                         <td className="px-3 py-2">{item.conteudo.assunto}</td>
                         <td className="px-3 py-2">{item.identificacao.responsavel}</td>
@@ -2017,13 +2719,13 @@ export function OficiosProtocolosPage() {
                         </td>
                         <td className="px-3 py-2 text-right">
                           <div className="flex justify-end gap-2">
-                            <Button variant="outline" size="sm" onClick={() => selecionar(item)}>
-                              Selecionar
-                            </Button>
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => void abrirPdfOficio(item.id)}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void abrirPdfOficio(item.id);
+                              }}
                               disabled={imprimindo}
                             >
                               PDF
