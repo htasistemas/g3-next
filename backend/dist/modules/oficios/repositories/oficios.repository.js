@@ -140,10 +140,16 @@ export class OficiosRepository {
         }
         return registro;
     }
+    async obterProximoNumero(dataReferencia) {
+        const ano = this.extrairAnoReferencia(dataReferencia);
+        const proximoNumero = await this.consultarProximoNumero(prisma, ano);
+        return this.formatarNumeroOficio(proximoNumero, ano);
+    }
     async criar(input) {
         const id = await prisma.$transaction(async (tx) => {
             const schema = await this.obterSchemaInfo();
             const destinatarios = normalizarDestinatarios(input);
+            const numeroSequencial = await this.gerarNumeroSequencialTx(tx, input.identificacao.data);
             const campos = [
                 Prisma.raw("tipo"),
                 Prisma.raw("numero"),
@@ -182,7 +188,7 @@ export class OficiosRepository {
             ];
             const valores = [
                 Prisma.sql `${input.identificacao.tipo}`,
-                Prisma.sql `${input.identificacao.numero}`,
+                Prisma.sql `${numeroSequencial}`,
                 Prisma.sql `${toOptionalDate(input.identificacao.data)}`,
                 Prisma.sql `${input.identificacao.setorOrigem}`,
                 Prisma.sql `${input.identificacao.responsavel}`,
@@ -408,6 +414,29 @@ export class OficiosRepository {
       WHERE oficio_id = ${oficioId}
         AND id = ${imagemId}
     `);
+    }
+    extrairAnoReferencia(dataReferencia) {
+        if (dataReferencia && /^\d{4}-\d{2}-\d{2}$/.test(dataReferencia)) {
+            return Number(dataReferencia.slice(0, 4));
+        }
+        return new Date().getFullYear();
+    }
+    formatarNumeroOficio(numero, ano) {
+        return `${String(numero).padStart(4, "0")}/${ano}`;
+    }
+    async consultarProximoNumero(client, ano) {
+        const rows = await client.$queryRaw(Prisma.sql `
+      SELECT COALESCE(MAX(CAST(split_part(numero, '/', 1) AS INTEGER)), 0) AS maior_numero
+      FROM oficios
+      WHERE numero ~ ${`^[0-9]+/${ano}$`}
+    `);
+        return Number(rows[0]?.maior_numero ?? 0) + 1;
+    }
+    async gerarNumeroSequencialTx(tx, dataReferencia) {
+        const ano = this.extrairAnoReferencia(dataReferencia);
+        await tx.$executeRawUnsafe("LOCK TABLE oficios IN SHARE ROW EXCLUSIVE MODE");
+        const proximoNumero = await this.consultarProximoNumero(tx, ano);
+        return this.formatarNumeroOficio(proximoNumero, ano);
     }
     async listarTramitesPorOficios(oficioIds) {
         if (!oficioIds.length)

@@ -1,13 +1,16 @@
 import { Router } from "express";
 import { asyncHandler } from "../../../shared/http/async-handler.js";
 import { ensureAuthenticated, ensurePermissions } from "../../auth/middlewares/auth.middleware.js";
-import { OficiosController } from "../controllers/oficios.controller.js";
+import { OficiosController, oficiosImportUploadMiddleware } from "../controllers/oficios.controller.js";
 const controller = new OficiosController();
 export const oficiosRoutes = Router();
 const permissoesLeitura = ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"];
 const permissoesEscrita = ["ADMINISTRADOR", "OPERADOR"];
 const permissaoExclusao = ["ADMINISTRADOR"];
 oficiosRoutes.get("/", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.listar.bind(controller)));
+oficiosRoutes.get("/proximo-numero", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.obterProximoNumero.bind(controller)));
+oficiosRoutes.get("/contexto-documento", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.obterContextoDocumento.bind(controller)));
+oficiosRoutes.post("/importar-conteudo", ensureAuthenticated, ensurePermissions(permissoesEscrita), oficiosImportUploadMiddleware, asyncHandler(controller.importarConteudo.bind(controller)));
 oficiosRoutes.post("/", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.criar.bind(controller)));
 oficiosRoutes.post("/:id/pdf-assinado", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.salvarPdfAssinado.bind(controller)));
 oficiosRoutes.get("/:id/pdf-assinado", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.obterPdfAssinado.bind(controller)));
@@ -15,6 +18,7 @@ oficiosRoutes.delete("/:id/pdf-assinado", ensureAuthenticated, ensurePermissions
 oficiosRoutes.get("/:id/imagens", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.listarImagens.bind(controller)));
 oficiosRoutes.post("/:id/imagens", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.adicionarImagem.bind(controller)));
 oficiosRoutes.delete("/:id/imagens/:imagemId", ensureAuthenticated, ensurePermissions(permissaoExclusao), asyncHandler(controller.removerImagem.bind(controller)));
+oficiosRoutes.get("/:id/documento", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.documento.bind(controller)));
 oficiosRoutes.get("/:id", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.obter.bind(controller)));
 oficiosRoutes.put("/:id", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.atualizar.bind(controller)));
 oficiosRoutes.delete("/:id", ensureAuthenticated, ensurePermissions(permissaoExclusao), asyncHandler(controller.excluir.bind(controller)));

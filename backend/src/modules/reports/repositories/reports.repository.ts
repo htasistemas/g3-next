@@ -2,8 +2,13 @@ import { prisma } from "../../../database/prisma.js";
 
 export type RelatorioInstituicao = {
   razaoSocial: string;
+  nomeFantasia: string;
+  unidadeNome: string;
   cnpj: string;
   enderecoCompleto: string;
+  cep: string;
+  cidade: string;
+  uf: string;
   telefone: string;
   email: string;
   site: string;
@@ -29,8 +34,13 @@ export class ReportsRepository {
     if (!unidade) {
       return {
         razaoSocial: "Instituicao nao cadastrada",
+        nomeFantasia: "",
+        unidadeNome: "",
         cnpj: "",
         enderecoCompleto: "",
+        cep: "",
+        cidade: "",
+        uf: "",
         telefone: "",
         email: "",
         site: "",
@@ -44,6 +54,7 @@ export class ReportsRepository {
     }
 
     const nomeInstituicao = unidade.razaoSocial || unidade.nomeFantasia;
+    const nomeUnidade = unidade.nomeFantasia || unidade.razaoSocial || "";
     const partesEndereco = [
       unidade.endereco?.logradouro,
       unidade.endereco?.numero,
@@ -60,8 +71,13 @@ export class ReportsRepository {
 
     return {
       razaoSocial: nomeInstituicao,
+      nomeFantasia: unidade.nomeFantasia ?? "",
+      unidadeNome: nomeUnidade,
       cnpj: unidade.cnpj ?? "",
       enderecoCompleto,
+      cep: unidade.endereco?.cep ?? "",
+      cidade: unidade.endereco?.cidade ?? "",
+      uf: unidade.endereco?.estado ?? "",
       telefone: unidade.telefone ?? "",
       email: unidade.email ?? "",
       site: unidade.site ?? "",

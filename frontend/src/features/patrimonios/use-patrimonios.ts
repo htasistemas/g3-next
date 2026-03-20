@@ -34,3 +34,23 @@ export function useRegistrarMovimentoPatrimonio() {
     }
   });
 }
+
+export function useAtualizarPatrimoniosEmLote() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (atualizacoes: Array<{ id: string; payload: Patrimonio }>) => {
+      const respostas: Array<{ patrimonio: Patrimonio }> = [];
+
+      for (const atualizacao of atualizacoes) {
+        const resposta = await patrimoniosService.atualizar(atualizacao.id, atualizacao.payload);
+        respostas.push(resposta);
+      }
+
+      return respostas;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["patrimonios"] });
+    }
+  });
+}

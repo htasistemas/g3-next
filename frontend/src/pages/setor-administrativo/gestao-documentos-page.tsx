@@ -839,7 +839,7 @@ export function GestaoDocumentosPage() {
   async function confirmarExclusaoLink() {
     if (!confirmarExcluirLink) return;
     try {
-      await api.delete(`/links-externos/${confirmarExcluirLink}`);
+      await httpClient.delete(`/api/links-externos/${confirmarExcluirLink}`);
       setConfirmarExcluirLink(null);
       void carregarLinks();
       setPopupMensagem({ tipo: "sucesso", titulo: "Sucesso", texto: "Link removido!" });
@@ -1361,7 +1361,8 @@ export function GestaoDocumentosPage() {
                         <td className="px-3 py-2">
                           <Button
                             variant="ghost"
-                            size="icon"
+                            size="sm"
+                            className="h-8 w-8 px-0"
                             title="Abrir site"
                             onClick={() => window.open(link.url, "_blank")}
                           >
@@ -1377,10 +1378,15 @@ export function GestaoDocumentosPage() {
                         </td>
                         <td className="px-3 py-2">
                           <div className="flex justify-center gap-2">
-                            <Button variant="ghost" size="icon" onClick={() => editarLink(link)}>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 px-0" onClick={() => editarLink(link)}>
                               <Edit2 className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="text-red-500" onClick={() => setConfirmarExcluirLink(link.id!)}>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 px-0 text-red-500"
+                              onClick={() => setConfirmarExcluirLink(link.id!)}
+                            >
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
@@ -1649,7 +1655,7 @@ export function GestaoDocumentosPage() {
                   <ExternalLink className="h-5 w-5" />
                   Site Sugerido
                 </CardTitle>
-                <Button variant="ghost" size="icon" onClick={() => setSugestaoLinkAberto(false)} className="h-8 w-8">
+                <Button variant="ghost" size="sm" onClick={() => setSugestaoLinkAberto(false)} className="h-8 w-8 px-0">
                   <X className="h-4 w-4" />
                 </Button>
               </div>

@@ -67,3 +67,61 @@ export type OficioImagemPayload = {
   conteudoBase64: string;
   ordem: number;
 };
+
+export type OficioDocumentoInstituicao = {
+  nomeCompleto: string;
+  unidadeOuNucleo?: string;
+  cnpj?: string;
+  endereco?: string;
+  cep?: string;
+  cidade?: string;
+  uf?: string;
+  telefone?: string;
+  site?: string;
+  email?: string;
+  logoUrl?: string;
+  rodapePadrao?: {
+    linha1: string;
+    linha2?: string;
+    linha3?: string;
+  };
+};
+
+export type OficioDocumentoContexto = {
+  cidadeUf?: string;
+  instituicao: OficioDocumentoInstituicao;
+};
+
+export type OficioImportacaoConteudo = {
+  identificacao: {
+    data?: string;
+    destinatario?: string;
+    destinatarioResponsavel?: string;
+    destinatarioCargo?: string;
+  };
+  conteudo: {
+    razaoSocial?: string;
+    saudacao?: string;
+    para?: string;
+    cargoPara?: string;
+    assunto?: string;
+    corpo?: string;
+    finalizacao?: string;
+    assinaturaNome?: string;
+    assinaturaCargo?: string;
+  };
+  protocolo: {
+    observacoes?: string;
+  };
+};
+
+export type OficioImportacaoResultado = {
+  nomeArquivo: string;
+  tipoMime: string;
+  avisos: string[];
+  referencia: {
+    numeroOficio?: string;
+    cidadeUf?: string;
+  };
+  conteudo: OficioImportacaoConteudo;
+};

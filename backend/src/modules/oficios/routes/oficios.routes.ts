@@ -4,7 +4,10 @@ import {
   ensureAuthenticated,
   ensurePermissions
 } from "../../auth/middlewares/auth.middleware.js";
-import { OficiosController } from "../controllers/oficios.controller.js";
+import {
+  OficiosController,
+  oficiosImportUploadMiddleware
+} from "../controllers/oficios.controller.js";
 
 const controller = new OficiosController();
 
@@ -19,6 +22,25 @@ oficiosRoutes.get(
   ensureAuthenticated,
   ensurePermissions(permissoesLeitura),
   asyncHandler(controller.listar.bind(controller))
+);
+oficiosRoutes.get(
+  "/proximo-numero",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.obterProximoNumero.bind(controller))
+);
+oficiosRoutes.get(
+  "/contexto-documento",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.obterContextoDocumento.bind(controller))
+);
+oficiosRoutes.post(
+  "/importar-conteudo",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  oficiosImportUploadMiddleware,
+  asyncHandler(controller.importarConteudo.bind(controller))
 );
 oficiosRoutes.post(
   "/",
@@ -63,6 +85,12 @@ oficiosRoutes.delete(
   ensureAuthenticated,
   ensurePermissions(permissaoExclusao),
   asyncHandler(controller.removerImagem.bind(controller))
+);
+oficiosRoutes.get(
+  "/:id/documento",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.documento.bind(controller))
 );
 
 oficiosRoutes.get(

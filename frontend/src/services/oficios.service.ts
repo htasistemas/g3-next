@@ -1,9 +1,44 @@
 import { httpClient } from "./http-client";
-import type { OficioImagemPayload, OficioPayload, OficioPdfAssinadoPayload } from "@/types/oficio";
+import type {
+  OficioDocumentoContexto,
+  OficioImportacaoResultado,
+  OficioImagemPayload,
+  OficioPayload,
+  OficioPdfAssinadoPayload
+} from "@/types/oficio";
 
 export const oficiosService = {
   async listar() {
     const { data } = await httpClient.get<{ oficios: OficioPayload[] }>("/api/oficios");
+    return data;
+  },
+
+  async obterProximoNumero(dataReferencia?: string) {
+    const { data } = await httpClient.get<{ numero: string }>("/api/oficios/proximo-numero", {
+      params: dataReferencia ? { data: dataReferencia } : undefined
+    });
+    return data;
+  },
+
+  async obterContextoDocumento() {
+    const { data } = await httpClient.get<OficioDocumentoContexto>("/api/oficios/contexto-documento");
+    return data;
+  },
+
+  async importarConteudoArquivo(arquivo: File) {
+    const formData = new FormData();
+    formData.append("arquivo", arquivo);
+
+    const { data } = await httpClient.post<OficioImportacaoResultado>(
+      "/api/oficios/importar-conteudo",
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data"
+        },
+        timeout: 300000
+      }
+    );
     return data;
   },
 
@@ -56,5 +91,12 @@ export const oficiosService = {
 
   async removerImagem(id: string, imagemId: string) {
     await httpClient.delete(`/api/oficios/${id}/imagens/${imagemId}`);
+  },
+
+  async obterDocumentoPdf(id: string) {
+    const { data } = await httpClient.get<Blob>(`/api/oficios/${id}/documento`, {
+      responseType: "blob"
+    });
+    return data;
   }
 };

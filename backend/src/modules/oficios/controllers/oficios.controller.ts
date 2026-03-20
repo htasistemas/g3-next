@@ -1,8 +1,16 @@
+import multer from "multer";
 import type { Request, Response } from "express";
 import type { AuthenticatedRequest } from "../../auth/middlewares/auth.middleware.js";
 import { OficiosService } from "../services/oficios.service.js";
 
 const service = new OficiosService();
+
+export const oficiosImportUploadMiddleware = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 25 * 1024 * 1024
+  }
+}).single("arquivo");
 
 export class OficiosController {
   async listar(_request: Request, response: Response) {
@@ -15,13 +23,37 @@ export class OficiosController {
     return response.json(oficio);
   }
 
+  async obterProximoNumero(request: Request, response: Response) {
+    const numero = await service.obterProximoNumero(request.query.data);
+    return response.json({ numero });
+  }
+
+  async obterContextoDocumento(_request: Request, response: Response) {
+    const contexto = await service.obterContextoDocumento();
+    return response.json(contexto);
+  }
+
+  async importarConteudo(request: Request, response: Response) {
+    const importacao = await service.importarConteudoArquivo(
+      (request as AuthenticatedRequest & { file?: Express.Multer.File }).file
+    );
+    return response.json(importacao);
+  }
+
   async criar(request: Request, response: Response) {
-    const oficio = await service.criar(request.body);
+    const oficio = await service.criar(
+      request.body,
+      (request as AuthenticatedRequest).authUser?.id
+    );
     return response.status(201).json(oficio);
   }
 
   async atualizar(request: Request, response: Response) {
-    const oficio = await service.atualizar(request.params.id, request.body);
+    const oficio = await service.atualizar(
+      request.params.id,
+      request.body,
+      (request as AuthenticatedRequest).authUser?.id
+    );
     return response.json(oficio);
   }
 
@@ -73,5 +105,14 @@ export class OficiosController {
       (request as AuthenticatedRequest).authUser?.id
     );
     return response.status(204).send();
+  }
+
+  async documento(request: Request, response: Response) {
+    const documento = await service.gerarDocumento(request.params.id);
+    return response
+      .status(200)
+      .type("application/pdf")
+      .setHeader("Content-Disposition", `inline; filename="${documento.filename}"`)
+      .send(documento.pdf);
   }
 }

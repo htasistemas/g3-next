@@ -17,6 +17,28 @@ export function useOficio(id?: string) {
   });
 }
 
+export function useProximoNumeroOficio(dataReferencia?: string) {
+  return useQuery({
+    queryKey: ["oficios", "proximo-numero", dataReferencia ?? ""],
+    queryFn: () => oficiosService.obterProximoNumero(dataReferencia),
+    staleTime: 30_000
+  });
+}
+
+export function useContextoDocumentoOficio() {
+  return useQuery({
+    queryKey: ["oficios", "contexto-documento"],
+    queryFn: () => oficiosService.obterContextoDocumento(),
+    staleTime: 300_000
+  });
+}
+
+export function useImportarConteudoOficio() {
+  return useMutation({
+    mutationFn: (arquivo: File) => oficiosService.importarConteudoArquivo(arquivo)
+  });
+}
+
 export function useSalvarOficio() {
   const queryClient = useQueryClient();
   return useMutation({
