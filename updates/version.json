@@ -1,9 +1,9 @@
 {
   "latestVersion": "1.00.170",
-  "releaseDate": "2026-03-18",
+  "releaseDate": "2026-03-20",
   "description": "Base atual do mecanismo de atualização do sistema.",
-  "packageName": "",
-  "checksum": "",
+  "packageName": "g3-next-update-1.00.170.zip",
+  "checksum": "2c8b6323926d9ca98b67fe0064d627f359d916390db5e7f22bb1628936689aa1",
   "minCompatibleVersion": "1.00.170",
   "releaseType": "stable",
   "downloadUrl": null

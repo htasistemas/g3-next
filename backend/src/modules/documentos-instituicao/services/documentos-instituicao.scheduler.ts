@@ -1,4 +1,5 @@
 import { DocumentosInstituicaoService } from "./documentos-instituicao.service.js";
+import { env } from "../../../config/env.js";
 
 let schedulerInicializado = false;
 let intervaloScheduler: NodeJS.Timeout | null = null;
@@ -10,6 +11,12 @@ export function iniciarDocumentosInstituicaoScheduler(intervaloMs = 60 * 60 * 10
   const service = new DocumentosInstituicaoService();
 
   const executar = async () => {
+    // Se o envio de e-mail estiver desabilitado no servidor, 
+    // não tenta processar os alertas para evitar erros de 503/Indisponível no terminal.
+    if (!env.APP_EMAIL_HABILITADO) {
+      return;
+    }
+
     try {
       await service.processarAlertasEmailPendentes();
     } catch (error) {

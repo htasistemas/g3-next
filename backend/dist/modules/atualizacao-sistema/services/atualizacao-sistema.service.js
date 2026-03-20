@@ -229,6 +229,9 @@ export class AtualizacaoSistemaService {
     }
     async baixarAtualizacao() {
         const manifesto = await this.lerManifesto();
+        if (!manifesto.packageName?.trim()) {
+            throw new AppError("Não há um pacote de atualização configurado no arquivo version.json.", 400);
+        }
         const caminhoPacote = await this.localizarOuBaixarPacote(manifesto);
         const checksum = await calcularSha256Arquivo(caminhoPacote);
         return {

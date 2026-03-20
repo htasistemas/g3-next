@@ -1,0 +1,14 @@
+{
+  "entries": [
+    {
+      "version": "0.0.0",
+      "releaseDate": "2026-03-20",
+      "title": "Base atual",
+      "description": "Estrutura inicial do mecanismo de atualização do sistema.",
+      "changes": [
+        "Manifesto e changelog inicial criados automaticamente."
+      ],
+      "releaseType": "stable"
+    }
+  ]
+}

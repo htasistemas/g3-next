@@ -1,0 +1,10 @@
+import { Router } from "express";
+import { AiController } from "../controllers/ai.controller.js";
+import { ensureAuthenticated } from "../../auth/middlewares/auth.middleware.js";
+const aiRoutes = Router();
+const controller = new AiController();
+aiRoutes.post("/ask", ensureAuthenticated, (req, res) => controller.ask(req, res));
+aiRoutes.get("/history", ensureAuthenticated, (req, res) => controller.history(req, res));
+aiRoutes.delete("/history", ensureAuthenticated, (req, res) => controller.clearHistory(req, res));
+aiRoutes.post("/suggest", ensureAuthenticated, (req, res) => controller.suggest(req, res));
+export { aiRoutes };

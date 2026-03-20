@@ -4,5 +4,9 @@
     "maintenance:on": "node scripts/maintenance-mode.mjs on",
     "maintenance:off": "node scripts/maintenance-mode.mjs off",
     "maintenance:status": "node scripts/maintenance-mode.mjs status"
+  },
+  "dependencies": {
+    "@google/genai": "^1.46.0",
+    "@google/generative-ai": "^0.24.1"
   }
 }
