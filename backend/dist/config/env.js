@@ -40,6 +40,10 @@ const envSchema = z.object({
     APP_AUTH_COOKIE_DOMAIN: optionalTrimmedStringFromEnv,
     APP_GOOGLE_CLIENT_ID: optionalTrimmedStringFromEnv,
     GOOGLE_CLIENT_ID: optionalTrimmedStringFromEnv,
+    APP_GEMINI_API_KEY: optionalTrimmedStringFromEnv,
+    GEMINI_API_KEY: optionalTrimmedStringFromEnv,
+    GOOGLE_GEMINI_API_KEY: optionalTrimmedStringFromEnv,
+    GOOGLE_API_KEY: optionalTrimmedStringFromEnv,
     APP_EMAIL_HABILITADO: booleanFromEnv.default(true),
     APP_EMAIL_REMETENTE: z.string().min(1).default("htasistemas@gmail.com"),
     APP_EMAIL_NOME: z.string().min(1).default("HTA Sistemas"),
@@ -53,9 +57,14 @@ const corsOrigins = parsedEnv.CORS_ORIGIN.split(",")
     .map((origin) => origin.trim())
     .filter((origin) => origin.length > 0);
 const googleClientIds = parseGoogleClientIds(parsedEnv.APP_GOOGLE_CLIENT_ID, parsedEnv.GOOGLE_CLIENT_ID);
+const geminiApiKey = parsedEnv.APP_GEMINI_API_KEY ??
+    parsedEnv.GEMINI_API_KEY ??
+    parsedEnv.GOOGLE_GEMINI_API_KEY ??
+    parsedEnv.GOOGLE_API_KEY;
 export const env = {
     ...parsedEnv,
     APP_GOOGLE_CLIENT_ID: googleClientIds[0],
     APP_GOOGLE_CLIENT_IDS: googleClientIds,
+    APP_GEMINI_API_KEY: geminiApiKey,
     CORS_ORIGINS: corsOrigins
 };
