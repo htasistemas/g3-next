@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { startTransition } from "react";
 import { PopupConfirmacao } from "@/components/admin/admin-popups";
 import { DatasComemorativasPopup } from "@/components/system/datas-comemorativas-popup";
+import { AIChatWidget } from "@/modules/ai/components/AIChatWidget";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { APP_VERSION } from "@/lib/app-version";
@@ -1096,7 +1097,6 @@ export function AppShell() {
         cancelarTexto="Não"
         confirmarVariant="default"
       />
-
       <DatasComemorativasPopup
         popup={popupDatasComemorativas}
         onClose={() => setPopupDatasComemorativas(null)}
@@ -1112,6 +1112,7 @@ export function AppShell() {
           navigate(`/configuracoes/datas-comemorativas?tab=calendario&data=${data}`);
         }}
       />
+      <AIChatWidget />
     </div>
   );
 }

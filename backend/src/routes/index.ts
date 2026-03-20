@@ -27,6 +27,7 @@ import { patrimonioRoutes } from "../modules/patrimonios/routes/patrimonio.route
 import { emprestimosEventosRoutes } from "../modules/emprestimos-eventos/routes/emprestimos-eventos.routes.js";
 import { fotosEventosRoutes } from "../modules/fotos-eventos/routes/fotos-eventos.routes.js";
 import { documentosInstituicaoRoutes } from "../modules/documentos-instituicao/routes/documentos-instituicao.routes.js";
+import { linksExternosRoutes } from "../modules/documentos-instituicao/links-externos.routes.js";
 import { oficiosRoutes } from "../modules/oficios/routes/oficios.routes.js";
 import { bancoEmpregosRoutes } from "../modules/banco-empregos/routes/banco-empregos.routes.js";
 import { bibliotecaRoutes } from "../modules/biblioteca/routes/biblioteca.routes.js";
@@ -45,6 +46,7 @@ import { chamadoTecnicoRoutes } from "../modules/chamados-tecnicos/routes/chamad
 import { atualizacaoSistemaRoutes } from "../modules/atualizacao-sistema/routes/atualizacao-sistema.routes.js";
 import { datasComemorativasRoutes } from "../modules/datas-comemorativas/routes/datas-comemorativas.routes.js";
 import { captacaoRecursosRoutes } from "../modules/captacao-recursos/routes/captacao-recursos.routes.js";
+import { aiRoutes } from "../modules/ai/routes/ai.routes.js";
 
 export const appRoutes = Router();
 
@@ -53,6 +55,7 @@ appRoutes.get("/health", (_request, response) => {
 });
 
 appRoutes.use("/api/auth", authRoutes);
+appRoutes.use("/api/ai", ensureAuthenticated, aiRoutes);
 appRoutes.use("/api/beneficiarios", beneficiarioRoutes);
 appRoutes.use("/api/familias", familiaRoutes);
 appRoutes.use("/api/unidades-assistenciais", unidadeAssistencialRoutes);
@@ -71,6 +74,7 @@ appRoutes.use("/api/lembretes-diarios", lembreteDiarioRoutes);
 appRoutes.use("/api/emprestimos-eventos", emprestimosEventosRoutes);
 appRoutes.use("/api/fotos-eventos", fotosEventosRoutes);
 appRoutes.use("/api/documentos-instituicao", documentosInstituicaoRoutes);
+appRoutes.use("/api/links-externos", linksExternosRoutes);
 appRoutes.use("/api/oficios", oficiosRoutes);
 appRoutes.use("/api/banco-empregos", bancoEmpregosRoutes);
 appRoutes.use("/api/biblioteca", bibliotecaRoutes);
