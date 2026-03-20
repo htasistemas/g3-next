@@ -20,6 +20,7 @@ import {
   AlarmClockCheck,
   BadgeDollarSign,
   BriefcaseBusiness,
+  Brain,
   Building2,
   CalendarRange,
   Bell,
@@ -417,6 +418,12 @@ export const menuSections: MenuSection[] = [
         ]
       },
       {
+        id: "configuracoes-pesquise-na-ia",
+        to: "/configuracoes/pesquise-na-ia",
+        label: "Pesquise na IA",
+        icon: Brain
+      },
+      {
         id: "configuracoes-atualizar-sistema",
         to: "/configuracoes/atualizar-sistema",
         label: "Atualizar sistema",
@@ -484,6 +491,7 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/configuracoes/datas-comemorativas")) return "Datas comemorativas";
   if (pathname.startsWith("/configuracoes/atualizar-sistema")) return "Atualizar sistema";
   if (pathname.startsWith("/configuracoes/chamado-tecnico")) return "Chamado técnico";
+  if (pathname.startsWith("/configuracoes/pesquise-na-ia")) return "Pesquise na IA";
   if (pathname.startsWith("/configuracoes/mensagens-personalizadas")) return "Mensagens personalizadas";
   if (pathname.startsWith("/configuracoes/usuarios")) return "Usuários";
   if (pathname.startsWith("/setor-rh/registro-ponto")) return "Registro de ponto";

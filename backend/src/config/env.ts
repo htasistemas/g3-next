@@ -41,6 +41,7 @@ const envSchema = z.object({
   APP_AUTH_COOKIE_DOMAIN: optionalTrimmedStringFromEnv,
   APP_GOOGLE_CLIENT_ID: optionalTrimmedStringFromEnv,
   GOOGLE_CLIENT_ID: optionalTrimmedStringFromEnv,
+  APP_GEMINI_API_KEY: optionalTrimmedStringFromEnv,
   APP_EMAIL_HABILITADO: booleanFromEnv.default(true),
   APP_EMAIL_REMETENTE: z.string().min(1).default("htasistemas@gmail.com"),
   APP_EMAIL_NOME: z.string().min(1).default("HTA Sistemas"),
