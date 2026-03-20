@@ -118,6 +118,7 @@ const MensagensPersonalizadasPage = carregarPagina(
 );
 const ChamadoTecnicoPage = carregarPagina("/configuracoes/chamado-tecnico", "ChamadoTecnicoPage");
 const SementePage = carregarPagina("/configuracoes/pesquise-na-ia", "SementePage");
+const SobreOSistemaPage = carregarPagina("/configuracoes/sobre-o-sistema", "SobreOSistemaPage");
 const CaptacaoRecursosPage = carregarPagina(
   "/captacao-recursos/dashboard",
   "CaptacaoRecursosPage"
@@ -356,6 +357,10 @@ export const router = createBrowserRouter([
       {
         path: "/configuracoes/pesquise-na-ia",
         element: SementePage
+      },
+      {
+        path: "/configuracoes/sobre-o-sistema",
+        element: SobreOSistemaPage
       },
       {
         path: "/configuracoes/mensagens-personalizadas",

@@ -60,6 +60,7 @@ import {
   ScrollText,
   Settings2,
   ShieldUser,
+  ShieldCheck,
   Siren,
   SlidersHorizontal,
   Stethoscope,
@@ -424,6 +425,12 @@ export const menuSections: MenuSection[] = [
         icon: Brain
       },
       {
+        id: "configuracoes-sobre-o-sistema",
+        to: "/configuracoes/sobre-o-sistema",
+        label: "Sobre o sistema",
+        icon: ShieldCheck
+      },
+      {
         id: "configuracoes-atualizar-sistema",
         to: "/configuracoes/atualizar-sistema",
         label: "Atualizar sistema",
@@ -492,6 +499,7 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/configuracoes/atualizar-sistema")) return "Atualizar sistema";
   if (pathname.startsWith("/configuracoes/chamado-tecnico")) return "Chamado técnico";
   if (pathname.startsWith("/configuracoes/pesquise-na-ia")) return "Pesquise na IA";
+  if (pathname.startsWith("/configuracoes/sobre-o-sistema")) return "Sobre o sistema";
   if (pathname.startsWith("/configuracoes/mensagens-personalizadas")) return "Mensagens personalizadas";
   if (pathname.startsWith("/configuracoes/usuarios")) return "Usuários";
   if (pathname.startsWith("/setor-rh/registro-ponto")) return "Registro de ponto";
