@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   Clock3,
   Eye,
+  ExternalLink,
   FileText,
   FileStack,
   FolderOpen,
@@ -16,7 +17,8 @@ import {
   Trash2,
   Undo2,
   Upload,
-  X
+  X,
+  Edit2
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -48,17 +50,27 @@ import type {
   DocumentoInstituicaoPayload
 } from "@/types/documentos-instituicao";
 import { useAuth } from "@/hooks/use-auth";
+import { httpClient } from "@/services/http-client";
 
-type AbaId = "lista" | "cadastro" | "anexos" | "alertas" | "relatorios";
+type AbaId = "lista" | "cadastro" | "anexos" | "alertas" | "relatorios" | "links";
 
 const abas: AdminTab[] = [
   { id: "lista", label: "Lista de documentos", icon: FolderOpen },
   { id: "cadastro", label: "Cadastro e edição", icon: FileStack },
+  { id: "links", label: "Links externos", icon: ExternalLink },
   { id: "alertas", label: "Alertas e vencimentos", icon: AlertTriangle },
   { id: "relatorios", label: "Relatórios e dashboard", icon: Bell }
 ];
 
 const tituloTela = "Gestão de documentos";
+
+interface LinkExterno {
+  id?: number;
+  nome: string;
+  url: string;
+  tiposRelacionados?: string;
+  observacao?: string;
+}
 
 const tiposDocumentoTerceiroSetor = [
   "Estatuto social",
@@ -250,6 +262,15 @@ export function GestaoDocumentosPage() {
   const [anexoParaSubstituirId, setAnexoParaSubstituirId] = useState<string | null>(null);
   const [anexoProcessandoId, setAnexoProcessandoId] = useState<string | null>(null);
 
+  // Estados para Links Externos
+  const [linksExternos, setLinksExternos] = useState<LinkExterno[]>([]);
+  const [loadingLinks, setLoadingLinks] = useState(false);
+  const [modoEdicaoLink, setModoEdicaoLink] = useState(false);
+  const [formLink, setFormLink] = useState<LinkExterno>({ nome: "", url: "", tiposRelacionados: "", observacao: "" });
+  const [confirmarExcluirLink, setConfirmarExcluirLink] = useState<number | null>(null);
+  const [sugestaoLinkAberto, setSugestaoLinkAberto] = useState(false);
+  const [linksParaSugerir, setLinksParaSugerir] = useState<LinkExterno[]>([]);
+
   const { data, isLoading } = useDocumentosInstituicao();
   const anexosQuery = useAnexosDocumentoInstituicao(form.id);
   const historicoQuery = useHistoricoDocumentoInstituicao(form.id);
@@ -317,6 +338,25 @@ export function GestaoDocumentosPage() {
     setAnexoPrincipalLocal(null);
   }, [form.id]);
 
+  // Carregar Links Externos
+  useEffect(() => {
+    if (abaAtiva === "links" || abaAtiva === "cadastro") {
+      void carregarLinks();
+    }
+  }, [abaAtiva]);
+
+  async function carregarLinks() {
+    setLoadingLinks(true);
+    try {
+      const response = await httpClient.get("/api/links-externos");
+      setLinksExternos(response.data);
+    } catch (error) {
+      console.error("Erro ao carregar links:", error);
+    } finally {
+      setLoadingLinks(false);
+    }
+  }
+
   const tiposDocumentoOptions = useMemo(
     () => mesclarOpcaoAtual(tiposDocumentoTerceiroSetor, form.tipoDocumento),
     [form.tipoDocumento]
@@ -333,6 +373,15 @@ export function GestaoDocumentosPage() {
     substituirAnexoMutation.isPending ||
     excluirAnexoMutation.isPending ||
     historicoMutation.isPending;
+
+  const linksSugeridosParaTipo = useMemo(() => {
+    const tipo = form.tipoDocumento.trim().toLowerCase();
+    if (!tipo) return [];
+    return linksExternos.filter((item) => {
+      const relacionados = (item.tiposRelacionados || "").toLowerCase();
+      return relacionados.includes(tipo);
+    });
+  }, [form.tipoDocumento, linksExternos]);
 
   function novo() {
     const proximo = criarFormularioPadrao(responsavelLogado);
@@ -742,6 +791,63 @@ export function GestaoDocumentosPage() {
     navigate("/dashboard/visao-geral");
   }
 
+  // Funções de Gerenciamento de Links
+  function novoLink() {
+    setFormLink({ nome: "", url: "", tiposRelacionados: "", observacao: "" });
+    setModoEdicaoLink(true);
+  }
+
+  function editarLink(link: LinkExterno) {
+    setFormLink({ ...link });
+    setModoEdicaoLink(true);
+  }
+
+  async function salvarLink() {
+    if (!formLink.nome.trim() || !formLink.url.trim()) {
+      setPopupMensagem({ tipo: "aviso", titulo: "Validação", texto: "Nome e URL são obrigatórios." });
+      return;
+    }
+    try {
+      if (formLink.id) {
+        await httpClient.put(`/api/links-externos/${formLink.id}`, formLink);
+      } else {
+        await httpClient.post("/api/links-externos", formLink);
+      }
+      setModoEdicaoLink(false);
+      void carregarLinks();
+      setPopupMensagem({ tipo: "sucesso", titulo: "Sucesso", texto: "Link salvo com sucesso!" });
+    } catch (error) {
+      setPopupMensagem({ tipo: "erro", titulo: "Erro", texto: "Erro ao salvar o link." });
+    }
+  }
+
+  function alternarTipoNoLink(tipo: string) {
+    const tiposAtuais = formLink.tiposRelacionados 
+      ? formLink.tiposRelacionados.split(",").map(t => t.trim()).filter(Boolean)
+      : [];
+    
+    let novosTipos: string[];
+    if (tiposAtuais.includes(tipo)) {
+      novosTipos = tiposAtuais.filter(t => t !== tipo);
+    } else {
+      novosTipos = [...tiposAtuais, tipo];
+    }
+    
+    setFormLink({ ...formLink, tiposRelacionados: novosTipos.join(", ") });
+  }
+
+  async function confirmarExclusaoLink() {
+    if (!confirmarExcluirLink) return;
+    try {
+      await api.delete(`/links-externos/${confirmarExcluirLink}`);
+      setConfirmarExcluirLink(null);
+      void carregarLinks();
+      setPopupMensagem({ tipo: "sucesso", titulo: "Sucesso", texto: "Link removido!" });
+    } catch (error) {
+      setPopupMensagem({ tipo: "erro", titulo: "Erro", texto: "Erro ao remover o link." });
+    }
+  }
+
   const acoes: AdminAction[] = [
     { label: "Buscar", icon: Search, onClick: buscar, variant: "outline" },
     { label: "Novo", icon: Plus, onClick: novo, variant: "default", disabled: carregandoAcoes },
@@ -758,7 +864,7 @@ export function GestaoDocumentosPage() {
         tabs={abas}
         activeTab={abaAtiva}
         onChangeTab={(tabId) => setAbaAtiva(tabId as AbaId)}
-        actions={acoes}
+        actions={abaAtiva === "links" ? [] : acoes}
         sectionLabel="Setor administrativo"
         pageTitle={tituloTela}
         activeTitle={abaAtiva === "lista" ? "Lista de documentos" : abas.find((item) => item.id === abaAtiva)?.label}
@@ -858,9 +964,22 @@ export function GestaoDocumentosPage() {
               <Label>Tipo de documento *</Label>
               <Select
                 value={form.tipoDocumento}
-                onChange={(event) =>
-                  setForm((atual) => ({ ...atual, tipoDocumento: event.target.value }))
-                }
+                onChange={(event) => {
+                  const novoTipo = event.target.value;
+                  setForm((atual) => ({ ...atual, tipoDocumento: novoTipo }));
+                  
+                  // Se houver links cadastrados para este tipo, abre o popup de sugestão
+                  if (novoTipo) {
+                    const links = linksExternos.filter((item) => {
+                      const relacionados = (item.tiposRelacionados || "").toLowerCase();
+                      return relacionados.includes(novoTipo.toLowerCase());
+                    });
+                    if (links.length > 0) {
+                      setLinksParaSugerir(links);
+                      setSugestaoLinkAberto(true);
+                    }
+                  }
+                }}
               >
                 <option value="">Selecione</option>
                 {tiposDocumentoOptions.map((item) => (
@@ -901,6 +1020,33 @@ export function GestaoDocumentosPage() {
                 className="bg-[var(--g3-primary-soft)]/20"
               />
             </div>
+
+            {linksSugeridosParaTipo.length > 0 && (
+              <div className="rounded-md border border-[var(--g3-active)]/30 bg-[var(--g3-primary-soft)]/20 p-2 md:col-span-2 xl:col-span-4">
+                <p className="flex items-center gap-2 text-xs font-semibold text-[var(--g3-active)]">
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Site sugerido para emissão/atualização deste documento:
+                </p>
+                <div className="mt-1 flex flex-wrap gap-3">
+                  {linksSugeridosParaTipo.map((link, idx) => (
+                    <div key={idx} className="flex flex-col">
+                      <a
+                        href={link.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-600 underline hover:text-blue-800"
+                      >
+                        {link.nome}
+                      </a>
+                      {link.observacao && (
+                        <span className="text-[10px] text-[var(--g3-muted)]">({link.observacao})</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="space-y-1">
               <Label>Data de emissão *</Label>
               <Input
@@ -1109,6 +1255,143 @@ export function GestaoDocumentosPage() {
                   )}
                 </CardContent>
               </Card>
+            </div>
+          </section>
+        ) : null}
+
+        {abaAtiva === "links" ? (
+          <section className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-[var(--g3-primary-soft)]/30 p-4">
+              <div className="space-y-1">
+                <h3 className="flex items-center gap-2 font-semibold text-[var(--g3-active)]">
+                  <ExternalLink className="h-5 w-5" />
+                  Gerenciar Links Externos
+                </h3>
+                <p className="text-sm text-[var(--g3-muted)]">
+                  Mantenha a lista de sites de certidões atualizada. Eles aparecerão no cadastro por tipo.
+                </p>
+              </div>
+              <Button onClick={novoLink}>
+                <Plus className="mr-2 h-4 w-4" />
+                Novo Link
+              </Button>
+            </div>
+
+            {modoEdicaoLink && (
+              <Card className="border-[var(--g3-active)] bg-[var(--g3-primary-soft)]/10">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">{formLink.id ? "Editar Link" : "Novo Link"}</CardTitle>
+                </CardHeader>
+                <CardContent className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label>Nome do Link *</Label>
+                    <Input
+                      placeholder="Ex: Receita Federal"
+                      value={formLink.nome}
+                      onChange={(e) => setFormLink({ ...formLink, nome: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>URL (Endereço do Site) *</Label>
+                    <Input
+                      placeholder="https://..."
+                      value={formLink.url}
+                      onChange={(e) => setFormLink({ ...formLink, url: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1 sm:col-span-2">
+                    <Label className="mb-2 block">Tipos de Documento Relacionados (Selecione um ou mais)</Label>
+                    <div className="flex flex-wrap gap-2 rounded-md border border-[var(--g3-border)] bg-[var(--g3-card)] p-3 max-h-48 overflow-y-auto">
+                      {tiposDocumentoTerceiroSetor.map((tipo) => {
+                        const selecionado = formLink.tiposRelacionados?.split(", ").includes(tipo);
+                        return (
+                          <button
+                            key={tipo}
+                            type="button"
+                            onClick={() => alternarTipoNoLink(tipo)}
+                            className={`rounded-full px-3 py-1 text-xs transition-colors ${
+                              selecionado 
+                                ? "bg-[var(--g3-active)] text-white" 
+                                : "bg-[var(--g3-primary-soft)] text-[var(--g3-active)] hover:bg-[var(--g3-active)]/20"
+                            }`}
+                          >
+                            {tipo}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {formLink.tiposRelacionados && (
+                      <p className="mt-2 text-[10px] text-[var(--g3-muted)]">
+                        <strong>Selecionados:</strong> {formLink.tiposRelacionados}
+                      </p>
+                    )}
+                  </div>
+                  <div className="space-y-1 sm:col-span-2">
+                    <Label>Observação</Label>
+                    <Input
+                      placeholder="Dica extra para o usuário"
+                      value={formLink.observacao}
+                      onChange={(e) => setFormLink({ ...formLink, observacao: e.target.value })}
+                    />
+                  </div>
+                  <div className="flex gap-2 sm:col-span-2">
+                    <Button onClick={() => void salvarLink()}>Salvar</Button>
+                    <Button variant="outline" onClick={() => setModoEdicaoLink(false)}>Cancelar</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]">
+              <table className="min-w-full text-sm">
+                <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]">
+                  <tr>
+                    <th className="px-3 py-2 text-left w-12">Acesso</th>
+                    <th className="px-3 py-2 text-left">Nome do Site</th>
+                    <th className="px-3 py-2 text-left">Vínculos (Tipos)</th>
+                    <th className="px-3 py-2 text-center w-24">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loadingLinks ? (
+                    <tr><td colSpan={4} className="p-4 text-center">Carregando...</td></tr>
+                  ) : linksExternos.length ? (
+                    linksExternos.map((link) => (
+                      <tr key={link.id} className="border-t border-[var(--g3-border)] hover:bg-[var(--g3-primary-soft)]/20">
+                        <td className="px-3 py-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Abrir site"
+                            onClick={() => window.open(link.url, "_blank")}
+                          >
+                            <ExternalLink className="h-4 w-4 text-blue-600" />
+                          </Button>
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="font-medium">{link.nome}</div>
+                          {link.observacao && <div className="text-[10px] text-amber-600">{link.observacao}</div>}
+                        </td>
+                        <td className="px-3 py-2 text-[var(--g3-muted)]">
+                          {link.tiposRelacionados || "---"}
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="flex justify-center gap-2">
+                            <Button variant="ghost" size="icon" onClick={() => editarLink(link)}>
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="text-red-500" onClick={() => setConfirmarExcluirLink(link.id!)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr><td colSpan={4} className="p-4 text-center">Nenhum link cadastrado.</td></tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </section>
         ) : null}
@@ -1336,6 +1619,7 @@ export function GestaoDocumentosPage() {
       </AdminPageLayout>
 
       {popupMensagem ? <PopupMensagem popup={popupMensagem} onClose={() => setPopupMensagem(null)} /> : null}
+      
       <PopupConfirmacao
         aberto={confirmarExcluir}
         titulo="Confirmar Exclusão"
@@ -1345,6 +1629,67 @@ export function GestaoDocumentosPage() {
         onConfirm={() => void confirmarExclusao()}
         confirmarTexto="Excluir"
       />
+
+      <PopupConfirmacao
+        aberto={!!confirmarExcluirLink}
+        titulo="Remover Link Externo"
+        texto="Deseja realmente remover este site da lista?"
+        onCancel={() => setConfirmarExcluirLink(null)}
+        onConfirm={() => void confirmarExclusaoLink()}
+        confirmarTexto="Sim, Remover"
+      />
+
+      {/* Popup de Sugestão de Link Externo */}
+      {sugestaoLinkAberto && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <Card className="w-full max-w-md border-[var(--g3-active)] shadow-2xl animate-in fade-in zoom-in duration-200">
+            <CardHeader className="bg-[var(--g3-primary-soft)]/20 pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-base font-bold text-[var(--g3-active)]">
+                  <ExternalLink className="h-5 w-5" />
+                  Site Sugerido
+                </CardTitle>
+                <Button variant="ghost" size="icon" onClick={() => setSugestaoLinkAberto(false)} className="h-8 w-8">
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-4">
+              <p className="text-sm text-[var(--g3-muted)]">
+                Para o tipo de documento <strong>{form.tipoDocumento}</strong>, recomendamos acessar o site oficial para emissão ou conferência:
+              </p>
+              
+              <div className="space-y-3">
+                {linksParaSugerir.map((link) => (
+                  <div key={link.id} className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card)] p-3 transition-colors hover:bg-[var(--g3-primary-soft)]/10">
+                    <div className="mb-1 font-semibold text-sm">{link.nome}</div>
+                    {link.observacao && <p className="mb-3 text-[11px] text-amber-600 font-medium">⚠️ {link.observacao}</p>}
+                    <Button 
+                      className="w-full gap-2 text-xs" 
+                      onClick={() => {
+                        window.open(link.url, "_blank");
+                        setSugestaoLinkAberto(false);
+                      }}
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      Acessar Site Agora
+                    </Button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="pt-2 text-center">
+                <button 
+                  onClick={() => setSugestaoLinkAberto(false)}
+                  className="text-xs text-[var(--g3-muted)] underline hover:text-[var(--g3-active)]"
+                >
+                  Continuar sem acessar
+                </button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </>
   );
 }
