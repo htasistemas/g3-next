@@ -45,7 +45,10 @@ export class SementeService {
     }
 
     if (!env.APP_GEMINI_API_KEY) {
-      throw new AppError("APP_GEMINI_API_KEY nao configurada.", 503);
+      throw new AppError(
+        "A chave da API Gemini nao esta configurada. Defina APP_GEMINI_API_KEY, GEMINI_API_KEY, GOOGLE_GEMINI_API_KEY ou GOOGLE_API_KEY no backend.",
+        503
+      );
     }
 
     const memorias = await this.repository.listarMemorias(payload.usuarioId);
