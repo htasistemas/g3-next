@@ -1,11 +1,16 @@
 import { prisma } from "../../../database/prisma.js";
 import type {
+  AlertasCentralAtendimentosSistema,
   CarenciaDoacaoRealizadaSistema,
+  ObrigatoriedadeDocumentosBeneficiarioSistema,
   PersonalizacaoSistema
 } from "../parametros-sistema.types.js";
 
 const CHAVE_PERSONALIZACAO = "PERSONALIZACAO_VISUAL";
 const CHAVE_CARENCIA_DOACAO_REALIZADA = "DOACAO_REALIZADA_CARENCIA";
+const CHAVE_OBRIGATORIEDADE_DOCUMENTOS_BENEFICIARIO =
+  "BENEFICIARIO_DOCUMENTOS_OBRIGATORIEDADE";
+const CHAVE_ALERTAS_CENTRAL_ATENDIMENTOS = "CENTRAL_ATENDIMENTOS_ALERTAS";
 
 type RegistroParametroSistema = {
   valor_json: unknown;
@@ -43,6 +48,36 @@ export class ParametrosSistemaRepository {
     usuarioAtualizacao: string
   ) {
     return this.salvarPorChave(CHAVE_CARENCIA_DOACAO_REALIZADA, valor, usuarioAtualizacao);
+  }
+
+  async buscarObrigatoriedadeDocumentosBeneficiario() {
+    return this.buscarPorChave<ObrigatoriedadeDocumentosBeneficiarioSistema>(
+      CHAVE_OBRIGATORIEDADE_DOCUMENTOS_BENEFICIARIO
+    );
+  }
+
+  async salvarObrigatoriedadeDocumentosBeneficiario(
+    valor: ObrigatoriedadeDocumentosBeneficiarioSistema,
+    usuarioAtualizacao: string
+  ) {
+    return this.salvarPorChave(
+      CHAVE_OBRIGATORIEDADE_DOCUMENTOS_BENEFICIARIO,
+      valor,
+      usuarioAtualizacao
+    );
+  }
+
+  async buscarAlertasCentralAtendimentos() {
+    return this.buscarPorChave<AlertasCentralAtendimentosSistema>(
+      CHAVE_ALERTAS_CENTRAL_ATENDIMENTOS
+    );
+  }
+
+  async salvarAlertasCentralAtendimentos(
+    valor: AlertasCentralAtendimentosSistema,
+    usuarioAtualizacao: string
+  ) {
+    return this.salvarPorChave(CHAVE_ALERTAS_CENTRAL_ATENDIMENTOS, valor, usuarioAtualizacao);
   }
 
   private async ensureEstrutura() {

@@ -47,6 +47,7 @@ const CadastroBeneficiarioPage = carregarPagina("/cadastros/beneficiarios", "Cad
 const CadastroProfissionalPage = carregarPagina("/cadastros/profissionais", "CadastroProfissionalPage");
 const CadastroVoluntariadoPage = carregarPagina("/cadastros/voluntariado", "CadastroVoluntariadoPage");
 const CadastroMatriculasPage = carregarPagina("/atendimentos/matriculas", "CadastroMatriculasPage");
+const CentralAtendimentosPage = carregarPagina("/atendimentos/central-atendimentos", "CentralAtendimentosPage");
 const BancoEmpregosPage = carregarPagina("/atendimentos/banco-empregos", "BancoEmpregosPage");
 const BibliotecaPage = carregarPagina("/atendimentos/biblioteca", "BibliotecaPage");
 const RegistroVisitasPage = carregarPagina("/atendimentos/registro-visitas", "RegistroVisitasPage");
@@ -170,6 +171,16 @@ export const router = createBrowserRouter([
       { path: "/cadastros/beneficiarios", element: CadastroBeneficiarioPage },
       { path: "/cadastros/profissionais", element: CadastroProfissionalPage },
       { path: "/cadastros/voluntariado", element: CadastroVoluntariadoPage },
+      {
+        path: "/atendimentos/central-atendimentos",
+        element: (
+          <RequirePermission
+            permissions={["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS", "CENTRAL_ATENDIMENTOS_VISUALIZAR"]}
+          >
+            {CentralAtendimentosPage}
+          </RequirePermission>
+        )
+      },
       { path: "/atendimentos/matriculas", element: CadastroMatriculasPage },
       { path: "/atendimentos/banco-empregos", element: BancoEmpregosPage },
       { path: "/atendimentos/biblioteca", element: BibliotecaPage },

@@ -46,6 +46,11 @@ import {
   useRemoverBeneficiario,
   useSalvarBeneficiario
 } from "@/features/beneficiarios/use-beneficiarios";
+import {
+  documentosObrigatoriedadeBeneficiarioPadrao,
+  parametrosSistemaService,
+  type DocumentoObrigatoriedadeBeneficiarioSetting
+} from "@/services/parametros-sistema.service";
 import { reportsService } from "@/services/reports.service";
 import { buscarEnderecoPorCep, buscarSugestaoZonaSubzona } from "@/services/cep.service";
 import type { Beneficiario, BeneficiarioFiltro, BeneficiarioStatus } from "@/types/beneficiario";
@@ -83,41 +88,15 @@ const abas = [
   { id: "observacoes", label: "Observações", icon: FileText }
 ] as const;
 
-const documentosConfig = [
-  { id: "cpf", nome: "CPF", obrigatorio: true, permiteIgnorar: false },
-  {
-    id: "comprovante_endereco",
-    nome: "Comprovante de endereço",
-    obrigatorio: true,
-    permiteIgnorar: false
-  },
-  { id: "cnh", nome: "CNH", obrigatorio: false, permiteIgnorar: true },
-  {
-    id: "certidao_nascimento",
-    nome: "Certidão de nascimento",
-    obrigatorio: false,
+type DocumentoCadastroConfig = DocumentoObrigatoriedadeBeneficiarioSetting & {
+  permiteIgnorar: boolean;
+};
+
+const documentosConfigBase: DocumentoCadastroConfig[] =
+  documentosObrigatoriedadeBeneficiarioPadrao.map((documento) => ({
+    ...documento,
     permiteIgnorar: true
-  },
-  {
-    id: "certidao_casamento",
-    nome: "Certidão de casamento",
-    obrigatorio: false,
-    permiteIgnorar: true
-  },
-  {
-    id: "carteira_trabalho",
-    nome: "Carteira de trabalho",
-    obrigatorio: false,
-    permiteIgnorar: true
-  },
-  {
-    id: "titulo_eleitor",
-    nome: "Título de eleitor",
-    obrigatorio: false,
-    permiteIgnorar: true
-  },
-  { id: "cartao_sus", nome: "Cartão do SUS", obrigatorio: false, permiteIgnorar: true }
-] as const;
+  }));
 
 const opcaoAutoDeclaracaoResidencia = "Auto declaração de residência";
 
@@ -251,6 +230,11 @@ function formatarTelefoneInput(telefone?: string) {
   return `(${ddd}`;
 }
 
+function telefoneValido(telefone?: string) {
+  const digitos = somenteDigitos(telefone);
+  return digitos.length === 10 || digitos.length === 11;
+}
+
 function formatarCep(cep?: string) {
   const digitos = somenteDigitos(cep).slice(0, 8);
   if (!digitos) return "";
@@ -261,18 +245,10 @@ function normalizarEmailDigitado(email?: string) {
   return (email ?? "").replace(/\s+/g, "").toLowerCase();
 }
 
-function criarDocumentosPadrao(): DocumentoCadastro[] {
-  return documentosConfig.map((config) => ({
-    id: config.id,
-    nome: config.nome,
-    numeroDocumento: "",
-    nomeArquivo: undefined,
-    caminhoArquivo: undefined,
-    contentType: undefined,
-    ignorado: false,
-    obrigatorio: config.obrigatorio,
-    permiteIgnorar: config.permiteIgnorar
-  }));
+function emailValido(email?: string) {
+  const valor = normalizarEmailDigitado(email);
+  if (!valor) return false;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valor);
 }
 
 function normalizarNomeDocumento(nome: string) {
@@ -283,12 +259,86 @@ function normalizarNomeDocumento(nome: string) {
     .toLowerCase();
 }
 
-function mapearDocumentosDoBeneficiario(item: Beneficiario): DocumentoCadastro[] {
+function obterConfiguracaoDocumentos(
+  configuracaoRemota?: DocumentoObrigatoriedadeBeneficiarioSetting[]
+): DocumentoCadastroConfig[] {
+  const configuracaoPorId = new Map(
+    (configuracaoRemota ?? []).map((documento) => [documento.id, documento])
+  );
+
+  return documentosConfigBase.map((documentoBase) => {
+    const configuracao = configuracaoPorId.get(documentoBase.id);
+    const obrigatorio = configuracao?.obrigatorio ?? documentoBase.obrigatorio;
+
+    return {
+      ...documentoBase,
+      nome: configuracao?.nome ?? documentoBase.nome,
+      obrigatorio,
+      permiteIgnorar: !obrigatorio
+    };
+  });
+}
+
+function criarDocumentosPadrao(configuracao?: DocumentoObrigatoriedadeBeneficiarioSetting[]) {
+  return obterConfiguracaoDocumentos(configuracao).map((documento) => ({
+    id: documento.id,
+    nome: documento.nome,
+    numeroDocumento: "",
+    nomeArquivo: undefined,
+    caminhoArquivo: undefined,
+    contentType: undefined,
+    ignorado: false,
+    obrigatorio: documento.obrigatorio,
+    permiteIgnorar: documento.permiteIgnorar
+  }));
+}
+
+function reconciliarDocumentosComConfiguracao(
+  documentosAtuais: DocumentoCadastro[],
+  configuracao?: DocumentoObrigatoriedadeBeneficiarioSetting[]
+): DocumentoCadastro[] {
+  const configuracaoAtual = criarDocumentosPadrao(configuracao);
+  const documentosPorId = new Map(documentosAtuais.map((documento) => [documento.id, documento]));
+  const documentosPorNome = new Map(
+    documentosAtuais.map((documento) => [normalizarNomeDocumento(documento.nome), documento])
+  );
+  const idsPadrao = new Set(configuracaoAtual.map((documento) => documento.id));
+
+  const documentosPadrao = configuracaoAtual.map((documentoPadrao) => {
+    const documentoAtual =
+      documentosPorId.get(documentoPadrao.id) ??
+      documentosPorNome.get(normalizarNomeDocumento(documentoPadrao.nome));
+
+    if (!documentoAtual) {
+      return documentoPadrao;
+    }
+
+    return {
+      ...documentoAtual,
+      id: documentoPadrao.id,
+      nome: documentoPadrao.nome,
+      obrigatorio: documentoPadrao.obrigatorio,
+      permiteIgnorar: documentoPadrao.permiteIgnorar,
+      ignorado: documentoPadrao.permiteIgnorar ? documentoAtual.ignorado : false
+    };
+  });
+
+  const documentosExtras = documentosAtuais.filter((documento) => !idsPadrao.has(documento.id));
+  return [...documentosPadrao, ...documentosExtras];
+}
+
+function mapearDocumentosDoBeneficiario(
+  item: Beneficiario,
+  configuracao?: DocumentoObrigatoriedadeBeneficiarioSetting[]
+): DocumentoCadastro[] {
   const anexos = item.documentos_obrigatorios ?? [];
   const anexosPorNome = new Map(anexos.map((doc) => [normalizarNomeDocumento(doc.nome), doc]));
-  const nomesDocumentosPadrao = new Set(documentosConfig.map((doc) => normalizarNomeDocumento(doc.nome)));
+  const configuracaoAtual = criarDocumentosPadrao(configuracao);
+  const nomesDocumentosPadrao = new Set(
+    configuracaoAtual.map((doc) => normalizarNomeDocumento(doc.nome))
+  );
 
-  const documentosPadrao = criarDocumentosPadrao().map((documento) => {
+  const documentosPadrao = configuracaoAtual.map((documento) => {
     const anexo = anexosPorNome.get(normalizarNomeDocumento(documento.nome));
     const numeroDocumento =
       anexo?.numeroDocumento ??
@@ -312,7 +362,8 @@ function mapearDocumentosDoBeneficiario(item: Beneficiario): DocumentoCadastro[]
       caminhoArquivo: anexo?.caminhoArquivo,
       contentType: anexo?.contentType,
       ignorado: documento.permiteIgnorar ? !!anexo?.ignorado : false,
-      obrigatorio: anexo?.obrigatorio ?? documento.obrigatorio
+      obrigatorio: documento.obrigatorio,
+      permiteIgnorar: documento.permiteIgnorar
     };
   });
 
@@ -330,7 +381,7 @@ function mapearDocumentosDoBeneficiario(item: Beneficiario): DocumentoCadastro[]
         contentType: doc.contentType,
         ignorado: !!doc.ignorado,
         obrigatorio: !!doc.obrigatorio,
-        permiteIgnorar: true
+        permiteIgnorar: !doc.obrigatorio
       };
     });
 
@@ -522,6 +573,12 @@ export function CadastroBeneficiarioPage() {
   const [filtros, setFiltros] = useState<BeneficiarioFiltro>(filtroDraft);
   const [beneficiarioSelecionadoId, setBeneficiarioSelecionadoId] = useState<string | undefined>();
   const [mensagem, setMensagem] = useState<{ tipo: "sucesso" | "erro"; texto: string } | null>(null);
+  const [avisoPendenciasSelecao, setAvisoPendenciasSelecao] = useState<
+    Array<{ grupo: string; itens: string[] }>
+  >([]);
+  const [configuracaoDocumentos, setConfiguracaoDocumentos] = useState<
+    DocumentoObrigatoriedadeBeneficiarioSetting[]
+  >(documentosObrigatoriedadeBeneficiarioPadrao);
   const [documentos, setDocumentos] = useState<DocumentoCadastro[]>(() => criarDocumentosPadrao());
   const [popupSalvarAberto, setPopupSalvarAberto] = useState(false);
   const [popupExcluirAberto, setPopupExcluirAberto] = useState(false);
@@ -545,6 +602,7 @@ export function CadastroBeneficiarioPage() {
   const streamDocumentoRef = useRef<MediaStream | null>(null);
   const impressaoEmAndamentoRef = useRef(false);
   const ultimoDisparoImpressaoRef = useRef(0);
+  const exibirAvisoPendenciasAoCarregarRef = useRef(false);
 
   const { data: listaData, isLoading: carregandoLista } = useBeneficiarios(filtros);
   const { data: detalhesData, isLoading: carregandoDetalhes } = useBeneficiario(beneficiarioSelecionadoId);
@@ -595,15 +653,44 @@ export function CadastroBeneficiarioPage() {
   ].some((valor) => valor.trim().length > 0);
 
   useEffect(() => {
+    let ativo = true;
+
+    void (async () => {
+      try {
+        const configuracao =
+          await parametrosSistemaService.obterObrigatoriedadeDocumentosBeneficiario();
+        if (!ativo) return;
+        setConfiguracaoDocumentos(configuracao.documentos);
+      } catch {
+        if (!ativo) return;
+      }
+    })();
+
+    return () => {
+      ativo = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    setDocumentos((estadoAtual) =>
+      reconciliarDocumentosComConfiguracao(estadoAtual, configuracaoDocumentos)
+    );
+  }, [configuracaoDocumentos]);
+
+  useEffect(() => {
     if (!detalhesData?.beneficiario) return;
     const item = detalhesData.beneficiario;
 
     reset(mapearBeneficiarioParaFormulario(item));
-    setDocumentos(mapearDocumentosDoBeneficiario(item));
+    setDocumentos(mapearDocumentosDoBeneficiario(item, configuracaoDocumentos));
+    if (exibirAvisoPendenciasAoCarregarRef.current) {
+      setAvisoPendenciasSelecao(obterPendenciasAvisoBeneficiario(item));
+      exibirAvisoPendenciasAoCarregarRef.current = false;
+    }
     setPopupExcluirDocumentoId(null);
     setMensagem(null);
     ultimoCepConsultadoRef.current = somenteDigitos(item.cep ?? "");
-  }, [detalhesData, reset]);
+  }, [configuracaoDocumentos, detalhesData, reset]);
 
   useEffect(() => {
     if (beneficiarioSelecionadoId) return;
@@ -612,10 +699,12 @@ export function CadastroBeneficiarioPage() {
       ...beneficiarioDefaultValues,
       codigo: codigo ?? beneficiarioDefaultValues.codigo
     });
-    setDocumentos(criarDocumentosPadrao());
+    setDocumentos(criarDocumentosPadrao(configuracaoDocumentos));
+    setAvisoPendenciasSelecao([]);
+    exibirAvisoPendenciasAoCarregarRef.current = false;
     setPopupExcluirDocumentoId(null);
     ultimoCepConsultadoRef.current = "";
-  }, [beneficiarioSelecionadoId, proximoCodigoData, reset]);
+  }, [beneficiarioSelecionadoId, configuracaoDocumentos, proximoCodigoData, reset]);
 
   useEffect(() => {
     const cepNormalizado = somenteDigitos(cepAtual);
@@ -816,11 +905,12 @@ export function CadastroBeneficiarioPage() {
       const beneficiarioPersistido = detalhesData?.beneficiario;
 
       const documentoCpf = documentos.find((documento) => documento.id === "cpf");
-      if (!documentoCpf || !validarCpf(documentoCpf.numeroDocumento)) {
+      const pendenciasDocumentos = obterPendenciasDocumentos(documentos);
+      if (!documentoCpf || pendenciasDocumentos.length > 0) {
         setAbaAtiva("documentos");
         setMensagem({
           tipo: "erro",
-          texto: "Preencha ou corrija os campos: CPF."
+          texto: `Preencha ou corrija os campos: ${pendenciasDocumentos.join(", ")}.`
         });
         return;
       }
@@ -879,7 +969,7 @@ export function CadastroBeneficiarioPage() {
         const id = beneficiarioAtualizado.id_beneficiario;
         setBeneficiarioSelecionadoId(id);
         reset(mapearBeneficiarioParaFormulario(beneficiarioAtualizado));
-        setDocumentos(mapearDocumentosDoBeneficiario(beneficiarioAtualizado));
+        setDocumentos(mapearDocumentosDoBeneficiario(beneficiarioAtualizado, configuracaoDocumentos));
         setPopupExcluirDocumentoId(null);
         setMensagem(null);
         setPopupSalvarAberto(true);
@@ -923,6 +1013,129 @@ export function CadastroBeneficiarioPage() {
       return { texto: "Ignorado", variant: "warning" as const };
     }
     return { texto: "Pendente", variant: "danger" as const };
+  }
+
+  function listarDocumentosObrigatorios(documentosAtuais: DocumentoCadastro[]) {
+    return documentosAtuais.filter((documento) => documento.obrigatorio).map((documento) => documento.nome);
+  }
+
+  function obterPendenciasDocumentos(documentosAtuais: DocumentoCadastro[]) {
+    return documentosAtuais.flatMap((documento) => {
+      const numeroDocumento = documento.numeroDocumento.trim();
+
+      if (documento.id === "cpf") {
+        if (!numeroDocumento) {
+          return documento.obrigatorio ? [documento.nome] : [];
+        }
+
+        return validarCpf(numeroDocumento) ? [] : [documento.nome];
+      }
+
+      if (!documento.obrigatorio) {
+        return [];
+      }
+
+      if (documentoEhComprovanteEndereco(documento)) {
+        const pendencias: string[] = [];
+        if (!numeroDocumento) {
+          pendencias.push(`Tipo do ${documento.nome.toLowerCase()}`);
+        }
+        if (!documento.caminhoArquivo) {
+          pendencias.push(documento.nome);
+        }
+        return pendencias;
+      }
+
+      if (numeroDocumento || documento.caminhoArquivo) {
+        return [];
+      }
+
+      return [documento.nome];
+    });
+  }
+
+  function obterPendenciasAvisoBeneficiario(item: Beneficiario) {
+    const dadosPessoais = new Set<string>();
+    const endereco = new Set<string>();
+    const contato = new Set<string>();
+    const documentos = new Set<string>();
+    const alertas = new Set<string>();
+
+    if (!item.nome_completo?.trim()) dadosPessoais.add("Nome completo");
+    if (!item.data_nascimento?.trim()) dadosPessoais.add("Data de nascimento");
+    if (!item.nome_mae?.trim()) dadosPessoais.add("Nome da mãe");
+    if (!item.sexo_biologico?.trim()) dadosPessoais.add("Sexo");
+    if (!item.cor_raca?.trim()) dadosPessoais.add("Raça/cor");
+    if (!item.estado_civil?.trim()) dadosPessoais.add("Estado civil");
+    if (!item.nacionalidade?.trim()) dadosPessoais.add("Nacionalidade");
+    if (!item.naturalidade_cidade?.trim()) dadosPessoais.add("Naturalidade (cidade)");
+    if (!item.naturalidade_uf?.trim()) dadosPessoais.add("Naturalidade (UF)");
+
+    if (!item.cep?.trim()) endereco.add("CEP");
+    if (!item.logradouro?.trim()) endereco.add("Endereço");
+    if (!item.numero?.trim()) endereco.add("Número");
+    if (!item.bairro?.trim()) endereco.add("Bairro");
+    if (!item.municipio?.trim()) endereco.add("Município");
+    if (!item.uf?.trim()) endereco.add("UF");
+    if (!item.zona?.trim()) endereco.add("Zona");
+    if (!item.subzona?.trim()) endereco.add("Subzona");
+
+    const enderecoIncompleto = ![
+      item.cep,
+      item.logradouro,
+      item.numero,
+      item.bairro,
+      item.municipio,
+      item.uf
+    ].every((valor) => valor?.trim());
+    if (enderecoIncompleto) {
+      alertas.add("Endereço incompleto");
+    }
+
+    if (!telefoneValido(item.telefone_principal)) {
+      contato.add("Telefone principal");
+    }
+
+    if (!item.email?.trim()) {
+      contato.add("E-mail");
+    } else if (!emailValido(item.email)) {
+      contato.add("E-mail inválido");
+    }
+
+    if (!item.cpf?.trim()) {
+      documentos.add("CPF");
+    } else if (!validarCpf(item.cpf)) {
+      documentos.add("CPF inválido");
+    }
+
+    const documentosBeneficiario = mapearDocumentosDoBeneficiario(item, configuracaoDocumentos);
+    obterPendenciasDocumentos(documentosBeneficiario).forEach((pendencia) => documentos.add(pendencia));
+
+    if (item.aceite_lgpd === false) {
+      alertas.add("Aceite LGPD");
+    }
+
+    const faltouUltimoAtendimento =
+      (item as Beneficiario & {
+        faltou_ultimo_atendimento?: boolean;
+        faltouUltimoAtendimento?: boolean;
+      }).faltou_ultimo_atendimento ??
+      (item as Beneficiario & {
+        faltou_ultimo_atendimento?: boolean;
+        faltouUltimoAtendimento?: boolean;
+      }).faltouUltimoAtendimento;
+
+    if (faltouUltimoAtendimento) {
+      alertas.add("Faltou ao último atendimento");
+    }
+
+    return [
+      { grupo: "Dados pessoais", itens: [...dadosPessoais] },
+      { grupo: "Endereço", itens: [...endereco] },
+      { grupo: "Contato", itens: [...contato] },
+      { grupo: "Documentos", itens: [...documentos] },
+      { grupo: "Alertas", itens: [...alertas] }
+    ].filter((grupo) => grupo.itens.length > 0);
   }
 
   function abrirSeletorArquivoDocumento(documentoId: DocumentoCadastroId) {
@@ -1182,7 +1395,7 @@ export function CadastroBeneficiarioPage() {
       ...beneficiarioDefaultValues,
       codigo: proximoCodigoData?.codigo
     });
-    setDocumentos(criarDocumentosPadrao());
+    setDocumentos(criarDocumentosPadrao(configuracaoDocumentos));
     setPopupExcluirDocumentoId(null);
     setMensagem(null);
   }
@@ -1192,7 +1405,7 @@ export function CadastroBeneficiarioPage() {
     encerrarWebcamDocumento();
     if (detalhesData?.beneficiario) {
       reset(mapearBeneficiarioParaFormulario(detalhesData.beneficiario));
-      setDocumentos(mapearDocumentosDoBeneficiario(detalhesData.beneficiario));
+      setDocumentos(mapearDocumentosDoBeneficiario(detalhesData.beneficiario, configuracaoDocumentos));
       setPopupExcluirDocumentoId(null);
       setMensagem(null);
       return;
@@ -1667,12 +1880,15 @@ export function CadastroBeneficiarioPage() {
                   {formatarStatus(detalhesData.beneficiario.status)}
                 </Badge>
               )}
-              <Badge
-                variant={classesTelaPadraoBeneficiario.badgeCodigo}
-                className="rounded-md border border-emerald-200 bg-emerald-100 px-3 py-1.5 text-sm font-bold tracking-[0.12em] text-emerald-800 shadow-sm"
-              >
-                Código {detalhesData?.beneficiario?.codigo ?? proximoCodigoData?.codigo ?? "---"}
-              </Badge>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-emerald-900">Código do beneficiário</span>
+                <Badge
+                  variant={classesTelaPadraoBeneficiario.badgeCodigo}
+                  className="rounded-md border border-emerald-200 bg-emerald-100 px-3 py-1.5 text-sm font-bold tracking-[0.12em] text-emerald-800 shadow-sm"
+                >
+                  {detalhesData?.beneficiario?.codigo ?? proximoCodigoData?.codigo ?? "---"}
+                </Badge>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -1789,6 +2005,7 @@ export function CadastroBeneficiarioPage() {
                                   : "bg-[var(--g3-card-soft)]"
                             }`}
                             onClick={() => {
+                              exibirAvisoPendenciasAoCarregarRef.current = true;
                               setBeneficiarioSelecionadoId(item.id_beneficiario);
                               setAbaAtiva("dados");
                             }}
@@ -2420,8 +2637,13 @@ export function CadastroBeneficiarioPage() {
                 {abaAtiva === "documentos" && (
                   <section className="space-y-3">
                     <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
-                      CPF e comprovante de endereço são obrigatórios. Documentos sem envio ficam com status pendente, exceto quando
-                      marcados como ignorados.
+                      {listarDocumentosObrigatorios(documentos).length
+                        ? `${listarDocumentosObrigatorios(documentos).join(", ")} ${
+                            listarDocumentosObrigatorios(documentos).length === 1 ? "é obrigatório" : "são obrigatórios"
+                          }.`
+                        : "Nenhum documento está marcado como obrigatório."}{" "}
+                      Documentos sem envio ficam com status pendente, exceto quando marcados como
+                      ignorados.
                     </div>
 
                     <div className="space-y-3">
@@ -2436,7 +2658,7 @@ export function CadastroBeneficiarioPage() {
                           <article
                             key={documento.id}
                             className={`rounded-lg border p-3 shadow-sm ${
-                              documento.id === "cpf" || documento.id === "comprovante_endereco"
+                              documento.obrigatorio
                                 ? "border-emerald-300 bg-emerald-100/80"
                                 : "border-slate-200 bg-white"
                             }`}
@@ -2468,7 +2690,9 @@ export function CadastroBeneficiarioPage() {
                               <div className="space-y-2">
                                 {documentoEhComprovanteEndereco(documento) ? (
                                   <div className="space-y-2">
-                                    <Label>Tipo do comprovante*</Label>
+                                    <Label>
+                                      Tipo do comprovante{documento.obrigatorio ? "*" : ""}
+                                    </Label>
                                     <div className="grid gap-2 sm:grid-cols-2">
                                       {opcoesComprovanteEndereco.map((opcao) => (
                                         <label
@@ -2661,6 +2885,48 @@ export function CadastroBeneficiarioPage() {
             <div className="flex justify-end border-t border-slate-100 px-5 py-3">
               <Button type="button" onClick={() => setMensagem(null)}>
                 OK
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {avisoPendenciasSelecao.length > 0 && (
+        <div
+          className="fixed inset-0 z-[59] flex items-center justify-center bg-slate-900/45 px-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setAvisoPendenciasSelecao([])}
+        >
+          <div
+            className="w-full max-w-lg rounded-xl border border-slate-200 bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="border-b border-slate-100 px-5 py-4">
+              <h3 className="text-base font-semibold text-slate-900">Aviso de pendências</h3>
+            </div>
+            <div className="px-5 py-4">
+              <p className="mb-3 text-sm text-slate-700">
+                Este cadastro possui pendências ou alertas que merecem atenção:
+              </p>
+              <div className="space-y-4">
+                {avisoPendenciasSelecao.map((grupo) => (
+                  <div key={grupo.grupo} className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+                    <p className="mb-2 text-sm font-semibold text-slate-900">{grupo.grupo}</p>
+                    <ul className="space-y-2 text-sm text-slate-700">
+                      {grupo.itens.map((item) => (
+                        <li key={`${grupo.grupo}-${item}`} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="flex justify-end border-t border-slate-100 px-5 py-3">
+              <Button type="button" onClick={() => setAvisoPendenciasSelecao([])}>
+                Ciente
               </Button>
             </div>
           </div>

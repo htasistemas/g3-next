@@ -47,4 +47,39 @@ export class FamiliaController {
     await service.removerMembro(request.params.id, request.params.membroId);
     return response.status(204).send();
   }
+
+  async listarHistorico(request: Request, response: Response) {
+    const historico = await service.listarHistorico(request.params.id);
+    return response.json({ historico });
+  }
+
+  async listarAlertas(request: Request, response: Response) {
+    const alertas = await service.listarAlertas(request.params.id);
+    return response.json({ alertas });
+  }
+
+  async definirResponsavel(request: Request, response: Response) {
+    const familia = await service.definirResponsavel(request.params.id, request.body);
+    return response.json({ familia });
+  }
+
+  async atualizarEndereco(request: Request, response: Response) {
+    const familia = await service.atualizarEndereco(request.params.id, request.body);
+    return response.json({ familia });
+  }
+
+  async validarBeneficioFamiliar(request: Request, response: Response) {
+    const validacao = await service.validarBeneficioFamiliar(request.params.id, request.query);
+    return response.json(validacao);
+  }
+
+  async transferirMembro(request: Request, response: Response) {
+    const resultado = await service.transferirMembro(request.params.id, request.body);
+    return response.json(resultado);
+  }
+
+  async desmembrarFamilia(request: Request, response: Response) {
+    const resultado = await service.desmembrarFamilia(request.params.id, request.body);
+    return response.json(resultado);
+  }
 }

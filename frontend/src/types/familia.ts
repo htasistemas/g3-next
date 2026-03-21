@@ -77,10 +77,84 @@ export type FamiliaFiltro = {
   status?: string;
 };
 
+export type FamiliaHistoricoItem = {
+  id: string;
+  tipo_evento: string;
+  descricao: string;
+  justificativa?: string;
+  usuario_nome?: string;
+  data_evento: string;
+};
+
+export type FamiliaAlerta = {
+  prioridade: "alta" | "media" | "baixa";
+  titulo: string;
+  descricao: string;
+};
+
+export type FamiliaValidacaoBeneficio = {
+  controla_por_familia: boolean;
+  carencia_em_dias: number;
+  bloquear_duplicidade: boolean;
+  permitir_excecao_com_justificativa: boolean;
+  bloqueado: boolean;
+  alerta: boolean;
+  mensagem?: string;
+};
+
+export type FamiliaEnderecoPayload = {
+  cep?: string;
+  logradouro?: string;
+  numero?: string;
+  complemento?: string;
+  bairro?: string;
+  ponto_referencia?: string;
+  municipio?: string;
+  uf?: string;
+  zona?: string;
+  situacao_imovel?: string;
+  tipo_moradia?: string;
+  observacoes?: string;
+};
+
+export type FamiliaTransferenciaPayload = {
+  id_membro: number;
+  familia_destino_id: number;
+  parentesco?: string;
+  responsavel_familiar?: boolean;
+};
+
+export type FamiliaDesmembramentoPayload = {
+  membro_ids: number[];
+  nome_familia: string;
+  novo_responsavel_id: number;
+  copiar_endereco_familiar?: boolean;
+  endereco?: FamiliaEnderecoPayload;
+  observacoes?: string;
+};
+
+export type FamiliaTransferenciaResponse = {
+  familia_origem: Familia;
+  familia_destino: Familia;
+};
+
+export type FamiliaDesmembramentoResponse = {
+  familia_origem: Familia;
+  familia_nova: Familia;
+};
+
 export type FamiliaListaResponse = {
   familias: Familia[];
 };
 
 export type FamiliaItemResponse = {
   familia: Familia;
+};
+
+export type FamiliaHistoricoResponse = {
+  historico: FamiliaHistoricoItem[];
+};
+
+export type FamiliaAlertaResponse = {
+  alertas: FamiliaAlerta[];
 };

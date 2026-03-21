@@ -1,8 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
-import { Clock3, Eye, RefreshCcw, Save, SlidersHorizontal, X } from "lucide-react";
+import {
+  BellRing,
+  Clock3,
+  Eye,
+  RefreshCcw,
+  Save,
+  SlidersHorizontal,
+  X
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -14,14 +23,20 @@ import {
   classesTelaPadraoBeneficiario
 } from "@/lib/tela-padrao-beneficiario";
 import {
+  alertasCentralAtendimentosPadrao,
+  documentosObrigatoriedadeBeneficiarioPadrao,
   parametrosSistemaService,
-  type CarenciaDoacaoRealizadaSettings
+  type AlertasCentralAtendimentosSettings,
+  type CarenciaDoacaoRealizadaSettings,
+  type ObrigatoriedadeDocumentosBeneficiarioSettings
 } from "@/services/parametros-sistema.service";
 import type { ThemeSettings } from "@/types/theme";
 
 const abas = [
   { id: "personalizacao", label: "Personalização", icon: SlidersHorizontal },
-  { id: "carencia", label: "Carência", icon: Clock3 }
+  { id: "carencia", label: "Carência", icon: Clock3 },
+  { id: "obrigatoriedade", label: "Campos obrigatórios", icon: Eye },
+  { id: "central-atendimentos", label: "Central de atendimentos", icon: BellRing }
 ] as const;
 
 type AbaId = (typeof abas)[number]["id"];
@@ -48,19 +63,29 @@ const carenciaPadrao: CarenciaDoacaoRealizadaSettings = {
   tempoCarenciaDias: 0
 };
 
+const obrigatoriedadePadrao: ObrigatoriedadeDocumentosBeneficiarioSettings = {
+  documentos: documentosObrigatoriedadeBeneficiarioPadrao
+};
+
 export function ParametrosSistemaPage() {
   const { settings, applyPreview, clearPreview, saveSettings, carregando: carregandoTema } = useTheme();
   const [abaAtiva, setAbaAtiva] = useState<AbaId>("personalizacao");
   const [draft, setDraft] = useState<ThemeSettings>(settings);
-  const [carenciaDraft, setCarenciaDraft] =
-    useState<CarenciaDoacaoRealizadaSettings>(carenciaPadrao);
-  const [carenciaSalva, setCarenciaSalva] =
-    useState<CarenciaDoacaoRealizadaSettings>(carenciaPadrao);
+  const [carenciaDraft, setCarenciaDraft] = useState<CarenciaDoacaoRealizadaSettings>(carenciaPadrao);
+  const [carenciaSalva, setCarenciaSalva] = useState<CarenciaDoacaoRealizadaSettings>(carenciaPadrao);
+  const [obrigatoriedadeDraft, setObrigatoriedadeDraft] =
+    useState<ObrigatoriedadeDocumentosBeneficiarioSettings>(obrigatoriedadePadrao);
+  const [obrigatoriedadeSalva, setObrigatoriedadeSalva] =
+    useState<ObrigatoriedadeDocumentosBeneficiarioSettings>(obrigatoriedadePadrao);
+  const [alertasCentralDraft, setAlertasCentralDraft] =
+    useState<AlertasCentralAtendimentosSettings>(alertasCentralAtendimentosPadrao);
+  const [alertasCentralSalvos, setAlertasCentralSalvos] =
+    useState<AlertasCentralAtendimentosSettings>(alertasCentralAtendimentosPadrao);
   const [carregandoCarencia, setCarregandoCarencia] = useState(true);
+  const [carregandoObrigatoriedade, setCarregandoObrigatoriedade] = useState(true);
+  const [carregandoAlertasCentral, setCarregandoAlertasCentral] = useState(true);
   const [salvando, setSalvando] = useState(false);
-  const [mensagem, setMensagem] = useState<{ tipo: "sucesso" | "erro"; texto: string } | null>(
-    null
-  );
+  const [mensagem, setMensagem] = useState<{ tipo: "sucesso" | "erro"; texto: string } | null>(null);
 
   useEffect(() => {
     setDraft(settings);
@@ -71,20 +96,32 @@ export function ParametrosSistemaPage() {
 
     void (async () => {
       setCarregandoCarencia(true);
+      setCarregandoObrigatoriedade(true);
+      setCarregandoAlertasCentral(true);
       try {
-        const carencia = await parametrosSistemaService.obterCarenciaDoacoesRealizadas();
+        const [carencia, obrigatoriedade, alertasCentral] = await Promise.all([
+          parametrosSistemaService.obterCarenciaDoacoesRealizadas(),
+          parametrosSistemaService.obterObrigatoriedadeDocumentosBeneficiario(),
+          parametrosSistemaService.obterAlertasCentralAtendimentos()
+        ]);
         if (!ativo) return;
         setCarenciaDraft(carencia);
         setCarenciaSalva(carencia);
+        setObrigatoriedadeDraft(obrigatoriedade);
+        setObrigatoriedadeSalva(obrigatoriedade);
+        setAlertasCentralDraft(alertasCentral);
+        setAlertasCentralSalvos(alertasCentral);
       } catch (error: any) {
         if (!ativo) return;
         setMensagem({
           tipo: "erro",
-          texto: error?.response?.data?.message ?? "Não foi possível carregar a carência."
+          texto: error?.response?.data?.message ?? "Não foi possível carregar os parâmetros do sistema."
         });
       } finally {
         if (ativo) {
           setCarregandoCarencia(false);
+          setCarregandoObrigatoriedade(false);
+          setCarregandoAlertasCentral(false);
         }
       }
     })();
@@ -104,8 +141,24 @@ export function ParametrosSistemaPage() {
     () => JSON.stringify(carenciaDraft) !== JSON.stringify(carenciaSalva),
     [carenciaDraft, carenciaSalva]
   );
-  const houveMudanca = abaAtiva === "carencia" ? houveMudancaCarencia : houveMudancaPersonalizacao;
-  const carregando = carregandoTema || carregandoCarencia;
+  const houveMudancaObrigatoriedade = useMemo(
+    () => JSON.stringify(obrigatoriedadeDraft) !== JSON.stringify(obrigatoriedadeSalva),
+    [obrigatoriedadeDraft, obrigatoriedadeSalva]
+  );
+  const houveMudancaAlertasCentral = useMemo(
+    () => JSON.stringify(alertasCentralDraft) !== JSON.stringify(alertasCentralSalvos),
+    [alertasCentralDraft, alertasCentralSalvos]
+  );
+  const houveMudanca =
+    abaAtiva === "carencia"
+      ? houveMudancaCarencia
+      : abaAtiva === "obrigatoriedade"
+        ? houveMudancaObrigatoriedade
+        : abaAtiva === "central-atendimentos"
+          ? houveMudancaAlertasCentral
+          : houveMudancaPersonalizacao;
+  const carregando =
+    carregandoTema || carregandoCarencia || carregandoObrigatoriedade || carregandoAlertasCentral;
 
   function atualizarModo(modo: ThemeSettings["modo"]) {
     setDraft((estadoAtual) => ({ ...estadoAtual, modo }));
@@ -141,6 +194,16 @@ export function ParametrosSistemaPage() {
       return;
     }
 
+    if (abaAtiva === "obrigatoriedade") {
+      setObrigatoriedadeDraft(obrigatoriedadeSalva);
+      return;
+    }
+
+    if (abaAtiva === "central-atendimentos") {
+      setAlertasCentralDraft(alertasCentralSalvos);
+      return;
+    }
+
     clearPreview();
     setDraft(settings);
   }
@@ -154,6 +217,20 @@ export function ParametrosSistemaPage() {
         setCarenciaDraft(salvo);
         setCarenciaSalva(salvo);
         setMensagem({ tipo: "sucesso", texto: "Carência salva com sucesso." });
+      } else if (abaAtiva === "obrigatoriedade") {
+        const salvo = await parametrosSistemaService.salvarObrigatoriedadeDocumentosBeneficiario(
+          obrigatoriedadeDraft
+        );
+        setObrigatoriedadeDraft(salvo);
+        setObrigatoriedadeSalva(salvo);
+        setMensagem({ tipo: "sucesso", texto: "Campos obrigatórios salvos com sucesso." });
+      } else if (abaAtiva === "central-atendimentos") {
+        const salvo = await parametrosSistemaService.salvarAlertasCentralAtendimentos(
+          alertasCentralDraft
+        );
+        setAlertasCentralDraft(salvo);
+        setAlertasCentralSalvos(salvo);
+        setMensagem({ tipo: "sucesso", texto: "Parâmetros da Central de atendimentos salvos com sucesso." });
       } else {
         await saveSettings(draft);
         setMensagem({ tipo: "sucesso", texto: "Personalização salva com sucesso." });
@@ -165,7 +242,11 @@ export function ParametrosSistemaPage() {
           error?.response?.data?.message ??
           (abaAtiva === "carencia"
             ? "Não foi possível salvar a carência."
-            : "Não foi possível salvar a personalização.")
+            : abaAtiva === "obrigatoriedade"
+              ? "Não foi possível salvar os campos obrigatórios."
+              : abaAtiva === "central-atendimentos"
+                ? "Não foi possível salvar os parâmetros da Central de atendimentos."
+                : "Não foi possível salvar a personalização.")
       });
     } finally {
       setSalvando(false);
@@ -178,8 +259,33 @@ export function ParametrosSistemaPage() {
       return;
     }
 
+    if (abaAtiva === "obrigatoriedade") {
+      setObrigatoriedadeDraft(obrigatoriedadePadrao);
+      return;
+    }
+
+    if (abaAtiva === "central-atendimentos") {
+      setAlertasCentralDraft(alertasCentralAtendimentosPadrao);
+      return;
+    }
+
     setDraft(defaultThemeSettings);
     applyPreview(defaultThemeSettings);
+  }
+
+  function alternarObrigatoriedadeDocumento(documentoId: string, obrigatorio: boolean) {
+    setObrigatoriedadeDraft((estadoAtual) => ({
+      documentos: estadoAtual.documentos.map((documento) =>
+        documento.id === documentoId ? { ...documento, obrigatorio } : documento
+      )
+    }));
+  }
+
+  function atualizarAlertaCentral<K extends keyof AlertasCentralAtendimentosSettings>(
+    campo: K,
+    valor: AlertasCentralAtendimentosSettings[K]
+  ) {
+    setAlertasCentralDraft((estadoAtual) => ({ ...estadoAtual, [campo]: valor }));
   }
 
   if (carregando) {
@@ -355,7 +461,7 @@ export function ParametrosSistemaPage() {
                   </div>
                 </div>
               </section>
-            ) : (
+            ) : abaAtiva === "carencia" ? (
               <section className="space-y-5">
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
                   <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-4">
@@ -386,9 +492,137 @@ export function ParametrosSistemaPage() {
                       <p>
                         Se a nova entrega estiver dentro do prazo configurado, será exigida a senha de um administrador logado.
                       </p>
-                      <p>
-                        As liberações fora da carência ficam registradas no histórico da doação.
+                      <p>As liberações fora da carência ficam registradas no histórico da doação.</p>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            ) : abaAtiva === "obrigatoriedade" ? (
+              <section className="space-y-5">
+                <div className="rounded-xl border border-slate-200 bg-white p-4">
+                  <p className="text-sm font-semibold text-slate-900">Campos obrigatórios</p>
+                  <p className="mt-2 text-sm text-slate-600">
+                    Esta área foi estruturada em lista para crescer com novas telas no futuro. Hoje ela controla os documentos obrigatórios do cadastro de beneficiários.
+                  </p>
+                </div>
+
+                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                  <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+                    <p className="text-sm font-semibold text-slate-900">Cadastro de beneficiários</p>
+                    <p className="text-xs text-slate-500">
+                      Marque os itens que devem ficar obrigatórios na aba Documentos.
+                    </p>
+                  </div>
+
+                  <div className="divide-y divide-slate-200">
+                    {obrigatoriedadeDraft.documentos.map((documento) => (
+                      <label
+                        key={documento.id}
+                        className={`flex items-start gap-3 px-4 py-3 transition ${
+                          documento.obrigatorio ? "bg-emerald-50/70" : "bg-white hover:bg-slate-50"
+                        }`}
+                      >
+                        <Checkbox
+                          checked={documento.obrigatorio}
+                          onChange={(event) =>
+                            alternarObrigatoriedadeDocumento(documento.id, event.target.checked)
+                          }
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-slate-900">{documento.nome}</p>
+                          <p className="text-xs text-slate-500">
+                            {documento.obrigatorio
+                              ? "Obrigatório no cadastro de beneficiários."
+                              : "Opcional no cadastro de beneficiários."}
+                          </p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </section>
+            ) : (
+              <section className="space-y-5">
+                <div className="rounded-xl border border-slate-200 bg-white p-4">
+                  <p className="text-sm font-semibold text-slate-900">Central de atendimentos</p>
+                  <p className="mt-2 text-sm text-slate-600">
+                    Configure a sensibilidade dos alertas automáticos e os limites usados na visão 360º do beneficiário.
+                  </p>
+                </div>
+
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="diasSemAtendimentoRecente">Dias sem atendimento recente</Label>
+                      <Input
+                        id="diasSemAtendimentoRecente"
+                        type="number"
+                        min={1}
+                        step={1}
+                        value={alertasCentralDraft.diasSemAtendimentoRecente}
+                        onChange={(event) =>
+                          atualizarAlertaCentral(
+                            "diasSemAtendimentoRecente",
+                            Math.max(1, Number(event.target.value) || 1)
+                          )
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="valorCustoElevadoMes">Valor de custo elevado no mês</Label>
+                      <Input
+                        id="valorCustoElevadoMes"
+                        type="number"
+                        min={0}
+                        step={0.01}
+                        value={alertasCentralDraft.valorCustoElevadoMes}
+                        onChange={(event) =>
+                          atualizarAlertaCentral(
+                            "valorCustoElevadoMes",
+                            Math.max(0, Number(event.target.value) || 0)
+                          )
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                    <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+                      <p className="text-sm font-semibold text-slate-900">Alertas ativos</p>
+                      <p className="text-xs text-slate-500">
+                        Marque as validações que devem aparecer automaticamente na Central.
                       </p>
+                    </div>
+                    <div className="divide-y divide-slate-200">
+                      {[
+                        ["alertarCestaMesmoMes", "Beneficiário já recebeu cesta básica no mês"],
+                        ["alertarFamiliaCestaMes", "Família já recebeu cesta básica no mês"],
+                        ["alertarCadastroIncompleto", "Cadastro incompleto"],
+                        ["alertarEncaminhamentoEmAberto", "Encaminhamento em aberto"],
+                        ["alertarInscricaoAtiva", "Inscrição ativa em curso, oficina ou atividade"]
+                      ].map(([campo, label]) => (
+                        <label
+                          key={campo}
+                          className="flex items-start gap-3 px-4 py-3 transition hover:bg-slate-50"
+                        >
+                          <Checkbox
+                            checked={Boolean(
+                              alertasCentralDraft[
+                                campo as keyof AlertasCentralAtendimentosSettings
+                              ]
+                            )}
+                            onChange={(event) =>
+                              atualizarAlertaCentral(
+                                campo as keyof AlertasCentralAtendimentosSettings,
+                                event.target.checked as never
+                              )
+                            }
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-slate-900">{label}</p>
+                          </div>
+                        </label>
+                      ))}
                     </div>
                   </div>
                 </div>

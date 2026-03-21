@@ -62,3 +62,46 @@ export type FamiliaFilters = {
   referencia?: string;
   status?: string;
 };
+
+export type FamiliaEnderecoInput = {
+  cep?: string;
+  logradouro?: string;
+  numero?: string;
+  complemento?: string;
+  bairro?: string;
+  ponto_referencia?: string;
+  municipio?: string;
+  uf?: string;
+  zona?: string;
+  situacao_imovel?: string;
+  tipo_moradia?: string;
+  observacoes?: string;
+  sincronizar_membros?: boolean;
+};
+
+export type FamiliaResponsavelInput = {
+  id_beneficiario: number;
+};
+
+export type FamiliaTransferenciaMembroInput = {
+  id_membro: number;
+  familia_destino_id: number;
+  parentesco?: string;
+  responsavel_familiar?: boolean;
+};
+
+export type FamiliaDesmembramentoInput = {
+  membro_ids: number[];
+  nome_familia: string;
+  novo_responsavel_id: number;
+  copiar_endereco_familiar?: boolean;
+  endereco?: FamiliaEnderecoInput;
+  observacoes?: string;
+};
+
+export type FamiliaBeneficioValidacaoInput = {
+  beneficio_nome: string;
+  beneficiario_id?: number;
+  data_referencia?: string;
+  quantidade_dias_carencia?: number;
+};

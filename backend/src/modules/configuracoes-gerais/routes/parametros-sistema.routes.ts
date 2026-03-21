@@ -37,3 +37,31 @@ parametrosSistemaRoutes.put(
   ensurePermissions(["ADMINISTRADOR"]),
   asyncHandler(controller.atualizarCarenciaDoacaoRealizada.bind(controller))
 );
+
+parametrosSistemaRoutes.get(
+  "/obrigatoriedade/beneficiarios/documentos",
+  ensureAuthenticated,
+  ensurePermissions(["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"]),
+  asyncHandler(controller.obterObrigatoriedadeDocumentosBeneficiario.bind(controller))
+);
+
+parametrosSistemaRoutes.put(
+  "/obrigatoriedade/beneficiarios/documentos",
+  ensureAuthenticated,
+  ensurePermissions(["ADMINISTRADOR"]),
+  asyncHandler(controller.atualizarObrigatoriedadeDocumentosBeneficiario.bind(controller))
+);
+
+parametrosSistemaRoutes.get(
+  "/central-atendimentos/alertas",
+  ensureAuthenticated,
+  ensurePermissions(["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"]),
+  asyncHandler(controller.obterAlertasCentralAtendimentos.bind(controller))
+);
+
+parametrosSistemaRoutes.put(
+  "/central-atendimentos/alertas",
+  ensureAuthenticated,
+  ensurePermissions(["ADMINISTRADOR"]),
+  asyncHandler(controller.atualizarAlertasCentralAtendimentos.bind(controller))
+);

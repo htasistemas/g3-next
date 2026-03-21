@@ -49,3 +49,41 @@ export const carenciaDoacaoRealizadaSchema = z.object({
 export const atualizarCarenciaDoacaoRealizadaPayloadSchema = z.object({
   carencia: carenciaDoacaoRealizadaSchema
 });
+
+export const documentoObrigatoriedadeBeneficiarioSchema = z.object({
+  id: z.string().trim().min(1).max(80),
+  nome: z.string().trim().min(1).max(120),
+  obrigatorio: z.boolean()
+});
+
+export const obrigatoriedadeDocumentosBeneficiarioSchema = z.object({
+  documentos: z.array(documentoObrigatoriedadeBeneficiarioSchema).max(20)
+});
+
+export const atualizarObrigatoriedadeDocumentosBeneficiarioPayloadSchema = z.object({
+  obrigatoriedade: obrigatoriedadeDocumentosBeneficiarioSchema
+});
+
+export const alertasCentralAtendimentosSchema = z.object({
+  dias_sem_atendimento_recente: z.preprocess((value) => {
+    if (value === null || value === undefined || value === "") return 90;
+    if (typeof value === "number") return value;
+    if (typeof value === "string") return Number(value);
+    return value;
+  }, z.number().int().min(1).max(3650)),
+  valor_custo_elevado_mes: z.preprocess((value) => {
+    if (value === null || value === undefined || value === "") return 1000;
+    if (typeof value === "number") return value;
+    if (typeof value === "string") return Number(value);
+    return value;
+  }, z.number().min(0).max(999999999)),
+  alertar_cesta_mesmo_mes: z.boolean(),
+  alertar_familia_cesta_mes: z.boolean(),
+  alertar_cadastro_incompleto: z.boolean(),
+  alertar_encaminhamento_em_aberto: z.boolean(),
+  alertar_inscricao_ativa: z.boolean()
+});
+
+export const atualizarAlertasCentralAtendimentosPayloadSchema = z.object({
+  alertas: alertasCentralAtendimentosSchema
+});

@@ -78,8 +78,8 @@ import type {
 } from "@/types/matricula";
 
 const abas = [
-  { id: "listagem", label: "Listagem de matrículas", icon: Search },
-  { id: "dados", label: "Dados da matrícula", icon: BookOpenCheck },
+  { id: "listagem", label: "Listagem de inscrições", icon: Search },
+  { id: "dados", label: "Dados da inscrição", icon: BookOpenCheck },
   { id: "catalogo", label: "Catálogo e vagas", icon: CalendarClock },
   { id: "inscricoes", label: "Inscrições e lista de espera", icon: UserPlus },
   { id: "agenda", label: "Atendimentos agendados", icon: ClipboardList },
@@ -103,7 +103,7 @@ type PopupMensagemState = {
 };
 
 const secaoTela = "Atendimentos";
-const tituloTela = "Matrículas";
+const tituloTela = "Inscrições";
 
 function formatarStatus(status?: string) {
   if (!status) return "Não informado";
@@ -851,7 +851,7 @@ export function CadastroMatriculasPage() {
       setPopupMensagem({
         tipo: "aviso",
         titulo: "Atenção",
-        texto: "Selecione uma matrícula para excluir."
+        texto: "Selecione uma inscrição para excluir."
       });
       return;
     }
@@ -869,13 +869,13 @@ export function CadastroMatriculasPage() {
       setPopupMensagem({
         tipo: "sucesso",
         titulo: "Confirmação",
-        texto: "Matrícula excluída com sucesso."
+        texto: "Inscrição excluída com sucesso."
       });
     } catch (error: any) {
       setPopupMensagem({
         tipo: "erro",
         titulo: "Erro",
-        texto: error?.response?.data?.message ?? "Não foi possível excluir a matrícula."
+        texto: error?.response?.data?.message ?? "Não foi possível excluir a inscrição."
       });
     }
   }
@@ -902,7 +902,7 @@ export function CadastroMatriculasPage() {
       setPopupMensagem({
         tipo: "aviso",
         titulo: "Atenção",
-        texto: "Selecione uma matrícula para imprimir a lista de presença."
+        texto: "Selecione uma inscrição para imprimir a lista de presença."
       });
       return;
     }
@@ -973,7 +973,7 @@ export function CadastroMatriculasPage() {
         titulo: "Atenção",
         texto:
           error?.message ??
-          "Matrícula registrada, mas não foi possível abrir o comprovante de matrícula para impressão."
+          "Inscrição registrada, mas não foi possível abrir o comprovante de inscrição para impressão."
       });
     }
   }
@@ -1547,7 +1547,7 @@ export function CadastroMatriculasPage() {
       setPopupMensagem({
         tipo: "aviso",
         titulo: "Atenção",
-        texto: "Selecione e salve uma matrícula antes de gerar presença."
+        texto: "Selecione e salve uma inscrição antes de gerar presença."
       });
       return;
     }
@@ -2006,13 +2006,13 @@ export function CadastroMatriculasPage() {
       setPopupMensagem({
         tipo: "sucesso",
         titulo: "Confirmação",
-        texto: "Matrícula salva com sucesso."
+        texto: "Inscrição salva com sucesso."
       });
     } catch (error: any) {
       setPopupMensagem({
         tipo: "erro",
         titulo: "Erro",
-        texto: error?.response?.data?.message ?? "Não foi possível salvar a matrícula."
+        texto: error?.response?.data?.message ?? "Não foi possível salvar a inscrição."
       });
     }
   }
@@ -2123,7 +2123,7 @@ export function CadastroMatriculasPage() {
                         {resumoListagem.totalCursos}
                       </p>
                       <p className="mt-2 text-sm text-emerald-800/80">
-                        Opções ativas para matrícula e acompanhamento.
+                        Opções ativas para inscrição e acompanhamento.
                       </p>
                     </div>
                     <div className="rounded-2xl border border-emerald-200 bg-[linear-gradient(180deg,#f6fff8_0%,#e3f8e9_100%)] p-4 text-center shadow-[0_18px_40px_rgba(22,101,52,0.12)]">
@@ -2156,7 +2156,7 @@ export function CadastroMatriculasPage() {
                         {resumoListagem.totalInscritos}
                       </p>
                       <p className="mt-2 text-sm text-emerald-800/80">
-                        Matrículas registradas considerando todos os status ativos.
+                        Inscrições registradas considerando todos os status ativos.
                       </p>
                     </div>
                     <div className="rounded-2xl border border-emerald-200 bg-[linear-gradient(180deg,#f7fff9_0%,#dff7e7_100%)] p-4 text-center shadow-[0_18px_40px_rgba(22,101,52,0.12)]">
@@ -2180,7 +2180,7 @@ export function CadastroMatriculasPage() {
                         value={filtroDraft.nome}
                         onChange={(event) => setFiltroDraft((atual) => ({ ...atual, nome: event.target.value }))}
                         onKeyDown={onFiltroEnter}
-                        placeholder="Nome da matrícula"
+                        placeholder="Nome da inscrição"
                       />
                     </div>
                     <div className="space-y-1">
@@ -2272,7 +2272,7 @@ export function CadastroMatriculasPage() {
                         {carregandoLista ? (
                           <tr>
                             <td className="px-3 py-4 text-center text-[var(--g3-muted)]" colSpan={10}>
-                              Carregando matrículas...
+                              Carregando inscrições...
                             </td>
                           </tr>
                         ) : matriculas.length ? (
@@ -2313,7 +2313,7 @@ export function CadastroMatriculasPage() {
                         ) : (
                           <tr>
                             <td className="px-3 py-4 text-center text-[var(--g3-muted)]" colSpan={10}>
-                              Nenhuma matrícula encontrada.
+                              Nenhuma inscrição encontrada.
                             </td>
                           </tr>
                         )}
@@ -2721,7 +2721,7 @@ export function CadastroMatriculasPage() {
                                         : "border-rose-200 bg-rose-100/95 text-rose-700"
                                     }`}
                                   >
-                                    {possuiVagas ? "Matrículas abertas" : "Esgotado"}
+                                    {possuiVagas ? "Inscrições abertas" : "Esgotado"}
                                   </span>
                                   <span
                                     className={`rounded-full border px-2 py-1 text-[11px] font-semibold shadow-md ring-1 ring-black/10 ${
@@ -2889,7 +2889,7 @@ export function CadastroMatriculasPage() {
 
                   <div className="space-y-3">
                     <div className="rounded-lg border border-emerald-900/70 bg-emerald-800 px-3 py-2 shadow-sm">
-                      <p className="text-sm font-semibold text-white">Matrícula</p>
+                      <p className="text-sm font-semibold text-white">Inscrição</p>
                     </div>
                     <div className="rounded-lg border border-[var(--g3-border)] p-3">
                     <div className="grid gap-3 xl:grid-cols-12">
@@ -3129,7 +3129,7 @@ export function CadastroMatriculasPage() {
                             <tr>
                               <th className="px-3 py-2 text-left font-semibold">Beneficiário</th>
                               <th className="px-3 py-2 text-left font-semibold">CPF</th>
-                              <th className="px-3 py-2 text-left font-semibold">Matrícula</th>
+                              <th className="px-3 py-2 text-left font-semibold">Inscrição</th>
                               <th className="px-3 py-2 text-left font-semibold">Status</th>
                               <th className="px-3 py-2 text-left font-semibold">Agendamento</th>
                               <th className="px-3 py-2 text-left font-semibold">Profissional</th>
@@ -3376,13 +3376,13 @@ export function CadastroMatriculasPage() {
                           placeholder={
                             cursoSelecionadoInscricao
                               ? "Digite para buscar entre os beneficiários inscritos"
-                              : "Selecione uma matrícula para listar os inscritos"
+                              : "Selecione uma inscrição para listar os inscritos"
                           }
                           disabled={!cursoSelecionadoInscricao || inscricoesAtivas.length === 0}
                         />
                         {!cursoSelecionadoInscricao ? (
                           <p className="text-[11px] text-[var(--g3-muted)]">
-                            Selecione uma matrícula para trazer os beneficiários inscritos.
+                            Selecione uma inscrição para trazer os beneficiários inscritos.
                           </p>
                         ) : inscricoesAtivas.length === 0 ? (
                           <p className="text-[11px] text-[var(--g3-muted)]">
@@ -3871,7 +3871,7 @@ export function CadastroMatriculasPage() {
                                   className="px-3 py-4 text-center text-[var(--g3-muted)]"
                                   colSpan={presencaExibirCpf ? 4 : 3}
                                 >
-                                  Nenhuma matrícula ativa para registrar presença.
+                                  Nenhuma inscrição ativa para registrar presença.
                                 </td>
                               </tr>
                             )}

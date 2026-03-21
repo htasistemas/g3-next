@@ -1,8 +1,13 @@
 import { AppError } from "../../../shared/errors/app-error.js";
 import {
+  familiaBeneficioValidacaoSchema,
+  familiaDesmembramentoInputSchema,
+  familiaEnderecoInputSchema,
   familiaFiltersSchema,
   familiaInputSchema,
-  familiaMembroInputSchema
+  familiaMembroInputSchema,
+  familiaResponsavelInputSchema,
+  familiaTransferenciaMembroInputSchema
 } from "../familia.schema.js";
 import { mapFamiliaToResponse } from "../familia.mapper.js";
 import { FamiliaRepository } from "../repositories/familia.repository.js";
@@ -88,6 +93,60 @@ export class FamiliaService {
     const familiaId = this.parseId(rawId, "familia");
     await this.repository.buscarPorIdOuFalhar(familiaId);
     await this.repository.remover(familiaId);
+  }
+
+  async listarHistorico(rawId: string) {
+    const familiaId = this.parseId(rawId, "familia");
+    return this.repository.listarHistorico(familiaId);
+  }
+
+  async listarAlertas(rawId: string) {
+    const familiaId = this.parseId(rawId, "familia");
+    return this.repository.listarAlertas(familiaId);
+  }
+
+  async definirResponsavel(rawId: string, rawInput: unknown) {
+    const familiaId = this.parseId(rawId, "familia");
+    const input = familiaResponsavelInputSchema.parse(rawInput);
+    const familia = await this.repository.definirResponsavel(familiaId, BigInt(input.id_beneficiario));
+    return mapFamiliaToResponse(familia);
+  }
+
+  async atualizarEndereco(rawId: string, rawInput: unknown) {
+    const familiaId = this.parseId(rawId, "familia");
+    const input = familiaEnderecoInputSchema.parse(rawInput);
+    const familia = await this.repository.atualizarEndereco(familiaId, input);
+    return mapFamiliaToResponse(familia);
+  }
+
+  async validarBeneficioFamiliar(rawId: string, rawInput: unknown) {
+    const familiaId = this.parseId(rawId, "familia");
+    const input = familiaBeneficioValidacaoSchema.parse(rawInput);
+    return this.repository.validarBeneficioFamiliar(
+      familiaId,
+      input.beneficio_nome,
+      input.quantidade_dias_carencia
+    );
+  }
+
+  async transferirMembro(rawId: string, rawInput: unknown) {
+    const familiaId = this.parseId(rawId, "familia");
+    const input = familiaTransferenciaMembroInputSchema.parse(rawInput);
+    const resultado = await this.repository.transferirMembro(familiaId, input);
+    return {
+      familia_origem: mapFamiliaToResponse(resultado.familia_origem),
+      familia_destino: mapFamiliaToResponse(resultado.familia_destino)
+    };
+  }
+
+  async desmembrarFamilia(rawId: string, rawInput: unknown) {
+    const familiaId = this.parseId(rawId, "familia");
+    const input = familiaDesmembramentoInputSchema.parse(rawInput);
+    const resultado = await this.repository.desmembrarFamilia(familiaId, input);
+    return {
+      familia_origem: mapFamiliaToResponse(resultado.familia_origem),
+      familia_nova: mapFamiliaToResponse(resultado.familia_nova)
+    };
   }
 
   private parseId(rawId: string, context: "familia" | "membro"): bigint {

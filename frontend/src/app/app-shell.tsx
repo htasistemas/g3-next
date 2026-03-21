@@ -207,9 +207,15 @@ export const menuSections: MenuSection[] = [
     icon: HeartHandshake,
     itens: [
       {
+        id: "atendimentos-central-atendimentos",
+        to: "/atendimentos/central-atendimentos",
+        label: "Central de Atendimentos",
+        icon: HeartHandshake
+      },
+      {
         id: "atendimentos-matriculas",
         to: "/atendimentos/matriculas",
-        label: "Matrículas",
+        label: "Inscrições",
         icon: GraduationCap
       },
       {
@@ -475,7 +481,8 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/cadastros/beneficiarios")) return "Cadastro de beneficiários";
   if (pathname.startsWith("/cadastros/profissionais")) return "Cadastro de profissionais";
   if (pathname.startsWith("/cadastros/voluntariado")) return "Cadastro de voluntariado";
-  if (pathname.startsWith("/atendimentos/matriculas")) return "Matrículas";
+  if (pathname.startsWith("/atendimentos/central-atendimentos")) return "Central de Atendimentos";
+  if (pathname.startsWith("/atendimentos/matriculas")) return "Inscrições";
   if (pathname.startsWith("/atendimentos/banco-empregos")) return "Banco de empregos";
   if (pathname.startsWith("/atendimentos/biblioteca")) return "Biblioteca";
   if (pathname.startsWith("/atendimentos/registro-visitas")) return "Registro de visitas";
@@ -527,6 +534,7 @@ function ocultarTituloTopo(pathname: string) {
     pathname.startsWith("/dashboard/power-bi") ||
     pathname.startsWith("/configuracoes/chamado-tecnico") ||
     pathname.startsWith("/configuracoes/mensagens-personalizadas") ||
+    pathname.startsWith("/atendimentos/central-atendimentos") ||
     pathname.startsWith("/atendimentos/matriculas") ||
     pathname.startsWith("/atendimentos/banco-empregos") ||
     pathname.startsWith("/atendimentos/biblioteca") ||

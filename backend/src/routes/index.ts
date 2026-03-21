@@ -48,6 +48,7 @@ import { datasComemorativasRoutes } from "../modules/datas-comemorativas/routes/
 import { captacaoRecursosRoutes } from "../modules/captacao-recursos/routes/captacao-recursos.routes.js";
 import { aiRoutes } from "../modules/ai/routes/ai.routes.js";
 import { sementeRoutes } from "../modules/semente/routes/semente.routes.js";
+import { centralAtendimentosRoutes } from "../modules/central-atendimentos/routes/central-atendimentos.routes.js";
 
 export const appRoutes = Router();
 
@@ -58,6 +59,7 @@ appRoutes.get("/health", (_request, response) => {
 appRoutes.use("/api/auth", authRoutes);
 appRoutes.use("/api/ai", ensureAuthenticated, aiRoutes);
 appRoutes.use("/api/semente", ensureAuthenticated, sementeRoutes);
+appRoutes.use("/api/central-atendimentos", centralAtendimentosRoutes);
 appRoutes.use("/api/beneficiarios", beneficiarioRoutes);
 appRoutes.use("/api/familias", familiaRoutes);
 appRoutes.use("/api/unidades-assistenciais", unidadeAssistencialRoutes);
