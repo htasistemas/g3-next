@@ -7,6 +7,7 @@ export class TokenService {
     const payload: JwtPayload = {
       sub: usuario.id,
       nomeUsuario: usuario.nomeUsuario,
+      nome: usuario.nome,
       permissoes: usuario.permissoes
     };
 

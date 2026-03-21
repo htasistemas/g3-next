@@ -187,6 +187,10 @@ const routeModules: RouteModuleDefinition[] = [
     loader: () => import("@/pages/configuracoes/chamado-tecnico-page")
   },
   {
+    path: "/configuracoes/manual-do-sistema",
+    loader: () => import("@/pages/configuracoes/manual-sistema-page")
+  },
+  {
     path: "/configuracoes/pesquise-na-ia",
     loader: () => import("@/pages/configuracoes/semente-page")
   },

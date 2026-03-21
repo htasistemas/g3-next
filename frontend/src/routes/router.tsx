@@ -118,6 +118,7 @@ const MensagensPersonalizadasPage = carregarPagina(
   "MensagensPersonalizadasPage"
 );
 const ChamadoTecnicoPage = carregarPagina("/configuracoes/chamado-tecnico", "ChamadoTecnicoPage");
+const ManualSistemaPage = carregarPagina("/configuracoes/manual-do-sistema", "ManualSistemaPage");
 const SementePage = carregarPagina("/configuracoes/pesquise-na-ia", "SementePage");
 const SobreOSistemaPage = carregarPagina("/configuracoes/sobre-o-sistema", "SobreOSistemaPage");
 const CaptacaoRecursosPage = carregarPagina(
@@ -364,6 +365,10 @@ export const router = createBrowserRouter([
       {
         path: "/configuracoes/chamado-tecnico",
         element: ChamadoTecnicoPage
+      },
+      {
+        path: "/configuracoes/manual-do-sistema",
+        element: ManualSistemaPage
       },
       {
         path: "/configuracoes/pesquise-na-ia",

@@ -1,7 +1,10 @@
 import { Prisma } from "@prisma/client";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { prisma } from "../../../database/prisma.js";
+import { env } from "../../../config/env.js";
 
 type AiIntent =
+  | "CONVERSA_SOCIAL"
   | "FAMILIAS_DESATUALIZADAS"
   | "BENEFICIARIOS_POR_LOCAL"
   | "BENEFICIARIOS_POR_FAIXA_ETARIA"
@@ -13,6 +16,8 @@ type AiIntent =
   | "DOACOES_PENDENTES_CAPTACAO"
   | "DOADORES_INADIMPLENTES_MES"
   | "RESUMO_SISTEMA"
+  | "ORIENTACAO_TECNICA"
+  | "RESPOSTA_ASSISTIDA"
   | "AJUDA"
   | "NAO_ENTENDIDO";
 
@@ -31,10 +36,49 @@ type AiResponse = {
   intent: AiIntent;
 };
 
+type AiSuggestionCategory =
+  | "familias"
+  | "beneficiarios"
+  | "beneficios"
+  | "atendimentos"
+  | "cursos-oficinas"
+  | "gestao-indicadores"
+  | "doadores-doacoes"
+  | "fornecedores-estoque"
+  | "territorio"
+  | "inconsistencias"
+  | "legislacao-orientacao";
+
+type AiContextPayload = {
+  pathname?: string;
+  pageTitle?: string;
+};
+
+type AiSuggestionItem = {
+  id: string;
+  categoria: AiSuggestionCategory;
+  pergunta: string;
+  descricao: string;
+  contextos?: string[];
+};
+
+type AiSuggestionCategoryMeta = {
+  id: AiSuggestionCategory;
+  label: string;
+  descricao: string;
+};
+
+type AiSuggestionsResponse = {
+  categorias: AiSuggestionCategoryMeta[];
+  perguntasFrequentes: AiSuggestionItem[];
+  sugestoes: AiSuggestionItem[];
+};
+
 type QueryContext = {
   query: string;
   normalizedQuery: string;
   userId?: string;
+  context?: AiContextPayload;
 };
 
 type DonationSummaryRow = {
@@ -195,69 +239,246 @@ function buildData(
   };
 }
 
+function normalizeContextTokens(context?: AiContextPayload) {
+  const values = [context?.pathname, context?.pageTitle]
+    .filter(Boolean)
+    .map((item) => normalizeQuery(String(item)));
+
+  return values.join(" ");
+}
+
+function itemMatchesSearch(item: AiSuggestionItem, search: string) {
+  if (!search) return true;
+  const searchable = normalizeQuery(`${item.pergunta} ${item.descricao}`);
+  return searchable.includes(search);
+}
+
+function itemMatchesContext(item: AiSuggestionItem, contextText: string) {
+  if (!contextText) return false;
+  return (item.contextos ?? []).some((contexto) => contextText.includes(normalizeQuery(contexto)));
+}
+
+function findKnowledgeAnswer(normalizedQuery: string) {
+  return KNOWLEDGE_BASE.find((item) =>
+    item.terms.some((term) => normalizedQuery.includes(normalizeQuery(term)))
+  );
+}
+
+function isGreetingQuery(normalizedQuery: string) {
+  return /^(oi|ola|olá|opa|e ai|e aí|bom dia|boa tarde|boa noite)(\b|!|\?)/.test(normalizedQuery);
+}
+
+function isSmallTalkQuery(normalizedQuery: string) {
+  return [
+    "como vai",
+    "tudo bem",
+    "quem e voce",
+    "quem é você",
+    "como perguntar",
+    "como posso perguntar",
+    "voce pode me ajudar",
+    "você pode me ajudar"
+  ].some((term) => normalizedQuery.includes(normalizeQuery(term)));
+}
+
+function extractFirstName(userName?: string) {
+  const trimmed = userName?.trim();
+  if (!trimmed) return undefined;
+  return trimmed.split(/\s+/u)[0];
+}
+
+const AI_SUGGESTION_CATEGORIES: AiSuggestionCategoryMeta[] = [
+  { id: "familias", label: "Famílias", descricao: "Consultas sobre núcleo familiar, responsável e atualização cadastral." },
+  { id: "beneficiarios", label: "Beneficiários", descricao: "Histórico, situação cadastral, pendências e vínculos." },
+  { id: "beneficios", label: "Benefícios", descricao: "Concessões, duplicidades, custos e cestas básicas." },
+  { id: "atendimentos", label: "Atendimentos", descricao: "Histórico, pendências, retornos e movimentações técnicas." },
+  { id: "cursos-oficinas", label: "Cursos e oficinas", descricao: "Inscrições, vagas, abandono e conclusão." },
+  { id: "gestao-indicadores", label: "Gestão e indicadores", descricao: "Resumos executivos, custos e comparação de períodos." },
+  { id: "doadores-doacoes", label: "Doadores e doações", descricao: "Arrecadação, inatividade, campanhas e inadimplência." },
+  { id: "fornecedores-estoque", label: "Fornecedores e estoque", descricao: "Saída de itens, custos e fornecedores." },
+  { id: "territorio", label: "Território", descricao: "Bairros, vulnerabilidade e distribuição por localidade." },
+  { id: "inconsistencias", label: "Inconsistências", descricao: "Duplicidades, documentos inválidos e faltas cadastrais." },
+  { id: "legislacao-orientacao", label: "Legislação e orientação técnica", descricao: "LOAS, SUAS, CadÚnico, BPC e orientação social." }
+];
+
+const AI_SUGGESTION_LIBRARY: AiSuggestionItem[] = [
+  { id: "familias-desatualizadas", categoria: "familias", pergunta: "Quais famílias estão sem atualização cadastral?", descricao: "Lista famílias e beneficiários sem atualização recente.", contextos: ["familias", "beneficiarios"] },
+  { id: "quem-mora-mesmo-endereco", categoria: "familias", pergunta: "Quem mora no mesmo endereço?", descricao: "Ajuda a localizar vínculos familiares e domicílios compartilhados.", contextos: ["familias", "beneficiarios"] },
+  { id: "responsavel-familiar", categoria: "familias", pergunta: "Quem é o responsável familiar?", descricao: "Consulta rápida do responsável do núcleo.", contextos: ["familias"] },
+  { id: "familias-vulnerabilidade", categoria: "familias", pergunta: "Existem famílias em maior vulnerabilidade?", descricao: "Resumo para priorização de atendimento.", contextos: ["familias", "dashboard"] },
+  { id: "historico-beneficiario", categoria: "beneficiarios", pergunta: "Qual o histórico deste beneficiário?", descricao: "Consulta histórico individual consolidado.", contextos: ["beneficiarios", "central-atendimentos"] },
+  { id: "familia-beneficiario", categoria: "beneficiarios", pergunta: "Ele pertence a qual família?", descricao: "Verifica vínculo familiar do beneficiário.", contextos: ["beneficiarios", "familias"] },
+  { id: "situacao-beneficiario", categoria: "beneficiarios", pergunta: "Está ativo ou inativo?", descricao: "Consulta situação cadastral do beneficiário.", contextos: ["beneficiarios"] },
+  { id: "pendencias-beneficiario", categoria: "beneficiarios", pergunta: "Possui pendências cadastrais?", descricao: "Ajuda a localizar campos e documentos pendentes.", contextos: ["beneficiarios"] },
+  { id: "quem-recebeu-cesta", categoria: "beneficios", pergunta: "Quem recebeu cesta básica este mês?", descricao: "Resumo de concessões do mês.", contextos: ["beneficios", "central-atendimentos"] },
+  { id: "familia-recebeu-beneficio", categoria: "beneficios", pergunta: "Essa família já recebeu benefício?", descricao: "Ajuda a evitar duplicidade de concessão.", contextos: ["familias", "beneficios", "central-atendimentos"] },
+  { id: "duplicidade-entrega", categoria: "beneficios", pergunta: "Existe duplicidade de entrega?", descricao: "Consulta inconsistências em concessões recentes.", contextos: ["beneficios", "familias"] },
+  { id: "custo-total-mes", categoria: "beneficios", pergunta: "Qual o custo total no mês?", descricao: "Resumo financeiro de benefícios e concessões.", contextos: ["beneficios", "central-atendimentos", "dashboard"] },
+  { id: "atendimentos-realizados", categoria: "atendimentos", pergunta: "Quais atendimentos foram realizados?", descricao: "Resumo de atendimentos registrados.", contextos: ["atendimentos", "central-atendimentos"] },
+  { id: "atendimentos-pendentes", categoria: "atendimentos", pergunta: "Quais atendimentos estão pendentes?", descricao: "Ajuda a localizar retornos e pendências.", contextos: ["atendimentos", "central-atendimentos"] },
+  { id: "casos-sem-retorno", categoria: "atendimentos", pergunta: "Quais casos estão sem retorno?", descricao: "Acompanha casos abertos sem retorno previsto.", contextos: ["atendimentos", "central-atendimentos"] },
+  { id: "historico-familia", categoria: "atendimentos", pergunta: "Qual o histórico da família?", descricao: "Consulta consolidada do núcleo familiar.", contextos: ["familias", "central-atendimentos"] },
+  { id: "quem-esta-inscrito", categoria: "cursos-oficinas", pergunta: "Quem está inscrito?", descricao: "Consulta inscritos em cursos e oficinas.", contextos: ["cursos", "atendimentos"] },
+  { id: "quem-concluiu", categoria: "cursos-oficinas", pergunta: "Quem concluiu?", descricao: "Lista participantes concluídos.", contextos: ["cursos"] },
+  { id: "quem-abandonou", categoria: "cursos-oficinas", pergunta: "Quem abandonou?", descricao: "Ajuda a identificar evasão.", contextos: ["cursos"] },
+  { id: "curso-mais-participantes", categoria: "cursos-oficinas", pergunta: "Qual curso tem mais participantes?", descricao: "Resumo comparativo entre cursos.", contextos: ["cursos", "dashboard"] },
+  { id: "quantos-atendimentos-mes", categoria: "gestao-indicadores", pergunta: "Quantos atendimentos no mês?", descricao: "Indicador mensal de produção.", contextos: ["central-atendimentos", "dashboard"] },
+  { id: "custo-por-familia", categoria: "gestao-indicadores", pergunta: "Qual custo por família?", descricao: "Resumo financeiro por núcleo familiar.", contextos: ["familias", "central-atendimentos", "dashboard"] },
+  { id: "resumo-executivo", categoria: "gestao-indicadores", pergunta: "Gere resumo executivo", descricao: "Síntese gerencial do sistema.", contextos: ["dashboard", "configuracoes"] },
+  { id: "compare-periodos", categoria: "gestao-indicadores", pergunta: "Compare períodos", descricao: "Ajuda a comparar indicadores e volumes.", contextos: ["dashboard"] },
+  { id: "maiores-doadores", categoria: "doadores-doacoes", pergunta: "Quem são os maiores doadores?", descricao: "Resumo dos principais doadores.", contextos: ["captacao", "dashboard"] },
+  { id: "quanto-arrecadamos", categoria: "doadores-doacoes", pergunta: "Quanto arrecadamos?", descricao: "Total de doações no período.", contextos: ["captacao", "dashboard"] },
+  { id: "doadores-inativos", categoria: "doadores-doacoes", pergunta: "Quais doadores estão inativos?", descricao: "Apoia a gestão de relacionamento.", contextos: ["captacao"] },
+  { id: "campanha-melhor-resultado", categoria: "doadores-doacoes", pergunta: "Qual campanha teve melhor resultado?", descricao: "Comparativo entre campanhas de captação.", contextos: ["captacao", "dashboard"] },
+  { id: "fornecedor-mais-forneceu", categoria: "fornecedores-estoque", pergunta: "Qual fornecedor mais forneceu?", descricao: "Resumo dos principais fornecedores.", contextos: ["almoxarifado", "fornecedores"] },
+  { id: "item-maior-saida", categoria: "fornecedores-estoque", pergunta: "Qual item teve maior saída?", descricao: "Ajuda a acompanhar giro de estoque.", contextos: ["almoxarifado"] },
+  { id: "custo-produtos-distribuidos", categoria: "fornecedores-estoque", pergunta: "Qual o custo dos produtos distribuídos?", descricao: "Resumo de custo por produto.", contextos: ["almoxarifado", "beneficios"] },
+  { id: "bairros-com-mais-familias", categoria: "territorio", pergunta: "Quais bairros têm mais famílias?", descricao: "Visão territorial do atendimento.", contextos: ["familias", "dashboard"] },
+  { id: "maior-vulnerabilidade", categoria: "territorio", pergunta: "Onde há maior vulnerabilidade?", descricao: "Ajuda na priorização territorial.", contextos: ["dashboard", "familias"] },
+  { id: "onde-distribuimos-mais", categoria: "territorio", pergunta: "Onde distribuímos mais benefícios?", descricao: "Distribuição geográfica de benefícios.", contextos: ["beneficios", "dashboard"] },
+  { id: "cadastros-duplicados", categoria: "inconsistencias", pergunta: "Existem cadastros duplicados?", descricao: "Ajuda a identificar duplicidades cadastrais.", contextos: ["beneficiarios", "familias"] },
+  { id: "cpfs-invalidos", categoria: "inconsistencias", pergunta: "Existem CPFs inválidos?", descricao: "Localiza documentos com inconsistência.", contextos: ["beneficiarios"] },
+  { id: "familias-sem-responsavel", categoria: "inconsistencias", pergunta: "Existem famílias sem responsável?", descricao: "Valida integridade dos núcleos familiares.", contextos: ["familias"] },
+  { id: "beneficiarios-sem-endereco", categoria: "inconsistencias", pergunta: "Existem beneficiários sem endereço?", descricao: "Consulta pendências críticas de cadastro.", contextos: ["beneficiarios"] },
+  { id: "o-que-e-loas", categoria: "legislacao-orientacao", pergunta: "O que é a LOAS?", descricao: "Orienta tecnicamente sobre assistência social." },
+  { id: "o-que-e-suas", categoria: "legislacao-orientacao", pergunta: "O que é o SUAS?", descricao: "Explica a estrutura do sistema único de assistência social." },
+  { id: "diferenca-cras-creas", categoria: "legislacao-orientacao", pergunta: "Qual a diferença entre CRAS e CREAS?", descricao: "Apoio conceitual para atendimento técnico." },
+  { id: "o-que-e-cadunico", categoria: "legislacao-orientacao", pergunta: "O que é o CadÚnico?", descricao: "Explica o cadastro único e seu uso." },
+  { id: "o-que-e-bpc", categoria: "legislacao-orientacao", pergunta: "O que é o BPC?", descricao: "Resumo sobre benefício de prestação continuada." },
+  { id: "quando-conceder-beneficio-eventual", categoria: "legislacao-orientacao", pergunta: "Quando conceder benefício eventual?", descricao: "Orienta sobre concessão assistencial." },
+  { id: "como-evitar-duplicidade-ajuda", categoria: "legislacao-orientacao", pergunta: "Como evitar duplicidade de ajuda?", descricao: "Boas práticas para evitar concessão duplicada." }
+];
+
+const KNOWLEDGE_BASE: Array<{ terms: string[]; answer: string }> = [
+  {
+    terms: ["loas"],
+    answer:
+      "**Resumo**\nA LOAS é a Lei Orgânica da Assistência Social.\n\n**Detalhamento**\nEla organiza a assistência social como política pública, define proteção social, benefícios e serviços.\n\n**Alertas**\nA concessão de benefícios deve seguir critérios institucionais e registro adequado.\n\n**Ação sugerida**\nUse o G3N para registrar atendimentos, benefícios, histórico e justificativas de decisão."
+  },
+  {
+    terms: ["suas"],
+    answer:
+      "**Resumo**\nO SUAS é o Sistema Único de Assistência Social.\n\n**Detalhamento**\nEle organiza a oferta de serviços, programas, projetos e benefícios socioassistenciais no Brasil.\n\n**Alertas**\nFluxos e encaminhamentos precisam respeitar proteção básica e especial.\n\n**Ação sugerida**\nRegistre no G3N atendimentos, vínculos familiares, benefícios e encaminhamentos com rastreabilidade."
+  },
+  {
+    terms: ["cras", "creas"],
+    answer:
+      "**Resumo**\nCRAS atua na proteção social básica e CREAS na proteção social especial.\n\n**Detalhamento**\nO CRAS trabalha prevenção, fortalecimento de vínculos e acompanhamento familiar. O CREAS atende situações de violação de direitos e maior complexidade.\n\n**Alertas**\nNem toda demanda social deve ser encaminhada ao CREAS.\n\n**Ação sugerida**\nUse o histórico da família e os atendimentos no G3N para justificar o encaminhamento correto."
+  },
+  {
+    terms: ["cadunico", "cadunico", "cad único", "cadunico"],
+    answer:
+      "**Resumo**\nO CadÚnico é o cadastro para programas sociais do governo federal.\n\n**Detalhamento**\nEle identifica famílias de baixa renda e apoia acesso a políticas públicas.\n\n**Alertas**\nCadastro no G3N não substitui atualização oficial do CadÚnico.\n\n**Ação sugerida**\nRegistre no G3N orientações dadas, pendências e necessidade de atualização cadastral."
+  },
+  {
+    terms: ["bpc"],
+    answer:
+      "**Resumo**\nO BPC é o Benefício de Prestação Continuada.\n\n**Detalhamento**\nGarante um salário mínimo à pessoa idosa ou com deficiência que atenda aos critérios legais.\n\n**Alertas**\nA análise depende de requisitos legais e documentação específica.\n\n**Ação sugerida**\nUse o G3N para registrar demanda, orientação técnica, documentos pendentes e encaminhamentos."
+  },
+  {
+    terms: ["beneficio eventual", "benefício eventual"],
+    answer:
+      "**Resumo**\nBenefício eventual atende situações temporárias e emergenciais previstas na política local.\n\n**Detalhamento**\nPode envolver auxílio por vulnerabilidade temporária, natalidade, funeral ou situações emergenciais.\n\n**Alertas**\nÉ importante evitar duplicidade e registrar justificativa técnica.\n\n**Ação sugerida**\nConsulte histórico do beneficiário e da família antes da concessão e registre a decisão no G3N."
+  }
+];
+
 export class AiService {
-  async processQuery(query: string, userId?: string): Promise<AiResponse> {
-    const context: QueryContext = {
+  suggest(query?: string, context?: AiContextPayload): AiSuggestionsResponse {
+    const search = normalizeQuery(query ?? "");
+    const contextText = normalizeContextTokens(context);
+
+    const ordered = [...AI_SUGGESTION_LIBRARY].sort((a, b) => {
+      const aContext = itemMatchesContext(a, contextText) ? 1 : 0;
+      const bContext = itemMatchesContext(b, contextText) ? 1 : 0;
+      if (aContext !== bContext) return bContext - aContext;
+      return a.pergunta.localeCompare(b.pergunta, "pt-BR");
+    });
+
+    const filtered = ordered.filter((item) => itemMatchesSearch(item, search));
+
+    return {
+      categorias: AI_SUGGESTION_CATEGORIES,
+      perguntasFrequentes: ordered.slice(0, 8),
+      sugestoes: filtered.slice(0, 24)
+    };
+  }
+
+  async processQuery(
+    query: string,
+    userId?: string,
+    context?: AiContextPayload,
+    userName?: string
+  ): Promise<AiResponse> {
+    const ctx: QueryContext = {
       query,
       normalizedQuery: normalizeQuery(query),
-      userId
+      userId,
+      context
     };
 
-    if (this.isHelpIntent(context.normalizedQuery)) {
+    if (isGreetingQuery(ctx.normalizedQuery) || isSmallTalkQuery(ctx.normalizedQuery)) {
+      return this.getConversationalReply(ctx.query, ctx.normalizedQuery, userName);
+    }
+
+    if (this.isHelpIntent(ctx.normalizedQuery)) {
       return this.getHelp();
     }
 
-    if (this.isOutdatedFamiliesIntent(context.normalizedQuery)) {
-      return this.findOutdatedFamilies(extractDays(context.normalizedQuery));
+    if (this.isOutdatedFamiliesIntent(ctx.normalizedQuery)) {
+      return this.findOutdatedFamilies(extractDays(ctx.normalizedQuery));
     }
 
-    if (this.isLocationIntent(context.normalizedQuery)) {
-      return this.countBeneficiariesByLocation(extractLocation(context.normalizedQuery));
+    if (this.isLocationIntent(ctx.normalizedQuery)) {
+      return this.countBeneficiariesByLocation(extractLocation(ctx.normalizedQuery));
     }
 
-    if (this.isAgeRangeIntent(context.normalizedQuery)) {
-      return this.countBeneficiariesByAgeRange(extractAgeRange(context.normalizedQuery));
+    if (this.isAgeRangeIntent(ctx.normalizedQuery)) {
+      return this.countBeneficiariesByAgeRange(extractAgeRange(ctx.normalizedQuery));
     }
 
-    if (this.isDonationIntent(context.normalizedQuery)) {
-      if (this.isInadimplenteIntent(context.normalizedQuery)) {
+    if (this.isDonationIntent(ctx.normalizedQuery)) {
+      if (this.isInadimplenteIntent(ctx.normalizedQuery)) {
         return this.getMonthlyDelinquentDonors();
       }
-      if (this.isCaptacaoPendingIntent(context.normalizedQuery)) {
+      if (this.isCaptacaoPendingIntent(ctx.normalizedQuery)) {
         return this.getCaptacaoPendingDonations();
       }
       return this.getDonationsSummary();
     }
 
-    if (this.isTaskIntent(context.normalizedQuery)) {
-      if (this.isResponsibleTaskIntent(context.normalizedQuery)) {
-        return this.getTasksByResponsible(extractResponsible(context.normalizedQuery));
+    if (this.isTaskIntent(ctx.normalizedQuery)) {
+      if (this.isResponsibleTaskIntent(ctx.normalizedQuery)) {
+        return this.getTasksByResponsible(extractResponsible(ctx.normalizedQuery));
       }
       return this.getPendingTasksSummary();
     }
 
-    if (this.isEnrollmentIntent(context.normalizedQuery)) {
-      if (this.isNoVacancyIntent(context.normalizedQuery)) {
+    if (this.isEnrollmentIntent(ctx.normalizedQuery)) {
+      if (this.isNoVacancyIntent(ctx.normalizedQuery)) {
         return this.getCoursesWithoutVacancy();
       }
       return this.getEnrollmentSummary();
     }
 
-    if (this.isSystemOverviewIntent(context.normalizedQuery)) {
+    if (this.isSystemOverviewIntent(ctx.normalizedQuery)) {
       return this.getSystemOverview();
     }
 
-    return {
-      intent: "NAO_ENTENDIDO",
-      answer:
-        "Ainda não consegui interpretar essa pergunta com segurança usando apenas os dados internos do G3 Next.\n\n" +
-        "Você pode tentar algo como:\n" +
-        "- Famílias sem atualização há 90 dias\n" +
-        "- Beneficiários no bairro Centro\n" +
-        "- Resumo de doações deste mês\n" +
-        "- Resumo geral do sistema",
-      data: buildData(["banco_interno"], undefined, undefined, { consulta: query })
-    };
+    const knowledgeAnswer = findKnowledgeAnswer(ctx.normalizedQuery);
+    if (knowledgeAnswer) {
+      return {
+        intent: "ORIENTACAO_TECNICA",
+        answer: knowledgeAnswer.answer,
+        data: buildData(["base_tecnica_g3n"], { consulta: query })
+      };
+    }
+
+    const assisted = await this.tryAssistedResponse(ctx);
+    if (assisted) {
+      return assisted;
+    }
+
+    return this.getFallbackNotUnderstood(query, context);
   }
 
   private isHelpIntent(normalizedQuery: string) {
@@ -348,6 +569,102 @@ export class AiService {
         "captacao_doacoes",
         "usuario"
       ])
+    };
+  }
+
+  private getConversationalReply(query: string, normalizedQuery: string, userName?: string): AiResponse {
+    const firstName = extractFirstName(userName);
+    const saudacaoPersonalizada = firstName
+      ? `Olá, ${firstName}.`
+      : "Olá.";
+
+    let answer =
+      `${saudacaoPersonalizada} Estou bem e posso te ajudar.\n\n` +
+      "Você pode me perguntar de forma natural, por exemplo:\n" +
+      "- Qual o histórico deste beneficiário?\n" +
+      "- Essa família já recebeu benefício?\n" +
+      "- Quantos atendimentos tivemos no mês?\n" +
+      "- O que é a LOAS?\n\n" +
+      "Se quiser, pode escrever só o assunto e eu tento te guiar.";
+
+    if (normalizedQuery.includes("como perguntar") || normalizedQuery.includes("como posso perguntar")) {
+      answer =
+        `${saudacaoPersonalizada} Você pode perguntar de forma simples, como se estivesse falando com uma pessoa.\n\n` +
+        "Exemplos úteis:\n" +
+        "- Me mostre famílias sem atualização cadastral\n" +
+        "- Quem recebeu cesta básica este mês?\n" +
+        "- Esse beneficiário pertence a qual família?\n" +
+        "- Qual o custo total no mês?\n\n" +
+        "Se quiser, eu também posso te sugerir perguntas por assunto.";
+    } else if (normalizedQuery.includes("quem e voce") || normalizedQuery.includes("quem é você")) {
+      answer =
+        `${saudacaoPersonalizada} Sou a IA do G3N.\n\n` +
+        "Posso te ajudar com consultas sobre beneficiários, famílias, benefícios, atendimentos, indicadores e também com orientações técnicas, como LOAS, SUAS, CadÚnico e BPC.";
+    } else if (isGreetingQuery(normalizedQuery)) {
+      answer = firstName
+        ? `${normalizedQuery.includes("bom dia") ? "Bom dia" : normalizedQuery.includes("boa tarde") ? "Boa tarde" : normalizedQuery.includes("boa noite") ? "Boa noite" : "Olá"}, ${firstName}. Tudo bem?\n\nEm que posso ajudar hoje?`
+        : `${normalizedQuery.includes("bom dia") ? "Bom dia" : normalizedQuery.includes("boa tarde") ? "Boa tarde" : normalizedQuery.includes("boa noite") ? "Boa noite" : "Olá"}. Tudo bem?\n\nEm que posso ajudar hoje?`;
+    }
+
+    return {
+      intent: "CONVERSA_SOCIAL",
+      answer,
+      data: buildData(["assistente_ia"], { consulta: query, modo: "conversa" })
+    };
+  }
+
+  private async tryAssistedResponse(context: QueryContext): Promise<AiResponse | null> {
+    if (!env.APP_GEMINI_API_KEY) {
+      return null;
+    }
+
+    try {
+      const client = new GoogleGenerativeAI(env.APP_GEMINI_API_KEY);
+      const model = client.getGenerativeModel({
+        model: "gemini-1.5-flash",
+        systemInstruction:
+          "Você é a IA do sistema G3N para assistência social e terceiro setor. " +
+          "Responda em português do Brasil, com linguagem clara e didática. " +
+          "Use sempre este formato: Resumo, Detalhamento, Alertas, Ação sugerida. " +
+          "Quando não puder confirmar números do banco, deixe explícito que é orientação geral."
+      });
+
+      const contextoTela = normalizeContextTokens(context.context);
+      const prompt =
+        `Pergunta do usuário: ${context.query}\n` +
+        `Contexto atual da tela: ${contextoTela || "não informado"}\n` +
+        "Se a pergunta depender de dados específicos não disponíveis aqui, responda de forma orientativa e sugira consulta adequada no sistema.";
+
+      const result = await model.generateContent(prompt);
+      const answer = result.response.text().trim();
+
+      if (!answer) {
+        return null;
+      }
+
+      return {
+        intent: "RESPOSTA_ASSISTIDA",
+        answer,
+        data: buildData(["assistente_ia"], { consulta: context.query, modo: "assistido" })
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  private getFallbackNotUnderstood(query: string, context?: AiContextPayload): AiResponse {
+    const sugestoes = this.suggest(query, context).perguntasFrequentes.slice(0, 4);
+    const lista = sugestoes.map((item) => `- ${item.pergunta}`).join("\n");
+
+    return {
+      intent: "NAO_ENTENDIDO",
+      answer:
+        "**Resumo**\nAinda não consegui responder essa pergunta com segurança usando os dados internos disponíveis.\n\n" +
+        "**Detalhamento**\nTente reformular a pergunta de forma mais objetiva ou usar uma das consultas abaixo.\n\n" +
+        "**Alertas**\nPerguntas muito amplas ou sem referência de contexto podem exigir consulta orientativa.\n\n" +
+        "**Ação sugerida**\nVocê pode tentar:\n" +
+        `${lista || "- Resumo geral do sistema"}`,
+      data: buildData(["banco_interno"], undefined, undefined, { consulta: query })
     };
   }
 

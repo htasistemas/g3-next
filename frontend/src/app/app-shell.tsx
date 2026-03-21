@@ -19,6 +19,7 @@ import type { RegistroPontoAlertaPendente } from "@/types/registro-ponto";
 import {
   AlarmClockCheck,
   BadgeDollarSign,
+  BookOpenText,
   BriefcaseBusiness,
   Brain,
   Building2,
@@ -425,6 +426,12 @@ export const menuSections: MenuSection[] = [
         ]
       },
       {
+        id: "configuracoes-manual-sistema",
+        to: "/configuracoes/manual-do-sistema",
+        label: "Manual do sistema",
+        icon: BookOpenText
+      },
+      {
         id: "configuracoes-pesquise-na-ia",
         to: "/configuracoes/pesquise-na-ia",
         label: "Pesquise na IA",
@@ -505,6 +512,7 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/configuracoes/datas-comemorativas")) return "Datas comemorativas";
   if (pathname.startsWith("/configuracoes/atualizar-sistema")) return "Atualizar sistema";
   if (pathname.startsWith("/configuracoes/chamado-tecnico")) return "Chamado técnico";
+  if (pathname.startsWith("/configuracoes/manual-do-sistema")) return "Manual do sistema";
   if (pathname.startsWith("/configuracoes/pesquise-na-ia")) return "Pesquise na IA";
   if (pathname.startsWith("/configuracoes/sobre-o-sistema")) return "Sobre o sistema";
   if (pathname.startsWith("/configuracoes/mensagens-personalizadas")) return "Mensagens personalizadas";

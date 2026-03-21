@@ -10,6 +10,7 @@ export type AuthenticatedRequest = Request & {
   authUser?: {
     id: string;
     nomeUsuario: string;
+    nome?: string;
     permissoes: string[];
   };
 };
@@ -39,6 +40,7 @@ export function ensureAuthenticated(
     request.authUser = {
       id: payload.sub,
       nomeUsuario: payload.nomeUsuario,
+      nome: payload.nome,
       permissoes: payload.permissoes ?? []
     };
     return next();
@@ -62,6 +64,7 @@ export function hydrateAuthenticatedUser(
     request.authUser = {
       id: payload.sub,
       nomeUsuario: payload.nomeUsuario,
+      nome: payload.nome,
       permissoes: payload.permissoes ?? []
     };
   } catch {

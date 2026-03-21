@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { beneficiariosService } from "@/services/beneficiarios.service";
-import { useFamilia, useFamiliaAlertas, useFamiliaHistorico, useFamilias, useRemoverFamilia, useSalvarFamilia, useValidacaoBeneficioFamiliar } from "@/features/familias/use-familias";
+import { useDesmembrarFamilia, useFamilia, useFamiliaAlertas, useFamiliaHistorico, useFamilias, useRemoverFamilia, useSalvarFamilia, useTransferirMembroFamilia, useValidacaoBeneficioFamiliar } from "@/features/familias/use-familias";
 import type { Beneficiario } from "@/types/beneficiario";
 import type { Familia, FamiliaFiltro, FamiliaMembro } from "@/types/familia";
 
@@ -73,7 +73,11 @@ export function CadastroVinculoFamiliarPage() {
   const [familiaForm, setFamiliaForm] = useState<Familia>(familiaVazia);
   const [membros, setMembros] = useState<FamiliaMembro[]>([]);
   const [membroForm, setMembroForm] = useState<FamiliaMembro>(membroVazio);
+  const [membroEmEdicaoId, setMembroEmEdicaoId] = useState<string>();
   const [buscaBeneficiario, setBuscaBeneficiario] = useState("");
+  const [membroTransferenciaId, setMembroTransferenciaId] = useState("");
+  const [familiaDestinoId, setFamiliaDestinoId] = useState("");
+  const [novoNomeFamilia, setNovoNomeFamilia] = useState("");
 
   const familiasQuery = useFamilias(filtros);
   const familiaQuery = useFamilia(familiaIdSelecionada);
@@ -82,6 +86,8 @@ export function CadastroVinculoFamiliarPage() {
   const validacaoQuery = useValidacaoBeneficioFamiliar(familiaIdSelecionada, "Cesta básica");
   const salvarFamilia = useSalvarFamilia();
   const removerFamilia = useRemoverFamilia();
+  const transferirMembro = useTransferirMembroFamilia();
+  const desmembrarFamilia = useDesmembrarFamilia();
   const buscaBeneficiarios = useQuery({
     queryKey: ["familias", "busca-beneficiario", buscaBeneficiario],
     queryFn: () => beneficiariosService.listar({ nome: buscaBeneficiario || undefined }),
@@ -107,7 +113,11 @@ export function CadastroVinculoFamiliarPage() {
     setFamiliaForm(familiaVazia);
     setMembros([]);
     setMembroForm(membroVazio);
+    setMembroEmEdicaoId(undefined);
     setBuscaBeneficiario("");
+    setMembroTransferenciaId("");
+    setFamiliaDestinoId("");
+    setNovoNomeFamilia("");
     setAbaAtiva("composicao");
     void queryClient.removeQueries({ queryKey: ["familia"] });
   }
@@ -117,9 +127,51 @@ export function CadastroVinculoFamiliarPage() {
     setAbaAtiva("resumo");
   }
 
-  function adicionarMembroLocal() {
+  function familiaComMesmoMembro(idBeneficiario: string) {
+    return familias.find((familiaItem) => {
+      if (familiaItem.id_familia === familiaIdSelecionada) return false;
+      if ((familiaItem.status ?? "ATIVO") !== "ATIVO") return false;
+      return (familiaItem.membros ?? []).some((membro) => membro.id_beneficiario === idBeneficiario);
+    });
+  }
+
+  async function aplicarEnderecoDoResponsavelSeNecessario(idBeneficiario: string) {
+    if (familiaForm.logradouro || familiaForm.bairro || familiaForm.municipio || familiaForm.uf || familiaForm.cep) {
+      return;
+    }
+
+    const response = await beneficiariosService.buscarPorId(idBeneficiario);
+    const beneficiario = response.beneficiario;
+    if (!beneficiario.logradouro && !beneficiario.bairro && !beneficiario.municipio && !beneficiario.uf && !beneficiario.cep) {
+      return;
+    }
+
+    setFamiliaForm((atual) => ({
+      ...atual,
+      cep: atual.cep || beneficiario.cep || "",
+      logradouro: atual.logradouro || beneficiario.logradouro || "",
+      numero: atual.numero || beneficiario.numero || "",
+      complemento: atual.complemento || beneficiario.complemento || "",
+      bairro: atual.bairro || beneficiario.bairro || "",
+      ponto_referencia: atual.ponto_referencia || beneficiario.ponto_referencia || "",
+      municipio: atual.municipio || beneficiario.municipio || "",
+      uf: atual.uf || beneficiario.uf || "",
+      zona: atual.zona || beneficiario.zona || ""
+    }));
+  }
+
+  async function adicionarMembroLocal() {
     if (!membroForm.id_beneficiario || !membroForm.parentesco.trim()) {
       setPopup({ tipo: "erro", titulo: "Vínculo incompleto", texto: "Selecione o beneficiário e informe o parentesco." });
+      return;
+    }
+    const familiaDuplicada = familiaComMesmoMembro(membroForm.id_beneficiario);
+    if (familiaDuplicada) {
+      setPopup({
+        tipo: "erro",
+        titulo: "Membro já vinculado",
+        texto: `Este beneficiário já pertence à família ativa ${familiaDuplicada.nome_familia}.`
+      });
       return;
     }
     const responsavelExistente = membros.find((item) => item.responsavel_familiar);
@@ -138,10 +190,23 @@ export function CadastroVinculoFamiliarPage() {
     const listaBase = membros.filter((item) => item.id_beneficiario !== membroForm.id_beneficiario);
     const lista = membroForm.responsavel_familiar ? listaBase.map((item) => ({ ...item, responsavel_familiar: false })) : listaBase;
     setMembros([...lista, { ...membroForm, parentesco: membroForm.responsavel_familiar ? "Responsável familiar" : membroForm.parentesco }]);
+    if (membroForm.responsavel_familiar) {
+      await aplicarEnderecoDoResponsavelSeNecessario(membroForm.id_beneficiario);
+    }
     setMembroForm(membroVazio);
+    setMembroEmEdicaoId(undefined);
   }
 
   function selecionarBeneficiario(beneficiario: Beneficiario, responsavel = false) {
+    const familiaDuplicada = familiaComMesmoMembro(String(beneficiario.id_beneficiario ?? ""));
+    if (familiaDuplicada) {
+      setPopup({
+        tipo: "erro",
+        titulo: "Beneficiário já vinculado",
+        texto: `Este beneficiário já pertence à família ativa ${familiaDuplicada.nome_familia}.`
+      });
+      return;
+    }
     setMembroForm({
       id_beneficiario: String(beneficiario.id_beneficiario ?? ""),
       parentesco: responsavel ? "Responsável familiar" : "",
@@ -149,7 +214,24 @@ export function CadastroVinculoFamiliarPage() {
       usa_endereco_familia: true,
       beneficiario: { id_beneficiario: String(beneficiario.id_beneficiario ?? ""), nome_completo: beneficiario.nome_completo, nome_social: beneficiario.nome_social, codigo: beneficiario.codigo, cpf: beneficiario.cpf }
     });
+    setMembroEmEdicaoId(String(beneficiario.id_beneficiario ?? ""));
     if (!familiaForm.nome_familia && responsavel) setFamiliaForm((atual) => ({ ...atual, nome_familia: `Família ${beneficiario.nome_completo}`.trim() }));
+  }
+
+  function editarMembro(membro: FamiliaMembro) {
+    setMembroForm(membro);
+    setMembroEmEdicaoId(membro.id_beneficiario);
+  }
+
+  async function tornarResponsavel(membro: FamiliaMembro) {
+    setMembros((atual) =>
+      atual.map((item) => ({
+        ...item,
+        responsavel_familiar: item.id_beneficiario === membro.id_beneficiario,
+        parentesco: item.id_beneficiario === membro.id_beneficiario ? "Responsável familiar" : item.parentesco
+      }))
+    );
+    await aplicarEnderecoDoResponsavelSeNecessario(membro.id_beneficiario);
   }
 
   async function salvar() {
@@ -158,6 +240,10 @@ export function CadastroVinculoFamiliarPage() {
     if (!membros.length) return setPopup({ tipo: "erro", titulo: "Composição obrigatória", texto: "Adicione pelo menos um membro." });
     if (!responsavel?.id_beneficiario) return setPopup({ tipo: "erro", titulo: "Responsável obrigatório", texto: "Defina um responsável familiar." });
     if (membros.some((item) => !item.parentesco?.trim())) return setPopup({ tipo: "erro", titulo: "Parentesco obrigatório", texto: "Todos os membros precisam ter parentesco." });
+    if (membros.filter((item) => item.responsavel_familiar).length > 1) return setPopup({ tipo: "erro", titulo: "Responsável duplicado", texto: "A família pode ter apenas um responsável ativo." });
+    if (membros.some((item) => item.usa_endereco_familia !== false) && !familiaForm.logradouro && !familiaForm.bairro && !familiaForm.municipio && !familiaForm.uf) {
+      return setPopup({ tipo: "erro", titulo: "Endereço principal obrigatório", texto: "Informe o endereço principal da família ou defina um responsável com endereço cadastrado." });
+    }
     try {
       const response = await salvarFamilia.mutateAsync({ ...familiaForm, id_familia: familiaIdSelecionada, id_referencia_familiar: responsavel.id_beneficiario, membros });
       setFamiliaIdSelecionada(response.familia.id_familia);
@@ -165,6 +251,61 @@ export function CadastroVinculoFamiliarPage() {
       setPopup({ tipo: "sucesso", titulo: "Vínculo familiar salvo", texto: "A família foi salva com sucesso." });
     } catch (error) {
       setPopup({ tipo: "erro", titulo: "Erro ao salvar", texto: mensagemErroApi(error) });
+    }
+  }
+
+  async function transferirParaOutraFamilia() {
+    if (!familiaIdSelecionada || !membroTransferenciaId || !familiaDestinoId) {
+      setPopup({ tipo: "erro", titulo: "Transferência incompleta", texto: "Selecione o membro e a família de destino." });
+      return;
+    }
+    try {
+      await transferirMembro.mutateAsync({
+        familiaId: familiaIdSelecionada,
+        transferencia: {
+          id_membro: Number(membroTransferenciaId),
+          familia_destino_id: Number(familiaDestinoId)
+        }
+      });
+      setMembroTransferenciaId("");
+      setFamiliaDestinoId("");
+      setPopup({ tipo: "sucesso", titulo: "Membro transferido", texto: "O membro foi transferido para outra família com sucesso." });
+    } catch (error) {
+      setPopup({ tipo: "erro", titulo: "Erro na transferência", texto: mensagemErroApi(error) });
+    }
+  }
+
+  async function criarNovaFamiliaPorDesmembramento() {
+    if (!familiaIdSelecionada || !membroTransferenciaId || !novoNomeFamilia.trim()) {
+      setPopup({ tipo: "erro", titulo: "Desmembramento incompleto", texto: "Selecione o membro e informe o nome da nova família." });
+      return;
+    }
+    const membro = membros.find((item) => item.id_beneficiario === membroTransferenciaId);
+    if (!membro) {
+      setPopup({ tipo: "erro", titulo: "Membro inválido", texto: "Selecione um membro válido para formar outra família." });
+      return;
+    }
+    if (!membro.id_familia_membro) {
+      setPopup({ tipo: "erro", titulo: "Salve a família primeiro", texto: "Para desmembrar, salve a família atual antes." });
+      return;
+    }
+    try {
+      const response = await desmembrarFamilia.mutateAsync({
+        familiaId: familiaIdSelecionada,
+        desmembramento: {
+          membro_ids: [Number(membro.id_familia_membro)],
+          nome_familia: novoNomeFamilia.trim(),
+          novo_responsavel_id: Number(membro.id_beneficiario),
+          copiar_endereco_familiar: true
+        }
+      });
+      setFamiliaIdSelecionada(response.familia_nova.id_familia);
+      setAbaAtiva("resumo");
+      setMembroTransferenciaId("");
+      setNovoNomeFamilia("");
+      setPopup({ tipo: "sucesso", titulo: "Nova família criada", texto: "O membro saiu do núcleo anterior e passou a ser o principal da nova família." });
+    } catch (error) {
+      setPopup({ tipo: "erro", titulo: "Erro no desmembramento", texto: mensagemErroApi(error) });
     }
   }
 
@@ -204,7 +345,7 @@ export function CadastroVinculoFamiliarPage() {
 
           {abaAtiva === "resumo" ? <Card><CardHeader><CardTitle className="text-base">Resumo familiar</CardTitle></CardHeader><CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{resumoCards.map((item) => <div key={item.titulo} className="rounded-xl border border-[var(--g3-border)] p-3"><p className="text-xs uppercase tracking-wide text-[var(--g3-muted)]">{item.titulo}</p><p className="mt-1 font-semibold">{String(item.valor)}</p></div>)}<div className="space-y-1 md:col-span-2 xl:col-span-4"><Label>Nome de referência</Label><Input value={familiaForm.nome_familia} onChange={(event) => setFamiliaForm((atual) => ({ ...atual, nome_familia: event.target.value }))} /></div><div className="space-y-1"><Label>Status</Label><Select value={familiaForm.status ?? "ATIVO"} onChange={(event) => setFamiliaForm((atual) => ({ ...atual, status: event.target.value as Familia["status"] }))}><option value="ATIVO">Ativo</option><option value="INATIVO">Inativo</option><option value="BLOQUEADO">Bloqueado</option></Select></div><div className="space-y-1"><Label>Renda familiar total</Label><Input value={familiaForm.renda_familiar_total ?? ""} onChange={(event) => setFamiliaForm((atual) => ({ ...atual, renda_familiar_total: event.target.value }))} /></div></CardContent></Card> : null}
 
-          {abaAtiva === "composicao" ? <Card><CardHeader><CardTitle className="text-base">Composição familiar</CardTitle></CardHeader><CardContent className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]"><div className="space-y-2"><Label>Buscar beneficiário</Label><Input value={buscaBeneficiario} onChange={(event) => setBuscaBeneficiario(event.target.value)} />{beneficiarios.map((beneficiario) => <div key={beneficiario.id_beneficiario} className="rounded-xl border border-[var(--g3-border)] p-3"><p className="font-medium">{beneficiario.nome_completo}</p><div className="mt-2 flex gap-2"><Button size="sm" variant="outline" onClick={() => selecionarBeneficiario(beneficiario)}>Adicionar</Button><Button size="sm" onClick={() => selecionarBeneficiario(beneficiario, true)}>Definir responsável</Button></div></div>)}</div><div className="space-y-4"><Card className="border-dashed"><CardHeader><CardTitle className="text-sm">Novo membro</CardTitle></CardHeader><CardContent className="grid gap-3 md:grid-cols-2"><div className="space-y-1"><Label>Beneficiário</Label><Input value={nomePessoa(membroForm.beneficiario)} readOnly /></div><div className="space-y-1"><Label>Parentesco</Label><Select value={membroForm.parentesco} onChange={(event) => setMembroForm((atual) => ({ ...atual, parentesco: event.target.value }))}><option value="">Selecione</option>{parentescoOptions.map((item) => <option key={item} value={item}>{item}</option>)}</Select></div><label className="flex items-center gap-2 text-sm"><Checkbox checked={Boolean(membroForm.responsavel_familiar)} onChange={(event) => setMembroForm((atual) => ({ ...atual, responsavel_familiar: event.target.checked, parentesco: event.target.checked ? "Responsável familiar" : atual.parentesco }))} />Responsável familiar</label><label className="flex items-center gap-2 text-sm"><Checkbox checked={Boolean(membroForm.usa_endereco_familia)} onChange={(event) => setMembroForm((atual) => ({ ...atual, usa_endereco_familia: event.target.checked }))} />Usa endereço da família</label><div><Button onClick={adicionarMembroLocal} disabled={!membroForm.id_beneficiario}>Salvar membro</Button></div></CardContent></Card><Card><CardHeader><CardTitle className="text-sm">Membros cadastrados</CardTitle></CardHeader><CardContent className="space-y-2">{membros.map((membro) => <div key={membro.id_beneficiario} className="flex items-center justify-between rounded-xl border border-[var(--g3-border)] px-3 py-2"><div><p className="font-medium">{nomePessoa(membro.beneficiario)}</p><p className="text-xs text-[var(--g3-muted)]">{membro.parentesco}</p></div><div className="flex gap-1">{membro.responsavel_familiar ? <Badge variant="success">Responsável</Badge> : null}<Button size="sm" variant="danger" onClick={() => setMembros((atual) => atual.filter((item) => item.id_beneficiario !== membro.id_beneficiario))}>Remover</Button></div></div>)}</CardContent></Card></div></CardContent></Card> : null}
+          {abaAtiva === "composicao" ? <Card><CardHeader><CardTitle className="text-base">Composição familiar</CardTitle></CardHeader><CardContent className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]"><div className="space-y-2"><Label>Buscar beneficiário</Label><Input value={buscaBeneficiario} onChange={(event) => setBuscaBeneficiario(event.target.value)} />{beneficiarios.map((beneficiario) => <div key={beneficiario.id_beneficiario} className="rounded-xl border border-[var(--g3-border)] p-3"><p className="font-medium">{beneficiario.nome_completo}</p><div className="mt-2 flex gap-2"><Button size="sm" variant="outline" onClick={() => selecionarBeneficiario(beneficiario)}>Adicionar</Button><Button size="sm" onClick={() => selecionarBeneficiario(beneficiario, true)}>Definir responsável</Button></div></div>)}</div><div className="space-y-4"><Card className="border-dashed"><CardHeader><CardTitle className="text-sm">{membroEmEdicaoId ? "Editar membro" : "Novo membro"}</CardTitle></CardHeader><CardContent className="grid gap-3 md:grid-cols-2"><div className="space-y-1"><Label>Beneficiário</Label><Input value={nomePessoa(membroForm.beneficiario)} readOnly /></div><div className="space-y-1"><Label>Parentesco</Label><Select value={membroForm.parentesco} onChange={(event) => setMembroForm((atual) => ({ ...atual, parentesco: event.target.value }))}><option value="">Selecione</option>{parentescoOptions.map((item) => <option key={item} value={item}>{item}</option>)}</Select></div><label className="flex items-center gap-2 text-sm"><Checkbox checked={Boolean(membroForm.responsavel_familiar)} disabled={Boolean(membros.find((item) => item.responsavel_familiar && item.id_beneficiario !== membroForm.id_beneficiario))} onChange={(event) => setMembroForm((atual) => ({ ...atual, responsavel_familiar: event.target.checked, parentesco: event.target.checked ? "Responsável familiar" : atual.parentesco }))} />Responsável familiar</label><label className="flex items-center gap-2 text-sm"><Checkbox checked={Boolean(membroForm.usa_endereco_familia)} onChange={(event) => setMembroForm((atual) => ({ ...atual, usa_endereco_familia: event.target.checked }))} />Usa endereço da família</label><div className="md:col-span-2 flex gap-2"><Button onClick={() => void adicionarMembroLocal()} disabled={!membroForm.id_beneficiario}>{membroEmEdicaoId ? "Atualizar membro" : "Salvar membro"}</Button>{membroEmEdicaoId ? <Button variant="outline" onClick={() => { setMembroForm(membroVazio); setMembroEmEdicaoId(undefined); }}>Cancelar edição</Button> : null}</div></CardContent></Card><Card><CardHeader><CardTitle className="text-sm">Membros cadastrados</CardTitle></CardHeader><CardContent className="space-y-2">{membros.map((membro) => <div key={membro.id_beneficiario} className="flex items-center justify-between rounded-xl border border-[var(--g3-border)] px-3 py-2"><div><p className="font-medium">{nomePessoa(membro.beneficiario)}</p><p className="text-xs text-[var(--g3-muted)]">{membro.parentesco}</p><p className="text-xs text-[var(--g3-muted)]">{membro.usa_endereco_familia ? "Herdará o endereço principal da família" : "Mantém endereço próprio"}</p></div><div className="flex gap-1">{membro.responsavel_familiar ? <Badge variant="success">Responsável</Badge> : null}<Button size="sm" variant="outline" onClick={() => editarMembro(membro)}>Editar</Button><Button size="sm" variant="outline" onClick={() => void tornarResponsavel(membro)} disabled={membro.responsavel_familiar}>Tornar responsável</Button><Button size="sm" variant="danger" onClick={() => setMembros((atual) => atual.filter((item) => item.id_beneficiario !== membro.id_beneficiario))}>Remover</Button></div></div>)}</CardContent></Card>{familiaIdSelecionada ? <Card><CardHeader><CardTitle className="text-sm">Saída do núcleo familiar</CardTitle></CardHeader><CardContent className="grid gap-3 md:grid-cols-2"><div className="space-y-1"><Label>Membro</Label><Select value={membroTransferenciaId} onChange={(event) => setMembroTransferenciaId(event.target.value)}><option value="">Selecione</option>{membros.filter((item) => !item.responsavel_familiar).map((item) => <option key={item.id_beneficiario} value={item.id_beneficiario}>{nomePessoa(item.beneficiario)}</option>)}</Select></div><div className="space-y-1"><Label>Transferir para família existente</Label><Select value={familiaDestinoId} onChange={(event) => setFamiliaDestinoId(event.target.value)}><option value="">Selecione</option>{familias.filter((item) => item.id_familia !== familiaIdSelecionada).map((item) => <option key={item.id_familia} value={item.id_familia}>{item.nome_familia}</option>)}</Select></div><div><Button variant="outline" onClick={() => void transferirParaOutraFamilia()} disabled={!membroTransferenciaId || !familiaDestinoId}>Transferir para outra família</Button></div><div className="space-y-1"><Label>Ou criar nova família</Label><Input value={novoNomeFamilia} onChange={(event) => setNovoNomeFamilia(event.target.value)} placeholder="Nome da nova família" /></div><div><Button variant="outline" onClick={() => void criarNovaFamiliaPorDesmembramento()} disabled={!membroTransferenciaId || !novoNomeFamilia.trim()}>Transformar em nova família</Button></div></CardContent></Card> : null}</div></CardContent></Card> : null}
 
           {abaAtiva === "endereco" ? <Card><CardHeader><CardTitle className="text-base">Endereço e moradia</CardTitle></CardHeader><CardContent className="grid gap-3 md:grid-cols-2"><div className="space-y-1"><Label>Logradouro</Label><Input value={familiaForm.logradouro ?? ""} onChange={(event) => setFamiliaForm((atual) => ({ ...atual, logradouro: event.target.value }))} /></div><div className="space-y-1"><Label>Bairro</Label><Input value={familiaForm.bairro ?? ""} onChange={(event) => setFamiliaForm((atual) => ({ ...atual, bairro: event.target.value }))} /></div><div className="space-y-1"><Label>Município</Label><Input value={familiaForm.municipio ?? ""} onChange={(event) => setFamiliaForm((atual) => ({ ...atual, municipio: event.target.value }))} /></div><div className="space-y-1"><Label>UF</Label><Input value={familiaForm.uf ?? ""} onChange={(event) => setFamiliaForm((atual) => ({ ...atual, uf: event.target.value }))} /></div></CardContent></Card> : null}
           {abaAtiva === "renda" ? <Card><CardHeader><CardTitle className="text-base">Renda e perfil social</CardTitle></CardHeader><CardContent className="grid gap-3 md:grid-cols-2"><div className="space-y-1"><Label>Renda familiar total</Label><Input value={familiaForm.renda_familiar_total ?? ""} onChange={(event) => setFamiliaForm((atual) => ({ ...atual, renda_familiar_total: event.target.value }))} /></div><div className="space-y-1"><Label>Observações</Label><Input value={familiaForm.observacoes ?? ""} onChange={(event) => setFamiliaForm((atual) => ({ ...atual, observacoes: event.target.value }))} /></div></CardContent></Card> : null}

@@ -10,7 +10,7 @@ export class AiController {
 
   async ask(request: AuthenticatedRequest, response: Response): Promise<void> {
     try {
-      const { query } = request.body;
+      const { query, context } = request.body;
       const userId = request.authUser?.id;
 
       if (typeof query !== "string" || !query.trim()) {
@@ -18,9 +18,18 @@ export class AiController {
         return;
       }
 
-      const result = await this.service.processQuery(query, userId);
+      const result = await this.service.processQuery(
+        query,
+        userId,
+        context,
+        request.authUser?.nome ?? request.authUser?.nomeUsuario
+      );
       if (userId) {
         const dadosSanitizados = sanitizeAiHistoryValue(result.data);
+        const contextSanitizado =
+          context && typeof context === "object"
+            ? sanitizeAiHistoryValue(context)
+            : undefined;
 
         await this.repository.registrarHistorico({
           usuarioId: userId,
@@ -29,7 +38,12 @@ export class AiController {
           intent: result.intent,
           fontes: dadosSanitizados?.fontes,
           parametros: dadosSanitizados?.parametros,
-          resumo: dadosSanitizados?.resumo,
+          resumo: {
+            ...dadosSanitizados?.resumo,
+            ...(contextSanitizado && typeof contextSanitizado === "object"
+              ? { contexto: JSON.stringify(contextSanitizado) }
+              : {})
+          },
           exemplos: dadosSanitizados?.exemplos
         });
       }
@@ -44,8 +58,18 @@ export class AiController {
   }
 
   async suggest(request: Request, response: Response): Promise<void> {
-    // Placeholder for autocomplete/suggestion logic
-    response.json({ suggestions: [] });
+    const query =
+      typeof request.body?.query === "string"
+        ? request.body.query
+        : typeof request.query?.query === "string"
+          ? request.query.query
+          : "";
+    const context =
+      request.body?.context && typeof request.body.context === "object"
+        ? request.body.context
+        : undefined;
+
+    response.json(this.service.suggest(query, context));
   }
 
   async history(request: AuthenticatedRequest, response: Response): Promise<void> {

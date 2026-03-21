@@ -1,218 +1,166 @@
 import { useMemo, useState } from "react";
-import { Bot, Brain, RefreshCw, Save, SendHorizonal } from "lucide-react";
+import { Brain, Lightbulb, RefreshCw, Search } from "lucide-react";
+import { useLocation } from "react-router-dom";
 import { AdminPageLayout, type AdminAction, type AdminTab } from "@/components/admin/admin-page-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { PopupMensagem, type PopupMensagemState } from "@/components/admin/admin-popups";
-import { useAuth } from "@/hooks/use-auth";
-import { httpClient } from "@/services/http-client";
+import { AIConversationPanel } from "@/modules/ai/components/AIConversationPanel";
+import { useAI } from "@/modules/ai/hooks/useAI";
 
-type AbaId = "conversa";
+type AbaId = "conversa" | "sugestoes";
 
-type ChatItem = {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  timestamp: string;
-  tipo?: "aprendizado" | "resposta";
-};
-
-type SementeResponse = {
-  tipo: "aprendizado" | "resposta";
-  answer: string;
-  memorias?: string[];
-};
-
-const abas: AdminTab[] = [{ id: "conversa", label: "Pesquise na IA", icon: Brain }];
+const abas: AdminTab[] = [
+  { id: "conversa", label: "Conversa com a IA", icon: Brain },
+  { id: "sugestoes", label: "Sugestões de perguntas", icon: Lightbulb }
+];
 
 export function SementePage() {
-  const { usuario } = useAuth();
   const [abaAtiva, setAbaAtiva] = useState<AbaId>("conversa");
-  const [mensagens, setMensagens] = useState<ChatItem[]>([]);
-  const [texto, setTexto] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [popup, setPopup] = useState<PopupMensagemState | null>(null);
+  const [perguntaSelecionada, setPerguntaSelecionada] = useState<string | null>(null);
+  const [buscaSugestao, setBuscaSugestao] = useState("");
+  const location = useLocation();
 
-  const usuarioId = usuario?.id ? Number(usuario.id) : 1;
+  const contexto = useMemo(
+    () => ({
+      pathname: location.pathname,
+      pageTitle: "Pesquise na IA"
+    }),
+    [location.pathname]
+  );
+
+  const { categories, suggestions, frequentQuestions, loadSuggestions } = useAI({
+    context: contexto,
+    autoLoad: false
+  });
+
+  const groupedSuggestions = useMemo(
+    () =>
+      suggestions.reduce<Record<string, typeof suggestions>>((acc, item) => {
+        acc[item.categoria] = [...(acc[item.categoria] ?? []), item];
+        return acc;
+      }, {}),
+    [suggestions]
+  );
 
   const acoes = useMemo<AdminAction[]>(
     () => [
       {
-        label: "Limpar conversa",
+        label: "Atualizar sugestões",
         icon: RefreshCw,
-        onClick: () => setMensagens([]),
-        variant: "outline",
-        disabled: loading || mensagens.length === 0
+        onClick: () => {
+          void loadSuggestions(buscaSugestao);
+        },
+        variant: "outline"
       }
     ],
-    [loading, mensagens.length]
+    [buscaSugestao, loadSuggestions]
   );
 
-  async function enviarMensagem() {
-    const mensagem = texto.trim();
-    if (!mensagem || loading) return;
-
-    const mensagemUsuario: ChatItem = {
-      id: crypto.randomUUID(),
-      role: "user",
-      content: mensagem,
-      timestamp: new Date().toISOString()
-    };
-
-    setMensagens((atual) => [...atual, mensagemUsuario]);
-    setTexto("");
-    setLoading(true);
-
-    try {
-      const { data } = await httpClient.post<SementeResponse>("/api/semente/chat", {
-        usuario_id: usuarioId,
-        mensagem
-      });
-
-      const mensagemAssistente: ChatItem = {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: data.answer,
-        timestamp: new Date().toISOString(),
-        tipo: data.tipo
-      };
-
-      setMensagens((atual) => [...atual, mensagemAssistente]);
-
-      if (data.tipo === "aprendizado") {
-        setPopup({
-          tipo: "sucesso",
-          titulo: "Memória registrada",
-          texto: "A Semente salvou a nova memória do usuário."
-        });
-      }
-    } catch (error: any) {
-      const textoErro =
-        error?.response?.data?.message ?? "Nao foi possivel enviar a mensagem para a Semente.";
-
-      setMensagens((atual) => [
-        ...atual,
-        {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: textoErro,
-          timestamp: new Date().toISOString()
-        }
-      ]);
-      setPopup({
-        tipo: "erro",
-        titulo: "Erro",
-        texto: textoErro
-      });
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function onSubmit(event: React.FormEvent) {
-    event.preventDefault();
-    void enviarMensagem();
-  }
-
   return (
-    <>
-      <AdminPageLayout
-        tabs={abas}
-        activeTab={abaAtiva}
-        onChangeTab={(tabId) => setAbaAtiva(tabId as AbaId)}
-        actions={acoes}
-        sectionLabel="Configurações gerais"
-        pageTitle="Pesquise na IA"
-        activeTitle="Pesquise na IA"
-      >
-        <section className="space-y-3">
-          <Card className="border-[var(--g3-border)]">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-sm">
-                <Bot className="h-4 w-4 text-[var(--g3-active)]" />
-                Semente
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="rounded-md border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-3 text-sm text-[var(--g3-muted)]">
-                Use perguntas normais para conversar com a Semente. Para ensinar uma preferência, envie uma mensagem iniciando com <strong>/aprender</strong>.
-              </div>
+    <AdminPageLayout
+      tabs={abas}
+      activeTab={abaAtiva}
+      onChangeTab={(tabId) => setAbaAtiva(tabId as AbaId)}
+      actions={acoes}
+      sectionLabel="Configurações gerais"
+      pageTitle="Pesquise na IA"
+      activeTitle={abaAtiva === "conversa" ? "Conversa com a IA" : "Sugestões de perguntas"}
+    >
+      <section className="space-y-4">
+        <div className="rounded-3xl border border-[var(--g3-border)] bg-[var(--g3-card)] px-5 py-4 shadow-sm">
+          <p className="text-sm text-[var(--g3-muted)]">
+            Esta central usa exatamente a mesma inteligência do robô disponível nas telas do sistema. As perguntas,
+            categorias, histórico e respostas são compartilhados.
+          </p>
+        </div>
 
-              <div className="max-h-[420px] min-h-[320px] space-y-3 overflow-y-auto rounded-md border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-3">
-                {mensagens.length === 0 ? (
-                  <div className="flex h-full min-h-[280px] items-center justify-center text-center text-sm text-[var(--g3-muted)]">
-                    Nenhuma mensagem enviada ainda. Experimente: <strong className="ml-1">/aprender Gosto de respostas curtas</strong>
-                  </div>
-                ) : (
-                  mensagens.map((mensagem) => (
-                    <div
-                      key={mensagem.id}
-                      className={`flex ${mensagem.role === "user" ? "justify-end" : "justify-start"}`}
-                    >
-                      <div
-                        className={`max-w-[82%] rounded-2xl px-4 py-3 text-sm shadow-sm ${
-                          mensagem.role === "user"
-                            ? "bg-[var(--g3-active)] text-white"
-                            : "border border-[var(--g3-border)] bg-[var(--g3-card)] text-[var(--g3-foreground)]"
-                        }`}
-                      >
-                        <p>{mensagem.content}</p>
-                        <p
-                          className={`mt-2 text-[10px] ${
-                            mensagem.role === "user" ? "text-white/80" : "text-[var(--g3-muted)]"
-                          }`}
-                        >
-                          {new Date(mensagem.timestamp).toLocaleTimeString("pt-BR", {
-                            hour: "2-digit",
-                            minute: "2-digit"
-                          })}
-                          {mensagem.tipo === "aprendizado" ? " • memória" : ""}
-                        </p>
-                      </div>
-                    </div>
-                  ))
-                )}
-
-                {loading ? (
-                  <div className="flex justify-start">
-                    <div className="inline-flex items-center gap-2 rounded-2xl border border-[var(--g3-border)] bg-[var(--g3-card)] px-4 py-3 text-sm text-[var(--g3-muted)]">
-                      <RefreshCw className="h-4 w-4 animate-spin text-[var(--g3-active)]" />
-                      Processando mensagem...
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-
-              <form onSubmit={onSubmit} className="flex flex-col gap-2 sm:flex-row">
+        {abaAtiva === "conversa" ? (
+          <AIConversationPanel
+            variant="page"
+            context={contexto}
+            showSidebar={false}
+            queuedQuestion={perguntaSelecionada}
+            onQueuedQuestionHandled={() => setPerguntaSelecionada(null)}
+            title="Pesquise na IA"
+            subtitle="Central completa de consulta com a mesma base inteligente do robô e opção de reiniciar a conversa quando quiser."
+          />
+        ) : (
+          <div className="space-y-4">
+            <Card className="border-[var(--g3-border)]">
+              <CardHeader className="rounded-t-3xl bg-[var(--g3-primary-soft)] pb-3">
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <Search className="h-4 w-4 text-[var(--g3-active)]" />
+                  Biblioteca de perguntas
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm text-[var(--g3-muted)]">
+                  Escolha uma pergunta pronta e envie para a aba de conversa usando a mesma IA do sistema.
+                </p>
                 <Input
-                  value={texto}
-                  onChange={(event) => setTexto(event.target.value)}
-                  placeholder="Digite sua pergunta ou use /aprender ..."
-                  disabled={loading}
+                  value={buscaSugestao}
+                  onChange={(event) => {
+                    const valor = event.target.value;
+                    setBuscaSugestao(valor);
+                    void loadSuggestions(valor);
+                  }}
+                  placeholder="Filtrar perguntas por assunto"
                 />
-                <div className="flex gap-2">
-                  <Button type="submit" disabled={loading || !texto.trim()}>
-                    <SendHorizonal className="mr-1.5 h-4 w-4" />
-                    Enviar
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={loading}
-                    onClick={() => setTexto("/aprender ")}
-                  >
-                    <Save className="mr-1.5 h-4 w-4" />
-                    Aprender
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        </section>
-      </AdminPageLayout>
+              </CardContent>
+            </Card>
 
-      {popup ? <PopupMensagem popup={popup} onClose={() => setPopup(null)} /> : null}
-    </>
+            <Card className="border-[var(--g3-border)]">
+              <CardHeader className="rounded-t-3xl bg-[var(--g3-primary-soft)] pb-3">
+                <CardTitle className="text-sm">Perguntas frequentes</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-wrap gap-2">
+                {frequentQuestions.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className="rounded-full border border-[var(--g3-border)] bg-[var(--g3-card-soft)] px-3 py-2 text-xs font-medium text-[var(--g3-active)] transition-colors hover:bg-[var(--g3-primary-soft)]"
+                    onClick={() => {
+                      setPerguntaSelecionada(item.pergunta);
+                      setAbaAtiva("conversa");
+                    }}
+                  >
+                    {item.pergunta}
+                  </button>
+                ))}
+              </CardContent>
+            </Card>
+
+            <div className="grid gap-4 xl:grid-cols-2">
+              {categories.map((category) => (
+                <Card key={category.id} className="border-[var(--g3-border)]">
+                  <CardHeader className="rounded-t-3xl bg-[var(--g3-primary-soft)] pb-3">
+                    <CardTitle className="text-sm">{category.label}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <p className="text-sm text-[var(--g3-muted)]">{category.descricao}</p>
+                    <div className="space-y-2">
+                      {(groupedSuggestions[category.id] ?? []).map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          className="w-full rounded-2xl border border-[var(--g3-border)] bg-[var(--g3-card-soft)] px-3 py-3 text-left transition-colors hover:bg-[var(--g3-primary-soft)]"
+                          onClick={() => {
+                            setPerguntaSelecionada(item.pergunta);
+                            setAbaAtiva("conversa");
+                          }}
+                        >
+                          <span className="block text-sm font-semibold text-[var(--g3-foreground)]">{item.pergunta}</span>
+                          <span className="mt-1 block text-xs text-[var(--g3-muted)]">{item.descricao}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+      </section>
+    </AdminPageLayout>
   );
 }

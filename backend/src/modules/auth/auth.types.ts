@@ -9,5 +9,6 @@ export type UsuarioAutenticado = {
 export type JwtPayload = {
   sub: string;
   nomeUsuario: string;
+  nome?: string;
   permissoes: string[];
 };

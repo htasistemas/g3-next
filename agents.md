@@ -26,6 +26,11 @@
 - Não aceitar fluxo com clique duplo para executar ação.
 - Exibir feedback visual em ações assíncronas (carregando, sucesso, erro).
 
+### Manual do Sistema
+
+- MUST manter a tela `Configurações gerais > Manual do sistema` atualizada sempre que houver criação, alteração ou remoção relevante de tela, fluxo, regra de negócio ou nomenclatura no G3N.
+- MUST revisar o conteúdo do manual na mesma entrega em que a funcionalidade do sistema for alterada, evitando defasagem entre operação real e documentação interna.
+
 ### Capitalização UI
 
 - Toda tela criada ou alterada deve seguir obrigatoriamente este padrão de capitalização.
