@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import JsBarcode from "jsbarcode";
 import {
   CheckSquare,
   AlertTriangle,
@@ -24,6 +25,7 @@ import {
   Wrench,
   X
 } from "lucide-react";
+import QRCode from "qrcode";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -77,7 +79,7 @@ type EdicaoLote = {
 };
 
 const abas: AdminTab[] = [
-  { id: "dashboard", label: "Painel de controle", icon: BarChart3 },
+  { id: "dashboard", label: "Dashboard", icon: BarChart3 },
   { id: "cadastro", label: "Cadastro patrimonial", icon: Pencil },
   { id: "localizacao", label: "Localização e custódia", icon: MapPin },
   { id: "visual", label: "Identificação visual", icon: Camera },
@@ -265,6 +267,227 @@ function somarDistribuicao(
     .slice(0, 5);
 }
 
+function normalizarCodigoEtiqueta(numeroPatrimonio?: string) {
+  return (numeroPatrimonio ?? "").trim().replace(/\s+/g, " ");
+}
+
+function montarConteudoQr(item: Partial<Patrimonio>, codigoEtiqueta: string) {
+  return [
+    `Patrimônio: ${codigoEtiqueta || "Não informado"}`,
+    item.nome?.trim() ? `Bem: ${item.nome.trim()}` : "",
+    gerarResumoLocalizacao(item.unidade, item.sala),
+    item.responsavel?.trim() ? `Responsável: ${item.responsavel.trim()}` : "",
+    item.categoria?.trim() ? `Categoria: ${item.categoria.trim()}` : ""
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+type VisualCodeProps = {
+  value: string;
+  compact?: boolean;
+  size?: number;
+  showValue?: boolean;
+  barcodeHeight?: number;
+  barWidth?: number;
+};
+
+type FormatoEtiquetaId = "50x30" | "60x40" | "80x50";
+
+type FormatoEtiqueta = {
+  id: FormatoEtiquetaId;
+  label: string;
+  widthMm: number;
+  heightMm: number;
+  qrSize: number;
+  qrContainerPx: number;
+  barcodeHeight: number;
+  barWidth: number;
+  numeroFontPx: number;
+  nomeFontPx: number;
+  detalheFontPx: number;
+  rodapeFontPx: number;
+};
+
+const formatosEtiqueta: FormatoEtiqueta[] = [
+  {
+    id: "50x30",
+    label: "50 x 30 mm",
+    widthMm: 50,
+    heightMm: 30,
+    qrSize: 56,
+    qrContainerPx: 64,
+    barcodeHeight: 18,
+    barWidth: 0.72,
+    numeroFontPx: 13,
+    nomeFontPx: 7.5,
+    detalheFontPx: 6.5,
+    rodapeFontPx: 6
+  },
+  {
+    id: "60x40",
+    label: "60 x 40 mm",
+    widthMm: 60,
+    heightMm: 40,
+    qrSize: 70,
+    qrContainerPx: 78,
+    barcodeHeight: 24,
+    barWidth: 0.88,
+    numeroFontPx: 17,
+    nomeFontPx: 9.5,
+    detalheFontPx: 7.5,
+    rodapeFontPx: 6.8
+  },
+  {
+    id: "80x50",
+    label: "80 x 50 mm",
+    widthMm: 80,
+    heightMm: 50,
+    qrSize: 88,
+    qrContainerPx: 96,
+    barcodeHeight: 30,
+    barWidth: 1.1,
+    numeroFontPx: 20,
+    nomeFontPx: 11,
+    detalheFontPx: 9,
+    rodapeFontPx: 8
+  }
+];
+
+function BarcodePreview({
+  value,
+  compact = false,
+  showValue = !compact,
+  barcodeHeight,
+  barWidth
+}: VisualCodeProps) {
+  const svgRef = useRef<SVGSVGElement | null>(null);
+
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+
+    if (!value.trim()) {
+      svg.innerHTML = "";
+      return;
+    }
+
+    try {
+      JsBarcode(svg, value, {
+        format: "CODE128",
+        displayValue: false,
+        margin: 0,
+        width: barWidth ?? (compact ? 1.1 : 1.65),
+        height: barcodeHeight ?? (compact ? 30 : 46),
+        background: "transparent",
+        lineColor: "#0f172a"
+      });
+    } catch {
+      svg.innerHTML = "";
+    }
+  }, [value]);
+
+  if (!value.trim()) {
+    return (
+      <div
+        className={`border border-dashed border-[var(--g3-border)] bg-white/70 text-center text-[var(--g3-muted)] ${
+          compact ? "rounded-lg px-2 py-3 text-[10px]" : "rounded-xl px-3 py-5 text-xs"
+        }`}
+      >
+        Informe o número patrimonial para gerar o código de barras.
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`border border-white/70 bg-white/85 ${
+        compact ? "rounded-lg px-2 py-2" : "rounded-xl px-3 py-3"
+      }`}
+    >
+      <div className="overflow-hidden rounded-lg">
+        <svg
+          ref={svgRef}
+          className={compact ? "h-10 w-full" : "h-16 w-full"}
+          role="img"
+          aria-label={`Código de barras ${value}`}
+        />
+      </div>
+      {showValue ? (
+        <p className="mt-2 text-center text-xs font-semibold tracking-[0.24em] text-[var(--g3-foreground)]">
+          {value}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function QrCodePreview({ value, compact = false, size }: VisualCodeProps) {
+  const [svgMarkup, setSvgMarkup] = useState("");
+  const qrSize = size ?? (compact ? 88 : 156);
+
+  useEffect(() => {
+    let ativo = true;
+
+    if (!value.trim()) {
+      setSvgMarkup("");
+      return () => {
+        ativo = false;
+      };
+    }
+
+    void QRCode.toString(value, {
+      type: "svg",
+      margin: 1,
+      width: qrSize,
+      color: {
+        dark: "#0f172a",
+        light: "#ffffff"
+      }
+    })
+      .then((svg) => {
+        if (ativo) {
+          setSvgMarkup(svg);
+        }
+      })
+      .catch(() => {
+        if (ativo) {
+          setSvgMarkup("");
+        }
+      });
+
+    return () => {
+      ativo = false;
+    };
+  }, [value, qrSize]);
+
+  if (!value.trim()) {
+    return (
+      <div
+        className={`border border-dashed border-[var(--g3-border)] bg-white/70 text-center text-[var(--g3-muted)] ${
+          compact ? "rounded-lg px-2 py-3 text-[10px]" : "rounded-xl px-3 py-5 text-xs"
+        }`}
+      >
+        Informe o número patrimonial para gerar o QR code.
+      </div>
+    );
+  }
+
+  return (
+    <div className={`border border-white/70 bg-white/85 ${compact ? "rounded-lg p-2" : "rounded-xl p-3"}`}>
+      <div
+        className="mx-auto flex items-center justify-center overflow-hidden [&>svg]:h-full [&>svg]:w-full"
+        style={{ width: `${qrSize}px`, height: `${qrSize}px` }}
+        dangerouslySetInnerHTML={{
+          __html:
+            svgMarkup ||
+            '<div style="font-size:12px;color:#64748b;text-align:center;">Gerando QR code...</div>'
+        }}
+      />
+    </div>
+  );
+}
+
 export function PatrimonioPage() {
   const navigate = useNavigate();
   const [abaAtiva, setAbaAtiva] = useState<AbaId>("dashboard");
@@ -276,6 +499,7 @@ export function PatrimonioPage() {
   const [selecionadosIds, setSelecionadosIds] = useState<string[]>([]);
   const [edicaoLote, setEdicaoLote] = useState<EdicaoLote>(defaultEdicaoLote);
   const [somenteCamposVaziosLote, setSomenteCamposVaziosLote] = useState(true);
+  const [formatoEtiquetaId, setFormatoEtiquetaId] = useState<FormatoEtiquetaId>("80x50");
   const [form, setForm] = useState<Patrimonio>(defaultForm);
   const [snapshot, setSnapshot] = useState<Patrimonio>(defaultForm);
   const [movimento, setMovimento] = useState<MovimentoAssistido>(criarMovimentoPadrao());
@@ -432,6 +656,12 @@ export function PatrimonioPage() {
   const ultimaMovimentacaoFormulario = useMemo(() => extrairUltimaMovimentacao(form), [form]);
   const badgeStatusFormulario = useMemo(() => obterBadgeStatus(form.status), [form.status]);
   const badgeConservacaoFormulario = useMemo(() => obterBadgeConservacao(form.conservacao), [form.conservacao]);
+  const codigoEtiqueta = useMemo(() => normalizarCodigoEtiqueta(form.numeroPatrimonio), [form.numeroPatrimonio]);
+  const conteudoQrEtiqueta = useMemo(() => montarConteudoQr(form, codigoEtiqueta), [form, codigoEtiqueta]);
+  const formatoEtiquetaSelecionado = useMemo(
+    () => formatosEtiqueta.find((item) => item.id === formatoEtiquetaId) ?? formatosEtiqueta[2],
+    [formatoEtiquetaId]
+  );
 
   function validarCampoFormulario(campo: CampoFormulario, valor = form[campo]) {
     if (campo === "numeroPatrimonio") {
@@ -843,6 +1073,45 @@ export function PatrimonioPage() {
     }
   }
 
+  function imprimirEtiquetaTermica() {
+    try {
+      const { widthMm, heightMm } = formatoEtiquetaSelecionado;
+      imprimirConteudoAtual({
+        titulo: "Etiqueta patrimonial",
+        seletor: "#patrimonio-etiqueta-termica-print",
+        tamanhoPagina: `${widthMm}mm ${heightMm}mm`,
+        margemPagina: "2.5mm",
+        paddingRaiz: "0",
+        estilosExtras: `
+          html,
+          body {
+            width: ${widthMm}mm;
+            min-height: ${heightMm}mm;
+          }
+
+          .g3-print-root {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+          }
+
+          #patrimonio-etiqueta-termica-print {
+            width: ${widthMm}mm !important;
+            min-height: ${heightMm}mm !important;
+            max-width: ${widthMm}mm !important;
+            box-shadow: none !important;
+          }
+        `
+      });
+    } catch (error: any) {
+      setPopupMensagem({
+        tipo: "erro",
+        titulo: "Erro",
+        texto: error?.message ?? "Não foi possível preparar a etiqueta térmica."
+      });
+    }
+  }
+
   function fechar() {
     navigate("/dashboard/visao-geral");
   }
@@ -879,7 +1148,8 @@ export function PatrimonioPage() {
         activeTitle={abas.find((aba) => aba.id === abaAtiva)?.label}
         codeBadge={form.numeroPatrimonio ? `Patrimônio ${form.numeroPatrimonio}` : "Novo cadastro"}
       >
-        <section className="grid gap-3 xl:grid-cols-[2fr,1fr]">
+        {abaAtiva === "dashboard" ? (
+          <section className="grid gap-3 xl:grid-cols-[2fr,1fr]">
           <Card className="border-[var(--g3-border)]">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm">Resumo executivo do patrimônio</CardTitle>
@@ -1038,7 +1308,8 @@ export function PatrimonioPage() {
               </div>
             </CardContent>
           </Card>
-        </section>
+          </section>
+        ) : null}
 
         {abaAtiva === "dashboard" ? (
           <section className="space-y-3">
@@ -1621,31 +1892,62 @@ export function PatrimonioPage() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="rounded-2xl border border-[var(--g3-border)] bg-gradient-to-br from-[var(--g3-primary-soft)] via-white to-[var(--g3-primary-soft)]/20 p-5">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--g3-muted)]">
-                      Etiqueta patrimonial
-                    </p>
-                    <p className="mt-3 text-3xl font-semibold tracking-tight text-[var(--g3-active)]">
-                      {form.numeroPatrimonio || "Sem número"}
-                    </p>
-                    <p className="mt-2 text-base font-semibold text-[var(--g3-foreground)]">
-                      {form.nome || "Nome do patrimônio"}
-                    </p>
-                    <div className="mt-4 grid gap-3 md:grid-cols-2">
-                      <div className="rounded-xl border border-white/70 bg-white/70 p-3">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--g3-muted)]">
-                          Local
+                    <div className="grid gap-4 xl:grid-cols-[1.3fr,190px]">
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--g3-muted)]">
+                          Etiqueta patrimonial
                         </p>
-                        <p className="mt-1 text-sm font-medium text-[var(--g3-foreground)]">
-                          {gerarResumoLocalizacao(form.unidade, form.sala)}
+                        <p className="mt-3 text-3xl font-semibold tracking-tight text-[var(--g3-active)]">
+                          {form.numeroPatrimonio || "Sem número"}
                         </p>
+                        <p className="mt-2 text-base font-semibold text-[var(--g3-foreground)]">
+                          {form.nome || "Nome do patrimônio"}
+                        </p>
+                        <div className="mt-4 grid gap-3 md:grid-cols-2">
+                          <div className="rounded-xl border border-white/70 bg-white/70 p-3">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--g3-muted)]">
+                              Local
+                            </p>
+                            <p className="mt-1 text-sm font-medium text-[var(--g3-foreground)]">
+                              {gerarResumoLocalizacao(form.unidade, form.sala)}
+                            </p>
+                          </div>
+                          <div className="rounded-xl border border-white/70 bg-white/70 p-3">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--g3-muted)]">
+                              Responsável
+                            </p>
+                            <p className="mt-1 text-sm font-medium text-[var(--g3-foreground)]">
+                              {form.responsavel || "---"}
+                            </p>
+                          </div>
+                        </div>
                       </div>
-                      <div className="rounded-xl border border-white/70 bg-white/70 p-3">
+
+                      <div className="rounded-2xl border border-white/70 bg-white/70 p-3">
                         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--g3-muted)]">
-                          Responsável
+                          QR code
                         </p>
-                        <p className="mt-1 text-sm font-medium text-[var(--g3-foreground)]">
-                          {form.responsavel || "---"}
-                        </p>
+                        <div className="mt-3">
+                          <QrCodePreview value={conteudoQrEtiqueta} />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 rounded-2xl border border-white/70 bg-white/70 p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--g3-muted)]">
+                            Código de barras
+                          </p>
+                          <p className="mt-1 text-xs text-[var(--g3-muted)]">
+                            A leitura usa o número patrimonial atual.
+                          </p>
+                        </div>
+                        <Badge variant="info">{codigoEtiqueta || "Sem número"}</Badge>
+                      </div>
+
+                      <div className="mt-3">
+                        <BarcodePreview value={codigoEtiqueta} />
                       </div>
                     </div>
                   </div>
@@ -1655,10 +1957,122 @@ export function PatrimonioPage() {
                     <Badge variant={badgeConservacaoFormulario.variant}>{badgeConservacaoFormulario.label}</Badge>
                   </div>
 
-                  <Button variant="outline" onClick={imprimir}>
-                    <Printer className="mr-2 h-4 w-4" />
-                    Imprimir ficha atual
-                  </Button>
+                  <div className="rounded-2xl border border-[var(--g3-border)] bg-[var(--g3-card)] p-4">
+                    <div className="grid gap-3 md:grid-cols-[minmax(0,1fr),220px] md:items-start">
+                      <div>
+                        <p className="text-sm font-semibold text-[var(--g3-foreground)]">
+                          Etiqueta térmica pronta para impressão
+                        </p>
+                        <p className="mt-1 text-xs text-[var(--g3-muted)]">
+                          Escolha o tamanho da etiqueta e a prévia será atualizada com número, código de barras e QR code.
+                        </p>
+                      </div>
+                      <div className="space-y-1">
+                        <Label>Tamanho da etiqueta</Label>
+                        <Select
+                          value={formatoEtiquetaId}
+                          onChange={(event) => setFormatoEtiquetaId(event.target.value as FormatoEtiquetaId)}
+                        >
+                          {formatosEtiqueta.map((formato) => (
+                            <option key={formato.id} value={formato.id}>
+                              {formato.label}
+                            </option>
+                          ))}
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Badge variant="info">{formatoEtiquetaSelecionado.label}</Badge>
+                      <Badge variant="info">
+                        {formatoEtiquetaSelecionado.widthMm} x {formatoEtiquetaSelecionado.heightMm} mm
+                      </Badge>
+                    </div>
+
+                    <div className="mt-4 overflow-x-auto pb-1">
+                      <div
+                        id="patrimonio-etiqueta-termica-print"
+                        className="rounded-2xl border border-slate-300 bg-white p-3 text-slate-900 shadow-sm"
+                        style={{
+                          width: `${formatoEtiquetaSelecionado.widthMm}mm`,
+                          maxWidth: "100%",
+                          minHeight: `${formatoEtiquetaSelecionado.heightMm}mm`
+                        }}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                              Patrimônio
+                            </p>
+                            <p
+                              className="mt-1 font-bold leading-none text-slate-900"
+                              style={{ fontSize: `${formatoEtiquetaSelecionado.numeroFontPx}px` }}
+                            >
+                              {codigoEtiqueta || "Sem número"}
+                            </p>
+                            <p
+                              className="mt-1 font-semibold leading-tight text-slate-900"
+                              style={{ fontSize: `${formatoEtiquetaSelecionado.nomeFontPx}px` }}
+                            >
+                              {form.nome || "Nome do patrimônio"}
+                            </p>
+                            <p
+                              className="mt-1 leading-tight text-slate-600"
+                              style={{ fontSize: `${formatoEtiquetaSelecionado.detalheFontPx}px` }}
+                            >
+                              {gerarResumoLocalizacao(form.unidade, form.sala)}
+                            </p>
+                            <p
+                              className="mt-1 leading-tight text-slate-600"
+                              style={{ fontSize: `${formatoEtiquetaSelecionado.detalheFontPx}px` }}
+                            >
+                              {form.responsavel || "Responsável não definido"}
+                            </p>
+                          </div>
+
+                          <div
+                            className="shrink-0"
+                            style={{ width: `${formatoEtiquetaSelecionado.qrContainerPx}px` }}
+                          >
+                            <QrCodePreview
+                              value={conteudoQrEtiqueta}
+                              compact
+                              size={formatoEtiquetaSelecionado.qrSize}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="mt-2">
+                          <BarcodePreview
+                            value={codigoEtiqueta}
+                            compact
+                            showValue={false}
+                            barcodeHeight={formatoEtiquetaSelecionado.barcodeHeight}
+                            barWidth={formatoEtiquetaSelecionado.barWidth}
+                          />
+                        </div>
+
+                        <div
+                          className="mt-1 flex items-center justify-between gap-2 font-medium uppercase tracking-[0.14em] text-slate-500"
+                          style={{ fontSize: `${formatoEtiquetaSelecionado.rodapeFontPx}px` }}
+                        >
+                          <span>{codigoEtiqueta || "Sem número"}</span>
+                          <span>{form.categoria?.trim() || "Sem categoria"}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" onClick={imprimir}>
+                      <Printer className="mr-2 h-4 w-4" />
+                      Imprimir ficha atual
+                    </Button>
+                    <Button onClick={imprimirEtiquetaTermica}>
+                      <Printer className="mr-2 h-4 w-4" />
+                      Imprimir etiqueta térmica
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
 

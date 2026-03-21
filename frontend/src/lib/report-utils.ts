@@ -96,11 +96,19 @@ export function reservarJanelaRelatorio(titulo = "Gerando relatório"): JanelaRe
 type ImprimirConteudoOptions = {
   titulo?: string;
   seletor?: string;
+  tamanhoPagina?: string;
+  margemPagina?: string;
+  paddingRaiz?: string;
+  estilosExtras?: string;
 };
 
 export function imprimirConteudoAtual(options?: ImprimirConteudoOptions) {
   const titulo = options?.titulo ?? document.title;
   const seletor = options?.seletor ?? "main";
+  const tamanhoPagina = options?.tamanhoPagina;
+  const margemPagina = options?.margemPagina ?? "12mm";
+  const paddingRaiz = options?.paddingRaiz ?? "24px";
+  const estilosExtras = options?.estilosExtras ?? "";
   const elemento = document.querySelector<HTMLElement>(seletor);
 
   if (!elemento) {
@@ -125,7 +133,8 @@ export function imprimirConteudoAtual(options?: ImprimirConteudoOptions) {
         ${estilos}
         <style>
           @page {
-            margin: 12mm;
+            ${tamanhoPagina ? `size: ${tamanhoPagina};` : ""}
+            margin: ${margemPagina};
           }
 
           body {
@@ -135,7 +144,7 @@ export function imprimirConteudoAtual(options?: ImprimirConteudoOptions) {
           }
 
           .g3-print-root {
-            padding: 24px;
+            padding: ${paddingRaiz};
           }
 
           [data-print="toolbar"],
@@ -185,6 +194,8 @@ export function imprimirConteudoAtual(options?: ImprimirConteudoOptions) {
             max-width: 100%;
             height: auto;
           }
+
+          ${estilosExtras}
         </style>
       </head>
       <body>
