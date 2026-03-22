@@ -1,6 +1,56 @@
 {
   "entries": [
     {
+      "version": "1.00.265",
+      "releaseDate": "2026-03-22",
+      "title": "Simplificação da consulta no almoxarifado",
+      "description": "A visualização de produtos passou a ficar concentrada apenas na aba Listagem de produtos.",
+      "changes": [
+        "Remoção da aba Itens do almoxarifado.",
+        "Manutenção da aba Listagem de produtos como ponto único de consulta.",
+        "Manual do sistema ajustado ao novo fluxo."
+      ],
+      "releaseType": "stable"
+    },
+    {
+      "version": "1.00.264",
+      "releaseDate": "2026-03-22",
+      "title": "Listagem de produtos no almoxarifado",
+      "description": "Inclusão de uma aba dedicada para visualizar todos os produtos cadastrados com suas quantidades.",
+      "changes": [
+        "Nova aba Listagem de produtos na tela de almoxarifado.",
+        "Exibição de código, produto, categoria, unidade, quantidade e situação.",
+        "Manual do sistema atualizado com a orientação da nova aba."
+      ],
+      "releaseType": "stable"
+    },
+    {
+      "version": "1.00.263",
+      "releaseDate": "2026-03-22",
+      "title": "Ajuste no popup de pendências do beneficiário",
+      "description": "O aviso de pendências do cadastro de beneficiários agora respeita a altura da tela e usa rolagem interna.",
+      "changes": [
+        "Popup de pendências com altura máxima pela viewport.",
+        "Cabeçalho e botão Ciente mantidos acessíveis mesmo com muitos itens.",
+        "Manual do sistema atualizado com a orientação do novo comportamento."
+      ],
+      "releaseType": "stable"
+    },
+    {
+      "version": "1.00.262",
+      "releaseDate": "2026-03-22",
+      "title": "Filtros estratégicos no georreferenciamento",
+      "description": "Inclusão de novos atalhos de leitura territorial e atualização do manual do sistema.",
+      "changes": [
+        "Novo botão Idosos sozinhos na tela de georreferenciamento.",
+        "Novo botão Aguardando cestas para priorizar demanda alimentar urgente.",
+        "Novo botão Mapa de apoio e risco cruzando violência, cestas, instituições e doadores.",
+        "Lista de camadas do mapa alinhada às opções retornadas pelo backend.",
+        "Manual do sistema atualizado com orientações da tela de georreferenciamento."
+      ],
+      "releaseType": "stable"
+    },
+    {
       "version": "1.00.170",
       "releaseDate": "2026-03-18",
       "title": "Mecanismo de atualização do sistema",

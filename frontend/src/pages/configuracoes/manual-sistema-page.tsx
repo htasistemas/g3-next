@@ -69,7 +69,8 @@ const secoesManual: ManualSecao[] = [
         ],
         atencoes: [
           "CPF, e-mail, telefone e CEP devem respeitar as máscaras e validações padronizadas.",
-          "Pendências de cadastro impactam atendimentos, benefícios e relatórios."
+          "Pendências de cadastro impactam atendimentos, benefícios e relatórios.",
+          "O aviso de pendências abre com rolagem interna quando houver muitos itens, mantendo o botão de fechamento sempre acessível."
         ]
       }
     ]
@@ -121,6 +122,49 @@ const secoesManual: ManualSecao[] = [
           "Consulte a listagem de inscrições para localizar status, vaga e situação do participante.",
           "Use os dados da inscrição para registrar turma, responsável, datas e observações.",
           "Revise a fila de espera e a situação de vagas para apoiar decisões de encaminhamento."
+        ]
+      }
+    ]
+  },
+  {
+    id: "dashboard",
+    titulo: "Dashboard territorial",
+    descricao: "Leitura geográfica para localizar vulnerabilidades, rede de apoio e áreas de risco.",
+    icon: Search,
+    telas: [
+      {
+        nome: "Georreferenciamento",
+        objetivo: "Cruzar camadas do território para localizar beneficiários, famílias, cestas, violência, instituições e doadores em um único mapa.",
+        comoUsar: [
+          "Use os filtros laterais para escolher camadas, bairros e período antes de atualizar a leitura territorial.",
+          "O botão Idosos sozinhos aplica foco em beneficiários e famílias com faixa etária idoso e sinais de vulnerabilidade alimentar.",
+          "O botão Aguardando cestas concentra famílias e beneficiários com necessidade urgente de alimentos para apoiar priorização operacional.",
+          "O botão Mapa de apoio e risco cruza violência, cestas entregues, instituições e doadores em visão agregada para leitura estratégica."
+        ],
+        atencoes: [
+          "Os atalhos estratégicos ajustam filtros automaticamente e podem ser combinados com bairro e período.",
+          "As camadas Instituições e Doadores ficam disponíveis na lista O que ver no mapa? para aprofundar a análise territorial."
+        ]
+      }
+    ]
+  },
+  {
+    id: "administrativo",
+    titulo: "Setor administrativo",
+    descricao: "Rotinas de apoio operacional e controle interno do G3N.",
+    icon: SlidersHorizontal,
+    telas: [
+      {
+        nome: "Almoxarifado",
+        objetivo: "Controlar cadastros, kits, movimentações e a visualização consolidada dos produtos armazenados.",
+        comoUsar: [
+          "Use a aba Listagem de produtos para ver todos os produtos cadastrados no almoxarifado com a quantidade em estoque.",
+          "Clique em um produto da listagem para abrir o item no cadastro e continuar edição ou conferência.",
+          "Use a aba Movimentações para registrar entradas, saídas e ajustes de estoque."
+        ],
+        atencoes: [
+          "A consulta de produtos fica centralizada na aba Listagem de produtos.",
+          "Cadastros e movimentações devem permanecer coerentes para evitar divergência de saldo."
         ]
       }
     ]

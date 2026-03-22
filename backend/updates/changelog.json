@@ -1,6 +1,50 @@
 {
   "entries": [
     {
+      "version": "1.00.265",
+      "releaseDate": "2026-03-22",
+      "title": "Simplificação da consulta no almoxarifado",
+      "description": "Atualização local da instância com a remoção da aba duplicada de consulta.",
+      "changes": [
+        "Aba Itens do almoxarifado removida.",
+        "Consulta mantida somente na aba Listagem de produtos."
+      ],
+      "releaseType": "stable"
+    },
+    {
+      "version": "1.00.264",
+      "releaseDate": "2026-03-22",
+      "title": "Listagem de produtos no almoxarifado",
+      "description": "Atualização local da instância com a nova aba de listagem de produtos.",
+      "changes": [
+        "Nova aba para visualizar todos os produtos do almoxarifado com a quantidade em estoque.",
+        "Manual do sistema revisado na mesma entrega."
+      ],
+      "releaseType": "stable"
+    },
+    {
+      "version": "1.00.263",
+      "releaseDate": "2026-03-22",
+      "title": "Ajuste no popup de pendências do beneficiário",
+      "description": "Atualização local da instância com correção de rolagem no aviso de pendências.",
+      "changes": [
+        "Popup de pendências com limite de altura e rolagem interna.",
+        "Botão de fechamento mantido acessível em listas extensas."
+      ],
+      "releaseType": "stable"
+    },
+    {
+      "version": "1.00.262",
+      "releaseDate": "2026-03-22",
+      "title": "Filtros estratégicos no georreferenciamento",
+      "description": "Atualização local da instância com novos botões e manual revisado.",
+      "changes": [
+        "Tela de georreferenciamento com atalhos Idosos sozinhos, Aguardando cestas e Mapa de apoio e risco.",
+        "Manual do sistema revisado na mesma entrega."
+      ],
+      "releaseType": "stable"
+    },
+    {
       "version": "0.0.0",
       "releaseDate": "2026-03-20",
       "title": "Base atual",

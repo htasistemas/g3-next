@@ -2893,19 +2893,19 @@ export function CadastroBeneficiarioPage() {
 
       {avisoPendenciasSelecao.length > 0 && (
         <div
-          className="fixed inset-0 z-[59] flex items-center justify-center bg-slate-900/45 px-4"
+          className="fixed inset-0 z-[59] flex items-center justify-center bg-slate-900/45 px-4 py-4"
           role="dialog"
           aria-modal="true"
           onClick={() => setAvisoPendenciasSelecao([])}
         >
           <div
-            className="w-full max-w-lg rounded-xl border border-slate-200 bg-white shadow-2xl"
+            className="flex max-h-[calc(100vh-2rem)] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl sm:max-h-[92vh]"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="border-b border-slate-100 px-5 py-4">
+            <div className="shrink-0 border-b border-slate-100 px-5 py-4">
               <h3 className="text-base font-semibold text-slate-900">Aviso de pendências</h3>
             </div>
-            <div className="px-5 py-4">
+            <div className="flex-1 overflow-y-auto px-5 py-4">
               <p className="mb-3 text-sm text-slate-700">
                 Este cadastro possui pendências ou alertas que merecem atenção:
               </p>
@@ -2924,7 +2924,7 @@ export function CadastroBeneficiarioPage() {
                 ))}
               </div>
             </div>
-            <div className="flex justify-end border-t border-slate-100 px-5 py-3">
+            <div className="shrink-0 border-t border-slate-100 px-5 py-3">
               <Button type="button" onClick={() => setAvisoPendenciasSelecao([])}>
                 Ciente
               </Button>

@@ -63,7 +63,7 @@ const filtrosPadrao: GeoFilters = {
   periodoTipo: "cadastro"
 };
 
-function alternarValor(lista: string[], valor: string) {
+function alternarValor<T extends string>(lista: T[], valor: T): T[] {
   return lista.includes(valor) ? lista.filter((item) => item !== valor) : [...lista, valor];
 }
 
@@ -148,6 +148,10 @@ function FiltroLista({ titulo, itens, selecionados, onToggle }: { titulo: string
   return <div><Label className="text-[10px] font-bold uppercase text-[var(--g3-muted)] tracking-wider">{titulo}</Label><div className="mt-2 max-h-32 space-y-1 overflow-auto rounded-lg border border-[var(--g3-border)] p-1.5 bg-white shadow-inner">{itens.slice(0, 24).map((item) => <label key={item} className="flex items-center gap-2 rounded px-1.5 py-1 hover:bg-[var(--g3-card-soft)] transition-colors cursor-pointer"><Checkbox checked={selecionados.includes(item)} onChange={() => onToggle(item)} /><span className="text-xs">{item}</span></label>)}</div></div>;
 }
 
+function mesmasCamadas(atuais: GeoLayer[], esperadas: GeoLayer[]) {
+  return atuais.length === esperadas.length && esperadas.every((item) => atuais.includes(item));
+}
+
 function criarIconePin(cor: string) {
   return L.divIcon({
     html: `<svg width="24" height="32" viewBox="0 0 24 32" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 0C5.37 0 0 5.37 0 12C0 21 12 32 12 32C12 32 24 21 24 12C24 5.37 18.63 0 12 0ZM12 16C9.79 16 8 14.21 8 12C8 9.79 9.79 8 12 8C14.21 8 16 9.79 16 12C16 14.21 14.21 16 12 16Z" fill="${cor}"/><path d="M12 14C13.1046 14 14 13.1046 14 12C14 10.8954 13.1046 10 12 10C10.8954 10 10 10.8954 10 12C10 13.1046 10.8954 14 12 14Z" fill="white"/></svg>`,
@@ -208,44 +212,68 @@ export function VulnerabilidadePage() {
     setFiltros((atual) => ({
       ...atual,
       camadas: ["beneficiarios", "pontos_distribuicao"],
+      modo: "cluster",
       receberCestaBasica: true,
       necessidadeCesta: undefined,
-      ocorrenciaViolencia: undefined
+      ocorrenciaViolencia: undefined,
+      faixaEtaria: [],
+      situacaoVulnerabilidade: []
     }));
-    setMensagem("Modo Cesta Basica ativado.");
+    setMensagem("Filtro de cestas entregues ativado.");
   }
 
   function ativarModoBeneficiarios() {
     setFiltros((atual) => ({
       ...atual,
       camadas: ["beneficiarios"],
+      modo: "cluster",
       receberCestaBasica: undefined,
       necessidadeCesta: undefined,
       ocorrenciaViolencia: undefined,
       faixaEtaria: [],
-      status: []
+      status: [],
+      situacaoVulnerabilidade: []
     }));
-    setMensagem("Foco em Beneficiarios Cadastrados ativado.");
+    setMensagem("Foco em beneficiários cadastrados ativado.");
   }
 
-  function ativarFocoIdosos() {
+  function ativarFocoIdososSozinhos() {
     setFiltros((atual) => ({
       ...atual,
-      camadas: ["beneficiarios", "familias"],
+      camadas: ["beneficiarios", "familias", "vulnerabilidade"],
+      modo: "cluster",
       faixaEtaria: ["idoso"],
-      receberCestaBasica: undefined
+      receberCestaBasica: undefined,
+      necessidadeCesta: true,
+      ocorrenciaViolencia: undefined
     }));
-    setMensagem("Foco em Idosos ativado.");
+    setMensagem("Filtro de idosos sozinhos ativado.");
   }
 
-  function ativarFocoInseguranca() {
+  function ativarAguardandoCestas() {
     setFiltros((atual) => ({
       ...atual,
-      camadas: ["beneficiarios", "familias", "pontos_distribuicao"],
+      camadas: ["beneficiarios", "familias", "pontos_distribuicao", "vulnerabilidade"],
+      modo: "cluster",
       necessidadeCesta: true,
-      receberCestaBasica: undefined
+      receberCestaBasica: undefined,
+      ocorrenciaViolencia: undefined
     }));
-    setMensagem("Mapa de Inseguranca Alimentar ativado.");
+    setMensagem("Filtro de famílias aguardando cestas ativado.");
+  }
+
+  function ativarMapaApoioERisco() {
+    setFiltros((atual) => ({
+      ...atual,
+      camadas: ["violencia", "pontos_distribuicao", "instituicoes", "doadores"] as GeoLayer[],
+      modo: "agregado",
+      receberCestaBasica: undefined,
+      necessidadeCesta: undefined,
+      ocorrenciaViolencia: undefined,
+      faixaEtaria: [],
+      situacaoVulnerabilidade: []
+    }));
+    setMensagem("Mapa de apoio e risco ativado.");
   }
 
   function alternarCamada(camada: GeoLayer) {
@@ -280,6 +308,31 @@ export function VulnerabilidadePage() {
     setMensagem("Janela de impressao aberta para PDF.");
   }
 
+  const camadasDisponiveis: GeoLayer[] = opcoes?.camadas?.map((item) => item.id as GeoLayer) ?? ([
+    "beneficiarios",
+    "familias",
+    "voluntarios",
+    "profissionais",
+    "instituicoes",
+    "doadores",
+    "pontos_distribuicao",
+    "vulnerabilidade",
+    "violencia"
+  ] as GeoLayer[]);
+
+  const idososSozinhosAtivo =
+    mesmasCamadas(filtros.camadas, ["beneficiarios", "familias", "vulnerabilidade"]) &&
+    filtros.modo === "cluster" &&
+    filtros.faixaEtaria.includes("idoso") &&
+    filtros.necessidadeCesta === true;
+  const aguardandoCestasAtivo =
+    mesmasCamadas(filtros.camadas, ["beneficiarios", "familias", "pontos_distribuicao", "vulnerabilidade"]) &&
+    filtros.modo === "cluster" &&
+    filtros.necessidadeCesta === true;
+  const mapaApoioERiscoAtivo =
+    mesmasCamadas(filtros.camadas, ["violencia", "pontos_distribuicao", "instituicoes", "doadores"]) &&
+    filtros.modo === "agregado";
+
   return (
     <main className="flex h-[calc(100vh-64px)] w-full overflow-hidden bg-slate-50">
       {/* BARRA LATERAL DE FILTROS */}
@@ -295,7 +348,7 @@ export function VulnerabilidadePage() {
             <div className="space-y-3">
               <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">O que ver no mapa?</Label>
               <div className="grid grid-cols-1 gap-1.5">
-                {(["beneficiarios", "familias", "voluntarios", "profissionais", "pontos_distribuicao", "violencia"] as GeoLayer[]).map(c => (
+                {camadasDisponiveis.map(c => (
                   <label key={c} className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg border text-xs cursor-pointer transition-all ${filtros.camadas.includes(c) ? "border-blue-200 bg-blue-50 text-blue-700 font-bold" : "bg-white border-slate-100 text-slate-500 hover:border-slate-300"}`}>
                     <div className="flex items-center gap-2">
                       <Checkbox checked={filtros.camadas.includes(c)} onChange={() => alternarCamada(c)} />
@@ -319,18 +372,40 @@ export function VulnerabilidadePage() {
               <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Visoes Estrategicas</Label>
               <div className="grid grid-cols-1 gap-2">
                 <Button variant="outline" size="sm" className={`justify-start h-10 border-emerald-200 text-emerald-700 hover:bg-emerald-50 ${filtros.receberCestaBasica ? "bg-emerald-100 ring-2 ring-emerald-500 ring-offset-1" : ""}`} onClick={ativarModoCesta}>
-                  <MapPinned className="mr-2 h-4 w-4" /> Cestas Entregues
+                  <MapPinned className="mr-2 h-4 w-4" /> Cestas entregues
                 </Button>
                 <Button variant="outline" size="sm" className="justify-start h-10 border-blue-200 text-blue-700 hover:bg-blue-50" onClick={ativarModoBeneficiarios}>
-                  <Target className="mr-2 h-4 w-4" /> Todos os Cadastrados
+                  <Target className="mr-2 h-4 w-4" /> Todos os cadastrados
                 </Button>
-                
-                {/* SUGESTOES DE LOCALIZACAO (PLACEHOLDERS DE ACOES) */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={`justify-start h-10 border-amber-200 text-amber-700 hover:bg-amber-50 ${idososSozinhosAtivo ? "bg-amber-100 ring-2 ring-amber-500 ring-offset-1" : ""}`}
+                  onClick={ativarFocoIdososSozinhos}
+                >
+                  <Target className="mr-2 h-4 w-4" /> Idosos sozinhos
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={`justify-start h-10 border-rose-200 text-rose-700 hover:bg-rose-50 ${aguardandoCestasAtivo ? "bg-rose-100 ring-2 ring-rose-500 ring-offset-1" : ""}`}
+                  onClick={ativarAguardandoCestas}
+                >
+                  <MapPinned className="mr-2 h-4 w-4" /> Aguardando cestas
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={`justify-start h-auto min-h-10 border-slate-300 text-slate-700 hover:bg-slate-50 ${mapaApoioERiscoAtivo ? "bg-slate-100 ring-2 ring-slate-500 ring-offset-1" : ""}`}
+                  onClick={ativarMapaApoioERisco}
+                >
+                  <MapPinned className="mr-2 h-4 w-4" /> Mapa de apoio e risco
+                </Button>
                 <div className="rounded-xl bg-slate-50 p-3 space-y-2 border border-dashed border-slate-200">
-                  <span className="text-[9px] font-bold text-slate-400 uppercase">Sugestoes de Analise</span>
-                  <button onClick={() => setMensagem("Dica: Use o filtro de Vulnerabilidade para encontrar familias sem renda.")} className="block text-[10px] text-slate-600 hover:text-blue-600 text-left w-full">• Onde estao os idosos sozinhos?</button>
-                  <button onClick={() => setMensagem("Dica: Filtre por 'Necessidade de Cesta' para planejar a proxima entrega.")} className="block text-[10px] text-slate-600 hover:text-blue-600 text-left w-full">• Familias que aguardam cestas</button>
-                  <button onClick={() => setMensagem("Dica: Ative a camada de Violencia para ver areas de risco.")} className="block text-[10px] text-slate-600 hover:text-blue-600 text-left w-full">• Areas com maior indice de violencia</button>
+                  <span className="text-[9px] font-bold text-slate-400 uppercase">Leitura rápida</span>
+                  <p className="text-[10px] text-slate-600">Idosos sozinhos prioriza beneficiários e famílias com faixa etária idoso e sinais de vulnerabilidade alimentar.</p>
+                  <p className="text-[10px] text-slate-600">Aguardando cestas concentra famílias e beneficiários com necessidade urgente de cesta.</p>
+                  <p className="text-[10px] text-slate-600">Mapa de apoio e risco cruza violência, cestas entregues, instituições e doadores em visão agregada.</p>
                 </div>
               </div>
             </div>
@@ -395,7 +470,7 @@ export function VulnerabilidadePage() {
 
             {data?.marcadores.map((item) => (
               (item.quantidade ?? 1) > 1 ? (
-                <CircleMarker key={item.id} center={[item.latitude, item.longitude]} radius={Math.min(24, 10 + item.quantidade / 4)} pathOptions={{ color: estilosCamada[item.camada], fillColor: estilosCamada[item.camada], fillOpacity: 0.8, weight: 2 }}>
+                <CircleMarker key={item.id} center={[item.latitude, item.longitude]} radius={Math.min(24, 10 + (item.quantidade ?? 1) / 4)} pathOptions={{ color: estilosCamada[item.camada], fillColor: estilosCamada[item.camada], fillOpacity: 0.8, weight: 2 }}>
                   <Tooltip permanent direction="center" className="!border-0 !bg-transparent !p-0 !shadow-none"><span className="text-[10px] font-black text-white">{item.quantidade}</span></Tooltip>
                 </CircleMarker>
               ) : (

@@ -1,9 +1,9 @@
 {
-  "latestVersion": "0.0.0",
-  "releaseDate": "2026-03-20",
+  "latestVersion": "1.00.265",
+  "releaseDate": "2026-03-22",
   "description": "Versão atualmente instalada nesta instância.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "0.0.0",
+  "minCompatibleVersion": "1.00.265",
   "releaseType": "stable"
 }

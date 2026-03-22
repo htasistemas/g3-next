@@ -33,13 +33,13 @@ import { imprimirConteudoAtual } from "@/lib/report-utils";
 import { almoxarifadoService } from "@/services/almoxarifado.service";
 import type { ComposicaoKitItem, ItemAlmoxarifado, MovimentacaoAlmoxarifado } from "@/types/almoxarifado";
 
-type AbaId = "dashboards" | "cadastro" | "kit" | "itens" | "movimentacoes";
+type AbaId = "dashboards" | "listagem_produtos" | "cadastro" | "kit" | "movimentacoes";
 
 const abas: AdminTab[] = [
   { id: "dashboards", label: "Dashboards", icon: ChartBar },
-  { id: "cadastro", label: "Cadastros De Itens", icon: BoxSelect },
-  { id: "kit", label: "Composição Do Kit", icon: Boxes },
-  { id: "itens", label: "Itens Do Almoxarifado", icon: ClipboardList },
+  { id: "listagem_produtos", label: "Listagem de produtos", icon: ClipboardList },
+  { id: "cadastro", label: "Cadastros de itens", icon: BoxSelect },
+  { id: "kit", label: "Composição do kit", icon: Boxes },
   { id: "movimentacoes", label: "Movimentações", icon: ClipboardList }
 ];
 
@@ -269,7 +269,7 @@ export function AlmoxarifadoPage() {
   }
 
   const acoes: AdminAction[] = [
-    { label: "Buscar", icon: Search, onClick: () => setAbaAtiva("itens"), variant: "outline" },
+    { label: "Buscar", icon: Search, onClick: () => setAbaAtiva("listagem_produtos"), variant: "outline" },
     { label: "Novo", icon: Plus, onClick: novo, variant: "default", disabled: carregandoAcoes },
     { label: "Salvar", icon: Save, onClick: () => void salvar(), variant: "default", disabled: carregandoAcoes },
     { label: "Cancelar", icon: Undo2, onClick: cancelar, variant: "outline", disabled: carregandoAcoes },
@@ -397,12 +397,65 @@ export function AlmoxarifadoPage() {
           </section>
         ) : null}
 
-        {abaAtiva === "itens" ? (
+        {abaAtiva === "listagem_produtos" ? (
           <section className="space-y-3">
-            <div className="space-y-1"><Label>Buscar Item</Label><Input placeholder="Código, descrição, categoria ou situação" value={busca} onChange={(event) => setBusca(event.target.value)} /></div>
+            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
+              <div className="space-y-1">
+                <Label>Buscar produto</Label>
+                <Input
+                  placeholder="Código, descrição, categoria ou situação"
+                  value={busca}
+                  onChange={(event) => setBusca(event.target.value)}
+                />
+              </div>
+              <Card className="border-emerald-200 bg-emerald-50">
+                <CardContent className="flex h-full flex-col justify-center px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">Produtos listados</p>
+                  <p className="mt-1 text-2xl font-semibold text-emerald-950">
+                    {carregandoItens ? "..." : itensFiltrados.length}
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
             <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]">
-              <table className="min-w-full text-sm"><thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"><tr><th className="px-3 py-2 text-left">Código</th><th className="px-3 py-2 text-left">Descrição</th><th className="px-3 py-2 text-left">Categoria</th><th className="px-3 py-2 text-left">Estoque</th><th className="px-3 py-2 text-left">Situação</th></tr></thead>
-                <tbody>{carregandoItens ? (<tr><td colSpan={5} className="px-3 py-4 text-center">Carregando itens...</td></tr>) : itensFiltrados.length ? itensFiltrados.map((item, index) => (<tr key={item.id_item ?? `${item.codigo}-${index}`} className={`border-t border-[var(--g3-border)] ${index % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35"}`} onClick={() => void selecionarItem(item)}><td className="px-3 py-2">{item.codigo}</td><td className="px-3 py-2">{item.descricao}</td><td className="px-3 py-2">{item.categoria}</td><td className="px-3 py-2">{item.estoque_atual}</td><td className="px-3 py-2">{item.situacao}</td></tr>)) : (<tr><td colSpan={5} className="px-3 py-4 text-center">Nenhum item encontrado.</td></tr>)}</tbody>
+              <table className="min-w-full text-sm">
+                <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Código</th>
+                    <th className="px-3 py-2 text-left">Produto</th>
+                    <th className="px-3 py-2 text-left">Categoria</th>
+                    <th className="px-3 py-2 text-left">Unidade</th>
+                    <th className="px-3 py-2 text-left">Quantidade</th>
+                    <th className="px-3 py-2 text-left">Situação</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {carregandoItens ? (
+                    <tr>
+                      <td colSpan={6} className="px-3 py-4 text-center">Carregando produtos...</td>
+                    </tr>
+                  ) : itensFiltrados.length ? (
+                    itensFiltrados.map((item, index) => (
+                      <tr
+                        key={item.id_item ?? `${item.codigo}-${index}`}
+                        className={`border-t border-[var(--g3-border)] ${index % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35"}`}
+                        onClick={() => void selecionarItem(item)}
+                      >
+                        <td className="px-3 py-2">{item.codigo}</td>
+                        <td className="px-3 py-2">{item.descricao}</td>
+                        <td className="px-3 py-2">{item.categoria}</td>
+                        <td className="px-3 py-2">{item.unidade}</td>
+                        <td className="px-3 py-2 font-semibold text-emerald-900">{item.estoque_atual}</td>
+                        <td className="px-3 py-2">{item.situacao}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={6} className="px-3 py-4 text-center">Nenhum produto cadastrado encontrado.</td>
+                    </tr>
+                  )}
+                </tbody>
               </table>
             </div>
           </section>
