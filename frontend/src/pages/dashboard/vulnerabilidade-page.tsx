@@ -1,7 +1,8 @@
 import "leaflet/dist/leaflet.css";
+import L from "leaflet";
 import { startTransition, useDeferredValue, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import type { Map as LeafletMap } from "leaflet";
-import { Circle, CircleMarker, MapContainer, Popup, TileLayer, Tooltip, useMap, useMapEvents } from "react-leaflet";
+import { Circle, CircleMarker, MapContainer, Marker, Popup, TileLayer, Tooltip, useMap, useMapEvents } from "react-leaflet";
 import { Download, Eraser, Filter, ImageDown, LocateFixed, MapPinned, Printer, RefreshCw, Target } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
@@ -144,7 +145,16 @@ function ResumoCard({ titulo, valor }: { titulo: string; valor: number }) {
 
 function FiltroLista({ titulo, itens, selecionados, onToggle }: { titulo: string; itens: string[]; selecionados: string[]; onToggle: (valor: string) => void }) {
   if (!itens.length) return null;
-  return <div><Label>{titulo}</Label><div className="mt-2 max-h-32 space-y-2 overflow-auto rounded-lg border border-[var(--g3-border)] p-2">{itens.slice(0, 24).map((item) => <label key={item} className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-[var(--g3-card-soft)]"><Checkbox checked={selecionados.includes(item)} onChange={() => onToggle(item)} /><span className="text-sm">{item}</span></label>)}</div></div>;
+  return <div><Label className="text-[10px] font-bold uppercase text-[var(--g3-muted)] tracking-wider">{titulo}</Label><div className="mt-2 max-h-32 space-y-1 overflow-auto rounded-lg border border-[var(--g3-border)] p-1.5 bg-white shadow-inner">{itens.slice(0, 24).map((item) => <label key={item} className="flex items-center gap-2 rounded px-1.5 py-1 hover:bg-[var(--g3-card-soft)] transition-colors cursor-pointer"><Checkbox checked={selecionados.includes(item)} onChange={() => onToggle(item)} /><span className="text-xs">{item}</span></label>)}</div></div>;
+}
+
+function criarIconePin(cor: string) {
+  return L.divIcon({
+    html: `<svg width="24" height="32" viewBox="0 0 24 32" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 0C5.37 0 0 5.37 0 12C0 21 12 32 12 32C12 32 24 21 24 12C24 5.37 18.63 0 12 0ZM12 16C9.79 16 8 14.21 8 12C8 9.79 9.79 8 12 8C14.21 8 16 9.79 16 12C16 14.21 14.21 16 12 16Z" fill="${cor}"/><path d="M12 14C13.1046 14 14 13.1046 14 12C14 10.8954 13.1046 10 12 10C10.8954 10 10 10.8954 10 12C10 13.1046 10.8954 14 12 14Z" fill="white"/></svg>`,
+    className: "bg-transparent border-0",
+    iconSize: [24, 32],
+    iconAnchor: [12, 32]
+  });
 }
 
 export function VulnerabilidadePage() {
@@ -156,6 +166,7 @@ export function VulnerabilidadePage() {
   const [mensagem, setMensagem] = useState<string | null>(null);
   const [pontoManual, setPontoManual] = useState<{ latitude: number; longitude: number } | null>(null);
   const [pontoSelecionado, setPontoSelecionado] = useState<GeoMapPoint | null>(null);
+  const [expandirFiltros, setExpandirFiltros] = useState(true);
   const [formPonto, setFormPonto] = useState({ acao: "PONTO_TERRITORIAL", categoria: "DEMANDA", titulo: "", descricao: "", entidadeTipo: "", entidadeId: "" });
   const [buscaVinculo, setBuscaVinculo] = useState("");
   const buscaVinculoAdiada = useDeferredValue(buscaVinculo);
@@ -193,36 +204,62 @@ export function VulnerabilidadePage() {
     setFiltros((atual) => ({ ...atual, [campo]: alternarValor(atual[campo], valor) }));
   }
 
-  async function salvarPonto() {
-    if (!pontoManual) return;
-    try {
-      const resposta = await salvarMarcacao.mutateAsync({
-        acao: formPonto.acao as "LOCALIZACAO_VINCULADA" | "PONTO_TERRITORIAL",
-        categoria: formPonto.acao === "PONTO_TERRITORIAL" ? (formPonto.categoria as any) : undefined,
-        titulo: formPonto.acao === "PONTO_TERRITORIAL" ? formPonto.titulo || undefined : undefined,
-        descricao: formPonto.descricao || undefined,
-        entidadeTipo: formPonto.acao === "LOCALIZACAO_VINCULADA" ? (formPonto.entidadeTipo as any) : undefined,
-        entidadeId: formPonto.acao === "LOCALIZACAO_VINCULADA" ? formPonto.entidadeId || undefined : undefined,
-        pontoDistribuicao: formPonto.categoria === "DISTRIBUICAO",
-        ocorrenciaViolencia: formPonto.categoria === "VIOLENCIA",
-        situacaoVulnerabilidade: formPonto.categoria === "VULNERABILIDADE",
-        latitude: pontoManual.latitude,
-        longitude: pontoManual.longitude
-      });
-      setMensagem(resposta.mensagem);
-      setPontoManual(null);
-      setModoMarcacao(false);
-      setBuscaVinculo("");
-      setFormPonto({ acao: "PONTO_TERRITORIAL", categoria: "DEMANDA", titulo: "", descricao: "", entidadeTipo: "", entidadeId: "" });
-    } catch {
-      setMensagem("Falha ao salvar a marcação manual.");
-    }
+  function ativarModoCesta() {
+    setFiltros((atual) => ({
+      ...atual,
+      camadas: ["beneficiarios", "pontos_distribuicao"],
+      receberCestaBasica: true,
+      necessidadeCesta: undefined,
+      ocorrenciaViolencia: undefined
+    }));
+    setMensagem("Modo Cesta Basica ativado.");
+  }
+
+  function ativarModoBeneficiarios() {
+    setFiltros((atual) => ({
+      ...atual,
+      camadas: ["beneficiarios"],
+      receberCestaBasica: undefined,
+      necessidadeCesta: undefined,
+      ocorrenciaViolencia: undefined,
+      faixaEtaria: [],
+      status: []
+    }));
+    setMensagem("Foco em Beneficiarios Cadastrados ativado.");
+  }
+
+  function ativarFocoIdosos() {
+    setFiltros((atual) => ({
+      ...atual,
+      camadas: ["beneficiarios", "familias"],
+      faixaEtaria: ["idoso"],
+      receberCestaBasica: undefined
+    }));
+    setMensagem("Foco em Idosos ativado.");
+  }
+
+  function ativarFocoInseguranca() {
+    setFiltros((atual) => ({
+      ...atual,
+      camadas: ["beneficiarios", "familias", "pontos_distribuicao"],
+      necessidadeCesta: true,
+      receberCestaBasica: undefined
+    }));
+    setMensagem("Mapa de Inseguranca Alimentar ativado.");
+  }
+
+  function alternarCamada(camada: GeoLayer) {
+    setFiltros((atual) => ({ ...atual, camadas: alternarValor(atual.camadas, camada) }));
+  }
+
+  function alternarFaixa(faixa: any) {
+    setFiltros((atual) => ({ ...atual, faixaEtaria: alternarValor(atual.faixaEtaria || [], faixa) as any }));
   }
 
   function exportarLista() {
     if (!data) return;
     const linhas = [
-      "Camada;Título;Tipo;Bairro;Cidade;Quantidade;Latitude;Longitude",
+      "Camada;Titulo;Tipo;Bairro;Cidade;Quantidade;Latitude;Longitude",
       ...data.marcadores.map((item) =>
         [rotulosCamada[item.camada], item.titulo, item.tipoLabel, item.bairro ?? "", item.cidade ?? "", item.quantidade ?? 1, item.latitude, item.longitude]
           .map((valor) => `"${String(valor).replace(/"/g, '""')}"`)
@@ -233,57 +270,195 @@ export function VulnerabilidadePage() {
     setMensagem("Lista territorial exportada.");
   }
 
-  function exportarImagem() {
-    if (!data) return;
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="780" viewBox="0 0 1200 780"><rect width="1200" height="780" fill="#eef7f0" /><text x="56" y="40" font-size="28" font-family="Arial" fill="#0f172a">Georreferenciamento territorial</text>${data.marcadores.map((item, indice) => `<circle cx="${80 + (indice % 20) * 52}" cy="${100 + Math.floor(indice / 20) * 38}" r="10" fill="${estilosCamada[item.camada]}" fill-opacity="0.8"><title>${item.titulo}</title></circle>`).join("")}</svg>`;
-    baixarArquivo("georreferenciamento-mapa.svg", svg, "image/svg+xml;charset=utf-8");
-    setMensagem("Imagem temática exportada.");
-  }
-
   function exportarPdf() {
     if (!data) return;
     const popup = window.open("", "_blank", "noopener,noreferrer,width=1200,height=900");
     if (!popup) return;
-    popup.document.write(`<html><head><meta charset="utf-8"><title>Relatório territorial</title></head><body style="font-family:Arial;padding:24px"><h1>Relatório territorial</h1><p>Total encontrado: ${data.totalEncontrado.toLocaleString("pt-BR")} | Geolocalizados: ${data.totalGeolocalizado.toLocaleString("pt-BR")}</p></body></html>`);
+    popup.document.write(`<html><head><meta charset="utf-8"><title>Relatorio territorial</title></head><body style="font-family:Arial;padding:24px"><h1>Relatorio territorial</h1><p>Total encontrado: ${data.totalEncontrado.toLocaleString("pt-BR")} | Geolocalizados: ${data.totalGeolocalizado.toLocaleString("pt-BR")}</p></body></html>`);
     popup.document.close();
     popup.print();
-    setMensagem("Janela de impressão aberta para PDF.");
+    setMensagem("Janela de impressao aberta para PDF.");
   }
 
   return (
-    <main className={classesTelaPadraoBeneficiario.container}>
-      <Card className={classesTelaPadraoBeneficiario.cardConteudo}>
-        <CardHeader className={classesTelaPadraoBeneficiario.cabecalhoConteudo}>
-          <div className={classesTelaPadraoBeneficiario.tituloAba}><MapPinned className="h-4 w-4" /><CardTitle className={classesTelaPadraoBeneficiario.tituloAbaTexto}>Georreferenciamento territorial</CardTitle></div>
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" size="sm" variant="outline" className={classesTelaPadraoBeneficiario.botaoAcao} onClick={() => setModoMarcacao((atual) => !atual)}><Target className="mr-1.5 h-3.5 w-3.5" />{modoMarcacao ? "Cancelar marcação" : "Marcação manual"}</Button>
-            <Button type="button" size="sm" variant="outline" className={classesTelaPadraoBeneficiario.botaoAcao} onClick={() => void geocodificarPendencias.mutateAsync(20).then((resposta) => setMensagem(`Geocodificação: ${resposta.atualizados} atualizados, ${resposta.naoEncontrados} não encontrados.`)).catch(() => setMensagem("Falha ao geocodificar os registros pendentes."))} disabled={geocodificarPendencias.isPending}><LocateFixed className={`mr-1.5 h-3.5 w-3.5 ${geocodificarPendencias.isPending ? "animate-pulse" : ""}`} />Geocodificar</Button>
-            <Button type="button" size="sm" variant="outline" className={classesTelaPadraoBeneficiario.botaoAcao} onClick={exportarLista} disabled={!data}><Download className="mr-1.5 h-3.5 w-3.5" />Exportar lista</Button>
-            <Button type="button" size="sm" variant="outline" className={classesTelaPadraoBeneficiario.botaoAcao} onClick={exportarImagem} disabled={!data}><ImageDown className="mr-1.5 h-3.5 w-3.5" />Exportar imagem</Button>
-            <Button type="button" size="sm" variant="outline" className={classesTelaPadraoBeneficiario.botaoAcao} onClick={exportarPdf} disabled={!data}><Printer className="mr-1.5 h-3.5 w-3.5" />Exportar PDF</Button>
-            <Button type="button" size="sm" variant="outline" className={classesTelaPadraoBeneficiario.botaoAcao} onClick={() => void refetch().then(() => setMensagem("Consulta territorial atualizada."))} disabled={isFetching}><RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />Atualizar</Button>
+    <main className="flex h-[calc(100vh-64px)] w-full overflow-hidden bg-slate-50">
+      {/* BARRA LATERAL DE FILTROS */}
+      <aside className={`relative z-20 flex flex-col border-r bg-white shadow-xl transition-all duration-300 ${expandirFiltros ? "w-80" : "w-0"}`}>
+        <div className="flex h-full flex-col overflow-y-auto overflow-x-hidden p-4 space-y-6">
+          <div className="flex items-center justify-between border-b pb-4">
+            <h2 className="flex items-center gap-2 font-bold text-slate-800"><Filter className="h-4 w-4" /> Filtros</h2>
+            <Button variant="ghost" size="sm" onClick={() => setExpandirFiltros(false)}>recolher</Button>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {mensagem ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-800">{mensagem}</div> : null}
-          {isError ? <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-3 text-sm text-red-700">Falha ao carregar o georreferenciamento.</div> : null}
-          <div className="grid gap-4 xl:grid-cols-[350px_minmax(0,1fr)_320px]">
-            <section className="space-y-3">
-              <Card className="border-[var(--g3-border)] bg-[var(--g3-card)]"><CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-sm"><Filter className="h-4 w-4" />Filtros territoriais</CardTitle></CardHeader><CardContent className="space-y-3 text-sm"><div><Label>Busca</Label><Input value={filtros.termo ?? ""} onChange={(event) => setFiltros((atual) => ({ ...atual, termo: event.target.value || undefined }))} placeholder="Nome, código, bairro ou situação" /></div><div className="grid grid-cols-2 gap-3"><div><Label>Modo</Label><Select value={filtros.modo} onChange={(event) => setFiltros((atual) => ({ ...atual, modo: event.target.value as any }))}><option value="cluster">Cluster</option><option value="marcadores">Marcadores</option><option value="heatmap">Heatmap</option><option value="agregado">Agregado</option></Select></div><div><Label>Idade exata</Label><Input type="number" min={0} max={120} value={filtros.idadeExata ?? ""} onChange={(event) => setFiltros((atual) => ({ ...atual, idadeExata: event.target.value ? Number(event.target.value) : undefined }))} /></div></div><div className="space-y-2 rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-3"><label className="flex items-center gap-2"><Checkbox checked={Boolean(filtros.receberCestaBasica)} onChange={(event) => setFiltros((atual) => ({ ...atual, receberCestaBasica: event.target.checked ? true : undefined }))} /><span>Recebimento de cesta básica</span></label><label className="flex items-center gap-2"><Checkbox checked={Boolean(filtros.necessidadeCesta)} onChange={(event) => setFiltros((atual) => ({ ...atual, necessidadeCesta: event.target.checked ? true : undefined }))} /><span>Necessidade de distribuição</span></label><label className="flex items-center gap-2"><Checkbox checked={Boolean(filtros.ocorrenciaViolencia)} onChange={(event) => setFiltros((atual) => ({ ...atual, ocorrenciaViolencia: event.target.checked ? true : undefined }))} /><span>Ocorrência de violência</span></label></div><FiltroLista titulo="Bairros" itens={opcoes?.bairros ?? []} selecionados={filtros.bairro} onToggle={(valor) => atualizarLista("bairro", valor)} /><FiltroLista titulo="Microterritórios" itens={opcoes?.microterritorios ?? []} selecionados={filtros.microterritorio} onToggle={(valor) => atualizarLista("microterritorio", valor)} /><FiltroLista titulo="Sexo" itens={opcoes?.sexos ?? []} selecionados={filtros.sexo} onToggle={(valor) => atualizarLista("sexo", valor)} /><FiltroLista titulo="Vulnerabilidade" itens={opcoes?.vulnerabilidades ?? []} selecionados={filtros.situacaoVulnerabilidade} onToggle={(valor) => atualizarLista("situacaoVulnerabilidade", valor)} /><FiltroLista titulo="Unidade de referência" itens={opcoes?.unidadesReferencia ?? []} selecionados={filtros.unidadeReferencia} onToggle={(valor) => atualizarLista("unidadeReferencia", valor)} /><FiltroLista titulo="Status" itens={opcoes?.statuses ?? []} selecionados={filtros.status} onToggle={(valor) => atualizarLista("status", valor)} /><div className="flex gap-2"><Button type="button" variant="outline" className="flex-1" onClick={() => startTransition(() => setFiltros((atual) => ({ ...filtrosPadrao, zoom: atual.zoom, bbox: atual.bbox })))}><Eraser className="mr-1.5 h-3.5 w-3.5" />Limpar</Button><Button type="button" variant="outline" className="flex-1" onClick={() => mapRef.current?.setView(centro, filtros.zoom)}><LocateFixed className="mr-1.5 h-3.5 w-3.5" />Centralizar</Button></div></CardContent></Card>
-            </section>
-            <section className="space-y-3">
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-4"><ResumoCard titulo="Encontrados" valor={data?.totalEncontrado ?? 0} /><ResumoCard titulo="Geolocalizados" valor={data?.totalGeolocalizado ?? 0} /><ResumoCard titulo="Violência" valor={data?.indicadores.totalOcorrenciasViolencia ?? 0} /><ResumoCard titulo="Distribuição" valor={data?.indicadores.totalPontosDistribuicao ?? 0} /></div>
-              <div className="overflow-hidden rounded-2xl border border-[var(--g3-border)] bg-[var(--g3-card)]"><div className="border-b border-[var(--g3-border)] px-4 py-3"><p className="text-sm font-semibold text-[var(--g3-foreground)]">Mapa territorial</p><p className="text-xs text-[var(--g3-muted)]">{viewportPronto ? data ? `${data.totalGeolocalizado} ponto(s) no recorte visível.` : "Carregando recorte visível..." : "Preparando consulta pela área visível do mapa..."}</p></div><div className="h-[660px]"><MapContainer center={centro} zoom={filtros.zoom} className="h-full w-full" ref={mapRef}><TileLayer attribution="&copy; OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" /><Observer onChange={atualizarViewport} onReady={() => setViewportPronto(true)} /><ClickCapture ativo={modoMarcacao} onPick={setPontoManual} />{data?.heatmap.map((item) => <Circle key={item.id} center={[item.latitude, item.longitude]} radius={Math.max(180, item.intensidade * 180)} pathOptions={{ color: "#dc2626", fillColor: "#f87171", fillOpacity: 0.16, weight: 1 }} />)}{data?.agregados.map((item) => <CircleMarker key={item.id} center={[item.latitude, item.longitude]} radius={Math.min(28, 10 + item.quantidade / 3)} pathOptions={{ color: estilosCamada[item.camada], fillColor: estilosCamada[item.camada], fillOpacity: 0.72, weight: 2 }} eventHandlers={{ click: () => mapRef.current?.flyTo([item.latitude, item.longitude], Math.max(filtros.zoom + 2, 13)) }}><Tooltip permanent direction="center" className="!border-0 !bg-transparent !p-0 !shadow-none"><span className="text-xs font-bold text-slate-900">{item.quantidade}</span></Tooltip></CircleMarker>)}{data?.marcadores.map((item) => <CircleMarker key={item.id} center={[item.latitude, item.longitude]} radius={item.quantidade && item.quantidade > 1 ? Math.min(22, 8 + item.quantidade / 3) : 8} pathOptions={{ color: estilosCamada[item.camada], fillColor: estilosCamada[item.camada], fillOpacity: 0.78, weight: 2 }} eventHandlers={{ click: () => ((item.quantidade ?? 1) > 1 ? mapRef.current?.flyTo([item.latitude, item.longitude], Math.max(filtros.zoom + 2, 14)) : setPontoSelecionado(item)) }}><Popup><strong>{item.titulo}</strong><div>{item.tipoLabel}</div><div>{item.bairro ?? "Sem bairro"}</div></Popup>{(item.quantidade ?? 1) > 1 ? <Tooltip permanent direction="center" className="!border-0 !bg-transparent !p-0 !shadow-none"><span className="text-xs font-bold text-slate-900">{item.quantidade}</span></Tooltip> : null}</CircleMarker>)}{pontoManual ? <CircleMarker center={[pontoManual.latitude, pontoManual.longitude]} radius={10} pathOptions={{ color: "#111827", fillColor: "#fde68a", fillOpacity: 0.95, weight: 2 }} /> : null}</MapContainer></div></div>
-            </section>
-            <section className="space-y-3">
-              <Card className="border-[var(--g3-border)] bg-[var(--g3-card)]"><CardHeader className="pb-2"><CardTitle className="text-sm">Resumo territorial</CardTitle></CardHeader><CardContent className="space-y-2 text-sm">{(data?.indicadores.rankingBairros.slice(0, 5) ?? []).map((item) => <div key={item.chave} className="flex items-center justify-between rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card-soft)] px-3 py-2"><span>{item.rotulo}</span><Badge>{item.total}</Badge></div>)}<div className="rounded-xl border border-dashed border-[var(--g3-border)] px-3 py-3 text-xs text-[var(--g3-muted)]">{data?.diagnostico.problemasAtuais.join(" ") ?? "Carregando diagnóstico territorial..."}</div></CardContent></Card>
-              {pontoSelecionado ? <Card className="border-[var(--g3-border)] bg-[var(--g3-card)]"><CardHeader className="pb-2"><CardTitle className="text-sm">Identificação do ponto</CardTitle></CardHeader><CardContent className="space-y-2 text-sm"><div className="flex items-center justify-between gap-2"><strong>{detalheAtual?.titulo ?? pontoSelecionado.titulo}</strong><Badge variant="success">{detalheAtual?.tipoLabel ?? pontoSelecionado.tipoLabel}</Badge></div><p>{detalheAtual?.bairro ?? "Sem bairro"}{detalheAtual?.cidade ? `, ${detalheAtual.cidade}` : ""}</p>{detalheAtual?.enderecoResumo ? <p>{detalheAtual.enderecoResumo}</p> : null}{detalheAtual?.telefone ? <p>Telefone: {detalheAtual.telefone}</p> : null}{detalheAtual?.situacaoResumo ? <p>Situação: {detalheAtual.situacaoResumo}</p> : null}{detalheAtual?.programaServico ? <p>Programa: {detalheAtual.programaServico}</p> : null}{detalheAtual?.rotaCadastro ? <Button type="button" variant="outline" className="w-full" onClick={() => navigate(String(detalheAtual.rotaCadastro))}>Abrir cadastro</Button> : null}</CardContent></Card> : null}
-              {pontoManual ? <Card className="border-amber-200 bg-amber-50"><CardHeader className="pb-2"><CardTitle className="text-sm">Marcação manual</CardTitle></CardHeader><CardContent className="space-y-3 text-sm"><p className="text-[var(--g3-muted)]">Latitude {pontoManual.latitude} | Longitude {pontoManual.longitude}</p><div><Label>Ação</Label><Select value={formPonto.acao} onChange={(event) => setFormPonto((atual) => ({ ...atual, acao: event.target.value }))}><option value="PONTO_TERRITORIAL">Ponto territorial</option><option value="LOCALIZACAO_VINCULADA">Vincular cadastro</option></Select></div>{formPonto.acao === "PONTO_TERRITORIAL" ? <><div><Label>Categoria</Label><Select value={formPonto.categoria} onChange={(event) => setFormPonto((atual) => ({ ...atual, categoria: event.target.value }))}><option value="DEMANDA">Demanda</option><option value="DISTRIBUICAO">Distribuição</option><option value="VULNERABILIDADE">Vulnerabilidade</option><option value="VIOLENCIA">Violência</option><option value="OUTRO">Outro</option></Select></div><div><Label>Título</Label><Input value={formPonto.titulo} onChange={(event) => setFormPonto((atual) => ({ ...atual, titulo: event.target.value }))} /></div></> : <><div><Label>Buscar vínculo</Label><Input value={buscaVinculo} onChange={(event) => setBuscaVinculo(event.target.value)} placeholder="Digite nome ou código" /></div><div className="max-h-36 space-y-2 overflow-auto">{(vinculos.data ?? []).map((item) => <button key={`${item.entidadeTipo}-${item.id}`} type="button" className="w-full rounded-lg border border-[var(--g3-border)] bg-white px-3 py-2 text-left" onClick={() => setFormPonto((atual) => ({ ...atual, entidadeTipo: item.entidadeTipo, entidadeId: item.id, titulo: item.titulo }))}><strong>{item.titulo}</strong><span className="block text-xs text-[var(--g3-muted)]">{item.subtitulo ?? item.entidadeTipo}</span></button>)}</div></>}<div><Label>Descrição</Label><Input value={formPonto.descricao} onChange={(event) => setFormPonto((atual) => ({ ...atual, descricao: event.target.value }))} /></div><div className="flex gap-2"><Button type="button" className="flex-1" onClick={() => void salvarPonto()} disabled={salvarMarcacao.isPending}>Salvar</Button><Button type="button" variant="outline" className="flex-1" onClick={() => setPontoManual(null)}>Fechar</Button></div></CardContent></Card> : null}
-            </section>
+
+          <div className="space-y-6">
+            {/* O QUE VER? (CAMADAS) */}
+            <div className="space-y-3">
+              <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">O que ver no mapa?</Label>
+              <div className="grid grid-cols-1 gap-1.5">
+                {(["beneficiarios", "familias", "voluntarios", "profissionais", "pontos_distribuicao", "violencia"] as GeoLayer[]).map(c => (
+                  <label key={c} className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg border text-xs cursor-pointer transition-all ${filtros.camadas.includes(c) ? "border-blue-200 bg-blue-50 text-blue-700 font-bold" : "bg-white border-slate-100 text-slate-500 hover:border-slate-300"}`}>
+                    <div className="flex items-center gap-2">
+                      <Checkbox checked={filtros.camadas.includes(c)} onChange={() => alternarCamada(c)} />
+                      <span>{rotulosCamada[c]}</span>
+                    </div>
+                    <div className="h-2 w-2 rounded-full" style={{ backgroundColor: estilosCamada[c] }} />
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* ONDE? (LOCALIZACAO) */}
+            <div className="space-y-3 border-t pt-4">
+              <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Onde? (Bairros e Regioes)</Label>
+              <Input value={filtros.termo ?? ""} onChange={(e) => setFiltros(a => ({ ...a, termo: e.target.value || undefined }))} placeholder="Buscar bairro ou endereco..." className="h-9" />
+              <FiltroLista titulo="Selecionar Bairros" itens={opcoes?.bairros ?? []} selecionados={filtros.bairro} onToggle={(v) => atualizarLista("bairro", v)} />
+            </div>
+
+            {/* FILTROS ESTRATEGICOS */}
+            <div className="space-y-3 border-t pt-4">
+              <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Visoes Estrategicas</Label>
+              <div className="grid grid-cols-1 gap-2">
+                <Button variant="outline" size="sm" className={`justify-start h-10 border-emerald-200 text-emerald-700 hover:bg-emerald-50 ${filtros.receberCestaBasica ? "bg-emerald-100 ring-2 ring-emerald-500 ring-offset-1" : ""}`} onClick={ativarModoCesta}>
+                  <MapPinned className="mr-2 h-4 w-4" /> Cestas Entregues
+                </Button>
+                <Button variant="outline" size="sm" className="justify-start h-10 border-blue-200 text-blue-700 hover:bg-blue-50" onClick={ativarModoBeneficiarios}>
+                  <Target className="mr-2 h-4 w-4" /> Todos os Cadastrados
+                </Button>
+                
+                {/* SUGESTOES DE LOCALIZACAO (PLACEHOLDERS DE ACOES) */}
+                <div className="rounded-xl bg-slate-50 p-3 space-y-2 border border-dashed border-slate-200">
+                  <span className="text-[9px] font-bold text-slate-400 uppercase">Sugestoes de Analise</span>
+                  <button onClick={() => setMensagem("Dica: Use o filtro de Vulnerabilidade para encontrar familias sem renda.")} className="block text-[10px] text-slate-600 hover:text-blue-600 text-left w-full">• Onde estao os idosos sozinhos?</button>
+                  <button onClick={() => setMensagem("Dica: Filtre por 'Necessidade de Cesta' para planejar a proxima entrega.")} className="block text-[10px] text-slate-600 hover:text-blue-600 text-left w-full">• Familias que aguardam cestas</button>
+                  <button onClick={() => setMensagem("Dica: Ative a camada de Violencia para ver areas de risco.")} className="block text-[10px] text-slate-600 hover:text-blue-600 text-left w-full">• Areas com maior indice de violencia</button>
+                </div>
+              </div>
+            </div>
+
+            {/* QUANDO? (PERIODO) */}
+            <div className="space-y-3 border-t pt-4">
+              <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Quando? (Periodo)</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <Input type="date" value={filtros.periodoInicio ?? ""} onChange={(e) => setFiltros(a => ({ ...a, periodoInicio: e.target.value || undefined }))} className="h-8 text-[10px]" />
+                <Input type="date" value={filtros.periodoFim ?? ""} onChange={(e) => setFiltros(a => ({ ...a, periodoFim: e.target.value || undefined }))} className="h-8 text-[10px]" />
+              </div>
+            </div>
           </div>
-          {isLoading || !viewportPronto ? <div className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card-soft)] px-3 py-4 text-sm text-[var(--g3-muted)]">{viewportPronto ? "Carregando dados territoriais..." : "Preparando a consulta pela área visível do mapa..."}</div> : null}
-        </CardContent>
-      </Card>
+
+          <div className="mt-auto border-t pt-4 flex gap-2">
+            <Button variant="outline" size="sm" className="flex-1" onClick={() => setFiltros(filtrosPadrao)}>Limpar</Button>
+            <Button variant="outline" size="sm" className="flex-1" onClick={() => refetch()}>Atualizar</Button>
+          </div>
+        </div>
+      </aside>
+
+      {/* AREA DO MAPA */}
+      <section className="relative flex-1 overflow-hidden">
+        {/* BOTAO PARA ABRIR FILTROS SE ESTIVEREM FECHADOS */}
+        {!expandirFiltros && (
+          <button onClick={() => setExpandirFiltros(true)} className="absolute left-4 top-4 z-30 rounded-full bg-white p-3 shadow-lg hover:bg-slate-50 border transition-all text-slate-700">
+            <Filter className="h-5 w-5" />
+          </button>
+        )}
+
+        {/* INDICADORES FLUTUANTES NO TOPO */}
+        <div className="absolute left-1/2 top-4 z-30 -translate-x-1/2 flex gap-3 pointer-events-none">
+          <div className="flex items-center gap-4 rounded-full bg-white/90 px-6 py-2 shadow-xl backdrop-blur-md border pointer-events-auto">
+            <div className="flex flex-col"><span className="text-[9px] font-bold uppercase text-slate-400 leading-none">Pessoas</span><span className="text-sm font-black text-slate-800">{(data?.totalEncontrado ?? 0).toLocaleString()}</span></div>
+            <div className="h-6 w-px bg-slate-200" />
+            <div className="flex flex-col"><span className="text-[9px] font-bold uppercase text-slate-400 leading-none">Cestas</span><span className="text-sm font-black text-emerald-600">{(data?.indicadores.totalPontosDistribuicao ?? 0).toLocaleString()}</span></div>
+            <div className="h-6 w-px bg-slate-200" />
+            <div className="flex flex-col"><span className="text-[9px] font-bold uppercase text-slate-400 leading-none">Alertas</span><span className="text-sm font-black text-red-600">{(data?.indicadores.totalOcorrenciasViolencia ?? 0).toLocaleString()}</span></div>
+          </div>
+        </div>
+
+        {/* ACOES RAPIDAS NO TOPO DIREITO */}
+        <div className="absolute right-4 top-4 z-30 flex flex-col gap-2">
+          <button title="Marcacao Manual" onClick={() => setModoMarcacao(!modoMarcacao)} className={`rounded-lg p-2.5 shadow-lg border transition-all ${modoMarcacao ? "bg-amber-500 text-white border-amber-600" : "bg-white text-slate-600 hover:bg-slate-50"}`}><Target className="h-5 w-5" /></button>
+          <button title="Exportar Dados" onClick={exportarLista} className="rounded-lg bg-white p-2.5 text-slate-600 shadow-lg border hover:bg-slate-50 transition-all"><Download className="h-5 w-5" /></button>
+          <button title="Gerar PDF" onClick={exportarPdf} className="rounded-lg bg-white p-2.5 text-slate-600 shadow-lg border hover:bg-slate-50 transition-all"><Printer className="h-5 w-5" /></button>
+        </div>
+
+        {/* MAPA EM SI */}
+        <div className="h-full w-full bg-slate-100">
+          <MapContainer center={centro} zoom={filtros.zoom} className="h-full w-full" ref={mapRef} zoomControl={false}>
+            <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>' url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
+            <Observer onChange={atualizarViewport} onReady={() => setViewportPronto(true)} />
+            <ClickCapture ativo={modoMarcacao} onPick={setPontoManual} />
+            
+            {/* RENDERIZACAO DE CAMADAS */}
+            {data?.agregados.map((item) => (
+              <CircleMarker key={item.id} center={[item.latitude, item.longitude]} radius={Math.min(28, 12 + item.quantidade / 4)} pathOptions={{ color: estilosCamada[item.camada], fillColor: estilosCamada[item.camada], fillOpacity: 0.6, weight: 2 }}>
+                <Tooltip permanent direction="center" className="!border-0 !bg-transparent !p-0 !shadow-none"><span className="text-[10px] font-black text-white">{item.quantidade}</span></Tooltip>
+              </CircleMarker>
+            ))}
+
+            {data?.marcadores.map((item) => (
+              (item.quantidade ?? 1) > 1 ? (
+                <CircleMarker key={item.id} center={[item.latitude, item.longitude]} radius={Math.min(24, 10 + item.quantidade / 4)} pathOptions={{ color: estilosCamada[item.camada], fillColor: estilosCamada[item.camada], fillOpacity: 0.8, weight: 2 }}>
+                  <Tooltip permanent direction="center" className="!border-0 !bg-transparent !p-0 !shadow-none"><span className="text-[10px] font-black text-white">{item.quantidade}</span></Tooltip>
+                </CircleMarker>
+              ) : (
+                <Marker key={item.id} position={[item.latitude, item.longitude]} icon={criarIconePin(estilosCamada[item.camada])} eventHandlers={{ click: () => setPontoSelecionado(item) }}>
+                  <Popup>
+                    <div className="p-2 min-w-[180px] space-y-2">
+                      <div className="border-b pb-1">
+                        <div className="text-[9px] font-bold uppercase text-slate-400">{item.tipoLabel}</div>
+                        <div className="text-sm font-black text-slate-800 leading-tight">{item.titulo}</div>
+                      </div>
+                      <div className="text-[11px] text-slate-600 flex items-center gap-1"><MapPinned className="h-3 w-3" /> {item.bairro}</div>
+                      {item.receberCestaBasica && <div className="rounded bg-emerald-50 px-2 py-1 text-[9px] font-black text-emerald-700 border border-emerald-100 uppercase">Elegível à Cesta</div>}
+                    </div>
+                  </Popup>
+                </Marker>
+              )
+            ))}
+
+            {pontoManual && <Marker position={[pontoManual.latitude, pontoManual.longitude]} icon={criarIconePin("#f59e0b")} />}
+          </MapContainer>
+        </div>
+
+        {/* CARD DE DETALHES FLUTUANTE NO CANTO INFERIOR DIREITO */}
+        {pontoSelecionado && (
+          <div className="absolute bottom-6 right-6 z-30 w-80 animate-in fade-in slide-in-from-bottom-4 duration-300">
+            <Card className="shadow-2xl border-2 border-white/50 bg-white/95 backdrop-blur-md">
+              <CardHeader className="p-4 flex flex-row items-center justify-between border-b bg-slate-50/50">
+                <div className="flex flex-col"><span className="text-[9px] font-bold uppercase text-slate-400 tracking-tight">{pontoSelecionado.tipoLabel}</span><CardTitle className="text-sm font-black text-slate-800">{pontoSelecionado.titulo}</CardTitle></div>
+                <button onClick={() => setPontoSelecionado(null)} className="text-slate-400 hover:text-slate-600">×</button>
+              </CardHeader>
+              <CardContent className="p-4 text-xs space-y-3">
+                <div className="grid grid-cols-1 gap-2">
+                  <div className="flex items-center gap-2"><div className="h-5 w-5 rounded bg-blue-50 flex items-center justify-center"><MapPinned className="h-3 w-3 text-blue-500" /></div> <span>{pontoSelecionado.bairro ?? "Bairro não informado"}</span></div>
+                  {detalheAtual?.enderecoResumo && <div className="text-slate-500 pl-7">{detalheAtual.enderecoResumo}</div>}
+                  {detalheAtual?.telefone && <div className="text-slate-600 pl-7">📞 {detalheAtual.telefone}</div>}
+                  {detalheAtual?.situacaoResumo && <div className="rounded-lg bg-amber-50 p-2 border border-amber-100 text-amber-800 mt-2">{detalheAtual.situacaoResumo}</div>}
+                </div>
+                {detalheAtual?.rotaCadastro && (
+                  <Button className="w-full h-8 text-xs font-bold" onClick={() => navigate(String(detalheAtual.rotaCadastro))}>Abrir Ficha de Cadastro</Button>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* CARD DE MENSAGEM FLUTUANTE */}
+        {mensagem && (
+          <div className="absolute bottom-6 left-1/2 z-40 -translate-x-1/2 animate-bounce">
+            <div className="rounded-full bg-slate-900 px-6 py-2 text-xs font-bold text-white shadow-2xl flex items-center gap-3">
+              <span>{mensagem}</span>
+              <button onClick={() => setMensagem(null)} className="text-slate-400 hover:text-white font-black text-sm">×</button>
+            </div>
+          </div>
+        )}
+
+        {/* LOADING INDICATOR */}
+        {(isLoading || isFetching) && (
+          <div className="absolute bottom-6 left-6 z-30 flex items-center gap-3 rounded-full bg-white/90 px-4 py-2 text-[10px] font-bold text-slate-500 shadow-xl border">
+            <RefreshCw className="h-3 w-3 animate-spin text-blue-500" /> Atualizando mapa...
+          </div>
+        )}
+      </section>
     </main>
   );
 }
+
