@@ -1,6 +1,41 @@
 {
   "entries": [
     {
+      "version": "1.00.268",
+      "releaseDate": "2026-03-22",
+      "title": "Webhook automática na licença do G3N",
+      "description": "Atualização local da instância com preenchimento automático da webhook pública da licença.",
+      "changes": [
+        "Webhook da InfinitePay preenchida automaticamente na tela da licença.",
+        "Persistência da URL pública padrão no salvamento da licença."
+      ],
+      "releaseType": "stable"
+    },
+    {
+      "version": "1.00.267",
+      "releaseDate": "2026-03-22",
+      "title": "Checkout real da licença com InfinitePay",
+      "description": "Atualização local da instância com checkout real da licença do G3N e retorno de pagamento dentro do sistema.",
+      "changes": [
+        "Geração de link real da InfinitePay para a licença de uso.",
+        "Rota pública de retorno do pagamento criada no frontend.",
+        "Atualização automática da vigência quando o pagamento é confirmado."
+      ],
+      "releaseType": "stable"
+    },
+    {
+      "version": "1.00.266",
+      "releaseDate": "2026-03-22",
+      "title": "Licença de uso do G3N",
+      "description": "Atualização local da instância com a nova tela de licença, vínculo por CNPJ e alertas por e-mail.",
+      "changes": [
+        "Nova tela de Licença de uso em Configurações gerais.",
+        "Persistência de plano, ciclo e dados de recebimento via InfinityPay.",
+        "Alertas de vencimento enviados apenas por e-mail sem bloqueio do sistema."
+      ],
+      "releaseType": "stable"
+    },
+    {
       "version": "1.00.265",
       "releaseDate": "2026-03-22",
       "title": "Simplificação da consulta no almoxarifado",

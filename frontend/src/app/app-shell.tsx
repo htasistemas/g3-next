@@ -55,6 +55,7 @@ import {
   MailPlus,
   MapPinned,
   MonitorDot,
+  ReceiptText,
   Presentation,
   RefreshCcw,
   Scale,
@@ -426,6 +427,13 @@ export const menuSections: MenuSection[] = [
         ]
       },
       {
+        id: "configuracoes-licenca-uso",
+        to: "/configuracoes/licenca-uso",
+        label: "Licença de uso",
+        icon: ReceiptText,
+        requiredPermissions: ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"]
+      },
+      {
         id: "configuracoes-manual-sistema",
         to: "/configuracoes/manual-do-sistema",
         label: "Manual do sistema",
@@ -512,6 +520,7 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/configuracoes/datas-comemorativas")) return "Datas comemorativas";
   if (pathname.startsWith("/configuracoes/atualizar-sistema")) return "Atualizar sistema";
   if (pathname.startsWith("/configuracoes/chamado-tecnico")) return "Chamado técnico";
+  if (pathname.startsWith("/configuracoes/licenca-uso")) return "Licença de uso";
   if (pathname.startsWith("/configuracoes/manual-do-sistema")) return "Manual do sistema";
   if (pathname.startsWith("/configuracoes/pesquise-na-ia")) return "Pesquise na IA";
   if (pathname.startsWith("/configuracoes/sobre-o-sistema")) return "Sobre o sistema";

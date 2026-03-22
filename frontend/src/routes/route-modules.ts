@@ -12,6 +12,10 @@ const routeModules: RouteModuleDefinition[] = [
   { path: "/manutencao", loader: () => import("@/pages/maintenance-preview-page") },
   { path: "/termos-de-uso", loader: () => import("@/pages/termos-uso-page") },
   { path: "/politica-de-privacidade", loader: () => import("@/pages/politica-privacidade-page") },
+  {
+    path: "/licenca-de-uso/retorno-pagamento",
+    loader: () => import("@/pages/configuracoes/licenca-uso-retorno-page")
+  },
   { path: "/senhas/painel", loader: () => import("@/pages/atendimentos/painel-senhas-page") },
   { path: "/dashboard/visao-geral", loader: () => import("@/pages/dashboard/visao-geral-page") },
   { path: "/dashboard/indicadores", loader: () => import("@/pages/dashboard/indicadores-page") },
@@ -185,6 +189,10 @@ const routeModules: RouteModuleDefinition[] = [
   {
     path: "/configuracoes/chamado-tecnico",
     loader: () => import("@/pages/configuracoes/chamado-tecnico-page")
+  },
+  {
+    path: "/configuracoes/licenca-uso",
+    loader: () => import("@/pages/configuracoes/licenca-uso-page")
   },
   {
     path: "/configuracoes/manual-do-sistema",

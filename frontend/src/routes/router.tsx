@@ -38,6 +38,10 @@ const CriarContaPage = carregarPagina("/criar-conta", "CriarContaPage");
 const MaintenancePreviewPage = carregarPagina("/manutencao", "MaintenancePreviewPage");
 const TermosUsoPage = carregarPagina("/termos-de-uso", "TermosUsoPage");
 const PoliticaPrivacidadePage = carregarPagina("/politica-de-privacidade", "PoliticaPrivacidadePage");
+const LicencaUsoRetornoPage = carregarPagina(
+  "/licenca-de-uso/retorno-pagamento",
+  "LicencaUsoRetornoPage"
+);
 const PainelSenhasPage = carregarPagina("/senhas/painel", "PainelSenhasPage");
 const VisaoGeralPage = carregarPagina("/dashboard/visao-geral", "VisaoGeralPage");
 const IndicadoresPage = carregarPagina("/dashboard/indicadores", "IndicadoresPage");
@@ -119,6 +123,7 @@ const MensagensPersonalizadasPage = carregarPagina(
 );
 const ChamadoTecnicoPage = carregarPagina("/configuracoes/chamado-tecnico", "ChamadoTecnicoPage");
 const ManualSistemaPage = carregarPagina("/configuracoes/manual-do-sistema", "ManualSistemaPage");
+const LicencaUsoPage = carregarPagina("/configuracoes/licenca-uso", "LicencaUsoPage");
 const SementePage = carregarPagina("/configuracoes/pesquise-na-ia", "SementePage");
 const SobreOSistemaPage = carregarPagina("/configuracoes/sobre-o-sistema", "SobreOSistemaPage");
 const CaptacaoRecursosPage = carregarPagina(
@@ -147,6 +152,10 @@ export const router = createBrowserRouter([
   {
     path: "/politica-de-privacidade",
     element: PoliticaPrivacidadePage
+  },
+  {
+    path: "/licenca-de-uso/retorno-pagamento",
+    element: LicencaUsoRetornoPage
   },
   {
     path: "/portal-doador",
@@ -365,6 +374,14 @@ export const router = createBrowserRouter([
       {
         path: "/configuracoes/chamado-tecnico",
         element: ChamadoTecnicoPage
+      },
+      {
+        path: "/configuracoes/licenca-uso",
+        element: (
+          <RequirePermission permissions={["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"]}>
+            {LicencaUsoPage}
+          </RequirePermission>
+        )
       },
       {
         path: "/configuracoes/manual-do-sistema",

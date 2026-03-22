@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.265",
+  "latestVersion": "1.00.268",
   "releaseDate": "2026-03-22",
-  "description": "Fluxo do almoxarifado simplificado com consulta centralizada na listagem de produtos.",
+  "description": "Webhook da licença do G3N preenchida automaticamente com a rota pública da InfinitePay no próprio sistema.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.265",
+  "minCompatibleVersion": "1.00.268",
   "releaseType": "stable",
   "downloadUrl": null
 }
