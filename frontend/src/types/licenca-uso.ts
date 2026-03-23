@@ -7,6 +7,7 @@ export type LicencaUsoConfiguracao = {
   instituicaoCnpj?: string;
   planoId: LicencaUsoPlanoId;
   cicloCobranca: LicencaUsoCiclo;
+  vigenciaInicialDias?: number;
   valorBaseMensal: number;
   percentualDesconto: number;
   valorCobranca: number;
@@ -53,15 +54,46 @@ export type LicencaUsoResumo = {
   bloqueiaSistema: false;
 };
 
+export type LicencaUsoPagamentoStatus = "pendente" | "pago" | "cancelado";
+
+export type LicencaUsoPagamentoHistorico = {
+  id: number;
+  status: LicencaUsoPagamentoStatus;
+  descricao: string;
+  planoId: LicencaUsoPlanoId;
+  cicloCobranca: LicencaUsoCiclo;
+  vigenciaInicio?: string;
+  vigenciaFim?: string;
+  vigenciaDias?: number;
+  valorLicenca: number;
+  valorImplantacao: number;
+  valorTotal: number;
+  orderNsu?: string;
+  invoiceSlug?: string;
+  transactionNsu?: string;
+  checkoutUrl?: string;
+  receiptUrl?: string;
+  criadoEm?: string;
+  pagoEm?: string;
+};
+
 export type LicencaUsoResponse = {
   configuracao: LicencaUsoConfiguracao;
   resumo: LicencaUsoResumo;
+  historico: {
+    pendentes: LicencaUsoPagamentoHistorico[];
+    realizados: LicencaUsoPagamentoHistorico[];
+  };
   atualizado_em?: string | null;
 };
 
 export type LicencaUsoCheckoutResponse = {
   configuracao: LicencaUsoConfiguracao;
   resumo: LicencaUsoResumo;
+  historico: {
+    pendentes: LicencaUsoPagamentoHistorico[];
+    realizados: LicencaUsoPagamentoHistorico[];
+  };
   checkoutUrl?: string;
   orderNsu?: string;
   invoiceSlug?: string;
@@ -71,5 +103,9 @@ export type LicencaUsoRetornoCheckoutResponse = {
   pago: boolean;
   configuracao: LicencaUsoConfiguracao;
   resumo: LicencaUsoResumo;
+  historico: {
+    pendentes: LicencaUsoPagamentoHistorico[];
+    realizados: LicencaUsoPagamentoHistorico[];
+  };
   retorno: Record<string, unknown>;
 };

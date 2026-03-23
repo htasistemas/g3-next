@@ -11,6 +11,7 @@ export type LicencaUsoConfiguracao = {
   instituicaoCnpj?: string;
   planoId: LicencaUsoPlano;
   cicloCobranca: LicencaUsoCiclo;
+  vigenciaInicialDias?: number;
   valorBaseMensal: number;
   percentualDesconto: number;
   valorCobranca: number;
@@ -57,6 +58,29 @@ export type LicencaUsoResumo = {
   diasParaVencimento?: number;
   proximoAlertaDias?: number;
   bloqueiaSistema: false;
+};
+
+export type LicencaUsoPagamentoStatus = "pendente" | "pago" | "cancelado";
+
+export type LicencaUsoPagamentoHistorico = {
+  id: number;
+  status: LicencaUsoPagamentoStatus;
+  descricao: string;
+  planoId: LicencaUsoPlano;
+  cicloCobranca: LicencaUsoCiclo;
+  vigenciaInicio?: string;
+  vigenciaFim?: string;
+  vigenciaDias?: number;
+  valorLicenca: number;
+  valorImplantacao: number;
+  valorTotal: number;
+  orderNsu?: string;
+  invoiceSlug?: string;
+  transactionNsu?: string;
+  checkoutUrl?: string;
+  receiptUrl?: string;
+  criadoEm?: string;
+  pagoEm?: string;
 };
 
 export type LicencaUsoAlertaProcessado = {

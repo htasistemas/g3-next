@@ -36,6 +36,7 @@ const fatorMesesPorCiclo: Record<LicencaUsoCiclo, number> = {
 const configuracaoPadrao: LicencaUsoConfiguracao = {
   planoId: "profissional",
   cicloCobranca: "mensal",
+  vigenciaInicialDias: 30,
   valorBaseMensal: planosBase.profissional.valorMensal,
   percentualDesconto: 0,
   valorCobranca: planosBase.profissional.valorMensal,
@@ -73,6 +74,12 @@ function adicionarMeses(dataIso: string, meses: number) {
   const data = new Date(`${dataIso}T00:00:00.000Z`);
   data.setUTCMonth(data.getUTCMonth() + meses);
   data.setUTCDate(data.getUTCDate() - 1);
+  return data.toISOString().slice(0, 10);
+}
+
+function adicionarDias(dataIso: string, dias: number) {
+  const data = new Date(`${dataIso}T00:00:00.000Z`);
+  data.setUTCDate(data.getUTCDate() + Math.max(dias, 1) - 1);
   return data.toISOString().slice(0, 10);
 }
 
@@ -119,6 +126,23 @@ function calcularCobranca(planoId: LicencaUsoPlano, ciclo: LicencaUsoCiclo) {
   };
 }
 
+function calcularVigencia(configuracao: Pick<LicencaUsoConfiguracao, "cicloCobranca" | "vigenciaInicialDias">, dataInicio: string) {
+  const vigenciaDias = Number(configuracao.vigenciaInicialDias ?? 0);
+  if (vigenciaDias > 0) {
+    return {
+      vigenciaInicio: dataInicio,
+      vigenciaFim: adicionarDias(dataInicio, vigenciaDias),
+      vigenciaDias
+    };
+  }
+
+  return {
+    vigenciaInicio: dataInicio,
+    vigenciaFim: adicionarMeses(dataInicio, mesesPorCiclo(configuracao.cicloCobranca)),
+    vigenciaDias: undefined
+  };
+}
+
 function montarResumo(configuracao: LicencaUsoConfiguracao): LicencaUsoResumo {
   const diasParaVencimento = diferencaDias(configuracao.dataVencimento);
   const proximos = [...(configuracao.diasAlertaEmail ?? [])]
@@ -137,6 +161,19 @@ export class LicencaUsoService {
   private readonly unidadeRepository = new UnidadeAssistencialRepository();
   private readonly emailService = new EmailService();
   private readonly infinitePayService = new InfinitePayService();
+
+  private async montarResposta(configuracao: LicencaUsoConfiguracao) {
+    const pagamentos = await this.repository.listarPagamentos();
+    return {
+      configuracao,
+      resumo: montarResumo(configuracao),
+      historico: {
+        pendentes: pagamentos.filter((item) => item.status === "pendente"),
+        realizados: pagamentos.filter((item) => item.status === "pago")
+      },
+      atualizado_em: null as string | null
+    };
+  }
 
   async obterConfiguracao() {
     const unidadeAtual = await this.unidadeRepository.buscarAtual();
@@ -157,11 +194,7 @@ export class LicencaUsoService {
       statusLicenca: calcularStatusLicenca(registro?.dataVencimento)
     });
 
-    return {
-      configuracao: base,
-      resumo: montarResumo(base),
-      atualizado_em: null as string | null
-    };
+    return this.montarResposta(base);
   }
 
   async atualizarConfiguracao(rawPayload: unknown, usuarioAtualizacao: string) {
@@ -176,6 +209,19 @@ export class LicencaUsoService {
     const cobrancaCalculada = calcularCobranca(planoId, cicloCobranca);
     const implantacaoIsentaCalculada =
       payload.configuracao.implantacaoIsenta ?? cobrancaCalculada.implantacaoIsenta;
+
+    const dataInicioVigencia =
+      payload.configuracao.dataInicioVigencia ?? atual?.dataInicioVigencia ?? new Date().toISOString().slice(0, 10);
+    const vigenciaCalculada = calcularVigencia(
+      {
+        cicloCobranca,
+        vigenciaInicialDias:
+          payload.configuracao.vigenciaInicialDias ??
+          atual?.vigenciaInicialDias ??
+          configuracaoPadrao.vigenciaInicialDias
+      },
+      dataInicioVigencia
+    );
 
     const normalizado = licencaUsoConfiguracaoSchema.parse({
       ...configuracaoPadrao,
@@ -194,6 +240,12 @@ export class LicencaUsoService {
         undefined,
       planoId,
       cicloCobranca,
+      vigenciaInicialDias:
+        payload.configuracao.vigenciaInicialDias ??
+        atual?.vigenciaInicialDias ??
+        configuracaoPadrao.vigenciaInicialDias,
+      dataInicioVigencia,
+      dataVencimento: payload.configuracao.dataVencimento ?? vigenciaCalculada.vigenciaFim,
       valorBaseMensal: payload.configuracao.valorBaseMensal ?? cobrancaCalculada.valorBaseMensal,
       percentualDesconto:
         payload.configuracao.percentualDesconto ?? cobrancaCalculada.percentualDesconto,
@@ -214,16 +266,12 @@ export class LicencaUsoService {
             ? [...atual.diasAlertaEmail].sort((a, b) => b - a)
             : configuracaoPadrao.diasAlertaEmail,
       statusLicenca: calcularStatusLicenca(
-        payload.configuracao.dataVencimento ?? atual?.dataVencimento
+        payload.configuracao.dataVencimento ?? vigenciaCalculada.vigenciaFim
       )
     });
 
     const salvo = await this.repository.salvarConfiguracao(normalizado, usuarioAtualizacao);
-
-    return {
-      configuracao: salvo,
-      resumo: montarResumo(salvo)
-    };
+    return this.montarResposta(salvo);
   }
 
   async gerarCheckoutLink() {
@@ -237,6 +285,8 @@ export class LicencaUsoService {
 
     const plano = planosBase[configuracao.planoId];
     const orderNsu = gerarOrderNsu();
+    const dataInicio = configuracao.dataInicioVigencia ?? new Date().toISOString().slice(0, 10);
+    const vigencia = calcularVigencia(configuracao, dataInicio);
     const itens = [
       {
         quantity: 1,
@@ -276,9 +326,25 @@ export class LicencaUsoService {
       "infinitepay-checkout"
     );
 
+    await this.repository.registrarPagamentoPendente({
+      descricao: `Licença G3N ${plano.nome}`,
+      planoId: configuracao.planoId,
+      cicloCobranca: configuracao.cicloCobranca,
+      vigenciaInicio: vigencia.vigenciaInicio,
+      vigenciaFim: vigencia.vigenciaFim,
+      vigenciaDias: vigencia.vigenciaDias,
+      valorLicenca: configuracao.valorCobranca,
+      valorImplantacao: configuracao.implantacaoIsenta ? 0 : configuracao.valorImplantacao,
+      valorTotal: configuracao.valorCobranca + (configuracao.implantacaoIsenta ? 0 : configuracao.valorImplantacao),
+      orderNsu: resposta.order_nsu ?? orderNsu,
+      invoiceSlug: resposta.invoice_slug,
+      checkoutUrl: resposta.url
+    });
+
+    const respostaCompleta = await this.montarResposta(salvo);
+
     return {
-      configuracao: salvo,
-      resumo: montarResumo(salvo),
+      ...respostaCompleta,
       checkoutUrl: resposta.url,
       orderNsu: resposta.order_nsu ?? orderNsu,
       invoiceSlug: resposta.invoice_slug
@@ -313,31 +379,44 @@ export class LicencaUsoService {
 
     const pago = Boolean(resposta.paid);
     const hoje = new Date().toISOString().slice(0, 10);
-    const novaVigenciaInicio = pago ? hoje : configuracao.dataInicioVigencia;
-    const novaVigenciaFim = pago
-      ? adicionarMeses(hoje, mesesPorCiclo(configuracao.cicloCobranca))
-      : configuracao.dataVencimento;
+    const vigencia = pago ? calcularVigencia(configuracao, hoje) : undefined;
+    const valorPago = Number((resposta.paid_amount ?? resposta.amount ?? 0) / 100);
+    const valorImplantacao = configuracao.implantacaoIsenta ? 0 : configuracao.valorImplantacao;
 
     const salvo = await this.repository.salvarConfiguracao(
       licencaUsoConfiguracaoSchema.parse({
         ...configuracao,
-        dataInicioVigencia: novaVigenciaInicio,
-        dataVencimento: novaVigenciaFim,
+        dataInicioVigencia: pago ? vigencia?.vigenciaInicio : configuracao.dataInicioVigencia,
+        dataVencimento: pago ? vigencia?.vigenciaFim : configuracao.dataVencimento,
         statusLicenca: pago ? "ativa" : calcularStatusLicenca(configuracao.dataVencimento),
         ultimoOrderNsu: resposta.order_nsu ?? orderNsu,
         ultimoInvoiceSlug: resposta.slug ?? slug,
         ultimaTransactionNsu: resposta.transaction_nsu ?? transactionNsu,
         ultimoReceiptUrl: resposta.receipt_url ?? payload.receipt_url ?? configuracao.ultimoReceiptUrl,
         ultimoCheckoutPago: pago,
-        ultimoValorPago: Number((resposta.paid_amount ?? resposta.amount ?? 0) / 100)
+        ultimoValorPago: valorPago
       }),
       "infinitepay-retorno"
     );
 
+    if (pago) {
+      await this.repository.marcarPagamentoComoPago({
+        orderNsu: resposta.order_nsu ?? orderNsu,
+        invoiceSlug: resposta.slug ?? slug,
+        transactionNsu: resposta.transaction_nsu ?? transactionNsu,
+        receiptUrl: resposta.receipt_url ?? payload.receipt_url ?? configuracao.ultimoReceiptUrl,
+        valorTotal: valorPago || configuracao.valorCobranca + valorImplantacao,
+        vigenciaInicio: vigencia?.vigenciaInicio,
+        vigenciaFim: vigencia?.vigenciaFim,
+        vigenciaDias: vigencia?.vigenciaDias
+      });
+    }
+
+    const respostaCompleta = await this.montarResposta(salvo);
+
     return {
       pago,
-      configuracao: salvo,
-      resumo: montarResumo(salvo),
+      ...respostaCompleta,
       retorno: resposta
     };
   }

@@ -1,12 +1,18 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../../database/prisma.js";
-import type { LicencaUsoAlertaProcessado, LicencaUsoConfiguracao } from "../licenca-uso.types.js";
+import type {
+  LicencaUsoAlertaProcessado,
+  LicencaUsoConfiguracao,
+  LicencaUsoPagamentoHistorico,
+  LicencaUsoPagamentoStatus
+} from "../licenca-uso.types.js";
 
 type RegistroLicencaUso = {
   instituicao_nome: string | null;
   instituicao_cnpj: string | null;
   plano_id: string;
   ciclo_cobranca: string;
+  vigencia_inicial_dias: number | null;
   valor_base_mensal: Prisma.Decimal | number | string;
   percentual_desconto: Prisma.Decimal | number | string;
   valor_cobranca: Prisma.Decimal | number | string;
@@ -47,6 +53,27 @@ type RegistroLicencaUso = {
   ultimo_valor_pago: Prisma.Decimal | number | string | null;
 };
 
+type RegistroLicencaUsoPagamento = {
+  id: bigint | number;
+  status: string;
+  descricao: string;
+  plano_id: string;
+  ciclo_cobranca: string;
+  vigencia_inicio: Date | string | null;
+  vigencia_fim: Date | string | null;
+  vigencia_dias: number | null;
+  valor_licenca: Prisma.Decimal | number | string;
+  valor_implantacao: Prisma.Decimal | number | string;
+  valor_total: Prisma.Decimal | number | string;
+  order_nsu: string | null;
+  invoice_slug: string | null;
+  transaction_nsu: string | null;
+  checkout_url: string | null;
+  receipt_url: string | null;
+  created_at: Date | string | null;
+  paid_at: Date | string | null;
+};
+
 const criarTabelaConfiguracaoSql = `
   CREATE TABLE IF NOT EXISTS licenca_uso_configuracoes (
     id BIGINT PRIMARY KEY,
@@ -54,6 +81,7 @@ const criarTabelaConfiguracaoSql = `
     instituicao_cnpj VARCHAR(20),
     plano_id VARCHAR(30) NOT NULL,
     ciclo_cobranca VARCHAR(20) NOT NULL,
+    vigencia_inicial_dias INTEGER,
     valor_base_mensal NUMERIC(12,2) NOT NULL DEFAULT 247,
     percentual_desconto NUMERIC(6,2) NOT NULL DEFAULT 0,
     valor_cobranca NUMERIC(12,2) NOT NULL DEFAULT 247,
@@ -99,6 +127,7 @@ const criarTabelaConfiguracaoSql = `
 `;
 
 const alteracoesEstruturaSql = [
+  "ALTER TABLE licenca_uso_configuracoes ADD COLUMN IF NOT EXISTS vigencia_inicial_dias INTEGER",
   "ALTER TABLE licenca_uso_configuracoes ADD COLUMN IF NOT EXISTS checkout_handle VARCHAR(120)",
   "ALTER TABLE licenca_uso_configuracoes ADD COLUMN IF NOT EXISTS checkout_redirect_url TEXT",
   "ALTER TABLE licenca_uso_configuracoes ADD COLUMN IF NOT EXISTS ultimo_checkout_url TEXT",
@@ -109,6 +138,29 @@ const alteracoesEstruturaSql = [
   "ALTER TABLE licenca_uso_configuracoes ADD COLUMN IF NOT EXISTS ultimo_checkout_pago BOOLEAN NOT NULL DEFAULT FALSE",
   "ALTER TABLE licenca_uso_configuracoes ADD COLUMN IF NOT EXISTS ultimo_valor_pago NUMERIC(12,2) NOT NULL DEFAULT 0"
 ];
+
+const criarTabelaPagamentosSql = `
+  CREATE TABLE IF NOT EXISTS licenca_uso_pagamentos (
+    id BIGSERIAL PRIMARY KEY,
+    status VARCHAR(20) NOT NULL,
+    descricao VARCHAR(255) NOT NULL,
+    plano_id VARCHAR(30) NOT NULL,
+    ciclo_cobranca VARCHAR(20) NOT NULL,
+    vigencia_inicio DATE,
+    vigencia_fim DATE,
+    vigencia_dias INTEGER,
+    valor_licenca NUMERIC(12,2) NOT NULL DEFAULT 0,
+    valor_implantacao NUMERIC(12,2) NOT NULL DEFAULT 0,
+    valor_total NUMERIC(12,2) NOT NULL DEFAULT 0,
+    order_nsu VARCHAR(120),
+    invoice_slug VARCHAR(120),
+    transaction_nsu VARCHAR(120),
+    checkout_url TEXT,
+    receipt_url TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    paid_at TIMESTAMP
+  );
+`;
 
 const criarTabelaAlertasSql = `
   CREATE TABLE IF NOT EXISTS licenca_uso_alertas (
@@ -154,6 +206,7 @@ function mapRow(row: RegistroLicencaUso): LicencaUsoConfiguracao {
     instituicaoCnpj: row.instituicao_cnpj ?? undefined,
     planoId: row.plano_id as LicencaUsoConfiguracao["planoId"],
     cicloCobranca: row.ciclo_cobranca as LicencaUsoConfiguracao["cicloCobranca"],
+    vigenciaInicialDias: row.vigencia_inicial_dias ?? undefined,
     valorBaseMensal: toNumber(row.valor_base_mensal),
     percentualDesconto: toNumber(row.percentual_desconto),
     valorCobranca: toNumber(row.valor_cobranca),
@@ -195,6 +248,29 @@ function mapRow(row: RegistroLicencaUso): LicencaUsoConfiguracao {
   };
 }
 
+function mapPagamentoRow(row: RegistroLicencaUsoPagamento): LicencaUsoPagamentoHistorico {
+  return {
+    id: Number(row.id),
+    status: row.status as LicencaUsoPagamentoStatus,
+    descricao: row.descricao,
+    planoId: row.plano_id as LicencaUsoPagamentoHistorico["planoId"],
+    cicloCobranca: row.ciclo_cobranca as LicencaUsoPagamentoHistorico["cicloCobranca"],
+    vigenciaInicio: toIsoDate(row.vigencia_inicio),
+    vigenciaFim: toIsoDate(row.vigencia_fim),
+    vigenciaDias: row.vigencia_dias ?? undefined,
+    valorLicenca: toNumber(row.valor_licenca),
+    valorImplantacao: toNumber(row.valor_implantacao),
+    valorTotal: toNumber(row.valor_total),
+    orderNsu: row.order_nsu ?? undefined,
+    invoiceSlug: row.invoice_slug ?? undefined,
+    transactionNsu: row.transaction_nsu ?? undefined,
+    checkoutUrl: row.checkout_url ?? undefined,
+    receiptUrl: row.receipt_url ?? undefined,
+    criadoEm: row.created_at ? new Date(row.created_at).toISOString() : undefined,
+    pagoEm: row.paid_at ? new Date(row.paid_at).toISOString() : undefined
+  };
+}
+
 export class LicencaUsoRepository {
   async buscarConfiguracao() {
     await ensureLicencaUsoEstrutura();
@@ -213,7 +289,7 @@ export class LicencaUsoRepository {
     const rows = await prisma.$queryRawUnsafe<RegistroLicencaUso[]>(
       `
         INSERT INTO licenca_uso_configuracoes (
-          id, instituicao_nome, instituicao_cnpj, plano_id, ciclo_cobranca, valor_base_mensal,
+          id, instituicao_nome, instituicao_cnpj, plano_id, ciclo_cobranca, vigencia_inicial_dias, valor_base_mensal,
           percentual_desconto, valor_cobranca, valor_implantacao, implantacao_isenta,
           data_inicio_vigencia, data_vencimento, status_licenca, alertas_email_ativos,
           dias_alerta_email, emails_alerta, observacoes, pix_chave, pix_recebedor, pix_cidade,
@@ -225,9 +301,9 @@ export class LicencaUsoRepository {
           ultimo_checkout_pago, ultimo_valor_pago, updated_at, updated_by
         )
         VALUES (
-          1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb, $15::jsonb,
-          $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32,
-          $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, NOW(), $43
+          1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15::jsonb, $16::jsonb,
+          $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33,
+          $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, NOW(), $44
         )
         ON CONFLICT (id)
         DO UPDATE SET
@@ -235,6 +311,7 @@ export class LicencaUsoRepository {
           instituicao_cnpj = EXCLUDED.instituicao_cnpj,
           plano_id = EXCLUDED.plano_id,
           ciclo_cobranca = EXCLUDED.ciclo_cobranca,
+          vigencia_inicial_dias = EXCLUDED.vigencia_inicial_dias,
           valor_base_mensal = EXCLUDED.valor_base_mensal,
           percentual_desconto = EXCLUDED.percentual_desconto,
           valor_cobranca = EXCLUDED.valor_cobranca,
@@ -281,6 +358,7 @@ export class LicencaUsoRepository {
       configuracao.instituicaoCnpj ?? null,
       configuracao.planoId,
       configuracao.cicloCobranca,
+      configuracao.vigenciaInicialDias ?? null,
       configuracao.valorBaseMensal,
       configuracao.percentualDesconto,
       configuracao.valorCobranca,
@@ -322,6 +400,96 @@ export class LicencaUsoRepository {
       usuarioAtualizacao
     );
     return mapRow(rows[0]);
+  }
+
+  async listarPagamentos() {
+    await ensureLicencaUsoEstrutura();
+    const rows = await prisma.$queryRawUnsafe<RegistroLicencaUsoPagamento[]>(`
+      SELECT *
+      FROM licenca_uso_pagamentos
+      ORDER BY created_at DESC, id DESC
+    `);
+    return rows.map(mapPagamentoRow);
+  }
+
+  async registrarPagamentoPendente(input: {
+    descricao: string;
+    planoId: LicencaUsoConfiguracao["planoId"];
+    cicloCobranca: LicencaUsoConfiguracao["cicloCobranca"];
+    vigenciaInicio?: string;
+    vigenciaFim?: string;
+    vigenciaDias?: number;
+    valorLicenca: number;
+    valorImplantacao: number;
+    valorTotal: number;
+    orderNsu?: string;
+    invoiceSlug?: string;
+    checkoutUrl?: string;
+  }) {
+    await ensureLicencaUsoEstrutura();
+    const rows = await prisma.$queryRawUnsafe<RegistroLicencaUsoPagamento[]>(
+      `
+        INSERT INTO licenca_uso_pagamentos (
+          status, descricao, plano_id, ciclo_cobranca, vigencia_inicio, vigencia_fim, vigencia_dias,
+          valor_licenca, valor_implantacao, valor_total, order_nsu, invoice_slug, checkout_url
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        RETURNING *
+      `,
+      "pendente",
+      input.descricao,
+      input.planoId,
+      input.cicloCobranca,
+      input.vigenciaInicio ?? null,
+      input.vigenciaFim ?? null,
+      input.vigenciaDias ?? null,
+      input.valorLicenca,
+      input.valorImplantacao,
+      input.valorTotal,
+      input.orderNsu ?? null,
+      input.invoiceSlug ?? null,
+      input.checkoutUrl ?? null
+    );
+    return mapPagamentoRow(rows[0]);
+  }
+
+  async marcarPagamentoComoPago(input: {
+    orderNsu: string;
+    invoiceSlug?: string;
+    transactionNsu?: string;
+    receiptUrl?: string;
+    valorTotal?: number;
+    vigenciaInicio?: string;
+    vigenciaFim?: string;
+    vigenciaDias?: number;
+  }) {
+    await ensureLicencaUsoEstrutura();
+    const rows = await prisma.$queryRawUnsafe<RegistroLicencaUsoPagamento[]>(
+      `
+        UPDATE licenca_uso_pagamentos
+        SET
+          status = 'pago',
+          invoice_slug = COALESCE($2, invoice_slug),
+          transaction_nsu = COALESCE($3, transaction_nsu),
+          receipt_url = COALESCE($4, receipt_url),
+          valor_total = COALESCE($5, valor_total),
+          vigencia_inicio = COALESCE($6::date, vigencia_inicio),
+          vigencia_fim = COALESCE($7::date, vigencia_fim),
+          vigencia_dias = COALESCE($8, vigencia_dias),
+          paid_at = NOW()
+        WHERE order_nsu = $1
+        RETURNING *
+      `,
+      input.orderNsu,
+      input.invoiceSlug ?? null,
+      input.transactionNsu ?? null,
+      input.receiptUrl ?? null,
+      input.valorTotal ?? null,
+      input.vigenciaInicio ?? null,
+      input.vigenciaFim ?? null,
+      input.vigenciaDias ?? null
+    );
+    return rows[0] ? mapPagamentoRow(rows[0]) : null;
   }
 
   async alertaJaEnviado(destinatario: string, diasAntecedencia: number, referenciaVencimento: string) {
@@ -368,7 +536,8 @@ export async function ensureLicencaUsoEstrutura() {
   if (!estruturaPromise) {
     estruturaPromise = Promise.all([
       prisma.$executeRawUnsafe(criarTabelaConfiguracaoSql),
-      prisma.$executeRawUnsafe(criarTabelaAlertasSql)
+      prisma.$executeRawUnsafe(criarTabelaAlertasSql),
+      prisma.$executeRawUnsafe(criarTabelaPagamentosSql)
     ]).then(() => undefined);
   }
   await estruturaPromise;

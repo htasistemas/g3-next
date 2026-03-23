@@ -186,18 +186,19 @@ const secoesManual: ManualSecao[] = [
       },
       {
         nome: "Licença de uso",
-        objetivo: "Controlar a licença comercial do G3N por CNPJ da instituição principal, ciclo de cobrança e alertas de vencimento.",
+        objetivo: "Controlar a licença comercial do G3N por CNPJ da instituição principal com fluxo guiado de plano, vigência inicial e histórico financeiro.",
         comoUsar: [
-          "Selecione o plano comercial do G3N e defina se a cobrança será mensal, semestral ou anual.",
-          "Confirme o CNPJ da instituição principal, as datas de vigência e os e-mails que receberão alertas de vencimento.",
-          "Use a seção de recebimento para manter os mesmos parâmetros operacionais de cobrança via InfinityPay usados no fluxo financeiro compartilhado.",
-          "Gere o checkout da licença pelo próprio G3N para abrir o link de pagamento e usar a rota interna de retorno do pagamento.",
-          "A webhook da InfinitePay já pode ser preenchida automaticamente com a rota pública do próprio G3N."
+          "Escolha o plano comercial do G3N e depois selecione o ciclo mensal, semestral ou anual.",
+          "Informe a vigência inicial em dias para que o sistema calcule automaticamente a data final da licença.",
+          "Use Gerar cobrança para abrir o checkout da InfinitePay sem precisar preencher campos técnicos manualmente.",
+          "Acompanhe os quadros Pagamentos a realizar e Pagamentos realizados para visualizar a jornada financeira da licença.",
+          "Os alertas continuam sendo enviados somente por e-mail e o sistema não bloqueia a operação quando a licença vence."
         ],
         atencoes: [
           "A licença fica vinculada ao CNPJ da unidade principal registrada no sistema.",
-          "Os alertas são enviados somente por e-mail e não bloqueiam a operação do G3N quando a licença estiver próxima do vencimento ou vencida.",
-          "No ciclo anual, a implantação pode ser registrada como isenta conforme a política comercial definida."
+          "A data final é recalculada automaticamente a partir da data inicial e da quantidade de dias informada na vigência inicial.",
+          "Cada checkout gerado entra primeiro no histórico como pendente e migra para realizado quando a InfinitePay confirma o pagamento.",
+          "No ciclo anual, a implantação continua isenta conforme a política comercial definida."
         ]
       },
       {

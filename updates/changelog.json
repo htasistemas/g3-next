@@ -1,6 +1,20 @@
 {
   "entries": [
     {
+      "version": "1.00.269",
+      "releaseDate": "2026-03-22",
+      "title": "Licença de uso guiada e com histórico financeiro",
+      "description": "A licença do G3N agora usa um fluxo comercial mais simples, com vigência inicial em dias e histórico de cobranças pendentes e pagas.",
+      "changes": [
+        "Tela da licença redesenhada para seleção guiada de plano, ciclo e vigência inicial.",
+        "Cálculo automático da data final da licença a partir da quantidade de dias informada.",
+        "Histórico visual de pagamentos a realizar e pagamentos realizados.",
+        "Persistência de cobranças pendentes e pagas no backend da licença.",
+        "Manual do sistema atualizado com o novo fluxo."
+      ],
+      "releaseType": "stable"
+    },
+    {
       "version": "1.00.268",
       "releaseDate": "2026-03-22",
       "title": "Webhook automática na licença do G3N",

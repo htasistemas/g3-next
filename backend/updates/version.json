@@ -1,9 +1,9 @@
 {
-  "latestVersion": "1.00.268",
+  "latestVersion": "1.00.269",
   "releaseDate": "2026-03-22",
-  "description": "Versão atualmente instalada nesta instância.",
+  "description": "Licença do G3N redesenhada com vigência inicial em dias, cálculo automático da data final e histórico financeiro de cobranças.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.268",
+  "minCompatibleVersion": "1.00.269",
   "releaseType": "stable"
 }

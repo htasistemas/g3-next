@@ -1,6 +1,18 @@
 {
   "entries": [
     {
+      "version": "1.00.269",
+      "releaseDate": "2026-03-22",
+      "title": "Licença guiada com vigência em dias",
+      "description": "Atualização local da instância com nova experiência comercial da licença e histórico financeiro persistido.",
+      "changes": [
+        "Vigência inicial em dias com cálculo automático da data final.",
+        "Histórico de pagamentos pendentes e pagos armazenado no backend.",
+        "Tela da licença simplificada para o usuário final."
+      ],
+      "releaseType": "stable"
+    },
+    {
       "version": "1.00.268",
       "releaseDate": "2026-03-22",
       "title": "Webhook automática na licença do G3N",
