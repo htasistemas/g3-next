@@ -15,10 +15,10 @@ import type {
 } from "../licenca-uso.types.js";
 
 const planosBase: Record<LicencaUsoPlano, { nome: string; valorMensal: number; implantacao: number }> = {
-  essencial: { nome: "Essencial", valorMensal: 147, implantacao: 497 },
-  profissional: { nome: "Profissional", valorMensal: 247, implantacao: 897 },
-  premium: { nome: "Premium", valorMensal: 397, implantacao: 1500 },
-  enterprise: { nome: "Enterprise", valorMensal: 597, implantacao: 1500 }
+  essencial: { nome: "Essencial", valorMensal: 297, implantacao: 497 },
+  profissional: { nome: "Profissional", valorMensal: 497, implantacao: 897 },
+  premium: { nome: "Premium", valorMensal: 697, implantacao: 1500 },
+  enterprise: { nome: "Enterprise", valorMensal: 797, implantacao: 1500 }
 };
 
 const descontoPorCiclo: Record<LicencaUsoCiclo, number> = {
