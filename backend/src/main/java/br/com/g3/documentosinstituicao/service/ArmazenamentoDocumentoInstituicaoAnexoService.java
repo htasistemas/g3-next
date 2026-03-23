@@ -22,10 +22,17 @@ public class ArmazenamentoDocumentoInstituicaoAnexoService {
   }
 
   public String salvarArquivo(Long documentoId, DocumentoInstituicaoAnexoRequest request) {
-    if (request == null || request.getConteudoBase64() == null || request.getConteudoBase64().trim().isEmpty()) {
+    if (request == null) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Envie o arquivo do anexo.");
     }
     validarTipoArquivo(request.getTipoMime(), request.getNomeArquivo());
+    String caminhoArquivoExistente = normalizarCaminhoArquivo(request.getCaminhoArquivo());
+    if (caminhoArquivoExistente != null) {
+      return caminhoArquivoExistente;
+    }
+    if (request.getConteudoBase64() == null || request.getConteudoBase64().trim().isEmpty()) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Envie o arquivo do anexo.");
+    }
     String extensao = obterExtensao(request.getNomeArquivo(), request.getTipoMime());
     String nomeArquivo = UUID.randomUUID() + extensao;
     Path destino = baseDir.resolve(String.valueOf(documentoId)).resolve(nomeArquivo);
@@ -37,6 +44,18 @@ public class ArmazenamentoDocumentoInstituicaoAnexoService {
       return destino.toString();
     } catch (IOException ex) {
       throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Falha ao salvar o anexo.");
+    }
+  }
+
+  public void excluirArquivo(String caminhoArquivo, Long documentoId) {
+    Path caminho = resolverCaminhoArquivo(caminhoArquivo, documentoId);
+    if (caminho == null) {
+      return;
+    }
+    try {
+      Files.deleteIfExists(caminho);
+    } catch (IOException ex) {
+      throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Falha ao excluir o anexo.");
     }
   }
 
@@ -86,6 +105,13 @@ public class ArmazenamentoDocumentoInstituicaoAnexoService {
       base64 = conteudo.substring(indice + 7);
     }
     return Base64.getDecoder().decode(base64);
+  }
+
+  private String normalizarCaminhoArquivo(String caminhoArquivo) {
+    if (caminhoArquivo == null || caminhoArquivo.trim().isEmpty()) {
+      return null;
+    }
+    return caminhoArquivo.trim();
   }
 
   private String obterExtensao(String nomeArquivo, String contentType) {

@@ -11,5 +11,7 @@ public interface DocumentoInstituicaoAnexoRepository {
 
   Optional<DocumentoInstituicaoAnexo> buscarPorId(Long id);
 
+  void remover(DocumentoInstituicaoAnexo anexo);
+
   void removerPorDocumento(Long documentoId);
 }

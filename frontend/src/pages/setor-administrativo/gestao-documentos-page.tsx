@@ -509,7 +509,7 @@ export function GestaoDocumentosPage() {
           nomeArquivo: upload.nomeOriginal || file.name,
           tipo: obterTipoAnexoArquivo(file),
           tipoMime: upload.mimeType || file.type || "application/octet-stream",
-          conteudoBase64: upload.caminhoArquivo,
+          caminhoArquivo: upload.caminhoArquivo,
           tamanho: `${Math.round((upload.tamanhoBytes ?? file.size) / 1024)} KB`,
           dataUpload: new Date().toISOString().slice(0, 10),
           usuario: responsavelLogado || "Usuário"
@@ -596,7 +596,7 @@ export function GestaoDocumentosPage() {
           nomeArquivo: upload.nomeOriginal || file.name,
           tipo: obterTipoAnexoArquivo(file),
           tipoMime: upload.mimeType || file.type || "application/octet-stream",
-          conteudoBase64: upload.caminhoArquivo,
+          caminhoArquivo: upload.caminhoArquivo,
           tamanho: `${Math.round((upload.tamanhoBytes ?? file.size) / 1024)} KB`,
           dataUpload: new Date().toISOString().slice(0, 10),
           usuario: responsavelLogado || "Usuário"

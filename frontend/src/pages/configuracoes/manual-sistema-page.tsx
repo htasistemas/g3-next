@@ -166,6 +166,19 @@ const secoesManual: ManualSecao[] = [
           "A consulta de produtos fica centralizada na aba Listagem de produtos.",
           "Cadastros e movimentações devem permanecer coerentes para evitar divergência de saldo."
         ]
+      },
+      {
+        nome: "Gestão de documentos",
+        objetivo: "Controlar documentos institucionais, anexar o arquivo principal e manter histórico de atualizações do documento.",
+        comoUsar: [
+          "Cadastre ou selecione um documento na lista para abrir o detalhamento completo.",
+          "Use a seção Arquivo do documento para anexar, substituir, visualizar, imprimir ou excluir o arquivo principal em um clique.",
+          "Após cada alteração relevante, consulte o histórico do documento para acompanhar registros de cadastro, envio, troca e remoção de anexo."
+        ],
+        atencoes: [
+          "O sistema aceita anexos PDF, JPG e PNG e grava apenas o caminho do arquivo no cadastro do documento.",
+          "Se o documento já estiver salvo, o anexo é armazenado no storage do sistema e permanece disponível para substituição e exclusão sem duplicar arquivo no banco."
+        ]
       }
     ]
   },

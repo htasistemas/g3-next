@@ -13,8 +13,9 @@ public class DocumentoInstituicaoAnexoRequest {
   @NotBlank(message = "Tipo MIME do arquivo e obrigatorio.")
   private String tipoMime;
 
-  @NotBlank(message = "Conteudo do arquivo e obrigatorio.")
   private String conteudoBase64;
+
+  private String caminhoArquivo;
 
   private String tamanho;
 
@@ -61,6 +62,14 @@ public class DocumentoInstituicaoAnexoRequest {
 
   public void setConteudoBase64(String conteudoBase64) {
     this.conteudoBase64 = conteudoBase64;
+  }
+
+  public String getCaminhoArquivo() {
+    return caminhoArquivo;
+  }
+
+  public void setCaminhoArquivo(String caminhoArquivo) {
+    this.caminhoArquivo = caminhoArquivo;
   }
 
   public LocalDate getDataUpload() {

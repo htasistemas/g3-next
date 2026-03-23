@@ -66,6 +66,21 @@ public class DocumentoInstituicaoController {
     return ResponseEntity.ok(service.adicionarAnexo(id, request));
   }
 
+  @PutMapping("/{id}/anexos/{anexoId}")
+  public ResponseEntity<DocumentoInstituicaoAnexoResponse> substituirAnexo(
+      @PathVariable("id") Long id,
+      @PathVariable("anexoId") Long anexoId,
+      @Valid @RequestBody DocumentoInstituicaoAnexoRequest request) {
+    return ResponseEntity.ok(service.substituirAnexo(id, anexoId, request));
+  }
+
+  @DeleteMapping("/{id}/anexos/{anexoId}")
+  public ResponseEntity<Void> excluirAnexo(
+      @PathVariable("id") Long id, @PathVariable("anexoId") Long anexoId) {
+    service.excluirAnexo(id, anexoId);
+    return ResponseEntity.noContent().build();
+  }
+
   @GetMapping("/{id}/anexos/{anexoId}/arquivo")
   public ResponseEntity<Resource> baixarAnexo(
       @PathVariable("id") Long id, @PathVariable("anexoId") Long anexoId) {

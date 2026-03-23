@@ -13,12 +13,12 @@ import br.com.g3.documentosinstituicao.repository.DocumentoInstituicaoAnexoRepos
 import br.com.g3.documentosinstituicao.repository.DocumentoInstituicaoHistoricoRepository;
 import br.com.g3.documentosinstituicao.repository.DocumentoInstituicaoRepository;
 import br.com.g3.documentosinstituicao.service.ArmazenamentoDocumentoInstituicaoAnexoService;
+import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.util.Objects;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.http.HttpStatus;
@@ -121,9 +121,7 @@ public class DocumentoInstituicaoServiceImpl implements br.com.g3.documentosinst
   @Transactional
   public DocumentoInstituicaoAnexoResponse adicionarAnexo(Long documentoId, DocumentoInstituicaoAnexoRequest request) {
     DocumentoInstituicao documento = validarDocumentoExistente(documentoId);
-    if (request == null) {
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Informe os dados do anexo.");
-    }
+    validarRequestAnexo(request);
     String caminhoArquivo = armazenamentoService.salvarArquivo(documentoId, request);
     DocumentoInstituicaoAnexo anexo = new DocumentoInstituicaoAnexo();
     anexo.setDocumentoId(documentoId);
@@ -144,6 +142,52 @@ public class DocumentoInstituicaoServiceImpl implements br.com.g3.documentosinst
         "Anexo",
         "Anexo registrado: " + request.getNomeArquivo());
     return mapAnexoResponse(salvo);
+  }
+
+  @Override
+  @Transactional
+  public DocumentoInstituicaoAnexoResponse substituirAnexo(
+      Long documentoId, Long anexoId, DocumentoInstituicaoAnexoRequest request) {
+    DocumentoInstituicao documento = validarDocumentoExistente(documentoId);
+    validarRequestAnexo(request);
+    DocumentoInstituicaoAnexo existente = buscarAnexoDoDocumento(documentoId, anexoId);
+    String caminhoAnterior = existente.getCaminhoArquivo();
+    String caminhoArquivo = armazenamentoService.salvarArquivo(documentoId, request);
+    existente.setNomeArquivo(request.getNomeArquivo());
+    existente.setTipo(request.getTipo());
+    existente.setTipoMime(request.getTipoMime());
+    existente.setTamanho(request.getTamanho());
+    existente.setCaminhoArquivo(caminhoArquivo);
+    existente.setDataUpload(request.getDataUpload() != null ? request.getDataUpload() : LocalDate.now());
+    existente.setUsuario(request.getUsuario());
+    DocumentoInstituicaoAnexo salvo = anexoRepository.salvar(existente);
+    documento.setAtualizadoEm(LocalDateTime.now());
+    repository.salvar(documento);
+    if (!Objects.equals(caminhoAnterior, caminhoArquivo)) {
+      armazenamentoService.excluirArquivo(caminhoAnterior, documentoId);
+    }
+    registrarHistoricoInterno(
+        documentoId,
+        request.getUsuario(),
+        "Anexo",
+        "Anexo atualizado: " + request.getNomeArquivo());
+    return mapAnexoResponse(salvo);
+  }
+
+  @Override
+  @Transactional
+  public void excluirAnexo(Long documentoId, Long anexoId) {
+    DocumentoInstituicao documento = validarDocumentoExistente(documentoId);
+    DocumentoInstituicaoAnexo anexo = buscarAnexoDoDocumento(documentoId, anexoId);
+    anexoRepository.remover(anexo);
+    armazenamentoService.excluirArquivo(anexo.getCaminhoArquivo(), documentoId);
+    documento.setAtualizadoEm(LocalDateTime.now());
+    repository.salvar(documento);
+    registrarHistoricoInterno(
+        documentoId,
+        obterUsuarioPadrao(anexo.getUsuario()),
+        "Anexo",
+        "Anexo removido: " + anexo.getNomeArquivo());
   }
 
   @Override
@@ -205,6 +249,40 @@ public class DocumentoInstituicaoServiceImpl implements br.com.g3.documentosinst
     return repository
         .buscarPorId(documentoId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Documento nao encontrado."));
+  }
+
+  private DocumentoInstituicaoAnexo buscarAnexoDoDocumento(Long documentoId, Long anexoId) {
+    DocumentoInstituicaoAnexo anexo =
+        anexoRepository
+            .buscarPorId(anexoId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Anexo nao encontrado."));
+    if (!documentoId.equals(anexo.getDocumentoId())) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Anexo nao encontrado.");
+    }
+    return anexo;
+  }
+
+  private void validarRequestAnexo(DocumentoInstituicaoAnexoRequest request) {
+    if (request == null) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Informe os dados do anexo.");
+    }
+    if (request.getNomeArquivo() == null || request.getNomeArquivo().trim().isEmpty()) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Nome do arquivo e obrigatorio.");
+    }
+    if (request.getTipo() == null || request.getTipo().trim().isEmpty()) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tipo do arquivo e obrigatorio.");
+    }
+    if (request.getTipoMime() == null || request.getTipoMime().trim().isEmpty()) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tipo MIME do arquivo e obrigatorio.");
+    }
+    if (request.getUsuario() == null || request.getUsuario().trim().isEmpty()) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Usuario responsavel e obrigatorio.");
+    }
+    boolean possuiConteudo = request.getConteudoBase64() != null && !request.getConteudoBase64().trim().isEmpty();
+    boolean possuiCaminho = request.getCaminhoArquivo() != null && !request.getCaminhoArquivo().trim().isEmpty();
+    if (!possuiConteudo && !possuiCaminho) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Conteudo do arquivo e obrigatorio.");
+    }
   }
 
   private void validarDatas(DocumentoInstituicaoRequest request) {

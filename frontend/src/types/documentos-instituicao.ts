@@ -49,7 +49,8 @@ export type DocumentoInstituicaoAnexoPayload = {
   nomeArquivo: string;
   tipo: string;
   tipoMime?: string;
-  conteudoBase64: string;
+  conteudoBase64?: string;
+  caminhoArquivo?: string;
   tamanho?: string;
   dataUpload?: string;
   usuario: string;

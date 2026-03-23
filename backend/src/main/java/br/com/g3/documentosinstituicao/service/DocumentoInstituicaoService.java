@@ -22,6 +22,11 @@ public interface DocumentoInstituicaoService {
 
   DocumentoInstituicaoAnexoResponse adicionarAnexo(Long documentoId, DocumentoInstituicaoAnexoRequest request);
 
+  DocumentoInstituicaoAnexoResponse substituirAnexo(
+      Long documentoId, Long anexoId, DocumentoInstituicaoAnexoRequest request);
+
+  void excluirAnexo(Long documentoId, Long anexoId);
+
   Resource obterArquivoAnexo(Long documentoId, Long anexoId);
 
   List<DocumentoInstituicaoHistoricoResponse> listarHistorico(Long documentoId);

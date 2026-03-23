@@ -30,6 +30,11 @@ public class DocumentoInstituicaoAnexoRepositoryImpl implements DocumentoInstitu
   }
 
   @Override
+  public void remover(DocumentoInstituicaoAnexo anexo) {
+    jpaRepository.delete(anexo);
+  }
+
+  @Override
   public void removerPorDocumento(Long documentoId) {
     jpaRepository.deleteAllByDocumentoId(documentoId);
   }
