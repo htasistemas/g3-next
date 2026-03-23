@@ -328,6 +328,42 @@ export async function ensureContabilidadeEstrutura() {
         )
       `);
 
+      await prisma.$executeRawUnsafe(`
+        ALTER TABLE financeiro_historico
+          ADD COLUMN IF NOT EXISTS aba VARCHAR(80),
+          ADD COLUMN IF NOT EXISTS acao VARCHAR(160),
+          ADD COLUMN IF NOT EXISTS tipo_registro VARCHAR(80),
+          ADD COLUMN IF NOT EXISTS registro_id VARCHAR(80),
+          ADD COLUMN IF NOT EXISTS valor NUMERIC(14,2),
+          ADD COLUMN IF NOT EXISTS conta VARCHAR(160),
+          ADD COLUMN IF NOT EXISTS status_anterior VARCHAR(60),
+          ADD COLUMN IF NOT EXISTS status_novo VARCHAR(60),
+          ADD COLUMN IF NOT EXISTS observacao TEXT,
+          ADD COLUMN IF NOT EXISTS origem VARCHAR(80),
+          ADD COLUMN IF NOT EXISTS usuario_id BIGINT REFERENCES usuarios(id) ON DELETE SET NULL,
+          ADD COLUMN IF NOT EXISTS usuario_nome VARCHAR(160),
+          ADD COLUMN IF NOT EXISTS perfil VARCHAR(255),
+          ADD COLUMN IF NOT EXISTS ip VARCHAR(120),
+          ADD COLUMN IF NOT EXISTS maquina VARCHAR(255),
+          ADD COLUMN IF NOT EXISTS criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+      `);
+
+      await prisma.$executeRawUnsafe(`
+        UPDATE financeiro_historico
+        SET
+          aba = COALESCE(NULLIF(aba, ''), 'Contabilidade'),
+          acao = COALESCE(NULLIF(acao, ''), 'Registro ajustado'),
+          tipo_registro = COALESCE(NULLIF(tipo_registro, ''), 'LEGADO'),
+          criado_em = COALESCE(criado_em, NOW())
+      `);
+
+      await prisma.$executeRawUnsafe(`
+        ALTER TABLE financeiro_historico
+          ALTER COLUMN aba SET NOT NULL,
+          ALTER COLUMN acao SET NOT NULL,
+          ALTER COLUMN tipo_registro SET NOT NULL
+      `);
+
       const comandosIndices = [
         `CREATE INDEX IF NOT EXISTS conta_bancaria_status_idx ON conta_bancaria(status, ativo)`,
         `CREATE INDEX IF NOT EXISTS financeiro_categoria_tipo_idx ON financeiro_categoria(tipo, status, ativo)`,
