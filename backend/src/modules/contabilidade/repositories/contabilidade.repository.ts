@@ -162,6 +162,9 @@ export async function ensureContabilidadeEstrutura() {
 
       await prisma.$executeRawUnsafe(`
         ALTER TABLE financeiro_centro_custo
+          ADD COLUMN IF NOT EXISTS codigo VARCHAR(40),
+          ADD COLUMN IF NOT EXISTS nome VARCHAR(160),
+          ADD COLUMN IF NOT EXISTS setor_responsavel VARCHAR(160),
           ADD COLUMN IF NOT EXISTS descricao TEXT,
           ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'ATIVA',
           ADD COLUMN IF NOT EXISTS ativo BOOLEAN NOT NULL DEFAULT TRUE,
@@ -172,10 +175,20 @@ export async function ensureContabilidadeEstrutura() {
       await prisma.$executeRawUnsafe(`
         UPDATE financeiro_centro_custo
         SET
+          codigo = COALESCE(NULLIF(codigo, ''), CONCAT('CC-', id)),
+          nome = COALESCE(NULLIF(nome, ''), CONCAT('Centro de custo ', id)),
+          setor_responsavel = COALESCE(NULLIF(setor_responsavel, ''), NULLIF(nome, ''), 'Não informado'),
           status = COALESCE(NULLIF(status, ''), 'ATIVA'),
           ativo = COALESCE(ativo, TRUE),
           criado_em = COALESCE(criado_em, NOW()),
           atualizado_em = COALESCE(atualizado_em, NOW())
+      `);
+
+      await prisma.$executeRawUnsafe(`
+        ALTER TABLE financeiro_centro_custo
+          ALTER COLUMN codigo SET NOT NULL,
+          ALTER COLUMN nome SET NOT NULL,
+          ALTER COLUMN setor_responsavel SET NOT NULL
       `);
 
       await prisma.$executeRawUnsafe(`
