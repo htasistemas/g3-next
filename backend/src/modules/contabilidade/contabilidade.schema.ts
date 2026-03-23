@@ -5,7 +5,8 @@ import {
   CONTA_BANCARIA_STATUS,
   CONTA_BANCARIA_TIPOS,
   LANCAMENTO_FINANCEIRO_STATUS,
-  LANCAMENTO_FINANCEIRO_TIPOS
+  LANCAMENTO_FINANCEIRO_TIPOS,
+  normalizarStatusConta
 } from "./contabilidade.workflow.js";
 
 const optionalTrimmedString = z.preprocess((value) => {
@@ -29,6 +30,11 @@ const decimal = z.preprocess((value) => {
   return value;
 }, z.number().finite());
 
+const statusAtivoInativo = z.preprocess((value) => {
+  if (typeof value !== "string") return value;
+  return normalizarStatusConta(value);
+}, z.enum(CONTA_BANCARIA_STATUS).optional());
+
 export const contaBancariaInputSchema = z.object({
   banco: z.string().trim().min(2, "Informe o banco."),
   agencia: optionalTrimmedString.nullable().optional(),
@@ -47,7 +53,7 @@ export const contaBancariaInputSchema = z.object({
   saldoInicial: decimal,
   dataSaldoInicial: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/),
   limiteMinimoAlerta: decimal.optional().nullable(),
-  status: z.enum(CONTA_BANCARIA_STATUS).optional(),
+  status: statusAtivoInativo,
   permiteMovimentacao: z.coerce.boolean().optional(),
   observacao: optionalTrimmedString.nullable().optional()
 });
@@ -62,7 +68,7 @@ export const categoriaFinanceiraInputSchema = z.object({
   subgrupo: optionalTrimmedString.nullable().optional(),
   categoriaPaiId: z.coerce.number().int().positive().optional().nullable(),
   aceitaLancamentoDireto: z.coerce.boolean().optional(),
-  status: z.enum(CONTA_BANCARIA_STATUS).optional(),
+  status: statusAtivoInativo,
   observacao: optionalTrimmedString.nullable().optional()
 });
 
@@ -71,7 +77,7 @@ export const centroCustoInputSchema = z.object({
   nome: z.string().trim().min(2, "Informe o nome do centro de custo."),
   setorResponsavel: z.string().trim().min(2, "Informe o setor responsável."),
   descricao: optionalTrimmedString.nullable().optional(),
-  status: z.enum(CONTA_BANCARIA_STATUS).optional()
+  status: statusAtivoInativo
 });
 
 export const lancamentoFinanceiroInputSchema = z.object({

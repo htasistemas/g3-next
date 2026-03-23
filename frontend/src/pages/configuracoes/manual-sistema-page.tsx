@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   HeartHandshake,
   Link2,
+  PiggyBank,
   Search,
   Settings2,
   SlidersHorizontal,
@@ -121,7 +122,11 @@ const secoesManual: ManualSecao[] = [
         comoUsar: [
           "Consulte a listagem de inscrições para localizar status, vaga e situação do participante.",
           "Use os dados da inscrição para registrar turma, responsável, datas e observações.",
-          "Revise a fila de espera e a situação de vagas para apoiar decisões de encaminhamento."
+          "Revise a fila de espera e a situação de vagas para apoiar decisões de encaminhamento.",
+          "Na aba Presença, gere a data da aula, salve as presenças e use Excluir data de presença quando precisar remover apenas a data gerada sem apagar o curso."
+        ],
+        atencoes: [
+          "O botão Excluir da barra superior remove todo o curso configurado e exige confirmação específica antes da exclusão."
         ]
       }
     ]
@@ -178,6 +183,29 @@ const secoesManual: ManualSecao[] = [
         atencoes: [
           "O sistema aceita anexos PDF, JPG e PNG e grava apenas o caminho do arquivo no cadastro do documento.",
           "Se o documento já estiver salvo, o anexo é armazenado no storage do sistema e permanece disponível para substituição e exclusão sem duplicar arquivo no banco."
+        ]
+      }
+    ]
+  },
+  {
+    id: "financeiro",
+    titulo: "Setor financeiro",
+    descricao: "Controle contábil, lançamentos, fluxo de caixa e operações financeiras do G3N.",
+    icon: PiggyBank,
+    telas: [
+      {
+        nome: "Contabilidade / financeiro",
+        objetivo: "Gerenciar lançamentos, contas, movimentações, anexos e demais rotinas financeiras em uma única central.",
+        comoUsar: [
+          "Use a aba Lançamentos para cadastrar, editar, baixar e acompanhar receitas, despesas e ajustes.",
+          "Quando um lançamento já estiver pago, recebido ou conciliado, use o botão Extornar para alterar o status para estornado em um clique.",
+          "Na aba Fluxo de caixa, registre entradas e saídas manuais com descrição, conta, data, valor e centro de custo quando aplicável.",
+          "Após o estorno, revise os filtros e a listagem para confirmar o novo status do lançamento antes de seguir com outras ações."
+        ],
+        atencoes: [
+          "O estorno só é permitido para lançamentos com status pago, recebido ou conciliado.",
+          "O campo Categoria textual foi removido do fluxo de caixa e o centro de custo deve ser selecionado apenas entre opções ativas cadastradas.",
+          "Lançamentos já estornados não devem ser estornados novamente."
         ]
       }
     ]

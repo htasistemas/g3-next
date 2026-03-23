@@ -56,7 +56,7 @@ export function mapCategoriaFinanceiraToResponse(row: CategoriaFinanceiraRow) {
     subgrupo: row.subgrupo ?? undefined,
     categoriaPaiId: row.categoria_pai_id ? Number(row.categoria_pai_id) : undefined,
     aceitaLancamentoDireto: row.aceita_lancamento_direto,
-    status: row.status,
+    status: normalizarStatusConta(row.status),
     observacao: row.observacao ?? undefined
   };
 }
@@ -68,7 +68,7 @@ export function mapCentroCustoToResponse(row: CentroCustoRow) {
     nome: row.nome,
     setorResponsavel: row.setor_responsavel,
     descricao: row.descricao ?? undefined,
-    status: row.status
+    status: normalizarStatusConta(row.status)
   };
 }
 

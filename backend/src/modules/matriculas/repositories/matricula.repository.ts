@@ -714,7 +714,12 @@ export class MatriculaRepository {
   }
 
   async removerPresencaData(cursoId: bigint, presencaDataId: bigint) {
-    await this.buscarPresencaDataOuFalhar(cursoId, presencaDataId);
+    const presencaData = await this.buscarPresencaDataOuFalhar(cursoId, presencaDataId);
+    await prisma.$executeRaw(Prisma.sql`
+      DELETE FROM cursos_atendimentos_presencas
+      WHERE curso_id = ${cursoId}
+        AND data_aula = ${presencaData.data_aula}
+    `);
     await prisma.$executeRaw(Prisma.sql`
       DELETE FROM cursos_atendimentos_presenca_datas
       WHERE id = ${presencaDataId}

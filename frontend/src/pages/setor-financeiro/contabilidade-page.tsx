@@ -299,11 +299,11 @@ function criarLancamentoVazio(visao: LancamentoVisaoId = 'todos'): LancamentoFin
 }
 
 const movimentacaoVazia: MovimentacaoFinanceiraPayload = {
-  tipo: 'AJUSTE',
+  tipo: 'ENTRADA',
   descricao: '',
   contraparte: '',
-  categoria: '',
   contaBancariaId: undefined,
+  centroCustoId: undefined,
   dataMovimentacao: hoje,
   valor: 0,
   origem: 'MANUAL',
@@ -566,8 +566,17 @@ function toCentroForm(item: CentroCusto): CentroCustoPayload {
     nome: item.nome,
     setorResponsavel: item.setorResponsavel,
     descricao: item.descricao,
-    status: item.status
+    status: item.status === 'INATIVA' ? 'INATIVA' : 'ATIVA'
   };
+}
+
+function normalizarStatusAtivoInativo(valor?: string | null): 'ATIVA' | 'INATIVA' {
+  return String(valor ?? '')
+    .trim()
+    .toUpperCase()
+    .startsWith('INAT')
+    ? 'INATIVA'
+    : 'ATIVA';
 }
 
 function toLancamentoForm(item: LancamentoFinanceiro): LancamentoFinanceiroPayload {
@@ -600,8 +609,8 @@ function toMovimentacaoForm(item: MovimentacaoFinanceira): MovimentacaoFinanceir
     tipo: item.tipo,
     descricao: item.descricao,
     contraparte: item.contraparte,
-    categoria: item.categoria,
     contaBancariaId: item.contaBancariaId,
+    centroCustoId: item.centroCustoId,
     dataMovimentacao: item.dataMovimentacao,
     valor: item.valor,
     origem: item.origem,
@@ -758,7 +767,10 @@ export function ContabilidadePage() {
   const titularContaPadrao = unidadeAtualQuery.data?.unidade?.nome_fantasia?.trim() ?? '';
 
   const categorias = categoriasQuery.data ?? [];
-  const centrosCusto = centrosQuery.data ?? [];
+  const centrosCusto = useMemo(
+    () => (centrosQuery.data ?? []).filter((centro) => centro.status === 'ATIVA'),
+    [centrosQuery.data]
+  );
   const lancamentos = lancamentosQuery.data ?? [];
   const movimentacoes = movimentacoesQuery.data ?? [];
 
@@ -1127,7 +1139,13 @@ export function ContabilidadePage() {
           setPopup({ tipo: 'aviso', titulo: 'Validação', texto: 'Informe código, nome e setor responsável.' });
           return;
         }
-        const resposta = await salvarCentroMutation.mutateAsync({ id: centroSelecionadoId, payload: centroForm });
+        const resposta = await salvarCentroMutation.mutateAsync({
+          id: centroSelecionadoId,
+          payload: {
+            ...centroForm,
+            status: normalizarStatusAtivoInativo(centroForm.status)
+          }
+        });
         setCentroSelecionadoId(resposta.id);
         setCentroForm(toCentroForm(resposta));
         setPopup({ tipo: 'sucesso', titulo: 'Centro salvo', texto: 'O centro de custo foi salvo com sucesso.' });
@@ -1243,6 +1261,18 @@ export function ContabilidadePage() {
       });
     } catch (error: any) {
       setPopup({ tipo: 'erro', titulo: 'Erro', texto: error?.response?.data?.message ?? 'Não foi possível baixar o lançamento.' });
+    }
+  }
+
+  async function estornarLancamento(item: LancamentoFinanceiro) {
+    try {
+      await estornarLancamentoMutation.mutateAsync(item.id);
+      if (lancamentoSelecionadoId === item.id) {
+        setLancamentoForm((atual) => ({ ...atual, status: 'ESTORNADO' }));
+      }
+      setPopup({ tipo: 'sucesso', titulo: 'Estorno concluído', texto: 'O lançamento foi estornado com sucesso.' });
+    } catch (error: any) {
+      setPopup({ tipo: 'erro', titulo: 'Erro', texto: error?.response?.data?.message ?? 'Não foi possível estornar o lançamento.' });
     }
   }
 
@@ -1431,7 +1461,7 @@ export function ContabilidadePage() {
                           </Button>
                         ) : null}
                         {['PAGO', 'RECEBIDO', 'CONCILIADO'].includes(item.status) ? (
-                          <Button size="sm" variant="ghost" onClick={() => void estornarLancamentoMutation.mutateAsync(item.id)}>
+                          <Button size="sm" variant="ghost" onClick={() => void estornarLancamento(item)}>
                             Estornar
                           </Button>
                         ) : null}
@@ -1461,8 +1491,7 @@ export function ContabilidadePage() {
             <div className="space-y-1"><Label>Valor</Label><Input type="number" min={0} step="0.01" value={movimentacaoForm.valor} onChange={(event) => setMovimentacaoForm((atual) => ({ ...atual, valor: Number(event.target.value) || 0 }))} /></div>
             <div className="space-y-1 xl:col-span-2"><Label>Descrição</Label><Input value={movimentacaoForm.descricao} onChange={(event) => setMovimentacaoForm((atual) => ({ ...atual, descricao: event.target.value }))} /></div>
             <div className="space-y-1"><Label>Contraparte</Label><Input value={movimentacaoForm.contraparte ?? ''} onChange={(event) => setMovimentacaoForm((atual) => ({ ...atual, contraparte: event.target.value }))} /></div>
-            <div className="space-y-1"><Label>Categoria textual</Label><Input value={movimentacaoForm.categoria ?? ''} onChange={(event) => setMovimentacaoForm((atual) => ({ ...atual, categoria: event.target.value }))} /></div>
-            <div className="space-y-1"><Label>Centro de custo</Label><Select value={movimentacaoForm.centroCustoId ? String(movimentacaoForm.centroCustoId) : ''} onChange={(event) => setMovimentacaoForm((atual) => ({ ...atual, centroCustoId: Number(event.target.value) || undefined }))}><option value="">Selecione</option>{centrosCusto.map((centro) => <option key={centro.id} value={centro.id}>{centro.nome}</option>)}</Select></div>
+            <div className="space-y-1"><Label>Centro de custo</Label><Select value={movimentacaoForm.centroCustoId ? String(movimentacaoForm.centroCustoId) : ''} onChange={(event) => setMovimentacaoForm((atual) => ({ ...atual, centroCustoId: Number(event.target.value) || undefined }))} disabled={!centrosCusto.length}><option value="">{centrosCusto.length ? 'Selecione' : 'Cadastre um centro de custo na aba Centro de custo'}</option>{centrosCusto.map((centro) => <option key={centro.id} value={centro.id}>{centro.nome}</option>)}</Select></div>
           </div>
         </Bloco>
 

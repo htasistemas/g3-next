@@ -77,6 +77,11 @@ public class ContabilidadeController {
     return ResponseEntity.ok(service.atualizarSituacaoLancamento(id, request.getStatus()));
   }
 
+  @PatchMapping("/lancamentos/{id}/estorno")
+  public ResponseEntity<LancamentoFinanceiroResponse> estornarLancamento(@PathVariable("id") Long id) {
+    return ResponseEntity.ok(service.estornarLancamento(id));
+  }
+
   @DeleteMapping("/lancamentos/{id}")
   public ResponseEntity<Void> removerLancamento(@PathVariable("id") Long id) {
     service.removerLancamento(id);

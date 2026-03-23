@@ -165,6 +165,29 @@ public class ContabilidadeServiceImpl implements ContabilidadeService {
 
   @Override
   @Transactional
+  public LancamentoFinanceiroResponse estornarLancamento(Long id) {
+    LancamentoFinanceiro lancamento =
+        lancamentoRepository
+            .buscarPorId(id)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Lancamento nao encontrado."));
+
+    String situacaoAtual = normalizarTexto(lancamento.getSituacao()).toUpperCase();
+    if ("ESTORNADO".equals(situacaoAtual)) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Lancamento ja foi estornado.");
+    }
+    if (!"PAGO".equals(situacaoAtual) && !"RECEBIDO".equals(situacaoAtual) && !"CONCILIADO".equals(situacaoAtual)) {
+      throw new ResponseStatusException(
+          HttpStatus.BAD_REQUEST,
+          "Somente lancamentos pagos, recebidos ou conciliados podem ser estornados.");
+    }
+
+    lancamento.setSituacao("ESTORNADO");
+    lancamento.setAtualizadoEm(LocalDateTime.now());
+    return mapLancamento(lancamentoRepository.salvar(lancamento));
+  }
+
+  @Override
+  @Transactional
   public void removerLancamento(Long id) {
     LancamentoFinanceiro lancamento =
         lancamentoRepository

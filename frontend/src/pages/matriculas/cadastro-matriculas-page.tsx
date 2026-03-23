@@ -24,6 +24,7 @@ import {
   Users,
   X
 } from "lucide-react";
+import { PopupConfirmacao } from "@/components/admin/admin-popups";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -358,6 +359,7 @@ export function CadastroMatriculasPage() {
   const [snapshot, setSnapshot] = useState<MatriculaFormValues | null>(null);
   const [popupMensagem, setPopupMensagem] = useState<PopupMensagemState | null>(null);
   const [popupExcluirAberto, setPopupExcluirAberto] = useState(false);
+  const [popupExcluirPresencaAberto, setPopupExcluirPresencaAberto] = useState(false);
   const [filtroDraft, setFiltroDraft] = useState<MatriculaFiltro>({
     nome: "",
     tipo: "",
@@ -417,6 +419,7 @@ export function CadastroMatriculasPage() {
   const [presencaExibirCpf, setPresencaExibirCpf] = useState(true);
   const [presencaCarregando, setPresencaCarregando] = useState(false);
   const [presencaSalvando, setPresencaSalvando] = useState(false);
+  const [presencaExcluindo, setPresencaExcluindo] = useState(false);
   const [presencaPendente, setPresencaPendente] = useState(false);
   const inputImagemRef = useRef<HTMLInputElement | null>(null);
 
@@ -1608,6 +1611,48 @@ export function CadastroMatriculasPage() {
       });
     } finally {
       setPresencaSalvando(false);
+    }
+  }
+
+  function excluirDataPresenca() {
+    if (!presencaDataSelecionada) {
+      setPopupMensagem({
+        tipo: "aviso",
+        titulo: "Atenção",
+        texto: "Selecione uma data de presença para excluir."
+      });
+      return;
+    }
+
+    setPopupExcluirPresencaAberto(true);
+  }
+
+  async function confirmarExclusaoDataPresenca() {
+    const cursoId = idSelecionado ?? getValues("id_matricula");
+    if (!cursoId || !presencaDataSelecionada) return;
+
+    setPresencaExcluindo(true);
+    try {
+      await matriculasService.removerPresencaData(cursoId, presencaDataSelecionada.id);
+      setPopupExcluirPresencaAberto(false);
+      setPresencaDataSelecionada(null);
+      setPresencasPorMatricula({});
+      setPresencaObservacoes("");
+      setPresencaPendente(false);
+      await carregarPresencaDatas();
+      setPopupMensagem({
+        tipo: "sucesso",
+        titulo: "Confirmação",
+        texto: "Data de presença excluída com sucesso."
+      });
+    } catch (error: any) {
+      setPopupMensagem({
+        tipo: "erro",
+        titulo: "Erro",
+        texto: error?.response?.data?.message ?? "Não foi possível excluir a data de presença."
+      });
+    } finally {
+      setPresencaExcluindo(false);
     }
   }
 
@@ -3814,14 +3859,24 @@ export function CadastroMatriculasPage() {
                         />
                       </div>
                       <div className="flex justify-end">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => void salvarObservacoesPresenca()}
-                          disabled={presencaSalvando}
-                        >
-                          Salvar observações
-                        </Button>
+                        <div className="flex flex-wrap justify-end gap-2">
+                          <Button
+                            type="button"
+                            variant="danger"
+                            onClick={excluirDataPresenca}
+                            disabled={presencaSalvando || presencaExcluindo}
+                          >
+                            {presencaExcluindo ? "Excluindo..." : "Excluir data de presença"}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => void salvarObservacoesPresenca()}
+                            disabled={presencaSalvando || presencaExcluindo}
+                          >
+                            Salvar observações
+                          </Button>
+                        </div>
                       </div>
 
                       <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]">
@@ -3889,37 +3944,25 @@ export function CadastroMatriculasPage() {
 
       {popupMensagem && <PopupMensagem popup={popupMensagem} onClose={() => setPopupMensagem(null)} />}
 
-      {popupExcluirAberto && (
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/45 px-4"
-          onClick={() => !removerMutation.isPending && setPopupExcluirAberto(false)}
-        >
-          <div
-            className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="border-b border-slate-100 px-5 py-4">
-              <h3 className="text-base font-semibold text-slate-900">Confirmar exclusão</h3>
-            </div>
-            <div className="px-5 py-4">
-              <p className="text-sm text-slate-700">Esta ação é irreversível. Deseja continuar?</p>
-            </div>
-            <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setPopupExcluirAberto(false)}
-                disabled={removerMutation.isPending}
-              >
-                Cancelar
-              </Button>
-              <Button type="button" variant="danger" onClick={() => void confirmarExclusao()} disabled={removerMutation.isPending}>
-                {removerMutation.isPending ? "Excluindo..." : "Excluir"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <PopupConfirmacao
+        aberto={popupExcluirAberto}
+        titulo="Confirmar exclusão"
+        texto="Esta ação exclui todo o curso configurado. Deseja continuar? Essa ação é irreversível."
+        processando={removerMutation.isPending}
+        onCancel={() => setPopupExcluirAberto(false)}
+        onConfirm={() => void confirmarExclusao()}
+        confirmarTexto="Excluir"
+      />
+
+      <PopupConfirmacao
+        aberto={popupExcluirPresencaAberto}
+        titulo="Excluir data de presença"
+        texto="Esta ação exclui apenas a data de presença selecionada. Deseja continuar? Essa ação é irreversível."
+        processando={presencaExcluindo}
+        onCancel={() => setPopupExcluirPresencaAberto(false)}
+        onConfirm={() => void confirmarExclusaoDataPresenca()}
+        confirmarTexto="Excluir"
+      />
     </section>
   );
 }
