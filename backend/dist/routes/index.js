@@ -45,6 +45,8 @@ import { datasComemorativasRoutes } from "../modules/datas-comemorativas/routes/
 import { captacaoRecursosRoutes } from "../modules/captacao-recursos/routes/captacao-recursos.routes.js";
 import { aiRoutes } from "../modules/ai/routes/ai.routes.js";
 import { sementeRoutes } from "../modules/semente/routes/semente.routes.js";
+import { centralAtendimentosRoutes } from "../modules/central-atendimentos/routes/central-atendimentos.routes.js";
+import { licencaUsoRoutes } from "../modules/licenca-uso/routes/licenca-uso.routes.js";
 export const appRoutes = Router();
 appRoutes.get("/health", (_request, response) => {
     response.json({ status: "ok", service: "g3-backend-node" });
@@ -52,6 +54,7 @@ appRoutes.get("/health", (_request, response) => {
 appRoutes.use("/api/auth", authRoutes);
 appRoutes.use("/api/ai", ensureAuthenticated, aiRoutes);
 appRoutes.use("/api/semente", ensureAuthenticated, sementeRoutes);
+appRoutes.use("/api/central-atendimentos", centralAtendimentosRoutes);
 appRoutes.use("/api/beneficiarios", beneficiarioRoutes);
 appRoutes.use("/api/familias", familiaRoutes);
 appRoutes.use("/api/unidades-assistenciais", unidadeAssistencialRoutes);
@@ -94,6 +97,7 @@ appRoutes.use("/api/chamados-tecnicos", chamadoTecnicoRoutes);
 appRoutes.use("/api/datas-comemorativas", datasComemorativasRoutes);
 appRoutes.use("/api/captacao-recursos", captacaoRecursosRoutes);
 appRoutes.use("/api/configuracoes/parametros", parametrosSistemaRoutes);
+appRoutes.use("/api/configuracoes/licenca-uso", licencaUsoRoutes);
 appRoutes.use("/api/configuracoes/atualizar-sistema", atualizacaoSistemaRoutes);
 appRoutes.use("/api/usuarios", usuarioRoutes);
 appRoutes.use("/api/mensagens-personalizadas", mensagensPersonalizadasRoutes);

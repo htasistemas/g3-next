@@ -21,6 +21,7 @@ export function ensureAuthenticated(request, _response, next) {
         request.authUser = {
             id: payload.sub,
             nomeUsuario: payload.nomeUsuario,
+            nome: payload.nome,
             permissoes: payload.permissoes ?? []
         };
         return next();
@@ -39,6 +40,7 @@ export function hydrateAuthenticatedUser(request, _response, next) {
         request.authUser = {
             id: payload.sub,
             nomeUsuario: payload.nomeUsuario,
+            nome: payload.nome,
             permissoes: payload.permissoes ?? []
         };
     }

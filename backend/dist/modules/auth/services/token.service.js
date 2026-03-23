@@ -5,6 +5,7 @@ export class TokenService {
         const payload = {
             sub: usuario.id,
             nomeUsuario: usuario.nomeUsuario,
+            nome: usuario.nome,
             permissoes: usuario.permissoes
         };
         return jwt.sign(payload, env.APP_AUTH_TOKEN_SECRET, {

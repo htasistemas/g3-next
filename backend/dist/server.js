@@ -19,6 +19,8 @@ import { CommemorativeImportService } from "./modules/datas-comemorativas/servic
 import { iniciarDatasComemorativasScheduler } from "./modules/datas-comemorativas/services/datas-comemorativas.scheduler.js";
 import { iniciarDocumentosInstituicaoScheduler } from "./modules/documentos-instituicao/services/documentos-instituicao.scheduler.js";
 import { ensureCaptacaoRecursosEstrutura } from "./modules/captacao-recursos/repositories/captacao-recursos.repository.js";
+import { ensureLicencaUsoEstrutura } from "./modules/licenca-uso/repositories/licenca-uso.repository.js";
+import { iniciarLicencaUsoScheduler } from "./modules/licenca-uso/services/licenca-uso.scheduler.js";
 import { ensureUsuariosGestaoEstrutura } from "./modules/usuarios/repositories/usuario-estrutura.repository.js";
 import { ensureVisitasDomiciliaresEstrutura } from "./modules/visitas-domiciliares/repositories/visitas-domiciliares.repository.js";
 async function aquecerEstruturasDeTela() {
@@ -30,6 +32,7 @@ async function aquecerEstruturasDeTela() {
         { nome: "datas-comemorativas", promise: ensureDatasComemorativasEstrutura() },
         { nome: "datas-comemorativas-seed", promise: commemorativeImportService.ensureSeedBase() },
         { nome: "captacao-recursos", promise: ensureCaptacaoRecursosEstrutura() },
+        { nome: "licenca-uso", promise: ensureLicencaUsoEstrutura() },
         { nome: "contabilidade", promise: ensureContabilidadeEstrutura() },
         { nome: "autorizacao-compras", promise: ensureAutorizacaoComprasEstrutura() },
         { nome: "banco-empregos", promise: ensureBancoEmpregosEstrutura() },
@@ -58,6 +61,7 @@ async function bootstrap() {
         iniciarAtualizacaoSistemaScheduler();
         iniciarDatasComemorativasScheduler();
         iniciarDocumentosInstituicaoScheduler();
+        iniciarLicencaUsoScheduler();
     });
 }
 bootstrap().catch((error) => {

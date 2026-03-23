@@ -90,6 +90,18 @@ export async function ensureContabilidadeEstrutura() {
         )
       `);
             await prisma.$executeRawUnsafe(`
+        ALTER TABLE financeiro_categoria
+          ADD COLUMN IF NOT EXISTS grupo VARCHAR(120),
+          ADD COLUMN IF NOT EXISTS subgrupo VARCHAR(120),
+          ADD COLUMN IF NOT EXISTS categoria_pai_id BIGINT REFERENCES financeiro_categoria(id) ON DELETE SET NULL,
+          ADD COLUMN IF NOT EXISTS aceita_lancamento_direto BOOLEAN NOT NULL DEFAULT TRUE,
+          ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'ATIVA',
+          ADD COLUMN IF NOT EXISTS observacao TEXT,
+          ADD COLUMN IF NOT EXISTS ativo BOOLEAN NOT NULL DEFAULT TRUE,
+          ADD COLUMN IF NOT EXISTS criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+          ADD COLUMN IF NOT EXISTS atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
+      `);
+            await prisma.$executeRawUnsafe(`
         CREATE TABLE IF NOT EXISTS financeiro_centro_custo (
           id BIGSERIAL PRIMARY KEY,
           codigo VARCHAR(40) NOT NULL,
@@ -101,6 +113,22 @@ export async function ensureContabilidadeEstrutura() {
           criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
           atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
         )
+      `);
+            await prisma.$executeRawUnsafe(`
+        ALTER TABLE financeiro_centro_custo
+          ADD COLUMN IF NOT EXISTS descricao TEXT,
+          ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'ATIVA',
+          ADD COLUMN IF NOT EXISTS ativo BOOLEAN NOT NULL DEFAULT TRUE,
+          ADD COLUMN IF NOT EXISTS criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+          ADD COLUMN IF NOT EXISTS atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
+      `);
+            await prisma.$executeRawUnsafe(`
+        UPDATE financeiro_centro_custo
+        SET
+          status = COALESCE(NULLIF(status, ''), 'ATIVA'),
+          ativo = COALESCE(ativo, TRUE),
+          criado_em = COALESCE(criado_em, NOW()),
+          atualizado_em = COALESCE(atualizado_em, NOW())
       `);
             await prisma.$executeRawUnsafe(`
         ALTER TABLE conta_bancaria
@@ -1156,6 +1184,9 @@ export class ContabilidadeRepository {
     async criarMovimentacao(input, ator) {
         await ensureContabilidadeEstrutura();
         return prisma.$transaction(async (tx) => {
+            if (input.centroCustoId) {
+                await this.buscarCentroCustoPorIdOuFalhar(BigInt(input.centroCustoId), tx);
+            }
             const movimentacao = await this.criarMovimentacaoInterna(tx, {
                 contaId: input.contaBancariaId ? BigInt(input.contaBancariaId) : null,
                 tipo: this.normalizarTipoMovimentacao(input.tipo),
@@ -1190,6 +1221,9 @@ export class ContabilidadeRepository {
                 throw new AppError("Movimentações originadas de lançamentos ou transferências não podem ser alteradas manualmente.", 409);
             }
             await this.reverterMovimentacaoConta(tx, atual);
+            if (input.centroCustoId) {
+                await this.buscarCentroCustoPorIdOuFalhar(BigInt(input.centroCustoId), tx);
+            }
             const contaId = input.contaBancariaId ? BigInt(input.contaBancariaId) : null;
             const tipo = this.normalizarTipoMovimentacao(input.tipo);
             let saldoAnterior = null;

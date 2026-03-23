@@ -1,6 +1,8 @@
 import { prisma } from "../../../database/prisma.js";
 const CHAVE_PERSONALIZACAO = "PERSONALIZACAO_VISUAL";
 const CHAVE_CARENCIA_DOACAO_REALIZADA = "DOACAO_REALIZADA_CARENCIA";
+const CHAVE_OBRIGATORIEDADE_DOCUMENTOS_BENEFICIARIO = "BENEFICIARIO_DOCUMENTOS_OBRIGATORIEDADE";
+const CHAVE_ALERTAS_CENTRAL_ATENDIMENTOS = "CENTRAL_ATENDIMENTOS_ALERTAS";
 const criarTabelaSql = `
   CREATE TABLE IF NOT EXISTS parametros_sistema (
     id BIGSERIAL PRIMARY KEY,
@@ -24,6 +26,18 @@ export class ParametrosSistemaRepository {
     }
     async salvarCarenciaDoacaoRealizada(valor, usuarioAtualizacao) {
         return this.salvarPorChave(CHAVE_CARENCIA_DOACAO_REALIZADA, valor, usuarioAtualizacao);
+    }
+    async buscarObrigatoriedadeDocumentosBeneficiario() {
+        return this.buscarPorChave(CHAVE_OBRIGATORIEDADE_DOCUMENTOS_BENEFICIARIO);
+    }
+    async salvarObrigatoriedadeDocumentosBeneficiario(valor, usuarioAtualizacao) {
+        return this.salvarPorChave(CHAVE_OBRIGATORIEDADE_DOCUMENTOS_BENEFICIARIO, valor, usuarioAtualizacao);
+    }
+    async buscarAlertasCentralAtendimentos() {
+        return this.buscarPorChave(CHAVE_ALERTAS_CENTRAL_ATENDIMENTOS);
+    }
+    async salvarAlertasCentralAtendimentos(valor, usuarioAtualizacao) {
+        return this.salvarPorChave(CHAVE_ALERTAS_CENTRAL_ATENDIMENTOS, valor, usuarioAtualizacao);
     }
     async ensureEstrutura() {
         await ensureParametrosSistemaEstrutura();

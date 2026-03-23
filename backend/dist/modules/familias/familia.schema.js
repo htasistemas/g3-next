@@ -29,6 +29,13 @@ const optionalId = z.preprocess((value) => {
         return Number(value);
     return value;
 }, z.number().int().positive().optional());
+const requiredId = z.preprocess((value) => {
+    if (typeof value === "number")
+        return value;
+    if (typeof value === "string")
+        return Number(value);
+    return value;
+}, z.number().int().positive());
 const optionalIsoDate = z.preprocess((value) => {
     if (typeof value !== "string")
         return value;
@@ -37,14 +44,8 @@ const optionalIsoDate = z.preprocess((value) => {
 }, z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional());
 export const familiaMembroInputSchema = z.object({
     id_familia_membro: optionalId,
-    id_beneficiario: z.preprocess((value) => {
-        if (typeof value === "number")
-            return value;
-        if (typeof value === "string")
-            return Number(value);
-        return value;
-    }, z.number().int().positive("id_beneficiario e obrigatorio.")),
-    parentesco: z.string().trim().min(1, "Parentesco e obrigatorio.").max(120),
+    id_beneficiario: requiredId,
+    parentesco: z.string().trim().min(1, "Parentesco é obrigatório.").max(120),
     responsavel_familiar: optionalBoolean,
     contribui_renda: optionalBoolean,
     renda_individual: optionalTrimmedString,
@@ -54,7 +55,7 @@ export const familiaMembroInputSchema = z.object({
 });
 export const familiaInputSchema = z
     .object({
-    nome_familia: z.string().trim().min(3, "Informe o nome da familia."),
+    nome_familia: z.string().trim().min(3, "Informe o nome da família."),
     id_referencia_familiar: optionalId,
     status: z.enum(familiaStatusValues).default("ATIVO"),
     cep: optionalTrimmedString,
@@ -92,32 +93,75 @@ export const familiaInputSchema = z
     periodicidade_atendimento: optionalTrimmedString,
     proxima_visita_prevista: optionalIsoDate,
     observacoes: optionalTrimmedString,
-    membros: z.array(familiaMembroInputSchema).optional()
+    membros: z.array(familiaMembroInputSchema).min(1, "Informe pelo menos um membro da família.")
 })
     .superRefine((value, ctx) => {
-    const membros = value.membros ?? [];
     const ids = new Set();
     let responsaveis = 0;
-    for (const [index, membro] of membros.entries()) {
+    for (const [index, membro] of value.membros.entries()) {
         if (ids.has(membro.id_beneficiario)) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
-                message: "Nao e permitido repetir o mesmo beneficiario na familia.",
+                message: "Não é permitido repetir o mesmo beneficiário na família.",
                 path: ["membros", index, "id_beneficiario"]
             });
         }
         ids.add(membro.id_beneficiario);
-        if (membro.responsavel_familiar) {
+        if (membro.responsavel_familiar)
             responsaveis += 1;
-        }
+    }
+    if (!value.id_referencia_familiar && responsaveis === 0) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "A família deve possuir um responsável familiar.",
+            path: ["id_referencia_familiar"]
+        });
     }
     if (responsaveis > 1) {
         ctx.addIssue({
             code: z.ZodIssueCode.custom,
-            message: "A familia pode ter apenas um responsavel familiar.",
+            message: "A família pode ter apenas um responsável familiar.",
             path: ["membros"]
         });
     }
+});
+export const familiaEnderecoInputSchema = z.object({
+    cep: optionalTrimmedString,
+    logradouro: optionalTrimmedString,
+    numero: optionalTrimmedString,
+    complemento: optionalTrimmedString,
+    bairro: optionalTrimmedString,
+    ponto_referencia: optionalTrimmedString,
+    municipio: optionalTrimmedString,
+    uf: optionalTrimmedString,
+    zona: optionalTrimmedString,
+    situacao_imovel: optionalTrimmedString,
+    tipo_moradia: optionalTrimmedString,
+    observacoes: optionalTrimmedString,
+    sincronizar_membros: optionalBoolean
+});
+export const familiaResponsavelInputSchema = z.object({
+    id_beneficiario: requiredId
+});
+export const familiaTransferenciaMembroInputSchema = z.object({
+    id_membro: requiredId,
+    familia_destino_id: requiredId,
+    parentesco: optionalTrimmedString,
+    responsavel_familiar: optionalBoolean
+});
+export const familiaDesmembramentoInputSchema = z.object({
+    membro_ids: z.array(requiredId).min(1, "Selecione pelo menos um membro para desmembrar."),
+    nome_familia: z.string().trim().min(3, "Informe o nome da nova família."),
+    novo_responsavel_id: requiredId,
+    copiar_endereco_familiar: optionalBoolean,
+    endereco: familiaEnderecoInputSchema.optional(),
+    observacoes: optionalTrimmedString
+});
+export const familiaBeneficioValidacaoSchema = z.object({
+    beneficio_nome: z.string().trim().min(2, "Informe o benefício."),
+    beneficiario_id: optionalId,
+    data_referencia: optionalIsoDate,
+    quantidade_dias_carencia: optionalInteger
 });
 export const familiaFiltersSchema = z.object({
     nome_familia: optionalTrimmedString,

@@ -14,3 +14,10 @@ familiaRoutes.delete("/:id", ensureAuthenticated, ensurePermissions(permissoesEs
 familiaRoutes.post("/:id/membros", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.adicionarMembro.bind(controller)));
 familiaRoutes.put("/:id/membros/:membroId", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.atualizarMembro.bind(controller)));
 familiaRoutes.delete("/:id/membros/:membroId", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.removerMembro.bind(controller)));
+familiaRoutes.get("/:id/historico", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.listarHistorico.bind(controller)));
+familiaRoutes.get("/:id/alertas", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.listarAlertas.bind(controller)));
+familiaRoutes.put("/:id/responsavel", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.definirResponsavel.bind(controller)));
+familiaRoutes.put("/:id/endereco", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.atualizarEndereco.bind(controller)));
+familiaRoutes.get("/:id/beneficios/validacao", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.validarBeneficioFamiliar.bind(controller)));
+familiaRoutes.post("/:id/membros/transferir", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.transferirMembro.bind(controller)));
+familiaRoutes.post("/:id/desmembrar", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.desmembrarFamilia.bind(controller)));

@@ -109,6 +109,7 @@ function normalizarBusca(valor) {
 function normalizarTextoDocumento(valor) {
     return (valor ?? "")
         .replace(/\u00a0/g, " ")
+        .replace(/([a-zà-ÿ])([A-ZÀ-Ý])/g, "$1 $2")
         .replace(/\r/g, "")
         .replace(/[ \t]+\n/g, "\n")
         .replace(/\n{3,}/g, "\n\n")

@@ -1,5 +1,5 @@
 import { AppError } from "../../../shared/errors/app-error.js";
-import { familiaFiltersSchema, familiaInputSchema, familiaMembroInputSchema } from "../familia.schema.js";
+import { familiaBeneficioValidacaoSchema, familiaDesmembramentoInputSchema, familiaEnderecoInputSchema, familiaFiltersSchema, familiaInputSchema, familiaMembroInputSchema, familiaResponsavelInputSchema, familiaTransferenciaMembroInputSchema } from "../familia.schema.js";
 import { mapFamiliaToResponse } from "../familia.mapper.js";
 import { FamiliaRepository } from "../repositories/familia.repository.js";
 import { mapaCamposTextoFamilia, mapaMembroFamilia } from "../../../utils/text-format-config.js";
@@ -65,6 +65,49 @@ export class FamiliaService {
         const familiaId = this.parseId(rawId, "familia");
         await this.repository.buscarPorIdOuFalhar(familiaId);
         await this.repository.remover(familiaId);
+    }
+    async listarHistorico(rawId) {
+        const familiaId = this.parseId(rawId, "familia");
+        return this.repository.listarHistorico(familiaId);
+    }
+    async listarAlertas(rawId) {
+        const familiaId = this.parseId(rawId, "familia");
+        return this.repository.listarAlertas(familiaId);
+    }
+    async definirResponsavel(rawId, rawInput) {
+        const familiaId = this.parseId(rawId, "familia");
+        const input = familiaResponsavelInputSchema.parse(rawInput);
+        const familia = await this.repository.definirResponsavel(familiaId, BigInt(input.id_beneficiario));
+        return mapFamiliaToResponse(familia);
+    }
+    async atualizarEndereco(rawId, rawInput) {
+        const familiaId = this.parseId(rawId, "familia");
+        const input = familiaEnderecoInputSchema.parse(rawInput);
+        const familia = await this.repository.atualizarEndereco(familiaId, input);
+        return mapFamiliaToResponse(familia);
+    }
+    async validarBeneficioFamiliar(rawId, rawInput) {
+        const familiaId = this.parseId(rawId, "familia");
+        const input = familiaBeneficioValidacaoSchema.parse(rawInput);
+        return this.repository.validarBeneficioFamiliar(familiaId, input.beneficio_nome, input.quantidade_dias_carencia);
+    }
+    async transferirMembro(rawId, rawInput) {
+        const familiaId = this.parseId(rawId, "familia");
+        const input = familiaTransferenciaMembroInputSchema.parse(rawInput);
+        const resultado = await this.repository.transferirMembro(familiaId, input);
+        return {
+            familia_origem: mapFamiliaToResponse(resultado.familia_origem),
+            familia_destino: mapFamiliaToResponse(resultado.familia_destino)
+        };
+    }
+    async desmembrarFamilia(rawId, rawInput) {
+        const familiaId = this.parseId(rawId, "familia");
+        const input = familiaDesmembramentoInputSchema.parse(rawInput);
+        const resultado = await this.repository.desmembrarFamilia(familiaId, input);
+        return {
+            familia_origem: mapFamiliaToResponse(resultado.familia_origem),
+            familia_nova: mapFamiliaToResponse(resultado.familia_nova)
+        };
     }
     parseId(rawId, context) {
         const id = Number(rawId);
