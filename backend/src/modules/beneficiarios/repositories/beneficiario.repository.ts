@@ -13,6 +13,12 @@ import type {
   BeneficiarioInput
 } from "../beneficiario.types.js";
 
+function ehConteudoInlineArquivo(valor?: string | null) {
+  const texto = trimOrUndefined(valor);
+  if (!texto) return false;
+  return texto.startsWith("data:") || /^[a-z0-9+/=\r\n]+$/i.test(texto);
+}
+
 const beneficiarioContatoSelect = {
   telefonePrincipal: true,
   telefonePrincipalWhatsapp: true,
@@ -600,7 +606,28 @@ export class BeneficiarioRepository {
 
     const documentos = this.montarDocumentos(beneficiarioId, input, now);
     if (documentos.length) {
-      await tx.documento.createMany({ data: documentos });
+      try {
+        await tx.documento.createMany({ data: documentos });
+      } catch (error) {
+        if (error instanceof AppError) {
+          throw error;
+        }
+
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          (error.code === "P2000" || error.code === "P2002" || error.code === "P2003")
+        ) {
+          throw new AppError(
+            "Nao foi possivel salvar os documentos do beneficiario. Revise os anexos informados e tente novamente.",
+            422
+          );
+        }
+
+        throw new AppError(
+          "Nao foi possivel salvar os documentos do beneficiario. Revise os anexos informados e tente novamente.",
+          500
+        );
+      }
     }
   }
 
@@ -665,20 +692,19 @@ export class BeneficiarioRepository {
       const contentType = trimOrUndefined(doc.contentType);
       const caminhoArquivoInformado = trimOrUndefined(doc.caminhoArquivo);
       const conteudoInformado = trimOrUndefined(doc.conteudo);
-      const caminhoArquivo =
-        caminhoArquivoInformado ??
-        (conteudoInformado
-          ? conteudoInformado.startsWith("data:")
-            ? conteudoInformado
-            : contentType
-              ? `data:${contentType};base64,${conteudoInformado}`
-              : conteudoInformado
-          : undefined);
+      const caminhoArquivo = caminhoArquivoInformado;
       const nomeArquivo = trimOrUndefined(doc.nomeArquivo);
       const possuiConteudo = !!(numeroDocumento || nomeArquivo || caminhoArquivo || doc.ignorado);
 
       if (!nomeDocumento || !possuiConteudo) {
         continue;
+      }
+
+      if (ehConteudoInlineArquivo(caminhoArquivoInformado) || ehConteudoInlineArquivo(conteudoInformado)) {
+        throw new AppError(
+          `O documento ${nomeDocumento} nao foi processado corretamente. Anexe o arquivo novamente antes de salvar.`,
+          400
+        );
       }
 
       documentos.push({

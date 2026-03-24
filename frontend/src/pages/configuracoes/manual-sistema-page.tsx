@@ -73,7 +73,9 @@ const secoesManual: ManualSecao[] = [
           "CPF, e-mail, telefone e CEP devem respeitar as máscaras e validações padronizadas.",
           "Pendências de cadastro impactam atendimentos, benefícios e relatórios.",
           "O aviso de pendências abre com rolagem interna quando houver muitos itens, mantendo o botão de fechamento sempre acessível.",
-          "Em produção, o envio de documentos depende de permissão de escrita na pasta de storage do servidor e do vínculo válido do usuário autenticado."
+          "Em produção, o envio de documentos depende de permissão de escrita na pasta de storage do servidor e do vínculo válido do usuário autenticado.",
+          "Capturas de documentos pela webcam passam por compressão antes do salvamento e exibem mensagem detalhada quando a imagem não puder ser processada.",
+          "Ao salvar o cadastro, anexos que não tiverem sido processados corretamente retornam mensagem orientando novo envio, em vez de erro interno genérico."
         ]
       }
     ]

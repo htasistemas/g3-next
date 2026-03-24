@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.286",
-  "releaseDate": "2026-03-23",
-  "description": "Correcao no upload de documentos do beneficiario em producao, com blindagem do usuario de upload e mensagem clara para falha de storage.",
+  "latestVersion": "1.00.288",
+  "releaseDate": "2026-03-24",
+  "description": "Salvamento de documentos do beneficiario ajustado para bloquear conteudo inline no cadastro, devolver mensagem funcional no erro e manter o fluxo de webcam tratado.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.286",
+  "minCompatibleVersion": "1.00.288",
   "releaseType": "stable",
   "downloadUrl": null
 }

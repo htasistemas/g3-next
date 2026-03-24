@@ -1,6 +1,30 @@
 {
     "entries":  [
                                                                                                     {
+                        "version":  "1.00.288",
+                        "releaseDate":  "2026-03-24",
+                        "title":  "Salvamento de documentos do beneficiario corrigido",
+                        "description":  "O cadastro de beneficiarios agora bloqueia anexos que nao foram processados corretamente antes de salvar e retorna mensagem orientativa ao usuario em vez de erro interno generico.",
+                        "changes":  [
+                                        "Bloqueio no backend para impedir gravacao de conteudo inline ou base64 na tabela de documentos do beneficiario.",
+                                        "Tratativa para devolver mensagem funcional quando o anexo precisar ser reenviado antes do salvamento.",
+                                        "Tela de beneficiarios mantida com exibicao da mensagem detalhada da API no alerta de erro.",
+                                        "Manual do sistema e versao oficial atualizados para 1.00.288."
+                                    ],
+                        "releaseType":  "stable"
+                    },{
+                        "version":  "1.00.287",
+                        "releaseDate":  "2026-03-24",
+                        "title":  "Webcam de documentos do beneficiario ajustada",
+                        "description":  "A captura de documentos pela webcam no cadastro de beneficiarios agora reduz a imagem antes do envio e apresenta mensagem clara quando a imagem nao puder ser processada.",
+                        "changes":  [
+                                        "Compressao da imagem capturada pela webcam antes de salvar o cadastro do beneficiario.",
+                                        "Tratativa no backend para retornar erro funcional quando a imagem enviada nao puder ser processada.",
+                                        "Tela de beneficiarios ajustada para exibir a mensagem detalhada da API em vez de erro interno generico.",
+                                        "Manual do sistema e versao oficial atualizados para 1.00.287."
+                                    ],
+                        "releaseType":  "stable"
+                    },{
                         "version":  "1.00.286",
                         "releaseDate":  "2026-03-24",
                         "title":  "Upload de documentos do beneficiario corrigido",

@@ -507,6 +507,8 @@ const fotoLarguraPx = 400;
 const fotoAlturaPx = 300;
 const fotoMaximaBytes = 5 * 1024 * 1024;
 const documentoMaximoBytes = 10 * 1024 * 1024;
+const documentoWebcamLarguraMaximaPx = 1600;
+const documentoWebcamAlturaMaximaPx = 1600;
 
 type AcaoCrud = {
   label: string;
@@ -531,6 +533,48 @@ function carregarImagem(dataUrl: string): Promise<HTMLImageElement> {
     imagem.onerror = () => reject(new Error("Não foi possível processar a imagem."));
     imagem.src = dataUrl;
   });
+}
+
+function extrairMensagemBeneficiario(error: unknown, fallback: string) {
+  if (typeof error === "object" && error !== null) {
+    const response = (error as any).response;
+    const message = response?.data?.message;
+    if (typeof message === "string" && message.trim()) {
+      return message;
+    }
+
+    const directMessage = (error as any).message;
+    if (typeof directMessage === "string" && directMessage.trim()) {
+      return directMessage;
+    }
+  }
+
+  return fallback;
+}
+
+async function ajustarImagemDocumentoCapturada(dataUrl: string): Promise<string> {
+  const imagem = await carregarImagem(dataUrl);
+  const canvas = document.createElement("canvas");
+
+  const proporcao = Math.min(
+    1,
+    documentoWebcamLarguraMaximaPx / imagem.width,
+    documentoWebcamAlturaMaximaPx / imagem.height
+  );
+
+  canvas.width = Math.max(1, Math.round(imagem.width * proporcao));
+  canvas.height = Math.max(1, Math.round(imagem.height * proporcao));
+
+  const contexto = canvas.getContext("2d");
+  if (!contexto) {
+    throw new Error("Não foi possível preparar a imagem capturada para o documento.");
+  }
+
+  contexto.fillStyle = "#ffffff";
+  contexto.fillRect(0, 0, canvas.width, canvas.height);
+  contexto.drawImage(imagem, 0, 0, canvas.width, canvas.height);
+
+  return canvas.toDataURL("image/jpeg", 0.82);
 }
 
 async function ajustarParaFotoQuatroPorTres(dataUrl: string): Promise<string> {
@@ -978,7 +1022,7 @@ export function CadastroBeneficiarioPage() {
       } catch (error: any) {
         setMensagem({
           tipo: "erro",
-          texto: error?.response?.data?.message ?? "Não foi possível salvar o beneficiário."
+          texto: extrairMensagemBeneficiario(error, "Não foi possível salvar o beneficiário.")
         });
       }
     },
@@ -1256,17 +1300,28 @@ export function CadastroBeneficiarioPage() {
       return;
     }
 
-    contexto.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+    try {
+      contexto.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const dataUrlOriginal = canvas.toDataURL("image/jpeg", 0.92);
+      const dataUrl = await ajustarImagemDocumentoCapturada(dataUrlOriginal);
 
-    atualizarDocumento(documento.id, {
-      nomeArquivo: `${normalizarNomeDocumento(documento.nome).replaceAll(" ", "-")}.jpg`,
-      caminhoArquivo: dataUrl,
-      contentType: "image/jpeg",
-      ignorado: false
-    });
-    encerrarWebcamDocumento();
-    setMensagem({ tipo: "sucesso", texto: "Documento capturado com sucesso." });
+      atualizarDocumento(documento.id, {
+        nomeArquivo: `${normalizarNomeDocumento(documento.nome).replaceAll(" ", "-")}.jpg`,
+        caminhoArquivo: dataUrl,
+        contentType: "image/jpeg",
+        ignorado: false
+      });
+      encerrarWebcamDocumento();
+      setMensagem({ tipo: "sucesso", texto: "Documento capturado com sucesso." });
+    } catch (error) {
+      setMensagem({
+        tipo: "erro",
+        texto: extrairMensagemBeneficiario(
+          error,
+          "Não foi possível preparar a imagem capturada pela webcam."
+        )
+      });
+    }
   }
 
   async function visualizarDocumento(documento: DocumentoCadastro) {
