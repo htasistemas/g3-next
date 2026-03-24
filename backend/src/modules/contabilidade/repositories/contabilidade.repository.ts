@@ -2171,6 +2171,8 @@ export class ContabilidadeRepository {
       ator?: ContabilidadeAtor;
     }
   ) {
+    const usuarioIdValido = await this.resolverUsuarioIdHistorico(tx, input.ator?.usuarioId);
+
     await tx.$executeRaw(Prisma.sql`
       INSERT INTO financeiro_historico (
         aba,
@@ -2200,7 +2202,7 @@ export class ContabilidadeRepository {
         ${trimOrUndefined(input.statusNovo ?? undefined)},
         ${trimOrUndefined(input.observacao ?? undefined)},
         ${trimOrUndefined(input.origem ?? undefined)},
-        ${input.ator?.usuarioId ?? null},
+        ${usuarioIdValido},
         ${trimOrUndefined(input.ator?.nomeUsuario ?? undefined)},
         ${input.ator?.permissoes?.join(", ") ?? null},
         ${trimOrUndefined(input.ator?.ip ?? undefined)},
@@ -2208,5 +2210,20 @@ export class ContabilidadeRepository {
         NOW()
       )
     `);
+  }
+
+  private async resolverUsuarioIdHistorico(tx: DbClient, usuarioId?: bigint) {
+    if (!usuarioId) {
+      return null;
+    }
+
+    const rows = await tx.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+      SELECT id
+      FROM usuarios
+      WHERE id = ${usuarioId}
+      LIMIT 1
+    `);
+
+    return rows[0]?.id ?? null;
   }
 }

@@ -50,6 +50,7 @@ import { aiRoutes } from "../modules/ai/routes/ai.routes.js";
 import { sementeRoutes } from "../modules/semente/routes/semente.routes.js";
 import { centralAtendimentosRoutes } from "../modules/central-atendimentos/routes/central-atendimentos.routes.js";
 import { licencaUsoRoutes } from "../modules/licenca-uso/routes/licenca-uso.routes.js";
+import { vendaRoutes } from "../modules/vendas/routes/venda.routes.js";
 
 export const appRoutes = Router();
 
@@ -104,6 +105,7 @@ appRoutes.use("/api/datas-comemorativas", datasComemorativasRoutes);
 appRoutes.use("/api/captacao-recursos", captacaoRecursosRoutes);
 appRoutes.use("/api/configuracoes/parametros", parametrosSistemaRoutes);
 appRoutes.use("/api/configuracoes/licenca-uso", licencaUsoRoutes);
+appRoutes.use("/api/vendas", vendaRoutes);
 appRoutes.use("/api/configuracoes/atualizar-sistema", atualizacaoSistemaRoutes);
 appRoutes.use("/api/usuarios", usuarioRoutes);
 appRoutes.use("/api/mensagens-personalizadas", mensagensPersonalizadasRoutes);

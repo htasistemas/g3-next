@@ -8,6 +8,7 @@ import {
   PiggyBank,
   Search,
   Settings2,
+  ShoppingBasket,
   SlidersHorizontal,
   UserRound
 } from "lucide-react";
@@ -198,6 +199,7 @@ const secoesManual: ManualSecao[] = [
         objetivo: "Gerenciar lançamentos, contas, movimentações, anexos e demais rotinas financeiras em uma única central.",
         comoUsar: [
           "Use a aba Lançamentos para cadastrar, editar, baixar e acompanhar receitas, despesas e ajustes.",
+          "Use a aba Centro de custo para cadastrar centros ativos antes de vincular lançamentos e movimentações financeiras.",
           "Quando um lançamento já estiver pago, recebido ou conciliado, use o botão Extornar para alterar o status para estornado em um clique.",
           "Na aba Fluxo de caixa, registre entradas e saídas manuais com descrição, conta, data, valor e centro de custo quando aplicável.",
           "Após o estorno, revise os filtros e a listagem para confirmar o novo status do lançamento antes de seguir com outras ações."
@@ -206,6 +208,45 @@ const secoesManual: ManualSecao[] = [
           "O estorno só é permitido para lançamentos com status pago, recebido ou conciliado.",
           "O campo Categoria textual foi removido do fluxo de caixa e o centro de custo deve ser selecionado apenas entre opções ativas cadastradas.",
           "Lançamentos já estornados não devem ser estornados novamente."
+        ]
+      }
+    ]
+  },
+  {
+    id: "vendas",
+    titulo: "Setor vendas",
+    descricao: "Operacao de caixa para vendas de produtos em uma tela exclusiva de atendimento.",
+    icon: ShoppingBasket,
+    telas: [
+      {
+        nome: "Frente de caixa",
+        objetivo: "Executar vendas em um modo dedicado, com busca de produtos do almoxarifado, lista de itens, subtotal, baixa de estoque, cliente opcional, historico persistido e impressao de notinha simples.",
+        comoUsar: [
+          "Acesse Setor vendas > Frente de caixa para abrir a operacao em tela exclusiva.",
+          "Use a busca principal para localizar produtos por codigo ou nome e informe a quantidade antes de adicionar o item.",
+          "Acompanhe a lista de itens, o subtotal e o historico lateral antes de abrir o pagamento e concluir a baixa do estoque.",
+          "Use os atalhos do modelo para ajuda, busca, quantidade, pagamento e cancelamento de item.",
+          "Ao concluir o pagamento, use a impressao da notinha simples como comprovante da venda."
+        ],
+        atencoes: [
+          "Nesta entrega a frente de caixa usa os produtos reais do almoxarifado e registra a baixa simples de estoque na conclusao da venda.",
+          "O fluxo considera impressao de notinha simples, sem emissao de nota fiscal ou TEF, mas com cliente opcional e historico de vendas salvo no sistema.",
+          "Ao evoluir o modulo, manter o fluxo com um clique, feedback visual e revisao do manual na mesma entrega."
+        ]
+      },
+      {
+        nome: "Historico de vendas",
+        objetivo: "Consultar vendas ja registradas, aplicar filtros e reimprimir a notinha simples de cada atendimento.",
+        comoUsar: [
+          "Acesse Setor vendas > Historico de vendas para abrir a tela de consulta dentro do sistema.",
+          "Filtre por cliente, forma de pagamento, data inicial e data final para localizar a venda desejada.",
+          "Selecione uma venda da lista para visualizar cliente, pagamento, total e itens vendidos.",
+          "Use o botao de impressao para reemitir a notinha simples do atendimento selecionado."
+        ],
+        atencoes: [
+          "A consulta usa o historico persistido pelo modulo de vendas e mostra os dados gravados no fechamento do caixa.",
+          "A reimpressao gera apenas comprovante simples, sem valor fiscal.",
+          "Ao alterar filtros, manter o uso com um clique e feedback visual durante o carregamento."
         ]
       }
     ]
@@ -261,6 +302,20 @@ const secoesManual: ManualSecao[] = [
         comoUsar: [
           "Cadastre usuários com perfis adequados às rotinas de cada setor.",
           "Revise permissões antes de liberar telas sensíveis, relatórios e dados financeiros."
+        ]
+      },
+      {
+        nome: "Atualizacao e recarregamento da interface",
+        objetivo: "Orientar a operacao quando houver nova publicacao do frontend e o navegador estiver com arquivos antigos em cache.",
+        comoUsar: [
+          "Se uma tela exibir erro de carregamento apos atualizacao do sistema, use o botao Atualizar pagina exibido na propria mensagem.",
+          "Quando necessario, acesse novamente a Visao geral para recarregar os modulos mais recentes do frontend.",
+          "Em novas publicacoes, aguarde a recarga completa da aplicacao antes de retomar a operacao.",
+          "No celular, use primeiro a secao desejada no topo e depois toque no item da secao aberta para navegar com menos ruido visual."
+        ],
+        atencoes: [
+          "O sistema tenta se recuperar automaticamente uma vez quando detecta erro de importacao dinamica de modulo.",
+          "Se o erro persistir apos a recarga, validar se a publicacao dos arquivos do frontend foi concluida no servidor."
         ]
       }
     ]

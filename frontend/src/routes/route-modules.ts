@@ -17,6 +17,14 @@ const routeModules: RouteModuleDefinition[] = [
     loader: () => import("@/pages/configuracoes/licenca-uso-retorno-page")
   },
   { path: "/senhas/painel", loader: () => import("@/pages/atendimentos/painel-senhas-page") },
+  {
+    path: "/setor-vendas/frente-caixa",
+    loader: () => import("@/pages/setor-vendas/frente-caixa-page")
+  },
+  {
+    path: "/setor-vendas/historico",
+    loader: () => import("@/pages/setor-vendas/historico-vendas-page")
+  },
   { path: "/dashboard/visao-geral", loader: () => import("@/pages/dashboard/visao-geral-page") },
   { path: "/dashboard/indicadores", loader: () => import("@/pages/dashboard/indicadores-page") },
   { path: "/dashboard/power-bi", loader: () => import("@/pages/dashboard/power-bi-page") },

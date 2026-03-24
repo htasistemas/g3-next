@@ -1,9 +1,51 @@
 import { Suspense, lazy, type ComponentType } from "react";
-import { Navigate, createBrowserRouter } from "react-router-dom";
+import { Navigate, createBrowserRouter, isRouteErrorResponse, useRouteError } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 import { AppShell } from "@/app/app-shell";
 import { RequireAuth } from "@/app/require-auth";
 import { RequirePermission } from "@/app/require-permission";
 import { carregarModuloRota, obterLoaderRota } from "@/routes/route-modules";
+
+const CHUNK_RELOAD_KEY = "g3:chunk-reload";
+
+function ehErroImportacaoDinamica(erro: unknown) {
+  if (!(erro instanceof Error)) {
+    return false;
+  }
+
+  const mensagem = erro.message.toLowerCase();
+  return (
+    mensagem.includes("failed to fetch dynamically imported module") ||
+    mensagem.includes("importing a module script failed") ||
+    mensagem.includes("failed to load url") ||
+    mensagem.includes("error loading dynamically imported module")
+  );
+}
+
+function limparMarcadorReloadChunk() {
+  try {
+    sessionStorage.removeItem(CHUNK_RELOAD_KEY);
+  } catch {}
+}
+
+function tentarRecuperarImportacaoDinamica(path: string, erro: unknown) {
+  if (!ehErroImportacaoDinamica(erro)) {
+    return false;
+  }
+
+  try {
+    const ultimoPath = sessionStorage.getItem(CHUNK_RELOAD_KEY);
+    if (ultimoPath === path) {
+      return false;
+    }
+
+    sessionStorage.setItem(CHUNK_RELOAD_KEY, path);
+    window.location.reload();
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function carregarPagina(path: string, exportName: string) {
   if (!obterLoaderRota(path)) {
@@ -11,11 +53,21 @@ function carregarPagina(path: string, exportName: string) {
   }
 
   const LazyPage = lazy(async () => {
-    const module = await carregarModuloRota(path);
-    if (!module) {
-      throw new Error(`Modulo da rota nao encontrado: ${path}`);
+    try {
+      const module = await carregarModuloRota(path);
+      if (!module) {
+        throw new Error(`Modulo da rota nao encontrado: ${path}`);
+      }
+
+      limparMarcadorReloadChunk();
+      return { default: module[exportName] as ComponentType };
+    } catch (erro) {
+      if (tentarRecuperarImportacaoDinamica(path, erro)) {
+        return new Promise<never>(() => {});
+      }
+
+      throw erro;
     }
-    return { default: module[exportName] as ComponentType };
   });
 
   return (
@@ -33,6 +85,53 @@ function RouteLoadingFallback() {
   );
 }
 
+function RouteErrorBoundary() {
+  const erro = useRouteError();
+
+  const titulo = isRouteErrorResponse(erro)
+    ? `${erro.status} ${erro.statusText || "Erro"}`
+    : "Nao foi possivel carregar esta tela";
+
+  const descricao = isRouteErrorResponse(erro)
+    ? erro.data?.message || "A rota retornou um erro inesperado."
+    : erro instanceof Error
+      ? erro.message
+      : "Ocorreu um erro inesperado ao carregar o modulo.";
+
+  const erroChunk = ehErroImportacaoDinamica(erro);
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[var(--g3-bg)] px-4 py-10">
+      <div className="w-full max-w-xl rounded-2xl border border-[var(--g3-border)] bg-[var(--g3-card)] p-6 shadow-sm">
+        <div className="space-y-2">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--g3-muted)]">Erro de navegacao</p>
+          <h1 className="text-2xl font-black text-[var(--g3-foreground)]">{titulo}</h1>
+          <p className="text-sm text-[var(--g3-muted)]">
+            {erroChunk
+              ? "O sistema encontrou uma versao antiga em cache e nao conseguiu carregar os arquivos mais novos. Atualize a pagina para sincronizar a aplicacao."
+              : descricao}
+          </p>
+        </div>
+
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Button type="button" onClick={() => window.location.reload()}>
+            Atualizar pagina
+          </Button>
+          <Button type="button" variant="outline" onClick={() => (window.location.href = "/dashboard/visao-geral")}>
+            Ir para visao geral
+          </Button>
+        </div>
+
+        {!erroChunk && erro instanceof Error ? (
+          <pre className="mt-6 overflow-auto rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-3 text-xs text-[var(--g3-muted)]">
+            {erro.message}
+          </pre>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 const LoginPage = carregarPagina("/login", "LoginPage");
 const CriarContaPage = carregarPagina("/criar-conta", "CriarContaPage");
 const MaintenancePreviewPage = carregarPagina("/manutencao", "MaintenancePreviewPage");
@@ -43,6 +142,8 @@ const LicencaUsoRetornoPage = carregarPagina(
   "LicencaUsoRetornoPage"
 );
 const PainelSenhasPage = carregarPagina("/senhas/painel", "PainelSenhasPage");
+const FrenteCaixaPage = carregarPagina("/setor-vendas/frente-caixa", "FrenteCaixaPage");
+const HistoricoVendasPage = carregarPagina("/setor-vendas/historico", "HistoricoVendasPage");
 const VisaoGeralPage = carregarPagina("/dashboard/visao-geral", "VisaoGeralPage");
 const IndicadoresPage = carregarPagina("/dashboard/indicadores", "IndicadoresPage");
 const PowerBiPage = carregarPagina("/dashboard/power-bi", "PowerBiPage");
@@ -135,35 +236,48 @@ const PortalDoadorPage = carregarPagina("/portal-doador", "PortalDoadorPage");
 export const router = createBrowserRouter([
   {
     path: "/login",
-    element: LoginPage
+    element: LoginPage,
+    errorElement: <RouteErrorBoundary />
   },
   {
     path: "/criar-conta",
-    element: CriarContaPage
+    element: CriarContaPage,
+    errorElement: <RouteErrorBoundary />
   },
   {
     path: "/manutencao",
-    element: MaintenancePreviewPage
+    element: MaintenancePreviewPage,
+    errorElement: <RouteErrorBoundary />
   },
   {
     path: "/termos-de-uso",
-    element: TermosUsoPage
+    element: TermosUsoPage,
+    errorElement: <RouteErrorBoundary />
   },
   {
     path: "/politica-de-privacidade",
-    element: PoliticaPrivacidadePage
+    element: PoliticaPrivacidadePage,
+    errorElement: <RouteErrorBoundary />
   },
   {
     path: "/licenca-de-uso/retorno-pagamento",
-    element: LicencaUsoRetornoPage
+    element: LicencaUsoRetornoPage,
+    errorElement: <RouteErrorBoundary />
   },
   {
     path: "/portal-doador",
-    element: PortalDoadorPage
+    element: PortalDoadorPage,
+    errorElement: <RouteErrorBoundary />
   },
   {
     path: "/senhas/painel",
-    element: <RequireAuth>{PainelSenhasPage}</RequireAuth>
+    element: <RequireAuth>{PainelSenhasPage}</RequireAuth>,
+    errorElement: <RouteErrorBoundary />
+  },
+  {
+    path: "/setor-vendas/frente-caixa",
+    element: <RequireAuth>{FrenteCaixaPage}</RequireAuth>,
+    errorElement: <RouteErrorBoundary />
   },
   {
     path: "/",
@@ -172,6 +286,7 @@ export const router = createBrowserRouter([
         <AppShell />
       </RequireAuth>
     ),
+    errorElement: <RouteErrorBoundary />,
     children: [
       { index: true, element: <Navigate to="/dashboard/visao-geral" replace /> },
       { path: "/dashboard/visao-geral", element: VisaoGeralPage },
@@ -201,6 +316,7 @@ export const router = createBrowserRouter([
       { path: "/financeiro/doacoes-realizadas", element: DoacoesRealizadasPage },
       { path: "/setor-rh/registro-ponto", element: RegistroPontoPage },
       { path: "/setor-rh/contratacao", element: ContratacaoPage },
+      { path: "/setor-vendas/historico", element: HistoricoVendasPage },
       { path: "/setor-administrativo/almoxarifado", element: AlmoxarifadoPage },
       { path: "/setor-administrativo/controle-veiculos", element: ControleVeiculosPage },
       { path: "/setor-administrativo/emprestimo-eventos", element: EmprestimoEventosPage },

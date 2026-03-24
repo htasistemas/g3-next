@@ -4698,3 +4698,28 @@ WHERE NOT EXISTS (
   SELECT 1 FROM historico_versao_sistema
   WHERE versao = '1.00.111'
 );
+
+CREATE TABLE IF NOT EXISTS venda_setor (
+  id BIGSERIAL PRIMARY KEY,
+  cliente_nome VARCHAR(255),
+  cliente_documento VARCHAR(32),
+  forma_pagamento VARCHAR(20) NOT NULL,
+  valor_total NUMERIC(14, 2) NOT NULL DEFAULT 0,
+  observacoes TEXT,
+  criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+  atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS venda_setor_item (
+  id BIGSERIAL PRIMARY KEY,
+  venda_id BIGINT NOT NULL REFERENCES venda_setor(id) ON DELETE CASCADE,
+  almoxarifado_item_id BIGINT NOT NULL REFERENCES almoxarifado_item(id) ON DELETE RESTRICT,
+  codigo_item VARCHAR(60) NOT NULL,
+  descricao_item VARCHAR(255) NOT NULL,
+  quantidade NUMERIC(12, 4) NOT NULL,
+  valor_unitario NUMERIC(14, 2) NOT NULL,
+  valor_total NUMERIC(14, 2) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS venda_setor_criado_em_idx ON venda_setor (criado_em DESC);
+CREATE INDEX IF NOT EXISTS venda_setor_item_venda_idx ON venda_setor_item (venda_id);

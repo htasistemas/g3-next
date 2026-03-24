@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.269",
-  "releaseDate": "2026-03-22",
-  "description": "Licença do G3N redesenhada com vigência inicial em dias, cálculo automático da data final e histórico financeiro de cobranças.",
+  "latestVersion": "1.00.285",
+  "releaseDate": "2026-03-23",
+  "description": "Correcao no cadastro de centro de custo da contabilidade e navegacao mobile reorganizada no menu principal.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.269",
+  "minCompatibleVersion": "1.00.285",
   "releaseType": "stable",
   "downloadUrl": null
 }

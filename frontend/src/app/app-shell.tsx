@@ -56,10 +56,12 @@ import {
   MapPinned,
   MonitorDot,
   ReceiptText,
+  ScanBarcode,
   Presentation,
   RefreshCcw,
   Scale,
   ScrollText,
+  ShoppingBasket,
   Settings2,
   ShieldUser,
   ShieldCheck,
@@ -385,6 +387,26 @@ export const menuSections: MenuSection[] = [
     ]
   },
   {
+    id: "setor-vendas",
+    secao: "Setor vendas",
+    icon: ShoppingBasket,
+    itens: [
+      {
+        id: "setor-vendas-historico",
+        to: "/setor-vendas/historico",
+        label: "Historico de vendas",
+        icon: ScrollText
+      },
+      {
+        id: "setor-vendas-frente-caixa",
+        to: "/setor-vendas/frente-caixa",
+        label: "Frente de caixa",
+        icon: ScanBarcode,
+        abrirEmNovaAba: true
+      }
+    ]
+  },
+  {
     id: "setor-rh",
     secao: "Setor RH",
     icon: UserCog,
@@ -526,6 +548,7 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/configuracoes/sobre-o-sistema")) return "Sobre o sistema";
   if (pathname.startsWith("/configuracoes/mensagens-personalizadas")) return "Mensagens personalizadas";
   if (pathname.startsWith("/configuracoes/usuarios")) return "Usuários";
+  if (pathname.startsWith("/setor-vendas/historico")) return "Historico de vendas";
   if (pathname.startsWith("/setor-rh/registro-ponto")) return "Registro de ponto";
   if (pathname.startsWith("/setor-administrativo/almoxarifado")) return "Almoxarifado";
   if (pathname.startsWith("/setor-administrativo/controle-veiculos")) return "Controle de veículos";
@@ -1090,34 +1113,77 @@ export function AppShell() {
               </div>
             </div>
 
-            <nav className="mt-1 flex flex-wrap gap-1.5 lg:hidden">
-              {menuSectionsVisiveis.flatMap((secao) =>
-                secao.itens.map((item) =>
-                  item.to ? (
-                    <NavLink
-                      key={item.id}
-                      to={item.to}
-                      target={item.abrirEmNovaAba ? "_blank" : undefined}
-                      rel={item.abrirEmNovaAba ? "noreferrer" : undefined}
-                      onMouseEnter={() => precarregarItemMenu(item)}
-                      onFocus={() => precarregarItemMenu(item)}
-                      onTouchStart={() => precarregarItemMenu(item)}
+            <nav className="mt-2 space-y-2 lg:hidden">
+              <div className="flex gap-1.5 overflow-x-auto pb-1">
+                {menuSectionsVisiveis.map((secao) => {
+                  const grupoAberto = gruposAbertos[secao.id] ?? secao.id === secaoAtivaId;
+                  const grupoAtivo = secao.id === secaoAtivaId;
+                  const IconeSecao = secao.icon;
+
+                  return (
+                    <button
+                      key={secao.id}
+                      type="button"
+                      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-wide ${
+                        grupoAberto || grupoAtivo
+                          ? "border-[var(--g3-active)] bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"
+                          : "border-[var(--g3-border)] bg-[var(--g3-card)] text-[var(--g3-muted)]"
+                      }`}
+                      onClick={() => alternarGrupo(secao.id)}
                     >
-                      {({ isActive }) => (
-                        <span
-                          className={`inline-flex rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-                            isActive
-                              ? "border-[var(--g3-active)] bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"
-                              : "border-[var(--g3-border)] bg-[var(--g3-card)] text-[var(--g3-muted)]"
-                          }`}
-                        >
-                          {item.label}
-                        </span>
+                      <IconeSecao className="h-3.5 w-3.5" />
+                      {secao.secao}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {menuSectionsVisiveis
+                .filter((secao) => gruposAbertos[secao.id] ?? secao.id === secaoAtivaId)
+                .map((secao) => (
+                  <div
+                    key={secao.id}
+                    className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] p-2 shadow-sm"
+                  >
+                    <div className="mb-1 flex items-center gap-2 px-1 py-1">
+                      <secao.icon className="h-3.5 w-3.5 text-[var(--g3-active)]" />
+                      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--g3-active)]">
+                        {secao.secao}
+                      </p>
+                    </div>
+                    <div className="grid gap-1.5">
+                      {secao.itens.map((item) =>
+                        item.to ? (
+                          <NavLink
+                            key={item.id}
+                            to={item.to}
+                            target={item.abrirEmNovaAba ? "_blank" : undefined}
+                            rel={item.abrirEmNovaAba ? "noreferrer" : undefined}
+                            onMouseEnter={() => precarregarItemMenu(item)}
+                            onFocus={() => precarregarItemMenu(item)}
+                            onTouchStart={() => precarregarItemMenu(item)}
+                          >
+                            {({ isActive }) => {
+                              const itemAtivo = isActive || itemEstaAtivo(location.pathname, item);
+                              return (
+                                <span
+                                  className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 text-xs font-medium ${
+                                    itemAtivo
+                                      ? "border-[var(--g3-active)] bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"
+                                      : "border-[var(--g3-border)] bg-[var(--g3-card-soft)] text-[var(--g3-foreground)]"
+                                  }`}
+                                >
+                                  <item.icon className="h-3.5 w-3.5" />
+                                  {item.label}
+                                </span>
+                              );
+                            }}
+                          </NavLink>
+                        ) : null
                       )}
-                    </NavLink>
-                  ) : null
-                )
-              )}
+                    </div>
+                  </div>
+                ))}
             </nav>
           </div>
         </header>

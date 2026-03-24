@@ -1,122 +1,200 @@
 {
-  "entries": [
-    {
-      "version": "1.00.269",
-      "releaseDate": "2026-03-22",
-      "title": "Licença de uso guiada e com histórico financeiro",
-      "description": "A licença do G3N agora usa um fluxo comercial mais simples, com vigência inicial em dias e histórico de cobranças pendentes e pagas.",
-      "changes": [
-        "Tela da licença redesenhada para seleção guiada de plano, ciclo e vigência inicial.",
-        "Cálculo automático da data final da licença a partir da quantidade de dias informada.",
-        "Histórico visual de pagamentos a realizar e pagamentos realizados.",
-        "Persistência de cobranças pendentes e pagas no backend da licença.",
-        "Manual do sistema atualizado com o novo fluxo."
-      ],
-      "releaseType": "stable"
-    },
-    {
-      "version": "1.00.268",
-      "releaseDate": "2026-03-22",
-      "title": "Webhook automática na licença do G3N",
-      "description": "A configuração da licença agora preenche automaticamente a webhook pública da InfinitePay com a rota do próprio G3N.",
-      "changes": [
-        "Preenchimento automático da webhook da licença no carregamento da tela.",
-        "Persistência da webhook pública padrão ao salvar a licença.",
-        "Manual do sistema atualizado com a nova automação."
-      ],
-      "releaseType": "stable"
-    },
-    {
-      "version": "1.00.267",
-      "releaseDate": "2026-03-22",
-      "title": "Checkout real da licença com InfinitePay",
-      "description": "A licença de uso do G3N agora gera checkout real da InfinitePay usando os valores e condições já configurados no próprio sistema.",
-      "changes": [
-        "Handle oficial Torresoft configurado na licença do G3N.",
-        "Rota interna de retorno do pagamento criada no frontend.",
-        "Geração de checkout real da licença a partir dos valores, ciclos e implantação definidos no G3N.",
-        "Confirmação de pagamento com atualização automática da vigência da licença.",
-        "Manual do sistema revisado com o novo fluxo."
-      ],
-      "releaseType": "stable"
-    },
-    {
-      "version": "1.00.266",
-      "releaseDate": "2026-03-22",
-      "title": "Licença de uso do G3N",
-      "description": "Nova tela em Configurações gerais para controlar plano, ciclo de cobrança, vínculo por CNPJ e alertas por e-mail da licença.",
-      "changes": [
-        "Nova tela Configurações gerais > Licença de uso.",
-        "Planos Essencial, Profissional, Premium e Enterprise com ciclos mensal, semestral e anual.",
-        "Vínculo automático ao CNPJ da instituição principal.",
-        "Configuração de recebimento compartilhada com o padrão InfinityPay.",
-        "Alertas somente por e-mail quando a licença estiver próxima do vencimento, sem bloqueio do sistema.",
-        "Manual do sistema atualizado com o novo fluxo."
-      ],
-      "releaseType": "stable"
-    },
-    {
-      "version": "1.00.265",
-      "releaseDate": "2026-03-22",
-      "title": "Simplificação da consulta no almoxarifado",
-      "description": "A visualização de produtos passou a ficar concentrada apenas na aba Listagem de produtos.",
-      "changes": [
-        "Remoção da aba Itens do almoxarifado.",
-        "Manutenção da aba Listagem de produtos como ponto único de consulta.",
-        "Manual do sistema ajustado ao novo fluxo."
-      ],
-      "releaseType": "stable"
-    },
-    {
-      "version": "1.00.264",
-      "releaseDate": "2026-03-22",
-      "title": "Listagem de produtos no almoxarifado",
-      "description": "Inclusão de uma aba dedicada para visualizar todos os produtos cadastrados com suas quantidades.",
-      "changes": [
-        "Nova aba Listagem de produtos na tela de almoxarifado.",
-        "Exibição de código, produto, categoria, unidade, quantidade e situação.",
-        "Manual do sistema atualizado com a orientação da nova aba."
-      ],
-      "releaseType": "stable"
-    },
-    {
-      "version": "1.00.263",
-      "releaseDate": "2026-03-22",
-      "title": "Ajuste no popup de pendências do beneficiário",
-      "description": "O aviso de pendências do cadastro de beneficiários agora respeita a altura da tela e usa rolagem interna.",
-      "changes": [
-        "Popup de pendências com altura máxima pela viewport.",
-        "Cabeçalho e botão Ciente mantidos acessíveis mesmo com muitos itens.",
-        "Manual do sistema atualizado com a orientação do novo comportamento."
-      ],
-      "releaseType": "stable"
-    },
-    {
-      "version": "1.00.262",
-      "releaseDate": "2026-03-22",
-      "title": "Filtros estratégicos no georreferenciamento",
-      "description": "Inclusão de novos atalhos de leitura territorial e atualização do manual do sistema.",
-      "changes": [
-        "Novo botão Idosos sozinhos na tela de georreferenciamento.",
-        "Novo botão Aguardando cestas para priorizar demanda alimentar urgente.",
-        "Novo botão Mapa de apoio e risco cruzando violência, cestas, instituições e doadores.",
-        "Lista de camadas do mapa alinhada às opções retornadas pelo backend.",
-        "Manual do sistema atualizado com orientações da tela de georreferenciamento."
-      ],
-      "releaseType": "stable"
-    },
-    {
-      "version": "1.00.170",
-      "releaseDate": "2026-03-18",
-      "title": "Mecanismo de atualização do sistema",
-      "description": "Inclusão da tela administrativa para atualização manual e automática, com histórico, logs e rollback.",
-      "changes": [
-        "Nova tela em Configurações gerais > Atualizar sistema.",
-        "Suporte a manifesto versionado, changelog, histórico e logs.",
-        "Fluxo com checksum, backup, aplicação de pacote e rollback.",
-        "Agendamento automático quando o modo estiver configurado como Automático."
-      ],
-      "releaseType": "stable"
-    }
-  ]
+    "entries":  [
+                                                                                {
+                        "version":  "1.00.285",
+                        "releaseDate":  "2026-03-23",
+                        "title":  "Contabilidade e menu mobile ajustados",
+                        "description":  "O sistema agora evita falha no cadastro de centro de custo por auditoria e reorganiza a navegacao no celular por secoes.",
+                        "changes":  [
+                                        "Blindagem da auditoria da contabilidade para nao bloquear o cadastro quando o usuario do token nao estiver valido na tabela de usuarios.",
+                                        "Criacao e atualizacao de centro de custo preservadas com historico seguro no backend.",
+                                        "Menu mobile trocado de lista espalhada para navegacao por secoes, reduzindo poluicao visual em celulares.",
+                                        "Manual do sistema e versao oficial atualizados."
+                                    ],
+                        "releaseType":  "stable"
+                    },{
+                        "version":  "1.00.284",
+                        "releaseDate":  "2026-03-23",
+                        "title":  "Recuperacao de erro de modulo dinamico",
+                        "description":  "O frontend agora tenta se recuperar automaticamente de erro de chunk e exibe uma tela de erro amigavel quando a rota nao carrega.",
+                        "changes":  [
+                                        "Reload automatico unico quando o navegador encontra assets antigos apos uma nova publicacao.",
+                                        "Nova tela de erro com acao para atualizar a pagina ou voltar para a Visao geral.",
+                                        "Manual do sistema atualizado com orientacao operacional para recarga apos deploy.",
+                                        "Versao oficial atualizada para 1.00.284."
+                                    ],
+                        "releaseType":  "stable"
+                    },{
+                        "version":  "1.00.283",
+                        "releaseDate":  "2026-03-23",
+                        "title":  "Historico de vendas no Setor vendas",
+                        "description":  "O modulo de vendas agora conta com uma tela interna de historico, filtros de consulta e reimpressao de notinha simples.",
+                        "changes":  [
+                                        "Nova tela Historico de vendas dentro do menu Setor vendas.",
+                                        "Filtros por cliente, forma de pagamento e periodo para localizar vendas persistidas.",
+                                        "Visualizacao detalhada da venda com itens, total, cliente e forma de pagamento.",
+                                        "Reimpressao de notinha simples diretamente pela consulta.",
+                                        "Manual do sistema e versao oficial atualizados."
+                                    ],
+                        "releaseType":  "stable"
+                    },{
+                        "version":  "1.00.282",
+                        "releaseDate":  "2026-03-23",
+                        "title":  "Persistencia real da frente de caixa",
+                        "description":  "A frente de caixa agora salva vendas no sistema, permite cliente opcional, mostra historico persistido e imprime notinha simples sem valor fiscal.",
+                        "changes":  [
+                                        "Nova API de vendas com gravacao de cabecalho e itens da venda.",
+                                        "Baixa simples de estoque executada no backend ao concluir a venda.",
+                                        "Cliente opcional e historico recente exibidos na propria frente de caixa.",
+                                        "Tela mantida em 100% da area visivel, sem rolagem da pagina, usando a cor padrao do sistema.",
+                                        "Manual do sistema e versao oficial atualizados."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.281",
+                        "releaseDate":  "2026-03-23",
+                        "title":  "Frente de caixa integrada ao almoxarifado",
+                        "description":  "A frente de caixa agora usa produtos reais do almoxarifado, faz a baixa simples de estoque na venda e imprime notinha sem valor fiscal.",
+                        "changes":  [
+                                        "Catalogo da frente de caixa conectado aos produtos ativos do almoxarifado.",
+                                        "Baixa simples de estoque registrada automaticamente ao concluir a venda.",
+                                        "Impressao de notinha simples como comprovante, sem emissao de nota fiscal.",
+                                        "Tela ajustada para usar a cor padrao do sistema e ocupar 100% da tela sem rolagem da pagina.",
+                                        "Manual do sistema atualizado com o novo fluxo."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.280",
+                        "releaseDate":  "2026-03-23",
+                        "title":  "Modelo inicial do Setor vendas",
+                        "description":  "Inclus�o do novo Setor vendas com uma frente de caixa exclusiva para avalia��o visual e operacional inicial.",
+                        "changes":  [
+                                        "Novo menu Setor vendas com atalho para a frente de caixa em nova aba.",
+                                        "Tela exclusiva de frente de caixa com busca de produtos, carrinho, atalhos r�pidos e modal de pagamento.",
+                                        "Fechamento da venda sem nota fiscal, com impressao de notinha simples como comprovante.",
+                                        "Manual do sistema atualizado com a nova tela e suas limitacoes atuais."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.269",
+                        "releaseDate":  "2026-03-22",
+                        "title":  "Licença de uso guiada e com histórico financeiro",
+                        "description":  "A licença do G3N agora usa um fluxo comercial mais simples, com vigência inicial em dias e histórico de cobranças pendentes e pagas.",
+                        "changes":  [
+                                        "Tela da licença redesenhada para seleção guiada de plano, ciclo e vigência inicial.",
+                                        "Cálculo automático da data final da licença a partir da quantidade de dias informada.",
+                                        "Histórico visual de pagamentos a realizar e pagamentos realizados.",
+                                        "Persistência de cobranças pendentes e pagas no backend da licença.",
+                                        "Manual do sistema atualizado com o novo fluxo."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.268",
+                        "releaseDate":  "2026-03-22",
+                        "title":  "Webhook automática na licença do G3N",
+                        "description":  "A configuração da licença agora preenche automaticamente a webhook pública da InfinitePay com a rota do próprio G3N.",
+                        "changes":  [
+                                        "Preenchimento automático da webhook da licença no carregamento da tela.",
+                                        "Persistência da webhook pública padrão ao salvar a licença.",
+                                        "Manual do sistema atualizado com a nova automação."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.267",
+                        "releaseDate":  "2026-03-22",
+                        "title":  "Checkout real da licença com InfinitePay",
+                        "description":  "A licença de uso do G3N agora gera checkout real da InfinitePay usando os valores e condições já configurados no próprio sistema.",
+                        "changes":  [
+                                        "Handle oficial Torresoft configurado na licença do G3N.",
+                                        "Rota interna de retorno do pagamento criada no frontend.",
+                                        "Geração de checkout real da licença a partir dos valores, ciclos e implantação definidos no G3N.",
+                                        "Confirmação de pagamento com atualização automática da vigência da licença.",
+                                        "Manual do sistema revisado com o novo fluxo."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.266",
+                        "releaseDate":  "2026-03-22",
+                        "title":  "Licença de uso do G3N",
+                        "description":  "Nova tela em Configurações gerais para controlar plano, ciclo de cobrança, vínculo por CNPJ e alertas por e-mail da licença.",
+                        "changes":  [
+                                        "Nova tela Configurações gerais \u003e Licença de uso.",
+                                        "Planos Essencial, Profissional, Premium e Enterprise com ciclos mensal, semestral e anual.",
+                                        "Vínculo automático ao CNPJ da instituição principal.",
+                                        "Configuração de recebimento compartilhada com o padrão InfinityPay.",
+                                        "Alertas somente por e-mail quando a licença estiver próxima do vencimento, sem bloqueio do sistema.",
+                                        "Manual do sistema atualizado com o novo fluxo."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.265",
+                        "releaseDate":  "2026-03-22",
+                        "title":  "Simplificação da consulta no almoxarifado",
+                        "description":  "A visualização de produtos passou a ficar concentrada apenas na aba Listagem de produtos.",
+                        "changes":  [
+                                        "Remoção da aba Itens do almoxarifado.",
+                                        "Manutenção da aba Listagem de produtos como ponto único de consulta.",
+                                        "Manual do sistema ajustado ao novo fluxo."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.264",
+                        "releaseDate":  "2026-03-22",
+                        "title":  "Listagem de produtos no almoxarifado",
+                        "description":  "Inclusão de uma aba dedicada para visualizar todos os produtos cadastrados com suas quantidades.",
+                        "changes":  [
+                                        "Nova aba Listagem de produtos na tela de almoxarifado.",
+                                        "Exibição de código, produto, categoria, unidade, quantidade e situação.",
+                                        "Manual do sistema atualizado com a orientação da nova aba."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.263",
+                        "releaseDate":  "2026-03-22",
+                        "title":  "Ajuste no popup de pendências do beneficiário",
+                        "description":  "O aviso de pendências do cadastro de beneficiários agora respeita a altura da tela e usa rolagem interna.",
+                        "changes":  [
+                                        "Popup de pendências com altura máxima pela viewport.",
+                                        "Cabeçalho e botão Ciente mantidos acessíveis mesmo com muitos itens.",
+                                        "Manual do sistema atualizado com a orientação do novo comportamento."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.262",
+                        "releaseDate":  "2026-03-22",
+                        "title":  "Filtros estratégicos no georreferenciamento",
+                        "description":  "Inclusão de novos atalhos de leitura territorial e atualização do manual do sistema.",
+                        "changes":  [
+                                        "Novo botão Idosos sozinhos na tela de georreferenciamento.",
+                                        "Novo botão Aguardando cestas para priorizar demanda alimentar urgente.",
+                                        "Novo botão Mapa de apoio e risco cruzando violência, cestas, instituições e doadores.",
+                                        "Lista de camadas do mapa alinhada às opções retornadas pelo backend.",
+                                        "Manual do sistema atualizado com orientações da tela de georreferenciamento."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.170",
+                        "releaseDate":  "2026-03-18",
+                        "title":  "Mecanismo de atualização do sistema",
+                        "description":  "Inclusão da tela administrativa para atualização manual e automática, com histórico, logs e rollback.",
+                        "changes":  [
+                                        "Nova tela em Configurações gerais \u003e Atualizar sistema.",
+                                        "Suporte a manifesto versionado, changelog, histórico e logs.",
+                                        "Fluxo com checksum, backup, aplicação de pacote e rollback.",
+                                        "Agendamento automático quando o modo estiver configurado como Automático."
+                                    ],
+                        "releaseType":  "stable"
+                    }
+                ]
 }

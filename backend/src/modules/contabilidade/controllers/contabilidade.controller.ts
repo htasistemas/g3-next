@@ -17,9 +17,20 @@ function obterOrigem(request: AuthenticatedRequest) {
   return typeof userAgent === "string" && userAgent.trim() ? userAgent.trim() : null;
 }
 
+function obterUsuarioId(request: AuthenticatedRequest) {
+  const id = request.authUser?.id;
+  if (!id) return undefined;
+
+  try {
+    return BigInt(id);
+  } catch {
+    return undefined;
+  }
+}
+
 function obterAtor(request: AuthenticatedRequest) {
   return {
-    usuarioId: request.authUser?.id ? BigInt(request.authUser.id) : undefined,
+    usuarioId: obterUsuarioId(request),
     nomeUsuario: request.authUser?.nomeUsuario,
     permissoes: request.authUser?.permissoes ?? [],
     ip: obterIp(request),
