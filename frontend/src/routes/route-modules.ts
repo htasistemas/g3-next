@@ -25,6 +25,10 @@ const routeModules: RouteModuleDefinition[] = [
     path: "/setor-vendas/historico",
     loader: () => import("@/pages/setor-vendas/historico-vendas-page")
   },
+  {
+    path: "/setor-vendas/carteira-digital-evento",
+    loader: () => import("@/pages/setor-vendas/carteira-digital-evento-page")
+  },
   { path: "/dashboard/visao-geral", loader: () => import("@/pages/dashboard/visao-geral-page") },
   { path: "/dashboard/indicadores", loader: () => import("@/pages/dashboard/indicadores-page") },
   { path: "/dashboard/power-bi", loader: () => import("@/pages/dashboard/power-bi-page") },

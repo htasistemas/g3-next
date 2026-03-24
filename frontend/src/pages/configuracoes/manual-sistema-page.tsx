@@ -251,6 +251,34 @@ const secoesManual: ManualSecao[] = [
           "A reimpressao gera apenas comprovante simples, sem valor fiscal.",
           "Ao alterar filtros, manter o uso com um clique e feedback visual durante o carregamento."
         ]
+      },
+      {
+        nome: "Carteira digital do evento",
+        objetivo: "Controlar creditos pre-pagos por participante em eventos da instituicao, com QR Code seguro, recarga, consumo nas barracas, extrato, dashboard e fechamento operacional em desktop e celular.",
+        comoUsar: [
+          "Acesse Setor vendas > Carteira digital do evento para abrir o modulo completo dentro do sistema.",
+          "No fluxo administrativo, comece pelo cadastro do evento e defina nome, tipo, periodo, status, regras de recarga, transferencia, estorno, validade do credito, centro de receita e observacoes.",
+          "Na aba Cadastros, use o proprio formulario em modo Novo ou Editar. Quando quiser iniciar um cadastro limpo, use o botao Novo evento, Nova barraca ou Novo item.",
+          "Depois cadastre os participantes do evento com nome, telefone, CPF opcional, responsavel opcional, numero da carteira e status. O sistema gera um token unico para o QR Code e usa o numero da carteira no codigo de barras para facilitar a leitura em leitores fisicos.",
+          "Use a impressao do cartao ou comanda quando precisar entregar o identificador fisico ao participante, com opcao de QR Code e codigo de barras, ou apresente o codigo diretamente no celular.",
+          "Cadastre barracas ou pontos de venda e em seguida os itens do evento com categoria, preco, estoque opcional e ordem de exibicao para organizar a operacao.",
+          "Para carregar saldo, use a recarga da carteira informando participante, valor, forma de pagamento e observacao. O sistema atualiza o saldo e registra a movimentacao no extrato.",
+          "Na operacao da barraca, selecione a barraca, monte a compra com os itens, leia ou informe o token da carteira, confira o nome do participante e o saldo atual e confirme a venda.",
+          "Quando a venda for confirmada, o sistema consulta o saldo no banco em tempo real, bloqueia saldo insuficiente, debita o valor aprovado e grava barraca, operador, horario, itens e total.",
+          "Use transferencia entre carteiras, ajuste manual, bloqueio, desbloqueio, segunda via, extrato, dashboard e fechamento para controlar todo o evento ate a prestacao de contas.",
+          "No celular, priorize a leitura ou digitacao do token, a visualizacao do QR Code em tamanho grande, a consulta rapida de saldo e a operacao objetiva nas barracas.",
+          "Passo a passo recomendado: 1. cadastre o evento. 2. cadastre participantes. 3. gere ou imprima os QR Codes. 4. cadastre barracas e itens. 5. faca as recargas. 6. realize as vendas nas barracas. 7. acompanhe extrato e dashboard durante o evento. 8. execute o fechamento ao final.",
+          "Perguntas frequentes: se o participante perdeu o QR Code, use segunda via e, se necessario, invalide o codigo anterior. Se o saldo nao for suficiente, interrompa a venda e siga com recarga, ajuste autorizado ou cancelamento. Se houver duvida sobre movimentos da carteira, consulte o extrato completo do participante."
+        ],
+        atencoes: [
+          "O QR Code usa um token seguro e o codigo de barras usa o numero da carteira. Em ambos os casos o saldo permanece salvo e validado exclusivamente no banco.",
+          "A venda bloqueia saldo insuficiente, evita saldo negativo por padrao e usa chave de operacao para reduzir duplicidade por clique repetido.",
+          "Para registrar recargas e vendas, o evento deve estar com status Ativo na aba de cadastro do proprio modulo.",
+          "O modulo persiste eventos, participantes, barracas, itens, vendas, itens da venda e extrato de movimentacoes em banco real, com auditoria do operador.",
+          "O QR Code nao leva saldo gravado. Toda validacao financeira e feita no servidor, consultando o banco antes de aprovar consumo, transferencia ou ajuste.",
+          "Se o saldo da carteira for insuficiente, a venda deve ser interrompida e o operador deve seguir com recarga, ajuste autorizado ou cancelamento da compra.",
+          "Nesta entrega o modulo reaproveita a arquitetura de vendas, usuarios, permissoes, impressao e relatorios do G3N, mas a leitura por camera nativa e a integracao contabil avancada ainda dependem da proxima etapa de evolucao."
+        ]
       }
     ]
   },

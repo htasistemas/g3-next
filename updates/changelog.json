@@ -1,6 +1,19 @@
 {
     "entries":  [
                                                                                                     {
+                        "version":  "1.00.289",
+                        "releaseDate":  "2026-03-24",
+                        "title":  "Carteira digital do evento no Setor vendas",
+                        "description":  "Novo modulo operacional para eventos beneficentes com carteira pre-paga, QR Code seguro, recarga, consumo em barracas, extrato, dashboard e fechamento inicial integrado ao G3N.",
+                        "changes":  [
+                                        "Novo modulo Carteira digital do evento dentro de Setor vendas, integrado ao shell, permissoes, rotas e servicos do sistema.",
+                                        "Backend com persistencia real para eventos, participantes, barracas, itens, vendas, itens da venda e movimentacoes da carteira.",
+                                        "Fluxos de recarga, ajuste, transferencia, segunda via, consulta por token, operacao de venda, extrato, dashboard, fechamento e relatorios iniciais.",
+                                        "Impressao de QR Code em cartao ou comanda e atalho da frente de caixa para o novo modulo.",
+                                        "Manual do sistema, init.db e versao oficial atualizados para 1.00.289."
+                                    ],
+                        "releaseType":  "stable"
+                    },{
                         "version":  "1.00.288",
                         "releaseDate":  "2026-03-24",
                         "title":  "Salvamento de documentos do beneficiario corrigido",

@@ -286,6 +286,7 @@ export function FrenteCaixaPage() {
           </div>
           <div className="flex flex-wrap items-center justify-start gap-2 lg:justify-end">
             <button type="button" onClick={() => setAjudaAberta(true)} className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold hover:bg-white/15"><HelpCircle className="mr-2 inline h-4 w-4" />Ajuda</button>
+            <Link to="/setor-vendas/carteira-digital-evento" className="rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white"><QrCode className="mr-2 inline h-4 w-4" />Carteira do evento</Link>
             <Link to="/dashboard/visao-geral" className="rounded-xl bg-white px-3 py-2 text-sm font-semibold text-[var(--g3-primary)]"><MonitorCog className="mr-2 inline h-4 w-4" />Voltar ao sistema</Link>
           </div>
         </header>

@@ -144,6 +144,7 @@ const LicencaUsoRetornoPage = carregarPagina(
 const PainelSenhasPage = carregarPagina("/senhas/painel", "PainelSenhasPage");
 const FrenteCaixaPage = carregarPagina("/setor-vendas/frente-caixa", "FrenteCaixaPage");
 const HistoricoVendasPage = carregarPagina("/setor-vendas/historico", "HistoricoVendasPage");
+const CarteiraDigitalEventoPage = carregarPagina("/setor-vendas/carteira-digital-evento", "CarteiraDigitalEventoPage");
 const VisaoGeralPage = carregarPagina("/dashboard/visao-geral", "VisaoGeralPage");
 const IndicadoresPage = carregarPagina("/dashboard/indicadores", "IndicadoresPage");
 const PowerBiPage = carregarPagina("/dashboard/power-bi", "PowerBiPage");
@@ -317,6 +318,21 @@ export const router = createBrowserRouter([
       { path: "/setor-rh/registro-ponto", element: RegistroPontoPage },
       { path: "/setor-rh/contratacao", element: ContratacaoPage },
       { path: "/setor-vendas/historico", element: HistoricoVendasPage },
+      {
+        path: "/setor-vendas/carteira-digital-evento",
+        element: (
+          <RequirePermission
+            permissions={[
+              "ADMINISTRADOR",
+              "OPERADOR",
+              "LEITURA_APENAS",
+              "SETOR_VENDAS_CARTEIRA_EVENTO_VISUALIZAR"
+            ]}
+          >
+            {CarteiraDigitalEventoPage}
+          </RequirePermission>
+        )
+      },
       { path: "/setor-administrativo/almoxarifado", element: AlmoxarifadoPage },
       { path: "/setor-administrativo/controle-veiculos", element: ControleVeiculosPage },
       { path: "/setor-administrativo/emprestimo-eventos", element: EmprestimoEventosPage },

@@ -58,6 +58,7 @@ import {
   ReceiptText,
   ScanBarcode,
   Presentation,
+  QrCode,
   RefreshCcw,
   Scale,
   ScrollText,
@@ -398,6 +399,18 @@ export const menuSections: MenuSection[] = [
         icon: ScrollText
       },
       {
+        id: "setor-vendas-carteira-digital-evento",
+        to: "/setor-vendas/carteira-digital-evento",
+        label: "Carteira digital do evento",
+        icon: QrCode,
+        requiredPermissions: [
+          "ADMINISTRADOR",
+          "OPERADOR",
+          "LEITURA_APENAS",
+          "SETOR_VENDAS_CARTEIRA_EVENTO_VISUALIZAR"
+        ]
+      },
+      {
         id: "setor-vendas-frente-caixa",
         to: "/setor-vendas/frente-caixa",
         label: "Frente de caixa",
@@ -548,6 +561,7 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/configuracoes/sobre-o-sistema")) return "Sobre o sistema";
   if (pathname.startsWith("/configuracoes/mensagens-personalizadas")) return "Mensagens personalizadas";
   if (pathname.startsWith("/configuracoes/usuarios")) return "Usuários";
+  if (pathname.startsWith("/setor-vendas/carteira-digital-evento")) return "Carteira digital do evento";
   if (pathname.startsWith("/setor-vendas/historico")) return "Historico de vendas";
   if (pathname.startsWith("/setor-rh/registro-ponto")) return "Registro de ponto";
   if (pathname.startsWith("/setor-administrativo/almoxarifado")) return "Almoxarifado";
@@ -573,14 +587,7 @@ function ocultarTituloTopo(pathname: string) {
     pathname.startsWith("/cadastros/") ||
     pathname.startsWith("/dashboard/power-bi") ||
     pathname.startsWith("/configuracoes/chamado-tecnico") ||
-    pathname.startsWith("/configuracoes/datas-comemorativas") ||
-    pathname.startsWith("/configuracoes/licenca-uso") ||
-    pathname.startsWith("/configuracoes/manual-do-sistema") ||
     pathname.startsWith("/configuracoes/mensagens-personalizadas") ||
-    pathname.startsWith("/configuracoes/parametros-sistema") ||
-    pathname.startsWith("/configuracoes/pesquise-na-ia") ||
-    pathname.startsWith("/configuracoes/sobre-o-sistema") ||
-    pathname.startsWith("/configuracoes/usuarios") ||
     pathname.startsWith("/atendimentos/central-atendimentos") ||
     pathname.startsWith("/atendimentos/matriculas") ||
     pathname.startsWith("/atendimentos/banco-empregos") ||
@@ -912,7 +919,7 @@ export function AppShell() {
   return (
     <div className="min-h-screen bg-[var(--g3-bg)]">
       <aside
-        className={`fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-[var(--g3-sidebar-border)] bg-[linear-gradient(180deg,var(--g3-sidebar-bg)_0%,var(--g3-sidebar-bg-alt)_100%)] text-[var(--g3-sidebar-text)] shadow-2xl shadow-[color:var(--g3-sidebar-shadow)] transition-[width] duration-300 lg:flex ${
+        className={`fixed inset-y-0 left-0 z-40 hidden isolate flex-col border-r border-[var(--g3-sidebar-border)] bg-[linear-gradient(180deg,var(--g3-sidebar-bg)_0%,var(--g3-sidebar-bg-alt)_100%)] text-[var(--g3-sidebar-text)] shadow-2xl shadow-[color:var(--g3-sidebar-shadow)] transition-[width] duration-300 lg:flex ${
           sidebarRecolhida ? "w-16" : "w-64"
         }`}
       >
@@ -951,7 +958,7 @@ export function AppShell() {
         </div>
 
         <nav
-          className={`g3-sidebar-scroll flex-1 overflow-y-auto ${
+          className={`g3-sidebar-scroll relative z-10 flex-1 overflow-y-auto ${
             sidebarRecolhida ? "space-y-1.5 px-1.5 py-2" : "space-y-2 px-2.5 py-3"
           }`}
         >
@@ -1003,28 +1010,22 @@ export function AppShell() {
                         <NavLink
                           key={item.id}
                           to={item.to}
-                          className="block"
+                          className={({ isActive }) => {
+                            const itemAtivo = isActive || itemEstaAtivo(location.pathname, item);
+                            return `flex w-full items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs font-medium leading-tight transition-colors ${
+                              itemAtivo
+                                ? "border-[var(--g3-active)] bg-[var(--g3-card)] text-[var(--g3-active)] shadow-sm"
+                                : "border-transparent text-[var(--g3-foreground)] hover:border-[var(--g3-border)] hover:bg-[var(--g3-primary-soft-hover)]"
+                            }`;
+                          }}
                           target={item.abrirEmNovaAba ? "_blank" : undefined}
                           rel={item.abrirEmNovaAba ? "noreferrer" : undefined}
                           onMouseEnter={() => precarregarItemMenu(item)}
                           onFocus={() => precarregarItemMenu(item)}
                           onTouchStart={() => precarregarItemMenu(item)}
                         >
-                          {({ isActive }) => {
-                            const itemAtivo = isActive || itemEstaAtivo(location.pathname, item);
-                            return (
-                              <span
-                                className={`flex w-full items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors ${
-                                  itemAtivo
-                                    ? "border-[var(--g3-active)] bg-[var(--g3-card)] text-[var(--g3-active)] shadow-sm"
-                                    : "border-transparent text-[var(--g3-foreground)] hover:border-[var(--g3-border)] hover:bg-[var(--g3-primary-soft-hover)]"
-                                }`}
-                              >
-                                <item.icon className="h-3.5 w-3.5" />
-                                {item.label}
-                              </span>
-                            );
-                          }}
+                          <item.icon className="h-3.5 w-3.5 shrink-0" />
+                          <span>{item.label}</span>
                         </NavLink>
                       ) : (
                         <span
@@ -1053,8 +1054,8 @@ export function AppShell() {
         </div>
       </aside>
 
-      <div className={`transition-[padding] duration-300 ${sidebarRecolhida ? "lg:pl-16" : "lg:pl-64"}`}>
-        <header className="border-b border-[var(--g3-header-border)] bg-[var(--g3-header-bg)]/95 backdrop-blur">
+      <div className={`relative z-0 transition-[padding] duration-300 ${sidebarRecolhida ? "lg:pl-16" : "lg:pl-64"}`}>
+        <header className="relative z-10 border-b border-[var(--g3-header-border)] bg-[var(--g3-header-bg)]/95 backdrop-blur">
           <div className="mx-auto w-full max-w-[1440px] px-4 py-1.5 lg:px-8">
             <div className="flex min-h-9 flex-wrap items-center justify-between gap-2">
               {semTituloNoTopo ? <div className="min-h-0 min-w-0" /> : (
@@ -1165,28 +1166,22 @@ export function AppShell() {
                           <NavLink
                             key={item.id}
                             to={item.to}
-                            className="block"
+                            className={({ isActive }) => {
+                              const itemAtivo = isActive || itemEstaAtivo(location.pathname, item);
+                              return `flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-xs font-medium leading-tight ${
+                                itemAtivo
+                                  ? "border-[var(--g3-active)] bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"
+                                  : "border-[var(--g3-border)] bg-[var(--g3-card-soft)] text-[var(--g3-foreground)]"
+                              }`;
+                            }}
                             target={item.abrirEmNovaAba ? "_blank" : undefined}
                             rel={item.abrirEmNovaAba ? "noreferrer" : undefined}
                             onMouseEnter={() => precarregarItemMenu(item)}
                             onFocus={() => precarregarItemMenu(item)}
                             onTouchStart={() => precarregarItemMenu(item)}
                           >
-                            {({ isActive }) => {
-                              const itemAtivo = isActive || itemEstaAtivo(location.pathname, item);
-                              return (
-                                <span
-                                  className={`flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-xs font-medium ${
-                                    itemAtivo
-                                      ? "border-[var(--g3-active)] bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"
-                                      : "border-[var(--g3-border)] bg-[var(--g3-card-soft)] text-[var(--g3-foreground)]"
-                                  }`}
-                                >
-                                  <item.icon className="h-3.5 w-3.5" />
-                                  {item.label}
-                                </span>
-                              );
-                            }}
+                            <item.icon className="h-3.5 w-3.5 shrink-0" />
+                            <span>{item.label}</span>
                           </NavLink>
                         ) : null
                       )}

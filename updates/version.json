@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.288",
+  "latestVersion": "1.00.289",
   "releaseDate": "2026-03-24",
-  "description": "Salvamento de documentos do beneficiario ajustado para bloquear conteudo inline no cadastro, devolver mensagem funcional no erro e manter o fluxo de webcam tratado.",
+  "description": "Novo modulo Carteira digital do evento no Setor vendas com eventos, participantes, QR Code seguro, recarga, operacao de consumo, extrato, dashboard e fechamento inicial.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.288",
+  "minCompatibleVersion": "1.00.289",
   "releaseType": "stable",
   "downloadUrl": null
 }

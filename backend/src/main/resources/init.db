@@ -4723,3 +4723,140 @@ CREATE TABLE IF NOT EXISTS venda_setor_item (
 
 CREATE INDEX IF NOT EXISTS venda_setor_criado_em_idx ON venda_setor (criado_em DESC);
 CREATE INDEX IF NOT EXISTS venda_setor_item_venda_idx ON venda_setor_item (venda_id);
+
+CREATE TABLE IF NOT EXISTS carteira_evento (
+  id BIGSERIAL PRIMARY KEY,
+  nome_evento VARCHAR(160) NOT NULL,
+  tipo_evento VARCHAR(60) NOT NULL,
+  data_inicio DATE NOT NULL,
+  data_fim DATE,
+  status VARCHAR(30) NOT NULL DEFAULT 'PLANEJADO',
+  permite_recarga BOOLEAN NOT NULL DEFAULT TRUE,
+  permite_transferencia BOOLEAN NOT NULL DEFAULT FALSE,
+  permite_estorno BOOLEAN NOT NULL DEFAULT FALSE,
+  validade_credito DATE,
+  centro_receita VARCHAR(120),
+  modo_financeiro VARCHAR(30) NOT NULL DEFAULT 'SIMPLES',
+  observacoes TEXT,
+  criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+  atualizado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+  criado_por_id BIGINT,
+  criado_por_nome VARCHAR(120),
+  atualizado_por_id BIGINT,
+  atualizado_por_nome VARCHAR(120)
+);
+
+CREATE TABLE IF NOT EXISTS carteira_evento_participante (
+  id BIGSERIAL PRIMARY KEY,
+  evento_id BIGINT NOT NULL REFERENCES carteira_evento(id) ON DELETE CASCADE,
+  nome VARCHAR(160) NOT NULL,
+  telefone VARCHAR(20),
+  cpf VARCHAR(14),
+  foto_path VARCHAR(255),
+  responsavel VARCHAR(160),
+  numero_carteira VARCHAR(40) NOT NULL,
+  status VARCHAR(30) NOT NULL DEFAULT 'ATIVO',
+  qr_code_token_unico VARCHAR(120) NOT NULL UNIQUE,
+  saldo_atual NUMERIC(14,2) NOT NULL DEFAULT 0,
+  criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+  atualizado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+  criado_por_id BIGINT,
+  criado_por_nome VARCHAR(120),
+  atualizado_por_id BIGINT,
+  atualizado_por_nome VARCHAR(120)
+);
+
+CREATE TABLE IF NOT EXISTS carteira_evento_barraca (
+  id BIGSERIAL PRIMARY KEY,
+  evento_id BIGINT NOT NULL REFERENCES carteira_evento(id) ON DELETE CASCADE,
+  nome_barraca VARCHAR(160) NOT NULL,
+  responsavel VARCHAR(160),
+  tipo_barraca VARCHAR(60),
+  operador VARCHAR(120),
+  status VARCHAR(30) NOT NULL DEFAULT 'ATIVA',
+  impressora VARCHAR(120),
+  observacoes TEXT,
+  criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+  atualizado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+  criado_por_id BIGINT,
+  criado_por_nome VARCHAR(120),
+  atualizado_por_id BIGINT,
+  atualizado_por_nome VARCHAR(120)
+);
+
+CREATE TABLE IF NOT EXISTS carteira_evento_item (
+  id BIGSERIAL PRIMARY KEY,
+  evento_id BIGINT NOT NULL REFERENCES carteira_evento(id) ON DELETE CASCADE,
+  barraca_id BIGINT REFERENCES carteira_evento_barraca(id) ON DELETE SET NULL,
+  nome_item VARCHAR(160) NOT NULL,
+  categoria VARCHAR(60) NOT NULL,
+  preco NUMERIC(14,2) NOT NULL DEFAULT 0,
+  estoque NUMERIC(14,3),
+  ativo BOOLEAN NOT NULL DEFAULT TRUE,
+  foto_path VARCHAR(255),
+  ordem_exibicao INTEGER NOT NULL DEFAULT 0,
+  criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+  atualizado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+  criado_por_id BIGINT,
+  criado_por_nome VARCHAR(120),
+  atualizado_por_id BIGINT,
+  atualizado_por_nome VARCHAR(120)
+);
+
+CREATE TABLE IF NOT EXISTS carteira_evento_venda (
+  id BIGSERIAL PRIMARY KEY,
+  evento_id BIGINT NOT NULL REFERENCES carteira_evento(id) ON DELETE CASCADE,
+  participante_id BIGINT NOT NULL REFERENCES carteira_evento_participante(id) ON DELETE RESTRICT,
+  barraca_id BIGINT NOT NULL REFERENCES carteira_evento_barraca(id) ON DELETE RESTRICT,
+  total NUMERIC(14,2) NOT NULL DEFAULT 0,
+  chave_operacao VARCHAR(120) NOT NULL UNIQUE,
+  observacoes TEXT,
+  criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+  operador_id BIGINT,
+  operador_nome VARCHAR(120)
+);
+
+CREATE TABLE IF NOT EXISTS carteira_evento_venda_item (
+  id BIGSERIAL PRIMARY KEY,
+  venda_id BIGINT NOT NULL REFERENCES carteira_evento_venda(id) ON DELETE CASCADE,
+  item_id BIGINT REFERENCES carteira_evento_item(id) ON DELETE SET NULL,
+  nome_item VARCHAR(160) NOT NULL,
+  quantidade NUMERIC(14,3) NOT NULL,
+  valor_unitario NUMERIC(14,2) NOT NULL,
+  valor_total NUMERIC(14,2) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS carteira_evento_movimentacao (
+  id BIGSERIAL PRIMARY KEY,
+  evento_id BIGINT NOT NULL REFERENCES carteira_evento(id) ON DELETE CASCADE,
+  participante_id BIGINT NOT NULL REFERENCES carteira_evento_participante(id) ON DELETE RESTRICT,
+  tipo VARCHAR(40) NOT NULL,
+  valor NUMERIC(14,2) NOT NULL,
+  saldo_anterior NUMERIC(14,2) NOT NULL DEFAULT 0,
+  saldo_posterior NUMERIC(14,2) NOT NULL DEFAULT 0,
+  forma_pagamento VARCHAR(40),
+  barraca_id BIGINT REFERENCES carteira_evento_barraca(id) ON DELETE SET NULL,
+  item_id BIGINT REFERENCES carteira_evento_item(id) ON DELETE SET NULL,
+  participante_destino_id BIGINT REFERENCES carteira_evento_participante(id) ON DELETE SET NULL,
+  venda_id BIGINT REFERENCES carteira_evento_venda(id) ON DELETE SET NULL,
+  motivo TEXT,
+  observacao TEXT,
+  criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+  operador_id BIGINT,
+  operador_nome VARCHAR(120)
+);
+
+CREATE INDEX IF NOT EXISTS carteira_evento_status_idx ON carteira_evento (status);
+CREATE INDEX IF NOT EXISTS carteira_evento_periodo_idx ON carteira_evento (data_inicio, data_fim);
+CREATE INDEX IF NOT EXISTS carteira_evento_participante_evento_idx ON carteira_evento_participante (evento_id);
+CREATE INDEX IF NOT EXISTS carteira_evento_participante_token_idx ON carteira_evento_participante (qr_code_token_unico);
+CREATE INDEX IF NOT EXISTS carteira_evento_participante_numero_idx ON carteira_evento_participante (numero_carteira);
+CREATE INDEX IF NOT EXISTS carteira_evento_barraca_evento_idx ON carteira_evento_barraca (evento_id);
+CREATE INDEX IF NOT EXISTS carteira_evento_item_evento_idx ON carteira_evento_item (evento_id);
+CREATE INDEX IF NOT EXISTS carteira_evento_item_barraca_idx ON carteira_evento_item (barraca_id);
+CREATE INDEX IF NOT EXISTS carteira_evento_venda_evento_idx ON carteira_evento_venda (evento_id, criado_em DESC);
+CREATE INDEX IF NOT EXISTS carteira_evento_venda_participante_idx ON carteira_evento_venda (participante_id, criado_em DESC);
+CREATE INDEX IF NOT EXISTS carteira_evento_venda_barraca_idx ON carteira_evento_venda (barraca_id, criado_em DESC);
+CREATE INDEX IF NOT EXISTS carteira_evento_venda_item_venda_idx ON carteira_evento_venda_item (venda_id);
+CREATE INDEX IF NOT EXISTS carteira_evento_movimentacao_evento_idx ON carteira_evento_movimentacao (evento_id, criado_em DESC);
+CREATE INDEX IF NOT EXISTS carteira_evento_movimentacao_participante_idx ON carteira_evento_movimentacao (participante_id, criado_em DESC);
