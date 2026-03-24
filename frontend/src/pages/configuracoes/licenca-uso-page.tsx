@@ -217,7 +217,10 @@ function SectionHeader({
         {eyebrow}
       </div>
       <div className="space-y-2">
-        <h2 className="font-serif text-2xl font-semibold tracking-tight text-slate-950 md:text-3xl">
+        <h2
+          className="text-2xl font-semibold tracking-tight text-slate-950 md:text-3xl"
+          style={{ fontFamily: "Verdana, Geneva, sans-serif" }}
+        >
           {titulo}
         </h2>
         <p className="max-w-3xl text-sm leading-6 text-slate-600 md:text-base">{descricao}</p>
@@ -408,7 +411,7 @@ export function LicencaUsoPage() {
         }
       ]}
     >
-      <div className="space-y-6 pb-6">
+      <div className="space-y-6 pb-6" style={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
         <section className="overflow-hidden rounded-[36px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,#f5f0de_0,#ffffff_38%,#ecf7f2_100%)]">
           <div className="grid gap-8 p-6 md:p-8 xl:grid-cols-[minmax(0,1.25fr)_380px]">
             <div className="space-y-6">
@@ -418,7 +421,10 @@ export function LicencaUsoPage() {
               </div>
 
               <div className="space-y-4">
-                <h1 className="max-w-4xl font-serif text-4xl font-semibold tracking-tight text-slate-950 md:text-5xl">
+                <h1
+                  className="max-w-4xl text-4xl font-semibold tracking-tight text-slate-950 md:text-5xl"
+                  style={{ fontFamily: "Verdana, Geneva, sans-serif" }}
+                >
                   Escolha o plano ideal para profissionalizar a gestão da sua instituição
                 </h1>
                 <p className="max-w-3xl text-base leading-7 text-slate-700 md:text-lg">

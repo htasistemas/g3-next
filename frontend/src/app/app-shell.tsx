@@ -573,7 +573,14 @@ function ocultarTituloTopo(pathname: string) {
     pathname.startsWith("/cadastros/") ||
     pathname.startsWith("/dashboard/power-bi") ||
     pathname.startsWith("/configuracoes/chamado-tecnico") ||
+    pathname.startsWith("/configuracoes/datas-comemorativas") ||
+    pathname.startsWith("/configuracoes/licenca-uso") ||
+    pathname.startsWith("/configuracoes/manual-do-sistema") ||
     pathname.startsWith("/configuracoes/mensagens-personalizadas") ||
+    pathname.startsWith("/configuracoes/parametros-sistema") ||
+    pathname.startsWith("/configuracoes/pesquise-na-ia") ||
+    pathname.startsWith("/configuracoes/sobre-o-sistema") ||
+    pathname.startsWith("/configuracoes/usuarios") ||
     pathname.startsWith("/atendimentos/central-atendimentos") ||
     pathname.startsWith("/atendimentos/matriculas") ||
     pathname.startsWith("/atendimentos/banco-empregos") ||
@@ -996,6 +1003,7 @@ export function AppShell() {
                         <NavLink
                           key={item.id}
                           to={item.to}
+                          className="block"
                           target={item.abrirEmNovaAba ? "_blank" : undefined}
                           rel={item.abrirEmNovaAba ? "noreferrer" : undefined}
                           onMouseEnter={() => precarregarItemMenu(item)}
@@ -1005,17 +1013,17 @@ export function AppShell() {
                           {({ isActive }) => {
                             const itemAtivo = isActive || itemEstaAtivo(location.pathname, item);
                             return (
-                            <span
-                              className={`flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors ${
-                                itemAtivo
-                                  ? "border-[var(--g3-active)] bg-[var(--g3-card)] text-[var(--g3-active)] shadow-sm"
-                                  : "border-transparent text-[var(--g3-foreground)] hover:border-[var(--g3-border)] hover:bg-[var(--g3-primary-soft-hover)]"
-                              }`}
-                            >
-                              <item.icon className="h-3.5 w-3.5" />
-                              {item.label}
-                            </span>
-                          );
+                              <span
+                                className={`flex w-full items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                                  itemAtivo
+                                    ? "border-[var(--g3-active)] bg-[var(--g3-card)] text-[var(--g3-active)] shadow-sm"
+                                    : "border-transparent text-[var(--g3-foreground)] hover:border-[var(--g3-border)] hover:bg-[var(--g3-primary-soft-hover)]"
+                                }`}
+                              >
+                                <item.icon className="h-3.5 w-3.5" />
+                                {item.label}
+                              </span>
+                            );
                           }}
                         </NavLink>
                       ) : (
@@ -1157,6 +1165,7 @@ export function AppShell() {
                           <NavLink
                             key={item.id}
                             to={item.to}
+                            className="block"
                             target={item.abrirEmNovaAba ? "_blank" : undefined}
                             rel={item.abrirEmNovaAba ? "noreferrer" : undefined}
                             onMouseEnter={() => precarregarItemMenu(item)}
@@ -1167,7 +1176,7 @@ export function AppShell() {
                               const itemAtivo = isActive || itemEstaAtivo(location.pathname, item);
                               return (
                                 <span
-                                  className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 text-xs font-medium ${
+                                  className={`flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-xs font-medium ${
                                     itemAtivo
                                       ? "border-[var(--g3-active)] bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"
                                       : "border-[var(--g3-border)] bg-[var(--g3-card-soft)] text-[var(--g3-foreground)]"
