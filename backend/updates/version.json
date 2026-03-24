@@ -1,9 +1,9 @@
 {
-  "latestVersion": "1.00.285",
+  "latestVersion": "1.00.286",
   "releaseDate": "2026-03-23",
-  "description": "Correcao no cadastro de centro de custo da contabilidade e navegacao mobile reorganizada no menu principal.",
+  "description": "Correcao no upload de documentos do beneficiario em producao, com blindagem do usuario de upload e mensagem clara para falha de storage.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.285",
+  "minCompatibleVersion": "1.00.286",
   "releaseType": "stable"
 }

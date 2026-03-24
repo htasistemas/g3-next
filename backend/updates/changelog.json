@@ -1,6 +1,18 @@
 {
     "entries":  [
-                                                                                {
+                                                                                                    {
+                        "version":  "1.00.286",
+                        "releaseDate":  "2026-03-24",
+                        "title":  "Upload de documentos do beneficiario corrigido",
+                        "description":  "O envio de documentos do cadastro de beneficiarios foi blindado para producao, evitando falha por usuario de upload invalido e melhorando o diagnostico de storage.",
+                        "changes":  [
+                                        "Validacao do usuario de upload antes de gravar metadados do arquivo.",
+                                        "Mensagem clara quando o servidor nao consegue gravar na pasta de storage.",
+                                        "Manual do sistema atualizado com observacao operacional para documentos em producao.",
+                                        "Versao oficial atualizada para 1.00.286."
+                                    ],
+                        "releaseType":  "stable"
+                    },{
                         "version":  "1.00.285",
                         "releaseDate":  "2026-03-23",
                         "title":  "Contabilidade e menu mobile ajustados",

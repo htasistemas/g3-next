@@ -18,6 +18,7 @@ type AuditoriaPayload = {
 export class ArquivosRepository {
   async criar(input: ArquivoMetadataCreateInput) {
     await ensureArquivosEstrutura(prisma);
+    const usuarioUploadId = await this.resolverUsuarioUploadId(input.usuarioUploadId ?? undefined);
 
     const rows = await prisma.$queryRaw<ArquivoMetadataRow[]>(Prisma.sql`
       INSERT INTO arquivos (
@@ -50,7 +51,7 @@ export class ArquivosRepository {
         ${input.extensao ?? null},
         ${BigInt(Math.max(0, input.tamanhoBytes))},
         NOW(),
-        ${input.usuarioUploadId ?? null},
+        ${usuarioUploadId},
         TRUE,
         ${input.observacao ?? null},
         ${input.metadadosJson ? JSON.stringify(input.metadadosJson) : null}::jsonb,
@@ -85,6 +86,25 @@ export class ArquivosRepository {
     }
 
     return arquivo;
+  }
+
+  private async resolverUsuarioUploadId(usuarioUploadId?: bigint | null) {
+    if (!usuarioUploadId) {
+      return null;
+    }
+
+    try {
+      const rows = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+        SELECT id
+        FROM usuarios
+        WHERE id = ${usuarioUploadId}
+        LIMIT 1
+      `);
+
+      return rows[0]?.id ?? null;
+    } catch {
+      return null;
+    }
   }
 
   async listar(filters: ArquivoListFilters) {
