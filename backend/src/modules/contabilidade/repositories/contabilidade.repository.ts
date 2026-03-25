@@ -1336,17 +1336,21 @@ export class ContabilidadeRepository {
         origem: trimOrUndefined(input.origem ?? undefined) ?? "AJUSTE_MANUAL",
         observacao: trimOrUndefined(input.observacao ?? undefined)
       });
-      await this.registrarHistorico(tx, {
-        aba: "Fluxo de caixa",
-        acao: "Movimentação criada",
-        tipoRegistro: "MOVIMENTACAO",
-        registroId: String(movimentacao.id),
-        valor: movimentacao.valor,
-        conta: movimentacao.conta_bancaria_nome,
-        observacao: "Movimentação manual registrada no fluxo de caixa.",
-        origem: movimentacao.origem,
-        ator
-      });
+      try {
+        await this.registrarHistorico(tx, {
+          aba: "Fluxo de caixa",
+          acao: "Movimentação criada",
+          tipoRegistro: "MOVIMENTACAO",
+          registroId: String(movimentacao.id),
+          valor: movimentacao.valor,
+          conta: movimentacao.conta_bancaria_nome,
+          observacao: "Movimentação manual registrada no fluxo de caixa.",
+          origem: movimentacao.origem,
+          ator
+        });
+      } catch (error) {
+        console.warn("[contabilidade] falha ao registrar histórico da movimentação criada:", error);
+      }
       return movimentacao;
     });
   }
@@ -1395,17 +1399,21 @@ export class ContabilidadeRepository {
         WHERE id = ${id}
       `);
       const movimentacao = await this.buscarMovimentacaoPorIdOuFalhar(id, tx);
-      await this.registrarHistorico(tx, {
-        aba: "Fluxo de caixa",
-        acao: "Movimentação atualizada",
-        tipoRegistro: "MOVIMENTACAO",
-        registroId: String(id),
-        valor: movimentacao.valor,
-        conta: movimentacao.conta_bancaria_nome,
-        observacao: "Movimentação manual atualizada.",
-        origem: movimentacao.origem,
-        ator
-      });
+      try {
+        await this.registrarHistorico(tx, {
+          aba: "Fluxo de caixa",
+          acao: "Movimentação atualizada",
+          tipoRegistro: "MOVIMENTACAO",
+          registroId: String(id),
+          valor: movimentacao.valor,
+          conta: movimentacao.conta_bancaria_nome,
+          observacao: "Movimentação manual atualizada.",
+          origem: movimentacao.origem,
+          ator
+        });
+      } catch (error) {
+        console.warn("[contabilidade] falha ao registrar histórico da movimentação atualizada:", error);
+      }
       return movimentacao;
     });
   }
@@ -1423,17 +1431,21 @@ export class ContabilidadeRepository {
         SET ativo = FALSE, atualizado_em = NOW()
         WHERE id = ${id}
       `);
-      await this.registrarHistorico(tx, {
-        aba: "Fluxo de caixa",
-        acao: "Movimentação cancelada",
-        tipoRegistro: "MOVIMENTACAO",
-        registroId: String(id),
-        valor: atual.valor,
-        conta: atual.conta_bancaria_nome,
-        observacao: "Movimentação manual cancelada.",
-        origem: atual.origem,
-        ator
-      });
+      try {
+        await this.registrarHistorico(tx, {
+          aba: "Fluxo de caixa",
+          acao: "Movimentação cancelada",
+          tipoRegistro: "MOVIMENTACAO",
+          registroId: String(id),
+          valor: atual.valor,
+          conta: atual.conta_bancaria_nome,
+          observacao: "Movimentação manual cancelada.",
+          origem: atual.origem,
+          ator
+        });
+      } catch (error) {
+        console.warn("[contabilidade] falha ao registrar histórico da movimentação cancelada:", error);
+      }
     });
   }
 

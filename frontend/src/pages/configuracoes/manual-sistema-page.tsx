@@ -213,7 +213,9 @@ const secoesManual: ManualSecao[] = [
         atencoes: [
           "O estorno só é permitido para lançamentos com status pago, recebido ou conciliado.",
           "O campo Categoria textual foi removido do fluxo de caixa e o centro de custo deve ser selecionado apenas entre opções ativas cadastradas.",
-          "Lançamentos já estornados não devem ser estornados novamente."
+          "Lançamentos já estornados não devem ser estornados novamente.",
+          "No fluxo de caixa, falhas auxiliares de histórico não devem mais impedir o salvamento principal da movimentação em produção.",
+          "Quando a gravação principal da movimentação falhar, o backend passa a retornar o motivo operacional real em vez de apenas erro interno do servidor."
         ]
       },
       {

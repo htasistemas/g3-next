@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.319",
+  "latestVersion": "1.00.320",
   "releaseDate": "2026-03-25",
-  "description": "Impressão da lista de presença corrigida para manter a mesma data da aula exibida na tela.",
+  "description": "Fluxo de caixa reforçado para salvar movimentações em produção sem cair em erro interno genérico.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.319",
+  "minCompatibleVersion": "1.00.320",
   "releaseType": "stable",
   "downloadUrl": null
 }

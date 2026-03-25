@@ -1,6 +1,18 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.320",
+                        "releaseDate":  "2026-03-25",
+                        "title":  "Fluxo de caixa mais resiliente em produção",
+                        "description":  "O salvamento de movimentações manuais no fluxo de caixa foi reforçado para não cair em erro interno genérico quando houver falha auxiliar de histórico ou exceção tratável.",
+                        "changes":  [
+                                        "Criação e atualização de movimentações do fluxo de caixa agora devolvem mensagem operacional mais clara quando a gravação principal falhar.",
+                                        "Falhas no registro auxiliar de histórico deixaram de bloquear o salvamento principal da movimentação em produção.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.319",
                         "releaseDate":  "2026-03-25",
                         "title":  "Lista de presença com data correta na impressão",

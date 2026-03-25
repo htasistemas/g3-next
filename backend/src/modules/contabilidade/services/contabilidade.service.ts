@@ -151,14 +151,42 @@ export class ContabilidadeService {
 
   async criarMovimentacao(rawInput: unknown, ator?: ContabilidadeAtor) {
     const input = movimentacaoFinanceiraInputSchema.parse(this.normalizarPayload(rawInput));
-    const row = await this.repository.criarMovimentacao(input, ator);
+    let row;
+    try {
+      row = await this.repository.criarMovimentacao(input, ator);
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      const motivo =
+        error instanceof Error && error.message.trim()
+          ? error.message.trim()
+          : "falha inesperada ao salvar a movimentação do fluxo de caixa";
+
+      throw new AppError(`Nao foi possivel salvar a movimentacao do fluxo de caixa. ${motivo}.`, 500);
+    }
     return mapMovimentacaoToResponse(row);
   }
 
   async atualizarMovimentacao(rawId: string, rawInput: unknown, ator?: ContabilidadeAtor) {
     const id = this.parseId(rawId);
     const input = movimentacaoFinanceiraInputSchema.parse(this.normalizarPayload(rawInput));
-    const row = await this.repository.atualizarMovimentacao(id, input, ator);
+    let row;
+    try {
+      row = await this.repository.atualizarMovimentacao(id, input, ator);
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      const motivo =
+        error instanceof Error && error.message.trim()
+          ? error.message.trim()
+          : "falha inesperada ao atualizar a movimentação do fluxo de caixa";
+
+      throw new AppError(`Nao foi possivel atualizar a movimentacao do fluxo de caixa. ${motivo}.`, 500);
+    }
     return mapMovimentacaoToResponse(row);
   }
 
