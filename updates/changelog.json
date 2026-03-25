@@ -1,6 +1,19 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.314",
+                        "releaseDate":  "2026-03-25",
+                        "title":  "Atualização de beneficiário mais resiliente em produção",
+                        "description":  "O salvamento do cadastro de beneficiário foi reforçado para não cair por falha de limpeza de arquivos antigos após a atualização dos documentos.",
+                        "changes":  [
+                                        "Atualização do beneficiário passou a tratar separadamente gravação, vinculação e limpeza de arquivos.",
+                                        "Falhas de limpeza de arquivo legado no storage deixaram de bloquear a atualização do cadastro.",
+                                        "Erros inesperados na atualização e vinculação passaram a retornar mensagem operacional mais clara.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.313",
                         "releaseDate":  "2026-03-25",
                         "title":  "Erro real no salvamento de documentos do beneficiário",

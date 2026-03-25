@@ -66,13 +66,47 @@ export class BeneficiarioService {
     const preparado = await this.prepararArquivosPayload(input, usuarioId, id);
 
     try {
-      const beneficiario = await this.repository.atualizar(id, preparado.input);
-      await this.vincularArquivos(preparado.novosCaminhos, id);
-      await this.limparArquivosSubstituidos(
-        this.coletarCaminhosRegistro(existente),
-        this.coletarCaminhosRegistro(beneficiario),
-        usuarioId
-      );
+      let beneficiario;
+      try {
+        beneficiario = await this.repository.atualizar(id, preparado.input);
+      } catch (error) {
+        if (error instanceof AppError) {
+          throw error;
+        }
+
+        const motivo =
+          error instanceof Error && error.message.trim()
+            ? error.message.trim()
+            : "falha inesperada ao atualizar os dados do beneficiario";
+
+        throw new AppError(`Nao foi possivel atualizar o beneficiario. ${motivo}.`, 500);
+      }
+
+      try {
+        await this.vincularArquivos(preparado.novosCaminhos, id);
+      } catch (error) {
+        if (error instanceof AppError) {
+          throw error;
+        }
+
+        const motivo =
+          error instanceof Error && error.message.trim()
+            ? error.message.trim()
+            : "falha inesperada ao vincular os arquivos do beneficiario";
+
+        throw new AppError(`Nao foi possivel vincular os arquivos do beneficiario. ${motivo}.`, 500);
+      }
+
+      try {
+        await this.limparArquivosSubstituidos(
+          this.coletarCaminhosRegistro(existente),
+          this.coletarCaminhosRegistro(beneficiario),
+          usuarioId
+        );
+      } catch (error) {
+        console.warn("[beneficiario] falha ao limpar arquivos substituidos apos atualizar cadastro:", error);
+      }
+
       return mapBeneficiarioToResponse(beneficiario);
     } catch (error) {
       await storageService.rollbackArquivos(preparado.novosCaminhos);

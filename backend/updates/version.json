@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.313",
+  "latestVersion": "1.00.314",
   "releaseDate": "2026-03-25",
-  "description": "Cadastro de beneficiário com erro real de documentos exibido no lugar de erro interno genérico.",
+  "description": "Atualização de beneficiário blindada para não falhar por limpeza de arquivos antigos no storage.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.313",
+  "minCompatibleVersion": "1.00.314",
   "releaseType": "stable"
 }
 
