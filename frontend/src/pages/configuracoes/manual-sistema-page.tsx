@@ -479,7 +479,7 @@ export function ManualSistemaPage() {
         }
       ]}
     >
-      <section className="space-y-4">
+      <section className="-mx-1 w-[calc(100%+0.5rem)] space-y-4 sm:mx-0 sm:w-full">
         <Card className="border-[var(--g3-border)]">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
@@ -504,12 +504,12 @@ export function ManualSistemaPage() {
           </CardContent>
         </Card>
 
-        <div className="grid gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
-          <Card className="border-[var(--g3-border)]">
+        <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)]">
+          <Card className="h-fit border-[var(--g3-border)]">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm">Seções do manual</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
               {secoesFiltradas.map((secao) => {
                 const Icon = secao.icon;
                 const ativa = secao.id === secaoSelecionada?.id;
@@ -518,14 +518,14 @@ export function ManualSistemaPage() {
                     key={secao.id}
                     type="button"
                     variant={ativa ? "default" : "outline"}
-                    className="h-auto w-full justify-start px-3 py-3 text-left"
+                    className="h-auto w-full min-w-0 justify-start whitespace-normal px-3 py-3 text-left"
                     onClick={() => setSecaoAtiva(secao.id)}
                   >
-                    <span className="flex items-start gap-3">
+                    <span className="flex min-w-0 w-full items-start gap-3">
                       <Icon className="mt-0.5 h-4 w-4 shrink-0" />
-                      <span>
-                        <span className="block text-sm font-semibold">{secao.titulo}</span>
-                        <span className="block text-xs opacity-80">{secao.descricao}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block whitespace-normal break-words text-sm font-semibold leading-snug">{secao.titulo}</span>
+                        <span className="block whitespace-normal break-words text-xs leading-snug opacity-80">{secao.descricao}</span>
                       </span>
                     </span>
                   </Button>
@@ -548,7 +548,7 @@ export function ManualSistemaPage() {
             </Card>
 
             {secaoSelecionada.telas.map((tela) => (
-              <Card key={tela.nome} className="border-[var(--g3-border)]">
+              <Card key={tela.nome} className="w-full border-[var(--g3-border)]">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm">{tela.nome}</CardTitle>
                 </CardHeader>
