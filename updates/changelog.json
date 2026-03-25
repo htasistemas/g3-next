@@ -1,6 +1,18 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.319",
+                        "releaseDate":  "2026-03-25",
+                        "title":  "Lista de presença com data correta na impressão",
+                        "description":  "A impressão da lista de presença das inscrições foi ajustada para usar a mesma data da aula exibida na aba Presença, sem recuo de um dia por fuso horário.",
+                        "changes":  [
+                                        "Formatação de datas do relatório ajustada para tratar datas ISO sem horário como data local pura.",
+                                        "A data impressa no PDF da lista de presença deixou de sair um dia anterior ao selecionado na tela.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.318",
                         "releaseDate":  "2026-03-25",
                         "title":  "Voluntariado compatível com base legada de produção",

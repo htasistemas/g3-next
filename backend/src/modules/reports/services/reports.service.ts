@@ -115,6 +115,12 @@ export class ReportsService {
     const texto = this.normalizarTexto(valor);
     if (!texto) return "---";
 
+    const matchIso = texto.match(/^(\d{4})-(\d{2})-(\d{2})(?:$|T)/);
+    if (matchIso) {
+      const [, ano, mes, dia] = matchIso;
+      return `${dia}/${mes}/${ano}`;
+    }
+
     const data = new Date(texto);
     if (Number.isNaN(data.getTime())) return texto;
 

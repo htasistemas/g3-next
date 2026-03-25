@@ -132,7 +132,8 @@ const secoesManual: ManualSecao[] = [
           "Na aba Presença, gere a data da aula, salve as presenças e use Excluir data de presença quando precisar remover apenas a data gerada sem apagar o curso."
         ],
         atencoes: [
-          "O botão Excluir da barra superior remove todo o curso configurado e exige confirmação específica antes da exclusão."
+          "O botão Excluir da barra superior remove todo o curso configurado e exige confirmação específica antes da exclusão.",
+          "Na aba Presença, a data exibida na lista e a data impressa na lista de presença agora seguem exatamente o mesmo dia informado, sem recuo por fuso horário."
         ]
       }
     ]
