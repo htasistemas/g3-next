@@ -5,6 +5,7 @@ import { ensureArquivosEstrutura } from "./arquivos-estrutura.repository.js";
 export class ArquivosRepository {
     async criar(input) {
         await ensureArquivosEstrutura(prisma);
+        const usuarioUploadId = await this.resolverUsuarioUploadId(input.usuarioUploadId ?? undefined);
         const rows = await prisma.$queryRaw(Prisma.sql `
       INSERT INTO arquivos (
         entidade_tipo,
@@ -36,7 +37,7 @@ export class ArquivosRepository {
         ${input.extensao ?? null},
         ${BigInt(Math.max(0, input.tamanhoBytes))},
         NOW(),
-        ${input.usuarioUploadId ?? null},
+        ${usuarioUploadId},
         TRUE,
         ${input.observacao ?? null},
         ${input.metadadosJson ? JSON.stringify(input.metadadosJson) : null}::jsonb,
@@ -69,6 +70,23 @@ export class ArquivosRepository {
             throw new AppError("Nao foi possivel registrar os metadados do arquivo.", 500);
         }
         return arquivo;
+    }
+    async resolverUsuarioUploadId(usuarioUploadId) {
+        if (!usuarioUploadId) {
+            return null;
+        }
+        try {
+            const rows = await prisma.$queryRaw(Prisma.sql `
+        SELECT id
+        FROM usuarios
+        WHERE id = ${usuarioUploadId}
+        LIMIT 1
+      `);
+            return rows[0]?.id ?? null;
+        }
+        catch {
+            return null;
+        }
     }
     async listar(filters) {
         await ensureArquivosEstrutura(prisma);

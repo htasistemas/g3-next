@@ -58,11 +58,15 @@ export const registroPontoFiltersSchema = z.object({
 export const registroPontoMarcarSchema = z.object({
     usuario_login: requiredTrimmedString("Informe o usuario."),
     senha: requiredTrimmedString("Informe a senha."),
+    face_imagem: requiredTrimmedString("Capture a face para confirmar o registro."),
     latitude: optionalNumber,
     longitude: optionalNumber,
     accuracy_metros: optionalNumber,
     origem_manual: optionalTrimmedString,
     validar_localizacao: optionalBoolean
+});
+export const registroPontoFaceSchema = z.object({
+    face_imagem: requiredTrimmedString("Capture a face do usuario.")
 });
 export const registroPontoAjusteSchema = z.object({
     entrada_1: optionalTime,

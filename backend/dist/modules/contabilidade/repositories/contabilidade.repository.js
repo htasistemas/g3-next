@@ -270,6 +270,39 @@ export async function ensureContabilidadeEstrutura() {
           criado_em TIMESTAMP NOT NULL DEFAULT NOW()
         )
       `);
+            await prisma.$executeRawUnsafe(`
+        ALTER TABLE financeiro_historico
+          ADD COLUMN IF NOT EXISTS aba VARCHAR(80),
+          ADD COLUMN IF NOT EXISTS acao VARCHAR(160),
+          ADD COLUMN IF NOT EXISTS tipo_registro VARCHAR(80),
+          ADD COLUMN IF NOT EXISTS registro_id VARCHAR(80),
+          ADD COLUMN IF NOT EXISTS valor NUMERIC(14,2),
+          ADD COLUMN IF NOT EXISTS conta VARCHAR(160),
+          ADD COLUMN IF NOT EXISTS status_anterior VARCHAR(60),
+          ADD COLUMN IF NOT EXISTS status_novo VARCHAR(60),
+          ADD COLUMN IF NOT EXISTS observacao TEXT,
+          ADD COLUMN IF NOT EXISTS origem VARCHAR(80),
+          ADD COLUMN IF NOT EXISTS usuario_id BIGINT REFERENCES usuarios(id) ON DELETE SET NULL,
+          ADD COLUMN IF NOT EXISTS usuario_nome VARCHAR(160),
+          ADD COLUMN IF NOT EXISTS perfil VARCHAR(255),
+          ADD COLUMN IF NOT EXISTS ip VARCHAR(120),
+          ADD COLUMN IF NOT EXISTS maquina VARCHAR(255),
+          ADD COLUMN IF NOT EXISTS criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+      `);
+            await prisma.$executeRawUnsafe(`
+        UPDATE financeiro_historico
+        SET
+          aba = COALESCE(NULLIF(aba, ''), 'Contabilidade'),
+          acao = COALESCE(NULLIF(acao, ''), 'Registro ajustado'),
+          tipo_registro = COALESCE(NULLIF(tipo_registro, ''), 'LEGADO'),
+          criado_em = COALESCE(criado_em, NOW())
+      `);
+            await prisma.$executeRawUnsafe(`
+        ALTER TABLE financeiro_historico
+          ALTER COLUMN aba SET NOT NULL,
+          ALTER COLUMN acao SET NOT NULL,
+          ALTER COLUMN tipo_registro SET NOT NULL
+      `);
             const comandosIndices = [
                 `CREATE INDEX IF NOT EXISTS conta_bancaria_status_idx ON conta_bancaria(status, ativo)`,
                 `CREATE INDEX IF NOT EXISTS financeiro_categoria_tipo_idx ON financeiro_categoria(tipo, status, ativo)`,
@@ -1211,17 +1244,22 @@ export class ContabilidadeRepository {
                 origem: trimOrUndefined(input.origem ?? undefined) ?? "AJUSTE_MANUAL",
                 observacao: trimOrUndefined(input.observacao ?? undefined)
             });
-            await this.registrarHistorico(tx, {
-                aba: "Fluxo de caixa",
-                acao: "Movimentação criada",
-                tipoRegistro: "MOVIMENTACAO",
-                registroId: String(movimentacao.id),
-                valor: movimentacao.valor,
-                conta: movimentacao.conta_bancaria_nome,
-                observacao: "Movimentação manual registrada no fluxo de caixa.",
-                origem: movimentacao.origem,
-                ator
-            });
+            try {
+                await this.registrarHistorico(tx, {
+                    aba: "Fluxo de caixa",
+                    acao: "Movimentação criada",
+                    tipoRegistro: "MOVIMENTACAO",
+                    registroId: String(movimentacao.id),
+                    valor: movimentacao.valor,
+                    conta: movimentacao.conta_bancaria_nome,
+                    observacao: "Movimentação manual registrada no fluxo de caixa.",
+                    origem: movimentacao.origem,
+                    ator
+                });
+            }
+            catch (error) {
+                console.warn("[contabilidade] falha ao registrar histórico da movimentação criada:", error);
+            }
             return movimentacao;
         });
     }
@@ -1269,17 +1307,22 @@ export class ContabilidadeRepository {
         WHERE id = ${id}
       `);
             const movimentacao = await this.buscarMovimentacaoPorIdOuFalhar(id, tx);
-            await this.registrarHistorico(tx, {
-                aba: "Fluxo de caixa",
-                acao: "Movimentação atualizada",
-                tipoRegistro: "MOVIMENTACAO",
-                registroId: String(id),
-                valor: movimentacao.valor,
-                conta: movimentacao.conta_bancaria_nome,
-                observacao: "Movimentação manual atualizada.",
-                origem: movimentacao.origem,
-                ator
-            });
+            try {
+                await this.registrarHistorico(tx, {
+                    aba: "Fluxo de caixa",
+                    acao: "Movimentação atualizada",
+                    tipoRegistro: "MOVIMENTACAO",
+                    registroId: String(id),
+                    valor: movimentacao.valor,
+                    conta: movimentacao.conta_bancaria_nome,
+                    observacao: "Movimentação manual atualizada.",
+                    origem: movimentacao.origem,
+                    ator
+                });
+            }
+            catch (error) {
+                console.warn("[contabilidade] falha ao registrar histórico da movimentação atualizada:", error);
+            }
             return movimentacao;
         });
     }
@@ -1296,17 +1339,22 @@ export class ContabilidadeRepository {
         SET ativo = FALSE, atualizado_em = NOW()
         WHERE id = ${id}
       `);
-            await this.registrarHistorico(tx, {
-                aba: "Fluxo de caixa",
-                acao: "Movimentação cancelada",
-                tipoRegistro: "MOVIMENTACAO",
-                registroId: String(id),
-                valor: atual.valor,
-                conta: atual.conta_bancaria_nome,
-                observacao: "Movimentação manual cancelada.",
-                origem: atual.origem,
-                ator
-            });
+            try {
+                await this.registrarHistorico(tx, {
+                    aba: "Fluxo de caixa",
+                    acao: "Movimentação cancelada",
+                    tipoRegistro: "MOVIMENTACAO",
+                    registroId: String(id),
+                    valor: atual.valor,
+                    conta: atual.conta_bancaria_nome,
+                    observacao: "Movimentação manual cancelada.",
+                    origem: atual.origem,
+                    ator
+                });
+            }
+            catch (error) {
+                console.warn("[contabilidade] falha ao registrar histórico da movimentação cancelada:", error);
+            }
         });
     }
     async listarTransferencias() {
@@ -1977,6 +2025,7 @@ export class ContabilidadeRepository {
         return 0;
     }
     async registrarHistorico(tx, input) {
+        const usuarioIdValido = await this.resolverUsuarioIdHistorico(tx, input.ator?.usuarioId);
         await tx.$executeRaw(Prisma.sql `
       INSERT INTO financeiro_historico (
         aba,
@@ -2006,7 +2055,7 @@ export class ContabilidadeRepository {
         ${trimOrUndefined(input.statusNovo ?? undefined)},
         ${trimOrUndefined(input.observacao ?? undefined)},
         ${trimOrUndefined(input.origem ?? undefined)},
-        ${input.ator?.usuarioId ?? null},
+        ${usuarioIdValido},
         ${trimOrUndefined(input.ator?.nomeUsuario ?? undefined)},
         ${input.ator?.permissoes?.join(", ") ?? null},
         ${trimOrUndefined(input.ator?.ip ?? undefined)},
@@ -2014,5 +2063,17 @@ export class ContabilidadeRepository {
         NOW()
       )
     `);
+    }
+    async resolverUsuarioIdHistorico(tx, usuarioId) {
+        if (!usuarioId) {
+            return null;
+        }
+        const rows = await tx.$queryRaw(Prisma.sql `
+      SELECT id
+      FROM usuarios
+      WHERE id = ${usuarioId}
+      LIMIT 1
+    `);
+        return rows[0]?.id ?? null;
     }
 }

@@ -144,21 +144,26 @@ export class StorageService {
             throw new AppError("Esta categoria aceita apenas imagens.", 400);
         }
         if (processarImagem) {
-            principalBuffer = await sharp(input.buffer)
-                .rotate()
-                .resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true })
-                .toFormat(mimeType === "image/png" ? "png" : mimeType === "image/webp" ? "webp" : "jpeg", {
-                quality: 88
-            })
-                .toBuffer();
-            if (policy.generateThumbnail) {
-                thumbnailBuffer = await sharp(principalBuffer)
+            try {
+                principalBuffer = await sharp(input.buffer)
                     .rotate()
-                    .resize({ width: 480, height: 480, fit: "inside", withoutEnlargement: true })
+                    .resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true })
                     .toFormat(mimeType === "image/png" ? "png" : mimeType === "image/webp" ? "webp" : "jpeg", {
-                    quality: 82
+                    quality: 88
                 })
                     .toBuffer();
+                if (policy.generateThumbnail) {
+                    thumbnailBuffer = await sharp(principalBuffer)
+                        .rotate()
+                        .resize({ width: 480, height: 480, fit: "inside", withoutEnlargement: true })
+                        .toFormat(mimeType === "image/png" ? "png" : mimeType === "image/webp" ? "webp" : "jpeg", {
+                        quality: 82
+                    })
+                        .toBuffer();
+                }
+            }
+            catch {
+                throw new AppError("Nao foi possivel processar a imagem enviada. Gere uma nova captura ou envie o arquivo pela galeria.", 400);
             }
         }
         const data = new Date();

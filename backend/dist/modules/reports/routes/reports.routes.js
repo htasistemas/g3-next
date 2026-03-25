@@ -18,3 +18,4 @@ reportsRoutes.post("/matriculas/pre-matricula-lista-espera", asyncHandler(contro
 reportsRoutes.post("/registro-doacao/relacao", asyncHandler(controller.relacaoRegistroDoacao.bind(controller)));
 reportsRoutes.post("/doacoes-realizadas/relacao", asyncHandler(controller.relacaoDoacoesRealizadas.bind(controller)));
 reportsRoutes.post("/doacoes-realizadas/recibo", asyncHandler(controller.reciboDoacaoRealizada.bind(controller)));
+reportsRoutes.post("/registro-ponto/espelho", asyncHandler(controller.espelhoPonto.bind(controller)));

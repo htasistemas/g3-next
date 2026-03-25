@@ -96,6 +96,16 @@ export const storagePolicies = {
         imageOnly: true,
         generateThumbnail: true
     },
+    colaborador_face: {
+        entidadeTipo: "colaborador",
+        categoria: "face",
+        subdirectory: "colaboradores/fotos",
+        allowedExtensions: imageExtensions,
+        allowedMimeTypes: imageMimeTypes,
+        maxSizeBytes: 5 * 1024 * 1024,
+        imageOnly: true,
+        generateThumbnail: true
+    },
     colaborador_documento: {
         entidadeTipo: "colaborador",
         categoria: "documento",

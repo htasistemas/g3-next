@@ -40,8 +40,13 @@ export class LocalStorageProvider {
     async salvar(caminhoArquivo, conteudo) {
         await this.ensureReady();
         const absolutePath = this.resolveAbsolutePath(caminhoArquivo);
-        await mkdir(dirname(absolutePath), { recursive: true });
-        await writeFile(absolutePath, conteudo);
+        try {
+            await mkdir(dirname(absolutePath), { recursive: true });
+            await writeFile(absolutePath, conteudo);
+        }
+        catch (error) {
+            throw new AppError(`Nao foi possivel gravar o arquivo em storage. Verifique permissoes de escrita em ${this.rootPath}.`, 500);
+        }
         return absolutePath;
     }
     async remover(caminhoArquivo) {

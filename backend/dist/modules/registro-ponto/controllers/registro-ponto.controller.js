@@ -1,5 +1,7 @@
 import { RegistroPontoService } from "../services/registro-ponto.service.js";
+import { ReportsService } from "../../reports/services/reports.service.js";
 const service = new RegistroPontoService();
+const reportsService = new ReportsService();
 function obterIp(request) {
     const forwarded = request.headers["x-forwarded-for"];
     if (typeof forwarded === "string" && forwarded.trim()) {
@@ -47,6 +49,14 @@ export class RegistroPontoController {
         const alerta = await service.buscarAlertaPendencia(request.authUser ?? {});
         return response.json(alerta);
     }
+    async buscarFace(request, response) {
+        const face = await service.buscarFaceUsuario(request.authUser ?? {});
+        return response.json(face);
+    }
+    async salvarFace(request, response) {
+        const face = await service.salvarFaceUsuario(request.body, request.authUser ?? {});
+        return response.json(face);
+    }
     async marcarPonto(request, response) {
         const origem = obterOrigem(request);
         const registro = await service.marcarPonto(request.body, request.authUser ?? {}, origem);
@@ -65,5 +75,17 @@ export class RegistroPontoController {
     async buscarHistorico(request, response) {
         const historico = await service.buscarHistorico(request.params.id, request.authUser ?? {});
         return response.json(historico);
+    }
+    async gerarEspelhoPontoPdf(request, response) {
+        const payload = {
+            ...request.query,
+            ...request.body
+        };
+        const resultado = await reportsService.gerarEspelhoPonto(payload, request.authUser);
+        return response
+            .status(200)
+            .type("application/pdf")
+            .setHeader("Content-Disposition", `inline; filename=\"${resultado.filename}\"`)
+            .send(resultado.pdf);
     }
 }

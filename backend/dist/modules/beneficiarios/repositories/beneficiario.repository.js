@@ -2,6 +2,12 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../../database/prisma.js";
 import { AppError } from "../../../shared/errors/app-error.js";
 import { joinSemicolonList, normalizeDigits, toOptionalDate, trimOrUndefined } from "../../../utils/string-utils.js";
+function ehConteudoInlineArquivo(valor) {
+    const texto = trimOrUndefined(valor);
+    if (!texto)
+        return false;
+    return texto.startsWith("data:") || /^[a-z0-9+/=\r\n]+$/i.test(texto);
+}
 const beneficiarioContatoSelect = {
     telefonePrincipal: true,
     telefonePrincipalWhatsapp: true,
@@ -10,9 +16,7 @@ const beneficiarioContatoSelect = {
     telefoneRecadoNumero: true,
     email: true,
     permiteContatoTel: true,
-    permiteContatoWhatsapp: true,
     permiteContatoSms: true,
-    permiteContatoEmail: true,
     horarioPreferencial: true
 };
 const beneficiarioInclude = {
@@ -430,9 +434,7 @@ export class BeneficiarioRepository {
                 telefoneRecadoNumero: normalizeDigits(input.telefone_recado_numero),
                 email: trimOrUndefined(input.email),
                 permiteContatoTel: input.permite_contato_tel ?? true,
-                permiteContatoWhatsapp: input.permite_contato_whatsapp ?? true,
                 permiteContatoSms: input.permite_contato_sms ?? false,
-                permiteContatoEmail: input.permite_contato_email ?? false,
                 horarioPreferencial: trimOrUndefined(input.horario_preferencial_contato),
                 criadoEm: now,
                 atualizadoEm: now
@@ -507,7 +509,27 @@ export class BeneficiarioRepository {
         });
         const documentos = this.montarDocumentos(beneficiarioId, input, now);
         if (documentos.length) {
-            await tx.documento.createMany({ data: documentos });
+            try {
+                await tx.documento.createMany({ data: documentos });
+            }
+            catch (error) {
+                if (error instanceof AppError) {
+                    throw error;
+                }
+                if (error instanceof Prisma.PrismaClientKnownRequestError &&
+                    (error.code === "P2000" || error.code === "P2002" || error.code === "P2003")) {
+                    const motivo = error.code === "P2000"
+                        ? "Um dos campos do documento excede o tamanho permitido."
+                        : error.code === "P2002"
+                            ? "Ja existe um documento com dados que exigem valor unico."
+                            : "Existe uma referencia invalida entre beneficiario e documento.";
+                    throw new AppError(`Nao foi possivel salvar os documentos do beneficiario. ${motivo}`, 422);
+                }
+                if (error instanceof Error && error.message.trim()) {
+                    throw new AppError(`Nao foi possivel salvar os documentos do beneficiario. ${error.message.trim()}`, 422);
+                }
+                throw new AppError("Nao foi possivel salvar os documentos do beneficiario. Revise os anexos informados e tente novamente.", 500);
+            }
         }
     }
     montarDocumentos(beneficiarioId, input, now) {
@@ -562,18 +584,14 @@ export class BeneficiarioRepository {
             const contentType = trimOrUndefined(doc.contentType);
             const caminhoArquivoInformado = trimOrUndefined(doc.caminhoArquivo);
             const conteudoInformado = trimOrUndefined(doc.conteudo);
-            const caminhoArquivo = caminhoArquivoInformado ??
-                (conteudoInformado
-                    ? conteudoInformado.startsWith("data:")
-                        ? conteudoInformado
-                        : contentType
-                            ? `data:${contentType};base64,${conteudoInformado}`
-                            : conteudoInformado
-                    : undefined);
+            const caminhoArquivo = caminhoArquivoInformado;
             const nomeArquivo = trimOrUndefined(doc.nomeArquivo);
             const possuiConteudo = !!(numeroDocumento || nomeArquivo || caminhoArquivo || doc.ignorado);
             if (!nomeDocumento || !possuiConteudo) {
                 continue;
+            }
+            if (ehConteudoInlineArquivo(caminhoArquivoInformado) || ehConteudoInlineArquivo(conteudoInformado)) {
+                throw new AppError(`O documento ${nomeDocumento} nao foi processado corretamente. Anexe o arquivo novamente antes de salvar.`, 400);
             }
             documentos.push({
                 beneficiarioId,

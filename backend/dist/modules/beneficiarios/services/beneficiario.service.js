@@ -47,9 +47,37 @@ export class BeneficiarioService {
         const existente = await this.repository.buscarPorIdOuFalhar(id);
         const preparado = await this.prepararArquivosPayload(input, usuarioId, id);
         try {
-            const beneficiario = await this.repository.atualizar(id, preparado.input);
-            await this.vincularArquivos(preparado.novosCaminhos, id);
-            await this.limparArquivosSubstituidos(this.coletarCaminhosRegistro(existente), this.coletarCaminhosRegistro(beneficiario), usuarioId);
+            let beneficiario;
+            try {
+                beneficiario = await this.repository.atualizar(id, preparado.input);
+            }
+            catch (error) {
+                if (error instanceof AppError) {
+                    throw error;
+                }
+                const motivo = error instanceof Error && error.message.trim()
+                    ? error.message.trim()
+                    : "falha inesperada ao atualizar os dados do beneficiario";
+                throw new AppError(`Nao foi possivel atualizar o beneficiario. ${motivo}.`, 500);
+            }
+            try {
+                await this.vincularArquivos(preparado.novosCaminhos, id);
+            }
+            catch (error) {
+                if (error instanceof AppError) {
+                    throw error;
+                }
+                const motivo = error instanceof Error && error.message.trim()
+                    ? error.message.trim()
+                    : "falha inesperada ao vincular os arquivos do beneficiario";
+                throw new AppError(`Nao foi possivel vincular os arquivos do beneficiario. ${motivo}.`, 500);
+            }
+            try {
+                await this.limparArquivosSubstituidos(this.coletarCaminhosRegistro(existente), this.coletarCaminhosRegistro(beneficiario), usuarioId);
+            }
+            catch (error) {
+                console.warn("[beneficiario] falha ao limpar arquivos substituidos apos atualizar cadastro:", error);
+            }
             return mapBeneficiarioToResponse(beneficiario);
         }
         catch (error) {
@@ -107,29 +135,50 @@ export class BeneficiarioService {
     }
     async prepararArquivosPayload(input, usuarioId, entidadeId) {
         const novosCaminhos = [];
-        const foto = await storageService.persistirCampo({
-            scope: "beneficiario_foto",
-            valor: input.foto_3x4,
-            nomeOriginal: `beneficiario-${input.codigo ?? "sem-codigo"}-foto.jpg`,
-            mimeType: "image/jpeg",
-            entidadeId,
-            usuarioUploadId: usuarioId,
-            observacao: "Foto 3x4 do beneficiario"
-        });
+        let foto;
+        try {
+            foto = await storageService.persistirCampo({
+                scope: "beneficiario_foto",
+                valor: input.foto_3x4,
+                nomeOriginal: `beneficiario-${input.codigo ?? "sem-codigo"}-foto.jpg`,
+                mimeType: "image/jpeg",
+                entidadeId,
+                usuarioUploadId: usuarioId,
+                observacao: "Foto 3x4 do beneficiario"
+            });
+        }
+        catch (error) {
+            if (error instanceof AppError) {
+                throw new AppError(`Nao foi possivel processar a foto 3x4: ${error.message}`, error.statusCode);
+            }
+            throw new AppError("Nao foi possivel processar a foto 3x4 do beneficiario.", 422);
+        }
         if (foto.registro && foto.caminhoArquivo) {
             novosCaminhos.push(foto.caminhoArquivo);
         }
         const documentosObrigatorios = await Promise.all((input.documentos_obrigatorios ?? []).map(async (documento) => {
-            const arquivo = await storageService.persistirCampo({
-                scope: "beneficiario_documento",
-                valor: documento.caminhoArquivo ?? documento.conteudo,
-                nomeOriginal: documento.nomeArquivo ??
-                    `${documento.nome?.replace(/\s+/g, "-").toLowerCase() || "documento"}.pdf`,
-                mimeType: documento.contentType,
-                entidadeId,
-                usuarioUploadId: usuarioId,
-                observacao: documento.nome
-            });
+            let arquivo;
+            try {
+                arquivo = await storageService.persistirCampo({
+                    scope: "beneficiario_documento",
+                    valor: documento.caminhoArquivo ?? documento.conteudo,
+                    nomeOriginal: documento.nomeArquivo ??
+                        `${documento.nome?.replace(/\s+/g, "-").toLowerCase() || "documento"}.pdf`,
+                    mimeType: documento.contentType,
+                    entidadeId,
+                    usuarioUploadId: usuarioId,
+                    observacao: documento.nome
+                });
+            }
+            catch (error) {
+                if (error instanceof AppError) {
+                    throw new AppError(`Nao foi possivel processar o documento ${documento.nome}: ${error.message}`, error.statusCode);
+                }
+                const motivo = error instanceof Error && error.message.trim()
+                    ? error.message.trim()
+                    : "erro desconhecido no processamento do arquivo";
+                throw new AppError(`Nao foi possivel processar o documento ${documento.nome}: ${motivo}.`, 422);
+            }
             if (arquivo.registro && arquivo.caminhoArquivo) {
                 novosCaminhos.push(arquivo.caminhoArquivo);
             }

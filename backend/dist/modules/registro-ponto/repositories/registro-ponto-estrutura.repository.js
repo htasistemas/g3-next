@@ -3,6 +3,9 @@ const sqlEstruturaRegistroPonto = [
     "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS horario_saida_1 TIME",
     "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS horario_entrada_2 TIME",
     "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS horario_saida_2 TIME",
+    "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS face_hash VARCHAR(255)",
+    "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS face_foto_url TEXT",
+    "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS face_cadastrada_em TIMESTAMP",
     `
   CREATE TABLE IF NOT EXISTS registro_ponto (
     id BIGSERIAL PRIMARY KEY,
