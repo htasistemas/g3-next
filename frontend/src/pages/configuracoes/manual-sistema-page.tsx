@@ -76,7 +76,8 @@ const secoesManual: ManualSecao[] = [
           "Em produção, o envio de documentos depende de permissão de escrita na pasta de storage do servidor e do vínculo válido do usuário autenticado.",
           "Capturas de documentos pela webcam passam por compressão antes do salvamento e exibem mensagem detalhada quando a imagem não puder ser processada.",
           "Ao salvar o cadastro, anexos que não tiverem sido processados corretamente retornam mensagem orientando novo envio, em vez de erro interno genérico.",
-          "Falhas na limpeza de arquivos antigos do storage não devem mais derrubar a atualização do cadastro em produção."
+          "Falhas na limpeza de arquivos antigos do storage não devem mais derrubar a atualização do cadastro em produção.",
+          "A compatibilidade com a base legada de produção foi mantida ignorando no ORM campos de comunicação que ainda não existem em contato_beneficiario."
         ]
       }
     ]
@@ -258,7 +259,8 @@ const secoesManual: ManualSecao[] = [
         ],
         atencoes: [
           "Falhas de storage antigo não devem mais derrubar a atualização do profissional em produção.",
-          "Mensagens de erro do cadastro devem priorizar o motivo real da foto ou da gravação, sem cair em erro interno genérico quando houver tratamento possível."
+          "Mensagens de erro do cadastro devem priorizar o motivo real da foto ou da gravação, sem cair em erro interno genérico quando houver tratamento possível.",
+          "A compatibilidade com bases de produção legadas foi mantida removendo do ORM campos ainda não existentes na tabela cadastro_profissionais."
         ]
       }
     ]

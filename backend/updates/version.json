@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.315",
+  "latestVersion": "1.00.317",
   "releaseDate": "2026-03-25",
-  "description": "Cadastro de profissionais ajustado para não cair em erro interno genérico por foto e cleanup em produção.",
+  "description": "Cadastro de beneficiário compatibilizado com a base legada sem colunas novas em contato_beneficiario.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.315",
+  "minCompatibleVersion": "1.00.317",
   "releaseType": "stable"
 }
 

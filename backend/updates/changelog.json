@@ -1,6 +1,32 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.317",
+                        "releaseDate":  "2026-03-25",
+                        "title":  "Beneficiário compatível com base legada de produção",
+                        "description":  "O cadastro de beneficiário foi compatibilizado com a tabela contato_beneficiario da produção, removendo do ORM colunas de comunicação que ainda não existem nessa base.",
+                        "changes":  [
+                                        "Campos de comunicação não existentes em contato_beneficiario removidos do model Prisma usado pelo módulo.",
+                                        "Criação e atualização do contato do beneficiário deixaram de depender de permite_contato_whatsapp, permite_contato_email e campos correlatos na produção.",
+                                        "Resposta do backend mantida compatível com o frontend, devolvendo os campos legados como indefinidos até a migração oficial da base.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.316",
+                        "releaseDate":  "2026-03-25",
+                        "title":  "Profissionais compatível com base legada de produção",
+                        "description":  "O cadastro de profissionais foi compatibilizado com a tabela cadastro_profissionais da produção, removendo do ORM colunas de comunicação que ainda não existem nessa base.",
+                        "changes":  [
+                                        "Colunas de comunicação não utilizadas removidas do model Prisma de CadastroProfissional.",
+                                        "CRUD de profissionais voltou a operar sem depender de permite_contato_whatsapp e campos correlatos na produção.",
+                                        "Compatibilidade preservada com a base legada até a migração estrutural oficial dessas colunas.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.315",
                         "releaseDate":  "2026-03-25",
                         "title":  "Cadastro de profissionais mais resiliente em produção",

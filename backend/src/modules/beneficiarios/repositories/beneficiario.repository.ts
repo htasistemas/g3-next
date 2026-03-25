@@ -27,9 +27,7 @@ const beneficiarioContatoSelect = {
   telefoneRecadoNumero: true,
   email: true,
   permiteContatoTel: true,
-  permiteContatoWhatsapp: true,
   permiteContatoSms: true,
-  permiteContatoEmail: true,
   horarioPreferencial: true
 } satisfies Prisma.ContatoBeneficiarioSelect;
 
@@ -523,9 +521,7 @@ export class BeneficiarioRepository {
         telefoneRecadoNumero: normalizeDigits(input.telefone_recado_numero),
         email: trimOrUndefined(input.email),
         permiteContatoTel: input.permite_contato_tel ?? true,
-        permiteContatoWhatsapp: input.permite_contato_whatsapp ?? true,
         permiteContatoSms: input.permite_contato_sms ?? false,
-        permiteContatoEmail: input.permite_contato_email ?? false,
         horarioPreferencial: trimOrUndefined(input.horario_preferencial_contato),
         criadoEm: now,
         atualizadoEm: now
