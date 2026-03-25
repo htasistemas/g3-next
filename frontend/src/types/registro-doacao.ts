@@ -35,6 +35,7 @@ export type RegistroDoacao = {
   id_registro_doacao?: string;
   doador_id?: string;
   doador_nome?: string;
+  numero_recibo?: string;
   tipo_doacao: string;
   descricao?: string;
   quantidade_itens?: number;

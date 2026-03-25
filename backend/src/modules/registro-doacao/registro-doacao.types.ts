@@ -30,6 +30,7 @@ export type RegistroDoacaoItemInput = {
 export type RegistroDoacaoInput = {
   doador_id?: number;
   conta_recebimento_id?: number;
+  numero_recibo?: string;
   tipo_doacao: string;
   descricao?: string;
   quantidade_itens?: number;

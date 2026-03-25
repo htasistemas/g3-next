@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.320",
+  "latestVersion": "1.00.324",
   "releaseDate": "2026-03-25",
-  "description": "Fluxo de caixa reforçado para salvar movimentações em produção sem cair em erro interno genérico.",
+  "description": "Recebimento de doações ajustado para concluir o registro pela aba Itens recebidos com o mesmo fluxo de salvamento da tela.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.320",
+  "minCompatibleVersion": "1.00.324",
   "releaseType": "stable",
   "downloadUrl": null
 }

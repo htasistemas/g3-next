@@ -37,6 +37,11 @@
 - Usar sentence case em labels, títulos, abas, botões e mensagens.
 - Usar maiúsculas apenas para siglas (CPF, CNPJ, LGPD, CEP, UF).
 
+### Listagens
+
+- MUST usar como modelo base a tela `Cadastro de beneficiários > aba Listagem de beneficiários` sempre que criar ou alterar uma aba de listagem no sistema.
+- MUST manter nas abas de listagem a mesma lógica visual e estrutural de referência: filtros no topo, botão de limpar filtros, tabela com rolagem, linhas clicáveis, destaque visual do item selecionado e estados claros de carregamento e vazio.
+
 ### Banco de Dados
 
 - Antes de alterar estrutura: analisar impacto e registrar diagnóstico.

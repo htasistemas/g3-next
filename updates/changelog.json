@@ -1,6 +1,57 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.324",
+                        "releaseDate":  "2026-03-25",
+                        "title":  "Recebimento de doações com ação final funcional na aba de itens",
+                        "description":  "A aba Itens recebidos passou a executar o mesmo fluxo de salvamento principal da tela ao concluir o registro da doação e a entrada.",
+                        "changes":  [
+                                        "Botão Incluir doação e registrar entrada ajustado para usar o submit oficial do formulário.",
+                                        "Conclusão do recebimento pela aba Itens recebidos agora reaproveita a mesma validação e persistência do botão Salvar da tela.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.323",
+                        "releaseDate":  "2026-03-25",
+                        "title":  "Relatório de doações realizadas no padrão do G3N",
+                        "description":  "A impressão da relação de doações realizadas foi ajustada para seguir o padrão visual do sistema e corrigir o encaixe da coluna Quantidade no PDF.",
+                        "changes":  [
+                                        "Título, descrição e colunas do relatório de doações realizadas ajustados para pt-BR e padrão visual do G3N.",
+                                        "Coluna Quantidade ampliada para não quebrar nem estourar na impressão.",
+                                        "Template padrão de relatórios ajustado para melhor quebra e ocupação das colunas em tabelas fixas.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.322",
+                        "releaseDate":  "2026-03-25",
+                        "title":  "Doações com ação final na aba de itens e famílias com listagem padronizada",
+                        "description":  "A aba Itens recebidos passou a ter a ação final de registrar a doação, e a aba Listagem de famílias foi ajustada para seguir o padrão da listagem de beneficiários.",
+                        "changes":  [
+                                        "Botão Incluir doação e registrar entrada adicionado na aba Itens recebidos do recebimento de doações.",
+                                        "Aba Listagem de famílias refeita no padrão visual da aba Listagem de beneficiários, com filtros, limpeza e tabela clicável.",
+                                        "Regra oficial adicionada ao AGENTS.md determinando que novas abas de listagem usem como referência a listagem de beneficiários.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.321",
+                        "releaseDate":  "2026-03-25",
+                        "title":  "Número do recibo no recebimento de doações",
+                        "description":  "A aba Dados da doação passou a aceitar o preenchimento do número do recibo no registro de recebimento de doações.",
+                        "changes":  [
+                                        "Campo Número do recibo incluído na aba Dados da doação.",
+                                        "Frontend e backend ajustados para salvar e retornar o número do recibo no cadastro.",
+                                        "Compatibilidade com a base existente garantida com criação da coluna numero_recibo quando necessário.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.320",
                         "releaseDate":  "2026-03-25",
                         "title":  "Fluxo de caixa mais resiliente em produção",

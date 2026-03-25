@@ -2,13 +2,26 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../../database/prisma.js";
 import { AppError } from "../../../shared/errors/app-error.js";
 import { normalizeDigits, toOptionalDate, trimOrUndefined } from "../../../utils/string-utils.js";
+let estruturaPromise = null;
 function toOptionalNumber(value) {
     if (value === null || value === undefined)
         return null;
     return Number.isFinite(value) ? value : null;
 }
+async function ensureRegistroDoacaoEstrutura() {
+    if (!estruturaPromise) {
+        estruturaPromise = prisma
+            .$executeRawUnsafe(`
+        ALTER TABLE recebimento_doacao
+          ADD COLUMN IF NOT EXISTS numero_recibo VARCHAR(80)
+      `)
+            .then(() => undefined);
+    }
+    await estruturaPromise;
+}
 export class RegistroDoacaoRepository {
     async listar(filters) {
+        await ensureRegistroDoacaoEstrutura();
         const where = [];
         const doadorNome = trimOrUndefined(filters.doador_nome);
         if (doadorNome) {
@@ -40,6 +53,7 @@ export class RegistroDoacaoRepository {
         r.id,
         r.doador_id,
         d.nome AS doador_nome,
+        r.numero_recibo,
         r.tipo_doacao,
         r.descricao,
         r.quantidade_itens,
@@ -66,11 +80,13 @@ export class RegistroDoacaoRepository {
     `);
     }
     async buscarPorId(id) {
+        await ensureRegistroDoacaoEstrutura();
         const registros = await prisma.$queryRaw(Prisma.sql `
       SELECT
         r.id,
         r.doador_id,
         d.nome AS doador_nome,
+        r.numero_recibo,
         r.tipo_doacao,
         r.descricao,
         r.quantidade_itens,
@@ -124,10 +140,12 @@ export class RegistroDoacaoRepository {
         return item;
     }
     async criar(input) {
+        await ensureRegistroDoacaoEstrutura();
         const registroId = await prisma.$transaction(async (tx) => {
             const inserted = await tx.$queryRaw(Prisma.sql `
         INSERT INTO recebimento_doacao (
           doador_id,
+          numero_recibo,
           tipo_doacao,
           descricao,
           quantidade_itens,
@@ -146,6 +164,7 @@ export class RegistroDoacaoRepository {
           atualizado_em
         ) VALUES (
           ${input.doador_id ? BigInt(input.doador_id) : null},
+          ${trimOrUndefined(input.numero_recibo)},
           ${input.tipo_doacao},
           ${trimOrUndefined(input.descricao)},
           ${input.quantidade_itens ?? null},
@@ -175,12 +194,14 @@ export class RegistroDoacaoRepository {
         return this.buscarPorIdOuFalhar(registroId);
     }
     async atualizar(id, input) {
+        await ensureRegistroDoacaoEstrutura();
         await this.buscarPorIdOuFalhar(id);
         await prisma.$transaction(async (tx) => {
             await tx.$executeRaw(Prisma.sql `
         UPDATE recebimento_doacao
         SET
           doador_id = ${input.doador_id ? BigInt(input.doador_id) : null},
+          numero_recibo = ${trimOrUndefined(input.numero_recibo)},
           tipo_doacao = ${input.tipo_doacao},
           descricao = ${trimOrUndefined(input.descricao)},
           quantidade_itens = ${input.quantidade_itens ?? null},

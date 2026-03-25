@@ -98,7 +98,8 @@ const secoesManual: ManualSecao[] = [
         ],
         atencoes: [
           "Não marque outro responsável se já existir um responsável ativo.",
-          "Membros configurados para usar o endereço da família herdam o endereço principal do núcleo."
+          "Membros configurados para usar o endereço da família herdam o endereço principal do núcleo.",
+          "A aba Listagem de famílias segue o mesmo padrão visual e estrutural da aba Listagem de beneficiários, com filtros no topo, limpeza rápida e tabela clicável."
         ]
       }
     ]
@@ -222,9 +223,9 @@ const secoesManual: ManualSecao[] = [
         nome: "Recebimento de doações",
         objetivo: "Registrar doações recebidas com doador vinculado, classificação oficial por tipo e organização separada entre dados do registro e itens recebidos.",
         comoUsar: [
-          "Na aba Dados da doação, selecione o doador, informe tipo, status e data de recebimento. Ao escolher o tipo, o sistema mostra ao lado o destino de entrada da doação, como Contabilidade, Almoxarifado ou Patrimônio.",
+          "Na aba Dados da doação, selecione o doador, informe número do recibo, tipo, status e data de recebimento. Ao escolher o tipo, o sistema mostra ao lado o destino de entrada da doação, como Contabilidade, Almoxarifado ou Patrimônio.",
           "Use apenas os tipos Doação financeira, Doação de bens de consumo e Doação de bens permanentes.",
-          "Na aba Dados da doação ficam apenas as informações principais do registro: doador, tipo, status, data de recebimento e observações.",
+          "Na aba Dados da doação ficam apenas as informações principais do registro: doador, número do recibo, tipo, status, data de recebimento e observações.",
           "Depois de registrar os dados principais, use a aba Itens recebidos, agora na posição 4, para lançar os produtos, quantidade, valor unitário e valor total da doação.",
           "Na aba Cadastro do doador, os campos visíveis seguem o padrão da migração: digitação livre, normalização visual ao sair do campo e normalização final antes do salvamento.",
           "Quando a doação financeira for recorrente, marque Doação recorrente e selecione a periodicidade entre única, diário, semanal, mensal ou anual.",
@@ -236,7 +237,21 @@ const secoesManual: ManualSecao[] = [
           "Os itens devem ser mantidos apenas na aba Itens recebidos para evitar duplicidade de informação.",
           "Na aba Itens recebidos, o sistema calcula automaticamente o valor total pela quantidade multiplicada pelo valor unitário.",
           "Ao salvar a doação, o sistema consolida os itens lançados para preencher a quantidade total e os valores do registro automaticamente.",
-          "Os campos monetários dos itens exibem máscara brasileira e o sistema grava o valor numérico sem formatação visual."
+          "Os campos monetários dos itens exibem máscara brasileira e o sistema grava o valor numérico sem formatação visual.",
+          "Na aba Itens recebidos existe a ação final de incluir a doação e registrar a entrada logo após a conferência dos itens lançados, usando o mesmo fluxo de salvar da tela."
+        ]
+      },
+      {
+        nome: "Doações realizadas",
+        objetivo: "Consultar o histórico de entregas e imprimir relatórios e recibos das doações realizadas a beneficiários e famílias.",
+        comoUsar: [
+          "Use a aba Histórico de doações para localizar as entregas já registradas e imprimir a relação completa pelo ícone da impressora da tela.",
+          "Quando precisar do comprovante individual, use o ícone da impressora na própria linha da doação para gerar o recibo da entrega.",
+          "A impressão da relação segue o padrão visual do G3N, com colunas ajustadas para leitura e melhor aproveitamento da página."
+        ],
+        atencoes: [
+          "No relatório da relação, a coluna Quantidade foi ajustada para caber corretamente sem quebrar o conteúdo na impressão.",
+          "Os títulos e descrições do PDF seguem o padrão pt-BR e a apresentação visual oficial do sistema."
         ]
       },
       {

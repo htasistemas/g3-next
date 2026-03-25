@@ -342,6 +342,7 @@ export class RelatorioTemplatePadrao {
               border-collapse: collapse;
               margin-top: 6px;
               font-size: 10px;
+              table-layout: fixed;
             }
             thead { display: table-header-group; }
             tfoot { display: table-footer-group; }
@@ -350,6 +351,8 @@ export class RelatorioTemplatePadrao {
               padding: 6px 7px;
               text-align: left;
               vertical-align: top;
+              overflow-wrap: anywhere;
+              word-break: break-word;
             }
             tr {
               page-break-inside: avoid;

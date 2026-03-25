@@ -850,17 +850,17 @@ export class ReportsService {
         });
         const contexto = await this.montarContextoInstitucional();
         const relatorioInput = {
-            titulo: "Relacao de Doacoes Realizadas",
+            titulo: "Relação de doações realizadas",
             metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),
-            descricao: "Relacao de doacoes entregues a beneficiarios e familias.",
+            descricao: "Relatório de doações entregues a beneficiários e famílias, no padrão visual do G3N.",
             tabela: {
                 colunas: [
                     { titulo: "Data", largura: "12%" },
-                    { titulo: "Beneficiario/Familia", largura: "28%" },
-                    { titulo: "Tipo", largura: "16%" },
-                    { titulo: "Situacao", largura: "12%" },
-                    { titulo: "Responsavel", largura: "22%" },
-                    { titulo: "Itens", largura: "10%" }
+                    { titulo: "Beneficiário / família", largura: "27%" },
+                    { titulo: "Tipo", largura: "15%" },
+                    { titulo: "Situação", largura: "12%" },
+                    { titulo: "Responsável", largura: "18%" },
+                    { titulo: "Quantidade", largura: "16%" }
                 ],
                 linhas: listaOrdenada.map((item) => [
                     this.formatarData(item.data_doacao),

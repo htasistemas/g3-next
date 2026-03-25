@@ -236,6 +236,7 @@ export function RegistroDoacaoPage() {
       ...detalheData.registro,
       id_registro_doacao: detalheData.registro.id_registro_doacao,
       doador_id: detalheData.registro.doador_id ?? "",
+      numero_recibo: detalheData.registro.numero_recibo ?? "",
       descricao: detalheData.registro.descricao ?? "",
       forma_recebimento: detalheData.registro.forma_recebimento ?? "",
       periodicidade: detalheData.registro.periodicidade ?? "",
@@ -571,6 +572,7 @@ export function RegistroDoacaoPage() {
       const payload: RegistroDoacao = {
         ...values,
         doador_id: values.doador_id || undefined,
+        numero_recibo: values.numero_recibo || undefined,
         quantidade_itens: quantidadeItensCalculada,
         valor_medio: valorMedioCalculado,
         valor_total: valorTotalCalculado,
@@ -584,6 +586,7 @@ export function RegistroDoacaoPage() {
         ...response.registro,
         id_registro_doacao: response.registro.id_registro_doacao,
         doador_id: response.registro.doador_id ?? "",
+        numero_recibo: response.registro.numero_recibo ?? "",
         descricao: response.registro.descricao ?? "",
         forma_recebimento: response.registro.forma_recebimento ?? "",
         periodicidade: response.registro.periodicidade ?? "",
@@ -868,6 +871,7 @@ export function RegistroDoacaoPage() {
                   </div>
 
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <div className="space-y-1"><Label>Número do recibo</Label><Input {...register("numero_recibo")} onBlur={() => aplicarFormatacaoRegistro("numero_recibo")} maxLength={80} /></div>
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <Label>Tipo de doação *</Label>
@@ -984,6 +988,15 @@ export function RegistroDoacaoPage() {
                         )) : <tr><td className="px-3 py-4 text-center" colSpan={5}>Nenhum item adicionado.</td></tr>}
                       </tbody>
                     </table>
+                  </div>
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      onClick={() => void handleSubmit(salvarRegistro)()}
+                      disabled={acaoEmAndamento}
+                    >
+                      {salvarMutation.isPending ? "Registrando..." : "Incluir doação e registrar entrada"}
+                    </Button>
                   </div>
                 </div>
               )}

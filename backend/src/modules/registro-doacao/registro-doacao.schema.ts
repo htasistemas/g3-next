@@ -74,6 +74,7 @@ export const registroDoacaoItemInputSchema = z.object({
 export const registroDoacaoInputSchema = z.object({
   doador_id: optionalInteger,
   conta_recebimento_id: optionalInteger,
+  numero_recibo: optionalTrimmedString,
   tipo_doacao: z.string().trim().min(2, "Informe o tipo de doacao."),
   descricao: optionalTrimmedString,
   quantidade_itens: optionalInteger,

@@ -48,6 +48,7 @@ export function mapRegistroDoacaoToResponse(row, itens) {
         id_registro_doacao: toStringId(row.id),
         doador_id: row.doador_id ? toStringId(row.doador_id) : undefined,
         doador_nome: row.doador_nome ?? undefined,
+        numero_recibo: row.numero_recibo ?? undefined,
         tipo_doacao: row.tipo_doacao,
         descricao: row.descricao ?? undefined,
         quantidade_itens: row.quantidade_itens ?? undefined,

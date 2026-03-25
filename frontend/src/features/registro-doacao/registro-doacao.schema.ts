@@ -29,6 +29,7 @@ export const registroDoacaoItemSchema = z.object({
 export const registroDoacaoFormSchema = z.object({
   id_registro_doacao: z.string().optional(),
   doador_id: optionalTrimmedString,
+  numero_recibo: optionalTrimmedString,
   tipo_doacao: z.string().trim().min(2, "Informe o tipo de doação."),
   descricao: optionalTrimmedString,
   quantidade_itens: z.preprocess((value) => (value === "" ? undefined : Number(value)), z.number().int().nonnegative().optional()),
@@ -48,6 +49,7 @@ export type RegistroDoacaoFormInput = z.input<typeof registroDoacaoFormSchema>;
 export type RegistroDoacaoFormValues = z.infer<typeof registroDoacaoFormSchema>;
 
 export const registroDoacaoDefaultValues: RegistroDoacaoFormValues = {
+  numero_recibo: "",
   tipo_doacao: "",
   descricao: "",
   quantidade_itens: undefined,
