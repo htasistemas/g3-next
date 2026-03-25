@@ -44,10 +44,39 @@ export class ProfissionalService {
     const foto = await this.prepararFoto(input.foto_3x4, input.nome_completo, usuarioId);
 
     try {
-      const profissional = await this.repository.criar({ ...input, foto_3x4: foto.caminhoArquivo });
-      if (foto.novoCaminho) {
-        await storageService.vincularEntidade(foto.novoCaminho, profissional.id);
+      let profissional;
+      try {
+        profissional = await this.repository.criar({ ...input, foto_3x4: foto.caminhoArquivo });
+      } catch (error) {
+        if (error instanceof AppError) {
+          throw error;
+        }
+
+        const motivo =
+          error instanceof Error && error.message.trim()
+            ? error.message.trim()
+            : "falha inesperada ao criar o cadastro do profissional";
+
+        throw new AppError(`Nao foi possivel salvar o profissional. ${motivo}.`, 500);
       }
+
+      if (foto.novoCaminho) {
+        try {
+          await storageService.vincularEntidade(foto.novoCaminho, profissional.id);
+        } catch (error) {
+          if (error instanceof AppError) {
+            throw error;
+          }
+
+          const motivo =
+            error instanceof Error && error.message.trim()
+              ? error.message.trim()
+              : "falha inesperada ao vincular a foto do profissional";
+
+          throw new AppError(`Nao foi possivel vincular a foto do profissional. ${motivo}.`, 500);
+        }
+      }
+
       return mapProfissionalToResponse(profissional);
     } catch (error) {
       await storageService.rollbackArquivos([foto.novoCaminho]);
@@ -64,15 +93,48 @@ export class ProfissionalService {
     const foto = await this.prepararFoto(input.foto_3x4, input.nome_completo, usuarioId, id);
 
     try {
-      const profissional = await this.repository.atualizar(id, { ...input, foto_3x4: foto.caminhoArquivo });
-      if (foto.novoCaminho) {
-        await storageService.vincularEntidade(foto.novoCaminho, id);
+      let profissional;
+      try {
+        profissional = await this.repository.atualizar(id, { ...input, foto_3x4: foto.caminhoArquivo });
+      } catch (error) {
+        if (error instanceof AppError) {
+          throw error;
+        }
+
+        const motivo =
+          error instanceof Error && error.message.trim()
+            ? error.message.trim()
+            : "falha inesperada ao atualizar o cadastro do profissional";
+
+        throw new AppError(`Nao foi possivel atualizar o profissional. ${motivo}.`, 500);
       }
+
+      if (foto.novoCaminho) {
+        try {
+          await storageService.vincularEntidade(foto.novoCaminho, id);
+        } catch (error) {
+          if (error instanceof AppError) {
+            throw error;
+          }
+
+          const motivo =
+            error instanceof Error && error.message.trim()
+              ? error.message.trim()
+              : "falha inesperada ao vincular a foto do profissional";
+
+          throw new AppError(`Nao foi possivel vincular a foto do profissional. ${motivo}.`, 500);
+        }
+      }
+
       if (
         this.isManagedStoragePath(existente.foto3x4) &&
         existente.foto3x4 !== profissional.foto3x4
       ) {
-        await storageService.desativarPorCaminho(existente.foto3x4, usuarioId);
+        try {
+          await storageService.desativarPorCaminho(existente.foto3x4, usuarioId);
+        } catch (error) {
+          console.warn("[profissional] falha ao limpar foto antiga apos atualizar cadastro:", error);
+        }
       }
       return mapProfissionalToResponse(profissional);
     } catch (error) {
@@ -116,15 +178,29 @@ export class ProfissionalService {
     usuarioId?: bigint,
     entidadeId?: bigint
   ) {
-    const arquivo = await storageService.persistirCampo({
-      scope: "colaborador_foto",
-      valor,
-      nomeOriginal: `${nomeCompleto?.replace(/\s+/g, "-").toLowerCase() || "colaborador"}-foto.jpg`,
-      mimeType: "image/jpeg",
-      entidadeId,
-      usuarioUploadId: usuarioId,
-      observacao: "Foto de colaborador"
-    });
+    let arquivo;
+    try {
+      arquivo = await storageService.persistirCampo({
+        scope: "colaborador_foto",
+        valor,
+        nomeOriginal: `${nomeCompleto?.replace(/\s+/g, "-").toLowerCase() || "colaborador"}-foto.jpg`,
+        mimeType: "image/jpeg",
+        entidadeId,
+        usuarioUploadId: usuarioId,
+        observacao: "Foto de colaborador"
+      });
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw new AppError(`Nao foi possivel processar a foto do profissional: ${error.message}`, error.statusCode);
+      }
+
+      const motivo =
+        error instanceof Error && error.message.trim()
+          ? error.message.trim()
+          : "erro desconhecido no processamento da foto";
+
+      throw new AppError(`Nao foi possivel processar a foto do profissional: ${motivo}.`, 422);
+    }
 
     return {
       caminhoArquivo: arquivo.caminhoArquivo,

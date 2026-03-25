@@ -247,6 +247,19 @@ const secoesManual: ManualSecao[] = [
           "A tela não deve mais exibir apenas erro interno do servidor nesse fluxo de documentos quando houver um motivo tratável.",
           "Mensagens de validação e persistência agora priorizam o motivo operacional real do erro."
         ]
+      },
+      {
+        nome: "Cadastro de profissionais",
+        objetivo: "Cadastrar e atualizar profissionais com dados pessoais, endereço, perfil profissional, agenda e foto do colaborador.",
+        comoUsar: [
+          "Use a foto 3x4 do profissional apenas em formatos aceitos pelo sistema e finalize o salvamento após revisar os dados principais.",
+          "Quando houver falha no processamento ou na vinculação da foto, a tela deve exibir o motivo operacional real retornado pelo backend.",
+          "Em produção, após trocar a foto do profissional, o sistema mantém o cadastro mesmo se a limpeza do arquivo antigo falhar no storage."
+        ],
+        atencoes: [
+          "Falhas de storage antigo não devem mais derrubar a atualização do profissional em produção.",
+          "Mensagens de erro do cadastro devem priorizar o motivo real da foto ou da gravação, sem cair em erro interno genérico quando houver tratamento possível."
+        ]
       }
     ]
   },

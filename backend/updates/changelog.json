@@ -1,6 +1,19 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.315",
+                        "releaseDate":  "2026-03-25",
+                        "title":  "Cadastro de profissionais mais resiliente em produção",
+                        "description":  "O cadastro de profissionais foi reforçado para não cair em erro interno genérico ao processar, vincular ou limpar foto antiga no storage.",
+                        "changes":  [
+                                        "Processamento da foto do profissional com mensagem operacional real quando houver falha.",
+                                        "Criação e atualização do profissional com tratamento específico para gravação e vinculação da foto.",
+                                        "Falha na limpeza da foto antiga deixou de derrubar a atualização do cadastro em produção.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.314",
                         "releaseDate":  "2026-03-25",
                         "title":  "Atualização de beneficiário mais resiliente em produção",

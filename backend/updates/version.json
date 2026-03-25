@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.314",
+  "latestVersion": "1.00.315",
   "releaseDate": "2026-03-25",
-  "description": "Atualização de beneficiário blindada para não falhar por limpeza de arquivos antigos no storage.",
+  "description": "Cadastro de profissionais ajustado para não cair em erro interno genérico por foto e cleanup em produção.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.314",
+  "minCompatibleVersion": "1.00.315",
   "releaseType": "stable"
 }
 
