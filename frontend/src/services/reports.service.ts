@@ -104,5 +104,12 @@ export const reportsService = {
       responseType: "blob"
     });
     return data as Blob;
+  },
+
+  async gerarEspelhoPonto(payload: Record<string, unknown>) {
+    const { data } = await httpClient.post("/api/reports/registro-ponto/espelho", payload, {
+      responseType: "blob"
+    });
+    return data as Blob;
   }
 };

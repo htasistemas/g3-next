@@ -259,7 +259,6 @@ export const mapaCamposTextoBancoEmpregosForm: Record<string, TipoFormatacaoText
 };
 
 export const mapaCamposTextoRegistroDoacaoForm: Record<string, TipoFormatacaoTexto> = {
-  tipo_doacao: "textoCurto",
   descricao: "textoCurto",
   forma_recebimento: "textoCurto",
   periodicidade: "textoCurto",

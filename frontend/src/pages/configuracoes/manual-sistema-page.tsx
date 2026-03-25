@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+﻿import { useMemo, useState } from "react";
 import {
   BookOpenText,
   Brain,
@@ -212,6 +212,40 @@ const secoesManual: ManualSecao[] = [
           "O campo Categoria textual foi removido do fluxo de caixa e o centro de custo deve ser selecionado apenas entre opções ativas cadastradas.",
           "Lançamentos já estornados não devem ser estornados novamente."
         ]
+      },
+      {
+        nome: "Recebimento de doações",
+        objetivo: "Registrar doações recebidas com doador vinculado, classificação oficial por tipo e organização separada entre dados do registro e itens recebidos.",
+        comoUsar: [
+          "Na aba Dados da doação, selecione o doador, informe tipo, status e data de recebimento. Ao escolher o tipo, o sistema mostra ao lado o destino de entrada da doação, como Contabilidade, Almoxarifado ou Patrimônio.",
+          "Use apenas os tipos Doação financeira, Doação de bens de consumo e Doação de bens permanentes.",
+          "Na aba Dados da doação ficam apenas as informações principais do registro: doador, tipo, status, data de recebimento e observações.",
+          "Depois de registrar os dados principais, use a aba Itens recebidos, agora na posição 4, para lançar os produtos, quantidade, valor unitário e valor total da doação.",
+          "Na aba Cadastro do doador, os campos visíveis seguem o padrão da migração: digitação livre, normalização visual ao sair do campo e normalização final antes do salvamento.",
+          "Quando a doação financeira for recorrente, marque Doação recorrente e selecione a periodicidade entre única, diário, semanal, mensal ou anual.",
+          "Use Observações como complemento curto do registro quando precisar detalhar a doação."
+        ],
+        atencoes: [
+          "Doações financeiras seguem entrada financeira na Contabilidade.",
+          "Doações de bens de consumo seguem entrada no Almoxarifado e doações de bens permanentes seguem entrada no Patrimônio.",
+          "Os itens devem ser mantidos apenas na aba Itens recebidos para evitar duplicidade de informação.",
+          "Na aba Itens recebidos, o sistema calcula automaticamente o valor total pela quantidade multiplicada pelo valor unitário.",
+          "Ao salvar a doação, o sistema consolida os itens lançados para preencher a quantidade total e os valores do registro automaticamente.",
+          "Os campos monetários dos itens exibem máscara brasileira e o sistema grava o valor numérico sem formatação visual."
+        ]
+      },
+      {
+        nome: "Cadastro de beneficiários",
+        objetivo: "Manter o cadastro social completo do beneficiário com documentos, contatos, endereço e demais informações obrigatórias.",
+        comoUsar: [
+          "Na aba Documentos, anexe ou capture os arquivos aceitos pelo sistema antes de salvar o cadastro.",
+          "Se houver falha no processamento de um documento, o sistema agora informa qual documento apresentou erro e o motivo real retornado pelo backend.",
+          "Revise nome do arquivo, tipo aceito, tamanho e integridade do anexo quando houver mensagem específica na tela."
+        ],
+        atencoes: [
+          "A tela não deve mais exibir apenas erro interno do servidor nesse fluxo de documentos quando houver um motivo tratável.",
+          "Mensagens de validação e persistência agora priorizam o motivo operacional real do erro."
+        ]
       }
     ]
   },
@@ -278,6 +312,32 @@ const secoesManual: ManualSecao[] = [
           "O QR Code nao leva saldo gravado. Toda validacao financeira e feita no servidor, consultando o banco antes de aprovar consumo, transferencia ou ajuste.",
           "Se o saldo da carteira for insuficiente, a venda deve ser interrompida e o operador deve seguir com recarga, ajuste autorizado ou cancelamento da compra.",
           "Nesta entrega o modulo reaproveita a arquitetura de vendas, usuarios, permissoes, impressao e relatorios do G3N, mas a leitura por camera nativa e a integracao contabil avancada ainda dependem da proxima etapa de evolucao."
+        ]
+      }
+    ]
+  },
+  {
+    id: "rh",
+    titulo: "Setor RH",
+    descricao: "Rotinas de jornada, confirmação operacional e validação de identidade no registro de ponto.",
+    icon: UserRound,
+    telas: [
+      {
+        nome: "Registro de ponto",
+        objetivo: "Registrar batidas com horário do servidor, localização do dispositivo e confirmação dupla por senha e face do usuário.",
+        comoUsar: [
+          "Acesse a aba Cadastro facial para capturar a face pela webcam e salvar o cadastro facial do usuário.",
+          "Durante a captura pela câmera, use o molde do rosto na tela para centralizar a face antes de confirmar a imagem.",
+          "Depois volte para a aba Registrar ponto para consultar a próxima batida, o espelho do dia e o saldo atual antes de marcar.",
+          "Somente após o cadastro da face o botão Registrar ponto agora fica liberado para a confirmação da batida.",
+          "Ao clicar em Registrar ponto agora, informe o usuário, a senha e faça a validação da face atual com prova de vida por duas piscadas ou leve virada do rosto antes do envio."
+        ],
+        atencoes: [
+          "A marcação exige simultaneamente senha e validação facial do mesmo usuário autenticado.",
+          "Na confirmação da marcação, o sistema exige duas piscadas ou uma leve virada do rosto para reduzir o risco de uso de foto estática no lugar de uma pessoa real.",
+          "Se a face capturada na confirmação não conferir com a face cadastrada do usuário, o registro do ponto é recusado.",
+          "A imagem facial é armazenada em arquivo no storage do sistema e o banco mantém apenas o caminho e os metadados necessários.",
+          "Se a câmera do dispositivo não estiver disponível, o cadastro facial e a confirmação do ponto não poderão ser concluídos nesse equipamento."
         ]
       }
     ]
@@ -543,3 +603,9 @@ export function ManualSistemaPage() {
     </AdminPageLayout>
   );
 }
+
+
+
+
+
+

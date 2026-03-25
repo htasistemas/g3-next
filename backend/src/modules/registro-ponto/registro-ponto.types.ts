@@ -26,6 +26,7 @@ export type RegistroPontoFilters = {
 export type RegistroPontoMarcarInput = {
   usuario_login: string;
   senha: string;
+  face_imagem?: string;
   latitude?: number;
   longitude?: number;
   accuracy_metros?: number;

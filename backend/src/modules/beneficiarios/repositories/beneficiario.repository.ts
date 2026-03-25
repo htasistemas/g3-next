@@ -617,8 +617,21 @@ export class BeneficiarioRepository {
           error instanceof Prisma.PrismaClientKnownRequestError &&
           (error.code === "P2000" || error.code === "P2002" || error.code === "P2003")
         ) {
+          const motivo =
+            error.code === "P2000"
+              ? "Um dos campos do documento excede o tamanho permitido."
+              : error.code === "P2002"
+                ? "Ja existe um documento com dados que exigem valor unico."
+                : "Existe uma referencia invalida entre beneficiario e documento.";
           throw new AppError(
-            "Nao foi possivel salvar os documentos do beneficiario. Revise os anexos informados e tente novamente.",
+            `Nao foi possivel salvar os documentos do beneficiario. ${motivo}`,
+            422
+          );
+        }
+
+        if (error instanceof Error && error.message.trim()) {
+          throw new AppError(
+            `Nao foi possivel salvar os documentos do beneficiario. ${error.message.trim()}`,
             422
           );
         }

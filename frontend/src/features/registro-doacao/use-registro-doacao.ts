@@ -50,7 +50,7 @@ export function useDoadores(termo?: string) {
   return useQuery({
     queryKey: ["registro-doacao", "doadores", termo ?? ""],
     queryFn: () => registroDoacaoService.listarDoadores(termo),
-    enabled: (termo?.trim().length ?? 0) >= 2
+    enabled: termo === undefined || (termo?.trim().length ?? 0) >= 2
   });
 }
 

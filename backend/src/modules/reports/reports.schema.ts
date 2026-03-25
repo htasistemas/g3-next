@@ -161,3 +161,14 @@ export const doacaoRealizadaReciboRequestSchema = z.object({
   doacaoRealizadaId: z.string().trim().min(1, "doacaoRealizadaId e obrigatorio."),
   usuarioEmissor: optionalString
 });
+
+export const registroPontoEspelhoRequestSchema = z.object({
+  data_inicial: optionalString,
+  data_final: optionalString,
+  usuario_id: optionalString,
+  status: optionalString,
+  ocorrencia: optionalString,
+  somente_alterados: optionalBoolean,
+  somente_inconsistencias: optionalBoolean,
+  usuarioEmissor: optionalString
+});

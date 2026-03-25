@@ -221,12 +221,12 @@ public class RecebimentoDoacaoServiceImpl implements RecebimentoDoacaoService {
       return;
     }
 
-    String tipo = normalizarTexto(recebimento.getTipoDoacao()).toLowerCase();
-    if (tipo.contains("dinheiro")) {
+    String destino = classificarDestinoOperacional(recebimento);
+    if ("contabilidade".equals(destino)) {
       gerarMovimentacaoFinanceira(recebimento);
-    } else if (tipo.contains("alimentos") || tipo.contains("industrializados") || tipo.contains("materiais")) {
+    } else if ("almoxarifado".equals(destino)) {
       gerarMovimentacaoAlmoxarifado(recebimento);
-    } else if (tipo.contains("bens")) {
+    } else if ("patrimonio".equals(destino)) {
       gerarPatrimonio(recebimento);
     }
 
@@ -402,8 +402,53 @@ public class RecebimentoDoacaoServiceImpl implements RecebimentoDoacaoService {
 
   private boolean isTipoItens(String tipo) {
     String lower = normalizarTexto(tipo).toLowerCase();
-    return lower.contains("alimentos") || lower.contains("industrializados") || lower.contains("materiais")
-        || lower.contains("bens");
+    return lower.contains("alimentos")
+        || lower.contains("industrializados")
+        || lower.contains("materiais")
+        || lower.contains("bens")
+        || lower.contains("bens de consumo")
+        || lower.contains("bens permanentes")
+        || lower.contains("doação de bens de consumo")
+        || lower.contains("doacao de bens de consumo")
+        || lower.contains("doação de bens permanentes")
+        || lower.contains("doacao de bens permanentes");
+  }
+
+  private String classificarDestinoOperacional(RecebimentoDoacao recebimento) {
+    String tipo = normalizarTexto(recebimento.getTipoDoacao()).toLowerCase();
+
+    if (tipo.contains("doação financeira")
+        || tipo.contains("doacao financeira")
+        || tipo.contains("dinheiro")
+        || tipo.contains("doação por campanhas")
+        || tipo.contains("doacao por campanhas")
+        || tipo.contains("doação recorrente")
+        || tipo.contains("doacao recorrente")
+        || tipo.contains("doação para eventos")
+        || tipo.contains("doacao para eventos")
+        || tipo.contains("doação incentivada")
+        || tipo.contains("doacao incentivada")) {
+      return "contabilidade";
+    }
+
+    if (tipo.contains("doação de bens de consumo")
+        || tipo.contains("doacao de bens de consumo")
+        || tipo.contains("alimentos")
+        || tipo.contains("industrializados")
+        || tipo.contains("materiais")
+        || tipo.contains("roupas")
+        || tipo.contains("higiene")
+        || tipo.contains("brinquedos")) {
+      return "almoxarifado";
+    }
+
+    if (tipo.contains("doação de bens permanentes")
+        || tipo.contains("doacao de bens permanentes")
+        || tipo.contains("bens")) {
+      return "patrimonio";
+    }
+
+    return "";
   }
 
   private String gerarDescricaoDoacao(RecebimentoDoacao recebimento) {

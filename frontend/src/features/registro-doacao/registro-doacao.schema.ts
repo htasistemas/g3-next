@@ -1,4 +1,5 @@
-import { z } from "zod";
+﻿import { z } from "zod";
+import { normalizarMoeda } from "@/lib/br-utils";
 
 const optionalTrimmedString = z.preprocess((value) => {
   if (typeof value !== "string") return value;
@@ -9,7 +10,7 @@ const optionalTrimmedString = z.preprocess((value) => {
 const optionalNumber = z.preprocess((value) => {
   if (value === null || value === undefined || value === "") return undefined;
   if (typeof value === "number") return value;
-  if (typeof value === "string") return Number(value);
+  if (typeof value === "string") return normalizarMoeda(value);
   return value;
 }, z.number().nonnegative().optional());
 
@@ -63,12 +64,9 @@ export const registroDoacaoDefaultValues: RegistroDoacaoFormValues = {
 };
 
 export const tipoDoacaoOptions = [
-  "Alimentos",
-  "Dinheiro",
-  "Higiene",
-  "Material escolar",
-  "Roupas",
-  "Outros"
+  "Doação financeira",
+  "Doação de bens de consumo",
+  "Doação de bens permanentes"
 ] as const;
 
 export const statusRegistroDoacaoOptions = [
@@ -77,3 +75,4 @@ export const statusRegistroDoacaoOptions = [
   "Finalizado",
   "Cancelado"
 ] as const;
+

@@ -1,5 +1,5 @@
-import "leaflet/dist/leaflet.css";
-import { useEffect, useMemo, useState } from "react";
+﻿import "leaflet/dist/leaflet.css";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -28,8 +28,14 @@ import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
-import { imprimirConteudoAtual } from "@/lib/report-utils";
+import { obterUrlArquivoAutenticado, resolverUrlArquivo } from "@/lib/arquivos";
+import { imprimirConteudoAtual, reservarJanelaRelatorio } from "@/lib/report-utils";
 import { toLocalDateISO } from "@/lib/date-utils";
+import {
+  capturarFotoTresPorQuatroDoVideo
+} from "@/lib/foto-3x4";
+import { reportsService } from "@/services/reports.service";
+import { registroPontoService } from "@/services/registro-ponto.service";
 import {
   classeBotaoAbaLateral,
   classeNumeroAbaLateral,
@@ -50,9 +56,11 @@ import {
   useAjustarRegistroPonto,
   useConfiguracaoRegistroPonto,
   useEspelhoPonto,
+  useFaceRegistroPonto,
   useHistoricoRegistroPonto,
   useMarcarPonto,
   useRegistrosPonto,
+  useSalvarFaceRegistroPonto,
   useSalvarConfiguracaoRegistroPonto
 } from "@/features/registro-ponto/use-registro-ponto";
 import type {
@@ -65,6 +73,7 @@ import type {
 const abas = [
   { id: "listagem", label: "Listagem", icon: Search },
   { id: "marcacao", label: "Registrar ponto", icon: Fingerprint },
+  { id: "cadastro-face", label: "Cadastro facial", icon: Fingerprint },
   { id: "espelho", label: "Espelho de ponto", icon: CalendarDays },
   { id: "ocorrencias", label: "Ocorrências", icon: AlertCircle },
   { id: "historico", label: "Histórico", icon: History },
@@ -116,6 +125,132 @@ function formatarDataHora(valor?: string) {
 function formatarHora(valor?: string) {
   if (!valor) return "--:--";
   return valor.slice(0, 5);
+}
+
+function resolverPreviewFace(valor?: string) {
+  if (!valor) return "";
+  if (valor.startsWith("data:") || valor.startsWith("blob:")) {
+    return valor;
+  }
+  return resolverUrlArquivo(valor);
+}
+
+function obterPreviewFaceAtual(args: {
+  modoFace: "cadastro" | "confirmacao";
+  rascunhoFaceCadastro: string;
+  confirmacaoFaceImagem: string;
+  faceUrl?: string;
+}) {
+  if (args.modoFace === "cadastro") {
+    return args.rascunhoFaceCadastro || args.faceUrl || "";
+  }
+  return args.confirmacaoFaceImagem || "";
+}
+
+function esperar(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+const intervaloPiscadaMs = 180;
+const duracaoMaximaPiscadaMs = 4200;
+const variacaoMinimaPiscada = 5.5;
+const variacaoMinimaMovimentoRosto = 9;
+
+function capturarAmostraOlhosDoVideo(video: HTMLVideoElement) {
+  const largura = 160;
+  const altura = 120;
+  const canvas = document.createElement("canvas");
+  canvas.width = largura;
+  canvas.height = altura;
+  const contexto = canvas.getContext("2d", { willReadFrequently: true });
+
+  if (!contexto) {
+    throw new Error("Não foi possível analisar a imagem da webcam.");
+  }
+
+  contexto.drawImage(video, 0, 0, largura, altura);
+
+  const origemX = Math.round(largura * 0.22);
+  const origemY = Math.round(altura * 0.18);
+  const larguraRecorte = Math.round(largura * 0.56);
+  const alturaRecorte = Math.round(altura * 0.24);
+
+  return contexto.getImageData(origemX, origemY, larguraRecorte, alturaRecorte).data;
+}
+
+function capturarAmostraRostoDoVideo(video: HTMLVideoElement) {
+  const largura = 180;
+  const altura = 180;
+  const canvas = document.createElement("canvas");
+  canvas.width = largura;
+  canvas.height = altura;
+  const contexto = canvas.getContext("2d", { willReadFrequently: true });
+
+  if (!contexto) {
+    throw new Error("Não foi possível analisar a posição do rosto na webcam.");
+  }
+
+  contexto.drawImage(video, 0, 0, largura, altura);
+
+  const origemX = Math.round(largura * 0.2);
+  const origemY = Math.round(altura * 0.16);
+  const larguraRecorte = Math.round(largura * 0.6);
+  const alturaRecorte = Math.round(altura * 0.68);
+
+  return contexto.getImageData(origemX, origemY, larguraRecorte, alturaRecorte).data;
+}
+
+function calcularVariacaoMedia(amostraInicial: Uint8ClampedArray, amostraFinal: Uint8ClampedArray) {
+  const tamanho = Math.min(amostraInicial.length, amostraFinal.length);
+  if (!tamanho) return 0;
+
+  let diferencaTotal = 0;
+
+  for (let indice = 0; indice < tamanho; indice += 4) {
+    const cinzaInicial =
+      amostraInicial[indice] * 0.299 +
+      amostraInicial[indice + 1] * 0.587 +
+      amostraInicial[indice + 2] * 0.114;
+    const cinzaFinal =
+      amostraFinal[indice] * 0.299 +
+      amostraFinal[indice + 1] * 0.587 +
+      amostraFinal[indice + 2] * 0.114;
+
+    diferencaTotal += Math.abs(cinzaInicial - cinzaFinal);
+  }
+
+  return diferencaTotal / Math.max(tamanho / 4, 1);
+}
+
+function calcularAssimetriaHorizontal(amostra: Uint8ClampedArray) {
+  if (!amostra.length) return 0;
+
+  let somaEsquerda = 0;
+  let somaDireita = 0;
+  let pixelsEsquerda = 0;
+  let pixelsDireita = 0;
+  const totalPixels = amostra.length / 4;
+  const metadePixels = Math.floor(totalPixels / 2);
+
+  for (let indice = 0; indice < amostra.length; indice += 4) {
+    const cinza =
+      amostra[indice] * 0.299 +
+      amostra[indice + 1] * 0.587 +
+      amostra[indice + 2] * 0.114;
+    const pixelIndex = indice / 4;
+
+    if (pixelIndex < metadePixels) {
+      somaEsquerda += cinza;
+      pixelsEsquerda += 1;
+    } else {
+      somaDireita += cinza;
+      pixelsDireita += 1;
+    }
+  }
+
+  const mediaEsquerda = somaEsquerda / Math.max(pixelsEsquerda, 1);
+  const mediaDireita = somaDireita / Math.max(pixelsDireita, 1);
+  return Math.abs(mediaEsquerda - mediaDireita);
 }
 
 function formatarMinutos(totalMinutos?: number) {
@@ -254,22 +389,32 @@ export function RegistroPontoPage() {
   const [mensagem, setMensagem] = useState<{ tipo: "sucesso" | "erro"; texto: string } | null>(null);
   const [popupMarcarAberto, setPopupMarcarAberto] = useState(false);
   const [popupAjusteAberto, setPopupAjusteAberto] = useState(false);
+  const [popupFaceAberto, setPopupFaceAberto] = useState(false);
+  const [modoFace, setModoFace] = useState<"cadastro" | "confirmacao">("cadastro");
   const [localizacaoHistoricoSelecionada, setLocalizacaoHistoricoSelecionada] = useState<LocalizacaoHistoricoMapa | null>(null);
   const [confirmacaoLogin, setConfirmacaoLogin] = useState("");
   const [confirmacaoSenha, setConfirmacaoSenha] = useState("");
+  const [confirmacaoFaceImagem, setConfirmacaoFaceImagem] = useState("");
+  const [rascunhoFaceCadastro, setRascunhoFaceCadastro] = useState("");
+  const [faceCadastroPreviewUrl, setFaceCadastroPreviewUrl] = useState("");
+  const [statusPiscada, setStatusPiscada] = useState<"idle" | "aguardando" | "detectada" | "falha">("idle");
+  const [validandoPiscada, setValidandoPiscada] = useState(false);
   const [etapaMarcacao, setEtapaMarcacao] = useState<"idle" | "localizacao" | "registro">("idle");
   const [ocorrenciaTipo, setOcorrenciaTipo] = useState<RegistroPontoOcorrenciaTipo>("OBSERVACAO_OPERACIONAL");
   const [ocorrenciaDescricao, setOcorrenciaDescricao] = useState("");
-
+  const videoFaceRef = useRef<HTMLVideoElement | null>(null);
+  const streamFaceRef = useRef<MediaStream | null>(null);
   const { data: listaData, isLoading: carregandoLista } = useRegistrosPonto(filtros);
   const { data: espelhoData, isLoading: carregandoEspelho } = useEspelhoPonto(filtros);
   const { data: historicoData, isLoading: carregandoHistorico } = useHistoricoRegistroPonto(registroSelecionadoId);
   const { data: configuracaoHorarioData, isLoading: carregandoConfiguracaoHorario } = useConfiguracaoRegistroPonto();
+  const { data: faceData, isLoading: carregandoFace } = useFaceRegistroPonto();
 
   const marcarMutation = useMarcarPonto();
   const ajusteMutation = useAjustarRegistroPonto();
   const ocorrenciaMutation = useAdicionarOcorrenciaPonto();
   const salvarConfiguracaoHorarioMutation = useSalvarConfiguracaoRegistroPonto();
+  const salvarFaceMutation = useSalvarFaceRegistroPonto();
 
   const ajusteForm = useForm<
     RegistroPontoAjusteFormInput,
@@ -355,8 +500,119 @@ export function RegistroPontoPage() {
     if (popupMarcarAberto) {
       setConfirmacaoLogin(usuario?.nomeUsuario ?? "");
       setConfirmacaoSenha("");
+      setConfirmacaoFaceImagem("");
     }
   }, [popupMarcarAberto, usuario?.nomeUsuario]);
+
+  useEffect(() => {
+    if (!popupFaceAberto || modoFace === "cadastro") {
+      setStatusPiscada("idle");
+      setValidandoPiscada(false);
+    }
+  }, [modoFace, popupFaceAberto]);
+
+  useEffect(() => {
+    if (rascunhoFaceCadastro) {
+      setFaceCadastroPreviewUrl(rascunhoFaceCadastro);
+      return;
+    }
+
+    const faceUrlSalva = faceData?.face_url;
+
+    if (!faceUrlSalva) {
+      setFaceCadastroPreviewUrl("");
+      return;
+    }
+
+    let ativo = true;
+    let revokeAtual: (() => void) | undefined;
+
+    async function carregarPreviewSalva() {
+      try {
+        const arquivo = await obterUrlArquivoAutenticado(faceUrlSalva);
+        if (!ativo) {
+          arquivo.revoke?.();
+          return;
+        }
+
+        revokeAtual = arquivo.revoke;
+        setFaceCadastroPreviewUrl(arquivo.url);
+      } catch {
+        if (ativo) {
+          setFaceCadastroPreviewUrl("");
+        }
+      }
+    }
+
+    void carregarPreviewSalva();
+
+    return () => {
+      ativo = false;
+      revokeAtual?.();
+    };
+  }, [faceData?.face_url, rascunhoFaceCadastro]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function iniciarCameraFace() {
+      if (!popupFaceAberto) {
+        return;
+      }
+
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setMensagem({
+          tipo: "erro",
+          texto: "Este dispositivo não permite captura de câmera para validação facial."
+        });
+        setPopupFaceAberto(false);
+        return;
+      }
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: {
+            facingMode: "user",
+            width: { ideal: 640 },
+            height: { ideal: 480 }
+          }
+        });
+
+        if (cancelled) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+
+        streamFaceRef.current = stream;
+
+        if (videoFaceRef.current) {
+          videoFaceRef.current.srcObject = stream;
+          await videoFaceRef.current.play().catch(() => undefined);
+        }
+      } catch (error) {
+        setMensagem({
+          tipo: "erro",
+          texto:
+            error instanceof Error
+              ? error.message
+              : "Não foi possível acessar a câmera para captura facial."
+        });
+        setPopupFaceAberto(false);
+      }
+    }
+
+    void iniciarCameraFace();
+
+    return () => {
+      cancelled = true;
+      streamFaceRef.current?.getTracks().forEach((track) => track.stop());
+      streamFaceRef.current = null;
+      if (videoFaceRef.current) {
+        videoFaceRef.current.srcObject = null;
+      }
+    };
+  }, [popupFaceAberto]);
 
   useEffect(() => {
     if (!registroSelecionado) {
@@ -468,10 +724,147 @@ export function RegistroPontoPage() {
     }
   });
 
+  async function capturarFaceDaCamera() {
+    const video = videoFaceRef.current;
+
+    if (!video || !video.videoWidth || !video.videoHeight) {
+      setMensagem({ tipo: "erro", texto: "A câmera ainda não está pronta para a captura facial." });
+      return;
+    }
+
+    try {
+      const dataUrl = capturarFotoTresPorQuatroDoVideo(video);
+
+      if (modoFace === "cadastro") {
+        setRascunhoFaceCadastro(dataUrl);
+      } else {
+        setConfirmacaoFaceImagem(dataUrl);
+      }
+    } catch (error) {
+      setMensagem({
+        tipo: "erro",
+        texto:
+          error instanceof Error
+            ? error.message
+            : "Não foi possível concluir a captura facial."
+      });
+    }
+  }
+
+  async function validarPiscadaECapturarFace() {
+    const video = videoFaceRef.current;
+
+    if (!video || !video.videoWidth || !video.videoHeight) {
+      setMensagem({ tipo: "erro", texto: "A câmera ainda não está pronta para validar a piscada." });
+      return;
+    }
+
+    setValidandoPiscada(true);
+    setStatusPiscada("aguardando");
+
+    try {
+      const amostraBase = capturarAmostraOlhosDoVideo(video);
+      const amostraRostoBase = capturarAmostraRostoDoVideo(video);
+      const assimetriaBase = calcularAssimetriaHorizontal(amostraRostoBase);
+      let maiorVariacaoOlhos = 0;
+      let maiorVariacaoRosto = 0;
+      let piscadasDetectadas = 0;
+      let picoPiscadaAtivo = false;
+      const totalTentativas = Math.ceil(duracaoMaximaPiscadaMs / intervaloPiscadaMs);
+
+      for (let tentativa = 0; tentativa < totalTentativas; tentativa += 1) {
+        await esperar(intervaloPiscadaMs);
+        const amostraAtual = capturarAmostraOlhosDoVideo(video);
+        const variacaoAtual = calcularVariacaoMedia(amostraBase, amostraAtual);
+        const amostraRostoAtual = capturarAmostraRostoDoVideo(video);
+        const assimetriaAtual = calcularAssimetriaHorizontal(amostraRostoAtual);
+        const variacaoRostoAtual = Math.abs(assimetriaAtual - assimetriaBase);
+
+        if (variacaoAtual > maiorVariacaoOlhos) {
+          maiorVariacaoOlhos = variacaoAtual;
+        }
+
+        if (variacaoRostoAtual > maiorVariacaoRosto) {
+          maiorVariacaoRosto = variacaoRostoAtual;
+        }
+
+        if (variacaoAtual >= variacaoMinimaPiscada && !picoPiscadaAtivo) {
+          piscadasDetectadas += 1;
+          picoPiscadaAtivo = true;
+        } else if (variacaoAtual < variacaoMinimaPiscada * 0.72) {
+          picoPiscadaAtivo = false;
+        }
+
+        if (piscadasDetectadas >= 2 || maiorVariacaoRosto >= variacaoMinimaMovimentoRosto) {
+          break;
+        }
+      }
+
+      const provaDeVidaAprovada =
+        piscadasDetectadas >= 2 || maiorVariacaoRosto >= variacaoMinimaMovimentoRosto;
+
+      if (!provaDeVidaAprovada) {
+        setStatusPiscada("falha");
+        setConfirmacaoFaceImagem("");
+        setMensagem({
+          tipo: "erro",
+          texto:
+            "Prova de vida não detectada. Pisque duas vezes ou vire levemente o rosto para os lados mantendo o rosto dentro do molde."
+        });
+        return;
+      }
+
+      const dataUrl = capturarFotoTresPorQuatroDoVideo(video);
+      setConfirmacaoFaceImagem(dataUrl);
+      setStatusPiscada("detectada");
+    } catch (error) {
+      setStatusPiscada("falha");
+      setMensagem({
+        tipo: "erro",
+        texto:
+          error instanceof Error
+            ? error.message
+            : "Não foi possível validar a piscada para a prova de vida."
+      });
+    } finally {
+      setValidandoPiscada(false);
+    }
+  }
+
+  async function salvarCadastroFace() {
+    if (!rascunhoFaceCadastro) {
+      setMensagem({ tipo: "erro", texto: "Capture a imagem da face pela webcam antes de salvar." });
+      return;
+    }
+
+    try {
+      const response = await salvarFaceMutation.mutateAsync({
+        face_imagem: rascunhoFaceCadastro
+      });
+
+      setRascunhoFaceCadastro("");
+      setMensagem({ tipo: "sucesso", texto: response.mensagem });
+    } catch (error: unknown) {
+      const apiError = error as { response?: { data?: { message?: string } } };
+      setMensagem({
+        tipo: "erro",
+        texto: apiError.response?.data?.message ?? "Não foi possível salvar a face do usuário."
+      });
+    }
+  }
+
   async function executarMarcacao() {
     try {
       if (!confirmacaoLogin.trim() || !confirmacaoSenha.trim()) {
         setMensagem({ tipo: "erro", texto: "Informe usuário e senha para confirmar a marcação." });
+        return;
+      }
+
+      if (!confirmacaoFaceImagem) {
+        setMensagem({
+          tipo: "erro",
+          texto: "Capture a face atual do usuário para confirmar a marcação."
+        });
         return;
       }
 
@@ -483,6 +876,7 @@ export function RegistroPontoPage() {
       const response = await marcarMutation.mutateAsync({
         usuario_login: confirmacaoLogin.trim(),
         senha: confirmacaoSenha,
+        face_imagem: confirmacaoFaceImagem,
         latitude: localizacao?.latitude,
         longitude: localizacao?.longitude,
         accuracy_metros: localizacao?.accuracy_metros,
@@ -499,6 +893,7 @@ export function RegistroPontoPage() {
           : response.mensagem
       });
       setConfirmacaoSenha("");
+      setConfirmacaoFaceImagem("");
     } catch (error: unknown) {
       const apiError = error as { response?: { data?: { message?: string } } };
       setMensagem({
@@ -604,6 +999,23 @@ export function RegistroPontoPage() {
     }
   }
 
+  async function gerarRelatorioEspelho() {
+    const janela = reservarJanelaRelatorio("Espelho de Ponto Individual");
+    try {
+      const blob = await registroPontoService.gerarEspelhoPontoPdf({
+        ...filtros,
+        usuarioEmissor: usuario?.nome ?? usuario?.nomeUsuario
+      });
+      janela.publicar(blob);
+    } catch (error: any) {
+      janela.fechar();
+      setMensagem({
+        tipo: "erro",
+        texto: error?.response?.data?.message ?? error?.message ?? "Não foi possível gerar o espelho de ponto."
+      });
+    }
+  }
+
   function acaoFechar() {
     navigate("/dashboard/visao-geral");
   }
@@ -612,6 +1024,12 @@ export function RegistroPontoPage() {
   const acoesDesabilitadas =
     marcacaoEmAndamento || ajusteMutation.isPending || ocorrenciaMutation.isPending;
   const filtrosTravados = true;
+  const previewFaceAtual = obterPreviewFaceAtual({
+    modoFace,
+    rascunhoFaceCadastro,
+    confirmacaoFaceImagem,
+    faceUrl: faceData?.face_url
+  });
 
   function obterTextoBotaoMarcacao() {
     if (etapaMarcacao === "localizacao") return "Obtendo localização...";
@@ -810,12 +1228,89 @@ export function RegistroPontoPage() {
                 </div>
               </div>
 
+              {false && (
+              <div className="grid gap-4 rounded-xl border border-[var(--g3-border)] bg-slate-50 p-4 lg:grid-cols-[220px_minmax(0,1fr)]">
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold text-[var(--g3-foreground)]">Validação facial</p>
+                  <div className="overflow-hidden rounded-xl border border-[var(--g3-border)] bg-white">
+                    {rascunhoFaceCadastro || faceData?.face_url ? (
+                      <img
+                        src={resolverPreviewFace(rascunhoFaceCadastro || faceData?.face_url)}
+                        alt="Face cadastrada"
+                        className="h-48 w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-48 items-center justify-center px-4 text-center text-sm text-[var(--g3-muted)]">
+                        Nenhuma face cadastrada.
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={`rounded-full border px-2 py-1 text-xs font-semibold ${
+                        faceData?.face_cadastrada
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                          : "border-amber-200 bg-amber-50 text-amber-700"
+                      }`}
+                    >
+                      {carregandoFace
+                        ? "Verificando cadastro..."
+                        : faceData?.face_cadastrada
+                          ? "Face cadastrada"
+                          : "Face pendente"}
+                    </span>
+                    {faceData?.face_cadastrada_em ? (
+                      <span className="text-xs text-[var(--g3-muted)]">
+                        Último cadastro em {formatarDataHora(faceData?.face_cadastrada_em ?? "")}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <p className="text-sm text-slate-700">
+                    Antes de registrar o ponto, cadastre a face do usuário e mantenha a senha para confirmação dupla.
+                  </p>
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setModoFace("cadastro");
+                        setPopupFaceAberto(true);
+                      }}
+                    >
+                      {faceData?.face_cadastrada ? "Atualizar face" : "Capturar face"}
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => void salvarCadastroFace()}
+                      disabled={!rascunhoFaceCadastro || salvarFaceMutation.isPending}
+                    >
+                      {salvarFaceMutation.isPending ? "Salvando face..." : "Salvar face cadastrada"}
+                    </Button>
+                  </div>
+
+                  {rascunhoFaceCadastro ? (
+                    <p className="text-xs text-[var(--g3-muted)]">
+                      A imagem acima está em rascunho. Clique em salvar para atualizar a face do usuário.
+                    </p>
+                  ) : (
+                    <p className="text-xs text-[var(--g3-muted)]">
+                      A marcação de ponto passará a exigir a senha e a captura facial atual do usuário.
+                    </p>
+                  )}
+                </div>
+              </div>
+              )}
+
               <div className="flex justify-end">
                 <Button
                   type="button"
                   className="w-full shadow-md sm:w-auto sm:min-w-[220px]"
                   onClick={() => setPopupMarcarAberto(true)}
-                  disabled={marcacaoEmAndamento}
+                  disabled={marcacaoEmAndamento || !faceData?.face_cadastrada}
                 >
                   {obterTextoBotaoMarcacao()}
                 </Button>
@@ -916,6 +1411,98 @@ export function RegistroPontoPage() {
       );
     }
 
+    if (abaAtiva === "cadastro-face") {
+      return (
+        <section className="space-y-3">
+          <Card>
+            <CardHeader>
+              <CardTitle>Cadastro facial</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-slate-700">
+                Cadastre ou atualize a face do usuário nesta aba. A marcação do ponto continuará exigindo senha e a captura facial atual na confirmação.
+              </p>
+
+              <div className="grid gap-4 rounded-xl border border-[var(--g3-border)] bg-slate-50 p-4 lg:grid-cols-[220px_minmax(0,1fr)]">
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold text-[var(--g3-foreground)]">Validação facial</p>
+                  <div className="overflow-hidden rounded-xl border border-[var(--g3-border)] bg-white">
+                    {rascunhoFaceCadastro || faceData?.face_url ? (
+                      <img
+                        src={resolverPreviewFace(rascunhoFaceCadastro || faceData?.face_url)}
+                        alt="Face cadastrada"
+                        className="h-48 w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-48 items-center justify-center px-4 text-center text-sm text-[var(--g3-muted)]">
+                        Nenhuma face cadastrada.
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={`rounded-full border px-2 py-1 text-xs font-semibold ${
+                        faceData?.face_cadastrada
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                          : "border-amber-200 bg-amber-50 text-amber-700"
+                      }`}
+                    >
+                      {carregandoFace
+                        ? "Verificando cadastro..."
+                        : faceData?.face_cadastrada
+                          ? "Face cadastrada"
+                          : "Face pendente"}
+                    </span>
+                    {faceData?.face_cadastrada_em ? (
+                      <span className="text-xs text-[var(--g3-muted)]">
+                        Último cadastro em {formatarDataHora(faceData?.face_cadastrada_em ?? "")}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <p className="text-sm text-slate-700">
+                    Use esta aba separada para preparar o cadastro facial do usuário antes do registro do ponto.
+                  </p>
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setModoFace("cadastro");
+                        setPopupFaceAberto(true);
+                      }}
+                    >
+                      {faceData?.face_cadastrada ? "Atualizar face" : "Capturar face"}
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => void salvarCadastroFace()}
+                      disabled={!rascunhoFaceCadastro || salvarFaceMutation.isPending}
+                    >
+                      {salvarFaceMutation.isPending ? "Salvando face..." : "Salvar face cadastrada"}
+                    </Button>
+                  </div>
+
+                  {rascunhoFaceCadastro ? (
+                    <p className="text-xs text-[var(--g3-muted)]">
+                      A imagem acima está em rascunho. Clique em salvar para atualizar a face do usuário.
+                    </p>
+                  ) : (
+                    <p className="text-xs text-[var(--g3-muted)]">
+                      Depois do cadastro, a confirmação da marcação continuará pedindo senha e uma nova captura facial.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+      );
+    }
+
     if (abaAtiva === "espelho") {
       return (
         <section className="space-y-3">
@@ -928,6 +1515,20 @@ export function RegistroPontoPage() {
             <Card><CardContent className="p-3"><p className="text-xs text-[var(--g3-muted)]">Faltas</p><p className="text-lg font-semibold">{formatarMinutos(totaisEspelho?.faltas_minutos ?? 0)}</p></CardContent></Card>
             <Card><CardContent className="p-3"><p className="text-xs text-[var(--g3-muted)]">Ajustes</p><p className="text-lg font-semibold">{totaisEspelho?.total_ajustes ?? 0}</p></CardContent></Card>
           </div>
+
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full sm:w-auto"
+              onClick={() => void gerarRelatorioEspelho()}
+              disabled={carregandoEspelho}
+            >
+              <Printer className="mr-2 h-4 w-4" />
+              Gerar Espelho de Ponto (PDF)
+            </Button>
+          </div>
+
           {carregandoEspelho ? <p className="text-sm text-[var(--g3-muted)]">Carregando espelho...</p> : renderTabelaRegistros(espelho, true)}
         </section>
       );
@@ -1000,8 +1601,8 @@ export function RegistroPontoPage() {
                               size="sm"
                               variant="outline"
                               className="h-7 w-7 px-0"
-                              aria-label="Ver localizacao no mapa"
-                              title="Ver localizacao no mapa"
+                              aria-label="Ver localização no mapa"
+                              title="Ver localização no mapa"
                               onClick={() => setLocalizacaoHistoricoSelecionada(localizacaoHistorico)}
                             >
                               <MapPinned className="h-3.5 w-3.5" />
@@ -1163,6 +1764,11 @@ export function RegistroPontoPage() {
                   <Input
                     value={confirmacaoLogin}
                     onChange={(event) => setConfirmacaoLogin(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && !marcacaoEmAndamento) {
+                        void executarMarcacao();
+                      }
+                    }}
                     disabled={marcacaoEmAndamento}
                   />
                 </div>
@@ -1172,8 +1778,47 @@ export function RegistroPontoPage() {
                     type="password"
                     value={confirmacaoSenha}
                     onChange={(event) => setConfirmacaoSenha(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && !marcacaoEmAndamento) {
+                        void executarMarcacao();
+                      }
+                    }}
                     disabled={marcacaoEmAndamento}
                   />
+                </div>
+                <div className="space-y-2 rounded-xl border border-[var(--g3-border)] bg-slate-50 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <Label>Face atual</Label>
+                      <p className="text-xs text-[var(--g3-muted)]">
+                        Capture a face do usuário e faça a prova de vida com duas piscadas ou uma leve virada do rosto para validar junto com a senha.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setModoFace("confirmacao");
+                        setPopupFaceAberto(true);
+                      }}
+                      disabled={marcacaoEmAndamento}
+                    >
+                      Capturar face
+                    </Button>
+                  </div>
+                  <div className="overflow-hidden rounded-lg border border-[var(--g3-border)] bg-white">
+                    {confirmacaoFaceImagem ? (
+                      <img
+                        src={resolverPreviewFace(confirmacaoFaceImagem)}
+                        alt="Face capturada para confirmação"
+                        className="h-40 w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-40 items-center justify-center px-4 text-center text-sm text-[var(--g3-muted)]">
+                        Nenhuma face capturada para esta marcação.
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
               <p className="text-xs text-[var(--g3-muted)]">
@@ -1183,6 +1828,120 @@ export function RegistroPontoPage() {
             <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3">
               <Button type="button" variant="outline" onClick={() => setPopupMarcarAberto(false)} disabled={marcacaoEmAndamento}>Cancelar</Button>
               <Button type="button" onClick={() => void executarMarcacao()} disabled={marcacaoEmAndamento}>{obterTextoBotaoMarcacao()}</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {popupFaceAberto && (
+        <div
+          className="fixed inset-0 z-[72] flex items-center justify-center bg-slate-900/45 px-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setPopupFaceAberto(false)}
+        >
+          <div
+            className="w-full max-w-3xl rounded-xl border border-slate-200 bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
+              <div>
+                <h3 className="text-base font-semibold text-slate-900">
+                  {modoFace === "cadastro" ? "Cadastrar face do usuário" : "Capturar face para a marcação"}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  {modoFace === "cadastro"
+                    ? "Centralize o rosto e mantenha boa iluminação antes de capturar."
+                    : "Centralize o rosto, mantenha boa iluminação e faça duas piscadas ou vire levemente o rosto quando o sistema solicitar."}
+                </p>
+              </div>
+              <Button type="button" variant="outline" onClick={() => setPopupFaceAberto(false)}>
+                Fechar
+              </Button>
+            </div>
+            <div className="grid gap-4 px-5 py-4 lg:grid-cols-[minmax(0,1fr)_260px]">
+              <div className="space-y-3">
+                <div className="relative overflow-hidden rounded-xl border border-[var(--g3-border)] bg-slate-950">
+                  <video ref={videoFaceRef} autoPlay muted playsInline className="h-[320px] w-full object-cover" />
+                  <div className="pointer-events-none absolute inset-0">
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0,transparent_28%,rgba(15,23,42,0.22)_28.5%,rgba(15,23,42,0.22)_100%)]" />
+                    <div className="absolute left-1/2 top-1/2 h-[220px] w-[168px] -translate-x-1/2 -translate-y-1/2 rounded-[999px] border-2 border-white/90 shadow-[0_0_0_9999px_rgba(15,23,42,0.12)]" />
+                    <div className="absolute left-1/2 top-[calc(50%-126px)] h-4 w-4 -translate-x-1/2 rounded-full border border-white/85 bg-white/20" />
+                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-slate-950/70 px-3 py-1 text-[11px] font-medium text-white">
+                      Centralize o rosto dentro do molde
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    onClick={() => void (modoFace === "cadastro" ? capturarFaceDaCamera() : validarPiscadaECapturarFace())}
+                    disabled={validandoPiscada}
+                  >
+                    {modoFace === "cadastro"
+                      ? "Capturar pela câmera"
+                      : validandoPiscada
+                        ? "Validando prova de vida..."
+                        : "Validar prova de vida e capturar"}
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div className="overflow-hidden rounded-xl border border-[var(--g3-border)] bg-slate-50">
+                  {modoFace === "cadastro" ? (
+                    previewFaceAtual ? (
+                      <img
+                        src={resolverPreviewFace(previewFaceAtual)}
+                        alt="Prévia da face cadastrada"
+                        className="h-56 w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-56 items-center justify-center px-4 text-center text-sm text-[var(--g3-muted)]">
+                        Nenhuma imagem preparada.
+                      </div>
+                    )
+                  ) : previewFaceAtual ? (
+                    <img
+                      src={resolverPreviewFace(previewFaceAtual)}
+                      alt="Prévia da face para marcação"
+                      className="h-56 w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-56 items-center justify-center px-4 text-center text-sm text-[var(--g3-muted)]">
+                      Capture a face para concluir a validação.
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-[var(--g3-muted)]">
+                  {modoFace === "cadastro"
+                    ? "Ao salvar, a face do usuário fica pronta para validação no registro de ponto."
+                    : "A captura atual será usada junto com a senha na confirmação da marcação, após a prova de vida com duas piscadas ou leve movimento do rosto."}
+                </p>
+                {modoFace === "confirmacao" ? (
+                  <div
+                    className={`rounded-lg border px-3 py-2 text-xs ${
+                      statusPiscada === "detectada"
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                        : statusPiscada === "falha"
+                          ? "border-red-200 bg-red-50 text-red-700"
+                          : "border-amber-200 bg-amber-50 text-amber-700"
+                    }`}
+                  >
+                    {statusPiscada === "detectada"
+                      ? "Prova de vida validada. A face foi aceita para a confirmação do ponto."
+                      : statusPiscada === "falha"
+                        ? "A prova de vida falhou. Tente novamente com duas piscadas ou uma leve virada do rosto."
+                        : "Ao iniciar a validação, olhe para a câmera por alguns segundos e faça duas piscadas ou uma leve virada do rosto."}
+                  </div>
+                ) : null}
+                {previewFaceAtual ? (
+                  <div className="flex justify-end">
+                    <Button type="button" variant="outline" onClick={() => setPopupFaceAberto(false)}>
+                      Usar esta captura
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
             </div>
           </div>
         </div>
@@ -1213,7 +1972,7 @@ export function RegistroPontoPage() {
           >
             <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
               <div className="space-y-1">
-                <h3 className="text-base font-semibold text-slate-900">Localizacao registrada</h3>
+                <h3 className="text-base font-semibold text-slate-900">Localização registrada</h3>
                 <p className="text-xs text-slate-500">
                   {localizacaoHistoricoSelecionada.acao}
                   {localizacaoHistoricoSelecionada.usuario ? ` | ${localizacaoHistoricoSelecionada.usuario}` : ""}
@@ -1228,7 +1987,7 @@ export function RegistroPontoPage() {
               <p className="text-sm text-slate-700">
                 Latitude {localizacaoHistoricoSelecionada.latitude.toFixed(6)} | Longitude {localizacaoHistoricoSelecionada.longitude.toFixed(6)}
                 {typeof localizacaoHistoricoSelecionada.accuracy_metros === "number"
-                  ? ` | Precisao aproximada de ${Math.round(localizacaoHistoricoSelecionada.accuracy_metros)} m`
+                  ? ` | Precisão aproximada de ${Math.round(localizacaoHistoricoSelecionada.accuracy_metros)} m`
                   : ""}
               </p>
               <div className="overflow-hidden rounded-xl border border-[var(--g3-border)]">
@@ -1247,7 +2006,7 @@ export function RegistroPontoPage() {
                     radius={10}
                     pathOptions={{ color: "#0f766e", fillColor: "#14b8a6", fillOpacity: 0.78 }}
                   >
-                    <Popup>Origem da localizacao do registro de ponto</Popup>
+                    <Popup>Origem da localização do registro de ponto</Popup>
                   </CircleMarker>
                   {typeof localizacaoHistoricoSelecionada.accuracy_metros === "number" ? (
                     <Circle
@@ -1265,3 +2024,6 @@ export function RegistroPontoPage() {
     </section>
   );
 }
+
+
+

@@ -60,3 +60,7 @@ reportsRoutes.post(
   "/doacoes-realizadas/recibo",
   asyncHandler(controller.reciboDoacaoRealizada.bind(controller))
 );
+reportsRoutes.post(
+  "/registro-ponto/espelho",
+  asyncHandler(controller.espelhoPonto.bind(controller))
+);

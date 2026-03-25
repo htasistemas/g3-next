@@ -60,6 +60,52 @@ export function normalizarEmail(valor?: string | null) {
   return texto || "";
 }
 
+export function normalizarMoeda(valor?: string | number | null) {
+  if (typeof valor === "number") {
+    return Number.isFinite(valor) ? valor : 0;
+  }
+
+  const texto = valor?.trim();
+  if (!texto) return 0;
+
+  if (/^\d+$/.test(texto)) {
+    return Number(texto);
+  }
+
+  if (texto.includes(",")) {
+    const normalizado = texto.replace(/\./g, "").replace(",", ".");
+    const numero = Number(normalizado);
+    return Number.isFinite(numero) ? numero : 0;
+  }
+
+  if (texto.includes(".")) {
+    const partes = texto.split(".");
+    const ultimaParte = partes[partes.length - 1] ?? "";
+    const numero =
+      /^\d{1,2}$/.test(ultimaParte) && partes.length === 2
+        ? Number(texto)
+        : Number(texto.replace(/\./g, ""));
+    return Number.isFinite(numero) ? numero : 0;
+  }
+
+  const numero = Number(texto);
+  return Number.isFinite(numero) ? numero : 0;
+}
+
+export function formatarMoeda(valor?: number | null) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL"
+  }).format(Number(valor ?? 0));
+}
+
+export function formatarMoedaInput(valor?: string | number | null) {
+  return new Intl.NumberFormat("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(normalizarMoeda(valor));
+}
+
 export function validarEmail(valor?: string | null) {
   const email = normalizarEmail(valor);
   if (!email) return false;

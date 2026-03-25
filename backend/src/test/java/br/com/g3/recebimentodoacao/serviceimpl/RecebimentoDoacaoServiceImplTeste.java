@@ -1,4 +1,4 @@
-package br.com.g3.recebimentodoacao.serviceimpl;
+﻿package br.com.g3.recebimentodoacao.serviceimpl;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
@@ -98,9 +98,35 @@ class RecebimentoDoacaoServiceImplTeste {
   }
 
   @Test
+  void criarRecebimentoCampanhaDeveGerarMovimentacaoFinanceira() {
+    RecebimentoDoacaoRequest request = new RecebimentoDoacaoRequest();
+    request.setTipoDoacao("Doação financeira");
+    request.setStatus("RECEBIDA");
+    request.setDataRecebimento(LocalDate.of(2026, 2, 10));
+    request.setValor(new BigDecimal("300.00"));
+
+    ContaBancaria conta = new ContaBancaria();
+    conta.setId(77L);
+    when(contaBancariaRepository.listarRecebimentoLocal()).thenReturn(List.of(conta));
+    when(movimentacaoFinanceiraRepository.existePorDoacaoId(any())).thenReturn(false);
+    when(almoxarifadoRepository.existeMovimentacaoPorDoacaoId(any())).thenReturn(false);
+    when(patrimonioRepository.existePorDoacaoId(any())).thenReturn(false);
+
+    when(recebimentoRepository.salvar(any())).thenAnswer(invocation -> {
+      RecebimentoDoacao recebimento = invocation.getArgument(0);
+      recebimento.setId(10L);
+      return recebimento;
+    });
+
+    service.criarRecebimento(request);
+
+    verify(contabilidadeService, times(1)).criarMovimentacao(any(MovimentacaoFinanceiraRequest.class));
+  }
+
+  @Test
   void criarRecebimentoItensDeveGerarEntradaAlmoxarifado() {
     RecebimentoDoacaoRequest request = new RecebimentoDoacaoRequest();
-    request.setTipoDoacao("Alimentos");
+    request.setTipoDoacao("Doação de bens de consumo");
     request.setStatus("RECEBIDA");
     request.setDataRecebimento(LocalDate.of(2026, 2, 10));
     request.setDescricao("Arroz");
@@ -131,7 +157,7 @@ class RecebimentoDoacaoServiceImplTeste {
   @Test
   void criarRecebimentoBensDeveGerarPatrimonio() {
     RecebimentoDoacaoRequest request = new RecebimentoDoacaoRequest();
-    request.setTipoDoacao("Bens");
+    request.setTipoDoacao("Doação de bens permanentes");
     request.setStatus("RECEBIDA");
     request.setDataRecebimento(LocalDate.of(2026, 2, 10));
 
@@ -178,3 +204,4 @@ class RecebimentoDoacaoServiceImplTeste {
     verify(contabilidadeService, never()).criarMovimentacao(any());
   }
 }
+

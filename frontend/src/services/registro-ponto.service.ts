@@ -3,6 +3,8 @@ import type {
   RegistroPontoAlertaPendente,
   RegistroPontoAjustePayload,
   RegistroPontoEspelhoResponse,
+  RegistroPontoFacePayload,
+  RegistroPontoFaceStatus,
   RegistroPontoFiltro,
   RegistroPontoHorarioTrabalho,
   RegistroPontoHorarioTrabalhoPayload,
@@ -44,6 +46,19 @@ export const registroPontoService = {
     return data;
   },
 
+  async buscarFace(): Promise<RegistroPontoFaceStatus> {
+    const { data } = await httpClient.get<RegistroPontoFaceStatus>("/api/registro-ponto/face");
+    return data;
+  },
+
+  async salvarFace(payload: RegistroPontoFacePayload): Promise<RegistroPontoFaceStatus & { mensagem: string }> {
+    const { data } = await httpClient.put<RegistroPontoFaceStatus & { mensagem: string }>(
+      "/api/registro-ponto/face",
+      payload
+    );
+    return data;
+  },
+
   async salvarConfiguracao(payload: RegistroPontoHorarioTrabalhoPayload): Promise<RegistroPontoHorarioTrabalho> {
     const { data } = await httpClient.put<RegistroPontoHorarioTrabalho>("/api/registro-ponto/configuracao", payload);
     return data;
@@ -78,5 +93,13 @@ export const registroPontoService = {
   async buscarHistorico(id: string): Promise<RegistroPontoHistoricoResponse> {
     const { data } = await httpClient.get<RegistroPontoHistoricoResponse>(`/api/registro-ponto/${id}/historico`);
     return data;
+  },
+
+  async gerarEspelhoPontoPdf(payload: Record<string, unknown>) {
+    const { data } = await httpClient.get("/api/registro-ponto/espelho/pdf", {
+      params: payload,
+      responseType: "blob"
+    });
+    return data as Blob;
   }
 };

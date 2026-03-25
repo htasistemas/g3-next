@@ -67,11 +67,22 @@ export type RegistroPontoFiltro = {
 export type RegistroPontoMarcarPayload = {
   usuario_login: string;
   senha: string;
+  face_imagem: string;
   latitude?: number;
   longitude?: number;
   accuracy_metros?: number;
   origem_manual?: string;
   validar_localizacao?: boolean;
+};
+
+export type RegistroPontoFaceStatus = {
+  face_cadastrada: boolean;
+  face_url?: string;
+  face_cadastrada_em?: string;
+};
+
+export type RegistroPontoFacePayload = {
+  face_imagem: string;
 };
 
 export type RegistroPontoMarcarResponse = {

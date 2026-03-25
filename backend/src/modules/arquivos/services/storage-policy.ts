@@ -4,6 +4,7 @@ export type StorageScopeKey =
   | "banco_empregos_documento"
   | "biblioteca_capa"
   | "colaborador_foto"
+  | "colaborador_face"
   | "colaborador_documento"
   | "instituicao_documento"
   | "instituicao_imagem"
@@ -127,6 +128,16 @@ export const storagePolicies: Record<StorageScopeKey, StoragePolicy> = {
   colaborador_foto: {
     entidadeTipo: "colaborador",
     categoria: "foto",
+    subdirectory: "colaboradores/fotos",
+    allowedExtensions: imageExtensions,
+    allowedMimeTypes: imageMimeTypes,
+    maxSizeBytes: 5 * 1024 * 1024,
+    imageOnly: true,
+    generateThumbnail: true
+  },
+  colaborador_face: {
+    entidadeTipo: "colaborador",
+    categoria: "face",
     subdirectory: "colaboradores/fotos",
     allowedExtensions: imageExtensions,
     allowedMimeTypes: imageMimeTypes,

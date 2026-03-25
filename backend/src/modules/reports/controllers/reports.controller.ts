@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import type { AuthenticatedRequest } from "../../auth/middlewares/auth.middleware.js";
 import { formatoRelatorioSchema } from "../reports.schema.js";
 import { ReportsService } from "../services/reports.service.js";
 
@@ -108,6 +109,12 @@ export class ReportsController {
   async reciboDoacaoRealizada(request: Request, response: Response) {
     const formato = formatoRelatorioSchema.parse(request.query.formato);
     const resultado = await service.gerarReciboDoacaoRealizada(request.body);
+    return responderRelatorio(response, resultado, formato);
+  }
+
+  async espelhoPonto(request: AuthenticatedRequest, response: Response) {
+    const formato = formatoRelatorioSchema.parse(request.query.formato);
+    const resultado = await service.gerarEspelhoPonto(request.body, request.authUser);
     return responderRelatorio(response, resultado, formato);
   }
 }

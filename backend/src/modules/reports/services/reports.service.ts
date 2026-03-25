@@ -5,6 +5,7 @@ import { RegistroDoacaoService } from "../../registro-doacao/services/registro-d
 import { DoacaoRealizadaService } from "../../doacoes-realizadas/services/doacao-realizada.service.js";
 import { UnidadeAssistencialService } from "../../unidades-assistenciais/services/unidade-assistencial.service.js";
 import { VoluntarioService } from "../../voluntarios/services/voluntario.service.js";
+import { RegistroPontoService } from "../../registro-ponto/services/registro-ponto.service.js";
 import { ReportsRepository } from "../repositories/reports.repository.js";
 import {
   RelatorioTemplatePadrao,
@@ -25,6 +26,7 @@ import {
   matriculasRelacaoRequestSchema,
   profissionalFichaRequestSchema,
   profissionalRelacaoRequestSchema,
+  registroPontoEspelhoRequestSchema,
   registroDoacaoRelacaoRequestSchema,
   termoAutorizacaoRequestSchema,
   unidadeAssistencialRelacaoRequestSchema,
@@ -50,6 +52,7 @@ export class ReportsService {
   private readonly doacaoRealizadaService = new DoacaoRealizadaService();
   private readonly unidadeAssistencialService = new UnidadeAssistencialService();
   private readonly voluntarioService = new VoluntarioService();
+  private readonly registroPontoService = new RegistroPontoService();
   private readonly repository = new ReportsRepository();
   private readonly template = new RelatorioTemplatePadrao();
   private readonly renderer = new HtmlPdfRenderer();
@@ -1270,5 +1273,95 @@ export class ReportsService {
     const html = this.template.montarHtml(relatorioInput);
     const pdf = await this.renderer.render(html, contexto.rodape, relatorioInput);
     return { html, pdf, filename: "relacao-unidades-assistenciais.pdf" };
+  }
+
+  private formatarMinutosRelatorio(totalMinutos?: number) {
+    const valor = Number(totalMinutos ?? 0);
+    const sinal = valor < 0 ? "-" : "";
+    const absoluto = Math.abs(valor);
+    const horas = Math.floor(absoluto / 60);
+    const minutos = absoluto % 60;
+    return `${sinal}${horas}h ${String(minutos).padStart(2, "0")}m`;
+  }
+
+  async gerarEspelhoPonto(rawPayload: unknown, authUser?: any): Promise<RelatorioResultado> {
+    const payload = registroPontoEspelhoRequestSchema.parse(rawPayload);
+    const ator = {
+      id: authUser?.id ? BigInt(authUser.id) : (payload.usuario_id ? BigInt(payload.usuario_id) : undefined),
+      nome_usuario: authUser?.nomeUsuario || payload.usuarioEmissor || "Sistema G3-Next",
+      permissoes: authUser?.permissoes || ["ADMINISTRADOR"]
+    };
+
+    const espelhoData = await this.registroPontoService.listarEspelho(
+      {
+        data_inicial: payload.data_inicial,
+        data_final: payload.data_final,
+        usuario_id: payload.usuario_id,
+        status: payload.status,
+        ocorrencia: payload.ocorrencia,
+        somente_alterados: payload.somente_alterados,
+        somente_inconsistencias: payload.somente_inconsistencias
+      },
+      ator
+    );
+
+    const registros = espelhoData.registros ?? [];
+    const totais = espelhoData.totais;
+
+    const contexto = await this.montarContextoInstitucional();
+    const relatorioInput: RelatorioHtmlInput = {
+      titulo: "Espelho de Ponto Individual",
+      metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),
+      descricao: `Relatório detalhado de marcações de ponto e apuração de horas${
+        registros[0]?.usuario_nome ? ` para o colaborador ${registros[0].usuario_nome}` : ""
+      }.`,
+      blocos: [
+        {
+          titulo: "Resumo do Período",
+          colunas: 3,
+          destaque: true,
+          campos: [
+            this.campo("Total de dias", String(totais?.total_dias ?? 0)),
+            this.campo("Horas extras", this.formatarMinutosRelatorio(totais?.horas_extras_minutos)),
+            this.campo("Banco de horas", this.formatarMinutosRelatorio(totais?.banco_horas_minutos)),
+            this.campo("Atrasos", this.formatarMinutosRelatorio(totais?.atrasos_minutos)),
+            this.campo("Faltas", this.formatarMinutosRelatorio(totais?.faltas_minutos)),
+            this.campo("Ajustes realizados", String(totais?.total_ajustes ?? 0))
+          ]
+        }
+      ],
+      tabela: {
+        colunas: [
+          { titulo: "Data", largura: "10%" },
+          { titulo: "E1", largura: "7%" },
+          { titulo: "S1", largura: "7%" },
+          { titulo: "E2", largura: "7%" },
+          { titulo: "S2", largura: "7%" },
+          { titulo: "Extra", largura: "10%" },
+          { titulo: "Banco", largura: "10%" },
+          { titulo: "Atraso", largura: "10%" },
+          { titulo: "Falta", largura: "10%" },
+          { titulo: "Ocorrências", largura: "22%" }
+        ],
+        linhas: registros.map((item) => [
+          this.formatarData(item.data),
+          item.entrada_1?.slice(0, 5) || "---",
+          item.saida_1?.slice(0, 5) || "---",
+          item.entrada_2?.slice(0, 5) || "---",
+          item.saida_2?.slice(0, 5) || "---",
+          this.formatarMinutosRelatorio(item.horas_extras_minutos),
+          this.formatarMinutosRelatorio(item.banco_horas_minutos),
+          this.formatarMinutosRelatorio(item.atrasos_minutos),
+          this.formatarMinutosRelatorio(item.faltas_minutos),
+          item.ocorrencias?.join(", ") || "---"
+        ])
+      },
+      cabecalho: contexto.cabecalho,
+      rodape: contexto.rodape
+    };
+
+    const html = this.template.montarHtml(relatorioInput);
+    const pdf = await this.renderer.render(html, contexto.rodape, relatorioInput);
+    return { html, pdf, filename: `espelho-ponto-${payload.usuario_id || "geral"}.pdf` };
   }
 }

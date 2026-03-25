@@ -1,5 +1,279 @@
-{
+﻿{
     "entries":  [
+                    {
+                        "version":  "1.00.313",
+                        "releaseDate":  "2026-03-25",
+                        "title":  "Erro real no salvamento de documentos do beneficiário",
+                        "description":  "O cadastro de beneficiário passou a devolver o motivo real das falhas ao salvar documentos, em vez de exibir apenas erro interno do servidor.",
+                        "changes":  [
+                                        "Processamento de foto e documentos com tratamento específico por arquivo no backend.",
+                                        "Mensagens agora informam qual documento falhou e o motivo retornado pelo processamento.",
+                                        "Falhas de banco na gravação dos documentos passaram a devolver explicação operacional mais clara.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.312",
+                        "releaseDate":  "2026-03-25",
+                        "title":  "Salvamento consolidado pelos itens recebidos",
+                        "description":  "O registro de doação passou a consolidar quantidade e valores automaticamente a partir dos itens lançados na aba Itens recebidos.",
+                        "changes":  [
+                                        "Quantidade total do registro calculada pela soma das quantidades dos itens.",
+                                        "Valor total do registro calculado pela soma dos valores totais dos itens lançados.",
+                                        "Valor médio do registro recalculado automaticamente no salvamento quando houver itens.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.311",
+                        "releaseDate":  "2026-03-25",
+                        "title":  "Itens recebidos com cálculo automático de valor total",
+                        "description":  "A aba Itens recebidos foi ajustada para remover Unidade, mascarar Valor unitário e calcular automaticamente o Valor total.",
+                        "changes":  [
+                                        "Campo Unidade removido do formulário e da grade de itens recebidos.",
+                                        "Campo Valor unitário ajustado para máscara monetária brasileira no front-end.",
+                                        "Campo Valor total exibido com máscara monetária e cálculo automático por quantidade x valor unitário.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.310",
+                        "releaseDate":  "2026-03-25",
+                        "title":  "Cadastro do doador alinhado ao padrão da migração",
+                        "description":  "A aba Cadastro do doador passou a seguir o padrão de digitação livre, normalização no blur e normalização final antes do salvamento.",
+                        "changes":  [
+                                        "Campo Nome mantido livre durante a digitação, sem bloquear espaços entre palavras.",
+                                        "Campos Nome, E-mail, Telefone, Cidade e UF normalizados ao sair do campo.",
+                                        "Payload do doador centralizado com normalização textual, e-mail em minúsculo, UF em maiúsculo e números limpos antes de salvar.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.309",
+                        "releaseDate":  "2026-03-25",
+                        "title":  "Campo nome do doador com espaço liberado",
+                        "description":  "A aba Cadastro do doador foi ajustada para permitir digitação normal com espaço no campo Nome.",
+                        "changes":  [
+                                        "Formatação do campo Nome removida do onChange para não bloquear o espaço antes da próxima palavra.",
+                                        "Normalização do nome mantida no blur para preservar o padrão visual em pt-BR.",
+                                        "Campo Cidade alinhado ao mesmo comportamento para evitar perda de espaço durante a digitação.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.308",
+                        "releaseDate":  "2026-03-25",
+                        "title":  "Lista fixa de doadores cadastrados",
+                        "description":  "A aba Cadastro do doador passou a exibir a lista dos doadores cadastrados logo abaixo do card Buscar doadores.",
+                        "changes":  [
+                                        "Lista completa de doadores cadastrados exibida abaixo do card de busca.",
+                                        "Seleção rápida do doador mantida a partir da nova lista fixa.",
+                                        "Busca por termo preservada sem depender da lista geral.",
+                                        "Versão oficial atualizada na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.307",
+                        "releaseDate":  "2026-03-25",
+                        "title":  "Tipo de doação preservado ao mudar de campo",
+                        "description":  "A aba Dados da doação foi ajustada para não perder mais o valor do campo Tipo de doação ao sair para o campo Status.",
+                        "changes":  [
+                                        "Remoção da formatação indevida em blur no campo Tipo de doação.",
+                                        "Mapa central de formatação atualizado para não interferir em select fechado.",
+                                        "Seleção do tipo mantida ao navegar entre campos da aba Dados da doação.",
+                                        "Versão oficial atualizada na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.306",
+                        "releaseDate":  "2026-03-25",
+                        "title":  "Popup menor e doador com cidade/UF preservados",
+                        "description":  "A tela de recebimento de doações teve novo ajuste no popup de mensagens e na preservação dos dados do doador selecionado.",
+                        "changes":  [
+                                        "Popup de WhatsApp e E-mail reduzido para não ocupar visualmente a área do menu.",
+                                        "Doador selecionado agora preserva cidade e UF no card de mensagens.",
+                                        "Seleção e limpeza do doador alinhadas para manter os dados exibidos corretamente.",
+                                        "Versão oficial atualizada na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.305",
+                        "releaseDate":  "2026-03-25",
+                        "title":  "Popup de mensagens ajustado na tela de doações",
+                        "description":  "O popup de WhatsApp e E-mail da aba Cadastro do doador foi ajustado para permanecer dentro dos limites visíveis da tela.",
+                        "changes":  [
+                                        "Dialog de envio de mensagens com largura e altura responsivas.",
+                                        "Rolagem interna preservada sem estourar a viewport.",
+                                        "Popup da aba Cadastro do doador estabilizado para telas menores e zoom.",
+                                        "Versão oficial atualizada na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.304",
+                        "releaseDate":  "2026-03-25",
+                        "title":  "Persistência entre abas no recebimento de doações",
+                        "description":  "Os campos da aba Dados da doação passaram a manter os valores selecionados corretamente ao navegar entre as abas da tela.",
+                        "changes":  [
+                                        "Campo Tipo de doação preservado ao trocar de aba.",
+                                        "Valores do formulário mantidos entre abas com ajuste na configuração do react-hook-form.",
+                                        "Fluxo da tela de recebimento de doações estabilizado para navegação sem perda de dados.",
+                                        "Versão oficial atualizada na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.303",
+                        "releaseDate":  "2026-03-25",
+                        "title":  "Dados da doação simplificados",
+                        "description":  "A aba Dados da doação foi simplificada para manter apenas os dados principais do registro, deixando os itens exclusivamente na aba Itens recebidos.",
+                        "changes":  [
+                                        "Aba Dados da doação mantida apenas com doador, tipo, status, data de recebimento e observações.",
+                                        "Campos de itens e valores removidos da aba Dados da doação para evitar redundância.",
+                                        "Aba Itens recebidos mantida como ponto único para lançamento dos itens da doação.",
+                                        "Manual do sistema atualizado com a nova organização da tela."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.302",
+                        "releaseDate":  "2026-03-25",
+                        "title":  "Periodicidade única no recebimento de doações",
+                        "description":  "A aba Dados da doação passou a oferecer a opção Única no campo Periodicidade, mantendo a tela revisada em pt-BR.",
+                        "changes":  [
+                                        "Campo Periodicidade atualizado com a opção Única.",
+                                        "Manual do sistema ajustado para refletir a nova opção no fluxo de doações.",
+                                        "Tela de recebimento de doações mantida alinhada ao padrão pt-BR.",
+                                        "Versão oficial atualizada na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.301",
+                        "releaseDate":  "2026-03-25",
+                        "title":  "Doações em pt-BR e prova de vida reforçada",
+                        "description":  "A tela de recebimento de doações teve a acentuação revisada em todas as abas e o registro de ponto ganhou uma prova de vida mais forte na validação facial.",
+                        "changes":  [
+                                        "Textos da tela de recebimento de doações revisados e padronizados em português do Brasil.",
+                                        "Mensagens, labels, abas e modais de doações corrigidos para pt-BR.",
+                                        "Validação facial do registro de ponto reforçada para exigir duas piscadas ou uma leve virada do rosto.",
+                                        "Manual do sistema atualizado com as regras atuais das duas telas."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.300",
+                        "releaseDate":  "2026-03-25",
+                        "title":  "Prova de vida por piscada no registro de ponto",
+                        "description":  "A confirmação facial do registro de ponto passou a exigir uma piscada para reforçar a validação de que há uma pessoa real diante da câmera.",
+                        "changes":  [
+                                        "Fluxo da aba Registrar ponto ajustado para solicitar piscada na captura facial de confirmação.",
+                                        "Modal facial passou a orientar a prova de vida e exibir o status da piscada.",
+                                        "Captura da confirmação só é aceita após variação compatível com piscada.",
+                                        "Manual do sistema atualizado com a nova regra operacional."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.299",
+                        "releaseDate":  "2026-03-25",
+                        "title":  "Validação facial mais rígida no registro de ponto",
+                        "description":  "O registro de ponto passou a recusar com mais rigor a confirmação facial quando a face capturada não corresponde à face cadastrada do usuário.",
+                        "changes":  [
+                                        "Comparação facial endurecida no backend para reduzir aceitação indevida.",
+                                        "Registro do ponto recusado quando a face capturada divergir da face cadastrada.",
+                                        "Teste automatizado adicionado para a regra de correspondência facial.",
+                                        "Manual do sistema atualizado com a regra de recusa por face divergente."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.298",
+                        "releaseDate":  "2026-03-25",
+                        "title":  "Cadastro facial com prévia e molde de captura",
+                        "description":  "A aba Cadastro facial do registro de ponto passou a exibir a imagem capturada imediatamente e ganhou um molde visual para centralizar o rosto na câmera.",
+                        "changes":  [
+                                        "Prévia da face capturada mantida visível no modal antes do fechamento.",
+                                        "Molde visual do rosto adicionado sobre a câmera para orientar o enquadramento.",
+                                        "Botão para confirmar o uso da captura incluído no fluxo facial.",
+                                        "Manual do sistema atualizado com a nova orientação de captura."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.297",
+                        "releaseDate":  "2026-03-25",
+                        "title":  "Registro de ponto com textos revisados em pt-BR",
+                        "description":  "A tela de registro de ponto foi revisada aba por aba para corrigir a acentuação e padronizar os textos exibidos em português do Brasil.",
+                        "changes":  [
+                                        "Textos da aba Registrar ponto corrigidos para pt-BR.",
+                                        "Textos da aba Cadastro facial corrigidos para pt-BR.",
+                                        "Textos auxiliares das abas Histórico e modais de localização corrigidos para pt-BR.",
+                                        "Manual do sistema atualizado com a nomenclatura correta do fluxo de registro de ponto."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.296",
+                        "releaseDate":  "2026-03-25",
+                        "title":  "Doações simplificadas e cadastro facial revisado",
+                        "description":  "A aba Dados da doação passou a usar apenas três tipos oficiais e a aba Cadastro facial do registro de ponto teve os textos ajustados para pt-BR, mantendo a validação facial na marcação.",
+                        "changes":  [
+                                        "Campo Tipo de doação reduzido para Doação financeira, Doação de bens de consumo e Doação de bens permanentes.",
+                                        "Forma de recebimento mantida apenas para Doação financeira, com destino operacional preservado por módulo.",
+                                        "Aba Cadastro facial do registro de ponto revisada com acentuação corrigida no padrão português do Brasil.",
+                                        "Reconhecimento facial mantido na validação do ponto junto com a senha do usuário."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.294",
+                        "releaseDate":  "2026-03-25",
+                        "title":  "Cadastro facial separado da marcaÃ§Ã£o do ponto",
+                        "description":  "O cadastro da face do usuÃ¡rio foi movido para uma aba prÃ³pria, mantendo a validaÃ§Ã£o facial junto com a senha apenas no momento de registrar o ponto.",
+                        "changes":  [
+                                        "Nova aba Cadastro facial dentro da tela de registro de ponto.",
+                                        "A aba Registrar ponto ficou focada apenas na marcaÃ§Ã£o e na confirmaÃ§Ã£o por senha mais face atual.",
+                                        "Fluxo operacional ajustado para separar claramente o cadastro facial da batida de ponto.",
+                                        "VersÃ£o oficial atualizada na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.293",
+                        "releaseDate":  "2026-03-25",
+                        "title":  "Registro de ponto com validaÃ§Ã£o facial e senha",
+                        "description":  "A aba Registrar ponto agora permite cadastrar a face do usuÃ¡rio e exige validaÃ§Ã£o facial junto com a senha no momento da marcaÃ§Ã£o.",
+                        "changes":  [
+                                        "Nova seÃ§Ã£o de validaÃ§Ã£o facial na tela de registro de ponto para cadastrar ou atualizar a face do usuÃ¡rio.",
+                                        "ConfirmaÃ§Ã£o da batida ajustada para exigir usuÃ¡rio, senha e captura facial atual antes do envio.",
+                                        "Backend preparado para armazenar a imagem facial em arquivo no storage e validar a face cadastrada na marcaÃ§Ã£o.",
+                                        "Manual do sistema e versÃ£o oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.292",
+                        "releaseDate":  "2026-03-25",
+                        "title":  "Recebimento de doaÃ§Ãµes com classificaÃ§Ã£o oficial por mÃ³dulo",
+                        "description":  "A tela de recebimento de doaÃ§Ãµes passou a usar a nova classificaÃ§Ã£o oficial por tipo, com destino operacional visÃ­vel e alinhamento da automaÃ§Ã£o para os mÃ³dulos do sistema.",
+                        "changes":  [
+                                        "Tipo de doaÃ§Ã£o atualizado para a nova lista oficial com categorias financeiras, bens de consumo, bens permanentes, campanhas, empresas, recorrentes, eventos e incentivadas.",
+                                        "Destino operacional exibido ao lado do tipo com classificaÃ§Ã£o por Contabilidade, Almoxarifado, PatrimÃ´nio, Parcerias, Assinatura ou Eventos.",
+                                        "Formas de recebimento ajustadas para o fluxo financeiro da tela.",
+                                        "Backend de recebimento de doaÃ§Ãµes alinhado para continuar gerando entrada automÃ¡tica em Contabilidade, Almoxarifado e PatrimÃ´nio conforme a nova classificaÃ§Ã£o.",
+                                        "Manual do sistema e versÃ£o oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
                                                                                                     {
                         "version":  "1.00.289",
                         "releaseDate":  "2026-03-24",
@@ -118,7 +392,7 @@
                         "version":  "1.00.280",
                         "releaseDate":  "2026-03-23",
                         "title":  "Modelo inicial do Setor vendas",
-                        "description":  "Atualiza��o local da inst�ncia com o novo menu de vendas e frente de caixa em tela exclusiva para avalia��o do fluxo.",
+                        "description":  "Atualizaï¿½ï¿½o local da instï¿½ncia com o novo menu de vendas e frente de caixa em tela exclusiva para avaliaï¿½ï¿½o do fluxo.",
                         "changes":  [
                                         "Novo acesso Setor vendas \u003e Frente de caixa.",
                                         "Tela dedicada para operacao do caixa com busca, itens, totalizacao e pagamento visual.",
@@ -130,46 +404,46 @@
                     {
                         "version":  "1.00.269",
                         "releaseDate":  "2026-03-22",
-                        "title":  "Licença guiada com vigência em dias",
-                        "description":  "Atualização local da instância com nova experiência comercial da licença e histórico financeiro persistido.",
+                        "title":  "LicenÃ§a guiada com vigÃªncia em dias",
+                        "description":  "AtualizaÃ§Ã£o local da instÃ¢ncia com nova experiÃªncia comercial da licenÃ§a e histÃ³rico financeiro persistido.",
                         "changes":  [
-                                        "Vigência inicial em dias com cálculo automático da data final.",
-                                        "Histórico de pagamentos pendentes e pagos armazenado no backend.",
-                                        "Tela da licença simplificada para o usuário final."
+                                        "VigÃªncia inicial em dias com cÃ¡lculo automÃ¡tico da data final.",
+                                        "HistÃ³rico de pagamentos pendentes e pagos armazenado no backend.",
+                                        "Tela da licenÃ§a simplificada para o usuÃ¡rio final."
                                     ],
                         "releaseType":  "stable"
                     },
                     {
                         "version":  "1.00.268",
                         "releaseDate":  "2026-03-22",
-                        "title":  "Webhook automática na licença do G3N",
-                        "description":  "Atualização local da instância com preenchimento automático da webhook pública da licença.",
+                        "title":  "Webhook automÃ¡tica na licenÃ§a do G3N",
+                        "description":  "AtualizaÃ§Ã£o local da instÃ¢ncia com preenchimento automÃ¡tico da webhook pÃºblica da licenÃ§a.",
                         "changes":  [
-                                        "Webhook da InfinitePay preenchida automaticamente na tela da licença.",
-                                        "Persistência da URL pública padrão no salvamento da licença."
+                                        "Webhook da InfinitePay preenchida automaticamente na tela da licenÃ§a.",
+                                        "PersistÃªncia da URL pÃºblica padrÃ£o no salvamento da licenÃ§a."
                                     ],
                         "releaseType":  "stable"
                     },
                     {
                         "version":  "1.00.267",
                         "releaseDate":  "2026-03-22",
-                        "title":  "Checkout real da licença com InfinitePay",
-                        "description":  "Atualização local da instância com checkout real da licença do G3N e retorno de pagamento dentro do sistema.",
+                        "title":  "Checkout real da licenÃ§a com InfinitePay",
+                        "description":  "AtualizaÃ§Ã£o local da instÃ¢ncia com checkout real da licenÃ§a do G3N e retorno de pagamento dentro do sistema.",
                         "changes":  [
-                                        "Geração de link real da InfinitePay para a licença de uso.",
-                                        "Rota pública de retorno do pagamento criada no frontend.",
-                                        "Atualização automática da vigência quando o pagamento é confirmado."
+                                        "GeraÃ§Ã£o de link real da InfinitePay para a licenÃ§a de uso.",
+                                        "Rota pÃºblica de retorno do pagamento criada no frontend.",
+                                        "AtualizaÃ§Ã£o automÃ¡tica da vigÃªncia quando o pagamento Ã© confirmado."
                                     ],
                         "releaseType":  "stable"
                     },
                     {
                         "version":  "1.00.266",
                         "releaseDate":  "2026-03-22",
-                        "title":  "Licença de uso do G3N",
-                        "description":  "Atualização local da instância com a nova tela de licença, vínculo por CNPJ e alertas por e-mail.",
+                        "title":  "LicenÃ§a de uso do G3N",
+                        "description":  "AtualizaÃ§Ã£o local da instÃ¢ncia com a nova tela de licenÃ§a, vÃ­nculo por CNPJ e alertas por e-mail.",
                         "changes":  [
-                                        "Nova tela de Licença de uso em Configurações gerais.",
-                                        "Persistência de plano, ciclo e dados de recebimento via InfinityPay.",
+                                        "Nova tela de LicenÃ§a de uso em ConfiguraÃ§Ãµes gerais.",
+                                        "PersistÃªncia de plano, ciclo e dados de recebimento via InfinityPay.",
                                         "Alertas de vencimento enviados apenas por e-mail sem bloqueio do sistema."
                                     ],
                         "releaseType":  "stable"
@@ -177,8 +451,8 @@
                     {
                         "version":  "1.00.265",
                         "releaseDate":  "2026-03-22",
-                        "title":  "Simplificação da consulta no almoxarifado",
-                        "description":  "Atualização local da instância com a remoção da aba duplicada de consulta.",
+                        "title":  "SimplificaÃ§Ã£o da consulta no almoxarifado",
+                        "description":  "AtualizaÃ§Ã£o local da instÃ¢ncia com a remoÃ§Ã£o da aba duplicada de consulta.",
                         "changes":  [
                                         "Aba Itens do almoxarifado removida.",
                                         "Consulta mantida somente na aba Listagem de produtos."
@@ -189,7 +463,7 @@
                         "version":  "1.00.264",
                         "releaseDate":  "2026-03-22",
                         "title":  "Listagem de produtos no almoxarifado",
-                        "description":  "Atualização local da instância com a nova aba de listagem de produtos.",
+                        "description":  "AtualizaÃ§Ã£o local da instÃ¢ncia com a nova aba de listagem de produtos.",
                         "changes":  [
                                         "Nova aba para visualizar todos os produtos do almoxarifado com a quantidade em estoque.",
                                         "Manual do sistema revisado na mesma entrega."
@@ -199,19 +473,19 @@
                     {
                         "version":  "1.00.263",
                         "releaseDate":  "2026-03-22",
-                        "title":  "Ajuste no popup de pendências do beneficiário",
-                        "description":  "Atualização local da instância com correção de rolagem no aviso de pendências.",
+                        "title":  "Ajuste no popup de pendÃªncias do beneficiÃ¡rio",
+                        "description":  "AtualizaÃ§Ã£o local da instÃ¢ncia com correÃ§Ã£o de rolagem no aviso de pendÃªncias.",
                         "changes":  [
-                                        "Popup de pendências com limite de altura e rolagem interna.",
-                                        "Botão de fechamento mantido acessível em listas extensas."
+                                        "Popup de pendÃªncias com limite de altura e rolagem interna.",
+                                        "BotÃ£o de fechamento mantido acessÃ­vel em listas extensas."
                                     ],
                         "releaseType":  "stable"
                     },
                     {
                         "version":  "1.00.262",
                         "releaseDate":  "2026-03-22",
-                        "title":  "Filtros estratégicos no georreferenciamento",
-                        "description":  "Atualização local da instância com novos botões e manual revisado.",
+                        "title":  "Filtros estratÃ©gicos no georreferenciamento",
+                        "description":  "AtualizaÃ§Ã£o local da instÃ¢ncia com novos botÃµes e manual revisado.",
                         "changes":  [
                                         "Tela de georreferenciamento com atalhos Idosos sozinhos, Aguardando cestas e Mapa de apoio e risco.",
                                         "Manual do sistema revisado na mesma entrega."
@@ -222,7 +496,7 @@
                         "version":  "0.0.0",
                         "releaseDate":  "2026-03-20",
                         "title":  "Base atual",
-                        "description":  "Estrutura inicial do mecanismo de atualização do sistema.",
+                        "description":  "Estrutura inicial do mecanismo de atualizaÃ§Ã£o do sistema.",
                         "changes":  [
                                         "Manifesto e changelog inicial criados automaticamente."
                                     ],
@@ -230,3 +504,4 @@
                     }
                 ]
 }
+

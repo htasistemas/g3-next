@@ -120,6 +120,6 @@ appRoutes.use(
 appRoutes.use(
   "/api/reports",
   ensureAuthenticated,
-  ensurePermissions(["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"]),
+  ensurePermissions(["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS", "PROFISSIONAL", "VOLUNTARIO"]),
   reportsRoutes
 );

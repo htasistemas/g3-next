@@ -216,8 +216,8 @@ export function MensagemEnvioDialog({
   if (!aberto) return null;
 
   const content = (
-    <div className={`grid gap-5 xl:grid-cols-[1.2fr_0.8fr] ${inline ? "" : "flex-1 overflow-y-auto p-5"}`}>
-      <section className="space-y-4 xl:min-w-0">
+    <div className={`min-h-0 grid gap-5 xl:grid-cols-[1.2fr_0.8fr] ${inline ? "" : "flex-1 overflow-y-auto p-5"}`}>
+      <section className="min-w-0 space-y-4 xl:min-w-0">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <div className="space-y-1">
             <Label>Canal</Label>
@@ -374,7 +374,7 @@ export function MensagemEnvioDialog({
         </div>
       </section>
 
-      <section className="space-y-4 xl:min-w-0">
+      <section className="min-w-0 space-y-4 xl:min-w-0">
         <div className="sticky top-0 space-y-4">
           <MensagemPreviewCard canal={canal} preview={preview} />
 
@@ -434,8 +434,8 @@ export function MensagemEnvioDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/55 px-4 py-6">
-      <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+    <div className="fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto bg-slate-950/55 px-3 py-3 sm:px-4 sm:py-6">
+      <div className="my-auto flex max-h-[calc(100vh-1.5rem)] w-full max-w-[min(920px,100vw-2.5rem)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl sm:max-h-[calc(100vh-3rem)] sm:max-w-[min(920px,100vw-3rem)]">
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
           <div>
             <h3 className="text-base font-semibold text-slate-900">Central de Envio de Mensagens</h3>

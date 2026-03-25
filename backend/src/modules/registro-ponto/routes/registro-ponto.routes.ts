@@ -10,8 +10,8 @@ const controller = new RegistroPontoController();
 
 export const registroPontoRoutes = Router();
 
-const permissoesLeitura = ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"];
-const permissoesMarcacao = ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"];
+const permissoesLeitura = ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS", "PROFISSIONAL", "VOLUNTARIO"];
+const permissoesMarcacao = ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS", "PROFISSIONAL", "VOLUNTARIO"];
 const permissoesAjuste = ["ADMINISTRADOR"];
 
 registroPontoRoutes.get(
@@ -35,6 +35,20 @@ registroPontoRoutes.get(
   asyncHandler(controller.buscarHorarioUsuario.bind(controller))
 );
 
+registroPontoRoutes.get(
+  "/face",
+  ensureAuthenticated,
+  ensurePermissions(permissoesMarcacao),
+  asyncHandler(controller.buscarFace.bind(controller))
+);
+
+registroPontoRoutes.put(
+  "/face",
+  ensureAuthenticated,
+  ensurePermissions(permissoesMarcacao),
+  asyncHandler(controller.salvarFace.bind(controller))
+);
+
 registroPontoRoutes.put(
   "/configuracao",
   ensureAuthenticated,
@@ -47,6 +61,13 @@ registroPontoRoutes.get(
   ensureAuthenticated,
   ensurePermissions(permissoesLeitura),
   asyncHandler(controller.listarEspelho.bind(controller))
+);
+
+registroPontoRoutes.get(
+  "/espelho/pdf",
+  ensureAuthenticated,
+  ensurePermissions(permissoesMarcacao),
+  asyncHandler(controller.gerarEspelhoPontoPdf.bind(controller))
 );
 
 registroPontoRoutes.post(
