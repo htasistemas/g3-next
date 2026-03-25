@@ -10,9 +10,7 @@ type BeneficiarioContatoRecord = {
   telefoneRecadoNumero: string | null;
   email: string | null;
   permiteContatoTel: boolean | null;
-  permiteContatoWhatsapp: boolean | null;
   permiteContatoSms: boolean | null;
-  permiteContatoEmail: boolean | null;
   horarioPreferencial: string | null;
 };
 
