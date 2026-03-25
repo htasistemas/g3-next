@@ -384,10 +384,6 @@ model CadastroVoluntario {
   motivacao              String?
   telefone               String?              @db.VarChar(30)
   email                  String               @db.VarChar(150)
-  permiteContatoWhatsapp Boolean?             @map("permite_contato_whatsapp")
-  permiteContatoEmail    Boolean?             @map("permite_contato_email")
-  preferenciaCanalComunicacao String?         @map("preferencia_canal_comunicacao") @db.VarChar(30)
-  aceiteComunicacaoMensagens Boolean?         @map("aceite_comunicacao_mensagens")
   cidade                 String?              @db.VarChar(150)
   estado                 String?              @db.VarChar(2)
   areaInteresse          String?              @map("area_interesse") @db.VarChar(150)

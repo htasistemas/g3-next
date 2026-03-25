@@ -1,6 +1,19 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.318",
+                        "releaseDate":  "2026-03-25",
+                        "title":  "Voluntariado compatível com base legada de produção",
+                        "description":  "O cadastro de voluntariado foi compatibilizado com a base legada de produção e passou a retornar mensagens mais claras quando houver falha no salvamento ou na foto.",
+                        "changes":  [
+                                        "Campos de comunicação ainda não existentes em alguns bancos de produção foram removidos do model Prisma de cadastro_voluntario.",
+                                        "Criação e atualização do voluntário agora tratam separadamente gravação do cadastro, vinculação da foto e limpeza da imagem antiga.",
+                                        "Falhas tratáveis do cadastro de voluntariado passam a devolver motivo operacional real, em vez de apenas erro interno do servidor.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.317",
                         "releaseDate":  "2026-03-25",
                         "title":  "Beneficiário compatível com base legada de produção",

@@ -262,6 +262,20 @@ const secoesManual: ManualSecao[] = [
           "Mensagens de erro do cadastro devem priorizar o motivo real da foto ou da gravação, sem cair em erro interno genérico quando houver tratamento possível.",
           "A compatibilidade com bases de produção legadas foi mantida removendo do ORM campos ainda não existentes na tabela cadastro_profissionais."
         ]
+      },
+      {
+        nome: "Cadastro de voluntariado",
+        objetivo: "Cadastrar e atualizar voluntários com dados pessoais, disponibilidade, endereço, interesses e foto do cadastro.",
+        comoUsar: [
+          "Preencha os dados do voluntário e salve normalmente em um clique após revisar nome, CPF, contatos, disponibilidade e área de interesse.",
+          "Quando houver foto 3x4, o sistema processa o arquivo antes do salvamento e informa o motivo real caso a imagem não possa ser utilizada.",
+          "Em produção, o cadastro foi ajustado para funcionar também em bases legadas que ainda não possuem colunas novas de comunicação na tabela cadastro_voluntario."
+        ],
+        atencoes: [
+          "Falhas tratáveis do cadastro ou da vinculação da foto agora retornam mensagem operacional em vez de apenas erro interno do servidor.",
+          "A limpeza de foto antiga no storage não deve mais derrubar a atualização do voluntário em produção.",
+          "A compatibilidade com a base legada foi mantida removendo do ORM os campos de comunicação ainda não existentes em alguns bancos de produção."
+        ]
       }
     ]
   },

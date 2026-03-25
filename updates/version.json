@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.317",
+  "latestVersion": "1.00.318",
   "releaseDate": "2026-03-25",
-  "description": "Cadastro de beneficiário compatibilizado com a base legada sem colunas novas em contato_beneficiario.",
+  "description": "Cadastro de voluntariado compatibilizado com a base legada e com tratamento de erro mais claro em produção.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.317",
+  "minCompatibleVersion": "1.00.318",
   "releaseType": "stable",
   "downloadUrl": null
 }
