@@ -89,9 +89,13 @@ function escapePowerShell(valor: string) {
   return valor.replaceAll("'", "''");
 }
 
+export function sanitizarConteudoJson(conteudo: string) {
+  return conteudo.charCodeAt(0) === 0xfeff ? conteudo.slice(1) : conteudo;
+}
+
 async function carregarJson<T>(arquivo: string) {
   const conteudo = await readFile(arquivo, "utf-8");
-  return JSON.parse(conteudo) as T;
+  return JSON.parse(sanitizarConteudoJson(conteudo)) as T;
 }
 
 function garantirDestinoSeguro(raiz: string, relativePath: string) {
