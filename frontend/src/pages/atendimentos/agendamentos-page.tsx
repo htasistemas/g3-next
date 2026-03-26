@@ -308,15 +308,15 @@ export function AgendamentosPage() {
                                     </div>
                                     <p className="truncate text-sm font-semibold text-[var(--g3-foreground)]">{item.beneficiarioNome}</p>
                                     <p className="text-xs text-[var(--g3-muted)]">
-                                      {item.tipoAtendimento} • {item.profissionalNome || "Sem profissional definido"}
+                                      {item.tipoAtendimento} - {item.profissionalNome || "Sem profissional definido"}
                                     </p>
                                     <p className="text-xs text-[var(--g3-muted)]">
-                                      {item.unidade || "Sem unidade"} • {item.setor || "Sem setor"}
-                                      {item.sala ? ` • Sala ${item.sala}` : ""}
+                                      {item.unidade || "Sem unidade"} - {item.setor || "Sem setor"}
+                                      {item.sala ? ` - Sala ${item.sala}` : ""}
                                     </p>
                                   </div>
                                   <div className="max-w-[280px] text-xs text-[var(--g3-muted)]">
-                                    {item.motivo || item.observacaoInterna || "Sem observação operacional."}
+                                    {item.motivo || item.observacaoInterna || "Sem observa--o operacional."}
                                   </div>
                                 </div>
                               </button>
