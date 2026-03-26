@@ -21,7 +21,7 @@ export function AIChatWidget() {
       </button>
 
       {isOpen ? (
-        <div className="fixed bottom-24 right-6 z-50 h-[640px] max-h-[82vh] w-[26rem] max-w-[92vw] overflow-hidden rounded-3xl">
+        <div className="fixed bottom-24 left-4 right-4 z-50 h-[640px] max-h-[82vh] overflow-hidden rounded-3xl sm:left-auto sm:right-6 sm:w-[26rem] sm:max-w-[92vw]">
           <AIConversationPanel
             variant="compact"
             context={{

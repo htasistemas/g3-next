@@ -831,25 +831,39 @@ export function OcorrenciasPage() {
     }
   }
 
+  const rotulosSalvarPorAba: Record<AbaId, string> = {
+    vitima: "Salvar vítima",
+    ocorrencia: "Salvar ocorrência",
+    autor: "Salvar possível autor",
+    classificacao: "Salvar classificação",
+    relato: "Salvar relato e encaminhamento"
+  };
+
   const acoes: AdminAction[] = [
-    { label: "Buscar", icon: Search, onClick: () => setAbrirBusca(true), variant: "outline" },
-    { label: "Novo", icon: Plus, onClick: novo, variant: "default", disabled: carregandoAcoes },
+    { label: "Buscar ocorrências", icon: Search, onClick: () => setAbrirBusca(true), variant: "outline" },
+    { label: "Nova ocorrência", icon: Plus, onClick: novo, variant: "default", disabled: carregandoAcoes },
     {
-      label: salvarMutation.isPending ? "Salvando..." : "Salvar",
+      label: salvarMutation.isPending ? "Salvando..." : rotulosSalvarPorAba[abaAtiva],
       icon: Save,
       onClick: () => void salvar(),
       variant: "default",
       disabled: carregandoAcoes
     },
-    { label: "Cancelar", icon: Undo2, onClick: cancelar, variant: "outline", disabled: carregandoAcoes },
+    { label: "Cancelar edição", icon: Undo2, onClick: cancelar, variant: "outline", disabled: carregandoAcoes },
     {
-      label: "Excluir",
+      label: "Excluir ocorrência",
       icon: Trash2,
       onClick: () => setConfirmarExcluir(true),
       variant: "danger",
       disabled: !form.id || carregandoAcoes
     },
-    { label: "Imprimir", icon: Printer, onClick: () => setAbrirImpressao(true), variant: "outline", disabled: !form.id },
+    {
+      label: "Imprimir ocorrência",
+      icon: Printer,
+      onClick: () => setAbrirImpressao(true),
+      variant: "outline",
+      disabled: !form.id
+    },
     { label: "Fechar", icon: X, onClick: () => navigate("/dashboard/visao-geral"), variant: "outline" }
   ];
 

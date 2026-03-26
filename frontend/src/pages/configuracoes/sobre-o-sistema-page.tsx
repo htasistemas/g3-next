@@ -302,7 +302,7 @@ export function SobreOSistemaPage() {
                     Autoria institucional
                   </p>
                   <p className="mt-2 text-base font-semibold leading-7 text-[var(--g3-active)] sm:text-lg">
-                    Desenvolvido por HTA Sistemas, sob o gerenciamento e desenvolvimento da Torresoft Soluções Empresariais.
+                    Desenvolvido por HTA Sistemas, sob o gerenciamento da Torresoft Soluções Empresariais.
                   </p>
                 </div>
               </div>

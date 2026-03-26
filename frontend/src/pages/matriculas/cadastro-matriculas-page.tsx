@@ -62,8 +62,7 @@ import { somenteDigitos, validarCpf } from "@/lib/validators";
 import {
   classeBotaoAbaLateral,
   classeNumeroAbaLateral,
-  classesTelaPadraoBeneficiario,
-  ordemAcoesCrudPadrao
+  classesTelaPadraoBeneficiario
 } from "@/lib/tela-padrao-beneficiario";
 import { useAuth } from "@/hooks/use-auth";
 import type {
@@ -90,7 +89,7 @@ const abas = [
 type AbaId = (typeof abas)[number]["id"];
 
 type AcaoCrud = {
-  label: (typeof ordemAcoesCrudPadrao)[number];
+  label: string;
   icon: LucideIcon;
   onClick: () => void;
   variant: "default" | "outline" | "danger" | "ghost";
@@ -2062,27 +2061,63 @@ export function CadastroMatriculasPage() {
     }
   }
 
-  const acoes: AcaoCrud[] = [
-    { label: "Buscar", icon: Search, onClick: buscar, variant: "outline" },
-    { label: "Novo", icon: Plus, onClick: novo, variant: "default", disabled: acaoEmAndamento },
-    {
-      label: "Salvar",
-      icon: Save,
-      onClick: () => void handleSubmit(salvar)(),
-      variant: "default",
-      disabled: acaoEmAndamento
-    },
-    { label: "Cancelar", icon: Undo2, onClick: cancelar, variant: "outline", disabled: acaoEmAndamento },
-    { label: "Excluir", icon: Trash2, onClick: excluir, variant: "danger", disabled: acaoEmAndamento },
-    {
-      label: "Imprimir",
-      icon: Printer,
-      onClick: () => void imprimir(),
-      variant: "outline",
-      disabled: acaoEmAndamento
-    },
-    { label: "Fechar", icon: X, onClick: fechar, variant: "outline" }
-  ];
+  const acoesPorAba: Record<AbaId, AcaoCrud[]> = {
+    listagem: [
+      { label: "Buscar inscrições", icon: Search, onClick: buscar, variant: "outline" },
+      { label: "Nova inscrição", icon: Plus, onClick: novo, variant: "default", disabled: acaoEmAndamento },
+      { label: "Salvar inscrição", icon: Save, onClick: () => void handleSubmit(salvar)(), variant: "default", disabled: acaoEmAndamento },
+      { label: "Cancelar edição", icon: Undo2, onClick: cancelar, variant: "outline", disabled: acaoEmAndamento },
+      { label: "Excluir inscrição", icon: Trash2, onClick: excluir, variant: "danger", disabled: acaoEmAndamento },
+      { label: "Imprimir inscrições", icon: Printer, onClick: () => void imprimir(), variant: "outline", disabled: acaoEmAndamento },
+      { label: "Fechar", icon: X, onClick: fechar, variant: "outline" }
+    ],
+    dados: [
+      { label: "Buscar inscrições", icon: Search, onClick: buscar, variant: "outline" },
+      { label: "Nova inscrição", icon: Plus, onClick: novo, variant: "default", disabled: acaoEmAndamento },
+      { label: "Salvar dados da inscrição", icon: Save, onClick: () => void handleSubmit(salvar)(), variant: "default", disabled: acaoEmAndamento },
+      { label: "Cancelar edição", icon: Undo2, onClick: cancelar, variant: "outline", disabled: acaoEmAndamento },
+      { label: "Excluir inscrição", icon: Trash2, onClick: excluir, variant: "danger", disabled: acaoEmAndamento },
+      { label: "Imprimir inscrições", icon: Printer, onClick: () => void imprimir(), variant: "outline", disabled: acaoEmAndamento },
+      { label: "Fechar", icon: X, onClick: fechar, variant: "outline" }
+    ],
+    catalogo: [
+      { label: "Buscar inscrições", icon: Search, onClick: buscar, variant: "outline" },
+      { label: "Nova inscrição", icon: Plus, onClick: novo, variant: "default", disabled: acaoEmAndamento },
+      { label: "Salvar catálogo e vagas", icon: Save, onClick: () => void handleSubmit(salvar)(), variant: "default", disabled: acaoEmAndamento },
+      { label: "Cancelar edição", icon: Undo2, onClick: cancelar, variant: "outline", disabled: acaoEmAndamento },
+      { label: "Excluir inscrição", icon: Trash2, onClick: excluir, variant: "danger", disabled: acaoEmAndamento },
+      { label: "Imprimir inscrições", icon: Printer, onClick: () => void imprimir(), variant: "outline", disabled: acaoEmAndamento },
+      { label: "Fechar", icon: X, onClick: fechar, variant: "outline" }
+    ],
+    inscricoes: [
+      { label: "Buscar inscrições", icon: Search, onClick: buscar, variant: "outline" },
+      { label: "Nova inscrição", icon: Plus, onClick: novo, variant: "default", disabled: acaoEmAndamento },
+      { label: "Salvar inscrições", icon: Save, onClick: () => void handleSubmit(salvar)(), variant: "default", disabled: acaoEmAndamento },
+      { label: "Cancelar edição", icon: Undo2, onClick: cancelar, variant: "outline", disabled: acaoEmAndamento },
+      { label: "Excluir inscrição", icon: Trash2, onClick: excluir, variant: "danger", disabled: acaoEmAndamento },
+      { label: "Imprimir inscrições", icon: Printer, onClick: () => void imprimir(), variant: "outline", disabled: acaoEmAndamento },
+      { label: "Fechar", icon: X, onClick: fechar, variant: "outline" }
+    ],
+    agenda: [
+      { label: "Buscar inscrições", icon: Search, onClick: buscar, variant: "outline" },
+      { label: "Nova inscrição", icon: Plus, onClick: novo, variant: "default", disabled: acaoEmAndamento },
+      { label: "Salvar agendamentos", icon: Save, onClick: () => void handleSubmit(salvar)(), variant: "default", disabled: acaoEmAndamento },
+      { label: "Cancelar edição", icon: Undo2, onClick: cancelar, variant: "outline", disabled: acaoEmAndamento },
+      { label: "Excluir inscrição", icon: Trash2, onClick: excluir, variant: "danger", disabled: acaoEmAndamento },
+      { label: "Imprimir inscrições", icon: Printer, onClick: () => void imprimir(), variant: "outline", disabled: acaoEmAndamento },
+      { label: "Fechar", icon: X, onClick: fechar, variant: "outline" }
+    ],
+    presenca: [
+      { label: "Buscar inscrições", icon: Search, onClick: buscar, variant: "outline" },
+      { label: "Nova inscrição", icon: Plus, onClick: novo, variant: "default", disabled: acaoEmAndamento },
+      { label: "Salvar presença", icon: Save, onClick: () => void handleSubmit(salvar)(), variant: "default", disabled: acaoEmAndamento },
+      { label: "Cancelar edição", icon: Undo2, onClick: cancelar, variant: "outline", disabled: acaoEmAndamento },
+      { label: "Excluir inscrição", icon: Trash2, onClick: excluir, variant: "danger", disabled: acaoEmAndamento },
+      { label: "Imprimir inscrições", icon: Printer, onClick: () => void imprimir(), variant: "outline", disabled: acaoEmAndamento },
+      { label: "Fechar", icon: X, onClick: fechar, variant: "outline" }
+    ]
+  };
+  const acoes = acoesPorAba[abaAtiva];
 
   return (
     <section className="w-full min-h-[calc(100vh-3.5rem)] px-2 py-2 sm:px-3 lg:px-4">
@@ -2100,13 +2135,11 @@ export function CadastroMatriculasPage() {
               </div>
 
               <div className={classesTelaPadraoBeneficiario.gradeAcoes}>
-                {ordemAcoesCrudPadrao.map((ordem) => {
-                  const acao = acoes.find((item) => item.label === ordem);
-                  if (!acao) return null;
+                {acoes.map((acao) => {
                   const Icone = acao.icon;
                   return (
                     <Button
-                      key={acao.label}
+                      key={`${abaAtiva}-${acao.label}`}
                       type="button"
                       variant={acao.variant}
                       onClick={acao.onClick}

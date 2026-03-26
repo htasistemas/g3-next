@@ -5,14 +5,16 @@ import type { ItemAlmoxarifado, MovimentacaoAlmoxarifado } from "@/types/almoxar
 export function useItensAlmoxarifado() {
   return useQuery({
     queryKey: ["almoxarifado", "itens"],
-    queryFn: () => almoxarifadoService.listarItens()
+    queryFn: () => almoxarifadoService.listarItens(),
+    refetchOnMount: "always"
   });
 }
 
 export function useMovimentacoesAlmoxarifado() {
   return useQuery({
     queryKey: ["almoxarifado", "movimentacoes"],
-    queryFn: () => almoxarifadoService.listarMovimentacoes()
+    queryFn: () => almoxarifadoService.listarMovimentacoes(),
+    refetchOnMount: "always"
   });
 }
 

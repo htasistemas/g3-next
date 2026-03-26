@@ -1,6 +1,126 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.335",
+                        "releaseDate":  "2026-03-26",
+                        "title":  "Almoxarifado com atualização imediata após recebimento de doação",
+                        "description":  "A interface passou a atualizar a listagem e as movimentações do almoxarifado logo após o registro de entrada automática vindo do recebimento de doações.",
+                        "changes":  [
+                                        "Salvar uma doação agora invalida também o cache de itens e movimentações do almoxarifado.",
+                                        "Tela do almoxarifado configurada para refazer a consulta ao abrir a listagem e as movimentações, evitando exibição de dados antigos em navegações internas.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.334",
+                        "releaseDate":  "2026-03-26",
+                        "title":  "Recebimento de doações com entrada automática no almoxarifado",
+                        "description":  "O fluxo de concluir a doação pela aba Itens recebidos passou a gerar a entrada no almoxarifado para doações de bens de consumo.",
+                        "changes":  [
+                                        "Botão Incluir doação e registrar entrada passou a finalizar o registro quando ele ainda estiver em rascunho.",
+                                        "Backend do módulo registro-doacao passou a criar item e movimentação de entrada no almoxarifado para doações de bens de consumo, evitando duplicidade por doacao_id.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.333",
+                        "releaseDate":  "2026-03-26",
+                        "title":  "Recebimento de doações com salvamento corrigido em Itens recebidos",
+                        "description":  "O botão Incluir doação e registrar entrada deixou de bloquear o salvamento por falha de validação em campo opcional numérico vazio.",
+                        "changes":  [
+                                        "Schema do formulário ajustado para tratar quantidade de itens vazia como campo opcional válido, sem converter o valor ausente para NaN.",
+                                        "Aba Itens recebidos voltou a conseguir concluir o registro quando os campos obrigatórios reais estiverem preenchidos.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.332",
+                        "releaseDate":  "2026-03-26",
+                        "title":  "Ocorrências com botões específicos por aba",
+                        "description":  "A barra superior da tela Ocorrências passou a trocar os rótulos genéricos por nomes específicos conforme a aba aberta, sem alterar a lógica existente da tela.",
+                        "changes":  [
+                                        "Botões como Salvar passaram a usar nomes contextuais como Salvar vítima, Salvar ocorrência, Salvar possível autor, Salvar classificação e Salvar relato e encaminhamento.",
+                                        "Ações globais da tela foram renomeadas para Buscar ocorrências, Nova ocorrência, Excluir ocorrência e Imprimir ocorrência, preservando o comportamento já implementado.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.331",
+                        "releaseDate":  "2026-03-26",
+                        "title":  "Inscrições com botões específicos por aba",
+                        "description":  "A barra superior da tela Inscrições passou a trocar os rótulos genéricos por nomes específicos conforme a aba aberta, sem alterar a lógica existente da tela.",
+                        "changes":  [
+                                        "Botões como Buscar, Salvar, Excluir e Imprimir passaram a usar nomes contextuais como Buscar inscrições, Salvar dados da inscrição, Salvar agendamentos e Salvar presença.",
+                                        "Apenas os rótulos da barra superior foram ajustados, preservando o comportamento já implementado na tela.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.330",
+                        "releaseDate":  "2026-03-26",
+                        "title":  "Recebimento de doações com orientação de próximo passo",
+                        "description":  "A aba Dados da doação passou a orientar explicitamente que o próximo passo é abrir a aba Itens recebidos antes de concluir o registro.",
+                        "changes":  [
+                                        "Aviso visual adicionado no fim da aba Dados da doação explicando que o usuário deve seguir para Itens recebidos.",
+                                        "Botão direto adicionado na própria orientação para avançar em um clique para a aba Itens recebidos.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.329",
+                        "releaseDate":  "2026-03-26",
+                        "title":  "Recebimento de doações com forma de recebimento visível",
+                        "description":  "A aba Dados da doação voltou a exibir a forma de recebimento para doações financeiras e o popup de validação passou a refletir melhor as pendências atuais do formulário.",
+                        "changes":  [
+                                        "Campo Forma de recebimento recolocado na aba Dados da doação quando o tipo selecionado for Doação financeira.",
+                                        "Popup de validação ajustado com fallback pelos valores atuais do formulário para listar campos pendentes mesmo quando o objeto de erro vier incompleto.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.328",
+                        "releaseDate":  "2026-03-26",
+                        "title":  "Recebimento de doações com popup de pendências mais claro",
+                        "description":  "A validação ao salvar a doação passou a listar no popup os campos obrigatórios que ainda faltam preencher na aba Dados da doação.",
+                        "changes":  [
+                                        "Schema do formulário reforçado para tratar doador, forma de recebimento em doação financeira e periodicidade recorrente como pendências explícitas do fluxo.",
+                                        "Coletor de erros da tela ajustado para converter as validações do formulário em lista legível de campos pendentes no popup.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.327",
+                        "releaseDate":  "2026-03-26",
+                        "title":  "Recebimento de doações com barra de ações por aba",
+                        "description":  "A barra superior da tela de recebimento de doações passou a mostrar ações específicas conforme a aba aberta, evitando ambiguidade entre salvar doador e salvar doação.",
+                        "changes":  [
+                                        "Ações da barra superior separadas por aba, com rótulos como Salvar doador, Salvar doação, Buscar registros e Confirmar mensagem.",
+                                        "Aba Cadastro do doador passou a usar ações próprias de novo, salvar e cancelar cadastro sem reutilizar o fluxo global do registro.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.326",
+                        "releaseDate":  "2026-03-26",
+                        "title":  "Pesquise na IA com envio acessível e nova conversa",
+                        "description":  "A aba Converse com a IA foi ajustada para manter o botão Enviar clicável e adicionar a ação Nova conversa ao lado do envio.",
+                        "changes":  [
+                                        "Barra de envio reorganizada para evitar sobreposição do botão Enviar com o ícone do robô.",
+                                        "Botão Nova conversa adicionado ao lado do envio para limpar a conversa atual em um clique.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.325",
                         "releaseDate":  "2026-03-25",
                         "title":  "Recebimento de doações com validação visível na aba de itens",

@@ -14,6 +14,13 @@ const optionalNumber = z.preprocess((value) => {
   return value;
 }, z.number().nonnegative().optional());
 
+const optionalInteger = z.preprocess((value) => {
+  if (value === null || value === undefined || value === "") return undefined;
+  if (typeof value === "number") return value;
+  if (typeof value === "string") return Number(value);
+  return value;
+}, z.number().int().nonnegative().optional());
+
 export const registroDoacaoItemSchema = z.object({
   descricao: z.string().trim().min(2, "Informe a descrição do item."),
   quantidade: z.preprocess((value) => Number(value), z.number().int().min(1)),
@@ -26,24 +33,50 @@ export const registroDoacaoItemSchema = z.object({
   observacoes: optionalTrimmedString
 });
 
-export const registroDoacaoFormSchema = z.object({
-  id_registro_doacao: z.string().optional(),
-  doador_id: optionalTrimmedString,
-  numero_recibo: optionalTrimmedString,
-  tipo_doacao: z.string().trim().min(2, "Informe o tipo de doação."),
-  descricao: optionalTrimmedString,
-  quantidade_itens: z.preprocess((value) => (value === "" ? undefined : Number(value)), z.number().int().nonnegative().optional()),
-  valor_medio: optionalNumber,
-  valor_total: optionalNumber,
-  valor: optionalNumber,
-  data_recebimento: z.string().trim().min(10, "Informe a data de recebimento."),
-  forma_recebimento: optionalTrimmedString,
-  recorrente: z.boolean().default(false),
-  periodicidade: optionalTrimmedString,
-  proxima_cobranca: optionalTrimmedString,
-  status: z.string().trim().min(2, "Informe o status."),
-  observacoes: optionalTrimmedString
-});
+export const registroDoacaoFormSchema = z
+  .object({
+    id_registro_doacao: z.string().optional(),
+    doador_id: optionalTrimmedString,
+    numero_recibo: optionalTrimmedString,
+    tipo_doacao: z.string().trim().min(2, "Informe o tipo de doação."),
+    descricao: optionalTrimmedString,
+    quantidade_itens: optionalInteger,
+    valor_medio: optionalNumber,
+    valor_total: optionalNumber,
+    valor: optionalNumber,
+    data_recebimento: z.string().trim().min(10, "Informe a data de recebimento."),
+    forma_recebimento: optionalTrimmedString,
+    recorrente: z.boolean().default(false),
+    periodicidade: optionalTrimmedString,
+    proxima_cobranca: optionalTrimmedString,
+    status: z.string().trim().min(2, "Informe o status."),
+    observacoes: optionalTrimmedString
+  })
+  .superRefine((values, ctx) => {
+    if (!values.doador_id?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["doador_id"],
+        message: "Selecione o doador."
+      });
+    }
+
+    if (values.tipo_doacao === "Doação financeira" && !values.forma_recebimento?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["forma_recebimento"],
+        message: "Informe a forma de recebimento."
+      });
+    }
+
+    if (values.recorrente && !values.periodicidade?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["periodicidade"],
+        message: "Informe a periodicidade."
+      });
+    }
+  });
 
 export type RegistroDoacaoFormInput = z.input<typeof registroDoacaoFormSchema>;
 export type RegistroDoacaoFormValues = z.infer<typeof registroDoacaoFormSchema>;

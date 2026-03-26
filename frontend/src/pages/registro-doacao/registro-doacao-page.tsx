@@ -83,7 +83,7 @@ const abas = [
 type AbaId = (typeof abas)[number]["id"];
 
 type AcaoCrud = {
-  label: (typeof ordemAcoesCrudPadrao)[number];
+  label: string;
   icon: LucideIcon;
   onClick: () => void;
   variant: "default" | "outline" | "danger" | "ghost";
@@ -136,9 +136,50 @@ function formatarData(data?: string) {
 }
 
 function obterCamposPendentesRegistroDoacao(errors: FieldErrors<RegistroDoacaoFormInput>) {
-  return Object.keys(errors)
-    .map((campo) => labelsCamposRegistroDoacao[campo as keyof RegistroDoacaoFormValues] ?? null)
-    .filter((campo): campo is string => Boolean(campo));
+  const pendencias = new Set<string>();
+
+  function visitar(campoAtual: string, valor: unknown) {
+    if (!valor || typeof valor !== "object") return;
+
+    if ("message" in (valor as Record<string, unknown>)) {
+      const label = labelsCamposRegistroDoacao[campoAtual as keyof RegistroDoacaoFormValues];
+      if (label) pendencias.add(label);
+    }
+
+    Object.entries(valor as Record<string, unknown>).forEach(([chave, filho]) => {
+      if (chave === "message" || chave === "type" || chave === "ref") return;
+      visitar(chave, filho);
+    });
+  }
+
+  Object.entries(errors).forEach(([campo, valor]) => visitar(campo, valor));
+
+  return Array.from(pendencias);
+}
+
+function obterCamposPendentesRegistroDoacaoPorValores(values: Record<string, unknown>) {
+  const pendencias: string[] = [];
+
+  const doadorId = typeof values.doador_id === "string" ? values.doador_id.trim() : "";
+  const tipoDoacao = typeof values.tipo_doacao === "string" ? values.tipo_doacao.trim() : "";
+  const status = typeof values.status === "string" ? values.status.trim() : "";
+  const dataRecebimento =
+    typeof values.data_recebimento === "string" ? values.data_recebimento.trim() : "";
+  const formaRecebimento =
+    typeof values.forma_recebimento === "string" ? values.forma_recebimento.trim() : "";
+  const recorrente = values.recorrente === true;
+  const periodicidade = typeof values.periodicidade === "string" ? values.periodicidade.trim() : "";
+
+  if (!doadorId) pendencias.push("Doador");
+  if (!tipoDoacao) pendencias.push("Tipo de doação");
+  if (!status) pendencias.push("Status");
+  if (!dataRecebimento) pendencias.push("Data de recebimento");
+  if (tipoDoacao === "Doação financeira" && !formaRecebimento) {
+    pendencias.push("Forma de recebimento");
+  }
+  if (recorrente && !periodicidade) pendencias.push("Periodicidade");
+
+  return pendencias;
 }
 
 function PopupMensagem({ popup, onClose }: { popup: PopupMensagemState; onClose: () => void }) {
@@ -336,7 +377,7 @@ export function RegistroDoacaoPage() {
     setFiltros({ ...filtroDraft });
   }
 
-  function novo() {
+  function novoRegistro() {
     setIdSelecionado(undefined);
     setSnapshot(null);
     reset(registroDoacaoDefaultValues);
@@ -352,6 +393,13 @@ export function RegistroDoacaoPage() {
     setNovoItemValorUnitarioInput("");
     setNovoItemValorTotalInput("");
     setAbaAtiva("dados");
+  }
+
+  function novoDoador() {
+    setDoadorForm({ nome: "", tipo_pessoa: "FISICA" });
+    setDoadorSelecionado(null);
+    setTermoDoador("");
+    setValue("doador_id", "", { shouldDirty: true, shouldValidate: true });
   }
 
   function aplicarFormatacaoDoadorCampo(campo: keyof Doador) {
@@ -396,7 +444,7 @@ export function RegistroDoacaoPage() {
     };
   }
 
-  function cancelar() {
+  function cancelarRegistro() {
     const valores = snapshot ?? registroDoacaoDefaultValues;
     reset(valores);
     setItens(detalheData?.registro?.itens ?? []);
@@ -407,6 +455,12 @@ export function RegistroDoacaoPage() {
     setValorTotalInput(valores.valor_total === undefined ? "" : formatarMoedaInput(valores.valor_total));
     setNovoItemValorUnitarioInput("");
     setNovoItemValorTotalInput("");
+  }
+
+  function cancelarDoador() {
+    const doadorBase = doadorSelecionado ?? { nome: "", tipo_pessoa: "FISICA" as const };
+    setDoadorForm(doadorBase);
+    setTermoDoador(doadorSelecionado?.nome ?? "");
   }
 
   function excluir() {
@@ -424,7 +478,7 @@ export function RegistroDoacaoPage() {
     try {
       await removerMutation.mutateAsync(id);
       setPopupExcluirAberto(false);
-      novo();
+      novoRegistro();
       setPopupMensagem({ tipo: "sucesso", titulo: "Confirmação", texto: "Registro excluído com sucesso." });
     } catch (error: any) {
       setPopupMensagem({ tipo: "erro", titulo: "Erro", texto: error?.response?.data?.message ?? "Não foi possível excluir." });
@@ -442,6 +496,10 @@ export function RegistroDoacaoPage() {
 
   function fechar() {
     navigate("/dashboard/visao-geral");
+  }
+
+  function confirmarMensagemGestao() {
+    setPopupMensagem({ tipo: "sucesso", titulo: "Confirmação", texto: "Mensagem preparada para envio." });
   }
 
   function selecionarRegistro(id: string) {
@@ -671,8 +729,27 @@ export function RegistroDoacaoPage() {
     }
   }
 
+  function salvarRegistroComEntrada() {
+    return handleSubmit(
+      async (values) => {
+        const statusAtual = typeof values.status === "string" ? values.status.trim() : "";
+        const statusParaSalvar =
+          !statusAtual || statusAtual === "Aguardando" ? "Finalizado" : values.status;
+
+        await salvarRegistro({
+          ...values,
+          status: statusParaSalvar
+        });
+      },
+      tratarErrosSalvar
+    )();
+  }
+
   function tratarErrosSalvar(errors: FieldErrors<RegistroDoacaoFormInput>) {
-    const pendencias = obterCamposPendentesRegistroDoacao(errors);
+    const pendencias =
+      obterCamposPendentesRegistroDoacao(errors).length > 0
+        ? obterCamposPendentesRegistroDoacao(errors)
+        : obterCamposPendentesRegistroDoacaoPorValores(getValues());
     setAbaAtiva("dados");
     setPopupMensagem({
       tipo: "aviso",
@@ -683,15 +760,48 @@ export function RegistroDoacaoPage() {
     });
   }
 
-  const acoes: AcaoCrud[] = [
-    { label: "Buscar", icon: Search, onClick: buscar, variant: "outline" },
-    { label: "Novo", icon: Plus, onClick: novo, variant: "default", disabled: acaoEmAndamento },
-    { label: "Salvar", icon: Save, onClick: () => void handleSubmit(salvarRegistro, tratarErrosSalvar)(), variant: "default", disabled: acaoEmAndamento },
-    { label: "Cancelar", icon: Undo2, onClick: cancelar, variant: "outline", disabled: acaoEmAndamento },
-    { label: "Excluir", icon: Trash2, onClick: excluir, variant: "danger", disabled: acaoEmAndamento },
-    { label: "Imprimir", icon: Printer, onClick: () => void imprimir(), variant: "outline", disabled: acaoEmAndamento },
-    { label: "Fechar", icon: X, onClick: fechar, variant: "outline" }
-  ];
+  const acoesPorAba: Record<AbaId, AcaoCrud[]> = {
+    listagem: [
+      { label: "Buscar registros", icon: Search, onClick: buscar, variant: "outline" },
+      { label: "Novo registro", icon: Plus, onClick: novoRegistro, variant: "default", disabled: acaoEmAndamento },
+      { label: "Imprimir relação", icon: Printer, onClick: () => void imprimir(), variant: "outline", disabled: acaoEmAndamento },
+      { label: "Fechar", icon: X, onClick: fechar, variant: "outline" }
+    ],
+    doador: [
+      { label: "Novo doador", icon: Plus, onClick: novoDoador, variant: "default", disabled: criarDoadorMutation.isPending || removerDoadorMutation.isPending },
+      { label: "Salvar doador", icon: Save, onClick: () => void salvarDoador(), variant: "default", disabled: criarDoadorMutation.isPending || removerDoadorMutation.isPending },
+      { label: "Cancelar cadastro", icon: Undo2, onClick: cancelarDoador, variant: "outline", disabled: criarDoadorMutation.isPending || removerDoadorMutation.isPending },
+      { label: "Fechar", icon: X, onClick: fechar, variant: "outline" }
+    ],
+    dados: [
+      { label: "Novo registro", icon: Plus, onClick: novoRegistro, variant: "default", disabled: acaoEmAndamento },
+      { label: "Salvar doação", icon: Save, onClick: () => void handleSubmit(salvarRegistro, tratarErrosSalvar)(), variant: "default", disabled: acaoEmAndamento },
+      { label: "Cancelar edição", icon: Undo2, onClick: cancelarRegistro, variant: "outline", disabled: acaoEmAndamento },
+      { label: "Excluir registro", icon: Trash2, onClick: excluir, variant: "danger", disabled: acaoEmAndamento },
+      { label: "Fechar", icon: X, onClick: fechar, variant: "outline" }
+    ],
+    itens: [
+      { label: "Novo registro", icon: Plus, onClick: novoRegistro, variant: "default", disabled: acaoEmAndamento },
+      { label: "Salvar doação", icon: Save, onClick: () => void handleSubmit(salvarRegistro, tratarErrosSalvar)(), variant: "default", disabled: acaoEmAndamento },
+      { label: "Cancelar edição", icon: Undo2, onClick: cancelarRegistro, variant: "outline", disabled: acaoEmAndamento },
+      { label: "Excluir registro", icon: Trash2, onClick: excluir, variant: "danger", disabled: acaoEmAndamento },
+      { label: "Fechar", icon: X, onClick: fechar, variant: "outline" }
+    ],
+    recorrencia: [
+      { label: "Novo registro", icon: Plus, onClick: novoRegistro, variant: "default", disabled: acaoEmAndamento },
+      { label: "Salvar doação", icon: Save, onClick: () => void handleSubmit(salvarRegistro, tratarErrosSalvar)(), variant: "default", disabled: acaoEmAndamento },
+      { label: "Cancelar edição", icon: Undo2, onClick: cancelarRegistro, variant: "outline", disabled: acaoEmAndamento },
+      { label: "Excluir registro", icon: Trash2, onClick: excluir, variant: "danger", disabled: acaoEmAndamento },
+      { label: "Fechar", icon: X, onClick: fechar, variant: "outline" }
+    ],
+    gestao: [
+      { label: "Novo registro", icon: Plus, onClick: novoRegistro, variant: "default", disabled: acaoEmAndamento },
+      { label: "Confirmar mensagem", icon: Save, onClick: confirmarMensagemGestao, variant: "default", disabled: acaoEmAndamento },
+      { label: "Cancelar edição", icon: Undo2, onClick: cancelarRegistro, variant: "outline", disabled: acaoEmAndamento },
+      { label: "Fechar", icon: X, onClick: fechar, variant: "outline" }
+    ]
+  };
+  const acoes = acoesPorAba[abaAtiva];
 
   return (
     <section className="mx-auto w-full max-w-[1440px] px-4 py-4 lg:px-8">
@@ -709,13 +819,11 @@ export function RegistroDoacaoPage() {
               </div>
 
               <div className={classesTelaPadraoBeneficiario.gradeAcoes}>
-                {ordemAcoesCrudPadrao.map((ordem) => {
-                  const acao = acoes.find((item) => item.label === ordem);
-                  if (!acao) return null;
+                {acoes.map((acao) => {
                   const Icone = acao.icon;
                   return (
                     <Button
-                      key={acao.label}
+                      key={`${abaAtiva}-${acao.label}`}
                       type="button"
                       variant={acao.variant}
                       onClick={acao.onClick}
@@ -790,7 +898,6 @@ export function RegistroDoacaoPage() {
                     <div className="space-y-1"><Label>Cidade</Label><Input value={doadorForm.cidade ?? ""} onChange={(e) => setDoadorForm((a) => ({ ...a, cidade: e.target.value }))} onBlur={() => aplicarFormatacaoDoadorCampo("cidade")} /></div>
                     <div className="space-y-1"><Label>UF</Label><Input value={doadorForm.uf ?? ""} maxLength={2} onChange={(e) => setDoadorForm((a) => ({ ...a, uf: e.target.value }))} onBlur={() => aplicarFormatacaoDoadorCampo("uf")} /></div>
                   </div>
-                  <div className="flex justify-end"><Button type="button" onClick={() => void salvarDoador()} disabled={criarDoadorMutation.isPending}>{criarDoadorMutation.isPending ? "Salvando..." : "Cadastrar doador"}</Button></div>
                   <MensagemAcoesRapidas
                     titulo="Mensagens do doador"
                     destinatarioTipo="DOADOR"
@@ -932,9 +1039,58 @@ export function RegistroDoacaoPage() {
                     </div>
                     <div className="space-y-1"><Label>Status *</Label><Select value={statusSelecionado} onChange={(e) => setValue("status", e.target.value, { shouldDirty: true, shouldValidate: true })} onBlur={() => aplicarFormatacaoRegistro("status")}><option value="">Selecione</option>{statusRegistroDoacaoOptions.map((item) => <option key={item} value={item}>{item}</option>)}</Select>{errors.status && <p className="text-xs text-rose-600">{errors.status.message}</p>}</div>
                     <div className="space-y-1"><Label>Data de recebimento *</Label><Input type="date" {...register("data_recebimento")} />{errors.data_recebimento && <p className="text-xs text-rose-600">{errors.data_recebimento.message}</p>}</div>
+                    {tiposComFormaRecebimento.has(tipoDoacaoSelecionado) ? (
+                      <div className="space-y-1 md:col-span-2 xl:col-span-4">
+                        <Label>Forma de recebimento *</Label>
+                        <div className="flex flex-col gap-2 xl:flex-row">
+                          <Select
+                            value={formaRecebimentoSelecionada}
+                            onChange={(e) =>
+                              setValue("forma_recebimento", e.target.value, {
+                                shouldDirty: true,
+                                shouldValidate: true
+                              })
+                            }
+                          >
+                            <option value="">Selecione</option>
+                            {formaRecebimentoOptions.map((item) => (
+                              <option key={item} value={item}>
+                                {item}
+                              </option>
+                            ))}
+                          </Select>
+                          <div className="flex gap-2 xl:w-[360px]">
+                            <Input
+                              value={novaFormaRecebimento}
+                              onChange={(e) => setNovaFormaRecebimento(e.target.value)}
+                              placeholder="Nova forma de recebimento"
+                            />
+                            <Button type="button" variant="outline" onClick={adicionarFormaRecebimento}>
+                              <Plus className="mr-1.5 h-4 w-4" />
+                              Adicionar
+                            </Button>
+                          </div>
+                        </div>
+                        {errors.forma_recebimento ? (
+                          <p className="text-xs text-rose-600">{errors.forma_recebimento.message}</p>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
 
                   <div className="space-y-1"><Label>Observações</Label><Textarea rows={2} {...register("observacoes")} maxLength={160} onBlur={() => aplicarFormatacaoRegistro("observacoes")} /></div>
+
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                    <p className="text-sm font-semibold text-amber-900">Próximo passo: preencher os itens recebidos</p>
+                    <p className="mt-1 text-sm text-amber-800">
+                      Depois de conferir os dados da doação, siga para a aba Itens recebidos para lançar os produtos, quantidades e valores antes de concluir o registro.
+                    </p>
+                    <div className="mt-3 flex justify-end">
+                      <Button type="button" variant="outline" onClick={() => setAbaAtiva("itens")}>
+                        Ir para Itens recebidos
+                      </Button>
+                    </div>
+                  </div>
                 </form>
               )}
 
@@ -996,14 +1152,6 @@ export function RegistroDoacaoPage() {
                       onChange={(e) => setMensagemGestao(e.target.value)}
                     />
                   </div>
-                  <div className="flex justify-end">
-                    <Button
-                      type="button"
-                      onClick={() => setPopupMensagem({ tipo: "sucesso", titulo: "Confirmação", texto: "Mensagem preparada para envio." })}
-                    >
-                      Confirmar mensagem
-                    </Button>
-                  </div>
                 </div>
               )}
 
@@ -1032,7 +1180,7 @@ export function RegistroDoacaoPage() {
                   <div className="flex justify-end">
                     <Button
                       type="button"
-                      onClick={() => void handleSubmit(salvarRegistro, tratarErrosSalvar)()}
+                      onClick={() => void salvarRegistroComEntrada()}
                       disabled={acaoEmAndamento}
                     >
                       {salvarMutation.isPending ? "Registrando..." : "Incluir doação e registrar entrada"}

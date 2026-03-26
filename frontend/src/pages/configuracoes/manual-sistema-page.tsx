@@ -130,11 +130,40 @@ const secoesManual: ManualSecao[] = [
           "Consulte a listagem de inscrições para localizar status, vaga e situação do participante.",
           "Use os dados da inscrição para registrar turma, responsável, datas e observações.",
           "Revise a fila de espera e a situação de vagas para apoiar decisões de encaminhamento.",
-          "Na aba Presença, gere a data da aula, salve as presenças e use Excluir data de presença quando precisar remover apenas a data gerada sem apagar o curso."
+          "Na aba Presença, gere a data da aula, salve as presenças e use Excluir data de presença quando precisar remover apenas a data gerada sem apagar o curso.",
+          "A barra superior da tela usa nomes específicos por aba, com ações como Buscar inscrições, Salvar dados da inscrição, Salvar agendamentos e Salvar presença para reduzir ambiguidade operacional."
         ],
         atencoes: [
           "O botão Excluir da barra superior remove todo o curso configurado e exige confirmação específica antes da exclusão.",
           "Na aba Presença, a data exibida na lista e a data impressa na lista de presença agora seguem exatamente o mesmo dia informado, sem recuo por fuso horário."
+        ]
+      },
+      {
+        nome: "Recebimento de doações",
+        objetivo: "Registrar dados da doação, itens recebidos, recorrência e comunicação com o doador.",
+        comoUsar: [
+          "Preencha a aba Dados da doação e depois siga para Itens recebidos para lançar os produtos, quantidades e valores antes de concluir o registro.",
+          "Na aba Itens recebidos, use Incluir doação e registrar entrada para salvar o registro completo com os itens já lançados e gerar a entrada no almoxarifado quando a doação for de bens de consumo.",
+          "A barra superior da tela usa nomes específicos por aba para deixar claro quando a ação salva o doador, a doação ou a comunicação."
+        ],
+        atencoes: [
+          "O botão Incluir doação e registrar entrada finaliza o registro quando ele ainda estiver em rascunho para permitir a integração automática com o almoxarifado.",
+          "Ao concluir a doação, o sistema agora também invalida o cache do almoxarifado para que a listagem e as movimentações reflitam os novos itens ao abrir a tela.",
+          "O salvamento pela aba Itens recebidos não deve mais bloquear o registro por campo opcional numérico vazio no formulário principal.",
+          "Quando faltar algum campo obrigatório real, o sistema continuará informando a pendência nominalmente no alerta."
+        ]
+      },
+      {
+        nome: "Ocorrências",
+        objetivo: "Registrar e acompanhar ocorrências envolvendo vítima, possível autor, classificação e encaminhamento.",
+        comoUsar: [
+          "Use Buscar ocorrências para localizar registros já cadastrados e continuar o preenchimento pelas abas da tela.",
+          "A barra superior da tela usa nomes específicos por aba, com ações como Salvar vítima, Salvar ocorrência, Salvar possível autor, Salvar classificação e Salvar relato e encaminhamento.",
+          "Use Nova ocorrência para iniciar um novo registro sem alterar o comportamento já existente da tela."
+        ],
+        atencoes: [
+          "Os botões Excluir ocorrência e Imprimir ocorrência continuam vinculados ao registro atual selecionado.",
+          "A troca de nomes na barra superior foi feita para reduzir ambiguidade operacional, sem alterar a lógica de cadastro, busca, exclusão ou impressão."
         ]
       }
     ]
@@ -224,10 +253,13 @@ const secoesManual: ManualSecao[] = [
         objetivo: "Registrar doações recebidas com doador vinculado, classificação oficial por tipo e organização separada entre dados do registro e itens recebidos.",
         comoUsar: [
           "Na aba Dados da doação, selecione o doador, informe número do recibo, tipo, status e data de recebimento. Ao escolher o tipo, o sistema mostra ao lado o destino de entrada da doação, como Contabilidade, Almoxarifado ou Patrimônio.",
+          "Quando o tipo for Doação financeira, a própria aba Dados da doação também exibe a forma de recebimento, com opção de selecionar uma forma existente ou cadastrar uma nova em um clique.",
           "Use apenas os tipos Doação financeira, Doação de bens de consumo e Doação de bens permanentes.",
           "Na aba Dados da doação ficam apenas as informações principais do registro: doador, número do recibo, tipo, status, data de recebimento e observações.",
+          "Ao final da aba Dados da doação, a tela exibe um aviso orientando que o próximo passo é abrir a aba Itens recebidos, com botão direto para avançar.",
           "Depois de registrar os dados principais, use a aba Itens recebidos, agora na posição 4, para lançar os produtos, quantidade, valor unitário e valor total da doação.",
           "Na aba Cadastro do doador, os campos visíveis seguem o padrão da migração: digitação livre, normalização visual ao sair do campo e normalização final antes do salvamento.",
+          "A barra superior agora muda conforme a aba aberta, mostrando ações exclusivas como Salvar doador, Salvar doação, Buscar registros ou Confirmar mensagem, conforme o contexto atual.",
           "Quando a doação financeira for recorrente, marque Doação recorrente e selecione a periodicidade entre única, diário, semanal, mensal ou anual.",
           "Use Observações como complemento curto do registro quando precisar detalhar a doação."
         ],
@@ -239,7 +271,10 @@ const secoesManual: ManualSecao[] = [
           "Ao salvar a doação, o sistema consolida os itens lançados para preencher a quantidade total e os valores do registro automaticamente.",
           "Os campos monetários dos itens exibem máscara brasileira e o sistema grava o valor numérico sem formatação visual.",
           "Na aba Itens recebidos existe a ação final de incluir a doação e registrar a entrada logo após a conferência dos itens lançados, usando o mesmo fluxo de salvar da tela.",
-          "Se faltar algum dado obrigatório da doação ou nenhum item tiver sido lançado, o sistema avisa em popup antes de concluir o registro."
+          "Se faltar algum dado obrigatório da doação ou nenhum item tiver sido lançado, o sistema avisa em popup antes de concluir o registro.",
+          "O botão Salvar da barra superior não é mais genérico para todas as abas, evitando dúvida entre salvar o cadastro do doador e salvar o registro da doação.",
+          "Quando faltar algum campo obrigatório da aba Dados da doação, o popup de validação passa a listar claramente quais campos ainda precisam ser preenchidos.",
+          "A forma de recebimento volta a aparecer na própria aba Dados da doação para evitar bloqueio invisível ao salvar doações financeiras."
         ]
       },
       {
@@ -430,10 +465,12 @@ const secoesManual: ManualSecao[] = [
         comoUsar: [
           "Pesquise por texto livre ou use as perguntas frequentes e categorias sugeridas.",
           "Consulte histórico compartilhado entre a central e o robô Pergunte à IA.",
-          "Use categorias como famílias, beneficiários, benefícios, atendimentos e legislação para acelerar a busca."
+          "Use categorias como famílias, beneficiários, benefícios, atendimentos e legislação para acelerar a busca.",
+          "Ao lado do botão Enviar, use Nova conversa para limpar o histórico visível atual e começar uma nova conversa em um clique."
         ],
         atencoes: [
-          "A IA respeita permissões e usa a mesma base inteligente nos dois pontos de acesso."
+          "A IA respeita permissões e usa a mesma base inteligente nos dois pontos de acesso.",
+          "Na central Pesquise na IA, a barra de envio foi reorganizada para manter os botões acessíveis sem sobrepor o ícone do robô."
         ]
       },
       {

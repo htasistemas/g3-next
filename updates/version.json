@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.325",
-  "releaseDate": "2026-03-25",
-  "description": "Recebimento de doações ajustado para validar campos pendentes e itens obrigatórios ao concluir pela aba Itens recebidos.",
+  "latestVersion": "1.00.335",
+  "releaseDate": "2026-03-26",
+  "description": "Recebimento de doações e almoxarifado ajustados para atualizar a listagem de estoque imediatamente após a entrada automática.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.325",
+  "minCompatibleVersion": "1.00.335",
   "releaseType": "stable",
   "downloadUrl": null
 }

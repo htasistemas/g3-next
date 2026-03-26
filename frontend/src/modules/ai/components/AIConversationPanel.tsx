@@ -76,6 +76,9 @@ export function AIConversationPanel({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }
 
+  const podeEnviar = !isLoading && inputValue.trim().length > 0;
+  const podeLimpar = !isLoading && messages.length > 0;
+
   function renderSuggestionButtons(items: AiSuggestionItem[], limit?: number) {
     return (limit ? items.slice(0, limit) : items).map((item) => (
       <button
@@ -94,7 +97,7 @@ export function AIConversationPanel({
       <div className={variant === "page" && showSidebar ? "grid h-full min-h-0 gap-4 lg:grid-cols-[1.2fr_0.8fr]" : "h-full min-h-0"}>
         <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-3xl border-2 border-emerald-500 bg-emerald-50 shadow-[0_22px_50px_rgba(15,118,110,0.22)]">
           <div className="border-b border-emerald-300 bg-[linear-gradient(180deg,rgba(209,250,229,1)_0%,rgba(236,253,245,0.98)_100%)] px-4 py-4">
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[var(--g3-active)] text-white shadow-sm">
@@ -109,7 +112,7 @@ export function AIConversationPanel({
                 </div>
                 <p className="mt-2 text-sm text-[var(--g3-muted)]">{subtitle}</p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 self-start">
                 <span className="inline-flex items-center gap-1 rounded-full bg-[var(--g3-primary-soft)] px-2 py-1 text-[10px] font-semibold text-[var(--g3-active)]">
                   <Sparkles size={12} />
                   IA
@@ -117,7 +120,7 @@ export function AIConversationPanel({
               </div>
             </div>
             {variant === "compact" ? (
-              <div className="mt-3 flex gap-2">
+              <div className="mt-3 flex flex-wrap gap-2">
                 <Button
                   type="button"
                   size="sm"
@@ -246,7 +249,7 @@ export function AIConversationPanel({
 
           <div className="shrink-0 border-t border-emerald-300 bg-emerald-50 p-4">
             {variant === "compact" ? (
-              <div className="mb-3 flex gap-2">
+              <div className="mb-3 flex flex-wrap gap-2">
                 <Button
                   type="button"
                   variant="outline"
@@ -271,15 +274,28 @@ export function AIConversationPanel({
                 </Button>
               </div>
             ) : null}
-            <form onSubmit={submitForm} className="flex gap-2">
+            <form onSubmit={submitForm} className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_auto]">
               <Input
                 value={inputValue}
                 onChange={(event) => setInputValue(event.target.value)}
                 placeholder="Digite sua pergunta..."
                 disabled={isLoading}
+                className="min-w-0"
               />
-              <Button type="submit" disabled={isLoading || !inputValue.trim()}>
-                <Send className="h-4 w-4" />
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!podeLimpar}
+                onClick={() => void clearHistory()}
+                className="w-full whitespace-nowrap md:w-auto"
+                title="Limpar a conversa atual e iniciar uma nova"
+              >
+                <Trash2 className="mr-1.5 h-4 w-4" />
+                Nova conversa
+              </Button>
+              <Button type="submit" disabled={!podeEnviar} className="w-full whitespace-nowrap md:w-auto">
+                <Send className="mr-1.5 h-4 w-4" />
+                Enviar
               </Button>
             </form>
           </div>

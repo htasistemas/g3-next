@@ -28,6 +28,8 @@ export function useSalvarRegistroDoacao() {
     },
     onSuccess: async (response) => {
       await queryClient.invalidateQueries({ queryKey: ["registro-doacao"] });
+      await queryClient.invalidateQueries({ queryKey: ["almoxarifado", "itens"] });
+      await queryClient.invalidateQueries({ queryKey: ["almoxarifado", "movimentacoes"] });
       const id = response.registro?.id_registro_doacao;
       if (id) {
         await queryClient.invalidateQueries({ queryKey: ["registro-doacao-item", id] });

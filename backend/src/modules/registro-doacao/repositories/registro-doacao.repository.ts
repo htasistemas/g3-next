@@ -22,6 +22,25 @@ function toOptionalNumber(value?: number | null): number | null {
   return Number.isFinite(value) ? value : null;
 }
 
+function normalizarTextoLivre(value?: string | null) {
+  return value?.trim().replace(/\s+/g, " ") ?? "";
+}
+
+function normalizarTextoBusca(value?: string | null) {
+  return normalizarTextoLivre(value).toLocaleLowerCase("pt-BR");
+}
+
+function statusPermiteIntegracaoAlmoxarifado(status?: string | null) {
+  const statusNormalizado = normalizarTextoBusca(status);
+  if (!statusNormalizado) return false;
+  return !["aguardando", "cancelado", "cancelada"].includes(statusNormalizado);
+}
+
+function tipoDoacaoIntegraAlmoxarifado(tipoDoacao?: string | null) {
+  const tipoNormalizado = normalizarTextoBusca(tipoDoacao);
+  return tipoNormalizado === "doação de bens de consumo" || tipoNormalizado === "doacao de bens de consumo";
+}
+
 async function ensureRegistroDoacaoEstrutura() {
   if (!estruturaPromise) {
     estruturaPromise = prisma
@@ -220,6 +239,7 @@ export class RegistroDoacaoRepository {
       }
 
       await this.inserirItens(tx, registroId, input.itens ?? []);
+      await this.integrarAoAlmoxarifadoSeAplicavel(tx, registroId, input);
       return registroId;
     });
 
@@ -260,6 +280,7 @@ export class RegistroDoacaoRepository {
       `);
 
       await this.inserirItens(tx, id, input.itens ?? []);
+      await this.integrarAoAlmoxarifadoSeAplicavel(tx, id, input);
     });
 
     return this.buscarPorIdOuFalhar(id);
@@ -439,5 +460,184 @@ export class RegistroDoacaoRepository {
         )
       `);
     }
+  }
+
+  private async integrarAoAlmoxarifadoSeAplicavel(
+    tx: TransactionClient,
+    registroId: bigint,
+    input: RegistroDoacaoInput
+  ) {
+    if (!tipoDoacaoIntegraAlmoxarifado(input.tipo_doacao)) {
+      return;
+    }
+
+    if (!statusPermiteIntegracaoAlmoxarifado(input.status)) {
+      return;
+    }
+
+    const itens = (input.itens ?? []).filter((item) => item.quantidade > 0);
+    if (!itens.length) {
+      return;
+    }
+
+    const movimentacoesExistentes = await tx.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+      SELECT id
+      FROM almoxarifado_movimentacao
+      WHERE doacao_id = ${registroId}
+      LIMIT 1
+    `);
+
+    if (movimentacoesExistentes[0]) {
+      return;
+    }
+
+    const doadorRows = input.doador_id
+      ? await tx.$queryRaw<Array<{ nome: string | null }>>(Prisma.sql`
+          SELECT nome
+          FROM doador
+          WHERE id = ${BigInt(input.doador_id)}
+          LIMIT 1
+        `)
+      : [];
+
+    const responsavel = normalizarTextoLivre(doadorRows[0]?.nome) || "Doador não informado";
+    const categoria = "Doação";
+    const referencia = `Doação ${registroId.toString()}`;
+
+    for (const item of itens) {
+      const descricao = normalizarTextoLivre(item.descricao);
+      if (!descricao) continue;
+
+      const unidade = normalizarTextoLivre(item.unidade) || "UN";
+      let almoxItem = await this.buscarItemAlmoxarifadoDuplicado(tx, descricao, categoria, unidade);
+
+      if (!almoxItem) {
+        almoxItem = await this.criarItemAlmoxarifadoViaDoacao(tx, {
+          descricao,
+          categoria,
+          unidade,
+          valor_unitario: item.valor_unitario,
+          observacoes: `Item criado automaticamente a partir da doação ${registroId.toString()}.`
+        });
+      }
+
+      const quantidade = Number(item.quantidade ?? 0);
+      const saldoApos = Number(almoxItem.estoque_atual ?? 0) + quantidade;
+
+      await tx.$executeRaw(Prisma.sql`
+        UPDATE almoxarifado_item
+        SET estoque_atual = ${saldoApos}, atualizado_em = NOW()
+        WHERE id = ${almoxItem.id}
+      `);
+
+      await tx.$executeRaw(Prisma.sql`
+        INSERT INTO almoxarifado_movimentacao (
+          item_id,
+          data_movimentacao,
+          tipo,
+          quantidade,
+          saldo_apos,
+          referencia,
+          responsavel,
+          observacoes,
+          doacao_id,
+          criado_em
+        ) VALUES (
+          ${almoxItem.id},
+          ${toOptionalDate(input.data_recebimento)},
+          ${"Entrada"},
+          ${quantidade},
+          ${saldoApos},
+          ${referencia},
+          ${responsavel},
+          ${normalizarTextoLivre(input.descricao) || "Entrada gerada automaticamente pelo recebimento de doação."},
+          ${registroId},
+          NOW()
+        )
+      `);
+    }
+
+    await tx.$executeRaw(Prisma.sql`
+      UPDATE recebimento_doacao
+      SET lancamentos_gerados = TRUE, atualizado_em = NOW()
+      WHERE id = ${registroId}
+    `);
+  }
+
+  private async buscarItemAlmoxarifadoDuplicado(
+    tx: TransactionClient,
+    descricao: string,
+    categoria: string,
+    unidade: string
+  ) {
+    const rows = await tx.$queryRaw<Array<{ id: bigint; estoque_atual: number }>>(Prisma.sql`
+      SELECT id, estoque_atual
+      FROM almoxarifado_item
+      WHERE LOWER(descricao) = ${normalizarTextoBusca(descricao)}
+        AND LOWER(categoria) = ${normalizarTextoBusca(categoria)}
+        AND LOWER(unidade) = ${normalizarTextoBusca(unidade)}
+      ORDER BY id ASC
+      LIMIT 1
+    `);
+
+    return rows[0] ?? null;
+  }
+
+  private async criarItemAlmoxarifadoViaDoacao(
+    tx: TransactionClient,
+    input: {
+      descricao: string;
+      categoria: string;
+      unidade: string;
+      valor_unitario?: number;
+      observacoes?: string;
+    }
+  ) {
+    const proximoCodigoRows = await tx.$queryRaw<Array<{ proximo: number }>>(Prisma.sql`
+      SELECT COALESCE(MAX(CAST(codigo AS INTEGER)), 0) + 1 AS proximo
+      FROM almoxarifado_item
+      WHERE codigo ~ '^[0-9]+$'
+    `);
+
+    const codigo = String(proximoCodigoRows[0]?.proximo ?? 1).padStart(4, "0");
+    const inserted = await tx.$queryRaw<Array<{ id: bigint; estoque_atual: number }>>(Prisma.sql`
+      INSERT INTO almoxarifado_item (
+        codigo,
+        descricao,
+        categoria,
+        unidade,
+        estoque_atual,
+        estoque_minimo,
+        valor_unitario,
+        is_kit,
+        situacao,
+        ignorar_validade,
+        observacoes,
+        criado_em,
+        atualizado_em
+      ) VALUES (
+        ${codigo},
+        ${input.descricao},
+        ${input.categoria},
+        ${input.unidade},
+        0,
+        0,
+        ${toOptionalNumber(input.valor_unitario) ?? 0},
+        FALSE,
+        ${"Ativo"},
+        TRUE,
+        ${trimOrUndefined(input.observacoes)},
+        NOW(),
+        NOW()
+      )
+      RETURNING id, estoque_atual
+    `);
+
+    const item = inserted[0];
+    if (!item) {
+      throw new AppError("Nao foi possivel criar o item de almoxarifado para a doacao.", 500);
+    }
+
+    return item;
   }
 }
