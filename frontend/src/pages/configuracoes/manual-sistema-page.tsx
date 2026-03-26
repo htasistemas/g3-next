@@ -238,7 +238,8 @@ const secoesManual: ManualSecao[] = [
           "Na aba Itens recebidos, o sistema calcula automaticamente o valor total pela quantidade multiplicada pelo valor unitário.",
           "Ao salvar a doação, o sistema consolida os itens lançados para preencher a quantidade total e os valores do registro automaticamente.",
           "Os campos monetários dos itens exibem máscara brasileira e o sistema grava o valor numérico sem formatação visual.",
-          "Na aba Itens recebidos existe a ação final de incluir a doação e registrar a entrada logo após a conferência dos itens lançados, usando o mesmo fluxo de salvar da tela."
+          "Na aba Itens recebidos existe a ação final de incluir a doação e registrar a entrada logo após a conferência dos itens lançados, usando o mesmo fluxo de salvar da tela.",
+          "Se faltar algum dado obrigatório da doação ou nenhum item tiver sido lançado, o sistema avisa em popup antes de concluir o registro."
         ]
       },
       {

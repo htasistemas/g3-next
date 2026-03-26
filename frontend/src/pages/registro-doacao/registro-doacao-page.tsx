@@ -1,5 +1,5 @@
 ﻿import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
 import type { LucideIcon } from "lucide-react";
@@ -116,11 +116,29 @@ const tiposComFormaRecebimento = new Set([
   "Doação financeira"
 ]);
 
+const labelsCamposRegistroDoacao: Partial<Record<keyof RegistroDoacaoFormValues, string>> = {
+  doador_id: "Doador",
+  numero_recibo: "Número do recibo",
+  tipo_doacao: "Tipo de doação",
+  data_recebimento: "Data de recebimento",
+  forma_recebimento: "Forma de recebimento",
+  periodicidade: "Periodicidade",
+  proxima_cobranca: "Próxima cobrança",
+  status: "Status",
+  observacoes: "Observações"
+};
+
 function formatarData(data?: string) {
   if (!data) return "---";
   const parsed = new Date(data);
   if (Number.isNaN(parsed.getTime())) return data;
   return parsed.toLocaleDateString("pt-BR");
+}
+
+function obterCamposPendentesRegistroDoacao(errors: FieldErrors<RegistroDoacaoFormInput>) {
+  return Object.keys(errors)
+    .map((campo) => labelsCamposRegistroDoacao[campo as keyof RegistroDoacaoFormValues] ?? null)
+    .filter((campo): campo is string => Boolean(campo));
 }
 
 function PopupMensagem({ popup, onClose }: { popup: PopupMensagemState; onClose: () => void }) {
@@ -535,6 +553,16 @@ export function RegistroDoacaoPage() {
   }
 
   async function salvarRegistro(values: RegistroDoacaoFormValues) {
+    if (!itens.length) {
+      setAbaAtiva("itens");
+      setPopupMensagem({
+        tipo: "aviso",
+        titulo: "Validação",
+        texto: "Inclua pelo menos um item recebido antes de registrar a doação."
+      });
+      return;
+    }
+
     try {
       const quantidadeItensCalculada = itens.length
         ? itens.reduce((total, item) => total + Number(item.quantidade ?? 0), 0)
@@ -643,10 +671,22 @@ export function RegistroDoacaoPage() {
     }
   }
 
+  function tratarErrosSalvar(errors: FieldErrors<RegistroDoacaoFormInput>) {
+    const pendencias = obterCamposPendentesRegistroDoacao(errors);
+    setAbaAtiva("dados");
+    setPopupMensagem({
+      tipo: "aviso",
+      titulo: "Validação",
+      texto: pendencias.length
+        ? `Preencha os campos obrigatórios: ${pendencias.join(", ")}.`
+        : "Revise os campos obrigatórios antes de salvar a doação."
+    });
+  }
+
   const acoes: AcaoCrud[] = [
     { label: "Buscar", icon: Search, onClick: buscar, variant: "outline" },
     { label: "Novo", icon: Plus, onClick: novo, variant: "default", disabled: acaoEmAndamento },
-    { label: "Salvar", icon: Save, onClick: () => void handleSubmit(salvarRegistro)(), variant: "default", disabled: acaoEmAndamento },
+    { label: "Salvar", icon: Save, onClick: () => void handleSubmit(salvarRegistro, tratarErrosSalvar)(), variant: "default", disabled: acaoEmAndamento },
     { label: "Cancelar", icon: Undo2, onClick: cancelar, variant: "outline", disabled: acaoEmAndamento },
     { label: "Excluir", icon: Trash2, onClick: excluir, variant: "danger", disabled: acaoEmAndamento },
     { label: "Imprimir", icon: Printer, onClick: () => void imprimir(), variant: "outline", disabled: acaoEmAndamento },
@@ -992,7 +1032,7 @@ export function RegistroDoacaoPage() {
                   <div className="flex justify-end">
                     <Button
                       type="button"
-                      onClick={() => void handleSubmit(salvarRegistro)()}
+                      onClick={() => void handleSubmit(salvarRegistro, tratarErrosSalvar)()}
                       disabled={acaoEmAndamento}
                     >
                       {salvarMutation.isPending ? "Registrando..." : "Incluir doação e registrar entrada"}

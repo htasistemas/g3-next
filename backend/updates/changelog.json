@@ -1,6 +1,19 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.325",
+                        "releaseDate":  "2026-03-25",
+                        "title":  "Recebimento de doações com validação visível na aba de itens",
+                        "description":  "A conclusão do recebimento pela aba Itens recebidos passou a avisar claramente quando houver campos obrigatórios pendentes ou nenhum item lançado.",
+                        "changes":  [
+                                        "Submit da aba Itens recebidos ajustado para usar o mesmo tratamento de validação do botão Salvar da tela.",
+                                        "Popup de validação agora lista os campos obrigatórios pendentes da doação quando o cadastro ainda não pode ser concluído.",
+                                        "Sistema passou a bloquear o registro final quando não houver nenhum item recebido lançado.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.324",
                         "releaseDate":  "2026-03-25",
                         "title":  "Recebimento de doações com ação final funcional na aba de itens",
