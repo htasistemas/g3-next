@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../../database/prisma.js";
 import { AppError } from "../../../shared/errors/app-error.js";
 import { normalizeDigits, toOptionalDate, trimOrUndefined } from "../../../utils/string-utils.js";
+import { formatarTextoPadrao } from "../../../utils/text-formatter.js";
 import type {
   DoadorInput,
   RegistroDoacaoFilters,
@@ -26,8 +27,20 @@ function normalizarTextoLivre(value?: string | null) {
   return value?.trim().replace(/\s+/g, " ") ?? "";
 }
 
+function formatarDescricaoProdutoAlmoxarifado(value?: string | null) {
+  const normalizado = normalizarTextoLivre(value);
+  if (!normalizado) return "";
+  return formatarTextoPadrao(normalizado);
+}
+
 function normalizarTextoBusca(value?: string | null) {
   return normalizarTextoLivre(value).toLocaleLowerCase("pt-BR");
+}
+
+function normalizarChaveProduto(value?: string | null) {
+  return normalizarTextoBusca(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 }
 
 function statusPermiteIntegracaoAlmoxarifado(status?: string | null) {
@@ -505,7 +518,7 @@ export class RegistroDoacaoRepository {
     const referencia = `Doação ${registroId.toString()}`;
 
     for (const item of itens) {
-      const descricao = normalizarTextoLivre(item.descricao);
+      const descricao = formatarDescricaoProdutoAlmoxarifado(item.descricao);
       if (!descricao) continue;
 
       const unidade = normalizarTextoLivre(item.unidade) || "UN";
@@ -519,6 +532,10 @@ export class RegistroDoacaoRepository {
           valor_unitario: item.valor_unitario,
           observacoes: `Item criado automaticamente a partir da doação ${registroId.toString()}.`
         });
+      }
+
+      if (!almoxItem) {
+        throw new AppError("Nao foi possivel localizar ou criar o item de almoxarifado da doacao.", 500);
       }
 
       const quantidade = Number(item.quantidade ?? 0);
@@ -570,17 +587,30 @@ export class RegistroDoacaoRepository {
     categoria: string,
     unidade: string
   ) {
-    const rows = await tx.$queryRaw<Array<{ id: bigint; estoque_atual: number }>>(Prisma.sql`
-      SELECT id, estoque_atual
+    const rows = await tx.$queryRaw<Array<{
+      id: bigint;
+      estoque_atual: number;
+      descricao: string;
+      categoria: string;
+      unidade: string;
+    }>>(Prisma.sql`
+      SELECT id, estoque_atual, descricao, categoria, unidade
       FROM almoxarifado_item
-      WHERE LOWER(descricao) = ${normalizarTextoBusca(descricao)}
-        AND LOWER(categoria) = ${normalizarTextoBusca(categoria)}
-        AND LOWER(unidade) = ${normalizarTextoBusca(unidade)}
+      WHERE LOWER(categoria) = ${normalizarTextoBusca(categoria)}
       ORDER BY id ASC
-      LIMIT 1
     `);
 
-    return rows[0] ?? null;
+    const chaveDescricao = normalizarChaveProduto(descricao);
+    const chaveUnidade = normalizarChaveProduto(unidade);
+    return (
+      rows.find((item) => {
+        const mesmaDescricao = normalizarChaveProduto(item.descricao) === chaveDescricao;
+        const mesmaUnidade = normalizarChaveProduto(item.unidade) === chaveUnidade;
+        return mesmaDescricao && mesmaUnidade;
+      }) ??
+      rows.find((item) => normalizarChaveProduto(item.descricao) === chaveDescricao) ??
+      null
+    );
   }
 
   private async criarItemAlmoxarifadoViaDoacao(
@@ -600,7 +630,9 @@ export class RegistroDoacaoRepository {
     `);
 
     const codigo = String(proximoCodigoRows[0]?.proximo ?? 1).padStart(4, "0");
-    const inserted = await tx.$queryRaw<Array<{ id: bigint; estoque_atual: number }>>(Prisma.sql`
+    const inserted = await tx.$queryRaw<
+      Array<{ id: bigint; estoque_atual: number; descricao: string; categoria: string; unidade: string }>
+    >(Prisma.sql`
       INSERT INTO almoxarifado_item (
         codigo,
         descricao,
@@ -630,7 +662,7 @@ export class RegistroDoacaoRepository {
         NOW(),
         NOW()
       )
-      RETURNING id, estoque_atual
+      RETURNING id, estoque_atual, descricao, categoria, unidade
     `);
 
     const item = inserted[0];

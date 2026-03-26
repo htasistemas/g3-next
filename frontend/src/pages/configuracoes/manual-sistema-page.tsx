@@ -130,12 +130,30 @@ const secoesManual: ManualSecao[] = [
           "Consulte a listagem de inscrições para localizar status, vaga e situação do participante.",
           "Use os dados da inscrição para registrar turma, responsável, datas e observações.",
           "Revise a fila de espera e a situação de vagas para apoiar decisões de encaminhamento.",
+          "Os atendimentos agendados não ficam mais dentro da tela de inscrições; quando precisar operar agenda, use o botão Abrir em Agendamentos.",
           "Na aba Presença, gere a data da aula, salve as presenças e use Excluir data de presença quando precisar remover apenas a data gerada sem apagar o curso.",
-          "A barra superior da tela usa nomes específicos por aba, com ações como Buscar inscrições, Salvar dados da inscrição, Salvar agendamentos e Salvar presença para reduzir ambiguidade operacional."
+          "A barra superior da tela usa nomes específicos por aba, com ações como Buscar inscrições, Salvar dados da inscrição e Salvar presença para reduzir ambiguidade operacional."
         ],
         atencoes: [
           "O botão Excluir da barra superior remove todo o curso configurado e exige confirmação específica antes da exclusão.",
           "Na aba Presença, a data exibida na lista e a data impressa na lista de presença agora seguem exatamente o mesmo dia informado, sem recuo por fuso horário."
+        ]
+      },
+      {
+        nome: "Agendamentos",
+        objetivo: "Centralizar agenda institucional de atendimentos, encaixes, fila de espera e conclusão operacional.",
+        comoUsar: [
+          "Use os filtros superiores para consultar a agenda por beneficiário, profissional, unidade, setor, período e status.",
+          "Na aba Agenda operacional, preencha beneficiário, tipo, profissional, data, horário, sala e observações para salvar o agendamento.",
+          "Os agendamentos salvos passam a aparecer agrupados em cards por dia, facilitando a leitura rápida da agenda operacional e da quantidade de atendimentos em cada data.",
+          "Use Encaixe quando precisar forçar um horário fora da grade padrão e Lista de espera quando ainda não houver vaga confirmada.",
+          "Selecione um agendamento na lista para confirmar, concluir atendimento ou cancelar a reserva.",
+          "Na aba Painel inteligente, acompanhe totais do período, encaixes, faltas, retornos pendentes e a distribuição por profissional."
+        ],
+        atencoes: [
+          "A barra superior da tela usa rótulos mais curtos para evitar sobreposição com o cabeçalho e manter as ações acessíveis em resoluções menores.",
+          "A conclusão do atendimento alimenta o histórico operacional e o histórico familiar quando houver vínculo com a família.",
+          "Quando existir conflito de horário, profissional, sala ou recurso, o sistema bloqueia o salvamento comum e orienta o uso de encaixe ou ajuste da agenda."
         ]
       },
       {
@@ -144,11 +162,14 @@ const secoesManual: ManualSecao[] = [
         comoUsar: [
           "Preencha a aba Dados da doação e depois siga para Itens recebidos para lançar os produtos, quantidades e valores antes de concluir o registro.",
           "Na aba Itens recebidos, use Incluir doação e registrar entrada para salvar o registro completo com os itens já lançados e gerar a entrada no almoxarifado quando a doação for de bens de consumo.",
+          "No campo Descrição dos itens recebidos, você pode reaproveitar a descrição de um produto já existente no almoxarifado; quando houver correspondência, a nova entrada soma a quantidade no mesmo item.",
+          "A descrição lançada também passa por padronização visual antes de criar item novo no almoxarifado, mantendo capitalização mais limpa e consistente.",
           "A barra superior da tela usa nomes específicos por aba para deixar claro quando a ação salva o doador, a doação ou a comunicação."
         ],
         atencoes: [
           "O botão Incluir doação e registrar entrada finaliza o registro quando ele ainda estiver em rascunho para permitir a integração automática com o almoxarifado.",
           "Ao concluir a doação, o sistema agora também invalida o cache do almoxarifado para que a listagem e as movimentações reflitam os novos itens ao abrir a tela.",
+          "A identificação de item existente considera diferenças de maiúsculas, minúsculas, espaços e acentos para evitar duplicidade como cesta basica e cesta básica.",
           "O salvamento pela aba Itens recebidos não deve mais bloquear o registro por campo opcional numérico vazio no formulário principal.",
           "Quando faltar algum campo obrigatório real, o sistema continuará informando a pendência nominalmente no alerta."
         ]
@@ -164,6 +185,25 @@ const secoesManual: ManualSecao[] = [
         atencoes: [
           "Os botões Excluir ocorrência e Imprimir ocorrência continuam vinculados ao registro atual selecionado.",
           "A troca de nomes na barra superior foi feita para reduzir ambiguidade operacional, sem alterar a lógica de cadastro, busca, exclusão ou impressão."
+        ]
+      },
+      {
+        nome: "Registro de visitas",
+        objetivo: "Registrar visitas domiciliares com identificação, condições do domicílio, situação social, registro técnico, anexos e histórico do beneficiário.",
+        comoUsar: [
+          "Use a aba Listagem das visitas para localizar registros já lançados com filtros por beneficiário, responsável, unidade, situação e data, seguindo o mesmo padrão visual das listagens do sistema.",
+          "Na aba Identificação da visita, use um único campo de Beneficiário para digitar a busca e selecionar a pessoa desejada na própria lista de resultados.",
+          "Ao iniciar uma nova visita, o campo Responsável já vem preenchido com o usuário logado e o campo Data é carregado automaticamente com a data atual, mas ambos continuam editáveis.",
+          "Use Buscar histórico para abrir rapidamente a aba Histórico do beneficiário e localizar visitas já registradas.",
+          "A barra superior da tela usa nomes específicos por aba, com ações como Salvar identificação da visita, Salvar condições do domicílio, Salvar situação familiar e social e Salvar registro da visita.",
+          "Use Nova visita para iniciar um novo registro sem alterar a lógica já existente da tela."
+        ],
+        atencoes: [
+          "Ao voltar a digitar no campo Beneficiário, a seleção anterior é limpa até que um beneficiário seja escolhido novamente na lista.",
+          "Se o navegador bloquear a janela dedicada de impressão, a tela usa a impressão da própria página como contingência para não interromper a operação.",
+          "O salvamento da identificação da visita foi ajustado para bases em que a consulta retorna datas e horários como texto, evitando erro interno do servidor no retorno do cadastro.",
+          "Os botões Excluir visita e Imprimir visita continuam vinculados ao registro atual selecionado.",
+          "A troca de nomes na barra superior foi feita para reduzir ambiguidade operacional, sem alterar a lógica de cadastro, histórico, exclusão ou impressão."
         ]
       }
     ]
@@ -207,6 +247,24 @@ const secoesManual: ManualSecao[] = [
         atencoes: [
           "A consulta de produtos fica centralizada na aba Listagem de produtos.",
           "Cadastros e movimentações devem permanecer coerentes para evitar divergência de saldo."
+        ]
+      },
+      {
+        nome: "Controle de veículos",
+        objetivo: "Gerenciar cadastro de veículos, mapa de bordo, locais de destino e motoristas autorizados.",
+        comoUsar: [
+          "Use a aba Cadastro de veículo para registrar placa, modelo, marca, dados do veículo, foto e documento em PDF.",
+          "Na aba Listagem de veículos, selecione um item da lista para visualizar o resumo completo e usar a ação Editar veículo.",
+          "Na aba Mapa de bordo, registre saídas, chegadas, condutor, destino e quilometragem do deslocamento.",
+          "Na aba Locais de destino, mantenha os endereços de referência organizados para reaproveitar no mapa de bordo.",
+          "Na aba Motoristas autorizados, vincule motorista e veículo com carteira e vencimento quando aplicável.",
+          "A barra superior da tela usa nomes específicos por aba, como Salvar veículo, Salvar mapa de bordo, Salvar destino e Salvar motorista autorizado."
+        ],
+        atencoes: [
+          "Na aba Dashboard, a barra superior usa ações próprias do painel e o botão Abrir cadastro de veículo leva diretamente ao cadastro.",
+          "Na aba Listagem de veículos, a ação principal da barra superior passa a ser Editar veículo, evitando confusão com o salvamento do cadastro.",
+          "Os botões da barra superior foram compactados e balanceados em largura para respeitar melhor o espaço do card e não avançar sobre o título da tela.",
+          "O vínculo de motorista autorizado foi ajustado para funcionar tanto em bases que usam cadastro_profissional quanto em bases que usam cadastro_profissionais."
         ]
       },
       {

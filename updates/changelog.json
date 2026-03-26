@@ -1,6 +1,154 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.347",
+                        "releaseDate":  "2026-03-26",
+                        "title":  "Registro de visitas estável e controle de veículos refinado",
+                        "description":  "O retorno do salvamento em Registro de visitas foi compatibilizado com bases que devolvem datas e horários em texto, e a barra de ações de Controle de veículos recebeu novo refinamento visual.",
+                        "changes":  [
+                                        "Mapper de visitas domiciliares passou a aceitar criado_em, atualizado_em, data_visita e horários tanto como Date quanto como string.",
+                                        "Horários de visitas agora retornam em formato HH:mm mesmo quando a base entrega colunas TIME como timestamp textual.",
+                                        "Barra de ações da tela Controle de veículos recebeu compactação adicional para manter os botões dentro do card sem avançar sobre o título.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.346",
+                        "releaseDate":  "2026-03-26",
+                        "title":  "Controle de veículos com barra de ações mais compacta",
+                        "description":  "A tela Controle de veículos recebeu ajuste visual para impedir que os botões da barra superior avancem sobre o título do card.",
+                        "changes":  [
+                                        "Layout administrativo passou a aceitar configuração opcional de compactação da barra de ações por tela.",
+                                        "Tela Controle de veículos passou a usar largura e espaçamento mais compactos nos botões do cabeçalho.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.345",
+                        "releaseDate":  "2026-03-26",
+                        "title":  "Motorista autorizado compatível com bases de produção",
+                        "description":  "O salvamento de motorista autorizado no controle de veículos foi ajustado para funcionar em bases com nomes diferentes para a tabela de profissionais.",
+                        "changes":  [
+                                        "Backend do controle de veículos passou a localizar automaticamente a tabela de profissionais compatível da base antes de buscar o nome do motorista.",
+                                        "Fluxo de motorista autorizado deixa de depender exclusivamente de cadastro_profissional e passa a aceitar também bases com cadastro_profissionais.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.344",
+                        "releaseDate":  "2026-03-26",
+                        "title":  "Controle de veículos com botões específicos por aba",
+                        "description":  "A barra superior da tela Controle de veículos passou a trocar os rótulos genéricos por nomes específicos conforme a aba aberta, sem alterar a lógica principal da tela.",
+                        "changes":  [
+                                        "Ações da barra superior ajustadas para contextos como Salvar veículo, Editar veículo, Salvar mapa de bordo, Salvar destino e Salvar motorista autorizado.",
+                                        "Dashboard da tela passou a usar ações próprias do painel, incluindo Abrir cadastro de veículo e Imprimir painel.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.343",
+                        "releaseDate":  "2026-03-26",
+                        "title":  "Agendamentos com barra ajustada e cards por dia",
+                        "description":  "A central de Agendamentos recebeu ajuste visual na barra de ações e passou a exibir a agenda operacional em cards agrupados por dia.",
+                        "changes":  [
+                                        "Rótulos da barra superior da tela Agendamentos encurtados para evitar invasão do espaço do cabeçalho e manter os botões acessíveis.",
+                                        "Agenda operacional passou a exibir cards por dia com a lista de agendamentos daquele dia, em vez de uma tabela única corrida.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.342",
+                        "releaseDate":  "2026-03-26",
+                        "title":  "Central de Agendamentos com menu próprio",
+                        "description":  "A agenda institucional saiu da tela de Inscrições e passou a funcionar em um módulo independente de Agendamentos, com agenda operacional, fila de espera e painel de indicadores.",
+                        "changes":  [
+                                        "Novo menu Atendimentos > Agendamentos com tela própria para consultar, criar, confirmar, concluir, cancelar e exportar agendamentos.",
+                                        "Nova aba Lista de espera no módulo Agendamentos, com conversão direta do item da fila para agendamento.",
+                                        "Aba Atendimentos agendados removida da navegação da tela Inscrições e substituída por atalho Abrir em Agendamentos.",
+                                        "Backend passou a expor rotas reais de agendamentos com persistência própria, histórico operacional e histórico familiar ao concluir atendimento.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.341",
+                        "releaseDate":  "2026-03-26",
+                        "title":  "Correções de estabilidade em visitas e doações",
+                        "description":  "Foram ajustados o retorno do salvamento de visitas domiciliares e a compatibilidade de importação do hook de almoxarifado usado pelo recebimento de doações durante o desenvolvimento.",
+                        "changes":  [
+                                        "Mapper de visitas domiciliares ajustado para aceitar datas vindas do banco como Date ou string, evitando falha no retorno do POST de salvamento.",
+                                        "Hook de registro de doações passou a reexportar useItensAlmoxarifado por compatibilidade, eliminando o erro intermitente de importação apontado pelo Vite.",
+                                        "Versão oficial atualizada na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.340",
+                        "releaseDate":  "2026-03-26",
+                        "title":  "Registro de visitas com listagem e preenchimento automático",
+                        "description":  "A tela Registro de visitas passou a contar com aba de listagem no padrão do sistema, preenchimento automático de responsável e data e contingência para impressão quando a janela dedicada for bloqueada.",
+                        "changes":  [
+                                        "Nova aba Listagem das visitas com filtros no topo, limpeza rápida, tabela clicável, destaque do item selecionado e estados claros de carregamento e vazio.",
+                                        "Ao iniciar uma nova visita, o campo Responsável é preenchido com o usuário logado e o campo Data recebe automaticamente a data atual, mantendo edição manual liberada.",
+                                        "Ao imprimir visita, a tela passa a usar a impressão da própria página como contingência quando o navegador bloquear a janela de impressão.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.339",
+                        "releaseDate":  "2026-03-26",
+                        "title":  "Registro de visitas com busca unificada de beneficiário",
+                        "description":  "A aba Identificação da visita passou a usar um único campo para buscar e selecionar o beneficiário, eliminando o campo redundante de exibição separada.",
+                        "changes":  [
+                                        "Campo Beneficiário agora concentra digitação da busca e seleção do beneficiário na própria lista de resultados.",
+                                        "Ao editar novamente o texto do campo, a seleção anterior é limpa até que um beneficiário seja escolhido de novo.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.338",
+                        "releaseDate":  "2026-03-26",
+                        "title":  "Registro de visitas com botões específicos por aba",
+                        "description":  "A barra superior da tela Registro de visitas passou a trocar os rótulos genéricos por nomes específicos conforme a aba aberta, sem alterar a lógica existente da tela.",
+                        "changes":  [
+                                        "Botões da barra superior passaram a usar nomes contextuais como Buscar histórico, Nova visita, Salvar identificação da visita, Salvar condições do domicílio e Salvar registro da visita.",
+                                        "Ações de excluir e imprimir também passaram a usar nomes específicos da tela, preservando o comportamento já implementado.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.337",
+                        "releaseDate":  "2026-03-26",
+                        "title":  "Recebimento de doações com descrição padronizada no almoxarifado",
+                        "description":  "As descrições dos itens lançados por recebimento de doações passaram a ser salvas com capitalização visual mais limpa e consistente no almoxarifado.",
+                        "changes":  [
+                                        "Descrição do item recebido passa por padronização antes de entrar na lista da doação e antes de criar novo item no almoxarifado.",
+                                        "A lógica de reaproveitamento por descrição continua ativa, sem perder a comparação que ignora acentos, maiúsculas e espaços.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.336",
+                        "releaseDate":  "2026-03-26",
+                        "title":  "Recebimento de doações com reaproveitamento de item existente",
+                        "description":  "A aba Itens recebidos passou a reaproveitar o item já cadastrado no almoxarifado pela descrição e somar a nova quantidade em vez de criar duplicidade.",
+                        "changes":  [
+                                        "Campo Descrição passou a sugerir produtos já existentes no almoxarifado e a informar quando a entrada será somada ao item já cadastrado.",
+                                        "Backend ajustado para reconhecer o mesmo produto mesmo com diferença de acentuação, letras maiúsculas ou espaços, evitando duplicidade como cesta basica e cesta básica.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.335",
                         "releaseDate":  "2026-03-26",
                         "title":  "Almoxarifado com atualização imediata após recebimento de doação",

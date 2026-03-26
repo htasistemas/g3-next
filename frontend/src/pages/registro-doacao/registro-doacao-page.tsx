@@ -1,4 +1,5 @@
 ﻿import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import { useForm, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
@@ -43,6 +44,7 @@ import {
   useRemoverRegistroDoacao,
   useSalvarRegistroDoacao
 } from "@/features/registro-doacao/use-registro-doacao";
+import { useItensAlmoxarifado } from "@/features/almoxarifado/use-almoxarifado";
 import { reportsService } from "@/services/reports.service";
 import { abrirRelatorioPdf } from "@/lib/report-utils";
 import { formatarTextoPorCampo, normalizarObjetoTexto } from "@/lib/text-formatter";
@@ -133,6 +135,21 @@ function formatarData(data?: string) {
   const parsed = new Date(data);
   if (Number.isNaN(parsed.getTime())) return data;
   return parsed.toLocaleDateString("pt-BR");
+}
+
+function normalizarChaveProduto(value?: string | null) {
+  return (value ?? "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLocaleLowerCase("pt-BR")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function formatarDescricaoItemRecebido(value?: string | null) {
+  const texto = (value ?? "").trim().replace(/\s+/g, " ");
+  if (!texto) return "";
+  return formatarTextoPorCampo("descricao", texto, mapaCamposTextoRegistroDoacaoForm) as string;
 }
 
 function obterCamposPendentesRegistroDoacao(errors: FieldErrors<RegistroDoacaoFormInput>) {
@@ -238,6 +255,7 @@ export function RegistroDoacaoPage() {
   const { data: detalheData, isLoading: carregandoDetalhes } = useRegistroDoacao(idSelecionado);
   const { data: doadoresData, isFetching: carregandoDoadores } = useDoadores(termoDoador);
   const { data: doadoresCadastradosData, isLoading: carregandoDoadoresCadastrados } = useDoadores();
+  const { data: itensAlmoxarifadoData } = useItensAlmoxarifado();
 
   const salvarMutation = useSalvarRegistroDoacao();
   const removerMutation = useRemoverRegistroDoacao();
@@ -261,6 +279,7 @@ export function RegistroDoacaoPage() {
   const registros = listaData?.registros ?? [];
   const doadores = doadoresData?.doadores ?? [];
   const doadoresCadastrados = doadoresCadastradosData?.doadores ?? [];
+  const itensAlmoxarifado = itensAlmoxarifadoData?.itens ?? [];
   const recorrente = !!watch("recorrente");
   const tipoDoacaoSelecionadoBruto = watch("tipo_doacao");
   const tipoDoacaoSelecionado =
@@ -286,6 +305,24 @@ export function RegistroDoacaoPage() {
       : undefined);
   const acaoEmAndamento =
     salvarMutation.isPending || removerMutation.isPending || carregandoDetalhes || criarDoadorMutation.isPending;
+  const descricoesAlmoxarifado = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          itensAlmoxarifado
+            .map((item) => item.descricao?.trim())
+            .filter((item): item is string => Boolean(item))
+        )
+      ).sort((a: string, b: string) => a.localeCompare(b, "pt-BR")),
+    [itensAlmoxarifado]
+  );
+  const itemAlmoxarifadoExistente = useMemo(() => {
+    const chave = normalizarChaveProduto(novoItem.descricao);
+    if (!chave) return null;
+    return (
+      itensAlmoxarifado.find((item) => normalizarChaveProduto(item.descricao) === chave) ?? null
+    );
+  }, [itensAlmoxarifado, novoItem.descricao]);
 
   useEffect(() => {
     if (!detalheData?.registro) return;
@@ -507,7 +544,7 @@ export function RegistroDoacaoPage() {
   }
 
   function adicionarItem() {
-    const descricao = novoItem.descricao?.trim() ?? "";
+    const descricao = formatarDescricaoItemRecebido(novoItem.descricao);
     if (
       descricao.length < 2 ||
       !novoItem.quantidade ||
@@ -527,7 +564,35 @@ export function RegistroDoacaoPage() {
       valor_total: novoItem.valor_total ? Number(novoItem.valor_total) : undefined
     };
 
-    setItens((atual) => [...atual, item]);
+    setItens((atual) => {
+      const indiceExistente = atual.findIndex(
+        (itemAtual) => normalizarChaveProduto(itemAtual.descricao) === normalizarChaveProduto(descricao)
+      );
+
+      if (indiceExistente < 0) {
+        return [...atual, item];
+      }
+
+      const listaAtualizada = [...atual];
+      const itemExistente = listaAtualizada[indiceExistente];
+      const quantidadeAtual = Number(itemExistente.quantidade ?? 0);
+      const quantidadeNova = Number(item.quantidade ?? 0);
+      const valorTotalAtual = Number(itemExistente.valor_total ?? 0);
+      const valorTotalNovo = Number(item.valor_total ?? 0);
+      const quantidadeSomada = quantidadeAtual + quantidadeNova;
+      const valorTotalSomado = Number((valorTotalAtual + valorTotalNovo).toFixed(2));
+      const valorUnitarioMedio =
+        quantidadeSomada > 0 ? Number((valorTotalSomado / quantidadeSomada).toFixed(2)) : itemExistente.valor_unitario;
+
+      listaAtualizada[indiceExistente] = {
+        ...itemExistente,
+        quantidade: quantidadeSomada,
+        valor_total: valorTotalSomado,
+        valor_unitario: valorUnitarioMedio
+      };
+
+      return listaAtualizada;
+    });
     setNovoItem({ descricao: "", quantidade: 1 });
     setNovoItemValorUnitarioInput("");
     setNovoItemValorTotalInput("");
@@ -1157,8 +1222,29 @@ export function RegistroDoacaoPage() {
 
               {abaAtiva === "itens" && (
                 <div className="space-y-3">
+                  <datalist id="registro-doacao-itens-almoxarifado">
+                    {descricoesAlmoxarifado.map((descricao) => (
+                      <option key={descricao} value={descricao} />
+                    ))}
+                  </datalist>
                   <div className="grid gap-3 rounded-lg border border-[var(--g3-border)] p-3 md:grid-cols-6">
-                    <div className="space-y-1 md:col-span-2"><Label>Descrição *</Label><Input value={novoItem.descricao ?? ""} onChange={(e) => setNovoItem((a) => ({ ...a, descricao: e.target.value }))} /></div>
+                    <div className="space-y-1 md:col-span-2">
+                      <Label>Descrição *</Label>
+                      <Input
+                        list="registro-doacao-itens-almoxarifado"
+                        value={novoItem.descricao ?? ""}
+                        onChange={(e) => setNovoItem((a) => ({ ...a, descricao: e.target.value }))}
+                      />
+                      {itemAlmoxarifadoExistente ? (
+                        <p className="text-xs text-emerald-700">
+                          Item já cadastrado no almoxarifado como código {itemAlmoxarifadoExistente.codigo}. Ao registrar a entrada, o sistema vai somar a quantidade a esse produto.
+                        </p>
+                      ) : (
+                        <p className="text-xs text-[var(--g3-muted)]">
+                          Se a descrição corresponder a um item já existente, o sistema reaproveita o cadastro e soma a nova quantidade.
+                        </p>
+                      )}
+                    </div>
                     <div className="space-y-1"><Label>Quantidade *</Label><Input type="number" min={1} value={novoItem.quantidade ?? 1} onChange={(e) => setNovoItem((a) => ({ ...a, quantidade: Number(e.target.value) }))} /></div>
                     <div className="space-y-1"><Label>Valor unitário *</Label><Input inputMode="decimal" value={novoItemValorUnitarioInput} onChange={(e) => atualizarNovoItemValorUnitarioInput(e.target.value)} onBlur={formatarNovoItemValorUnitarioNoBlur} placeholder="0,00" /></div>
                     <div className="space-y-1"><Label>Valor total</Label><Input value={novoItemValorTotalInput} readOnly placeholder="0,00" /></div>

@@ -82,11 +82,10 @@ const abas = [
   { id: "dados", label: "Dados da inscrição", icon: BookOpenCheck },
   { id: "catalogo", label: "Catálogo e vagas", icon: CalendarClock },
   { id: "inscricoes", label: "Inscrições e lista de espera", icon: UserPlus },
-  { id: "agenda", label: "Atendimentos agendados", icon: ClipboardList },
   { id: "presenca", label: "Presença", icon: Users }
 ] as const;
 
-type AbaId = (typeof abas)[number]["id"];
+type AbaId = "listagem" | "dados" | "catalogo" | "inscricoes" | "agenda" | "presenca";
 
 type AcaoCrud = {
   label: string;
@@ -2897,6 +2896,19 @@ export function CadastroMatriculasPage() {
               )}
               {abaAtiva === "inscricoes" && (
                 <div className="space-y-3">
+                  <div className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-3">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-[var(--g3-foreground)]">Agendamentos agora ficam em tela própria</p>
+                        <p className="text-xs text-[var(--g3-muted)]">
+                          Use a central <strong>Agendamentos</strong> para marcar, confirmar, encaixar, concluir e acompanhar a fila de espera.
+                        </p>
+                      </div>
+                      <Button type="button" variant="outline" onClick={() => navigate("/atendimentos/agendamentos")}>
+                        Abrir em Agendamentos
+                      </Button>
+                    </div>
+                  </div>
                   <div className="rounded-lg border border-[var(--g3-border)] p-3">
                     <p className="mb-3 text-sm font-semibold text-[var(--g3-foreground)]">
                       Seleção de curso/atendimento
@@ -3999,6 +4011,7 @@ export function CadastroMatriculasPage() {
     </section>
   );
 }
+
 
 
 

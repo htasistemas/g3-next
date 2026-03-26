@@ -242,6 +242,13 @@ export const menuSections: MenuSection[] = [
         icon: MapPinned
       },
       {
+        id: "atendimentos-agendamentos",
+        to: "/atendimentos/agendamentos",
+        label: "Agendamentos",
+        icon: CalendarRange,
+        requiredPermissions: ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS", "AGENDAMENTOS_VISUALIZAR"]
+      },
+      {
         id: "atendimentos-ocorrencias",
         to: "/atendimentos/ocorrencias",
         label: "Ocorrências",
@@ -536,6 +543,7 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/atendimentos/banco-empregos")) return "Banco de empregos";
   if (pathname.startsWith("/atendimentos/biblioteca")) return "Biblioteca";
   if (pathname.startsWith("/atendimentos/registro-visitas")) return "Registro de visitas";
+  if (pathname.startsWith("/atendimentos/agendamentos")) return "Agendamentos";
   if (pathname.startsWith("/atendimentos/ocorrencias")) return "Ocorrências";
   if (pathname.startsWith("/atendimentos/chamada-senhas")) return "Chamada de senhas";
   if (pathname.startsWith("/financeiro/registro-doacao")) return "Recebimento de doações";

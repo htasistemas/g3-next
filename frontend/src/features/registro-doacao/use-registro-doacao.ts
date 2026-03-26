@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { registroDoacaoService } from "@/services/registro-doacao.service";
 import type { Doador, RegistroDoacao, RegistroDoacaoFiltro } from "@/types/registro-doacao";
 
+export { useItensAlmoxarifado } from "@/features/almoxarifado/use-almoxarifado";
+
 export function useRegistrosDoacao(filtros: RegistroDoacaoFiltro) {
   return useQuery({
     queryKey: ["registro-doacao", filtros],

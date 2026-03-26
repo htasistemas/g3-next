@@ -157,6 +157,7 @@ const CentralAtendimentosPage = carregarPagina("/atendimentos/central-atendiment
 const BancoEmpregosPage = carregarPagina("/atendimentos/banco-empregos", "BancoEmpregosPage");
 const BibliotecaPage = carregarPagina("/atendimentos/biblioteca", "BibliotecaPage");
 const RegistroVisitasPage = carregarPagina("/atendimentos/registro-visitas", "RegistroVisitasPage");
+const AgendamentosPage = carregarPagina("/atendimentos/agendamentos", "AgendamentosPage");
 const OcorrenciasPage = carregarPagina("/atendimentos/ocorrencias", "OcorrenciasPage");
 const ChamadaSenhasPage = carregarPagina("/atendimentos/chamada-senhas", "ChamadaSenhasPage");
 const RegistroDoacaoPage = carregarPagina("/financeiro/registro-doacao", "RegistroDoacaoPage");
@@ -311,6 +312,14 @@ export const router = createBrowserRouter([
       { path: "/atendimentos/banco-empregos", element: BancoEmpregosPage },
       { path: "/atendimentos/biblioteca", element: BibliotecaPage },
       { path: "/atendimentos/registro-visitas", element: RegistroVisitasPage },
+      {
+        path: "/atendimentos/agendamentos",
+        element: (
+          <RequirePermission permissions={["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS", "AGENDAMENTOS_VISUALIZAR"]}>
+            {AgendamentosPage}
+          </RequirePermission>
+        )
+      },
       { path: "/atendimentos/ocorrencias", element: OcorrenciasPage },
       { path: "/atendimentos/chamada-senhas", element: ChamadaSenhasPage },
       { path: "/financeiro/registro-doacao", element: RegistroDoacaoPage },

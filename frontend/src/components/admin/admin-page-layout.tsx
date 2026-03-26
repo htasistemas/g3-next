@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   classeBotaoAbaLateral,
   classeNumeroAbaLateral,
@@ -31,6 +32,8 @@ type AdminPageLayoutProps = {
   activeTitle?: string;
   activeIcon?: LucideIcon;
   codeBadge?: string;
+  actionsClassName?: string;
+  actionButtonClassName?: string;
   children: React.ReactNode;
 };
 
@@ -44,6 +47,8 @@ export function AdminPageLayout({
   activeTitle,
   activeIcon: ActiveIcon,
   codeBadge,
+  actionsClassName,
+  actionButtonClassName,
   children
 }: AdminPageLayoutProps) {
   const tab = tabs.find((item) => item.id === activeTab);
@@ -75,14 +80,14 @@ export function AdminPageLayout({
             </div>
           ) : null}
 
-          <div className={classesTelaPadraoBeneficiario.gradeAcoes}>
+          <div className={cn(classesTelaPadraoBeneficiario.gradeAcoes, actionsClassName)}>
             {actions.map((action) => (
               <Button
                 key={action.label}
                 type="button"
                 variant={action.variant}
                 size="sm"
-                className={classesTelaPadraoBeneficiario.botaoAcao}
+                className={cn(classesTelaPadraoBeneficiario.botaoAcao, actionButtonClassName)}
                 onClick={action.onClick}
                 disabled={action.disabled}
               >

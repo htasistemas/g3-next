@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+﻿import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Car,
@@ -955,26 +955,109 @@ export function ControleVeiculosPage() {
     window.open(url, "_blank", "noopener,noreferrer");
   }
 
-  const acoes: AdminAction[] = [
-    {
-      label: "Buscar",
-      icon: Search,
-      onClick: () => window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }),
-      variant: "outline"
-    },
-    { label: "Novo", icon: Plus, onClick: novo, variant: "default", disabled: carregandoAcoes },
-    {
-      label: abaAtiva === "listagem" ? "Editar veículo" : "Salvar",
-      icon: abaAtiva === "listagem" ? Pencil : Save,
-      onClick: abaAtiva === "listagem" ? editarVeiculoSelecionado : () => void salvar(),
-      variant: "default",
-      disabled: carregandoAcoes || (abaAtiva === "listagem" && !veiculoSelecionadoListagem)
-    },
-    { label: "Cancelar", icon: Undo2, onClick: cancelar, variant: "outline", disabled: carregandoAcoes },
-    { label: "Excluir", icon: Trash2, onClick: excluir, variant: "danger", disabled: carregandoAcoes },
-    { label: "Imprimir", icon: Printer, onClick: imprimir, variant: "outline", disabled: carregandoAcoes },
-    { label: "Fechar", icon: X, onClick: () => navigate("/dashboard/visao-geral"), variant: "outline" }
-  ];
+  const acoesPorAba: Record<AbaId, AdminAction[]> = {
+    dashboard: [
+      {
+        label: "Buscar painel",
+        icon: Search,
+        onClick: () => window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }),
+        variant: "outline"
+      },
+      {
+        label: "Abrir cadastro de veículo",
+        icon: Plus,
+        onClick: () => {
+          setAbaAtiva("cadastro");
+          setVeiculoForm(defaultVeiculo);
+          setFotoVeiculoArquivo(null);
+          setFotoVeiculoPreview("");
+          setDocumentoVeiculoArquivo(null);
+        },
+        variant: "default",
+        disabled: carregandoAcoes
+      },
+      { label: "Imprimir painel", icon: Printer, onClick: imprimir, variant: "outline", disabled: carregandoAcoes },
+      { label: "Fechar", icon: X, onClick: () => navigate("/dashboard/visao-geral"), variant: "outline" }
+    ],
+    cadastro: [
+      {
+        label: "Buscar veículos",
+        icon: Search,
+        onClick: () => window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }),
+        variant: "outline"
+      },
+      { label: "Novo veículo", icon: Plus, onClick: novo, variant: "default", disabled: carregandoAcoes },
+      { label: "Salvar veículo", icon: Save, onClick: () => void salvar(), variant: "default", disabled: carregandoAcoes },
+      { label: "Cancelar cadastro", icon: Undo2, onClick: cancelar, variant: "outline", disabled: carregandoAcoes },
+      { label: "Excluir veículo", icon: Trash2, onClick: excluir, variant: "danger", disabled: carregandoAcoes },
+      { label: "Imprimir cadastro do veículo", icon: Printer, onClick: imprimir, variant: "outline", disabled: carregandoAcoes },
+      { label: "Fechar", icon: X, onClick: () => navigate("/dashboard/visao-geral"), variant: "outline" }
+    ],
+    listagem: [
+      {
+        label: "Buscar veículos",
+        icon: Search,
+        onClick: () => window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }),
+        variant: "outline"
+      },
+      { label: "Novo veículo", icon: Plus, onClick: novo, variant: "default", disabled: carregandoAcoes },
+      {
+        label: "Editar veículo",
+        icon: Pencil,
+        onClick: editarVeiculoSelecionado,
+        variant: "default",
+        disabled: carregandoAcoes || !veiculoSelecionadoListagem
+      },
+      { label: "Cancelar seleção", icon: Undo2, onClick: cancelar, variant: "outline", disabled: carregandoAcoes },
+      { label: "Excluir veículo", icon: Trash2, onClick: excluir, variant: "danger", disabled: carregandoAcoes },
+      { label: "Imprimir veículos", icon: Printer, onClick: imprimir, variant: "outline", disabled: carregandoAcoes },
+      { label: "Fechar", icon: X, onClick: () => navigate("/dashboard/visao-geral"), variant: "outline" }
+    ],
+    diario: [
+      {
+        label: "Buscar mapas de bordo",
+        icon: Search,
+        onClick: () => window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }),
+        variant: "outline"
+      },
+      { label: "Novo mapa de bordo", icon: Plus, onClick: novo, variant: "default", disabled: carregandoAcoes },
+      { label: "Salvar mapa de bordo", icon: Save, onClick: () => void salvar(), variant: "default", disabled: carregandoAcoes },
+      { label: "Cancelar edição", icon: Undo2, onClick: cancelar, variant: "outline", disabled: carregandoAcoes },
+      { label: "Excluir mapa de bordo", icon: Trash2, onClick: excluir, variant: "danger", disabled: carregandoAcoes },
+      { label: "Imprimir mapa de bordo", icon: Printer, onClick: imprimir, variant: "outline", disabled: carregandoAcoes },
+      { label: "Fechar", icon: X, onClick: () => navigate("/dashboard/visao-geral"), variant: "outline" }
+    ],
+    destinos: [
+      {
+        label: "Buscar destinos",
+        icon: Search,
+        onClick: () => window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }),
+        variant: "outline"
+      },
+      { label: "Novo destino", icon: Plus, onClick: novo, variant: "default", disabled: carregandoAcoes },
+      { label: "Salvar destino", icon: Save, onClick: () => void salvar(), variant: "default", disabled: carregandoAcoes },
+      { label: "Cancelar edição", icon: Undo2, onClick: cancelar, variant: "outline", disabled: carregandoAcoes },
+      { label: "Excluir destino", icon: Trash2, onClick: excluir, variant: "danger", disabled: carregandoAcoes },
+      { label: "Imprimir destinos", icon: Printer, onClick: imprimir, variant: "outline", disabled: carregandoAcoes },
+      { label: "Fechar", icon: X, onClick: () => navigate("/dashboard/visao-geral"), variant: "outline" }
+    ],
+    motoristas: [
+      {
+        label: "Buscar motoristas autorizados",
+        icon: Search,
+        onClick: () => window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }),
+        variant: "outline"
+      },
+      { label: "Novo motorista autorizado", icon: Plus, onClick: novo, variant: "default", disabled: carregandoAcoes },
+      { label: "Salvar motorista autorizado", icon: Save, onClick: () => void salvar(), variant: "default", disabled: carregandoAcoes },
+      { label: "Cancelar edição", icon: Undo2, onClick: cancelar, variant: "outline", disabled: carregandoAcoes },
+      { label: "Excluir motorista autorizado", icon: Trash2, onClick: excluir, variant: "danger", disabled: carregandoAcoes },
+      { label: "Imprimir motoristas autorizados", icon: Printer, onClick: imprimir, variant: "outline", disabled: carregandoAcoes },
+      { label: "Fechar", icon: X, onClick: () => navigate("/dashboard/visao-geral"), variant: "outline" }
+    ]
+  };
+
+  const acoes = acoesPorAba[abaAtiva];
 
   const codeBadge =
     abaAtiva === "cadastro" && veiculoForm.placa
@@ -1009,6 +1092,8 @@ export function ControleVeiculosPage() {
         pageTitle={tituloTela}
         activeTitle={abas.find((item) => item.id === abaAtiva)?.label}
         codeBadge={codeBadge}
+        actionsClassName="lg:max-w-[48rem] xl:max-w-[54rem]"
+        actionButtonClassName="h-auto min-h-9 px-2 py-1.5 text-[10px] leading-tight whitespace-normal text-center lg:max-w-[9rem] lg:px-2"
       >
         {abaAtiva === "dashboard" ? (
           <section className="space-y-4">
@@ -1301,3 +1386,4 @@ export function ControleVeiculosPage() {
     </>
   );
 }
+

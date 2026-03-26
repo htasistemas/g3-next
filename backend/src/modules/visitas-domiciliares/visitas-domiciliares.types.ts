@@ -24,9 +24,9 @@ export type VisitaDomiciliarRow = {
   beneficiario_nome: string;
   unidade: string;
   responsavel: string;
-  data_visita: Date;
-  horario_inicial: string;
-  horario_final: string | null;
+  data_visita: Date | string;
+  horario_inicial: string | Date;
+  horario_final: string | Date | null;
   tipo_visita: string | null;
   situacao: string;
   usar_endereco_beneficiario: boolean;
@@ -36,6 +36,6 @@ export type VisitaDomiciliarRow = {
   situacao_social: unknown;
   registro: unknown;
   anexos: unknown;
-  criado_em: Date;
-  atualizado_em: Date;
+  criado_em: Date | string;
+  atualizado_em: Date | string;
 };

@@ -52,6 +52,7 @@ import { centralAtendimentosRoutes } from "../modules/central-atendimentos/route
 import { licencaUsoRoutes } from "../modules/licenca-uso/routes/licenca-uso.routes.js";
 import { vendaRoutes } from "../modules/vendas/routes/venda.routes.js";
 import { carteiraEventoRoutes } from "../modules/carteira-evento/routes/carteira-evento.routes.js";
+import { agendamentosRoutes } from "../modules/agendamentos/routes/agendamentos.routes.js";
 
 export const appRoutes = Router();
 
@@ -63,6 +64,7 @@ appRoutes.use("/api/auth", authRoutes);
 appRoutes.use("/api/ai", ensureAuthenticated, aiRoutes);
 appRoutes.use("/api/semente", ensureAuthenticated, sementeRoutes);
 appRoutes.use("/api/central-atendimentos", centralAtendimentosRoutes);
+appRoutes.use("/api/agendamentos", agendamentosRoutes);
 appRoutes.use("/api/beneficiarios", beneficiarioRoutes);
 appRoutes.use("/api/familias", familiaRoutes);
 appRoutes.use("/api/unidades-assistenciais", unidadeAssistencialRoutes);
