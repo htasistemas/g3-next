@@ -6,27 +6,6 @@ function formatarDataIso(value?: Date | string | null) {
   return String(value).slice(0, 10);
 }
 
-function formatarDataHoraIso(value?: Date | string | null) {
-  if (!value) return undefined;
-  if (value instanceof Date) return value.toISOString();
-  const texto = String(value).trim();
-  if (!texto) return undefined;
-  const data = new Date(texto);
-  if (Number.isNaN(data.getTime())) return texto;
-  return data.toISOString();
-}
-
-function formatarHora(value?: Date | string | null) {
-  if (!value) return undefined;
-  if (value instanceof Date) return value.toISOString().slice(11, 16);
-  const texto = String(value).trim();
-  if (!texto) return undefined;
-  if (/^\d{2}:\d{2}(:\d{2})?$/.test(texto)) return texto.slice(0, 5);
-  const data = new Date(texto);
-  if (Number.isNaN(data.getTime())) return texto.slice(0, 5);
-  return data.toISOString().slice(11, 16);
-}
-
 function asArray<T = Record<string, unknown>>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
 }
@@ -55,8 +34,8 @@ export function mapAgendamentoRow(row: AgendamentoRow) {
     profissionalNome: row.profissional_nome ?? undefined,
     equipeApoio: asArray<string>(row.equipe_apoio),
     data: formatarDataIso(row.data_agendamento),
-    horaInicial: formatarHora(row.hora_inicial),
-    horaFinal: formatarHora(row.hora_final),
+    horaInicial: row.hora_inicial,
+    horaFinal: row.hora_final ?? undefined,
     duracaoMinutos: row.duracao_minutos ?? undefined,
     sala: row.sala ?? undefined,
     recurso: row.recurso ?? undefined,
@@ -80,13 +59,13 @@ export function mapAgendamentoRow(row: AgendamentoRow) {
     documentosPendentes: row.documentos_pendentes,
     autorizacaoPendente: row.autorizacao_pendente,
     confirmacaoCanal: row.confirmacao_canal ?? undefined,
-    confirmadoEm: formatarDataHoraIso(row.confirmado_em),
+    confirmadoEm: row.confirmado_em?.toISOString(),
     confirmadoPorNome: row.confirmado_por_nome ?? undefined,
     observacaoConfirmacao: row.observacao_confirmacao ?? undefined,
     statusChegada: row.status_chegada ?? undefined,
-    horarioChegadaReal: formatarHora(row.horario_chegada_real),
-    horarioInicioReal: formatarHora(row.horario_inicio_real),
-    horarioFimReal: formatarHora(row.horario_fim_real),
+    horarioChegadaReal: row.horario_chegada_real ?? undefined,
+    horarioInicioReal: row.horario_inicio_real ?? undefined,
+    horarioFimReal: row.horario_fim_real ?? undefined,
     concluidoResumo: row.concluido_resumo ?? undefined,
     desfecho: row.desfecho ?? undefined,
     comparecimento: row.comparecimento ?? undefined,
@@ -96,8 +75,8 @@ export function mapAgendamentoRow(row: AgendamentoRow) {
     centralAtendimentoId: row.central_atendimento_id ? Number(row.central_atendimento_id) : undefined,
     participantes: asArray(row.participantes),
     criadoPorNome: row.criado_por_nome ?? undefined,
-    criadoEm: formatarDataHoraIso(row.criado_em),
-    atualizadoEm: formatarDataHoraIso(row.atualizado_em)
+    criadoEm: row.criado_em.toISOString(),
+    atualizadoEm: row.atualizado_em.toISOString()
   };
 }
 
@@ -119,7 +98,7 @@ export function mapListaEsperaRow(row: AgendamentoListaEsperaRow) {
     dataEntrada: formatarDataIso(row.data_entrada),
     encaixeAutomatico: row.encaixe_automatico,
     convertidoAgendamentoId: row.convertido_agendamento_id ? Number(row.convertido_agendamento_id) : undefined,
-    criadoEm: formatarDataHoraIso(row.criado_em),
-    atualizadoEm: formatarDataHoraIso(row.atualizado_em)
+    criadoEm: row.criado_em.toISOString(),
+    atualizadoEm: row.atualizado_em.toISOString()
   };
 }

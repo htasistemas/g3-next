@@ -13,77 +13,13 @@ type LembreteResumoRow = {
   total_vencidos: bigint | number | null;
 };
 
-const sqlEstrutura = [
-  `
-    CREATE TABLE IF NOT EXISTS lembretes_diarios (
-      id BIGSERIAL PRIMARY KEY,
-      titulo VARCHAR(200) NOT NULL,
-      descricao TEXT,
-      usuario_id BIGINT,
-      todos_usuarios BOOLEAN NOT NULL DEFAULT FALSE,
-      data_inicial DATE NOT NULL,
-      recorrencia VARCHAR(20) NOT NULL,
-      hora_aviso TIME,
-      status VARCHAR(20) NOT NULL,
-      proxima_execucao_em TIMESTAMP NOT NULL,
-      adiado_ate TIMESTAMP,
-      concluido_em TIMESTAMP,
-      deletado_em TIMESTAMP,
-      criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
-      atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
-    );
-  `,
-  `
-    ALTER TABLE lembretes_diarios
-      ADD COLUMN IF NOT EXISTS usuario_id BIGINT;
-  `,
-  `
-    ALTER TABLE lembretes_diarios
-      ADD COLUMN IF NOT EXISTS todos_usuarios BOOLEAN NOT NULL DEFAULT FALSE;
-  `,
-  `
-    CREATE INDEX IF NOT EXISTS lembretes_diarios_status_execucao_idx
-      ON lembretes_diarios (status, proxima_execucao_em);
-  `,
-  `
-    CREATE INDEX IF NOT EXISTS lembretes_diarios_usuario_idx
-      ON lembretes_diarios (usuario_id, proxima_execucao_em);
-  `,
-  `
-    CREATE INDEX IF NOT EXISTS lembretes_diarios_ativos_idx
-      ON lembretes_diarios (deletado_em, proxima_execucao_em);
-  `
-];
-
-let ensurePromise: Promise<void> | null = null;
-
 function montarDataHoraProxima(dataInicial: string, horaAviso?: string | null) {
   const hora = trimOrUndefined(horaAviso) ?? "09:00";
   return new Date(`${dataInicial}T${hora}:00`);
 }
 
-export async function ensureLembretesDiariosEstrutura() {
-  if (!ensurePromise) {
-    ensurePromise = (async () => {
-      for (const sql of sqlEstrutura) {
-        await prisma.$executeRawUnsafe(sql);
-      }
-    })().catch((error) => {
-      ensurePromise = null;
-      throw error;
-    });
-  }
-
-  await ensurePromise;
-}
-
 export class LembreteDiarioRepository {
-  private async ensureEstrutura() {
-    await ensureLembretesDiariosEstrutura();
-  }
-
   async listar(usuarioId?: number) {
-    await this.ensureEstrutura();
     const filtroUsuario = usuarioId
       ? Prisma.sql`AND (usuario_id = ${BigInt(usuarioId)} OR todos_usuarios = TRUE)`
       : Prisma.empty;
@@ -112,7 +48,6 @@ export class LembreteDiarioRepository {
   }
 
   async obterResumo(usuarioId?: number) {
-    await this.ensureEstrutura();
     const filtroUsuario = usuarioId
       ? Prisma.sql`AND (usuario_id = ${BigInt(usuarioId)} OR todos_usuarios = TRUE)`
       : Prisma.empty;
@@ -140,7 +75,6 @@ export class LembreteDiarioRepository {
   }
 
   async buscarPorId(id: bigint) {
-    await this.ensureEstrutura();
     const rows = await prisma.$queryRaw<LembreteDiarioRow[]>(Prisma.sql`
       SELECT
         id,

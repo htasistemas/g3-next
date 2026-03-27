@@ -143,15 +143,15 @@ const secoesManual: ManualSecao[] = [
         nome: "Agendamentos",
         objetivo: "Centralizar agenda institucional de atendimentos, encaixes, fila de espera e conclusão operacional.",
         comoUsar: [
-          "Na aba Agenda operacional, use a caixa de seleção de Curso, atendimento ou oficina para escolher primeiro um cadastro já lançado na tela de Inscrições.",
-          "Depois dessa escolha, a tela carrega automaticamente as datas vinculadas ao cadastro, os profissionais relacionados e um campo de seleção com os beneficiários já cadastrados naquele curso, atendimento ou oficina.",
-          "Depois de informar beneficiário, curso/atendimento/oficina, data e profissional, o sistema gera automaticamente o próximo horário disponível e exibe os agendamentos em cards agrupados por data, profissional e tipo, com o nome do curso em destaque, o nome do profissional logo abaixo e o dia da semana por extenso ao lado da data.",
+          "Use os filtros superiores para consultar a agenda por beneficiário, profissional, unidade, setor, período e status.",
+          "Na aba Agenda operacional, preencha beneficiário, tipo, profissional, data, horário, sala e observações para salvar o agendamento.",
+          "Os agendamentos salvos passam a aparecer agrupados em cards por dia, facilitando a leitura rápida da agenda operacional e da quantidade de atendimentos em cada data.",
           "Use Encaixe quando precisar forçar um horário fora da grade padrão e Lista de espera quando ainda não houver vaga confirmada.",
           "Selecione um agendamento na lista para confirmar, concluir atendimento ou cancelar a reserva.",
           "Na aba Painel inteligente, acompanhe totais do período, encaixes, faltas, retornos pendentes e a distribuição por profissional."
         ],
         atencoes: [
-          "A barra superior da tela usa nomes específicos por aba, com ações como Novo agendamento, Salvar agendamento, Salvar lista de espera e Imprimir painel inteligente, seguindo o mesmo padrão operacional adotado em inscrições.",
+          "A barra superior da tela usa rótulos mais curtos para evitar sobreposição com o cabeçalho e manter as ações acessíveis em resoluções menores.",
           "A conclusão do atendimento alimenta o histórico operacional e o histórico familiar quando houver vínculo com a família.",
           "Quando existir conflito de horário, profissional, sala ou recurso, o sistema bloqueia o salvamento comum e orienta o uso de encaixe ou ajuste da agenda."
         ]
