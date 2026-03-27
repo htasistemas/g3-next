@@ -1,6 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { emprestimosEventosService } from "@/services/emprestimos-eventos.service";
-import type { EmprestimoEventoPayload, EventoEmprestimo } from "@/types/emprestimos-eventos";
+import type {
+  EmprestimoEventoPayload,
+  EventoEmprestimo,
+  ResponsavelEmprestimo,
+  ResponsavelEmprestimoPayload
+} from "@/types/emprestimos-eventos";
 
 type FiltrosEmprestimo = {
   inicio?: string;
@@ -30,6 +35,13 @@ export function useEventosEmprestimo() {
   return useQuery({
     queryKey: ["emprestimos-eventos", "eventos"],
     queryFn: () => emprestimosEventosService.listarEventos()
+  });
+}
+
+export function useResponsaveisEmprestimo() {
+  return useQuery({
+    queryKey: ["emprestimos-eventos", "responsaveis"],
+    queryFn: () => emprestimosEventosService.listarResponsaveis()
   });
 }
 
@@ -107,6 +119,32 @@ export function useRemoverEventoEmprestimo() {
     mutationFn: (id: number) => emprestimosEventosService.excluirEvento(id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["emprestimos-eventos", "eventos"] });
+      await queryClient.invalidateQueries({ queryKey: ["emprestimos-eventos"] });
+    }
+  });
+}
+
+export function useSalvarResponsavelEmprestimo() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: ResponsavelEmprestimoPayload & { id?: number }) => {
+      if (payload.id) {
+        return emprestimosEventosService.atualizarResponsavel(payload.id, payload);
+      }
+      return emprestimosEventosService.criarResponsavel(payload);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["emprestimos-eventos", "responsaveis"] });
+    }
+  });
+}
+
+export function useRemoverResponsavelEmprestimo() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => emprestimosEventosService.excluirResponsavel(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["emprestimos-eventos", "responsaveis"] });
       await queryClient.invalidateQueries({ queryKey: ["emprestimos-eventos"] });
     }
   });

@@ -44,9 +44,9 @@ export class SementeService {
       };
     }
 
-    if (!env.APP_GEMINI_API_KEY) {
+    if (!env.APP_GEMINI_API_KEY || env.IA_PROVIDER !== "gemini") {
       throw new AppError(
-        "A chave da API Gemini nao esta configurada. Defina APP_GEMINI_API_KEY, GEMINI_API_KEY, GOOGLE_GEMINI_API_KEY ou GOOGLE_API_KEY no backend.",
+        "A IA generativa nao esta configurada no backend. Defina GEMINI_API_KEY, IA_PROVIDER=gemini e IA_MODEL no ambiente.",
         503
       );
     }
@@ -54,7 +54,7 @@ export class SementeService {
     const memorias = await this.repository.listarMemorias(payload.usuarioId);
     const client = new GoogleGenerativeAI(env.APP_GEMINI_API_KEY);
     const model = client.getGenerativeModel({
-      model: "gemini-1.5-flash",
+      model: env.IA_MODEL,
       systemInstruction: montarInstrucaoSistema(memorias.map((item) => item.conteudo))
     });
 

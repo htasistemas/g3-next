@@ -26,9 +26,12 @@ function normalizarDataIso(valor) {
 function escapePowerShell(valor) {
     return valor.replaceAll("'", "''");
 }
+export function sanitizarConteudoJson(conteudo) {
+    return conteudo.charCodeAt(0) === 0xfeff ? conteudo.slice(1) : conteudo;
+}
 async function carregarJson(arquivo) {
     const conteudo = await readFile(arquivo, "utf-8");
-    return JSON.parse(conteudo);
+    return JSON.parse(sanitizarConteudoJson(conteudo));
 }
 function garantirDestinoSeguro(raiz, relativePath) {
     const destino = path.resolve(raiz, relativePath);

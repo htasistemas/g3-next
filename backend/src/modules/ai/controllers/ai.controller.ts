@@ -10,6 +10,7 @@ export class AiController {
 
   async ask(request: AuthenticatedRequest, response: Response): Promise<void> {
     try {
+      const startedAt = Date.now();
       const { query, context } = request.body;
       const userId = request.authUser?.id;
 
@@ -36,6 +37,12 @@ export class AiController {
           pergunta: sanitizeAiHistoryValue(query.trim()),
           resposta: sanitizeAiHistoryValue(result.answer),
           intent: result.intent,
+          tipoConsulta: result.data?.parametros?.tipoConsulta
+            ? String(result.data.parametros.tipoConsulta)
+            : result.data?.origem === "banco_interno"
+              ? "banco_interno"
+              : "assistida",
+          tempoRespostaMs: Date.now() - startedAt,
           fontes: dadosSanitizados?.fontes,
           parametros: dadosSanitizados?.parametros,
           resumo: {

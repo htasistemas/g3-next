@@ -5,6 +5,8 @@ import type {
   EmprestimoEventoPayload,
   EventoEmprestimo,
   ItemEmprestimoEvento,
+  ResponsavelEmprestimo,
+  ResponsavelEmprestimoPayload,
   StatusEmprestimoEvento,
   TipoItemEmprestimo
 } from "@/types/emprestimos-eventos";
@@ -117,6 +119,11 @@ export const emprestimosEventosService = {
     return data;
   },
 
+  async listarResponsaveis() {
+    const { data } = await httpClient.get<ResponsavelEmprestimo[]>("/api/emprestimos-eventos/responsaveis");
+    return data;
+  },
+
   async criarEvento(payload: Omit<EventoEmprestimo, "id">) {
     const { data } = await httpClient.post<EventoEmprestimo>("/api/emprestimos-eventos/eventos", payload);
     return data;
@@ -132,6 +139,23 @@ export const emprestimosEventosService = {
 
   async excluirEvento(id: number) {
     await httpClient.delete(`/api/emprestimos-eventos/eventos/${id}`);
+  },
+
+  async criarResponsavel(payload: ResponsavelEmprestimoPayload) {
+    const { data } = await httpClient.post<ResponsavelEmprestimo>("/api/emprestimos-eventos/responsaveis", payload);
+    return data;
+  },
+
+  async atualizarResponsavel(id: number, payload: ResponsavelEmprestimoPayload) {
+    const { data } = await httpClient.put<ResponsavelEmprestimo>(
+      `/api/emprestimos-eventos/responsaveis/${id}`,
+      payload
+    );
+    return data;
+  },
+
+  async excluirResponsavel(id: number) {
+    await httpClient.delete(`/api/emprestimos-eventos/responsaveis/${id}`);
   },
 
   async listarMovimentacoes(id: number) {

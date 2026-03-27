@@ -24,10 +24,19 @@ export type EmprestimoEventoItemInput = {
   observacaoItem?: string | null;
 };
 
+export type ResponsavelEmprestimoInput = {
+  nome: string;
+  documento?: string | null;
+  telefone?: string | null;
+  email?: string | null;
+  observacoes?: string | null;
+};
+
 export type EmprestimoEventoInput = {
   eventoId: number;
   unidadeId?: number | null;
   responsavelId?: number | null;
+  responsavelNome?: string | null;
   dataRetiradaPrevista: string;
   dataDevolucaoPrevista: string;
   dataRetiradaReal?: string | null;
@@ -56,11 +65,23 @@ export type EventoEmprestimoRow = {
   status: string;
 };
 
+export type ResponsavelEmprestimoRow = {
+  id: bigint;
+  nome: string;
+  documento: string | null;
+  telefone: string | null;
+  email: string | null;
+  observacoes: string | null;
+  criado_em: Date;
+  atualizado_em: Date;
+};
+
 export type EmprestimoEventoRow = {
   id: bigint;
   evento_id: bigint;
   unidade_id: bigint | null;
   responsavel_id: bigint | null;
+  responsavel_nome_livre: string | null;
   data_retirada_prevista: Date;
   data_devolucao_prevista: Date;
   data_retirada_real: Date | null;

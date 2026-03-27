@@ -70,6 +70,11 @@ export class EmprestimosEventosController {
     return response.json(eventos);
   }
 
+  async listarResponsaveis(_request: Request, response: Response) {
+    const responsaveis = await service.listarResponsaveis();
+    return response.json(responsaveis);
+  }
+
   async criarEvento(request: Request, response: Response) {
     const evento = await service.criarEvento(request.body);
     return response.status(201).json(evento);
@@ -82,6 +87,21 @@ export class EmprestimosEventosController {
 
   async excluirEvento(request: Request, response: Response) {
     await service.excluirEvento(request.params.id);
+    return response.status(204).send();
+  }
+
+  async criarResponsavel(request: Request, response: Response) {
+    const responsavel = await service.criarResponsavel(request.body);
+    return response.status(201).json(responsavel);
+  }
+
+  async atualizarResponsavel(request: Request, response: Response) {
+    const responsavel = await service.atualizarResponsavel(request.params.id, request.body);
+    return response.json(responsavel);
+  }
+
+  async excluirResponsavel(request: Request, response: Response) {
+    await service.excluirResponsavel(request.params.id);
     return response.status(204).send();
   }
 

@@ -202,6 +202,8 @@ const secoesManual: ManualSecao[] = [
           "Ao voltar a digitar no campo Beneficiário, a seleção anterior é limpa até que um beneficiário seja escolhido novamente na lista.",
           "Se o navegador bloquear a janela dedicada de impressão, a tela usa a impressão da própria página como contingência para não interromper a operação.",
           "O salvamento da identificação da visita foi ajustado para bases em que a consulta retorna datas e horários como texto, evitando erro interno do servidor no retorno do cadastro.",
+          "O backend de visitas também passou a compatibilizar automaticamente colunas faltantes da tabela visita_domiciliar em bases antigas de produção antes de salvar ou consultar registros.",
+          "O backend de visitas passou a converter automaticamente os horários para TIME e os blocos de endereço, condições, situação social, registro e anexos para JSONB compatível com PostgreSQL, evitando erro interno do servidor ao salvar novas visitas.",
           "Os botões Excluir visita e Imprimir visita continuam vinculados ao registro atual selecionado.",
           "A troca de nomes na barra superior foi feita para reduzir ambiguidade operacional, sem alterar a lógica de cadastro, histórico, exclusão ou impressão."
         ]
@@ -221,11 +223,14 @@ const secoesManual: ManualSecao[] = [
           "Use os filtros laterais para escolher camadas, bairros e período antes de atualizar a leitura territorial.",
           "O botão Idosos sozinhos aplica foco em beneficiários e famílias com faixa etária idoso e sinais de vulnerabilidade alimentar.",
           "O botão Aguardando cestas concentra famílias e beneficiários com necessidade urgente de alimentos para apoiar priorização operacional.",
-          "O botão Mapa de apoio e risco cruza violência, cestas entregues, instituições e doadores em visão agregada para leitura estratégica."
+          "O botão Mapa de apoio e risco cruza violência, cestas entregues, instituições e doadores em visão agregada para leitura estratégica.",
+          "A visualização do mapa passou a usar Google Maps quando o frontend estiver configurado com VITE_GOOGLE_MAPS_API_KEY e VITE_GOOGLE_MAPS_MAP_ID."
         ],
         atencoes: [
           "Os atalhos estratégicos ajustam filtros automaticamente e podem ser combinados com bairro e período.",
-          "As camadas Instituições e Doadores ficam disponíveis na lista O que ver no mapa? para aprofundar a análise territorial."
+          "As camadas Instituições e Doadores ficam disponíveis na lista O que ver no mapa? para aprofundar a análise territorial.",
+          "Se as variáveis do Google Maps não estiverem configuradas no ambiente do frontend, a tela exibirá aviso para completar a configuração antes de carregar o mapa.",
+          "Se o Google Maps recusar o carregamento, revise a chave, a API Maps JavaScript e os domínios liberados no Google Cloud antes de testar novamente."
         ]
       }
     ]
@@ -265,6 +270,24 @@ const secoesManual: ManualSecao[] = [
           "Na aba Listagem de veículos, a ação principal da barra superior passa a ser Editar veículo, evitando confusão com o salvamento do cadastro.",
           "Os botões da barra superior foram compactados e balanceados em largura para respeitar melhor o espaço do card e não avançar sobre o título da tela.",
           "O vínculo de motorista autorizado foi ajustado para funcionar tanto em bases que usam cadastro_profissional quanto em bases que usam cadastro_profissionais."
+        ]
+      },
+      {
+        nome: "Empréstimo para eventos",
+        objetivo: "Controlar empréstimos de itens para eventos, agenda de reservas, itens vinculados e eventos associados.",
+        comoUsar: [
+          "Na aba Dados do empréstimo, selecione o evento, informe unidade, período, observações e o responsável pela retirada ou acompanhamento.",
+          "Na aba Responsáveis, cadastre previamente os dados da pessoa que pode retirar os produtos, como nome, documento, telefone, e-mail e observações.",
+          "Depois disso, na aba Dados do empréstimo, o campo Responsável passa a sugerir os nomes cadastrados na aba Responsáveis.",
+          "Na aba Itens vinculados, digite o nome do item para localizar rapidamente patrimônio ou almoxarifado, depois informe quantidade e observação antes de adicionar.",
+          "Ao imprimir a partir da aba Dados do empréstimo ou Itens vinculados, o sistema gera o termo de empréstimo no padrão de relatórios do G3N com dados do evento, responsável, período e itens.",
+          "Na aba Agenda de empréstimos, consulte a ocupação por período e por dia para verificar reservas já programadas.",
+          "A barra superior usa ações específicas por aba, como Buscar empréstimos, Salvar dados do empréstimo, Salvar empréstimo com itens, Salvar responsável e Imprimir termo de empréstimo."
+        ],
+        atencoes: [
+          "Quando o navegador bloquear a janela dedicada de impressão, a tela usa a impressão da própria página como contingência, sem deixar a operação travada em tela em branco.",
+          "O módulo passou a manter cadastro próprio de responsáveis para retirada, sem depender apenas da lista de usuários internos.",
+          "O cadastro do empréstimo mantém compatibilidade com bases antigas criando automaticamente as colunas e a tabela novas necessárias quando ainda não existirem."
         ]
       },
       {
@@ -524,11 +547,18 @@ const secoesManual: ManualSecao[] = [
           "Pesquise por texto livre ou use as perguntas frequentes e categorias sugeridas.",
           "Consulte histórico compartilhado entre a central e o robô Pergunte à IA.",
           "Use categorias como famílias, beneficiários, benefícios, atendimentos e legislação para acelerar a busca.",
-          "Ao lado do botão Enviar, use Nova conversa para limpar o histórico visível atual e começar uma nova conversa em um clique."
+          "Ao lado do botão Enviar, use Nova conversa para limpar o histórico visível atual e começar uma nova conversa em um clique.",
+          "Quando GEMINI_API_KEY, IA_PROVIDER e IA_MODEL estiverem configurados no backend, a IA também responde perguntas abertas com apoio do Gemini.",
+          "Outros recursos de IA do sistema que dependem do Gemini também passam a usar o mesmo modelo configurado em IA_MODEL.",
+          "Perguntas de totalizadores e resumos, como quantos beneficiários existem ou quantos atendimentos houve no mês, passam a consultar o banco real antes de montar a resposta executiva.",
+          "Perguntas gerais e orientativas fora do sistema, como legislação, conceitos e boas práticas, também podem ser respondidas pelo Gemini sem depender de uma tela específica.",
+          "Perguntas analíticas tendem a sair em formato estruturado, enquanto perguntas gerais passam a ser respondidas em texto mais natural e menos engessado."
         ],
         atencoes: [
           "A IA respeita permissões e usa a mesma base inteligente nos dois pontos de acesso.",
-          "Na central Pesquise na IA, a barra de envio foi reorganizada para manter os botões acessíveis sem sobrepor o ícone do robô."
+          "Na central Pesquise na IA, a barra de envio foi reorganizada para manter os botões acessíveis sem sobrepor o ícone do robô.",
+          "Se a chave Gemini não estiver configurada no backend, o sistema informa que a IA generativa está indisponível sem expor segredos no frontend.",
+          "As respostas estruturadas usam dados reais de beneficiários, agenda, visitas e atendimentos internos, sem depender de conteúdo inventado."
         ]
       },
       {

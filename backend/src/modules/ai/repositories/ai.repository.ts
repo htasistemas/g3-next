@@ -8,6 +8,8 @@ export type AiHistoricoRow = {
   pergunta: string;
   resposta: string;
   intent: string | null;
+  tipo_consulta: string | null;
+  tempo_resposta_ms: number | null;
   fontes_json: unknown;
   parametros_json: unknown;
   resumo_json: unknown;
@@ -20,6 +22,8 @@ type RegistrarHistoricoInput = {
   pergunta: string;
   resposta: string;
   intent?: string;
+  tipoConsulta?: string;
+  tempoRespostaMs?: number;
   fontes?: string[];
   parametros?: Record<string, string | number>;
   resumo?: Record<string, number | string | null>;
@@ -42,6 +46,8 @@ export class AiRepository {
         pergunta,
         resposta,
         intent,
+        tipo_consulta,
+        tempo_resposta_ms,
         fontes_json,
         parametros_json,
         resumo_json,
@@ -58,6 +64,8 @@ export class AiRepository {
       pergunta: row.pergunta,
       resposta: row.resposta,
       intent: row.intent ?? undefined,
+      tipoConsulta: row.tipo_consulta ?? undefined,
+      tempoRespostaMs: row.tempo_resposta_ms ?? undefined,
       data: {
         origem: "banco_interno" as const,
         fontes: Array.isArray(row.fontes_json) ? (row.fontes_json as string[]) : [],
@@ -80,6 +88,8 @@ export class AiRepository {
         pergunta,
         resposta,
         intent,
+        tipo_consulta,
+        tempo_resposta_ms,
         fontes_json,
         parametros_json,
         resumo_json,
@@ -90,6 +100,8 @@ export class AiRepository {
         ${input.pergunta},
         ${input.resposta},
         ${input.intent ?? null},
+        ${input.tipoConsulta ?? null},
+        ${input.tempoRespostaMs ?? null},
         ${JSON.stringify(input.fontes ?? [])}::jsonb,
         ${JSON.stringify(input.parametros ?? {})}::jsonb,
         ${JSON.stringify(input.resumo ?? {})}::jsonb,

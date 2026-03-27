@@ -69,6 +69,17 @@ async function bootstrap() {
     console.log(
       `[g3-backend-node] executando em http://${env.API_HOST}:${env.API_PORT}`
     );
+    if (env.IA_PROVIDER === "gemini") {
+      if (!env.APP_GEMINI_API_KEY) {
+        console.warn(
+          "[g3-backend-node] assistente de IA indisponivel: defina GEMINI_API_KEY no ambiente do backend."
+        );
+      } else {
+        console.log(
+          `[g3-backend-node] assistente de IA configurado com provider=${env.IA_PROVIDER} model=${env.IA_MODEL}`
+        );
+      }
+    }
     void aquecerEstruturasDeTela();
     iniciarAtualizacaoSistemaScheduler();
     iniciarDatasComemorativasScheduler();

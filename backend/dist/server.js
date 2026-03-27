@@ -23,6 +23,7 @@ import { ensureLicencaUsoEstrutura } from "./modules/licenca-uso/repositories/li
 import { iniciarLicencaUsoScheduler } from "./modules/licenca-uso/services/licenca-uso.scheduler.js";
 import { ensureUsuariosGestaoEstrutura } from "./modules/usuarios/repositories/usuario-estrutura.repository.js";
 import { ensureVisitasDomiciliaresEstrutura } from "./modules/visitas-domiciliares/repositories/visitas-domiciliares.repository.js";
+import { ensureAgendamentosEstrutura } from "./modules/agendamentos/repositories/agendamentos.repository.js";
 async function aquecerEstruturasDeTela() {
     const commemorativeImportService = new CommemorativeImportService();
     const aquecimentos = [
@@ -39,6 +40,7 @@ async function aquecerEstruturasDeTela() {
         { nome: "biblioteca", promise: ensureBibliotecaEstrutura() },
         { nome: "ocorrencias-crianca", promise: ensureOcorrenciasCriancaEstrutura() },
         { nome: "visitas-domiciliares", promise: ensureVisitasDomiciliaresEstrutura() },
+        { nome: "agendamentos", promise: ensureAgendamentosEstrutura() },
         { nome: "senhas", promise: ensureSenhasEstrutura() },
         { nome: "chamados-tecnicos", promise: ensureChamadoTecnicoParametrosIniciais() },
         { nome: "mensagens-personalizadas", promise: ensureMensagensPersonalizadasBase() }

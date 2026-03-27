@@ -653,16 +653,24 @@ export class ControleVeiculosRepository {
     }
     async buscarNomeMotorista(tipoOrigem, motoristaId) {
         if (tipoOrigem === "PROFISSIONAL") {
-            const rows = await prisma.$queryRaw(Prisma.sql `
-        SELECT nome_completo
-        FROM cadastro_profissional
-        WHERE id = ${BigInt(motoristaId)}
-        LIMIT 1
-      `);
+            const { tabelaProfissionais } = await this.obterFontesMotoristas();
+            if (!tabelaProfissionais) {
+                throw new AppError("Tabela de profissionais nao encontrada para vinculo.", 500);
+            }
+            const rows = await prisma.$queryRawUnsafe(`
+          SELECT nome_completo
+          FROM ${tabelaProfissionais}
+          WHERE id = $1
+          LIMIT 1
+        `, BigInt(motoristaId));
             if (!rows.length) {
-                throw new AppError("Profissional não encontrado para vínculo.", 404);
+                throw new AppError("Profissional nao encontrado para vinculo.", 404);
             }
             return rows[0].nome_completo;
+        }
+        const { possuiVoluntarios } = await this.obterFontesMotoristas();
+        if (!possuiVoluntarios) {
+            throw new AppError("Tabela de voluntarios nao encontrada para vinculo.", 500);
         }
         const rows = await prisma.$queryRaw(Prisma.sql `
       SELECT nome_completo
@@ -671,7 +679,7 @@ export class ControleVeiculosRepository {
       LIMIT 1
     `);
         if (!rows.length) {
-            throw new AppError("Voluntário não encontrado para vínculo.", 404);
+            throw new AppError("Voluntario nao encontrado para vinculo.", 404);
         }
         return rows[0].nome_completo;
     }

@@ -1,6 +1,158 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.359",
+                        "releaseDate":  "2026-03-27",
+                        "title":  "Georreferenciamento com tratamento de falha no Google Maps",
+                        "description":  "A tela de georreferenciamento passou a tratar falhas de autenticacao do Google Maps com mensagem clara e carregamento mais robusto.",
+                        "changes":  [
+                                        "Carga do Google Maps passou a validar falha de autenticacao e exibir orientacao objetiva na propria tela.",
+                                        "Map ID placeholder deixou de ser enviado para o mapa, evitando erro de configuracao desnecessario.",
+                                        "Manual do sistema e versao oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.358",
+                        "releaseDate":  "2026-03-27",
+                        "title":  "Georreferenciamento com Google Maps",
+                        "description":  "A tela de georreferenciamento deixou de usar OpenStreetMap na visualização principal e passou a operar com Google Maps no frontend.",
+                        "changes":  [
+                                        "Mapa principal da leitura territorial passou a carregar Google Maps com script oficial via VITE_GOOGLE_MAPS_API_KEY.",
+                                        "Configuração opcional de estilização por VITE_GOOGLE_MAPS_MAP_ID adicionada ao ambiente do frontend.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.357",
+                        "releaseDate":  "2026-03-27",
+                        "title":  "Empréstimo para eventos com correção no enum de status",
+                        "description":  "O salvamento do empréstimo voltou a respeitar os valores internos do enum de status, sem converter AGENDADO para Agendado no backend.",
+                        "changes":  [
+                                        "Backend deixou de normalizar o campo status do módulo de empréstimos para eventos como texto amigável.",
+                                        "Fluxo de salvar empréstimo pela aba Itens vinculados voltou a aceitar corretamente os valores RASCUNHO, AGENDADO, RETIRADO, DEVOLVIDO e CANCELADO.",
+                                        "Versão oficial atualizada na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.356",
+                        "releaseDate":  "2026-03-27",
+                        "title":  "Empréstimo para eventos com responsáveis e termo institucional",
+                        "description":  "A tela de empréstimos para eventos passou a ter cadastro próprio de responsáveis, busca digitada de itens e termo de empréstimo imprimível no padrão do G3N.",
+                        "changes":  [
+                                        "Nova aba Responsáveis para cadastrar, editar e excluir pessoas autorizadas a retirar produtos, com persistência real no banco.",
+                                        "Campo Responsável na aba Dados do empréstimo passou a usar os responsáveis cadastrados na própria tela.",
+                                        "Campo Item na aba Itens vinculados passou a aceitar digitação com busca progressiva, com ajuste visual para reduzir Quantidade e ampliar Observação.",
+                                        "Impressão da aba de empréstimo agora gera termo institucional com dados do evento, responsável, período, itens e campos de assinatura.",
+                                        "Backend passou a criar e compatibilizar automaticamente tabela e colunas novas do módulo em bases existentes.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.355",
+                        "releaseDate":  "2026-03-27",
+                        "title":  "Empréstimo para eventos com ações por aba e responsável livre",
+                        "description":  "A tela de empréstimos para eventos foi ajustada para aceitar nome livre no responsável, imprimir com contingência e usar botões de ação específicos conforme a aba aberta.",
+                        "changes":  [
+                                        "Campo Responsável na aba Dados do empréstimo passou a aceitar digitação livre de qualquer pessoa, com aproveitamento automático do usuário quando houver correspondência.",
+                                        "Impressão passou a usar a própria página como contingência quando o navegador bloquear a abertura da janela dedicada.",
+                                        "Barra superior deixou de usar rótulos genéricos e passou a exibir ações específicas por aba, como Buscar empréstimos, Salvar dados do empréstimo e Salvar empréstimo com itens.",
+                                        "Backend passou a manter coluna compatível para nome livre do responsável em bases existentes e novas instalações.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.354",
+                        "releaseDate":  "2026-03-27",
+                        "title":  "IA com resposta geral mais natural",
+                        "description":  "O assistente passou a diferenciar melhor perguntas analíticas e perguntas gerais, respondendo de forma menos engessada quando o assunto for conceitual ou orientativo.",
+                        "changes":  [
+                                        "Perguntas gerais agora usam resposta em prosa natural, sem forçar blocos com títulos em todos os casos.",
+                                        "Consultas analíticas, resumos, listas e indicadores continuam priorizando formato estruturado para leitura operacional.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.353",
+                        "releaseDate":  "2026-03-27",
+                        "title":  "IA ampliada para perguntas gerais",
+                        "description":  "O assistente do G3N passou a responder melhor perguntas gerais, técnicas e orientativas com apoio do Gemini, sem perder a proteção sobre dados internos não consultados.",
+                        "changes":  [
+                                        "Prompt do Gemini foi ajustado para permitir respostas gerais fora do contexto estrito do sistema.",
+                                        "IA continua impedida de inventar dados internos da instituição quando a pergunta exigir consulta real ao banco.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.352",
+                        "releaseDate":  "2026-03-27",
+                        "title":  "Gemini padronizado nos recursos de IA do backend",
+                        "description":  "A configuração do Gemini foi consolidada para usar o mesmo provider e o mesmo modelo em diferentes recursos de IA do G3N.",
+                        "changes":  [
+                                        "Serviço Semente passou a respeitar IA_PROVIDER e IA_MODEL no backend, usando o mesmo modelo configurado para o assistente principal.",
+                                        "Mensagens de indisponibilidade da IA foram alinhadas ao padrão de configuração por ambiente com GEMINI_API_KEY.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.351",
+                        "releaseDate":  "2026-03-27",
+                        "title":  "Assistente de IA com resumos executivos reais",
+                        "description":  "O módulo Pergunte à IA passou a responder resumos de beneficiários e atendimentos consultando o banco real e usando formato executivo premium.",
+                        "changes":  [
+                                        "IA agora identifica perguntas de totalizadores de beneficiários e atendimentos e consulta dados reais antes de responder.",
+                                        "Novas respostas estruturadas entregam Resposta direta, Resumo, Detalhes, Alertas e Sugestões com base em beneficiários, visitas, atendimentos e agendamentos.",
+                                        "Fallback do Gemini e orientações do assistente foram alinhados ao formato premium definido para o G3N.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.350",
+                        "releaseDate":  "2026-03-26",
+                        "title":  "Assistente de IA com configuração segura por ambiente",
+                        "description":  "O módulo Pergunte à IA foi ajustado para usar provider e modelo definidos no ambiente, com aviso amigável quando a chave Gemini não estiver configurada.",
+                        "changes":  [
+                                        "Backend passou a reconhecer IA_PROVIDER e IA_MODEL no startup e a registrar aviso claro quando GEMINI_API_KEY não estiver disponível.",
+                                        "Histórico da IA passou a registrar tipo da consulta e tempo de resposta em milissegundos.",
+                                        "Respostas assistidas do Gemini passaram a usar o modelo configurado no ambiente do backend, sem expor a chave no frontend ou no repositório.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.349",
+                        "releaseDate":  "2026-03-26",
+                        "title":  "Registro de visitas com salvamento validado no PostgreSQL",
+                        "description":  "A gravação de novas visitas domiciliares foi corrigida para bases PostgreSQL com colunas TIME e JSONB, eliminando o erro interno do servidor ao salvar a identificação da visita.",
+                        "changes":  [
+                                        "Horário inicial e horário final passaram a ser convertidos automaticamente para TIME quando a coluna da base usa esse tipo.",
+                                        "Campos de endereço, condições, situação social, registro e anexos passaram a ser gravados como JSONB compatível com PostgreSQL, inclusive com anexos vazios.",
+                                        "Fluxo de criação de visita foi reproduzido e validado diretamente no backend após a correção.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.348",
+                        "releaseDate":  "2026-03-26",
+                        "title":  "Registro de visitas compatível com produção antiga",
+                        "description":  "O módulo de visitas domiciliares passou a aceitar bases de produção com schema antigo da tabela visita_domiciliar, eliminando o erro 500 ao salvar a identificação da visita.",
+                        "changes":  [
+                                        "Backend de visitas agora executa ALTER TABLE IF NOT EXISTS para completar colunas faltantes da tabela visita_domiciliar antes de salvar ou consultar.",
+                                        "Criação, atualização e leitura de visitas passaram a usar apenas as colunas realmente disponíveis no schema, com fallbacks seguros para produção.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.347",
                         "releaseDate":  "2026-03-26",
                         "title":  "Registro de visitas estável e controle de veículos refinado",

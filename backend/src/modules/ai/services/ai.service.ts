@@ -6,8 +6,10 @@ import { env } from "../../../config/env.js";
 type AiIntent =
   | "CONVERSA_SOCIAL"
   | "FAMILIAS_DESATUALIZADAS"
+  | "BENEFICIARIOS_RESUMO"
   | "BENEFICIARIOS_POR_LOCAL"
   | "BENEFICIARIOS_POR_FAIXA_ETARIA"
+  | "ATENDIMENTOS_RESUMO"
   | "RESUMO_DOACOES"
   | "TAREFAS_PENDENTES"
   | "TAREFAS_POR_RESPONSAVEL"
@@ -133,6 +135,11 @@ type CaptacaoPendingItemRow = {
   data_hora: Date | null;
 };
 
+type AtendimentoResumoRow = {
+  total_hoje: bigint | number;
+  total_mes: bigint | number;
+};
+
 function removeAccents(value: string) {
   return value.normalize("NFD").replace(/\p{Diacritic}/gu, "");
 }
@@ -224,6 +231,28 @@ function extractAgeRange(normalizedQuery: string) {
   return null;
 }
 
+function resolveReferencePeriod(normalizedQuery: string) {
+  if (/\b(hoje|dia atual|neste dia)\b/.test(normalizedQuery)) {
+    return "hoje" as const;
+  }
+
+  if (/\b(semana|semanal|ultimos 7 dias|ultimos sete dias)\b/.test(normalizedQuery)) {
+    return "semana" as const;
+  }
+
+  if (/\b(mes|mês|mensal)\b/.test(normalizedQuery)) {
+    return "mes" as const;
+  }
+
+  return "mes" as const;
+}
+
+function prefersStructuredAnswer(normalizedQuery: string) {
+  return /(quantos|total|resumo|relatorio|relatório|indicador|compar|lista|listar|quem|quais|atendimentos|beneficiarios|beneficiários|familias|famílias|doacoes|doações)/.test(
+    normalizedQuery
+  );
+}
+
 function buildData(
   fontes: string[],
   resumo?: AiResponseData["resumo"],
@@ -237,6 +266,34 @@ function buildData(
     exemplos,
     parametros
   };
+}
+
+function buildPremiumAnswer(input: {
+  respostaDireta: string;
+  resumo?: string[];
+  detalhes?: string[];
+  alertas?: string[];
+  sugestoes?: string[];
+}) {
+  const blocos = [`**Resposta direta**\n${input.respostaDireta}`];
+
+  if (input.resumo?.length) {
+    blocos.push(`**Resumo**\n${input.resumo.map((item) => `- ${item}`).join("\n")}`);
+  }
+
+  if (input.detalhes?.length) {
+    blocos.push(`**Detalhes**\n${input.detalhes.map((item) => `- ${item}`).join("\n")}`);
+  }
+
+  if (input.alertas?.length) {
+    blocos.push(`**Alertas**\n${input.alertas.map((item) => `- ${item}`).join("\n")}`);
+  }
+
+  if (input.sugestoes?.length) {
+    blocos.push(`**Sugestões**\n${input.sugestoes.map((item) => `- ${item}`).join("\n")}`);
+  }
+
+  return blocos.join("\n\n");
 }
 
 function normalizeContextTokens(context?: AiContextPayload) {
@@ -436,6 +493,14 @@ export class AiService {
       return this.countBeneficiariesByAgeRange(extractAgeRange(ctx.normalizedQuery));
     }
 
+    if (this.isBeneficiarySummaryIntent(ctx.normalizedQuery)) {
+      return this.getBeneficiarySummary();
+    }
+
+    if (this.isAttendanceSummaryIntent(ctx.normalizedQuery)) {
+      return this.getAttendanceSummary(ctx.normalizedQuery);
+    }
+
     if (this.isDonationIntent(ctx.normalizedQuery)) {
       if (this.isInadimplenteIntent(ctx.normalizedQuery)) {
         return this.getMonthlyDelinquentDonors();
@@ -469,8 +534,12 @@ export class AiService {
       return {
         intent: "ORIENTACAO_TECNICA",
         answer: knowledgeAnswer.answer,
-        data: buildData(["base_tecnica_g3n"], { consulta: query })
+        data: buildData(["base_tecnica_g3n"], { consulta: query, tipoConsulta: "base_tecnica" })
       };
+    }
+
+    if (!env.APP_GEMINI_API_KEY || env.IA_PROVIDER !== "gemini") {
+      return this.getIaUnavailable(query);
     }
 
     const assisted = await this.tryAssistedResponse(ctx);
@@ -534,6 +603,14 @@ export class AiService {
     return /(faixa etaria|faixa etária|crianca|criancas|adolescente|adolescentes|jovem|jovens|adulto|adultos|idoso|idosos|\d+\s*(?:a|-)\s*\d+\s*anos)/.test(
       normalizedQuery
     );
+  }
+
+  private isBeneficiarySummaryIntent(normalizedQuery: string) {
+    return /(quantos|total|resumo|relatorio|relat?rio).*(beneficiarios|benefici?rios)/.test(normalizedQuery);
+  }
+
+  private isAttendanceSummaryIntent(normalizedQuery: string) {
+    return /(quantos|total|resumo|relatorio|relat?rio).*(atendimentos|atendimento|visitas|agendamentos)/.test(normalizedQuery);
   }
 
   private isSystemOverviewIntent(normalizedQuery: string) {
@@ -609,31 +686,50 @@ export class AiService {
     return {
       intent: "CONVERSA_SOCIAL",
       answer,
-      data: buildData(["assistente_ia"], { consulta: query, modo: "conversa" })
+      data: buildData(["assistente_ia"], { consulta: query, modo: "conversa", tipoConsulta: "conversa" })
+    };
+  }
+
+  private getIaUnavailable(query: string): AiResponse {
+    return {
+      intent: "RESPOSTA_ASSISTIDA",
+      answer:
+        "**Resposta direta**\nO assistente inteligente está indisponível neste momento.\n\n" +
+        "**Resumo**\nA chave do Gemini não está configurada no backend ou o provedor não está habilitado.\n\n" +
+        "**Detalhes**\nConsultas estruturadas já implementadas no banco continuam funcionando, mas perguntas abertas dependem da configuração da IA generativa.\n\n" +
+        "**Alertas**\nDefina `GEMINI_API_KEY`, `IA_PROVIDER=gemini` e `IA_MODEL` no ambiente do backend.\n\n" +
+        "**Sugestões**\nTente uma pergunta objetiva das sugestões automáticas ou configure a chave e tente novamente.",
+      data: buildData(["assistente_ia"], { consulta: query, tipoConsulta: "ia_indisponivel" })
     };
   }
 
   private async tryAssistedResponse(context: QueryContext): Promise<AiResponse | null> {
-    if (!env.APP_GEMINI_API_KEY) {
+    if (!env.APP_GEMINI_API_KEY || env.IA_PROVIDER !== "gemini") {
       return null;
     }
 
     try {
       const client = new GoogleGenerativeAI(env.APP_GEMINI_API_KEY);
+      const respostaEstruturada = prefersStructuredAnswer(context.normalizedQuery);
       const model = client.getGenerativeModel({
-        model: "gemini-1.5-flash",
+        model: env.IA_MODEL,
         systemInstruction:
-          "Você é a IA do sistema G3N para assistência social e terceiro setor. " +
-          "Responda em português do Brasil, com linguagem clara e didática. " +
-          "Use sempre este formato: Resumo, Detalhamento, Alertas, Ação sugerida. " +
-          "Quando não puder confirmar números do banco, deixe explícito que é orientação geral."
+          "Você é o Assistente Inteligente do sistema G3N para assistência social e terceiro setor. " +
+          "Responda em português do Brasil, de forma clara, profissional e objetiva. " +
+          (respostaEstruturada
+            ? "Quando a pergunta pedir análise, resumo, lista, comparação, indicador ou dado operacional, use este formato: Resposta direta, Resumo, Detalhes, Alertas, Sugestões. "
+            : "Quando a pergunta for geral, conceitual ou orientativa, responda em texto natural, fluido e bem organizado, sem forçar blocos com títulos. ") +
+          "Você pode responder perguntas gerais, técnicas, institucionais e operacionais, mesmo quando não forem sobre uma tela específica do sistema. " +
+          "Nunca invente dados internos da instituição. Quando a pergunta depender de números, cadastros, históricos ou fatos do banco que não foram consultados, deixe explícito que se trata apenas de orientação geral."
       });
 
       const contextoTela = normalizeContextTokens(context.context);
       const prompt =
         `Pergunta do usuário: ${context.query}\n` +
         `Contexto atual da tela: ${contextoTela || "não informado"}\n` +
-        "Se a pergunta depender de dados específicos não disponíveis aqui, responda de forma orientativa e sugira consulta adequada no sistema.";
+        `Estilo esperado: ${respostaEstruturada ? "resposta estruturada em blocos curtos" : "resposta natural em prosa clara"}\n` +
+        "Se a pergunta for geral, responda normalmente com base em conhecimento útil e seguro. " +
+        "Se a pergunta depender de dados específicos da instituição que não foram consultados aqui, informe isso com clareza e sugira uma consulta adequada dentro do sistema.";
 
       const result = await model.generateContent(prompt);
       const answer = result.response.text().trim();
@@ -645,7 +741,7 @@ export class AiService {
       return {
         intent: "RESPOSTA_ASSISTIDA",
         answer,
-        data: buildData(["assistente_ia"], { consulta: context.query, modo: "assistido" })
+        data: buildData(["assistente_ia"], { consulta: context.query, modo: "assistido", tipoConsulta: "gemini" })
       };
     } catch {
       return null;
@@ -659,10 +755,11 @@ export class AiService {
     return {
       intent: "NAO_ENTENDIDO",
       answer:
-        "**Resumo**\nAinda não consegui responder essa pergunta com segurança usando os dados internos disponíveis.\n\n" +
-        "**Detalhamento**\nTente reformular a pergunta de forma mais objetiva ou usar uma das consultas abaixo.\n\n" +
+        "**Resposta direta**\nAinda não consegui responder essa pergunta com segurança usando os dados internos disponíveis.\n\n" +
+        "**Resumo**\nA consulta precisa de mais contexto ou de uma formulação mais objetiva.\n\n" +
+        "**Detalhes**\nTente reformular a pergunta de forma mais objetiva ou usar uma das consultas abaixo.\n\n" +
         "**Alertas**\nPerguntas muito amplas ou sem referência de contexto podem exigir consulta orientativa.\n\n" +
-        "**Ação sugerida**\nVocê pode tentar:\n" +
+        "**Sugestões**\nVocê pode tentar:\n" +
         `${lista || "- Resumo geral do sistema"}`,
       data: buildData(["banco_interno"], undefined, undefined, { consulta: query })
     };
@@ -899,6 +996,229 @@ export class AiService {
           bairro: item.bairro ?? "-"
         })),
         { faixaEtaria: faixa.label }
+      )
+    };
+  }
+
+  private async getBeneficiarySummary(): Promise<AiResponse> {
+    const [totalBeneficiarios, ativos, semEndereco, comFamilia, exemplosPendentes] = await Promise.all([
+      prisma.cadastroBeneficiario.count(),
+      prisma.cadastroBeneficiario.count({
+        where: {
+          status: {
+            equals: "ATIVO",
+            mode: "insensitive"
+          }
+        }
+      }),
+      prisma.cadastroBeneficiario.count({
+        where: {
+          enderecoId: null
+        }
+      }),
+      prisma.$queryRaw<Array<{ total: bigint | number }>>(Prisma.sql`
+        SELECT COUNT(DISTINCT m.beneficiario_id)::BIGINT AS total
+        FROM vinculo_familiar_membro m
+      `),
+      prisma.cadastroBeneficiario.findMany({
+        where: {
+          OR: [{ enderecoId: null }, { status: null }, { status: "" }]
+        },
+        select: {
+          nomeCompleto: true,
+          status: true,
+          codigo: true
+        },
+        take: 5,
+        orderBy: {
+          nomeCompleto: "asc"
+        }
+      })
+    ]);
+
+    const totalComFamilia = bigintToNumber(comFamilia[0]?.total);
+    const totalInativos = Math.max(totalBeneficiarios - ativos, 0);
+
+    return {
+      intent: "BENEFICIARIOS_RESUMO",
+      answer: buildPremiumAnswer({
+        respostaDireta: `Hoje o G3N possui ${totalBeneficiarios} beneficiários cadastrados.`,
+        resumo: [
+          `${ativos} com status ativo`,
+          `${totalInativos} sem status ativo`,
+          `${totalComFamilia} vinculados a núcleo familiar`
+        ],
+        detalhes: [
+          `${semEndereco} sem endereço vinculado`,
+          `${exemplosPendentes.length} exemplos de cadastro com pendência listados para conferência`
+        ],
+        alertas:
+          semEndereco > 0 || exemplosPendentes.length > 0
+            ? [
+                `${semEndereco} beneficiários ainda estão sem endereço`,
+                "Cadastros sem status definido ou sem endereço podem afetar filtros, relatórios e atendimentos"
+              ]
+            : undefined,
+        sugestoes: [
+          "Pergunte quais beneficiários estão sem endereço",
+          "Peça um resumo de atendimentos do mês",
+          "Consulte famílias sem atualização cadastral"
+        ]
+      }),
+      data: buildData(
+        ["cadastro_beneficiario", "vinculo_familiar_membro"],
+        {
+          totalBeneficiarios,
+          ativos,
+          inativos: totalInativos,
+          semEndereco,
+          comFamilia: totalComFamilia
+        },
+        exemplosPendentes.map((item) => ({
+          nome: item.nomeCompleto,
+          codigo: item.codigo ?? "-",
+          status: item.status ?? "Sem status"
+        })),
+        { tipoConsulta: "beneficiarios_resumo" }
+      )
+    };
+  }
+
+  private async getAttendanceSummary(normalizedQuery: string): Promise<AiResponse> {
+    const periodo = resolveReferencePeriod(normalizedQuery);
+    const hoje = new Date();
+    const inicioHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+    const inicioAmanha = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() + 1);
+    const inicioSemana = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - 6);
+    const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+
+    const intervaloInicio =
+      periodo === "hoje" ? inicioHoje : periodo === "semana" ? inicioSemana : inicioMes;
+    const intervaloFim = periodo === "hoje" ? inicioAmanha : inicioAmanha;
+
+    const [centralRows, visitaRows, agendaRows, statusAgenda, topTipos] = await Promise.all([
+      prisma.$queryRaw<AtendimentoResumoRow[]>(Prisma.sql`
+        SELECT
+          COUNT(*) FILTER (WHERE data_hora >= ${inicioHoje} AND data_hora < ${inicioAmanha})::BIGINT AS total_hoje,
+          COUNT(*) FILTER (WHERE data_hora >= ${inicioMes})::BIGINT AS total_mes
+        FROM central_atendimento
+      `),
+      prisma.$queryRaw<AtendimentoResumoRow[]>(Prisma.sql`
+        SELECT
+          COUNT(*) FILTER (WHERE data_visita >= ${inicioHoje} AND data_visita < ${inicioAmanha})::BIGINT AS total_hoje,
+          COUNT(*) FILTER (WHERE data_visita >= ${inicioMes})::BIGINT AS total_mes
+        FROM visita_domiciliar
+      `),
+      prisma.$queryRaw<AtendimentoResumoRow[]>(Prisma.sql`
+        SELECT
+          COUNT(*) FILTER (
+            WHERE data_agendamento >= ${inicioHoje}
+              AND data_agendamento < ${inicioAmanha}
+              AND COALESCE(status, '') <> 'Cancelado'
+          )::BIGINT AS total_hoje,
+          COUNT(*) FILTER (
+            WHERE data_agendamento >= ${inicioMes}
+              AND COALESCE(status, '') <> 'Cancelado'
+          )::BIGINT AS total_mes
+        FROM agendamento
+      `),
+      prisma.$queryRaw<
+        Array<{ status: string | null; total: bigint | number }>
+      >(Prisma.sql`
+        SELECT COALESCE(NULLIF(TRIM(status), ''), 'Sem status') AS status, COUNT(*)::BIGINT AS total
+        FROM agendamento
+        WHERE data_agendamento >= ${intervaloInicio}
+          AND data_agendamento < ${intervaloFim}
+        GROUP BY COALESCE(NULLIF(TRIM(status), ''), 'Sem status')
+        ORDER BY total DESC, status ASC
+        LIMIT 5
+      `),
+      prisma.$queryRaw<
+        Array<{ tipo: string | null; total: bigint | number }>
+      >(Prisma.sql`
+        SELECT COALESCE(NULLIF(TRIM(tipo_atendimento), ''), 'Sem tipo definido') AS tipo, COUNT(*)::BIGINT AS total
+        FROM agendamento
+        WHERE data_agendamento >= ${intervaloInicio}
+          AND data_agendamento < ${intervaloFim}
+        GROUP BY COALESCE(NULLIF(TRIM(tipo_atendimento), ''), 'Sem tipo definido')
+        ORDER BY total DESC, tipo ASC
+        LIMIT 5
+      `)
+    ]);
+
+    const centralHoje = bigintToNumber(centralRows[0]?.total_hoje);
+    const centralMes = bigintToNumber(centralRows[0]?.total_mes);
+    const visitasHoje = bigintToNumber(visitaRows[0]?.total_hoje);
+    const visitasMes = bigintToNumber(visitaRows[0]?.total_mes);
+    const agendaHoje = bigintToNumber(agendaRows[0]?.total_hoje);
+    const agendaMes = bigintToNumber(agendaRows[0]?.total_mes);
+
+    const totalPeriodo =
+      periodo === "hoje"
+        ? centralHoje + visitasHoje + agendaHoje
+        : periodo === "semana"
+          ? statusAgenda.reduce((acc, item) => acc + bigintToNumber(item.total), 0)
+          : centralMes + visitasMes + agendaMes;
+
+    const respostaDireta =
+      periodo === "hoje"
+        ? `Hoje foram localizados ${totalPeriodo} registros entre atendimentos, visitas e agendamentos ativos.`
+        : periodo === "semana"
+          ? `Nos últimos 7 dias foram localizados ${totalPeriodo} agendamentos ativos na agenda institucional.`
+          : `No mês atual foram localizados ${totalPeriodo} registros entre atendimentos, visitas e agendamentos ativos.`;
+
+    return {
+      intent: "ATENDIMENTOS_RESUMO",
+      answer: buildPremiumAnswer({
+        respostaDireta,
+        resumo: [
+          `${centralHoje} atendimentos na central hoje`,
+          `${visitasHoje} visitas domiciliares hoje`,
+          `${agendaHoje} agendamentos ativos hoje`
+        ],
+        detalhes: [
+          `${centralMes} atendimentos registrados no mês`,
+          `${visitasMes} visitas registradas no mês`,
+          `${agendaMes} agendamentos ativos registrados no mês`
+        ],
+        alertas:
+          statusAgenda.length > 0
+            ? statusAgenda.map(
+                (item) => `${item.status ?? "Sem status"}: ${bigintToNumber(item.total)} no período consultado`
+              )
+            : undefined,
+        sugestoes:
+          topTipos.length > 0
+            ? topTipos.map(
+                (item) => `Tipo ${item.tipo ?? "Sem tipo definido"} com ${bigintToNumber(item.total)} registro(s)`
+              )
+            : ["Pergunte pelos atendimentos do mês", "Consulte retornos pendentes"]
+      }),
+      data: buildData(
+        ["central_atendimento", "visita_domiciliar", "agendamento"],
+        {
+          periodo,
+          centralHoje,
+          centralMes,
+          visitasHoje,
+          visitasMes,
+          agendamentosHoje: agendaHoje,
+          agendamentosMes: agendaMes,
+          totalPeriodo
+        },
+        [
+          ...statusAgenda.map((item) => ({
+            tipo: "status",
+            nome: item.status ?? "Sem status",
+            total: bigintToNumber(item.total)
+          })),
+          ...topTipos.map((item) => ({
+            tipo: "tipo_atendimento",
+            nome: item.tipo ?? "Sem tipo definido",
+            total: bigintToNumber(item.total)
+          }))
+        ],
+        { tipoConsulta: "atendimentos_resumo", periodo }
       )
     };
   }

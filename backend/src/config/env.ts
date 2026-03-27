@@ -45,6 +45,8 @@ const envSchema = z.object({
   GEMINI_API_KEY: optionalTrimmedStringFromEnv,
   GOOGLE_GEMINI_API_KEY: optionalTrimmedStringFromEnv,
   GOOGLE_API_KEY: optionalTrimmedStringFromEnv,
+  IA_PROVIDER: z.enum(["gemini"]).default("gemini"),
+  IA_MODEL: z.string().trim().min(1).default("gemini-2.5-flash"),
   APP_EMAIL_HABILITADO: booleanFromEnv.default(true),
   APP_EMAIL_REMETENTE: z.string().min(1).default("htasistemas@gmail.com"),
   APP_EMAIL_NOME: z.string().min(1).default("HTA Sistemas"),

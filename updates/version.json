@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.347",
-  "releaseDate": "2026-03-26",
-  "description": "Correção do salvamento em Registro de visitas e refinamento visual da barra em Controle de veículos.",
+  "latestVersion": "1.00.359",
+  "releaseDate": "2026-03-27",
+  "description": "Georreferenciamento com Google Maps recebeu tratamento de falha de autenticacao e orientacao operacional de configuracao.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.347",
+  "minCompatibleVersion": "1.00.359",
   "releaseType": "stable",
   "downloadUrl": null
 }

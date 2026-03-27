@@ -280,7 +280,7 @@ export function AIConversationPanel({
                 onChange={(event) => setInputValue(event.target.value)}
                 placeholder="Digite sua pergunta..."
                 disabled={isLoading}
-                className="min-w-0"
+                className="min-w-0 h-12 text-base"
               />
               <Button
                 type="button"

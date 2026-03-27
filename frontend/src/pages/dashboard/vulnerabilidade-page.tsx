@@ -1,8 +1,4 @@
-import "leaflet/dist/leaflet.css";
-import L from "leaflet";
 import { startTransition, useDeferredValue, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
-import type { Map as LeafletMap } from "leaflet";
-import { Circle, CircleMarker, MapContainer, Marker, Popup, TileLayer, Tooltip, useMap, useMapEvents } from "react-leaflet";
 import { Download, Eraser, Filter, ImageDown, LocateFixed, MapPinned, Printer, RefreshCw, Target } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +18,16 @@ import {
 } from "@/features/dashboard/use-dashboard";
 import { classesTelaPadraoBeneficiario } from "@/lib/tela-padrao-beneficiario";
 import type { GeoBBox, GeoDetailResponse, GeoFilters, GeoLayer, GeoMapPoint, GeoQueryResponse } from "@/types/georreferenciamento";
+
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY?.trim() || "";
+const GOOGLE_MAPS_MAP_ID =
+  import.meta.env.VITE_GOOGLE_MAPS_MAP_ID?.trim() &&
+  !/^INSERIR_/i.test(import.meta.env.VITE_GOOGLE_MAPS_MAP_ID.trim())
+    ? import.meta.env.VITE_GOOGLE_MAPS_MAP_ID.trim()
+    : undefined;
+
+let googleMapsPromise: Promise<any> | null = null;
+const GOOGLE_MAPS_AUTH_FAILURE_EVENT = "g3:google-maps-auth-failure";
 
 const estilosCamada: Record<GeoLayer, string> = {
   beneficiarios: "#2563eb",
@@ -120,25 +126,6 @@ function detalheBasico(ponto: GeoMapPoint | null): GeoDetailResponse | null {
   };
 }
 
-function Observer({ onChange, onReady }: { onChange: (payload: { zoom: number; bbox: GeoBBox }) => void; onReady: () => void }) {
-  const map = useMap();
-  const publicar = useEffectEvent(() => {
-    const bounds = map.getBounds();
-    onChange({ zoom: map.getZoom(), bbox: { north: bounds.getNorth(), south: bounds.getSouth(), east: bounds.getEast(), west: bounds.getWest() } });
-    onReady();
-  });
-  useMapEvents({ moveend: publicar, zoomend: publicar });
-  useEffect(() => {
-    publicar();
-  }, [publicar]);
-  return null;
-}
-
-function ClickCapture({ ativo, onPick }: { ativo: boolean; onPick: (payload: { latitude: number; longitude: number }) => void }) {
-  useMapEvents({ click(event) { if (ativo) onPick({ latitude: Number(event.latlng.lat.toFixed(6)), longitude: Number(event.latlng.lng.toFixed(6)) }); } });
-  return null;
-}
-
 function ResumoCard({ titulo, valor }: { titulo: string; valor: number }) {
   return <Card className="border-[var(--g3-border)] bg-[linear-gradient(180deg,#f6fbf7_0%,#e6f5ea_100%)] shadow-[0_18px_38px_-28px_rgba(22,101,52,0.35)]"><CardContent className="px-3 py-3"><p className="text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">{titulo}</p><p className="mt-1 text-2xl font-semibold text-[var(--g3-foreground)]">{valor.toLocaleString("pt-BR")}</p></CardContent></Card>;
 }
@@ -152,18 +139,294 @@ function mesmasCamadas(atuais: GeoLayer[], esperadas: GeoLayer[]) {
   return atuais.length === esperadas.length && esperadas.every((item) => atuais.includes(item));
 }
 
-function criarIconePin(cor: string) {
-  return L.divIcon({
-    html: `<svg width="24" height="32" viewBox="0 0 24 32" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 0C5.37 0 0 5.37 0 12C0 21 12 32 12 32C12 32 24 21 24 12C24 5.37 18.63 0 12 0ZM12 16C9.79 16 8 14.21 8 12C8 9.79 9.79 8 12 8C14.21 8 16 9.79 16 12C16 14.21 14.21 16 12 16Z" fill="${cor}"/><path d="M12 14C13.1046 14 14 13.1046 14 12C14 10.8954 13.1046 10 12 10C10.8954 10 10 10.8954 10 12C10 13.1046 10.8954 14 12 14Z" fill="white"/></svg>`,
-    className: "bg-transparent border-0",
-    iconSize: [24, 32],
-    iconAnchor: [12, 32]
-  });
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function criarSvgPin(cor: string) {
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`<svg width="24" height="32" viewBox="0 0 24 32" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 0C5.37 0 0 5.37 0 12C0 21 12 32 12 32C12 32 24 21 24 12C24 5.37 18.63 0 12 0ZM12 16C9.79 16 8 14.21 8 12C8 9.79 9.79 8 12 8C14.21 8 16 9.79 16 12C16 14.21 14.21 16 12 16Z" fill="${cor}"/><path d="M12 14C13.1046 14 14 13.1046 14 12C14 10.8954 13.1046 10 12 10C10.8954 10 10 10.8954 10 12C10 13.1046 10.8954 14 12 14Z" fill="white"/></svg>`)}`;
+}
+
+async function carregarGoogleMaps() {
+  if ((window as any).google?.maps) {
+    return (window as any).google.maps;
+  }
+
+  if (!GOOGLE_MAPS_API_KEY) {
+    throw new Error("Defina VITE_GOOGLE_MAPS_API_KEY no ambiente do frontend.");
+  }
+
+  if (!googleMapsPromise) {
+    googleMapsPromise = new Promise((resolve, reject) => {
+      (window as any).gm_authFailure = () => {
+        window.dispatchEvent(new CustomEvent(GOOGLE_MAPS_AUTH_FAILURE_EVENT));
+      };
+
+      const existente = document.querySelector<HTMLScriptElement>('script[data-google-maps="true"]');
+      if (existente) {
+        existente.addEventListener("load", () => resolve((window as any).google.maps), { once: true });
+        existente.addEventListener("error", () => reject(new Error("Falha ao carregar Google Maps.")), { once: true });
+        return;
+      }
+
+      const script = document.createElement("script");
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(GOOGLE_MAPS_API_KEY)}&v=weekly&language=pt-BR&region=BR&loading=async`;
+      script.async = true;
+      script.defer = true;
+      script.dataset.googleMaps = "true";
+      script.onload = () => resolve((window as any).google.maps);
+      script.onerror = () => reject(new Error("Falha ao carregar Google Maps."));
+      document.head.appendChild(script);
+    });
+  }
+
+  return googleMapsPromise;
+}
+
+function GoogleGeoMap({
+  center,
+  zoom,
+  agregados,
+  marcadores,
+  pontoManual,
+  modoMarcacao,
+  onPick,
+  onReady,
+  onViewportChange,
+  onSelecionar
+}: {
+  center: [number, number];
+  zoom: number;
+  agregados: GeoQueryResponse["agregados"];
+  marcadores: GeoQueryResponse["marcadores"];
+  pontoManual: { latitude: number; longitude: number } | null;
+  modoMarcacao: boolean;
+  onPick: (payload: { latitude: number; longitude: number }) => void;
+  onReady: () => void;
+  onViewportChange: (payload: { zoom: number; bbox: GeoBBox }) => void;
+  onSelecionar: (ponto: GeoMapPoint) => void;
+}) {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<any>(null);
+  const overlaysRef = useRef<any[]>([]);
+  const infoWindowRef = useRef<any>(null);
+  const modoMarcacaoRef = useRef(modoMarcacao);
+  const [erroMapa, setErroMapa] = useState<string | null>(null);
+
+  useEffect(() => {
+    modoMarcacaoRef.current = modoMarcacao;
+  }, [modoMarcacao]);
+
+  useEffect(() => {
+    const handleAuthFailure = () => {
+      setErroMapa("Google Maps nao autorizou o carregamento. Verifique a chave, o dominio liberado e a API Maps JavaScript.");
+    };
+
+    window.addEventListener(GOOGLE_MAPS_AUTH_FAILURE_EVENT, handleAuthFailure);
+    return () => window.removeEventListener(GOOGLE_MAPS_AUTH_FAILURE_EVENT, handleAuthFailure);
+  }, []);
+
+  useEffect(() => {
+    let ativo = true;
+
+    void carregarGoogleMaps()
+      .then((maps) => {
+        if (!ativo || !rootRef.current) return;
+        setErroMapa(null);
+
+        if (!mapRef.current) {
+          const mapOptions: Record<string, unknown> = {
+            center: { lat: center[0], lng: center[1] },
+            zoom,
+            mapTypeControl: false,
+            streetViewControl: false,
+            fullscreenControl: false,
+            gestureHandling: "greedy"
+          };
+
+          if (GOOGLE_MAPS_MAP_ID) {
+            mapOptions.mapId = GOOGLE_MAPS_MAP_ID;
+          }
+
+          mapRef.current = new maps.Map(rootRef.current, mapOptions);
+
+          mapRef.current.addListener("idle", () => {
+            const bounds = mapRef.current.getBounds();
+            if (!bounds) return;
+            const northEast = bounds.getNorthEast();
+            const southWest = bounds.getSouthWest();
+            onViewportChange({
+              zoom: mapRef.current.getZoom(),
+              bbox: {
+                north: northEast.lat(),
+                south: southWest.lat(),
+                east: northEast.lng(),
+                west: southWest.lng()
+              }
+            });
+            onReady();
+          });
+
+          mapRef.current.addListener("click", (event: any) => {
+            if (!modoMarcacaoRef.current || !event.latLng) return;
+            onPick({
+              latitude: Number(event.latLng.lat().toFixed(6)),
+              longitude: Number(event.latLng.lng().toFixed(6))
+            });
+          });
+
+          infoWindowRef.current = new maps.InfoWindow();
+        }
+      })
+      .catch((error) => {
+        if (!ativo) return;
+        setErroMapa(error instanceof Error ? error.message : "Falha ao carregar Google Maps.");
+      });
+
+    return () => {
+      ativo = false;
+    };
+  }, [center, zoom, modoMarcacao, onPick, onReady, onViewportChange]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    map.setCenter({ lat: center[0], lng: center[1] });
+    map.setZoom(zoom);
+  }, [center, zoom]);
+
+  useEffect(() => {
+    const maps = (window as any).google?.maps;
+    const map = mapRef.current;
+    if (!maps || !map) return;
+
+    overlaysRef.current.forEach((overlay) => {
+      if (overlay.setMap) overlay.setMap(null);
+    });
+    overlaysRef.current = [];
+
+    agregados.forEach((item) => {
+      const circle = new maps.Circle({
+        map,
+        center: { lat: item.latitude, lng: item.longitude },
+        radius: Math.min(850, 180 + item.quantidade * 12),
+        strokeColor: estilosCamada[item.camada],
+        strokeOpacity: 0.9,
+        strokeWeight: 2,
+        fillColor: estilosCamada[item.camada],
+        fillOpacity: 0.28
+      });
+
+      const marker = new maps.Marker({
+        map,
+        position: { lat: item.latitude, lng: item.longitude },
+        label: {
+          text: String(item.quantidade),
+          color: "#ffffff",
+          fontWeight: "700",
+          fontSize: "11px"
+        },
+        icon: {
+          path: maps.SymbolPath.CIRCLE,
+          fillColor: estilosCamada[item.camada],
+          fillOpacity: 1,
+          strokeColor: "#ffffff",
+          strokeWeight: 2,
+          scale: Math.min(22, 12 + item.quantidade / 3)
+        }
+      });
+
+      marker.addListener("click", () => {
+        infoWindowRef.current?.setContent(`<div style="min-width:180px;padding:6px 4px"><div style="font-size:11px;font-weight:700;color:#0f172a">${escapeHtml(rotulosCamada[item.camada])}</div><div style="font-size:13px;margin-top:4px;color:#334155">${escapeHtml(item.bairro || "Ponto agregado")}</div><div style="font-size:12px;margin-top:6px;color:#475569">Quantidade: ${item.quantidade}</div></div>`);
+        infoWindowRef.current?.open({ anchor: marker, map });
+      });
+
+      overlaysRef.current.push(circle, marker);
+    });
+
+    marcadores.forEach((item) => {
+      if ((item.quantidade ?? 1) > 1) {
+        const marker = new maps.Marker({
+          map,
+          position: { lat: item.latitude, lng: item.longitude },
+          label: {
+            text: String(item.quantidade),
+            color: "#ffffff",
+            fontWeight: "700",
+            fontSize: "11px"
+          },
+          icon: {
+            path: maps.SymbolPath.CIRCLE,
+            fillColor: estilosCamada[item.camada],
+            fillOpacity: 1,
+            strokeColor: "#ffffff",
+            strokeWeight: 2,
+            scale: Math.min(22, 10 + (item.quantidade ?? 1) / 4)
+          }
+        });
+        marker.addListener("click", () => onSelecionar(item));
+        overlaysRef.current.push(marker);
+        return;
+      }
+
+      const marker = new maps.Marker({
+        map,
+        position: { lat: item.latitude, lng: item.longitude },
+        title: item.titulo,
+        icon: {
+          url: criarSvgPin(estilosCamada[item.camada]),
+          scaledSize: new maps.Size(24, 32),
+          anchor: new maps.Point(12, 32)
+        }
+      });
+
+      marker.addListener("click", () => {
+        onSelecionar(item);
+        infoWindowRef.current?.setContent(`<div style="min-width:190px;padding:6px 4px"><div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase">${escapeHtml(item.tipoLabel)}</div><div style="font-size:14px;font-weight:800;color:#0f172a;margin-top:4px">${escapeHtml(item.titulo)}</div><div style="font-size:12px;color:#475569;margin-top:6px">${escapeHtml(item.bairro || "Bairro não informado")}</div></div>`);
+        infoWindowRef.current?.open({ anchor: marker, map });
+      });
+
+      overlaysRef.current.push(marker);
+    });
+
+    if (pontoManual) {
+      const marker = new maps.Marker({
+        map,
+        position: { lat: pontoManual.latitude, lng: pontoManual.longitude },
+        icon: {
+          url: criarSvgPin("#f59e0b"),
+          scaledSize: new maps.Size(24, 32),
+          anchor: new maps.Point(12, 32)
+        }
+      });
+      overlaysRef.current.push(marker);
+    }
+  }, [agregados, marcadores, onSelecionar, pontoManual]);
+
+  if (erroMapa) {
+    return (
+      <div className="flex h-full w-full items-center justify-center bg-slate-100 px-6">
+        <div className="max-w-xl rounded-2xl border border-amber-200 bg-white p-6 text-center shadow-sm">
+          <p className="text-sm font-semibold text-slate-900">Nao foi possivel carregar o Google Maps.</p>
+          <p className="mt-2 text-sm text-slate-600">{erroMapa}</p>
+          <p className="mt-3 text-xs text-slate-500">
+            Confirme se a chave tem a API Maps JavaScript habilitada e se o dominio atual esta autorizado no Google Cloud.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return <div ref={rootRef} className="h-full w-full" />;
 }
 
 export function VulnerabilidadePage() {
   const navigate = useNavigate();
-  const mapRef = useRef<LeafletMap | null>(null);
   const [filtros, setFiltros] = useState<GeoFilters>(filtrosPadrao);
   const [viewportPronto, setViewportPronto] = useState(false);
   const [modoMarcacao, setModoMarcacao] = useState(false);
@@ -456,41 +719,24 @@ export function VulnerabilidadePage() {
 
         {/* MAPA EM SI */}
         <div className="h-full w-full bg-slate-100">
-          <MapContainer center={centro} zoom={filtros.zoom} className="h-full w-full" ref={mapRef} zoomControl={false}>
-            <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>' url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
-            <Observer onChange={atualizarViewport} onReady={() => setViewportPronto(true)} />
-            <ClickCapture ativo={modoMarcacao} onPick={setPontoManual} />
-            
-            {/* RENDERIZACAO DE CAMADAS */}
-            {data?.agregados.map((item) => (
-              <CircleMarker key={item.id} center={[item.latitude, item.longitude]} radius={Math.min(28, 12 + item.quantidade / 4)} pathOptions={{ color: estilosCamada[item.camada], fillColor: estilosCamada[item.camada], fillOpacity: 0.6, weight: 2 }}>
-                <Tooltip permanent direction="center" className="!border-0 !bg-transparent !p-0 !shadow-none"><span className="text-[10px] font-black text-white">{item.quantidade}</span></Tooltip>
-              </CircleMarker>
-            ))}
-
-            {data?.marcadores.map((item) => (
-              (item.quantidade ?? 1) > 1 ? (
-                <CircleMarker key={item.id} center={[item.latitude, item.longitude]} radius={Math.min(24, 10 + (item.quantidade ?? 1) / 4)} pathOptions={{ color: estilosCamada[item.camada], fillColor: estilosCamada[item.camada], fillOpacity: 0.8, weight: 2 }}>
-                  <Tooltip permanent direction="center" className="!border-0 !bg-transparent !p-0 !shadow-none"><span className="text-[10px] font-black text-white">{item.quantidade}</span></Tooltip>
-                </CircleMarker>
-              ) : (
-                <Marker key={item.id} position={[item.latitude, item.longitude]} icon={criarIconePin(estilosCamada[item.camada])} eventHandlers={{ click: () => setPontoSelecionado(item) }}>
-                  <Popup>
-                    <div className="p-2 min-w-[180px] space-y-2">
-                      <div className="border-b pb-1">
-                        <div className="text-[9px] font-bold uppercase text-slate-400">{item.tipoLabel}</div>
-                        <div className="text-sm font-black text-slate-800 leading-tight">{item.titulo}</div>
-                      </div>
-                      <div className="text-[11px] text-slate-600 flex items-center gap-1"><MapPinned className="h-3 w-3" /> {item.bairro}</div>
-                      {item.receberCestaBasica && <div className="rounded bg-emerald-50 px-2 py-1 text-[9px] font-black text-emerald-700 border border-emerald-100 uppercase">Elegível à Cesta</div>}
-                    </div>
-                  </Popup>
-                </Marker>
-              )
-            ))}
-
-            {pontoManual && <Marker position={[pontoManual.latitude, pontoManual.longitude]} icon={criarIconePin("#f59e0b")} />}
-          </MapContainer>
+          {GOOGLE_MAPS_API_KEY ? (
+            <GoogleGeoMap
+              center={centro}
+              zoom={filtros.zoom}
+              agregados={data?.agregados ?? []}
+              marcadores={data?.marcadores ?? []}
+              pontoManual={pontoManual}
+              modoMarcacao={modoMarcacao}
+              onPick={setPontoManual}
+              onReady={() => setViewportPronto(true)}
+              onViewportChange={atualizarViewport}
+              onSelecionar={setPontoSelecionado}
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center px-6 text-center text-sm text-slate-600">
+              Defina `VITE_GOOGLE_MAPS_API_KEY` no ambiente do frontend para carregar o Google Maps.
+            </div>
+          )}
         </div>
 
         {/* CARD DE DETALHES FLUTUANTE NO CANTO INFERIOR DIREITO */}

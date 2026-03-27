@@ -26,8 +26,30 @@ const estruturaSql = [
     atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
   )
   `,
+    "ALTER TABLE IF EXISTS visita_domiciliar ADD COLUMN IF NOT EXISTS beneficiario_nome TEXT",
+    "ALTER TABLE IF EXISTS visita_domiciliar ADD COLUMN IF NOT EXISTS horario_final TEXT",
+    "ALTER TABLE IF EXISTS visita_domiciliar ADD COLUMN IF NOT EXISTS tipo_visita TEXT",
+    "ALTER TABLE IF EXISTS visita_domiciliar ADD COLUMN IF NOT EXISTS usar_endereco_beneficiario BOOLEAN NOT NULL DEFAULT TRUE",
+    "ALTER TABLE IF EXISTS visita_domiciliar ADD COLUMN IF NOT EXISTS endereco JSONB NOT NULL DEFAULT '{}'::jsonb",
+    "ALTER TABLE IF EXISTS visita_domiciliar ADD COLUMN IF NOT EXISTS observacoes_iniciais TEXT",
+    "ALTER TABLE IF EXISTS visita_domiciliar ADD COLUMN IF NOT EXISTS condicoes JSONB NOT NULL DEFAULT '{}'::jsonb",
+    "ALTER TABLE IF EXISTS visita_domiciliar ADD COLUMN IF NOT EXISTS situacao_social JSONB NOT NULL DEFAULT '{}'::jsonb",
+    "ALTER TABLE IF EXISTS visita_domiciliar ADD COLUMN IF NOT EXISTS registro JSONB NOT NULL DEFAULT '{}'::jsonb",
+    "ALTER TABLE IF EXISTS visita_domiciliar ADD COLUMN IF NOT EXISTS anexos JSONB NOT NULL DEFAULT '[]'::jsonb",
+    "ALTER TABLE IF EXISTS visita_domiciliar ADD COLUMN IF NOT EXISTS criado_em TIMESTAMP NOT NULL DEFAULT NOW()",
+    "ALTER TABLE IF EXISTS visita_domiciliar ADD COLUMN IF NOT EXISTS atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()",
     "CREATE INDEX IF NOT EXISTS visita_domiciliar_data_idx ON visita_domiciliar(data_visita)",
-    "CREATE INDEX IF NOT EXISTS visita_domiciliar_beneficiario_idx ON visita_domiciliar(beneficiario_id)"
+    "CREATE INDEX IF NOT EXISTS visita_domiciliar_beneficiario_idx ON visita_domiciliar(beneficiario_id)",
+    `
+  CREATE TABLE IF NOT EXISTS visita_domiciliar_anexo (
+    id BIGSERIAL PRIMARY KEY,
+    visita_id BIGINT NOT NULL REFERENCES visita_domiciliar(id) ON DELETE CASCADE,
+    nome VARCHAR(200) NOT NULL,
+    tipo VARCHAR(60) NOT NULL,
+    tamanho VARCHAR(40),
+    criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+  )
+  `
 ];
 let estruturaPromise = null;
 export async function ensureVisitasDomiciliaresEstrutura() {
@@ -39,6 +61,24 @@ export async function ensureVisitasDomiciliaresEstrutura() {
         })();
     }
     await estruturaPromise;
+}
+function sqlHorario(valor, tipoColuna) {
+    const horario = typeof valor === "string" ? valor.trim() : "";
+    if (!horario) {
+        return Prisma.raw("NULL");
+    }
+    if (tipoColuna === "time without time zone") {
+        if (!/^\d{2}:\d{2}(:\d{2})?$/.test(horario)) {
+            throw new AppError("Horario invalido para visita domiciliar.", 400);
+        }
+        return Prisma.raw(`TIME '${horario}'`);
+    }
+    return Prisma.sql `${horario}`;
+}
+function sqlJsonb(valor) {
+    const json = JSON.stringify(valor ?? {});
+    const escaped = json.replace(/'/g, "''");
+    return Prisma.raw(`CAST('${escaped}' AS JSONB)`);
 }
 export class VisitasDomiciliaresRepository {
     schemaInfoPromise = null;
@@ -63,7 +103,7 @@ export class VisitasDomiciliaresRepository {
             this.schemaInfoPromise = (async () => {
                 const [colunas, tabelas] = await Promise.all([
                     prisma.$queryRaw(Prisma.sql `
-            SELECT column_name
+            SELECT column_name, data_type
             FROM information_schema.columns
             WHERE table_schema = 'public'
               AND table_name = 'visita_domiciliar'
@@ -79,8 +119,20 @@ export class VisitasDomiciliaresRepository {
                 const tabelasSet = new Set(tabelas.map((item) => item.table_name));
                 return {
                     possuiBeneficiarioNome: colunasSet.has("beneficiario_nome"),
+                    tipoHorarioInicial: colunas.find((item) => item.column_name === "horario_inicial")?.data_type ?? null,
+                    possuiHorarioFinal: colunasSet.has("horario_final"),
+                    tipoHorarioFinal: colunas.find((item) => item.column_name === "horario_final")?.data_type ?? null,
+                    possuiTipoVisita: colunasSet.has("tipo_visita"),
+                    possuiUsarEnderecoBeneficiario: colunasSet.has("usar_endereco_beneficiario"),
+                    possuiEndereco: colunasSet.has("endereco"),
+                    possuiObservacoesIniciais: colunasSet.has("observacoes_iniciais"),
+                    possuiCondicoes: colunasSet.has("condicoes"),
+                    possuiSituacaoSocial: colunasSet.has("situacao_social"),
+                    possuiRegistro: colunasSet.has("registro"),
                     possuiAnexos: colunasSet.has("anexos"),
-                    possuiTabelaAnexos: tabelasSet.has("visita_domiciliar_anexo")
+                    possuiTabelaAnexos: tabelasSet.has("visita_domiciliar_anexo"),
+                    possuiCriadoEm: colunasSet.has("criado_em"),
+                    possuiAtualizadoEm: colunasSet.has("atualizado_em")
                 };
             })();
         }
@@ -96,6 +148,22 @@ export class VisitasDomiciliaresRepository {
             : schema.possuiTabelaAnexos
                 ? "COALESCE((SELECT jsonb_agg(jsonb_build_object('id', a.id, 'nome', a.nome, 'tipo', a.tipo, 'tamanho', a.tamanho, 'criadoEm', a.criado_em) ORDER BY a.id ASC) FROM visita_domiciliar_anexo a WHERE a.visita_id = v.id), '[]'::jsonb) AS anexos"
                 : "'[]'::jsonb AS anexos";
+        const colunaHorarioFinal = schema.possuiHorarioFinal ? "v.horario_final" : "NULL::text AS horario_final";
+        const colunaTipoVisita = schema.possuiTipoVisita ? "v.tipo_visita" : "NULL::text AS tipo_visita";
+        const colunaUsarEndereco = schema.possuiUsarEnderecoBeneficiario
+            ? "v.usar_endereco_beneficiario"
+            : "TRUE AS usar_endereco_beneficiario";
+        const colunaEndereco = schema.possuiEndereco ? "v.endereco" : "'{}'::jsonb AS endereco";
+        const colunaObservacoesIniciais = schema.possuiObservacoesIniciais
+            ? "v.observacoes_iniciais"
+            : "NULL::text AS observacoes_iniciais";
+        const colunaCondicoes = schema.possuiCondicoes ? "v.condicoes" : "'{}'::jsonb AS condicoes";
+        const colunaSituacaoSocial = schema.possuiSituacaoSocial
+            ? "v.situacao_social"
+            : "'{}'::jsonb AS situacao_social";
+        const colunaRegistro = schema.possuiRegistro ? "v.registro" : "'{}'::jsonb AS registro";
+        const colunaCriadoEm = schema.possuiCriadoEm ? "v.criado_em" : "NOW() AS criado_em";
+        const colunaAtualizadoEm = schema.possuiAtualizadoEm ? "v.atualizado_em" : "NOW() AS atualizado_em";
         const colunas = [
             "v.id",
             "v.beneficiario_id",
@@ -104,18 +172,18 @@ export class VisitasDomiciliaresRepository {
             "v.responsavel",
             "v.data_visita",
             "v.horario_inicial",
-            "v.horario_final",
-            "v.tipo_visita",
+            colunaHorarioFinal,
+            colunaTipoVisita,
             "v.situacao",
-            "v.usar_endereco_beneficiario",
-            "v.endereco",
-            "v.observacoes_iniciais",
-            "v.condicoes",
-            "v.situacao_social",
-            "v.registro",
+            colunaUsarEndereco,
+            colunaEndereco,
+            colunaObservacoesIniciais,
+            colunaCondicoes,
+            colunaSituacaoSocial,
+            colunaRegistro,
             colunaAnexos,
-            "v.criado_em",
-            "v.atualizado_em"
+            colunaCriadoEm,
+            colunaAtualizadoEm
         ].join(",\n        ");
         if (id) {
             return prisma.$queryRawUnsafe(`
@@ -163,18 +231,18 @@ export class VisitasDomiciliaresRepository {
             Prisma.raw("responsavel"),
             Prisma.raw("data_visita"),
             Prisma.raw("horario_inicial"),
-            Prisma.raw("horario_final"),
-            Prisma.raw("tipo_visita"),
+            ...(schema.possuiHorarioFinal ? [Prisma.raw("horario_final")] : []),
+            ...(schema.possuiTipoVisita ? [Prisma.raw("tipo_visita")] : []),
             Prisma.raw("situacao"),
-            Prisma.raw("usar_endereco_beneficiario"),
-            Prisma.raw("endereco"),
-            Prisma.raw("observacoes_iniciais"),
-            Prisma.raw("condicoes"),
-            Prisma.raw("situacao_social"),
-            Prisma.raw("registro"),
+            ...(schema.possuiUsarEnderecoBeneficiario ? [Prisma.raw("usar_endereco_beneficiario")] : []),
+            ...(schema.possuiEndereco ? [Prisma.raw("endereco")] : []),
+            ...(schema.possuiObservacoesIniciais ? [Prisma.raw("observacoes_iniciais")] : []),
+            ...(schema.possuiCondicoes ? [Prisma.raw("condicoes")] : []),
+            ...(schema.possuiSituacaoSocial ? [Prisma.raw("situacao_social")] : []),
+            ...(schema.possuiRegistro ? [Prisma.raw("registro")] : []),
             ...(schema.possuiAnexos ? [Prisma.raw("anexos")] : []),
-            Prisma.raw("criado_em"),
-            Prisma.raw("atualizado_em")
+            ...(schema.possuiCriadoEm ? [Prisma.raw("criado_em")] : []),
+            ...(schema.possuiAtualizadoEm ? [Prisma.raw("atualizado_em")] : [])
         ];
         const valores = [
             Prisma.sql `${BigInt(input.beneficiarioId)}`,
@@ -184,21 +252,23 @@ export class VisitasDomiciliaresRepository {
             Prisma.sql `${input.unidade}`,
             Prisma.sql `${input.responsavel}`,
             Prisma.sql `${toOptionalDate(input.dataVisita)}`,
-            Prisma.sql `${input.horarioInicial}`,
-            Prisma.sql `${input.horarioFinal ?? null}`,
-            Prisma.sql `${input.tipoVisita ?? null}`,
+            sqlHorario(input.horarioInicial, schema.tipoHorarioInicial),
+            ...(schema.possuiHorarioFinal ? [sqlHorario(input.horarioFinal ?? null, schema.tipoHorarioFinal)] : []),
+            ...(schema.possuiTipoVisita ? [Prisma.sql `${input.tipoVisita ?? null}`] : []),
             Prisma.sql `${input.situacao}`,
-            Prisma.sql `${input.usarEnderecoBeneficiario}`,
-            Prisma.sql `${(input.endereco ?? {})}`,
-            Prisma.sql `${input.observacoesIniciais ?? null}`,
-            Prisma.sql `${(input.condicoes ?? {})}`,
-            Prisma.sql `${(input.situacaoSocial ?? {})}`,
-            Prisma.sql `${(input.registro ?? {})}`,
-            ...(schema.possuiAnexos
-                ? [Prisma.sql `${(input.anexos ?? [])}`]
+            ...(schema.possuiUsarEnderecoBeneficiario ? [Prisma.sql `${input.usarEnderecoBeneficiario}`] : []),
+            ...(schema.possuiEndereco ? [sqlJsonb(input.endereco ?? {})] : []),
+            ...(schema.possuiObservacoesIniciais ? [Prisma.sql `${input.observacoesIniciais ?? null}`] : []),
+            ...(schema.possuiCondicoes
+                ? [sqlJsonb(input.condicoes ?? {})]
                 : []),
-            Prisma.sql `NOW()`,
-            Prisma.sql `NOW()`
+            ...(schema.possuiSituacaoSocial
+                ? [sqlJsonb(input.situacaoSocial ?? {})]
+                : []),
+            ...(schema.possuiRegistro ? [sqlJsonb(input.registro ?? {})] : []),
+            ...(schema.possuiAnexos ? [sqlJsonb(input.anexos ?? [])] : []),
+            ...(schema.possuiCriadoEm ? [Prisma.sql `NOW()`] : []),
+            ...(schema.possuiAtualizadoEm ? [Prisma.sql `NOW()`] : [])
         ];
         const inserted = await prisma.$queryRaw(Prisma.sql `
       INSERT INTO visita_domiciliar (${Prisma.join(campos, ", ")})
@@ -225,20 +295,32 @@ export class VisitasDomiciliaresRepository {
             Prisma.sql `unidade = ${input.unidade}`,
             Prisma.sql `responsavel = ${input.responsavel}`,
             Prisma.sql `data_visita = ${toOptionalDate(input.dataVisita)}`,
-            Prisma.sql `horario_inicial = ${input.horarioInicial}`,
-            Prisma.sql `horario_final = ${input.horarioFinal ?? null}`,
-            Prisma.sql `tipo_visita = ${input.tipoVisita ?? null}`,
-            Prisma.sql `situacao = ${input.situacao}`,
-            Prisma.sql `usar_endereco_beneficiario = ${input.usarEnderecoBeneficiario}`,
-            Prisma.sql `endereco = ${(input.endereco ?? {})}`,
-            Prisma.sql `observacoes_iniciais = ${input.observacoesIniciais ?? null}`,
-            Prisma.sql `condicoes = ${(input.condicoes ?? {})}`,
-            Prisma.sql `situacao_social = ${(input.situacaoSocial ?? {})}`,
-            Prisma.sql `registro = ${(input.registro ?? {})}`,
-            ...(schema.possuiAnexos
-                ? [Prisma.sql `anexos = ${(input.anexos ?? [])}`]
+            Prisma.sql `horario_inicial = ${sqlHorario(input.horarioInicial, schema.tipoHorarioInicial)}`,
+            ...(schema.possuiHorarioFinal
+                ? [Prisma.sql `horario_final = ${sqlHorario(input.horarioFinal ?? null, schema.tipoHorarioFinal)}`]
                 : []),
-            Prisma.sql `atualizado_em = NOW()`
+            ...(schema.possuiTipoVisita ? [Prisma.sql `tipo_visita = ${input.tipoVisita ?? null}`] : []),
+            Prisma.sql `situacao = ${input.situacao}`,
+            ...(schema.possuiUsarEnderecoBeneficiario
+                ? [Prisma.sql `usar_endereco_beneficiario = ${input.usarEnderecoBeneficiario}`]
+                : []),
+            ...(schema.possuiEndereco
+                ? [Prisma.sql `endereco = ${sqlJsonb(input.endereco ?? {})}`]
+                : []),
+            ...(schema.possuiObservacoesIniciais
+                ? [Prisma.sql `observacoes_iniciais = ${input.observacoesIniciais ?? null}`]
+                : []),
+            ...(schema.possuiCondicoes
+                ? [Prisma.sql `condicoes = ${sqlJsonb(input.condicoes ?? {})}`]
+                : []),
+            ...(schema.possuiSituacaoSocial
+                ? [Prisma.sql `situacao_social = ${sqlJsonb(input.situacaoSocial ?? {})}`]
+                : []),
+            ...(schema.possuiRegistro
+                ? [Prisma.sql `registro = ${sqlJsonb(input.registro ?? {})}`]
+                : []),
+            ...(schema.possuiAnexos ? [Prisma.sql `anexos = ${sqlJsonb(input.anexos ?? [])}`] : []),
+            ...(schema.possuiAtualizadoEm ? [Prisma.sql `atualizado_em = NOW()`] : [])
         ];
         await prisma.$executeRaw(Prisma.sql `
       UPDATE visita_domiciliar

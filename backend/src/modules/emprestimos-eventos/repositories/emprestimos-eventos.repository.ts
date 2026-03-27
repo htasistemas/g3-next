@@ -11,6 +11,8 @@ import type {
   EmprestimoEventoRow,
   EventoEmprestimoInput,
   EventoEmprestimoRow,
+  ResponsavelEmprestimoInput,
+  ResponsavelEmprestimoRow,
   StatusEmprestimoEvento,
   TipoItemEmprestimo
 } from "../emprestimos-eventos.types.js";
@@ -39,8 +41,42 @@ function overlapSql(
   )`;
 }
 
+const estruturaSql = [
+  "ALTER TABLE IF EXISTS emprestimos_eventos ADD COLUMN IF NOT EXISTS responsavel_nome VARCHAR(200)",
+  "ALTER TABLE IF EXISTS emprestimos_eventos ADD COLUMN IF NOT EXISTS responsavel_cadastro_id BIGINT",
+  `CREATE TABLE IF NOT EXISTS emprestimos_eventos_responsaveis (
+      id BIGSERIAL PRIMARY KEY,
+      nome VARCHAR(200) NOT NULL,
+      documento VARCHAR(40),
+      telefone VARCHAR(40),
+      email VARCHAR(160),
+      observacoes TEXT,
+      criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+      atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
+  "CREATE INDEX IF NOT EXISTS emprestimos_eventos_responsaveis_nome_idx ON emprestimos_eventos_responsaveis(nome)"
+];
+
+let estruturaPromise: Promise<void> | null = null;
+
 export class EmprestimosEventosRepository {
+  private async ensureEstrutura() {
+    if (!estruturaPromise) {
+      estruturaPromise = (async () => {
+        for (const sql of estruturaSql) {
+          await prisma.$executeRawUnsafe(sql);
+        }
+      })().catch((error) => {
+        estruturaPromise = null;
+        throw error;
+      });
+    }
+
+    await estruturaPromise;
+  }
+
   async listarEmprestimos(filtros: EmprestimoEventoFiltros) {
+    await this.ensureEstrutura();
     const where: Prisma.Sql[] = [];
 
     const inicio = toOptionalDateTime(filtros.inicio);
@@ -92,7 +128,8 @@ export class EmprestimosEventosRepository {
         e.id,
         e.evento_id,
         e.unidade_id,
-        e.responsavel_id,
+        COALESCE(e.responsavel_cadastro_id, e.responsavel_id) AS responsavel_id,
+        e.responsavel_nome AS responsavel_nome_livre,
         e.data_retirada_prevista,
         e.data_devolucao_prevista,
         e.data_retirada_real,
@@ -105,9 +142,10 @@ export class EmprestimosEventosRepository {
         ev.data_inicio AS evento_data_inicio,
         ev.data_fim AS evento_data_fim,
         ev.status AS evento_status,
-        COALESCE(u.nome_usuario, u.nome) AS responsavel_nome
+        COALESCE(r.nome, NULLIF(TRIM(e.responsavel_nome), ''), u.nome_usuario, u.nome) AS responsavel_nome
       FROM emprestimos_eventos e
       INNER JOIN eventos_emprestimos ev ON ev.id = e.evento_id
+      LEFT JOIN emprestimos_eventos_responsaveis r ON r.id = e.responsavel_cadastro_id
       LEFT JOIN usuarios u ON u.id = e.responsavel_id
       WHERE 1 = 1
       ${whereClause}
@@ -124,12 +162,14 @@ export class EmprestimosEventosRepository {
   }
 
   async buscarEmprestimoPorId(id: bigint) {
+    await this.ensureEstrutura();
     const registros = await prisma.$queryRaw<EmprestimoEventoRow[]>(Prisma.sql`
       SELECT
         e.id,
         e.evento_id,
         e.unidade_id,
-        e.responsavel_id,
+        COALESCE(e.responsavel_cadastro_id, e.responsavel_id) AS responsavel_id,
+        e.responsavel_nome AS responsavel_nome_livre,
         e.data_retirada_prevista,
         e.data_devolucao_prevista,
         e.data_retirada_real,
@@ -142,9 +182,10 @@ export class EmprestimosEventosRepository {
         ev.data_inicio AS evento_data_inicio,
         ev.data_fim AS evento_data_fim,
         ev.status AS evento_status,
-        COALESCE(u.nome_usuario, u.nome) AS responsavel_nome
+        COALESCE(r.nome, NULLIF(TRIM(e.responsavel_nome), ''), u.nome_usuario, u.nome) AS responsavel_nome
       FROM emprestimos_eventos e
       INNER JOIN eventos_emprestimos ev ON ev.id = e.evento_id
+      LEFT JOIN emprestimos_eventos_responsaveis r ON r.id = e.responsavel_cadastro_id
       LEFT JOIN usuarios u ON u.id = e.responsavel_id
       WHERE e.id = ${id}
       LIMIT 1
@@ -169,14 +210,20 @@ export class EmprestimosEventosRepository {
   }
 
   async criarEmprestimo(input: EmprestimoEventoInput) {
+    await this.ensureEstrutura();
     const id = await prisma.$transaction(async (tx) => {
       await this.validarEventoExiste(tx, input.eventoId);
+      if (input.responsavelId) {
+        await this.validarResponsavelExiste(tx, input.responsavelId);
+      }
 
       const inserted = await tx.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
         INSERT INTO emprestimos_eventos (
           evento_id,
           unidade_id,
           responsavel_id,
+          responsavel_cadastro_id,
+          responsavel_nome,
           data_retirada_prevista,
           data_devolucao_prevista,
           data_retirada_real,
@@ -188,7 +235,9 @@ export class EmprestimosEventosRepository {
         ) VALUES (
           ${BigInt(input.eventoId)},
           ${input.unidadeId ? BigInt(input.unidadeId) : null},
+          ${null},
           ${input.responsavelId ? BigInt(input.responsavelId) : null},
+          ${trimOrUndefined(input.responsavelNome ?? undefined)},
           ${toOptionalDateTime(input.dataRetiradaPrevista)},
           ${toOptionalDateTime(input.dataDevolucaoPrevista)},
           ${toOptionalDateTime(input.dataRetiradaReal)},
@@ -221,17 +270,23 @@ export class EmprestimosEventosRepository {
   }
 
   async atualizarEmprestimo(id: bigint, input: EmprestimoEventoInput) {
+    await this.ensureEstrutura();
     await this.buscarEmprestimoPorIdOuFalhar(id);
 
     await prisma.$transaction(async (tx) => {
       await this.validarEventoExiste(tx, input.eventoId);
+      if (input.responsavelId) {
+        await this.validarResponsavelExiste(tx, input.responsavelId);
+      }
 
       await tx.$executeRaw(Prisma.sql`
         UPDATE emprestimos_eventos
         SET
           evento_id = ${BigInt(input.eventoId)},
           unidade_id = ${input.unidadeId ? BigInt(input.unidadeId) : null},
-          responsavel_id = ${input.responsavelId ? BigInt(input.responsavelId) : null},
+          responsavel_id = ${null},
+          responsavel_cadastro_id = ${input.responsavelId ? BigInt(input.responsavelId) : null},
+          responsavel_nome = ${trimOrUndefined(input.responsavelNome ?? undefined)},
           data_retirada_prevista = ${toOptionalDateTime(input.dataRetiradaPrevista)},
           data_devolucao_prevista = ${toOptionalDateTime(input.dataDevolucaoPrevista)},
           data_retirada_real = ${toOptionalDateTime(input.dataRetiradaReal)},
@@ -260,6 +315,7 @@ export class EmprestimosEventosRepository {
   }
 
   async removerEmprestimo(id: bigint) {
+    await this.ensureEstrutura();
     await this.buscarEmprestimoPorIdOuFalhar(id);
     await prisma.$executeRaw(Prisma.sql`
       DELETE FROM emprestimos_eventos
@@ -272,6 +328,7 @@ export class EmprestimosEventosRepository {
     status: StatusEmprestimoEvento,
     usuarioId?: number
   ) {
+    await this.ensureEstrutura();
     await this.buscarEmprestimoPorIdOuFalhar(id);
 
     await prisma.$transaction(async (tx) => {
@@ -307,6 +364,7 @@ export class EmprestimosEventosRepository {
   }
 
   async listarEventos() {
+    await this.ensureEstrutura();
     return prisma.$queryRaw<EventoEmprestimoRow[]>(Prisma.sql`
       SELECT
         id,
@@ -321,7 +379,129 @@ export class EmprestimosEventosRepository {
     `);
   }
 
+  async listarResponsaveis() {
+    await this.ensureEstrutura();
+    return prisma.$queryRaw<ResponsavelEmprestimoRow[]>(Prisma.sql`
+      SELECT
+        id,
+        nome,
+        documento,
+        telefone,
+        email,
+        observacoes,
+        criado_em,
+        atualizado_em
+      FROM emprestimos_eventos_responsaveis
+      ORDER BY nome ASC, id ASC
+    `);
+  }
+
+  async buscarResponsavelPorId(id: bigint) {
+    await this.ensureEstrutura();
+    const rows = await prisma.$queryRaw<ResponsavelEmprestimoRow[]>(Prisma.sql`
+      SELECT
+        id,
+        nome,
+        documento,
+        telefone,
+        email,
+        observacoes,
+        criado_em,
+        atualizado_em
+      FROM emprestimos_eventos_responsaveis
+      WHERE id = ${id}
+      LIMIT 1
+    `);
+    return rows[0] ?? null;
+  }
+
+  async criarResponsavel(input: ResponsavelEmprestimoInput) {
+    await this.ensureEstrutura();
+    const inserted = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+      INSERT INTO emprestimos_eventos_responsaveis (
+        nome,
+        documento,
+        telefone,
+        email,
+        observacoes,
+        criado_em,
+        atualizado_em
+      ) VALUES (
+        ${input.nome},
+        ${trimOrUndefined(input.documento ?? undefined)},
+        ${trimOrUndefined(input.telefone ?? undefined)},
+        ${trimOrUndefined(input.email ?? undefined)},
+        ${trimOrUndefined(input.observacoes ?? undefined)},
+        NOW(),
+        NOW()
+      )
+      RETURNING id
+    `);
+
+    const id = inserted[0]?.id;
+    if (!id) {
+      throw new AppError("Nao foi possivel criar o responsavel.", 500);
+    }
+
+    const responsavel = await this.buscarResponsavelPorId(id);
+    if (!responsavel) {
+      throw new AppError("Responsavel nao encontrado apos criacao.", 500);
+    }
+    return responsavel;
+  }
+
+  async atualizarResponsavel(id: bigint, input: ResponsavelEmprestimoInput) {
+    await this.ensureEstrutura();
+    const atual = await this.buscarResponsavelPorId(id);
+    if (!atual) {
+      throw new AppError("Responsavel nao encontrado.", 404);
+    }
+
+    await prisma.$executeRaw(Prisma.sql`
+      UPDATE emprestimos_eventos_responsaveis
+      SET
+        nome = ${input.nome},
+        documento = ${trimOrUndefined(input.documento ?? undefined)},
+        telefone = ${trimOrUndefined(input.telefone ?? undefined)},
+        email = ${trimOrUndefined(input.email ?? undefined)},
+        observacoes = ${trimOrUndefined(input.observacoes ?? undefined)},
+        atualizado_em = NOW()
+      WHERE id = ${id}
+    `);
+
+    const responsavel = await this.buscarResponsavelPorId(id);
+    if (!responsavel) {
+      throw new AppError("Responsavel nao encontrado apos atualizacao.", 500);
+    }
+    return responsavel;
+  }
+
+  async excluirResponsavel(id: bigint) {
+    await this.ensureEstrutura();
+    const atual = await this.buscarResponsavelPorId(id);
+    if (!atual) {
+      throw new AppError("Responsavel nao encontrado.", 404);
+    }
+
+    const emprestimoVinculado = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+      SELECT id
+      FROM emprestimos_eventos
+      WHERE responsavel_cadastro_id = ${id}
+      LIMIT 1
+    `);
+
+    if (emprestimoVinculado.length) {
+      throw new AppError("Nao e possivel excluir responsavel vinculado a emprestimos.", 409);
+    }
+
+    await prisma.$executeRaw(Prisma.sql`
+      DELETE FROM emprestimos_eventos_responsaveis
+      WHERE id = ${id}
+    `);
+  }
+
   async buscarEventoPorId(id: bigint) {
+    await this.ensureEstrutura();
     const rows = await prisma.$queryRaw<EventoEmprestimoRow[]>(Prisma.sql`
       SELECT
         id,
@@ -339,6 +519,7 @@ export class EmprestimosEventosRepository {
   }
 
   async criarEvento(input: EventoEmprestimoInput) {
+    await this.ensureEstrutura();
     const inserted = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
       INSERT INTO eventos_emprestimos (
         titulo,
@@ -370,6 +551,7 @@ export class EmprestimosEventosRepository {
   }
 
   async atualizarEvento(id: bigint, input: EventoEmprestimoInput) {
+    await this.ensureEstrutura();
     const atual = await this.buscarEventoPorId(id);
     if (!atual) {
       throw new AppError("Evento nao encontrado.", 404);
@@ -394,6 +576,7 @@ export class EmprestimosEventosRepository {
   }
 
   async excluirEvento(id: bigint) {
+    await this.ensureEstrutura();
     const evento = await this.buscarEventoPorId(id);
     if (!evento) {
       throw new AppError("Evento nao encontrado.", 404);
@@ -416,6 +599,7 @@ export class EmprestimosEventosRepository {
   }
 
   async listarAgendaResumo(inicio: Date, fim: Date) {
+    await this.ensureEstrutura();
     const emprestimos = await prisma.$queryRaw<
       Array<{ id: bigint; inicio: Date; fim: Date; status: string }>
     >(Prisma.sql`
@@ -453,6 +637,7 @@ export class EmprestimosEventosRepository {
   }
 
   async listarAgendaDia(data: Date) {
+    await this.ensureEstrutura();
     const inicioDia = new Date(data);
     inicioDia.setHours(0, 0, 0, 0);
     const fimDia = new Date(data);
@@ -463,7 +648,8 @@ export class EmprestimosEventosRepository {
         e.id,
         e.evento_id,
         e.unidade_id,
-        e.responsavel_id,
+        COALESCE(e.responsavel_cadastro_id, e.responsavel_id) AS responsavel_id,
+        e.responsavel_nome AS responsavel_nome_livre,
         e.data_retirada_prevista,
         e.data_devolucao_prevista,
         e.data_retirada_real,
@@ -476,9 +662,10 @@ export class EmprestimosEventosRepository {
         ev.data_inicio AS evento_data_inicio,
         ev.data_fim AS evento_data_fim,
         ev.status AS evento_status,
-        COALESCE(u.nome_usuario, u.nome) AS responsavel_nome
+        COALESCE(r.nome, NULLIF(TRIM(e.responsavel_nome), ''), u.nome_usuario, u.nome) AS responsavel_nome
       FROM emprestimos_eventos e
       INNER JOIN eventos_emprestimos ev ON ev.id = e.evento_id
+      LEFT JOIN emprestimos_eventos_responsaveis r ON r.id = e.responsavel_cadastro_id
       LEFT JOIN usuarios u ON u.id = e.responsavel_id
       WHERE ${overlapSql(inicioDia, fimDia, "e.data_retirada_prevista", "e.data_devolucao_prevista")}
       ORDER BY e.data_retirada_prevista ASC, e.id ASC
@@ -500,6 +687,7 @@ export class EmprestimosEventosRepository {
     fim: Date;
     emprestimoId?: number;
   }) {
+    await this.ensureEstrutura();
     const conflitos = await prisma.$queryRaw<
       Array<{
         emprestimo_id: bigint;
@@ -574,6 +762,7 @@ export class EmprestimosEventosRepository {
   }
 
   async listarMovimentacoes(emprestimoId: bigint) {
+    await this.ensureEstrutura();
     await this.buscarEmprestimoPorIdOuFalhar(emprestimoId);
     return prisma.$queryRaw<EmprestimoEventoMovimentacaoRow[]>(Prisma.sql`
       SELECT
@@ -598,6 +787,18 @@ export class EmprestimosEventosRepository {
     `);
     if (!rows.length) {
       throw new AppError("Evento nao encontrado para emprestimo.", 404);
+    }
+  }
+
+  private async validarResponsavelExiste(tx: TransactionClient, responsavelId: number) {
+    const rows = await tx.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+      SELECT id
+      FROM emprestimos_eventos_responsaveis
+      WHERE id = ${BigInt(responsavelId)}
+      LIMIT 1
+    `);
+    if (!rows.length) {
+      throw new AppError("Responsavel nao encontrado para emprestimo.", 404);
     }
   }
 

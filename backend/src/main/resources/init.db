@@ -3242,6 +3242,8 @@ CREATE TABLE IF NOT EXISTS emprestimos_eventos (
   evento_id BIGINT NOT NULL REFERENCES eventos_emprestimos(id) ON DELETE RESTRICT,
   unidade_id BIGINT REFERENCES unidade_assistencial(id) ON DELETE SET NULL,
   responsavel_id BIGINT REFERENCES usuarios(id) ON DELETE SET NULL,
+  responsavel_cadastro_id BIGINT,
+  responsavel_nome VARCHAR(200),
   data_retirada_prevista TIMESTAMP NOT NULL,
   data_devolucao_prevista TIMESTAMP NOT NULL,
   data_retirada_real TIMESTAMP,
@@ -3251,6 +3253,20 @@ CREATE TABLE IF NOT EXISTS emprestimos_eventos (
   criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
   atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS emprestimos_eventos_responsaveis (
+  id BIGSERIAL PRIMARY KEY,
+  nome VARCHAR(200) NOT NULL,
+  documento VARCHAR(40),
+  telefone VARCHAR(40),
+  email VARCHAR(160),
+  observacoes TEXT,
+  criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+  atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS emprestimos_eventos_responsaveis_nome_idx
+  ON emprestimos_eventos_responsaveis (nome);
 
 CREATE TABLE IF NOT EXISTS emprestimos_eventos_itens (
   id BIGSERIAL PRIMARY KEY,
