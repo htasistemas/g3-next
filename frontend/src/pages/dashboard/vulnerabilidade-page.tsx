@@ -1,6 +1,9 @@
-import { startTransition, useDeferredValue, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import { startTransition, useDeferredValue, useEffect, useEffectEvent, useMemo, useState } from "react";
 import { Download, Eraser, Filter, ImageDown, LocateFixed, MapPinned, Printer, RefreshCw, Target } from "lucide-react";
+import "leaflet/dist/leaflet.css";
+import L from "leaflet";
 import { useNavigate } from "react-router-dom";
+import { CircleMarker, MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,16 +21,6 @@ import {
 } from "@/features/dashboard/use-dashboard";
 import { classesTelaPadraoBeneficiario } from "@/lib/tela-padrao-beneficiario";
 import type { GeoBBox, GeoDetailResponse, GeoFilters, GeoLayer, GeoMapPoint, GeoQueryResponse } from "@/types/georreferenciamento";
-
-const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY?.trim() || "";
-const GOOGLE_MAPS_MAP_ID =
-  import.meta.env.VITE_GOOGLE_MAPS_MAP_ID?.trim() &&
-  !/^INSERIR_/i.test(import.meta.env.VITE_GOOGLE_MAPS_MAP_ID.trim())
-    ? import.meta.env.VITE_GOOGLE_MAPS_MAP_ID.trim()
-    : undefined;
-
-let googleMapsPromise: Promise<any> | null = null;
-const GOOGLE_MAPS_AUTH_FAILURE_EVENT = "g3:google-maps-auth-failure";
 
 const estilosCamada: Record<GeoLayer, string> = {
   beneficiarios: "#2563eb",
@@ -152,40 +145,75 @@ function criarSvgPin(cor: string) {
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`<svg width="24" height="32" viewBox="0 0 24 32" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 0C5.37 0 0 5.37 0 12C0 21 12 32 12 32C12 32 24 21 24 12C24 5.37 18.63 0 12 0ZM12 16C9.79 16 8 14.21 8 12C8 9.79 9.79 8 12 8C14.21 8 16 9.79 16 12C16 14.21 14.21 16 12 16Z" fill="${cor}"/><path d="M12 14C13.1046 14 14 13.1046 14 12C14 10.8954 13.1046 10 12 10C10.8954 10 10 10.8954 10 12C10 13.1046 10.8954 14 12 14Z" fill="white"/></svg>`)}`;
 }
 
-async function carregarGoogleMaps() {
-  if ((window as any).google?.maps) {
-    return (window as any).google.maps;
-  }
+function criarIconePin(cor: string) {
+  return L.icon({
+    iconUrl: criarSvgPin(cor),
+    iconSize: [24, 32],
+    iconAnchor: [12, 32],
+    popupAnchor: [0, -28]
+  });
+}
 
-  if (!GOOGLE_MAPS_API_KEY) {
-    throw new Error("Defina VITE_GOOGLE_MAPS_API_KEY no ambiente do frontend.");
-  }
+function Observer({
+  center,
+  zoom,
+  onReady,
+  onViewportChange
+}: {
+  center: [number, number];
+  zoom: number;
+  onReady: () => void;
+  onViewportChange: (payload: { zoom: number; bbox: GeoBBox }) => void;
+}) {
+  const map = useMap();
 
-  if (!googleMapsPromise) {
-    googleMapsPromise = new Promise((resolve, reject) => {
-      (window as any).gm_authFailure = () => {
-        window.dispatchEvent(new CustomEvent(GOOGLE_MAPS_AUTH_FAILURE_EVENT));
-      };
+  useEffect(() => {
+    map.setView(center, zoom, { animate: false });
+  }, [center, map, zoom]);
 
-      const existente = document.querySelector<HTMLScriptElement>('script[data-google-maps="true"]');
-      if (existente) {
-        existente.addEventListener("load", () => resolve((window as any).google.maps), { once: true });
-        existente.addEventListener("error", () => reject(new Error("Falha ao carregar Google Maps.")), { once: true });
-        return;
-      }
+  useEffect(() => {
+    const atualizar = () => {
+      const bounds = map.getBounds();
+      onViewportChange({
+        zoom: map.getZoom(),
+        bbox: {
+          north: bounds.getNorth(),
+          south: bounds.getSouth(),
+          east: bounds.getEast(),
+          west: bounds.getWest()
+        }
+      });
+      onReady();
+    };
 
-      const script = document.createElement("script");
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(GOOGLE_MAPS_API_KEY)}&v=weekly&language=pt-BR&region=BR&loading=async`;
-      script.async = true;
-      script.defer = true;
-      script.dataset.googleMaps = "true";
-      script.onload = () => resolve((window as any).google.maps);
-      script.onerror = () => reject(new Error("Falha ao carregar Google Maps."));
-      document.head.appendChild(script);
-    });
-  }
+    atualizar();
+    map.on("moveend zoomend", atualizar);
+    return () => {
+      map.off("moveend zoomend", atualizar);
+    };
+  }, [map, onReady, onViewportChange]);
 
-  return googleMapsPromise;
+  return null;
+}
+
+function ClickCapture({
+  modoMarcacao,
+  onPick
+}: {
+  modoMarcacao: boolean;
+  onPick: (payload: { latitude: number; longitude: number }) => void;
+}) {
+  useMapEvents({
+    click(event) {
+      if (!modoMarcacao) return;
+      onPick({
+        latitude: Number(event.latlng.lat.toFixed(6)),
+        longitude: Number(event.latlng.lng.toFixed(6))
+      });
+    }
+  });
+
+  return null;
 }
 
 function GoogleGeoMap({
@@ -211,218 +239,78 @@ function GoogleGeoMap({
   onViewportChange: (payload: { zoom: number; bbox: GeoBBox }) => void;
   onSelecionar: (ponto: GeoMapPoint) => void;
 }) {
-  const rootRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<any>(null);
-  const overlaysRef = useRef<any[]>([]);
-  const infoWindowRef = useRef<any>(null);
-  const modoMarcacaoRef = useRef(modoMarcacao);
-  const [erroMapa, setErroMapa] = useState<string | null>(null);
-
-  useEffect(() => {
-    modoMarcacaoRef.current = modoMarcacao;
-  }, [modoMarcacao]);
-
-  useEffect(() => {
-    const handleAuthFailure = () => {
-      setErroMapa("Google Maps nao autorizou o carregamento. Verifique a chave, o dominio liberado e a API Maps JavaScript.");
-    };
-
-    window.addEventListener(GOOGLE_MAPS_AUTH_FAILURE_EVENT, handleAuthFailure);
-    return () => window.removeEventListener(GOOGLE_MAPS_AUTH_FAILURE_EVENT, handleAuthFailure);
-  }, []);
-
-  useEffect(() => {
-    let ativo = true;
-
-    void carregarGoogleMaps()
-      .then((maps) => {
-        if (!ativo || !rootRef.current) return;
-        setErroMapa(null);
-
-        if (!mapRef.current) {
-          const mapOptions: Record<string, unknown> = {
-            center: { lat: center[0], lng: center[1] },
-            zoom,
-            mapTypeControl: false,
-            streetViewControl: false,
-            fullscreenControl: false,
-            gestureHandling: "greedy"
-          };
-
-          if (GOOGLE_MAPS_MAP_ID) {
-            mapOptions.mapId = GOOGLE_MAPS_MAP_ID;
+  return (
+    <MapContainer center={center} zoom={zoom} className="h-full w-full" zoomControl attributionControl>
+      <TileLayer
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>'
+        url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+        subdomains={["a", "b", "c", "d"]}
+      />
+      <Observer center={center} zoom={zoom} onReady={onReady} onViewportChange={onViewportChange} />
+      <ClickCapture modoMarcacao={modoMarcacao} onPick={onPick} />
+      {agregados.map((item) => (
+        <CircleMarker
+          key={
+            "agregado-" + item.camada + "-" + item.latitude + "-" + item.longitude
           }
-
-          mapRef.current = new maps.Map(rootRef.current, mapOptions);
-
-          mapRef.current.addListener("idle", () => {
-            const bounds = mapRef.current.getBounds();
-            if (!bounds) return;
-            const northEast = bounds.getNorthEast();
-            const southWest = bounds.getSouthWest();
-            onViewportChange({
-              zoom: mapRef.current.getZoom(),
-              bbox: {
-                north: northEast.lat(),
-                south: southWest.lat(),
-                east: northEast.lng(),
-                west: southWest.lng()
-              }
-            });
-            onReady();
-          });
-
-          mapRef.current.addListener("click", (event: any) => {
-            if (!modoMarcacaoRef.current || !event.latLng) return;
-            onPick({
-              latitude: Number(event.latLng.lat().toFixed(6)),
-              longitude: Number(event.latLng.lng().toFixed(6))
-            });
-          });
-
-          infoWindowRef.current = new maps.InfoWindow();
-        }
-      })
-      .catch((error) => {
-        if (!ativo) return;
-        setErroMapa(error instanceof Error ? error.message : "Falha ao carregar Google Maps.");
-      });
-
-    return () => {
-      ativo = false;
-    };
-  }, [center, zoom, modoMarcacao, onPick, onReady, onViewportChange]);
-
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-    map.setCenter({ lat: center[0], lng: center[1] });
-    map.setZoom(zoom);
-  }, [center, zoom]);
-
-  useEffect(() => {
-    const maps = (window as any).google?.maps;
-    const map = mapRef.current;
-    if (!maps || !map) return;
-
-    overlaysRef.current.forEach((overlay) => {
-      if (overlay.setMap) overlay.setMap(null);
-    });
-    overlaysRef.current = [];
-
-    agregados.forEach((item) => {
-      const circle = new maps.Circle({
-        map,
-        center: { lat: item.latitude, lng: item.longitude },
-        radius: Math.min(850, 180 + item.quantidade * 12),
-        strokeColor: estilosCamada[item.camada],
-        strokeOpacity: 0.9,
-        strokeWeight: 2,
-        fillColor: estilosCamada[item.camada],
-        fillOpacity: 0.28
-      });
-
-      const marker = new maps.Marker({
-        map,
-        position: { lat: item.latitude, lng: item.longitude },
-        label: {
-          text: String(item.quantidade),
-          color: "#ffffff",
-          fontWeight: "700",
-          fontSize: "11px"
-        },
-        icon: {
-          path: maps.SymbolPath.CIRCLE,
-          fillColor: estilosCamada[item.camada],
-          fillOpacity: 1,
-          strokeColor: "#ffffff",
-          strokeWeight: 2,
-          scale: Math.min(22, 12 + item.quantidade / 3)
-        }
-      });
-
-      marker.addListener("click", () => {
-        infoWindowRef.current?.setContent(`<div style="min-width:180px;padding:6px 4px"><div style="font-size:11px;font-weight:700;color:#0f172a">${escapeHtml(rotulosCamada[item.camada])}</div><div style="font-size:13px;margin-top:4px;color:#334155">${escapeHtml(item.bairro || "Ponto agregado")}</div><div style="font-size:12px;margin-top:6px;color:#475569">Quantidade: ${item.quantidade}</div></div>`);
-        infoWindowRef.current?.open({ anchor: marker, map });
-      });
-
-      overlaysRef.current.push(circle, marker);
-    });
-
-    marcadores.forEach((item) => {
-      if ((item.quantidade ?? 1) > 1) {
-        const marker = new maps.Marker({
-          map,
-          position: { lat: item.latitude, lng: item.longitude },
-          label: {
-            text: String(item.quantidade),
-            color: "#ffffff",
-            fontWeight: "700",
-            fontSize: "11px"
-          },
-          icon: {
-            path: maps.SymbolPath.CIRCLE,
+          center={[item.latitude, item.longitude]}
+          pathOptions={{
+            color: estilosCamada[item.camada],
             fillColor: estilosCamada[item.camada],
-            fillOpacity: 1,
-            strokeColor: "#ffffff",
-            strokeWeight: 2,
-            scale: Math.min(22, 10 + (item.quantidade ?? 1) / 4)
-          }
-        });
-        marker.addListener("click", () => onSelecionar(item));
-        overlaysRef.current.push(marker);
-        return;
-      }
-
-      const marker = new maps.Marker({
-        map,
-        position: { lat: item.latitude, lng: item.longitude },
-        title: item.titulo,
-        icon: {
-          url: criarSvgPin(estilosCamada[item.camada]),
-          scaledSize: new maps.Size(24, 32),
-          anchor: new maps.Point(12, 32)
-        }
-      });
-
-      marker.addListener("click", () => {
-        onSelecionar(item);
-        infoWindowRef.current?.setContent(`<div style="min-width:190px;padding:6px 4px"><div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase">${escapeHtml(item.tipoLabel)}</div><div style="font-size:14px;font-weight:800;color:#0f172a;margin-top:4px">${escapeHtml(item.titulo)}</div><div style="font-size:12px;color:#475569;margin-top:6px">${escapeHtml(item.bairro || "Bairro não informado")}</div></div>`);
-        infoWindowRef.current?.open({ anchor: marker, map });
-      });
-
-      overlaysRef.current.push(marker);
-    });
-
-    if (pontoManual) {
-      const marker = new maps.Marker({
-        map,
-        position: { lat: pontoManual.latitude, lng: pontoManual.longitude },
-        icon: {
-          url: criarSvgPin("#f59e0b"),
-          scaledSize: new maps.Size(24, 32),
-          anchor: new maps.Point(12, 32)
-        }
-      });
-      overlaysRef.current.push(marker);
-    }
-  }, [agregados, marcadores, onSelecionar, pontoManual]);
-
-  if (erroMapa) {
-    return (
-      <div className="flex h-full w-full items-center justify-center bg-slate-100 px-6">
-        <div className="max-w-xl rounded-2xl border border-amber-200 bg-white p-6 text-center shadow-sm">
-          <p className="text-sm font-semibold text-slate-900">Nao foi possivel carregar o Google Maps.</p>
-          <p className="mt-2 text-sm text-slate-600">{erroMapa}</p>
-          <p className="mt-3 text-xs text-slate-500">
-            Confirme se a chave tem a API Maps JavaScript habilitada e se o dominio atual esta autorizado no Google Cloud.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  return <div ref={rootRef} className="h-full w-full" />;
+            fillOpacity: 0.34,
+            weight: 2
+          }}
+          radius={Math.min(30, 10 + item.quantidade / 2)}
+        >
+          <Popup>
+            <div className="min-w-[180px]">
+              <div className="text-[11px] font-bold text-slate-900">{rotulosCamada[item.camada]}</div>
+              <div className="mt-1 text-xs text-slate-700">{item.bairro || "Ponto agregado"}</div>
+              <div className="mt-2 text-xs text-slate-600">Quantidade: {item.quantidade}</div>
+            </div>
+          </Popup>
+        </CircleMarker>
+      ))}
+      {marcadores.map((item) => {
+        const isGrupo = (item.quantidade ?? 1) > 1;
+        return (
+          <Marker
+            key={item.id}
+            position={[item.latitude, item.longitude]}
+            icon={
+              isGrupo
+                ? L.divIcon({
+                    className: "geo-cluster-marker",
+                    html:
+                      '<div style="background:' +
+                      estilosCamada[item.camada] +
+                      ';color:#fff;border:2px solid #fff;width:34px;height:34px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;box-shadow:0 10px 24px -12px rgba(15,23,42,.65)">' +
+                      escapeHtml(String(item.quantidade ?? 1)) +
+                      "</div>",
+                    iconSize: [34, 34],
+                    iconAnchor: [17, 17]
+                  })
+                : criarIconePin(estilosCamada[item.camada])
+            }
+            eventHandlers={{ click: () => onSelecionar(item) }}
+          >
+            <Popup>
+              <div className="min-w-[190px]">
+                <div className="text-[10px] font-bold uppercase text-slate-500">{item.tipoLabel}</div>
+                <div className="mt-1 text-sm font-extrabold text-slate-900">{item.titulo}</div>
+                <div className="mt-2 text-xs text-slate-600">{item.bairro || "Bairro nao informado"}</div>
+              </div>
+            </Popup>
+          </Marker>
+        );
+      })}
+      {pontoManual ? (
+        <Marker position={[pontoManual.latitude, pontoManual.longitude]} icon={criarIconePin("#f59e0b")}>
+          <Popup>Ponto manual selecionado</Popup>
+        </Marker>
+      ) : null}
+    </MapContainer>
+  );
 }
 
 export function VulnerabilidadePage() {
@@ -719,24 +607,23 @@ export function VulnerabilidadePage() {
 
         {/* MAPA EM SI */}
         <div className="h-full w-full bg-slate-100">
-          {GOOGLE_MAPS_API_KEY ? (
-            <GoogleGeoMap
-              center={centro}
-              zoom={filtros.zoom}
-              agregados={data?.agregados ?? []}
-              marcadores={data?.marcadores ?? []}
-              pontoManual={pontoManual}
-              modoMarcacao={modoMarcacao}
-              onPick={setPontoManual}
-              onReady={() => setViewportPronto(true)}
-              onViewportChange={atualizarViewport}
-              onSelecionar={setPontoSelecionado}
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center px-6 text-center text-sm text-slate-600">
-              Defina `VITE_GOOGLE_MAPS_API_KEY` no ambiente do frontend para carregar o Google Maps.
-            </div>
-          )}
+          <GoogleGeoMap
+            center={centro}
+            zoom={filtros.zoom}
+            agregados={data?.agregados ?? []}
+            marcadores={data?.marcadores ?? []}
+            pontoManual={pontoManual}
+            modoMarcacao={modoMarcacao}
+            onPick={setPontoManual}
+            onReady={() => setViewportPronto(true)}
+            onViewportChange={atualizarViewport}
+            onSelecionar={setPontoSelecionado}
+          />
+        </div>
+
+        <div className="absolute bottom-6 left-6 z-30 max-w-sm rounded-2xl border border-white/60 bg-white/95 px-4 py-3 shadow-xl backdrop-blur-md">
+          <p className="text-xs font-semibold text-slate-900">Mapa gratuito ativo</p>
+          <p className="mt-1 text-xs text-slate-600">A tela usa base CARTO Voyager com Leaflet, sem depender de chave ou faturamento.</p>
         </div>
 
         {/* CARD DE DETALHES FLUTUANTE NO CANTO INFERIOR DIREITO */}

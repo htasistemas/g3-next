@@ -224,13 +224,13 @@ const secoesManual: ManualSecao[] = [
           "O botão Idosos sozinhos aplica foco em beneficiários e famílias com faixa etária idoso e sinais de vulnerabilidade alimentar.",
           "O botão Aguardando cestas concentra famílias e beneficiários com necessidade urgente de alimentos para apoiar priorização operacional.",
           "O botão Mapa de apoio e risco cruza violência, cestas entregues, instituições e doadores em visão agregada para leitura estratégica.",
-          "A visualização do mapa passou a usar Google Maps quando o frontend estiver configurado com VITE_GOOGLE_MAPS_API_KEY e VITE_GOOGLE_MAPS_MAP_ID."
+          "A visualização do mapa passou a usar uma base gratuita CARTO Voyager com Leaflet, sem depender de chave ou faturamento."
         ],
         atencoes: [
           "Os atalhos estratégicos ajustam filtros automaticamente e podem ser combinados com bairro e período.",
           "As camadas Instituições e Doadores ficam disponíveis na lista O que ver no mapa? para aprofundar a análise territorial.",
-          "Se as variáveis do Google Maps não estiverem configuradas no ambiente do frontend, a tela exibirá aviso para completar a configuração antes de carregar o mapa.",
-          "Se o Google Maps recusar o carregamento, revise a chave, a API Maps JavaScript e os domínios liberados no Google Cloud antes de testar novamente."
+          "A base gratuita da CARTO é carregada diretamente no navegador e não exige configuração de chave no frontend.",
+          "Se o mapa não carregar, valide apenas a conectividade do navegador com os tiles externos da CARTO."
         ]
       }
     ]

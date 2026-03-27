@@ -1,6 +1,18 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.360",
+                        "releaseDate":  "2026-03-27",
+                        "title":  "Georreferenciamento com mapa gratuito CARTO",
+                        "description":  "A tela de georreferenciamento deixou de depender do Google Maps e passou a usar base gratuita CARTO Voyager com Leaflet.",
+                        "changes":  [
+                                        "Mapa territorial voltou a operar sem chave e sem faturamento, usando tiles CARTO Voyager.",
+                                        "Marcadores, ponto manual, leitura por camada e atualizacao de viewport foram mantidos na mesma tela.",
+                                        "Manual do sistema e versao oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.359",
                         "releaseDate":  "2026-03-27",
                         "title":  "Georreferenciamento com tratamento de falha no Google Maps",
