@@ -16,15 +16,21 @@ type EnviarEmailSimplesInput = {
 };
 
 export class EmailService {
-  private readonly transporter = nodemailer.createTransport({
-    host: env.MAIL_HOST,
-    port: env.MAIL_PORT,
-    secure: env.MAIL_PORT === 465,
-    auth: {
-      user: env.MAIL_USER,
-      pass: env.MAIL_PASS
+  private createTransporter() {
+    if (!env.MAIL_PASS) {
+      throw new AppError("MAIL_PASS nao configurada para envio de email.", 503);
     }
-  });
+
+    return nodemailer.createTransport({
+      host: env.MAIL_HOST,
+      port: env.MAIL_PORT,
+      secure: env.MAIL_PORT === 465,
+      auth: {
+        user: env.MAIL_USER,
+        pass: env.MAIL_PASS
+      }
+    });
+  }
 
   async enviarEmailTeste(rawInput: unknown): Promise<EnvioEmailTesteResult> {
     if (!env.APP_EMAIL_HABILITADO) {
@@ -86,9 +92,11 @@ export class EmailService {
       throw new AppError("Envio de email desabilitado no servidor.", 503);
     }
 
-    await this.transporter.verify();
+    const transporter = this.createTransporter();
 
-    const info = await this.transporter.sendMail({
+    await transporter.verify();
+
+    const info = await transporter.sendMail({
       from: `${env.APP_EMAIL_NOME} <${env.APP_EMAIL_REMETENTE}>`,
       to: input.destinatario,
       subject: input.assunto,

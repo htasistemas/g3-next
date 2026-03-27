@@ -12,6 +12,7 @@ import { ensureMensagensPersonalizadasBase } from "./modules/mensagens-personali
 import { ensureOcorrenciasCriancaEstrutura } from "./modules/ocorrencias-crianca/repositories/ocorrencias-crianca.repository.js";
 import { ensureRegistroPontoEstrutura } from "./modules/registro-ponto/repositories/registro-ponto-estrutura.repository.js";
 import { ensureSenhasEstrutura } from "./modules/senhas/repositories/senhas.repository.js";
+import { ensureLembretesDiariosEstrutura } from "./modules/lembretes-diarios/repositories/lembrete-diario.repository.js";
 import { ensureAtualizacaoSistemaEstrutura } from "./modules/atualizacao-sistema/repositories/atualizacao-sistema.repository.js";
 import { iniciarAtualizacaoSistemaScheduler } from "./modules/atualizacao-sistema/services/atualizacao-sistema.scheduler.js";
 import { ensureDatasComemorativasEstrutura } from "./modules/datas-comemorativas/repositories/datas-comemorativas.repository.js";
@@ -24,6 +25,7 @@ import { iniciarLicencaUsoScheduler } from "./modules/licenca-uso/services/licen
 import { ensureUsuariosGestaoEstrutura } from "./modules/usuarios/repositories/usuario-estrutura.repository.js";
 import { ensureVisitasDomiciliaresEstrutura } from "./modules/visitas-domiciliares/repositories/visitas-domiciliares.repository.js";
 import { ensureAgendamentosEstrutura } from "./modules/agendamentos/repositories/agendamentos.repository.js";
+import type { Server } from "node:http";
 
 async function aquecerEstruturasDeTela() {
   const commemorativeImportService = new CommemorativeImportService();
@@ -42,6 +44,7 @@ async function aquecerEstruturasDeTela() {
     { nome: "ocorrencias-crianca", promise: ensureOcorrenciasCriancaEstrutura() },
     { nome: "visitas-domiciliares", promise: ensureVisitasDomiciliaresEstrutura() },
     { nome: "agendamentos", promise: ensureAgendamentosEstrutura() },
+    { nome: "lembretes-diarios", promise: ensureLembretesDiariosEstrutura() },
     { nome: "senhas", promise: ensureSenhasEstrutura() },
     { nome: "chamados-tecnicos", promise: ensureChamadoTecnicoParametrosIniciais() },
     { nome: "mensagens-personalizadas", promise: ensureMensagensPersonalizadasBase() }
@@ -65,27 +68,56 @@ async function bootstrap() {
     ensureRegistroPontoEstrutura(prisma)
   ]);
 
-  app.listen(env.API_PORT, env.API_HOST, () => {
-    console.log(
-      `[g3-backend-node] executando em http://${env.API_HOST}:${env.API_PORT}`
-    );
-    if (env.IA_PROVIDER === "gemini") {
-      if (!env.APP_GEMINI_API_KEY) {
-        console.warn(
-          "[g3-backend-node] assistente de IA indisponivel: defina GEMINI_API_KEY no ambiente do backend."
-        );
-      } else {
-        console.log(
-          `[g3-backend-node] assistente de IA configurado com provider=${env.IA_PROVIDER} model=${env.IA_MODEL}`
-        );
-      }
-    }
-    void aquecerEstruturasDeTela();
-    iniciarAtualizacaoSistemaScheduler();
-    iniciarDatasComemorativasScheduler();
-    iniciarDocumentosInstituicaoScheduler();
-    iniciarLicencaUsoScheduler();
-  });
+  const host = env.API_HOST;
+  const maxTentativasPorta = env.NODE_ENV === "development" ? 10 : 1;
+
+  const iniciarServidor = (porta: number, tentativa = 1): Promise<Server> =>
+    new Promise((resolve, reject) => {
+      const server = app.listen(porta, host);
+
+      server.once("listening", () => {
+        console.log(`[g3-backend-node] executando em http://${host}:${porta}`);
+
+        if (porta !== env.API_PORT) {
+          console.warn(
+            `[g3-backend-node] porta ${env.API_PORT} ocupada; utilizando ${porta} no ambiente local.`
+          );
+        }
+
+        if (env.IA_PROVIDER === "gemini") {
+          if (!env.APP_GEMINI_API_KEY) {
+            console.warn(
+              "[g3-backend-node] assistente de IA indisponivel: defina GEMINI_API_KEY no ambiente do backend."
+            );
+          } else {
+            console.log(
+              `[g3-backend-node] assistente de IA configurado com provider=${env.IA_PROVIDER} model=${env.IA_MODEL}`
+            );
+          }
+        }
+
+        void aquecerEstruturasDeTela();
+        iniciarAtualizacaoSistemaScheduler();
+        iniciarDatasComemorativasScheduler();
+        iniciarDocumentosInstituicaoScheduler();
+        iniciarLicencaUsoScheduler();
+        resolve(server);
+      });
+
+      server.once("error", (error: NodeJS.ErrnoException) => {
+        if (error.code === "EADDRINUSE" && tentativa < maxTentativasPorta) {
+          console.warn(
+            `[g3-backend-node] porta ${porta} ocupada; tentando ${porta + 1}.`
+          );
+          void iniciarServidor(porta + 1, tentativa + 1).then(resolve).catch(reject);
+          return;
+        }
+
+        reject(error);
+      });
+    });
+
+  await iniciarServidor(env.API_PORT);
 }
 
 bootstrap().catch((error) => {

@@ -3,6 +3,8 @@ import { z } from "zod";
 import { parseGoogleClientIds } from "./google-client-ids.js";
 
 config();
+config({ path: ".env.local", override: false });
+config({ path: ".env.example.node", override: false });
 
 const booleanFromEnv = z.preprocess((value) => {
   if (typeof value === "boolean") return value;
@@ -34,7 +36,10 @@ const envSchema = z.object({
     .default(
       "https://g3n.htasistemas.com.br,http://localhost:5173,http://127.0.0.1:5173,http://0.0.0.0:5173,http://localhost:4200,http://127.0.0.1:4200,http://0.0.0.0:4200"
     ),
-  DATABASE_URL: z.string().min(1, "DATABASE_URL nao configurada"),
+  DATABASE_URL: z
+    .string()
+    .min(1)
+    .default("postgresql://postgres:admin@localhost:5432/g3?schema=public"),
   APP_AUTH_TOKEN_SECRET: z.string().min(16).default("g3-next-dev-token-secret-2026"),
   APP_AUTH_TOKEN_EXPIRATION_MINUTES: z.coerce.number().int().positive().default(480),
   APP_AUTH_COOKIE_NAME: z.string().trim().min(1).default("g3n_auth_token"),
@@ -47,13 +52,13 @@ const envSchema = z.object({
   GOOGLE_API_KEY: optionalTrimmedStringFromEnv,
   IA_PROVIDER: z.enum(["gemini"]).default("gemini"),
   IA_MODEL: z.string().trim().min(1).default("gemini-2.5-flash"),
-  APP_EMAIL_HABILITADO: booleanFromEnv.default(true),
+  APP_EMAIL_HABILITADO: booleanFromEnv.default(false),
   APP_EMAIL_REMETENTE: z.string().min(1).default("htasistemas@gmail.com"),
   APP_EMAIL_NOME: z.string().min(1).default("HTA Sistemas"),
   MAIL_HOST: z.string().min(1).default("smtp.gmail.com"),
   MAIL_PORT: z.coerce.number().int().positive().default(587),
   MAIL_USER: z.string().min(1).default("htasistemas@gmail.com"),
-  MAIL_PASS: z.string().min(1, "MAIL_PASS nao configurada")
+  MAIL_PASS: optionalTrimmedStringFromEnv
 });
 
 const parsedEnv = envSchema.parse(process.env);

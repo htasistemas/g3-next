@@ -84,6 +84,71 @@ const estruturaSql = [
       atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
     )
   `,
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS beneficiario_id BIGINT",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS familia_id BIGINT",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS inscricao_origem_id BIGINT",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS beneficiario_nome VARCHAR(200)",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS familia_nome VARCHAR(200)",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS responsavel_nome VARCHAR(200)",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS telefone VARCHAR(40)",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS email VARCHAR(160)",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS forma_contato_preferencial VARCHAR(60)",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS observacoes_importantes TEXT",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS restricoes_alerta TEXT",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS necessidade_especial TEXT",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS transporte_apoio TEXT",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS unidade VARCHAR(160)",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS setor VARCHAR(160)",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS tipo_atendimento VARCHAR(160)",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS subcategoria VARCHAR(160)",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS profissional_id VARCHAR(60)",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS profissional_nome VARCHAR(200)",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS equipe_apoio JSONB NOT NULL DEFAULT '[]'::jsonb",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS data_agendamento DATE",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS hora_inicial TIME",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS hora_final TIME",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS duracao_minutos INTEGER",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS sala VARCHAR(160)",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS recurso VARCHAR(160)",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS modalidade VARCHAR(60)",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS origem_atendimento VARCHAR(120)",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS prioridade VARCHAR(40) NOT NULL DEFAULT 'Normal'",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS status VARCHAR(80) NOT NULL DEFAULT 'Agendado'",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS motivo TEXT",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS objetivo TEXT",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS observacao_interna TEXT",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS observacao_curta VARCHAR(240)",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS coletivo BOOLEAN NOT NULL DEFAULT FALSE",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS titulo_coletivo VARCHAR(200)",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS capacidade_maxima INTEGER",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS participantes JSONB NOT NULL DEFAULT '[]'::jsonb",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS recorrencia JSONB",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS retorno_programado_para DATE",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS encaminhamento_origem VARCHAR(200)",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS primeira_vez BOOLEAN NOT NULL DEFAULT FALSE",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS retorno BOOLEAN NOT NULL DEFAULT FALSE",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS urgencia BOOLEAN NOT NULL DEFAULT FALSE",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS documentos_pendentes BOOLEAN NOT NULL DEFAULT FALSE",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS autorizacao_pendente BOOLEAN NOT NULL DEFAULT FALSE",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS confirmacao_canal VARCHAR(60)",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS confirmado_em TIMESTAMP",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS confirmado_por_nome VARCHAR(160)",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS observacao_confirmacao TEXT",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS status_chegada VARCHAR(80)",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS horario_chegada_real TIME",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS horario_inicio_real TIME",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS horario_fim_real TIME",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS concluido_resumo TEXT",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS desfecho VARCHAR(160)",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS comparecimento VARCHAR(40)",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS encaminhamento_interno TEXT",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS encaminhamento_externo TEXT",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS custo_atendimento NUMERIC(14,2)",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS central_atendimento_id BIGINT",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS criado_por_usuario_id BIGINT",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS criado_por_nome VARCHAR(160)",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS criado_em TIMESTAMP NOT NULL DEFAULT NOW()",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()",
   "CREATE INDEX IF NOT EXISTS agendamento_data_idx ON agendamento(data_agendamento, hora_inicial)",
   "CREATE INDEX IF NOT EXISTS agendamento_beneficiario_idx ON agendamento(beneficiario_id)",
   "CREATE INDEX IF NOT EXISTS agendamento_profissional_idx ON agendamento(profissional_nome, data_agendamento)",
@@ -109,6 +174,23 @@ const estruturaSql = [
       atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
     )
   `,
+  "ALTER TABLE agendamento_lista_espera ADD COLUMN IF NOT EXISTS beneficiario_id BIGINT",
+  "ALTER TABLE agendamento_lista_espera ADD COLUMN IF NOT EXISTS beneficiario_nome VARCHAR(200)",
+  "ALTER TABLE agendamento_lista_espera ADD COLUMN IF NOT EXISTS familia_id BIGINT",
+  "ALTER TABLE agendamento_lista_espera ADD COLUMN IF NOT EXISTS familia_nome VARCHAR(200)",
+  "ALTER TABLE agendamento_lista_espera ADD COLUMN IF NOT EXISTS unidade VARCHAR(160)",
+  "ALTER TABLE agendamento_lista_espera ADD COLUMN IF NOT EXISTS setor VARCHAR(160)",
+  "ALTER TABLE agendamento_lista_espera ADD COLUMN IF NOT EXISTS tipo_atendimento VARCHAR(160)",
+  "ALTER TABLE agendamento_lista_espera ADD COLUMN IF NOT EXISTS profissional_preferencial VARCHAR(200)",
+  "ALTER TABLE agendamento_lista_espera ADD COLUMN IF NOT EXISTS faixa_horario_preferida VARCHAR(120)",
+  "ALTER TABLE agendamento_lista_espera ADD COLUMN IF NOT EXISTS prioridade VARCHAR(40) DEFAULT 'Normal'",
+  "ALTER TABLE agendamento_lista_espera ADD COLUMN IF NOT EXISTS motivo TEXT",
+  "ALTER TABLE agendamento_lista_espera ADD COLUMN IF NOT EXISTS observacao TEXT",
+  "ALTER TABLE agendamento_lista_espera ADD COLUMN IF NOT EXISTS data_entrada DATE NOT NULL DEFAULT CURRENT_DATE",
+  "ALTER TABLE agendamento_lista_espera ADD COLUMN IF NOT EXISTS encaixe_automatico BOOLEAN NOT NULL DEFAULT FALSE",
+  "ALTER TABLE agendamento_lista_espera ADD COLUMN IF NOT EXISTS convertido_agendamento_id BIGINT",
+  "ALTER TABLE agendamento_lista_espera ADD COLUMN IF NOT EXISTS criado_em TIMESTAMP NOT NULL DEFAULT NOW()",
+  "ALTER TABLE agendamento_lista_espera ADD COLUMN IF NOT EXISTS atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()",
   `
     CREATE TABLE IF NOT EXISTS agendamento_log (
       id BIGSERIAL PRIMARY KEY,
@@ -120,7 +202,14 @@ const estruturaSql = [
       valor_novo JSONB,
       criado_em TIMESTAMP NOT NULL DEFAULT NOW()
     )
-  `
+  `,
+  "ALTER TABLE agendamento_log ADD COLUMN IF NOT EXISTS agendamento_id BIGINT",
+  "ALTER TABLE agendamento_log ADD COLUMN IF NOT EXISTS acao VARCHAR(80)",
+  "ALTER TABLE agendamento_log ADD COLUMN IF NOT EXISTS usuario_id BIGINT",
+  "ALTER TABLE agendamento_log ADD COLUMN IF NOT EXISTS usuario_nome VARCHAR(160)",
+  "ALTER TABLE agendamento_log ADD COLUMN IF NOT EXISTS valor_anterior JSONB",
+  "ALTER TABLE agendamento_log ADD COLUMN IF NOT EXISTS valor_novo JSONB",
+  "ALTER TABLE agendamento_log ADD COLUMN IF NOT EXISTS criado_em TIMESTAMP NOT NULL DEFAULT NOW()"
 ];
 
 let estruturaPromise: Promise<void> | null = null;
@@ -136,7 +225,19 @@ function formatarData(value?: string | null) {
 }
 
 function serializarJson(value: unknown) {
-  return JSON.stringify(value ?? null);
+  return JSON.stringify(value ?? null, (_chave, atual) =>
+    typeof atual === "bigint" ? atual.toString() : atual
+  );
+}
+
+function sqlDate(value?: string | null) {
+  const data = formatarData(value);
+  return data ? Prisma.sql`${data}::date` : Prisma.sql`NULL`;
+}
+
+function sqlTime(value?: string | null) {
+  const hora = formatarHora(value);
+  return hora ? Prisma.sql`${hora}::time` : Prisma.sql`NULL`;
 }
 
 type UsuarioActor = { id?: string; nome?: string; nomeUsuario?: string };
@@ -154,6 +255,19 @@ export async function ensureAgendamentosEstrutura() {
 }
 
 export class AgendamentosRepository {
+  private async tabelaExiste(tabela: string) {
+    const resultado = await prisma.$queryRaw<Array<{ existe: boolean }>>(Prisma.sql`
+      SELECT EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = ${tabela}
+      ) AS existe
+    `);
+
+    return !!resultado[0]?.existe;
+  }
+
   async ensureEstrutura() {
     await ensureAgendamentosEstrutura();
   }
@@ -203,6 +317,7 @@ export class AgendamentosRepository {
 
   private async registrarHistoricoFamilia(familiaId?: bigint | null, descricao?: string, dadosNovos?: unknown) {
     if (!familiaId) return;
+    if (!(await this.tabelaExiste("familia_historico"))) return;
 
     await prisma.$executeRaw(Prisma.sql`
       INSERT INTO familia_historico (
@@ -358,9 +473,9 @@ export class AgendamentosRepository {
         ${trimOrUndefined(input.profissionalId)},
         ${trimOrUndefined(input.profissionalNome)},
         ${Prisma.sql`${serializarJson(input.equipeApoio ?? [])}::jsonb`},
-        ${formatarData(input.data)},
-        ${formatarHora(input.horaInicial)},
-        ${formatarHora(input.horaFinal)},
+        ${sqlDate(input.data)},
+        ${sqlTime(input.horaInicial)},
+        ${sqlTime(input.horaFinal)},
         ${input.duracaoMinutos ?? null},
         ${trimOrUndefined(input.sala)},
         ${trimOrUndefined(input.recurso)},
@@ -377,7 +492,7 @@ export class AgendamentosRepository {
         ${input.capacidadeMaxima ?? null},
         ${Prisma.sql`${serializarJson(input.participantes ?? [])}::jsonb`},
         ${input.recorrencia ? Prisma.sql`${serializarJson(input.recorrencia)}::jsonb` : Prisma.sql`NULL`},
-        ${formatarData(input.retornoProgramadoPara)},
+        ${sqlDate(input.retornoProgramadoPara)},
         ${trimOrUndefined(input.encaminhamentoOrigem)},
         ${input.primeiraVez ?? false},
         ${input.retorno ?? false},
@@ -437,9 +552,9 @@ export class AgendamentosRepository {
         profissional_id = ${trimOrUndefined(input.profissionalId)},
         profissional_nome = ${trimOrUndefined(input.profissionalNome)},
         equipe_apoio = ${Prisma.sql`${serializarJson(input.equipeApoio ?? [])}::jsonb`},
-        data_agendamento = ${formatarData(input.data)},
-        hora_inicial = ${formatarHora(input.horaInicial)},
-        hora_final = ${formatarHora(input.horaFinal)},
+        data_agendamento = ${sqlDate(input.data)},
+        hora_inicial = ${sqlTime(input.horaInicial)},
+        hora_final = ${sqlTime(input.horaFinal)},
         duracao_minutos = ${input.duracaoMinutos ?? null},
         sala = ${trimOrUndefined(input.sala)},
         recurso = ${trimOrUndefined(input.recurso)},
@@ -456,7 +571,7 @@ export class AgendamentosRepository {
         capacidade_maxima = ${input.capacidadeMaxima ?? null},
         participantes = ${Prisma.sql`${serializarJson(input.participantes ?? [])}::jsonb`},
         recorrencia = ${input.recorrencia ? Prisma.sql`${serializarJson(input.recorrencia)}::jsonb` : Prisma.sql`NULL`},
-        retorno_programado_para = ${formatarData(input.retornoProgramadoPara)},
+        retorno_programado_para = ${sqlDate(input.retornoProgramadoPara)},
         encaminhamento_origem = ${trimOrUndefined(input.encaminhamentoOrigem)},
         primeira_vez = ${input.primeiraVez ?? false},
         retorno = ${input.retorno ?? false},
@@ -508,9 +623,9 @@ export class AgendamentosRepository {
     await prisma.$executeRaw(Prisma.sql`
       UPDATE agendamento
       SET
-        data_agendamento = ${formatarData(input.data)},
-        hora_inicial = ${formatarHora(input.horaInicial)},
-        hora_final = ${formatarHora(input.horaFinal)},
+        data_agendamento = ${sqlDate(input.data)},
+        hora_inicial = ${sqlTime(input.horaInicial)},
+        hora_final = ${sqlTime(input.horaFinal)},
         profissional_nome = ${trimOrUndefined(input.profissionalNome) ?? anterior.profissional_nome},
         sala = ${trimOrUndefined(input.sala) ?? anterior.sala},
         recurso = ${trimOrUndefined(input.recurso) ?? anterior.recurso},
@@ -566,9 +681,9 @@ export class AgendamentosRepository {
       SET
         status = ${statusFinal},
         status_chegada = ${input.statusChegada},
-        horario_chegada_real = ${formatarHora(input.horarioChegada)},
-        horario_inicio_real = ${formatarHora(input.horarioInicio)},
-        horario_fim_real = ${formatarHora(input.horarioFim)},
+        horario_chegada_real = ${sqlTime(input.horarioChegada)},
+        horario_inicio_real = ${sqlTime(input.horarioInicio)},
+        horario_fim_real = ${sqlTime(input.horarioFim)},
         observacao_interna = ${trimOrUndefined(input.observacao) ?? anterior.observacao_interna},
         atualizado_em = NOW()
       WHERE id = ${id}
@@ -602,7 +717,7 @@ export class AgendamentosRepository {
         ${atual.motivo},
         ${payload.resumo},
         ${payload.observacaoImportante ?? atual.observacao_interna},
-        ${formatarData(payload.retornoGeradoPara)},
+        ${sqlDate(payload.retornoGeradoPara)},
         ${usuario?.id ? BigInt(usuario.id) : null},
         ${trimOrUndefined(usuario?.nome ?? usuario?.nomeUsuario)},
         NOW(),
@@ -634,7 +749,7 @@ export class AgendamentosRepository {
         concluido_resumo = ${input.resumo},
         desfecho = ${trimOrUndefined(input.desfecho)},
         comparecimento = ${trimOrUndefined(input.comparecimento) ?? 'Presente'},
-        retorno_programado_para = ${formatarData(input.retornoGeradoPara)},
+        retorno_programado_para = ${sqlDate(input.retornoGeradoPara)},
         encaminhamento_interno = ${trimOrUndefined(input.encaminhamentoInterno)},
         encaminhamento_externo = ${trimOrUndefined(input.encaminhamentoExterno)},
         observacao_interna = ${trimOrUndefined(input.observacaoImportante) ?? anterior.observacao_interna},
@@ -686,7 +801,7 @@ export class AgendamentosRepository {
         ${input.prioridade ?? 'Normal'},
         ${trimOrUndefined(input.motivo)},
         ${trimOrUndefined(input.observacao)},
-        ${formatarData(input.dataEntrada) ?? formatarData(new Date().toISOString().slice(0, 10))},
+        ${sqlDate(input.dataEntrada ?? new Date().toISOString().slice(0, 10))},
         ${input.encaixeAutomatico ?? false}
       ) RETURNING id
     `);
@@ -730,17 +845,18 @@ export class AgendamentosRepository {
 
   async catalogos() {
     await this.ensureEstrutura();
+    const possuiItensAlmoxarifado = await this.tabelaExiste("item_almoxarifado");
     const [unidades, setores, profissionais, tipos, salas, recursos] = await Promise.all([
       prisma.$queryRaw<Array<{ nome_fantasia: string | null }>>(Prisma.sql`SELECT nome_fantasia FROM unidade_assistencial ORDER BY nome_fantasia ASC`),
       prisma.$queryRaw<Array<{ setor: string | null }>>(Prisma.sql`
         SELECT DISTINCT NULLIF(TRIM(setor), '') AS setor
-        FROM usuario
+        FROM usuarios
         WHERE NULLIF(TRIM(setor), '') IS NOT NULL
         ORDER BY setor ASC
       `),
       prisma.$queryRaw<Array<{ nome_completo: string | null }>>(Prisma.sql`
         SELECT nome_completo
-        FROM cadastro_profissional
+        FROM cadastro_profissionais
         ORDER BY nome_completo ASC
       `),
       prisma.$queryRaw<Array<{ tipo_atendimento: string | null }>>(Prisma.sql`
@@ -749,14 +865,20 @@ export class AgendamentosRepository {
         WHERE NULLIF(TRIM(tipo_atendimento), '') IS NOT NULL
         ORDER BY tipo_atendimento ASC
       `),
-      prisma.$queryRaw<Array<{ nome: string | null }>>(Prisma.sql`SELECT nome FROM salas ORDER BY nome ASC`),
-      prisma.$queryRaw<Array<{ descricao: string | null }>>(Prisma.sql`
-        SELECT DISTINCT NULLIF(TRIM(descricao), '') AS descricao
-        FROM item_almoxarifado
-        WHERE NULLIF(TRIM(descricao), '') IS NOT NULL
-        ORDER BY descricao ASC
-        LIMIT 100
-      `)
+      prisma.$queryRaw<Array<{ nome: string | null }>>(Prisma.sql`
+        SELECT nome
+        FROM salas_unidade
+        ORDER BY nome ASC
+      `),
+      possuiItensAlmoxarifado
+        ? prisma.$queryRaw<Array<{ descricao: string | null }>>(Prisma.sql`
+            SELECT DISTINCT NULLIF(TRIM(descricao), '') AS descricao
+            FROM item_almoxarifado
+            WHERE NULLIF(TRIM(descricao), '') IS NOT NULL
+            ORDER BY descricao ASC
+            LIMIT 100
+          `)
+        : Promise.resolve<Array<{ descricao: string | null }>>([])
     ]);
 
     return {

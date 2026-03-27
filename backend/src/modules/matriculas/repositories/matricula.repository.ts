@@ -19,6 +19,116 @@ import type {
 
 type TransactionClient = Prisma.TransactionClient;
 
+const estruturaSql = [
+  `
+    CREATE TABLE IF NOT EXISTS cursos_atendimentos (
+      id BIGSERIAL PRIMARY KEY,
+      tipo VARCHAR(60) NOT NULL,
+      nome VARCHAR(200) NOT NULL,
+      descricao TEXT,
+      imagem TEXT,
+      vagas_totais INTEGER NOT NULL DEFAULT 0,
+      vagas_disponiveis INTEGER NOT NULL DEFAULT 0,
+      carga_horaria INTEGER,
+      horario_inicial TIME,
+      duracao_horas INTEGER NOT NULL DEFAULT 1,
+      dias_semana TEXT,
+      faixa_etaria TEXT,
+      vaga_preferencial_idosos BOOLEAN NOT NULL DEFAULT FALSE,
+      sexo_permitido VARCHAR(20),
+      restricoes TEXT,
+      profissional VARCHAR(200),
+      instituicao_parceira VARCHAR(200),
+      sala_id BIGINT REFERENCES salas_unidade(id) ON DELETE SET NULL,
+      status VARCHAR(40) NOT NULL DEFAULT 'ATIVO',
+      data_triagem DATE,
+      data_encaminhamento DATE,
+      data_conclusao DATE,
+      criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+      atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+  `,
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS descricao TEXT",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS imagem TEXT",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS carga_horaria INTEGER",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS horario_inicial TIME",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS dias_semana TEXT",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS faixa_etaria TEXT",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS vaga_preferencial_idosos BOOLEAN NOT NULL DEFAULT FALSE",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS sexo_permitido VARCHAR(20)",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS restricoes TEXT",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS profissional VARCHAR(200)",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS instituicao_parceira VARCHAR(200)",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS sala_id BIGINT REFERENCES salas_unidade(id) ON DELETE SET NULL",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS data_triagem DATE",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS data_encaminhamento DATE",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS data_conclusao DATE",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS criado_em TIMESTAMP NOT NULL DEFAULT NOW()",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()",
+  `
+    CREATE TABLE IF NOT EXISTS cursos_atendimentos_matriculas (
+      id BIGSERIAL PRIMARY KEY,
+      curso_id BIGINT NOT NULL REFERENCES cursos_atendimentos(id) ON DELETE CASCADE,
+      beneficiario_nome VARCHAR(200) NOT NULL,
+      cpf VARCHAR(20),
+      email VARCHAR(150),
+      status VARCHAR(40) NOT NULL DEFAULT 'ATIVO',
+      data_matricula TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+  `,
+  "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS data_agendada DATE",
+  "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS hora_agendada TIME",
+  "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS status_agendamento VARCHAR(30)",
+  "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS profissional_id VARCHAR(40)",
+  "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS profissional_nome VARCHAR(200)",
+  "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS profissional_tipo VARCHAR(20)",
+  "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS confirmacao_presenca BOOLEAN NOT NULL DEFAULT FALSE",
+  `
+    CREATE TABLE IF NOT EXISTS cursos_atendimentos_fila_espera (
+      id BIGSERIAL PRIMARY KEY,
+      curso_id BIGINT NOT NULL REFERENCES cursos_atendimentos(id) ON DELETE CASCADE,
+      beneficiario_nome VARCHAR(200) NOT NULL,
+      cpf VARCHAR(20),
+      data_entrada TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+  `,
+  `
+    CREATE TABLE IF NOT EXISTS cursos_atendimentos_presenca_datas (
+      id BIGSERIAL PRIMARY KEY,
+      curso_id BIGINT NOT NULL REFERENCES cursos_atendimentos(id) ON DELETE CASCADE,
+      data_aula DATE NOT NULL,
+      status VARCHAR(40) NOT NULL DEFAULT 'GERADA',
+      observacoes TEXT,
+      criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+      atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+  `,
+  "CREATE UNIQUE INDEX IF NOT EXISTS cursos_atendimentos_presenca_datas_unq ON cursos_atendimentos_presenca_datas(curso_id, data_aula)",
+  `
+    CREATE TABLE IF NOT EXISTS cursos_atendimentos_presencas (
+      id BIGSERIAL PRIMARY KEY,
+      curso_id BIGINT NOT NULL REFERENCES cursos_atendimentos(id) ON DELETE CASCADE,
+      matricula_id BIGINT NOT NULL REFERENCES cursos_atendimentos_matriculas(id) ON DELETE CASCADE,
+      data_aula DATE NOT NULL,
+      status VARCHAR(40) NOT NULL DEFAULT 'AUSENTE',
+      criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+      atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+  `,
+  "CREATE UNIQUE INDEX IF NOT EXISTS cursos_atendimentos_presencas_unq ON cursos_atendimentos_presencas(curso_id, matricula_id, data_aula)",
+  `
+    CREATE TABLE IF NOT EXISTS cursos_atendimentos_presenca_anexos (
+      id BIGSERIAL PRIMARY KEY,
+      presenca_data_id BIGINT NOT NULL REFERENCES cursos_atendimentos_presenca_datas(id) ON DELETE CASCADE,
+      nome_arquivo VARCHAR(255),
+      caminho_arquivo TEXT,
+      criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+  `
+];
+
+let estruturaPromise: Promise<void> | null = null;
+
 function joinList(values?: string[]) {
   if (!values?.length) return undefined;
   const sanitized = values.map((item) => item.trim()).filter(Boolean);
@@ -65,7 +175,51 @@ type MatriculaResumoRow = {
 };
 
 export class MatriculaRepository {
+  private async ensureEstrutura() {
+    if (!estruturaPromise) {
+      estruturaPromise = (async () => {
+        for (const comando of estruturaSql) {
+          await prisma.$executeRawUnsafe(comando);
+        }
+      })();
+    }
+
+    await estruturaPromise;
+  }
+
+  private async tabelaExiste(tabela: string) {
+    const resultado = await prisma.$queryRaw<Array<{ existe: boolean }>>(Prisma.sql`
+      SELECT EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = ${tabela}
+      ) AS existe
+    `);
+
+    return !!resultado[0]?.existe;
+  }
+
+  private async colunaExiste(tabela: string, coluna: string) {
+    const tabelaValida = await this.tabelaExiste(tabela);
+    if (!tabelaValida) return false;
+
+    const resultado = await prisma.$queryRaw<Array<{ existe: boolean }>>(Prisma.sql`
+      SELECT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = ${tabela}
+          AND column_name = ${coluna}
+      ) AS existe
+    `);
+
+    return !!resultado[0]?.existe;
+  }
+
   async listar(filters: MatriculaFilters) {
+    await this.ensureEstrutura();
+    const possuiInstituicaoParceira = await this.colunaExiste("cursos_atendimentos", "instituicao_parceira");
     const where: Prisma.Sql[] = [];
 
     const nome = trimOrUndefined(filters.nome);
@@ -133,7 +287,7 @@ export class MatriculaRepository {
         c.sexo_permitido,
         c.restricoes,
         c.profissional,
-        c.instituicao_parceira,
+        ${possuiInstituicaoParceira ? Prisma.sql`c.instituicao_parceira` : Prisma.sql`NULL::VARCHAR`} AS instituicao_parceira,
         c.sala_id,
         s.nome AS sala_nome,
         c.status,
@@ -163,6 +317,7 @@ export class MatriculaRepository {
   }
 
   async obterResumoCatalogo() {
+    await this.ensureEstrutura();
     const rows = await prisma.$queryRaw<MatriculaResumoRow[]>(Prisma.sql`
       SELECT
         COUNT(*)::BIGINT AS cursos_no_catalogo,
@@ -185,6 +340,8 @@ export class MatriculaRepository {
   }
 
   async buscarPorId(id: bigint) {
+    await this.ensureEstrutura();
+    const possuiInstituicaoParceira = await this.colunaExiste("cursos_atendimentos", "instituicao_parceira");
     const cursos = await prisma.$queryRaw<MatriculaCursoRow[]>(Prisma.sql`
       SELECT
         c.id,
@@ -203,7 +360,7 @@ export class MatriculaRepository {
         c.sexo_permitido,
         c.restricoes,
         c.profissional,
-        c.instituicao_parceira,
+        ${possuiInstituicaoParceira ? Prisma.sql`c.instituicao_parceira` : Prisma.sql`NULL::VARCHAR`} AS instituicao_parceira,
         c.sala_id,
         s.nome AS sala_nome,
         c.status,
@@ -332,6 +489,7 @@ export class MatriculaRepository {
   }
 
   async criar(input: MatriculaInput) {
+    await this.ensureEstrutura();
     const cursoId = await prisma.$transaction(async (tx) => {
       const diasSemana = joinList(input.dias_semana);
       const faixaEtaria = joinList(input.faixa_etaria);
@@ -408,6 +566,7 @@ export class MatriculaRepository {
   }
 
   async atualizar(id: bigint, input: MatriculaInput) {
+    await this.ensureEstrutura();
     await this.buscarPorIdOuFalhar(id);
 
     await prisma.$transaction(async (tx) => {

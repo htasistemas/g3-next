@@ -12,10 +12,26 @@ const optionalIsoDate = z.preprocess((value) => {
   return trimmed.length ? trimmed : undefined;
 }, z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional());
 
-const optionalTime = z.preprocess((value) => {
+function normalizarHoraEntrada(value: unknown) {
   if (typeof value !== "string") return value;
   const trimmed = value.trim();
-  return trimmed.length ? trimmed : undefined;
+  if (!trimmed) return undefined;
+  if (/^\d{2}:\d{2}(:\d{2})?$/.test(trimmed)) return trimmed;
+
+  const matchIso = trimmed.match(/T(\d{2}:\d{2}:\d{2})/);
+  if (matchIso?.[1]) return matchIso[1];
+
+  const matchHora = trimmed.match(/\b(\d{2}:\d{2}:\d{2})\b/);
+  if (matchHora?.[1]) return matchHora[1];
+
+  const matchHoraCurta = trimmed.match(/\b(\d{2}:\d{2})\b/);
+  if (matchHoraCurta?.[1]) return matchHoraCurta[1];
+
+  return trimmed;
+}
+
+const optionalTime = z.preprocess((value) => {
+  return normalizarHoraEntrada(value);
 }, z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/).optional());
 
 const prioridadeSchema = z.enum(["Normal", "Media", "Alta", "Urgencia"]);
@@ -51,7 +67,7 @@ export const agendamentoInputSchema = z.object({
   profissionalNome: optionalTrimmedString.nullable().optional(),
   equipeApoio: z.array(z.string().trim().min(2)).optional().nullable(),
   data: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/),
-  horaInicial: z.string().trim().regex(/^\d{2}:\d{2}(:\d{2})?$/),
+  horaInicial: z.preprocess(normalizarHoraEntrada, z.string().trim().regex(/^\d{2}:\d{2}(:\d{2})?$/)),
   horaFinal: optionalTime.nullable().optional(),
   duracaoMinutos: z.coerce.number().int().positive().max(1440).optional().nullable(),
   sala: optionalTrimmedString.nullable().optional(),
