@@ -20,8 +20,10 @@ const optionalTime = z.preprocess((value) => {
 
 const prioridadeSchema = z.enum(["Normal", "Media", "Alta", "Urgencia"]);
 const modalidadeSchema = z.enum(["Presencial", "Remoto", "Domiciliar", "Externo", "Coletivo"]);
+const tipoOperacionalSchema = z.enum(["curso", "atendimento", "oficina"]);
 
 export const agendamentoParticipanteSchema = z.object({
+  matriculaId: z.coerce.number().int().positive().optional().nullable(),
   beneficiarioId: z.coerce.number().int().positive().optional().nullable(),
   beneficiarioNome: z.string().trim().min(2, "Informe o participante."),
   telefone: optionalTrimmedString.nullable().optional(),
@@ -100,7 +102,36 @@ export const agendamentoInputSchema = z.object({
   urgencia: z.coerce.boolean().optional(),
   documentosPendentes: z.coerce.boolean().optional(),
   autorizacaoPendente: z.coerce.boolean().optional(),
-  permitirConflito: z.coerce.boolean().optional()
+  permitirConflito: z.coerce.boolean().optional(),
+  itemTipo: tipoOperacionalSchema.nullable().optional(),
+  itemOrigemId: z.coerce.number().int().positive().nullable().optional(),
+  itemNome: optionalTrimmedString.nullable().optional(),
+  itemDiasSemana: optionalTrimmedString.nullable().optional(),
+  itemLocal: optionalTrimmedString.nullable().optional(),
+  diaSemana: optionalTrimmedString.nullable().optional()
+});
+
+export const agendamentoOperacionalInputSchema = z.object({
+  id: optionalTrimmedString.optional(),
+  tipo: tipoOperacionalSchema,
+  itemId: z.coerce.number().int().positive(),
+  data: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/),
+  beneficiariosIds: z
+    .array(z.coerce.number().int().positive())
+    .optional(),
+  matriculasIds: z
+    .array(z.coerce.number().int().positive())
+    .optional()
+}).superRefine((input, ctx) => {
+  const totalBeneficiarios = input.beneficiariosIds?.length ?? 0;
+  const totalMatriculas = input.matriculasIds?.length ?? 0;
+  if (!totalBeneficiarios && !totalMatriculas) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["matriculasIds"],
+      message: "Selecione ao menos um beneficiário."
+    });
+  }
 });
 
 export const agendamentoListaEsperaInputSchema = z.object({

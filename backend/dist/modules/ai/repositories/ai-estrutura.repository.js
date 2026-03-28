@@ -6,6 +6,8 @@ const sqlEstruturaAi = [
     pergunta TEXT NOT NULL,
     resposta TEXT NOT NULL,
     intent VARCHAR(120),
+    tipo_consulta VARCHAR(80),
+    tempo_resposta_ms INTEGER,
     fontes_json JSONB,
     parametros_json JSONB,
     resumo_json JSONB,
@@ -13,6 +15,8 @@ const sqlEstruturaAi = [
     criado_em TIMESTAMP NOT NULL DEFAULT NOW()
   )
   `,
+    "ALTER TABLE IF EXISTS ai_historico ADD COLUMN IF NOT EXISTS tipo_consulta VARCHAR(80)",
+    "ALTER TABLE IF EXISTS ai_historico ADD COLUMN IF NOT EXISTS tempo_resposta_ms INTEGER",
     "CREATE INDEX IF NOT EXISTS ai_historico_usuario_data_idx ON ai_historico(usuario_id, criado_em DESC)"
 ];
 let estruturaInicializada = false;

@@ -102,6 +102,15 @@ type ImprimirConteudoOptions = {
   estilosExtras?: string;
 };
 
+type ImprimirHtmlOptions = {
+  titulo: string;
+  html: string;
+  tamanhoPagina?: string;
+  margemPagina?: string;
+  paddingRaiz?: string;
+  estilosExtras?: string;
+};
+
 export function imprimirConteudoAtual(options?: ImprimirConteudoOptions) {
   const titulo = options?.titulo ?? document.title;
   const seletor = options?.seletor ?? "main";
@@ -200,6 +209,74 @@ export function imprimirConteudoAtual(options?: ImprimirConteudoOptions) {
       </head>
       <body>
         <div class="g3-print-root">${serializarConteudoParaImpressao(elemento)}</div>
+      </body>
+    </html>`);
+  janela.document.close();
+
+  janela.addEventListener("load", () => {
+    janela.focus();
+    janela.print();
+  });
+
+  janela.addEventListener("afterprint", () => {
+    janela.close();
+  });
+}
+
+export function imprimirHtml(options: ImprimirHtmlOptions) {
+  const tamanhoPagina = options.tamanhoPagina;
+  const margemPagina = options.margemPagina ?? "12mm";
+  const paddingRaiz = options.paddingRaiz ?? "24px";
+  const estilosExtras = options.estilosExtras ?? "";
+  const janela = window.open("", "_blank", "noopener,noreferrer,width=1200,height=900");
+
+  if (!janela) {
+    throw new Error("O navegador bloqueou a abertura da janela de impressão.");
+  }
+
+  const estilos = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
+    .map((node) => node.outerHTML)
+    .join("\n");
+
+  janela.document.write(`<!doctype html>
+    <html lang="pt-BR">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>${escapeHtml(options.titulo)}</title>
+        ${estilos}
+        <style>
+          @page {
+            ${tamanhoPagina ? `size: ${tamanhoPagina};` : ""}
+            margin: ${margemPagina};
+          }
+
+          body {
+            margin: 0;
+            background: #fff;
+            color: #0f172a;
+            font-family: Arial, sans-serif;
+          }
+
+          .g3-print-root {
+            padding: ${paddingRaiz};
+          }
+
+          table {
+            width: 100%;
+            border-collapse: collapse;
+          }
+
+          th,
+          td {
+            vertical-align: top;
+          }
+
+          ${estilosExtras}
+        </style>
+      </head>
+      <body>
+        <div class="g3-print-root">${options.html}</div>
       </body>
     </html>`);
   janela.document.close();

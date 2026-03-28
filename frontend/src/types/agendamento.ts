@@ -1,5 +1,6 @@
 export type AgendamentoPrioridade = "Normal" | "Media" | "Alta" | "Urgencia";
 export type AgendamentoModalidade = "Presencial" | "Remoto" | "Domiciliar" | "Externo" | "Coletivo";
+export type AgendamentoOperacionalTipo = "curso" | "atendimento" | "oficina";
 
 export type AgendamentoStatus =
   | "Agendado"
@@ -18,6 +19,7 @@ export type AgendamentoStatus =
   | "Urgencia";
 
 export type AgendamentoParticipante = {
+  matriculaId?: number;
   beneficiarioId?: number;
   beneficiarioNome: string;
   telefone?: string;
@@ -78,6 +80,12 @@ export type Agendamento = {
   documentosPendentes?: boolean;
   autorizacaoPendente?: boolean;
   permitirConflito?: boolean;
+  itemTipo?: AgendamentoOperacionalTipo;
+  itemOrigemId?: number;
+  itemNome?: string;
+  itemDiasSemana?: string;
+  itemLocal?: string;
+  diaSemana?: string;
   confirmacaoCanal?: string;
   confirmadoEm?: string;
   confirmadoPorNome?: string;
@@ -133,4 +141,34 @@ export type AgendamentoFiltros = {
   prioridade?: string;
   modalidade?: string;
   visualizacao?: string;
+};
+
+export type AgendamentoOperacionalItem = {
+  id: number;
+  tipo?: string;
+  nome: string;
+  profissionalNome?: string;
+  horario?: string;
+  diasSemana?: string;
+  local?: string;
+};
+
+export type AgendamentoOperacionalBeneficiario = {
+  matriculaId: number;
+  beneficiarioId?: number;
+  nomeCompleto: string;
+  telefone?: string;
+  email?: string;
+  status?: string;
+  profissionalNome?: string;
+  selecionavel: boolean;
+};
+
+export type AgendamentoOperacionalPayload = {
+  id?: string;
+  tipo: AgendamentoOperacionalTipo;
+  itemId: number;
+  data: string;
+  beneficiariosIds?: number[];
+  matriculasIds?: number[];
 };

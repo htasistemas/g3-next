@@ -1,5 +1,13 @@
 import { httpClient } from "./http-client";
-import type { Agendamento, AgendamentoFiltros, AgendamentoListaEspera } from "@/types/agendamento";
+import type {
+  Agendamento,
+  AgendamentoFiltros,
+  AgendamentoListaEspera,
+  AgendamentoOperacionalBeneficiario,
+  AgendamentoOperacionalItem,
+  AgendamentoOperacionalPayload,
+  AgendamentoOperacionalTipo
+} from "@/types/agendamento";
 
 export const agendamentosService = {
   async listar(filtros?: AgendamentoFiltros) {
@@ -15,6 +23,11 @@ export const agendamentosService = {
   },
 
   async criar(payload: Agendamento) {
+    const { data } = await httpClient.post<{ agendamento: Agendamento | null }>("/api/agendamentos", payload);
+    return data.agendamento;
+  },
+
+  async criarOperacional(payload: AgendamentoOperacionalPayload) {
     const { data } = await httpClient.post<{ agendamento: Agendamento | null }>("/api/agendamentos", payload);
     return data.agendamento;
   },
@@ -80,6 +93,30 @@ export const agendamentosService = {
       salas: string[];
       recursos: string[];
     }>("/api/agendamentos/catalogos");
+    return data;
+  },
+
+  async listarItens(tipo: AgendamentoOperacionalTipo, busca?: string) {
+    const { data } = await httpClient.get<{ itens: AgendamentoOperacionalItem[] }>("/api/agendamentos/itens", {
+      params: { tipo, busca }
+    });
+    return data.itens ?? [];
+  },
+
+  async listarBeneficiarios(itemId: number) {
+    const { data } = await httpClient.get<{ beneficiarios: AgendamentoOperacionalBeneficiario[] }>("/api/agendamentos/beneficiarios", {
+      params: { itemId }
+    });
+    return data.beneficiarios ?? [];
+  },
+
+  async notificar(id: string | number, canal: "WHATSAPP" | "EMAIL") {
+    const { data } = await httpClient.post<{
+      canal: "WHATSAPP" | "EMAIL";
+      enviados: number;
+      ignorados: number;
+      links?: string[];
+    }>(`/api/agendamentos/${id}/notificar`, { canal });
     return data;
   }
 };

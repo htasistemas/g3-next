@@ -1,6 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { agendamentosService } from "@/services/agendamentos.service";
-import type { Agendamento, AgendamentoFiltros, AgendamentoListaEspera } from "@/types/agendamento";
+import type {
+  Agendamento,
+  AgendamentoFiltros,
+  AgendamentoListaEspera,
+  AgendamentoOperacionalPayload,
+  AgendamentoOperacionalTipo
+} from "@/types/agendamento";
 
 export function useAgendamentos(filtros: AgendamentoFiltros) {
   return useQuery({
@@ -38,6 +44,22 @@ export function useListaEsperaAgendamentos() {
   });
 }
 
+export function useItensOperacionaisAgendamento(tipo?: AgendamentoOperacionalTipo, busca?: string) {
+  return useQuery({
+    queryKey: ["agendamentos", "itens", tipo, busca],
+    queryFn: () => agendamentosService.listarItens(tipo as AgendamentoOperacionalTipo, busca),
+    enabled: Boolean(tipo)
+  });
+}
+
+export function useBeneficiariosOperacionaisAgendamento(itemId?: number | null) {
+  return useQuery({
+    queryKey: ["agendamentos", "beneficiarios", itemId],
+    queryFn: () => agendamentosService.listarBeneficiarios(itemId as number),
+    enabled: Boolean(itemId)
+  });
+}
+
 function invalidarAgendamentos(queryClient: ReturnType<typeof useQueryClient>) {
   return Promise.all([
     queryClient.invalidateQueries({ queryKey: ["agendamentos"] }),
@@ -52,6 +74,16 @@ export function useSalvarAgendamento() {
       if (payload.id) return agendamentosService.atualizar(payload.id, payload);
       return agendamentosService.criar(payload);
     },
+    onSuccess: async () => {
+      await invalidarAgendamentos(queryClient);
+    }
+  });
+}
+
+export function useSalvarAgendamentoOperacional() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: AgendamentoOperacionalPayload) => agendamentosService.criarOperacional(payload),
     onSuccess: async () => {
       await invalidarAgendamentos(queryClient);
     }
@@ -130,6 +162,17 @@ export function useConverterListaEsperaAgendamento() {
       agendamentosService.converterListaEspera(id, payload),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["agendamentos", "lista-espera"] });
+      await invalidarAgendamentos(queryClient);
+    }
+  });
+}
+
+export function useNotificarAgendamento() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, canal }: { id: string | number; canal: "WHATSAPP" | "EMAIL" }) =>
+      agendamentosService.notificar(id, canal),
+    onSuccess: async () => {
       await invalidarAgendamentos(queryClient);
     }
   });

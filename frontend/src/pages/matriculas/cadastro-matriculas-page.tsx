@@ -366,6 +366,7 @@ export function CadastroMatriculasPage() {
     beneficiario: ""
   });
   const [filtros, setFiltros] = useState<MatriculaFiltro>(filtroDraft);
+  const [filtroStatusAgendamentoRapido, setFiltroStatusAgendamentoRapido] = useState<"" | "AGENDADO" | "PENDENTE" | "CANCELADA" | "FINALIZADA">("");
   const [inscricoes, setInscricoes] = useState<MatriculaInscricao[]>([]);
   const [filaEspera, setFilaEspera] = useState<MatriculaFilaEspera[]>([]);
   const [novaInscricao, setNovaInscricao] = useState<MatriculaInscricao>({
@@ -422,6 +423,7 @@ export function CadastroMatriculasPage() {
   const inputImagemRef = useRef<HTMLInputElement | null>(null);
 
   const { data: listaData, isLoading: carregandoLista, isFetching: atualizandoLista } = useMatriculas(filtros);
+  const { data: catalogoData, isLoading: carregandoCatalogo } = useMatriculas({});
   const { data: detalhesData, isLoading: carregandoDetalhes } = useMatricula(idSelecionado);
   const salvarMutation = useSalvarMatricula();
   const removerMutation = useRemoverMatricula();
@@ -482,7 +484,7 @@ export function CadastroMatriculasPage() {
   const acaoEmAndamento =
     salvarMutation.isPending || removerMutation.isPending || carregandoDetalhes || atualizandoLista;
 
-  const matriculas = listaData?.matriculas ?? [];
+  const matriculas = catalogoData?.matriculas ?? [];
   const salasCatalogo = salasData?.salas ?? [];
   const beneficiariosCatalogo = beneficiariosCatalogoData?.beneficiarios ?? [];
   const beneficiariosFilaCatalogo = beneficiariosFilaCatalogoData?.beneficiarios ?? [];
@@ -494,6 +496,7 @@ export function CadastroMatriculasPage() {
   const ehInscricaoAtendimento = (cursoSelecionadoInscricao?.tipo ?? "").trim().toUpperCase() === "ATENDIMENTO";
   const ehTipoAtendimento = tipoMatriculaAtual.trim().toUpperCase() === "ATENDIMENTO";
   const abaAtual = abas.find((aba) => aba.id === abaAtiva);
+  const possuiMatriculaSelecionada = Boolean(getValues("id_matricula"));
   const inscricoesAtivas = inscricoes.filter((item) => (item.status ?? "ATIVO") !== "CANCELADO");
   const horaPadraoAgenda = useMemo(
     () => String(cursoSelecionadoInscricao?.horario_inicial ?? getValues("horario_inicial") ?? "").trim(),
@@ -525,6 +528,49 @@ export function CadastroMatriculasPage() {
       ocupacao
     };
   }, [matriculas]);
+  const inscricoesListagem = useMemo(() => {
+    const termoNome = normalizarNomeComparacaoTexto(filtros.nome);
+    const termoTipo = normalizarNomeComparacaoTexto(filtros.tipo);
+    const termoStatus = normalizarNomeComparacaoTexto(filtros.status);
+    const termoProfissional = normalizarNomeComparacaoTexto(filtros.profissional);
+    const termoBeneficiario = normalizarNomeComparacaoTexto(filtros.beneficiario);
+
+    return matriculas
+      .flatMap((curso) =>
+        (curso.matriculas ?? []).map((inscricao) => ({
+          ...inscricao,
+          curso_id: curso.id_matricula,
+          curso_nome: curso.nome,
+          curso_tipo: curso.tipo,
+          curso_status: curso.status
+        }))
+      )
+      .filter((item) => {
+        const statusInscricaoNormalizado = String(item.status ?? "").trim().toUpperCase();
+        const possuiAgendamento = Boolean(normalizarDataIso(item.data_agendada) || String(item.hora_agendada ?? "").trim());
+        const statusAgendamentoNormalizado =
+          statusInscricaoNormalizado === "CANCELADO"
+            ? "CANCELADA"
+            : statusInscricaoNormalizado === "FINALIZADO"
+              ? "FINALIZADA"
+              : possuiAgendamento
+                ? "AGENDADO"
+                : "PENDENTE";
+        if (termoNome && !normalizarNomeComparacaoTexto(item.curso_nome).includes(termoNome)) return false;
+        if (termoTipo && !normalizarNomeComparacaoTexto(item.curso_tipo).includes(termoTipo)) return false;
+        if (termoStatus && !normalizarNomeComparacaoTexto(item.status ?? item.curso_status).includes(termoStatus)) return false;
+        if (termoProfissional && !normalizarNomeComparacaoTexto(item.profissional_nome).includes(termoProfissional)) return false;
+        if (termoBeneficiario && !normalizarNomeComparacaoTexto(item.beneficiario_nome).includes(termoBeneficiario)) return false;
+        if (filtroStatusAgendamentoRapido && statusAgendamentoNormalizado !== filtroStatusAgendamentoRapido) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        const dataA = normalizarDataIso(a.data_matricula) ?? "";
+        const dataB = normalizarDataIso(b.data_matricula) ?? "";
+        if (dataA !== dataB) return dataB.localeCompare(dataA);
+        return a.beneficiario_nome.localeCompare(b.beneficiario_nome, "pt-BR");
+      });
+  }, [filtroStatusAgendamentoRapido, filtros, matriculas]);
   const podeAdicionarInscricao = useMemo(() => {
     const nome = formatarTextoPadrao(novaInscricao.beneficiario_nome);
     if (nome.length < 3) return false;
@@ -744,6 +790,7 @@ export function CadastroMatriculasPage() {
     const base = { nome: "", tipo: "", status: "", profissional: "", beneficiario: "" };
     setFiltroDraft(base);
     setFiltros(base);
+    setFiltroStatusAgendamentoRapido("");
   }
 
   function novo() {
@@ -2064,55 +2111,42 @@ export function CadastroMatriculasPage() {
     listagem: [
       { label: "Buscar inscrições", icon: Search, onClick: buscar, variant: "outline" },
       { label: "Nova inscrição", icon: Plus, onClick: novo, variant: "default", disabled: acaoEmAndamento },
-      { label: "Salvar inscrição", icon: Save, onClick: () => void handleSubmit(salvar)(), variant: "default", disabled: acaoEmAndamento },
-      { label: "Cancelar edição", icon: Undo2, onClick: cancelar, variant: "outline", disabled: acaoEmAndamento },
-      { label: "Excluir inscrição", icon: Trash2, onClick: excluir, variant: "danger", disabled: acaoEmAndamento },
       { label: "Imprimir inscrições", icon: Printer, onClick: () => void imprimir(), variant: "outline", disabled: acaoEmAndamento },
       { label: "Fechar", icon: X, onClick: fechar, variant: "outline" }
     ],
     dados: [
-      { label: "Buscar inscrições", icon: Search, onClick: buscar, variant: "outline" },
       { label: "Nova inscrição", icon: Plus, onClick: novo, variant: "default", disabled: acaoEmAndamento },
       { label: "Salvar dados da inscrição", icon: Save, onClick: () => void handleSubmit(salvar)(), variant: "default", disabled: acaoEmAndamento },
       { label: "Cancelar edição", icon: Undo2, onClick: cancelar, variant: "outline", disabled: acaoEmAndamento },
-      { label: "Excluir inscrição", icon: Trash2, onClick: excluir, variant: "danger", disabled: acaoEmAndamento },
-      { label: "Imprimir inscrições", icon: Printer, onClick: () => void imprimir(), variant: "outline", disabled: acaoEmAndamento },
+      { label: "Excluir inscrição", icon: Trash2, onClick: excluir, variant: "danger", disabled: acaoEmAndamento || !possuiMatriculaSelecionada },
       { label: "Fechar", icon: X, onClick: fechar, variant: "outline" }
     ],
     catalogo: [
-      { label: "Buscar inscrições", icon: Search, onClick: buscar, variant: "outline" },
       { label: "Nova inscrição", icon: Plus, onClick: novo, variant: "default", disabled: acaoEmAndamento },
       { label: "Salvar catálogo e vagas", icon: Save, onClick: () => void handleSubmit(salvar)(), variant: "default", disabled: acaoEmAndamento },
       { label: "Cancelar edição", icon: Undo2, onClick: cancelar, variant: "outline", disabled: acaoEmAndamento },
-      { label: "Excluir inscrição", icon: Trash2, onClick: excluir, variant: "danger", disabled: acaoEmAndamento },
-      { label: "Imprimir inscrições", icon: Printer, onClick: () => void imprimir(), variant: "outline", disabled: acaoEmAndamento },
+      { label: "Excluir inscrição", icon: Trash2, onClick: excluir, variant: "danger", disabled: acaoEmAndamento || !possuiMatriculaSelecionada },
       { label: "Fechar", icon: X, onClick: fechar, variant: "outline" }
     ],
     inscricoes: [
-      { label: "Buscar inscrições", icon: Search, onClick: buscar, variant: "outline" },
       { label: "Nova inscrição", icon: Plus, onClick: novo, variant: "default", disabled: acaoEmAndamento },
-      { label: "Salvar inscrições", icon: Save, onClick: () => void handleSubmit(salvar)(), variant: "default", disabled: acaoEmAndamento },
+      { label: "Salvar inscrições e fila", icon: Save, onClick: () => void handleSubmit(salvar)(), variant: "default", disabled: acaoEmAndamento },
       { label: "Cancelar edição", icon: Undo2, onClick: cancelar, variant: "outline", disabled: acaoEmAndamento },
-      { label: "Excluir inscrição", icon: Trash2, onClick: excluir, variant: "danger", disabled: acaoEmAndamento },
-      { label: "Imprimir inscrições", icon: Printer, onClick: () => void imprimir(), variant: "outline", disabled: acaoEmAndamento },
+      { label: "Excluir inscrição", icon: Trash2, onClick: excluir, variant: "danger", disabled: acaoEmAndamento || !possuiMatriculaSelecionada },
       { label: "Fechar", icon: X, onClick: fechar, variant: "outline" }
     ],
     agenda: [
-      { label: "Buscar inscrições", icon: Search, onClick: buscar, variant: "outline" },
       { label: "Nova inscrição", icon: Plus, onClick: novo, variant: "default", disabled: acaoEmAndamento },
       { label: "Salvar agendamentos", icon: Save, onClick: () => void handleSubmit(salvar)(), variant: "default", disabled: acaoEmAndamento },
       { label: "Cancelar edição", icon: Undo2, onClick: cancelar, variant: "outline", disabled: acaoEmAndamento },
-      { label: "Excluir inscrição", icon: Trash2, onClick: excluir, variant: "danger", disabled: acaoEmAndamento },
-      { label: "Imprimir inscrições", icon: Printer, onClick: () => void imprimir(), variant: "outline", disabled: acaoEmAndamento },
+      { label: "Excluir inscrição", icon: Trash2, onClick: excluir, variant: "danger", disabled: acaoEmAndamento || !possuiMatriculaSelecionada },
       { label: "Fechar", icon: X, onClick: fechar, variant: "outline" }
     ],
     presenca: [
-      { label: "Buscar inscrições", icon: Search, onClick: buscar, variant: "outline" },
       { label: "Nova inscrição", icon: Plus, onClick: novo, variant: "default", disabled: acaoEmAndamento },
       { label: "Salvar presença", icon: Save, onClick: () => void handleSubmit(salvar)(), variant: "default", disabled: acaoEmAndamento },
       { label: "Cancelar edição", icon: Undo2, onClick: cancelar, variant: "outline", disabled: acaoEmAndamento },
-      { label: "Excluir inscrição", icon: Trash2, onClick: excluir, variant: "danger", disabled: acaoEmAndamento },
-      { label: "Imprimir inscrições", icon: Printer, onClick: () => void imprimir(), variant: "outline", disabled: acaoEmAndamento },
+      { label: "Imprimir lista de presença", icon: Printer, onClick: () => void imprimir(), variant: "outline", disabled: acaoEmAndamento },
       { label: "Fechar", icon: X, onClick: fechar, variant: "outline" }
     ]
   };
@@ -2329,67 +2363,103 @@ export function CadastroMatriculasPage() {
                     </Button>
                   </div>
 
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { value: "", label: "Todos" },
+                      { value: "AGENDADO", label: "Agendado" },
+                      { value: "PENDENTE", label: "Pendente" },
+                      { value: "CANCELADA", label: "Cancelada" },
+                      { value: "FINALIZADA", label: "Finalizada" }
+                    ].map((item) => (
+                      <Button
+                        key={item.label}
+                        type="button"
+                        variant={filtroStatusAgendamentoRapido === item.value ? "default" : "outline"}
+                        className={filtroStatusAgendamentoRapido === item.value ? "" : "bg-white"}
+                        onClick={() => setFiltroStatusAgendamentoRapido(item.value as typeof filtroStatusAgendamentoRapido)}
+                      >
+                        {item.label}
+                      </Button>
+                    ))}
+                  </div>
+
                   <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]">
                     <table className="min-w-full text-sm">
                       <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]">
                         <tr>
+                          <th className="px-3 py-2 text-left font-semibold">Beneficiário</th>
+                          <th className="px-3 py-2 text-left font-semibold">CPF</th>
+                          <th className="px-3 py-2 text-left font-semibold">Curso / atendimento</th>
                           <th className="px-3 py-2 text-left font-semibold">Tipo</th>
-                          <th className="px-3 py-2 text-left font-semibold">Nome</th>
                           <th className="px-3 py-2 text-left font-semibold">Status</th>
-                          <th className="px-3 py-2 text-left font-semibold">Horário</th>
-                          <th className="px-3 py-2 text-left font-semibold">Idade</th>
-                          <th className="px-3 py-2 text-left font-semibold">Dias</th>
-                          <th className="px-3 py-2 text-left font-semibold">Vagas restantes</th>
-                          <th className="px-3 py-2 text-left font-semibold">Inscritos</th>
-                          <th className="px-3 py-2 text-left font-semibold">Fila</th>
+                          <th className="px-3 py-2 text-left font-semibold">Data da inscrição</th>
+                          <th className="px-3 py-2 text-left font-semibold">Agendamento</th>
                           <th className="px-3 py-2 text-left font-semibold">Profissional</th>
                         </tr>
                       </thead>
                       <tbody>
                         {carregandoLista ? (
                           <tr>
-                            <td className="px-3 py-4 text-center text-[var(--g3-muted)]" colSpan={10}>
+                            <td className="px-3 py-4 text-center text-[var(--g3-muted)]" colSpan={8}>
                               Carregando inscrições...
                             </td>
                           </tr>
-                        ) : matriculas.length ? (
-                          matriculas.map((item, index) => {
-                            const horarioAulas =
-                              item.horario_inicial && item.duracao_horas
-                                ? `${item.horario_inicial} (${item.duracao_horas}h)`
-                                : item.horario_inicial ?? "---";
-                            const idade = item.faixa_etaria?.length ? item.faixa_etaria.join(", ") : "---";
-                            const dias = item.dias_semana?.length ? item.dias_semana.join(", ") : "---";
-                            const vagasRestantes = item.vagas_disponiveis ?? 0;
-
+                        ) : inscricoesListagem.length ? (
+                          inscricoesListagem.map((item, index) => {
+                            const possuiAgendamento = Boolean(normalizarDataIso(item.data_agendada) || String(item.hora_agendada ?? "").trim());
+                            const statusInscricaoNormalizado = String(item.status ?? "").trim().toUpperCase();
+                            const statusAgendamentoTexto =
+                              statusInscricaoNormalizado === "CANCELADO"
+                                ? "Cancelada"
+                                : statusInscricaoNormalizado === "FINALIZADO"
+                                  ? "Finalizada"
+                                  : item.status_agendamento?.trim() || (possuiAgendamento ? "Agendado" : "Pendente");
+                            const agendamento = item.data_agendada
+                              ? `${formatarData(item.data_agendada)}${item.hora_agendada ? ` às ${item.hora_agendada}` : ""}`
+                              : "---";
+                            const classeStatusAgendamento =
+                              statusInscricaoNormalizado === "CANCELADO"
+                                ? "bg-rose-100 text-rose-700"
+                                : statusInscricaoNormalizado === "FINALIZADO"
+                                  ? "bg-slate-200 text-slate-700"
+                                  : possuiAgendamento
+                                    ? "bg-emerald-100 text-emerald-700"
+                                    : "bg-amber-100 text-amber-700";
                             return (
                               <tr
-                                key={item.id_matricula}
+                                key={`${item.curso_id ?? "sem-curso"}-${item.id_matricula_item ?? index}`}
                                 className={`cursor-pointer border-t border-[var(--g3-border)] ${
-                                  index % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35"
+                                  item.curso_id && item.curso_id === idSelecionado
+                                    ? "bg-[var(--g3-primary-soft-hover)]"
+                                    : index % 2 === 0
+                                      ? "bg-[var(--g3-card)]"
+                                      : "bg-[var(--g3-primary-soft)]/35"
                                 } hover:bg-[var(--g3-primary-soft-hover)]`}
-                                onClick={() => item.id_matricula && selecionarMatricula(item.id_matricula)}
+                                onClick={() => item.curso_id && selecionarMatricula(item.curso_id)}
                               >
-                                <td className="px-3 py-2 whitespace-nowrap">{item.tipo}</td>
-                                <td className="px-3 py-2 whitespace-nowrap">{item.nome}</td>
+                                <td className="px-3 py-2 whitespace-nowrap">{item.beneficiario_nome}</td>
+                                <td className="px-3 py-2 whitespace-nowrap">{formatarCpf(item.cpf)}</td>
+                                <td className="px-3 py-2 whitespace-nowrap">{item.curso_nome}</td>
+                                <td className="px-3 py-2 whitespace-nowrap">{item.curso_tipo}</td>
                                 <td className="px-3 py-2 whitespace-nowrap">{formatarStatus(item.status)}</td>
-                                <td className="px-3 py-2 whitespace-nowrap">{horarioAulas}</td>
-                                <td className="px-3 py-2 max-w-[200px] truncate" title={idade}>
-                                  {idade}
+                                <td className="px-3 py-2 whitespace-nowrap">{formatarData(item.data_matricula)}</td>
+                                <td className="px-3 py-2 whitespace-nowrap">
+                                  <div className="flex flex-col gap-1">
+                                    <span
+                                      className={`inline-flex w-fit rounded-full px-2 py-0.5 text-[11px] font-semibold ${classeStatusAgendamento}`}
+                                    >
+                                      {statusAgendamentoTexto}
+                                    </span>
+                                    <span className="text-xs text-[var(--g3-muted)]">{agendamento}</span>
+                                  </div>
                                 </td>
-                                <td className="px-3 py-2 max-w-[220px] truncate" title={dias}>
-                                  {dias}
-                                </td>
-                                <td className="px-3 py-2 whitespace-nowrap font-semibold">{vagasRestantes}</td>
-                                <td className="px-3 py-2 whitespace-nowrap">{item.total_matriculas ?? 0}</td>
-                                <td className="px-3 py-2 whitespace-nowrap">{item.total_fila_espera ?? 0}</td>
-                                <td className="px-3 py-2 whitespace-nowrap">{item.profissional ?? "---"}</td>
+                                <td className="px-3 py-2 whitespace-nowrap">{item.profissional_nome ?? "---"}</td>
                               </tr>
                             );
                           })
                         ) : (
                           <tr>
-                            <td className="px-3 py-4 text-center text-[var(--g3-muted)]" colSpan={10}>
+                            <td className="px-3 py-4 text-center text-[var(--g3-muted)]" colSpan={8}>
                               Nenhuma inscrição encontrada.
                             </td>
                           </tr>
@@ -2739,7 +2809,7 @@ export function CadastroMatriculasPage() {
 
               {abaAtiva === "catalogo" && (
                 <div className="space-y-4">
-                  {carregandoLista ? (
+                  {carregandoCatalogo ? (
                     <div className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card)] px-4 py-8 text-center text-sm text-[var(--g3-muted)]">
                       Carregando catálogo de cursos e vagas...
                     </div>

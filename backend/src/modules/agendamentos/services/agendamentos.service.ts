@@ -5,6 +5,7 @@ import {
   agendamentoFiltrosSchema,
   agendamentoInputSchema,
   agendamentoListaEsperaInputSchema,
+  agendamentoOperacionalInputSchema,
   agendamentoRemarcacaoInputSchema
 } from "../agendamentos.schema.js";
 import { AgendamentosRepository } from "../repositories/agendamentos.repository.js";
@@ -24,6 +25,14 @@ export class AgendamentosService {
   }
 
   async criar(rawInput: unknown, usuario?: UsuarioActor) {
+    const body = rawInput as Record<string, unknown>;
+    if (body && "itemId" in body && "tipo" in body && ("beneficiariosIds" in body || "matriculasIds" in body)) {
+      const input = agendamentoOperacionalInputSchema.parse(rawInput);
+      if (input.id) {
+        return this.repository.atualizarOperacional(this.parseId(input.id), input, usuario);
+      }
+      return this.repository.criarOperacional(input, usuario);
+    }
     const input = agendamentoInputSchema.parse(rawInput);
     return this.repository.criar(input, usuario);
   }
@@ -79,6 +88,31 @@ export class AgendamentosService {
 
   async catalogos() {
     return this.repository.catalogos();
+  }
+
+  async listarItens(rawTipo: unknown, rawBusca: unknown) {
+    const tipo = String(rawTipo ?? "").trim().toLowerCase();
+    if (!["curso", "atendimento", "oficina"].includes(tipo)) {
+      throw new AppError("Tipo operacional invalido.", 400);
+    }
+    return this.repository.listarItensOperacionais(tipo as "curso" | "atendimento" | "oficina", typeof rawBusca === "string" ? rawBusca : undefined);
+  }
+
+  async listarBeneficiarios(rawItemId: unknown) {
+    const itemId = Number(rawItemId);
+    if (!Number.isInteger(itemId) || itemId <= 0) {
+      throw new AppError("Item operacional invalido.", 400);
+    }
+    return this.repository.listarBeneficiariosOperacionais(BigInt(itemId));
+  }
+
+  async notificar(rawId: string, rawBody: unknown, usuario?: UsuarioActor) {
+    const body = (rawBody ?? {}) as { canal?: string };
+    const canal = String(body.canal ?? "").trim().toUpperCase();
+    if (canal !== "WHATSAPP" && canal !== "EMAIL") {
+      throw new AppError("Canal de notificacao invalido.", 400);
+    }
+    return this.repository.notificar(this.parseId(rawId), canal, usuario);
   }
 
   private parseId(rawId: string): bigint {

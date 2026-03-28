@@ -1,8 +1,8 @@
 import { AppError } from "../../../shared/errors/app-error.js";
 import { mapaCamposTextoEmprestimosEventos } from "../../../utils/text-format-config.js";
 import { normalizarObjetoTexto } from "../../../utils/text-formatter.js";
-import { mapEmprestimoToResponse, mapEventoEmprestimoToResponse, mapMovimentacaoToResponse } from "../emprestimos-eventos.mapper.js";
-import { disponibilidadeQuerySchema, emprestimoEventoInputSchema, eventoEmprestimoInputSchema } from "../emprestimos-eventos.schema.js";
+import { mapEmprestimoToResponse, mapEventoEmprestimoToResponse, mapMovimentacaoToResponse, mapResponsavelEmprestimoToResponse } from "../emprestimos-eventos.mapper.js";
+import { disponibilidadeQuerySchema, emprestimoEventoInputSchema, eventoEmprestimoInputSchema, responsavelEmprestimoInputSchema } from "../emprestimos-eventos.schema.js";
 import { EmprestimosEventosRepository } from "../repositories/emprestimos-eventos.repository.js";
 function parseDateOnly(rawValue, label) {
     if (typeof rawValue !== "string" || !rawValue.trim()) {
@@ -70,6 +70,10 @@ export class EmprestimosEventosService {
         const eventos = await this.repository.listarEventos();
         return eventos.map(mapEventoEmprestimoToResponse);
     }
+    async listarResponsaveis() {
+        const responsaveis = await this.repository.listarResponsaveis();
+        return responsaveis.map(mapResponsavelEmprestimoToResponse);
+    }
     async criarEvento(rawInput) {
         const input = eventoEmprestimoInputSchema.parse(this.normalizarPayload(rawInput));
         const registro = await this.repository.criarEvento(input);
@@ -84,6 +88,21 @@ export class EmprestimosEventosService {
     async excluirEvento(rawId) {
         const id = this.parseId(rawId);
         await this.repository.excluirEvento(id);
+    }
+    async criarResponsavel(rawInput) {
+        const input = responsavelEmprestimoInputSchema.parse(this.normalizarPayload(rawInput));
+        const registro = await this.repository.criarResponsavel(input);
+        return mapResponsavelEmprestimoToResponse(registro);
+    }
+    async atualizarResponsavel(rawId, rawInput) {
+        const id = this.parseId(rawId);
+        const input = responsavelEmprestimoInputSchema.parse(this.normalizarPayload(rawInput));
+        const registro = await this.repository.atualizarResponsavel(id, input);
+        return mapResponsavelEmprestimoToResponse(registro);
+    }
+    async excluirResponsavel(rawId) {
+        const id = this.parseId(rawId);
+        await this.repository.excluirResponsavel(id);
     }
     async listarAgendaResumo(rawInicio, rawFim) {
         const inicio = parseDateOnly(rawInicio, "Data inicial");

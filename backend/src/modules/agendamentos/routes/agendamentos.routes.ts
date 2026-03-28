@@ -25,6 +25,8 @@ const permissoesEdicao = [
 agendamentosRoutes.use(ensureAuthenticated);
 
 agendamentosRoutes.get("/", ensurePermissions(permissoesVisualizacao), controller.listar.bind(controller));
+agendamentosRoutes.get("/itens", ensurePermissions(permissoesVisualizacao), controller.listarItens.bind(controller));
+agendamentosRoutes.get("/beneficiarios", ensurePermissions(permissoesVisualizacao), controller.listarBeneficiarios.bind(controller));
 agendamentosRoutes.get("/indicadores", ensurePermissions(permissoesVisualizacao), controller.indicadores.bind(controller));
 agendamentosRoutes.get("/catalogos", ensurePermissions(permissoesVisualizacao), controller.catalogos.bind(controller));
 agendamentosRoutes.get("/lista-espera", ensurePermissions(permissoesVisualizacao), controller.listarListaEspera.bind(controller));
@@ -38,5 +40,6 @@ agendamentosRoutes.post("/:id/remarcar", ensurePermissions(["ADMINISTRADOR", "OP
 agendamentosRoutes.post("/:id/confirmar", ensurePermissions(["ADMINISTRADOR", "OPERADOR", "AGENDAMENTOS_CONFIRMAR"]), controller.confirmar.bind(controller));
 agendamentosRoutes.post("/:id/check-in", ensurePermissions(["ADMINISTRADOR", "OPERADOR", "AGENDAMENTOS_CHECKIN"]), controller.checkIn.bind(controller));
 agendamentosRoutes.post("/:id/concluir", ensurePermissions(["ADMINISTRADOR", "OPERADOR", "AGENDAMENTOS_CONCLUIR"]), controller.concluir.bind(controller));
+agendamentosRoutes.post("/:id/notificar", ensurePermissions(permissoesEdicao), controller.notificar.bind(controller));
 
 export { agendamentosRoutes };

@@ -37,9 +37,9 @@ export function mapEmprestimoToResponse(row, itens) {
             status: row.evento_status
         },
         unidadeId: row.unidade_id ? Number(row.unidade_id) : null,
-        responsavel: row.responsavel_id
+        responsavel: row.responsavel_id || row.responsavel_nome
             ? {
-                id: Number(row.responsavel_id),
+                id: row.responsavel_id ? Number(row.responsavel_id) : null,
                 nome: row.responsavel_nome ?? ""
             }
             : null,
@@ -60,5 +60,17 @@ export function mapMovimentacaoToResponse(row) {
         descricao: row.descricao ?? null,
         usuarioId: row.usuario_id ? Number(row.usuario_id) : null,
         criadoEm: row.criado_em.toISOString()
+    };
+}
+export function mapResponsavelEmprestimoToResponse(row) {
+    return {
+        id: Number(row.id),
+        nome: row.nome,
+        documento: row.documento ?? null,
+        telefone: row.telefone ?? null,
+        email: row.email ?? null,
+        observacoes: row.observacoes ?? null,
+        criadoEm: row.criado_em.toISOString(),
+        atualizadoEm: row.atualizado_em.toISOString()
     };
 }

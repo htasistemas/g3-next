@@ -49,6 +49,10 @@ export class EmprestimosEventosController {
         const eventos = await service.listarEventos();
         return response.json(eventos);
     }
+    async listarResponsaveis(_request, response) {
+        const responsaveis = await service.listarResponsaveis();
+        return response.json(responsaveis);
+    }
     async criarEvento(request, response) {
         const evento = await service.criarEvento(request.body);
         return response.status(201).json(evento);
@@ -59,6 +63,18 @@ export class EmprestimosEventosController {
     }
     async excluirEvento(request, response) {
         await service.excluirEvento(request.params.id);
+        return response.status(204).send();
+    }
+    async criarResponsavel(request, response) {
+        const responsavel = await service.criarResponsavel(request.body);
+        return response.status(201).json(responsavel);
+    }
+    async atualizarResponsavel(request, response) {
+        const responsavel = await service.atualizarResponsavel(request.params.id, request.body);
+        return response.json(responsavel);
+    }
+    async excluirResponsavel(request, response) {
+        await service.excluirResponsavel(request.params.id);
         return response.status(204).send();
     }
     async listarMovimentacoes(request, response) {

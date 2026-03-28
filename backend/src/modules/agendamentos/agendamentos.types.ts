@@ -22,6 +22,7 @@ export type AgendamentoModalidade =
   | "Coletivo";
 
 export type AgendamentoPrioridade = "Normal" | "Media" | "Alta" | "Urgencia";
+export type AgendamentoOperacionalTipo = "curso" | "atendimento" | "oficina";
 
 export type AgendamentoInput = {
   id?: string;
@@ -76,9 +77,63 @@ export type AgendamentoInput = {
   documentosPendentes?: boolean;
   autorizacaoPendente?: boolean;
   permitirConflito?: boolean;
+  itemTipo?: AgendamentoOperacionalTipo | null;
+  itemOrigemId?: number | null;
+  itemNome?: string | null;
+  itemDiasSemana?: string | null;
+  itemLocal?: string | null;
+  diaSemana?: string | null;
 };
 
+export type AgendamentoOperacionalInput = {
+  id?: string;
+  tipo: AgendamentoOperacionalTipo;
+  itemId: number;
+  data: string;
+  beneficiariosIds?: number[];
+  matriculasIds?: number[];
+};
+
+export type AgendamentoOperacionalItemRow = {
+  id: bigint;
+  tipo: string | null;
+  nome: string;
+  profissional: string | null;
+  horario_inicial: string | null;
+  duracao_horas: number | null;
+  dias_semana: string | null;
+  sala_nome: string | null;
+  instituicao_parceira: string | null;
+  status: string | null;
+};
+
+export type AgendamentoOperacionalBeneficiarioRow = {
+  matricula_id: bigint;
+  beneficiario_id: bigint | null;
+  beneficiario_nome: string;
+  telefone: string | null;
+  email: string | null;
+  status: string | null;
+  cpf: string | null;
+  profissional_nome: string | null;
+};
+
+export type AgendamentoBeneficiarioRow = {
+  id: bigint;
+  agendamento_id: bigint;
+  beneficiario_id: bigint | null;
+  beneficiario_nome: string;
+  telefone: string | null;
+  email: string | null;
+  status: string | null;
+  criado_em: Date;
+  atualizado_em: Date;
+};
+
+export type AgendamentoEnvioCanal = "WHATSAPP" | "EMAIL";
+
 export type AgendamentoParticipanteInput = {
+  matriculaId?: number | null;
   beneficiarioId?: number | null;
   beneficiarioNome: string;
   telefone?: string | null;
@@ -198,6 +253,12 @@ export type AgendamentoRow = {
   urgencia: boolean;
   documentos_pendentes: boolean;
   autorizacao_pendente: boolean;
+  item_tipo: string | null;
+  item_origem_id: bigint | null;
+  item_nome: string | null;
+  item_dias_semana: string | null;
+  item_local: string | null;
+  dia_semana: string | null;
   confirmacao_canal: string | null;
   confirmado_em: Date | null;
   confirmado_por_nome: string | null;

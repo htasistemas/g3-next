@@ -1,6 +1,281 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.383",
+                        "releaseDate":  "2026-03-28",
+                        "title":  "Agendamentos com ficha de presença impressa a partir do card",
+                        "description":  "Os cards da agenda operacional ganharam botão com ícone de impressora para gerar ficha de presença no padrão do G3N.",
+                        "changes":  [
+                                        "Cada card da agenda operacional agora possui ação de impressão para ficha de presença.",
+                                        "A ficha de presença é gerada com dados do agendamento, lista dos beneficiários e campos de assinatura.",
+                                        "A infraestrutura de impressão reutiliza o padrão de relatórios HTML do frontend do G3N."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.382",
+                        "releaseDate":  "2026-03-28",
+                        "title":  "Agendamentos com botões internos mais compactos",
+                        "description":  "Os botões WhatsApp, E-mail, Editar e Cancelar dentro dos cards da agenda operacional ficaram menores para reduzir ocupação visual.",
+                        "changes":  [
+                                        "Botões de ação dos cards receberam altura e espaçamento menores.",
+                                        "Leitura do card ficou mais limpa sem alterar o comportamento das ações.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.381",
+                        "releaseDate":  "2026-03-28",
+                        "title":  "Agendamentos com beneficiários em lista vertical dentro do card",
+                        "description":  "A lista de beneficiários dentro de cada card da agenda operacional passou a ser exibida em linhas verticais, uma abaixo da outra.",
+                        "changes":  [
+                                        "Participantes do card deixaram a grade em colunas e passaram a aparecer em lista vertical para leitura semelhante a tabela.",
+                                        "Cada linha continua exibindo nome e telefone dentro do bloco do beneficiário.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.380",
+                        "releaseDate":  "2026-03-28",
+                        "title":  "Agendamentos com agenda gerada em duas colunas",
+                        "description":  "Os cards da agenda operacional gerada passaram a ser exibidos em duas colunas, lado a lado.",
+                        "changes":  [
+                                        "Lista de cards da agenda operacional foi reorganizada em grade com duas colunas por data.",
+                                        "Leitura visual da agenda gerada ficou mais compacta e operacional.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.379",
+                        "releaseDate":  "2026-03-28",
+                        "title":  "Agendamentos com grade operacional em duas colunas",
+                        "description":  "Os cards de cursos, atendimentos e oficinas da aba operacional passaram a ser exibidos em duas colunas, lado a lado.",
+                        "changes":  [
+                                        "Grade de itens operacionais foi ajustada para mostrar dois cards por linha.",
+                                        "Distribuição visual dos cards ficou mais equilibrada para leitura e clique na aba Agendamento operacional.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.378",
+                        "releaseDate":  "2026-03-28",
+                        "title":  "Agendamentos com seleção operacional sem campo adicional de item",
+                        "description":  "A aba Agendamento operacional deixou de exibir o campo adicional de curso, atendimento ou oficina, mantendo apenas a grade de itens do tipo selecionado.",
+                        "changes":  [
+                                        "Campo adicional de item foi removido da aba operacional para simplificar o fluxo visual.",
+                                        "Seleção do item continua sendo feita diretamente pela grade de cards do tipo escolhido.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.377",
+                        "releaseDate":  "2026-03-28",
+                        "title":  "Agendamentos com resumo operacional alinhado em linha única",
+                        "description":  "O card de resumo do item operacional passou a exibir profissional, dias, horário e local na mesma linha, com o horário limitado ao formato HH:mm.",
+                        "changes":  [
+                                        "Resumo do item operacional foi reorganizado em quatro colunas para leitura mais direta na aba Agendamento operacional.",
+                                        "Campo Horário do resumo passou a mostrar apenas a hora, sem carregar data junto.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.376",
+                        "releaseDate":  "2026-03-28",
+                        "title":  "Agendamentos com geração operacional corrigida e interface mais direta",
+                        "description":  "A geração da agenda operacional foi corrigida no backend e a aba operacional ficou mais clara, sem título redundante e com o botão Gerar Agenda salvando o card imediatamente.",
+                        "changes":  [
+                                        "Backend passou a normalizar horário dos itens operacionais, gravar campos TIME com compatibilidade real no PostgreSQL e serializar logs com BigInt sem erro interno.",
+                                        "Aba Agendamento operacional removeu o título Gerar card operacional, reposicionou o campo Tipo ao lado da seleção do item, renomeou o botão para Gerar Agenda e esclareceu na interface que o clique já salva a agenda.",
+                                        "Cards de cursos, atendimentos e oficinas perderam o fundo verde, e a grade de beneficiários vinculados passou a aparecer lado a lado para acelerar a seleção."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.375",
+                        "releaseDate":  "2026-03-28",
+                        "title":  "Agendamentos com geração operacional baseada na matrícula da inscrição",
+                        "description":  "O botão Gerar card operacional passou a usar a matrícula da inscrição como referência estável, evitando falhas quando o vínculo do beneficiário ainda não estiver totalmente resolvido no cadastro.",
+                        "changes":  [
+                                        "Backend de Agendamentos passou a aceitar matrícula da inscrição como origem da seleção operacional, sem depender exclusivamente do beneficiário resolvido no cadastro.",
+                                        "Frontend da agenda operacional passou a selecionar e restaurar participantes usando a matrícula do item inscrito, inclusive na edição do card.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.374",
+                        "releaseDate":  "2026-03-28",
+                        "title":  "Agendamentos com grade visual reforçada nos itens operacionais",
+                        "description":  "Os itens do bloco Gerar card operacional passaram a aparecer em grade com até quatro cards por linha, fundo verde claro e sombreamento leve.",
+                        "changes":  [
+                                        "Lista de cursos, atendimentos e oficinas na agenda operacional passou a usar grade responsiva com maior densidade visual.",
+                                        "Cards de seleção receberam fundo verde claro e sombreamento para reforçar leitura e clique.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.373",
+                        "releaseDate":  "2026-03-27",
+                        "title":  "Agendamentos com compatibilidade reforçada na busca de beneficiários",
+                        "description":  "A agenda operacional passou a localizar beneficiários vinculados sem falhar em bases que usam variações antigas na tabela de contato do beneficiário.",
+                        "changes":  [
+                                        "Backend deixou de depender rigidamente da coluna telefone_principal na busca operacional de beneficiários vinculados.",
+                                        "Consulta passou a aceitar variações antigas da tabela contato_beneficiario ao resolver telefone do cadastro.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.372",
+                        "releaseDate":  "2026-03-27",
+                        "title":  "Inscrições com ações realmente contextuais por aba",
+                        "description":  "A barra superior da tela de Inscrições deixou de reaproveitar botões genéricos e passou a exibir apenas ações coerentes com a aba aberta.",
+                        "changes":  [
+                                        "Aba Listagem ficou com Buscar inscrições, Nova inscrição, Imprimir inscrições e Fechar.",
+                                        "Abas de edição passaram a exibir apenas ações próprias do contexto, como Salvar dados da inscrição, Salvar catálogo e vagas, Salvar inscrições e fila e Imprimir lista de presença.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.371",
+                        "releaseDate":  "2026-03-27",
+                        "title":  "Inscrições com catálogo restaurado por consulta própria",
+                        "description":  "A aba Catálogo e vagas voltou a carregar os cards cadastrados com uma consulta própria, sem depender da lógica da listagem.",
+                        "changes":  [
+                                        "Tela de Inscrições passou a usar uma consulta dedicada para Catálogo e vagas, restaurando os cards cadastrados.",
+                                        "Listagem de inscrições continua com sua própria consulta filtrada, sem interferir no catálogo.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.370",
+                        "releaseDate":  "2026-03-27",
+                        "title":  "Inscrições com catálogo preservado ao usar filtros",
+                        "description":  "A aba Catálogo e vagas voltou a exibir os cards normalmente, mesmo depois do uso de filtros na listagem de inscrições.",
+                        "changes":  [
+                                        "Consulta base da tela de Inscrições voltou a carregar o catálogo completo para evitar sumiço dos cards na aba Catálogo e vagas.",
+                                        "Filtros da listagem continuam atuando sobre a tabela de inscrições, sem interferir na visualização do catálogo.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.369",
+                        "releaseDate":  "2026-03-27",
+                        "title":  "Inscrições com filtro rápido e agenda com vínculo reforçado",
+                        "description":  "A listagem de inscrições ganhou filtros rápidos por status de agendamento e a agenda operacional passou a localizar beneficiários vinculados com a mesma regra usada no módulo de inscrições.",
+                        "changes":  [
+                                        "Aba Listagem de inscrições passou a ter filtros rápidos por Agendado, Pendente, Cancelada e Finalizada acima da tabela.",
+                                        "Backend de Agendamentos alinhou a busca de beneficiários vinculados com a lógica de CPF e nome já usada no módulo de inscrições, reduzindo casos em que a lista vinha vazia.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.368",
+                        "releaseDate":  "2026-03-27",
+                        "title":  "Agendamentos em sequência vertical e inscrições com novos destaques",
+                        "description":  "A aba operacional de Agendamentos passou a seguir a ordem resumo, geração e agenda, e a listagem de Inscrições ganhou destaque visual para canceladas e finalizadas.",
+                        "changes":  [
+                                        "Aba Agendamento operacional foi reorganizada em sequência vertical: resumo do card no topo, depois Gerar card operacional e, por fim, Agenda operacional gerada.",
+                                        "Listagem de Inscrições passou a sinalizar visualmente inscrições agendadas, pendentes, canceladas e finalizadas na coluna de agendamento.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.367",
+                        "releaseDate":  "2026-03-27",
+                        "title":  "Inscrições com destaque de agendamento na listagem",
+                        "description":  "A listagem de inscrições passou a sinalizar visualmente quais inscrições já têm agendamento e quais seguem pendentes.",
+                        "changes":  [
+                                        "Coluna Agendamento passou a exibir selo visual com status agendado ou pendente, além da data e hora quando já houver marcação.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.366",
+                        "releaseDate":  "2026-03-27",
+                        "title":  "Agendamentos com dashboard e inscrições com listagem individual",
+                        "description":  "A agenda operacional ganhou a aba Dashboard e a tela de Inscrições voltou a listar corretamente as inscrições individuais já incluídas.",
+                        "changes":  [
+                                        "Nova aba Dashboard em Agendamentos com pacientes agendados, frequência média, faltas da semana, sessões do mês, lista de espera, total de cards e confirmados.",
+                                        "Aba Listagem de inscrições passou a exibir inscrições individuais salvas dentro dos cursos, com beneficiário, CPF, curso, status, data da inscrição, agendamento e profissional.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.365",
+                        "releaseDate":  "2026-03-27",
+                        "title":  "Agendamentos com destaque claro para card em edição",
+                        "description":  "O card que está sendo editado na agenda operacional passou a ter sinalização visual reforçada para evitar confusão durante a alteração.",
+                        "changes":  [
+                                        "Card ativo da agenda ganhou cabeçalho mais forte, fundo destacado, selo Em edição e aviso textual de que o formulário está ligado àquele agendamento.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.364",
+                        "releaseDate":  "2026-03-27",
+                        "title":  "Agendamentos com resumo fixo e operação mais direta",
+                        "description":  "A aba Agendamento operacional ficou mais simples, com remoção dos filtros rápidos e novo resumo fixo do card no topo do formulário.",
+                        "changes":  [
+                                        "Filtros rápidos foram removidos da aba operacional para reduzir poluição visual e manter foco total na geração do card.",
+                                        "Novo resumo no topo do formulário passou a mostrar tipo, item, data e quantidade de beneficiários antes do salvamento.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.363",
+                        "releaseDate":  "2026-03-27",
+                        "title":  "Agendamentos com seleção operacional mais rápida",
+                        "description":  "A seleção de beneficiários na agenda operacional ficou mais produtiva, com resumo fixo dos escolhidos e limpeza da seleção em um clique.",
+                        "changes":  [
+                                        "Bloco de beneficiários ganhou resumo visual fixo com nomes selecionados, contadores de disponíveis e selecionados e botão Limpar seleção.",
+                                        "Tela de Agendamentos teve textos revisados em pt-BR para manter leitura limpa e consistente na operação diária.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.362",
+                        "releaseDate":  "2026-03-27",
+                        "title":  "Agendamentos com refinamento visual na agenda operacional",
+                        "description":  "A agenda operacional ficou mais elegante e mais fácil de ler, com agrupamento por data, cards mais leves e indicadores resumidos no topo da operação.",
+                        "changes":  [
+                                        "Cards operacionais passaram a exibir melhor hierarquia visual com resumo em blocos, contagem de participantes e lista de presença mais limpa.",
+                                        "Agenda passou a agrupar cards por data com cabeçalho de dia, reforçando a leitura operacional por período.",
+                                        "Bloco de geração do card recebeu texto orientativo e o manual do sistema foi atualizado na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.361",
+                        "releaseDate":  "2026-03-27",
+                        "title":  "Agendamentos com agenda operacional integrada às inscrições",
+                        "description":  "A aba Agendamento operacional foi refatorada para gerar cards simples e produtivos a partir de cursos, atendimentos e oficinas já cadastrados nas inscrições.",
+                        "changes":  [
+                                        "Nova operação com seleção por tipo, item vinculado às inscrições, resumo automático do item e seleção de beneficiários já relacionados ao cadastro.",
+                                        "Cards operacionais passaram a ser gerados por data e horário, com cabeçalho visual limpo e ações rápidas para WhatsApp, e-mail, edição e cancelamento.",
+                                        "Backend passou a expor busca de itens operacionais, beneficiários vinculados, gravação auditada dos cards e registro de envios de comunicação.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.360",
                         "releaseDate":  "2026-03-27",
                         "title":  "Georreferenciamento com mapa gratuito CARTO",

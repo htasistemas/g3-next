@@ -5,6 +5,18 @@ function formatarDataIso(value) {
         return value.toISOString().slice(0, 10);
     return String(value).slice(0, 10);
 }
+function formatarHora(value) {
+    if (!value)
+        return undefined;
+    if (value instanceof Date) {
+        const horas = String(value.getUTCHours()).padStart(2, "0");
+        const minutos = String(value.getUTCMinutes()).padStart(2, "0");
+        return `${horas}:${minutos}`;
+    }
+    const texto = String(value);
+    const match = texto.match(/(\d{2}):(\d{2})/);
+    return match ? `${match[1]}:${match[2]}` : texto;
+}
 function asArray(value) {
     return Array.isArray(value) ? value : [];
 }
@@ -32,8 +44,8 @@ export function mapAgendamentoRow(row) {
         profissionalNome: row.profissional_nome ?? undefined,
         equipeApoio: asArray(row.equipe_apoio),
         data: formatarDataIso(row.data_agendamento),
-        horaInicial: row.hora_inicial,
-        horaFinal: row.hora_final ?? undefined,
+        horaInicial: formatarHora(row.hora_inicial),
+        horaFinal: formatarHora(row.hora_final),
         duracaoMinutos: row.duracao_minutos ?? undefined,
         sala: row.sala ?? undefined,
         recurso: row.recurso ?? undefined,
@@ -56,14 +68,20 @@ export function mapAgendamentoRow(row) {
         urgencia: row.urgencia,
         documentosPendentes: row.documentos_pendentes,
         autorizacaoPendente: row.autorizacao_pendente,
+        itemTipo: row.item_tipo ?? undefined,
+        itemOrigemId: row.item_origem_id ? Number(row.item_origem_id) : undefined,
+        itemNome: row.item_nome ?? undefined,
+        itemDiasSemana: row.item_dias_semana ?? undefined,
+        itemLocal: row.item_local ?? undefined,
+        diaSemana: row.dia_semana ?? undefined,
         confirmacaoCanal: row.confirmacao_canal ?? undefined,
         confirmadoEm: row.confirmado_em?.toISOString(),
         confirmadoPorNome: row.confirmado_por_nome ?? undefined,
         observacaoConfirmacao: row.observacao_confirmacao ?? undefined,
         statusChegada: row.status_chegada ?? undefined,
-        horarioChegadaReal: row.horario_chegada_real ?? undefined,
-        horarioInicioReal: row.horario_inicio_real ?? undefined,
-        horarioFimReal: row.horario_fim_real ?? undefined,
+        horarioChegadaReal: formatarHora(row.horario_chegada_real),
+        horarioInicioReal: formatarHora(row.horario_inicio_real),
+        horarioFimReal: formatarHora(row.horario_fim_real),
         concluidoResumo: row.concluido_resumo ?? undefined,
         desfecho: row.desfecho ?? undefined,
         comparecimento: row.comparecimento ?? undefined,

@@ -37,6 +37,13 @@ export const eventoEmprestimoInputSchema = z
         });
     }
 });
+export const responsavelEmprestimoInputSchema = z.object({
+    nome: z.string().trim().min(2, "Informe o nome do responsável."),
+    documento: optionalTrimmedString.nullable().optional(),
+    telefone: optionalTrimmedString.nullable().optional(),
+    email: optionalTrimmedString.nullable().optional(),
+    observacoes: optionalTrimmedString.nullable().optional()
+});
 export const emprestimoEventoItemInputSchema = z.object({
     itemId: z.coerce.number().int().positive(),
     tipoItem: tipoItemSchema,
@@ -49,6 +56,7 @@ export const emprestimoEventoInputSchema = z
     eventoId: z.coerce.number().int().positive(),
     unidadeId: z.coerce.number().int().positive().nullable().optional(),
     responsavelId: z.coerce.number().int().positive().nullable().optional(),
+    responsavelNome: optionalTrimmedString.nullable().optional(),
     dataRetiradaPrevista: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/),
     dataDevolucaoPrevista: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/),
     dataRetiradaReal: optionalIsoDateTime.nullable().optional(),

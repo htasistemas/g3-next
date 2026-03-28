@@ -1,5 +1,5 @@
 import { AppError } from "../../../shared/errors/app-error.js";
-import { agendamentoCheckInInputSchema, agendamentoConclusaoInputSchema, agendamentoFiltrosSchema, agendamentoInputSchema, agendamentoListaEsperaInputSchema, agendamentoRemarcacaoInputSchema } from "../agendamentos.schema.js";
+import { agendamentoCheckInInputSchema, agendamentoConclusaoInputSchema, agendamentoFiltrosSchema, agendamentoInputSchema, agendamentoListaEsperaInputSchema, agendamentoOperacionalInputSchema, agendamentoRemarcacaoInputSchema } from "../agendamentos.schema.js";
 import { AgendamentosRepository } from "../repositories/agendamentos.repository.js";
 export class AgendamentosService {
     repository = new AgendamentosRepository();
@@ -11,6 +11,14 @@ export class AgendamentosService {
         return this.repository.obter(this.parseId(rawId));
     }
     async criar(rawInput, usuario) {
+        const body = rawInput;
+        if (body && "itemId" in body && "tipo" in body && ("beneficiariosIds" in body || "matriculasIds" in body)) {
+            const input = agendamentoOperacionalInputSchema.parse(rawInput);
+            if (input.id) {
+                return this.repository.atualizarOperacional(this.parseId(input.id), input, usuario);
+            }
+            return this.repository.criarOperacional(input, usuario);
+        }
         const input = agendamentoInputSchema.parse(rawInput);
         return this.repository.criar(input, usuario);
     }
@@ -55,6 +63,28 @@ export class AgendamentosService {
     }
     async catalogos() {
         return this.repository.catalogos();
+    }
+    async listarItens(rawTipo, rawBusca) {
+        const tipo = String(rawTipo ?? "").trim().toLowerCase();
+        if (!["curso", "atendimento", "oficina"].includes(tipo)) {
+            throw new AppError("Tipo operacional invalido.", 400);
+        }
+        return this.repository.listarItensOperacionais(tipo, typeof rawBusca === "string" ? rawBusca : undefined);
+    }
+    async listarBeneficiarios(rawItemId) {
+        const itemId = Number(rawItemId);
+        if (!Number.isInteger(itemId) || itemId <= 0) {
+            throw new AppError("Item operacional invalido.", 400);
+        }
+        return this.repository.listarBeneficiariosOperacionais(BigInt(itemId));
+    }
+    async notificar(rawId, rawBody, usuario) {
+        const body = (rawBody ?? {});
+        const canal = String(body.canal ?? "").trim().toUpperCase();
+        if (canal !== "WHATSAPP" && canal !== "EMAIL") {
+            throw new AppError("Canal de notificacao invalido.", 400);
+        }
+        return this.repository.notificar(this.parseId(rawId), canal, usuario);
     }
     parseId(rawId) {
         const parsed = Number(rawId);

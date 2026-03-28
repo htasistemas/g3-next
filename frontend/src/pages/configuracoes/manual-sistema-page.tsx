@@ -127,12 +127,13 @@ const secoesManual: ManualSecao[] = [
         nome: "Inscrições",
         objetivo: "Gerenciar inscrições em cursos, oficinas e atividades.",
         comoUsar: [
-          "Consulte a listagem de inscrições para localizar status, vaga e situação do participante.",
+          "Consulte a listagem de inscrições para localizar cada inscrição individual já incluída, com beneficiário, curso, status, data da inscrição, agendamento e profissional; o agendamento agora fica destacado visualmente como agendado, pendente, cancelado ou finalizado, com filtros rápidos por status acima da tabela.",
+          "A aba Catálogo e vagas voltou a usar uma fonte própria de dados, então os cards cadastrados continuam visíveis mesmo quando a listagem estiver filtrada.",
           "Use os dados da inscrição para registrar turma, responsável, datas e observações.",
           "Revise a fila de espera e a situação de vagas para apoiar decisões de encaminhamento.",
           "Os atendimentos agendados não ficam mais dentro da tela de inscrições; quando precisar operar agenda, use o botão Abrir em Agendamentos.",
           "Na aba Presença, gere a data da aula, salve as presenças e use Excluir data de presença quando precisar remover apenas a data gerada sem apagar o curso.",
-          "A barra superior da tela usa nomes específicos por aba, com ações como Buscar inscrições, Salvar dados da inscrição e Salvar presença para reduzir ambiguidade operacional."
+          "A barra superior da tela usa ações realmente contextuais por aba: a listagem fica com Buscar, Nova, Imprimir e Fechar; as abas de edição mostram apenas as ações que fazem sentido para aquele conteúdo, como Salvar dados da inscrição, Salvar catálogo e vagas, Salvar inscrições e fila ou Imprimir lista de presença."
         ],
         atencoes: [
           "O botão Excluir da barra superior remove todo o curso configurado e exige confirmação específica antes da exclusão.",
@@ -141,19 +142,24 @@ const secoesManual: ManualSecao[] = [
       },
       {
         nome: "Agendamentos",
-        objetivo: "Centralizar agenda institucional de atendimentos, encaixes, fila de espera e conclusão operacional.",
+        objetivo: "Centralizar a agenda operacional da instituição com base em cursos, atendimentos e oficinas já cadastrados nas inscrições.",
         comoUsar: [
-          "Use os filtros superiores para consultar a agenda por beneficiário, profissional, unidade, setor, período e status.",
-          "Na aba Agenda operacional, preencha beneficiário, tipo, profissional, data, horário, sala e observações para salvar o agendamento.",
-          "Os agendamentos salvos passam a aparecer agrupados em cards por dia, facilitando a leitura rápida da agenda operacional e da quantidade de atendimentos em cada data.",
-          "Use Encaixe quando precisar forçar um horário fora da grade padrão e Lista de espera quando ainda não houver vaga confirmada.",
-          "Selecione um agendamento na lista para confirmar, concluir atendimento ou cancelar a reserva.",
-          "Na aba Painel inteligente, acompanhe totais do período, encaixes, faltas, retornos pendentes e a distribuição por profissional."
+          "Na aba Agendamento operacional, escolha o tipo entre curso, atendimento ou oficina para carregar apenas os itens já cadastrados nas inscrições.",
+          "Os filtros rápidos foram removidos dessa aba para deixar a operação mais direta; o foco agora é montar o card sem distrações.",
+          "Depois selecione o item desejado em cards operacionais exibidos lado a lado, em grade com dois cards por linha, para o sistema preencher automaticamente o resumo com profissional, dias, horário e local na mesma linha, sem redigitação manual.",
+          "Use a lista de beneficiários vinculados ao item para marcar quem participará naquela data; a agenda operacional agora usa a própria matrícula da inscrição como referência de seleção, o que evita falhas quando o vínculo do cadastro do beneficiário ainda não estiver totalmente resolvido, além da seleção rápida, resumo dos escolhidos e opção de limpar seleção em um clique.",
+          "No topo da aba operacional, acompanhe primeiro o resumo do card com tipo, item, data e quantidade de beneficiários antes de montar a agenda.",
+          "Na área principal, o campo Tipo fica ao lado da grade de itens do tipo selecionado, sem campo adicional de curso, atendimento ou oficina, e os beneficiários vinculados passam a aparecer em grade, lado a lado, para agilizar a marcação.",
+          "Informe a data do agendamento e use Gerar Agenda para salvar a agenda do dia com os participantes agrupados no mesmo card. Não há um segundo botão de salvar: o clique em Gerar Agenda já persiste o card imediatamente.",
+          "Os cards ficam organizados por data e horário, em grade com duas colunas na agenda gerada, com cabeçalho verde, resumo visual leve, lista de beneficiários exibida em linhas verticais e botões de ação compactos para reduzir poluição visual.",
+          "Dentro de cada card, o botão com ícone de impressora gera uma ficha de presença no padrão operacional do G3N, com dados do agendamento e linhas de assinatura dos beneficiários.",
+          "Na aba Dashboard, acompanhe pacientes agendados, frequência média, faltas da semana, sessões do mês, lista de espera, total de cards e confirmados.",
+          "Na aba Lista de espera, acompanhe demandas ainda não convertidas em agenda."
         ],
         atencoes: [
-          "A barra superior da tela usa rótulos mais curtos para evitar sobreposição com o cabeçalho e manter as ações acessíveis em resoluções menores.",
-          "A conclusão do atendimento alimenta o histórico operacional e o histórico familiar quando houver vínculo com a família.",
-          "Quando existir conflito de horário, profissional, sala ou recurso, o sistema bloqueia o salvamento comum e orienta o uso de encaixe ou ajuste da agenda."
+          "O agendamento operacional reaproveita dados reais das inscrições; se um beneficiário não estiver vinculado ao item, ele não poderá ser selecionado no card.",
+          "O sistema impede duplicidade do mesmo beneficiário dentro do mesmo card e registra auditoria de criação, edição, cancelamento e envios.",
+          "O envio por WhatsApp prepara links diretos para contato e o envio por e-mail depende de endereço válido cadastrado no participante."
         ]
       },
       {
