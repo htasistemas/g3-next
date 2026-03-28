@@ -550,13 +550,14 @@ export function AgendamentosPage() {
         .g3-topo-marca { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; }
         .g3-topo-selo { border: 1px solid rgba(255,255,255,0.35); border-radius: 999px; padding: 4px 10px; font-size: 11px; font-weight: 600; background: rgba(255,255,255,0.12); }
         .g3-topo-corpo { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 16px; padding: 18px; }
+        .g3-topo-texto { text-align: center; }
         .g3-topo-logo { width: 88px; height: 88px; object-fit: contain; border-radius: 16px; background: #ffffff; border: 1px solid #dbe7df; padding: 10px; }
-        .g3-topo h1 { margin: 0; font-size: 24px; font-weight: 700; color: #14532d; }
-        .g3-topo h2 { margin: 4px 0 0; font-size: 16px; font-weight: 700; color: #1f2937; }
+        .g3-topo h1 { margin: 0; font-size: 18px; font-weight: 700; color: #14532d; }
+        .g3-topo h2 { margin: 4px 0 0; font-size: 24px; font-weight: 800; color: #1f2937; font-family: Arial, sans-serif; }
         .g3-bloco { margin-bottom: 16px; border: 1px solid #dbe7df; border-radius: 16px; background: #ffffff; overflow: hidden; }
         .g3-bloco-titulo { margin: 0; padding: 12px 16px; background: #eef8f2; border-bottom: 1px solid #dbe7df; font-size: 14px; font-weight: 700; color: #166534; }
         .g3-meta { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; padding: 14px 16px 16px; }
-        .g3-meta-item { border: 1px solid #dbe7df; border-radius: 12px; padding: 10px 12px; background: #f9fcfa; }
+        .g3-meta-item { border: 1px solid #dbe7df; border-radius: 12px; padding: 10px 12px; background: #f9fcfa; text-align: center; }
         .g3-meta-item strong { display: block; margin-bottom: 4px; font-size: 11px; font-weight: 600; color: #5d7467; }
         .g3-meta-item span { display: block; font-size: 14px; font-weight: 700; color: #163027; }
         .g3-orientacao { margin: 0 0 16px; border-left: 4px solid #0f8a57; border-radius: 10px; padding: 10px 12px; background: #f4fbf7; font-size: 12px; color: #4b6356; }
@@ -565,6 +566,10 @@ export function AgendamentosPage() {
         .g3-tabela th, .g3-tabela td { border: 1px solid #dbe7df; padding: 10px 12px; text-align: left; }
         .g3-tabela tbody tr:nth-child(even) td { background: #f8fbf9; }
         .g3-tabela td { font-size: 13px; color: #233a31; min-height: 36px; }
+        .g3-tabela td:first-child,
+        .g3-tabela td:nth-child(3),
+        .g3-tabela td:nth-child(4),
+        .g3-tabela td:nth-child(5) { white-space: nowrap; }
         .g3-rodape { margin-top: 18px; padding-top: 12px; border-top: 1px solid #dbe7df; font-size: 11px; color: #6b7f75; text-align: center; }
         .g3-rodape div + div { margin-top: 2px; }
       `,
@@ -581,7 +586,7 @@ export function AgendamentosPage() {
                   ? `<img src="${escapeHtml(logomarcaRelatorio)}" alt="Logomarca da instituição" class="g3-topo-logo" />`
                   : ""
               }
-              <div>
+              <div class="g3-topo-texto">
                 <h1>${escapeHtml(nomeInstituicao)}</h1>
                 <h2>Agendamento e lista de presença</h2>
               </div>
@@ -603,10 +608,10 @@ export function AgendamentosPage() {
           <table class="g3-tabela">
             <thead>
               <tr>
-                <th style="width: 52px;">Nº</th>
+                <th style="width: 42px;">Nº</th>
                 <th>Beneficiário</th>
-                <th style="width: 170px;">Telefone</th>
-                <th style="width: 140px;">Status</th>
+                <th style="width: 132px;">Telefone</th>
+                <th style="width: 108px;">Status</th>
                 <th style="width: 120px;">Presença</th>
               </tr>
             </thead>

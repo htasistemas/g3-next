@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.400",
+  "latestVersion": "1.00.401",
   "releaseDate": "2026-03-28",
-  "description": "A tela de usuários passou a usar ações contextuais por aba e a listagem ganhou botão de exclusão com ações destacadas.",
+  "description": "O relatório de agendamento e lista de presença passou a priorizar o título e o campo do beneficiário na impressão.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.400",
+  "minCompatibleVersion": "1.00.401",
   "releaseType": "stable",
   "downloadUrl": null
 }

@@ -1,6 +1,18 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.401",
+                        "releaseDate":  "2026-03-28",
+                        "title":  "Relatorio de agendamento com tabela mais equilibrada",
+                        "description":  "A impressao de agendamento e lista de presenca foi ajustada para dar mais destaque ao titulo e mais largura ao nome do beneficiario.",
+                        "changes":  [
+                                        "O nome da instituicao no cabecalho ficou menor e o titulo do relatorio passou a ocupar mais destaque visual.",
+                                        "As colunas de numero, telefone e status foram reduzidas para abrir mais espaco ao campo do beneficiario.",
+                                        "O manual interno e a versao do sistema foram atualizados para refletir o novo enquadramento do relatorio."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.400",
                         "releaseDate":  "2026-03-28",
                         "title":  "Usuarios com acoes contextuais por aba",
