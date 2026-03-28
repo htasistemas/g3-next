@@ -404,6 +404,7 @@ export function RegistroPontoPage() {
   const [ocorrenciaDescricao, setOcorrenciaDescricao] = useState("");
   const videoFaceRef = useRef<HTMLVideoElement | null>(null);
   const streamFaceRef = useRef<MediaStream | null>(null);
+  const marcacaoEmExecucaoRef = useRef(false);
   const { data: listaData, isLoading: carregandoLista } = useRegistrosPonto(filtros);
   const { data: espelhoData, isLoading: carregandoEspelho } = useEspelhoPonto(filtros);
   const { data: historicoData, isLoading: carregandoHistorico } = useHistoricoRegistroPonto(registroSelecionadoId);
@@ -854,6 +855,12 @@ export function RegistroPontoPage() {
   }
 
   async function executarMarcacao() {
+    if (marcacaoEmExecucaoRef.current) {
+      return;
+    }
+
+    marcacaoEmExecucaoRef.current = true;
+
     try {
       if (!confirmacaoLogin.trim() || !confirmacaoSenha.trim()) {
         setMensagem({ tipo: "erro", texto: "Informe usuário e senha para confirmar a marcação." });
@@ -901,6 +908,7 @@ export function RegistroPontoPage() {
         texto: apiError.response?.data?.message ?? "Não foi possível registrar a batida de ponto."
       });
     } finally {
+      marcacaoEmExecucaoRef.current = false;
       setEtapaMarcacao("idle");
     }
   }

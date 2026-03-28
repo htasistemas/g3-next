@@ -1,10 +1,25 @@
 import { useDeferredValue, useMemo, useState } from "react";
-import { Activity, CalendarRange, FileDown, Users, X } from "lucide-react";
+import {
+  Activity,
+  BadgeCheck,
+  CalendarDays,
+  CalendarRange,
+  ChevronLeft,
+  ChevronRight,
+  Clock3,
+  FileDown,
+  LayoutGrid,
+  TriangleAlert,
+  TrendingUp,
+  Users,
+  X,
+  type LucideIcon
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { AdminPageLayout, type AdminAction, type AdminTab } from "@/components/admin/admin-page-layout";
 import { PopupConfirmacao, PopupMensagem, type PopupMensagemState } from "@/components/admin/admin-popups";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { imprimirHtml } from "@/lib/report-utils";
 import {
   AgendaCardList,
   BeneficiarioSelector,
@@ -22,15 +37,23 @@ import {
   useItensOperacionaisAgendamento,
   useListaEsperaAgendamentos,
   useNotificarAgendamento,
+  useRemarcarAgendamento,
+  useSalvarAgendamento,
   useSalvarAgendamentoOperacional
 } from "@/features/agendamentos/use-agendamentos";
 import type { Agendamento, AgendamentoOperacionalItem, AgendamentoOperacionalTipo } from "@/types/agendamento";
 
 type AbaId = "agenda" | "dashboard" | "espera";
 
+type DashboardCard = {
+  label: string;
+  value: string | number;
+  icon: LucideIcon;
+};
+
 const abas: AdminTab[] = [
-  { id: "agenda", label: "Agendamento operacional", icon: CalendarRange },
   { id: "dashboard", label: "Dashboard", icon: Activity },
+  { id: "agenda", label: "Agendamento", icon: CalendarRange },
   { id: "espera", label: "Lista de espera", icon: Users }
 ];
 
@@ -59,6 +82,24 @@ function normalizarData(data?: string) {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+function somarDias(data: string, deslocamento: number) {
+  const base = normalizarData(data) ?? new Date(`${hoje}T12:00:00`);
+  base.setDate(base.getDate() + deslocamento);
+  return base.toISOString().slice(0, 10);
+}
+
+function formatarDataExtensa(data?: string) {
+  const parsed = normalizarData(data);
+  if (!parsed) return "---";
+  const texto = new Intl.DateTimeFormat("pt-BR", {
+    weekday: "long",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  }).format(parsed);
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
+
 function escapeHtml(value?: string | number | null) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -68,38 +109,146 @@ function escapeHtml(value?: string | number | null) {
     .replaceAll("'", "&#39;");
 }
 
+function imprimirFichaHtml(options: {
+  titulo: string;
+  html: string;
+  estilosExtras?: string;
+  tamanhoPagina?: string;
+  margemPagina?: string;
+  paddingRaiz?: string;
+}) {
+  const janela = window.open("", "g3n-agendamento-impressao", "width=1200,height=900");
+
+  if (!janela) {
+    throw new Error("O navegador bloqueou a abertura da ficha de presença.");
+  }
+
+  try {
+    janela.opener = null;
+  } catch {
+    // Alguns navegadores não permitem ajustar opener em todas as combinações.
+  }
+
+  const estilos = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
+    .map((node) => node.outerHTML)
+    .join("\n");
+
+  const tamanhoPagina = options.tamanhoPagina ?? "A4 portrait";
+  const margemPagina = options.margemPagina ?? "12mm";
+  const paddingRaiz = options.paddingRaiz ?? "18px";
+  const estilosExtras = options.estilosExtras ?? "";
+
+  janela.document.write(`<!doctype html>
+    <html lang="pt-BR">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>${escapeHtml(options.titulo)}</title>
+        ${estilos}
+        <style>
+          @page {
+            size: ${tamanhoPagina};
+            margin: ${margemPagina};
+          }
+
+          body {
+            margin: 0;
+            background: #fff;
+            color: #0f172a;
+            font-family: Arial, sans-serif;
+          }
+
+          .g3-print-root {
+            padding: ${paddingRaiz};
+          }
+
+          table {
+            width: 100%;
+            border-collapse: collapse;
+          }
+
+          th,
+          td {
+            vertical-align: top;
+          }
+
+          ${estilosExtras}
+        </style>
+      </head>
+      <body>
+        <div class="g3-print-root">${options.html}</div>
+        <script>
+          let impressaoExecutada = false;
+
+          const executarImpressao = () => {
+            if (impressaoExecutada) return;
+            impressaoExecutada = true;
+            window.setTimeout(() => {
+              try {
+                window.focus();
+                window.print();
+              } catch {
+                // Mantem a janela aberta para o usuario se a impressao falhar.
+              }
+            }, 300);
+          };
+
+          if (document.readyState === "complete") {
+            executarImpressao();
+          } else {
+            window.addEventListener("load", executarImpressao, { once: true });
+          }
+
+          window.setTimeout(executarImpressao, 1200);
+          window.addEventListener("afterprint", () => window.close(), { once: true });
+        </script>
+      </body>
+    </html>`);
+  janela.document.close();
+}
+
 export function AgendamentosPage() {
   const navigate = useNavigate();
-  const [abaAtiva, setAbaAtiva] = useState<AbaId>("agenda");
+  const [abaAtiva, setAbaAtiva] = useState<AbaId>("dashboard");
   const [tipo, setTipo] = useState<AgendamentoOperacionalTipo | undefined>();
   const [buscaItem, setBuscaItem] = useState("");
   const buscaItemAdiada = useDeferredValue(buscaItem);
   const [itemSelecionado, setItemSelecionado] = useState<AgendamentoOperacionalItem | null>(null);
   const [dataAgendamento, setDataAgendamento] = useState(hoje);
+  const [dataVisualizacao, setDataVisualizacao] = useState(hoje);
   const [buscaBeneficiario, setBuscaBeneficiario] = useState("");
   const [beneficiariosSelecionados, setBeneficiariosSelecionados] = useState<number[]>([]);
   const [selecionadoId, setSelecionadoId] = useState<number | null>(null);
   const [popup, setPopup] = useState<PopupMensagemState | null>(null);
   const [confirmarCancelar, setConfirmarCancelar] = useState<Agendamento | null>(null);
+  const [agendaParaExcluir, setAgendaParaExcluir] = useState<Agendamento | null>(null);
+  const [agendaParaData, setAgendaParaData] = useState<{ acao: "copiar" | "mover"; item: Agendamento } | null>(null);
+  const [novaDataAgenda, setNovaDataAgenda] = useState(hoje);
+  const [participanteParaMover, setParticipanteParaMover] = useState<{ item: Agendamento; index: number } | null>(null);
+  const [participanteParaExcluir, setParticipanteParaExcluir] = useState<{ item: Agendamento; index: number } | null>(null);
 
   const agendamentosQuery = useAgendamentos({});
   const indicadoresQuery = useIndicadoresAgendamentos({});
   const listaEsperaQuery = useListaEsperaAgendamentos();
   const itensQuery = useItensOperacionaisAgendamento(tipo, buscaItemAdiada);
   const beneficiariosQuery = useBeneficiariosOperacionaisAgendamento(itemSelecionado?.id ?? null);
+  const salvarAgendamentoMutation = useSalvarAgendamento();
   const salvarMutation = useSalvarAgendamentoOperacional();
   const cancelarMutation = useCancelarAgendamento();
   const notificarMutation = useNotificarAgendamento();
+  const remarcarMutation = useRemarcarAgendamento();
 
   const cards = useMemo(
     () =>
       (agendamentosQuery.data ?? [])
+        .filter((item) => (item.status ?? "").trim().toUpperCase() !== "CANCELADO")
         .filter((item) => item.itemOrigemId || item.itemNome || item.coletivo)
         .sort((a, b) => `${a.data ?? ""}${a.horaInicial ?? ""}`.localeCompare(`${b.data ?? ""}${b.horaInicial ?? ""}`)),
     [agendamentosQuery.data]
   );
 
   const cardSelecionado = cards.find((item) => item.id === selecionadoId) ?? null;
+  const cardsDoDia = useMemo(() => cards.filter((item) => (item.data ?? "").slice(0, 10) === dataVisualizacao), [cards, dataVisualizacao]);
 
   const beneficiariosFiltrados = useMemo(() => {
     const termo = buscaBeneficiario.trim().toLowerCase();
@@ -115,7 +264,7 @@ export function AgendamentosPage() {
     { label: "Beneficiários", value: `${beneficiariosSelecionados.length} selecionado(s)` }
   ];
 
-  const dashboardResumo = useMemo(() => {
+  const dashboardResumo = useMemo<DashboardCard[]>(() => {
     const hojeData = new Date();
     const inicioSemana = obterInicioSemana(hojeData);
     const fimSemana = obterFimSemana(hojeData);
@@ -135,13 +284,13 @@ export function AgendamentosPage() {
     }).length;
 
     return [
-      { label: "Pacientes agendados", value: participantesAgendados },
-      { label: "Frequência média", value: frequenciaMedia.toLocaleString("pt-BR") },
-      { label: "Faltas da semana", value: faltasSemana },
-      { label: "Sessões do mês", value: sessoesMes },
-      { label: "Lista de espera", value: (listaEsperaQuery.data ?? []).length },
-      { label: "Total de cards", value: cards.length },
-      { label: "Confirmados", value: indicadoresQuery.data?.confirmados ?? 0 }
+      { label: "Pacientes agendados", value: participantesAgendados, icon: Users },
+      { label: "Frequência média", value: frequenciaMedia.toLocaleString("pt-BR"), icon: TrendingUp },
+      { label: "Faltas da semana", value: faltasSemana, icon: TriangleAlert },
+      { label: "Sessões do mês", value: sessoesMes, icon: CalendarDays },
+      { label: "Lista de espera", value: (listaEsperaQuery.data ?? []).length, icon: Clock3 },
+      { label: "Total de cards", value: cards.length, icon: LayoutGrid },
+      { label: "Confirmados", value: indicadoresQuery.data?.confirmados ?? 0, icon: BadgeCheck }
     ];
   }, [cards, indicadoresQuery.data?.confirmados, listaEsperaQuery.data]);
 
@@ -157,6 +306,7 @@ export function AgendamentosPage() {
         setBuscaBeneficiario("");
         setBeneficiariosSelecionados([]);
         setDataAgendamento(hoje);
+        setDataVisualizacao(hoje);
         setAbaAtiva("agenda");
       },
       variant: "default"
@@ -180,6 +330,7 @@ export function AgendamentosPage() {
         matriculasIds: beneficiariosSelecionados
       });
       setSelecionadoId(salvo?.id ?? null);
+      setDataVisualizacao(dataAgendamento);
       setPopup({
         tipo: "sucesso",
         titulo: "Confirmação",
@@ -212,6 +363,12 @@ export function AgendamentosPage() {
 
   function imprimirFichaPresenca(item: Agendamento) {
     const participantes = item.participantes ?? [];
+    const atividade = item.itemNome || item.tipoAtendimento;
+    const tipo = item.itemTipo || item.setor || "-";
+    const profissional = item.profissionalNome || "Sem profissional definido";
+    const data = item.data ? new Date(`${item.data}T12:00:00`).toLocaleDateString("pt-BR") : "-";
+    const horario = item.horaInicial || "-";
+    const local = item.itemLocal || item.sala || item.unidade || "-";
     const linhas = participantes.length
       ? participantes
           .map(
@@ -220,6 +377,7 @@ export function AgendamentosPage() {
                 <td>${index + 1}</td>
                 <td>${escapeHtml(participante.beneficiarioNome)}</td>
                 <td>${escapeHtml(participante.telefone || "-")}</td>
+                <td>${escapeHtml(participante.comparecimento || "Pendente")}</td>
                 <td></td>
                 <td></td>
               </tr>`
@@ -228,57 +386,90 @@ export function AgendamentosPage() {
       : `
         <tr>
           <td>1</td>
-          <td colspan="4">Sem beneficiários vinculados ao card.</td>
+          <td colspan="5">Sem beneficiários vinculados ao card.</td>
         </tr>`;
 
-    imprimirHtml({
-      titulo: `Ficha de presença - ${item.itemNome || item.tipoAtendimento}`,
+    const emitidoEm = new Date().toLocaleString("pt-BR");
+
+    imprimirFichaHtml({
+      titulo: `Agendamento e lista de presença - ${atividade}`,
       tamanhoPagina: "A4 portrait",
+      paddingRaiz: "16px",
       estilosExtras: `
-        .g3-ficha { color: #0f172a; }
-        .g3-topo { border-bottom: 3px solid #047857; padding-bottom: 14px; margin-bottom: 18px; }
-        .g3-topo h1 { margin: 0; font-size: 24px; color: #065f46; }
-        .g3-topo p { margin: 6px 0 0; font-size: 13px; color: #475569; }
-        .g3-meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 18px; }
-        .g3-meta-item { border: 1px solid #cbd5e1; border-radius: 12px; padding: 10px 12px; background: #f8fafc; }
-        .g3-meta-item strong { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; margin-bottom: 4px; }
-        .g3-meta-item span { font-size: 14px; font-weight: 600; color: #0f172a; }
-        .g3-tabela thead th { background: #ecfdf5; color: #065f46; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
-        .g3-tabela th, .g3-tabela td { border: 1px solid #cbd5e1; padding: 10px 12px; text-align: left; }
-        .g3-tabela td { font-size: 13px; min-height: 36px; }
-        .g3-rodape { margin-top: 26px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
-        .g3-assinatura { padding-top: 28px; border-top: 1px solid #94a3b8; text-align: center; font-size: 12px; color: #475569; }
+        .g3-ficha { color: #163027; }
+        .g3-topo { margin-bottom: 18px; border: 1px solid #cfe9da; border-radius: 18px; overflow: hidden; background: linear-gradient(180deg, #f6fdf8 0%, #edf8f1 100%); }
+        .g3-topo-faixa { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; background: #0f8a57; color: #ffffff; }
+        .g3-topo-marca { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; }
+        .g3-topo-selo { border: 1px solid rgba(255,255,255,0.35); border-radius: 999px; padding: 4px 10px; font-size: 11px; font-weight: 600; background: rgba(255,255,255,0.12); }
+        .g3-topo-corpo { display: grid; gap: 6px; padding: 18px; }
+        .g3-topo h1 { margin: 0; font-size: 24px; font-weight: 700; color: #14532d; }
+        .g3-topo p { margin: 0; font-size: 13px; color: #4b6356; }
+        .g3-bloco { margin-bottom: 16px; border: 1px solid #dbe7df; border-radius: 16px; background: #ffffff; overflow: hidden; }
+        .g3-bloco-titulo { margin: 0; padding: 12px 16px; background: #eef8f2; border-bottom: 1px solid #dbe7df; font-size: 14px; font-weight: 700; color: #166534; }
+        .g3-meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 14px 16px 16px; }
+        .g3-meta-item { border: 1px solid #dbe7df; border-radius: 12px; padding: 10px 12px; background: #f9fcfa; }
+        .g3-meta-item strong { display: block; margin-bottom: 4px; font-size: 11px; font-weight: 600; color: #5d7467; }
+        .g3-meta-item span { display: block; font-size: 14px; font-weight: 700; color: #163027; }
+        .g3-indicadores { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px; }
+        .g3-indicador { border: 1px solid #dbe7df; border-radius: 14px; padding: 12px 14px; background: #f8fbf9; }
+        .g3-indicador strong { display: block; margin-bottom: 4px; font-size: 11px; font-weight: 600; color: #5d7467; }
+        .g3-indicador span { font-size: 18px; font-weight: 700; color: #14532d; }
+        .g3-orientacao { margin: 0 0 16px; border-left: 4px solid #0f8a57; border-radius: 10px; padding: 10px 12px; background: #f4fbf7; font-size: 12px; color: #4b6356; }
+        .g3-tabela { width: 100%; table-layout: fixed; border: 1px solid #dbe7df; border-radius: 16px; overflow: hidden; }
+        .g3-tabela thead th { padding: 11px 12px; background: #0f8a57; color: #ffffff; font-size: 12px; font-weight: 700; text-align: left; }
+        .g3-tabela th, .g3-tabela td { border: 1px solid #dbe7df; padding: 10px 12px; text-align: left; }
+        .g3-tabela tbody tr:nth-child(even) td { background: #f8fbf9; }
+        .g3-tabela td { font-size: 13px; color: #233a31; min-height: 36px; }
+        .g3-assinaturas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-top: 24px; }
+        .g3-assinatura { padding-top: 28px; border-top: 1px solid #8ba59a; text-align: center; font-size: 12px; color: #5d7467; }
+        .g3-rodape { margin-top: 16px; font-size: 11px; color: #6b7f75; text-align: right; }
       `,
       html: `
         <section class="g3-ficha">
           <header class="g3-topo">
-            <h1>Ficha de presença</h1>
-            <p>Relatório operacional do G3N</p>
+            <div class="g3-topo-faixa">
+              <span class="g3-topo-marca">G3N</span>
+              <span class="g3-topo-selo">Agendamento</span>
+            </div>
+            <div class="g3-topo-corpo">
+              <h1>Agendamento e lista de presença</h1>
+              <p>Documento operacional no padrão visual do sistema G3N para conferência, presença e assinatura.</p>
+            </div>
           </header>
-          <section class="g3-meta">
-            <div class="g3-meta-item"><strong>Atividade</strong><span>${escapeHtml(item.itemNome || item.tipoAtendimento)}</span></div>
-            <div class="g3-meta-item"><strong>Tipo</strong><span>${escapeHtml(item.itemTipo || item.setor || "-")}</span></div>
-            <div class="g3-meta-item"><strong>Profissional</strong><span>${escapeHtml(item.profissionalNome || "Sem profissional definido")}</span></div>
-            <div class="g3-meta-item"><strong>Data</strong><span>${escapeHtml(item.data ? new Date(`${item.data}T12:00:00`).toLocaleDateString("pt-BR") : "-")}</span></div>
-            <div class="g3-meta-item"><strong>Horário</strong><span>${escapeHtml(item.horaInicial || "-")}</span></div>
-            <div class="g3-meta-item"><strong>Local</strong><span>${escapeHtml(item.itemLocal || item.sala || item.unidade || "-")}</span></div>
+          <section class="g3-bloco">
+            <h2 class="g3-bloco-titulo">Resumo do agendamento</h2>
+            <div class="g3-meta">
+              <div class="g3-meta-item"><strong>Atividade</strong><span>${escapeHtml(atividade)}</span></div>
+              <div class="g3-meta-item"><strong>Tipo</strong><span>${escapeHtml(tipo)}</span></div>
+              <div class="g3-meta-item"><strong>Profissional</strong><span>${escapeHtml(profissional)}</span></div>
+              <div class="g3-meta-item"><strong>Data</strong><span>${escapeHtml(data)}</span></div>
+              <div class="g3-meta-item"><strong>Horário</strong><span>${escapeHtml(horario)}</span></div>
+              <div class="g3-meta-item"><strong>Local</strong><span>${escapeHtml(local)}</span></div>
+            </div>
           </section>
+          <section class="g3-indicadores">
+            <div class="g3-indicador"><strong>Total de participantes</strong><span>${escapeHtml(participantes.length)}</span></div>
+            <div class="g3-indicador"><strong>Status da agenda</strong><span>${escapeHtml(item.status || "Agendado")}</span></div>
+          </section>
+          <p class="g3-orientacao">Use esta lista para registrar a presença dos beneficiários, marcar a situação do atendimento e recolher as assinaturas no mesmo documento.</p>
           <table class="g3-tabela">
             <thead>
               <tr>
-                <th style="width: 56px;">#</th>
+                <th style="width: 52px;">Nº</th>
                 <th>Beneficiário</th>
-                <th style="width: 180px;">Telefone</th>
+                <th style="width: 170px;">Telefone</th>
+                <th style="width: 140px;">Status</th>
                 <th style="width: 180px;">Assinatura</th>
                 <th style="width: 120px;">Presença</th>
               </tr>
             </thead>
             <tbody>${linhas}</tbody>
           </table>
-          <footer class="g3-rodape">
+          <section class="g3-assinaturas">
             <div class="g3-assinatura">Responsável pelo atendimento</div>
             <div class="g3-assinatura">Data e conferência</div>
-          </footer>
+          </section>
+          <footer class="g3-rodape">Emitido em ${escapeHtml(emitidoEm)}</footer>
         </section>`
     });
   }
@@ -299,11 +490,181 @@ export function AgendamentosPage() {
     };
     setItemSelecionado(itemResumo.id ? itemResumo : null);
     setDataAgendamento(item.data ?? hoje);
+    setDataVisualizacao(item.data ?? hoje);
     setBeneficiariosSelecionados(
       (item.participantes ?? [])
         .map((participante) => participante.matriculaId ?? participante.beneficiarioId)
         .filter(Boolean) as number[]
     );
+  }
+
+  async function copiarAgenda(item: Agendamento) {
+    const itemId = item.itemOrigemId;
+    const tipoItem = item.itemTipo;
+    const matriculasIds = (item.participantes ?? []).map((participante) => participante.matriculaId).filter(Boolean) as number[];
+
+    if (!tipoItem || !itemId || !matriculasIds.length) {
+      setPopup({ tipo: "erro", titulo: "Atenção", texto: "Não foi possível copiar esta agenda porque faltam dados obrigatórios." });
+      return;
+    }
+    setAgendaParaData({ acao: "copiar", item });
+    setNovaDataAgenda(item.data?.slice(0, 10) || hoje);
+  }
+
+  async function moverAgenda(item: Agendamento) {
+    if (!item.id) return;
+    setAgendaParaData({ acao: "mover", item });
+    setNovaDataAgenda(item.data?.slice(0, 10) || hoje);
+  }
+
+  async function excluirAgenda(item: Agendamento) {
+    if (!item.id) return;
+    setAgendaParaExcluir(item);
+  }
+
+  async function confirmarAcaoComData() {
+    if (!agendaParaData) return;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(novaDataAgenda)) {
+      setPopup({ tipo: "erro", titulo: "Data inválida", texto: "Informe a data no formato AAAA-MM-DD." });
+      return;
+    }
+
+    try {
+      if (agendaParaData.acao === "copiar") {
+        const itemId = agendaParaData.item.itemOrigemId;
+        const tipoItem = agendaParaData.item.itemTipo;
+        const matriculasIds = (agendaParaData.item.participantes ?? [])
+          .map((participante) => participante.matriculaId)
+          .filter(Boolean) as number[];
+
+        if (!tipoItem || !itemId || !matriculasIds.length) {
+          setPopup({ tipo: "erro", titulo: "Atenção", texto: "Não foi possível copiar esta agenda porque faltam dados obrigatórios." });
+          return;
+        }
+
+        await salvarMutation.mutateAsync({
+          tipo: tipoItem,
+          itemId,
+          data: novaDataAgenda,
+          matriculasIds
+        });
+        setPopup({ tipo: "sucesso", titulo: "Confirmação", texto: "Agenda copiada com sucesso para a nova data." });
+      } else {
+        if (!agendaParaData.item.id) return;
+        await remarcarMutation.mutateAsync({
+          id: agendaParaData.item.id,
+          payload: { data: novaDataAgenda }
+        });
+        setPopup({ tipo: "sucesso", titulo: "Confirmação", texto: "Agenda remarcada com sucesso." });
+      }
+
+      setDataVisualizacao(novaDataAgenda);
+      setAgendaParaData(null);
+    } catch (error: any) {
+      setPopup({
+        tipo: "erro",
+        titulo: "Erro",
+        texto:
+          error?.response?.data?.message ??
+          (agendaParaData.acao === "copiar" ? "Não foi possível copiar a agenda." : "Não foi possível remarcar a agenda.")
+      });
+    }
+  }
+
+  async function alternarConfirmacaoParticipante(item: Agendamento, index: number) {
+    if (!item.id) return;
+    const participantes = (item.participantes ?? []).map((participante, participanteIndex) =>
+      participanteIndex === index
+        ? {
+            ...participante,
+            observacao: participante.observacao === "Confirmado" ? "A confirmar" : "Confirmado"
+          }
+        : participante
+    );
+
+    try {
+      await salvarAgendamentoMutation.mutateAsync({
+        ...item,
+        participantes
+      });
+    } catch (error: any) {
+      setPopup({ tipo: "erro", titulo: "Erro", texto: error?.response?.data?.message ?? "Não foi possível atualizar a confirmação." });
+    }
+  }
+
+  function solicitarMoverParticipante(item: Agendamento, index: number) {
+    setParticipanteParaMover({ item, index });
+    setNovaDataAgenda(item.data?.slice(0, 10) || hoje);
+  }
+
+  function solicitarExcluirParticipante(item: Agendamento, index: number) {
+    setParticipanteParaExcluir({ item, index });
+  }
+
+  async function salvarParticipantesAtualizados(item: Agendamento, participantes: NonNullable<Agendamento["participantes"]>) {
+    if (!item.id) return;
+
+    if (!participantes.length) {
+      await cancelarMutation.mutateAsync({ id: item.id, motivo: "Agenda sem participantes após ajuste individual." });
+      if (selecionadoId === item.id) {
+        setSelecionadoId(null);
+      }
+      return;
+    }
+
+    await salvarAgendamentoMutation.mutateAsync({
+      ...item,
+      participantes
+    });
+  }
+
+  async function confirmarMoverParticipante() {
+    if (!participanteParaMover) return;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(novaDataAgenda)) {
+      setPopup({ tipo: "erro", titulo: "Data inválida", texto: "Informe a data no formato AAAA-MM-DD." });
+      return;
+    }
+
+    const participante = participanteParaMover.item.participantes?.[participanteParaMover.index];
+    const matriculaId = participante?.matriculaId;
+    const itemId = participanteParaMover.item.itemOrigemId;
+    const tipoItem = participanteParaMover.item.itemTipo;
+
+    if (!participante || !matriculaId || !itemId || !tipoItem) {
+      setPopup({ tipo: "erro", titulo: "Atenção", texto: "Não foi possível mover este beneficiário." });
+      return;
+    }
+
+    try {
+      await salvarMutation.mutateAsync({
+        tipo: tipoItem,
+        itemId,
+        data: novaDataAgenda,
+        matriculasIds: [matriculaId]
+      });
+
+      const participantesRestantes = (participanteParaMover.item.participantes ?? []).filter((_, index) => index !== participanteParaMover.index);
+      await salvarParticipantesAtualizados(participanteParaMover.item, participantesRestantes);
+
+      setDataVisualizacao(novaDataAgenda);
+      setParticipanteParaMover(null);
+      setPopup({ tipo: "sucesso", titulo: "Confirmação", texto: "Beneficiário movido para a nova data com sucesso." });
+    } catch (error: any) {
+      setPopup({ tipo: "erro", titulo: "Erro", texto: error?.response?.data?.message ?? "Não foi possível mover o beneficiário." });
+    }
+  }
+
+  async function confirmarExcluirParticipante() {
+    if (!participanteParaExcluir) return;
+
+    try {
+      const participantesRestantes = (participanteParaExcluir.item.participantes ?? []).filter((_, index) => index !== participanteParaExcluir.index);
+      await salvarParticipantesAtualizados(participanteParaExcluir.item, participantesRestantes);
+      setParticipanteParaExcluir(null);
+      setPopup({ tipo: "sucesso", titulo: "Confirmação", texto: "Beneficiário removido da agenda com sucesso." });
+    } catch (error: any) {
+      setPopup({ tipo: "erro", titulo: "Erro", texto: error?.response?.data?.message ?? "Não foi possível remover o beneficiário." });
+    }
   }
 
   return (
@@ -378,7 +739,7 @@ export function AgendamentosPage() {
                     disabled={!tipo || !itemSelecionado?.id || !beneficiariosSelecionados.length || !dataAgendamento}
                     loading={salvarMutation.isPending}
                     onClick={salvarCard}
-                    texto={cardSelecionado?.id ? "Atualizar Agenda" : "Gerar Agenda"}
+                    texto={cardSelecionado?.id ? "Atualizar agenda" : "Gerar agenda"}
                   />
                 </CardContent>
               </Card>
@@ -387,13 +748,39 @@ export function AgendamentosPage() {
                 <CardHeader className="space-y-2">
                   <CardTitle className="text-sm">Agenda operacional gerada</CardTitle>
                   <p className="text-xs text-[var(--g3-muted)]">
-                    Cards organizados por data, com leitura rápida do item, profissional, horário, local e participantes.
+                    Use a data de visualização para navegar entre os dias e carregar somente os cards agendados naquela data.
                   </p>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-4">
+                  <div className="flex flex-col gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 shadow-sm md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-800">Data em exibição</p>
+                      <p className="mt-1 text-base font-semibold text-emerald-950">{formatarDataExtensa(dataVisualizacao)}</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button type="button" variant="outline" className="shadow-sm" onClick={() => setDataVisualizacao((atual) => somarDias(atual, -1))}>
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <input
+                        type="date"
+                        value={dataVisualizacao}
+                        onChange={(event) => setDataVisualizacao(event.target.value)}
+                        className="h-10 rounded-xl border border-[var(--g3-border)] bg-white px-3 text-sm text-[var(--g3-foreground)] shadow-sm outline-none focus:border-emerald-400"
+                      />
+                      <Button type="button" variant="outline" className="shadow-sm" onClick={() => setDataVisualizacao((atual) => somarDias(atual, 1))}>
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
                   <AgendaCardList
-                    cards={cards}
+                    cards={cardsDoDia}
                     selecionadoId={selecionadoId}
+                    onAlternarConfirmacao={(item, index) => void alternarConfirmacaoParticipante(item, index)}
+                    onMoverParticipante={(item, index) => solicitarMoverParticipante(item, index)}
+                    onExcluirParticipante={(item, index) => solicitarExcluirParticipante(item, index)}
+                    onCopiar={(item) => void copiarAgenda(item)}
+                    onExcluir={(item) => void excluirAgenda(item)}
+                    onMover={(item) => void moverAgenda(item)}
                     onEditar={carregarParaEdicao}
                     onCancelar={(item) => setConfirmarCancelar(item)}
                     onWhatsApp={(item) => void executarNotificacao(item, "WHATSAPP")}
@@ -415,9 +802,15 @@ export function AgendamentosPage() {
               </CardHeader>
               <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 {dashboardResumo.map((card) => (
-                  <div key={card.label} className="rounded-2xl border border-[var(--g3-border)] bg-white px-4 py-4 shadow-sm">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">{card.label}</p>
-                    <p className="mt-2 text-2xl font-bold text-[var(--g3-foreground)]">{card.value}</p>
+                  <div
+                    key={card.label}
+                    className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-5 text-center shadow-[0_10px_24px_rgba(22,101,52,0.12)]"
+                  >
+                    <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-white text-emerald-700 shadow-sm">
+                      <card.icon className="h-5 w-5" />
+                    </div>
+                    <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-emerald-800">{card.label}</p>
+                    <p className="mt-2 text-2xl font-bold text-emerald-950">{card.value}</p>
                   </div>
                 ))}
               </CardContent>
@@ -466,6 +859,100 @@ export function AgendamentosPage() {
         }}
         confirmarTexto="Cancelar agenda"
       />
+
+      <PopupConfirmacao
+        aberto={Boolean(agendaParaExcluir)}
+        titulo="Excluir agenda"
+        texto="Deseja realmente excluir esta agenda da listagem?"
+        processando={cancelarMutation.isPending}
+        onCancel={() => setAgendaParaExcluir(null)}
+        onConfirm={() => {
+          if (!agendaParaExcluir?.id) return;
+          void cancelarMutation
+            .mutateAsync({ id: agendaParaExcluir.id, motivo: "Excluído pela agenda operacional." })
+            .then(() => {
+              setPopup({ tipo: "sucesso", titulo: "Confirmação", texto: "Agenda removida com sucesso." });
+              if (selecionadoId === agendaParaExcluir.id) {
+                setSelecionadoId(null);
+              }
+              setAgendaParaExcluir(null);
+            })
+            .catch((error: any) =>
+              setPopup({ tipo: "erro", titulo: "Erro", texto: error?.response?.data?.message ?? "Não foi possível excluir a agenda." })
+            );
+        }}
+        confirmarTexto="Excluir agenda"
+      />
+
+      <PopupConfirmacao
+        aberto={Boolean(participanteParaExcluir)}
+        titulo="Excluir beneficiário"
+        texto="Deseja realmente remover este beneficiário da agenda do dia?"
+        processando={salvarAgendamentoMutation.isPending || cancelarMutation.isPending}
+        onCancel={() => setParticipanteParaExcluir(null)}
+        onConfirm={() => void confirmarExcluirParticipante()}
+        confirmarTexto="Excluir beneficiário"
+      />
+
+      {agendaParaData ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/45 px-4" onClick={() => setAgendaParaData(null)}>
+          <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="border-b border-slate-100 px-5 py-4">
+              <h3 className="text-base font-semibold text-emerald-800">
+                {agendaParaData.acao === "copiar" ? "Copiar agenda" : "Mover agenda"}
+              </h3>
+            </div>
+            <div className="space-y-4 px-5 py-4">
+              <p className="text-sm text-slate-700">
+                {agendaParaData.acao === "copiar"
+                  ? "Informe a nova data para criar uma cópia desta agenda."
+                  : "Informe a nova data para remarcar esta agenda."}
+              </p>
+              <input
+                type="date"
+                value={novaDataAgenda}
+                onChange={(event) => setNovaDataAgenda(event.target.value)}
+                className="h-10 w-full rounded-xl border border-[var(--g3-border)] bg-white px-3 text-sm text-[var(--g3-foreground)] shadow-sm outline-none focus:border-emerald-400"
+              />
+            </div>
+            <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3">
+              <Button type="button" variant="outline" onClick={() => setAgendaParaData(null)}>
+                Cancelar
+              </Button>
+              <Button type="button" onClick={() => void confirmarAcaoComData()}>
+                Salvar data
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {participanteParaMover ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/45 px-4" onClick={() => setParticipanteParaMover(null)}>
+          <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="border-b border-slate-100 px-5 py-4">
+              <h3 className="text-base font-semibold text-emerald-800">Mover beneficiário</h3>
+            </div>
+            <div className="space-y-4 px-5 py-4">
+              <p className="text-sm text-slate-700">Informe a nova data para transferir apenas este beneficiário.</p>
+              <input
+                type="date"
+                value={novaDataAgenda}
+                onChange={(event) => setNovaDataAgenda(event.target.value)}
+                className="h-10 w-full rounded-xl border border-[var(--g3-border)] bg-white px-3 text-sm text-[var(--g3-foreground)] shadow-sm outline-none focus:border-emerald-400"
+              />
+            </div>
+            <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3">
+              <Button type="button" variant="outline" onClick={() => setParticipanteParaMover(null)}>
+                Cancelar
+              </Button>
+              <Button type="button" onClick={() => void confirmarMoverParticipante()}>
+                Salvar data
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {popup ? <PopupMensagem popup={popup} onClose={() => setPopup(null)} /> : null}
     </>

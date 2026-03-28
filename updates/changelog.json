@@ -1,6 +1,126 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.393",
+                        "releaseDate":  "2026-03-28",
+                        "title":  "Agendamento com ficha de presença no padrão visual do G3N",
+                        "description":  "A impressão da ficha de presença foi ajustada para seguir o padrão institucional do sistema G3N.",
+                        "changes":  [
+                                        "A ficha passou a usar cabeçalho institucional, resumo do agendamento em blocos e tabela de presença com visual alinhado ao sistema.",
+                                        "O documento impresso agora apresenta indicadores, área de assinaturas e rodapé de emissão no mesmo padrão visual do G3N.",
+                                        "O manual interno foi atualizado para refletir o novo modelo de impressão da aba Agendamento."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.392",
+                        "releaseDate":  "2026-03-28",
+                        "title":  "Agendamento com ficha de presença estável no botão de impressão",
+                        "description":  "O botão de imprimir do card da agenda voltou a abrir corretamente a ficha de presença em nova janela pronta para impressão.",
+                        "changes":  [
+                                        "A geração da ficha de presença passou a reservar a janela de impressão do próprio card antes de disparar o print.",
+                                        "A nova janela agora abre com o resumo do agendamento e a lista de presença completos, sem ficar em branco.",
+                                        "O manual do sistema foi atualizado para refletir o comportamento da impressão na aba Agendamento."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.391",
+                        "releaseDate":  "2026-03-28",
+                        "title":  "Agendamento com remarcação individual e WhatsApp em pt-BR",
+                        "description":  "A agenda passou a permitir mover ou excluir beneficiários individualmente e o texto do WhatsApp agora mostra a data no formato brasileiro.",
+                        "changes":  [
+                                        "Cada beneficiário listado no card da agenda pode ser transferido sozinho para outra data ou removido apenas da agenda do dia.",
+                                        "A remarcação individual reaproveita a própria agenda operacional, criando a nova vaga do beneficiário e atualizando a lista do card original.",
+                                        "As mensagens preparadas para WhatsApp passaram a exibir a data do agendamento em português do Brasil."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.390",
+                        "releaseDate":  "2026-03-28",
+                        "title":  "Agendamento com popups internos e confirmação por beneficiário",
+                        "description":  "A tela de agendamento passou a usar popups visuais do sistema nas ações dos cards e ganhou marcação individual de confirmado ou a confirmar por beneficiário.",
+                        "changes":  [
+                                        "Os botões de copiar, mover e excluir agenda deixaram de abrir janelas nativas do Windows e passaram a usar o padrão visual interno do sistema.",
+                                        "Cada beneficiário listado no card da agenda agora pode ser alternado entre confirmado e a confirmar por meio de ícones de status.",
+                                        "O manual interno e a versão do sistema foram atualizados para refletir o novo comportamento da agenda."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.389",
+                        "releaseDate":  "2026-03-28",
+                        "title":  "Agendamentos com aba renomeada",
+                        "description":  "A aba principal de operação da agenda foi renomeada para Agendamento para simplificar a navegação.",
+                        "changes":  [
+                                        "A aba antes exibida como Agendamento operacional passou a se chamar Agendamento.",
+                                        "O manual interno foi atualizado para refletir a nova nomenclatura da aba.",
+                                        "A versão do sistema foi incrementada para registrar a alteração de interface."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.388",
+                        "releaseDate":  "2026-03-28",
+                        "title":  "Agendamentos operacionais com navegação diária",
+                        "description":  "A agenda operacional passou a mostrar os cards apenas da data em exibição, com navegação rápida para dias anteriores e posteriores.",
+                        "changes":  [
+                                        "A tela passou a ter uma data de visualização separada da data de cadastro do card.",
+                                        "Os botões de avançar e voltar permitem mudar o dia com um clique e listar somente os cards agendados naquela data.",
+                                        "O manual interno e a versão do sistema foram atualizados para refletir a nova navegação diária."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.387",
+                        "releaseDate":  "2026-03-28",
+                        "title":  "Agendamentos com tratamento seguro de conflito no backend",
+                        "description":  "As rotas de agendamentos passaram a encaminhar erros assíncronos para o middleware padrão, evitando queda do servidor quando há conflito de agenda.",
+                        "changes":  [
+                                        "As rotas do módulo de agendamentos passaram a usar o wrapper assíncrono padrão do backend.",
+                                        "Conflitos de agenda continuam retornando HTTP 409, mas agora sem encerrar o processo Node.",
+                                        "A estabilidade do fluxo de criação, remarcação, cancelamento e notificação de agendamentos foi reforçada."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.386",
+                        "releaseDate":  "2026-03-28",
+                        "title":  "Agendamentos operacionais com cards mais destacados",
+                        "description":  "Os cards da agenda operacional receberam sombreamento mais forte para destacar melhor os blocos na leitura da tela.",
+                        "changes":  [
+                                        "Os cards da agenda operacional passaram a usar sombreamento reforçado no estado normal.",
+                                        "Os cards em edição ganharam destaque adicional com sombra verde mais evidente.",
+                                        "O manual interno e a versão do sistema foram atualizados para refletir o ajuste visual."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.385",
+                        "releaseDate":  "2026-03-28",
+                        "title":  "Agendamentos operacionais com nova tarja visual e ações rápidas no card",
+                        "description":  "Os cards da agenda operacional passaram a exibir a identificação principal em tarja verde clara, listagem de beneficiários em tabela e ações rápidas para copiar, remarcar, imprimir e remover agendas.",
+                        "changes":  [
+                                        "Os dados de profissional, data, horário e local passaram a ficar agrupados em uma única tarja verde clara dentro do card.",
+                                        "A lista de beneficiários deixou de usar blocos individuais e passou a ser exibida em tabela com nome e telefone em linhas sequenciais.",
+                                        "Os cards agora oferecem ações para copiar agenda para outra data, remarcar agenda, imprimir o agendamento com lista de presença e remover a agenda da listagem operacional."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.384",
+                        "releaseDate":  "2026-03-28",
+                        "title":  "Agendamentos com dashboard primeiro e impressão completa do agendamento",
+                        "description":  "A tela de agendamentos passou a abrir pelo dashboard, os cards do painel receberam visual verde claro com ícones e a impressão agora inclui o resumo do agendamento junto com a lista de presença.",
+                        "changes":  [
+                                        "A aba Dashboard passou a ser a primeira na navegação da tela de agendamentos.",
+                                        "Os cards do dashboard receberam ícones sugestivos, fundo verde claro, sombreamento nas bordas e conteúdo centralizado.",
+                                        "A frase de resumo vazio foi removida da aba Agendamento operacional e o botão Imprimir agendamento passou a gerar o resumo do agendamento junto com a lista de presença."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.383",
                         "releaseDate":  "2026-03-28",
                         "title":  "Agendamentos com ficha de presença impressa a partir do card",

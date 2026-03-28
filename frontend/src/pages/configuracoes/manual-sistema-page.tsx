@@ -144,16 +144,22 @@ const secoesManual: ManualSecao[] = [
         nome: "Agendamentos",
         objetivo: "Centralizar a agenda operacional da instituição com base em cursos, atendimentos e oficinas já cadastrados nas inscrições.",
         comoUsar: [
-          "Na aba Agendamento operacional, escolha o tipo entre curso, atendimento ou oficina para carregar apenas os itens já cadastrados nas inscrições.",
+          "A aba Dashboard agora abre primeiro na tela para mostrar a visão resumida dos agendamentos logo na entrada do módulo.",
+          "Na aba Agendamento, escolha o tipo entre curso, atendimento ou oficina para carregar apenas os itens já cadastrados nas inscrições.",
           "Os filtros rápidos foram removidos dessa aba para deixar a operação mais direta; o foco agora é montar o card sem distrações.",
           "Depois selecione o item desejado em cards operacionais exibidos lado a lado, em grade com dois cards por linha, para o sistema preencher automaticamente o resumo com profissional, dias, horário e local na mesma linha, sem redigitação manual.",
           "Use a lista de beneficiários vinculados ao item para marcar quem participará naquela data; a agenda operacional agora usa a própria matrícula da inscrição como referência de seleção, o que evita falhas quando o vínculo do cadastro do beneficiário ainda não estiver totalmente resolvido, além da seleção rápida, resumo dos escolhidos e opção de limpar seleção em um clique.",
           "No topo da aba operacional, acompanhe primeiro o resumo do card com tipo, item, data e quantidade de beneficiários antes de montar a agenda.",
           "Na área principal, o campo Tipo fica ao lado da grade de itens do tipo selecionado, sem campo adicional de curso, atendimento ou oficina, e os beneficiários vinculados passam a aparecer em grade, lado a lado, para agilizar a marcação.",
           "Informe a data do agendamento e use Gerar Agenda para salvar a agenda do dia com os participantes agrupados no mesmo card. Não há um segundo botão de salvar: o clique em Gerar Agenda já persiste o card imediatamente.",
-          "Os cards ficam organizados por data e horário, em grade com duas colunas na agenda gerada, com cabeçalho verde, resumo visual leve, lista de beneficiários exibida em linhas verticais e botões de ação compactos para reduzir poluição visual.",
-          "Dentro de cada card, o botão com ícone de impressora gera uma ficha de presença no padrão operacional do G3N, com dados do agendamento e linhas de assinatura dos beneficiários.",
-          "Na aba Dashboard, acompanhe pacientes agendados, frequência média, faltas da semana, sessões do mês, lista de espera, total de cards e confirmados.",
+          "Na listagem da agenda gerada, use a data em exibição com os botões de avançar e voltar para navegar pelos dias e ver somente os cards agendados naquela data, evitando uma tela extensa com todos os cards misturados.",
+          "Os cards ficam organizados por data e horário, em grade com duas colunas na agenda gerada, com cabeçalho verde, sombreamento visual, uma tarja verde clara para profissional, data, horário e local, lista de beneficiários em formato de tabela e botões compactos em linha única.",
+          "Dentro de cada card, os botões por ícone permitem copiar a agenda para outra data, remarcar a agenda, imprimir o agendamento com a lista de presença, acionar WhatsApp, enviar e-mail e remover a agenda da listagem operacional, sempre com popup visual do próprio sistema.",
+          "Ao usar o botão de impressão do card, o sistema abre a ficha de presença em nova janela já pronta para impressão, com cabeçalho institucional G3N, resumo do agendamento, tabela de presença e área de assinaturas no padrão visual do sistema.",
+          "Na lista de beneficiários agendados dentro do card, use o ícone de verificado para indicar confirmado e o ícone de interrogação para indicar a confirmar; o clique alterna o estado do participante.",
+          "Cada beneficiário da agenda também pode ser movido individualmente para outra data ou removido apenas daquele dia, sem precisar alterar todos os participantes do card.",
+          "As mensagens preparadas para WhatsApp passaram a exibir a data do agendamento em português do Brasil.",
+          "Na aba Dashboard, acompanhe pacientes agendados, frequência média, faltas da semana, sessões do mês, lista de espera, total de cards e confirmados em cards com ícones e leitura centralizada.",
           "Na aba Lista de espera, acompanhe demandas ainda não convertidas em agenda."
         ],
         atencoes: [
@@ -506,7 +512,7 @@ const secoesManual: ManualSecao[] = [
         atencoes: [
           "A marcação exige simultaneamente senha e validação facial do mesmo usuário autenticado.",
           "Na confirmação da marcação, o sistema exige duas piscadas ou uma leve virada do rosto para reduzir o risco de uso de foto estática no lugar de uma pessoa real.",
-          "Se a face capturada na confirmação não conferir com a face cadastrada do usuário, o registro do ponto é recusado.",
+          "Se a face capturada na confirmação não conferir com a face cadastrada do usuário, o registro do ponto é recusado. A comparação considera variações controladas de enquadramento e espelhamento para reduzir reprovações indevidas da webcam.",
           "A imagem facial é armazenada em arquivo no storage do sistema e o banco mantém apenas o caminho e os metadados necessários.",
           "Se a câmera do dispositivo não estiver disponível, o cadastro facial e a confirmação do ponto não poderão ser concluídos nesse equipamento."
         ]

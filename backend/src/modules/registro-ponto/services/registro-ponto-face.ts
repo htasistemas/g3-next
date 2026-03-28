@@ -1,7 +1,16 @@
 import sharp from "sharp";
 
 const faceHashSize = 16;
-const distanciaMaximaReconhecimentoFace = 40;
+const distanciaMaximaReconhecimentoFace = 56;
+const assinaturaFaceV2Prefixo = "v2:";
+const variacoesAssinaturaFace = [
+  { cropRatio: 1, espelhar: false },
+  { cropRatio: 0.9, espelhar: false },
+  { cropRatio: 0.82, espelhar: false },
+  { cropRatio: 1, espelhar: true },
+  { cropRatio: 0.9, espelhar: true },
+  { cropRatio: 0.82, espelhar: true }
+] as const;
 
 function bitsParaHex(bits: number[]) {
   let hex = "";
@@ -20,22 +29,21 @@ function bitsParaHex(bits: number[]) {
 }
 
 export async function gerarHashFace(buffer: Buffer) {
-  const amostra = await sharp(buffer)
-    .rotate()
-    .resize(faceHashSize, faceHashSize, {
-      fit: "cover",
-      position: "centre"
-    })
-    .grayscale()
-    .normalize()
-    .raw()
-    .toBuffer();
+  const amostra = await gerarAmostraFace(buffer, { cropRatio: 1, espelhar: false });
 
   const media =
     amostra.reduce((total, valorAtual) => total + valorAtual, 0) / Math.max(amostra.length, 1);
   const bits = Array.from(amostra, (valorAtual) => (valorAtual >= media ? 1 : 0));
 
   return bitsParaHex(bits);
+}
+
+export async function gerarAssinaturaFace(buffer: Buffer) {
+  const hashes = await Promise.all(
+    variacoesAssinaturaFace.map((variacao) => gerarHashFaceVariacao(buffer, variacao))
+  );
+
+  return `${assinaturaFaceV2Prefixo}${hashes.join("|")}`;
 }
 
 export function calcularDistanciaHashFace(hashA: string, hashB: string) {
@@ -57,8 +65,91 @@ export function calcularDistanciaHashFace(hashA: string, hashB: string) {
   return distancia;
 }
 
+export function calcularMenorDistanciaFace(hashCadastrado: string, hashAtual: string) {
+  const hashesCadastrados = extrairHashesAssinatura(hashCadastrado);
+  const hashesAtuais = extrairHashesAssinatura(hashAtual);
+  let menorDistancia = Number.POSITIVE_INFINITY;
+
+  for (const hashBase of hashesCadastrados) {
+    for (const hashComparacao of hashesAtuais) {
+      const distanciaAtual = calcularDistanciaHashFace(hashBase, hashComparacao);
+      if (distanciaAtual < menorDistancia) {
+        menorDistancia = distanciaAtual;
+      }
+    }
+  }
+
+  return Number.isFinite(menorDistancia) ? menorDistancia : Number.MAX_SAFE_INTEGER;
+}
+
 export function facesConferem(hashCadastrado: string, hashAtual: string) {
-  return calcularDistanciaHashFace(hashCadastrado, hashAtual) <= distanciaMaximaReconhecimentoFace;
+  return calcularMenorDistanciaFace(hashCadastrado, hashAtual) <= distanciaMaximaReconhecimentoFace;
+}
+
+function extrairHashesAssinatura(assinatura: string) {
+  const valorNormalizado = assinatura.trim();
+  if (!valorNormalizado) {
+    return [];
+  }
+
+  if (!valorNormalizado.startsWith(assinaturaFaceV2Prefixo)) {
+    return [valorNormalizado];
+  }
+
+  return valorNormalizado
+    .slice(assinaturaFaceV2Prefixo.length)
+    .split("|")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+async function gerarHashFaceVariacao(
+  buffer: Buffer,
+  variacao: { cropRatio: number; espelhar: boolean }
+) {
+  const amostra = await gerarAmostraFace(buffer, variacao);
+  const media =
+    amostra.reduce((total, valorAtual) => total + valorAtual, 0) / Math.max(amostra.length, 1);
+  const bits = Array.from(amostra, (valorAtual) => (valorAtual >= media ? 1 : 0));
+
+  return bitsParaHex(bits);
+}
+
+async function gerarAmostraFace(
+  buffer: Buffer,
+  variacao: { cropRatio: number; espelhar: boolean }
+) {
+  const metadata = await sharp(buffer).rotate().metadata();
+  let pipeline = sharp(buffer).rotate();
+
+  if (
+    variacao.cropRatio < 1 &&
+    metadata.width &&
+    metadata.height &&
+    metadata.width > faceHashSize &&
+    metadata.height > faceHashSize
+  ) {
+    const width = Math.max(Math.round(metadata.width * variacao.cropRatio), faceHashSize);
+    const height = Math.max(Math.round(metadata.height * variacao.cropRatio), faceHashSize);
+    const left = Math.max(Math.floor((metadata.width - width) / 2), 0);
+    const top = Math.max(Math.floor((metadata.height - height) / 2), 0);
+
+    pipeline = pipeline.extract({ left, top, width, height });
+  }
+
+  if (variacao.espelhar) {
+    pipeline = pipeline.flop();
+  }
+
+  return pipeline
+    .resize(faceHashSize, faceHashSize, {
+      fit: "cover",
+      position: "centre"
+    })
+    .grayscale()
+    .normalize()
+    .raw()
+    .toBuffer();
 }
 
 export { distanciaMaximaReconhecimentoFace };

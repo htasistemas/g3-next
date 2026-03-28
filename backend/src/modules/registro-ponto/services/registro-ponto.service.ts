@@ -14,7 +14,11 @@ import {
 import { ensureRegistroPontoEstrutura } from "../repositories/registro-ponto-estrutura.repository.js";
 import { RegistroPontoRepository } from "../repositories/registro-ponto.repository.js";
 import type { RegistroPontoOrigem } from "../registro-ponto.types.js";
-import { calcularDistanciaHashFace, facesConferem, gerarHashFace } from "./registro-ponto-face.js";
+import {
+  calcularMenorDistanciaFace,
+  facesConferem,
+  gerarAssinaturaFace
+} from "./registro-ponto-face.js";
 
 type AtorRaw = {
   id?: string | number | bigint;
@@ -89,7 +93,7 @@ export class RegistroPontoService {
     }
 
     const { buffer } = parseBase64Payload(input.face_imagem, "image/jpeg");
-    const faceHash = await gerarHashFace(buffer);
+    const faceHash = await gerarAssinaturaFace(buffer);
     const resultado = await storageService.salvarArquivo({
       scope: "colaborador_face",
       conteudo: input.face_imagem,
@@ -222,8 +226,8 @@ export class RegistroPontoService {
     }
 
     const { buffer } = parseBase64Payload(faceImagem, "image/jpeg");
-    const faceHashAtual = await gerarHashFace(buffer);
-    const distancia = calcularDistanciaHashFace(usuario.face_hash, faceHashAtual);
+    const faceHashAtual = await gerarAssinaturaFace(buffer);
+    const distancia = calcularMenorDistanciaFace(usuario.face_hash, faceHashAtual);
 
     if (!facesConferem(usuario.face_hash, faceHashAtual)) {
       throw new AppError(

@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.383",
+  "latestVersion": "1.00.393",
   "releaseDate": "2026-03-28",
-  "description": "Agendamentos passou a gerar ficha de presença a partir do card da agenda operacional com botão de impressão no padrão do G3N.",
+  "description": "A ficha de presença do agendamento foi ajustada para o padrão visual institucional do G3N.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.383",
+  "minCompatibleVersion": "1.00.393",
   "releaseType": "stable",
   "downloadUrl": null
 }

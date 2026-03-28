@@ -1,4 +1,18 @@
-import { CalendarDays, Clock3, Mail, MapPin, MessageCircle, Pencil, Printer, Users, XCircle } from "lucide-react";
+import {
+  BadgeCheck,
+  CalendarDays,
+  CircleHelp,
+  Clock3,
+  Copy,
+  Mail,
+  MapPin,
+  MessageCircle,
+  Pencil,
+  Printer,
+  Trash2,
+  Users,
+  XCircle
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -60,27 +74,41 @@ export function ItemSelector(props: {
 }) {
   return (
     <div className="space-y-3">
-      <div className="max-h-56 overflow-auto rounded-xl border border-[var(--g3-border)] bg-white p-2 shadow-sm">
+      <div className="max-h-56 overflow-auto rounded-xl border border-[var(--g3-border)] bg-white shadow-sm">
         {props.carregando ? (
           <p className="px-2 py-6 text-sm text-[var(--g3-muted)]">Carregando itens...</p>
         ) : props.itens.length ? (
-          <div className="grid gap-2 md:grid-cols-2">
-            {props.itens.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => props.onSelect(item)}
-                className={`h-full rounded-xl border px-3 py-3 text-left shadow-sm transition-all ${
-                  props.selecionadoId === item.id
-                    ? "border-emerald-300 bg-white shadow-md ring-1 ring-emerald-200"
-                    : "border-[var(--g3-border)] bg-white hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md"
-                }`}
-              >
-                <p className="text-sm font-semibold text-[var(--g3-foreground)]">{item.nome}</p>
-                <p className="mt-1 text-xs text-[var(--g3-muted)]">{item.profissionalNome || "Sem profissional definido"}</p>
-              </button>
-            ))}
-          </div>
+          <table className="w-full border-collapse text-sm">
+            <thead className="sticky top-0 bg-emerald-50 text-left">
+              <tr>
+                <th className="border-b border-[var(--g3-border)] px-3 py-2 font-semibold text-emerald-900">Nome</th>
+                <th className="border-b border-[var(--g3-border)] px-3 py-2 font-semibold text-emerald-900">Profissional</th>
+                <th className="border-b border-[var(--g3-border)] px-3 py-2 font-semibold text-emerald-900">Horário</th>
+                <th className="border-b border-[var(--g3-border)] px-3 py-2 font-semibold text-emerald-900">Local</th>
+              </tr>
+            </thead>
+            <tbody>
+              {props.itens.map((item) => {
+                const ativo = props.selecionadoId === item.id;
+                return (
+                  <tr
+                    key={item.id}
+                    onClick={() => props.onSelect(item)}
+                    className={`cursor-pointer transition-colors ${
+                      ativo ? "bg-emerald-50" : "bg-white hover:bg-[var(--g3-primary-soft)]/35"
+                    }`}
+                  >
+                    <td className="border-b border-[var(--g3-border)] px-3 py-2 font-medium text-[var(--g3-foreground)]">{item.nome}</td>
+                    <td className="border-b border-[var(--g3-border)] px-3 py-2 text-[var(--g3-muted)]">
+                      {item.profissionalNome || "Sem profissional definido"}
+                    </td>
+                    <td className="border-b border-[var(--g3-border)] px-3 py-2 text-[var(--g3-muted)]">{formatarHorario(item.horario)}</td>
+                    <td className="border-b border-[var(--g3-border)] px-3 py-2 text-[var(--g3-muted)]">{item.local || "Não informado"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         ) : (
           <p className="px-2 py-6 text-sm text-[var(--g3-muted)]">Nenhum item encontrado.</p>
         )}
@@ -91,13 +119,7 @@ export function ItemSelector(props: {
 
 export function ItemResumoCard({ item }: { item?: AgendamentoOperacionalItem | null }) {
   if (!item) {
-    return (
-      <Card className="border-dashed border-[var(--g3-border)]">
-        <CardContent className="px-4 py-5 text-sm text-[var(--g3-muted)]">
-          Selecione um item para ver o resumo automaticamente.
-        </CardContent>
-      </Card>
-    );
+    return null;
   }
 
   return (
@@ -142,16 +164,27 @@ export function BeneficiarioSelector(props: {
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
         <div className="flex-1 space-y-1">
           <Label>Beneficiários vinculados</Label>
           <Input value={props.busca} onChange={(event) => props.onBuscaChange(event.target.value)} placeholder="Buscar por nome" />
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" onClick={props.onSelecionarTodos}>
+        <div className="flex flex-wrap gap-2 xl:self-end">
+          <Button
+            type="button"
+            variant="default"
+            onClick={props.onSelecionarTodos}
+            className="bg-emerald-600 shadow-[0_10px_22px_rgba(5,150,105,0.18)] hover:bg-emerald-700"
+          >
             Selecionar todos
           </Button>
-          <Button type="button" variant="outline" onClick={props.onLimparSelecao} disabled={!props.selecionados.length}>
+          <Button
+            type="button"
+            variant="default"
+            onClick={props.onLimparSelecao}
+            disabled={!props.selecionados.length}
+            className="bg-emerald-600 shadow-[0_10px_22px_rgba(5,150,105,0.18)] hover:bg-emerald-700 disabled:bg-emerald-300"
+          >
             Limpar seleção
           </Button>
         </div>
@@ -159,7 +192,6 @@ export function BeneficiarioSelector(props: {
 
       <div className="rounded-xl border border-[var(--g3-border)] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbf8_100%)] p-3 shadow-sm">
         <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--g3-muted)]">
-          <Badge variant="info">{props.beneficiarios.filter((item) => item.selecionavel).length} disponíveis</Badge>
           <Badge variant="default">{props.selecionados.length} selecionados</Badge>
         </div>
         <div className="mt-3 min-h-[24px]">
@@ -240,9 +272,9 @@ export function GenerateCardButton(props: { disabled?: boolean; loading?: boolea
         disabled={props.disabled || props.loading}
         onClick={props.onClick}
       >
-        {props.loading ? "Gerando agenda..." : props.texto || "Gerar Agenda"}
+        {props.loading ? "Gerando agenda..." : props.texto || "Gerar agenda"}
       </Button>
-      <p className="text-center text-xs text-[var(--g3-muted)]">Ao clicar em Gerar Agenda, o card é salvo imediatamente.</p>
+      <p className="text-center text-xs text-[var(--g3-muted)]">Ao clicar em Gerar agenda, o card é salvo imediatamente.</p>
     </div>
   );
 }
@@ -250,6 +282,12 @@ export function GenerateCardButton(props: { disabled?: boolean; loading?: boolea
 export function AgendaCardList(props: {
   cards: Agendamento[];
   selecionadoId?: number | null;
+  onAlternarConfirmacao: (item: Agendamento, index: number) => void;
+  onMoverParticipante: (item: Agendamento, index: number) => void;
+  onExcluirParticipante: (item: Agendamento, index: number) => void;
+  onCopiar: (item: Agendamento) => void;
+  onExcluir: (item: Agendamento) => void;
+  onMover: (item: Agendamento) => void;
   onEditar: (item: Agendamento) => void;
   onCancelar: (item: Agendamento) => void;
   onWhatsApp: (item: Agendamento) => void;
@@ -266,43 +304,25 @@ export function AgendaCardList(props: {
     );
   }
 
-  const grupos = props.cards.reduce<Array<{ data: string; itens: Agendamento[] }>>((acc, item) => {
-    const chave = item.data || "Sem data";
-    const existente = acc.find((grupo) => grupo.data === chave);
-    if (existente) {
-      existente.itens.push(item);
-      return acc;
-    }
-    acc.push({ data: chave, itens: [item] });
-    return acc;
-  }, []);
-
   return (
-    <div className="space-y-4">
-      {grupos.map((grupo) => (
-        <section key={grupo.data} className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/35 px-4 py-3">
-            <div>
-              <p className="text-sm font-semibold text-[var(--g3-foreground)]">{formatarData(grupo.data)}</p>
-              <p className="text-xs text-[var(--g3-muted)]">{formatarDiaSemana(grupo.data) || "Data não identificada"}</p>
-            </div>
-            <Badge variant="info">{grupo.itens.length} card(s)</Badge>
-          </div>
-          <div className="grid gap-3 lg:grid-cols-2">
-            {grupo.itens.map((item) => (
-              <AgendaCard
-                key={item.id ?? `${item.itemOrigemId}-${item.data}`}
-                item={item}
-                ativo={props.selecionadoId === item.id}
-                onEditar={() => props.onEditar(item)}
-                onCancelar={() => props.onCancelar(item)}
-                onWhatsApp={() => props.onWhatsApp(item)}
-                onEmail={() => props.onEmail(item)}
-                onImprimir={() => props.onImprimir(item)}
-              />
-            ))}
-          </div>
-        </section>
+    <div className="grid gap-3 lg:grid-cols-2">
+      {props.cards.map((item) => (
+        <AgendaCard
+          key={item.id ?? `${item.itemOrigemId}-${item.data}`}
+          item={item}
+          ativo={props.selecionadoId === item.id}
+          onAlternarConfirmacao={(index) => props.onAlternarConfirmacao(item, index)}
+          onMoverParticipante={(index) => props.onMoverParticipante(item, index)}
+          onExcluirParticipante={(index) => props.onExcluirParticipante(item, index)}
+          onCopiar={() => props.onCopiar(item)}
+          onExcluir={() => props.onExcluir(item)}
+          onMover={() => props.onMover(item)}
+          onEditar={() => props.onEditar(item)}
+          onCancelar={() => props.onCancelar(item)}
+          onWhatsApp={() => props.onWhatsApp(item)}
+          onEmail={() => props.onEmail(item)}
+          onImprimir={() => props.onImprimir(item)}
+        />
       ))}
     </div>
   );
@@ -311,6 +331,12 @@ export function AgendaCardList(props: {
 export function AgendaCard(props: {
   item: Agendamento;
   ativo?: boolean;
+  onAlternarConfirmacao: (index: number) => void;
+  onMoverParticipante: (index: number) => void;
+  onExcluirParticipante: (index: number) => void;
+  onCopiar: () => void;
+  onExcluir: () => void;
+  onMover: () => void;
   onWhatsApp: () => void;
   onEmail: () => void;
   onImprimir: () => void;
@@ -321,10 +347,10 @@ export function AgendaCard(props: {
 
   return (
     <Card
-      className={`overflow-hidden border-[var(--g3-border)] bg-white shadow-sm transition-all ${
+      className={`overflow-hidden border-[var(--g3-border)] bg-white shadow-[0_14px_34px_rgba(15,23,42,0.10)] transition-all ${
         props.ativo
-          ? "border-emerald-300 bg-[linear-gradient(180deg,#ffffff_0%,#f4fbf6_100%)] ring-2 ring-emerald-500 ring-offset-2"
-          : "hover:-translate-y-0.5 hover:shadow-md"
+          ? "border-emerald-300 bg-[linear-gradient(180deg,#ffffff_0%,#f4fbf6_100%)] ring-2 ring-emerald-500 ring-offset-2 shadow-[0_18px_40px_rgba(5,150,105,0.18)]"
+          : "hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(15,23,42,0.16)]"
       }`}
     >
       <div className={`px-4 py-3 ${props.ativo ? "bg-emerald-700" : "bg-emerald-600"}`}>
@@ -345,65 +371,143 @@ export function AgendaCard(props: {
           </div>
         ) : null}
 
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-xl bg-[var(--g3-primary-soft)]/30 px-3 py-3 text-sm text-[var(--g3-foreground)]">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--g3-muted)]">Profissional</p>
-            <p className="mt-1 flex items-center gap-2 font-medium">
-              <Users className="h-4 w-4 text-emerald-700" /> {props.item.profissionalNome || "Sem profissional definido"}
-            </p>
-          </div>
-          <div className="rounded-xl bg-[var(--g3-primary-soft)]/30 px-3 py-3 text-sm text-[var(--g3-foreground)]">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--g3-muted)]">Data</p>
-            <p className="mt-1 flex items-center gap-2 font-medium">
-              <CalendarDays className="h-4 w-4 text-emerald-700" /> {formatarData(props.item.data)} {props.item.diaSemana ? `- ${props.item.diaSemana}` : ""}
-            </p>
-          </div>
-          <div className="rounded-xl bg-[var(--g3-primary-soft)]/30 px-3 py-3 text-sm text-[var(--g3-foreground)]">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--g3-muted)]">Horário</p>
-            <p className="mt-1 flex items-center gap-2 font-medium">
-              <Clock3 className="h-4 w-4 text-emerald-700" /> {props.item.horaInicial || "---"}
-            </p>
-          </div>
-          <div className="rounded-xl bg-[var(--g3-primary-soft)]/30 px-3 py-3 text-sm text-[var(--g3-foreground)]">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--g3-muted)]">Local</p>
-            <p className="mt-1 flex items-center gap-2 font-medium">
-              <MapPin className="h-4 w-4 text-emerald-700" /> {props.item.itemLocal || props.item.sala || props.item.unidade || "---"}
-            </p>
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">Beneficiários</p>
-            <p className="text-xs text-[var(--g3-muted)]">Lista de presença do card</p>
-          </div>
-          <div className="space-y-2">
-            {participantes.map((participante, index) => (
-              <div
-                key={`${participante.matriculaId ?? participante.beneficiarioId ?? participante.beneficiarioNome}-${index}`}
-                className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] px-3 py-3 text-sm text-[var(--g3-foreground)]"
-              >
-                <p className="font-medium">{participante.beneficiarioNome}</p>
-                <p className="mt-1 text-xs text-[var(--g3-muted)]">{participante.telefone || "Sem telefone cadastrado"}</p>
-              </div>
-            ))}
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 shadow-sm">
+          <div className="grid gap-3 text-sm md:grid-cols-2 xl:grid-cols-4">
+            <div className="text-[var(--g3-foreground)]">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--g3-muted)]">Profissional</p>
+              <p className="mt-1 flex items-center gap-2 font-medium">
+                <Users className="h-4 w-4 text-emerald-700" /> {props.item.profissionalNome || "Sem profissional definido"}
+              </p>
+            </div>
+            <div className="text-[var(--g3-foreground)]">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--g3-muted)]">Data</p>
+              <p className="mt-1 flex items-center gap-2 font-medium">
+                <CalendarDays className="h-4 w-4 text-emerald-700" /> {formatarData(props.item.data)} {props.item.diaSemana ? `- ${props.item.diaSemana}` : ""}
+              </p>
+            </div>
+            <div className="text-[var(--g3-foreground)]">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--g3-muted)]">Horário</p>
+              <p className="mt-1 flex items-center gap-2 font-medium">
+                <Clock3 className="h-4 w-4 text-emerald-700" /> {props.item.horaInicial || "---"}
+              </p>
+            </div>
+            <div className="text-[var(--g3-foreground)]">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--g3-muted)]">Local</p>
+              <p className="mt-1 flex items-center gap-2 font-medium">
+                <MapPin className="h-4 w-4 text-emerald-700" /> {props.item.itemLocal || props.item.sala || props.item.unidade || "---"}
+              </p>
+            </div>
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2 border-t border-[var(--g3-border)] pt-4">
-          <Button type="button" variant="outline" className="h-8 gap-1.5 px-2.5 text-xs shadow-sm" onClick={props.onImprimir}>
-            <Printer className="h-4 w-4" /> Imprimir
+        <div className="overflow-hidden rounded-xl border border-[var(--g3-border)]">
+          <table className="w-full border-collapse text-sm">
+            <thead className="bg-emerald-50 text-left">
+              <tr>
+                <th className="border-b border-[var(--g3-border)] px-3 py-2 font-semibold text-emerald-900">Beneficiário</th>
+                <th className="border-b border-[var(--g3-border)] px-3 py-2 font-semibold text-emerald-900">Telefone</th>
+                <th className="border-b border-[var(--g3-border)] px-3 py-2 text-center font-semibold text-emerald-900">Confirmação</th>
+                <th className="border-b border-[var(--g3-border)] px-3 py-2 text-center font-semibold text-emerald-900">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {participantes.length ? (
+                participantes.map((participante, index) => (
+                  (() => {
+                    const confirmado = participante.observacao === "Confirmado";
+                    return (
+                  <tr
+                    key={`${participante.matriculaId ?? participante.beneficiarioId ?? participante.beneficiarioNome}-${index}`}
+                    className="bg-white"
+                  >
+                    <td className="border-b border-[var(--g3-border)] px-3 py-2 text-[var(--g3-foreground)]">
+                      {participante.beneficiarioNome}
+                    </td>
+                    <td className="border-b border-[var(--g3-border)] px-3 py-2 text-[var(--g3-muted)]">
+                      {participante.telefone || "Sem telefone cadastrado"}
+                    </td>
+                    <td className="border-b border-[var(--g3-border)] px-3 py-2 text-center">
+                      <button
+                        type="button"
+                        onClick={() => props.onAlternarConfirmacao(index)}
+                        className={`inline-flex h-9 w-9 items-center justify-center rounded-full border transition-colors ${
+                          confirmado
+                            ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                            : "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                        }`}
+                        title={confirmado ? "Confirmado" : "A confirmar"}
+                        aria-label={confirmado ? "Confirmado" : "A confirmar"}
+                      >
+                        {confirmado ? <BadgeCheck className="h-4 w-4" /> : <CircleHelp className="h-4 w-4" />}
+                      </button>
+                    </td>
+                    <td className="border-b border-[var(--g3-border)] px-3 py-2">
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => props.onMoverParticipante(index)}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-sky-200 bg-sky-50 text-sky-700 transition-colors hover:bg-sky-100"
+                          title="Mover beneficiário"
+                          aria-label="Mover beneficiário"
+                        >
+                          <CalendarDays className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => props.onExcluirParticipante(index)}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-700 transition-colors hover:bg-rose-100"
+                          title="Excluir beneficiário"
+                          aria-label="Excluir beneficiário"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                    );
+                  })()
+                ))
+              ) : (
+                <tr className="bg-white">
+                  <td colSpan={4} className="px-3 py-4 text-center text-[var(--g3-muted)]">
+                    Nenhum beneficiário vinculado.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="flex flex-nowrap items-center gap-2 overflow-x-auto border-t border-[var(--g3-border)] pt-4">
+          <Button type="button" variant="outline" className="h-8 min-w-8 px-2 shadow-sm" onClick={props.onCopiar} title="Copiar agenda" aria-label="Copiar agenda">
+            <Copy className="h-4 w-4" />
           </Button>
-          <Button type="button" variant="outline" className="h-8 gap-1.5 px-2.5 text-xs" onClick={props.onWhatsApp}>
-            <MessageCircle className="h-4 w-4" /> WhatsApp
+          <Button type="button" variant="outline" className="h-8 min-w-8 px-2 shadow-sm" onClick={props.onMover} title="Mover agenda" aria-label="Mover agenda">
+            <CalendarDays className="h-4 w-4" />
           </Button>
-          <Button type="button" variant="outline" className="h-8 gap-1.5 px-2.5 text-xs" onClick={props.onEmail}>
-            <Mail className="h-4 w-4" /> E-mail
+          <Button
+            type="button"
+            variant="outline"
+            className="h-8 min-w-8 px-2 shadow-sm"
+            onClick={props.onImprimir}
+            title="Imprimir agendamento"
+            aria-label="Imprimir agendamento"
+          >
+            <Printer className="h-4 w-4" />
           </Button>
-          <Button type="button" variant="default" className="h-8 gap-1.5 px-2.5 text-xs" onClick={props.onEditar}>
+          <Button type="button" variant="outline" className="h-8 min-w-8 px-2" onClick={props.onWhatsApp} title="WhatsApp" aria-label="WhatsApp">
+            <MessageCircle className="h-4 w-4" />
+          </Button>
+          <Button type="button" variant="outline" className="h-8 min-w-8 px-2" onClick={props.onEmail} title="E-mail" aria-label="E-mail">
+            <Mail className="h-4 w-4" />
+          </Button>
+          <Button type="button" variant="outline" className="h-8 min-w-8 px-2" onClick={props.onExcluir} title="Excluir agenda" aria-label="Excluir agenda">
+            <Trash2 className="h-4 w-4" />
+          </Button>
+          <Button type="button" variant="default" className="h-8 gap-1.5 px-2.5 text-xs whitespace-nowrap" onClick={props.onEditar}>
             <Pencil className="h-4 w-4" /> Editar
           </Button>
-          <Button type="button" variant="danger" className="h-8 gap-1.5 px-2.5 text-xs" onClick={props.onCancelar}>
+          <Button type="button" variant="danger" className="h-8 gap-1.5 px-2.5 text-xs whitespace-nowrap" onClick={props.onCancelar}>
             <XCircle className="h-4 w-4" /> Cancelar
           </Button>
         </div>

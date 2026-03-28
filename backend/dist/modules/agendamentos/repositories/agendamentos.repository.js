@@ -902,7 +902,13 @@ export class AgendamentosRepository {
         if (!beneficiarios.length) {
             throw new AppError("Este agendamento nao possui beneficiarios vinculados.", 400);
         }
-        const mensagemBase = `Lembrete: ${agendamento.item_nome ?? agendamento.tipo_atendimento} em ${String(agendamento.data_agendamento).slice(0, 10)} as ${String(agendamento.hora_inicial).slice(0, 5)}.`;
+        const dataAgendamento = String(agendamento.data_agendamento).slice(0, 10);
+        const dataMensagem = new Intl.DateTimeFormat("pt-BR", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric"
+        }).format(new Date(`${dataAgendamento}T12:00:00`));
+        const mensagemBase = `Lembrete: ${agendamento.item_nome ?? agendamento.tipo_atendimento} em ${dataMensagem} às ${String(agendamento.hora_inicial).slice(0, 5)}.`;
         const resultado = {
             canal,
             enviados: 0,
