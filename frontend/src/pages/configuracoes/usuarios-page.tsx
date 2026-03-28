@@ -48,8 +48,7 @@ import { mapaCamposTextoUsuarioForm } from "@/lib/text-format-config";
 import {
   classeBotaoAbaLateral,
   classeNumeroAbaLateral,
-  classesTelaPadraoBeneficiario,
-  ordemAcoesCrudPadrao
+  classesTelaPadraoBeneficiario
 } from "@/lib/tela-padrao-beneficiario";
 import type {
   Usuario,
@@ -367,6 +366,15 @@ export function UsuariosPage() {
     reset(snapshot ?? usuarioDefaultValues);
   }
 
+  function abrirPopupExcluir(usuarioId: string) {
+    setPopupConfirmacao({
+      tipo: "excluir",
+      titulo: "Confirmar exclusão",
+      texto: "Esta ação é irreversível. Deseja continuar?",
+      usuarioId
+    });
+  }
+
   function excluir() {
     const id = getValues("id_usuario");
     if (!id) {
@@ -378,12 +386,7 @@ export function UsuariosPage() {
       return;
     }
 
-    setPopupConfirmacao({
-      tipo: "excluir",
-      titulo: "Confirmar exclusão",
-      texto: "Esta ação é irreversível. Deseja continuar?",
-      usuarioId: id
-    });
+    abrirPopupExcluir(id);
   }
 
   function imprimir() {
@@ -575,21 +578,50 @@ export function UsuariosPage() {
     }
   }
 
-  const acoesCrud: AcaoCrud[] = [
-    { label: "Buscar", icon: Search, onClick: buscar, variant: "outline" },
-    { label: "Novo", icon: Plus, onClick: novo, variant: "outline" },
-    {
-      label: "Salvar",
-      icon: Save,
-      onClick: () => void handleSubmit(salvar)(),
-      variant: "default",
-      disabled: acaoEmAndamento
-    },
-    { label: "Cancelar", icon: Undo2, onClick: cancelar, variant: "outline", disabled: acaoEmAndamento },
-    { label: "Excluir", icon: Trash2, onClick: excluir, variant: "danger", disabled: acaoEmAndamento },
-    { label: "Imprimir", icon: Printer, onClick: imprimir, variant: "outline" },
-    { label: "Fechar", icon: X, onClick: fechar, variant: "outline" }
-  ];
+  const acoesCrudPorAba: Record<AbaId, AcaoCrud[]> = {
+    listagem: [
+      { label: "Buscar usuários", icon: Search, onClick: buscar, variant: "outline" },
+      { label: "Novo usuário", icon: Plus, onClick: novo, variant: "default", disabled: acaoEmAndamento },
+      { label: "Imprimir listagem", icon: Printer, onClick: imprimir, variant: "outline" },
+      { label: "Fechar tela", icon: X, onClick: fechar, variant: "outline" }
+    ],
+    cadastro: [
+      { label: "Buscar usuários", icon: Search, onClick: () => setAbaAtiva("listagem"), variant: "outline" },
+      { label: "Novo usuário", icon: Plus, onClick: novo, variant: "outline", disabled: acaoEmAndamento },
+      {
+        label: "Salvar usuário",
+        icon: Save,
+        onClick: () => void handleSubmit(salvar)(),
+        variant: "default",
+        disabled: acaoEmAndamento
+      },
+      { label: "Cancelar edição", icon: Undo2, onClick: cancelar, variant: "outline", disabled: acaoEmAndamento },
+      { label: "Excluir usuário", icon: Trash2, onClick: excluir, variant: "danger", disabled: acaoEmAndamento },
+      { label: "Imprimir cadastro", icon: Printer, onClick: imprimir, variant: "outline" },
+      { label: "Fechar tela", icon: X, onClick: fechar, variant: "outline" }
+    ],
+    permissoes: [
+      { label: "Expandir módulos", icon: ChevronDown, onClick: expandirTodos, variant: "outline", disabled: carregandoPermissoes },
+      { label: "Recolher módulos", icon: ChevronRight, onClick: recolherTodos, variant: "outline", disabled: carregandoPermissoes },
+      { label: "Marcar permissões", icon: ShieldCheck, onClick: marcarTudo, variant: "default", disabled: carregandoPermissoes || ehAdminImutavel },
+      { label: "Limpar permissões", icon: Undo2, onClick: desmarcarTudo, variant: "outline", disabled: carregandoPermissoes || ehAdminImutavel },
+      {
+        label: "Salvar permissões",
+        icon: Save,
+        onClick: () => void handleSubmit(salvar)(),
+        variant: "default",
+        disabled: acaoEmAndamento || !idSelecionado
+      },
+      { label: "Fechar tela", icon: X, onClick: fechar, variant: "outline" }
+    ],
+    auditoria: [
+      { label: "Buscar usuários", icon: Search, onClick: () => setAbaAtiva("listagem"), variant: "outline" },
+      { label: "Imprimir histórico", icon: Printer, onClick: imprimir, variant: "outline" },
+      { label: "Fechar tela", icon: X, onClick: fechar, variant: "outline" }
+    ]
+  };
+
+  const acoesCrud = acoesCrudPorAba[abaAtiva];
 
   const abaAtual = abas.find((aba) => aba.id === abaAtiva);
   const IconeAbaAtual = abaAtual?.icon ?? UsersRound;
@@ -640,7 +672,7 @@ export function UsuariosPage() {
             <div className={classesTelaPadraoBeneficiario.tituloAba}>
               <IconeAbaAtual className="h-4 w-4" />
               <CardTitle className={classesTelaPadraoBeneficiario.tituloAbaTexto}>
-                {abaAtual?.label ?? "Usuarios"}
+                {abaAtual?.label ?? "Usuários"}
               </CardTitle>
             </div>
             <span className="rounded-full bg-[var(--g3-primary-soft)] px-2 py-1 text-[10px] font-semibold uppercase text-[var(--g3-active)]">
@@ -723,17 +755,67 @@ export function UsuariosPage() {
                           <td className="px-3 py-2">{formatarDataHora(usuario.ultimo_acesso_em)}</td>
                           <td className="px-3 py-2">
                             <div className="flex flex-wrap gap-1">
-                              <Button type="button" variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); selecionarUsuario(usuario.id_usuario, "cadastro"); }}>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="border-[var(--g3-border)] bg-white shadow-sm hover:bg-[var(--g3-primary-soft)] hover:shadow-md"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  selecionarUsuario(usuario.id_usuario, "cadastro");
+                                }}
+                              >
                                 Editar
                               </Button>
-                              <Button type="button" variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setIdSelecionado(usuario.id_usuario); setPopupResetSenhaAberto(true); }}>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="border-[var(--g3-border)] bg-white shadow-sm hover:bg-[var(--g3-primary-soft)] hover:shadow-md"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setIdSelecionado(usuario.id_usuario);
+                                  setPopupResetSenhaAberto(true);
+                                }}
+                              >
                                 Senha
                               </Button>
-                              <Button type="button" variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); abrirPopupStatus(usuario, usuario.status === "ATIVO" ? "INATIVO" : "ATIVO"); }}>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="border-[var(--g3-border)] bg-white shadow-sm hover:bg-[var(--g3-primary-soft)] hover:shadow-md"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  abrirPopupStatus(usuario, usuario.status === "ATIVO" ? "INATIVO" : "ATIVO");
+                                }}
+                              >
                                 {usuario.status === "ATIVO" ? "Inativar" : "Ativar"}
                               </Button>
-                              <Button type="button" variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); abrirPopupStatus(usuario, "BLOQUEADO"); }}>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="border-[var(--g3-border)] bg-white shadow-sm hover:bg-[var(--g3-primary-soft)] hover:shadow-md"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  abrirPopupStatus(usuario, "BLOQUEADO");
+                                }}
+                              >
                                 Bloquear
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="danger"
+                                size="sm"
+                                className="shadow-sm hover:shadow-md"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setIdSelecionado(usuario.id_usuario);
+                                  abrirPopupExcluir(usuario.id_usuario);
+                                }}
+                              >
+                                Excluir
                               </Button>
                             </div>
                           </td>

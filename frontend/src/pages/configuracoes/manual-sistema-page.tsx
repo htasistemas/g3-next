@@ -155,8 +155,8 @@ const secoesManual: ManualSecao[] = [
           "Na listagem da agenda gerada, use a data em exibição com os botões de avançar e voltar para navegar pelos dias e ver somente os cards agendados naquela data, evitando uma tela extensa com todos os cards misturados.",
           "Os cards ficam organizados por data e horário, em grade com duas colunas na agenda gerada, com cabeçalho verde, sombreamento visual, uma tarja verde clara para profissional, data, horário e local, lista de beneficiários em formato de tabela e botões compactos em linha única.",
           "Dentro de cada card, os botões por ícone permitem copiar a agenda para outra data, remarcar a agenda, imprimir o agendamento com a lista de presença, acionar WhatsApp, enviar e-mail e remover a agenda da listagem operacional, sempre com popup visual do próprio sistema.",
-          "Ao usar o botão de impressão do card, o sistema abre a ficha de presença em nova janela já pronta para impressão, com cabeçalho institucional G3N, resumo do agendamento, tabela de presença e área de assinaturas no padrão visual do sistema.",
-          "Na lista de beneficiários agendados dentro do card, use o ícone de verificado para indicar confirmado e o ícone de interrogação para indicar a confirmar; o clique alterna o estado do participante.",
+          "Ao usar o botão de impressão do card, o sistema abre a ficha de presença em nova janela de visualização como folha A4 do G3N, com logomarca do relatório, nome da instituição, resumo do agendamento em oito blocos organizados em 4 por linha, tabela de presença, rodapé institucional e um botão de impressora no topo para disparar a impressão manualmente.",
+          "Na lista de beneficiários agendados dentro do card, use o ícone de verificado ou de interrogação dentro da própria coluna de ações, ao lado de mover e excluir, para alternar o status do participante entre confirmado e a confirmar.",
           "Cada beneficiário da agenda também pode ser movido individualmente para outra data ou removido apenas daquele dia, sem precisar alterar todos os participantes do card.",
           "As mensagens preparadas para WhatsApp passaram a exibir a data do agendamento em português do Brasil.",
           "Na aba Dashboard, acompanhe pacientes agendados, frequência média, faltas da semana, sessões do mês, lista de espera, total de cards e confirmados em cards com ícones e leitura centralizada.",
@@ -578,7 +578,9 @@ const secoesManual: ManualSecao[] = [
         objetivo: "Controlar acesso por perfil e manter segurança operacional.",
         comoUsar: [
           "Cadastre usuários com perfis adequados às rotinas de cada setor.",
-          "Revise permissões antes de liberar telas sensíveis, relatórios e dados financeiros."
+          "Revise permissões antes de liberar telas sensíveis, relatórios e dados financeiros.",
+          "Na tela de usuários, a barra superior agora muda conforme a aba aberta, com ações específicas para listagem, cadastro, permissões e auditoria.",
+          "Na aba Listagem de usuários, os botões do registro usam fundo com sombreamento e o botão Excluir foi incluído ao lado de Bloquear para agilizar a operação."
         ]
       },
       {

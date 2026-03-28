@@ -1,6 +1,90 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.400",
+                        "releaseDate":  "2026-03-28",
+                        "title":  "Usuarios com acoes contextuais por aba",
+                        "description":  "A tela de usuarios passou a adaptar a barra de acoes conforme a aba ativa e reforcou os botoes da listagem.",
+                        "changes":  [
+                                        "A barra superior da tela de usuarios agora exibe acoes especificas para as abas de listagem, cadastro, permissoes e auditoria.",
+                                        "A aba Listagem de usuarios ganhou o botao Excluir ao lado de Bloquear em cada registro.",
+                                        "Os botoes de acao da listagem passaram a usar fundo proprio com sombreamento para melhorar leitura e clique."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.399",
+                        "releaseDate":  "2026-03-28",
+                        "title":  "Agendamento com cabeçalho e rodapé institucionais reais",
+                        "description":  "A ficha de presença da agenda passou a usar os dados reais da unidade assistencial atual no cabeçalho e no rodapé.",
+                        "changes":  [
+                                        "A logomarca do relatório e o nome da instituição passaram a ser exibidos no topo da ficha quando cadastrados na unidade assistencial atual.",
+                                        "O rodapé institucional agora exibe os dados reais da unidade, como nome, CNPJ, contato e endereço quando disponíveis.",
+                                        "O bloco de orientação acima da tabela foi removido e o manual interno foi atualizado para refletir o novo padrão."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.398",
+                        "releaseDate":  "2026-03-28",
+                        "title":  "Agendamento com resumo da ficha em grade 4x2",
+                        "description":  "O resumo do relatório de agendamento e lista de presença passou a agrupar os 8 blocos em quatro itens por linha.",
+                        "changes":  [
+                                        "Os dados do resumo foram reorganizados em uma grade única com 8 blocos no total.",
+                                        "A ficha passou a exibir quatro blocos na primeira linha e quatro na segunda, mantendo alinhamento visual no padrão G3N.",
+                                        "O manual interno e a versão do sistema foram atualizados para refletir o novo arranjo do resumo."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.397",
+                        "releaseDate":  "2026-03-28",
+                        "title":  "Agendamento com ficha de presença simplificada",
+                        "description":  "A ficha de presença da agenda foi simplificada para remover texto complementar e campos de assinatura.",
+                        "changes":  [
+                                        "O texto explicativo abaixo do título do relatório foi removido do topo da ficha.",
+                                        "A coluna de assinatura e o bloco de assinaturas do rodapé foram retirados do documento.",
+                                        "O manual interno e a versão do sistema foram atualizados para refletir a simplificação da ficha."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.396",
+                        "releaseDate":  "2026-03-28",
+                        "title":  "Agendamento com ficha A4 alinhada entre visualização e impressão",
+                        "description":  "A ficha de presença da agenda passou a manter o mesmo enquadramento visual na tela e na impressão, no padrão A4 do G3N.",
+                        "changes":  [
+                                        "A visualização do relatório passou a usar uma folha A4 do G3N, com o conteúdo centralizado dentro de um papel fixo.",
+                                        "A impressão passou a reaproveitar o mesmo enquadramento da visualização, reduzindo diferenças entre o que é visto e o que é impresso.",
+                                        "O manual interno e a versão do sistema foram atualizados para refletir o novo padrão da ficha."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.395",
+                        "releaseDate":  "2026-03-28",
+                        "title":  "Agendamento com visualização da ficha antes da impressão",
+                        "description":  "A ficha de presença da agenda passou a abrir em modo de visualização com botão próprio de impressora no topo.",
+                        "changes":  [
+                                        "A abertura da ficha deixou de disparar a impressora automaticamente e passou a mostrar primeiro o relatório completo.",
+                                        "A nova visualização ganhou botão com ícone de impressora no topo para que a impressão seja iniciada manualmente pelo operador.",
+                                        "O manual interno e a versão do sistema foram atualizados para refletir o novo fluxo da ficha de presença."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.394",
+                        "releaseDate":  "2026-03-28",
+                        "title":  "Agendamento com confirmação do beneficiário dentro das ações",
+                        "description":  "O status de confirmação do beneficiário passou a ficar agrupado com as demais ações da linha no card do agendamento.",
+                        "changes":  [
+                                        "O ícone de confirmado ou a confirmar saiu da coluna separada e passou a aparecer junto de mover e excluir beneficiário.",
+                                        "A tabela do card ficou mais compacta ao concentrar as ações operacionais do participante na mesma coluna.",
+                                        "O manual interno e a versão do sistema foram atualizados para refletir o novo posicionamento do status."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.393",
                         "releaseDate":  "2026-03-28",
                         "title":  "Agendamento com ficha de presença no padrão visual do G3N",

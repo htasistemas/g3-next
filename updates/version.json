@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.393",
+  "latestVersion": "1.00.400",
   "releaseDate": "2026-03-28",
-  "description": "A ficha de presença do agendamento foi ajustada para o padrão visual institucional do G3N.",
+  "description": "A tela de usuários passou a usar ações contextuais por aba e a listagem ganhou botão de exclusão com ações destacadas.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.393",
+  "minCompatibleVersion": "1.00.400",
   "releaseType": "stable",
   "downloadUrl": null
 }

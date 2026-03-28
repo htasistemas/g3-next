@@ -406,7 +406,6 @@ export function AgendaCard(props: {
               <tr>
                 <th className="border-b border-[var(--g3-border)] px-3 py-2 font-semibold text-emerald-900">Beneficiário</th>
                 <th className="border-b border-[var(--g3-border)] px-3 py-2 font-semibold text-emerald-900">Telefone</th>
-                <th className="border-b border-[var(--g3-border)] px-3 py-2 text-center font-semibold text-emerald-900">Confirmação</th>
                 <th className="border-b border-[var(--g3-border)] px-3 py-2 text-center font-semibold text-emerald-900">Ações</th>
               </tr>
             </thead>
@@ -423,26 +422,24 @@ export function AgendaCard(props: {
                     <td className="border-b border-[var(--g3-border)] px-3 py-2 text-[var(--g3-foreground)]">
                       {participante.beneficiarioNome}
                     </td>
-                    <td className="border-b border-[var(--g3-border)] px-3 py-2 text-[var(--g3-muted)]">
+                    <td className="border-b border-[var(--g3-border)] px-3 py-2 text-[var(--g3-muted)] whitespace-nowrap">
                       {participante.telefone || "Sem telefone cadastrado"}
-                    </td>
-                    <td className="border-b border-[var(--g3-border)] px-3 py-2 text-center">
-                      <button
-                        type="button"
-                        onClick={() => props.onAlternarConfirmacao(index)}
-                        className={`inline-flex h-9 w-9 items-center justify-center rounded-full border transition-colors ${
-                          confirmado
-                            ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                            : "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
-                        }`}
-                        title={confirmado ? "Confirmado" : "A confirmar"}
-                        aria-label={confirmado ? "Confirmado" : "A confirmar"}
-                      >
-                        {confirmado ? <BadgeCheck className="h-4 w-4" /> : <CircleHelp className="h-4 w-4" />}
-                      </button>
                     </td>
                     <td className="border-b border-[var(--g3-border)] px-3 py-2">
                       <div className="flex items-center justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => props.onAlternarConfirmacao(index)}
+                          className={`inline-flex h-9 w-9 items-center justify-center rounded-full border transition-colors ${
+                            confirmado
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                              : "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                          }`}
+                          title={confirmado ? "Confirmado" : "A confirmar"}
+                          aria-label={confirmado ? "Confirmado" : "A confirmar"}
+                        >
+                          {confirmado ? <BadgeCheck className="h-4 w-4" /> : <CircleHelp className="h-4 w-4" />}
+                        </button>
                         <button
                           type="button"
                           onClick={() => props.onMoverParticipante(index)}
@@ -469,7 +466,7 @@ export function AgendaCard(props: {
                 ))
               ) : (
                 <tr className="bg-white">
-                  <td colSpan={4} className="px-3 py-4 text-center text-[var(--g3-muted)]">
+                  <td colSpan={3} className="px-3 py-4 text-center text-[var(--g3-muted)]">
                     Nenhum beneficiário vinculado.
                   </td>
                 </tr>

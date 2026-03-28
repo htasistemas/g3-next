@@ -20,6 +20,9 @@ import { AdminPageLayout, type AdminAction, type AdminTab } from "@/components/a
 import { PopupConfirmacao, PopupMensagem, type PopupMensagemState } from "@/components/admin/admin-popups";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useUnidadeAssistencialAtual } from "@/features/unidades-assistenciais/use-unidades-assistenciais";
+import { resolverUrlArquivo } from "@/lib/arquivos";
+import { formatarCnpj, formatarTelefone } from "@/lib/br-utils";
 import {
   AgendaCardList,
   BeneficiarioSelector,
@@ -50,6 +53,9 @@ type DashboardCard = {
   value: string | number;
   icon: LucideIcon;
 };
+
+let janelaFichaAgendamentoAtual: Window | null = null;
+let urlFichaAgendamentoAtual: string | null = null;
 
 const abas: AdminTab[] = [
   { id: "dashboard", label: "Dashboard", icon: Activity },
@@ -109,6 +115,37 @@ function escapeHtml(value?: string | number | null) {
     .replaceAll("'", "&#39;");
 }
 
+function montarRodapeInstitucional(unidade?: {
+  razao_social?: string;
+  nome_fantasia?: string;
+  cnpj?: string;
+  telefone?: string;
+  email?: string;
+  logradouro?: string;
+  numero?: string;
+  complemento?: string;
+  bairro?: string;
+  cidade?: string;
+  estado?: string;
+}) {
+  const linha1 = unidade?.razao_social?.trim() || unidade?.nome_fantasia?.trim() || "Instituição não cadastrada";
+  const detalhes = [formatarCnpj(unidade?.cnpj), formatarTelefone(unidade?.telefone), unidade?.email?.trim()]
+    .filter(Boolean)
+    .join(" • ");
+  const endereco = [
+    unidade?.logradouro?.trim(),
+    unidade?.numero?.trim(),
+    unidade?.complemento?.trim(),
+    unidade?.bairro?.trim(),
+    unidade?.cidade?.trim(),
+    unidade?.estado?.trim()
+  ]
+    .filter(Boolean)
+    .join(" • ");
+
+  return { linha1, linha2: detalhes, linha3: endereco };
+}
+
 function imprimirFichaHtml(options: {
   titulo: string;
   html: string;
@@ -117,16 +154,13 @@ function imprimirFichaHtml(options: {
   margemPagina?: string;
   paddingRaiz?: string;
 }) {
-  const janela = window.open("", "g3n-agendamento-impressao", "width=1200,height=900");
-
-  if (!janela) {
-    throw new Error("O navegador bloqueou a abertura da ficha de presença.");
+  if (janelaFichaAgendamentoAtual && !janelaFichaAgendamentoAtual.closed) {
+    janelaFichaAgendamentoAtual.close();
   }
 
-  try {
-    janela.opener = null;
-  } catch {
-    // Alguns navegadores não permitem ajustar opener em todas as combinações.
+  if (urlFichaAgendamentoAtual) {
+    URL.revokeObjectURL(urlFichaAgendamentoAtual);
+    urlFichaAgendamentoAtual = null;
   }
 
   const estilos = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
@@ -138,7 +172,7 @@ function imprimirFichaHtml(options: {
   const paddingRaiz = options.paddingRaiz ?? "18px";
   const estilosExtras = options.estilosExtras ?? "";
 
-  janela.document.write(`<!doctype html>
+  const conteudo = `<!doctype html>
     <html lang="pt-BR">
       <head>
         <meta charset="utf-8" />
@@ -153,12 +187,66 @@ function imprimirFichaHtml(options: {
 
           body {
             margin: 0;
-            background: #fff;
+            background: #eef3ef;
             color: #0f172a;
             font-family: Arial, sans-serif;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+
+          .g3-print-toolbar {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            display: flex;
+            justify-content: flex-end;
+            padding: 16px 20px 0;
+            background: linear-gradient(180deg, #eef3ef 0%, rgba(238, 243, 239, 0.94) 72%, rgba(238, 243, 239, 0) 100%);
+          }
+
+          .g3-print-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid #0f8a57;
+            border-radius: 999px;
+            padding: 10px 16px;
+            background: #0f8a57;
+            color: #ffffff;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 14px 30px rgba(15, 138, 87, 0.18);
+          }
+
+          .g3-print-button:hover {
+            background: #0c6d45;
+          }
+
+          .g3-print-button svg {
+            width: 16px;
+            height: 16px;
+            fill: currentColor;
           }
 
           .g3-print-root {
+            max-width: 1120px;
+            margin: 0 auto;
+            padding: ${paddingRaiz} 20px 28px;
+          }
+
+          .g3-print-sheet {
+            width: 210mm;
+            min-height: 297mm;
+            margin: 0 auto;
+            background: #ffffff;
+            box-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
+            border: 1px solid #dbe7df;
+            box-sizing: border-box;
+            overflow: hidden;
+          }
+
+          .g3-print-sheet-inner {
             padding: ${paddingRaiz};
           }
 
@@ -172,39 +260,95 @@ function imprimirFichaHtml(options: {
             vertical-align: top;
           }
 
+          @media print {
+            body {
+              background: #fff;
+            }
+
+            .g3-print-toolbar {
+              display: none !important;
+            }
+
+            .g3-print-root {
+              max-width: none;
+              padding: 0;
+            }
+
+            .g3-print-sheet {
+              width: auto;
+              min-height: auto;
+              margin: 0;
+              box-shadow: none;
+              border: 0;
+              overflow: visible;
+            }
+
+            .g3-print-sheet-inner {
+              padding: ${paddingRaiz};
+            }
+          }
+
           ${estilosExtras}
         </style>
       </head>
       <body>
-        <div class="g3-print-root">${options.html}</div>
+        <div class="g3-print-toolbar">
+          <button type="button" class="g3-print-button" id="g3-print-button" aria-label="Imprimir relatório">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 9V3h12v6h1a3 3 0 0 1 3 3v5h-4v4H6v-4H2v-5a3 3 0 0 1 3-3h1zm2-4v4h8V5H8zm8 14v-4H8v4h8zm3-8a1 1 0 1 0 0 2a1 1 0 0 0 0-2z"/>
+            </svg>
+            Imprimir
+          </button>
+        </div>
+        <div class="g3-print-root">
+          <div class="g3-print-sheet">
+            <div class="g3-print-sheet-inner">${options.html}</div>
+          </div>
+        </div>
         <script>
-          let impressaoExecutada = false;
-
-          const executarImpressao = () => {
-            if (impressaoExecutada) return;
-            impressaoExecutada = true;
-            window.setTimeout(() => {
-              try {
-                window.focus();
-                window.print();
-              } catch {
-                // Mantem a janela aberta para o usuario se a impressao falhar.
-              }
-            }, 300);
-          };
-
-          if (document.readyState === "complete") {
-            executarImpressao();
-          } else {
-            window.addEventListener("load", executarImpressao, { once: true });
-          }
-
-          window.setTimeout(executarImpressao, 1200);
-          window.addEventListener("afterprint", () => window.close(), { once: true });
+          document.getElementById("g3-print-button")?.addEventListener("click", () => {
+            try {
+              window.focus();
+              window.print();
+            } catch {
+              // Mantem a janela aberta para o usuario se a impressao falhar.
+            }
+          });
         </script>
       </body>
-    </html>`);
-  janela.document.close();
+    </html>`;
+
+  const blob = new Blob([conteudo], { type: "text/html;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const janela = window.open(url, "_blank", "width=1200,height=900");
+
+  if (!janela) {
+    URL.revokeObjectURL(url);
+    throw new Error("O navegador bloqueou a abertura da ficha de presença.");
+  }
+
+  try {
+    janela.opener = null;
+  } catch {
+    // Alguns navegadores não permitem ajustar opener em todas as combinações.
+  }
+
+  janelaFichaAgendamentoAtual = janela;
+  urlFichaAgendamentoAtual = url;
+
+  janela.addEventListener(
+    "beforeunload",
+    () => {
+      if (janelaFichaAgendamentoAtual === janela) {
+        janelaFichaAgendamentoAtual = null;
+      }
+      if (urlFichaAgendamentoAtual === url) {
+        URL.revokeObjectURL(url);
+        urlFichaAgendamentoAtual = null;
+      }
+    },
+    { once: true }
+  );
 }
 
 export function AgendamentosPage() {
@@ -232,6 +376,7 @@ export function AgendamentosPage() {
   const listaEsperaQuery = useListaEsperaAgendamentos();
   const itensQuery = useItensOperacionaisAgendamento(tipo, buscaItemAdiada);
   const beneficiariosQuery = useBeneficiariosOperacionaisAgendamento(itemSelecionado?.id ?? null);
+  const unidadeAtualQuery = useUnidadeAssistencialAtual();
   const salvarAgendamentoMutation = useSalvarAgendamento();
   const salvarMutation = useSalvarAgendamentoOperacional();
   const cancelarMutation = useCancelarAgendamento();
@@ -362,6 +507,7 @@ export function AgendamentosPage() {
   }
 
   function imprimirFichaPresenca(item: Agendamento) {
+    const unidadeAtual = unidadeAtualQuery.data?.unidade;
     const participantes = item.participantes ?? [];
     const atividade = item.itemNome || item.tipoAtendimento;
     const tipo = item.itemTipo || item.setor || "-";
@@ -369,6 +515,9 @@ export function AgendamentosPage() {
     const data = item.data ? new Date(`${item.data}T12:00:00`).toLocaleDateString("pt-BR") : "-";
     const horario = item.horaInicial || "-";
     const local = item.itemLocal || item.sala || item.unidade || "-";
+    const nomeInstituicao = unidadeAtual?.razao_social?.trim() || unidadeAtual?.nome_fantasia?.trim() || "Instituição não cadastrada";
+    const logomarcaRelatorio = resolverUrlArquivo(unidadeAtual?.logomarca_relatorio || unidadeAtual?.logomarca);
+    const rodapeInstitucional = montarRodapeInstitucional(unidadeAtual);
     const linhas = participantes.length
       ? participantes
           .map(
@@ -379,14 +528,13 @@ export function AgendamentosPage() {
                 <td>${escapeHtml(participante.telefone || "-")}</td>
                 <td>${escapeHtml(participante.comparecimento || "Pendente")}</td>
                 <td></td>
-                <td></td>
               </tr>`
           )
           .join("")
       : `
         <tr>
           <td>1</td>
-          <td colspan="5">Sem beneficiários vinculados ao card.</td>
+          <td colspan="4">Sem beneficiários vinculados ao card.</td>
         </tr>`;
 
     const emitidoEm = new Date().toLocaleString("pt-BR");
@@ -401,28 +549,24 @@ export function AgendamentosPage() {
         .g3-topo-faixa { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; background: #0f8a57; color: #ffffff; }
         .g3-topo-marca { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; }
         .g3-topo-selo { border: 1px solid rgba(255,255,255,0.35); border-radius: 999px; padding: 4px 10px; font-size: 11px; font-weight: 600; background: rgba(255,255,255,0.12); }
-        .g3-topo-corpo { display: grid; gap: 6px; padding: 18px; }
+        .g3-topo-corpo { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 16px; padding: 18px; }
+        .g3-topo-logo { width: 88px; height: 88px; object-fit: contain; border-radius: 16px; background: #ffffff; border: 1px solid #dbe7df; padding: 10px; }
         .g3-topo h1 { margin: 0; font-size: 24px; font-weight: 700; color: #14532d; }
-        .g3-topo p { margin: 0; font-size: 13px; color: #4b6356; }
+        .g3-topo h2 { margin: 4px 0 0; font-size: 16px; font-weight: 700; color: #1f2937; }
         .g3-bloco { margin-bottom: 16px; border: 1px solid #dbe7df; border-radius: 16px; background: #ffffff; overflow: hidden; }
         .g3-bloco-titulo { margin: 0; padding: 12px 16px; background: #eef8f2; border-bottom: 1px solid #dbe7df; font-size: 14px; font-weight: 700; color: #166534; }
-        .g3-meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 14px 16px 16px; }
+        .g3-meta { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; padding: 14px 16px 16px; }
         .g3-meta-item { border: 1px solid #dbe7df; border-radius: 12px; padding: 10px 12px; background: #f9fcfa; }
         .g3-meta-item strong { display: block; margin-bottom: 4px; font-size: 11px; font-weight: 600; color: #5d7467; }
         .g3-meta-item span { display: block; font-size: 14px; font-weight: 700; color: #163027; }
-        .g3-indicadores { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px; }
-        .g3-indicador { border: 1px solid #dbe7df; border-radius: 14px; padding: 12px 14px; background: #f8fbf9; }
-        .g3-indicador strong { display: block; margin-bottom: 4px; font-size: 11px; font-weight: 600; color: #5d7467; }
-        .g3-indicador span { font-size: 18px; font-weight: 700; color: #14532d; }
         .g3-orientacao { margin: 0 0 16px; border-left: 4px solid #0f8a57; border-radius: 10px; padding: 10px 12px; background: #f4fbf7; font-size: 12px; color: #4b6356; }
         .g3-tabela { width: 100%; table-layout: fixed; border: 1px solid #dbe7df; border-radius: 16px; overflow: hidden; }
         .g3-tabela thead th { padding: 11px 12px; background: #0f8a57; color: #ffffff; font-size: 12px; font-weight: 700; text-align: left; }
         .g3-tabela th, .g3-tabela td { border: 1px solid #dbe7df; padding: 10px 12px; text-align: left; }
         .g3-tabela tbody tr:nth-child(even) td { background: #f8fbf9; }
         .g3-tabela td { font-size: 13px; color: #233a31; min-height: 36px; }
-        .g3-assinaturas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-top: 24px; }
-        .g3-assinatura { padding-top: 28px; border-top: 1px solid #8ba59a; text-align: center; font-size: 12px; color: #5d7467; }
-        .g3-rodape { margin-top: 16px; font-size: 11px; color: #6b7f75; text-align: right; }
+        .g3-rodape { margin-top: 18px; padding-top: 12px; border-top: 1px solid #dbe7df; font-size: 11px; color: #6b7f75; text-align: center; }
+        .g3-rodape div + div { margin-top: 2px; }
       `,
       html: `
         <section class="g3-ficha">
@@ -432,8 +576,15 @@ export function AgendamentosPage() {
               <span class="g3-topo-selo">Agendamento</span>
             </div>
             <div class="g3-topo-corpo">
-              <h1>Agendamento e lista de presença</h1>
-              <p>Documento operacional no padrão visual do sistema G3N para conferência, presença e assinatura.</p>
+              ${
+                logomarcaRelatorio
+                  ? `<img src="${escapeHtml(logomarcaRelatorio)}" alt="Logomarca da instituição" class="g3-topo-logo" />`
+                  : ""
+              }
+              <div>
+                <h1>${escapeHtml(nomeInstituicao)}</h1>
+                <h2>Agendamento e lista de presença</h2>
+              </div>
             </div>
           </header>
           <section class="g3-bloco">
@@ -445,13 +596,10 @@ export function AgendamentosPage() {
               <div class="g3-meta-item"><strong>Data</strong><span>${escapeHtml(data)}</span></div>
               <div class="g3-meta-item"><strong>Horário</strong><span>${escapeHtml(horario)}</span></div>
               <div class="g3-meta-item"><strong>Local</strong><span>${escapeHtml(local)}</span></div>
+              <div class="g3-meta-item"><strong>Total de participantes</strong><span>${escapeHtml(participantes.length)}</span></div>
+              <div class="g3-meta-item"><strong>Status da agenda</strong><span>${escapeHtml(item.status || "Agendado")}</span></div>
             </div>
           </section>
-          <section class="g3-indicadores">
-            <div class="g3-indicador"><strong>Total de participantes</strong><span>${escapeHtml(participantes.length)}</span></div>
-            <div class="g3-indicador"><strong>Status da agenda</strong><span>${escapeHtml(item.status || "Agendado")}</span></div>
-          </section>
-          <p class="g3-orientacao">Use esta lista para registrar a presença dos beneficiários, marcar a situação do atendimento e recolher as assinaturas no mesmo documento.</p>
           <table class="g3-tabela">
             <thead>
               <tr>
@@ -459,17 +607,17 @@ export function AgendamentosPage() {
                 <th>Beneficiário</th>
                 <th style="width: 170px;">Telefone</th>
                 <th style="width: 140px;">Status</th>
-                <th style="width: 180px;">Assinatura</th>
                 <th style="width: 120px;">Presença</th>
               </tr>
             </thead>
             <tbody>${linhas}</tbody>
           </table>
-          <section class="g3-assinaturas">
-            <div class="g3-assinatura">Responsável pelo atendimento</div>
-            <div class="g3-assinatura">Data e conferência</div>
-          </section>
-          <footer class="g3-rodape">Emitido em ${escapeHtml(emitidoEm)}</footer>
+          <footer class="g3-rodape">
+            <div>${escapeHtml(rodapeInstitucional.linha1)}</div>
+            ${rodapeInstitucional.linha2 ? `<div>${escapeHtml(rodapeInstitucional.linha2)}</div>` : ""}
+            ${rodapeInstitucional.linha3 ? `<div>${escapeHtml(rodapeInstitucional.linha3)}</div>` : ""}
+            <div>Emitido em ${escapeHtml(emitidoEm)}</div>
+          </footer>
         </section>`
     });
   }
