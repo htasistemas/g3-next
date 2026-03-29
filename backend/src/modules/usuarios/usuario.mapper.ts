@@ -1,5 +1,6 @@
 import type {
   UsuarioAuditoriaItem,
+  UsuarioOrigemTipo,
   UsuarioPermissaoCatalogo,
   UsuarioResponse,
   UsuarioStatus
@@ -22,6 +23,9 @@ type UsuarioRow = {
   tentativas_login_invalidas: number | bigint | null;
   ultimo_login_invalido_em: Date | null;
   ultimo_acesso_em: Date | null;
+  origem_tipo: string | null;
+  origem_id: string | null;
+  origem_nome: string | null;
   criado_em: Date;
   atualizado_em: Date;
   permissoes: string[] | null;
@@ -88,6 +92,14 @@ function mapStatus(valor?: string | null): UsuarioStatus {
   if (status === "BLOQUEADO") return "BLOQUEADO";
   if (status === "INATIVO") return "INATIVO";
   return "ATIVO";
+}
+
+function mapOrigemTipo(valor?: string | null): UsuarioOrigemTipo | undefined {
+  const origem = limparTexto(valor)?.toUpperCase();
+  if (origem === "BENEFICIARIO" || origem === "PROFISSIONAL" || origem === "VOLUNTARIO") {
+    return origem;
+  }
+  return undefined;
 }
 
 function toInteger(valor: number | bigint | null | undefined): number {
@@ -165,6 +177,9 @@ export function mapUsuarioRowParaResponse(row: UsuarioRow): UsuarioResponse {
     tentativas_login_invalidas: toInteger(row.tentativas_login_invalidas),
     ultimo_login_invalido_em: row.ultimo_login_invalido_em?.toISOString(),
     ultimo_acesso_em: row.ultimo_acesso_em?.toISOString(),
+    origem_tipo: mapOrigemTipo(row.origem_tipo),
+    origem_id: limparTexto(row.origem_id),
+    origem_nome: limparTexto(row.origem_nome),
     criado_em: row.criado_em.toISOString(),
     atualizado_em: row.atualizado_em.toISOString()
   };

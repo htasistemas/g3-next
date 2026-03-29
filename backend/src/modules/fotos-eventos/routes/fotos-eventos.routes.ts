@@ -39,6 +39,24 @@ fotosEventosRoutes.post(
   ensurePermissions(permissoesEscrita),
   asyncHandler(controller.adicionarFoto.bind(controller))
 );
+fotosEventosRoutes.post(
+  "/:id/fotos/lote",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.adicionarFotosLote.bind(controller))
+);
+fotosEventosRoutes.put(
+  "/:id/fotos/reordenar",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.reordenarFotos.bind(controller))
+);
+fotosEventosRoutes.put(
+  "/:id/fotos/:fotoId/capa",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.definirFotoPrincipal.bind(controller))
+);
 fotosEventosRoutes.put(
   "/:id/fotos/:fotoId",
   ensureAuthenticated,

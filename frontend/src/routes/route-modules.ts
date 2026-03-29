@@ -118,6 +118,10 @@ const routeModules: RouteModuleDefinition[] = [
     loader: () => import("@/pages/setor-administrativo/lembretes-diarios-page")
   },
   {
+    path: "/setor-administrativo/checklist-diario",
+    loader: () => import("@/pages/setor-administrativo/checklist-diario-page")
+  },
+  {
     path: "/setor-juridico/plano-trabalho",
     loader: () => import("@/pages/setor-juridico/plano-trabalho-page-next")
   },

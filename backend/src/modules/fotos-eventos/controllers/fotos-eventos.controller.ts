@@ -51,6 +51,25 @@ export class FotosEventosController {
     return response.status(201).json(foto);
   }
 
+  async adicionarFotosLote(request: Request, response: Response) {
+    const fotos = await service.adicionarFotosLote(
+      request.params.id,
+      request.body,
+      (request as AuthenticatedRequest).authUser?.id
+    );
+    return response.status(201).json({ fotos });
+  }
+
+  async definirFotoPrincipal(request: Request, response: Response) {
+    const foto = await service.definirFotoPrincipal(request.params.id, request.params.fotoId);
+    return response.json(foto);
+  }
+
+  async reordenarFotos(request: Request, response: Response) {
+    const fotos = await service.reordenarFotos(request.params.id, request.body);
+    return response.json({ fotos });
+  }
+
   async atualizarFoto(request: Request, response: Response) {
     const foto = await service.atualizarFoto(request.params.id, request.params.fotoId, request.body);
     return response.json(foto);

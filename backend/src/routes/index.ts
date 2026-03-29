@@ -23,6 +23,7 @@ import { almoxarifadoRoutes } from "../modules/almoxarifado/routes/almoxarifado.
 import { controleVeiculosRoutes } from "../modules/controle-veiculos/routes/controle-veiculos.routes.js";
 import { tarefaAdministrativaRoutes } from "../modules/tarefas-administrativas/routes/tarefa-administrativa.routes.js";
 import { lembreteDiarioRoutes } from "../modules/lembretes-diarios/routes/lembrete-diario.routes.js";
+import { checklistDiarioRoutes } from "../modules/checklist-diario/routes/checklist-diario.routes.js";
 import { patrimonioRoutes } from "../modules/patrimonios/routes/patrimonio.routes.js";
 import { emprestimosEventosRoutes } from "../modules/emprestimos-eventos/routes/emprestimos-eventos.routes.js";
 import { fotosEventosRoutes } from "../modules/fotos-eventos/routes/fotos-eventos.routes.js";
@@ -79,6 +80,7 @@ appRoutes.use("/api/almoxarifado", almoxarifadoRoutes);
 appRoutes.use("/api/controle-veiculos", controleVeiculosRoutes);
 appRoutes.use("/api/patrimonios", patrimonioRoutes);
 appRoutes.use("/api/administrativo/tarefas", tarefaAdministrativaRoutes);
+appRoutes.use("/api/administrativo/checklist-diario", checklistDiarioRoutes);
 appRoutes.use("/api/lembretes-diarios", lembreteDiarioRoutes);
 appRoutes.use("/api/emprestimos-eventos", emprestimosEventosRoutes);
 appRoutes.use("/api/fotos-eventos", fotosEventosRoutes);

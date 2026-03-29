@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.325",
-  "releaseDate": "2026-03-25",
-  "description": "Recebimento de doações ajustado para validar campos pendentes e itens obrigatórios ao concluir pela aba Itens recebidos.",
+  "latestVersion": "1.00.328",
+  "releaseDate": "2026-03-29",
+  "description": "Backend de fotos e eventos ampliado com upload em lote, definição de capa e reordenação persistida da galeria.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.325",
+  "minCompatibleVersion": "1.00.328",
   "releaseType": "stable"
 }
 

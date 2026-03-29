@@ -87,9 +87,9 @@ export function useRemoverUsuario() {
   return useMutation({
     mutationFn: (id_usuario: string) => usuariosService.remover(id_usuario),
     onSuccess: async (resultado) => {
-      const id = resultado.usuario.id_usuario;
+      const id = resultado.id_usuario;
       await queryClient.invalidateQueries({ queryKey: ["usuarios"] });
-      await queryClient.invalidateQueries({ queryKey: ["usuario", id] });
+      await queryClient.removeQueries({ queryKey: ["usuario", id] });
     }
   });
 }

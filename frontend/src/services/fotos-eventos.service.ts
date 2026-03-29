@@ -1,5 +1,10 @@
 import { httpClient } from "./http-client";
-import type { FotoEvento, FotoEventoItem, FotoEventoPayload } from "@/types/fotos-eventos";
+import type {
+  FotoEvento,
+  FotoEventoFotosLotePayload,
+  FotoEventoItem,
+  FotoEventoPayload
+} from "@/types/fotos-eventos";
 
 export const fotosEventosService = {
   async listar(params?: {
@@ -46,16 +51,18 @@ export const fotosEventosService = {
 
   async adicionarFoto(
     id: number,
-    payload: {
-      arquivo: { nomeArquivo: string; contentType: string; conteudo: string };
-      legenda?: string;
-      creditos?: string;
-      tags?: string[];
-      ordem?: number | null;
-    }
+    payload: FotoEventoFotosLotePayload["fotos"][number]
   ) {
     const { data } = await httpClient.post<FotoEventoItem>(`/api/fotos-eventos/${id}/fotos`, payload);
     return data;
+  },
+
+  async adicionarFotosLote(id: number, payload: FotoEventoFotosLotePayload) {
+    const { data } = await httpClient.post<{ fotos: FotoEventoItem[] }>(
+      `/api/fotos-eventos/${id}/fotos/lote`,
+      payload
+    );
+    return data.fotos;
   },
 
   async atualizarFoto(
@@ -68,6 +75,21 @@ export const fotosEventosService = {
       payload
     );
     return data;
+  },
+
+  async definirCapa(id: number, fotoId: number) {
+    const { data } = await httpClient.put<FotoEventoItem>(
+      `/api/fotos-eventos/${id}/fotos/${fotoId}/capa`
+    );
+    return data;
+  },
+
+  async reordenarFotos(id: number, fotoIds: number[]) {
+    const { data } = await httpClient.put<{ fotos: FotoEventoItem[] }>(
+      `/api/fotos-eventos/${id}/fotos/reordenar`,
+      { fotoIds }
+    );
+    return data.fotos;
   },
 
   async removerFoto(id: number, fotoId: number) {

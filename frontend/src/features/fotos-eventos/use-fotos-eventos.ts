@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fotosEventosService } from "@/services/fotos-eventos.service";
-import type { FotoEventoPayload } from "@/types/fotos-eventos";
+import type { FotoEventoFotosLotePayload, FotoEventoPayload } from "@/types/fotos-eventos";
 
 type FiltrosFotoEvento = {
   busca?: string;
@@ -68,6 +68,42 @@ export function useAdicionarFotoEvento() {
         ordem?: number | null;
       };
     }) => fotosEventosService.adicionarFoto(id, payload),
+    onSuccess: async (_response, vars) => {
+      await queryClient.invalidateQueries({ queryKey: ["fotos-eventos"] });
+      await queryClient.invalidateQueries({ queryKey: ["fotos-eventos", "detalhe", vars.id] });
+    }
+  });
+}
+
+export function useAdicionarFotosEventoLote() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: FotoEventoFotosLotePayload }) =>
+      fotosEventosService.adicionarFotosLote(id, payload),
+    onSuccess: async (_response, vars) => {
+      await queryClient.invalidateQueries({ queryKey: ["fotos-eventos"] });
+      await queryClient.invalidateQueries({ queryKey: ["fotos-eventos", "detalhe", vars.id] });
+    }
+  });
+}
+
+export function useDefinirCapaEvento() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, fotoId }: { id: number; fotoId: number }) =>
+      fotosEventosService.definirCapa(id, fotoId),
+    onSuccess: async (_response, vars) => {
+      await queryClient.invalidateQueries({ queryKey: ["fotos-eventos"] });
+      await queryClient.invalidateQueries({ queryKey: ["fotos-eventos", "detalhe", vars.id] });
+    }
+  });
+}
+
+export function useReordenarFotosEvento() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, fotoIds }: { id: number; fotoIds: number[] }) =>
+      fotosEventosService.reordenarFotos(id, fotoIds),
     onSuccess: async (_response, vars) => {
       await queryClient.invalidateQueries({ queryKey: ["fotos-eventos"] });
       await queryClient.invalidateQueries({ queryKey: ["fotos-eventos", "detalhe", vars.id] });

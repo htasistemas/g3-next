@@ -191,6 +191,10 @@ const LembretesDiariosPage = carregarPagina(
   "/setor-administrativo/lembretes-diarios",
   "LembretesDiariosPage"
 );
+const ChecklistDiarioPage = carregarPagina(
+  "/setor-administrativo/checklist-diario",
+  "ChecklistDiarioPage"
+);
 const PlanoTrabalhoPage = carregarPagina("/setor-juridico/plano-trabalho", "PlanoTrabalhoPage");
 const TermoFomentoPage = carregarPagina("/setor-juridico/termo-fomento", "TermoFomentoPage");
 const AutorizacaoComprasPage = carregarPagina(
@@ -351,6 +355,20 @@ export const router = createBrowserRouter([
       { path: "/setor-administrativo/patrimonio", element: PatrimonioPage },
       { path: "/setor-administrativo/tarefas-pendencias", element: TarefasPendenciasPage },
       { path: "/setor-administrativo/lembretes-diarios", element: LembretesDiariosPage },
+      {
+        path: "/setor-administrativo/checklist-diario",
+        element: (
+          <RequirePermission
+            permissions={[
+              "ADMINISTRADOR",
+              "SETOR_ADMINISTRATIVO_CHECKLIST_DIARIO_VISUALIZAR_PROPRIO",
+              "SETOR_ADMINISTRATIVO_CHECKLIST_DIARIO_VISUALIZAR_TODOS"
+            ]}
+          >
+            {ChecklistDiarioPage}
+          </RequirePermission>
+        )
+      },
       { path: "/setor-juridico/plano-trabalho", element: PlanoTrabalhoPage },
       { path: "/setor-juridico/termo-fomento", element: TermoFomentoPage },
       { path: "/setor-financeiro/autorizacao-compras", element: AutorizacaoComprasPage },

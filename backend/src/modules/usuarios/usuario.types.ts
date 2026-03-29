@@ -1,6 +1,8 @@
 export const usuarioStatusValues = ["ATIVO", "INATIVO", "BLOQUEADO"] as const;
 
 export type UsuarioStatus = (typeof usuarioStatusValues)[number];
+export const usuarioOrigemTipoValues = ["BENEFICIARIO", "PROFISSIONAL", "VOLUNTARIO"] as const;
+export type UsuarioOrigemTipo = (typeof usuarioOrigemTipoValues)[number];
 
 export type UsuarioInputBase = {
   nome_completo: string;
@@ -17,6 +19,9 @@ export type UsuarioInputBase = {
   permissoes?: string[];
   status?: UsuarioStatus;
   exigir_troca_senha?: boolean;
+  origem_tipo?: UsuarioOrigemTipo;
+  origem_id?: string;
+  origem_nome?: string;
 };
 
 export type UsuarioCreateInput = UsuarioInputBase & {
@@ -85,6 +90,9 @@ export type UsuarioResponse = {
   tentativas_login_invalidas: number;
   ultimo_login_invalido_em?: string;
   ultimo_acesso_em?: string;
+  origem_tipo?: UsuarioOrigemTipo;
+  origem_id?: string;
+  origem_nome?: string;
   criado_em: string;
   atualizado_em: string;
 };
@@ -92,4 +100,9 @@ export type UsuarioResponse = {
 export type UsuarioDetalheResponse = {
   usuario: UsuarioResponse;
   auditoria: UsuarioAuditoriaItem[];
+};
+
+export type UsuarioRemocaoResponse = {
+  id_usuario: string;
+  removido_em: string;
 };

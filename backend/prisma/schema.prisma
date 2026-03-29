@@ -431,7 +431,7 @@ model Usuario {
 
 model Permissao {
   id          BigInt            @id @default(autoincrement())
-  nome        String            @db.VarChar(60)
+  nome        String            @db.VarChar(180)
   usuarios    UsuarioPermissao[]
 
   @@map("permissao")

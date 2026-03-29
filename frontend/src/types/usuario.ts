@@ -1,4 +1,5 @@
 export type UsuarioStatus = "ATIVO" | "INATIVO" | "BLOQUEADO";
+export type UsuarioOrigemTipo = "BENEFICIARIO" | "PROFISSIONAL" | "VOLUNTARIO";
 
 export type Usuario = {
   id_usuario: string;
@@ -19,6 +20,9 @@ export type Usuario = {
   tentativas_login_invalidas: number;
   ultimo_login_invalido_em?: string;
   ultimo_acesso_em?: string;
+  origem_tipo?: UsuarioOrigemTipo;
+  origem_id?: string;
+  origem_nome?: string;
   criado_em: string;
   atualizado_em: string;
 };
@@ -52,6 +56,11 @@ export type UsuarioListaResponse = {
 export type UsuarioDetalheResponse = {
   usuario: Usuario;
   auditoria: UsuarioAuditoriaItem[];
+};
+
+export type UsuarioRemocaoResponse = {
+  id_usuario: string;
+  removido_em: string;
 };
 
 export type UsuarioPermissoesResponse = {
@@ -89,4 +98,7 @@ export type UsuarioPayload = {
   exigir_troca_senha?: boolean;
   senha?: string;
   confirmar_senha?: string;
+  origem_tipo?: UsuarioOrigemTipo;
+  origem_id?: string;
+  origem_nome?: string;
 };

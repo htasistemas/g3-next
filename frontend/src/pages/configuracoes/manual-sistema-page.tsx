@@ -314,6 +314,50 @@ const secoesManual: ManualSecao[] = [
           "O sistema aceita anexos PDF, JPG e PNG e grava apenas o caminho do arquivo no cadastro do documento.",
           "Se o documento já estiver salvo, o anexo é armazenado no storage do sistema e permanece disponível para substituição e exclusão sem duplicar arquivo no banco."
         ]
+      },
+      {
+        nome: "Checklist diário",
+        objetivo: "Organizar a rotina administrativa por usuário com execução diária, visão semanal, recorrência e rastreabilidade operacional.",
+        comoUsar: [
+          "Acesse Setor administrativo > Checklist diário para abrir a central operacional da rotina.",
+          "No topo da tela, use os filtros por usuário, unidade, período, status, prioridade, dia da semana, tipo de modelo, somente pendentes e somente atrasados para chegar rapidamente ao recorte desejado.",
+          "Use o Modo diário para acompanhar as tarefas do dia, com leitura de pendentes, atrasadas, concluídas, alertas críticos e percentual de conclusão em tempo real.",
+          "Quando a atividade estiver pronta, use a ação de concluir no próprio item. O sistema registra data, hora, usuário executor e exige observação quando o modelo pedir esse preenchimento.",
+          "Quando a tarefa não puder ser executada, use a dispensa somente se você tiver permissão. O sistema exige motivo e mantém a trilha completa da decisão.",
+          "Quando for necessário corrigir uma conclusão ou devolver a atividade para a fila, use a reabertura apenas em perfis autorizados. A auditoria anterior é preservada.",
+          "No Modo semanal, acompanhe os cards por dia da semana com resumo de concluídas, pendentes e atrasadas e use a seta de recolher para compactar dias que não precisam de análise naquele momento.",
+          "Na aba Modelos, clique em Novo modelo para criar um checklist novo ou selecione um modelo existente na coluna da esquerda para editar os dados e as atividades.",
+          "Dentro do editor de modelo, ajuste nome, tipo, setor, cargo e as atividades vinculadas. Use Adicionar atividade para incluir novos itens da rotina com horário, prioridade, alerta, criticidade e observação obrigatória.",
+          "Use a ação Salvar para persistir a criação ou alteração do modelo. Se precisar reaproveitar uma estrutura já pronta, use Clonar no card do modelo desejado.",
+          "Hoje o fluxo oficial para retirada de uso do checklist é Ativar ou Inativar o modelo. Não existe exclusão física de modelo na tela atual; a inativação é a forma correta de interromper o uso mantendo rastreabilidade.",
+          "Na aba Configurações, apenas perfis autorizados podem ativar sábado e domingo. Enquanto esses dias estiverem desligados, o sistema não gera tarefas automáticas neles.",
+          "Use a geração semanal quando precisar preparar a semana operacional. A geração respeita os modelos ativos, evita duplicidade e mantém o snapshot da atividade gerada."
+        ],
+        atencoes: [
+          "Sábado e domingo permanecem desativados por padrão e não geram tarefas automáticas enquanto estiverem desligados.",
+          "Pendência, atraso, conclusão, dispensa e não se aplica são status operacionais reais e devem refletir a execução do dia, não apenas controle visual.",
+          "Toda conclusão, dispensa, reabertura, alteração de modelo e atualização de configuração gera histórico de auditoria do checklist.",
+          "A geração semanal evita duplicidade por usuário, atividade e data e mantém o snapshot da atividade mesmo após edição posterior do modelo.",
+          "Os indicadores do topo e da visão gerencial usam dados reais do banco e devem ser lidos como acompanhamento operacional da rotina."
+        ]
+      },
+      {
+        nome: "Fotos e eventos",
+        objetivo: "Gerenciar eventos institucionais com álbum persistido, capa do evento, galeria organizada e ações claras por contexto.",
+        comoUsar: [
+          "Na aba Listagem, use busca e status para localizar rapidamente o evento e acompanhe os indicadores de total de eventos, fotos, álbuns sem capa e evento com mais fotos.",
+          "Na aba Cadastro do evento, preencha os dados principais e use Adicionar fotos para fazer upload múltiplo antes mesmo do primeiro salvamento.",
+          "Depois do upload, escolha visualmente a capa do álbum ainda no cadastro. A primeira imagem marcada como destaque será persistida como capa real no banco.",
+          "Ao salvar, o sistema grava o evento, envia as fotos pendentes, define a capa e mantém o fluxo completo sincronizado entre cadastro, listagem e galeria.",
+          "Na aba Galeria do evento, use Adicionar fotos para complementar o álbum, Definir capa para trocar a imagem principal, Reordenar para ajustar a sequência visual e Excluir foto para remover itens específicos.",
+          "Use Publicar evento quando o álbum já estiver consistente e o status precisar ser ajustado para realizado sem voltar para o formulário."
+        ],
+        atencoes: [
+          "A capa do evento é persistida por vínculo com a foto cadastrada no álbum e pode ser substituída sem duplicar imagem ou deixar referência órfã.",
+          "A remoção da foto principal limpa a capa atual do evento e exige nova definição visual quando necessário.",
+          "As fotos ficam armazenadas no storage do sistema com persistência real; o banco guarda apenas os metadados e caminhos do arquivo.",
+          "As ações mudam conforme a aba para evitar botões genéricos e reduzir clique desnecessário durante a operação."
+        ]
       }
     ]
   },
@@ -579,8 +623,15 @@ const secoesManual: ManualSecao[] = [
         comoUsar: [
           "Cadastre usuários com perfis adequados às rotinas de cada setor.",
           "Revise permissões antes de liberar telas sensíveis, relatórios e dados financeiros.",
-          "Na tela de usuários, a barra superior agora muda conforme a aba aberta, com ações específicas para listagem, cadastro, permissões e auditoria.",
-          "Na aba Listagem de usuários, os botões do registro usam fundo com sombreamento e o botão Excluir foi incluído ao lado de Bloquear para agilizar a operação."
+          "Na tela de usuários, o título principal agora fica dentro do card superior da própria tela, seguindo o mesmo padrão visual dos demais módulos do G3N.",
+          "Na aba Listagem de usuários, as ações do registro foram convertidas para ícones com tooltip, com exclusão isolada no final para reduzir clique acidental.",
+          "A exclusão de usuário passou a ser persistida corretamente como exclusão lógica real, sem mensagem falsa de sucesso e com atualização imediata da listagem.",
+          "No cadastro de usuário, use o bloco Importar dados de origem para iniciar o cadastro a partir de beneficiário, profissional ou voluntário com vínculo salvo no banco.",
+          "O resumo do perfil agora mostra com clareza quais telas e quais ações operacionais ficam liberadas para o usuário selecionado."
+        ],
+        atencoes: [
+          "A exclusão exige confirmação explícita porque a ação é irreversível na operação diária.",
+          "O vínculo de origem importada ajuda a evitar duplicidade e deixa rastreável de onde o cadastro do usuário foi criado."
         ]
       },
       {

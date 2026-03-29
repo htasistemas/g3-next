@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.401",
-  "releaseDate": "2026-03-28",
-  "description": "O relatório de agendamento e lista de presença passou a priorizar o título e o campo do beneficiário na impressão.",
+  "latestVersion": "1.00.407",
+  "releaseDate": "2026-03-29",
+  "description": "O manual do sistema foi atualizado com instruções claras de criação, edição, clonagem e inativação dos modelos do Checklist diário.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.401",
+  "minCompatibleVersion": "1.00.407",
   "releaseType": "stable",
   "downloadUrl": null
 }

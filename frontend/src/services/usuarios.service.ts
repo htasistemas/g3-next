@@ -5,6 +5,7 @@ import type {
   UsuarioListaResponse,
   UsuarioPayload,
   UsuarioPermissoesResponse,
+  UsuarioRemocaoResponse,
   UsuarioStatus
 } from "@/types/usuario";
 
@@ -54,8 +55,8 @@ export const usuariosService = {
     return data;
   },
 
-  async remover(id: string): Promise<UsuarioDetalheResponse> {
-    const { data } = await httpClient.delete<UsuarioDetalheResponse>(`/api/usuarios/${id}`);
+  async remover(id: string): Promise<UsuarioRemocaoResponse> {
+    const { data } = await httpClient.delete<UsuarioRemocaoResponse>(`/api/usuarios/${id}`);
     return data;
   }
 };

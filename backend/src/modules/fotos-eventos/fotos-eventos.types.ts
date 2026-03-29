@@ -25,11 +25,20 @@ export type FotoEventoFotoInput = {
   ordem?: number | null;
 };
 
+export type FotoEventoFotosLoteInput = {
+  fotos: FotoEventoFotoInput[];
+  fotoPrincipalIndex?: number | null;
+};
+
 export type FotoEventoFotoAtualizacaoInput = {
   legenda?: string | null;
   creditos?: string | null;
   tags?: string[] | null;
   ordem?: number | null;
+};
+
+export type FotoEventoReordenacaoInput = {
+  fotoIds: number[];
 };
 
 export type FotoEventoFiltros = {

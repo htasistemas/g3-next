@@ -517,7 +517,7 @@ export function AgendamentosPage() {
     const local = item.itemLocal || item.sala || item.unidade || "-";
     const nomeInstituicao = unidadeAtual?.razao_social?.trim() || unidadeAtual?.nome_fantasia?.trim() || "Instituição não cadastrada";
     const logomarcaRelatorio = resolverUrlArquivo(unidadeAtual?.logomarca_relatorio || unidadeAtual?.logomarca);
-    const rodapeInstitucional = montarRodapeInstitucional(unidadeAtual);
+    const rodapeInstitucional = montarRodapeInstitucional(unidadeAtual ?? undefined);
     const linhas = participantes.length
       ? participantes
           .map(

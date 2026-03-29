@@ -1,6 +1,74 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.407",
+                        "releaseDate":  "2026-03-29",
+                        "title":  "Manual do checklist diario ampliado",
+                        "description":  "O manual interno do sistema passou a explicar de forma objetiva como criar, editar, clonar e inativar modelos do checklist diario.",
+                        "changes":  [
+                                        "A seção do Checklist diario no manual agora orienta o uso da aba Modelos com fluxo real de criação e edição.",
+                                        "O texto do manual passou a esclarecer que a retirada de uso atual do modelo acontece por inativação, e não por exclusão física.",
+                                        "A documentação interna ficou alinhada com o comportamento atual da tela para reduzir dúvida operacional."
+                                    ]
+                    },
+                    {
+                        "version":  "1.00.406",
+                        "releaseDate":  "2026-03-29",
+                        "title":  "Checklist diario com dias recolhiveis no modo semanal",
+                        "description":  "A aba semanal do checklist diario recebeu controle de recolher e expandir por dia para melhorar navegacao e leitura da semana.",
+                        "changes":  [
+                                        "Cada card de dia passou a ter seta de recolher e expandir para reduzir poluicao visual em semanas com muitas atividades.",
+                                        "A orientacao do modo semanal foi atualizada no manual interno do sistema para refletir a nova navegacao.",
+                                        "O redesenho semanal manteve os resumos, prioridades e status sem voltar para a grade comprimida anterior."
+                                    ]
+                    },
+                    {
+                        "version":  "1.00.405",
+                        "releaseDate":  "2026-03-29",
+                        "title":  "Checklist diario com modo semanal redesenhado",
+                        "description":  "A aba semanal do checklist diario foi refeita para leitura operacional real, com resumo da semana e cards amplos por dia.",
+                        "changes":  [
+                                        "A grade comprimida de sete colunas foi substituida por cards por dia com largura util, destaque visual e melhor hierarquia de informacao.",
+                                        "Cada dia passou a exibir contadores de concluidas, pendentes e atrasadas, alem de horario, prioridade, modelo e descricao resumida das atividades.",
+                                        "O topo da aba semanal ganhou um resumo da semana para leitura rapida das pendencias e dos atrasos sem exigir abertura de cada card."
+                                    ]
+                    },
+                    {
+                        "version":  "1.00.404",
+                        "releaseDate":  "2026-03-29",
+                        "title":  "Fotos e eventos com galeria profissional e capa persistida",
+                        "description":  "O modulo Fotos e eventos passou a suportar upload multiplo, definicao real de capa, reordenacao e acoes especificas por aba no padrao do G3N.",
+                        "changes":  [
+                                        "O cadastro do evento agora aceita upload multiplo de fotos antes do primeiro salvamento e permite escolher visualmente qual imagem sera gravada como capa do album.",
+                                        "A galeria do evento passou a permitir definicao persistida de capa, reordenacao das fotos e exclusao segura sem quebrar o vinculo do album no banco.",
+                                        "A tela recebeu dashboards mais uteis por aba, layout mais claro e barra de acoes contextual para reduzir botoes genericos e cliques desnecessarios."
+                                    ]
+                    },
+                    {
+                        "version":  "1.00.403",
+                        "releaseDate":  "2026-03-29",
+                        "title":  "Usuarios com exclusao real, origem importada e perfil legivel",
+                        "description":  "A tela de usuarios foi padronizada com exclusao persistida corretamente, acoes em icones, importacao por origem e leitura mais clara de permissoes.",
+                        "changes":  [
+                                        "A exclusao agora remove logicamente o usuario da operacao real, sem falso sucesso, sem manter o registro na listagem e com auditoria preservada.",
+                                        "O cadastro passou a aceitar importacao a partir de beneficiario, profissional ou voluntario, salvando o vinculo de origem no banco para rastreabilidade e bloqueio de duplicidade.",
+                                        "A interface de usuarios foi alinhada ao padrao visual do G3N com titulo no card superior, icones com tooltip na listagem e resumo gerencial por tela e acao no perfil."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.402",
+                        "releaseDate":  "2026-03-29",
+                        "title":  "Checklist diário operacional no Setor administrativo",
+                        "description":  "O G3N passou a contar com o módulo Checklist diário com visão diária e semanal, modelos recorrentes, auditoria e configurações operacionais.",
+                        "changes":  [
+                                        "Foi criada a base operacional do Checklist diário com execução por usuário, status automáticos, dispensa, reabertura, histórico e indicadores gerenciais.",
+                                        "O Setor administrativo recebeu a nova tela Checklist diário com filtros, visão semanal, gestão de modelos, configurações de sábado e domingo e leitura de auditoria.",
+                                        "O manual do sistema e a versão oficial foram atualizados na mesma entrega para refletir o novo módulo."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.401",
                         "releaseDate":  "2026-03-28",
                         "title":  "Relatorio de agendamento com tabela mais equilibrada",

@@ -1,11 +1,17 @@
 import { z } from "zod";
 import { validarCpf } from "@/lib/validators";
-import type { UsuarioStatus } from "@/types/usuario";
+import type { UsuarioOrigemTipo, UsuarioStatus } from "@/types/usuario";
 
 export const usuarioStatusOptions: { value: UsuarioStatus; label: string }[] = [
   { value: "ATIVO", label: "Ativo" },
   { value: "INATIVO", label: "Inativo" },
   { value: "BLOQUEADO", label: "Bloqueado" }
+];
+
+export const usuarioOrigemOptions: { value: UsuarioOrigemTipo; label: string }[] = [
+  { value: "BENEFICIARIO", label: "Beneficiário" },
+  { value: "PROFISSIONAL", label: "Profissional" },
+  { value: "VOLUNTARIO", label: "Voluntário" }
 ];
 
 const optionalTrimmedString = z
@@ -70,6 +76,9 @@ export const usuarioFormSchema = z
     permissoes: optionalStringArray.default([]),
     status: z.enum(["ATIVO", "INATIVO", "BLOQUEADO"]).default("ATIVO"),
     exigir_troca_senha: optionalBoolean.default(false),
+    origem_tipo: z.enum(["BENEFICIARIO", "PROFISSIONAL", "VOLUNTARIO"]).optional(),
+    origem_id: optionalTrimmedString,
+    origem_nome: optionalTrimmedString,
     senha: z.string().optional(),
     confirmar_senha: z.string().optional()
   })
@@ -120,6 +129,14 @@ export const usuarioFormSchema = z
         });
       }
     }
+
+    if (input.origem_tipo && !input.origem_id) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["origem_id"],
+        message: "Selecione um cadastro de origem."
+      });
+    }
   });
 
 export type UsuarioFormInput = z.input<typeof usuarioFormSchema>;
@@ -141,6 +158,9 @@ export const usuarioDefaultValues: UsuarioFormValues = {
   permissoes: ["OPERADOR"],
   status: "ATIVO",
   exigir_troca_senha: false,
+  origem_tipo: undefined,
+  origem_id: undefined,
+  origem_nome: undefined,
   senha: "",
   confirmar_senha: ""
 };

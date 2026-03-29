@@ -72,6 +72,7 @@ import {
   Ticket,
   Package,
   UserRound,
+  UserRoundCheck,
   UserCog,
   UsersRound,
   WalletCards,
@@ -339,6 +340,17 @@ export const menuSections: MenuSection[] = [
         to: "/setor-administrativo/lembretes-diarios",
         label: "Lembretes diários",
         icon: AlarmClockCheck
+      },
+      {
+        id: "setor-administrativo-checklist-diario",
+        to: "/setor-administrativo/checklist-diario",
+        label: "Checklist diário",
+        icon: UserRoundCheck,
+        requiredPermissions: [
+          "ADMINISTRADOR",
+          "SETOR_ADMINISTRATIVO_CHECKLIST_DIARIO_VISUALIZAR_PROPRIO",
+          "SETOR_ADMINISTRATIVO_CHECKLIST_DIARIO_VISUALIZAR_TODOS"
+        ]
       }
     ]
   },
@@ -568,7 +580,7 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/configuracoes/pesquise-na-ia")) return "Pesquise na IA";
   if (pathname.startsWith("/configuracoes/sobre-o-sistema")) return "Sobre o sistema";
   if (pathname.startsWith("/configuracoes/mensagens-personalizadas")) return "Mensagens personalizadas";
-  if (pathname.startsWith("/configuracoes/usuarios")) return "Usuários";
+  if (pathname.startsWith("/configuracoes/usuarios")) return "";
   if (pathname.startsWith("/setor-vendas/carteira-digital-evento")) return "Carteira digital do evento";
   if (pathname.startsWith("/setor-vendas/historico")) return "Historico de vendas";
   if (pathname.startsWith("/setor-rh/registro-ponto")) return "Registro de ponto";
@@ -581,6 +593,7 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/setor-administrativo/patrimonio")) return "Patrimônio";
   if (pathname.startsWith("/setor-administrativo/tarefas-pendencias")) return "Tarefas e pendências";
   if (pathname.startsWith("/setor-administrativo/lembretes-diarios")) return "Lembretes diários";
+  if (pathname.startsWith("/setor-administrativo/checklist-diario")) return "Checklist diário";
   if (pathname.startsWith("/setor-juridico/plano-trabalho")) return "Plano de trabalho";
   if (pathname.startsWith("/setor-juridico/termo-fomento")) return "Termo de fomento";
   if (pathname.startsWith("/setor-financeiro/autorizacao-compras")) return "Autorização de compras";

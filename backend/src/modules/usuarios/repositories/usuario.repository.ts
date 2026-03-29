@@ -13,6 +13,7 @@ import type {
   UsuarioCreateInput,
   UsuarioDetalheResponse,
   UsuarioFilters,
+  UsuarioRemocaoResponse,
   UsuarioResponse,
   UsuarioStatus,
   UsuarioUpdateInput
@@ -33,6 +34,8 @@ type DuplicidadeRow = {
   nome_usuario: string;
   email: string | null;
   cpf: string | null;
+  origem_tipo: string | null;
+  origem_id: string | null;
 };
 
 export class UsuarioRepository {
@@ -61,6 +64,9 @@ export class UsuarioRepository {
         u.tentativas_login_invalidas,
         u.ultimo_login_invalido_em,
         u.ultimo_acesso_em,
+        u.origem_tipo,
+        u.origem_id,
+        u.origem_nome,
         u.criado_em,
         u.atualizado_em,
         COALESCE(
@@ -88,6 +94,9 @@ export class UsuarioRepository {
         u.tentativas_login_invalidas,
         u.ultimo_login_invalido_em,
         u.ultimo_acesso_em,
+        u.origem_tipo,
+        u.origem_id,
+        u.origem_nome,
         u.criado_em,
         u.atualizado_em
       ORDER BY
@@ -160,7 +169,9 @@ export class UsuarioRepository {
     await this.validarDuplicidades({
       nome_usuario: nomeUsuario,
       email,
-      cpf
+      cpf,
+      origem_tipo: input.origem_tipo,
+      origem_id: trimOrUndefined(input.origem_id)
     });
 
     const permissoesNormalizadas = this.normalizarPermissoes(
@@ -197,7 +208,9 @@ export class UsuarioRepository {
           nome_usuario: nomeUsuario,
           email,
           status: input.status ?? "ATIVO",
-          permissoes: permissoesNormalizadas
+          permissoes: permissoesNormalizadas,
+          origem_tipo: input.origem_tipo ?? null,
+          origem_id: trimOrUndefined(input.origem_id) ?? null
         }
       );
 
@@ -227,7 +240,9 @@ export class UsuarioRepository {
       nome_usuario: nomeUsuario,
       email,
       cpf,
-      ignorar_id: id
+      ignorar_id: id,
+      origem_tipo: input.origem_tipo,
+      origem_id: trimOrUndefined(input.origem_id)
     });
 
     await prisma.$transaction(async (tx) => {
@@ -270,7 +285,9 @@ export class UsuarioRepository {
           nome_usuario: nomeUsuario,
           email,
           status: input.status ?? this.mapStatusPersistido(existente.status),
-          permissoes: permissoesNormalizadas
+          permissoes: permissoesNormalizadas,
+          origem_tipo: input.origem_tipo ?? null,
+          origem_id: trimOrUndefined(input.origem_id) ?? null
         }
       );
     });
@@ -374,7 +391,7 @@ export class UsuarioRepository {
     return this.buscarPorId(id);
   }
 
-  async remover(id: bigint, ator: UsuarioAtor): Promise<UsuarioDetalheResponse> {
+  async remover(id: bigint, ator: UsuarioAtor): Promise<UsuarioRemocaoResponse> {
     await ensureUsuariosGestaoEstrutura(prisma);
 
     const usuario = await this.buscarUsuarioRowPorId(id);
@@ -382,16 +399,20 @@ export class UsuarioRepository {
       throw new AppError("Usuario nao encontrado.", 404);
     }
 
+    const removidoEm = new Date();
+
     await prisma.$transaction(async (tx) => {
       await tx.$executeRawUnsafe(
         `
           UPDATE usuarios
-          SET status = 'INATIVO',
+          SET deletado_em = $2,
+              deletado_por = $3,
               atualizado_em = NOW(),
-              atualizado_por = $2
+              atualizado_por = $3
           WHERE id = $1
         `,
         id,
+        removidoEm,
         ator.nome_usuario
       );
 
@@ -403,12 +424,17 @@ export class UsuarioRepository {
           entidade_id: id.toString()
         },
         {
-          status_novo: "INATIVO"
+          status_anterior: this.mapStatusPersistido(usuario.status),
+          removido_em: removidoEm.toISOString(),
+          removido_por: ator.nome_usuario
         }
       );
     });
 
-    return this.buscarPorId(id);
+    return {
+      id_usuario: id.toString(),
+      removido_em: removidoEm.toISOString()
+    };
   }
 
   private async buscarUsuarioRowPorId(id: bigint): Promise<UsuarioRow | null> {
@@ -430,6 +456,9 @@ export class UsuarioRepository {
         u.tentativas_login_invalidas,
         u.ultimo_login_invalido_em,
         u.ultimo_acesso_em,
+        u.origem_tipo,
+        u.origem_id,
+        u.origem_nome,
         u.criado_em,
         u.atualizado_em,
         COALESCE(
@@ -440,6 +469,7 @@ export class UsuarioRepository {
       LEFT JOIN usuario_permissao up ON up.usuario_id = u.id
       LEFT JOIN permissao p ON p.id = up.permissao_id
       WHERE u.id = ${id}
+        AND u.deletado_em IS NULL
       GROUP BY
         u.id,
         u.nome_usuario,
@@ -457,6 +487,9 @@ export class UsuarioRepository {
         u.tentativas_login_invalidas,
         u.ultimo_login_invalido_em,
         u.ultimo_acesso_em,
+        u.origem_tipo,
+        u.origem_id,
+        u.origem_nome,
         u.criado_em,
         u.atualizado_em
       LIMIT 1
@@ -494,7 +527,7 @@ export class UsuarioRepository {
   }
 
   private buildWhereClause(filters: UsuarioFilters): Prisma.Sql {
-    const conditions: Prisma.Sql[] = [];
+    const conditions: Prisma.Sql[] = [Prisma.sql`u.deletado_em IS NULL`];
 
     if (filters.nome) {
       const termo = `%${filters.nome.trim()}%`;
@@ -552,10 +585,6 @@ export class UsuarioRepository {
       conditions.push(Prisma.sql`u.criado_em::date <= ${filters.criado_ate}::date`);
     }
 
-    if (!conditions.length) {
-      return Prisma.empty;
-    }
-
     return Prisma.sql`WHERE ${Prisma.join(conditions, " AND ")}`;
   }
 
@@ -578,8 +607,11 @@ export class UsuarioRepository {
           cargo = $8,
           status = $9,
           exigir_troca_senha = $10,
+          origem_tipo = $11,
+          origem_id = $12,
+          origem_nome = $13,
           atualizado_em = NOW(),
-          atualizado_por = $11
+          atualizado_por = $14
         WHERE id = $1
       `,
       usuarioId,
@@ -592,6 +624,9 @@ export class UsuarioRepository {
       trimOrUndefined(input.cargo) ?? null,
       input.status ?? "ATIVO",
       !!input.exigir_troca_senha,
+      trimOrUndefined(input.origem_tipo) ?? null,
+      trimOrUndefined(input.origem_id) ?? null,
+      trimOrUndefined(input.origem_nome) ?? null,
       usuarioAtualizacao
     );
   }
@@ -649,6 +684,8 @@ export class UsuarioRepository {
     nome_usuario: string;
     email: string;
     cpf?: string;
+    origem_tipo?: string;
+    origem_id?: string;
     ignorar_id?: bigint;
   }) {
     const condicoes: Prisma.Sql[] = [
@@ -660,14 +697,21 @@ export class UsuarioRepository {
       condicoes.push(Prisma.sql`u.cpf = ${input.cpf}`);
     }
 
+    if (input.origem_tipo && input.origem_id) {
+      condicoes.push(
+        Prisma.sql`(u.origem_tipo = ${input.origem_tipo} AND u.origem_id = ${input.origem_id})`
+      );
+    }
+
     const ignorarSql = input.ignorar_id
       ? Prisma.sql`AND u.id <> ${input.ignorar_id}`
       : Prisma.empty;
 
     const duplicidades = await prisma.$queryRaw<DuplicidadeRow[]>(Prisma.sql`
-      SELECT u.id, u.nome_usuario, u.email, u.cpf
+      SELECT u.id, u.nome_usuario, u.email, u.cpf, u.origem_tipo, u.origem_id
       FROM usuarios u
       WHERE (${Prisma.join(condicoes, " OR ")})
+        AND u.deletado_em IS NULL
       ${ignorarSql}
       LIMIT 10
     `);
@@ -692,6 +736,17 @@ export class UsuarioRepository {
       );
       if (cpfRepetido) {
         throw new AppError("Ja existe um usuario com este CPF.", 409);
+      }
+    }
+
+    if (input.origem_tipo && input.origem_id) {
+      const origemRepetida = duplicidades.some(
+        (item) =>
+          trimOrUndefined(item.origem_tipo)?.toUpperCase() === input.origem_tipo?.toUpperCase() &&
+          trimOrUndefined(item.origem_id) === input.origem_id
+      );
+      if (origemRepetida) {
+        throw new AppError("Ja existe um usuario vinculado a esta origem de cadastro.", 409);
       }
     }
   }

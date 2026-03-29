@@ -4,6 +4,14 @@ export type FotoUploadPayload = {
   conteudo: string;
 };
 
+export type FotoEventoFotoPayload = {
+  arquivo: FotoUploadPayload;
+  legenda?: string;
+  creditos?: string;
+  tags?: string[];
+  ordem?: number | null;
+};
+
 export type FotoEvento = {
   id: number;
   unidadeId?: number | null;
@@ -48,4 +56,9 @@ export type FotoEventoPayload = {
   unidadeId?: number | null;
   fotoPrincipalUpload?: FotoUploadPayload | null;
   fotoPrincipalId?: number | null;
+};
+
+export type FotoEventoFotosLotePayload = {
+  fotos: FotoEventoFotoPayload[];
+  fotoPrincipalIndex?: number | null;
 };

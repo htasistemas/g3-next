@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useQuery } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useNavigate } from "react-router-dom";
-import type { LucideIcon } from "lucide-react";
 import {
   ChevronDown,
   ChevronRight,
   History,
   KeyRound,
   ListFilter,
+  Lock,
+  LockOpen,
+  Pencil,
   Plus,
   Printer,
   Save,
@@ -17,19 +18,22 @@ import {
   Trash2,
   Undo2,
   UserRound,
-  UsersRound,
   X
 } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { useNavigate } from "react-router-dom";
+import { AdminPageLayout, type AdminAction, type AdminTab } from "@/components/admin/admin-page-layout";
+import { PopupConfirmacao, PopupMensagem, type PopupMensagemState } from "@/components/admin/admin-popups";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { imprimirConteudoAtual } from "@/lib/report-utils";
 import {
   usuarioDefaultValues,
   usuarioFormSchema,
+  usuarioOrigemOptions,
   usuarioStatusOptions,
   type UsuarioFormInput,
   type UsuarioFormValues
@@ -45,34 +49,71 @@ import {
 } from "@/features/usuarios/use-usuarios";
 import { formatarTextoPorCampo } from "@/lib/text-formatter";
 import { mapaCamposTextoUsuarioForm } from "@/lib/text-format-config";
-import {
-  classeBotaoAbaLateral,
-  classeNumeroAbaLateral,
-  classesTelaPadraoBeneficiario
-} from "@/lib/tela-padrao-beneficiario";
+import { imprimirConteudoAtual } from "@/lib/report-utils";
+import { beneficiariosService } from "@/services/beneficiarios.service";
+import { profissionaisService } from "@/services/profissionais.service";
+import { voluntariosService } from "@/services/voluntarios.service";
+import type { Beneficiario } from "@/types/beneficiario";
+import type { Profissional } from "@/types/profissional";
 import type {
   Usuario,
   UsuarioFiltros,
+  UsuarioOrigemTipo,
   UsuarioPayload,
   UsuarioPermissaoCatalogo,
   UsuarioStatus
 } from "@/types/usuario";
+import type { Voluntario } from "@/types/voluntario";
 
-const abas = [
+const abas: AdminTab[] = [
   { id: "listagem", label: "Listagem de usuários", icon: ListFilter },
-  { id: "cadastro", label: "Cadastro / edição", icon: UserRound },
+  { id: "cadastro", label: "Cadastro e edição", icon: UserRound },
   { id: "permissoes", label: "Permissões e acessos", icon: ShieldCheck },
-  { id: "auditoria", label: "Auditoria / histórico", icon: History }
-] as const;
+  { id: "auditoria", label: "Auditoria e histórico", icon: History }
+];
 
 type AbaId = (typeof abas)[number]["id"];
 
-type AcaoCrud = {
-  label: (typeof ordemAcoesCrudPadrao)[number];
-  icon: LucideIcon;
-  onClick: () => void;
-  variant: "default" | "outline" | "danger" | "ghost";
-  disabled?: boolean;
+type ConfirmacaoState =
+  | {
+      tipo: "status";
+      titulo: string;
+      texto: string;
+      usuarioId: string;
+      status: UsuarioStatus;
+    }
+  | {
+      tipo: "excluir";
+      titulo: string;
+      texto: string;
+      usuarioId: string;
+    };
+
+type OrigemBuscaItem = {
+  tipo: UsuarioOrigemTipo;
+  id: string;
+  nome: string;
+  cpf?: string;
+  email?: string;
+  telefone?: string;
+  unidade?: string;
+  setor?: string;
+  cargo?: string;
+  descricao?: string;
+};
+
+type ResumoTela = {
+  tela: string;
+  modulo: string;
+  acoes: {
+    visualizar?: string;
+    editar?: string;
+    excluir?: string;
+    aprovar?: string;
+    imprimir?: string;
+    exportar?: string;
+    configurar?: string;
+  };
 };
 
 const pageSizeDefault = 10;
@@ -95,6 +136,9 @@ function mapUsuarioParaFormulario(usuario: Usuario): UsuarioFormValues {
     permissoes: usuario.permissoes.length ? usuario.permissoes : ["OPERADOR"],
     status: usuario.status,
     exigir_troca_senha: usuario.exigir_troca_senha,
+    origem_tipo: usuario.origem_tipo,
+    origem_id: usuario.origem_id,
+    origem_nome: usuario.origem_nome,
     senha: "",
     confirmar_senha: ""
   };
@@ -123,7 +167,10 @@ function mapFormularioParaPayload(values: UsuarioFormValues): UsuarioPayload {
     perfil_acesso: values.perfil_acesso?.trim().toUpperCase() || undefined,
     permissoes,
     status: values.status,
-    exigir_troca_senha: !!values.exigir_troca_senha
+    exigir_troca_senha: !!values.exigir_troca_senha,
+    origem_tipo: values.origem_tipo,
+    origem_id: values.origem_id?.trim() || undefined,
+    origem_nome: values.origem_nome?.trim() || undefined
   };
 
   if (!values.id_usuario) {
@@ -147,6 +194,25 @@ function formatarStatus(status: UsuarioStatus) {
   return "Bloqueado";
 }
 
+function formatarTipoOrigem(tipo?: UsuarioOrigemTipo) {
+  if (tipo === "BENEFICIARIO") return "Beneficiário";
+  if (tipo === "PROFISSIONAL") return "Profissional";
+  if (tipo === "VOLUNTARIO") return "Voluntário";
+  return "Sem vínculo";
+}
+
+function formatarPerfil(nome?: string) {
+  if (!nome) return "Não definido";
+  if (nome === "ADMINISTRADOR") return "Administrador";
+  if (nome === "OPERADOR") return "Operacional";
+  if (nome === "LEITURA_APENAS") return "Leitura apenas";
+  return nome
+    .toLowerCase()
+    .split("_")
+    .map((parte) => parte.charAt(0).toUpperCase() + parte.slice(1))
+    .join(" ");
+}
+
 function ordenarPermissoesPorModulo(permissoes: UsuarioPermissaoCatalogo[]) {
   const map = new Map<string, UsuarioPermissaoCatalogo[]>();
   permissoes.forEach((item) => {
@@ -156,47 +222,100 @@ function ordenarPermissoesPorModulo(permissoes: UsuarioPermissaoCatalogo[]) {
   });
 
   return [...map.entries()]
-    .sort((a, b) => a[0].localeCompare(b[0]))
+    .sort((a, b) => a[0].localeCompare(b[0], "pt-BR"))
     .map(([modulo, itens]) => ({
       modulo,
-      itens: itens.sort((a, b) => a.nome.localeCompare(b.nome))
+      itens: itens.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
     }));
 }
 
-function PopupMensagem({
-  titulo,
-  texto,
-  tipo,
-  onClose
-}: {
-  titulo: string;
-  texto: string;
-  tipo: "sucesso" | "erro" | "aviso";
-  onClose: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/45 px-4" onClick={onClose}>
-      <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="border-b border-slate-100 px-5 py-4">
-          <h3
-            className={`text-base font-semibold ${
-              tipo === "sucesso" ? "text-emerald-800" : tipo === "erro" ? "text-rose-700" : "text-amber-700"
-            }`}
-          >
-            {titulo}
-          </h3>
-        </div>
-        <div className="px-5 py-4">
-          <p className="text-sm text-slate-700">{texto}</p>
-        </div>
-        <div className="flex justify-end border-t border-slate-100 px-5 py-3">
-          <Button type="button" onClick={onClose}>
-            OK
-          </Button>
-        </div>
-      </div>
-    </div>
+function agruparPermissoesPorTela(permissoes: UsuarioPermissaoCatalogo[], selecionadas: string[]): ResumoTela[] {
+  const porTela = new Map<string, ResumoTela>();
+
+  permissoes
+    .filter((item) => selecionadas.includes(item.nome))
+    .forEach((item) => {
+      const chave = `${item.modulo}::${item.tela}`;
+      const atual =
+        porTela.get(chave) ??
+        ({
+          modulo: item.modulo,
+          tela: item.tela,
+          acoes: {}
+        } satisfies ResumoTela);
+
+      const acao = item.acao.toLowerCase();
+      if (acao.includes("visualizar") || acao.includes("leitura") || acao.includes("acesso")) atual.acoes.visualizar = item.nome;
+      if (acao.includes("editar") || acao.includes("cadastrar") || acao.includes("alterar") || acao.includes("operar")) atual.acoes.editar = item.nome;
+      if (acao.includes("excluir") || acao.includes("remover") || acao.includes("deletar")) atual.acoes.excluir = item.nome;
+      if (acao.includes("aprovar") || acao.includes("autorizar")) atual.acoes.aprovar = item.nome;
+      if (acao.includes("imprimir")) atual.acoes.imprimir = item.nome;
+      if (acao.includes("exportar")) atual.acoes.exportar = item.nome;
+      if (acao.includes("configurar")) atual.acoes.configurar = item.nome;
+
+      porTela.set(chave, atual);
+    });
+
+  return [...porTela.values()].sort((a, b) =>
+    `${a.modulo} ${a.tela}`.localeCompare(`${b.modulo} ${b.tela}`, "pt-BR")
   );
+}
+
+function sugerirLogin(nome: string, email?: string) {
+  const candidatoEmail = email?.split("@")[0]?.trim();
+  if (candidatoEmail) {
+    return candidatoEmail.toLowerCase();
+  }
+
+  return nome
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ".")
+    .replace(/^\.+|\.+$/g, "")
+    .slice(0, 40);
+}
+
+function mapBeneficiarioOrigem(item: Beneficiario): OrigemBuscaItem {
+  return {
+    tipo: "BENEFICIARIO",
+    id: item.id_beneficiario ?? "",
+    nome: item.nome_completo,
+    cpf: item.cpf,
+    email: item.email,
+    telefone: item.telefone_principal,
+    setor: "Beneficiários",
+    descricao: item.codigo ? `Código ${item.codigo}` : undefined
+  };
+}
+
+function mapProfissionalOrigem(item: Profissional): OrigemBuscaItem {
+  return {
+    tipo: "PROFISSIONAL",
+    id: item.id_profissional ?? "",
+    nome: item.nome_completo,
+    cpf: item.cpf,
+    email: item.email,
+    telefone: item.telefone,
+    unidade: item.unidade,
+    setor: item.vinculo,
+    cargo: item.categoria,
+    descricao: item.categoria
+  };
+}
+
+function mapVoluntarioOrigem(item: Voluntario): OrigemBuscaItem {
+  return {
+    tipo: "VOLUNTARIO",
+    id: item.id_voluntario ?? "",
+    nome: item.nome_completo,
+    cpf: item.cpf,
+    email: item.email,
+    telefone: item.telefone,
+    setor: "Voluntariado",
+    cargo: item.profissao,
+    descricao: item.profissao
+  };
 }
 
 export function UsuariosPage() {
@@ -204,22 +323,16 @@ export function UsuariosPage() {
   const [abaAtiva, setAbaAtiva] = useState<AbaId>("listagem");
   const [idSelecionado, setIdSelecionado] = useState<string>();
   const [snapshot, setSnapshot] = useState<UsuarioFormValues | null>(null);
-  const [popupMensagem, setPopupMensagem] = useState<{
-    tipo: "sucesso" | "erro" | "aviso";
-    titulo: string;
-    texto: string;
-  } | null>(null);
-  const [popupConfirmacao, setPopupConfirmacao] = useState<{
-    tipo: "status" | "excluir";
-    titulo: string;
-    texto: string;
-    usuarioId: string;
-    status?: UsuarioStatus;
-  } | null>(null);
+  const [popupMensagem, setPopupMensagem] = useState<PopupMensagemState | null>(null);
+  const [popupConfirmacao, setPopupConfirmacao] = useState<ConfirmacaoState | null>(null);
   const [popupResetSenhaAberto, setPopupResetSenhaAberto] = useState(false);
   const [novaSenha, setNovaSenha] = useState("");
   const [confirmarNovaSenha, setConfirmarNovaSenha] = useState("");
   const [exigirTrocaSenhaReset, setExigirTrocaSenhaReset] = useState(true);
+  const [buscaPermissao, setBuscaPermissao] = useState("");
+  const [modulosExpandidos, setModulosExpandidos] = useState<string[]>([]);
+  const [origemBusca, setOrigemBusca] = useState("");
+  const [origemBuscaAplicada, setOrigemBuscaAplicada] = useState("");
   const [filtroDraft, setFiltroDraft] = useState<UsuarioFiltros>({
     nome: "",
     login: "",
@@ -258,9 +371,13 @@ export function UsuariosPage() {
   });
 
   const permissoesSelecionadasValue = watch("permissoes");
+  const perfilSelecionado = watch("perfil_acesso") ?? "OPERADOR";
+  const origemTipoSelecionada = watch("origem_tipo");
+  const origemNomeSelecionada = watch("origem_nome");
   const emailUsuarioAtual = watch("email");
+  const usuarioIdAtual = watch("id_usuario");
   const ehAdminImutavel = emailUsuarioAtual?.toLowerCase() === "htasistemas@gmail.com";
-  
+
   const permissoesSelecionadas = Array.isArray(permissoesSelecionadasValue)
     ? permissoesSelecionadasValue
     : typeof permissoesSelecionadasValue === "string"
@@ -269,19 +386,16 @@ export function UsuariosPage() {
           .map((item) => item.trim())
           .filter(Boolean)
       : [];
-  const perfilSelecionado = watch("perfil_acesso") ?? "OPERADOR";
+
   const acaoEmAndamento =
     salvarMutation.isPending ||
     atualizarStatusMutation.isPending ||
     resetarSenhaMutation.isPending ||
     removerMutation.isPending;
 
-  const [modulosExpandidos, setModulosExpandidos] = useState<string[]>([]);
-  const [buscaPermissao, setBuscaPermissao] = useState("");
-
   const gruposPermissoes = useMemo(() => {
     const todos = ordenarPermissoesPorModulo(permissoesData?.permissoes ?? []);
-    if (!buscaPermissao) return todos;
+    if (!buscaPermissao.trim()) return todos;
 
     const termo = buscaPermissao.toLowerCase();
     return todos
@@ -291,50 +405,58 @@ export function UsuariosPage() {
           (item) =>
             item.nome.toLowerCase().includes(termo) ||
             item.modulo.toLowerCase().includes(termo) ||
-            item.tela.toLowerCase().includes(termo)
+            item.tela.toLowerCase().includes(termo) ||
+            item.acao.toLowerCase().includes(termo)
         )
       }))
       .filter((grupo) => grupo.itens.length > 0);
-  }, [permissoesData, buscaPermissao]);
+  }, [buscaPermissao, permissoesData?.permissoes]);
 
-  const alternarModulo = (modulo: string) => {
-    setModulosExpandidos((prev) =>
-      prev.includes(modulo) ? prev.filter((m) => m !== modulo) : [...prev, modulo]
-    );
-  };
-
-  const expandirTodos = () => {
-    setModulosExpandidos(gruposPermissoes.map((g) => g.modulo));
-  };
-
-  const recolherTodos = () => {
-    setModulosExpandidos([]);
-  };
-
-  const marcarTudo = () => {
-    if (ehAdminImutavel) return;
-    const todasPermissoes = gruposPermissoes.flatMap((g) => g.itens.map((i) => i.nome));
-    const novas = Array.from(new Set([...permissoesSelecionadas, ...todasPermissoes]));
-    setValue("permissoes", novas, { shouldDirty: true, shouldValidate: true });
-  };
-
-  const desmarcarTudo = () => {
-    if (ehAdminImutavel) return;
-    setValue("permissoes", [], { shouldDirty: true, shouldValidate: true });
-    setValue("perfil_acesso", "", { shouldDirty: true, shouldValidate: true });
-  };
-
-  const permissoesDisponiveis = useMemo(
-    () => (permissoesData?.permissoes ?? []).map((item) => item.nome).sort((a, b) => a.localeCompare(b)),
-    [permissoesData]
+  const resumoPermissoes = useMemo(
+    () => agruparPermissoesPorTela(permissoesData?.permissoes ?? [], permissoesSelecionadas),
+    [permissoesData?.permissoes, permissoesSelecionadas]
   );
+
+  const perfisDisponiveis = useMemo(() => {
+    const base = ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"];
+    const extras = [perfilSelecionado].filter(Boolean);
+    return Array.from(
+      new Set(
+        [...base, ...extras].filter((item) =>
+          (permissoesData?.permissoes ?? []).some((permissao) => permissao.nome === item)
+        )
+      )
+    );
+  }, [perfilSelecionado, permissoesData?.permissoes]);
+
+  const origemBuscaHabilitada = !!origemTipoSelecionada && origemBuscaAplicada.trim().length >= 2;
+
+  const { data: origemResultados = [], isFetching: buscandoOrigem } = useQuery({
+    queryKey: ["usuarios", "origem", origemTipoSelecionada, origemBuscaAplicada],
+    enabled: origemBuscaHabilitada,
+    queryFn: async (): Promise<OrigemBuscaItem[]> => {
+      const termo = origemBuscaAplicada.trim();
+      if (origemTipoSelecionada === "BENEFICIARIO") {
+        const resultado = await beneficiariosService.listar({ nome: termo });
+        return (resultado.beneficiarios ?? []).map(mapBeneficiarioOrigem).filter((item) => item.id);
+      }
+
+      if (origemTipoSelecionada === "PROFISSIONAL") {
+        const resultado = await profissionaisService.listar({ nome: termo });
+        return (resultado.profissionais ?? []).map(mapProfissionalOrigem).filter((item) => item.id);
+      }
+
+      const resultado = await voluntariosService.listar({ nome: termo });
+      return (resultado.voluntarios ?? []).map(mapVoluntarioOrigem).filter((item) => item.id);
+    }
+  });
 
   useEffect(() => {
     if (!usuarioData?.usuario) return;
     const formValues = mapUsuarioParaFormulario(usuarioData.usuario);
     reset(formValues);
     setSnapshot(formValues);
-  }, [usuarioData, reset]);
+  }, [reset, usuarioData]);
 
   function aplicarFormatacaoCampo(campo: keyof UsuarioFormValues) {
     const valorAtual = getValues(campo);
@@ -358,51 +480,14 @@ export function UsuariosPage() {
   function novo() {
     setIdSelecionado(undefined);
     setSnapshot(null);
+    setOrigemBusca("");
+    setOrigemBuscaAplicada("");
     reset(usuarioDefaultValues);
     setAbaAtiva("cadastro");
   }
 
   function cancelar() {
     reset(snapshot ?? usuarioDefaultValues);
-  }
-
-  function abrirPopupExcluir(usuarioId: string) {
-    setPopupConfirmacao({
-      tipo: "excluir",
-      titulo: "Confirmar exclusão",
-      texto: "Esta ação é irreversível. Deseja continuar?",
-      usuarioId
-    });
-  }
-
-  function excluir() {
-    const id = getValues("id_usuario");
-    if (!id) {
-      setPopupMensagem({
-        tipo: "aviso",
-        titulo: "Atenção",
-        texto: "Selecione um usuário para excluir."
-      });
-      return;
-    }
-
-    abrirPopupExcluir(id);
-  }
-
-  function imprimir() {
-    try {
-      imprimirConteudoAtual({ titulo: "Usuários" });
-    } catch (error: any) {
-      setPopupMensagem({
-        tipo: "erro",
-        titulo: "Erro",
-        texto: error?.message ?? "Não foi possível preparar a impressão."
-      });
-    }
-  }
-
-  function fechar() {
-    navigate("/dashboard/visao-geral");
   }
 
   function limparFiltros() {
@@ -423,7 +508,42 @@ export function UsuariosPage() {
     setFiltros(base);
   }
 
+  function abrirPopupExcluir(usuarioId: string) {
+    setPopupConfirmacao({
+      tipo: "excluir",
+      titulo: "Confirmar exclusão",
+      texto: "Esta ação é irreversível. Deseja realmente continuar?",
+      usuarioId
+    });
+  }
+
+  function excluirAtual() {
+    const id = getValues("id_usuario");
+    if (!id) {
+      setPopupMensagem({
+        tipo: "aviso",
+        titulo: "Atenção",
+        texto: "Selecione um usuário para excluir."
+      });
+      return;
+    }
+
+    abrirPopupExcluir(id);
+  }
+
+  function abrirPopupStatus(usuario: Usuario, status: UsuarioStatus) {
+    setPopupConfirmacao({
+      tipo: "status",
+      titulo: "Confirmar alteração",
+      texto: `Deseja alterar o status para ${formatarStatus(status).toLowerCase()}?`,
+      usuarioId: usuario.id_usuario,
+      status
+    });
+  }
+
   function trocarPermissao(nomePermissao: string) {
+    if (ehAdminImutavel) return;
+
     const marcada = permissoesSelecionadas.includes(nomePermissao);
     const proximo = marcada
       ? permissoesSelecionadas.filter((item) => item !== nomePermissao)
@@ -439,11 +559,67 @@ export function UsuariosPage() {
     }
   }
 
+  function expandirTodos() {
+    setModulosExpandidos(gruposPermissoes.map((item) => item.modulo));
+  }
+
+  function recolherTodos() {
+    setModulosExpandidos([]);
+  }
+
+  function marcarTudo() {
+    if (ehAdminImutavel) return;
+    const todasPermissoes = gruposPermissoes.flatMap((grupo) => grupo.itens.map((item) => item.nome));
+    setValue("permissoes", Array.from(new Set([...permissoesSelecionadas, ...todasPermissoes])), {
+      shouldDirty: true,
+      shouldValidate: true
+    });
+  }
+
+  function desmarcarTudo() {
+    if (ehAdminImutavel) return;
+    setValue("permissoes", [], { shouldDirty: true, shouldValidate: true });
+    setValue("perfil_acesso", "", { shouldDirty: true, shouldValidate: true });
+  }
+
+  function aplicarOrigem(item: OrigemBuscaItem) {
+    setValue("origem_tipo", item.tipo, { shouldDirty: true, shouldValidate: true });
+    setValue("origem_id", item.id, { shouldDirty: true, shouldValidate: true });
+    setValue("origem_nome", item.nome, { shouldDirty: true, shouldValidate: true });
+    setValue("nome_completo", item.nome, { shouldDirty: true, shouldValidate: true });
+    setValue("email", item.email ?? "", { shouldDirty: true, shouldValidate: true });
+    setValue("telefone", item.telefone ?? "", { shouldDirty: true, shouldValidate: true });
+    setValue("cpf", item.cpf ?? "", { shouldDirty: true, shouldValidate: true });
+    setValue("unidade", item.unidade ?? getValues("unidade"), { shouldDirty: true, shouldValidate: true });
+    setValue("setor", item.setor ?? getValues("setor"), { shouldDirty: true, shouldValidate: true });
+    setValue("cargo", item.cargo ?? getValues("cargo"), { shouldDirty: true, shouldValidate: true });
+
+    if (!usuarioIdAtual || !getValues("nome_usuario").trim()) {
+      setValue("nome_usuario", sugerirLogin(item.nome, item.email), {
+        shouldDirty: true,
+        shouldValidate: true
+      });
+    }
+
+    setPopupMensagem({
+      tipo: "sucesso",
+      titulo: "Origem importada",
+      texto: "Os dados foram carregados para edição antes do salvamento."
+    });
+  }
+
+  function limparOrigem() {
+    setValue("origem_tipo", undefined, { shouldDirty: true, shouldValidate: true });
+    setValue("origem_id", undefined, { shouldDirty: true, shouldValidate: true });
+    setValue("origem_nome", undefined, { shouldDirty: true, shouldValidate: true });
+    setOrigemBusca("");
+    setOrigemBuscaAplicada("");
+  }
+
   async function salvar(values: UsuarioFormValues) {
     try {
-      const payload = mapFormularioParaPayload(values);
       const resultado = await salvarMutation.mutateAsync({
-        ...payload,
+        ...mapFormularioParaPayload(values),
         id_usuario: values.id_usuario
       });
       const formValues = mapUsuarioParaFormulario(resultado.usuario);
@@ -452,62 +628,60 @@ export function UsuariosPage() {
       setIdSelecionado(resultado.usuario.id_usuario);
       setPopupMensagem({
         tipo: "sucesso",
-        titulo: "Confirmação",
-        texto: "Usuário salvo com sucesso."
+        titulo: "Usuário salvo",
+        texto: "O cadastro foi persistido com sucesso."
       });
     } catch (error: any) {
       setPopupMensagem({
         tipo: "erro",
-        titulo: "Erro",
+        titulo: "Erro ao salvar",
         texto: error?.response?.data?.message ?? "Não foi possível salvar o usuário."
       });
     }
-  }
-
-  function abrirPopupStatus(usuario: Usuario, status: UsuarioStatus) {
-    setPopupConfirmacao({
-      tipo: "status",
-      titulo: "Confirmar alteração",
-      texto: `Deseja alterar o status para ${formatarStatus(status).toLowerCase()}?`,
-      usuarioId: usuario.id_usuario,
-      status
-    });
   }
 
   async function confirmarPopupAcao() {
     if (!popupConfirmacao) return;
 
     try {
-      if (popupConfirmacao.tipo === "status" && popupConfirmacao.status) {
+      if (popupConfirmacao.tipo === "status") {
         const resultado = await atualizarStatusMutation.mutateAsync({
           id_usuario: popupConfirmacao.usuarioId,
           status: popupConfirmacao.status
         });
+
         if (idSelecionado === resultado.usuario.id_usuario) {
           const formValues = mapUsuarioParaFormulario(resultado.usuario);
           reset(formValues);
           setSnapshot(formValues);
         }
+
+        setPopupMensagem({
+          tipo: "sucesso",
+          titulo: "Status atualizado",
+          texto: "O status do usuário foi atualizado com sucesso."
+        });
       }
 
       if (popupConfirmacao.tipo === "excluir") {
-        const resultado = await removerMutation.mutateAsync(popupConfirmacao.usuarioId);
-        if (idSelecionado === resultado.usuario.id_usuario) {
-          const formValues = mapUsuarioParaFormulario(resultado.usuario);
-          reset(formValues);
-          setSnapshot(formValues);
+        await removerMutation.mutateAsync(popupConfirmacao.usuarioId);
+        if (idSelecionado === popupConfirmacao.usuarioId) {
+          setIdSelecionado(undefined);
+          setSnapshot(null);
+          reset(usuarioDefaultValues);
+          setAbaAtiva("listagem");
         }
-      }
 
-      setPopupMensagem({
-        tipo: "sucesso",
-        titulo: "Confirmação",
-        texto: "Operação concluída com sucesso."
-      });
+        setPopupMensagem({
+          tipo: "sucesso",
+          titulo: "Usuário excluído",
+          texto: "O usuário foi excluído com sucesso."
+        });
+      }
     } catch (error: any) {
       setPopupMensagem({
         tipo: "erro",
-        titulo: "Erro",
+        titulo: "Erro na operação",
         texto: error?.response?.data?.message ?? "Não foi possível concluir a operação."
       });
     } finally {
@@ -566,37 +740,47 @@ export function UsuariosPage() {
       setExigirTrocaSenhaReset(true);
       setPopupMensagem({
         tipo: "sucesso",
-        titulo: "Confirmação",
-        texto: "Senha redefinida com sucesso."
+        titulo: "Senha redefinida",
+        texto: "A nova senha foi registrada com sucesso."
       });
     } catch (error: any) {
       setPopupMensagem({
         tipo: "erro",
-        titulo: "Erro",
+        titulo: "Erro ao redefinir senha",
         texto: error?.response?.data?.message ?? "Não foi possível redefinir a senha."
       });
     }
   }
 
-  const acoesCrudPorAba: Record<AbaId, AcaoCrud[]> = {
+  function imprimir() {
+    try {
+      imprimirConteudoAtual({ titulo: "Usuários" });
+    } catch (error: any) {
+      setPopupMensagem({
+        tipo: "erro",
+        titulo: "Erro na impressão",
+        texto: error?.message ?? "Não foi possível preparar a impressão."
+      });
+    }
+  }
+
+  function fechar() {
+    navigate("/dashboard/visao-geral");
+  }
+
+  const acoesCrudPorAba: Record<AbaId, AdminAction[]> = {
     listagem: [
-      { label: "Buscar usuários", icon: Search, onClick: buscar, variant: "outline" },
+      { label: "Buscar usuários", icon: Search, onClick: buscar, variant: "outline", disabled: acaoEmAndamento },
       { label: "Novo usuário", icon: Plus, onClick: novo, variant: "default", disabled: acaoEmAndamento },
       { label: "Imprimir listagem", icon: Printer, onClick: imprimir, variant: "outline" },
       { label: "Fechar tela", icon: X, onClick: fechar, variant: "outline" }
     ],
     cadastro: [
-      { label: "Buscar usuários", icon: Search, onClick: () => setAbaAtiva("listagem"), variant: "outline" },
+      { label: "Ir para listagem", icon: Search, onClick: () => setAbaAtiva("listagem"), variant: "outline" },
       { label: "Novo usuário", icon: Plus, onClick: novo, variant: "outline", disabled: acaoEmAndamento },
-      {
-        label: "Salvar usuário",
-        icon: Save,
-        onClick: () => void handleSubmit(salvar)(),
-        variant: "default",
-        disabled: acaoEmAndamento
-      },
+      { label: "Salvar usuário", icon: Save, onClick: () => void handleSubmit(salvar)(), variant: "default", disabled: acaoEmAndamento },
       { label: "Cancelar edição", icon: Undo2, onClick: cancelar, variant: "outline", disabled: acaoEmAndamento },
-      { label: "Excluir usuário", icon: Trash2, onClick: excluir, variant: "danger", disabled: acaoEmAndamento },
+      { label: "Excluir usuário", icon: Trash2, onClick: excluirAtual, variant: "danger", disabled: acaoEmAndamento || !usuarioIdAtual },
       { label: "Imprimir cadastro", icon: Printer, onClick: imprimir, variant: "outline" },
       { label: "Fechar tela", icon: X, onClick: fechar, variant: "outline" }
     ],
@@ -605,376 +789,555 @@ export function UsuariosPage() {
       { label: "Recolher módulos", icon: ChevronRight, onClick: recolherTodos, variant: "outline", disabled: carregandoPermissoes },
       { label: "Marcar permissões", icon: ShieldCheck, onClick: marcarTudo, variant: "default", disabled: carregandoPermissoes || ehAdminImutavel },
       { label: "Limpar permissões", icon: Undo2, onClick: desmarcarTudo, variant: "outline", disabled: carregandoPermissoes || ehAdminImutavel },
-      {
-        label: "Salvar permissões",
-        icon: Save,
-        onClick: () => void handleSubmit(salvar)(),
-        variant: "default",
-        disabled: acaoEmAndamento || !idSelecionado
-      },
+      { label: "Salvar permissões", icon: Save, onClick: () => void handleSubmit(salvar)(), variant: "default", disabled: acaoEmAndamento },
       { label: "Fechar tela", icon: X, onClick: fechar, variant: "outline" }
     ],
     auditoria: [
-      { label: "Buscar usuários", icon: Search, onClick: () => setAbaAtiva("listagem"), variant: "outline" },
+      { label: "Ir para listagem", icon: Search, onClick: () => setAbaAtiva("listagem"), variant: "outline" },
       { label: "Imprimir histórico", icon: Printer, onClick: imprimir, variant: "outline" },
       { label: "Fechar tela", icon: X, onClick: fechar, variant: "outline" }
     ]
   };
 
-  const acoesCrud = acoesCrudPorAba[abaAtiva];
-
-  const abaAtual = abas.find((aba) => aba.id === abaAtiva);
-  const IconeAbaAtual = abaAtual?.icon ?? UsersRound;
-
   const paginaAtual = listaData?.paginacao.pagina ?? 1;
   const totalPaginas = listaData?.paginacao.total_paginas ?? 1;
 
   return (
-    <main className={classesTelaPadraoBeneficiario.container}>
-      <section className={classesTelaPadraoBeneficiario.barraAcoes} data-print="toolbar">
-        <div className={classesTelaPadraoBeneficiario.gradeAcoes}>
-          {acoesCrud.map((acao) => (
-            <Button
-              key={acao.label}
-              type="button"
-              variant={acao.variant}
-              size="sm"
-              className={classesTelaPadraoBeneficiario.botaoAcao}
-              onClick={acao.onClick}
-              disabled={acao.disabled}
-            >
-              <acao.icon className="mr-1.5 h-3.5 w-3.5" />
-              {acao.label}
-            </Button>
-          ))}
-        </div>
-      </section>
-
-      <div className={classesTelaPadraoBeneficiario.gradePrincipal} data-print="layout-grid">
-        <Card className={classesTelaPadraoBeneficiario.cardAbas} data-print="tabs">
-          <CardContent className={classesTelaPadraoBeneficiario.conteudoAbas}>
-            {abas.map((aba, indice) => (
-              <button
-                key={aba.id}
-                type="button"
-                className={classeBotaoAbaLateral(abaAtiva === aba.id)}
-                onClick={() => setAbaAtiva(aba.id)}
-              >
-                <span className={classeNumeroAbaLateral(abaAtiva === aba.id)}>{indice + 1}</span>
-                <span>{aba.label}</span>
-              </button>
-            ))}
-          </CardContent>
-        </Card>
-
-        <Card className={classesTelaPadraoBeneficiario.cardConteudo}>
-          <CardHeader className={classesTelaPadraoBeneficiario.cabecalhoConteudo}>
-            <div className={classesTelaPadraoBeneficiario.tituloAba}>
-              <IconeAbaAtual className="h-4 w-4" />
-              <CardTitle className={classesTelaPadraoBeneficiario.tituloAbaTexto}>
-                {abaAtual?.label ?? "Usuários"}
-              </CardTitle>
+    <>
+      <AdminPageLayout
+        tabs={abas}
+        activeTab={abaAtiva}
+        onChangeTab={(tab) => setAbaAtiva(tab as AbaId)}
+        actions={acoesCrudPorAba[abaAtiva]}
+        sectionLabel="Configurações gerais"
+        pageTitle="Usuários"
+        activeTitle={abas.find((aba) => aba.id === abaAtiva)?.label}
+        codeBadge={usuarioIdAtual ? `Código: ${usuarioIdAtual}` : "Novo usuário"}
+      >
+        {abaAtiva === "listagem" && (
+          <section className="space-y-4">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <div className="space-y-1">
+                <Label>Nome</Label>
+                <Input value={filtroDraft.nome ?? ""} onChange={(event) => setFiltroDraft((atual) => ({ ...atual, nome: event.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <Label>Login</Label>
+                <Input value={filtroDraft.login ?? ""} onChange={(event) => setFiltroDraft((atual) => ({ ...atual, login: event.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <Label>E-mail</Label>
+                <Input value={filtroDraft.email ?? ""} onChange={(event) => setFiltroDraft((atual) => ({ ...atual, email: event.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <Label>Status</Label>
+                <Select value={filtroDraft.status ?? ""} onChange={(event) => setFiltroDraft((atual) => ({ ...atual, status: event.target.value as UsuarioStatus | "" }))}>
+                  <option value="">Todos</option>
+                  {usuarioStatusOptions.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </Select>
+              </div>
             </div>
-            <span className="rounded-full bg-[var(--g3-primary-soft)] px-2 py-1 text-[10px] font-semibold uppercase text-[var(--g3-active)]">
-              Configuracoes gerais
-            </span>
-          </CardHeader>
 
-          <CardContent className="space-y-4">
-            {abaAtiva === "listagem" && (
-              <section className="space-y-4">
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="flex justify-end">
+              <Button type="button" variant="outline" onClick={limparFiltros} disabled={acaoEmAndamento}>
+                Limpar filtros
+              </Button>
+            </div>
+
+            <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]">
+              <table className="min-w-full text-sm">
+                <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Nome</th>
+                    <th className="px-3 py-2 text-left">Login</th>
+                    <th className="px-3 py-2 text-left">Perfil</th>
+                    <th className="px-3 py-2 text-left">Origem</th>
+                    <th className="px-3 py-2 text-left">Status</th>
+                    <th className="px-3 py-2 text-left">Último acesso</th>
+                    <th className="px-3 py-2 text-left">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {carregandoLista && (
+                    <tr>
+                      <td className="px-3 py-5 text-center text-[var(--g3-muted)]" colSpan={7}>
+                        Carregando usuários...
+                      </td>
+                    </tr>
+                  )}
+                  {!carregandoLista && !listaData?.usuarios.length && (
+                    <tr>
+                      <td className="px-3 py-5 text-center text-[var(--g3-muted)]" colSpan={7}>
+                        Nenhum usuário encontrado para os filtros informados.
+                      </td>
+                    </tr>
+                  )}
+                  {listaData?.usuarios.map((usuario, indice) => {
+                    const linhaSelecionada = usuario.id_usuario === idSelecionado;
+                    const proximoStatus = usuario.status === "ATIVO" ? "INATIVO" : "ATIVO";
+
+                    return (
+                      <tr
+                        key={usuario.id_usuario}
+                        className={[
+                          "cursor-pointer border-t border-[var(--g3-border)] transition-colors",
+                          indice % 2 === 0 ? "bg-white" : "bg-[var(--g3-primary-soft)]/25",
+                          linhaSelecionada ? "bg-[var(--g3-primary-soft)]/70" : "hover:bg-[var(--g3-primary-soft)]/40"
+                        ].join(" ")}
+                        onClick={() => selecionarUsuario(usuario.id_usuario, "cadastro")}
+                      >
+                        <td className="px-3 py-2">{usuario.nome_completo ?? "---"}</td>
+                        <td className="px-3 py-2">{usuario.nome_usuario}</td>
+                        <td className="px-3 py-2">{formatarPerfil(usuario.perfil_acesso)}</td>
+                        <td className="px-3 py-2">{formatarTipoOrigem(usuario.origem_tipo)}</td>
+                        <td className="px-3 py-2">{formatarStatus(usuario.status)}</td>
+                        <td className="px-3 py-2">{formatarDataHora(usuario.ultimo_acesso_em)}</td>
+                        <td className="px-3 py-2">
+                          <div className="flex items-center gap-1">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              title="Editar usuário"
+                              aria-label="Editar usuário"
+                              disabled={acaoEmAndamento}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                selecionarUsuario(usuario.id_usuario, "cadastro");
+                              }}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              title="Redefinir senha"
+                              aria-label="Redefinir senha"
+                              disabled={acaoEmAndamento}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setIdSelecionado(usuario.id_usuario);
+                                setPopupResetSenhaAberto(true);
+                              }}
+                            >
+                              <KeyRound className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              title={proximoStatus === "ATIVO" ? "Ativar usuário" : "Inativar usuário"}
+                              aria-label={proximoStatus === "ATIVO" ? "Ativar usuário" : "Inativar usuário"}
+                              disabled={acaoEmAndamento}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                abrirPopupStatus(usuario, proximoStatus);
+                              }}
+                            >
+                              {proximoStatus === "ATIVO" ? <LockOpen className="h-4 w-4" /> : <UserRound className="h-4 w-4" />}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              title={usuario.status === "BLOQUEADO" ? "Desbloquear usuário" : "Bloquear usuário"}
+                              aria-label={usuario.status === "BLOQUEADO" ? "Desbloquear usuário" : "Bloquear usuário"}
+                              disabled={acaoEmAndamento}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                abrirPopupStatus(usuario, usuario.status === "BLOQUEADO" ? "ATIVO" : "BLOQUEADO");
+                              }}
+                            >
+                              <Lock className="h-4 w-4" />
+                            </Button>
+                            <div className="ml-2 border-l border-[var(--g3-border)] pl-2">
+                              <Button
+                                type="button"
+                                variant="danger"
+                                size="sm"
+                                className="h-8 w-8 p-0"
+                                title="Excluir usuário"
+                                aria-label="Excluir usuário"
+                                disabled={acaoEmAndamento}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  abrirPopupExcluir(usuario.id_usuario);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-[var(--g3-muted)]">
+                Total: {listaData?.paginacao.total ?? 0}
+                {atualizandoLista ? " (atualizando...)" : ""}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button type="button" variant="outline" size="sm" disabled={paginaAtual <= 1} onClick={() => setFiltros((atual) => ({ ...atual, pagina: paginaAtual - 1 }))}>
+                  Anterior
+                </Button>
+                <span className="text-xs text-[var(--g3-muted)]">
+                  Página {paginaAtual} de {totalPaginas}
+                </span>
+                <Button type="button" variant="outline" size="sm" disabled={paginaAtual >= totalPaginas} onClick={() => setFiltros((atual) => ({ ...atual, pagina: paginaAtual + 1 }))}>
+                  Próxima
+                </Button>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {abaAtiva === "cadastro" && (
+          <section className="space-y-4">
+            <Card className="border-[var(--g3-border)]">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">Importar dados de origem</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid gap-3 md:grid-cols-[220px_minmax(0,1fr)_140px]">
                   <div className="space-y-1">
-                    <Label>Nome</Label>
-                    <Input value={filtroDraft.nome ?? ""} onChange={(e) => setFiltroDraft((v) => ({ ...v, nome: e.target.value }))} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Login</Label>
-                    <Input value={filtroDraft.login ?? ""} onChange={(e) => setFiltroDraft((v) => ({ ...v, login: e.target.value }))} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>E-mail</Label>
-                    <Input value={filtroDraft.email ?? ""} onChange={(e) => setFiltroDraft((v) => ({ ...v, email: e.target.value }))} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Status</Label>
-                    <Select value={filtroDraft.status ?? ""} onChange={(e) => setFiltroDraft((v) => ({ ...v, status: e.target.value as UsuarioStatus | "" }))}>
-                      <option value="">Todos</option>
-                      {usuarioStatusOptions.map((item) => (
+                    <Label>Origem</Label>
+                    <Select
+                      value={origemTipoSelecionada ?? ""}
+                      onChange={(event) => {
+                        const value = event.target.value as UsuarioOrigemTipo | "";
+                        if (!value) {
+                          limparOrigem();
+                          return;
+                        }
+                        setValue("origem_tipo", value, { shouldDirty: true, shouldValidate: true });
+                        setValue("origem_id", undefined, { shouldDirty: true, shouldValidate: true });
+                        setValue("origem_nome", undefined, { shouldDirty: true, shouldValidate: true });
+                        setOrigemBusca("");
+                        setOrigemBuscaAplicada("");
+                      }}
+                    >
+                      <option value="">Sem origem</option>
+                      {usuarioOrigemOptions.map((item) => (
                         <option key={item.value} value={item.value}>
                           {item.label}
                         </option>
                       ))}
                     </Select>
                   </div>
-                </div>
-
-                <div className="flex justify-end">
-                  <Button type="button" variant="outline" onClick={limparFiltros}>
-                    Limpar filtros
-                  </Button>
-                </div>
-
-                <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]">
-                  <table className="min-w-full text-sm">
-                    <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]">
-                      <tr>
-                        <th className="px-3 py-2 text-left">Nome</th>
-                        <th className="px-3 py-2 text-left">Login</th>
-                        <th className="px-3 py-2 text-left">Perfil</th>
-                        <th className="px-3 py-2 text-left">Status</th>
-                        <th className="px-3 py-2 text-left">Último acesso</th>
-                        <th className="px-3 py-2 text-left">Ações</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {carregandoLista && (
-                        <tr>
-                          <td className="px-3 py-4 text-center text-[var(--g3-muted)]" colSpan={6}>
-                            Carregando usuários...
-                          </td>
-                        </tr>
-                      )}
-                      {!carregandoLista && !listaData?.usuarios.length && (
-                        <tr>
-                          <td className="px-3 py-4 text-center text-[var(--g3-muted)]" colSpan={6}>
-                            Nenhum usuário encontrado.
-                          </td>
-                        </tr>
-                      )}
-                      {listaData?.usuarios.map((usuario, indice) => (
-                        <tr
-                          key={usuario.id_usuario}
-                          className={`cursor-pointer border-t border-[var(--g3-border)] ${indice % 2 === 0 ? "bg-white" : "bg-[var(--g3-primary-soft)]/35"}`}
-                          onClick={() => selecionarUsuario(usuario.id_usuario, "cadastro")}
-                        >
-                          <td className="px-3 py-2">{usuario.nome_completo ?? "---"}</td>
-                          <td className="px-3 py-2">{usuario.nome_usuario}</td>
-                          <td className="px-3 py-2">{usuario.perfil_acesso ?? "---"}</td>
-                          <td className="px-3 py-2">{formatarStatus(usuario.status)}</td>
-                          <td className="px-3 py-2">{formatarDataHora(usuario.ultimo_acesso_em)}</td>
-                          <td className="px-3 py-2">
-                            <div className="flex flex-wrap gap-1">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="border-[var(--g3-border)] bg-white shadow-sm hover:bg-[var(--g3-primary-soft)] hover:shadow-md"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  selecionarUsuario(usuario.id_usuario, "cadastro");
-                                }}
-                              >
-                                Editar
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="border-[var(--g3-border)] bg-white shadow-sm hover:bg-[var(--g3-primary-soft)] hover:shadow-md"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setIdSelecionado(usuario.id_usuario);
-                                  setPopupResetSenhaAberto(true);
-                                }}
-                              >
-                                Senha
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="border-[var(--g3-border)] bg-white shadow-sm hover:bg-[var(--g3-primary-soft)] hover:shadow-md"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  abrirPopupStatus(usuario, usuario.status === "ATIVO" ? "INATIVO" : "ATIVO");
-                                }}
-                              >
-                                {usuario.status === "ATIVO" ? "Inativar" : "Ativar"}
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="border-[var(--g3-border)] bg-white shadow-sm hover:bg-[var(--g3-primary-soft)] hover:shadow-md"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  abrirPopupStatus(usuario, "BLOQUEADO");
-                                }}
-                              >
-                                Bloquear
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="danger"
-                                size="sm"
-                                className="shadow-sm hover:shadow-md"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setIdSelecionado(usuario.id_usuario);
-                                  abrirPopupExcluir(usuario.id_usuario);
-                                }}
-                              >
-                                Excluir
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-[var(--g3-muted)]">
-                    Total: {listaData?.paginacao.total ?? 0}
-                    {atualizandoLista ? " (atualizando...)" : ""}
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <Button type="button" variant="outline" size="sm" disabled={paginaAtual <= 1} onClick={() => setFiltros((v) => ({ ...v, pagina: paginaAtual - 1 }))}>
-                      Anterior
-                    </Button>
-                    <span className="text-xs text-[var(--g3-muted)]">
-                      Página {paginaAtual} de {totalPaginas}
-                    </span>
-                    <Button type="button" variant="outline" size="sm" disabled={paginaAtual >= totalPaginas} onClick={() => setFiltros((v) => ({ ...v, pagina: paginaAtual + 1 }))}>
-                      Próxima
+                  <div className="space-y-1">
+                    <Label>Buscar cadastro</Label>
+                    <Input
+                      placeholder="Digite nome, código ou referência"
+                      value={origemBusca}
+                      disabled={!origemTipoSelecionada}
+                      onChange={(event) => setOrigemBusca(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          setOrigemBuscaAplicada(origemBusca);
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <Button type="button" variant="outline" className="w-full" disabled={!origemTipoSelecionada || origemBusca.trim().length < 2} onClick={() => setOrigemBuscaAplicada(origemBusca)}>
+                      Buscar
                     </Button>
                   </div>
                 </div>
-              </section>
-            )}
 
-            {abaAtiva === "cadastro" && (
-              <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-12">
-                <div className="space-y-1 xl:col-span-5">
-                  <Label>Nome completo *</Label>
-                  <Input {...register("nome_completo")} onBlur={() => aplicarFormatacaoCampo("nome_completo")} />
-                  {errors.nome_completo && <p className="text-xs text-red-600">{errors.nome_completo.message}</p>}
+                <div className="rounded-lg border border-dashed border-[var(--g3-border)] p-3 text-sm">
+                  <p className="font-medium text-[var(--g3-foreground)]">Vínculo atual</p>
+                  <p className="mt-1 text-[var(--g3-muted)]">
+                    {origemTipoSelecionada && origemNomeSelecionada
+                      ? `${formatarTipoOrigem(origemTipoSelecionada)}: ${origemNomeSelecionada}`
+                      : "Nenhum vínculo selecionado."}
+                  </p>
+                  {!!origemTipoSelecionada && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button type="button" variant="outline" size="sm" onClick={limparOrigem} disabled={acaoEmAndamento}>
+                        Limpar vínculo
+                      </Button>
+                    </div>
+                  )}
                 </div>
-                <div className="space-y-1 xl:col-span-3">
-                  <Label>Nome de exibição</Label>
-                  <Input {...register("nome_exibicao")} onBlur={() => aplicarFormatacaoCampo("nome_exibicao")} />
-                </div>
-                <div className="space-y-1 xl:col-span-2">
-                  <Label>Login *</Label>
-                  <Input {...register("nome_usuario")} />
-                  {errors.nome_usuario && <p className="text-xs text-red-600">{errors.nome_usuario.message}</p>}
-                </div>
-                <div className="space-y-1 xl:col-span-2">
-                  <Label>Status *</Label>
-                  <Select {...register("status")}>
-                    {usuarioStatusOptions.map((item) => (
-                      <option key={item.value} value={item.value}>
-                        {item.label}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-                <div className="space-y-1 xl:col-span-4">
-                  <Label>E-mail *</Label>
-                  <Input type="email" {...register("email")} />
-                  {errors.email && <p className="text-xs text-red-600">{errors.email.message}</p>}
-                </div>
-                <div className="space-y-1 xl:col-span-2">
-                  <Label>Telefone</Label>
-                  <Input {...register("telefone")} />
-                </div>
-                <div className="space-y-1 xl:col-span-2">
-                  <Label>CPF</Label>
-                  <Input {...register("cpf")} />
-                  {errors.cpf && <p className="text-xs text-red-600">{errors.cpf.message}</p>}
-                </div>
-                <div className="space-y-1 xl:col-span-2">
-                  <Label>Matrícula</Label>
-                  <Input {...register("matricula")} />
-                </div>
-                <div className="space-y-1 xl:col-span-2">
-                  <Label>Perfil</Label>
-                  <Select value={perfilSelecionado} onChange={(event) => {
+
+                {!!errors.origem_id && <p className="text-xs text-red-600">{errors.origem_id.message}</p>}
+
+                {origemBuscaHabilitada && (
+                  <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]">
+                    <table className="min-w-full text-sm">
+                      <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]">
+                        <tr>
+                          <th className="px-3 py-2 text-left">Nome</th>
+                          <th className="px-3 py-2 text-left">Documento</th>
+                          <th className="px-3 py-2 text-left">Contato</th>
+                          <th className="px-3 py-2 text-left">Detalhe</th>
+                          <th className="px-3 py-2 text-left">Ação</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {buscandoOrigem && (
+                          <tr>
+                            <td className="px-3 py-4 text-center text-[var(--g3-muted)]" colSpan={5}>
+                              Buscando cadastros...
+                            </td>
+                          </tr>
+                        )}
+                        {!buscandoOrigem && !origemResultados.length && (
+                          <tr>
+                            <td className="px-3 py-4 text-center text-[var(--g3-muted)]" colSpan={5}>
+                              Nenhum cadastro encontrado para a origem selecionada.
+                            </td>
+                          </tr>
+                        )}
+                        {origemResultados.map((item) => (
+                          <tr key={`${item.tipo}-${item.id}`} className="border-t border-[var(--g3-border)]">
+                            <td className="px-3 py-2">{item.nome}</td>
+                            <td className="px-3 py-2">{item.cpf ?? "---"}</td>
+                            <td className="px-3 py-2">{item.email ?? item.telefone ?? "---"}</td>
+                            <td className="px-3 py-2">{item.descricao ?? item.unidade ?? "---"}</td>
+                            <td className="px-3 py-2">
+                              <Button type="button" variant="outline" size="sm" disabled={acaoEmAndamento} onClick={() => aplicarOrigem(item)}>
+                                Importar
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-12">
+              <div className="space-y-1 xl:col-span-5">
+                <Label>Nome completo *</Label>
+                <Input {...register("nome_completo")} onBlur={() => aplicarFormatacaoCampo("nome_completo")} />
+                {errors.nome_completo && <p className="text-xs text-red-600">{errors.nome_completo.message}</p>}
+              </div>
+              <div className="space-y-1 xl:col-span-3">
+                <Label>Nome de exibição</Label>
+                <Input {...register("nome_exibicao")} onBlur={() => aplicarFormatacaoCampo("nome_exibicao")} />
+              </div>
+              <div className="space-y-1 xl:col-span-2">
+                <Label>Login *</Label>
+                <Input {...register("nome_usuario")} />
+                {errors.nome_usuario && <p className="text-xs text-red-600">{errors.nome_usuario.message}</p>}
+              </div>
+              <div className="space-y-1 xl:col-span-2">
+                <Label>Status *</Label>
+                <Select {...register("status")}>
+                  {usuarioStatusOptions.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+
+              <div className="space-y-1 xl:col-span-4">
+                <Label>E-mail *</Label>
+                <Input type="email" {...register("email")} />
+                {errors.email && <p className="text-xs text-red-600">{errors.email.message}</p>}
+              </div>
+              <div className="space-y-1 xl:col-span-2">
+                <Label>Telefone</Label>
+                <Input {...register("telefone")} />
+              </div>
+              <div className="space-y-1 xl:col-span-2">
+                <Label>CPF</Label>
+                <Input {...register("cpf")} />
+                {errors.cpf && <p className="text-xs text-red-600">{errors.cpf.message}</p>}
+              </div>
+              <div className="space-y-1 xl:col-span-2">
+                <Label>Matrícula</Label>
+                <Input {...register("matricula")} />
+              </div>
+              <div className="space-y-1 xl:col-span-2">
+                <Label>Perfil principal</Label>
+                <Select
+                  value={perfilSelecionado}
+                  onChange={(event) => {
                     const value = event.target.value;
                     setValue("perfil_acesso", value, { shouldDirty: true, shouldValidate: true });
                     if (value && !permissoesSelecionadas.includes(value)) {
-                      setValue("permissoes", [...permissoesSelecionadas, value], { shouldDirty: true, shouldValidate: true });
+                      setValue("permissoes", [...permissoesSelecionadas, value], {
+                        shouldDirty: true,
+                        shouldValidate: true
+                      });
                     }
-                  }}>
-                    {permissoesDisponiveis.map((permissao) => (
-                      <option key={permissao} value={permissao}>
-                        {permissao}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-                <div className="space-y-1 xl:col-span-4">
-                  <Label>Setor</Label>
-                  <Input {...register("setor")} onBlur={() => aplicarFormatacaoCampo("setor")} />
-                </div>
-                <div className="space-y-1 xl:col-span-4">
-                  <Label>Unidade</Label>
-                  <Input {...register("unidade")} onBlur={() => aplicarFormatacaoCampo("unidade")} />
-                </div>
-                <div className="space-y-1 xl:col-span-4">
-                  <Label>Cargo / função</Label>
-                  <Input {...register("cargo")} onBlur={() => aplicarFormatacaoCampo("cargo")} />
-                </div>
-                {!getValues("id_usuario") && (
-                  <>
-                    <div className="space-y-1 xl:col-span-3">
-                      <Label>Senha inicial *</Label>
-                      <Input type="password" {...register("senha")} />
-                      {errors.senha && <p className="text-xs text-red-600">{errors.senha.message}</p>}
-                    </div>
-                    <div className="space-y-1 xl:col-span-3">
-                      <Label>Confirmar senha *</Label>
-                      <Input type="password" {...register("confirmar_senha")} />
-                      {errors.confirmar_senha && <p className="text-xs text-red-600">{errors.confirmar_senha.message}</p>}
-                    </div>
-                  </>
-                )}
-                <div className="flex flex-wrap items-center gap-3 xl:col-span-12">
-                  <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-[var(--g3-foreground)]">
-                    <Checkbox
-                      checked={!!watch("exigir_troca_senha")}
-                      onChange={(event) =>
-                        setValue("exigir_troca_senha", event.target.checked, {
-                          shouldDirty: true,
-                          shouldValidate: true
-                        })
-                      }
-                    />
-                    Exigir troca de senha no primeiro acesso
-                  </label>
-                  <Button type="button" variant="outline" size="sm" onClick={() => setPopupResetSenhaAberto(true)} disabled={!getValues("id_usuario")}>
-                    <KeyRound className="mr-1.5 h-3.5 w-3.5" />
-                    Redefinir senha
-                  </Button>
-                </div>
-              </section>
-            )}
+                  }}
+                >
+                  {perfisDisponiveis.map((permissao) => (
+                    <option key={permissao} value={permissao}>
+                      {formatarPerfil(permissao)}
+                    </option>
+                  ))}
+                </Select>
+              </div>
 
-            {abaAtiva === "permissoes" && (
-              <section className="space-y-4">
-                <div className="flex items-center gap-3 border-b border-[var(--g3-border)] pb-4">
+              <div className="space-y-1 xl:col-span-4">
+                <Label>Setor</Label>
+                <Input {...register("setor")} onBlur={() => aplicarFormatacaoCampo("setor")} />
+              </div>
+              <div className="space-y-1 xl:col-span-4">
+                <Label>Unidade</Label>
+                <Input {...register("unidade")} onBlur={() => aplicarFormatacaoCampo("unidade")} />
+              </div>
+              <div className="space-y-1 xl:col-span-4">
+                <Label>Cargo ou função</Label>
+                <Input {...register("cargo")} onBlur={() => aplicarFormatacaoCampo("cargo")} />
+              </div>
+
+              {!!origemTipoSelecionada && (
+                <>
+                  <div className="space-y-1 xl:col-span-3">
+                    <Label>Tipo de origem</Label>
+                    <Input value={formatarTipoOrigem(origemTipoSelecionada)} readOnly />
+                  </div>
+                  <div className="space-y-1 xl:col-span-5">
+                    <Label>Origem vinculada</Label>
+                    <Input value={origemNomeSelecionada ?? ""} readOnly />
+                  </div>
+                  <div className="space-y-1 xl:col-span-4">
+                    <Label>ID da origem</Label>
+                    <Input value={watch("origem_id") ?? ""} readOnly />
+                  </div>
+                </>
+              )}
+
+              {!usuarioIdAtual && (
+                <>
+                  <div className="space-y-1 xl:col-span-3">
+                    <Label>Senha inicial *</Label>
+                    <Input type="password" {...register("senha")} />
+                    {errors.senha && <p className="text-xs text-red-600">{errors.senha.message}</p>}
+                  </div>
+                  <div className="space-y-1 xl:col-span-3">
+                    <Label>Confirmar senha *</Label>
+                    <Input type="password" {...register("confirmar_senha")} />
+                    {errors.confirmar_senha && <p className="text-xs text-red-600">{errors.confirmar_senha.message}</p>}
+                  </div>
+                </>
+              )}
+
+              <div className="flex flex-wrap items-center gap-3 xl:col-span-12">
+                <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-[var(--g3-foreground)]">
+                  <Checkbox
+                    checked={!!watch("exigir_troca_senha")}
+                    onChange={(event) =>
+                      setValue("exigir_troca_senha", event.target.checked, {
+                        shouldDirty: true,
+                        shouldValidate: true
+                      })
+                    }
+                  />
+                  Exigir troca de senha no primeiro acesso
+                </label>
+                <Button type="button" variant="outline" size="sm" disabled={!usuarioIdAtual || acaoEmAndamento} onClick={() => setPopupResetSenhaAberto(true)}>
+                  <KeyRound className="mr-1.5 h-3.5 w-3.5" />
+                  Redefinir senha
+                </Button>
+              </div>
+            </section>
+
+            <Card className="border-[var(--g3-border)]">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">Resumo do perfil</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/40 p-3">
+                    <p className="text-xs uppercase tracking-[0.12em] text-[var(--g3-muted)]">Perfil principal</p>
+                    <p className="mt-1 text-sm font-semibold text-[var(--g3-foreground)]">{formatarPerfil(perfilSelecionado)}</p>
+                  </div>
+                  <div className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/40 p-3">
+                    <p className="text-xs uppercase tracking-[0.12em] text-[var(--g3-muted)]">Telas acessíveis</p>
+                    <p className="mt-1 text-sm font-semibold text-[var(--g3-foreground)]">{resumoPermissoes.length}</p>
+                  </div>
+                  <div className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/40 p-3">
+                    <p className="text-xs uppercase tracking-[0.12em] text-[var(--g3-muted)]">Permissões marcadas</p>
+                    <p className="mt-1 text-sm font-semibold text-[var(--g3-foreground)]">{permissoesSelecionadas.length}</p>
+                  </div>
+                </div>
+
+                {!resumoPermissoes.length ? (
+                  <p className="text-sm text-[var(--g3-muted)]">
+                    Selecione permissões para visualizar claramente as telas e ações liberadas.
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]">
+                    <table className="min-w-full text-sm">
+                      <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]">
+                        <tr>
+                          <th className="px-3 py-2 text-left">Módulo</th>
+                          <th className="px-3 py-2 text-left">Tela</th>
+                          <th className="px-3 py-2 text-left">Ações liberadas</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {resumoPermissoes.slice(0, 8).map((item) => {
+                          const acoes = Object.entries(item.acoes)
+                            .filter(([, valor]) => !!valor)
+                            .map(([acao]) => acao);
+                          return (
+                            <tr key={`${item.modulo}-${item.tela}`} className="border-t border-[var(--g3-border)]">
+                              <td className="px-3 py-2">{item.modulo}</td>
+                              <td className="px-3 py-2">{item.tela}</td>
+                              <td className="px-3 py-2">{acoes.join(", ") || "---"}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </section>
+        )}
+
+        {abaAtiva === "permissoes" && (
+          <section className="space-y-4">
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="space-y-3">
+                <div className="flex flex-col gap-3 border-b border-[var(--g3-border)] pb-4 md:flex-row md:items-center">
                   <div className="relative flex-1">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-[var(--g3-muted)]" />
                     <Input
-                      placeholder="Buscar permissão, módulo ou tela..."
+                      placeholder="Buscar permissão, módulo, tela ou ação"
                       className="pl-9"
                       value={buscaPermissao}
-                      onChange={(e) => setBuscaPermissao(e.target.value)}
+                      onChange={(event) => setBuscaPermissao(event.target.value)}
                     />
                   </div>
-                  <div className="flex gap-2">
-                    <Button type="button" variant="outline" size="sm" onClick={expandirTodos}>
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={expandirTodos} disabled={carregandoPermissoes}>
                       Expandir todos
                     </Button>
-                    <Button type="button" variant="outline" size="sm" onClick={recolherTodos}>
+                    <Button type="button" variant="outline" size="sm" onClick={recolherTodos} disabled={carregandoPermissoes}>
                       Recolher todos
                     </Button>
-                    <Button type="button" variant="outline" size="sm" onClick={marcarTudo} disabled={ehAdminImutavel}>
+                    <Button type="button" variant="outline" size="sm" onClick={marcarTudo} disabled={carregandoPermissoes || ehAdminImutavel}>
                       Marcar tudo
                     </Button>
-                    <Button type="button" variant="outline" size="sm" onClick={desmarcarTudo} disabled={ehAdminImutavel}>
+                    <Button type="button" variant="outline" size="sm" onClick={desmarcarTudo} disabled={carregandoPermissoes || ehAdminImutavel}>
                       Desmarcar tudo
                     </Button>
                   </div>
@@ -982,148 +1345,58 @@ export function UsuariosPage() {
 
                 {carregandoPermissoes && <p className="text-sm text-[var(--g3-muted)]">Carregando permissões...</p>}
                 {!carregandoPermissoes && !gruposPermissoes.length && <p className="text-sm text-[var(--g3-muted)]">Nenhuma permissão cadastrada.</p>}
-                
-                {ehAdminImutavel && (
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                    <p className="font-semibold">Usuário Administrador Restrito</p>
-                    <p>As permissões deste usuário não podem ser alteradas pois ele possui acesso total ao sistema.</p>
-                  </div>
-                )}
+                {ehAdminImutavel && <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Este usuário está protegido e mantém acesso total ao sistema.</div>}
 
                 {gruposPermissoes.map((grupo) => {
                   const expandido = modulosExpandidos.includes(grupo.modulo);
-
-                  // Agrupar itens por tela dentro do módulo
-                  const telasMap = new Map<
-                    string,
-                    {
-                      visualizar?: string;
-                      editar?: string;
-                      excluir?: string;
-                      aprovar?: string;
-                      imprimir?: string;
-                      exportar?: string;
-                      configurar?: string;
-                    }
-                  >();
-                  
-                  grupo.itens.forEach(item => {
-                    const info = telasMap.get(item.tela) ?? {};
-                    const acao = item.acao.toLowerCase();
-                    if (acao.includes("visualizar") || acao.includes("leitura") || acao.includes("acesso")) info.visualizar = item.nome;
-                    if (acao.includes("editar") || acao.includes("cadastrar") || acao.includes("alterar")) info.editar = item.nome;
-                    if (acao.includes("excluir") || acao.includes("remover") || acao.includes("deletar")) info.excluir = item.nome;
-                    if (acao.includes("aprovar") || acao.includes("autorizar")) info.aprovar = item.nome;
-                    if (acao.includes("imprimir")) info.imprimir = item.nome;
-                    if (acao.includes("exportar")) info.exportar = item.nome;
-                    if (acao.includes("configurar")) info.configurar = item.nome;
-                    telasMap.set(item.tela, info);
-                  });
-
-                  const telas = Array.from(telasMap.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+                  const telas = agruparPermissoesPorTela(grupo.itens, grupo.itens.map((item) => item.nome));
 
                   return (
                     <Card key={grupo.modulo} className="overflow-hidden border border-[var(--g3-border)] shadow-sm">
-                      <CardHeader 
-                        className="bg-[var(--g3-primary-soft)]/50 py-3 cursor-pointer hover:bg-[var(--g3-primary-soft)]/70 transition-colors flex flex-row items-center justify-between"
-                        onClick={() => alternarModulo(grupo.modulo)}
+                      <CardHeader
+                        className="flex cursor-pointer flex-row items-center justify-between bg-[var(--g3-primary-soft)]/45 py-3"
+                        onClick={() =>
+                          setModulosExpandidos((atual) =>
+                            atual.includes(grupo.modulo) ? atual.filter((item) => item !== grupo.modulo) : [...atual, grupo.modulo]
+                          )
+                        }
                       >
-                        <CardTitle className="text-sm font-bold text-[var(--g3-active)] uppercase tracking-wider">
-                          {grupo.modulo}
-                        </CardTitle>
+                        <CardTitle className="text-sm font-semibold text-[var(--g3-active)]">{grupo.modulo}</CardTitle>
                         {expandido ? <ChevronDown className="h-4 w-4 text-[var(--g3-active)]" /> : <ChevronRight className="h-4 w-4 text-[var(--g3-active)]" />}
                       </CardHeader>
-                      
+
                       {expandido && (
-                        <CardContent className="p-0 border-t border-[var(--g3-border)]">
+                        <CardContent className="p-0">
                           <div className="overflow-x-auto">
                             <table className="min-w-full text-sm">
-                              <thead className="bg-[var(--g3-primary-soft)]/30 text-[var(--g3-active)]">
+                              <thead className="bg-[var(--g3-primary-soft)]/25 text-[var(--g3-active)]">
                                 <tr>
-                                  <th className="px-4 py-2 text-left font-semibold">Tela / Submenu</th>
-                                  <th className="w-20 px-2 py-2 text-center font-semibold text-[11px]">Visualizar</th>
-                                  <th className="w-20 px-2 py-2 text-center font-semibold text-[11px]">Editar</th>
-                                  <th className="w-20 px-2 py-2 text-center font-semibold text-[11px]">Excluir</th>
-                                  <th className="w-20 px-2 py-2 text-center font-semibold text-[11px]">Aprovar</th>
-                                  <th className="w-20 px-2 py-2 text-center font-semibold text-[11px]">Imprimir</th>
-                                  <th className="w-20 px-2 py-2 text-center font-semibold text-[11px]">Exportar</th>
-                                  <th className="w-20 px-2 py-2 text-center font-semibold text-[11px]">Configurar</th>
+                                  <th className="px-4 py-2 text-left">Tela</th>
+                                  <th className="w-20 px-2 py-2 text-center text-[11px]">Ver</th>
+                                  <th className="w-20 px-2 py-2 text-center text-[11px]">Editar</th>
+                                  <th className="w-20 px-2 py-2 text-center text-[11px]">Excluir</th>
+                                  <th className="w-20 px-2 py-2 text-center text-[11px]">Aprovar</th>
+                                  <th className="w-20 px-2 py-2 text-center text-[11px]">Imprimir</th>
+                                  <th className="w-20 px-2 py-2 text-center text-[11px]">Exportar</th>
+                                  <th className="w-24 px-2 py-2 text-center text-[11px]">Configurar</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-[var(--g3-border)]">
-                                {telas.map(([tela, acoes]) => (
-                                  <tr key={tela} className="hover:bg-[var(--g3-primary-soft)]/10 transition-colors">
-                                    <td className="px-4 py-2.5 font-medium text-[var(--g3-foreground)]">{tela}</td>
-                                    <td className="px-2 py-2.5 text-center">
-                                      {acoes.visualizar && (
-                                        <Checkbox
-                                          checked={permissoesSelecionadas.includes(acoes.visualizar)}
-                                          onChange={() => trocarPermissao(acoes.visualizar!)}
-                                          disabled={ehAdminImutavel}
-                                          className="mx-auto"
-                                        />
-                                      )}
-                                    </td>
-                                    <td className="px-2 py-2.5 text-center">
-                                      {acoes.editar && (
-                                        <Checkbox
-                                          checked={permissoesSelecionadas.includes(acoes.editar)}
-                                          onChange={() => trocarPermissao(acoes.editar!)}
-                                          disabled={ehAdminImutavel}
-                                          className="mx-auto"
-                                        />
-                                      )}
-                                    </td>
-                                    <td className="px-2 py-2.5 text-center">
-                                      {acoes.excluir && (
-                                        <Checkbox
-                                          checked={permissoesSelecionadas.includes(acoes.excluir)}
-                                          onChange={() => trocarPermissao(acoes.excluir!)}
-                                          disabled={ehAdminImutavel}
-                                          className="mx-auto"
-                                        />
-                                      )}
-                                    </td>
-                                    <td className="px-2 py-2.5 text-center">
-                                      {acoes.aprovar && (
-                                        <Checkbox
-                                          checked={permissoesSelecionadas.includes(acoes.aprovar)}
-                                          onChange={() => trocarPermissao(acoes.aprovar!)}
-                                          disabled={ehAdminImutavel}
-                                          className="mx-auto"
-                                        />
-                                      )}
-                                    </td>
-                                    <td className="px-2 py-2.5 text-center">
-                                      {acoes.imprimir && (
-                                        <Checkbox
-                                          checked={permissoesSelecionadas.includes(acoes.imprimir)}
-                                          onChange={() => trocarPermissao(acoes.imprimir!)}
-                                          disabled={ehAdminImutavel}
-                                          className="mx-auto"
-                                        />
-                                      )}
-                                    </td>
-                                    <td className="px-2 py-2.5 text-center">
-                                      {acoes.exportar && (
-                                        <Checkbox
-                                          checked={permissoesSelecionadas.includes(acoes.exportar)}
-                                          onChange={() => trocarPermissao(acoes.exportar!)}
-                                          disabled={ehAdminImutavel}
-                                          className="mx-auto"
-                                        />
-                                      )}
-                                    </td>
-                                    <td className="px-2 py-2.5 text-center">
-                                      {acoes.configurar && (
-                                        <Checkbox
-                                          checked={permissoesSelecionadas.includes(acoes.configurar)}
-                                          onChange={() => trocarPermissao(acoes.configurar!)}
-                                          disabled={ehAdminImutavel}
-                                          className="mx-auto"
-                                        />
-                                      )}
-                                    </td>
+                                {telas.map((item) => (
+                                  <tr key={`${item.modulo}-${item.tela}`} className="hover:bg-[var(--g3-primary-soft)]/12">
+                                    <td className="px-4 py-2.5 font-medium text-[var(--g3-foreground)]">{item.tela}</td>
+                                    {(["visualizar", "editar", "excluir", "aprovar", "imprimir", "exportar", "configurar"] as const).map((acao) => (
+                                      <td key={acao} className="px-2 py-2.5 text-center">
+                                        {item.acoes[acao] ? (
+                                          <Checkbox
+                                            checked={permissoesSelecionadas.includes(item.acoes[acao] as string)}
+                                            onChange={() => trocarPermissao(item.acoes[acao] as string)}
+                                            disabled={ehAdminImutavel}
+                                            className="mx-auto"
+                                          />
+                                        ) : null}
+                                      </td>
+                                    ))}
                                   </tr>
                                 ))}
                               </tbody>
@@ -1134,87 +1407,107 @@ export function UsuariosPage() {
                     </Card>
                   );
                 })}
-              </section>
-            )}
-
-            {abaAtiva === "auditoria" && (
-              <section className="space-y-3">
-                {carregandoUsuario && <p className="text-sm text-[var(--g3-muted)]">Carregando histórico...</p>}
-                {!carregandoUsuario && !idSelecionado && <p className="text-sm text-[var(--g3-muted)]">Selecione um usuário na listagem.</p>}
-                {!carregandoUsuario && idSelecionado && !usuarioData?.auditoria?.length && (
-                  <p className="text-sm text-[var(--g3-muted)]">Nenhum registro de auditoria para este usuário.</p>
-                )}
-                {!!usuarioData?.auditoria?.length && (
-                  <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]">
-                    <table className="min-w-full text-sm">
-                      <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]">
-                        <tr>
-                          <th className="px-3 py-2 text-left">Data</th>
-                          <th className="px-3 py-2 text-left">Ação</th>
-                          <th className="px-3 py-2 text-left">Executado por</th>
-                          <th className="px-3 py-2 text-left">Detalhes</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {usuarioData.auditoria.map((item, indice) => (
-                          <tr key={item.id} className={`border-t border-[var(--g3-border)] ${indice % 2 === 0 ? "bg-white" : "bg-[var(--g3-primary-soft)]/35"}`}>
-                            <td className="px-3 py-2">{formatarDataHora(item.criado_em)}</td>
-                            <td className="px-3 py-2">{item.acao}</td>
-                            <td className="px-3 py-2">{item.usuario_nome ?? "Sistema"}</td>
-                            <td className="px-3 py-2">
-                              <pre className="max-w-[560px] whitespace-pre-wrap break-all text-xs text-[var(--g3-muted)]">
-                                {item.dados_json ? JSON.stringify(item.dados_json, null, 2) : "---"}
-                              </pre>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+              </div>
+              <Card className="border-[var(--g3-border)]">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm">Leitura gerencial do perfil</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                  <div className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/40 p-3">
+                    <p className="text-xs uppercase tracking-[0.12em] text-[var(--g3-muted)]">Perfil principal</p>
+                    <p className="mt-1 font-semibold text-[var(--g3-foreground)]">{formatarPerfil(perfilSelecionado)}</p>
                   </div>
-                )}
-              </section>
+                  <div className="rounded-lg border border-[var(--g3-border)] p-3">
+                    <p className="font-medium text-[var(--g3-foreground)]">O que este perfil acessa</p>
+                    <p className="mt-1 text-[var(--g3-muted)]">
+                      {resumoPermissoes.length ? `${resumoPermissoes.length} telas mapeadas por módulo e ação.` : "Nenhuma permissão operacional marcada."}
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    {resumoPermissoes.slice(0, 6).map((item) => (
+                      <div key={`${item.modulo}-${item.tela}`} className="rounded-lg border border-[var(--g3-border)] p-3">
+                        <p className="font-medium text-[var(--g3-foreground)]">{item.tela}</p>
+                        <p className="text-xs text-[var(--g3-muted)]">{item.modulo}</p>
+                        <p className="mt-1 text-xs text-[var(--g3-foreground)]">
+                          {Object.entries(item.acoes)
+                            .filter(([, valor]) => !!valor)
+                            .map(([acao]) => acao)
+                            .join(", ") || "Sem ação operacional"}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </section>
+        )}
+
+        {abaAtiva === "auditoria" && (
+          <section className="space-y-3">
+            {carregandoUsuario && <p className="text-sm text-[var(--g3-muted)]">Carregando histórico...</p>}
+            {!carregandoUsuario && !idSelecionado && <p className="text-sm text-[var(--g3-muted)]">Selecione um usuário na listagem.</p>}
+            {!carregandoUsuario && idSelecionado && !usuarioData?.auditoria?.length && <p className="text-sm text-[var(--g3-muted)]">Nenhum registro de auditoria encontrado para este usuário.</p>}
+
+            {!!usuarioData?.auditoria?.length && (
+              <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]">
+                    <tr>
+                      <th className="px-3 py-2 text-left">Data</th>
+                      <th className="px-3 py-2 text-left">Ação</th>
+                      <th className="px-3 py-2 text-left">Executado por</th>
+                      <th className="px-3 py-2 text-left">Detalhes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {usuarioData.auditoria.map((item, indice) => (
+                      <tr key={item.id} className={`border-t border-[var(--g3-border)] ${indice % 2 === 0 ? "bg-white" : "bg-[var(--g3-primary-soft)]/25"}`}>
+                        <td className="px-3 py-2">{formatarDataHora(item.criado_em)}</td>
+                        <td className="px-3 py-2">{item.acao}</td>
+                        <td className="px-3 py-2">{item.usuario_nome ?? "Sistema"}</td>
+                        <td className="px-3 py-2">
+                          <pre className="max-w-[560px] whitespace-pre-wrap break-all text-xs text-[var(--g3-muted)]">
+                            {item.dados_json ? JSON.stringify(item.dados_json, null, 2) : "---"}
+                          </pre>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
-          </CardContent>
-        </Card>
-      </div>
+          </section>
+        )}
+      </AdminPageLayout>
 
-      {popupMensagem && <PopupMensagem {...popupMensagem} onClose={() => setPopupMensagem(null)} />}
+      {popupMensagem ? <PopupMensagem popup={popupMensagem} onClose={() => setPopupMensagem(null)} /> : null}
 
-      {popupConfirmacao && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/45 px-4" onClick={() => !acaoEmAndamento && setPopupConfirmacao(null)}>
-          <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="border-b border-slate-100 px-5 py-4">
-              <h3 className="text-base font-semibold text-slate-900">{popupConfirmacao.titulo}</h3>
-            </div>
-            <div className="px-5 py-4">
-              <p className="text-sm text-slate-700">{popupConfirmacao.texto}</p>
-            </div>
-            <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3">
-              <Button type="button" variant="outline" onClick={() => setPopupConfirmacao(null)} disabled={acaoEmAndamento}>
-                Cancelar
-              </Button>
-              <Button type="button" onClick={() => void confirmarPopupAcao()} disabled={acaoEmAndamento}>
-                {acaoEmAndamento ? "Processando..." : "Confirmar"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <PopupConfirmacao
+        aberto={!!popupConfirmacao}
+        titulo={popupConfirmacao?.titulo ?? ""}
+        texto={popupConfirmacao?.texto ?? ""}
+        processando={acaoEmAndamento}
+        confirmarTexto={popupConfirmacao?.tipo === "excluir" ? "Excluir" : "Confirmar"}
+        confirmarVariant={popupConfirmacao?.tipo === "excluir" ? "danger" : "default"}
+        onCancel={() => setPopupConfirmacao(null)}
+        onConfirm={() => void confirmarPopupAcao()}
+      />
 
       {popupResetSenhaAberto && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/45 px-4" onClick={() => !resetarSenhaMutation.isPending && setPopupResetSenhaAberto(false)}>
-          <div className="w-full max-w-lg rounded-xl border border-slate-200 bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/45 px-4" onClick={() => { if (!resetarSenhaMutation.isPending) setPopupResetSenhaAberto(false); }}>
+          <div className="w-full max-w-lg rounded-xl border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
             <div className="border-b border-slate-100 px-5 py-4">
               <h3 className="text-base font-semibold text-slate-900">Redefinir senha</h3>
             </div>
             <div className="grid gap-3 px-5 py-4 sm:grid-cols-2">
               <div className="space-y-1">
                 <Label>Nova senha</Label>
-                <Input type="password" value={novaSenha} onChange={(e) => setNovaSenha(e.target.value)} />
+                <Input type="password" value={novaSenha} onChange={(event) => setNovaSenha(event.target.value)} />
               </div>
               <div className="space-y-1">
                 <Label>Confirmar nova senha</Label>
-                <Input type="password" value={confirmarNovaSenha} onChange={(e) => setConfirmarNovaSenha(e.target.value)} />
+                <Input type="password" value={confirmarNovaSenha} onChange={(event) => setConfirmarNovaSenha(event.target.value)} />
               </div>
               <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-[var(--g3-foreground)] sm:col-span-2">
                 <Checkbox checked={exigirTrocaSenhaReset} onChange={(event) => setExigirTrocaSenhaReset(event.target.checked)} />
@@ -1222,16 +1515,16 @@ export function UsuariosPage() {
               </label>
             </div>
             <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3">
-              <Button type="button" variant="outline" onClick={() => setPopupResetSenhaAberto(false)} disabled={resetarSenhaMutation.isPending}>
+              <Button type="button" variant="outline" disabled={resetarSenhaMutation.isPending} onClick={() => setPopupResetSenhaAberto(false)}>
                 Cancelar
               </Button>
-              <Button type="button" onClick={() => void confirmarResetSenha()} disabled={resetarSenhaMutation.isPending}>
+              <Button type="button" disabled={resetarSenhaMutation.isPending} onClick={() => void confirmarResetSenha()}>
                 {resetarSenhaMutation.isPending ? "Salvando..." : "Salvar nova senha"}
               </Button>
             </div>
           </div>
         </div>
       )}
-    </main>
+    </>
   );
 }
