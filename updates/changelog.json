@@ -1,6 +1,39 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.410",
+                        "releaseDate":  "2026-03-29",
+                        "title":  "Checklist diario com aba Historico refinada",
+                        "description":  "A aba Historico do checklist diario foi reestruturada para leitura mais clara da auditoria operacional.",
+                        "changes":  [
+                                        "A aba passou a mostrar um resumo superior da auditoria com volume de eventos, acoes distintas, motivos e observacoes.",
+                                        "Os eventos do historico ganharam cards mais legiveis com origem, status anterior, novo status, observacao e motivo quando aplicavel.",
+                                        "O manual interno foi atualizado para refletir a nova leitura da trilha de auditoria no checklist diario."
+                                    ]
+                    },
+                    {
+                        "version":  "1.00.409",
+                        "releaseDate":  "2026-03-29",
+                        "title":  "Checklist diario com aba Indicadores refinada",
+                        "description":  "A aba Indicadores do checklist diario foi reorganizada para leitura gerencial mais clara e util.",
+                        "changes":  [
+                                        "A aba passou a exibir cards de painel gerencial com conclusao geral, itens criticos nao concluidos, nao se aplica e dispensas.",
+                                        "Os blocos de cumprimento por usuario, unidade e setor ficaram separados com leitura mais clara e badges de desempenho.",
+                                        "As tarefas mais atrasadas e as mais recorrentes passaram a ter destaque proprio na interface e o manual foi atualizado com essa leitura gerencial."
+                                    ]
+                    },
+                    {
+                        "version":  "1.00.408",
+                        "releaseDate":  "2026-03-29",
+                        "title":  "Checklist diario com aba Modelos refinada",
+                        "description":  "A aba Modelos do checklist diario foi redesenhada para melhorar leitura, selecao de modelos e edicao das atividades.",
+                        "changes":  [
+                                        "A aba ganhou resumo superior com indicadores do conjunto de modelos e do editor atual.",
+                                        "A lista lateral de modelos ficou mais legivel, com status ativo ou inativo, descricao resumida e destaque visual do item selecionado.",
+                                        "O editor passou a trabalhar com cards por atividade, separando melhor dados gerais, horario, prioridade, alerta e criterios obrigatorios."
+                                    ]
+                    },
+                    {
                         "version":  "1.00.407",
                         "releaseDate":  "2026-03-29",
                         "title":  "Manual do checklist diario ampliado",

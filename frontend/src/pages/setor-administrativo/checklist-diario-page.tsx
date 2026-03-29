@@ -112,6 +112,13 @@ function statusRotulo(status: ChecklistStatus) {
   return "Pendente";
 }
 
+function tipoModeloRotulo(tipo: ChecklistModeloPayload["tipo"]) {
+  if (tipo === "INSTITUCIONAL") return "Institucional";
+  if (tipo === "SETOR") return "Setor";
+  if (tipo === "FUNCAO") return "Função";
+  return "Usuário";
+}
+
 function modeloVazio(): ChecklistModeloPayload {
   return {
     nome: "",
@@ -560,10 +567,299 @@ export function ChecklistDiarioPage() {
     </div>
   );
 
+  const conteudoModelosPremium = (
+    <div className="space-y-4">
+      <Card className="overflow-hidden border border-[var(--g3-border)] shadow-[0_18px_36px_-28px_rgba(15,23,42,0.45)]">
+        <CardHeader className="border-b border-[var(--g3-border)]/70 pb-3">
+          <CardTitle className="text-sm">Resumo dos modelos</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4">
+          {[
+            { label: "Modelos cadastrados", valor: modelos.length, apoio: "Base total disponível no checklist" },
+            { label: "Modelos ativos", valor: modelos.filter((item) => item.ativo).length, apoio: "Usados na geração operacional" },
+            { label: "Atividades do modelo", valor: modeloForm.itens.length, apoio: "Itens configurados no editor atual" },
+            { label: "Tipo selecionado", valor: tipoModeloRotulo(modeloForm.tipo), apoio: modeloSelecionadoId ? "Modelo em edição" : "Novo modelo em preparação" }
+          ].map((item) => (
+            <div key={item.label} className="rounded-2xl border border-[var(--g3-border)] bg-[var(--g3-card)] p-4 shadow-[0_12px_26px_-24px_rgba(15,23,42,0.8)]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--g3-muted)]">{item.label}</p>
+              <p className="mt-2 text-2xl font-black tracking-tight text-[var(--g3-foreground)]">{item.valor}</p>
+              <p className="mt-1 text-xs text-[var(--g3-muted)]">{item.apoio}</p>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
+        <Card className="overflow-hidden rounded-3xl border border-[var(--g3-border)] shadow-[0_20px_40px_-30px_rgba(15,23,42,0.45)]">
+          <CardHeader className="border-b border-[var(--g3-border)]/70 pb-3">
+            <div className="space-y-3">
+              <div>
+                <CardTitle className="text-sm">Modelos cadastrados</CardTitle>
+                <p className="mt-1 text-xs text-[var(--g3-muted)]">
+                  Selecione um modelo para editar, clonar ou inativar sem perder rastreabilidade.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                  setModeloSelecionadoId(undefined);
+                  setModeloForm(modeloVazio());
+                }}
+                disabled={!podeGerenciarModelos}
+              >
+                Novo modelo
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3 p-4">
+            {modelos.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-[var(--g3-border)] bg-[var(--g3-card-soft)] px-4 py-8 text-center">
+                <p className="text-sm font-medium text-[var(--g3-foreground)]">Nenhum modelo cadastrado</p>
+                <p className="mt-1 text-xs text-[var(--g3-muted)]">Crie o primeiro modelo para iniciar a rotina recorrente do checklist.</p>
+              </div>
+            ) : (
+              modelos.map((modelo) => (
+                <div
+                  key={modelo.id}
+                  className={`rounded-2xl border p-4 transition ${
+                    modeloSelecionadoId === modelo.id
+                      ? "border-[var(--g3-active)] bg-[var(--g3-primary-soft)]/55 shadow-[0_16px_32px_-28px_rgba(15,23,42,0.8)]"
+                      : "border-[var(--g3-border)] bg-[var(--g3-card-soft)]"
+                  }`}
+                >
+                  <button type="button" className="w-full text-left" onClick={() => setModeloSelecionadoId(modelo.id)}>
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-[var(--g3-foreground)]">{modelo.nome}</p>
+                        <p className="mt-1 text-xs text-[var(--g3-muted)]">{tipoModeloRotulo(modelo.tipo)} • {modelo.itens.length} atividade(s)</p>
+                      </div>
+                      <Badge variant={modelo.ativo ? "success" : "default"}>{modelo.ativo ? "Ativo" : "Inativo"}</Badge>
+                    </div>
+                    {modelo.descricao ? <p className="mt-3 line-clamp-2 text-sm leading-5 text-[var(--g3-muted)]">{modelo.descricao}</p> : null}
+                  </button>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Button type="button" size="sm" variant="outline" onClick={() => void clonarModeloMutation.mutateAsync(modelo.id)} disabled={acoesEmAndamento || !podeGerenciarModelos}>Clonar</Button>
+                    <Button type="button" size="sm" variant="ghost" onClick={() => void statusModeloMutation.mutateAsync({ id: modelo.id, ativo: !modelo.ativo })} disabled={acoesEmAndamento || !podeGerenciarModelos}>{modelo.ativo ? "Inativar" : "Ativar"}</Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+
+        <div className="space-y-4">
+          <Card className="overflow-hidden rounded-3xl border border-[var(--g3-border)] shadow-[0_20px_40px_-30px_rgba(15,23,42,0.45)]">
+            <CardHeader className="border-b border-[var(--g3-border)]/70 pb-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <CardTitle className="text-sm">Editor de modelo</CardTitle>
+                  <p className="mt-1 text-xs text-[var(--g3-muted)]">Defina o escopo do modelo e mantenha as atividades organizadas por dia, horário e prioridade.</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="default">{tipoModeloRotulo(modeloForm.tipo)}</Badge>
+                  <Badge variant={modeloForm.ativo ?? true ? "success" : "default"}>{(modeloForm.ativo ?? true) ? "Pronto para uso" : "Inativo"}</Badge>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4 p-4">
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-1">
+                  <Label>Nome do modelo</Label>
+                  <Input value={modeloForm.nome} onChange={(event) => setModeloForm((atual) => ({ ...atual, nome: event.target.value }))} placeholder="Nome do modelo" />
+                </div>
+                <div className="space-y-1">
+                  <Label>Tipo do modelo</Label>
+                  <Select value={modeloForm.tipo} onChange={(event) => setModeloForm((atual) => ({ ...atual, tipo: event.target.value as any }))}><option value="INSTITUCIONAL">Institucional</option><option value="SETOR">Setor</option><option value="FUNCAO">Função</option><option value="USUARIO">Usuário</option></Select>
+                </div>
+                <div className="space-y-1">
+                  <Label>Setor</Label>
+                  <Input value={modeloForm.setor ?? ""} onChange={(event) => setModeloForm((atual) => ({ ...atual, setor: event.target.value }))} placeholder="Setor" />
+                </div>
+                <div className="space-y-1">
+                  <Label>Cargo</Label>
+                  <Input value={modeloForm.cargo ?? ""} onChange={(event) => setModeloForm((atual) => ({ ...atual, cargo: event.target.value }))} placeholder="Cargo" />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label>Descrição do modelo</Label>
+                <Textarea value={modeloForm.descricao ?? ""} onChange={(event) => setModeloForm((atual) => ({ ...atual, descricao: event.target.value }))} placeholder="Descreva o objetivo operacional deste modelo" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="overflow-hidden rounded-3xl border border-[var(--g3-border)] shadow-[0_20px_40px_-30px_rgba(15,23,42,0.45)]">
+            <CardHeader className="border-b border-[var(--g3-border)]/70 pb-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <CardTitle className="text-sm">Atividades do modelo</CardTitle>
+                  <p className="mt-1 text-xs text-[var(--g3-muted)]">Organize a rotina semanal com horários, alertas e criticidade em cada item.</p>
+                </div>
+                <Button type="button" variant="outline" onClick={() => setModeloForm((atual) => ({ ...atual, itens: [...atual.itens, { diaSemana: 1, titulo: "", descricaoDetalhada: "", horarioPrevisto: "08:00", prioridade: "MEDIA", alertaAtivo: false, horarioAlerta: null, observacaoObrigatoria: false, atividadeCritica: false, ordem: atual.itens.length, ativo: true }] }))} disabled={!podeGerenciarModelos}>
+                  Adicionar atividade
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4 p-4">
+              {modeloForm.itens.map((item, index) => (
+                <div key={`${index}-${item.titulo}`} className={`rounded-3xl border p-4 shadow-[0_14px_28px_-24px_rgba(15,23,42,0.8)] ${prioridadeClasse(item.prioridade)}`}>
+                  <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-[var(--g3-foreground)]">Atividade {index + 1}</p>
+                      <p className="mt-1 text-xs text-[var(--g3-muted)]">Configure dia, descrição, alerta e critérios obrigatórios deste item.</p>
+                    </div>
+                    <Button type="button" size="sm" variant="ghost" onClick={() => setModeloForm((atual) => ({ ...atual, itens: atual.itens.filter((_, currentIndex) => currentIndex !== index) }))}>Remover</Button>
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <div className="space-y-1">
+                      <Label>Dia da semana</Label>
+                      <Select value={String(item.diaSemana)} onChange={(event) => setModeloForm((atual) => ({ ...atual, itens: atual.itens.map((current, currentIndex) => currentIndex === index ? { ...current, diaSemana: Number(event.target.value) } : current) }))}>{diasSemana.map((dia) => <option key={dia.valor} value={dia.valor}>{dia.label}</option>)}</Select>
+                    </div>
+                    <div className="space-y-1 xl:col-span-2">
+                      <Label>Título da atividade</Label>
+                      <Input value={item.titulo} onChange={(event) => setModeloForm((atual) => ({ ...atual, itens: atual.itens.map((current, currentIndex) => currentIndex === index ? { ...current, titulo: event.target.value } : current) }))} placeholder="Título" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Prioridade</Label>
+                      <Select value={item.prioridade} onChange={(event) => setModeloForm((atual) => ({ ...atual, itens: atual.itens.map((current, currentIndex) => currentIndex === index ? { ...current, prioridade: event.target.value as ChecklistPrioridade } : current) }))}><option value="BAIXA">Baixa</option><option value="MEDIA">Média</option><option value="ALTA">Alta</option><option value="CRITICA">Crítica</option></Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Horário previsto</Label>
+                      <Input type="time" value={item.horarioPrevisto ?? ""} onChange={(event) => setModeloForm((atual) => ({ ...atual, itens: atual.itens.map((current, currentIndex) => currentIndex === index ? { ...current, horarioPrevisto: event.target.value || null } : current) }))} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Horário do alerta</Label>
+                      <Input type="time" value={item.horarioAlerta ?? ""} onChange={(event) => setModeloForm((atual) => ({ ...atual, itens: atual.itens.map((current, currentIndex) => currentIndex === index ? { ...current, horarioAlerta: event.target.value || null, alertaAtivo: !!event.target.value } : current) }))} />
+                    </div>
+                    <div className="space-y-1 xl:col-span-2">
+                      <Label>Descrição detalhada</Label>
+                      <Textarea value={item.descricaoDetalhada ?? ""} onChange={(event) => setModeloForm((atual) => ({ ...atual, itens: atual.itens.map((current, currentIndex) => currentIndex === index ? { ...current, descricaoDetalhada: event.target.value } : current) }))} placeholder="Descrição detalhada" />
+                    </div>
+                    <div className="flex flex-col justify-end gap-2 rounded-2xl border border-[var(--g3-border)]/70 bg-white/55 px-3 py-3 text-sm text-[var(--g3-muted)]">
+                      <label className="inline-flex items-center gap-2"><Checkbox checked={item.observacaoObrigatoria} onChange={(event) => setModeloForm((atual) => ({ ...atual, itens: atual.itens.map((current, currentIndex) => currentIndex === index ? { ...current, observacaoObrigatoria: event.target.checked } : current) }))} /> Observação obrigatória</label>
+                      <label className="inline-flex items-center gap-2"><Checkbox checked={item.atividadeCritica} onChange={(event) => setModeloForm((atual) => ({ ...atual, itens: atual.itens.map((current, currentIndex) => currentIndex === index ? { ...current, atividadeCritica: event.target.checked } : current) }))} /> Atividade crítica</label>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+
   const conteudoIndicadores = (
     <div className="grid gap-3 xl:grid-cols-2">
       <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Cumprimento por usuário</CardTitle></CardHeader><CardContent className="space-y-2">{(indicadores?.cumprimentoPorUsuario ?? []).map((item) => <div key={item.usuarioId} className="flex items-center justify-between rounded-lg border border-[var(--g3-border)] px-3 py-2"><span className="text-sm">{item.usuarioNome}</span><Badge variant={item.percentual >= 80 ? "success" : item.percentual >= 50 ? "warning" : "danger"}>{item.percentual}%</Badge></div>)}</CardContent></Card>
       <Card><CardHeader className="pb-2"><CardTitle className="text-sm">Tarefas mais atrasadas</CardTitle></CardHeader><CardContent className="space-y-2">{(indicadores?.tarefasMaisAtrasadas ?? []).map((item) => <div key={item.tituloAtividade} className="flex items-center justify-between rounded-lg border border-[var(--g3-border)] px-3 py-2"><span className="text-sm">{item.tituloAtividade}</span><Badge variant="danger">{item.quantidade}</Badge></div>)}</CardContent></Card>
+    </div>
+  );
+
+  const conteudoIndicadoresPremium = (
+    <div className="space-y-4">
+      <Card className="overflow-hidden border border-[var(--g3-border)] shadow-[0_18px_36px_-28px_rgba(15,23,42,0.45)]">
+        <CardHeader className="border-b border-[var(--g3-border)]/70 pb-3">
+          <CardTitle className="text-sm">Painel gerencial</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4">
+          {[
+            { label: "Conclusão geral", valor: `${indicadores?.resumo.percentualConclusao ?? 0}%`, apoio: "Taxa agregada do período filtrado" },
+            { label: "Críticas não concluídas", valor: indicadores?.resumo.criticasNaoConcluidas ?? 0, apoio: "Itens críticos ainda em aberto" },
+            { label: "Não se aplica", valor: indicadores?.resumo.naoAplicaveis ?? 0, apoio: "Execuções encerradas por regra de contexto" },
+            { label: "Dispensadas", valor: indicadores?.resumo.dispensadas ?? 0, apoio: "Atividades dispensadas com trilha de auditoria" }
+          ].map((item) => (
+            <div key={item.label} className="rounded-2xl border border-[var(--g3-border)] bg-[var(--g3-card)] p-4 shadow-[0_12px_26px_-24px_rgba(15,23,42,0.8)]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--g3-muted)]">{item.label}</p>
+              <p className="mt-2 text-2xl font-black tracking-tight text-[var(--g3-foreground)]">{item.valor}</p>
+              <p className="mt-1 text-xs text-[var(--g3-muted)]">{item.apoio}</p>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Card className="overflow-hidden rounded-3xl border border-[var(--g3-border)] shadow-[0_20px_40px_-30px_rgba(15,23,42,0.45)]">
+          <CardHeader className="border-b border-[var(--g3-border)]/70 pb-3">
+            <CardTitle className="text-sm">Cumprimento por usuário</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 p-4">
+            {(indicadores?.cumprimentoPorUsuario ?? []).map((item) => (
+              <div key={item.usuarioId} className="rounded-2xl border border-[var(--g3-border)] bg-[var(--g3-card)] px-4 py-3 shadow-[0_12px_24px_-24px_rgba(15,23,42,0.85)]">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-[var(--g3-foreground)]">{item.usuarioNome}</p>
+                    <p className="mt-1 text-xs text-[var(--g3-muted)]">{item.concluidas} de {item.total} concluídas</p>
+                  </div>
+                  <Badge variant={item.percentual >= 80 ? "success" : item.percentual >= 50 ? "warning" : "danger"}>{item.percentual}%</Badge>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card className="overflow-hidden rounded-3xl border border-[var(--g3-border)] shadow-[0_20px_40px_-30px_rgba(15,23,42,0.45)]">
+          <CardHeader className="border-b border-[var(--g3-border)]/70 pb-3">
+            <CardTitle className="text-sm">Tarefas mais atrasadas</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 p-4">
+            {(indicadores?.tarefasMaisAtrasadas ?? []).map((item) => (
+              <div key={item.tituloAtividade} className="flex items-center justify-between gap-3 rounded-2xl border border-red-200 bg-red-50/70 px-4 py-3">
+                <p className="text-sm font-medium text-[var(--g3-foreground)]">{item.tituloAtividade}</p>
+                <Badge variant="danger">{item.quantidade}</Badge>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card className="overflow-hidden rounded-3xl border border-[var(--g3-border)] shadow-[0_20px_40px_-30px_rgba(15,23,42,0.45)]">
+          <CardHeader className="border-b border-[var(--g3-border)]/70 pb-3">
+            <CardTitle className="text-sm">Cumprimento por unidade</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 p-4">
+            {(indicadores?.cumprimentoPorUnidade ?? []).map((item) => (
+              <div key={`${item.unidadeId ?? "sem-unidade"}-${item.unidadeNome}`} className="rounded-2xl border border-[var(--g3-border)] bg-[var(--g3-card)] px-4 py-3 shadow-[0_12px_24px_-24px_rgba(15,23,42,0.85)]">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-[var(--g3-foreground)]">{item.unidadeNome}</p>
+                    <p className="mt-1 text-xs text-[var(--g3-muted)]">{item.total} atividade(s) no período</p>
+                  </div>
+                  <Badge variant={item.percentual >= 80 ? "success" : item.percentual >= 50 ? "warning" : "danger"}>{item.percentual}%</Badge>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card className="overflow-hidden rounded-3xl border border-[var(--g3-border)] shadow-[0_20px_40px_-30px_rgba(15,23,42,0.45)]">
+          <CardHeader className="border-b border-[var(--g3-border)]/70 pb-3">
+            <CardTitle className="text-sm">Setores e recorrência</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4 p-4 md:grid-cols-2">
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--g3-muted)]">Cumprimento por setor</p>
+              {(indicadores?.cumprimentoPorSetor ?? []).map((item) => (
+                <div key={item.setor} className="rounded-2xl border border-[var(--g3-border)] bg-[var(--g3-card)] px-4 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-sm font-medium text-[var(--g3-foreground)]">{item.setor}</span>
+                    <Badge variant={item.percentual >= 80 ? "success" : item.percentual >= 50 ? "warning" : "danger"}>{item.percentual}%</Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--g3-muted)]">Tarefas mais recorrentes</p>
+              {(indicadores?.tarefasMaisRecorrentes ?? []).map((item) => (
+                <div key={item.tituloAtividade} className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--g3-border)] bg-[var(--g3-card)] px-4 py-3">
+                  <p className="text-sm font-medium text-[var(--g3-foreground)]">{item.tituloAtividade}</p>
+                  <Badge variant="default">{item.quantidade}</Badge>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 
@@ -596,6 +892,86 @@ export function ChecklistDiarioPage() {
         ))}
       </CardContent>
     </Card>
+  );
+
+  const conteudoHistoricoPremium = (
+    <div className="space-y-4">
+      <Card className="overflow-hidden border border-[var(--g3-border)] shadow-[0_18px_36px_-28px_rgba(15,23,42,0.45)]">
+        <CardHeader className="border-b border-[var(--g3-border)]/70 pb-3">
+          <CardTitle className="text-sm">Resumo da auditoria</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4">
+          {[
+            { label: "Eventos no histórico", valor: historico.length, apoio: "Ocorrências carregadas no filtro atual" },
+            { label: "Ações distintas", valor: new Set(historico.map((item) => item.acao)).size, apoio: "Tipos de alteração registrados" },
+            { label: "Com motivo", valor: historico.filter((item) => !!item.motivo).length, apoio: "Eventos com justificativa formal" },
+            { label: "Com observação", valor: historico.filter((item) => !!item.observacao).length, apoio: "Eventos com complemento descritivo" }
+          ].map((item) => (
+            <div key={item.label} className="rounded-2xl border border-[var(--g3-border)] bg-[var(--g3-card)] p-4 shadow-[0_12px_26px_-24px_rgba(15,23,42,0.8)]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--g3-muted)]">{item.label}</p>
+              <p className="mt-2 text-2xl font-black tracking-tight text-[var(--g3-foreground)]">{item.valor}</p>
+              <p className="mt-1 text-xs text-[var(--g3-muted)]">{item.apoio}</p>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      <Card className="overflow-hidden rounded-3xl border border-[var(--g3-border)] shadow-[0_20px_40px_-30px_rgba(15,23,42,0.45)]">
+        <CardHeader className="border-b border-[var(--g3-border)]/70 pb-3">
+          <CardTitle className="text-sm">Trilha de auditoria</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 p-4">
+          {historico.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-[var(--g3-border)] bg-[var(--g3-card-soft)] px-4 py-10 text-center">
+              <p className="text-sm font-medium text-[var(--g3-foreground)]">Nenhum evento carregado</p>
+              <p className="mt-1 text-xs text-[var(--g3-muted)]">Selecione uma execução para visualizar a trilha detalhada de auditoria.</p>
+            </div>
+          ) : null}
+
+          {historico.map((item) => (
+            <div key={item.id} className="rounded-3xl border border-[var(--g3-border)] bg-[var(--g3-card)] p-4 shadow-[0_14px_28px_-24px_rgba(15,23,42,0.8)]">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-semibold text-[var(--g3-foreground)]">{item.acao}</p>
+                    <Badge variant="default">{item.referenciaTipo.toLowerCase()}</Badge>
+                  </div>
+                  <p className="mt-1 text-xs text-[var(--g3-muted)]">
+                    {item.usuarioResponsavelNome ?? "Sistema"} • {item.origem ?? "Origem não informada"}
+                  </p>
+                </div>
+                <span className="text-xs text-[var(--g3-muted)]">{formatarDataHora(item.criadoEm)}</span>
+              </div>
+
+              <div className="mt-3 grid gap-2 md:grid-cols-2">
+                <div className="rounded-2xl bg-[var(--g3-card-soft)] px-3 py-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--g3-muted)]">Status anterior</p>
+                  <p className="mt-1 text-sm font-medium text-[var(--g3-foreground)]">{item.statusAnterior ?? "Sem status"}</p>
+                </div>
+                <div className="rounded-2xl bg-[var(--g3-card-soft)] px-3 py-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--g3-muted)]">Novo status</p>
+                  <p className="mt-1 text-sm font-medium text-[var(--g3-foreground)]">{item.statusNovo ?? "Sem status"}</p>
+                </div>
+              </div>
+
+              {item.observacao ? (
+                <div className="mt-3 rounded-2xl border border-[var(--g3-border)]/70 bg-white/70 px-4 py-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--g3-muted)]">Observação</p>
+                  <p className="mt-1 text-sm leading-6 text-[var(--g3-foreground)]">{item.observacao}</p>
+                </div>
+              ) : null}
+
+              {item.motivo ? (
+                <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-700">Motivo</p>
+                  <p className="mt-1 text-sm leading-6 text-[var(--g3-foreground)]">{item.motivo}</p>
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
   );
 
   return (
@@ -658,10 +1034,10 @@ export function ChecklistDiarioPage() {
 
       {abaAtiva === "diario" ? conteudoExecucoes : null}
       {abaAtiva === "semanal" ? conteudoSemanal : null}
-      {abaAtiva === "modelos" ? conteudoModelos : null}
-      {abaAtiva === "indicadores" ? conteudoIndicadores : null}
+      {abaAtiva === "modelos" ? conteudoModelosPremium : null}
+      {abaAtiva === "indicadores" ? conteudoIndicadoresPremium : null}
       {abaAtiva === "configuracoes" ? conteudoConfiguracoes : null}
-      {abaAtiva === "historico" ? conteudoHistorico : null}
+      {abaAtiva === "historico" ? conteudoHistoricoPremium : null}
 
       {popupMensagem ? <PopupMensagem popup={popupMensagem} onClose={() => setPopupMensagem(null)} /> : null}
     </AdminPageLayout>

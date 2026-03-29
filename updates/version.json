@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.407",
+  "latestVersion": "1.00.410",
   "releaseDate": "2026-03-29",
-  "description": "O manual do sistema foi atualizado com instruções claras de criação, edição, clonagem e inativação dos modelos do Checklist diário.",
+  "description": "Checklist diário teve a aba Histórico refinada com painel-resumo de auditoria e eventos mais legíveis.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.407",
+  "minCompatibleVersion": "1.00.410",
   "releaseType": "stable",
   "downloadUrl": null
 }
