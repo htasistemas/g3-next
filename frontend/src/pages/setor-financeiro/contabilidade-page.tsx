@@ -139,18 +139,7 @@ type ExclusaoTipo =
 const abas: AdminTab[] = [
   { id: 'painel', label: 'Painel financeiro', icon: List },
   { id: 'lancamentos', label: 'Lançamentos', icon: ReceiptText },
-  { id: 'fluxoCaixa', label: 'Fluxo de caixa', icon: ArrowRightLeft },
-  { id: 'contas', label: 'Contas bancárias e caixa', icon: Landmark },
-  { id: 'transferencias', label: 'Transferências', icon: ArrowRightLeft },
-  { id: 'categorias', label: 'Categorias financeiras / contábeis', icon: FolderTree },
-  { id: 'centros', label: 'Centro de custo', icon: Building2 },
-  { id: 'conciliacao', label: 'Conciliação bancária', icon: Search },
-  { id: 'compras', label: 'Integração com compras', icon: ReceiptText },
-  { id: 'historico', label: 'Histórico / auditoria', icon: History },
-  { id: 'anexos', label: 'Anexos', icon: Paperclip },
-  { id: 'relatorios', label: 'Relatórios', icon: FileText },
-  { id: 'impressoes', label: 'Impressões', icon: Printer },
-  { id: 'emendas', label: 'Emendas', icon: BookOpenText }
+  { id: 'contas', label: 'Contas bancárias', icon: Landmark }
 ];
 
 function abaEstaNaLista(abaAtual: AbaId, abasPermitidas: AbaId[]) {
@@ -351,6 +340,12 @@ function formatarMoedaInput(valor: number | null | undefined) {
 function parseMoedaInput(valor: string) {
   const apenasDigitos = valor.replace(/\D/g, '');
   return Number(apenasDigitos || '0') / 100;
+}
+
+function parseDecimalInput(valor: string) {
+  const normalizado = valor.trim().replace(/\./g, '').replace(',', '.');
+  const numero = Number(normalizado);
+  return Number.isFinite(numero) ? numero : 0;
 }
 
 function formatarData(valor?: string) {
@@ -701,24 +696,18 @@ export function ContabilidadePage() {
 
   const carregarContas = abaEstaNaLista(abaAtiva, [
     'painel',
-    'resumoContas',
     'lancamentos',
-    'fluxoCaixa',
-    'contas',
-    'transferencias',
-    'conciliacao',
-    'compras',
-    'relatorios'
+    'contas'
   ]);
-  const carregarCategorias = abaEstaNaLista(abaAtiva, ['painel', 'lancamentos', 'compras']);
-  const carregarCentros = abaEstaNaLista(abaAtiva, ['painel', 'lancamentos', 'fluxoCaixa', 'compras']);
-  const carregarLancamentos = abaEstaNaLista(abaAtiva, ['painel', 'lancamentos', 'anexos', 'relatorios']);
-  const carregarMovimentacoes = abaEstaNaLista(abaAtiva, ['painel', 'fluxoCaixa', 'relatorios']);
-  const carregarTransferencias = abaAtiva === 'transferencias';
-  const carregarConciliacoes = abaAtiva === 'conciliacao';
-  const carregarCompras = abaEstaNaLista(abaAtiva, ['painel', 'compras']);
-  const carregarHistorico = abaAtiva === 'historico';
-  const carregarEmendas = abaAtiva === 'emendas';
+  const carregarCategorias = abaEstaNaLista(abaAtiva, ['painel', 'lancamentos']);
+  const carregarCentros = false;
+  const carregarLancamentos = abaEstaNaLista(abaAtiva, ['painel', 'lancamentos']);
+  const carregarMovimentacoes = abaEstaNaLista(abaAtiva, ['painel', 'contas']);
+  const carregarTransferencias = false;
+  const carregarConciliacoes = false;
+  const carregarCompras = false;
+  const carregarHistorico = false;
+  const carregarEmendas = false;
   const carregarDadosConta = abaAtiva === 'contas';
 
   const contasQuery = useContasBancarias({ enabled: carregarContas });
@@ -976,43 +965,14 @@ export function ContabilidadePage() {
           movimentacoesQuery.isLoading ||
           comprasQuery.isLoading
         );
-      case 'resumoContas':
-        return contasQuery.isLoading;
       case 'lancamentos':
         return (
           contasQuery.isLoading ||
           categoriasQuery.isLoading ||
-          centrosQuery.isLoading ||
           lancamentosQuery.isLoading
         );
-      case 'fluxoCaixa':
-        return contasQuery.isLoading || centrosQuery.isLoading || movimentacoesQuery.isLoading;
       case 'contas':
-        return contasQuery.isLoading || planosTrabalhoQuery.isLoading || unidadeAtualQuery.isLoading;
-      case 'transferencias':
-        return contasQuery.isLoading || transferenciasQuery.isLoading;
-      case 'categorias':
-        return categoriasQuery.isLoading;
-      case 'centros':
-        return centrosQuery.isLoading;
-      case 'conciliacao':
-        return contasQuery.isLoading || conciliacoesQuery.isLoading;
-      case 'compras':
-        return (
-          contasQuery.isLoading ||
-          categoriasQuery.isLoading ||
-          centrosQuery.isLoading ||
-          comprasQuery.isLoading
-        );
-      case 'historico':
-        return historicoQuery.isLoading;
-      case 'anexos':
-        return lancamentosQuery.isLoading || (!!lancamentoSelecionadoId && arquivosQuery.isLoading);
-      case 'relatorios':
-        return contasQuery.isLoading || lancamentosQuery.isLoading || movimentacoesQuery.isLoading;
-      case 'emendas':
-        return emendasQuery.isLoading;
-      case 'impressoes':
+        return contasQuery.isLoading || planosTrabalhoQuery.isLoading || unidadeAtualQuery.isLoading || movimentacoesQuery.isLoading;
       default:
         return false;
     }
@@ -1204,8 +1164,12 @@ export function ContabilidadePage() {
       }
 
       const payload = lancamentoAjustado();
-      if (!payload.natureza.trim() || !payload.contraparte.trim() || !payload.historico.trim() || payload.valor <= 0) {
-        setPopup({ tipo: 'aviso', titulo: 'Validação', texto: 'Preencha natureza, favorecido/pagador, histórico e valor maior que zero.' });
+      if (!payload.natureza.trim() || !payload.contraparte.trim() || !payload.historico.trim()) {
+        setPopup({ tipo: 'aviso', titulo: 'Validação', texto: 'Preencha natureza, favorecido/pagador e histórico.' });
+        return;
+      }
+      if (payload.valor <= 0) {
+        setPopup({ tipo: 'aviso', titulo: 'Validação', texto: 'Informe um valor maior que zero.' });
         return;
       }
       const resposta = await salvarLancamentoMutation.mutateAsync({ id: lancamentoSelecionadoId, payload });
@@ -1313,86 +1277,160 @@ export function ContabilidadePage() {
   function renderPainel() {
     return (
       <section className="space-y-4">
-        {renderFiltros()}
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <ResumoCard titulo="Saldo geral" valor={formatarMoeda(saldoGeral)} />
-          <ResumoCard titulo="Saldo em bancos" valor={formatarMoeda(saldoBancos)} />
-          <ResumoCard titulo="Saldo em caixa" valor={formatarMoeda(saldoCaixa)} />
-          <ResumoCard titulo="Saldo projetado" valor={formatarMoeda(projecaoCaixa)} destaque="#0f766e" />
-          <ResumoCard titulo="Contas a pagar" valor={formatarMoeda(totalContasPagar)} destaque="#b45309" />
-          <ResumoCard titulo="Contas a receber" valor={formatarMoeda(totalContasReceber)} destaque="#2563eb" />
-          <ResumoCard titulo="Compras aguardando pagamento" valor={String(comprasAguardandoPagamento.length)} destaque="#9333ea" />
-          <ResumoCard titulo="Contas com saldo baixo" valor={String(contasSaldoBaixo.length)} destaque="#dc2626" />
-        </div>
+        <Bloco
+          titulo="Resumo financeiro"
+          descricao="Tela simplificada para acompanhar o essencial: saldo atual, contas em aberto e últimos lançamentos."
+          className="border-emerald-200 bg-[linear-gradient(180deg,#f6fff9_0%,#eefbf3_100%)] shadow-[0_18px_48px_-30px_rgba(22,163,74,0.28)]"
+        >
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            <ResumoCard titulo="Saldo geral" valor={formatarMoeda(saldoGeral)} />
+            <ResumoCard titulo="Saldo em bancos" valor={formatarMoeda(saldoBancos)} destaque="#0f766e" />
+            <ResumoCard titulo="Saldo em caixa" valor={formatarMoeda(saldoCaixa)} destaque="#2563eb" />
+            <ResumoCard titulo="Contas a pagar" valor={formatarMoeda(totalContasPagar)} destaque="#b45309" />
+            <ResumoCard titulo="Contas a receber" valor={formatarMoeda(totalContasReceber)} destaque="#15803d" />
+          </div>
+          <div className="grid gap-3 lg:grid-cols-[1.4fr_1fr]">
+            <div className="rounded-xl border border-emerald-200/80 bg-white/85 p-4 shadow-sm">
+              <p className="text-sm font-semibold text-[var(--g3-foreground)]">Leitura rápida</p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-3">
+                  <p className="text-xs font-semibold text-emerald-700">Lançamentos do período</p>
+                  <p className="mt-1 text-2xl font-bold text-emerald-900">{lancamentosFiltrados.length}</p>
+                </div>
+                <div className="rounded-lg border border-amber-100 bg-amber-50 p-3">
+                  <p className="text-xs font-semibold text-amber-700">Pendências</p>
+                  <p className="mt-1 text-2xl font-bold text-amber-900">{contasPagar.length + contasReceber.length}</p>
+                </div>
+                <div className="rounded-lg border border-rose-100 bg-rose-50 p-3">
+                  <p className="text-xs font-semibold text-rose-700">Contas com alerta</p>
+                  <p className="mt-1 text-2xl font-bold text-rose-900">{contasSaldoBaixo.length}</p>
+                </div>
+              </div>
+              <div className="mt-4 rounded-lg border border-dashed border-emerald-200 bg-emerald-50/70 p-3 text-sm text-emerald-900">
+                Use <strong>Lançamentos</strong> para registrar receitas e despesas. Use <strong>Contas bancárias</strong> para cadastrar e acompanhar cada conta.
+              </div>
+            </div>
+            <div className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] p-4 shadow-sm">
+              <p className="text-sm font-semibold text-[var(--g3-foreground)]">Contas bancárias ativas</p>
+              <div className="mt-3 space-y-2">
+                {contas.slice(0, 4).map((conta) => (
+                  <div key={conta.id} className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/25 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-[var(--g3-foreground)]">{conta.nomeConta}</p>
+                        <p className="text-xs text-[var(--g3-muted)]">{conta.banco}</p>
+                      </div>
+                      <p className="whitespace-nowrap text-sm font-bold text-emerald-700">{formatarMoeda(conta.saldoAtual)}</p>
+                    </div>
+                  </div>
+                ))}
+                {!contas.length ? (
+                  <div className="rounded-lg border border-dashed border-[var(--g3-border)] p-4 text-sm text-[var(--g3-muted)]">
+                    Nenhuma conta bancária cadastrada.
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </Bloco>
 
         <div className="grid gap-4 xl:grid-cols-2">
-          <Bloco titulo="Receitas x despesas por mês">
-            <ResponsiveChart minHeight={260}>
-              <BarChart data={graficoMensal}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--g3-border)" />
-                <XAxis dataKey="periodo" tick={{ fontSize: 12 }} />
-                <YAxis tickFormatter={(valor) => `R$ ${Math.round(Number(valor) / 1000)} mil`} />
-                <Tooltip formatter={(valor) => formatarMoeda(Number(valor ?? 0))} />
-                <Legend />
-                <Bar dataKey="receitas" name="Receitas" fill="#0f766e" radius={[6, 6, 0, 0]} />
-                <Bar dataKey="despesas" name="Despesas" fill="#dc2626" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveChart>
+          <Bloco titulo="Últimos lançamentos" descricao="Os registros mais recentes ficam aqui para conferência rápida.">
+            <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]">
+              <table className="min-w-full text-sm">
+                <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Data</th>
+                    <th className="px-3 py-2 text-left">Histórico</th>
+                    <th className="px-3 py-2 text-left">Tipo</th>
+                    <th className="px-3 py-2 text-left">Valor</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lancamentosFiltrados.slice(0, 8).map((item, index) => (
+                    <tr key={item.id} className={`border-t border-[var(--g3-border)] ${index % 2 === 0 ? 'bg-[var(--g3-card)]' : 'bg-[var(--g3-primary-soft)]/25'}`}>
+                      <td className="px-3 py-2">{formatarData(item.dataLancamento)}</td>
+                      <td className="px-3 py-2">{item.historico}</td>
+                      <td className="px-3 py-2">{formatarStatus(item.tipo)}</td>
+                      <td className="px-3 py-2 font-semibold">{formatarMoeda(item.valor)}</td>
+                    </tr>
+                  ))}
+                  {!lancamentosFiltrados.length ? (
+                    <tr><td colSpan={4} className="px-3 py-4 text-center text-[var(--g3-muted)]">Nenhum lançamento encontrado.</td></tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
           </Bloco>
 
-          <Bloco titulo="Despesas por categoria">
-            <ResponsiveChart minHeight={260}>
-              <PieChart>
-                <Pie data={graficoCategoria} dataKey="valor" nameKey="nome" innerRadius={55} outerRadius={90}>
-                  {graficoCategoria.map((item, index) => <Cell key={item.nome} fill={coresGraficos[index % coresGraficos.length]} />)}
-                </Pie>
-                <Tooltip formatter={(valor) => formatarMoeda(Number(valor ?? 0))} />
-                <Legend />
-              </PieChart>
-            </ResponsiveChart>
+          <Bloco titulo="Próximos vencimentos" descricao="Ajuda a priorizar o que precisa receber ou pagar primeiro.">
+            <div className="space-y-2">
+              {[...contasPagar, ...contasReceber]
+                .sort((a, b) => (a.vencimento || '').localeCompare(b.vencimento || ''))
+                .slice(0, 8)
+                .map((item) => (
+                  <div key={item.id} className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/25 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-[var(--g3-foreground)]">{item.historico}</p>
+                        <p className="text-xs text-[var(--g3-muted)]">
+                          {formatarStatus(item.tipo)} • {item.contraparte} • vence em {formatarData(item.vencimento)}
+                        </p>
+                      </div>
+                      <p className="whitespace-nowrap text-sm font-bold text-[var(--g3-foreground)]">{formatarMoeda(item.valor)}</p>
+                    </div>
+                  </div>
+                ))}
+              {!contasPagar.length && !contasReceber.length ? (
+                <div className="rounded-lg border border-dashed border-[var(--g3-border)] p-4 text-sm text-[var(--g3-muted)]">
+                  Não há vencimentos em aberto no momento.
+                </div>
+              ) : null}
+            </div>
           </Bloco>
         </div>
-
-        <Bloco titulo="Evolução de saldo">
-          <ResponsiveChart minHeight={260}>
-            <LineChart data={graficoSaldo}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--g3-border)" />
-              <XAxis dataKey="data" tick={{ fontSize: 12 }} />
-              <YAxis tickFormatter={(valor) => `R$ ${Math.round(Number(valor) / 1000)} mil`} />
-              <Tooltip formatter={(valor) => formatarMoeda(Number(valor ?? 0))} />
-              <Line dataKey="saldo" type="monotone" stroke="#2563eb" strokeWidth={3} dot={false} />
-            </LineChart>
-          </ResponsiveChart>
-        </Bloco>
       </section>
     );
   }
 
   function renderFormularioLancamentos() {
-    const visaoAtual = resumoVisoesLancamento.find((item) => item.id === visaoLancamentos) ?? resumoVisoesLancamento[0];
     return (
       <section className="space-y-4">
         <Bloco
           titulo="Lançamentos"
-          descricao={visaoAtual.descricao}
+          descricao="Preencha somente o essencial para registrar uma receita ou despesa sem etapas desnecessárias."
           className="border-emerald-200 bg-[linear-gradient(180deg,#f3fff7_0%,#ebfbf1_100%)] shadow-[0_20px_50px_-28px_rgba(22,163,74,0.32)]"
         >
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <div className="space-y-1"><Label>Data</Label><Input type="date" value={lancamentoForm.dataLancamento} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, dataLancamento: event.target.value }))} /></div>
-            <div className="space-y-1"><Label>Tipo do lançamento</Label><Select value={lancamentoForm.tipo} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, tipo: event.target.value as LancamentoFinanceiro['tipo'] }))}><option value="RECEITA">Receita</option><option value="DESPESA">Despesa</option><option value="AJUSTE">Ajuste</option><option value="ESTORNO">Estorno</option></Select></div>
-            <div className="space-y-1"><Label>Conta</Label><Select value={lancamentoForm.contaBancariaId ? String(lancamentoForm.contaBancariaId) : ''} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, contaBancariaId: Number(event.target.value) || undefined }))}><option value="">Selecione</option>{contas.map((conta) => <option key={conta.id} value={conta.id}>{conta.nomeConta}</option>)}</Select></div>
-            <div className="space-y-1"><Label>Categoria</Label><Select value={lancamentoForm.categoriaId ? String(lancamentoForm.categoriaId) : ''} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, categoriaId: Number(event.target.value) || undefined }))}><option value="">Selecione</option>{categorias.map((categoria) => <option key={categoria.id} value={categoria.id}>{categoria.nome}</option>)}</Select></div>
-            <div className="space-y-1"><Label>Centro de custo</Label><Select value={lancamentoForm.centroCustoId ? String(lancamentoForm.centroCustoId) : ''} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, centroCustoId: Number(event.target.value) || undefined }))}><option value="">Selecione</option>{centrosCusto.map((centro) => <option key={centro.id} value={centro.id}>{centro.nome}</option>)}</Select></div>
-            <div className="space-y-1"><Label>Natureza</Label><Input value={lancamentoForm.natureza} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, natureza: event.target.value }))} /></div>
-            <div className="space-y-1 md:col-span-2 xl:col-span-1"><Label>Favorecido / pagador</Label><Input value={lancamentoForm.contraparte} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, contraparte: event.target.value }))} /></div>
-            <div className="space-y-1"><Label>Documento</Label><Input value={lancamentoForm.documento ?? ''} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, documento: event.target.value }))} /></div>
+          <div className="rounded-xl border border-emerald-200/80 bg-white/85 p-3 text-sm text-emerald-900">
+            Passo a passo: escolha o tipo, informe a conta, descreva para quem foi ou de quem veio, preencha o histórico e digite o valor.
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="space-y-1"><Label>Tipo</Label><Select value={lancamentoForm.tipo} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, tipo: event.target.value as LancamentoFinanceiro['tipo'] }))}><option value="RECEITA">Receita</option><option value="DESPESA">Despesa</option><option value="AJUSTE">Ajuste</option><option value="ESTORNO">Estorno</option></Select></div>
+            <div className="space-y-1"><Label>Data do lançamento</Label><Input type="date" value={lancamentoForm.dataLancamento} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, dataLancamento: event.target.value }))} /></div>
             <div className="space-y-1"><Label>Vencimento</Label><Input type="date" value={lancamentoForm.vencimento} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, vencimento: event.target.value }))} /></div>
-            <div className="space-y-1"><Label>Valor</Label><Input type="number" min={0} step="0.01" value={lancamentoForm.valor} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, valor: Number(event.target.value) || 0 }))} /></div>
-            <div className="space-y-1"><Label>Forma de pagamento</Label><Input value={lancamentoForm.formaPagamento ?? ''} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, formaPagamento: event.target.value }))} /></div>
+            <div className="space-y-1"><Label>Conta bancária</Label><Select value={lancamentoForm.contaBancariaId ? String(lancamentoForm.contaBancariaId) : ''} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, contaBancariaId: Number(event.target.value) || undefined }))}><option value="">Selecione</option>{contas.map((conta) => <option key={conta.id} value={conta.id}>{conta.nomeConta}</option>)}</Select></div>
+            <div className="space-y-1"><Label>Categoria</Label><Select value={lancamentoForm.categoriaId ? String(lancamentoForm.categoriaId) : ''} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, categoriaId: Number(event.target.value) || undefined }))}><option value="">Opcional</option>{categorias.map((categoria) => <option key={categoria.id} value={categoria.id}>{categoria.nome}</option>)}</Select></div>
+            <div className="space-y-1"><Label>Natureza</Label><Input value={lancamentoForm.natureza} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, natureza: event.target.value }))} placeholder="Ex.: conta de energia, mensalidade, doação" /></div>
+            <div className="space-y-1 md:col-span-2"><Label>Favorecido / pagador</Label><Input value={lancamentoForm.contraparte} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, contraparte: event.target.value }))} placeholder="Quem recebeu ou quem pagou" /></div>
+            <div className="space-y-1"><Label>Valor</Label><Input inputMode="decimal" value={String(lancamentoForm.valor || '')} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, valor: parseDecimalInput(event.target.value) }))} placeholder="0,00" /></div>
             <div className="space-y-1"><Label>Status</Label><Select value={lancamentoForm.status} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, status: event.target.value as LancamentoFinanceiro['status'] }))}><option value="PENDENTE">Pendente</option><option value="AGUARDANDO_PAGAMENTO">Aguardando pagamento</option><option value="AGUARDANDO_RECEBIMENTO">Aguardando recebimento</option><option value="PREVISTO">Previsto</option><option value="VENCIDO">Vencido</option><option value="ATRASADO">Atrasado</option><option value="PAGO">Pago</option><option value="RECEBIDO">Recebido</option><option value="CANCELADO">Cancelado</option><option value="RENEGOCIADO">Renegociado</option></Select></div>
-            <div className="space-y-1"><Label>Origem</Label><Input value={lancamentoForm.origem ?? ''} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, origem: event.target.value }))} disabled={!!lancamentoForm.compraId} /></div>
-            <div className="space-y-1 md:col-span-2 xl:col-span-3"><Label>Histórico</Label><Textarea rows={4} value={lancamentoForm.historico} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, historico: event.target.value }))} /></div>
-            <div className="space-y-1 md:col-span-2 xl:col-span-3"><Label>Observação</Label><Textarea rows={3} value={lancamentoForm.observacao ?? ''} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, observacao: event.target.value }))} /></div>
+            <div className="space-y-1 md:col-span-2 xl:col-span-4"><Label>Histórico</Label><Textarea rows={3} value={lancamentoForm.historico} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, historico: event.target.value }))} placeholder="Descreva em poucas palavras o lançamento" /></div>
+            <div className="space-y-1 md:col-span-2 xl:col-span-4"><Label>Observação</Label><Textarea rows={2} value={lancamentoForm.observacao ?? ''} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, observacao: event.target.value }))} placeholder="Opcional" /></div>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <ResumoCard titulo="Todos" valor={String(lancamentosFiltrados.length)} subtitulo={formatarMoeda(lancamentosFiltrados.reduce((acc, item) => acc + item.valor, 0))} className="border-emerald-100 bg-white/80" />
+            <ResumoCard titulo="Receitas" valor={String(receitas.length)} subtitulo={formatarMoeda(receitas.reduce((acc, item) => acc + item.valor, 0))} destaque="#15803d" className="border-emerald-100 bg-white/80" />
+            <ResumoCard titulo="Despesas" valor={String(despesas.length)} subtitulo={formatarMoeda(despesas.reduce((acc, item) => acc + item.valor, 0))} destaque="#b45309" className="border-emerald-100 bg-white/80" />
+            <ResumoCard titulo="Em aberto" valor={String(contasPagar.length + contasReceber.length)} subtitulo={formatarMoeda(totalContasPagar + totalContasReceber)} destaque="#2563eb" className="border-emerald-100 bg-white/80" />
+          </div>
+        </Bloco>
+
+        <Bloco titulo="Filtros rápidos" descricao="Use apenas o necessário para localizar um lançamento com facilidade.">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="space-y-1"><Label>Período inicial</Label><Input type="date" value={periodoInicial} onChange={(event) => setPeriodoInicial(event.target.value)} /></div>
+            <div className="space-y-1"><Label>Período final</Label><Input type="date" value={periodoFinal} onChange={(event) => setPeriodoFinal(event.target.value)} /></div>
+            <div className="space-y-1"><Label>Conta</Label><Select value={filtroContaId ? String(filtroContaId) : ''} onChange={(event) => setFiltroContaId(Number(event.target.value) || undefined)}><option value="">Todas</option>{contas.map((conta) => <option key={conta.id} value={conta.id}>{conta.nomeConta}</option>)}</Select></div>
+            <div className="space-y-1"><Label>Busca</Label><Input value={filtroBusca} onChange={(event) => setFiltroBusca(event.target.value)} placeholder="Histórico, favorecido, pagador ou natureza" /></div>
           </div>
         </Bloco>
 
@@ -1647,12 +1685,19 @@ export function ContabilidadePage() {
   function renderContas() {
     return (
       <section className="space-y-4">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <ResumoCard titulo="Total de contas" valor={String(resumoContas.total)} centralizado className="bg-gradient-to-br from-slate-50 via-white to-slate-100" />
+          <ResumoCard titulo="Contas ativas" valor={String(resumoContas.ativas)} destaque="#0f766e" centralizado className="bg-gradient-to-br from-emerald-50 via-white to-teal-50" />
+          <ResumoCard titulo="Com projeto vinculado" valor={String(resumoContas.comProjeto)} destaque="#2563eb" centralizado className="bg-gradient-to-br from-sky-50 via-white to-blue-50" />
+          <ResumoCard titulo="Com Pix habilitado" valor={String(resumoContas.comPix)} destaque="#9333ea" centralizado className="bg-gradient-to-br from-fuchsia-50 via-white to-violet-50" />
+        </div>
+
         <Bloco
-          titulo="Contas bancárias e caixa"
-          descricao="Cadastre novas contas, edite as já existentes e visualize os dados financeiros herdados do legado no mesmo lugar."
+          titulo="Cadastro de conta bancária"
+          descricao="Mantenha o cadastro simples. Preencha os dados principais da conta e salve."
         >
-          <div className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/35 p-3 text-xs text-[var(--g3-muted)]">
-            As contas e movimentações bancárias já existentes no legado são carregadas automaticamente das tabelas financeiras do banco.
+          <div className="rounded-lg border border-emerald-200/80 bg-emerald-50/80 p-3 text-sm text-emerald-900">
+            As contas criadas aparecem logo abaixo em cards com saldo, banco, agência, número, Pix e demais detalhes.
           </div>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <div className="space-y-1"><Label>Banco</Label><Select value={contaForm.banco} onChange={(event) => setContaForm((atual) => ({ ...atual, banco: event.target.value }))}><option value="">Selecione</option>{bancosDisponiveis.map((banco) => <option key={banco} value={banco}>{banco}</option>)}</Select></div>
@@ -1679,12 +1724,97 @@ export function ContabilidadePage() {
           </div>
         </Bloco>
 
-        <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]">
-          <table className="min-w-full text-sm">
-            <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"><tr><th className="px-3 py-2 text-left">Conta</th><th className="px-3 py-2 text-left">Banco</th><th className="px-3 py-2 text-left">Tipo</th><th className="px-3 py-2 text-left">Status</th><th className="px-3 py-2 text-left">Saldo</th><th className="px-3 py-2 text-right">Ações</th></tr></thead>
-            <tbody>{contas.length ? contas.map((item, index) => <tr key={item.id} className={`border-t border-[var(--g3-border)] ${index % 2 === 0 ? 'bg-[var(--g3-card)]' : 'bg-[var(--g3-primary-soft)]/35'}`}><td className="px-3 py-2">{item.nomeConta}</td><td className="px-3 py-2">{item.banco}</td><td className="px-3 py-2">{formatarStatus(item.tipo)}</td><td className="px-3 py-2">{formatarStatus(item.status)}</td><td className="px-3 py-2">{formatarMoeda(item.saldoAtual)}</td><td className="px-3 py-2 text-right"><div className="flex flex-wrap justify-end gap-2"><Button size="sm" variant="outline" onClick={() => { setContaSelecionadaId(item.id); setContaForm(toContaForm(item)); }}>Editar</Button><Button size="sm" variant="danger" onClick={() => solicitarExclusaoConta(item)}>Excluir</Button></div></td></tr>) : <tr><td colSpan={6} className="px-3 py-4 text-center text-[var(--g3-muted)]">Nenhuma conta cadastrada.</td></tr>}</tbody>
-          </table>
-        </div>
+        <Bloco
+          titulo="Contas cadastradas"
+          descricao="Cada card mostra os principais dados da conta para facilitar a conferência visual."
+        >
+          {contas.length ? (
+            <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
+              {contas.map((conta) => {
+                const estilo = obterEstiloContaPorBanco(conta.banco);
+                const identificacao = formatarAgenciaConta(conta);
+                const tituloConta = formatarTituloResumoConta(conta, identificacao);
+                return (
+                  <article
+                    key={conta.id}
+                    className={`rounded-xl border bg-gradient-to-br p-3 shadow-sm ${estilo.borda} ${estilo.fundo}`}
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="flex-1 space-y-1.5">
+                        <div className="flex justify-center">
+                          <span className={`inline-flex rounded-full px-3 py-1.5 text-sm font-semibold ${estilo.selo}`}>
+                            {conta.banco || 'Banco não informado'}
+                          </span>
+                        </div>
+                        <div>
+                          <h3 className="text-base font-semibold text-[var(--g3-foreground)]">{tituloConta}</h3>
+                          <p className="text-xs text-[var(--g3-muted)]">Agência {identificacao.agencia}</p>
+                        </div>
+                      </div>
+                      <div className="rounded-lg bg-white/80 px-3 py-2 text-center shadow-sm">
+                        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--g3-muted)]">Saldo atual</p>
+                        <p className={`mt-1 text-2xl font-bold ${estilo.valor}`}>{formatarMoeda(conta.saldoAtual)}</p>
+                        <p className="mt-0.5 text-[11px] text-[var(--g3-muted)]">
+                          Atualizado em {formatarDataHora(conta.dataAtualizacao)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 grid gap-2.5 md:grid-cols-2">
+                      <div className="rounded-lg border border-white/70 bg-white/70 p-2.5">
+                        <p className="text-xs font-semibold text-[var(--g3-muted)]">Agência</p>
+                        <p className="mt-1 text-sm font-medium text-[var(--g3-foreground)]">{identificacao.agencia}</p>
+                      </div>
+                      <div className="rounded-lg border border-white/70 bg-white/70 p-2.5">
+                        <p className="text-xs font-semibold text-[var(--g3-muted)]">Conta</p>
+                        <p className="mt-1 text-sm font-medium text-[var(--g3-foreground)]">{identificacao.numero}</p>
+                      </div>
+                      <div className="rounded-lg border border-white/70 bg-white/70 p-2.5">
+                        <p className="text-xs font-semibold text-[var(--g3-muted)]">Tipo e status</p>
+                        <p className="mt-1 text-sm font-medium text-[var(--g3-foreground)]">
+                          {formatarStatus(conta.tipo)} • {formatarStatus(conta.status)}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-white/70 bg-white/70 p-2.5">
+                        <p className="text-xs font-semibold text-[var(--g3-muted)]">Projeto vinculado</p>
+                        <p className="mt-1 text-sm font-medium text-[var(--g3-foreground)]">
+                          {conta.projetoVinculado?.trim() || 'Sem projeto vinculado'}
+                        </p>
+                      </div>
+                      <div className="min-w-0 rounded-lg border border-white/70 bg-white/70 p-3 md:col-span-2 md:min-h-[88px]">
+                        <p className="text-xs font-semibold text-[var(--g3-muted)]">Pix</p>
+                        <p className="mt-1 break-all text-sm font-medium leading-relaxed text-[var(--g3-foreground)]">{formatarPixConta(conta)}</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex flex-wrap gap-2 text-xs text-[var(--g3-muted)]">
+                        <span className="rounded-full bg-white/75 px-2.5 py-1">
+                          {conta.permiteMovimentacao ? 'Movimentação habilitada' : 'Somente consulta'}
+                        </span>
+                        <span className="rounded-full bg-white/75 px-2.5 py-1">
+                          {conta.recebimentoLocal ? 'Recebimento local' : 'Sem recebimento local'}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="button" variant="outline" size="sm" onClick={() => abrirContaParaEdicao(conta)}>
+                          Editar
+                        </Button>
+                        <Button type="button" variant="danger" size="sm" onClick={() => solicitarExclusaoConta(conta)}>
+                          Excluir
+                        </Button>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/30 p-6 text-center text-sm text-[var(--g3-muted)]">
+              Nenhuma conta bancária encontrada.
+            </div>
+          )}
+        </Bloco>
 
         <Bloco titulo="Últimas movimentações bancárias" descricao="Movimentações já encontradas nas tabelas financeiras do legado e do módulo atual.">
           <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]">
@@ -1878,7 +2008,7 @@ export function ContabilidadePage() {
     painel: [
       { label: 'Atualizar painel', icon: Search, onClick: () => void atualizarDados(), variant: 'outline', disabled: processando },
       { label: 'Abrir lançamentos', icon: Plus, onClick: () => setAbaAtiva('lancamentos'), variant: 'default', disabled: processando },
-      { label: 'Imprimir painel', icon: Printer, onClick: imprimirAbaAtual, variant: 'outline' },
+      { label: 'Abrir contas bancárias', icon: Landmark, onClick: () => setAbaAtiva('contas'), variant: 'outline', disabled: processando },
       { label: 'Fechar tela', icon: X, onClick: () => navigate('/dashboard/visao-geral'), variant: 'outline' }
     ],
     resumoContas: [
@@ -1911,7 +2041,7 @@ export function ContabilidadePage() {
       { label: 'Salvar conta bancária', icon: Save, onClick: () => void salvarAtual(), variant: 'default', disabled: processando },
       { label: 'Cancelar edição', icon: Undo2, onClick: limparFormularioAtual, variant: 'outline', disabled: processando },
       { label: 'Excluir conta bancária', icon: Trash2, onClick: solicitarExclusao, variant: 'danger', disabled: processando || !contaSelecionadaId },
-      { label: 'Imprimir contas', icon: Printer, onClick: imprimirAbaAtual, variant: 'outline' },
+      { label: 'Abrir lançamentos', icon: ReceiptText, onClick: () => setAbaAtiva('lancamentos'), variant: 'outline', disabled: processando },
       { label: 'Fechar tela', icon: X, onClick: () => navigate('/dashboard/visao-geral'), variant: 'outline' }
     ],
     transferencias: [
@@ -2014,20 +2144,8 @@ export function ContabilidadePage() {
       >
         {carregandoAbaAtiva ? renderCarregandoAba() : null}
         {!carregandoAbaAtiva && abaAtiva === 'painel' ? renderPainel() : null}
-        {!carregandoAbaAtiva && abaAtiva === 'resumoContas' ? renderResumoContas() : null}
         {!carregandoAbaAtiva && abaAtiva === 'lancamentos' ? renderFormularioLancamentos() : null}
-        {!carregandoAbaAtiva && abaAtiva === 'fluxoCaixa' ? renderFluxoCaixa() : null}
         {!carregandoAbaAtiva && abaAtiva === 'contas' ? renderContas() : null}
-        {!carregandoAbaAtiva && abaAtiva === 'transferencias' ? renderTransferencias() : null}
-        {!carregandoAbaAtiva && abaAtiva === 'categorias' ? renderCategorias() : null}
-        {!carregandoAbaAtiva && abaAtiva === 'centros' ? renderCentros() : null}
-        {!carregandoAbaAtiva && abaAtiva === 'conciliacao' ? renderConciliacao() : null}
-        {!carregandoAbaAtiva && abaAtiva === 'compras' ? renderCompras() : null}
-        {!carregandoAbaAtiva && abaAtiva === 'historico' ? renderHistorico() : null}
-        {!carregandoAbaAtiva && abaAtiva === 'anexos' ? renderAnexos() : null}
-        {!carregandoAbaAtiva && abaAtiva === 'relatorios' ? renderRelatorios() : null}
-        {!carregandoAbaAtiva && abaAtiva === 'impressoes' ? renderImpressoes() : null}
-        {!carregandoAbaAtiva && abaAtiva === 'emendas' ? renderEmendas() : null}
       </AdminPageLayout>
 
       {popup ? <PopupMensagem popup={popup} onClose={() => setPopup(null)} /> : null}

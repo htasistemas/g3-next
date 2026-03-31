@@ -367,25 +367,26 @@ const secoesManual: ManualSecao[] = [
   {
     id: "financeiro",
     titulo: "Setor financeiro",
-    descricao: "Controle contábil, lançamentos, fluxo de caixa e operações financeiras do G3N.",
+    descricao: "Controle financeiro simplificado, com foco em lançamentos e contas bancárias.",
     icon: PiggyBank,
     telas: [
       {
         nome: "Contabilidade / financeiro",
-        objetivo: "Gerenciar lançamentos, contas, movimentações, anexos e demais rotinas financeiras em uma única central.",
+        objetivo: "Permitir que qualquer usuário registre receitas e despesas e acompanhe as contas bancárias com o mínimo de complexidade.",
         comoUsar: [
-          "Use a aba Lançamentos para cadastrar, editar, baixar e acompanhar receitas, despesas e ajustes.",
-          "Use a aba Centro de custo para cadastrar centros ativos antes de vincular lançamentos e movimentações financeiras.",
-          "Quando um lançamento já estiver pago, recebido ou conciliado, use o botão Extornar para alterar o status para estornado em um clique.",
-          "Na aba Fluxo de caixa, registre entradas e saídas manuais com descrição, conta, data, valor e centro de custo quando aplicável.",
-          "Após o estorno, revise os filtros e a listagem para confirmar o novo status do lançamento antes de seguir com outras ações."
+          "A tela foi simplificada para trabalhar somente com três abas principais: Painel financeiro, Lançamentos e Contas bancárias.",
+          "Use Painel financeiro para ver saldo geral, contas a pagar, contas a receber, últimos lançamentos e próximos vencimentos em leitura rápida.",
+          "Use Lançamentos para registrar receitas e despesas com poucos campos: tipo, datas, conta bancária, natureza, favorecido ou pagador, histórico, valor e status.",
+          "Na aba Lançamentos, os cards de resumo mostram rapidamente quantos lançamentos existem, quanto entrou, quanto saiu e o que ainda está em aberto.",
+          "Use Contas bancárias para cadastrar contas e depois acompanhar cada conta em cards com banco, agência, número, saldo atual, Pix, projeto vinculado e status.",
+          "Para editar uma conta, clique em Editar no card correspondente. Para iniciar um novo cadastro, use Nova conta bancária na barra superior ou no formulário."
         ],
         atencoes: [
-          "O estorno só é permitido para lançamentos com status pago, recebido ou conciliado.",
-          "O campo Categoria textual foi removido do fluxo de caixa e o centro de custo deve ser selecionado apenas entre opções ativas cadastradas.",
-          "Lançamentos já estornados não devem ser estornados novamente.",
-          "No fluxo de caixa, falhas auxiliares de histórico não devem mais impedir o salvamento principal da movimentação em produção.",
-          "Quando a gravação principal da movimentação falhar, o backend passa a retornar o motivo operacional real em vez de apenas erro interno do servidor."
+          "As abas Fluxo de caixa, Centro de custo, Conciliação bancária, Integração com compras, Histórico, Anexos, Relatórios, Impressões e Emendas foram retiradas dessa tela para reduzir complexidade operacional.",
+          "O estorno continua disponível somente para lançamentos já pagos, recebidos ou conciliados.",
+          "O cadastro de centro de custo deixou de fazer parte do fluxo simplificado dessa tela.",
+          "Ao salvar um centro de custo no backend, o sistema agora suporta perfis longos de permissões no histórico sem retornar erro interno do servidor.",
+          "Se o valor do lançamento for digitado com vírgula, a tela passa a interpretar corretamente o número antes do salvamento."
         ]
       },
       {
