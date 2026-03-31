@@ -57,12 +57,21 @@ export const registroPontoFiltersSchema = z.object({
 export const registroPontoMarcarSchema = z.object({
   usuario_login: requiredTrimmedString("Informe o usuario."),
   senha: requiredTrimmedString("Informe a senha."),
-  face_imagem: requiredTrimmedString("Capture a face para confirmar o registro."),
+  modo_confirmacao: z.enum(["senha", "face"]).default("senha"),
+  face_imagem: optionalTrimmedString,
   latitude: optionalNumber,
   longitude: optionalNumber,
   accuracy_metros: optionalNumber,
   origem_manual: optionalTrimmedString,
   validar_localizacao: optionalBoolean
+}).superRefine((value, context) => {
+  if (value.modo_confirmacao === "face" && !value.face_imagem) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["face_imagem"],
+      message: "Capture a face para confirmar o registro."
+    });
+  }
 });
 
 export const registroPontoFaceSchema = z.object({

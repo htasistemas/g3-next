@@ -138,7 +138,12 @@ export class RegistroPontoService {
   async marcarPonto(rawInput: unknown, atorRaw: AtorRaw, origem: RegistroPontoOrigem) {
     const input = registroPontoMarcarSchema.parse(rawInput ?? {});
     const ator = this.parseAtor(atorRaw);
-    await this.validarConfirmacaoUsuario(input.usuario_login, input.senha, input.face_imagem, ator);
+    await this.validarConfirmacaoUsuario(
+      input.usuario_login,
+      input.senha,
+      input.modo_confirmacao === "face" ? input.face_imagem : undefined,
+      ator
+    );
     return this.repository.marcarPonto(input, ator, origem);
   }
 

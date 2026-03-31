@@ -391,6 +391,7 @@ export function RegistroPontoPage() {
   const [popupAjusteAberto, setPopupAjusteAberto] = useState(false);
   const [popupFaceAberto, setPopupFaceAberto] = useState(false);
   const [modoFace, setModoFace] = useState<"cadastro" | "confirmacao">("cadastro");
+  const [modoConfirmacaoMarcacao, setModoConfirmacaoMarcacao] = useState<"senha" | "face">("senha");
   const [modoConfirmacaoAjuste, setModoConfirmacaoAjuste] = useState<"senha" | "face">("senha");
   const [localizacaoHistoricoSelecionada, setLocalizacaoHistoricoSelecionada] = useState<LocalizacaoHistoricoMapa | null>(null);
   const [confirmacaoLogin, setConfirmacaoLogin] = useState("");
@@ -513,6 +514,15 @@ export function RegistroPontoPage() {
       setConfirmacaoFaceImagem("");
     }
   }, [popupAjusteAberto, usuario?.nomeUsuario]);
+
+  useEffect(() => {
+    if (modoConfirmacaoMarcacao === "senha") {
+      setConfirmacaoFaceImagem("");
+      if (popupFaceAberto && modoFace === "confirmacao") {
+        setPopupFaceAberto(false);
+      }
+    }
+  }, [modoConfirmacaoMarcacao, modoFace, popupFaceAberto]);
 
   useEffect(() => {
     if (modoConfirmacaoAjuste === "senha") {
@@ -885,7 +895,7 @@ export function RegistroPontoPage() {
         return;
       }
 
-      if (!confirmacaoFaceImagem) {
+      if (modoConfirmacaoMarcacao === "face" && !confirmacaoFaceImagem) {
         setMensagem({
           tipo: "erro",
           texto: "Capture a face atual do usuário para confirmar a marcação."
@@ -899,9 +909,10 @@ export function RegistroPontoPage() {
       const marcouSemLocalizacao = !localizacao;
       setEtapaMarcacao("registro");
       const response = await marcarMutation.mutateAsync({
+        modo_confirmacao: modoConfirmacaoMarcacao,
         usuario_login: confirmacaoLogin.trim(),
         senha: confirmacaoSenha,
-        face_imagem: confirmacaoFaceImagem,
+        face_imagem: modoConfirmacaoMarcacao === "face" ? confirmacaoFaceImagem : undefined,
         latitude: localizacao?.latitude,
         longitude: localizacao?.longitude,
         accuracy_metros: localizacao?.accuracy_metros,
@@ -1342,7 +1353,7 @@ export function RegistroPontoPage() {
                     </p>
                   ) : (
                     <p className="text-xs text-[var(--g3-muted)]">
-                      A marcação de ponto passará a exigir a senha e a captura facial atual do usuário.
+                      A marcação de ponto pode ser feita somente com senha ou com senha e captura facial, conforme o modo selecionado.
                     </p>
                   )}
                 </div>
@@ -1354,7 +1365,7 @@ export function RegistroPontoPage() {
                   type="button"
                   className="w-full shadow-md sm:w-auto sm:min-w-[220px]"
                   onClick={() => setPopupMarcarAberto(true)}
-                  disabled={marcacaoEmAndamento || !faceData?.face_cadastrada}
+                  disabled={marcacaoEmAndamento}
                 >
                   {obterTextoBotaoMarcacao()}
                 </Button>
@@ -1864,38 +1875,77 @@ export function RegistroPontoPage() {
                   />
                 </div>
                 <div className="space-y-2 rounded-xl border border-[var(--g3-border)] bg-slate-50 p-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <Label>Face atual</Label>
-                      <p className="text-xs text-[var(--g3-muted)]">
-                        Capture a face do usuário e faça a prova de vida com duas piscadas ou uma leve virada do rosto para validar junto com a senha.
-                      </p>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        setModoFace("confirmacao");
-                        setPopupFaceAberto(true);
-                      }}
-                      disabled={marcacaoEmAndamento}
-                    >
-                      Capturar face
-                    </Button>
-                  </div>
-                  <div className="overflow-hidden rounded-lg border border-[var(--g3-border)] bg-white">
-                    {confirmacaoFaceImagem ? (
-                      <img
-                        src={resolverPreviewFace(confirmacaoFaceImagem)}
-                        alt="Face capturada para confirmação"
-                        className="h-40 w-full object-cover"
+                  <Label>Confirmação da marcação</Label>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <label className="flex items-start gap-2 rounded-lg border border-[var(--g3-border)] bg-white p-3">
+                      <input
+                        type="radio"
+                        name="modo-confirmacao-marcacao"
+                        className="mt-1"
+                        checked={modoConfirmacaoMarcacao === "senha"}
+                        onChange={() => setModoConfirmacaoMarcacao("senha")}
+                        disabled={marcacaoEmAndamento}
                       />
-                    ) : (
-                      <div className="flex h-40 items-center justify-center px-4 text-center text-sm text-[var(--g3-muted)]">
-                        Nenhuma face capturada para esta marcação.
-                      </div>
-                    )}
+                      <span className="space-y-1">
+                        <span className="block text-sm font-medium text-slate-900">Somente senha</span>
+                        <span className="block text-xs text-[var(--g3-muted)]">Registra o ponto apenas com usuário e senha.</span>
+                      </span>
+                    </label>
+                    <label className="flex items-start gap-2 rounded-lg border border-[var(--g3-border)] bg-white p-3">
+                      <input
+                        type="radio"
+                        name="modo-confirmacao-marcacao"
+                        className="mt-1"
+                        checked={modoConfirmacaoMarcacao === "face"}
+                        onChange={() => setModoConfirmacaoMarcacao("face")}
+                        disabled={marcacaoEmAndamento}
+                      />
+                      <span className="space-y-1">
+                        <span className="block text-sm font-medium text-slate-900">Senha + captura facial</span>
+                        <span className="block text-xs text-[var(--g3-muted)]">Exige senha e validação facial para registrar o ponto.</span>
+                      </span>
+                    </label>
                   </div>
+                  {modoConfirmacaoMarcacao === "face" ? (
+                    <>
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <Label>Face atual</Label>
+                          <p className="text-xs text-[var(--g3-muted)]">
+                            Capture a face do usuário e faça a prova de vida com duas piscadas ou uma leve virada do rosto para validar junto com a senha.
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setModoFace("confirmacao");
+                            setPopupFaceAberto(true);
+                          }}
+                          disabled={marcacaoEmAndamento}
+                        >
+                          Capturar face
+                        </Button>
+                      </div>
+                      <div className="overflow-hidden rounded-lg border border-[var(--g3-border)] bg-white">
+                        {confirmacaoFaceImagem ? (
+                          <img
+                            src={resolverPreviewFace(confirmacaoFaceImagem)}
+                            alt="Face capturada para confirmação"
+                            className="h-40 w-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-40 items-center justify-center px-4 text-center text-sm text-[var(--g3-muted)]">
+                            Nenhuma face capturada para esta marcação.
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                      A marcação será confirmada somente com o usuário e a senha.
+                    </div>
+                  )}
                 </div>
               </div>
               <p className="text-xs text-[var(--g3-muted)]">

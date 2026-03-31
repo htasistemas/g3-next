@@ -67,7 +67,8 @@ export type RegistroPontoFiltro = {
 export type RegistroPontoMarcarPayload = {
   usuario_login: string;
   senha: string;
-  face_imagem: string;
+  modo_confirmacao?: "senha" | "face";
+  face_imagem?: string;
   latitude?: number;
   longitude?: number;
   accuracy_metros?: number;
