@@ -1282,7 +1282,7 @@ export function ContabilidadePage() {
           descricao="Tela simplificada para acompanhar o essencial: saldo atual, contas em aberto e últimos lançamentos."
           className="border-emerald-200 bg-[linear-gradient(180deg,#f6fff9_0%,#eefbf3_100%)] shadow-[0_18px_48px_-30px_rgba(22,163,74,0.28)]"
         >
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
             <ResumoCard titulo="Saldo geral" valor={formatarMoeda(saldoGeral)} />
             <ResumoCard titulo="Saldo em bancos" valor={formatarMoeda(saldoBancos)} destaque="#0f766e" />
             <ResumoCard titulo="Saldo em caixa" valor={formatarMoeda(saldoCaixa)} destaque="#2563eb" />

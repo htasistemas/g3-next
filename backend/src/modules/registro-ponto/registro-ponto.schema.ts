@@ -77,7 +77,7 @@ export const registroPontoAjusteSchema = z.object({
   observacoes: optionalTrimmedString,
   justificativa: z.string().trim().min(5, "Informe a justificativa do ajuste."),
   observacao: z.string().trim().min(5, "Informe a observacao do ajuste."),
-  modo_confirmacao: z.enum(["senha", "face"]).default("face"),
+  modo_confirmacao: z.enum(["senha", "face"]).default("senha"),
   usuario_login: requiredTrimmedString("Informe o usuario responsavel pela confirmacao."),
   senha: requiredTrimmedString("Informe a senha para confirmar o ajuste."),
   face_imagem: optionalTrimmedString

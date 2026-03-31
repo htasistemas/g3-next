@@ -515,6 +515,15 @@ export function RegistroPontoPage() {
   }, [popupAjusteAberto, usuario?.nomeUsuario]);
 
   useEffect(() => {
+    if (modoConfirmacaoAjuste === "senha") {
+      setConfirmacaoFaceImagem("");
+      if (popupFaceAberto && modoFace === "confirmacao") {
+        setPopupFaceAberto(false);
+      }
+    }
+  }, [modoConfirmacaoAjuste, modoFace, popupFaceAberto]);
+
+  useEffect(() => {
     if (!popupFaceAberto || modoFace === "cadastro") {
       setStatusPiscada("idle");
       setValidandoPiscada(false);
