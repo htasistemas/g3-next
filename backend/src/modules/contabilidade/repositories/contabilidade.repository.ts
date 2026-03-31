@@ -349,6 +349,12 @@ export async function ensureContabilidadeEstrutura() {
       `);
 
       await prisma.$executeRawUnsafe(`
+        ALTER TABLE financeiro_historico
+          ALTER COLUMN perfil TYPE TEXT,
+          ALTER COLUMN maquina TYPE TEXT
+      `);
+
+      await prisma.$executeRawUnsafe(`
         UPDATE financeiro_historico
         SET
           aba = COALESCE(NULLIF(aba, ''), 'Contabilidade'),
