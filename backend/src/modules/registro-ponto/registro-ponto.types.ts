@@ -42,6 +42,10 @@ export type RegistroPontoAjusteInput = {
   observacoes?: string;
   justificativa: string;
   observacao: string;
+  modo_confirmacao?: "senha" | "face";
+  usuario_login?: string;
+  senha?: string;
+  face_imagem?: string;
 };
 
 export type RegistroPontoOcorrenciaInput = {

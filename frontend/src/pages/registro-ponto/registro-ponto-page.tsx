@@ -391,6 +391,7 @@ export function RegistroPontoPage() {
   const [popupAjusteAberto, setPopupAjusteAberto] = useState(false);
   const [popupFaceAberto, setPopupFaceAberto] = useState(false);
   const [modoFace, setModoFace] = useState<"cadastro" | "confirmacao">("cadastro");
+  const [modoConfirmacaoAjuste, setModoConfirmacaoAjuste] = useState<"senha" | "face">("senha");
   const [localizacaoHistoricoSelecionada, setLocalizacaoHistoricoSelecionada] = useState<LocalizacaoHistoricoMapa | null>(null);
   const [confirmacaoLogin, setConfirmacaoLogin] = useState("");
   const [confirmacaoSenha, setConfirmacaoSenha] = useState("");
@@ -504,6 +505,14 @@ export function RegistroPontoPage() {
       setConfirmacaoFaceImagem("");
     }
   }, [popupMarcarAberto, usuario?.nomeUsuario]);
+
+  useEffect(() => {
+    if (popupAjusteAberto) {
+      setConfirmacaoLogin(usuario?.nomeUsuario ?? "");
+      setConfirmacaoSenha("");
+      setConfirmacaoFaceImagem("");
+    }
+  }, [popupAjusteAberto, usuario?.nomeUsuario]);
 
   useEffect(() => {
     if (!popupFaceAberto || modoFace === "cadastro") {
@@ -919,15 +928,33 @@ export function RegistroPontoPage() {
       return;
     }
 
+    if (!confirmacaoLogin.trim() || !confirmacaoSenha.trim()) {
+      setMensagem({ tipo: "erro", texto: "Informe usuário e senha para confirmar o ajuste administrativo." });
+      return;
+    }
+
+    if (modoConfirmacaoAjuste === "face" && !confirmacaoFaceImagem) {
+      setMensagem({ tipo: "erro", texto: "Capture a face para confirmar o ajuste administrativo." });
+      return;
+    }
+
     try {
       await ajusteMutation.mutateAsync({
         id: registroSelecionado.id,
-        payload: values
+        payload: {
+          ...values,
+          modo_confirmacao: modoConfirmacaoAjuste,
+          usuario_login: confirmacaoLogin.trim(),
+          senha: confirmacaoSenha,
+          face_imagem: modoConfirmacaoAjuste === "face" ? confirmacaoFaceImagem : undefined
+        }
       });
       setMensagem({ tipo: "sucesso", texto: "Ajuste administrativo salvo com sucesso." });
       setPopupAjusteAberto(false);
       ajusteForm.setValue("justificativa", "");
       ajusteForm.setValue("observacao", "");
+      setConfirmacaoSenha("");
+      setConfirmacaoFaceImagem("");
     } catch (error: unknown) {
       const apiError = error as { response?: { data?: { message?: string } } };
       setMensagem({
@@ -1659,6 +1686,39 @@ export function RegistroPontoPage() {
               <div><Label>Observações</Label><Textarea {...ajusteForm.register("observacoes")} disabled={!isAdmin} /></div>
               <div><Label>Justificativa*</Label><Textarea {...ajusteForm.register("justificativa")} disabled={!isAdmin} /></div>
               <div><Label>Observação da ação*</Label><Textarea {...ajusteForm.register("observacao")} disabled={!isAdmin} /></div>
+              <div className="space-y-2 rounded-xl border border-[var(--g3-border)] bg-slate-50 p-3">
+                <Label>Confirmação do ajuste</Label>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <label className="flex items-start gap-2 rounded-lg border border-[var(--g3-border)] bg-white p-3">
+                    <input
+                      type="radio"
+                      name="modo-confirmacao-ajuste"
+                      className="mt-1"
+                      checked={modoConfirmacaoAjuste === "senha"}
+                      onChange={() => setModoConfirmacaoAjuste("senha")}
+                      disabled={!isAdmin}
+                    />
+                    <span className="space-y-1">
+                      <span className="block text-sm font-medium text-slate-900">Somente senha</span>
+                      <span className="block text-xs text-[var(--g3-muted)]">Confirma o ajuste apenas com o usuário e a senha do administrador.</span>
+                    </span>
+                  </label>
+                  <label className="flex items-start gap-2 rounded-lg border border-[var(--g3-border)] bg-white p-3">
+                    <input
+                      type="radio"
+                      name="modo-confirmacao-ajuste"
+                      className="mt-1"
+                      checked={modoConfirmacaoAjuste === "face"}
+                      onChange={() => setModoConfirmacaoAjuste("face")}
+                      disabled={!isAdmin}
+                    />
+                    <span className="space-y-1">
+                      <span className="block text-sm font-medium text-slate-900">Senha + captura facial</span>
+                      <span className="block text-xs text-[var(--g3-muted)]">Exige senha e validação facial para concluir o ajuste.</span>
+                    </span>
+                  </label>
+                </div>
+              </div>
               <button type="submit" className="hidden" />
             </form>
           </CardContent>
@@ -1959,7 +2019,62 @@ export function RegistroPontoPage() {
         <div className="fixed inset-0 z-[71] flex items-center justify-center bg-slate-900/45 px-4" role="dialog" aria-modal="true" onClick={() => !ajusteMutation.isPending && setPopupAjusteAberto(false)}>
           <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
             <div className="border-b border-slate-100 px-5 py-4"><h3 className="text-base font-semibold text-slate-900">Confirmar ajuste administrativo</h3></div>
-            <div className="px-5 py-4"><p className="text-sm text-slate-700">Esta ação ficará registrada na auditoria. Deseja continuar?</p></div>
+            <div className="space-y-3 px-5 py-4">
+              <p className="text-sm text-slate-700">Esta ação ficará registrada na auditoria. Confirme abaixo para continuar.</p>
+              <div>
+                <Label>Usuário</Label>
+                <Input
+                  value={confirmacaoLogin}
+                  onChange={(event) => setConfirmacaoLogin(event.target.value)}
+                  disabled={ajusteMutation.isPending}
+                />
+              </div>
+              <div>
+                <Label>Senha</Label>
+                <Input
+                  type="password"
+                  value={confirmacaoSenha}
+                  onChange={(event) => setConfirmacaoSenha(event.target.value)}
+                  disabled={ajusteMutation.isPending}
+                />
+              </div>
+              {modoConfirmacaoAjuste === "face" ? (
+                <div className="space-y-2 rounded-xl border border-[var(--g3-border)] bg-slate-50 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <Label>Face atual</Label>
+                      <p className="text-xs text-[var(--g3-muted)]">
+                        Capture a face do administrador para validar junto com a senha.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setModoFace("confirmacao");
+                        setPopupFaceAberto(true);
+                      }}
+                      disabled={ajusteMutation.isPending}
+                    >
+                      Capturar face
+                    </Button>
+                  </div>
+                  <div className="overflow-hidden rounded-lg border border-[var(--g3-border)] bg-white">
+                    {confirmacaoFaceImagem ? (
+                      <img
+                        src={resolverPreviewFace(confirmacaoFaceImagem)}
+                        alt="Face capturada para confirmação do ajuste"
+                        className="h-40 w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-40 items-center justify-center px-4 text-center text-sm text-[var(--g3-muted)]">
+                        Nenhuma face capturada para esta confirmação.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+            </div>
             <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3">
               <Button type="button" variant="outline" onClick={() => setPopupAjusteAberto(false)} disabled={ajusteMutation.isPending}>Cancelar</Button>
               <Button type="button" onClick={() => void submitAjuste()} disabled={ajusteMutation.isPending}>{ajusteMutation.isPending ? "Salvando..." : "Salvar ajuste"}</Button>

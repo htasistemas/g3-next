@@ -376,7 +376,7 @@ export const menuSections: MenuSection[] = [
   {
     id: "financeiro",
     secao: "Setor financeiro",
-    icon: WalletCards,
+    icon: DollarSign,
     itens: [
       {
         id: "setor-financeiro-autorizacao-compras",

@@ -150,6 +150,12 @@ export class RegistroPontoService {
   ) {
     const input = registroPontoAjusteSchema.parse(rawInput);
     const ator = this.parseAtor(atorRaw);
+    await this.validarConfirmacaoUsuario(
+      input.usuario_login,
+      input.senha,
+      input.modo_confirmacao === "face" ? input.face_imagem : undefined,
+      ator
+    );
     return this.repository.ajustarRegistro(rawRegistroId, input, ator, origem);
   }
 
@@ -188,7 +194,7 @@ export class RegistroPontoService {
   private async validarConfirmacaoUsuario(
     login: string,
     senha: string,
-    faceImagem: string,
+    faceImagem: string | undefined,
     ator: { id?: bigint; nome_usuario: string }
   ) {
     if (!ator.id) {
@@ -218,22 +224,24 @@ export class RegistroPontoService {
       throw new AppError("Usuario ou senha invalidos para confirmar o registro de ponto.", 401);
     }
 
-    if (!usuario.face_hash) {
-      throw new AppError(
-        "Cadastre a face do usuario antes de registrar o ponto com validacao facial.",
-        400
-      );
-    }
+    if (faceImagem) {
+      if (!usuario.face_hash) {
+        throw new AppError(
+          "Cadastre a face do usuario antes de usar validacao facial.",
+          400
+        );
+      }
 
-    const { buffer } = parseBase64Payload(faceImagem, "image/jpeg");
-    const faceHashAtual = await gerarAssinaturaFace(buffer);
-    const distancia = calcularMenorDistanciaFace(usuario.face_hash, faceHashAtual);
+      const { buffer } = parseBase64Payload(faceImagem, "image/jpeg");
+      const faceHashAtual = await gerarAssinaturaFace(buffer);
+      const distancia = calcularMenorDistanciaFace(usuario.face_hash, faceHashAtual);
 
-    if (!facesConferem(usuario.face_hash, faceHashAtual)) {
-      throw new AppError(
-        `A validacao facial nao conferiu com a face cadastrada para este usuario. Distancia calculada: ${distancia}.`,
-        401
-      );
+      if (!facesConferem(usuario.face_hash, faceHashAtual)) {
+        throw new AppError(
+          `A validacao facial nao conferiu com a face cadastrada para este usuario. Distancia calculada: ${distancia}.`,
+          401
+        );
+      }
     }
   }
 

@@ -138,7 +138,6 @@ type ExclusaoTipo =
 
 const abas: AdminTab[] = [
   { id: 'painel', label: 'Painel financeiro', icon: List },
-  { id: 'resumoContas', label: 'Resumo de contas', icon: PiggyBank },
   { id: 'lancamentos', label: 'Lançamentos', icon: ReceiptText },
   { id: 'fluxoCaixa', label: 'Fluxo de caixa', icon: ArrowRightLeft },
   { id: 'contas', label: 'Contas bancárias e caixa', icon: Landmark },
@@ -215,11 +214,11 @@ const visoesLancamento: Array<{
   icon: typeof ReceiptText;
   destaque: string;
 }> = [
-  { id: 'todos', label: 'Todos', descricao: 'Visão consolidada de receitas e despesas.', icon: ReceiptText, destaque: '#2563eb' },
-  { id: 'receitas', label: 'Receitas', descricao: 'Entradas e recebimentos previstos.', icon: Banknote, destaque: '#0f766e' },
-  { id: 'despesas', label: 'Despesas', descricao: 'Saídas e pagamentos registrados.', icon: Wallet, destaque: '#dc2626' },
-  { id: 'contasPagar', label: 'Contas a pagar', descricao: 'Obrigações em aberto e vencimentos.', icon: HandCoins, destaque: '#b45309' },
-  { id: 'contasReceber', label: 'Contas a receber', descricao: 'Títulos e receitas pendentes.', icon: PiggyBank, destaque: '#7c3aed' }
+  { id: 'todos', label: 'Todos', descricao: 'Visão consolidada de receitas e despesas.', icon: ReceiptText, destaque: '#166534' },
+  { id: 'receitas', label: 'Receitas', descricao: 'Entradas e recebimentos previstos.', icon: Banknote, destaque: '#15803d' },
+  { id: 'despesas', label: 'Despesas', descricao: 'Saídas e pagamentos registrados.', icon: Wallet, destaque: '#0f766e' },
+  { id: 'contasPagar', label: 'Contas a pagar', descricao: 'Obrigações em aberto e vencimentos.', icon: HandCoins, destaque: '#047857' },
+  { id: 'contasReceber', label: 'Contas a receber', descricao: 'Títulos e receitas pendentes.', icon: PiggyBank, destaque: '#065f46' }
 ];
 
 const contaVazia: ContaBancariaPayload = {
@@ -647,14 +646,16 @@ function ResumoCard({
 function Bloco({
   titulo,
   descricao,
-  children
+  children,
+  className
 }: {
   titulo: string;
   descricao?: string;
   children: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <section className="space-y-3 rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] p-4">
+    <section className={`space-y-3 rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] p-4 ${className ?? ''}`}>
       <div>
         <h3 className="text-sm font-semibold text-[var(--g3-foreground)]">{titulo}</h3>
         {descricao ? <p className="mt-1 text-xs text-[var(--g3-muted)]">{descricao}</p> : null}
@@ -1371,63 +1372,33 @@ export function ContabilidadePage() {
     const visaoAtual = resumoVisoesLancamento.find((item) => item.id === visaoLancamentos) ?? resumoVisoesLancamento[0];
     return (
       <section className="space-y-4">
-        {renderFiltros()}
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          {resumoVisoesLancamento.map((item) => {
-            const Icone = item.icon;
-            const selecionado = item.id === visaoLancamentos;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => mudarVisaoLancamentos(item.id)}
-                className={`rounded-xl border p-4 text-left transition ${
-                  selecionado
-                    ? 'border-[var(--g3-active)] bg-[var(--g3-primary-soft)] shadow-sm'
-                    : 'border-[var(--g3-border)] bg-[var(--g3-card)] hover:border-[var(--g3-active)]/40'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--g3-muted)]">{item.label}</p>
-                    <p className="mt-1 text-2xl font-bold" style={{ color: item.destaque }}>
-                      {formatarMoeda(item.valorTotal)}
-                    </p>
-                    <p className="mt-1 text-xs text-[var(--g3-muted)]">{item.quantidade} registro(s)</p>
-                  </div>
-                  <span className="rounded-full bg-white/80 p-2 text-[var(--g3-active)] shadow-sm">
-                    <Icone className="h-4 w-4" />
-                  </span>
-                </div>
-                <p className="mt-3 text-xs text-[var(--g3-muted)]">{item.descricao}</p>
-              </button>
-            );
-          })}
-        </div>
-
-        <Bloco titulo="Lançamentos" descricao={visaoAtual.descricao}>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <Bloco
+          titulo="Lançamentos"
+          descricao={visaoAtual.descricao}
+          className="border-emerald-200 bg-[linear-gradient(180deg,#f3fff7_0%,#ebfbf1_100%)] shadow-[0_20px_50px_-28px_rgba(22,163,74,0.32)]"
+        >
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <div className="space-y-1"><Label>Data</Label><Input type="date" value={lancamentoForm.dataLancamento} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, dataLancamento: event.target.value }))} /></div>
             <div className="space-y-1"><Label>Tipo do lançamento</Label><Select value={lancamentoForm.tipo} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, tipo: event.target.value as LancamentoFinanceiro['tipo'] }))}><option value="RECEITA">Receita</option><option value="DESPESA">Despesa</option><option value="AJUSTE">Ajuste</option><option value="ESTORNO">Estorno</option></Select></div>
             <div className="space-y-1"><Label>Conta</Label><Select value={lancamentoForm.contaBancariaId ? String(lancamentoForm.contaBancariaId) : ''} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, contaBancariaId: Number(event.target.value) || undefined }))}><option value="">Selecione</option>{contas.map((conta) => <option key={conta.id} value={conta.id}>{conta.nomeConta}</option>)}</Select></div>
             <div className="space-y-1"><Label>Categoria</Label><Select value={lancamentoForm.categoriaId ? String(lancamentoForm.categoriaId) : ''} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, categoriaId: Number(event.target.value) || undefined }))}><option value="">Selecione</option>{categorias.map((categoria) => <option key={categoria.id} value={categoria.id}>{categoria.nome}</option>)}</Select></div>
             <div className="space-y-1"><Label>Centro de custo</Label><Select value={lancamentoForm.centroCustoId ? String(lancamentoForm.centroCustoId) : ''} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, centroCustoId: Number(event.target.value) || undefined }))}><option value="">Selecione</option>{centrosCusto.map((centro) => <option key={centro.id} value={centro.id}>{centro.nome}</option>)}</Select></div>
             <div className="space-y-1"><Label>Natureza</Label><Input value={lancamentoForm.natureza} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, natureza: event.target.value }))} /></div>
-            <div className="space-y-1"><Label>Favorecido / pagador</Label><Input value={lancamentoForm.contraparte} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, contraparte: event.target.value }))} /></div>
+            <div className="space-y-1 md:col-span-2 xl:col-span-1"><Label>Favorecido / pagador</Label><Input value={lancamentoForm.contraparte} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, contraparte: event.target.value }))} /></div>
             <div className="space-y-1"><Label>Documento</Label><Input value={lancamentoForm.documento ?? ''} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, documento: event.target.value }))} /></div>
             <div className="space-y-1"><Label>Vencimento</Label><Input type="date" value={lancamentoForm.vencimento} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, vencimento: event.target.value }))} /></div>
             <div className="space-y-1"><Label>Valor</Label><Input type="number" min={0} step="0.01" value={lancamentoForm.valor} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, valor: Number(event.target.value) || 0 }))} /></div>
             <div className="space-y-1"><Label>Forma de pagamento</Label><Input value={lancamentoForm.formaPagamento ?? ''} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, formaPagamento: event.target.value }))} /></div>
             <div className="space-y-1"><Label>Status</Label><Select value={lancamentoForm.status} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, status: event.target.value as LancamentoFinanceiro['status'] }))}><option value="PENDENTE">Pendente</option><option value="AGUARDANDO_PAGAMENTO">Aguardando pagamento</option><option value="AGUARDANDO_RECEBIMENTO">Aguardando recebimento</option><option value="PREVISTO">Previsto</option><option value="VENCIDO">Vencido</option><option value="ATRASADO">Atrasado</option><option value="PAGO">Pago</option><option value="RECEBIDO">Recebido</option><option value="CANCELADO">Cancelado</option><option value="RENEGOCIADO">Renegociado</option></Select></div>
             <div className="space-y-1"><Label>Origem</Label><Input value={lancamentoForm.origem ?? ''} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, origem: event.target.value }))} disabled={!!lancamentoForm.compraId} /></div>
-            <div className="space-y-1 md:col-span-2 xl:col-span-4"><Label>Histórico</Label><Textarea rows={3} value={lancamentoForm.historico} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, historico: event.target.value }))} /></div>
-            <div className="space-y-1 md:col-span-2 xl:col-span-4"><Label>Observação</Label><Textarea rows={2} value={lancamentoForm.observacao ?? ''} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, observacao: event.target.value }))} /></div>
+            <div className="space-y-1 md:col-span-2 xl:col-span-3"><Label>Histórico</Label><Textarea rows={4} value={lancamentoForm.historico} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, historico: event.target.value }))} /></div>
+            <div className="space-y-1 md:col-span-2 xl:col-span-3"><Label>Observação</Label><Textarea rows={3} value={lancamentoForm.observacao ?? ''} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, observacao: event.target.value }))} /></div>
           </div>
         </Bloco>
 
-        <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]">
+        <div className="overflow-x-auto rounded-2xl border border-emerald-200 bg-[linear-gradient(180deg,#f8fffa_0%,#eefcf3_100%)] shadow-[0_22px_55px_-30px_rgba(22,163,74,0.28)]">
           <table className="min-w-full text-sm">
-            <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]">
+            <thead className="bg-emerald-100/90 text-emerald-900">
               <tr>
                 <th className="px-3 py-2 text-left">Data</th>
                 <th className="px-3 py-2 text-left">Tipo</th>
@@ -1900,18 +1871,124 @@ export function ContabilidadePage() {
     );
   }
 
-  const acoes: AdminAction[] = [
-    { label: 'Atualizar', icon: Search, onClick: () => void atualizarDados(), variant: 'outline', disabled: processando },
-    { label: 'Novo', icon: Plus, onClick: limparFormularioAtual, variant: 'default', disabled: processando },
-    { label: 'Salvar', icon: Save, onClick: () => void salvarAtual(), variant: 'default', disabled: processando },
-    { label: 'Cancelar', icon: Undo2, onClick: limparFormularioAtual, variant: 'outline', disabled: processando },
-    { label: 'Excluir', icon: Trash2, onClick: solicitarExclusao, variant: 'danger', disabled: processando },
-    { label: 'Imprimir', icon: Printer, onClick: () => imprimirConteudoAtual({ titulo: `Contabilidade / financeiro - ${abas.find((item) => item.id === abaAtiva)?.label ?? ''}` }), variant: 'outline' },
-    { label: 'Fechar', icon: X, onClick: () => navigate('/dashboard/visao-geral'), variant: 'outline' }
-  ];
+  const imprimirAbaAtual = () =>
+    imprimirConteudoAtual({ titulo: `Contabilidade / financeiro - ${abas.find((item) => item.id === abaAtiva)?.label ?? ''}` });
+
+  const acoesPorAba: Record<AbaId, AdminAction[]> = {
+    painel: [
+      { label: 'Atualizar painel', icon: Search, onClick: () => void atualizarDados(), variant: 'outline', disabled: processando },
+      { label: 'Abrir lançamentos', icon: Plus, onClick: () => setAbaAtiva('lancamentos'), variant: 'default', disabled: processando },
+      { label: 'Imprimir painel', icon: Printer, onClick: imprimirAbaAtual, variant: 'outline' },
+      { label: 'Fechar tela', icon: X, onClick: () => navigate('/dashboard/visao-geral'), variant: 'outline' }
+    ],
+    resumoContas: [
+      { label: 'Atualizar resumo', icon: Search, onClick: () => void atualizarDados(), variant: 'outline', disabled: processando },
+      { label: 'Abrir contas', icon: Landmark, onClick: () => setAbaAtiva('contas'), variant: 'default', disabled: processando },
+      { label: 'Imprimir resumo', icon: Printer, onClick: imprimirAbaAtual, variant: 'outline' },
+      { label: 'Fechar tela', icon: X, onClick: () => navigate('/dashboard/visao-geral'), variant: 'outline' }
+    ],
+    lancamentos: [
+      { label: 'Atualizar lançamentos', icon: Search, onClick: () => void atualizarDados(), variant: 'outline', disabled: processando },
+      { label: 'Novo lançamento', icon: Plus, onClick: limparFormularioAtual, variant: 'default', disabled: processando },
+      { label: 'Salvar lançamento', icon: Save, onClick: () => void salvarAtual(), variant: 'default', disabled: processando },
+      { label: 'Cancelar edição', icon: Undo2, onClick: limparFormularioAtual, variant: 'outline', disabled: processando },
+      { label: 'Excluir lançamento', icon: Trash2, onClick: solicitarExclusao, variant: 'danger', disabled: processando || !lancamentoSelecionadoId },
+      { label: 'Imprimir lançamentos', icon: Printer, onClick: imprimirAbaAtual, variant: 'outline' },
+      { label: 'Fechar tela', icon: X, onClick: () => navigate('/dashboard/visao-geral'), variant: 'outline' }
+    ],
+    fluxoCaixa: [
+      { label: 'Atualizar fluxo', icon: Search, onClick: () => void atualizarDados(), variant: 'outline', disabled: processando },
+      { label: 'Nova movimentação', icon: Plus, onClick: limparFormularioAtual, variant: 'default', disabled: processando },
+      { label: 'Salvar movimentação', icon: Save, onClick: () => void salvarAtual(), variant: 'default', disabled: processando },
+      { label: 'Cancelar edição', icon: Undo2, onClick: limparFormularioAtual, variant: 'outline', disabled: processando },
+      { label: 'Excluir movimentação', icon: Trash2, onClick: solicitarExclusao, variant: 'danger', disabled: processando || !movimentacaoSelecionadaId },
+      { label: 'Imprimir fluxo de caixa', icon: Printer, onClick: imprimirAbaAtual, variant: 'outline' },
+      { label: 'Fechar tela', icon: X, onClick: () => navigate('/dashboard/visao-geral'), variant: 'outline' }
+    ],
+    contas: [
+      { label: 'Atualizar contas', icon: Search, onClick: () => void atualizarDados(), variant: 'outline', disabled: processando },
+      { label: 'Nova conta bancária', icon: Plus, onClick: limparFormularioAtual, variant: 'default', disabled: processando },
+      { label: 'Salvar conta bancária', icon: Save, onClick: () => void salvarAtual(), variant: 'default', disabled: processando },
+      { label: 'Cancelar edição', icon: Undo2, onClick: limparFormularioAtual, variant: 'outline', disabled: processando },
+      { label: 'Excluir conta bancária', icon: Trash2, onClick: solicitarExclusao, variant: 'danger', disabled: processando || !contaSelecionadaId },
+      { label: 'Imprimir contas', icon: Printer, onClick: imprimirAbaAtual, variant: 'outline' },
+      { label: 'Fechar tela', icon: X, onClick: () => navigate('/dashboard/visao-geral'), variant: 'outline' }
+    ],
+    transferencias: [
+      { label: 'Atualizar transferências', icon: Search, onClick: () => void atualizarDados(), variant: 'outline', disabled: processando },
+      { label: 'Nova transferência', icon: Plus, onClick: limparFormularioAtual, variant: 'default', disabled: processando },
+      { label: 'Salvar transferência', icon: Save, onClick: () => void salvarAtual(), variant: 'default', disabled: processando },
+      { label: 'Cancelar edição', icon: Undo2, onClick: limparFormularioAtual, variant: 'outline', disabled: processando },
+      { label: 'Imprimir transferências', icon: Printer, onClick: imprimirAbaAtual, variant: 'outline' },
+      { label: 'Fechar tela', icon: X, onClick: () => navigate('/dashboard/visao-geral'), variant: 'outline' }
+    ],
+    categorias: [
+      { label: 'Atualizar categorias', icon: Search, onClick: () => void atualizarDados(), variant: 'outline', disabled: processando },
+      { label: 'Nova categoria', icon: Plus, onClick: limparFormularioAtual, variant: 'default', disabled: processando },
+      { label: 'Salvar categoria', icon: Save, onClick: () => void salvarAtual(), variant: 'default', disabled: processando },
+      { label: 'Cancelar edição', icon: Undo2, onClick: limparFormularioAtual, variant: 'outline', disabled: processando },
+      { label: 'Excluir categoria', icon: Trash2, onClick: solicitarExclusao, variant: 'danger', disabled: processando || !categoriaSelecionadaId },
+      { label: 'Imprimir categorias', icon: Printer, onClick: imprimirAbaAtual, variant: 'outline' },
+      { label: 'Fechar tela', icon: X, onClick: () => navigate('/dashboard/visao-geral'), variant: 'outline' }
+    ],
+    centros: [
+      { label: 'Atualizar centros de custo', icon: Search, onClick: () => void atualizarDados(), variant: 'outline', disabled: processando },
+      { label: 'Novo centro de custo', icon: Plus, onClick: limparFormularioAtual, variant: 'default', disabled: processando },
+      { label: 'Salvar centro de custo', icon: Save, onClick: () => void salvarAtual(), variant: 'default', disabled: processando },
+      { label: 'Cancelar edição', icon: Undo2, onClick: limparFormularioAtual, variant: 'outline', disabled: processando },
+      { label: 'Excluir centro de custo', icon: Trash2, onClick: solicitarExclusao, variant: 'danger', disabled: processando || !centroSelecionadoId },
+      { label: 'Imprimir centros de custo', icon: Printer, onClick: imprimirAbaAtual, variant: 'outline' },
+      { label: 'Fechar tela', icon: X, onClick: () => navigate('/dashboard/visao-geral'), variant: 'outline' }
+    ],
+    conciliacao: [
+      { label: 'Atualizar conciliações', icon: Search, onClick: () => void atualizarDados(), variant: 'outline', disabled: processando },
+      { label: 'Nova conciliação', icon: Plus, onClick: limparFormularioAtual, variant: 'default', disabled: processando },
+      { label: 'Salvar conciliação', icon: Save, onClick: () => void salvarAtual(), variant: 'default', disabled: processando },
+      { label: 'Cancelar edição', icon: Undo2, onClick: limparFormularioAtual, variant: 'outline', disabled: processando },
+      { label: 'Imprimir conciliações', icon: Printer, onClick: imprimirAbaAtual, variant: 'outline' },
+      { label: 'Fechar tela', icon: X, onClick: () => navigate('/dashboard/visao-geral'), variant: 'outline' }
+    ],
+    compras: [
+      { label: 'Atualizar compras', icon: Search, onClick: () => void atualizarDados(), variant: 'outline', disabled: processando },
+      { label: 'Abrir lançamentos', icon: ReceiptText, onClick: () => setAbaAtiva('lancamentos'), variant: 'default', disabled: processando },
+      { label: 'Imprimir integração com compras', icon: Printer, onClick: imprimirAbaAtual, variant: 'outline' },
+      { label: 'Fechar tela', icon: X, onClick: () => navigate('/dashboard/visao-geral'), variant: 'outline' }
+    ],
+    historico: [
+      { label: 'Atualizar histórico', icon: Search, onClick: () => void atualizarDados(), variant: 'outline', disabled: processando },
+      { label: 'Imprimir histórico', icon: Printer, onClick: imprimirAbaAtual, variant: 'outline' },
+      { label: 'Fechar tela', icon: X, onClick: () => navigate('/dashboard/visao-geral'), variant: 'outline' }
+    ],
+    anexos: [
+      { label: 'Atualizar anexos', icon: Search, onClick: () => void atualizarDados(), variant: 'outline', disabled: processando },
+      { label: 'Novo lançamento', icon: Plus, onClick: () => setAbaAtiva('lancamentos'), variant: 'default', disabled: processando },
+      { label: 'Imprimir anexos', icon: Printer, onClick: imprimirAbaAtual, variant: 'outline' },
+      { label: 'Fechar tela', icon: X, onClick: () => navigate('/dashboard/visao-geral'), variant: 'outline' }
+    ],
+    relatorios: [
+      { label: 'Atualizar relatórios', icon: Search, onClick: () => void atualizarDados(), variant: 'outline', disabled: processando },
+      { label: 'Imprimir relatórios', icon: Printer, onClick: imprimirAbaAtual, variant: 'outline' },
+      { label: 'Fechar tela', icon: X, onClick: () => navigate('/dashboard/visao-geral'), variant: 'outline' }
+    ],
+    impressoes: [
+      { label: 'Atualizar impressões', icon: Search, onClick: () => void atualizarDados(), variant: 'outline', disabled: processando },
+      { label: 'Imprimir documentos', icon: Printer, onClick: imprimirAbaAtual, variant: 'outline' },
+      { label: 'Fechar tela', icon: X, onClick: () => navigate('/dashboard/visao-geral'), variant: 'outline' }
+    ],
+    emendas: [
+      { label: 'Atualizar emendas', icon: Search, onClick: () => void atualizarDados(), variant: 'outline', disabled: processando },
+      { label: 'Nova emenda', icon: Plus, onClick: limparFormularioAtual, variant: 'default', disabled: processando },
+      { label: 'Salvar emenda', icon: Save, onClick: () => void salvarAtual(), variant: 'default', disabled: processando },
+      { label: 'Cancelar edição', icon: Undo2, onClick: limparFormularioAtual, variant: 'outline', disabled: processando },
+      { label: 'Imprimir emendas', icon: Printer, onClick: imprimirAbaAtual, variant: 'outline' },
+      { label: 'Fechar tela', icon: X, onClick: () => navigate('/dashboard/visao-geral'), variant: 'outline' }
+    ]
+  };
+
+  const acoes = acoesPorAba[abaAtiva];
 
   const codeBadge =
-    ['resumoContas', 'contas'].includes(abaAtiva) && contaSelecionadaId
+    ['contas'].includes(abaAtiva) && contaSelecionadaId
       ? `Conta ${contaSelecionadaId}`
       : ['lancamentos', 'anexos'].includes(abaAtiva) && lancamentoSelecionadoId
         ? `Lançamento ${lancamentoSelecionadoId}`
@@ -1919,7 +1996,9 @@ export function ContabilidadePage() {
           ? `Categoria ${categoriaSelecionadaId}`
           : abaAtiva === 'centros' && centroSelecionadoId
             ? `Centro ${centroSelecionadoId}`
-            : undefined;
+            : abaAtiva === 'lancamentos'
+              ? 'Novo lançamento'
+              : undefined;
 
   return (
     <>

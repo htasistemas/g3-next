@@ -76,7 +76,19 @@ export const registroPontoAjusteSchema = z.object({
   saida_2: optionalTime,
   observacoes: optionalTrimmedString,
   justificativa: z.string().trim().min(5, "Informe a justificativa do ajuste."),
-  observacao: z.string().trim().min(5, "Informe a observacao do ajuste.")
+  observacao: z.string().trim().min(5, "Informe a observacao do ajuste."),
+  modo_confirmacao: z.enum(["senha", "face"]).default("face"),
+  usuario_login: requiredTrimmedString("Informe o usuario responsavel pela confirmacao."),
+  senha: requiredTrimmedString("Informe a senha para confirmar o ajuste."),
+  face_imagem: optionalTrimmedString
+}).superRefine((value, context) => {
+  if (value.modo_confirmacao === "face" && !value.face_imagem) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["face_imagem"],
+      message: "Capture a face para confirmar o ajuste."
+    });
+  }
 });
 
 export const registroPontoOcorrenciaSchema = z.object({
