@@ -1,6 +1,18 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.411",
+                        "releaseDate":  "2026-03-31",
+                        "title":  "Versão oficial alinhada com hardening de segurança",
+                        "description":  "Os arquivos oficiais de versão foram sincronizados com a entrega de segurança do frontend e endurecimento das dependências npm.",
+                        "changes":  [
+                                        "Versão oficial do sistema alinhada para 1.00.411.",
+                                        "Manifestos de atualização atualizados para refletir a entrega de segurança.",
+                                        "Entrega registra correção preventiva no axios e atualização de dependências auditadas no frontend."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.325",
                         "releaseDate":  "2026-03-25",
                         "title":  "Recebimento de doações com validação visível na aba de itens",

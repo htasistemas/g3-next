@@ -1,6 +1,17 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.411",
+                        "releaseDate":  "2026-03-31",
+                        "title":  "Hardening de dependências do frontend",
+                        "description":  "O frontend recebeu atualização preventiva de dependências e configuração mais restritiva do npm para reduzir risco de cadeia de suprimentos.",
+                        "changes":  [
+                                        "Axios foi fixado na versão 1.14.0 com reinstalação completa das dependências do frontend.",
+                                        "React-router-dom e vite foram atualizados para versões sem as vulnerabilidades apontadas na auditoria.",
+                                        "O projeto passou a usar save-exact e ignore-scripts no npm, com versão oficial do sistema alinhada para esta entrega."
+                                    ]
+                    },
+                    {
                         "version":  "1.00.410",
                         "releaseDate":  "2026-03-29",
                         "title":  "Checklist diario com aba Historico refinada",

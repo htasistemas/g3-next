@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.328",
-  "releaseDate": "2026-03-29",
-  "description": "Backend de fotos e eventos ampliado com upload em lote, definição de capa e reordenação persistida da galeria.",
+  "latestVersion": "1.00.411",
+  "releaseDate": "2026-03-31",
+  "description": "Versão oficial alinhada com a entrega de segurança do frontend e endurecimento das dependências do sistema.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.328",
+  "minCompatibleVersion": "1.00.411",
   "releaseType": "stable"
 }
 
