@@ -457,7 +457,6 @@ export const mapaCamposTextoContabilidade: Record<string, TipoFormatacaoTexto> =
   numero: "textoCurto",
   digito: "textoCurto",
   nomeConta: "instituicao",
-  tipo: "textoCurto",
   titular: "nomePessoa",
   projetoVinculado: "textoCurto",
   tipoChavePix: "textoCurto",
@@ -480,10 +479,8 @@ export const mapaCamposTextoContabilidade: Record<string, TipoFormatacaoTexto> =
   grupo: "textoCurto",
   subgrupo: "textoCurto",
   setorResponsavel: "textoCurto",
-  situacao: "textoCurto",
   identificacao: "textoCurto",
   referenciaLegal: "textoCurto",
-  status: "textoCurto",
   observacao: "textoCurto",
   observacoes: "textoCurto",
   responsavel: "nomePessoa"
