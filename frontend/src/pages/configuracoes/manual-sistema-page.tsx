@@ -378,6 +378,7 @@ const secoesManual: ManualSecao[] = [
           "Use Painel financeiro para ver saldo geral, contas a pagar, contas a receber, últimos lançamentos e próximos vencimentos em leitura rápida.",
           "Use Lançamentos para registrar receitas e despesas com poucos campos: tipo, datas, conta bancária, natureza, favorecido ou pagador, histórico, valor e status.",
           "Na aba Lançamentos, os cards de resumo mostram rapidamente quantos lançamentos existem, quanto entrou, quanto saiu e o que ainda está em aberto.",
+          "Quando o lançamento for salvo já como Pago, Recebido ou Conciliado, o sistema também atualiza automaticamente o saldo da conta bancária vinculada.",
           "Use Contas bancárias para cadastrar contas e depois acompanhar cada conta em cards com banco, agência, número, saldo atual, Pix, projeto vinculado e status.",
           "Para editar uma conta, clique em Editar no card correspondente. Para iniciar um novo cadastro, use Nova conta bancária na barra superior ou no formulário."
         ],

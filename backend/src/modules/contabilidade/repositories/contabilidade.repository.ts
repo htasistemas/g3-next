@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../../database/prisma.js";
 import { ensureArquivosEstrutura } from "../../arquivos/repositories/arquivos-estrutura.repository.js";
 import { AppError } from "../../../shared/errors/app-error.js";
-import { toOptionalDate, trimOrUndefined } from "../../../utils/string-utils.js";
+import { toIsoDate, toOptionalDate, trimOrUndefined } from "../../../utils/string-utils.js";
 import {
   calcularSaldoConta,
   gerarNumeroRecibo,
@@ -1099,6 +1099,7 @@ export class ContabilidadeRepository {
         `);
       }
       const lancamento = await this.buscarLancamentoPorIdOuFalhar(id, tx);
+      await this.sincronizarSaldoContaPorLancamento(tx, lancamento);
       await this.registrarHistorico(tx, {
         aba: "Lançamentos",
         acao: "Lançamento criado",
@@ -1166,6 +1167,7 @@ export class ContabilidadeRepository {
         WHERE id = ${id}
       `);
       const lancamento = await this.buscarLancamentoPorIdOuFalhar(id, tx);
+      await this.sincronizarSaldoContaPorLancamento(tx, lancamento);
       await this.registrarHistorico(tx, {
         aba: "Lançamentos",
         acao: "Lançamento atualizado",
@@ -2138,6 +2140,99 @@ export class ContabilidadeRepository {
       throw new AppError("Não foi possível criar a movimentação financeira.", 500);
     }
     return this.buscarMovimentacaoPorIdOuFalhar(id, tx);
+  }
+
+  private async sincronizarSaldoContaPorLancamento(
+    tx: DbClient,
+    lancamento: LancamentoFinanceiroRow
+  ) {
+    const movimentacoesVinculadas = await tx.$queryRaw<MovimentacaoFinanceiraRow[]>(Prisma.sql`
+      ${MOVIMENTACAO_SELECT}
+      WHERE m.ativo = TRUE
+        AND m.lancamento_financeiro_id = ${lancamento.id}
+      ORDER BY m.id ASC
+    `);
+
+    const lancamentoLiquidado = ["PAGO", "RECEBIDO", "CONCILIADO"].includes(
+      normalizarTextoEnum(lancamento.situacao)
+    );
+
+    if (!lancamentoLiquidado) {
+      for (const movimentacao of movimentacoesVinculadas) {
+        await this.reverterMovimentacaoConta(tx, movimentacao);
+        await tx.$executeRaw(Prisma.sql`
+          UPDATE movimentacao_financeira
+          SET ativo = FALSE, atualizado_em = NOW()
+          WHERE id = ${movimentacao.id}
+        `);
+      }
+      return;
+    }
+
+    if (!lancamento.conta_bancaria_id) {
+      throw new AppError(
+        "Selecione a conta bancária para atualizar o saldo ao salvar um lançamento liquidado.",
+        400
+      );
+    }
+
+    await this.validarContaMovimentavel(tx, lancamento.conta_bancaria_id);
+
+    const tipoMovimentacao = tipoMovimentacaoPorLancamento(
+      normalizarTipoLancamento(lancamento.tipo)
+    );
+    const dataEfetivacao =
+      toIsoDate(lancamento.data_baixa) ??
+      toIsoDate(lancamento.data_lancamento) ??
+      toIsoDate(lancamento.vencimento) ??
+      new Date().toISOString().slice(0, 10);
+
+    const movimentacaoAtual = movimentacoesVinculadas[0];
+    const movimentacaoJaCorreta =
+      movimentacoesVinculadas.length === 1 &&
+      movimentacaoAtual &&
+      movimentacaoAtual.conta_bancaria_id === lancamento.conta_bancaria_id &&
+      this.normalizarTipoMovimentacao(movimentacaoAtual.tipo) === tipoMovimentacao &&
+      movimentacaoAtual.valor === lancamento.valor &&
+      toIsoDate(movimentacaoAtual.data_movimentacao) === dataEfetivacao;
+
+    if (movimentacaoJaCorreta) {
+      return;
+    }
+
+    for (const movimentacao of movimentacoesVinculadas) {
+      await this.reverterMovimentacaoConta(tx, movimentacao);
+      await tx.$executeRaw(Prisma.sql`
+        UPDATE movimentacao_financeira
+        SET ativo = FALSE, atualizado_em = NOW()
+        WHERE id = ${movimentacao.id}
+      `);
+    }
+
+    await this.criarMovimentacaoInterna(tx, {
+      contaId: lancamento.conta_bancaria_id,
+      tipo: tipoMovimentacao,
+      descricao: lancamento.historico ?? lancamento.descricao,
+      contraparte: lancamento.contraparte,
+      categoria: lancamento.categoria_nome ?? lancamento.natureza ?? lancamento.tipo,
+      categoriaId: lancamento.categoria_financeira_id
+        ? Number(lancamento.categoria_financeira_id)
+        : undefined,
+      centroCustoId: lancamento.centro_custo_id ? Number(lancamento.centro_custo_id) : undefined,
+      dataMovimentacao: dataEfetivacao,
+      valor: lancamento.valor,
+      origem: lancamento.origem ? `${lancamento.origem}_LANCAMENTO` : "LANCAMENTO",
+      observacao: trimOrUndefined(lancamento.observacao ?? undefined),
+      lancamentoId: lancamento.id
+    });
+
+    if (!lancamento.data_baixa) {
+      await tx.$executeRaw(Prisma.sql`
+        UPDATE lancamento_financeiro
+        SET data_baixa = ${toOptionalDate(dataEfetivacao)}, atualizado_em = NOW()
+        WHERE id = ${lancamento.id}
+      `);
+    }
   }
 
   private async reverterMovimentacaoConta(tx: DbClient, movimentacao: MovimentacaoFinanceiraRow) {
