@@ -1163,11 +1163,18 @@ export function ContabilidadePage() {
         return;
       }
 
-      const payload = lancamentoAjustado();
-      if (!payload.natureza.trim() || !payload.contraparte.trim() || !payload.historico.trim()) {
-        setPopup({ tipo: 'aviso', titulo: 'Validação', texto: 'Preencha natureza, favorecido/pagador e histórico.' });
-        return;
-      }
+      const lancamentoNormalizado = lancamentoAjustado();
+      const payload = {
+        ...lancamentoNormalizado,
+        natureza: lancamentoNormalizado.natureza.trim(),
+        contraparte: lancamentoNormalizado.contraparte.trim(),
+        historico: lancamentoNormalizado.historico.trim(),
+        documento: lancamentoNormalizado.documento?.trim() ?? '',
+        observacao: lancamentoNormalizado.observacao?.trim() ?? '',
+        formaPagamento: lancamentoNormalizado.formaPagamento?.trim() ?? '',
+        setor: lancamentoNormalizado.setor?.trim() ?? '',
+        origem: lancamentoNormalizado.origem?.trim() ?? ''
+      };
       if (payload.valor <= 0) {
         setPopup({ tipo: 'aviso', titulo: 'Validação', texto: 'Informe um valor maior que zero.' });
         return;
