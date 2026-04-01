@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.411",
-  "releaseDate": "2026-03-31",
-  "description": "Pacotes do frontend foram endurecidos com correção de segurança no axios, atualização do react-router-dom e do vite.",
+  "latestVersion": "1.00.412",
+  "releaseDate": "2026-04-01",
+  "description": "Registro de ponto com geração do espelho em PDF liberada para o mesmo perfil que já consulta a aba e com ação visual reforçada no botão.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.411",
+  "minCompatibleVersion": "1.00.412",
   "releaseType": "stable",
   "downloadUrl": null
 }

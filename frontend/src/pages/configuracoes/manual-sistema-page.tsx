@@ -555,11 +555,13 @@ const secoesManual: ManualSecao[] = [
           "Acesse a aba Cadastro facial para capturar a face pela webcam e salvar o cadastro facial do usuário.",
           "Durante a captura pela câmera, use o molde do rosto na tela para centralizar a face antes de confirmar a imagem.",
           "Depois volte para a aba Registrar ponto para consultar a próxima batida, o espelho do dia e o saldo atual antes de marcar.",
+          "Na aba Espelho de ponto, use o botão Gerar espelho de ponto PDF para emitir o relatório individual em um clique, com o mesmo padrão visual dos formulários do G3N.",
           "Somente após o cadastro da face o botão Registrar ponto agora fica liberado para a confirmação da batida.",
           "Ao clicar em Registrar ponto agora, informe o usuário e a senha. Se o modo escolhido for Somente senha, a marcação é concluída sem captura facial. Se o modo escolhido for Senha + captura facial, faça também a validação da face atual com prova de vida por duas piscadas ou leve virada do rosto antes do envio.",
           "Na aba Ajuste administrativo, escolha entre Somente senha ou Senha + captura facial antes de salvar a correção do registro."
         ],
         atencoes: [
+          "A geração do espelho em PDF segue a mesma permissão de leitura da aba Espelho de ponto para evitar bloqueio indevido por autenticação quando o usuário já pode consultar o espelho na tela.",
           "A marcação pode ser configurada para Somente senha ou para Senha + captura facial, conforme a necessidade operacional.",
           "Na confirmação da marcação, o sistema exige duas piscadas ou uma leve virada do rosto para reduzir o risco de uso de foto estática no lugar de uma pessoa real.",
           "Se a face capturada na confirmação não conferir com a face cadastrada do usuário, o registro do ponto é recusado. A comparação considera variações controladas de enquadramento e espelhamento para reduzir reprovações indevidas da webcam.",

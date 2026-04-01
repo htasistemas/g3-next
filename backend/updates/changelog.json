@@ -1,6 +1,18 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.412",
+                        "releaseDate":  "2026-04-01",
+                        "title":  "Registro de ponto com espelho em PDF liberado",
+                        "description":  "A geração do espelho de ponto em PDF foi corrigida para usar a mesma regra de acesso da aba e a documentação interna foi revisada.",
+                        "changes":  [
+                                        "Permissão da rota /api/registro-ponto/espelho/pdf alinhada à leitura do módulo para evitar erro 401 com usuário já autorizado na tela.",
+                                        "Botão Gerar espelho de ponto PDF destacado visualmente em verde com sombreamento no frontend.",
+                                        "Versão oficial e manual do sistema atualizados para refletir o comportamento atual."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.411",
                         "releaseDate":  "2026-03-31",
                         "title":  "Versão oficial alinhada com hardening de segurança",

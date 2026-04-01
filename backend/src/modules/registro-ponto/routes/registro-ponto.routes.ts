@@ -66,7 +66,7 @@ registroPontoRoutes.get(
 registroPontoRoutes.get(
   "/espelho/pdf",
   ensureAuthenticated,
-  ensurePermissions(permissoesMarcacao),
+  ensurePermissions(permissoesLeitura),
   asyncHandler(controller.gerarEspelhoPontoPdf.bind(controller))
 );
 

@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.411",
-  "releaseDate": "2026-03-31",
-  "description": "Versão oficial alinhada com a entrega de segurança do frontend e endurecimento das dependências do sistema.",
+  "latestVersion": "1.00.412",
+  "releaseDate": "2026-04-01",
+  "description": "Versão oficial alinhada com o ajuste do registro de ponto para geração correta do espelho em PDF e refinamento visual do botão.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.411",
+  "minCompatibleVersion": "1.00.412",
   "releaseType": "stable"
 }
 

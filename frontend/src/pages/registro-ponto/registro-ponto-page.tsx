@@ -1057,7 +1057,7 @@ export function RegistroPontoPage() {
   async function gerarRelatorioEspelho() {
     const janela = reservarJanelaRelatorio("Espelho de Ponto Individual");
     try {
-      const blob = await registroPontoService.gerarEspelhoPontoPdf({
+      const blob = await reportsService.gerarEspelhoPonto({
         ...filtros,
         usuarioEmissor: usuario?.nome ?? usuario?.nomeUsuario
       });
@@ -1574,13 +1574,12 @@ export function RegistroPontoPage() {
           <div className="flex justify-end">
             <Button
               type="button"
-              variant="outline"
-              className="w-full sm:w-auto"
+              className="w-full border-emerald-700 bg-emerald-600 text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-700 hover:shadow-xl hover:shadow-emerald-200/80 sm:w-auto"
               onClick={() => void gerarRelatorioEspelho()}
               disabled={carregandoEspelho}
             >
               <Printer className="mr-2 h-4 w-4" />
-              Gerar Espelho de Ponto (PDF)
+              Gerar espelho de ponto PDF
             </Button>
           </div>
 
