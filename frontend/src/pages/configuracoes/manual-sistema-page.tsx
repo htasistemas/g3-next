@@ -592,6 +592,7 @@ const secoesManual: ManualSecao[] = [
         objetivo: "Apresentar os planos comerciais do G3N em formato de página de vendas e permitir contratação com simulação, vigência e histórico financeiro no mesmo fluxo.",
         comoUsar: [
           "Use o topo comercial da página para comparar os planos, entender o posicionamento de cada faixa e acionar demonstração ou WhatsApp.",
+          "Os valores mensais vigentes exibidos nos cards são: Essencial R$ 397,00, Profissional R$ 697,00, Premium R$ 997,00 e Enterprise R$ 1.497,00.",
           "Alterne entre mensal e anual para visualizar economia e custo-benefício antes de definir o plano.",
           "Consulte os cards comerciais, o comparativo entre planos, a seção Para quem é, os benefícios e o FAQ para apoiar a decisão.",
           "Ao escolher o plano e a data inicial do contrato, o sistema calcula automaticamente a vigência e prepara a contratação.",
@@ -600,6 +601,7 @@ const secoesManual: ManualSecao[] = [
         ],
         atencoes: [
           "A licença fica vinculada ao CNPJ da unidade principal registrada no sistema.",
+          "No plano Enterprise, a implantação inicial vigente é de R$ 2.497,00.",
           "A data final é recalculada automaticamente a partir da data inicial e do ciclo escolhido disponível na página comercial.",
           "Cada checkout gerado entra primeiro no histórico como pendente e migra para realizado quando a InfinitePay confirma o pagamento.",
           "No ciclo anual, a implantação continua isenta conforme a política comercial definida."

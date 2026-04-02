@@ -1,6 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { startTransition } from "react";
+import { startTransition, type MouseEvent } from "react";
 import { PopupConfirmacao } from "@/components/admin/admin-popups";
 import { DatasComemorativasPopup } from "@/components/system/datas-comemorativas-popup";
 import { AIChatWidget } from "@/modules/ai/components/AIChatWidget";
@@ -907,6 +907,27 @@ export function AppShell() {
     void precarregarRota(item.to);
   }
 
+  function navegarItemMenu(event: MouseEvent<HTMLAnchorElement>, item: MenuItem) {
+    if (!item.to) {
+      return;
+    }
+
+    event.preventDefault();
+
+    if (item.abrirEmNovaAba) {
+      window.open(item.to, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    if (location.pathname === item.to) {
+      return;
+    }
+
+    startTransition(() => {
+      navigate(item.to as string);
+    });
+  }
+
   function alternarSidebar() {
     setSidebarRecolhida((valorAtual) => !valorAtual);
   }
@@ -1041,6 +1062,7 @@ export function AppShell() {
                           }}
                           target={item.abrirEmNovaAba ? "_blank" : undefined}
                           rel={item.abrirEmNovaAba ? "noreferrer" : undefined}
+                          onClick={(event) => navegarItemMenu(event, item)}
                           onMouseEnter={() => precarregarItemMenu(item)}
                           onFocus={() => precarregarItemMenu(item)}
                           onTouchStart={() => precarregarItemMenu(item)}
@@ -1197,6 +1219,7 @@ export function AppShell() {
                             }}
                             target={item.abrirEmNovaAba ? "_blank" : undefined}
                             rel={item.abrirEmNovaAba ? "noreferrer" : undefined}
+                            onClick={(event) => navegarItemMenu(event, item)}
                             onMouseEnter={() => precarregarItemMenu(item)}
                             onFocus={() => precarregarItemMenu(item)}
                             onTouchStart={() => precarregarItemMenu(item)}

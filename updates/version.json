@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.412",
+  "latestVersion": "1.00.415",
   "releaseDate": "2026-04-01",
-  "description": "Registro de ponto com geração do espelho em PDF liberada para o mesmo perfil que já consulta a aba e com ação visual reforçada no botão.",
+  "description": "Tela de licença de uso revisada com novo valor de implantação do plano Enterprise.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.412",
+  "minCompatibleVersion": "1.00.415",
   "releaseType": "stable",
   "downloadUrl": null
 }

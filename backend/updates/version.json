@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.412",
+  "latestVersion": "1.00.415",
   "releaseDate": "2026-04-01",
-  "description": "Versão oficial alinhada com o ajuste do registro de ponto para geração correta do espelho em PDF e refinamento visual do botão.",
+  "description": "Versão oficial alinhada com a revisão da implantação do plano Enterprise na licença de uso.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.412",
+  "minCompatibleVersion": "1.00.415",
   "releaseType": "stable"
 }
 

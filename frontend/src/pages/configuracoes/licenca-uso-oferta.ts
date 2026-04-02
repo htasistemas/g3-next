@@ -23,7 +23,7 @@ export const ofertaPlanos: OfertaPlano[] = [
   {
     id: "essencial",
     nome: "Essencial",
-    valorMensal: 297,
+    valorMensal: 397,
     implantacao: 497,
     resumo: "Ideal para organizações que querem sair do papel, padronizar o cadastro e começar a operar com base organizada.",
     mensagemValor:
@@ -40,7 +40,7 @@ export const ofertaPlanos: OfertaPlano[] = [
   {
     id: "profissional",
     nome: "Profissional",
-    valorMensal: 497,
+    valorMensal: 697,
     implantacao: 897,
     destaque: "Mais escolhido",
     resumo:
@@ -59,7 +59,7 @@ export const ofertaPlanos: OfertaPlano[] = [
   {
     id: "premium",
     nome: "Premium",
-    valorMensal: 697,
+    valorMensal: 997,
     implantacao: 1500,
     resumo:
       "Ideal para instituições que precisam integrar atendimento, gestão, captação e prestação de contas em um único ambiente.",
@@ -78,8 +78,8 @@ export const ofertaPlanos: OfertaPlano[] = [
   {
     id: "enterprise",
     nome: "Enterprise",
-    valorMensal: 797,
-    implantacao: 1500,
+    valorMensal: 1497,
+    implantacao: 2497,
     resumo: "Ideal para grandes instituições, redes, unidades integradas e operações mais complexas.",
     mensagemValor:
       "Escale a operação da instituição com governança, integração e controle avançado.",

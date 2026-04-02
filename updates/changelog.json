@@ -1,6 +1,39 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.415",
+                        "releaseDate":  "2026-04-01",
+                        "title":  "Licença de uso com nova implantação do Enterprise",
+                        "description":  "A página de Licença de uso recebeu ajuste no valor de implantação do plano Enterprise.",
+                        "changes":  [
+                                        "Implantação do plano Enterprise atualizada para R$ 2.497,00.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ]
+                    },
+                    {
+                        "version":  "1.00.414",
+                        "releaseDate":  "2026-04-01",
+                        "title":  "Licença de uso com revisão de Premium e Enterprise",
+                        "description":  "A página de Licença de uso recebeu nova revisão comercial com ajuste dos valores mensais dos planos Premium e Enterprise.",
+                        "changes":  [
+                                        "Plano Premium atualizado para R$ 997,00 por mês.",
+                                        "Plano Enterprise atualizado para R$ 1.497,00 por mês.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ]
+                    },
+                    {
+                        "version":  "1.00.413",
+                        "releaseDate":  "2026-04-01",
+                        "title":  "Licença de uso com nova tabela comercial",
+                        "description":  "A página de Licença de uso foi atualizada com os novos preços mensais dos planos e novo valor de implantação do Enterprise.",
+                        "changes":  [
+                                        "Plano Essencial atualizado para R$ 397,00 por mês.",
+                                        "Plano Profissional atualizado para R$ 697,00 por mês, com estado inicial da tela alinhado ao novo valor.",
+                                        "Plano Premium atualizado para R$ 897,00 por mês e plano Enterprise para R$ 1.197,00 por mês, com implantação do Enterprise ajustada para R$ 1.900,00.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ]
+                    },
+                    {
                         "version":  "1.00.412",
                         "releaseDate":  "2026-04-01",
                         "title":  "Espelho de ponto com PDF liberado e ação destacada",
