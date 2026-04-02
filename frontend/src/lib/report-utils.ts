@@ -124,102 +124,53 @@ export function imprimirConteudoAtual(options?: ImprimirConteudoOptions) {
     throw new Error("Não foi possível localizar o conteúdo para impressão.");
   }
 
-  const janela = window.open("", "_blank", "noopener,noreferrer,width=1200,height=900");
-  if (!janela) {
-    throw new Error("O navegador bloqueou a abertura da janela de impressão.");
-  }
+  imprimirHtmlSemJanela({
+    titulo,
+    html: serializarConteudoParaImpressao(elemento),
+    tamanhoPagina,
+    margemPagina,
+    paddingRaiz,
+    estilosExtras: `
+      [data-print="toolbar"],
+      [data-print="tabs"],
+      [data-print-hidden="true"],
+      button {
+        display: none !important;
+      }
 
-  const estilos = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
-    .map((node) => node.outerHTML)
-    .join("\n");
+      [data-print="layout-grid"] {
+        display: block !important;
+      }
 
-  janela.document.write(`<!doctype html>
-    <html lang="pt-BR">
-      <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>${escapeHtml(titulo)}</title>
-        ${estilos}
-        <style>
-          @page {
-            ${tamanhoPagina ? `size: ${tamanhoPagina};` : ""}
-            margin: ${margemPagina};
-          }
+      input,
+      select,
+      textarea {
+        min-height: auto !important;
+        border: 1px solid #cbd5e1 !important;
+        background: #fff !important;
+        color: #0f172a !important;
+        box-shadow: none !important;
+        padding: 0.35rem 0.5rem !important;
+      }
 
-          body {
-            margin: 0;
-            background: #fff;
-            color: #0f172a;
-          }
+      input[type="checkbox"],
+      input[type="radio"] {
+        display: inline-block !important;
+        width: auto !important;
+        height: auto !important;
+      }
 
-          .g3-print-root {
-            padding: ${paddingRaiz};
-          }
+      textarea {
+        white-space: pre-wrap !important;
+      }
 
-          [data-print="toolbar"],
-          [data-print="tabs"],
-          [data-print-hidden="true"],
-          button {
-            display: none !important;
-          }
+      img {
+        max-width: 100%;
+        height: auto;
+      }
 
-          [data-print="layout-grid"] {
-            display: block !important;
-          }
-
-          input,
-          select,
-          textarea {
-            min-height: auto !important;
-            border: 1px solid #cbd5e1 !important;
-            background: #fff !important;
-            color: #0f172a !important;
-            box-shadow: none !important;
-            padding: 0.35rem 0.5rem !important;
-          }
-
-          input[type="checkbox"],
-          input[type="radio"] {
-            display: inline-block !important;
-            width: auto !important;
-            height: auto !important;
-          }
-
-          textarea {
-            white-space: pre-wrap !important;
-          }
-
-          table {
-            width: 100%;
-            border-collapse: collapse;
-          }
-
-          th,
-          td {
-            vertical-align: top;
-          }
-
-          img {
-            max-width: 100%;
-            height: auto;
-          }
-
-          ${estilosExtras}
-        </style>
-      </head>
-      <body>
-        <div class="g3-print-root">${serializarConteudoParaImpressao(elemento)}</div>
-      </body>
-    </html>`);
-  janela.document.close();
-
-  janela.addEventListener("load", () => {
-    janela.focus();
-    janela.print();
-  });
-
-  janela.addEventListener("afterprint", () => {
-    janela.close();
+      ${estilosExtras}
+    `
   });
 }
 
@@ -289,6 +240,92 @@ export function imprimirHtml(options: ImprimirHtmlOptions) {
   janela.addEventListener("afterprint", () => {
     janela.close();
   });
+}
+
+export function imprimirHtmlSemJanela(options: ImprimirHtmlOptions) {
+  const tamanhoPagina = options.tamanhoPagina;
+  const margemPagina = options.margemPagina ?? "12mm";
+  const paddingRaiz = options.paddingRaiz ?? "24px";
+  const estilosExtras = options.estilosExtras ?? "";
+  const iframe = document.createElement("iframe");
+
+  iframe.setAttribute("aria-hidden", "true");
+  iframe.style.position = "fixed";
+  iframe.style.right = "0";
+  iframe.style.bottom = "0";
+  iframe.style.width = "0";
+  iframe.style.height = "0";
+  iframe.style.border = "0";
+  iframe.style.visibility = "hidden";
+  document.body.appendChild(iframe);
+
+  const frameWindow = iframe.contentWindow;
+  const frameDocument = frameWindow?.document;
+
+  if (!frameWindow || !frameDocument) {
+    iframe.remove();
+    throw new Error("Não foi possível preparar a impressão.");
+  }
+
+  const estilos = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
+    .map((node) => node.outerHTML)
+    .join("\n");
+
+  frameDocument.open();
+  frameDocument.write(`<!doctype html>
+    <html lang="pt-BR">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>${escapeHtml(options.titulo)}</title>
+        ${estilos}
+        <style>
+          @page {
+            ${tamanhoPagina ? `size: ${tamanhoPagina};` : ""}
+            margin: ${margemPagina};
+          }
+
+          body {
+            margin: 0;
+            background: #fff;
+            color: #0f172a;
+            font-family: Arial, sans-serif;
+          }
+
+          .g3-print-root {
+            padding: ${paddingRaiz};
+          }
+
+          table {
+            width: 100%;
+            border-collapse: collapse;
+          }
+
+          th,
+          td {
+            vertical-align: top;
+          }
+
+          ${estilosExtras}
+        </style>
+      </head>
+      <body>
+        <div class="g3-print-root">${options.html}</div>
+      </body>
+    </html>`);
+  frameDocument.close();
+
+  const limpar = () => {
+    window.setTimeout(() => {
+      iframe.remove();
+    }, 500);
+  };
+
+  frameWindow.addEventListener("afterprint", limpar, { once: true });
+  window.setTimeout(() => {
+    frameWindow.focus();
+    frameWindow.print();
+  }, 50);
 }
 
 function escapeHtml(value: string) {

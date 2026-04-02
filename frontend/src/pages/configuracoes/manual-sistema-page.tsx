@@ -272,7 +272,8 @@ const secoesManual: ManualSecao[] = [
         comoUsar: [
           "Use a aba Cadastro de veículo para registrar placa, modelo, marca, dados do veículo, foto e documento em PDF.",
           "Na aba Listagem de veículos, selecione um item da lista para visualizar o resumo completo e usar a ação Editar veículo.",
-          "Na aba Mapa de bordo, registre saídas, chegadas, condutor, destino e quilometragem do deslocamento.",
+          "Na aba Mapa de bordo, registre saídas, chegadas, condutor, destino e quilometragem do deslocamento. O campo Data abre preenchido com a data atual e não permite edição manual.",
+          "Ao usar a ação Imprimir mapa de bordo, informe o veículo, a data inicial e a data final do período desejado para gerar o relatório.",
           "Na aba Locais de destino, mantenha os endereços de referência organizados para reaproveitar no mapa de bordo.",
           "Na aba Motoristas autorizados, vincule motorista e veículo com carteira e vencimento quando aplicável.",
           "A barra superior da tela usa nomes específicos por aba, como Salvar veículo, Salvar mapa de bordo, Salvar destino e Salvar motorista autorizado."
@@ -281,7 +282,8 @@ const secoesManual: ManualSecao[] = [
           "Na aba Dashboard, a barra superior usa ações próprias do painel e o botão Abrir cadastro de veículo leva diretamente ao cadastro.",
           "Na aba Listagem de veículos, a ação principal da barra superior passa a ser Editar veículo, evitando confusão com o salvamento do cadastro.",
           "Os botões da barra superior foram compactados e balanceados em largura para respeitar melhor o espaço do card e não avançar sobre o título da tela.",
-          "O vínculo de motorista autorizado foi ajustado para funcionar tanto em bases que usam cadastro_profissional quanto em bases que usam cadastro_profissionais."
+          "O vínculo de motorista autorizado foi ajustado para funcionar tanto em bases que usam cadastro_profissional quanto em bases que usam cadastro_profissionais.",
+          "A impressão do mapa de bordo é gerada no próprio navegador sem abrir aba auxiliar, respeita o período informado no modal de impressão e segue o padrão institucional do G3N com nome da instituição, logomarca de relatório e rodapé oficial da unidade."
         ]
       },
       {

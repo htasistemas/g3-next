@@ -1,5 +1,6 @@
 ﻿import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import type { KeyboardEvent } from "react";
 import {
   Car,
   ClipboardList,
@@ -41,12 +42,14 @@ import {
 } from "@/features/controle-veiculos/use-controle-veiculos";
 import { resolverUrlArquivo } from "@/lib/arquivos";
 import {
+  formatarCnpj,
   formatarDataPtBr,
   formatarTelefone,
   mascararTelefoneInput,
   normalizarTelefone
 } from "@/lib/br-utils";
-import { imprimirConteudoAtual } from "@/lib/report-utils";
+import { useUnidadeAssistencialAtual } from "@/features/unidades-assistenciais/use-unidades-assistenciais";
+import { imprimirConteudoAtual, imprimirHtmlSemJanela } from "@/lib/report-utils";
 import { arquivosService } from "@/services/arquivos.service";
 import { controleVeiculosService } from "@/services/controle-veiculos.service";
 import type {
@@ -124,6 +127,13 @@ const defaultMotorista: MotoristaAutorizado = {
   vencimentoCarteira: ""
 };
 
+type PeriodoImpressaoDiario = {
+  aberto: boolean;
+  dataInicial: string;
+  dataFinal: string;
+  veiculoId: number | null;
+};
+
 function mascararDataHifen(valor?: string | null) {
   const digitos = String(valor ?? "").replace(/\D/g, "").slice(0, 8);
   if (digitos.length <= 2) return digitos;
@@ -168,6 +178,18 @@ function calcularKmRodados(kmInicial?: number | null, kmFinal?: number | null) {
   return diferenca >= 0 ? diferenca : 0;
 }
 
+function obterChaveOrdenacaoDiario(registro: RegistroDiarioBordo) {
+  const dataReferencia =
+    normalizarDataFormularioParaIso(registro.dataSaida || registro.data) ??
+    normalizarDataFormularioParaIso(registro.data) ??
+    "0000-00-00";
+  const horarioReferencia = String(registro.horarioSaida ?? registro.horarioChegada ?? "")
+    .trim()
+    .padEnd(5, "0");
+
+  return `${dataReferencia}T${horarioReferencia || "00:00"}|${String(registro.id ?? 0).padStart(12, "0")}`;
+}
+
 function montarRotuloDestino(local?: LocalDestinoVeiculo | null) {
   if (!local) return "";
   const nome = String(local.nome ?? "").trim();
@@ -209,6 +231,66 @@ function obterNomeArquivo(valor?: string | null) {
   return partes[partes.length - 1] ?? texto;
 }
 
+function montarRodapeInstitucional(unidade?: {
+  razao_social?: string;
+  nome_fantasia?: string;
+  cnpj?: string;
+  telefone?: string;
+  email?: string;
+  logradouro?: string;
+  numero?: string;
+  complemento?: string;
+  bairro?: string;
+  cidade?: string;
+  estado?: string;
+}) {
+  const linha1 = unidade?.razao_social?.trim() || unidade?.nome_fantasia?.trim() || "Instituição não cadastrada";
+  const detalhes = [formatarCnpj(unidade?.cnpj), formatarTelefone(unidade?.telefone), unidade?.email?.trim()]
+    .filter(Boolean)
+    .join(" • ");
+  const endereco = [
+    unidade?.logradouro?.trim(),
+    unidade?.numero?.trim(),
+    unidade?.complemento?.trim(),
+    unidade?.bairro?.trim(),
+    unidade?.cidade?.trim(),
+    unidade?.estado?.trim()
+  ]
+    .filter(Boolean)
+    .join(" • ");
+
+  return { linha1, linha2: detalhes, linha3: endereco };
+}
+
+function focarProximoCampoComEnter(event: KeyboardEvent<HTMLDivElement>) {
+  if (event.key !== "Enter" || event.shiftKey || event.ctrlKey || event.altKey || event.metaKey) {
+    return;
+  }
+
+  const elementoAtual = event.target;
+  if (!(elementoAtual instanceof HTMLElement) || elementoAtual.tagName === "TEXTAREA") {
+    return;
+  }
+
+  const campos = Array.from(
+    event.currentTarget.querySelectorAll<HTMLElement>("input, select, textarea, button")
+  ).filter((elemento) => {
+    if (elemento.tabIndex < 0) return false;
+    if ("disabled" in elemento && elemento.disabled) return false;
+    if ("readOnly" in elemento && elemento.readOnly) return false;
+    return true;
+  });
+
+  const indiceAtual = campos.indexOf(elementoAtual);
+  if (indiceAtual < 0) return;
+
+  const proximoCampo = campos[indiceAtual + 1];
+  if (!proximoCampo) return;
+
+  event.preventDefault();
+  proximoCampo.focus();
+}
+
 function arquivoEhPdf(arquivo: File) {
   return arquivo.type === "application/pdf" || arquivo.name.toLowerCase().endsWith(".pdf");
 }
@@ -245,12 +327,19 @@ export function ControleVeiculosPage() {
   const [termoMotorista, setTermoMotorista] = useState("");
   const [popupMensagem, setPopupMensagem] = useState<PopupMensagemState | null>(null);
   const [confirmarExcluir, setConfirmarExcluir] = useState(false);
+  const [periodoImpressaoDiario, setPeriodoImpressaoDiario] = useState<PeriodoImpressaoDiario>({
+    aberto: false,
+    dataInicial: hojeBr,
+    dataFinal: hojeBr,
+    veiculoId: null
+  });
   const [fotoVeiculoArquivo, setFotoVeiculoArquivo] = useState<File | null>(null);
   const [fotoVeiculoPreview, setFotoVeiculoPreview] = useState("");
   const [enviandoFotoVeiculo, setEnviandoFotoVeiculo] = useState(false);
   const [documentoVeiculoArquivo, setDocumentoVeiculoArquivo] = useState<File | null>(null);
   const [enviandoDocumentoVeiculo, setEnviandoDocumentoVeiculo] = useState(false);
 
+  const unidadeAtualQuery = useUnidadeAssistencialAtual();
   const { data: veiculosData } = useVeiculos();
   const { data: diarioData } = useDiarioBordo();
   const { data: locaisDestinoData } = useLocaisDestinoVeiculo();
@@ -268,7 +357,13 @@ export function ControleVeiculosPage() {
   const removerMotoristaMutation = useRemoverMotoristaAutorizado();
 
   const veiculos = veiculosData ?? [];
-  const diarios = diarioData ?? [];
+  const diarios = useMemo(
+    () =>
+      [...(diarioData ?? [])].sort((primeiro, segundo) =>
+        obterChaveOrdenacaoDiario(segundo).localeCompare(obterChaveOrdenacaoDiario(primeiro))
+      ),
+    [diarioData]
+  );
   const locaisDestino = locaisDestinoData ?? [];
   const motoristasAutorizados = motoristasAutorizadosData ?? [];
   const motoristasVeiculo = motoristasVeiculoData ?? [];
@@ -665,167 +760,148 @@ export function ControleVeiculosPage() {
     }
   }
 
-  function imprimirDiarioBordoVeiculo() {
-    const veiculoSelecionado =
-      veiculos.find((item) => item.id === diarioForm.veiculoId) ??
-      veiculos.find((item) => item.id === veiculoForm.id) ??
-      null;
-    const janela = window.open("", "_blank", "noopener,noreferrer,width=1400,height=900");
+  function abrirImpressaoDiarioBordo() {
+    const datasDisponiveis = diarios
+      .map((item) => normalizarDataFormularioParaIso(item.dataSaida || item.data))
+      .filter((valor): valor is string => Boolean(valor))
+      .sort();
 
-    if (!janela) {
+    const dataPadraoInicial = datasDisponiveis[0] ? formatarDataPtBr(datasDisponiveis[0]) : hojeBr;
+    const dataPadraoFinal = datasDisponiveis[datasDisponiveis.length - 1]
+      ? formatarDataPtBr(datasDisponiveis[datasDisponiveis.length - 1])
+      : hojeBr;
+
+    setPeriodoImpressaoDiario({
+      aberto: true,
+      dataInicial: dataPadraoInicial,
+      dataFinal: dataPadraoFinal,
+      veiculoId: diarioForm.veiculoId ?? veiculoForm.id ?? null
+    });
+  }
+
+  function imprimirDiarioBordoVeiculo() {
+    const dataInicialIso = normalizarDataFormularioParaIso(periodoImpressaoDiario.dataInicial);
+    const dataFinalIso = normalizarDataFormularioParaIso(periodoImpressaoDiario.dataFinal);
+    const veiculoSelecionadoImpressao =
+      veiculos.find((item) => item.id === periodoImpressaoDiario.veiculoId) ?? null;
+
+    if (!dataInicialIso || !dataFinalIso) {
       setPopupMensagem({
-        tipo: "erro",
-        titulo: "Erro",
-        texto: "O navegador bloqueou a abertura da impressão do diário de bordo."
+        tipo: "aviso",
+        titulo: "Validação",
+        texto: "Informe uma data inicial e uma data final válidas para imprimir o mapa de bordo."
       });
       return;
     }
 
-    const linhas = Array.from(
-      { length: 16 },
-      () => `
+    if (dataInicialIso > dataFinalIso) {
+      setPopupMensagem({
+        tipo: "aviso",
+        titulo: "Validação",
+        texto: "A data inicial não pode ser maior que a data final."
+      });
+      return;
+    }
+
+    if (!veiculoSelecionadoImpressao) {
+      setPopupMensagem({
+        tipo: "aviso",
+        titulo: "Validação",
+        texto: "Selecione o veículo que deseja imprimir no mapa de bordo."
+      });
+      return;
+    }
+
+    const diariosFiltrados = diarios
+      .filter((item) => {
+        const dataReferencia = normalizarDataFormularioParaIso(item.dataSaida || item.data);
+        if (!dataReferencia) return false;
+        if (item.veiculoId !== veiculoSelecionadoImpressao.id) return false;
+        return dataReferencia >= dataInicialIso && dataReferencia <= dataFinalIso;
+      })
+      .sort((primeiro, segundo) => {
+        const dataPrimeiro = normalizarDataFormularioParaIso(primeiro.dataSaida || primeiro.data) ?? "";
+        const dataSegundo = normalizarDataFormularioParaIso(segundo.dataSaida || segundo.data) ?? "";
+        return dataPrimeiro.localeCompare(dataSegundo);
+      });
+
+    if (!diariosFiltrados.length) {
+      setPopupMensagem({
+        tipo: "aviso",
+        titulo: "Atenção",
+        texto: "Nenhum mapa de bordo foi encontrado no período informado."
+      });
+      return;
+    }
+
+    const linhas = diariosFiltrados
+      .map((item) => {
+        const veiculoLinha = veiculos.find((veiculo) => veiculo.id === item.veiculoId) ?? null;
+        const destino = item.localDestinoNome || item.destino || "---";
+        const kmRodados = item.kmRodados ?? calcularKmRodados(item.kmInicial, item.kmFinal);
+        return `
         <tr>
-          <td>&nbsp;</td>
-          <td>&nbsp;</td>
-          <td>&nbsp;</td>
-          <td>&nbsp;</td>
-          <td>&nbsp;</td>
-          <td>&nbsp;</td>
-          <td>&nbsp;</td>
+          <td>${escapeHtml(formatarDataPtBr(normalizarDataFormularioParaIso(item.dataSaida || item.data) ?? item.data ?? ""))}</td>
+          <td>${escapeHtml(veiculoLinha?.placa ?? "---")}</td>
+          <td>${escapeHtml(item.condutor ?? "---")}</td>
+          <td>${escapeHtml(item.horarioSaida ?? "---")}</td>
+          <td>${escapeHtml(item.horarioChegada ?? "---")}</td>
+          <td>${escapeHtml(String(kmRodados || 0))}</td>
+          <td>${escapeHtml(destino)}</td>
         </tr>
-      `
-    ).join("");
+      `;
+      })
+      .join("");
     const preencherCampo = (valor?: string | number | null) => {
       const texto = String(valor ?? "").trim();
       return texto ? escapeHtml(texto) : "&nbsp;";
     };
     const dataEmissao = formatarDataPtBr(new Date().toISOString().slice(0, 10));
-    const veiculoDescricao = veiculoSelecionado
-      ? `${veiculoSelecionado.placa ?? ""}${veiculoSelecionado.modelo ? ` - ${veiculoSelecionado.modelo}` : ""}`
+    const veiculoDescricao = veiculoSelecionadoImpressao
+      ? `${veiculoSelecionadoImpressao.placa ?? ""}${veiculoSelecionadoImpressao.modelo ? ` - ${veiculoSelecionadoImpressao.modelo}` : ""}`
       : "";
+    const periodoDescricao = `${formatarDataPtBr(dataInicialIso)} até ${formatarDataPtBr(dataFinalIso)}`;
+    const unidadeAtual = unidadeAtualQuery.data?.unidade;
+    const nomeInstituicao =
+      unidadeAtual?.razao_social?.trim() ||
+      unidadeAtual?.nome_fantasia?.trim() ||
+      "Instituição não cadastrada";
+    const logomarcaRelatorio = resolverUrlArquivo(unidadeAtual?.logomarca_relatorio || unidadeAtual?.logomarca);
+    const rodapeInstitucional = montarRodapeInstitucional(unidadeAtual ?? undefined);
 
-    janela.document.write(`<!doctype html>
-      <html lang="pt-BR">
-        <head><meta charset="utf-8" /><title>Diário de bordo de veículo</title>
-          <style>
-            @page { size: A4 landscape; margin: 10mm; }
-            * { box-sizing: border-box; }
-            body { font-family: Arial, sans-serif; margin: 0; color: #0f172a; background: #fff; }
-            .folha { padding: 18px; }
-            .topo {
-              border: 1px solid #bbf7d0;
-              border-radius: 18px;
-              padding: 18px 20px;
-              background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 100%);
-              margin-bottom: 16px;
-            }
-            .marca {
-              font-size: 11px;
-              font-weight: 700;
-              letter-spacing: 0.18em;
-              text-transform: uppercase;
-              color: #166534;
-            }
-            h1 {
-              margin: 8px 0 6px;
-              font-size: 24px;
-              line-height: 1.1;
-              letter-spacing: 0.08em;
-              text-transform: uppercase;
-              color: #14532d;
-            }
-            .subtitulo { margin: 0; font-size: 12px; color: #475569; }
-            .meta-grid {
-              display: grid;
-              grid-template-columns: repeat(4, minmax(0, 1fr));
-              gap: 10px;
-              margin-top: 16px;
-            }
-            .meta-item {
-              min-height: 74px;
-              border: 1px solid #cbd5e1;
-              border-radius: 14px;
-              background: #fff;
-              padding: 10px 12px;
-            }
-            .meta-item strong {
-              display: block;
-              font-size: 11px;
-              text-transform: uppercase;
-              letter-spacing: 0.05em;
-              color: #166534;
-            }
-            .meta-linha {
-              display: block;
-              min-height: 20px;
-              margin-top: 14px;
-              border-bottom: 1px solid #0f172a;
-              font-size: 12px;
-            }
-            .tabela-wrap {
-              overflow: hidden;
-              border: 1px solid #cbd5e1;
-              border-radius: 18px;
-            }
-            table { width: 100%; border-collapse: collapse; }
-            th {
-              background: #166534;
-              color: #fff;
-              padding: 10px 8px;
-              border: 1px solid #166534;
-              font-size: 11px;
-              text-align: left;
-              text-transform: uppercase;
-              letter-spacing: 0.04em;
-            }
-            td {
-              height: 34px;
-              border: 1px solid #cbd5e1;
-              padding: 8px;
-              font-size: 12px;
-            }
-            .assinaturas {
-              display: grid;
-              grid-template-columns: repeat(2, minmax(0, 1fr));
-              gap: 24px;
-              margin-top: 24px;
-            }
-            .assinatura {
-              padding-top: 30px;
-              border-top: 1px solid #0f172a;
-              text-align: center;
-              font-size: 12px;
-            }
-            .rodape {
-              margin-top: 12px;
-              text-align: right;
-              font-size: 11px;
-              color: #64748b;
-            }
-          </style>
-        </head>
-        <body>
+    try {
+      imprimirHtmlSemJanela({
+        titulo: "Mapa de bordo",
+        tamanhoPagina: "A4 landscape",
+        margemPagina: "10mm",
+        paddingRaiz: "18px",
+        html: `
           <div class="folha">
             <div class="topo">
-              <div class="marca">Sistema G3N</div>
-              <h1>DIÁRIO DE BORDO DE VEÍCULO</h1>
-              <p class="subtitulo">Relatório em branco para preenchimento manual e posterior lançamento no sistema.</p>
+              <div class="g3-topo-faixa">
+                <span class="g3-topo-marca">G3N</span>
+                <span class="g3-topo-selo">Controle de veículos</span>
+              </div>
+              <div class="g3-topo-corpo">
+                ${logomarcaRelatorio ? `<img src="${escapeHtml(logomarcaRelatorio)}" alt="Logomarca da instituição" class="g3-topo-logo" />` : ""}
+                <div class="g3-topo-texto">
+                  <h1>${escapeHtml(nomeInstituicao)}</h1>
+                  <h2>Mapa de bordo</h2>
+                  <p class="subtitulo">Relatório gerado a partir dos lançamentos registrados na tela de controle de veículos.</p>
+                </div>
+              </div>
               <div class="meta-grid">
+                <div class="meta-item">
+                  <strong>Período</strong>
+                  <span class="meta-linha">${preencherCampo(periodoDescricao)}</span>
+                </div>
                 <div class="meta-item">
                   <strong>Veículo</strong>
                   <span class="meta-linha">${preencherCampo(veiculoDescricao)}</span>
                 </div>
                 <div class="meta-item">
                   <strong>Placa</strong>
-                  <span class="meta-linha">${preencherCampo(veiculoSelecionado?.placa)}</span>
-                </div>
-                <div class="meta-item">
-                  <strong>Marca / modelo</strong>
-                  <span class="meta-linha">${preencherCampo(
-                    veiculoSelecionado
-                      ? `${veiculoSelecionado.marca ?? ""}${veiculoSelecionado.modelo ? ` / ${veiculoSelecionado.modelo}` : ""}`
-                      : ""
-                  )}</span>
+                  <span class="meta-linha">${preencherCampo(veiculoSelecionadoImpressao?.placa)}</span>
                 </div>
                 <div class="meta-item">
                   <strong>Emitido em</strong>
@@ -838,38 +914,154 @@ export function ControleVeiculosPage() {
                 <thead>
                   <tr>
                     <th>Data</th>
+                    <th>Veículo</th>
                     <th>Condutor</th>
-                    <th>Horário de saída</th>
-                    <th>Km inicial</th>
-                    <th>Horário de chegada</th>
-                    <th>Km final</th>
+                    <th>Saída</th>
+                    <th>Chegada</th>
+                    <th>Km rodados</th>
                     <th>Destino</th>
                   </tr>
                 </thead>
                 <tbody>${linhas}</tbody>
               </table>
             </div>
-            <div class="assinaturas">
-              <div class="assinatura">Assinatura do condutor</div>
-              <div class="assinatura">Assinatura do responsável</div>
-            </div>
-            <p class="rodape">Documento gerado em ${escapeHtml(dataEmissao)}.</p>
+            <footer class="rodape">
+              <div>${escapeHtml(rodapeInstitucional.linha1)}</div>
+              ${rodapeInstitucional.linha2 ? `<div>${escapeHtml(rodapeInstitucional.linha2)}</div>` : ""}
+              ${rodapeInstitucional.linha3 ? `<div>${escapeHtml(rodapeInstitucional.linha3)}</div>` : ""}
+              <div>Emitido em ${escapeHtml(dataEmissao)}</div>
+            </footer>
           </div>
-          <script>
-            window.onload = () => {
-              window.focus();
-              window.print();
-            };
-            window.onafterprint = () => window.close();
-          </script>
-        </body>
-      </html>`);
-    janela.document.close();
+        `,
+        estilosExtras: `
+          * { box-sizing: border-box; }
+          body { font-family: Arial, sans-serif; margin: 0; color: #0f172a; background: #fff; }
+          .folha { padding: 18px; }
+          .topo {
+            border: 1px solid #bbf7d0;
+            border-radius: 18px;
+            background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 100%);
+            margin-bottom: 16px;
+            overflow: hidden;
+          }
+          .g3-topo-faixa {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 14px 18px;
+            background: #0f8a57;
+            color: #ffffff;
+          }
+          .g3-topo-marca { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; }
+          .g3-topo-selo {
+            border: 1px solid rgba(255,255,255,0.35);
+            border-radius: 999px;
+            padding: 4px 10px;
+            font-size: 11px;
+            font-weight: 600;
+            background: rgba(255,255,255,0.12);
+          }
+          .g3-topo-corpo {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            align-items: center;
+            gap: 16px;
+            padding: 18px;
+          }
+          .g3-topo-logo {
+            width: 88px;
+            height: 88px;
+            object-fit: contain;
+            border-radius: 16px;
+            background: #ffffff;
+            border: 1px solid #dbe7df;
+            padding: 10px;
+          }
+          .g3-topo-texto { text-align: center; }
+          h1 { margin: 0; font-size: 18px; font-weight: 700; color: #14532d; }
+          h2 {
+            margin: 4px 0 6px;
+            font-size: 24px;
+            line-height: 1.1;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #1f2937;
+            font-weight: 800;
+          }
+          .subtitulo { margin: 0; font-size: 12px; color: #475569; }
+          .meta-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+            padding: 0 18px 18px;
+          }
+          .meta-item {
+            min-height: 74px;
+            border: 1px solid #cbd5e1;
+            border-radius: 14px;
+            background: #fff;
+            padding: 10px 12px;
+          }
+          .meta-item strong {
+            display: block;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #166534;
+          }
+          .meta-linha {
+            display: block;
+            min-height: 20px;
+            margin-top: 14px;
+            border-bottom: 1px solid #0f172a;
+            font-size: 12px;
+          }
+          .tabela-wrap {
+            overflow: hidden;
+            border: 1px solid #cbd5e1;
+            border-radius: 18px;
+          }
+          table { width: 100%; border-collapse: collapse; }
+          th {
+            background: #166534;
+            color: #fff;
+            padding: 10px 8px;
+            border: 1px solid #166534;
+            font-size: 11px;
+            text-align: left;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+          }
+          td {
+            border: 1px solid #cbd5e1;
+            padding: 8px;
+            font-size: 12px;
+          }
+          .rodape {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #dbe7df;
+            font-size: 11px;
+            color: #6b7f75;
+            text-align: center;
+          }
+          .rodape div + div { margin-top: 2px; }
+        `
+      });
+      setPeriodoImpressaoDiario((atual) => ({ ...atual, aberto: false }));
+    } catch (error: any) {
+      setPopupMensagem({
+        tipo: "erro",
+        titulo: "Erro",
+        texto: error?.message ?? "Não foi possível preparar a impressão do mapa de bordo."
+      });
+    }
   }
 
   function imprimir() {
     if (abaAtiva === "diario") {
-      imprimirDiarioBordoVeiculo();
+      abrirImpressaoDiarioBordo();
       return;
     }
 
@@ -1268,9 +1460,9 @@ export function ControleVeiculosPage() {
         ) : null}
         {abaAtiva === "diario" ? (
           <section className="space-y-4">
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4" onKeyDown={focarProximoCampoComEnter}>
               <div className="space-y-1"><Label>Veículo *</Label><Select value={String(diarioForm.veiculoId ?? "")} onChange={(event) => { const veiculoId = Number(event.target.value) || null; setDiarioForm((atual) => ({ ...atual, veiculoId, condutor: "" })); }}><option value="">Selecione</option>{veiculos.map((item) => <option key={item.id} value={item.id}>{item.placa} - {item.modelo}</option>)}</Select></div>
-              <div className="space-y-1"><Label>Data *</Label><Input placeholder="dd-mm-aaaa" value={diarioForm.data ?? ""} onChange={(event) => setDiarioForm((atual) => ({ ...atual, data: mascararDataHifen(event.target.value) }))} /></div>
+              <div className="space-y-1"><Label>Data *</Label><Input placeholder="dd-mm-aaaa" value={diarioForm.data ?? ""} readOnly disabled className="cursor-not-allowed bg-slate-100 text-slate-500" /></div>
               <div className="space-y-1"><Label>Data de saída</Label><Input placeholder="dd-mm-aaaa" value={diarioForm.dataSaida ?? ""} onChange={(event) => setDiarioForm((atual) => ({ ...atual, dataSaida: mascararDataHifen(event.target.value) }))} /></div>
               <div className="space-y-1"><Label>Hora de saída</Label><Input type="time" value={diarioForm.horarioSaida ?? ""} onChange={(event) => setDiarioForm((atual) => ({ ...atual, horarioSaida: event.target.value }))} /></div>
               <div className="space-y-1"><Label>Data de chegada</Label><Input placeholder="dd-mm-aaaa" value={diarioForm.dataChegada ?? ""} onChange={(event) => setDiarioForm((atual) => ({ ...atual, dataChegada: mascararDataHifen(event.target.value) }))} /></div>
@@ -1381,6 +1573,83 @@ export function ControleVeiculosPage() {
           </section>
         ) : null}
       </AdminPageLayout>
+      {periodoImpressaoDiario.aberto ? (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/45 px-4"
+          onClick={() => setPeriodoImpressaoDiario((atual) => ({ ...atual, aberto: false }))}
+        >
+          <div
+            className="w-full max-w-lg rounded-xl border border-slate-200 bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="border-b border-slate-100 px-5 py-4">
+              <h3 className="text-base font-semibold text-slate-900">Imprimir mapa de bordo</h3>
+              <p className="mt-1 text-sm text-slate-600">
+                Informe o período desejado para gerar a impressão do mapa de bordo.
+              </p>
+            </div>
+            <div className="grid gap-4 px-5 py-4 md:grid-cols-2">
+              <div className="space-y-1 md:col-span-2">
+                <Label>Veículo</Label>
+                <Select
+                  value={String(periodoImpressaoDiario.veiculoId ?? "")}
+                  onChange={(event) =>
+                    setPeriodoImpressaoDiario((atual) => ({
+                      ...atual,
+                      veiculoId: Number(event.target.value) || null
+                    }))
+                  }
+                >
+                  <option value="">Selecione</option>
+                  {veiculos.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.placa} - {item.modelo}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>Data inicial</Label>
+                <Input
+                  placeholder="dd-mm-aaaa"
+                  value={periodoImpressaoDiario.dataInicial}
+                  onChange={(event) =>
+                    setPeriodoImpressaoDiario((atual) => ({
+                      ...atual,
+                      dataInicial: mascararDataHifen(event.target.value)
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Data final</Label>
+                <Input
+                  placeholder="dd-mm-aaaa"
+                  value={periodoImpressaoDiario.dataFinal}
+                  onChange={(event) =>
+                    setPeriodoImpressaoDiario((atual) => ({
+                      ...atual,
+                      dataFinal: mascararDataHifen(event.target.value)
+                    }))
+                  }
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setPeriodoImpressaoDiario((atual) => ({ ...atual, aberto: false }))}
+              >
+                Cancelar
+              </Button>
+              <Button type="button" onClick={imprimirDiarioBordoVeiculo}>
+                Imprimir
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {popupMensagem ? <PopupMensagem popup={popupMensagem} onClose={() => setPopupMensagem(null)} /> : null}
       <PopupConfirmacao aberto={confirmarExcluir} titulo="Confirmar exclusão" texto="Esta ação é irreversível. Deseja continuar?" processando={carregandoAcoes} onCancel={() => setConfirmarExcluir(false)} onConfirm={() => void confirmarExclusao()} confirmarTexto="Excluir" />
     </>
