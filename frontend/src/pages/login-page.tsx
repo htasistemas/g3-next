@@ -10,10 +10,23 @@ import { precarregarRota } from "@/routes/route-modules";
 import { authService } from "@/services/auth.service";
 
 const FOTO_LATERAL_URL = "/images/loguim.jpg";
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim() || undefined;
+
+function normalizarValorAmbiente(valor: string | undefined) {
+  const normalizado = valor?.trim();
+  if (!normalizado) return undefined;
+  if (normalizado.startsWith("__ENV_") && normalizado.endsWith("__")) return undefined;
+  return normalizado;
+}
+
+const GOOGLE_CLIENT_ID =
+  normalizarValorAmbiente(import.meta.env.VITE_GOOGLE_CLIENT_ID) ??
+  normalizarValorAmbiente(window.__env?.googleClientId);
+const GOOGLE_ALLOWED_ORIGINS =
+  normalizarValorAmbiente(import.meta.env.VITE_GOOGLE_ALLOWED_ORIGINS) ??
+  normalizarValorAmbiente(window.__env?.googleAllowedOrigins) ??
+  "";
 const GOOGLE_CONFIGURED_ORIGINS = new Set(
-  (import.meta.env.VITE_GOOGLE_ALLOWED_ORIGINS ?? "")
-    .split(",")
+  GOOGLE_ALLOWED_ORIGINS.split(",")
     .map((origem: string) => origem.trim())
     .filter(Boolean)
 );
@@ -140,7 +153,7 @@ export function LoginPage() {
       }
 
       window.google.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
+        client_id: GOOGLE_CLIENT_ID!,
         ux_mode: "popup",
         auto_select: false,
         cancel_on_tap_outside: true,

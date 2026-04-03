@@ -1,4 +1,4 @@
-import { startTransition, useDeferredValue, useEffect, useEffectEvent, useMemo, useState } from "react";
+import { startTransition, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { Download, Eraser, Filter, ImageDown, LocateFixed, MapPinned, Printer, RefreshCw, Target } from "lucide-react";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
@@ -332,7 +332,7 @@ export function VulnerabilidadePage() {
   const salvarMarcacao = useSalvarMarcacaoGeorreferenciamento();
   const geocodificarPendencias = useGeocodificarPendenciasGeorreferenciamento();
 
-  const atualizarViewport = useEffectEvent((payload: { zoom: number; bbox: GeoBBox }) => {
+  function atualizarViewport(payload: { zoom: number; bbox: GeoBBox }) {
     setFiltros((atual) =>
       atual.zoom === payload.zoom &&
       atual.bbox &&
@@ -343,7 +343,7 @@ export function VulnerabilidadePage() {
         ? atual
         : { ...atual, zoom: payload.zoom, bbox: payload.bbox }
     );
-  });
+  }
 
   const centro = useMemo<[number, number]>(() => {
     if (pontoManual) return [pontoManual.latitude, pontoManual.longitude];

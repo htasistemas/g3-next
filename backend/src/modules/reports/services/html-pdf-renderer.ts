@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import PDFDocument from "pdfkit";
+import { LocalStorageProvider } from "../../arquivos/services/local-storage.provider.js";
 import type { RelatorioHtmlInput } from "../templates/relatorio-template-padrao.js";
 
 type RodapeRender = {
@@ -72,6 +73,8 @@ function extractSectionSpacerLines(value: string): number | null {
 }
 
 export class HtmlPdfRenderer {
+  private readonly storageProvider = new LocalStorageProvider();
+
   async render(html: string, rodape: RodapeRender, layout?: RelatorioHtmlInput): Promise<Buffer> {
     if (!layout) {
       return this.renderLegado(html, rodape);
@@ -660,8 +663,9 @@ export class HtmlPdfRenderer {
       caminhoNormalizado,
       path.resolve(process.cwd(), caminhoNormalizado),
       path.resolve(process.cwd(), "..", caminhoNormalizado),
+      this.resolverCaminhoStorage(caminhoNormalizado),
       path.resolve(process.cwd(), "..", "frontend", "public", caminhoNormalizado.replace(/^[/\\]/, ""))
-    ];
+    ].filter((candidato): candidato is string => Boolean(candidato));
 
     for (const candidato of candidatos) {
       if (fs.existsSync(candidato)) {
@@ -674,6 +678,14 @@ export class HtmlPdfRenderer {
     }
 
     return undefined;
+  }
+
+  private resolverCaminhoStorage(caminhoArquivo: string): string | undefined {
+    try {
+      return this.storageProvider.resolveAbsolutePath(caminhoArquivo);
+    } catch {
+      return undefined;
+    }
   }
 
   private htmlToText(html: string): string {

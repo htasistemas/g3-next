@@ -19,6 +19,7 @@ const mimeByExtension: Record<string, string> = {
   jpeg: "image/jpeg",
   png: "image/png",
   webp: "image/webp",
+  svg: "image/svg+xml",
   pdf: "application/pdf",
   txt: "text/plain",
   csv: "text/csv",
@@ -66,6 +67,13 @@ export function detectarMimeTypePorAssinatura(buffer: Buffer) {
     return "application/pdf";
   }
 
+  const trechoInicial = buffer.subarray(0, Math.min(buffer.length, 512)).toString("utf8").trimStart();
+  if (trechoInicial.startsWith("<svg") || trechoInicial.startsWith("<?xml")) {
+    if (trechoInicial.includes("<svg")) {
+      return "image/svg+xml";
+    }
+  }
+
   if (
     buffer.length >= 8 &&
     buffer[0] === 0x89 &&
@@ -100,11 +108,22 @@ export function parseBase64Payload(
     throw new AppError("Conteudo do arquivo nao informado.", 400);
   }
 
-  const match = raw.match(/^data:([^;,]+);base64,(.+)$/i);
-  if (match) {
+  const dataUrlMatch = raw.match(/^data:([^,]*?),(.*)$/is);
+  if (dataUrlMatch) {
+    const metadata = (dataUrlMatch[1] ?? "").trim();
+    const payload = dataUrlMatch[2] ?? "";
+    const metadataParts = metadata
+      .split(";")
+      .map((item) => item.trim())
+      .filter(Boolean);
+    const mimeType = metadataParts[0]?.toLowerCase() || fallbackMimeType?.trim().toLowerCase() || undefined;
+    const isBase64 = metadataParts.some((item) => item.toLowerCase() === "base64");
+
     return {
-      mimeType: match[1]?.trim().toLowerCase(),
-      buffer: Buffer.from(match[2] ?? "", "base64")
+      mimeType,
+      buffer: isBase64
+        ? Buffer.from(payload, "base64")
+        : Buffer.from(decodeURIComponent(payload), "utf8")
     };
   }
 

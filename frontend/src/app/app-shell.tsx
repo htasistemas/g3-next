@@ -7,7 +7,7 @@ import { AIChatWidget } from "@/modules/ai/components/AIChatWidget";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { APP_VERSION } from "@/lib/app-version";
-import { resolverUrlArquivo } from "@/lib/arquivos";
+import { obterUrlArquivoAutenticado, resolverUrlArquivo } from "@/lib/arquivos";
 import { precarregarRota, precarregarRotas } from "@/routes/route-modules";
 import { useResumoLembretesDiarios } from "@/features/lembretes-diarios/use-lembretes-diarios";
 import { registroPontoService } from "@/services/registro-ponto.service";
@@ -653,6 +653,7 @@ export function AppShell() {
   const [sidebarRecolhida, setSidebarRecolhida] = useState(false);
   const [gruposAbertos, setGruposAbertos] = useState<Record<string, boolean>>({});
   const [lembreteAlertaAtivo, setLembreteAlertaAtivo] = useState(false);
+  const [logomarcaTopoUrl, setLogomarcaTopoUrl] = useState("");
   const logomarcaInstituicao = unidadeAtualData?.unidade?.logomarca;
   const nomeInstituicao =
     unidadeAtualData?.unidade?.nome_fantasia ??
@@ -737,6 +738,46 @@ export function AppShell() {
       return proximoEstado;
     });
   }, [menuSectionsVisiveis, secaoAtivaId]);
+
+  useEffect(() => {
+    let ativo = true;
+    let revokeAtual: (() => void) | undefined;
+
+    if (!logomarcaInstituicao) {
+      setLogomarcaTopoUrl("");
+      return () => {
+        revokeAtual?.();
+      };
+    }
+
+    if (logomarcaInstituicao.startsWith("data:") || logomarcaInstituicao.startsWith("blob:")) {
+      setLogomarcaTopoUrl(logomarcaInstituicao);
+      return () => {
+        revokeAtual?.();
+      };
+    }
+
+    void (async () => {
+      try {
+        const arquivo = await obterUrlArquivoAutenticado(logomarcaInstituicao);
+        if (!ativo) {
+          arquivo.revoke?.();
+          return;
+        }
+        revokeAtual = arquivo.revoke;
+        setLogomarcaTopoUrl(arquivo.url || resolverUrlArquivo(logomarcaInstituicao));
+      } catch {
+        if (ativo) {
+          setLogomarcaTopoUrl(resolverUrlArquivo(logomarcaInstituicao));
+        }
+      }
+    })();
+
+    return () => {
+      ativo = false;
+      revokeAtual?.();
+    };
+  }, [logomarcaInstituicao]);
 
   useEffect(() => {
     const atualizarAlerta = () => {
@@ -975,7 +1016,7 @@ export function AppShell() {
               <div className="w-full text-center">
                 {logomarcaInstituicao ? (
                   <img
-                    src={resolverUrlArquivo(logomarcaInstituicao)}
+                    src={logomarcaTopoUrl || resolverUrlArquivo(logomarcaInstituicao)}
                     alt={`Logomarca da instituição ${nomeInstituicao}`}
                     className="mx-auto h-10 w-auto max-w-[170px] object-contain"
                   />

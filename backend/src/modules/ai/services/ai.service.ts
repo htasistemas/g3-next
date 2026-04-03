@@ -539,7 +539,7 @@ export class AiService {
     }
 
     if (!env.APP_GEMINI_API_KEY || env.IA_PROVIDER !== "gemini") {
-      return this.getIaUnavailable(query);
+      return this.getIaUnavailable(query, context);
     }
 
     const assisted = await this.tryAssistedResponse(ctx);
@@ -690,16 +690,20 @@ export class AiService {
     };
   }
 
-  private getIaUnavailable(query: string): AiResponse {
+  private getIaUnavailable(query: string, context?: AiContextPayload): AiResponse {
+    const sugestoes = this.suggest(query, context).perguntasFrequentes.slice(0, 5);
+    const lista = sugestoes.map((item) => `- ${item.pergunta}`).join("\n");
+
     return {
       intent: "RESPOSTA_ASSISTIDA",
       answer:
-        "**Resposta direta**\nO assistente inteligente está indisponível neste momento.\n\n" +
-        "**Resumo**\nA chave do Gemini não está configurada no backend ou o provedor não está habilitado.\n\n" +
-        "**Detalhes**\nConsultas estruturadas já implementadas no banco continuam funcionando, mas perguntas abertas dependem da configuração da IA generativa.\n\n" +
-        "**Alertas**\nDefina `GEMINI_API_KEY`, `IA_PROVIDER=gemini` e `IA_MODEL` no ambiente do backend.\n\n" +
-        "**Sugestões**\nTente uma pergunta objetiva das sugestões automáticas ou configure a chave e tente novamente.",
-      data: buildData(["assistente_ia"], { consulta: query, tipoConsulta: "ia_indisponivel" })
+        "**Resposta direta**\nA IA generativa não está configurada neste ambiente local, mas as consultas internas do sistema continuam disponíveis.\n\n" +
+        "**Resumo**\nPerguntas abertas dependem do Gemini. Já perguntas objetivas sobre dados do sistema continuam funcionando com consultas controladas no banco.\n\n" +
+        "**Detalhes**\nVocê pode perguntar por beneficiários, famílias, atendimentos, doações, tarefas, matrículas, cursos, captação e indicadores gerais.\n\n" +
+        "**Alertas**\nSe quiser respostas abertas com apoio generativo nesta máquina, defina `GEMINI_API_KEY`, `IA_PROVIDER=gemini` e `IA_MODEL` no backend.\n\n" +
+        "**Sugestões**\nTente uma destas consultas agora:\n" +
+        `${lista || "- Resumo geral do sistema"}`,
+      data: buildData(["assistente_ia"], undefined, undefined, { consulta: query, tipoConsulta: "ia_modo_local" })
     };
   }
 

@@ -1076,7 +1076,7 @@ export class ReportsService {
         colunas: [
           { titulo: "Item", largura: "46%" },
           { titulo: "Unidade", largura: "14%" },
-          { titulo: "Quantidade", largura: "12%" },
+          { titulo: "Quant", largura: "12%" },
           { titulo: "Observações", largura: "28%" }
         ],
         linhas: doacao.itens.map((item) => [
@@ -1094,7 +1094,7 @@ export class ReportsService {
         {
           titulo: "Assinaturas",
           conteudo:
-            "Responsável pela entrega:\n[[espaco:2.8]]\n_______________________________________________________________\n\nRecebedor:\n[[espaco:2.8]]\n_______________________________________________________________"
+            "Recebedor:\n[[espaco:2.8]]\n_______________________________________________________________"
         }
       ],
       cabecalho: contexto.cabecalho,

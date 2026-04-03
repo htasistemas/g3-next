@@ -46,11 +46,17 @@ const secoesManual: ManualSecao[] = [
         comoUsar: [
           "Comece pelos cadastros para garantir base confiável de beneficiários, famílias e profissionais.",
           "Use Atendimentos para registrar movimentações sociais, benefícios, inscrições e acompanhamentos.",
-          "Use Configurações gerais para manter parâmetros, usuários, IA e o próprio manual atualizados."
+          "Use Configurações gerais para manter parâmetros, usuários, IA e o próprio manual atualizados.",
+          "No acesso local pela tela de login, o botão Entrar com Google depende do client ID configurado no ambiente do frontend e do backend.",
+          "Quando o backend estiver em desenvolvimento sem envio de e-mail configurado, a recuperação de senha conclui localmente e grava a senha temporária no log do servidor."
         ],
         atencoes: [
           "Toda informação crítica deve ser validada antes do salvamento.",
-          "Sempre mantenha cadastros e vínculos familiares consistentes para evitar duplicidade de concessão."
+          "Sempre mantenha cadastros e vínculos familiares consistentes para evitar duplicidade de concessão.",
+          "Se o login Google ficar indisponível em ambiente local, revise APP_GOOGLE_CLIENT_ID, GOOGLE_CLIENT_ID e VITE_GOOGLE_CLIENT_ID antes de testar a autenticação.",
+          "Essa recuperação local sem e-mail é apenas de apoio ao desenvolvimento; em ambientes com envio ativo, a senha temporária continua sendo enviada ao endereço cadastrado.",
+          "Na impressão da ficha cadastral do beneficiário e no recibo de doação entregue, a logomarca do cabeçalho é carregada diretamente do storage local da unidade quando estiver salva como caminho lógico do sistema.",
+          "No cadastro da unidade assistencial, a Logomarca da unidade vazado preserva o arquivo original enviado pelo cliente, incluindo SVG e imagens com transparência, enquanto a Logomarca do relatório pode ser normalizada para manter compatibilidade de impressão."
         ]
       }
     ]
@@ -236,7 +242,8 @@ const secoesManual: ManualSecao[] = [
           "O botão Idosos sozinhos aplica foco em beneficiários e famílias com faixa etária idoso e sinais de vulnerabilidade alimentar.",
           "O botão Aguardando cestas concentra famílias e beneficiários com necessidade urgente de alimentos para apoiar priorização operacional.",
           "O botão Mapa de apoio e risco cruza violência, cestas entregues, instituições e doadores em visão agregada para leitura estratégica.",
-          "A visualização do mapa passou a usar uma base gratuita CARTO Voyager com Leaflet, sem depender de chave ou faturamento."
+          "A visualização do mapa passou a usar uma base gratuita CARTO Voyager com Leaflet, sem depender de chave ou faturamento.",
+          "A abertura da tela foi compatibilizada com runtimes React que ainda não expõem useEffectEvent, evitando erro de navegação ao entrar no georreferenciamento."
         ],
         atencoes: [
           "Os atalhos estratégicos ajustam filtros automaticamente e podem ser combinados com bairro e período.",
@@ -427,11 +434,13 @@ const secoesManual: ManualSecao[] = [
         comoUsar: [
           "Use a aba Histórico de doações para localizar as entregas já registradas e imprimir a relação completa pelo ícone da impressora da tela.",
           "Quando precisar do comprovante individual, use o ícone da impressora na própria linha da doação para gerar o recibo da entrega.",
-          "A impressão da relação segue o padrão visual do G3N, com colunas ajustadas para leitura e melhor aproveitamento da página."
+          "A impressão da relação segue o padrão visual do G3N, com colunas ajustadas para leitura e melhor aproveitamento da página.",
+          "No recibo individual da entrega, o cabeçalho usa a logomarca institucional configurada na unidade, a tabela de itens mantém o rótulo Quant para a quantidade e a seção de assinaturas exibe apenas o campo do recebedor."
         ],
         atencoes: [
           "No relatório da relação, a coluna Quantidade foi ajustada para caber corretamente sem quebrar o conteúdo na impressão.",
-          "Os títulos e descrições do PDF seguem o padrão pt-BR e a apresentação visual oficial do sistema."
+          "Os títulos e descrições do PDF seguem o padrão pt-BR e a apresentação visual oficial do sistema.",
+          "Se o recibo individual ficar sem logomarca, revise o cadastro da unidade atual e confirme se a logomarca ou a logomarca de relatório está salva no storage do sistema."
         ]
       },
       {
@@ -626,7 +635,7 @@ const secoesManual: ManualSecao[] = [
         atencoes: [
           "A IA respeita permissões e usa a mesma base inteligente nos dois pontos de acesso.",
           "Na central Pesquise na IA, a barra de envio foi reorganizada para manter os botões acessíveis sem sobrepor o ícone do robô.",
-          "Se a chave Gemini não estiver configurada no backend, o sistema informa que a IA generativa está indisponível sem expor segredos no frontend.",
+          "Se a chave Gemini não estiver configurada no backend, a central continua em modo local com sugestões e consultas objetivas ao banco, sem expor segredos no frontend.",
           "As respostas estruturadas usam dados reais de beneficiários, agenda, visitas e atendimentos internos, sem depender de conteúdo inventado."
         ]
       },

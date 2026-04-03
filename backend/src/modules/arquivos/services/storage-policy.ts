@@ -35,8 +35,8 @@ export type StoragePolicy = {
   generateThumbnail?: boolean;
 };
 
-const imageExtensions = ["jpg", "jpeg", "png", "webp"];
-const imageMimeTypes = ["image/jpeg", "image/png", "image/webp"];
+const imageExtensions = ["jpg", "jpeg", "png", "webp", "svg"];
+const imageMimeTypes = ["image/jpeg", "image/png", "image/webp", "image/svg+xml"];
 const documentExtensions = [
   ...imageExtensions,
   "pdf",

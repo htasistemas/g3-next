@@ -20,6 +20,41 @@ export function lerArquivoComoDataUrl(arquivo: File): Promise<string> {
   });
 }
 
+export async function normalizarImagemParaJpeg(
+  dataUrl: string,
+  options?: {
+    maxWidth?: number;
+    maxHeight?: number;
+    quality?: number;
+    fillStyle?: string;
+  }
+): Promise<string> {
+  const imagem = await carregarImagem(dataUrl);
+  const maxWidth = options?.maxWidth ?? imagem.width;
+  const maxHeight = options?.maxHeight ?? imagem.height;
+  const quality = options?.quality ?? 0.92;
+  const fillStyle = options?.fillStyle ?? "#ffffff";
+
+  const escala = Math.min(maxWidth / imagem.width, maxHeight / imagem.height, 1);
+  const largura = Math.max(1, Math.round(imagem.width * escala));
+  const altura = Math.max(1, Math.round(imagem.height * escala));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = largura;
+  canvas.height = altura;
+  const contexto = canvas.getContext("2d");
+
+  if (!contexto) {
+    throw new Error("Não foi possível processar a imagem.");
+  }
+
+  contexto.fillStyle = fillStyle;
+  contexto.fillRect(0, 0, largura, altura);
+  contexto.drawImage(imagem, 0, 0, largura, altura);
+
+  return canvas.toDataURL("image/jpeg", quality);
+}
+
 export async function ajustarParaFotoTresPorQuatro(dataUrl: string): Promise<string> {
   const imagem = await carregarImagem(dataUrl);
   const canvas = document.createElement("canvas");

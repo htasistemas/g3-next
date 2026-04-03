@@ -58,8 +58,8 @@ import {
 } from "@/lib/text-format-config";
 import { formatarTextoPorCampo, normalizarObjetoTexto } from "@/lib/text-formatter";
 import { abrirRelatorioPdf } from "@/lib/report-utils";
-import { resolverUrlArquivo } from "@/lib/arquivos";
-import { fotoMaximaBytes, lerArquivoComoDataUrl } from "@/lib/foto-3x4";
+import { obterUrlArquivoAutenticado, resolverUrlArquivo } from "@/lib/arquivos";
+import { fotoMaximaBytes, lerArquivoComoDataUrl, normalizarImagemParaJpeg } from "@/lib/foto-3x4";
 import { useAuth } from "@/hooks/use-auth";
 import type {
   DiretoriaUnidade,
@@ -234,6 +234,8 @@ export function CadastroUnidadeAssistencialPage() {
   const [popupExcluirAberto, setPopupExcluirAberto] = useState(false);
   const [carregandoCep, setCarregandoCep] = useState(false);
   const [imprimindoRelatorio, setImprimindoRelatorio] = useState(false);
+  const [previewLogomarcaUrl, setPreviewLogomarcaUrl] = useState("");
+  const [previewLogomarcaRelatorioUrl, setPreviewLogomarcaRelatorioUrl] = useState("");
   const ultimoCepConsultadoRef = useRef("");
   const inputLogomarcaRef = useRef<HTMLInputElement | null>(null);
   const inputLogomarcaRelatorioRef = useRef<HTMLInputElement | null>(null);
@@ -300,6 +302,88 @@ export function CadastroUnidadeAssistencialPage() {
     setMensagem(null);
     setAbaAtiva("dados");
   }, [replaceDiretoria, replaceSalas, reset, unidadeData]);
+
+  useEffect(() => {
+    let ativo = true;
+    let revokeAtual: (() => void) | undefined;
+
+    if (!logomarcaAtual) {
+      setPreviewLogomarcaUrl("");
+      return () => {
+        revokeAtual?.();
+      };
+    }
+
+    if (logomarcaAtual.startsWith("data:") || logomarcaAtual.startsWith("blob:")) {
+      setPreviewLogomarcaUrl(logomarcaAtual);
+      return () => {
+        revokeAtual?.();
+      };
+    }
+
+    void (async () => {
+      try {
+        const arquivo = await obterUrlArquivoAutenticado(logomarcaAtual);
+        if (!ativo) {
+          arquivo.revoke?.();
+          return;
+        }
+        revokeAtual = arquivo.revoke;
+        setPreviewLogomarcaUrl(arquivo.url || resolverUrlArquivo(logomarcaAtual));
+      } catch {
+        if (ativo) {
+          setPreviewLogomarcaUrl(resolverUrlArquivo(logomarcaAtual));
+        }
+      }
+    })();
+
+    return () => {
+      ativo = false;
+      revokeAtual?.();
+    };
+  }, [logomarcaAtual]);
+
+  useEffect(() => {
+    let ativo = true;
+    let revokeAtual: (() => void) | undefined;
+
+    if (!logomarcaRelatorioAtual) {
+      setPreviewLogomarcaRelatorioUrl("");
+      return () => {
+        revokeAtual?.();
+      };
+    }
+
+    if (logomarcaRelatorioAtual.startsWith("data:") || logomarcaRelatorioAtual.startsWith("blob:")) {
+      setPreviewLogomarcaRelatorioUrl(logomarcaRelatorioAtual);
+      return () => {
+        revokeAtual?.();
+      };
+    }
+
+    void (async () => {
+      try {
+        const arquivo = await obterUrlArquivoAutenticado(logomarcaRelatorioAtual);
+        if (!ativo) {
+          arquivo.revoke?.();
+          return;
+        }
+        revokeAtual = arquivo.revoke;
+        setPreviewLogomarcaRelatorioUrl(
+          arquivo.url || resolverUrlArquivo(logomarcaRelatorioAtual)
+        );
+      } catch {
+        if (ativo) {
+          setPreviewLogomarcaRelatorioUrl(resolverUrlArquivo(logomarcaRelatorioAtual));
+        }
+      }
+    })();
+
+    return () => {
+      ativo = false;
+      revokeAtual?.();
+    };
+  }, [logomarcaRelatorioAtual]);
 
   useEffect(() => {
     const cepNormalizado = somenteDigitos(cepAtual);
@@ -462,7 +546,15 @@ export function CadastroUnidadeAssistencialPage() {
 
     try {
       const dataUrl = await lerArquivoComoDataUrl(arquivo);
-      setValue(campo, dataUrl, { shouldDirty: true, shouldValidate: true });
+      const valorImagem =
+        campo === "logomarca"
+          ? dataUrl
+          : await normalizarImagemParaJpeg(dataUrl, {
+              maxWidth: 1800,
+              maxHeight: 1800,
+              quality: 0.9
+            });
+      setValue(campo, valorImagem, { shouldDirty: true, shouldValidate: true });
       setMensagem(null);
     } catch (error: any) {
       setMensagem({
@@ -848,7 +940,7 @@ export function CadastroUnidadeAssistencialPage() {
                       <div className="mt-2 flex aspect-[4/3] w-full max-w-[170px] items-center justify-center overflow-hidden rounded-md border border-emerald-800 bg-emerald-900">
                         {logomarcaAtual ? (
                           <img
-                            src={resolverUrlArquivo(logomarcaAtual)}
+                            src={previewLogomarcaUrl || resolverUrlArquivo(logomarcaAtual)}
                             alt="Logomarca da unidade vazado"
                             className="h-full w-full object-contain"
                           />
@@ -894,7 +986,10 @@ export function CadastroUnidadeAssistencialPage() {
                       <div className="mt-2 flex aspect-[4/3] w-full max-w-[170px] items-center justify-center overflow-hidden rounded-md border border-[var(--g3-border)] bg-[var(--g3-card-soft)]">
                         {logomarcaRelatorioAtual ? (
                           <img
-                            src={resolverUrlArquivo(logomarcaRelatorioAtual)}
+                            src={
+                              previewLogomarcaRelatorioUrl ||
+                              resolverUrlArquivo(logomarcaRelatorioAtual)
+                            }
                             alt="Logomarca do relatório"
                             className="h-full w-full object-contain"
                           />
