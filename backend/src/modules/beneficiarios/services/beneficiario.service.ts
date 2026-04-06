@@ -1,4 +1,5 @@
 import { AppError } from "../../../shared/errors/app-error.js";
+import { EmailService } from "../../email/services/email.service.js";
 import {
   beneficiarioAddressSuggestionSchema,
   beneficiarioFiltersSchema,
@@ -6,6 +7,11 @@ import {
 } from "../beneficiario.schema.js";
 import { mapBeneficiarioToResponse } from "../beneficiario.mapper.js";
 import { BeneficiarioRepository } from "../repositories/beneficiario.repository.js";
+import {
+  montarMensagemAlteracoesBeneficiario,
+  montarResumoAlteracoesBeneficiario,
+  obterDestinatariosAlteracaoBeneficiario
+} from "./beneficiario-email-notificacao.js";
 import {
   mapaCamposTextoBeneficiario,
   mapaDocumentoBeneficiario
@@ -16,6 +22,7 @@ import { storageService } from "../../arquivos/services/storage-instance.js";
 
 export class BeneficiarioService {
   private readonly repository = new BeneficiarioRepository();
+  private readonly emailService = new EmailService();
 
   async listar(rawFilters: unknown) {
     const filtersNormalizados =
@@ -63,6 +70,7 @@ export class BeneficiarioService {
     const input = beneficiarioInputSchema.parse(inputNormalizado);
     const usuarioId = this.parseUsuarioId(rawUsuarioId);
     const existente = await this.repository.buscarPorIdOuFalhar(id);
+    const snapshotAnterior = mapBeneficiarioToResponse(existente);
     const preparado = await this.prepararArquivosPayload(input, usuarioId, id);
 
     try {
@@ -107,7 +115,9 @@ export class BeneficiarioService {
         console.warn("[beneficiario] falha ao limpar arquivos substituidos apos atualizar cadastro:", error);
       }
 
-      return mapBeneficiarioToResponse(beneficiario);
+      const response = mapBeneficiarioToResponse(beneficiario);
+      await this.enviarEmailAtualizacaoCadastro(snapshotAnterior, response);
+      return response;
     } catch (error) {
       await storageService.rollbackArquivos(preparado.novosCaminhos);
       throw error;
@@ -313,5 +323,38 @@ export class BeneficiarioService {
       return undefined;
     }
     return BigInt(parsed);
+  }
+
+  private async enviarEmailAtualizacaoCadastro(
+    anterior: Record<string, unknown>,
+    atual: Record<string, unknown>
+  ) {
+    const alteracoes = montarResumoAlteracoesBeneficiario(anterior, atual);
+    if (!alteracoes.length) {
+      return;
+    }
+
+    const destinatarios = obterDestinatariosAlteracaoBeneficiario(anterior, atual);
+    if (!destinatarios.length) {
+      return;
+    }
+
+    const assunto = "Atualizacao cadastral do beneficiario - G3 Next";
+    const mensagem = montarMensagemAlteracoesBeneficiario(atual, alteracoes);
+
+    for (const destinatario of destinatarios) {
+      try {
+        await this.emailService.enviarEmailSimples({
+          destinatario,
+          assunto,
+          mensagem
+        });
+      } catch (error) {
+        console.warn("[beneficiario] falha ao enviar email automatico de atualizacao:", {
+          destinatario,
+          error
+        });
+      }
+    }
   }
 }
