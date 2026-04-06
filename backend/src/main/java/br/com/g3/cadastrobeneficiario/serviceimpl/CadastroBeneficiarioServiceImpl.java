@@ -6,6 +6,7 @@ import br.com.g3.cadastrobeneficiario.dto.AptidaoCestaBasicaRequest;
 import br.com.g3.cadastrobeneficiario.dto.CadastroBeneficiarioCriacaoRequest;
 import br.com.g3.cadastrobeneficiario.dto.CadastroBeneficiarioResponse;
 import br.com.g3.cadastrobeneficiario.dto.CadastroBeneficiarioResumoResponse;
+import br.com.g3.cadastrobeneficiario.dto.DocumentoBeneficiarioResponse;
 import br.com.g3.cadastrobeneficiario.dto.DocumentoUploadRequest;
 import br.com.g3.cadastrobeneficiario.mapper.CadastroBeneficiarioMapper;
 import br.com.g3.cadastrobeneficiario.repository.CadastroBeneficiarioRepository;
@@ -14,11 +15,20 @@ import br.com.g3.cadastrobeneficiario.service.ArmazenamentoDocumentoService;
 import br.com.g3.cadastrobeneficiario.service.CadastroBeneficiarioService;
 import br.com.g3.unidadeassistencial.domain.Endereco;
 import br.com.g3.unidadeassistencial.service.GeocodificacaoService;
-import java.time.format.DateTimeFormatter;
+import java.beans.IntrospectionException;
+import java.beans.Introspector;
+import java.beans.PropertyDescriptor;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,6 +41,12 @@ import org.springframework.web.server.ResponseStatusException;
 public class CadastroBeneficiarioServiceImpl implements CadastroBeneficiarioService {
   private static final Logger LOGGER =
       LoggerFactory.getLogger(CadastroBeneficiarioServiceImpl.class);
+  private static final DateTimeFormatter DATA_UI = DateTimeFormatter.ofPattern("dd-MM-yyyy");
+  private static final DateTimeFormatter DATA_HORA_UI =
+      DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm");
+  private static final Set<String> CAMPOS_IGNORADOS_EMAIL =
+      Set.of("class", "id", "dataCadastro", "dataAtualizacao");
+  private static final Map<String, String> LABELS_EMAIL = criarLabelsEmail();
   private final CadastroBeneficiarioRepository repository;
   private final ArmazenamentoDocumentoService armazenamentoDocumentoService;
   private final DocumentoBeneficiarioJpaRepository documentoRepository;
@@ -70,12 +86,13 @@ public class CadastroBeneficiarioServiceImpl implements CadastroBeneficiarioServ
   public CadastroBeneficiarioResponse atualizar(Long id, CadastroBeneficiarioCriacaoRequest request) {
     CadastroBeneficiario cadastro =
         repository.buscarPorId(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+    CadastroBeneficiarioResponse cadastroAnterior = CadastroBeneficiarioMapper.toResponse(cadastro);
     CadastroBeneficiarioMapper.aplicarAtualizacao(cadastro, request);
     CadastroBeneficiario salvo = repository.salvar(cadastro);
     adicionarDocumentosUpload(salvo, request);
     CadastroBeneficiario atualizado = repository.salvar(salvo);
     CadastroBeneficiarioResponse response = CadastroBeneficiarioMapper.toResponse(atualizado);
-    enviarEmailAtualizacao(response);
+    enviarEmailAtualizacao(cadastroAnterior, response);
     return response;
   }
 
@@ -463,13 +480,27 @@ public class CadastroBeneficiarioServiceImpl implements CadastroBeneficiarioServ
     }
   }
 
-  private void enviarEmailAtualizacao(CadastroBeneficiarioResponse beneficiario) {
-    if (!podeEnviarEmail(beneficiario)) return;
+  private void enviarEmailAtualizacao(
+      CadastroBeneficiarioResponse beneficiarioAnterior,
+      CadastroBeneficiarioResponse beneficiarioAtual) {
+    List<String> alteracoes = listarAlteracoesEmail(beneficiarioAnterior, beneficiarioAtual);
+    if (alteracoes.isEmpty()) {
+      return;
+    }
+
+    Set<String> destinatarios = obterDestinatariosEmail(beneficiarioAnterior, beneficiarioAtual);
+    if (destinatarios.isEmpty()) {
+      return;
+    }
+
     try {
-      emailService.enviarAtualizacaoBeneficiario(
-          beneficiario.getEmail(),
-          beneficiario.getNomeCompleto(),
-          beneficiario.getCodigo());
+      for (String destinatario : destinatarios) {
+        emailService.enviarAtualizacaoBeneficiario(
+            destinatario,
+            beneficiarioAtual.getNomeCompleto(),
+            beneficiarioAtual.getCodigo(),
+            alteracoes);
+      }
     } catch (Exception ex) {
       LOGGER.warn("Envio de email de atualizacao de beneficiario ignorado.", ex);
     }
@@ -482,5 +513,244 @@ public class CadastroBeneficiarioServiceImpl implements CadastroBeneficiarioServ
     }
     String email = beneficiario.getEmail();
     return email != null && !email.trim().isEmpty();
+  }
+
+  static List<String> listarAlteracoesEmail(
+      CadastroBeneficiarioResponse anterior, CadastroBeneficiarioResponse atual) {
+    if (anterior == null || atual == null) {
+      return List.of();
+    }
+
+    try {
+      return List.of(Introspector.getBeanInfo(CadastroBeneficiarioResponse.class, Object.class).getPropertyDescriptors())
+          .stream()
+          .filter(descriptor -> !CAMPOS_IGNORADOS_EMAIL.contains(descriptor.getName()))
+          .sorted(Comparator.comparing(CadastroBeneficiarioServiceImpl::ordemLabelEmail))
+          .map(descriptor -> montarDescricaoAlteracao(descriptor, anterior, atual))
+          .filter(Objects::nonNull)
+          .collect(Collectors.toList());
+    } catch (IntrospectionException ex) {
+      LOGGER.warn("Falha ao montar alteracoes de email do beneficiario.", ex);
+      return List.of();
+    }
+  }
+
+  private static String montarDescricaoAlteracao(
+      PropertyDescriptor descriptor,
+      CadastroBeneficiarioResponse anterior,
+      CadastroBeneficiarioResponse atual) {
+    try {
+      Object valorAnterior = descriptor.getReadMethod().invoke(anterior);
+      Object valorAtual = descriptor.getReadMethod().invoke(atual);
+      String antes = formatarValorEmail(descriptor.getName(), valorAnterior);
+      String depois = formatarValorEmail(descriptor.getName(), valorAtual);
+      if (Objects.equals(antes, depois)) {
+        return null;
+      }
+      return labelEmail(descriptor.getName())
+          + ": de \""
+          + antes
+          + "\" para \""
+          + depois
+          + "\".";
+    } catch (Exception ex) {
+      LOGGER.debug("Falha ao comparar campo {} do beneficiario.", descriptor.getName(), ex);
+      return null;
+    }
+  }
+
+  private Set<String> obterDestinatariosEmail(
+      CadastroBeneficiarioResponse beneficiarioAnterior,
+      CadastroBeneficiarioResponse beneficiarioAtual) {
+    LinkedHashSet<String> destinatarios = new LinkedHashSet<>();
+    adicionarDestinatarioEmail(destinatarios, beneficiarioAtual);
+    adicionarDestinatarioEmail(destinatarios, beneficiarioAnterior);
+    return destinatarios;
+  }
+
+  private void adicionarDestinatarioEmail(
+      Set<String> destinatarios, CadastroBeneficiarioResponse beneficiario) {
+    if (!podeEnviarEmail(beneficiario)) {
+      return;
+    }
+    destinatarios.add(beneficiario.getEmail().trim().toLowerCase(Locale.ROOT));
+  }
+
+  private static Map<String, String> criarLabelsEmail() {
+    Map<String, String> labels = new LinkedHashMap<>();
+    labels.put("codigo", "Código");
+    labels.put("nomeCompleto", "Nome completo");
+    labels.put("nomeSocial", "Nome social");
+    labels.put("apelido", "Apelido");
+    labels.put("dataNascimento", "Data de nascimento");
+    labels.put("foto3x4", "Foto 3x4");
+    labels.put("sexoBiologico", "Sexo biológico");
+    labels.put("corRaca", "Cor ou raça");
+    labels.put("estadoCivil", "Estado civil");
+    labels.put("nacionalidade", "Nacionalidade");
+    labels.put("naturalidadeCidade", "Naturalidade cidade");
+    labels.put("naturalidadeUf", "Naturalidade UF");
+    labels.put("nomeMae", "Nome da mãe");
+    labels.put("nomePai", "Nome do pai");
+    labels.put("status", "Status");
+    labels.put("optaReceberCestaBasica", "Opta receber cesta básica");
+    labels.put("aptoReceberCestaBasica", "Apto receber cesta básica");
+    labels.put("cep", "CEP");
+    labels.put("logradouro", "Logradouro");
+    labels.put("numero", "Número");
+    labels.put("complemento", "Complemento");
+    labels.put("bairro", "Bairro");
+    labels.put("pontoReferencia", "Ponto de referência");
+    labels.put("municipio", "Município");
+    labels.put("zona", "Zona");
+    labels.put("subzona", "Subzona");
+    labels.put("uf", "UF");
+    labels.put("latitude", "Latitude");
+    labels.put("longitude", "Longitude");
+    labels.put("telefonePrincipal", "Telefone principal");
+    labels.put("telefonePrincipalWhatsapp", "Telefone principal WhatsApp");
+    labels.put("telefoneSecundario", "Telefone secundário");
+    labels.put("telefoneRecadoNome", "Telefone recado nome");
+    labels.put("telefoneRecadoNumero", "Telefone recado número");
+    labels.put("email", "E-mail");
+    labels.put("permiteContatoTel", "Permite contato por telefone");
+    labels.put("permiteContatoWhatsapp", "Permite contato por WhatsApp");
+    labels.put("permiteContatoSms", "Permite contato por SMS");
+    labels.put("permiteContatoEmail", "Permite contato por e-mail");
+    labels.put("horarioPreferencialContato", "Horário preferencial de contato");
+    labels.put("cpf", "CPF");
+    labels.put("rgNumero", "RG número");
+    labels.put("rgOrgaoEmissor", "RG órgão emissor");
+    labels.put("rgUf", "RG UF");
+    labels.put("rgDataEmissao", "RG data de emissão");
+    labels.put("nis", "NIS");
+    labels.put("certidaoTipo", "Certidão tipo");
+    labels.put("certidaoLivro", "Certidão livro");
+    labels.put("certidaoFolha", "Certidão folha");
+    labels.put("certidaoTermo", "Certidão termo");
+    labels.put("certidaoCartorio", "Certidão cartório");
+    labels.put("certidaoMunicipio", "Certidão município");
+    labels.put("certidaoUf", "Certidão UF");
+    labels.put("tituloEleitor", "Título de eleitor");
+    labels.put("cnh", "CNH");
+    labels.put("cartaoSus", "Cartão SUS");
+    labels.put("moraComFamilia", "Mora com família");
+    labels.put("responsavelLegal", "Responsável legal");
+    labels.put("vinculoFamiliar", "Vínculo familiar");
+    labels.put("situacaoVulnerabilidade", "Situação de vulnerabilidade");
+    labels.put("composicaoFamiliar", "Composição familiar");
+    labels.put("criancasAdolescentes", "Crianças e adolescentes");
+    labels.put("idosos", "Idosos");
+    labels.put("acompanhamentoCras", "Acompanhamento CRAS");
+    labels.put("acompanhamentoSaude", "Acompanhamento saúde");
+    labels.put("participaComunidade", "Participa comunidade");
+    labels.put("redeApoio", "Rede de apoio");
+    labels.put("sabeLerEscrever", "Sabe ler e escrever");
+    labels.put("nivelEscolaridade", "Nível de escolaridade");
+    labels.put("estudaAtualmente", "Estuda atualmente");
+    labels.put("ocupacao", "Ocupação");
+    labels.put("situacaoTrabalho", "Situação de trabalho");
+    labels.put("localTrabalho", "Local de trabalho");
+    labels.put("rendaMensal", "Renda mensal");
+    labels.put("fonteRenda", "Fonte de renda");
+    labels.put("possuiDeficiencia", "Possui deficiência");
+    labels.put("tipoDeficiencia", "Tipo de deficiência");
+    labels.put("cidPrincipal", "CID principal");
+    labels.put("usaMedicacaoContinua", "Usa medicação contínua");
+    labels.put("descricaoMedicacao", "Descrição da medicação");
+    labels.put("servicoSaudeReferencia", "Serviço de saúde de referência");
+    labels.put("recebeBeneficio", "Recebe benefício");
+    labels.put("beneficiosDescricao", "Benefícios descrição");
+    labels.put("valorTotalBeneficios", "Valor total benefícios");
+    labels.put("beneficiosRecebidos", "Benefícios recebidos");
+    labels.put("aceiteLgpd", "Aceite LGPD");
+    labels.put("dataAceiteLgpd", "Data aceite LGPD");
+    labels.put("observacoes", "Observações");
+    labels.put("documentosObrigatorios", "Documentos obrigatórios");
+    return labels;
+  }
+
+  private static String ordemLabelEmail(PropertyDescriptor descriptor) {
+    return labelEmail(descriptor.getName());
+  }
+
+  private static String labelEmail(String propriedade) {
+    return LABELS_EMAIL.getOrDefault(propriedade, humanizarNomeCampo(propriedade));
+  }
+
+  private static String formatarValorEmail(String propriedade, Object valor) {
+    if (valor == null) {
+      return "Não informado";
+    }
+    if (valor instanceof String texto) {
+      String normalizado = texto.trim();
+      return normalizado.isEmpty() ? "Não informado" : normalizado;
+    }
+    if (valor instanceof Boolean booleano) {
+      return Boolean.TRUE.equals(booleano) ? "Sim" : "Não";
+    }
+    if (valor instanceof LocalDate data) {
+      return data.format(DATA_UI);
+    }
+    if (valor instanceof LocalDateTime dataHora) {
+      return dataHora.format(DATA_HORA_UI);
+    }
+    if ("documentosObrigatorios".equals(propriedade) && valor instanceof List<?> listaDocumentos) {
+      return formatarDocumentosEmail(listaDocumentos);
+    }
+    if (valor instanceof List<?> lista) {
+      List<String> itens =
+          lista.stream()
+              .filter(Objects::nonNull)
+              .map(String::valueOf)
+              .map(String::trim)
+              .filter(item -> !item.isEmpty())
+              .sorted()
+              .collect(Collectors.toList());
+      return itens.isEmpty() ? "Não informado" : String.join(", ", itens);
+    }
+    return String.valueOf(valor);
+  }
+
+  private static String formatarDocumentosEmail(List<?> listaDocumentos) {
+    List<String> documentos =
+        listaDocumentos.stream()
+            .filter(DocumentoBeneficiarioResponse.class::isInstance)
+            .map(DocumentoBeneficiarioResponse.class::cast)
+            .map(CadastroBeneficiarioServiceImpl::formatarDocumentoEmail)
+            .filter(item -> item != null && !item.isBlank())
+            .sorted()
+            .collect(Collectors.toList());
+    return documentos.isEmpty() ? "Não informado" : String.join(", ", documentos);
+  }
+
+  private static String formatarDocumentoEmail(DocumentoBeneficiarioResponse documento) {
+    if (documento == null) {
+      return null;
+    }
+    String nome = documento.getNome() == null ? "" : documento.getNome().trim();
+    String nomeArquivo =
+        documento.getNomeArquivo() == null ? "" : documento.getNomeArquivo().trim();
+    if (nome.isEmpty() && nomeArquivo.isEmpty()) {
+      return null;
+    }
+    if (nome.isEmpty()) {
+      return nomeArquivo;
+    }
+    if (nomeArquivo.isEmpty()) {
+      return nome;
+    }
+    return nome + " (" + nomeArquivo + ")";
+  }
+
+  private static String humanizarNomeCampo(String nomeCampo) {
+    if (nomeCampo == null || nomeCampo.isBlank()) {
+      return "Campo";
+    }
+    String texto = nomeCampo.replaceAll("([a-z])([A-Z])", "$1 $2").trim();
+    if (texto.isEmpty()) {
+      return "Campo";
+    }
+    return Character.toUpperCase(texto.charAt(0)) + texto.substring(1);
   }
 }

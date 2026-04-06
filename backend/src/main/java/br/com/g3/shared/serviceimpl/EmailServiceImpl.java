@@ -212,12 +212,19 @@ public class EmailServiceImpl implements EmailService {
 
   @Override
   public void enviarAtualizacaoBeneficiario(String destinatario, String nome, String codigo) {
+    enviarAtualizacaoBeneficiario(destinatario, nome, codigo, List.of());
+  }
+
+  @Override
+  public void enviarAtualizacaoBeneficiario(
+      String destinatario, String nome, String codigo, List<String> alteracoes) {
     enviarEmailBeneficiario(
         destinatario,
         nome,
         codigo,
         "Atualizacao cadastral - G3",
-        "Atualizacao realizada");
+        "Atualizacao realizada",
+        alteracoes);
   }
 
   @Override
@@ -480,6 +487,16 @@ public class EmailServiceImpl implements EmailService {
 
   private void enviarEmailBeneficiario(
       String destinatario, String nome, String codigo, String assunto, String acao) {
+    enviarEmailBeneficiario(destinatario, nome, codigo, assunto, acao, List.of());
+  }
+
+  private void enviarEmailBeneficiario(
+      String destinatario,
+      String nome,
+      String codigo,
+      String assunto,
+      String acao,
+      List<String> alteracoes) {
     configurarMailSeNecessario();
     if (destinatario == null || destinatario.trim().isEmpty()) {
       LOGGER.warn("Envio de email de beneficiario ignorado: destinatario vazio.");
@@ -511,17 +528,30 @@ public class EmailServiceImpl implements EmailService {
     String nomeSeguro = nome == null || nome.trim().isEmpty() ? "beneficiario" : nome.trim();
     String codigoSeguro = codigo == null || codigo.trim().isEmpty() ? "nao informado" : codigo.trim();
 
-    String corpo =
-        "Ola "
-            + nomeSeguro
-            + ",\n\n"
-            + acao
-            + " no cadastro do beneficiario no G3.\n"
-            + "Codigo: "
-            + codigoSeguro
-            + "\n\n"
-            + "Atenciosamente,\n"
-            + "Equipe G3";
+    StringBuilder corpo = new StringBuilder();
+    corpo
+        .append("Ola ")
+        .append(nomeSeguro)
+        .append(",\n\n")
+        .append(acao)
+        .append(" no cadastro do beneficiario no G3.\n")
+        .append("Codigo: ")
+        .append(codigoSeguro)
+        .append("\n\n");
+    if (alteracoes == null || alteracoes.isEmpty()) {
+      corpo.append("Nenhuma alteracao detalhada foi identificada para envio.\n\n");
+    } else {
+      corpo.append("Alteracoes realizadas:\n");
+      for (String alteracao : alteracoes) {
+        if (alteracao != null && !alteracao.trim().isEmpty()) {
+          corpo.append("- ").append(alteracao.trim()).append("\n");
+        }
+      }
+      corpo.append("\n");
+    }
+    corpo.append("Este email foi gerado automaticamente pelo G3.\n\n");
+    corpo.append("Atenciosamente,\n");
+    corpo.append("Equipe G3");
 
     try {
       MimeMessageHelper helper =
@@ -529,7 +559,7 @@ public class EmailServiceImpl implements EmailService {
       helper.setTo(destinatarioSeguro);
       helper.setFrom(from, nomeRemetente);
       helper.setSubject(assunto);
-      helper.setText(corpo, false);
+      helper.setText(corpo.toString(), false);
       mailSender.send(helper.getMimeMessage());
     } catch (Exception ex) {
       LOGGER.warn("Falha ao enviar email de beneficiario.", ex);

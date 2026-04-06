@@ -1,5 +1,7 @@
 package br.com.g3.shared.service;
 
+import java.util.List;
+
 public interface EmailService {
   void enviarRecuperacaoSenha(String destinatario, String nome, String token, String validade);
 
@@ -8,6 +10,9 @@ public interface EmailService {
   void enviarCadastroBeneficiario(String destinatario, String nome, String codigo);
 
   void enviarAtualizacaoBeneficiario(String destinatario, String nome, String codigo);
+
+  void enviarAtualizacaoBeneficiario(
+      String destinatario, String nome, String codigo, List<String> alteracoes);
 
   void enviarAlertasSistema(String destinatario, java.util.List<String> alertas, String frequenciaEnvio);
 }

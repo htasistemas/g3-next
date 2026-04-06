@@ -1,6 +1,17 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.418",
+                        "releaseDate":  "2026-04-06",
+                        "title":  "Cadastro de beneficiário com e-mail automático de alterações",
+                        "description":  "Toda atualização no cadastro de beneficiário passou a enviar automaticamente um e-mail com o resumo dos campos alterados.",
+                        "changes":  [
+                                        "O backend agora compara o cadastro anterior com o atualizado antes de disparar a notificação.",
+                                        "O e-mail de atualização passou a informar campo por campo o que mudou, incluindo documentos anexados quando houver alteração.",
+                                        "Versão oficial e registro interno da entrega atualizados na mesma publicação."
+                                    ]
+                    },
+                    {
                         "version":  "1.00.415",
                         "releaseDate":  "2026-04-01",
                         "title":  "Licença de uso com nova implantação do Enterprise",
