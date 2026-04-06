@@ -570,10 +570,18 @@ public class CadastroBeneficiarioServiceImpl implements CadastroBeneficiarioServ
 
   private void adicionarDestinatarioEmail(
       Set<String> destinatarios, CadastroBeneficiarioResponse beneficiario) {
-    if (!podeEnviarEmail(beneficiario)) {
+    if (!possuiEmailDestinatario(beneficiario)) {
       return;
     }
     destinatarios.add(beneficiario.getEmail().trim().toLowerCase(Locale.ROOT));
+  }
+
+  private boolean possuiEmailDestinatario(CadastroBeneficiarioResponse beneficiario) {
+    if (beneficiario == null) {
+      return false;
+    }
+    String email = beneficiario.getEmail();
+    return email != null && !email.trim().isEmpty();
   }
 
   private static Map<String, String> criarLabelsEmail() {
