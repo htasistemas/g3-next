@@ -1,6 +1,17 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.419",
+                        "releaseDate":  "2026-04-06",
+                        "title":  "Envio automático do beneficiário com SMTP mais resiliente",
+                        "description":  "O disparo automático de e-mail nas alterações do cadastro de beneficiário foi ajustado no backend Node para reduzir falhas silenciosas e melhorar o diagnóstico operacional.",
+                        "changes":  [
+                                        "O envio automático do cadastro de beneficiário deixou de depender da verificação SMTP prévia em toda atualização.",
+                                        "O backend passou a registrar logs claros quando prepara, envia ou falha ao enviar o e-mail automático de alteração.",
+                                        "Versão oficial e changelog atualizados na mesma entrega."
+                                    ]
+                    },
+                    {
                         "version":  "1.00.418",
                         "releaseDate":  "2026-04-06",
                         "title":  "Cadastro de beneficiário com e-mail automático de alterações",

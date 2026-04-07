@@ -336,11 +336,22 @@ export class BeneficiarioService {
 
     const destinatarios = obterDestinatariosAlteracaoBeneficiario(anterior, atual);
     if (!destinatarios.length) {
+      console.warn("[beneficiario] atualizacao sem destinatario para envio de email:", {
+        codigo: atual.codigo,
+        nome: atual.nome_completo
+      });
       return;
     }
 
     const assunto = "Atualizacao cadastral do beneficiario - G3 Next";
     const mensagem = montarMensagemAlteracoesBeneficiario(atual, alteracoes);
+
+    console.info("[beneficiario] preparando email automatico de atualizacao:", {
+      codigo: atual.codigo,
+      nome: atual.nome_completo,
+      destinatarios,
+      totalAlteracoes: alteracoes.length
+    });
 
     for (const destinatario of destinatarios) {
       try {
@@ -349,8 +360,13 @@ export class BeneficiarioService {
           assunto,
           mensagem
         });
+        console.info("[beneficiario] email automatico de atualizacao enviado:", {
+          codigo: atual.codigo,
+          destinatario
+        });
       } catch (error) {
         console.warn("[beneficiario] falha ao enviar email automatico de atualizacao:", {
+          codigo: atual.codigo,
           destinatario,
           error
         });

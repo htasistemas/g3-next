@@ -39,6 +39,8 @@ export class EmailService {
       "Este e um email de teste enviado pelo endpoint /api/email/teste do backend G3 Next.";
 
     try {
+      await this.transporter.verify();
+
       const info = await this.enviarEmailSimples({
         destinatario,
         assunto,
@@ -85,8 +87,6 @@ export class EmailService {
     if (!env.APP_EMAIL_HABILITADO) {
       throw new AppError("Envio de email desabilitado no servidor.", 503);
     }
-
-    await this.transporter.verify();
 
     const info = await this.transporter.sendMail({
       from: `${env.APP_EMAIL_NOME} <${env.APP_EMAIL_REMETENTE}>`,
