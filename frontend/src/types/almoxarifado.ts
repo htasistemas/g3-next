@@ -11,9 +11,13 @@ export type ItemAlmoxarifado = {
   localizacao?: string;
   localizacao_interna?: string;
   estoque_atual: number;
+  estoque_fisico?: number;
+  estoque_disponivel?: number;
+  estoque_montavel_kit?: number;
   estoque_minimo: number;
   valor_unitario: number;
   is_kit: boolean;
+  possui_composicao_kit?: boolean;
   situacao: string;
   validade?: string;
   ignorar_validade?: boolean;

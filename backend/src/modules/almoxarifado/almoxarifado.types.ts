@@ -50,6 +50,10 @@ export type AlmoxarifadoItemRow = {
   validade: Date | null;
   ignorar_validade: boolean;
   observacoes: string | null;
+  estoque_fisico?: number;
+  estoque_disponivel?: number;
+  estoque_montavel_kit?: number;
+  possui_composicao_kit?: boolean;
 };
 
 export type AlmoxarifadoMovimentacaoRow = {

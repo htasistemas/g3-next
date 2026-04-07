@@ -1,6 +1,28 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.423",
+                        "releaseDate":  "2026-04-06",
+                        "title":  "Almoxarifado com saldo disponível calculado para kits",
+                        "description":  "Itens de kit, como cesta básica, passaram a exibir e validar o saldo disponível com base no estoque pronto e também na composição cadastrada do kit.",
+                        "changes":  [
+                                        "A composição do kit agora informa quantas unidades completas podem ser montadas a partir dos componentes cadastrados.",
+                                        "O saldo disponível do kit passou a considerar o estoque físico já pronto somado ao estoque montável pela composição.",
+                                        "Doações realizadas e tela do almoxarifado passaram a respeitar essa regra sem inflar a quantidade dos itens componentes."
+                                    ]
+                    },
+                    {
+                        "version":  "1.00.422",
+                        "releaseDate":  "2026-04-06",
+                        "title":  "Listagem de fotos e eventos com abertura por clique",
+                        "description":  "A aba Listagem de Fotos e eventos foi simplificada para abrir a galeria diretamente ao clicar no evento, sem botão separado.",
+                        "changes":  [
+                                        "O botão Abrir foi removido da listagem de eventos.",
+                                        "Cada linha da listagem passou a abrir a galeria do evento com um clique direto sobre o item.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ]
+                    },
+                    {
                         "version":  "1.00.421",
                         "releaseDate":  "2026-04-06",
                         "title":  "Galeria do evento com dados abaixo da capa",

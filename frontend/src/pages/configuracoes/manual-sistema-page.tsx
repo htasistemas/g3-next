@@ -266,11 +266,14 @@ const secoesManual: ManualSecao[] = [
         comoUsar: [
           "Use a aba Listagem de produtos para ver todos os produtos cadastrados no almoxarifado com a quantidade em estoque.",
           "Clique em um produto da listagem para abrir o item no cadastro e continuar edição ou conferência.",
+          "Quando o item for um kit, use a aba Composição do kit para informar a quantidade de cada componente necessária em 1 unidade do kit, como a composição de 1 cesta básica.",
+          "O saldo disponível do kit passa a considerar tanto o que já existe pronto no item quanto o que ainda pode ser montado automaticamente a partir dos componentes cadastrados.",
           "Use a aba Movimentações para registrar entradas, saídas e ajustes de estoque."
         ],
         atencoes: [
           "A consulta de produtos fica centralizada na aba Listagem de produtos.",
-          "Cadastros e movimentações devem permanecer coerentes para evitar divergência de saldo."
+          "Cadastros e movimentações devem permanecer coerentes para evitar divergência de saldo.",
+          "Em kits com composição, a disponibilidade exibida pode ser maior que o estoque físico do item porque o sistema também considera os componentes suficientes para montar novas unidades."
         ]
       },
       {
@@ -358,6 +361,7 @@ const secoesManual: ManualSecao[] = [
         objetivo: "Gerenciar eventos institucionais com álbum persistido, capa do evento, galeria organizada e ações claras por contexto.",
         comoUsar: [
           "Na aba Listagem, use busca e status para localizar rapidamente o evento e acompanhe os indicadores de total de eventos, fotos, álbuns sem capa e evento com mais fotos.",
+          "Na listagem de eventos, clique diretamente sobre a linha do evento para abrir a galeria, sem depender de botão de ação separado.",
           "Na aba Cadastro do evento, preencha os dados principais e use Adicionar fotos para fazer upload múltiplo antes mesmo do primeiro salvamento.",
           "Depois do upload, escolha visualmente a capa do álbum ainda no cadastro. A primeira imagem marcada como destaque será persistida como capa real no banco.",
           "Ao salvar, o sistema grava o evento, envia as fotos pendentes, define a capa e mantém o fluxo completo sincronizado entre cadastro, listagem e galeria.",

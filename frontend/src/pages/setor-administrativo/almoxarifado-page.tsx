@@ -151,6 +151,9 @@ export function AlmoxarifadoPage() {
   }, [itens]);
 
   const carregandoAcoes = salvarMutation.isPending || removerMutation.isPending || movimentarMutation.isPending;
+  const kitComSaldoCalculado = !!itemForm.is_kit && !!itemForm.possui_composicao_kit;
+  const estoqueEditavel = Number(itemForm.estoque_fisico ?? itemForm.estoque_atual ?? 0);
+  const saldoDisponivelKit = Number(itemForm.estoque_disponivel ?? itemForm.estoque_atual ?? 0);
 
   useEffect(() => {
     const proximoCodigo = proximoCodigoData?.codigo?.trim();
@@ -191,7 +194,10 @@ export function AlmoxarifadoPage() {
         setPopupMensagem({ tipo: "aviso", titulo: "Validação", texto: "Preencha código, descrição, categoria e unidade." });
         return;
       }
-      const response = await salvarMutation.mutateAsync(itemForm);
+      const response = await salvarMutation.mutateAsync({
+        ...itemForm,
+        estoque_atual: Number(itemForm.estoque_fisico ?? itemForm.estoque_atual ?? 0)
+      });
       setItemForm(response);
       setItemSnapshot(response);
 
@@ -361,7 +367,26 @@ export function AlmoxarifadoPage() {
                 onChange={(event) => setItemForm((atual) => ({ ...atual, unidade: event.target.value }))}
               />
             </div>
-            <div className="space-y-1"><Label>Estoque atual</Label><Input type="number" min={0} value={itemForm.estoque_atual} onChange={(event) => setItemForm((atual) => ({ ...atual, estoque_atual: Number(event.target.value) || 0 }))} /></div>
+            <div className="space-y-1">
+              <Label>{kitComSaldoCalculado ? "Saldo disponível do kit" : "Estoque atual"}</Label>
+              <Input
+                type="number"
+                min={0}
+                readOnly={kitComSaldoCalculado}
+                value={kitComSaldoCalculado ? saldoDisponivelKit : estoqueEditavel}
+                onChange={(event) =>
+                  setItemForm((atual) => {
+                    const valor = Number(event.target.value) || 0;
+                    return { ...atual, estoque_atual: valor, estoque_fisico: valor };
+                  })
+                }
+              />
+              {kitComSaldoCalculado ? (
+                <p className="text-xs text-[var(--g3-muted)]">
+                  Saldo calculado automaticamente: {itemForm.estoque_fisico ?? 0} pronto(s) + {itemForm.estoque_montavel_kit ?? 0} montável(is) pela composição.
+                </p>
+              ) : null}
+            </div>
             <div className="space-y-1"><Label>{"Estoque m\u00ednimo"}</Label><Input type="number" min={0} value={itemForm.estoque_minimo} onChange={(event) => setItemForm((atual) => ({ ...atual, estoque_minimo: Number(event.target.value) || 0 }))} /></div>
             <div className="space-y-1">
               <Label>{"Valor unit\u00e1rio"}</Label>
@@ -384,13 +409,16 @@ export function AlmoxarifadoPage() {
 
         {abaAtiva === "kit" ? (
           <section className="space-y-3">
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-900">
+              Cadastre aqui a quantidade de cada item que compõe 1 unidade do kit. O saldo disponível do kit passa a considerar o que já existe pronto no item e também o que ainda pode ser montado com os componentes.
+            </div>
             <div className="grid gap-3 rounded-lg border border-[var(--g3-border)] p-3 md:grid-cols-3">
-              <div className="space-y-1"><Label>Item Do Almoxarifado</Label><Select value={novoKitItemId} onChange={(event) => setNovoKitItemId(event.target.value)}><option value="">Selecione</option>{itens.filter((item) => !item.is_kit).map((item) => (<option key={item.id_item} value={item.id_item}>{item.codigo} - {item.descricao}</option>))}</Select></div>
-              <div className="space-y-1"><Label>Quantidade</Label><Input type="number" min={1} value={novoKitQuantidade} onChange={(event) => setNovoKitQuantidade(event.target.value)} /></div>
+              <div className="space-y-1"><Label>Item da composição</Label><Select value={novoKitItemId} onChange={(event) => setNovoKitItemId(event.target.value)}><option value="">Selecione</option>{itens.filter((item) => !item.is_kit).map((item) => (<option key={item.id_item} value={item.id_item}>{item.codigo} - {item.descricao}</option>))}</Select></div>
+              <div className="space-y-1"><Label>Quantidade por kit</Label><Input type="number" min={1} value={novoKitQuantidade} onChange={(event) => setNovoKitQuantidade(event.target.value)} /></div>
               <div className="flex items-end"><Button className="w-full" onClick={adicionarItemKit}>Adicionar Item</Button></div>
             </div>
             <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]">
-              <table className="min-w-full text-sm"><thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"><tr><th className="px-3 py-2 text-left">Código</th><th className="px-3 py-2 text-left">Descrição</th><th className="px-3 py-2 text-left">Quantidade</th></tr></thead>
+              <table className="min-w-full text-sm"><thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"><tr><th className="px-3 py-2 text-left">Código</th><th className="px-3 py-2 text-left">Descrição</th><th className="px-3 py-2 text-left">Quantidade por kit</th></tr></thead>
                 <tbody>{kitComposicao.length ? kitComposicao.map((item, index) => (<tr key={`${item.produto_item_id}-${index}`} className={`border-t border-[var(--g3-border)] ${index % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35"}`}><td className="px-3 py-2">{item.produto_item_codigo ?? item.produto_item_id}</td><td className="px-3 py-2">{item.produto_item_descricao ?? "---"}</td><td className="px-3 py-2">{item.quantidade_item}</td></tr>)) : (<tr><td colSpan={3} className="px-3 py-4 text-center">Nenhum item no kit.</td></tr>)}</tbody>
               </table>
             </div>

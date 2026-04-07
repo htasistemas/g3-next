@@ -623,13 +623,12 @@ export function FotosEventosPage() {
                     <th className="px-3 py-2 text-left">Status</th>
                     <th className="px-3 py-2 text-left">Fotos</th>
                     <th className="px-3 py-2 text-left">Capa</th>
-                    <th className="px-3 py-2 text-right">Ação</th>
                   </tr>
                 </thead>
                 <tbody>
                   {isLoading ? (
                     <tr>
-                      <td colSpan={7} className="px-3 py-5 text-center">
+                      <td colSpan={6} className="px-3 py-5 text-center">
                         Carregando eventos...
                       </td>
                     </tr>
@@ -637,9 +636,10 @@ export function FotosEventosPage() {
                     eventos.map((item, index) => (
                       <tr
                         key={item.id}
-                        className={`border-t border-[var(--g3-border)] transition hover:bg-[var(--g3-primary-soft)]/40 ${
+                        className={`cursor-pointer border-t border-[var(--g3-border)] transition hover:bg-[var(--g3-primary-soft)]/40 ${
                           index % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/20"
                         }`}
+                        onClick={() => selecionar(item.id)}
                       >
                         <td className="px-3 py-3">
                           <div className="min-w-[220px]">
@@ -656,16 +656,11 @@ export function FotosEventosPage() {
                         </td>
                         <td className="px-3 py-3">{item.totalFotos ?? 0}</td>
                         <td className="px-3 py-3">{item.fotoPrincipalId ? "Definida" : "Pendente"}</td>
-                        <td className="px-3 py-3 text-right">
-                          <Button variant="outline" size="sm" onClick={() => selecionar(item.id)}>
-                            Abrir
-                          </Button>
-                        </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={7} className="px-3 py-5 text-center text-[var(--g3-muted)]">
+                      <td colSpan={6} className="px-3 py-5 text-center text-[var(--g3-muted)]">
                         Nenhum evento encontrado para os filtros informados.
                       </td>
                     </tr>
