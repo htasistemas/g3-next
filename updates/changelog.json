@@ -1,6 +1,17 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.420",
+                        "releaseDate":  "2026-04-06",
+                        "title":  "Contas bancárias com saldo refletindo lançamentos vinculados",
+                        "description":  "Os cards da aba Contas bancárias da Contabilidade / financeiro passaram a refletir corretamente o impacto dos lançamentos vinculados à conta, evitando saldo visual desatualizado.",
+                        "changes":  [
+                                        "O saldo exibido das contas bancárias agora considera lançamentos ativos vinculados à conta que ainda não geraram movimentação efetiva.",
+                                        "A regra evita contagem em duplicidade quando o lançamento já possui movimentação financeira ativa associada.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ]
+                    },
+                    {
                         "version":  "1.00.419",
                         "releaseDate":  "2026-04-06",
                         "title":  "Envio automático do beneficiário com SMTP mais resiliente",

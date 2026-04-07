@@ -110,6 +110,31 @@ const MOVIMENTACAO_SELECT = Prisma.sql`
   LEFT JOIN financeiro_centro_custo cc ON cc.id = m.centro_custo_id
 `;
 
+const CONTA_BANCARIA_SALDO_ATUAL_SELECT = Prisma.sql`
+  (
+    COALESCE(cb.saldo, 0)::float8
+    + COALESCE((
+      SELECT
+        SUM(
+          CASE
+            WHEN UPPER(COALESCE(l.tipo, '')) = 'RECEITA' THEN COALESCE(l.valor, 0)
+            ELSE COALESCE(l.valor, 0) * -1
+          END
+        )::float8
+      FROM lancamento_financeiro l
+      WHERE l.ativo = TRUE
+        AND l.conta_bancaria_id = cb.id
+        AND UPPER(COALESCE(l.situacao, '')) NOT IN ('CANCELADO', 'ESTORNADO')
+        AND NOT EXISTS (
+          SELECT 1
+          FROM movimentacao_financeira m
+          WHERE m.ativo = TRUE
+            AND m.lancamento_financeiro_id = l.id
+        )
+    ), 0)::float8
+  ) AS saldo
+`;
+
 export async function ensureContabilidadeEstrutura() {
   if (!estruturaPromise) {
     estruturaPromise = (async () => {
@@ -422,31 +447,31 @@ export class ContabilidadeRepository {
     await ensureContabilidadeEstrutura();
     return prisma.$queryRaw<ContaBancariaRow[]>(Prisma.sql`
       SELECT
-        id,
-        banco,
-        agencia,
-        numero,
-        digito,
-        nome_conta,
-        tipo,
-        titular,
-        projeto_vinculado,
-        pix_vinculado,
-        tipo_chave_pix,
-        chave_pix,
-        recebimento_local,
-        saldo::float8 AS saldo,
-        saldo_inicial::float8 AS saldo_inicial,
-        data_saldo_inicial,
-        limite_minimo_alerta::float8 AS limite_minimo_alerta,
-        status,
-        permite_movimentacao,
-        observacao,
-        data_atualizacao,
-        ativo
-      FROM conta_bancaria
-      WHERE ativo = TRUE
-      ORDER BY nome_conta ASC, banco ASC, numero ASC
+        cb.id,
+        cb.banco,
+        cb.agencia,
+        cb.numero,
+        cb.digito,
+        cb.nome_conta,
+        cb.tipo,
+        cb.titular,
+        cb.projeto_vinculado,
+        cb.pix_vinculado,
+        cb.tipo_chave_pix,
+        cb.chave_pix,
+        cb.recebimento_local,
+        ${CONTA_BANCARIA_SALDO_ATUAL_SELECT},
+        cb.saldo_inicial::float8 AS saldo_inicial,
+        cb.data_saldo_inicial,
+        cb.limite_minimo_alerta::float8 AS limite_minimo_alerta,
+        cb.status,
+        cb.permite_movimentacao,
+        cb.observacao,
+        cb.data_atualizacao,
+        cb.ativo
+      FROM conta_bancaria cb
+      WHERE cb.ativo = TRUE
+      ORDER BY cb.nome_conta ASC, cb.banco ASC, cb.numero ASC
     `);
   }
 
@@ -454,30 +479,30 @@ export class ContabilidadeRepository {
     await ensureContabilidadeEstrutura();
     const rows = await tx.$queryRaw<ContaBancariaRow[]>(Prisma.sql`
       SELECT
-        id,
-        banco,
-        agencia,
-        numero,
-        digito,
-        nome_conta,
-        tipo,
-        titular,
-        projeto_vinculado,
-        pix_vinculado,
-        tipo_chave_pix,
-        chave_pix,
-        recebimento_local,
-        saldo::float8 AS saldo,
-        saldo_inicial::float8 AS saldo_inicial,
-        data_saldo_inicial,
-        limite_minimo_alerta::float8 AS limite_minimo_alerta,
-        status,
-        permite_movimentacao,
-        observacao,
-        data_atualizacao,
-        ativo
-      FROM conta_bancaria
-      WHERE id = ${id}
+        cb.id,
+        cb.banco,
+        cb.agencia,
+        cb.numero,
+        cb.digito,
+        cb.nome_conta,
+        cb.tipo,
+        cb.titular,
+        cb.projeto_vinculado,
+        cb.pix_vinculado,
+        cb.tipo_chave_pix,
+        cb.chave_pix,
+        cb.recebimento_local,
+        ${CONTA_BANCARIA_SALDO_ATUAL_SELECT},
+        cb.saldo_inicial::float8 AS saldo_inicial,
+        cb.data_saldo_inicial,
+        cb.limite_minimo_alerta::float8 AS limite_minimo_alerta,
+        cb.status,
+        cb.permite_movimentacao,
+        cb.observacao,
+        cb.data_atualizacao,
+        cb.ativo
+      FROM conta_bancaria cb
+      WHERE cb.id = ${id}
       LIMIT 1
     `);
     return rows[0] ?? null;

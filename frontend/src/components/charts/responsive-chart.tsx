@@ -1,14 +1,15 @@
-import { useEffect, useRef, useState, type PropsWithChildren } from "react";
+import { useEffect, useRef, useState, type ReactElement } from "react";
 import { ResponsiveContainer } from "recharts";
 
 type ResponsiveLength = number | `${number}%`;
 
-type ResponsiveChartProps = PropsWithChildren<{
+type ResponsiveChartProps = {
+  children: ReactElement;
   width?: ResponsiveLength;
   height?: ResponsiveLength;
   minWidth?: number;
   minHeight?: number;
-}>;
+};
 
 export function ResponsiveChart({
   children,
