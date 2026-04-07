@@ -10,6 +10,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  formatarCpf,
+  formatarMoedaInput,
+  formatarTelefone,
+  mascararTelefoneInput,
+  normalizarCpf,
+  normalizarMoeda,
+  normalizarTelefone,
+  validarCpf
+} from "@/lib/br-utils";
 import { carteiraEventoService } from "@/services/carteira-evento.service";
 import type {
   BarracaEvento,
@@ -41,6 +51,30 @@ function formatarMoeda(valor: number) {
 
 function toDateInput(valor?: string) {
   return valor?.slice(0, 10) ?? "";
+}
+
+function formatarData(valor?: string) {
+  if (!valor) return "---";
+  const data = new Date(valor);
+  if (Number.isNaN(data.getTime())) return valor;
+  return data.toLocaleDateString("pt-BR");
+}
+
+function mascararCpfInput(valor?: string) {
+  const digitos = normalizarCpf(valor).slice(0, 11);
+  if (digitos.length <= 3) return digitos;
+  if (digitos.length <= 6) return `${digitos.slice(0, 3)}.${digitos.slice(3)}`;
+  if (digitos.length <= 9) return `${digitos.slice(0, 3)}.${digitos.slice(3, 6)}.${digitos.slice(6)}`;
+  return `${digitos.slice(0, 3)}.${digitos.slice(3, 6)}.${digitos.slice(6, 9)}-${digitos.slice(9)}`;
+}
+
+function CampoErro({ texto }: { texto?: string }) {
+  if (!texto) return null;
+  return <p className="text-xs text-rose-600">{texto}</p>;
+}
+
+function classesCampoInvalido(erro?: string) {
+  return erro ? "border-rose-500 focus-visible:ring-rose-500" : "";
 }
 
 function novaChaveOperacao() {
@@ -141,6 +175,9 @@ export function CarteiraDigitalEventoPage() {
   const [transferenciaDestinoId, setTransferenciaDestinoId] = useState("");
   const [transferenciaValor, setTransferenciaValor] = useState("");
   const [transferenciaMotivo, setTransferenciaMotivo] = useState("");
+  const [errosParticipante, setErrosParticipante] = useState<Record<string, string | undefined>>({});
+  const [errosOperacao, setErrosOperacao] = useState<Record<string, string | undefined>>({});
+  const [consultaSaldoId, setConsultaSaldoId] = useState("");
 
   const eventoSelecionado = useMemo(() => eventos.find((item) => item.id === eventoSelecionadoId) ?? null, [eventos, eventoSelecionadoId]);
   const barracasEvento = useMemo(() => barracas.filter((item) => item.eventoId === eventoSelecionadoId), [barracas, eventoSelecionadoId]);
@@ -153,6 +190,10 @@ export function CarteiraDigitalEventoPage() {
     [itensEvento, barracaOperacaoId]
   );
   const subtotalVenda = itensVenda.reduce((acc, atual) => acc + atual.item.preco * atual.quantidade, 0);
+  const participanteSaldoConsulta = useMemo(
+    () => participantes.find((item) => item.id === Number(consultaSaldoId || 0)) ?? participanteSelecionado ?? null,
+    [consultaSaldoId, participanteSelecionado, participantes]
+  );
 
   const actions: AdminAction[] = [
     { label: "Atualizar", icon: RefreshCcw, onClick: () => void carregarBase(eventoSelecionadoId), variant: "outline" }
@@ -238,6 +279,7 @@ export function CarteiraDigitalEventoPage() {
   }
 
   function selecionarParticipante(item: ParticipanteCarteira) {
+    setConsultaSaldoId(String(item.id));
     setParticipanteSelecionado(item);
     setParticipanteForm({
       id: item.id,
@@ -250,6 +292,61 @@ export function CarteiraDigitalEventoPage() {
       status: item.status,
       observacoes: item.observacoes
     });
+  }
+
+  function validarCampoParticipante(campo: "nome" | "telefone" | "cpf", valor: string) {
+    if (campo === "nome") {
+      return valor.trim().length >= 3 ? undefined : "Informe um nome com pelo menos 3 caracteres.";
+    }
+    if (campo === "telefone") {
+      const telefone = normalizarTelefone(valor);
+      if (!telefone) return undefined;
+      return [10, 11].includes(telefone.length) ? undefined : "Informe um telefone válido.";
+    }
+    if (campo === "cpf") {
+      const cpf = normalizarCpf(valor);
+      if (!cpf) return undefined;
+      return validarCpf(cpf) ? undefined : "Informe um CPF válido.";
+    }
+    return undefined;
+  }
+
+  function validarParticipanteForm() {
+    const proximosErros = {
+      nome: validarCampoParticipante("nome", participanteForm.nome),
+      telefone: validarCampoParticipante("telefone", participanteForm.telefone),
+      cpf: validarCampoParticipante("cpf", participanteForm.cpf)
+    };
+    setErrosParticipante(proximosErros);
+    return !Object.values(proximosErros).some(Boolean);
+  }
+
+  function validarRecargaForm() {
+    const proximosErros = {
+      recargaValor: normalizarMoeda(recargaValor) > 0 ? undefined : "Informe um valor de recarga maior que zero."
+    };
+    setErrosOperacao((atual) => ({ ...atual, ...proximosErros }));
+    return !Object.values(proximosErros).some(Boolean);
+  }
+
+  function validarAjusteForm() {
+    const proximosErros = {
+      ajusteValor: normalizarMoeda(ajusteValor) > 0 ? undefined : "Informe um valor maior que zero.",
+      ajusteMotivo: ajusteMotivo.trim().length >= 3 ? undefined : "Informe um motivo com pelo menos 3 caracteres."
+    };
+    setErrosOperacao((atual) => ({ ...atual, ...proximosErros }));
+    return !Object.values(proximosErros).some(Boolean);
+  }
+
+  function validarTransferenciaForm() {
+    const proximosErros = {
+      transferenciaDestinoId: transferenciaDestinoId ? undefined : "Selecione a carteira de destino.",
+      transferenciaValor: normalizarMoeda(transferenciaValor) > 0 ? undefined : "Informe um valor maior que zero.",
+      transferenciaMotivo:
+        transferenciaMotivo.trim().length >= 3 ? undefined : "Informe um motivo com pelo menos 3 caracteres."
+    };
+    setErrosOperacao((atual) => ({ ...atual, ...proximosErros }));
+    return !Object.values(proximosErros).some(Boolean);
   }
 
   function selecionarBarraca(item: BarracaEvento) {
@@ -296,12 +393,23 @@ export function CarteiraDigitalEventoPage() {
 
   async function salvarParticipante() {
     if (!eventoSelecionadoId) return;
+    if (!validarParticipanteForm()) {
+      setPopup({ tipo: "aviso", titulo: "Carteira digital do evento", texto: "Revise os campos inválidos da carteira antes de salvar." });
+      return;
+    }
     try {
-      const payload = { ...participanteForm, evento_id: eventoSelecionadoId };
+      const payload = {
+        ...participanteForm,
+        evento_id: eventoSelecionadoId,
+        telefone: normalizarTelefone(participanteForm.telefone) || undefined,
+        cpf: normalizarCpf(participanteForm.cpf) || undefined
+      };
       const participante = participanteForm.id ? await carteiraEventoService.atualizarParticipante(participanteForm.id, payload) : await carteiraEventoService.criarParticipante(payload);
       await carregarBase(eventoSelecionadoId);
       setParticipanteSelecionado(participante);
+      setConsultaSaldoId(String(participante.id));
       setParticipanteForm(criarParticipanteFormPadrao());
+      setErrosParticipante({});
       setPopup({ tipo: "sucesso", titulo: "Carteira digital do evento", texto: "Carteira salva com sucesso." });
     } catch (error: any) {
       setPopup({ tipo: "erro", titulo: "Carteira digital do evento", texto: error?.response?.data?.message ?? "Não foi possível salvar a carteira." });
@@ -338,11 +446,17 @@ export function CarteiraDigitalEventoPage() {
 
   async function executarRecarga() {
     if (!participanteSelecionado) return;
+    if (!validarRecargaForm()) {
+      setPopup({ tipo: "aviso", titulo: "Recarga", texto: "Informe um valor de recarga maior que zero." });
+      return;
+    }
+    const valorRecarga = normalizarMoeda(recargaValor);
     try {
-      const participante = await carteiraEventoService.recarregar({ participante_id: participanteSelecionado.id, valor_recarga: Number(recargaValor || 0), forma_pagamento: recargaForma });
+      const participante = await carteiraEventoService.recarregar({ participante_id: participanteSelecionado.id, valor_recarga: valorRecarga, forma_pagamento: recargaForma });
       await carregarBase(eventoSelecionadoId);
       setParticipanteSelecionado(participante);
       setRecargaValor("");
+      setErrosOperacao((atual) => ({ ...atual, recargaValor: undefined }));
     } catch (error: any) {
       setPopup({ tipo: "erro", titulo: "Recarga", texto: error?.response?.data?.message ?? "Não foi possível realizar a recarga." });
     }
@@ -350,12 +464,18 @@ export function CarteiraDigitalEventoPage() {
 
   async function executarAjuste() {
     if (!participanteSelecionado) return;
+    if (!validarAjusteForm()) {
+      setPopup({ tipo: "aviso", titulo: "Ajuste", texto: "Informe valor maior que zero e um motivo válido para o ajuste." });
+      return;
+    }
+    const valorAjuste = normalizarMoeda(ajusteValor);
     try {
-      const participante = await carteiraEventoService.ajustar({ participante_id: participanteSelecionado.id, tipo_ajuste: ajusteTipo, valor: Number(ajusteValor || 0), motivo: ajusteMotivo });
+      const participante = await carteiraEventoService.ajustar({ participante_id: participanteSelecionado.id, tipo_ajuste: ajusteTipo, valor: valorAjuste, motivo: ajusteMotivo.trim() });
       await carregarBase(eventoSelecionadoId);
       setParticipanteSelecionado(participante);
       setAjusteValor("");
       setAjusteMotivo("");
+      setErrosOperacao((atual) => ({ ...atual, ajusteValor: undefined, ajusteMotivo: undefined }));
     } catch (error: any) {
       setPopup({ tipo: "erro", titulo: "Ajuste", texto: error?.response?.data?.message ?? "Não foi possível registrar o ajuste." });
     }
@@ -363,13 +483,24 @@ export function CarteiraDigitalEventoPage() {
 
   async function executarTransferencia() {
     if (!participanteSelecionado) return;
+    if (!validarTransferenciaForm()) {
+      setPopup({ tipo: "aviso", titulo: "Transferência", texto: "Informe carteira destino, valor maior que zero e motivo válido para transferir." });
+      return;
+    }
+    const valorTransferencia = normalizarMoeda(transferenciaValor);
     try {
-      const resposta = await carteiraEventoService.transferir({ evento_id: eventoSelecionadoId, carteira_origem_id: participanteSelecionado.id, carteira_destino_id: Number(transferenciaDestinoId), valor_transferencia: Number(transferenciaValor || 0), motivo: transferenciaMotivo });
+      const resposta = await carteiraEventoService.transferir({ evento_id: eventoSelecionadoId, carteira_origem_id: participanteSelecionado.id, carteira_destino_id: Number(transferenciaDestinoId), valor_transferencia: valorTransferencia, motivo: transferenciaMotivo.trim() });
       await carregarBase(eventoSelecionadoId);
       setParticipanteSelecionado(resposta.origem);
       setTransferenciaDestinoId("");
       setTransferenciaValor("");
       setTransferenciaMotivo("");
+      setErrosOperacao((atual) => ({
+        ...atual,
+        transferenciaDestinoId: undefined,
+        transferenciaValor: undefined,
+        transferenciaMotivo: undefined
+      }));
     } catch (error: any) {
       setPopup({ tipo: "erro", titulo: "Transferência", texto: error?.response?.data?.message ?? "Não foi possível transferir os créditos." });
     }
@@ -519,7 +650,7 @@ export function CarteiraDigitalEventoPage() {
         ) : null}
 
         {abaAtiva === "cadastros" ? (
-          <div className="grid gap-4 xl:grid-cols-4">
+          <div className="space-y-4">
             <Card>
               <CardHeader><CardTitle>{eventoForm.id ? "Editar evento" : "Novo evento"}</CardTitle></CardHeader>
               <CardContent className="space-y-2">
@@ -529,18 +660,46 @@ export function CarteiraDigitalEventoPage() {
                     <p className="text-sm text-[var(--g3-muted)]">{item.status}</p>
                   </button>
                 ))}
-                <div className="space-y-2 pt-2">
-                  <Input value={eventoForm.nome_evento} onChange={(e) => setEventoForm((a) => ({ ...a, nome_evento: e.target.value }))} placeholder="Nome do evento" />
-                  <Select value={eventoForm.tipo_evento} onChange={(e) => setEventoForm((a) => ({ ...a, tipo_evento: e.target.value }))}>
-                    {tiposEvento.map((item) => <option key={item}>{item}</option>)}
-                  </Select>
-                  <Select value={eventoForm.status} onChange={(e) => setEventoForm((a) => ({ ...a, status: e.target.value }))}>
-                    <option value="ATIVO">Ativo</option>
-                    <option value="PLANEJADO">Planejado</option>
-                    <option value="ENCERRADO">Encerrado</option>
-                    <option value="CANCELADO">Cancelado</option>
-                  </Select>
-                  <Input type="date" value={eventoForm.data_inicio} onChange={(e) => setEventoForm((a) => ({ ...a, data_inicio: e.target.value }))} />
+                <div className="grid gap-3 pt-2 md:grid-cols-2">
+                  <div className="space-y-1 md:col-span-2">
+                    <Label>Nome do evento</Label>
+                    <Input value={eventoForm.nome_evento} onChange={(e) => setEventoForm((a) => ({ ...a, nome_evento: e.target.value }))} placeholder="Nome do evento" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Tipo do evento</Label>
+                    <Select value={eventoForm.tipo_evento} onChange={(e) => setEventoForm((a) => ({ ...a, tipo_evento: e.target.value }))}>
+                      {tiposEvento.map((item) => <option key={item}>{item}</option>)}
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Status</Label>
+                    <Select value={eventoForm.status} onChange={(e) => setEventoForm((a) => ({ ...a, status: e.target.value }))}>
+                      <option value="ATIVO">Ativo</option>
+                      <option value="PLANEJADO">Planejado</option>
+                      <option value="ENCERRADO">Encerrado</option>
+                      <option value="CANCELADO">Cancelado</option>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Data inicial</Label>
+                    <Input type="date" value={eventoForm.data_inicio} onChange={(e) => setEventoForm((a) => ({ ...a, data_inicio: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Data final</Label>
+                    <Input type="date" value={eventoForm.data_fim} onChange={(e) => setEventoForm((a) => ({ ...a, data_fim: e.target.value }))} placeholder="Data final" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Centro de receita</Label>
+                    <Input value={eventoForm.centro_receita} onChange={(e) => setEventoForm((a) => ({ ...a, centro_receita: e.target.value }))} placeholder="Centro de receita" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Validade do crédito</Label>
+                    <Input type="date" value={eventoForm.validade_credito} onChange={(e) => setEventoForm((a) => ({ ...a, validade_credito: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1 md:col-span-2">
+                    <Label>Observações do evento</Label>
+                    <Textarea value={eventoForm.observacoes} onChange={(e) => setEventoForm((a) => ({ ...a, observacoes: e.target.value }))} rows={4} placeholder="Observações do evento" />
+                  </div>
                   <div className="flex gap-2">
                     <Button type="button" className="flex-1" onClick={() => void salvarEvento()}><Save className="mr-1.5 h-4 w-4" />Salvar</Button>
                     <Button type="button" variant="outline" className="flex-1" onClick={() => setEventoForm(criarEventoFormPadrao())}>Novo evento</Button>
@@ -552,15 +711,24 @@ export function CarteiraDigitalEventoPage() {
             <Card>
               <CardHeader><CardTitle>{barracaForm.id ? "Editar barraca" : "Nova barraca"}</CardTitle></CardHeader>
               <CardContent className="space-y-2">
+                <div className="rounded-xl border border-dashed border-[var(--g3-border)] bg-[var(--g3-card-soft)] px-4 py-3 text-sm text-[var(--g3-muted)]">
+                  As barracas cadastradas para o evento selecionado aparecem abaixo para conferência e edição rápida.
+                </div>
                 {barracasEvento.map((item) => (
                   <button key={item.id} type="button" onClick={() => selecionarBarraca(item)} className="w-full rounded-xl border border-[var(--g3-border)] px-3 py-2 text-left hover:bg-[var(--g3-card-soft)]">
                     <p className="font-semibold">{item.nomeBarraca}</p>
                     <p className="text-sm text-[var(--g3-muted)]">{item.status}</p>
                   </button>
                 ))}
-                <div className="space-y-2 pt-2">
-                  <Input value={barracaForm.nome_barraca} onChange={(e) => setBarracaForm((a) => ({ ...a, nome_barraca: e.target.value }))} placeholder="Nome da barraca" />
-                  <Input value={barracaForm.tipo_barraca} onChange={(e) => setBarracaForm((a) => ({ ...a, tipo_barraca: e.target.value }))} placeholder="Tipo" />
+                <div className="grid gap-3 pt-2 md:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label>Nome da barraca</Label>
+                    <Input value={barracaForm.nome_barraca} onChange={(e) => setBarracaForm((a) => ({ ...a, nome_barraca: e.target.value }))} placeholder="Nome da barraca" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Tipo</Label>
+                    <Input value={barracaForm.tipo_barraca} onChange={(e) => setBarracaForm((a) => ({ ...a, tipo_barraca: e.target.value }))} placeholder="Tipo" />
+                  </div>
                   <div className="flex gap-2">
                     <Button type="button" className="flex-1" onClick={() => void salvarBarraca()}><Save className="mr-1.5 h-4 w-4" />Salvar</Button>
                     <Button type="button" variant="outline" className="flex-1" onClick={() => setBarracaForm(criarBarracaFormPadrao())}>Nova barraca</Button>
@@ -572,18 +740,41 @@ export function CarteiraDigitalEventoPage() {
             <Card>
               <CardHeader><CardTitle>{itemForm.id ? "Editar item" : "Novo item"}</CardTitle></CardHeader>
               <CardContent className="space-y-2">
+                <div className="rounded-xl border border-dashed border-[var(--g3-border)] bg-[var(--g3-card-soft)] px-4 py-3 text-sm text-[var(--g3-muted)]">
+                  Os produtos do evento selecionado ficam listados abaixo com barraca, categoria e preço para melhorar a conferência visual antes da operação.
+                </div>
                 {itensEvento.map((item) => (
                   <button key={item.id} type="button" onClick={() => selecionarItem(item)} className="w-full rounded-xl border border-[var(--g3-border)] px-3 py-2 text-left hover:bg-[var(--g3-card-soft)]">
                     <p className="font-semibold">{item.nomeItem}</p>
-                    <p className="text-sm text-[var(--g3-muted)]">{formatarMoeda(item.preco)}</p>
+                    <p className="text-sm text-[var(--g3-muted)]">{item.nomeBarraca || "Evento"} · {formatarMoeda(item.preco)}</p>
                   </button>
                 ))}
-                <div className="space-y-2 pt-2">
-                  <Input value={itemForm.nome_item} onChange={(e) => setItemForm((a) => ({ ...a, nome_item: e.target.value }))} placeholder="Nome do item" />
-                  <Select value={itemForm.categoria} onChange={(e) => setItemForm((a) => ({ ...a, categoria: e.target.value }))}>
-                    {categoriasItem.map((item) => <option key={item}>{item}</option>)}
-                  </Select>
-                  <Input value={itemForm.preco} onChange={(e) => setItemForm((a) => ({ ...a, preco: e.target.value }))} placeholder="Preço" />
+                <div className="grid gap-3 pt-2 md:grid-cols-2">
+                  <div className="space-y-1 md:col-span-2">
+                    <Label>Nome do produto</Label>
+                    <Input value={itemForm.nome_item} onChange={(e) => setItemForm((a) => ({ ...a, nome_item: e.target.value }))} placeholder="Nome do item" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Barraca</Label>
+                    <Select value={itemForm.barraca_id} onChange={(e) => setItemForm((a) => ({ ...a, barraca_id: e.target.value }))}>
+                      <option value="">Evento</option>
+                      {barracasEvento.map((item) => <option key={item.id} value={item.id}>{item.nomeBarraca}</option>)}
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Categoria</Label>
+                    <Select value={itemForm.categoria} onChange={(e) => setItemForm((a) => ({ ...a, categoria: e.target.value }))}>
+                      {categoriasItem.map((item) => <option key={item}>{item}</option>)}
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Preço</Label>
+                    <Input value={itemForm.preco} onChange={(e) => setItemForm((a) => ({ ...a, preco: e.target.value }))} placeholder="Preço" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Estoque</Label>
+                    <Input value={itemForm.estoque} onChange={(e) => setItemForm((a) => ({ ...a, estoque: e.target.value }))} placeholder="Estoque opcional" />
+                  </div>
                   <div className="flex gap-2">
                     <Button type="button" className="flex-1" onClick={() => void salvarItem()}><Save className="mr-1.5 h-4 w-4" />Salvar</Button>
                     <Button type="button" variant="outline" className="flex-1" onClick={() => setItemForm(criarItemFormPadrao())}>Novo item</Button>
@@ -593,11 +784,51 @@ export function CarteiraDigitalEventoPage() {
             </Card>
 
             <Card>
-              <CardHeader><CardTitle>Configuração auxiliar</CardTitle></CardHeader>
-              <CardContent className="space-y-2">
-                <Input type="date" value={eventoForm.data_fim} onChange={(e) => setEventoForm((a) => ({ ...a, data_fim: e.target.value }))} placeholder="Data final" />
-                <Input value={eventoForm.centro_receita} onChange={(e) => setEventoForm((a) => ({ ...a, centro_receita: e.target.value }))} placeholder="Centro de receita" />
-                <Textarea value={eventoForm.observacoes} onChange={(e) => setEventoForm((a) => ({ ...a, observacoes: e.target.value }))} rows={6} placeholder="Observações do evento" />
+              <CardHeader><CardTitle>Conferência visual</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <div className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">Evento em edição</p>
+                  <p className="mt-2 text-xl font-black">{eventoForm.nome_evento || "Nome do evento não informado"}</p>
+                  <div className="mt-3 grid gap-3 md:grid-cols-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">Tipo</p>
+                      <p className="mt-1 text-sm font-semibold">{eventoForm.tipo_evento || "---"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">Data inicial</p>
+                      <p className="mt-1 text-sm font-semibold">{formatarData(eventoForm.data_inicio)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">Status</p>
+                      <p className="mt-1 text-sm font-semibold">{eventoForm.status || "---"}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-[var(--g3-border)] p-4">
+                  <p className="text-sm font-semibold">Barracas cadastradas</p>
+                  <div className="mt-3 space-y-2">
+                    {barracasEvento.length ? barracasEvento.map((item) => (
+                      <div key={item.id} className="rounded-xl border border-[var(--g3-border)] px-3 py-2">
+                        <p className="font-semibold">{item.nomeBarraca}</p>
+                        <p className="text-sm text-[var(--g3-muted)]">{item.tipoBarraca || "Tipo não informado"} · {item.status}</p>
+                      </div>
+                    )) : <p className="text-sm text-[var(--g3-muted)]">Nenhuma barraca cadastrada para este evento.</p>}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-[var(--g3-border)] p-4">
+                  <p className="text-sm font-semibold">Produtos cadastrados</p>
+                  <div className="mt-3 space-y-2">
+                    {itensEvento.length ? itensEvento.map((item) => (
+                      <div key={item.id} className="rounded-xl border border-[var(--g3-border)] px-3 py-2">
+                        <p className="font-semibold">{item.nomeItem}</p>
+                        <p className="text-sm text-[var(--g3-muted)]">{item.nomeBarraca || "Evento"} · {item.categoria}</p>
+                        <p className="text-sm font-semibold">{formatarMoeda(item.preco)}</p>
+                      </div>
+                    )) : <p className="text-sm text-[var(--g3-muted)]">Nenhum produto cadastrado para este evento.</p>}
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -634,19 +865,32 @@ export function CarteiraDigitalEventoPage() {
                     <button key={item.id} type="button" onClick={() => selecionarParticipante(item)} className={`w-full rounded-xl border px-3 py-2 text-left ${participanteSelecionado?.id === item.id ? "border-[var(--g3-active)] bg-[var(--g3-primary-soft)]" : "border-[var(--g3-border)] hover:bg-[var(--g3-card-soft)]"}`}>
                       <p className="font-semibold">{item.nome}</p>
                       <p className="text-sm text-[var(--g3-muted)]">Carteira {item.numeroCarteira} · {formatarMoeda(item.saldoAtual)}</p>
+                      <p className="text-xs text-[var(--g3-muted)]">{formatarTelefone(item.telefone) || "Telefone não informado"}{item.cpf ? ` · CPF ${formatarCpf(item.cpf)}` : ""}</p>
                     </button>
                   ))}
-                  <div className="space-y-2 pt-2">
-                    <Input value={participanteForm.nome} onChange={(e) => setParticipanteForm((a) => ({ ...a, nome: e.target.value }))} placeholder="Nome" />
-                    <Input value={participanteForm.telefone} onChange={(e) => setParticipanteForm((a) => ({ ...a, telefone: e.target.value }))} placeholder="Telefone" />
-                    <Input value={participanteForm.cpf} onChange={(e) => setParticipanteForm((a) => ({ ...a, cpf: e.target.value }))} placeholder="CPF opcional" />
+                  <div className="grid gap-3 pt-2">
+                    <div className="space-y-1">
+                      <Label>Nome</Label>
+                      <Input className={classesCampoInvalido(errosParticipante.nome)} value={participanteForm.nome} onChange={(e) => setParticipanteForm((a) => ({ ...a, nome: e.target.value }))} onBlur={() => setErrosParticipante((atual) => ({ ...atual, nome: validarCampoParticipante("nome", participanteForm.nome) }))} placeholder="Nome" />
+                      <CampoErro texto={errosParticipante.nome} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Telefone</Label>
+                      <Input className={classesCampoInvalido(errosParticipante.telefone)} value={mascararTelefoneInput(participanteForm.telefone)} onChange={(e) => setParticipanteForm((a) => ({ ...a, telefone: e.target.value }))} onBlur={() => setErrosParticipante((atual) => ({ ...atual, telefone: validarCampoParticipante("telefone", participanteForm.telefone) }))} placeholder="(00) 00000-0000" />
+                      <CampoErro texto={errosParticipante.telefone} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>CPF</Label>
+                      <Input className={classesCampoInvalido(errosParticipante.cpf)} value={mascararCpfInput(participanteForm.cpf)} onChange={(e) => setParticipanteForm((a) => ({ ...a, cpf: e.target.value }))} onBlur={() => setErrosParticipante((atual) => ({ ...atual, cpf: validarCampoParticipante("cpf", participanteForm.cpf) }))} placeholder="000.000.000-00" />
+                      <CampoErro texto={errosParticipante.cpf} />
+                    </div>
                     <Button type="button" onClick={() => void salvarParticipante()}><Save className="mr-1.5 h-4 w-4" />Salvar carteira</Button>
                   </div>
                 </CardContent>
               </Card>
 
               <Card>
-                <CardHeader><CardTitle>QR Code, código de barras e recarga</CardTitle></CardHeader>
+                <CardHeader><CardTitle>QR Code, código de barras, saldo e recarga</CardTitle></CardHeader>
                 <CardContent className="space-y-3">
                   {participanteSelecionado ? (
                     <>
@@ -659,8 +903,28 @@ export function CarteiraDigitalEventoPage() {
                           Imprimir cartão/comanda
                         </Button>
                       </div>
+                      <div className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-4">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">Consulta de saldo</p>
+                        <div className="mt-3 space-y-2">
+                          <Select value={consultaSaldoId} onChange={(e) => setConsultaSaldoId(e.target.value)}>
+                            <option value="">Selecione a carteira</option>
+                            {participantes.map((item) => <option key={item.id} value={item.id}>{item.nome} · {item.numeroCarteira}</option>)}
+                          </Select>
+                          {participanteSaldoConsulta ? (
+                            <div className="rounded-xl border border-[var(--g3-border)] bg-white px-3 py-3">
+                              <p className="font-semibold">{participanteSaldoConsulta.nome}</p>
+                              <p className="text-sm text-[var(--g3-muted)]">Carteira {participanteSaldoConsulta.numeroCarteira}</p>
+                              <p className="mt-2 text-2xl font-black text-[var(--g3-active)]">{formatarMoeda(participanteSaldoConsulta.saldoAtual)}</p>
+                            </div>
+                          ) : (
+                            <p className="text-sm text-[var(--g3-muted)]">Selecione um participante para consultar o saldo atual da carteira.</p>
+                          )}
+                        </div>
+                      </div>
                       <div className="space-y-2">
-                        <Input value={recargaValor} onChange={(e) => setRecargaValor(e.target.value)} placeholder="Valor da recarga" />
+                        <Label>Valor da recarga</Label>
+                        <Input className={classesCampoInvalido(errosOperacao.recargaValor)} inputMode="decimal" value={recargaValor} onChange={(e) => setRecargaValor(formatarMoedaInput(e.target.value))} onBlur={validarRecargaForm} placeholder="0,00" />
+                        <CampoErro texto={errosOperacao.recargaValor} />
                         <Select value={recargaForma} onChange={(e) => setRecargaForma(e.target.value)}>
                           {formasRecarga.map((item) => <option key={item}>{item}</option>)}
                         </Select>
@@ -683,15 +947,20 @@ export function CarteiraDigitalEventoPage() {
                         <option value="DEBITO">DEBITO</option>
                         <option value="ESTORNO">ESTORNO</option>
                       </Select>
-                      <Input value={ajusteValor} onChange={(e) => setAjusteValor(e.target.value)} placeholder="Valor do ajuste" />
-                      <Textarea value={ajusteMotivo} onChange={(e) => setAjusteMotivo(e.target.value)} rows={2} placeholder="Motivo do ajuste" />
+                      <Input className={classesCampoInvalido(errosOperacao.ajusteValor)} inputMode="decimal" value={ajusteValor} onChange={(e) => setAjusteValor(formatarMoedaInput(e.target.value))} onBlur={validarAjusteForm} placeholder="Valor do ajuste" />
+                      <CampoErro texto={errosOperacao.ajusteValor} />
+                      <Textarea className={classesCampoInvalido(errosOperacao.ajusteMotivo)} value={ajusteMotivo} onChange={(e) => setAjusteMotivo(e.target.value)} onBlur={validarAjusteForm} rows={2} placeholder="Motivo do ajuste" />
+                      <CampoErro texto={errosOperacao.ajusteMotivo} />
                       <Button type="button" variant="outline" onClick={() => void executarAjuste()}>Aplicar ajuste</Button>
-                      <Select value={transferenciaDestinoId} onChange={(e) => setTransferenciaDestinoId(e.target.value)}>
+                      <Select className={classesCampoInvalido(errosOperacao.transferenciaDestinoId)} value={transferenciaDestinoId} onChange={(e) => setTransferenciaDestinoId(e.target.value)} onBlur={validarTransferenciaForm}>
                         <option value="">Carteira destino</option>
                         {participantes.filter((item) => item.id !== participanteSelecionado.id).map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
                       </Select>
-                      <Input value={transferenciaValor} onChange={(e) => setTransferenciaValor(e.target.value)} placeholder="Valor da transferência" />
-                      <Input value={transferenciaMotivo} onChange={(e) => setTransferenciaMotivo(e.target.value)} placeholder="Motivo da transferência" />
+                      <CampoErro texto={errosOperacao.transferenciaDestinoId} />
+                      <Input className={classesCampoInvalido(errosOperacao.transferenciaValor)} inputMode="decimal" value={transferenciaValor} onChange={(e) => setTransferenciaValor(formatarMoedaInput(e.target.value))} onBlur={validarTransferenciaForm} placeholder="Valor da transferência" />
+                      <CampoErro texto={errosOperacao.transferenciaValor} />
+                      <Input className={classesCampoInvalido(errosOperacao.transferenciaMotivo)} value={transferenciaMotivo} onChange={(e) => setTransferenciaMotivo(e.target.value)} onBlur={validarTransferenciaForm} placeholder="Motivo da transferência" />
+                      <CampoErro texto={errosOperacao.transferenciaMotivo} />
                       <Button type="button" variant="outline" onClick={() => void executarTransferencia()}>Transferir crédito</Button>
                       <div className="space-y-2 pt-2">
                         {extrato.slice(0, 6).map((item) => (

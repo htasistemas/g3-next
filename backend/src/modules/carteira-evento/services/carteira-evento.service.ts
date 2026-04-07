@@ -1,4 +1,5 @@
 import { AppError } from "../../../shared/errors/app-error.js";
+import { z } from "zod";
 import {
   ajusteCarteiraInputSchema,
   barracaEventoFiltersSchema,
@@ -19,6 +20,7 @@ import {
   transferenciaCarteiraInputSchema
 } from "../carteira-evento.schema.js";
 import type { CarteiraEventoAtor } from "../carteira-evento.types.js";
+import { participanteCarteiraStatusValues } from "../carteira-evento.types.js";
 import { CarteiraEventoRepository } from "../repositories/carteira-evento.repository.js";
 
 export class CarteiraEventoService {
@@ -109,9 +111,7 @@ export class CarteiraEventoService {
 
   alterarStatusParticipante(rawId: string, rawInput: unknown, ator: CarteiraEventoAtor) {
     const id = this.parseId(rawId, "participante");
-    const body = participanteCarteiraInputSchema
-      .pick({ status: true })
-      .parse(rawInput ?? {});
+    const body = z.object({ status: z.enum(participanteCarteiraStatusValues) }).parse(rawInput ?? {});
     return this.repository.alterarStatusParticipante(id, body.status, ator);
   }
 

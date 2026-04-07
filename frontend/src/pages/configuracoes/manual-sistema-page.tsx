@@ -365,6 +365,7 @@ const secoesManual: ManualSecao[] = [
           "Na aba Cadastro do evento, preencha os dados principais e use Adicionar fotos para fazer upload múltiplo antes mesmo do primeiro salvamento.",
           "Depois do upload, escolha visualmente a capa do álbum ainda no cadastro. A primeira imagem marcada como destaque será persistida como capa real no banco.",
           "Ao salvar, o sistema grava o evento, envia as fotos pendentes, define a capa e mantém o fluxo completo sincronizado entre cadastro, listagem e galeria.",
+          "Quando o evento for salvo com sucesso, a tela passa a confirmar corretamente o cadastro sem exibir mensagem indevida de erro, mesmo quando houver fotos pendentes no mesmo fluxo.",
           "Na aba Galeria do evento, o card principal agora mostra a foto em destaque no topo e, abaixo dela, status, capa definida, nome do evento, data, local e as ações Adicionar fotos e Editar evento.",
           "Na aba Galeria do evento, use Adicionar fotos para complementar o álbum, Definir capa para trocar a imagem principal, Reordenar para ajustar a sequência visual e Excluir foto para remover itens específicos.",
           "Use Publicar evento quando o álbum já estiver consistente e o status precisar ser ajustado para realizado sem voltar para o formulário."
@@ -535,8 +536,13 @@ const secoesManual: ManualSecao[] = [
         comoUsar: [
           "Acesse Setor vendas > Carteira digital do evento para abrir o modulo completo dentro do sistema.",
           "No fluxo administrativo, comece pelo cadastro do evento e defina nome, tipo, periodo, status, regras de recarga, transferencia, estorno, validade do credito, centro de receita e observacoes.",
+          "Na aba Cadastros, os blocos de evento, barraca e produto agora ficam organizados um abaixo do outro para melhorar a visualizacao e a conferencia durante o preenchimento.",
           "Na aba Cadastros, use o proprio formulario em modo Novo ou Editar. Quando quiser iniciar um cadastro limpo, use o botao Novo evento, Nova barraca ou Novo item.",
+          "Abaixo dos formularios, o sistema lista visualmente o evento em edicao, as barracas cadastradas e os produtos vinculados para facilitar a conferencia antes da operacao.",
           "Depois cadastre os participantes do evento com nome, telefone, CPF opcional, responsavel opcional, numero da carteira e status. O sistema gera um token unico para o QR Code e usa o numero da carteira no codigo de barras para facilitar a leitura em leitores fisicos.",
+          "Na aba Carteiras, telefone e CPF seguem mascara visual, validacao no blur e no salvamento e normalizacao para persistencia sem mascara, mantendo padrao unico do sistema.",
+          "Na mesma aba, recarga, ajuste e transferencia usam digitacao monetaria em padrao brasileiro, destacam visualmente campos invalidos e bloqueiam envio com valor zerado ou motivo incompleto.",
+          "Use o bloco Consulta de saldo para selecionar rapidamente um participante e conferir nome, numero da carteira e saldo atual sem precisar iniciar venda ou recarga.",
           "Use a impressao do cartao ou comanda quando precisar entregar o identificador fisico ao participante, com opcao de QR Code e codigo de barras, ou apresente o codigo diretamente no celular.",
           "Cadastre barracas ou pontos de venda e em seguida os itens do evento com categoria, preco, estoque opcional e ordem de exibicao para organizar a operacao.",
           "Para carregar saldo, use a recarga da carteira informando participante, valor, forma de pagamento e observacao. O sistema atualiza o saldo e registra a movimentacao no extrato.",
@@ -549,6 +555,7 @@ const secoesManual: ManualSecao[] = [
         ],
         atencoes: [
           "O QR Code usa um token seguro e o codigo de barras usa o numero da carteira. Em ambos os casos o saldo permanece salvo e validado exclusivamente no banco.",
+          "CPF e telefone invalidos nao devem ser persistidos na carteira do participante; revise os avisos abaixo dos campos antes de salvar.",
           "A venda bloqueia saldo insuficiente, evita saldo negativo por padrao e usa chave de operacao para reduzir duplicidade por clique repetido.",
           "Para registrar recargas e vendas, o evento deve estar com status Ativo na aba de cadastro do proprio modulo.",
           "O modulo persiste eventos, participantes, barracas, itens, vendas, itens da venda e extrato de movimentacoes em banco real, com auditoria do operador.",

@@ -1,6 +1,39 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.426",
+                        "releaseDate":  "2026-04-07",
+                        "title":  "Carteira digital do evento com validacao padronizada e consulta de saldo",
+                        "description":  "A aba Carteiras da Carteira digital do evento foi ajustada para validar CPF, telefone e valores no padrao do sistema e ganhou consulta visual de saldo do participante.",
+                        "changes":  [
+                                        "A recarga passou a interpretar corretamente valores em formato brasileiro e nao exibe mais o alerta tecnico Number must be greater than 0 em lancamentos validos.",
+                                        "Os campos de CPF, telefone, recarga, ajuste e transferencia agora validam no blur e no envio, com destaque visual e mensagens claras para campos invalidos.",
+                                        "A aba Carteiras passou a exibir um bloco proprio de consulta de saldo da carteira do participante, com nome, numero da carteira e saldo atual."
+                                    ]
+                    },
+                    {
+                        "version":  "1.00.425",
+                        "releaseDate":  "2026-04-07",
+                        "title":  "Carteira digital do evento com cadastro em coluna e conferência visual",
+                        "description":  "A aba Cadastros da Carteira digital do evento foi reorganizada para melhorar a leitura e a conferência dos dados informados.",
+                        "changes":  [
+                                        "Os cards de cadastro de evento, barraca e produto passaram a ficar empilhados um abaixo do outro.",
+                                        "A tela passou a exibir abaixo dos formulários uma conferência visual com o evento em edição, as barracas cadastradas e os produtos vinculados.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ]
+                    },
+                    {
+                        "version":  "1.00.424",
+                        "releaseDate":  "2026-04-07",
+                        "title":  "Fotos e eventos com confirmação correta no novo cadastro",
+                        "description":  "O fluxo de novo evento em Fotos e eventos foi ajustado para não exibir mensagem genérica de erro quando o cadastro principal já foi salvo com sucesso.",
+                        "changes":  [
+                                        "O salvamento do evento passou a ser tratado separadamente do envio das fotos pendentes.",
+                                        "Quando o evento é criado com sucesso, a tela não mostra mais erro indevido de cadastro.",
+                                        "Se houver falha apenas no envio das fotos, a interface passa a informar isso de forma específica."
+                                    ]
+                    },
+                    {
                         "version":  "1.00.423",
                         "releaseDate":  "2026-04-06",
                         "title":  "Almoxarifado com saldo disponível calculado para kits",

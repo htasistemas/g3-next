@@ -289,6 +289,7 @@ export function FotosEventosPage() {
     }
 
     try {
+      const quantidadeUploadsPendentes = uploadsPendentes.length;
       const payload: FormState = {
         ...form,
         titulo: form.titulo.trim(),
@@ -299,7 +300,6 @@ export function FotosEventosPage() {
       };
 
       const response = await salvarMutation.mutateAsync(payload);
-      await persistirUploadsPendentes(response.id);
 
       const proximo: FormState = {
         id: response.id,
@@ -316,15 +316,27 @@ export function FotosEventosPage() {
 
       setForm(proximo);
       setSnapshot(proximo);
-      setPopupMensagem({
-        tipo: "sucesso",
-        titulo: "Confirmação",
-        texto:
-          uploadsPendentes.length > 0
-            ? "Evento salvo e fotos adicionadas com sucesso."
-            : "Evento salvo com sucesso."
-      });
       setAbaAtiva("detalhe");
+
+      try {
+        await persistirUploadsPendentes(response.id);
+        setPopupMensagem({
+          tipo: "sucesso",
+          titulo: "Confirmação",
+          texto:
+            quantidadeUploadsPendentes > 0
+              ? "Evento salvo e fotos adicionadas com sucesso."
+              : "Evento salvo com sucesso."
+        });
+      } catch (error: any) {
+        setPopupMensagem({
+          tipo: "aviso",
+          titulo: "Atenção",
+          texto:
+            error?.response?.data?.message ??
+            "O evento foi salvo, mas não foi possível concluir o envio das fotos."
+        });
+      }
     } catch (error: any) {
       setPopupMensagem({
         tipo: "erro",

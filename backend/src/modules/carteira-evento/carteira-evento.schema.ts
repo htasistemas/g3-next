@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizarCpf, normalizarTelefone, validarCpf } from "../../utils/br-utils.js";
 import {
   barracaStatusValues,
   eventoCarteiraModoFinanceiroValues,
@@ -38,6 +39,24 @@ export const participanteCarteiraInputSchema = z.object({
   numero_carteira: optionalTrimmedString,
   status: z.enum(participanteCarteiraStatusValues),
   observacoes: z.string().trim().max(1000).optional()
+}).superRefine((input, context) => {
+  const telefone = normalizarTelefone(input.telefone);
+  if (telefone && ![10, 11].includes(telefone.length)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["telefone"],
+      message: "Informe um telefone valido."
+    });
+  }
+
+  const cpf = normalizarCpf(input.cpf);
+  if (cpf && !validarCpf(cpf)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["cpf"],
+      message: "Informe um CPF valido."
+    });
+  }
 });
 
 export const recargaCarteiraInputSchema = z.object({
