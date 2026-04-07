@@ -875,8 +875,8 @@ export function FotosEventosPage() {
           <section className="space-y-4">
             <div className="grid gap-3 xl:grid-cols-[1.1fr_0.9fr]">
               <Card className="overflow-hidden border-[var(--g3-border)] bg-[var(--g3-card)] shadow-sm">
-                <div className="grid gap-0 md:grid-cols-[0.95fr_1.05fr]">
-                  <div className="aspect-[4/3] bg-slate-100">
+                <div className="grid gap-0">
+                  <div className="aspect-[16/9] bg-slate-100">
                     {capaAtual?.arquivoUrl ? (
                       <img
                         src={resolverUrlArquivo(capaAtual.arquivoUrl)}
@@ -911,28 +911,33 @@ export function FotosEventosPage() {
                       <h2 className="text-lg font-semibold tracking-tight text-[var(--g3-foreground)]">
                         {(detalhes?.evento?.titulo ?? form.titulo) || "Evento não selecionado"}
                       </h2>
-                      <p className="text-sm leading-6 text-[var(--g3-muted)]">
-                        {detalhes?.evento?.descricao ?? form.descricao ?? "Sem descrição cadastrada."}
-                      </p>
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div className="rounded-xl border border-[var(--g3-border)] bg-white p-3">
-                        <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-[var(--g3-foreground)]">
+                        <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--g3-muted)]">
                           <CalendarDays className="h-4 w-4 text-[var(--g3-active)]" />
                           Data do evento
                         </div>
-                        <p className="text-sm text-[var(--g3-muted)]">
+                        <p className="text-sm font-semibold text-[var(--g3-foreground)]">
                           {formatarData(detalhes?.evento?.dataEvento ?? form.dataEvento)}
                         </p>
                       </div>
                       <div className="rounded-xl border border-[var(--g3-border)] bg-white p-3">
-                        <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-[var(--g3-foreground)]">
+                        <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--g3-muted)]">
                           <MapPin className="h-4 w-4 text-[var(--g3-active)]" />
                           Local
                         </div>
-                        <p className="text-sm text-[var(--g3-muted)]">{detalhes?.evento?.local ?? form.local ?? "---"}</p>
+                        <p className="text-sm font-semibold text-[var(--g3-foreground)]">{detalhes?.evento?.local ?? form.local ?? "---"}</p>
                       </div>
                     </div>
+                    {String(detalhes?.evento?.descricao ?? form.descricao ?? "").trim() ? (
+                      <div className="rounded-xl border border-dashed border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/35 p-3">
+                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--g3-muted)]">Descrição</p>
+                        <p className="mt-1 text-sm leading-6 text-[var(--g3-muted)]">
+                          {detalhes?.evento?.descricao ?? form.descricao}
+                        </p>
+                      </div>
+                    ) : null}
                     <div className="flex flex-wrap gap-2">
                       <input
                         id="galeriaEvento"

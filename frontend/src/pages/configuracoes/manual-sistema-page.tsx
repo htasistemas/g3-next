@@ -361,6 +361,7 @@ const secoesManual: ManualSecao[] = [
           "Na aba Cadastro do evento, preencha os dados principais e use Adicionar fotos para fazer upload múltiplo antes mesmo do primeiro salvamento.",
           "Depois do upload, escolha visualmente a capa do álbum ainda no cadastro. A primeira imagem marcada como destaque será persistida como capa real no banco.",
           "Ao salvar, o sistema grava o evento, envia as fotos pendentes, define a capa e mantém o fluxo completo sincronizado entre cadastro, listagem e galeria.",
+          "Na aba Galeria do evento, o card principal agora mostra a foto em destaque no topo e, abaixo dela, status, capa definida, nome do evento, data, local e as ações Adicionar fotos e Editar evento.",
           "Na aba Galeria do evento, use Adicionar fotos para complementar o álbum, Definir capa para trocar a imagem principal, Reordenar para ajustar a sequência visual e Excluir foto para remover itens específicos.",
           "Use Publicar evento quando o álbum já estiver consistente e o status precisar ser ajustado para realizado sem voltar para o formulário."
         ],

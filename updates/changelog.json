@@ -1,6 +1,17 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.421",
+                        "releaseDate":  "2026-04-06",
+                        "title":  "Galeria do evento com dados abaixo da capa",
+                        "description":  "O card principal da aba Galeria do evento foi reorganizado para exibir as informações operacionais abaixo da foto, deixando a leitura mais direta.",
+                        "changes":  [
+                                        "A foto de capa do evento passou a ocupar o topo do card principal da galeria.",
+                                        "Status, indicação de capa definida, nome do evento, data, local e ações principais foram reposicionados abaixo da imagem.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ]
+                    },
+                    {
                         "version":  "1.00.420",
                         "releaseDate":  "2026-04-06",
                         "title":  "Contas bancárias com saldo refletindo lançamentos vinculados",
