@@ -140,10 +140,12 @@ export class StorageService {
         let principalBuffer = input.buffer;
         let thumbnailBuffer;
         const processarImagem = mimeType.startsWith("image/");
+        const preservarImagemOriginal = mimeType === "image/svg+xml";
+        const processarImagemBinaria = processarImagem && !preservarImagemOriginal;
         if (policy.imageOnly && !processarImagem) {
             throw new AppError("Esta categoria aceita apenas imagens.", 400);
         }
-        if (processarImagem) {
+        if (processarImagemBinaria) {
             try {
                 principalBuffer = await sharp(input.buffer)
                     .rotate()

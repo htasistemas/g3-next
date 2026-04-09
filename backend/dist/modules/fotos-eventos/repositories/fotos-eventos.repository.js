@@ -291,6 +291,59 @@ export class FotosEventosRepository {
         const foto = await prisma.$transaction(async (tx) => this.inserirFoto(tx, eventoId, input));
         return this.buscarFotoPorIdOuFalhar(eventoId, foto.id);
     }
+    async adicionarFotosLote(eventoId, input) {
+        await this.buscarPorIdOuFalhar(eventoId);
+        return prisma.$transaction(async (tx) => {
+            const eventoRows = await tx.$queryRaw(Prisma.sql `
+        SELECT foto_principal_id
+        FROM fotos_eventos
+        WHERE id = ${eventoId}
+        LIMIT 1
+      `);
+            const fotosInseridas = [];
+            for (const fotoInput of input.fotos) {
+                const foto = await this.inserirFoto(tx, eventoId, fotoInput);
+                fotosInseridas.push(foto.id);
+            }
+            const indiceCapa = typeof input.fotoPrincipalIndex === "number" &&
+                input.fotoPrincipalIndex >= 0 &&
+                input.fotoPrincipalIndex < fotosInseridas.length
+                ? input.fotoPrincipalIndex
+                : null;
+            const fotoPrincipalId = indiceCapa != null
+                ? fotosInseridas[indiceCapa]
+                : !eventoRows[0]?.foto_principal_id && fotosInseridas.length
+                    ? fotosInseridas[0]
+                    : null;
+            if (fotoPrincipalId) {
+                await this.definirFotoPrincipal(tx, eventoId, fotoPrincipalId);
+            }
+            if (!fotosInseridas.length) {
+                return [];
+            }
+            return tx.$queryRaw(Prisma.sql `
+        SELECT
+          id,
+          evento_id,
+          arquivo,
+          nome_arquivo,
+          mime_type,
+          tamanho_bytes,
+          largura,
+          altura,
+          legenda,
+          creditos,
+          tags,
+          ordem,
+          criado_em,
+          atualizado_em
+        FROM fotos_eventos_itens
+        WHERE evento_id = ${eventoId}
+          AND id IN (${Prisma.join(fotosInseridas)})
+        ORDER BY COALESCE(ordem, 9999) ASC, id ASC
+      `);
+        });
+    }
     async atualizarFoto(eventoId, fotoId, input) {
         await this.buscarFotoPorIdOuFalhar(eventoId, fotoId);
         await prisma.$executeRaw(Prisma.sql `
@@ -321,6 +374,39 @@ export class FotosEventosRepository {
           AND foto_principal_id = ${fotoId}
       `);
         });
+    }
+    async definirFotoPrincipalPorId(eventoId, fotoId) {
+        await this.buscarPorIdOuFalhar(eventoId);
+        await prisma.$transaction(async (tx) => {
+            await this.definirFotoPrincipal(tx, eventoId, fotoId);
+            await tx.$executeRaw(Prisma.sql `
+        UPDATE fotos_eventos
+        SET atualizado_em = NOW()
+        WHERE id = ${eventoId}
+      `);
+        });
+        return this.buscarFotoPorIdOuFalhar(eventoId, fotoId);
+    }
+    async reordenarFotos(eventoId, fotoIds) {
+        await this.buscarPorIdOuFalhar(eventoId);
+        const ids = fotoIds.map((item) => BigInt(item));
+        const fotos = await this.listarFotosEvento(eventoId);
+        const fotosEventoIds = new Set(fotos.map((item) => Number(item.id)));
+        if (ids.some((item) => !fotosEventoIds.has(Number(item)))) {
+            throw new AppError("A ordem informada contem fotos que nao pertencem ao evento.", 400);
+        }
+        await prisma.$transaction(async (tx) => {
+            for (let index = 0; index < ids.length; index += 1) {
+                await tx.$executeRaw(Prisma.sql `
+          UPDATE fotos_eventos_itens
+          SET ordem = ${index + 1},
+              atualizado_em = NOW()
+          WHERE evento_id = ${eventoId}
+            AND id = ${ids[index]}
+        `);
+            }
+        });
+        return this.listarFotosEvento(eventoId);
     }
     async inserirFoto(tx, eventoId, input) {
         const arquivo = montarArquivoPersistido(input.arquivo);

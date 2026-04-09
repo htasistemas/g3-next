@@ -14,7 +14,7 @@ registroPontoRoutes.get("/face", ensureAuthenticated, ensurePermissions(permisso
 registroPontoRoutes.put("/face", ensureAuthenticated, ensurePermissions(permissoesMarcacao), asyncHandler(controller.salvarFace.bind(controller)));
 registroPontoRoutes.put("/configuracao", ensureAuthenticated, ensurePermissions(permissoesMarcacao), asyncHandler(controller.salvarHorarioUsuario.bind(controller)));
 registroPontoRoutes.get("/espelho", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.listarEspelho.bind(controller)));
-registroPontoRoutes.get("/espelho/pdf", ensureAuthenticated, ensurePermissions(permissoesMarcacao), asyncHandler(controller.gerarEspelhoPontoPdf.bind(controller)));
+registroPontoRoutes.get("/espelho/pdf", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.gerarEspelhoPontoPdf.bind(controller)));
 registroPontoRoutes.post("/marcar", ensureAuthenticated, ensurePermissions(permissoesMarcacao), asyncHandler(controller.marcarPonto.bind(controller)));
 registroPontoRoutes.get("/", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.listar.bind(controller)));
 registroPontoRoutes.patch("/:id/ajuste", ensureAuthenticated, ensurePermissions(permissoesAjuste), asyncHandler(controller.ajustarRegistro.bind(controller)));

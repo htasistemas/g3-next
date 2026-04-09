@@ -1,12 +1,15 @@
 import { AppError } from "../../../shared/errors/app-error.js";
+import { EmailService } from "../../email/services/email.service.js";
 import { beneficiarioAddressSuggestionSchema, beneficiarioFiltersSchema, beneficiarioInputSchema } from "../beneficiario.schema.js";
 import { mapBeneficiarioToResponse } from "../beneficiario.mapper.js";
 import { BeneficiarioRepository } from "../repositories/beneficiario.repository.js";
+import { montarMensagemAlteracoesBeneficiario, montarResumoAlteracoesBeneficiario, obterDestinatariosAlteracaoBeneficiario } from "./beneficiario-email-notificacao.js";
 import { mapaCamposTextoBeneficiario, mapaDocumentoBeneficiario } from "../../../utils/text-format-config.js";
 import { normalizarObjetoTexto } from "../../../utils/text-formatter.js";
 import { storageService } from "../../arquivos/services/storage-instance.js";
 export class BeneficiarioService {
     repository = new BeneficiarioRepository();
+    emailService = new EmailService();
     async listar(rawFilters) {
         const filtersNormalizados = rawFilters && typeof rawFilters === "object"
             ? normalizarObjetoTexto(rawFilters, {
@@ -45,6 +48,7 @@ export class BeneficiarioService {
         const input = beneficiarioInputSchema.parse(inputNormalizado);
         const usuarioId = this.parseUsuarioId(rawUsuarioId);
         const existente = await this.repository.buscarPorIdOuFalhar(id);
+        const snapshotAnterior = mapBeneficiarioToResponse(existente);
         const preparado = await this.prepararArquivosPayload(input, usuarioId, id);
         try {
             let beneficiario;
@@ -78,7 +82,9 @@ export class BeneficiarioService {
             catch (error) {
                 console.warn("[beneficiario] falha ao limpar arquivos substituidos apos atualizar cadastro:", error);
             }
-            return mapBeneficiarioToResponse(beneficiario);
+            const response = mapBeneficiarioToResponse(beneficiario);
+            await this.enviarEmailAtualizacaoCadastro(snapshotAnterior, response);
+            return response;
         }
         catch (error) {
             await storageService.rollbackArquivos(preparado.novosCaminhos);
@@ -238,5 +244,47 @@ export class BeneficiarioService {
             return undefined;
         }
         return BigInt(parsed);
+    }
+    async enviarEmailAtualizacaoCadastro(anterior, atual) {
+        const alteracoes = montarResumoAlteracoesBeneficiario(anterior, atual);
+        if (!alteracoes.length) {
+            return;
+        }
+        const destinatarios = obterDestinatariosAlteracaoBeneficiario(anterior, atual);
+        if (!destinatarios.length) {
+            console.warn("[beneficiario] atualizacao sem destinatario para envio de email:", {
+                codigo: atual.codigo,
+                nome: atual.nome_completo
+            });
+            return;
+        }
+        const assunto = "Atualizacao cadastral do beneficiario - G3 Next";
+        const mensagem = montarMensagemAlteracoesBeneficiario(atual, alteracoes);
+        console.info("[beneficiario] preparando email automatico de atualizacao:", {
+            codigo: atual.codigo,
+            nome: atual.nome_completo,
+            destinatarios,
+            totalAlteracoes: alteracoes.length
+        });
+        for (const destinatario of destinatarios) {
+            try {
+                await this.emailService.enviarEmailSimples({
+                    destinatario,
+                    assunto,
+                    mensagem
+                });
+                console.info("[beneficiario] email automatico de atualizacao enviado:", {
+                    codigo: atual.codigo,
+                    destinatario
+                });
+            }
+            catch (error) {
+                console.warn("[beneficiario] falha ao enviar email automatico de atualizacao:", {
+                    codigo: atual.codigo,
+                    destinatario,
+                    error
+                });
+            }
+        }
     }
 }

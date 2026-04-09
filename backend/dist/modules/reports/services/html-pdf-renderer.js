@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import PDFDocument from "pdfkit";
+import { LocalStorageProvider } from "../../arquivos/services/local-storage.provider.js";
 function mmToPt(mm) {
     return mm * 2.83464567;
 }
@@ -55,6 +56,7 @@ function extractSectionSpacerLines(value) {
     return lines;
 }
 export class HtmlPdfRenderer {
+    storageProvider = new LocalStorageProvider();
     async render(html, rodape, layout) {
         if (!layout) {
             return this.renderLegado(html, rodape);
@@ -564,8 +566,9 @@ export class HtmlPdfRenderer {
             caminhoNormalizado,
             path.resolve(process.cwd(), caminhoNormalizado),
             path.resolve(process.cwd(), "..", caminhoNormalizado),
+            this.resolverCaminhoStorage(caminhoNormalizado),
             path.resolve(process.cwd(), "..", "frontend", "public", caminhoNormalizado.replace(/^[/\\]/, ""))
-        ];
+        ].filter((candidato) => Boolean(candidato));
         for (const candidato of candidatos) {
             if (fs.existsSync(candidato)) {
                 try {
@@ -577,6 +580,14 @@ export class HtmlPdfRenderer {
             }
         }
         return undefined;
+    }
+    resolverCaminhoStorage(caminhoArquivo) {
+        try {
+            return this.storageProvider.resolveAbsolutePath(caminhoArquivo);
+        }
+        catch {
+            return undefined;
+        }
     }
     htmlToText(html) {
         return html

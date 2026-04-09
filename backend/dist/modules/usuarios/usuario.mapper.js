@@ -49,6 +49,13 @@ function mapStatus(valor) {
         return "INATIVO";
     return "ATIVO";
 }
+function mapOrigemTipo(valor) {
+    const origem = limparTexto(valor)?.toUpperCase();
+    if (origem === "BENEFICIARIO" || origem === "PROFISSIONAL" || origem === "VOLUNTARIO") {
+        return origem;
+    }
+    return undefined;
+}
 function toInteger(valor) {
     if (typeof valor === "bigint")
         return Number(valor);
@@ -123,6 +130,9 @@ export function mapUsuarioRowParaResponse(row) {
         tentativas_login_invalidas: toInteger(row.tentativas_login_invalidas),
         ultimo_login_invalido_em: row.ultimo_login_invalido_em?.toISOString(),
         ultimo_acesso_em: row.ultimo_acesso_em?.toISOString(),
+        origem_tipo: mapOrigemTipo(row.origem_tipo),
+        origem_id: limparTexto(row.origem_id),
+        origem_nome: limparTexto(row.origem_nome),
         criado_em: row.criado_em.toISOString(),
         atualizado_em: row.atualizado_em.toISOString()
     };

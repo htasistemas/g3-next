@@ -91,12 +91,13 @@ export class RegistroPontoService {
     async marcarPonto(rawInput, atorRaw, origem) {
         const input = registroPontoMarcarSchema.parse(rawInput ?? {});
         const ator = this.parseAtor(atorRaw);
-        await this.validarConfirmacaoUsuario(input.usuario_login, input.senha, input.face_imagem, ator);
+        await this.validarConfirmacaoUsuario(input.usuario_login, input.senha, input.modo_confirmacao === "face" ? input.face_imagem : undefined, ator);
         return this.repository.marcarPonto(input, ator, origem);
     }
     async ajustarRegistro(rawRegistroId, rawInput, atorRaw, origem) {
         const input = registroPontoAjusteSchema.parse(rawInput);
         const ator = this.parseAtor(atorRaw);
+        await this.validarConfirmacaoUsuario(input.usuario_login, input.senha, input.modo_confirmacao === "face" ? input.face_imagem : undefined, ator);
         return this.repository.ajustarRegistro(rawRegistroId, input, ator, origem);
     }
     async adicionarOcorrencia(rawRegistroId, rawInput, atorRaw, origem) {
@@ -141,14 +142,16 @@ export class RegistroPontoService {
         if (!senhaConfere) {
             throw new AppError("Usuario ou senha invalidos para confirmar o registro de ponto.", 401);
         }
-        if (!usuario.face_hash) {
-            throw new AppError("Cadastre a face do usuario antes de registrar o ponto com validacao facial.", 400);
-        }
-        const { buffer } = parseBase64Payload(faceImagem, "image/jpeg");
-        const faceHashAtual = await gerarAssinaturaFace(buffer);
-        const distancia = calcularMenorDistanciaFace(usuario.face_hash, faceHashAtual);
-        if (!facesConferem(usuario.face_hash, faceHashAtual)) {
-            throw new AppError(`A validacao facial nao conferiu com a face cadastrada para este usuario. Distancia calculada: ${distancia}.`, 401);
+        if (faceImagem) {
+            if (!usuario.face_hash) {
+                throw new AppError("Cadastre a face do usuario antes de usar validacao facial.", 400);
+            }
+            const { buffer } = parseBase64Payload(faceImagem, "image/jpeg");
+            const faceHashAtual = await gerarAssinaturaFace(buffer);
+            const distancia = calcularMenorDistanciaFace(usuario.face_hash, faceHashAtual);
+            if (!facesConferem(usuario.face_hash, faceHashAtual)) {
+                throw new AppError(`A validacao facial nao conferiu com a face cadastrada para este usuario. Distancia calculada: ${distancia}.`, 401);
+            }
         }
     }
     async buscarUsuarioConfirmacao(usuarioId) {

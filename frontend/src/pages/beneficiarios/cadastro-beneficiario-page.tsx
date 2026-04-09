@@ -23,7 +23,8 @@ import {
   GraduationCap,
   HeartPulse,
   HandCoins,
-  FileText
+  FileText,
+  ArrowUpDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -128,6 +129,17 @@ type DocumentoCadastro = {
   obrigatorio: boolean;
   permiteIgnorar: boolean;
 };
+
+type ColunaOrdenacaoBeneficiario =
+  | "codigo"
+  | "nome_completo"
+  | "data_nascimento"
+  | "cpf"
+  | "telefone_principal"
+  | "bairro"
+  | "status";
+
+type DirecaoOrdenacao = "asc" | "desc";
 
 function documentoEhComprovanteEndereco(documento: DocumentoCadastro) {
   return documento.id === "comprovante_endereco";
@@ -615,6 +627,10 @@ export function CadastroBeneficiarioPage() {
     data_nascimento: ""
   });
   const [filtros, setFiltros] = useState<BeneficiarioFiltro>(filtroDraft);
+  const [ordenacaoListagem, setOrdenacaoListagem] = useState<{
+    coluna: ColunaOrdenacaoBeneficiario;
+    direcao: DirecaoOrdenacao;
+  }>({ coluna: "nome_completo", direcao: "asc" });
   const [beneficiarioSelecionadoId, setBeneficiarioSelecionadoId] = useState<string | undefined>();
   const [mensagem, setMensagem] = useState<{ tipo: "sucesso" | "erro"; texto: string } | null>(null);
   const [avisoPendenciasSelecao, setAvisoPendenciasSelecao] = useState<
@@ -900,7 +916,45 @@ export function CadastroBeneficiarioPage() {
     };
   }, [foto3x4Atual]);
 
-  const beneficiarios = listaData?.beneficiarios ?? [];
+  const beneficiarios = useMemo(() => {
+    const lista = [...(listaData?.beneficiarios ?? [])];
+    const { coluna, direcao } = ordenacaoListagem;
+    const fator = direcao === "asc" ? 1 : -1;
+
+    const obterValor = (item: Beneficiario) => {
+      switch (coluna) {
+        case "codigo":
+          return item.codigo?.trim() ?? "";
+        case "nome_completo":
+          return item.nome_completo?.trim() ?? "";
+        case "data_nascimento":
+          return item.data_nascimento?.trim() ?? "";
+        case "cpf":
+          return somenteDigitos(item.cpf);
+        case "telefone_principal":
+          return somenteDigitos(item.telefone_principal);
+        case "bairro":
+          return item.bairro?.trim() ?? "";
+        case "status":
+          return item.status?.trim() ?? "";
+        default:
+          return "";
+      }
+    };
+
+    lista.sort((itemA, itemB) => {
+      const valorA = obterValor(itemA);
+      const valorB = obterValor(itemB);
+
+      if (coluna === "data_nascimento") {
+        return valorA.localeCompare(valorB) * fator;
+      }
+
+      return String(valorA).localeCompare(String(valorB), "pt-BR", { numeric: true, sensitivity: "base" }) * fator;
+    });
+
+    return lista;
+  }, [listaData?.beneficiarios, ordenacaoListagem]);
   const abaAtual = abas.find((aba) => aba.id === abaAtiva);
   const tituloAbaAtiva = abaAtual?.label ?? tituloTela;
   const IconeAbaAtiva = abaAtual?.icon ?? ListFilter;
@@ -925,6 +979,32 @@ export function CadastroBeneficiarioPage() {
 
   const bloqueadoAcao =
     salvarMutation.isPending || removerMutation.isPending || carregandoDetalhes || imprimindoRelatorio;
+
+  function alternarOrdenacaoListagem(coluna: ColunaOrdenacaoBeneficiario) {
+    setOrdenacaoListagem((atual) => ({
+      coluna,
+      direcao: atual.coluna === coluna && atual.direcao === "asc" ? "desc" : "asc"
+    }));
+  }
+
+  function renderCabecalhoOrdenavel(
+    coluna: ColunaOrdenacaoBeneficiario,
+    label: string
+  ) {
+    const ativa = ordenacaoListagem.coluna === coluna;
+    const sufixo = ativa ? (ordenacaoListagem.direcao === "asc" ? " ↑" : " ↓") : "";
+
+    return (
+      <button
+        type="button"
+        onClick={() => alternarOrdenacaoListagem(coluna)}
+        className="flex items-center gap-1 font-semibold text-emerald-900 transition hover:text-emerald-950"
+      >
+        <span>{label}{sufixo}</span>
+        <ArrowUpDown className={`h-3.5 w-3.5 ${ativa ? "opacity-100" : "opacity-50"}`} />
+      </button>
+    );
+  }
 
   function aplicarFormatacaoCampo(campo: keyof BeneficiarioFormValues) {
     const valorAtual = getValues(campo);
@@ -2036,18 +2116,18 @@ export function CadastroBeneficiarioPage() {
                   ) : beneficiarios.length === 0 ? (
                     <p className="p-3 text-sm text-slate-500">Nenhum beneficiário encontrado.</p>
                   ) : (
-                    <table className="w-full text-left text-sm">
-                      <thead className="bg-slate-50 text-xs text-slate-500">
-                        <tr>
-                          <th className="px-2 py-2">Código</th>
-                          <th className="px-2 py-2">Nome</th>
-                          <th className="px-2 py-2">Data de nascimento</th>
-                          <th className="px-2 py-2">CPF</th>
-                          <th className="px-2 py-2">Telefone</th>
-                          <th className="px-2 py-2">Bairro</th>
-                          <th className="px-2 py-2">Status</th>
-                        </tr>
-                      </thead>
+                        <table className="w-full text-left text-sm">
+                          <thead className="bg-emerald-100 text-xs text-emerald-900">
+                            <tr>
+                              <th className="px-2 py-2">{renderCabecalhoOrdenavel("codigo", "Código")}</th>
+                              <th className="px-2 py-2">{renderCabecalhoOrdenavel("nome_completo", "Nome")}</th>
+                              <th className="px-2 py-2">{renderCabecalhoOrdenavel("data_nascimento", "Data de nascimento")}</th>
+                              <th className="px-2 py-2">{renderCabecalhoOrdenavel("cpf", "CPF")}</th>
+                              <th className="px-2 py-2">{renderCabecalhoOrdenavel("telefone_principal", "Telefone")}</th>
+                              <th className="px-2 py-2">{renderCabecalhoOrdenavel("bairro", "Bairro")}</th>
+                              <th className="px-2 py-2">{renderCabecalhoOrdenavel("status", "Status")}</th>
+                            </tr>
+                          </thead>
                       <tbody>
                         {beneficiarios.map((item, indice) => (
                           <tr

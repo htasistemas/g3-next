@@ -2,14 +2,15 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../../database/prisma.js";
 import { ensureArquivosEstrutura } from "../../arquivos/repositories/arquivos-estrutura.repository.js";
 import { AppError } from "../../../shared/errors/app-error.js";
-import { toOptionalDate, trimOrUndefined } from "../../../utils/string-utils.js";
-import { calcularSaldoConta, gerarNumeroRecibo, lancamentoEstaBloqueadoPorOrigem, normalizarSituacaoConciliacao, normalizarStatusConta, normalizarStatusLancamento, normalizarTextoEnum, normalizarTipoCategoria, normalizarTipoConta, normalizarTipoLancamento, statusBaixadoPorTipo, tipoMovimentacaoPorLancamento } from "../contabilidade.workflow.js";
+import { toIsoDate, toOptionalDate, trimOrUndefined } from "../../../utils/string-utils.js";
+import { calcularSaldoConta, gerarNumeroRecibo, lancamentoEstaBloqueadoPorOrigem, normalizarDirecaoAjuste, normalizarSituacaoConciliacao, normalizarStatusConta, normalizarStatusLancamento, normalizarTextoEnum, normalizarTipoCategoria, normalizarTipoConta, normalizarTipoLancamento, statusBaixadoPorTipo, tipoMovimentacaoPorLancamento } from "../contabilidade.workflow.js";
 let estruturaPromise = null;
 const LANCAMENTO_SELECT = Prisma.sql `
   SELECT
     l.id,
     l.data_lancamento,
     l.tipo,
+    l.direcao_ajuste,
     l.natureza,
     l.conta_bancaria_id,
     l.categoria_financeira_id,
@@ -67,6 +68,41 @@ const MOVIMENTACAO_SELECT = Prisma.sql `
   LEFT JOIN conta_bancaria c ON c.id = m.conta_bancaria_id
   LEFT JOIN financeiro_categoria cat ON cat.id = m.categoria_financeira_id
   LEFT JOIN financeiro_centro_custo cc ON cc.id = m.centro_custo_id
+`;
+const CONTA_BANCARIA_SALDO_ATUAL_SELECT = Prisma.sql `
+  (
+    COALESCE(cb.saldo, 0)::float8
+    + COALESCE((
+      SELECT
+        SUM(
+          CASE
+            WHEN UPPER(COALESCE(l.tipo, '')) = 'RECEITA' THEN COALESCE(l.valor, 0)
+            WHEN UPPER(COALESCE(l.tipo, '')) = 'AJUSTE'
+              AND UPPER(COALESCE(l.direcao_ajuste, 'DIMINUIR')) = 'AUMENTAR'
+            THEN COALESCE(l.valor, 0)
+            ELSE COALESCE(l.valor, 0) * -1
+          END
+        )::float8
+      FROM lancamento_financeiro l
+      WHERE l.ativo = TRUE
+        AND l.conta_bancaria_id = cb.id
+        AND UPPER(COALESCE(l.situacao, '')) IN (
+          'PREVISTO',
+          'PENDENTE',
+          'VENCIDO',
+          'ATRASADO',
+          'AGUARDANDO_PAGAMENTO',
+          'AGUARDANDO_RECEBIMENTO',
+          'RENEGOCIADO'
+        )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM movimentacao_financeira m
+          WHERE m.ativo = TRUE
+            AND m.lancamento_financeiro_id = l.id
+        )
+    ), 0)::float8
+  ) AS saldo
 `;
 export async function ensureContabilidadeEstrutura() {
     if (!estruturaPromise) {
@@ -176,6 +212,7 @@ export async function ensureContabilidadeEstrutura() {
           ADD COLUMN IF NOT EXISTS setor VARCHAR(160),
           ADD COLUMN IF NOT EXISTS documento VARCHAR(120),
           ADD COLUMN IF NOT EXISTS historico TEXT,
+          ADD COLUMN IF NOT EXISTS direcao_ajuste VARCHAR(20),
           ADD COLUMN IF NOT EXISTS forma_pagamento VARCHAR(80),
           ADD COLUMN IF NOT EXISTS origem VARCHAR(80) NOT NULL DEFAULT 'MANUAL',
           ADD COLUMN IF NOT EXISTS observacao TEXT,
@@ -193,6 +230,10 @@ export async function ensureContabilidadeEstrutura() {
           data_lancamento = COALESCE(data_lancamento, vencimento, CURRENT_DATE),
           natureza = COALESCE(NULLIF(natureza, ''), tipo),
           historico = COALESCE(NULLIF(historico, ''), descricao),
+          direcao_ajuste = CASE
+            WHEN UPPER(COALESCE(tipo, '')) = 'AJUSTE' THEN COALESCE(NULLIF(direcao_ajuste, ''), 'DIMINUIR')
+            ELSE NULLIF(direcao_ajuste, '')
+          END,
           origem = COALESCE(NULLIF(origem, ''), CASE WHEN compra_id IS NULL THEN 'MANUAL' ELSE 'COMPRA' END),
           bloqueado_origem = CASE WHEN compra_id IS NULL THEN bloqueado_origem ELSE TRUE END
       `);
@@ -290,6 +331,11 @@ export async function ensureContabilidadeEstrutura() {
           ADD COLUMN IF NOT EXISTS criado_em TIMESTAMP NOT NULL DEFAULT NOW()
       `);
             await prisma.$executeRawUnsafe(`
+        ALTER TABLE financeiro_historico
+          ALTER COLUMN perfil TYPE TEXT,
+          ALTER COLUMN maquina TYPE TEXT
+      `);
+            await prisma.$executeRawUnsafe(`
         UPDATE financeiro_historico
         SET
           aba = COALESCE(NULLIF(aba, ''), 'Contabilidade'),
@@ -351,61 +397,93 @@ export class ContabilidadeRepository {
         await ensureContabilidadeEstrutura();
         return prisma.$queryRaw(Prisma.sql `
       SELECT
-        id,
-        banco,
-        agencia,
-        numero,
-        digito,
-        nome_conta,
-        tipo,
-        titular,
-        projeto_vinculado,
-        pix_vinculado,
-        tipo_chave_pix,
-        chave_pix,
-        recebimento_local,
-        saldo::float8 AS saldo,
-        saldo_inicial::float8 AS saldo_inicial,
-        data_saldo_inicial,
-        limite_minimo_alerta::float8 AS limite_minimo_alerta,
-        status,
-        permite_movimentacao,
-        observacao,
-        data_atualizacao,
-        ativo
-      FROM conta_bancaria
-      WHERE ativo = TRUE
-      ORDER BY nome_conta ASC, banco ASC, numero ASC
+        cb.id,
+        cb.banco,
+        cb.agencia,
+        cb.numero,
+        cb.digito,
+        cb.nome_conta,
+        cb.tipo,
+        cb.titular,
+        cb.projeto_vinculado,
+        cb.pix_vinculado,
+        cb.tipo_chave_pix,
+        cb.chave_pix,
+        cb.recebimento_local,
+        ${CONTA_BANCARIA_SALDO_ATUAL_SELECT},
+        cb.saldo_inicial::float8 AS saldo_inicial,
+        cb.data_saldo_inicial,
+        cb.limite_minimo_alerta::float8 AS limite_minimo_alerta,
+        cb.status,
+        cb.permite_movimentacao,
+        cb.observacao,
+        cb.data_atualizacao,
+        cb.ativo
+      FROM conta_bancaria cb
+      WHERE cb.ativo = TRUE
+      ORDER BY cb.nome_conta ASC, cb.banco ASC, cb.numero ASC
     `);
     }
     async buscarContaBancariaPorId(id, tx = prisma) {
         await ensureContabilidadeEstrutura();
         const rows = await tx.$queryRaw(Prisma.sql `
       SELECT
-        id,
-        banco,
-        agencia,
-        numero,
-        digito,
-        nome_conta,
-        tipo,
-        titular,
-        projeto_vinculado,
-        pix_vinculado,
-        tipo_chave_pix,
-        chave_pix,
-        recebimento_local,
-        saldo::float8 AS saldo,
-        saldo_inicial::float8 AS saldo_inicial,
-        data_saldo_inicial,
-        limite_minimo_alerta::float8 AS limite_minimo_alerta,
-        status,
-        permite_movimentacao,
-        observacao,
-        data_atualizacao,
-        ativo
-      FROM conta_bancaria
-      WHERE id = ${id}
+        cb.id,
+        cb.banco,
+        cb.agencia,
+        cb.numero,
+        cb.digito,
+        cb.nome_conta,
+        cb.tipo,
+        cb.titular,
+        cb.projeto_vinculado,
+        cb.pix_vinculado,
+        cb.tipo_chave_pix,
+        cb.chave_pix,
+        cb.recebimento_local,
+        ${CONTA_BANCARIA_SALDO_ATUAL_SELECT},
+        cb.saldo_inicial::float8 AS saldo_inicial,
+        cb.data_saldo_inicial,
+        cb.limite_minimo_alerta::float8 AS limite_minimo_alerta,
+        cb.status,
+        cb.permite_movimentacao,
+        cb.observacao,
+        cb.data_atualizacao,
+        cb.ativo
+      FROM conta_bancaria cb
+      WHERE cb.id = ${id}
+      LIMIT 1
+    `);
+        return rows[0] ?? null;
+    }
+    async buscarContaBancariaPorIdComSaldoReal(id, tx = prisma) {
+        await ensureContabilidadeEstrutura();
+        const rows = await tx.$queryRaw(Prisma.sql `
+      SELECT
+        cb.id,
+        cb.banco,
+        cb.agencia,
+        cb.numero,
+        cb.digito,
+        cb.nome_conta,
+        cb.tipo,
+        cb.titular,
+        cb.projeto_vinculado,
+        cb.pix_vinculado,
+        cb.tipo_chave_pix,
+        cb.chave_pix,
+        cb.recebimento_local,
+        COALESCE(cb.saldo, 0)::float8 AS saldo,
+        cb.saldo_inicial::float8 AS saldo_inicial,
+        cb.data_saldo_inicial,
+        cb.limite_minimo_alerta::float8 AS limite_minimo_alerta,
+        cb.status,
+        cb.permite_movimentacao,
+        cb.observacao,
+        cb.data_atualizacao,
+        cb.ativo
+      FROM conta_bancaria cb
+      WHERE cb.id = ${id}
       LIMIT 1
     `);
         return rows[0] ?? null;
@@ -414,6 +492,13 @@ export class ContabilidadeRepository {
         const conta = await this.buscarContaBancariaPorId(id, tx);
         if (!conta || !conta.ativo) {
             throw new AppError("Conta bancária não encontrada.", 404);
+        }
+        return conta;
+    }
+    async buscarContaBancariaPorIdComSaldoRealOuFalhar(id, tx = prisma) {
+        const conta = await this.buscarContaBancariaPorIdComSaldoReal(id, tx);
+        if (!conta || !conta.ativo) {
+            throw new AppError("Conta bancÃ¡ria nÃ£o encontrada.", 404);
         }
         return conta;
     }
@@ -914,7 +999,8 @@ export class ContabilidadeRepository {
         await ensureContabilidadeEstrutura();
         return prisma.$transaction(async (tx) => {
             const tipo = normalizarTipoLancamento(input.tipo);
-            const status = normalizarStatusLancamento(input.status, tipo);
+            const direcaoAjuste = tipo === "AJUSTE" ? input.direcaoAjuste ?? "DIMINUIR" : null;
+            const status = normalizarStatusLancamento(input.status, tipo, direcaoAjuste);
             const origem = trimOrUndefined(input.origem ?? undefined) ?? (input.compraId ? "COMPRA" : "MANUAL");
             const contaId = input.contaBancariaId ? BigInt(input.contaBancariaId) : null;
             const categoriaId = input.categoriaId ? BigInt(input.categoriaId) : null;
@@ -944,6 +1030,7 @@ export class ContabilidadeRepository {
         INSERT INTO lancamento_financeiro (
           data_lancamento,
           tipo,
+          direcao_ajuste,
           natureza,
           conta_bancaria_id,
           categoria_financeira_id,
@@ -971,6 +1058,7 @@ export class ContabilidadeRepository {
         ) VALUES (
           ${toOptionalDate(input.dataLancamento)},
           ${tipo},
+          ${direcaoAjuste},
           ${input.natureza},
           ${contaId},
           ${categoriaId},
@@ -1010,6 +1098,7 @@ export class ContabilidadeRepository {
         `);
             }
             const lancamento = await this.buscarLancamentoPorIdOuFalhar(id, tx);
+            await this.sincronizarSaldoContaPorLancamento(tx, lancamento);
             await this.registrarHistorico(tx, {
                 aba: "Lançamentos",
                 acao: "Lançamento criado",
@@ -1031,7 +1120,8 @@ export class ContabilidadeRepository {
         return prisma.$transaction(async (tx) => {
             const atual = await this.buscarLancamentoPorIdOuFalhar(id, tx);
             const tipo = normalizarTipoLancamento(input.tipo);
-            const status = normalizarStatusLancamento(input.status, tipo);
+            const direcaoAjuste = tipo === "AJUSTE" ? input.direcaoAjuste ?? "DIMINUIR" : null;
+            const status = normalizarStatusLancamento(input.status, tipo, direcaoAjuste);
             const contaId = input.contaBancariaId ? BigInt(input.contaBancariaId) : null;
             const categoriaId = input.categoriaId ? BigInt(input.categoriaId) : null;
             const centroId = input.centroCustoId ? BigInt(input.centroCustoId) : null;
@@ -1055,6 +1145,7 @@ export class ContabilidadeRepository {
         SET
           data_lancamento = ${toOptionalDate(input.dataLancamento)},
           tipo = ${tipo},
+          direcao_ajuste = ${direcaoAjuste},
           natureza = ${input.natureza},
           conta_bancaria_id = ${contaId},
           categoria_financeira_id = ${categoriaId},
@@ -1076,6 +1167,7 @@ export class ContabilidadeRepository {
         WHERE id = ${id}
       `);
             const lancamento = await this.buscarLancamentoPorIdOuFalhar(id, tx);
+            await this.sincronizarSaldoContaPorLancamento(tx, lancamento);
             await this.registrarHistorico(tx, {
                 aba: "Lançamentos",
                 acao: "Lançamento atualizado",
@@ -1096,7 +1188,7 @@ export class ContabilidadeRepository {
         await ensureContabilidadeEstrutura();
         return prisma.$transaction(async (tx) => {
             const atual = await this.buscarLancamentoPorIdOuFalhar(id, tx);
-            const novoStatus = normalizarStatusLancamento(status, normalizarTipoLancamento(atual.tipo));
+            const novoStatus = normalizarStatusLancamento(status, normalizarTipoLancamento(atual.tipo), atual.direcao_ajuste ? normalizarDirecaoAjuste(atual.direcao_ajuste) : undefined);
             if (["PAGO", "RECEBIDO", "CONCILIADO"].includes(novoStatus)) {
                 throw new AppError("Use a ação de pagar ou receber para baixar o lançamento.", 409);
             }
@@ -1138,7 +1230,9 @@ export class ContabilidadeRepository {
                 throw new AppError("O lançamento não possui conta vinculada para estorno.", 409);
             }
             const conta = await this.buscarContaBancariaPorIdOuFalhar(atual.conta_bancaria_id, tx);
-            const tipoEstorno = tipoMovimentacaoPorLancamento(tipo) === "ENTRADA" ? "SAIDA" : "ENTRADA";
+            const tipoEstorno = tipoMovimentacaoPorLancamento(tipo, atual.direcao_ajuste ? normalizarDirecaoAjuste(atual.direcao_ajuste) : undefined) === "ENTRADA"
+                ? "SAIDA"
+                : "ENTRADA";
             await this.criarMovimentacaoInterna(tx, {
                 contaId: atual.conta_bancaria_id,
                 tipo: tipoEstorno,
@@ -1279,7 +1373,7 @@ export class ContabilidadeRepository {
             let saldoAnterior = null;
             let saldoAtual = null;
             if (contaId) {
-                const conta = await this.validarContaMovimentavel(tx, contaId);
+                const conta = await this.validarContaMovimentavel(tx, contaId, true, true);
                 saldoAnterior = conta.saldo;
                 saldoAtual = calcularSaldoConta(conta.saldo, input.valor, tipo);
                 await tx.$executeRaw(Prisma.sql `
@@ -1411,8 +1505,8 @@ export class ContabilidadeRepository {
     async criarTransferencia(input, ator) {
         await ensureContabilidadeEstrutura();
         return prisma.$transaction(async (tx) => {
-            const contaOrigem = await this.validarContaMovimentavel(tx, BigInt(input.contaOrigemId));
-            const contaDestino = await this.validarContaMovimentavel(tx, BigInt(input.contaDestinoId));
+            const contaOrigem = await this.validarContaMovimentavel(tx, BigInt(input.contaOrigemId), true, true);
+            const contaDestino = await this.validarContaMovimentavel(tx, BigInt(input.contaDestinoId), true, true);
             if (input.contaOrigemId === input.contaDestinoId) {
                 throw new AppError("A conta de destino deve ser diferente da conta de origem.", 400);
             }
@@ -1871,10 +1965,10 @@ export class ContabilidadeRepository {
         if (!contaId) {
             throw new AppError("Selecione a conta financeira para efetivar o pagamento ou recebimento.", 400);
         }
-        const conta = await this.validarContaMovimentavel(tx, contaId);
+        const conta = await this.validarContaMovimentavel(tx, contaId, true, true);
         await this.criarMovimentacaoInterna(tx, {
             contaId,
-            tipo: tipoMovimentacaoPorLancamento(tipo),
+            tipo: tipoMovimentacaoPorLancamento(tipo, lancamento.direcao_ajuste ? normalizarDirecaoAjuste(lancamento.direcao_ajuste) : undefined),
             descricao: lancamento.historico ?? lancamento.descricao,
             contraparte: lancamento.contraparte,
             categoria: lancamento.categoria_nome ?? lancamento.natureza ?? lancamento.tipo,
@@ -1886,7 +1980,7 @@ export class ContabilidadeRepository {
             observacao: trimOrUndefined(input.observacao ?? undefined),
             lancamentoId: id
         });
-        const statusFinal = statusBaixadoPorTipo(tipo);
+        const statusFinal = statusBaixadoPorTipo(tipo, lancamento.direcao_ajuste ? normalizarDirecaoAjuste(lancamento.direcao_ajuste) : undefined);
         const dataBaixaIso = input.data ?? new Date().toISOString().slice(0, 10);
         await tx.$executeRaw(Prisma.sql `
       UPDATE lancamento_financeiro
@@ -1902,7 +1996,9 @@ export class ContabilidadeRepository {
     `);
         await this.registrarHistorico(tx, {
             aba: "Lançamentos",
-            acao: tipo === "RECEITA" ? "Recebimento confirmado" : "Pagamento confirmado",
+            acao: tipoMovimentacaoPorLancamento(tipo, lancamento.direcao_ajuste ? normalizarDirecaoAjuste(lancamento.direcao_ajuste) : undefined) === "ENTRADA"
+                ? "Recebimento confirmado"
+                : "Pagamento confirmado",
             tipoRegistro: "LANCAMENTO",
             registroId: String(id),
             valor: lancamento.valor,
@@ -1922,8 +2018,10 @@ export class ContabilidadeRepository {
             responsavel: trimOrUndefined(input.responsavel ?? undefined) ?? undefined
         };
     }
-    async validarContaMovimentavel(tx, id, exigirMovimentacao = true) {
-        const conta = await this.buscarContaBancariaPorIdOuFalhar(id, tx);
+    async validarContaMovimentavel(tx, id, exigirMovimentacao = true, usarSaldoReal = false) {
+        const conta = usarSaldoReal
+            ? await this.buscarContaBancariaPorIdComSaldoRealOuFalhar(id, tx)
+            : await this.buscarContaBancariaPorIdOuFalhar(id, tx);
         if (normalizarStatusConta(conta.status) !== "ATIVA") {
             throw new AppError("A conta selecionada está inativa.", 409);
         }
@@ -1936,7 +2034,7 @@ export class ContabilidadeRepository {
         let saldoAnterior = null;
         let saldoAtual = null;
         if (input.contaId) {
-            const conta = await this.validarContaMovimentavel(tx, input.contaId);
+            const conta = await this.validarContaMovimentavel(tx, input.contaId, true, true);
             saldoAnterior = conta.saldo;
             saldoAtual = calcularSaldoConta(conta.saldo, input.valor, input.tipo);
             await tx.$executeRaw(Prisma.sql `
@@ -1993,10 +2091,80 @@ export class ContabilidadeRepository {
         }
         return this.buscarMovimentacaoPorIdOuFalhar(id, tx);
     }
+    async sincronizarSaldoContaPorLancamento(tx, lancamento) {
+        const movimentacoesVinculadas = await tx.$queryRaw(Prisma.sql `
+      ${MOVIMENTACAO_SELECT}
+      WHERE m.ativo = TRUE
+        AND m.lancamento_financeiro_id = ${lancamento.id}
+      ORDER BY m.id ASC
+    `);
+        const lancamentoLiquidado = ["PAGO", "RECEBIDO", "CONCILIADO"].includes(normalizarTextoEnum(lancamento.situacao));
+        if (!lancamentoLiquidado) {
+            for (const movimentacao of movimentacoesVinculadas) {
+                await this.reverterMovimentacaoConta(tx, movimentacao);
+                await tx.$executeRaw(Prisma.sql `
+          UPDATE movimentacao_financeira
+          SET ativo = FALSE, atualizado_em = NOW()
+          WHERE id = ${movimentacao.id}
+        `);
+            }
+            return;
+        }
+        if (!lancamento.conta_bancaria_id) {
+            throw new AppError("Selecione a conta bancária para atualizar o saldo ao salvar um lançamento liquidado.", 400);
+        }
+        await this.validarContaMovimentavel(tx, lancamento.conta_bancaria_id);
+        const tipoMovimentacao = tipoMovimentacaoPorLancamento(normalizarTipoLancamento(lancamento.tipo), lancamento.direcao_ajuste ? normalizarDirecaoAjuste(lancamento.direcao_ajuste) : undefined);
+        const dataEfetivacao = toIsoDate(lancamento.data_baixa) ??
+            toIsoDate(lancamento.data_lancamento) ??
+            toIsoDate(lancamento.vencimento) ??
+            new Date().toISOString().slice(0, 10);
+        const movimentacaoAtual = movimentacoesVinculadas[0];
+        const movimentacaoJaCorreta = movimentacoesVinculadas.length === 1 &&
+            movimentacaoAtual &&
+            movimentacaoAtual.conta_bancaria_id === lancamento.conta_bancaria_id &&
+            this.normalizarTipoMovimentacao(movimentacaoAtual.tipo) === tipoMovimentacao &&
+            movimentacaoAtual.valor === lancamento.valor &&
+            toIsoDate(movimentacaoAtual.data_movimentacao) === dataEfetivacao;
+        if (movimentacaoJaCorreta) {
+            return;
+        }
+        for (const movimentacao of movimentacoesVinculadas) {
+            await this.reverterMovimentacaoConta(tx, movimentacao);
+            await tx.$executeRaw(Prisma.sql `
+        UPDATE movimentacao_financeira
+        SET ativo = FALSE, atualizado_em = NOW()
+        WHERE id = ${movimentacao.id}
+      `);
+        }
+        await this.criarMovimentacaoInterna(tx, {
+            contaId: lancamento.conta_bancaria_id,
+            tipo: tipoMovimentacao,
+            descricao: lancamento.historico ?? lancamento.descricao,
+            contraparte: lancamento.contraparte,
+            categoria: lancamento.categoria_nome ?? lancamento.natureza ?? lancamento.tipo,
+            categoriaId: lancamento.categoria_financeira_id
+                ? Number(lancamento.categoria_financeira_id)
+                : undefined,
+            centroCustoId: lancamento.centro_custo_id ? Number(lancamento.centro_custo_id) : undefined,
+            dataMovimentacao: dataEfetivacao,
+            valor: lancamento.valor,
+            origem: lancamento.origem ? `${lancamento.origem}_LANCAMENTO` : "LANCAMENTO",
+            observacao: trimOrUndefined(lancamento.observacao ?? undefined),
+            lancamentoId: lancamento.id
+        });
+        if (!lancamento.data_baixa) {
+            await tx.$executeRaw(Prisma.sql `
+        UPDATE lancamento_financeiro
+        SET data_baixa = ${toOptionalDate(dataEfetivacao)}, atualizado_em = NOW()
+        WHERE id = ${lancamento.id}
+      `);
+        }
+    }
     async reverterMovimentacaoConta(tx, movimentacao) {
         if (!movimentacao.conta_bancaria_id)
             return;
-        const conta = await this.buscarContaBancariaPorIdOuFalhar(movimentacao.conta_bancaria_id, tx);
+        const conta = await this.buscarContaBancariaPorIdComSaldoRealOuFalhar(movimentacao.conta_bancaria_id, tx);
         const tipo = this.normalizarTipoMovimentacao(movimentacao.tipo);
         const saldo = tipo === "ENTRADA"
             ? conta.saldo - movimentacao.valor

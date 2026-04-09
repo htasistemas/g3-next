@@ -1,5 +1,5 @@
 import { toIsoDate } from "../../utils/string-utils.js";
-import { normalizarStatusConta, normalizarStatusLancamento, normalizarStatusTransferencia, normalizarSituacaoConciliacao, normalizarTipoConta, normalizarTipoLancamento } from "./contabilidade.workflow.js";
+import { normalizarDirecaoAjuste, normalizarStatusConta, normalizarStatusLancamento, normalizarStatusTransferencia, normalizarSituacaoConciliacao, normalizarTipoConta, normalizarTipoLancamento } from "./contabilidade.workflow.js";
 export function mapContaBancariaToResponse(row) {
     return {
         id: Number(row.id),
@@ -55,6 +55,7 @@ export function mapLancamentoToResponse(row) {
         id: Number(row.id),
         dataLancamento: toIsoDate(row.data_lancamento) ?? "",
         tipo,
+        direcaoAjuste: row.direcao_ajuste ? normalizarDirecaoAjuste(row.direcao_ajuste) : undefined,
         natureza: row.natureza ?? tipo,
         contaBancariaId: row.conta_bancaria_id ? Number(row.conta_bancaria_id) : undefined,
         categoriaId: row.categoria_financeira_id ? Number(row.categoria_financeira_id) : undefined,
@@ -67,7 +68,7 @@ export function mapLancamentoToResponse(row) {
         vencimento: toIsoDate(row.vencimento) ?? "",
         valor: row.valor,
         formaPagamento: row.forma_pagamento ?? undefined,
-        status: normalizarStatusLancamento(row.situacao, tipo),
+        status: normalizarStatusLancamento(row.situacao, tipo, row.direcao_ajuste ? normalizarDirecaoAjuste(row.direcao_ajuste) : undefined),
         origem: row.origem ?? "MANUAL",
         observacao: row.observacao ?? undefined,
         dataBaixa: toIsoDate(row.data_baixa) ?? undefined,

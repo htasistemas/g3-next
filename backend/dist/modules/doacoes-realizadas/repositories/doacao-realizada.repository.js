@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../../database/prisma.js";
+import { calcularEstoqueDisponivelKit, planejarConsumoSaidaKit } from "../../almoxarifado/almoxarifado-kit.js";
 import { AppError } from "../../../shared/errors/app-error.js";
 import { normalizeDigits, toOptionalDate, trimOrUndefined } from "../../../utils/string-utils.js";
 const estruturaDoacaoRealizadaSql = [
@@ -330,12 +331,13 @@ export class DoacaoRealizadaRepository {
         codigo,
         descricao,
         unidade,
-        estoque_atual
+        estoque_atual,
+        is_kit
       FROM almoxarifado_item
       ${whereClause}
       ORDER BY descricao ASC
       LIMIT 30
-    `);
+    `).then(async (itens) => this.aplicarEstoqueDisponivelKit(itens));
     }
     async buscarUltimaEntregaMesmoItem(payload) {
         await this.ensureEstrutura();
@@ -435,7 +437,8 @@ export class DoacaoRealizadaRepository {
         id,
         codigo,
         descricao,
-        estoque_atual::float8 AS estoque_atual
+        estoque_atual::float8 AS estoque_atual,
+        is_kit
       FROM almoxarifado_item
       WHERE id = ${itemId}
       LIMIT 1
@@ -444,14 +447,38 @@ export class DoacaoRealizadaRepository {
         if (!item) {
             throw new AppError("Item de almoxarifado nao encontrado para doacao.", 400);
         }
-        return item;
+        return (await this.aplicarEstoqueDisponivelKit([item], tx))[0];
     }
     async movimentarEstoqueDoacao(tx, payload) {
         const item = await this.buscarItemEstoqueOuFalhar(tx, payload.itemId);
         const estoqueAtual = Number(item.estoque_atual ?? 0);
+        const estoqueFisico = Number(item.estoque_fisico ?? item.estoque_atual ?? 0);
+        const composicaoKit = item.is_kit && item.possui_composicao_kit
+            ? await this.listarComposicaoKitComEstoque([payload.itemId], tx)
+            : [];
         let saldoApos;
+        let estoqueFisicoApos = estoqueFisico;
+        let quantidadeConsumirComponentes = 0;
         try {
-            saldoApos = calcularSaldoMovimentacaoDoacao(estoqueAtual, payload.quantidade, payload.tipo);
+            if (item.is_kit && composicaoKit.length) {
+                if (payload.tipo === "Saida") {
+                    const planoConsumo = planejarConsumoSaidaKit(estoqueFisico, payload.quantidade, composicaoKit);
+                    if (!planoConsumo.suficiente) {
+                        throw new AppError("Estoque insuficiente para registrar a doacao.", 400);
+                    }
+                    estoqueFisicoApos = estoqueFisico - planoConsumo.consumirEstoqueFisico;
+                    quantidadeConsumirComponentes = planoConsumo.consumirComponentes;
+                    saldoApos = planoConsumo.estoqueDisponivel - payload.quantidade;
+                }
+                else {
+                    estoqueFisicoApos = estoqueFisico + payload.quantidade;
+                    saldoApos = estoqueAtual + payload.quantidade;
+                }
+            }
+            else {
+                saldoApos = calcularSaldoMovimentacaoDoacao(estoqueAtual, payload.quantidade, payload.tipo);
+                estoqueFisicoApos = saldoApos;
+            }
         }
         catch (error) {
             if (error instanceof AppError && payload.tipo === "Saida") {
@@ -492,10 +519,109 @@ export class DoacaoRealizadaRepository {
         await tx.$executeRaw(Prisma.sql `
       UPDATE almoxarifado_item
       SET
-        estoque_atual = ${saldoApos},
+        estoque_atual = ${estoqueFisicoApos},
         atualizado_em = NOW()
       WHERE id = ${payload.itemId}
     `);
+        if (quantidadeConsumirComponentes > 0) {
+            await this.consumirComponentesKit(tx, {
+                item,
+                quantidadeKits: quantidadeConsumirComponentes,
+                dataMovimentacao: payload.dataMovimentacao,
+                responsavel: payload.responsavel,
+                registroId: payload.registroId,
+                observacoes: payload.observacoes,
+                composicao: composicaoKit
+            });
+        }
+    }
+    async listarComposicaoKitComEstoque(produtoKitIds, tx = prisma) {
+        if (!produtoKitIds.length) {
+            return [];
+        }
+        return tx.$queryRaw(Prisma.sql `
+      SELECT
+        c.produto_kit_id,
+        c.produto_item_id,
+        c.quantidade_item::float8 AS quantidade_item,
+        COALESCE(i.estoque_atual, 0)::float8 AS estoque_componente
+      FROM produtos_kit_composicao c
+      INNER JOIN almoxarifado_item i ON i.id = c.produto_item_id
+      WHERE c.ativo = TRUE
+        AND c.produto_kit_id IN (${Prisma.join(produtoKitIds)})
+    `);
+    }
+    async aplicarEstoqueDisponivelKit(itens, tx = prisma) {
+        const idsKit = itens.filter((item) => item.is_kit).map((item) => item.id);
+        if (!idsKit.length) {
+            return itens.map((item) => ({
+                ...item,
+                estoque_fisico: item.estoque_atual,
+                possui_composicao_kit: false
+            }));
+        }
+        const composicoes = await this.listarComposicaoKitComEstoque(idsKit, tx);
+        const composicaoPorKit = new Map();
+        for (const componente of composicoes) {
+            const chave = String(componente.produto_kit_id);
+            const lista = composicaoPorKit.get(chave) ?? [];
+            lista.push(componente);
+            composicaoPorKit.set(chave, lista);
+        }
+        return itens.map((item) => {
+            const estoqueFisico = Number(item.estoque_atual ?? 0);
+            const componentes = composicaoPorKit.get(String(item.id)) ?? [];
+            if (!item.is_kit || !componentes.length) {
+                return {
+                    ...item,
+                    estoque_fisico: estoqueFisico,
+                    possui_composicao_kit: false
+                };
+            }
+            return {
+                ...item,
+                estoque_fisico: estoqueFisico,
+                estoque_atual: calcularEstoqueDisponivelKit(estoqueFisico, componentes),
+                possui_composicao_kit: true
+            };
+        });
+    }
+    async consumirComponentesKit(tx, payload) {
+        for (const componente of payload.composicao) {
+            const itemComponente = await this.buscarItemEstoqueOuFalhar(tx, componente.produto_item_id);
+            const quantidadeConsumida = Number(componente.quantidade_item) * Number(payload.quantidadeKits);
+            const saldoApos = Number(itemComponente.estoque_fisico ?? itemComponente.estoque_atual ?? 0) - quantidadeConsumida;
+            await tx.$executeRaw(Prisma.sql `
+        INSERT INTO almoxarifado_movimentacao (
+          item_id,
+          data_movimentacao,
+          tipo,
+          quantidade,
+          saldo_apos,
+          referencia,
+          responsavel,
+          observacoes,
+          criado_em
+        ) VALUES (
+          ${componente.produto_item_id},
+          ${toOptionalDate(payload.dataMovimentacao)},
+          ${"Saida"},
+          ${quantidadeConsumida},
+          ${saldoApos},
+          ${`Doacao realizada ${payload.registroId} via kit ${payload.item.codigo}`},
+          ${trimOrUndefined(payload.responsavel)},
+          ${trimOrUndefined(payload.observacoes) ?? `Baixa automatica de componente do kit ${payload.item.descricao}.`},
+          NOW()
+        )
+      `);
+            await tx.$executeRaw(Prisma.sql `
+        UPDATE almoxarifado_item
+        SET
+          estoque_atual = ${saldoApos},
+          atualizado_em = NOW()
+        WHERE id = ${componente.produto_item_id}
+      `);
+        }
     }
     async ensureEstrutura() {
         await ensureDoacoesRealizadasEstrutura();

@@ -1,5 +1,7 @@
 import { AppError } from "../../../shared/errors/app-error.js";
+import { z } from "zod";
 import { ajusteCarteiraInputSchema, barracaEventoFiltersSchema, barracaEventoInputSchema, dashboardCarteiraFiltersSchema, eventoCarteiraFiltersSchema, eventoCarteiraInputSchema, extratoCarteiraFiltersSchema, fechamentoCarteiraFiltersSchema, itemEventoFiltersSchema, itemEventoInputSchema, operacaoConsultaTokenSchema, operacaoVendaInputSchema, participanteCarteiraFiltersSchema, participanteCarteiraInputSchema, recargaCarteiraInputSchema, relatorioCarteiraFiltersSchema, transferenciaCarteiraInputSchema } from "../carteira-evento.schema.js";
+import { participanteCarteiraStatusValues } from "../carteira-evento.types.js";
 import { CarteiraEventoRepository } from "../repositories/carteira-evento.repository.js";
 export class CarteiraEventoService {
     repository = new CarteiraEventoRepository();
@@ -72,9 +74,7 @@ export class CarteiraEventoService {
     }
     alterarStatusParticipante(rawId, rawInput, ator) {
         const id = this.parseId(rawId, "participante");
-        const body = participanteCarteiraInputSchema
-            .pick({ status: true })
-            .parse(rawInput ?? {});
+        const body = z.object({ status: z.enum(participanteCarteiraStatusValues) }).parse(rawInput ?? {});
         return this.repository.alterarStatusParticipante(id, body.status, ator);
     }
     emitirSegundaVia(rawId, rawInput, ator) {

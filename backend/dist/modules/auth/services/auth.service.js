@@ -94,6 +94,12 @@ export class AuthService {
                 enviado: true
             };
         }
+        if (!env.APP_EMAIL_HABILITADO && env.NODE_ENV === "development") {
+            console.warn(`[auth] recuperacao de senha em desenvolvimento para ${usuario.email}: senha temporaria ${senhaTemporaria}`);
+            return {
+                enviado: true
+            };
+        }
         try {
             await this.emailService.enviarEmailRecuperacaoSenha({
                 destinatario: usuario.email,

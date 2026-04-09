@@ -19,6 +19,24 @@ const fotoUploadSchema = z.object({
     contentType: z.string().trim().min(3, "Informe o tipo do arquivo."),
     conteudo: z.string().trim().min(10, "Informe o conteudo em base64.")
 });
+const positiveInteger = z.preprocess((value) => {
+    if (value == null || value === "")
+        return undefined;
+    if (typeof value === "number")
+        return value;
+    if (typeof value === "string")
+        return Number(value);
+    return value;
+}, z.number().int().positive());
+const nonNegativeInteger = z.preprocess((value) => {
+    if (value == null || value === "")
+        return undefined;
+    if (typeof value === "number")
+        return value;
+    if (typeof value === "string")
+        return Number(value);
+    return value;
+}, z.number().int().min(0));
 export const fotoEventoInputSchema = z.object({
     titulo: z.string().trim().min(2, "Informe o titulo."),
     descricao: optionalTrimmedString.nullable().optional(),
@@ -37,9 +55,16 @@ export const fotoEventoFotoInputSchema = z.object({
     tags: z.array(z.string().trim().min(1)).nullable().optional(),
     ordem: optionalNumber.nullable().optional()
 });
+export const fotoEventoFotosLoteInputSchema = z.object({
+    fotos: z.array(fotoEventoFotoInputSchema).min(1, "Adicione ao menos uma foto."),
+    fotoPrincipalIndex: nonNegativeInteger.nullable().optional()
+});
 export const fotoEventoFotoAtualizacaoSchema = z.object({
     legenda: optionalTrimmedString.nullable().optional(),
     creditos: optionalTrimmedString.nullable().optional(),
     tags: z.array(z.string().trim().min(1)).nullable().optional(),
     ordem: optionalNumber.nullable().optional()
+});
+export const fotoEventoReordenacaoSchema = z.object({
+    fotoIds: z.array(positiveInteger).min(1, "Informe a ordem das fotos.")
 });

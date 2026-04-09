@@ -1,7 +1,7 @@
-import { config } from "dotenv";
 import { z } from "zod";
+import { loadBackendEnvFiles, normalizeRuntimeEnv } from "./env-runtime.js";
 import { parseGoogleClientIds } from "./google-client-ids.js";
-config();
+loadBackendEnvFiles();
 const booleanFromEnv = z.preprocess((value) => {
     if (typeof value === "boolean")
         return value;
@@ -20,7 +20,8 @@ const optionalTrimmedStringFromEnv = z.preprocess((value) => {
     const normalized = value.trim();
     return normalized.length > 0 ? normalized : undefined;
 }, z.string().min(1).optional());
-const envSchema = z.object({
+const envSchema = z
+    .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
     API_PORT: z.coerce.number().int().positive().default(3333),
     API_HOST: z.string().min(1).default("0.0.0.0"),
@@ -52,9 +53,18 @@ const envSchema = z.object({
     MAIL_HOST: z.string().min(1).default("smtp.gmail.com"),
     MAIL_PORT: z.coerce.number().int().positive().default(587),
     MAIL_USER: z.string().min(1).default("htasistemas@gmail.com"),
-    MAIL_PASS: z.string().min(1, "MAIL_PASS nao configurada")
+    MAIL_PASS: optionalTrimmedStringFromEnv
+})
+    .superRefine((env, ctx) => {
+    if (env.APP_EMAIL_HABILITADO && !env.MAIL_PASS) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["MAIL_PASS"],
+            message: "MAIL_PASS nao configurada"
+        });
+    }
 });
-const parsedEnv = envSchema.parse(process.env);
+const parsedEnv = envSchema.parse(normalizeRuntimeEnv(process.env));
 const corsOrigins = parsedEnv.CORS_ORIGIN.split(",")
     .map((origin) => origin.trim())
     .filter((origin) => origin.length > 0);

@@ -85,14 +85,18 @@ export function normalizarTipoLancamento(valor) {
         return "ESTORNO";
     return "DESPESA";
 }
-export function normalizarStatusLancamento(valor, tipo) {
+export function normalizarDirecaoAjuste(valor) {
+    const normalizado = normalizarTextoEnum(valor);
+    return normalizado === "DIMINUIR" ? "DIMINUIR" : "AUMENTAR";
+}
+export function normalizarStatusLancamento(valor, tipo, direcaoAjuste) {
     const normalizado = normalizarTextoEnum(valor);
     const tipoNormalizado = tipo ?? "DESPESA";
     if (["ABERTO", "EM_ABERTO", "A_PAGAR", "A_RECEBER"].includes(normalizado)) {
-        return statusPendentePorTipo(tipoNormalizado);
+        return statusPendentePorTipo(tipoNormalizado, direcaoAjuste);
     }
     if (["PAGO", "PAGA", "QUITADO", "LIQUIDADO", "BAIXADO", "COMPENSADO"].includes(normalizado)) {
-        return statusBaixadoPorTipo(tipoNormalizado);
+        return statusBaixadoPorTipo(tipoNormalizado, direcaoAjuste);
     }
     if (["RECEBIDO", "RECEBIDA"].includes(normalizado)) {
         return "RECEBIDO";
@@ -100,7 +104,7 @@ export function normalizarStatusLancamento(valor, tipo) {
     if (LANCAMENTO_FINANCEIRO_STATUS.includes(normalizado)) {
         return normalizado;
     }
-    return statusPendentePorTipo(tipoNormalizado);
+    return statusPendentePorTipo(tipoNormalizado, direcaoAjuste);
 }
 export function normalizarStatusTransferencia(valor) {
     const normalizado = normalizarTextoEnum(valor);
@@ -116,13 +120,24 @@ export function normalizarSituacaoConciliacao(valor) {
     }
     return "PENDENTE";
 }
-export function statusBaixadoPorTipo(tipo) {
+export function statusBaixadoPorTipo(tipo, direcaoAjuste) {
+    if (tipo === "AJUSTE") {
+        return normalizarDirecaoAjuste(direcaoAjuste) === "AUMENTAR" ? "RECEBIDO" : "PAGO";
+    }
     return tipo === "RECEITA" ? "RECEBIDO" : "PAGO";
 }
-export function statusPendentePorTipo(tipo) {
+export function statusPendentePorTipo(tipo, direcaoAjuste) {
+    if (tipo === "AJUSTE") {
+        return normalizarDirecaoAjuste(direcaoAjuste) === "AUMENTAR"
+            ? "AGUARDANDO_RECEBIMENTO"
+            : "AGUARDANDO_PAGAMENTO";
+    }
     return tipo === "RECEITA" ? "AGUARDANDO_RECEBIMENTO" : "AGUARDANDO_PAGAMENTO";
 }
-export function tipoMovimentacaoPorLancamento(tipo) {
+export function tipoMovimentacaoPorLancamento(tipo, direcaoAjuste) {
+    if (tipo === "AJUSTE") {
+        return normalizarDirecaoAjuste(direcaoAjuste) === "AUMENTAR" ? "ENTRADA" : "SAIDA";
+    }
     return tipo === "RECEITA" ? "ENTRADA" : "SAIDA";
 }
 export function calcularSaldoConta(saldoAtual, valor, tipoMovimentacao) {

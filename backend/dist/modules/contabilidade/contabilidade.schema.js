@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CATEGORIA_FINANCEIRA_TIPOS, CONCILIACAO_FINANCEIRA_SITUACOES, CONTA_BANCARIA_STATUS, CONTA_BANCARIA_TIPOS, LANCAMENTO_FINANCEIRO_STATUS, LANCAMENTO_FINANCEIRO_TIPOS, normalizarStatusConta } from "./contabilidade.workflow.js";
+import { CATEGORIA_FINANCEIRA_TIPOS, CONCILIACAO_FINANCEIRA_SITUACOES, CONTA_BANCARIA_STATUS, CONTA_BANCARIA_TIPOS, LANCAMENTO_FINANCEIRO_STATUS, LANCAMENTO_FINANCEIRO_TIPOS, normalizarDirecaoAjuste, normalizarStatusConta } from "./contabilidade.workflow.js";
 const optionalTrimmedString = z.preprocess((value) => {
     if (typeof value !== "string")
         return value;
@@ -26,6 +26,13 @@ const statusAtivoInativo = z.preprocess((value) => {
         return value;
     return normalizarStatusConta(value);
 }, z.enum(CONTA_BANCARIA_STATUS).optional());
+const direcaoAjusteSchema = z.preprocess((value) => {
+    if (value == null || value === "")
+        return undefined;
+    if (typeof value !== "string")
+        return value;
+    return normalizarDirecaoAjuste(value);
+}, z.enum(["AUMENTAR", "DIMINUIR"]).optional());
 export const contaBancariaInputSchema = z.object({
     banco: z.string().trim().min(2, "Informe o banco."),
     agencia: optionalTrimmedString.nullable().optional(),
@@ -73,6 +80,7 @@ export const lancamentoFinanceiroInputSchema = z.object({
     tipo: z.enum(LANCAMENTO_FINANCEIRO_TIPOS, {
         errorMap: () => ({ message: "Selecione o tipo do lançamento." })
     }),
+    direcaoAjuste: direcaoAjusteSchema.nullable().optional(),
     natureza: z.string().trim().min(2, "Informe a natureza."),
     contaBancariaId: z.coerce.number().int().positive().optional().nullable(),
     categoriaId: z.coerce.number().int().positive().optional().nullable(),
@@ -93,6 +101,14 @@ export const lancamentoFinanceiroInputSchema = z.object({
     responsavel: optionalTrimmedString.nullable().optional(),
     compraId: z.coerce.number().int().positive().optional().nullable(),
     projeto: optionalTrimmedString.nullable().optional()
+}).superRefine((input, ctx) => {
+    if (input.tipo === "AJUSTE" && !input.direcaoAjuste) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["direcaoAjuste"],
+            message: "Selecione se o ajuste deve aumentar ou diminuir o valor."
+        });
+    }
 });
 export const movimentacaoFinanceiraInputSchema = z.object({
     tipo: z.string().trim().min(2, "Informe o tipo."),

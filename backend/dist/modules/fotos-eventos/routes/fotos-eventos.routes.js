@@ -11,6 +11,9 @@ fotosEventosRoutes.get("/", ensureAuthenticated, ensurePermissions(permissoesLei
 fotosEventosRoutes.post("/", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.criar.bind(controller)));
 fotosEventosRoutes.get("/:id/principal", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.obterFotoPrincipal.bind(controller)));
 fotosEventosRoutes.post("/:id/fotos", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.adicionarFoto.bind(controller)));
+fotosEventosRoutes.post("/:id/fotos/lote", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.adicionarFotosLote.bind(controller)));
+fotosEventosRoutes.put("/:id/fotos/reordenar", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.reordenarFotos.bind(controller)));
+fotosEventosRoutes.put("/:id/fotos/:fotoId/capa", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.definirFotoPrincipal.bind(controller)));
 fotosEventosRoutes.put("/:id/fotos/:fotoId", ensureAuthenticated, ensurePermissions(permissoesEscrita), asyncHandler(controller.atualizarFoto.bind(controller)));
 fotosEventosRoutes.delete("/:id/fotos/:fotoId", ensureAuthenticated, ensurePermissions(permissaoExclusao), asyncHandler(controller.removerFoto.bind(controller)));
 fotosEventosRoutes.get("/:id/fotos/:fotoId/arquivo", ensureAuthenticated, ensurePermissions(permissoesLeitura), asyncHandler(controller.obterArquivoFoto.bind(controller)));

@@ -2,7 +2,8 @@ import { AppError } from "../../../shared/errors/app-error.js";
 import { mapaCamposTextoFotosEventos } from "../../../utils/text-format-config.js";
 import { normalizarObjetoTexto } from "../../../utils/text-formatter.js";
 import { mapFotoEventoItemToResponse, mapFotoEventoToResponse } from "../fotos-eventos.mapper.js";
-import { fotoEventoFotoAtualizacaoSchema, fotoEventoFotoInputSchema, fotoEventoInputSchema } from "../fotos-eventos.schema.js";
+import { fotoEventoFotoAtualizacaoSchema, fotoEventoFotoInputSchema, fotoEventoFotosLoteInputSchema, fotoEventoInputSchema } from "../fotos-eventos.schema.js";
+import { fotoEventoReordenacaoSchema } from "../fotos-eventos.schema.js";
 import { FotosEventosRepository } from "../repositories/fotos-eventos.repository.js";
 import { storageService } from "../../arquivos/services/storage-instance.js";
 export class FotosEventosService {
@@ -90,12 +91,48 @@ export class FotosEventosService {
             throw error;
         }
     }
+    async adicionarFotosLote(rawEventoId, rawInput, rawUsuarioId) {
+        const eventoId = this.parseId(rawEventoId);
+        const input = fotoEventoFotosLoteInputSchema.parse(this.normalizarPayload(rawInput));
+        const usuarioId = this.parseUsuarioId(rawUsuarioId);
+        const preparados = [];
+        const novosCaminhos = [];
+        for (const fotoInput of input.fotos) {
+            const preparado = await this.prepararFotoItem(fotoInput, usuarioId, eventoId);
+            preparados.push(preparado.input);
+            novosCaminhos.push(...preparado.novosCaminhos);
+        }
+        try {
+            const fotos = await this.repository.adicionarFotosLote(eventoId, {
+                fotos: preparados,
+                fotoPrincipalIndex: typeof input.fotoPrincipalIndex === "number" ? input.fotoPrincipalIndex : null
+            });
+            await this.vincularFotos(eventoId, novosCaminhos);
+            return fotos.map(mapFotoEventoItemToResponse);
+        }
+        catch (error) {
+            await storageService.rollbackArquivos(novosCaminhos);
+            throw error;
+        }
+    }
+    async definirFotoPrincipal(rawEventoId, rawFotoId) {
+        const eventoId = this.parseId(rawEventoId);
+        const fotoId = this.parseId(rawFotoId);
+        const foto = await this.repository.definirFotoPrincipalPorId(eventoId, fotoId);
+        return mapFotoEventoItemToResponse(foto);
+    }
     async atualizarFoto(rawEventoId, rawFotoId, rawInput) {
         const eventoId = this.parseId(rawEventoId);
         const fotoId = this.parseId(rawFotoId);
         const input = fotoEventoFotoAtualizacaoSchema.parse(this.normalizarPayload(rawInput));
         const foto = await this.repository.atualizarFoto(eventoId, fotoId, input);
         return mapFotoEventoItemToResponse(foto);
+    }
+    async reordenarFotos(rawEventoId, rawInput) {
+        const eventoId = this.parseId(rawEventoId);
+        const input = fotoEventoReordenacaoSchema.parse(this.normalizarPayload(rawInput));
+        const fotos = await this.repository.reordenarFotos(eventoId, input.fotoIds);
+        return fotos.map(mapFotoEventoItemToResponse);
     }
     async removerFoto(rawEventoId, rawFotoId, rawUsuarioId) {
         const eventoId = this.parseId(rawEventoId);

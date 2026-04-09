@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { isValidCpf, isValidPhone } from "../../utils/validators.js";
-import { usuarioStatusValues } from "./usuario.types.js";
+import { usuarioOrigemTipoValues, usuarioStatusValues } from "./usuario.types.js";
 const optionalTrimmedString = z.preprocess((value) => {
     if (typeof value !== "string")
         return value;
@@ -39,6 +39,12 @@ const optionalUsuarioStatus = z.preprocess((value) => {
     const trimmed = value.trim();
     return trimmed.length ? trimmed.toUpperCase() : undefined;
 }, z.enum(usuarioStatusValues).optional());
+const optionalUsuarioOrigemTipo = z.preprocess((value) => {
+    if (typeof value !== "string")
+        return value;
+    const trimmed = value.trim();
+    return trimmed.length ? trimmed.toUpperCase() : undefined;
+}, z.enum(usuarioOrigemTipoValues).optional());
 const optionalPermissoesArray = z.preprocess((value) => {
     if (value === null || value === undefined || value === "")
         return undefined;
@@ -55,7 +61,7 @@ const optionalPermissoesArray = z.preprocess((value) => {
     }
     return value;
 }, z.array(z.string().trim().min(1)).optional());
-const baseUsuarioSchema = z.object({
+const baseUsuarioSchemaShape = {
     nome_completo: z.string().trim().min(3, "Informe o nome completo."),
     nome_exibicao: optionalTrimmedString,
     nome_usuario: z.string().trim().min(3, "Informe o login do usuario."),
@@ -77,14 +83,34 @@ const baseUsuarioSchema = z.object({
     perfil_acesso: optionalTrimmedString,
     permissoes: optionalPermissoesArray,
     status: z.enum(usuarioStatusValues).default("ATIVO"),
-    exigir_troca_senha: optionalBoolean.default(false)
+    exigir_troca_senha: optionalBoolean.default(false),
+    origem_tipo: optionalUsuarioOrigemTipo,
+    origem_id: optionalTrimmedString,
+    origem_nome: optionalTrimmedString
+};
+const baseUsuarioSchema = z.object(baseUsuarioSchemaShape).superRefine((input, context) => {
+    if (input.origem_tipo && !input.origem_id) {
+        context.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["origem_id"],
+            message: "Informe a origem vinculada do usuario."
+        });
+    }
 });
-export const criarUsuarioSchema = baseUsuarioSchema
-    .extend({
+export const criarUsuarioSchema = z
+    .object({
+    ...baseUsuarioSchemaShape,
     senha: z.string().min(6, "A senha deve ter no minimo 6 caracteres."),
     confirmar_senha: z.string().min(6, "Confirme a senha.")
 })
     .superRefine((input, context) => {
+    if (input.origem_tipo && !input.origem_id) {
+        context.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["origem_id"],
+            message: "Informe a origem vinculada do usuario."
+        });
+    }
     if (input.senha !== input.confirmar_senha) {
         context.addIssue({
             code: z.ZodIssueCode.custom,
