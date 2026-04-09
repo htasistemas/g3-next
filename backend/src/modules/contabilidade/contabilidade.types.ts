@@ -8,6 +8,8 @@ export type ContaBancariaStatus = "ATIVA" | "INATIVA";
 
 export type CategoriaFinanceiraTipo = "RECEITA" | "DESPESA";
 
+export type DirecaoAjusteFinanceiro = "AUMENTAR" | "DIMINUIR";
+
 export type LancamentoFinanceiroTipo =
   | "RECEITA"
   | "DESPESA"
@@ -89,6 +91,7 @@ export type CentroCustoInput = {
 export type LancamentoFinanceiroInput = {
   dataLancamento: string;
   tipo: LancamentoFinanceiroTipo;
+  direcaoAjuste?: DirecaoAjusteFinanceiro | null;
   natureza: string;
   contaBancariaId?: number | null;
   categoriaId?: number | null;
@@ -214,6 +217,7 @@ export type LancamentoFinanceiroRow = {
   id: bigint;
   data_lancamento: Date | null;
   tipo: string;
+  direcao_ajuste: string | null;
   natureza: string | null;
   conta_bancaria_id: bigint | null;
   categoria_financeira_id: bigint | null;

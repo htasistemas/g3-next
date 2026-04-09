@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.415",
-  "releaseDate": "2026-04-01",
-  "description": "Versão oficial alinhada com a revisão da implantação do plano Enterprise na licença de uso.",
+  "latestVersion": "1.00.431",
+  "releaseDate": "2026-04-09",
+  "description": "Versão oficial alinhada com a correção global de saldo fiel nas contas e com o novo tratamento de ajustes financeiros.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.415",
+  "minCompatibleVersion": "1.00.431",
   "releaseType": "stable"
 }
 

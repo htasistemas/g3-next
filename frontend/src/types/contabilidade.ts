@@ -8,6 +8,8 @@ export type StatusAtivoInativo = 'ATIVA' | 'INATIVA';
 
 export type CategoriaFinanceiraTipo = 'RECEITA' | 'DESPESA';
 
+export type DirecaoAjusteFinanceiro = 'AUMENTAR' | 'DIMINUIR';
+
 export type LancamentoFinanceiroTipo =
   | 'RECEITA'
   | 'DESPESA'
@@ -95,6 +97,7 @@ export type CentroCusto = CentroCustoPayload & {
 export type LancamentoFinanceiroPayload = {
   dataLancamento: string;
   tipo: LancamentoFinanceiroTipo;
+  direcaoAjuste?: DirecaoAjusteFinanceiro;
   natureza: string;
   contaBancariaId?: number;
   categoriaId?: number;

@@ -73,7 +73,8 @@ const secoesManual: ManualSecao[] = [
         comoUsar: [
           "Preencha os dados pessoais principais e confira campos obrigatórios destacados.",
           "Revise a aba de documentos e use a regra de obrigatoriedade definida em parâmetros do sistema.",
-          "Ao abrir um beneficiário, leia o aviso de pendências antes de continuar o atendimento."
+          "Ao abrir um beneficiário, leia o aviso de pendências antes de continuar o atendimento.",
+          "Na aba Listagem de beneficiários, a tarja do cabeçalho da tabela usa fundo verde claro e permite ordenar por clique os campos Código, Nome, Data de nascimento, CPF, Telefone, Bairro e Status."
         ],
         atencoes: [
           "CPF, e-mail, telefone e CEP devem respeitar as máscaras e validações padronizadas.",
@@ -391,9 +392,15 @@ const secoesManual: ManualSecao[] = [
         comoUsar: [
           "A tela foi simplificada para trabalhar somente com três abas principais: Painel financeiro, Lançamentos e Contas bancárias.",
           "Use Painel financeiro para ver saldo geral, contas a pagar, contas a receber, últimos lançamentos e próximos vencimentos em leitura rápida.",
-          "Use Lançamentos para registrar receitas e despesas com poucos campos: tipo, datas, conta bancária, natureza, favorecido ou pagador, histórico, valor e status.",
+          "Use Lançamentos para registrar receitas, despesas e ajustes com poucos campos: tipo, datas, conta bancária, natureza, favorecido ou pagador, histórico, valor e status.",
+          "Na aba Lançamentos, o campo Valor aplica a máscara brasileira ao sair do campo, convertendo entradas como 1000 para 1.000,00 sem alterar o valor numérico salvo.",
+          "O salvamento da aba Lançamentos passou a aceitar somente uma execução por vez, evitando duplicidade de débitos ou créditos quando houver clique repetido no botão de salvar.",
+          "No campo Tipo da aba Lançamentos, a opção Estorno não aparece mais na criação manual; o estorno continua disponível apenas como ação específica para lançamentos já baixados.",
+          "Quando o tipo for Ajuste, a tela exige informar se o ajuste deve aumentar ou diminuir o saldo da conta antes do salvamento.",
           "Na aba Lançamentos, os cards de resumo mostram rapidamente quantos lançamentos existem, quanto entrou, quanto saiu e o que ainda está em aberto.",
           "Ao salvar um lançamento vinculado a uma conta bancária, os cards de Contas bancárias passam a refletir imediatamente o impacto financeiro esperado daquela conta, mesmo antes da baixa.",
+          "O saldo exibido nas contas bancárias usa o saldo real da conta somado apenas à projeção dos lançamentos ainda em aberto, sem duplicar créditos ou débitos já baixados, pagos, recebidos ou conciliados.",
+          "Ao efetivar receita, despesa ou ajuste em qualquer conta bancária, o saldo realizado passa a seguir exatamente o valor informado no lançamento, sem duplicar débito ou crédito em nenhuma conta do sistema.",
           "Quando o lançamento for salvo já como Pago, Recebido ou Conciliado, o sistema também atualiza automaticamente o saldo realizado da conta bancária vinculada.",
           "Use Contas bancárias para cadastrar contas e depois acompanhar cada conta em cards com banco, agência, número, saldo atual, Pix, projeto vinculado e status.",
           "Para editar uma conta, clique em Editar no card correspondente. Para iniciar um novo cadastro, use Nova conta bancária na barra superior ou no formulário."

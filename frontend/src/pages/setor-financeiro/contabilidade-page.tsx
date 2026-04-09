@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -47,6 +47,7 @@ import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { resolverUrlArquivo } from '@/lib/arquivos';
+import { formatarMoedaInput as formatarMoedaSemSimbolo } from '@/lib/br-utils';
 import { imprimirConteudoAtual } from '@/lib/report-utils';
 import {
   useArquivosLancamentoContabil,
@@ -94,6 +95,7 @@ import type {
   ConciliacaoFinanceiraPayload,
   ContaBancaria,
   ContaBancariaPayload,
+  DirecaoAjusteFinanceiro,
   EmendaImpositivaPayload,
   HistoricoContabilidade,
   LancamentoFinanceiro,
@@ -265,6 +267,7 @@ function criarLancamentoVazio(visao: LancamentoVisaoId = 'todos'): LancamentoFin
   return {
     dataLancamento: hoje,
     tipo: tipoPadraoPorVisaoLancamento(visao),
+    direcaoAjuste: 'DIMINUIR',
     natureza: '',
     contaBancariaId: undefined,
     categoriaId: undefined,
@@ -334,7 +337,7 @@ function formatarMoeda(valor: number) {
 }
 
 function formatarMoedaInput(valor: number | null | undefined) {
-  return formatarMoeda(Number(valor ?? 0));
+  return formatarMoedaSemSimbolo(Number(valor ?? 0));
 }
 
 function parseMoedaInput(valor: string) {
@@ -346,6 +349,13 @@ function parseDecimalInput(valor: string) {
   const normalizado = valor.trim().replace(/\./g, '').replace(',', '.');
   const numero = Number(normalizado);
   return Number.isFinite(numero) ? numero : 0;
+}
+
+function formatarMoedaParaEdicao(valor: number | null | undefined) {
+  if (!valor) return '';
+  const numero = Number(valor);
+  if (!Number.isFinite(numero)) return '';
+  return String(numero).replace('.', ',');
 }
 
 function formatarData(valor?: string) {
@@ -577,6 +587,7 @@ function toLancamentoForm(item: LancamentoFinanceiro): LancamentoFinanceiroPaylo
   return {
     dataLancamento: item.dataLancamento,
     tipo: item.tipo,
+    direcaoAjuste: item.direcaoAjuste ?? 'DIMINUIR',
     natureza: item.natureza,
     contaBancariaId: item.contaBancariaId,
     categoriaId: item.categoriaId,
@@ -663,6 +674,7 @@ function Bloco({
 export function ContabilidadePage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const salvamentoEmAndamentoRef = useRef(false);
   const [abaAtiva, setAbaAtiva] = useState<AbaId>('painel');
   const [visaoLancamentos, setVisaoLancamentos] = useState<LancamentoVisaoId>('todos');
   const [filtroBusca, setFiltroBusca] = useState('');
@@ -682,6 +694,8 @@ export function ContabilidadePage() {
   const [centroSelecionadoId, setCentroSelecionadoId] = useState<number>();
   const [lancamentoSelecionadoId, setLancamentoSelecionadoId] = useState<number>();
   const [movimentacaoSelecionadaId, setMovimentacaoSelecionadaId] = useState<number>();
+  const [lancamentoValorInput, setLancamentoValorInput] = useState('');
+  const [editandoValorLancamento, setEditandoValorLancamento] = useState(false);
 
   const [contaForm, setContaForm] = useState<ContaBancariaPayload>(contaVazia);
   const [categoriaForm, setCategoriaForm] = useState<CategoriaFinanceiraPayload>(categoriaVazia);
@@ -693,6 +707,11 @@ export function ContabilidadePage() {
   const [emendaForm, setEmendaForm] = useState<EmendaImpositivaPayload>(emendaVazia);
   const [arquivoSelecionado, setArquivoSelecionado] = useState<File | null>(null);
   const [arquivoObservacao, setArquivoObservacao] = useState('');
+
+  useEffect(() => {
+    if (editandoValorLancamento) return;
+    setLancamentoValorInput(lancamentoForm.valor ? formatarMoedaInput(lancamentoForm.valor) : '');
+  }, [editandoValorLancamento, lancamentoForm.valor]);
 
   const carregarContas = abaEstaNaLista(abaAtiva, [
     'painel',
@@ -931,6 +950,7 @@ export function ContabilidadePage() {
   );
 
   const processando =
+    salvamentoEmAndamentoRef.current ||
     salvarContaMutation.isPending ||
     removerContaMutation.isPending ||
     salvarCategoriaMutation.isPending ||
@@ -1060,6 +1080,11 @@ export function ContabilidadePage() {
   }
 
   async function salvarAtual() {
+    if (salvamentoEmAndamentoRef.current) {
+      return;
+    }
+
+    salvamentoEmAndamentoRef.current = true;
     try {
       if (abaAtiva === 'contas') {
         if (!contaForm.banco.trim() || !contaForm.numero.trim() || !contaForm.nomeConta.trim()) {
@@ -1175,6 +1200,10 @@ export function ContabilidadePage() {
         setor: lancamentoNormalizado.setor?.trim() ?? '',
         origem: lancamentoNormalizado.origem?.trim() ?? ''
       };
+      if (payload.tipo === 'AJUSTE' && !payload.direcaoAjuste) {
+        setPopup({ tipo: 'aviso', titulo: 'Validação', texto: 'Selecione se o ajuste deve aumentar ou diminuir o saldo.' });
+        return;
+      }
       if (payload.valor <= 0) {
         setPopup({ tipo: 'aviso', titulo: 'Validação', texto: 'Informe um valor maior que zero.' });
         return;
@@ -1185,6 +1214,8 @@ export function ContabilidadePage() {
       setPopup({ tipo: 'sucesso', titulo: 'Lançamento salvo', texto: 'O lançamento financeiro foi salvo com sucesso.' });
     } catch (error: any) {
       setPopup({ tipo: 'erro', titulo: 'Erro', texto: error?.response?.data?.message ?? 'Não foi possível salvar os dados.' });
+    } finally {
+      salvamentoEmAndamentoRef.current = false;
     }
   }
 
@@ -1412,14 +1443,37 @@ export function ContabilidadePage() {
             Passo a passo: escolha o tipo, informe a conta, descreva para quem foi ou de quem veio, preencha o histórico e digite o valor.
           </div>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <div className="space-y-1"><Label>Tipo</Label><Select value={lancamentoForm.tipo} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, tipo: event.target.value as LancamentoFinanceiro['tipo'] }))}><option value="RECEITA">Receita</option><option value="DESPESA">Despesa</option><option value="AJUSTE">Ajuste</option><option value="ESTORNO">Estorno</option></Select></div>
+            <div className="space-y-1"><Label>Tipo</Label><Select value={lancamentoForm.tipo} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, tipo: event.target.value as LancamentoFinanceiro['tipo'], direcaoAjuste: event.target.value === 'AJUSTE' ? (atual.direcaoAjuste ?? 'DIMINUIR') : undefined }))}><option value="RECEITA">Receita</option><option value="DESPESA">Despesa</option><option value="AJUSTE">Ajuste</option></Select></div>
+            {lancamentoForm.tipo === 'AJUSTE' ? <div className="space-y-1"><Label>Direção do ajuste</Label><Select value={lancamentoForm.direcaoAjuste ?? 'DIMINUIR'} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, direcaoAjuste: event.target.value as DirecaoAjusteFinanceiro }))}><option value="DIMINUIR">Diminuir saldo</option><option value="AUMENTAR">Aumentar saldo</option></Select></div> : null}
             <div className="space-y-1"><Label>Data do lançamento</Label><Input type="date" value={lancamentoForm.dataLancamento} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, dataLancamento: event.target.value }))} /></div>
             <div className="space-y-1"><Label>Vencimento</Label><Input type="date" value={lancamentoForm.vencimento} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, vencimento: event.target.value }))} /></div>
             <div className="space-y-1"><Label>Conta bancária</Label><Select value={lancamentoForm.contaBancariaId ? String(lancamentoForm.contaBancariaId) : ''} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, contaBancariaId: Number(event.target.value) || undefined }))}><option value="">Selecione</option>{contas.map((conta) => <option key={conta.id} value={conta.id}>{conta.nomeConta}</option>)}</Select></div>
             <div className="space-y-1"><Label>Categoria</Label><Select value={lancamentoForm.categoriaId ? String(lancamentoForm.categoriaId) : ''} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, categoriaId: Number(event.target.value) || undefined }))}><option value="">Opcional</option>{categorias.map((categoria) => <option key={categoria.id} value={categoria.id}>{categoria.nome}</option>)}</Select></div>
             <div className="space-y-1"><Label>Natureza</Label><Input value={lancamentoForm.natureza} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, natureza: event.target.value }))} placeholder="Ex.: conta de energia, mensalidade, doação" /></div>
             <div className="space-y-1 md:col-span-2"><Label>Favorecido / pagador</Label><Input value={lancamentoForm.contraparte} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, contraparte: event.target.value }))} placeholder="Quem recebeu ou quem pagou" /></div>
-            <div className="space-y-1"><Label>Valor</Label><Input inputMode="decimal" value={String(lancamentoForm.valor || '')} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, valor: parseDecimalInput(event.target.value) }))} placeholder="0,00" /></div>
+            <div className="space-y-1">
+              <Label>Valor</Label>
+              <Input
+                inputMode="decimal"
+                value={lancamentoValorInput}
+                onFocus={() => {
+                  setEditandoValorLancamento(true);
+                  setLancamentoValorInput(formatarMoedaParaEdicao(lancamentoForm.valor));
+                }}
+                onChange={(event) => {
+                  const valorDigitado = event.target.value;
+                  setLancamentoValorInput(valorDigitado);
+                  setLancamentoForm((atual) => ({ ...atual, valor: parseDecimalInput(valorDigitado) }));
+                }}
+                onBlur={() => {
+                  const valorNormalizado = parseDecimalInput(lancamentoValorInput);
+                  setEditandoValorLancamento(false);
+                  setLancamentoForm((atual) => ({ ...atual, valor: valorNormalizado }));
+                  setLancamentoValorInput(valorNormalizado ? formatarMoedaInput(valorNormalizado) : '');
+                }}
+                placeholder="0,00"
+              />
+            </div>
             <div className="space-y-1"><Label>Status</Label><Select value={lancamentoForm.status} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, status: event.target.value as LancamentoFinanceiro['status'] }))}><option value="PENDENTE">Pendente</option><option value="AGUARDANDO_PAGAMENTO">Aguardando pagamento</option><option value="AGUARDANDO_RECEBIMENTO">Aguardando recebimento</option><option value="PREVISTO">Previsto</option><option value="VENCIDO">Vencido</option><option value="ATRASADO">Atrasado</option><option value="PAGO">Pago</option><option value="RECEBIDO">Recebido</option><option value="CANCELADO">Cancelado</option><option value="RENEGOCIADO">Renegociado</option></Select></div>
             <div className="space-y-1 md:col-span-2 xl:col-span-4"><Label>Histórico</Label><Textarea rows={3} value={lancamentoForm.historico} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, historico: event.target.value }))} placeholder="Descreva em poucas palavras o lançamento" /></div>
             <div className="space-y-1 md:col-span-2 xl:col-span-4"><Label>Observação</Label><Textarea rows={2} value={lancamentoForm.observacao ?? ''} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, observacao: event.target.value }))} placeholder="Opcional" /></div>

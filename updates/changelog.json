@@ -1,6 +1,62 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.431",
+                        "releaseDate":  "2026-04-09",
+                        "title":  "Contabilidade com saldo fiel por lançamento e ajuste com direção",
+                        "description":  "A tela Contabilidade / financeiro foi ajustada para aplicar o valor exato informado em receitas, despesas e ajustes em qualquer conta bancária, sem duplicidade no saldo.",
+                        "changes":  [
+                                        "As rotinas de movimentação passaram a usar o saldo real da conta para atualizar débito e crédito, evitando duplicidade do valor lançado em qualquer conta bancária do sistema.",
+                                        "O campo Tipo da aba Lançamentos deixou de exibir a opção Estorno na criação manual.",
+                                        "Quando o tipo for Ajuste, a tela e a API agora exigem informar se o ajuste deve aumentar ou diminuir o saldo.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ]
+                    },
+                    {
+                        "version":  "1.00.430",
+                        "releaseDate":  "2026-04-09",
+                        "title":  "Listagem de beneficiários com cabeçalho verde e ordenação por coluna",
+                        "description":  "A aba Listagem de beneficiários recebeu ajuste visual no cabeçalho da tabela e passou a permitir ordenação por clique nas colunas principais.",
+                        "changes":  [
+                                        "A tarja do cabeçalho da tabela passou a usar fundo verde claro para reforçar o padrão visual da listagem de referência.",
+                                        "As colunas Código, Nome, Data de nascimento, CPF, Telefone, Bairro e Status agora permitem ordenação crescente e decrescente por clique.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ]
+                    },
+                    {
+                        "version":  "1.00.429",
+                        "releaseDate":  "2026-04-09",
+                        "title":  "Contabilidade com bloqueio de salvamento duplicado em lançamentos",
+                        "description":  "A aba Lançamentos da Contabilidade / financeiro foi ajustada para impedir a criação duplicada de débitos e créditos por acionamento repetido do salvamento.",
+                        "changes":  [
+                                        "O fluxo de salvar lançamento agora bloqueia reentrada enquanto a gravação atual ainda está em andamento.",
+                                        "A regra evita duplicidade de lançamentos quando o usuário aciona o salvamento mais de uma vez em sequência rápida.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ]
+                    },
+                    {
+                        "version":  "1.00.428",
+                        "releaseDate":  "2026-04-09",
+                        "title":  "Contabilidade com saldo sem duplicidade em contas bancárias",
+                        "description":  "A tela Contabilidade / financeiro foi ajustada para impedir que lançamentos já liquidados sejam somados duas vezes no saldo exibido das contas bancárias.",
+                        "changes":  [
+                                        "O saldo projetado das contas passou a considerar apenas lançamentos ainda em aberto, sem reaplicar créditos ou débitos já pagos, recebidos ou conciliados.",
+                                        "A leitura visual da aba Contas bancárias deixou de inflar o saldo quando a conta já havia sido atualizada pela movimentação do próprio lançamento.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ]
+                    },
+                    {
+                        "version":  "1.00.427",
+                        "releaseDate":  "2026-04-09",
+                        "title":  "Contabilidade com máscara correta no valor do lançamento",
+                        "description":  "A aba Lançamentos da tela Contabilidade / financeiro foi ajustada para exibir o valor no padrão brasileiro após a digitação.",
+                        "changes":  [
+                                        "O campo Valor voltou a aceitar entradas como 1000 e a formatar a exibição para 1.000,00 ao sair do campo.",
+                                        "O valor continua sendo normalizado como número para o salvamento do lançamento financeiro.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ]
+                    },
+                    {
                         "version":  "1.00.426",
                         "releaseDate":  "2026-04-07",
                         "title":  "Carteira digital do evento com validacao padronizada e consulta de saldo",

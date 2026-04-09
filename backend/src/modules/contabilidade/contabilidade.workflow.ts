@@ -3,6 +3,7 @@ import type {
   ContaBancariaStatus,
   ContaBancariaTipo,
   ConciliacaoFinanceiraSituacao,
+  DirecaoAjusteFinanceiro,
   LancamentoFinanceiroStatus,
   LancamentoFinanceiroTipo,
   TransferenciaFinanceiraStatus
@@ -99,17 +100,23 @@ export function normalizarTipoLancamento(valor?: string | null): LancamentoFinan
   return "DESPESA";
 }
 
+export function normalizarDirecaoAjuste(valor?: string | null): DirecaoAjusteFinanceiro {
+  const normalizado = normalizarTextoEnum(valor);
+  return normalizado === "DIMINUIR" ? "DIMINUIR" : "AUMENTAR";
+}
+
 export function normalizarStatusLancamento(
   valor?: string | null,
-  tipo?: LancamentoFinanceiroTipo
+  tipo?: LancamentoFinanceiroTipo,
+  direcaoAjuste?: DirecaoAjusteFinanceiro | null
 ): LancamentoFinanceiroStatus {
   const normalizado = normalizarTextoEnum(valor);
   const tipoNormalizado = tipo ?? "DESPESA";
   if (["ABERTO", "EM_ABERTO", "A_PAGAR", "A_RECEBER"].includes(normalizado)) {
-    return statusPendentePorTipo(tipoNormalizado);
+    return statusPendentePorTipo(tipoNormalizado, direcaoAjuste);
   }
   if (["PAGO", "PAGA", "QUITADO", "LIQUIDADO", "BAIXADO", "COMPENSADO"].includes(normalizado)) {
-    return statusBaixadoPorTipo(tipoNormalizado);
+    return statusBaixadoPorTipo(tipoNormalizado, direcaoAjuste);
   }
   if (["RECEBIDO", "RECEBIDA"].includes(normalizado)) {
     return "RECEBIDO";
@@ -118,7 +125,7 @@ export function normalizarStatusLancamento(
     return normalizado as LancamentoFinanceiroStatus;
   }
 
-  return statusPendentePorTipo(tipoNormalizado);
+  return statusPendentePorTipo(tipoNormalizado, direcaoAjuste);
 }
 
 export function normalizarStatusTransferencia(valor?: string | null): TransferenciaFinanceiraStatus {
@@ -137,15 +144,35 @@ export function normalizarSituacaoConciliacao(valor?: string | null): Conciliaca
   return "PENDENTE";
 }
 
-export function statusBaixadoPorTipo(tipo: LancamentoFinanceiroTipo): LancamentoFinanceiroStatus {
+export function statusBaixadoPorTipo(
+  tipo: LancamentoFinanceiroTipo,
+  direcaoAjuste?: DirecaoAjusteFinanceiro | null
+): LancamentoFinanceiroStatus {
+  if (tipo === "AJUSTE") {
+    return normalizarDirecaoAjuste(direcaoAjuste) === "AUMENTAR" ? "RECEBIDO" : "PAGO";
+  }
   return tipo === "RECEITA" ? "RECEBIDO" : "PAGO";
 }
 
-export function statusPendentePorTipo(tipo: LancamentoFinanceiroTipo): LancamentoFinanceiroStatus {
+export function statusPendentePorTipo(
+  tipo: LancamentoFinanceiroTipo,
+  direcaoAjuste?: DirecaoAjusteFinanceiro | null
+): LancamentoFinanceiroStatus {
+  if (tipo === "AJUSTE") {
+    return normalizarDirecaoAjuste(direcaoAjuste) === "AUMENTAR"
+      ? "AGUARDANDO_RECEBIMENTO"
+      : "AGUARDANDO_PAGAMENTO";
+  }
   return tipo === "RECEITA" ? "AGUARDANDO_RECEBIMENTO" : "AGUARDANDO_PAGAMENTO";
 }
 
-export function tipoMovimentacaoPorLancamento(tipo: LancamentoFinanceiroTipo) {
+export function tipoMovimentacaoPorLancamento(
+  tipo: LancamentoFinanceiroTipo,
+  direcaoAjuste?: DirecaoAjusteFinanceiro | null
+) {
+  if (tipo === "AJUSTE") {
+    return normalizarDirecaoAjuste(direcaoAjuste) === "AUMENTAR" ? "ENTRADA" : "SAIDA";
+  }
   return tipo === "RECEITA" ? "ENTRADA" : "SAIDA";
 }
 
