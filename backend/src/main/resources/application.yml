@@ -58,7 +58,9 @@ app:
     pg-dump-path: ${APP_BACKUP_PG_DUMP_PATH:pg_dump}
     psql-path: ${APP_BACKUP_PSQL_PATH:psql}
   email:
-    habilitado: ${APP_EMAIL_HABILITADO:true}
+    habilitado: ${APP_EMAIL_HABILITADO:false}
     remetente: ${APP_EMAIL_REMETENTE:}
     nome-remetente: ${APP_EMAIL_NOME:HTA Sistemas}
     chamados-destino: ${APP_EMAIL_DESTINO_CHAMADOS:htasistemas@gmail.com}
+  websocket:
+    allowed-origins: ${APP_WEBSOCKET_ALLOWED_ORIGINS:https://g3n.htasistemas.com.br,http://localhost:5173,http://127.0.0.1:5173,http://0.0.0.0:5173,http://localhost:4200,http://127.0.0.1:4200,http://0.0.0.0:4200}

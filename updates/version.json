@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.431",
+  "latestVersion": "1.00.432",
   "releaseDate": "2026-04-09",
-  "description": "Contabilidade ajustada para aplicar saldo fiel em todas as contas e tratar ajustes com direção explícita.",
+  "description": "Segurança endurecida com proteção de ambiente, senha temporária mais forte e WebSocket restrito por origem.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.431",
+  "minCompatibleVersion": "1.00.432",
   "releaseType": "stable",
   "downloadUrl": null
 }

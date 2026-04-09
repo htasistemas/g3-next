@@ -1,6 +1,18 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.432",
+                        "releaseDate":  "2026-04-09",
+                        "title":  "Hardening de segurança em ambiente, autenticação e comunicação em tempo real",
+                        "description":  "O G3N recebeu endurecimento de segurança para reduzir risco operacional com segredo de autenticação, envio de e-mail, recuperação de senha e conexões WebSocket.",
+                        "changes":  [
+                                        "O backend passou a rejeitar em produção o segredo padrão de desenvolvimento para autenticação e a desabilitar e-mail local quando MAIL_PASS não estiver configurada.",
+                                        "A geração de senha temporária na recuperação de acesso passou a usar fonte criptográfica mais segura.",
+                                        "O WebSocket do painel de senhas deixou de aceitar qualquer origem e passou a usar lista explícita de origens permitidas.",
+                                        "Arquivos temporários e um arquivo local sensível fora do fluxo normal foram removidos da raiz do projeto, e o manual do sistema foi atualizado na mesma entrega."
+                                    ]
+                    },
+                    {
                         "version":  "1.00.431",
                         "releaseDate":  "2026-04-09",
                         "title":  "Contabilidade com saldo fiel por lançamento e ajuste com direção",

@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.431",
+  "latestVersion": "1.00.432",
   "releaseDate": "2026-04-09",
-  "description": "Versão oficial alinhada com a correção global de saldo fiel nas contas e com o novo tratamento de ajustes financeiros.",
+  "description": "Versão oficial alinhada com o endurecimento de segurança de ambiente, autenticação e WebSocket.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.431",
+  "minCompatibleVersion": "1.00.432",
   "releaseType": "stable"
 }
 

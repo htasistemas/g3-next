@@ -2,6 +2,7 @@ import { z } from "zod";
 import { loadBackendEnvFiles, normalizeRuntimeEnv } from "./env-runtime.js";
 import { parseGoogleClientIds } from "./google-client-ids.js";
 loadBackendEnvFiles();
+const DEFAULT_DEV_AUTH_TOKEN_SECRET = "g3-next-dev-token-secret-2026";
 const booleanFromEnv = z.preprocess((value) => {
     if (typeof value === "boolean")
         return value;
@@ -35,7 +36,7 @@ const envSchema = z
         .min(1)
         .default("https://g3n.htasistemas.com.br,http://localhost:5173,http://127.0.0.1:5173,http://0.0.0.0:5173,http://localhost:4200,http://127.0.0.1:4200,http://0.0.0.0:4200"),
     DATABASE_URL: z.string().min(1, "DATABASE_URL nao configurada"),
-    APP_AUTH_TOKEN_SECRET: z.string().min(16).default("g3-next-dev-token-secret-2026"),
+    APP_AUTH_TOKEN_SECRET: z.string().min(16, "APP_AUTH_TOKEN_SECRET nao configurado"),
     APP_AUTH_TOKEN_EXPIRATION_MINUTES: z.coerce.number().int().positive().default(480),
     APP_AUTH_COOKIE_NAME: z.string().trim().min(1).default("g3n_auth_token"),
     APP_AUTH_COOKIE_DOMAIN: optionalTrimmedStringFromEnv,
@@ -47,7 +48,7 @@ const envSchema = z
     GOOGLE_API_KEY: optionalTrimmedStringFromEnv,
     IA_PROVIDER: z.enum(["gemini"]).default("gemini"),
     IA_MODEL: z.string().trim().min(1).default("gemini-2.5-flash"),
-    APP_EMAIL_HABILITADO: booleanFromEnv.default(true),
+    APP_EMAIL_HABILITADO: booleanFromEnv.default(false),
     APP_EMAIL_REMETENTE: z.string().min(1).default("htasistemas@gmail.com"),
     APP_EMAIL_NOME: z.string().min(1).default("HTA Sistemas"),
     MAIL_HOST: z.string().min(1).default("smtp.gmail.com"),
@@ -56,6 +57,14 @@ const envSchema = z
     MAIL_PASS: optionalTrimmedStringFromEnv
 })
     .superRefine((env, ctx) => {
+    if (env.NODE_ENV === "production" &&
+        env.APP_AUTH_TOKEN_SECRET === DEFAULT_DEV_AUTH_TOKEN_SECRET) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["APP_AUTH_TOKEN_SECRET"],
+            message: "APP_AUTH_TOKEN_SECRET padrao de desenvolvimento nao pode ser usado em producao"
+        });
+    }
     if (env.APP_EMAIL_HABILITADO && !env.MAIL_PASS) {
         ctx.addIssue({
             code: z.ZodIssueCode.custom,

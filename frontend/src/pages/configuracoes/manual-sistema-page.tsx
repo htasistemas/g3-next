@@ -54,6 +54,8 @@ const secoesManual: ManualSecao[] = [
           "Toda informação crítica deve ser validada antes do salvamento.",
           "Sempre mantenha cadastros e vínculos familiares consistentes para evitar duplicidade de concessão.",
           "Se o login Google ficar indisponível em ambiente local, revise APP_GOOGLE_CLIENT_ID, GOOGLE_CLIENT_ID e VITE_GOOGLE_CLIENT_ID antes de testar a autenticação.",
+          "Em produção, o backend não deve operar com o segredo padrão de desenvolvimento para autenticação; configure APP_AUTH_TOKEN_SECRET próprio antes de publicar.",
+          "O envio de e-mail deve permanecer desabilitado enquanto MAIL_PASS não estiver configurada no ambiente da instância.",
           "Essa recuperação local sem e-mail é apenas de apoio ao desenvolvimento; em ambientes com envio ativo, a senha temporária continua sendo enviada ao endereço cadastrado.",
           "Na impressão da ficha cadastral do beneficiário e no recibo de doação entregue, a logomarca do cabeçalho é carregada diretamente do storage local da unidade quando estiver salva como caminho lógico do sistema.",
           "No cadastro da unidade assistencial, a Logomarca da unidade vazado preserva o arquivo original enviado pelo cliente, incluindo SVG e imagens com transparência, enquanto a Logomarca do relatório pode ser normalizada para manter compatibilidade de impressão."

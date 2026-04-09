@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { randomInt } from "node:crypto";
 import { OAuth2Client } from "google-auth-library";
 import { env } from "../../../config/env.js";
 import { AppError } from "../../../shared/errors/app-error.js";
@@ -154,7 +155,7 @@ export class AuthService {
         const alfabeto = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
         let senha = "";
         for (let indice = 0; indice < 10; indice += 1) {
-            const randomIndex = Math.floor(Math.random() * alfabeto.length);
+            const randomIndex = randomInt(alfabeto.length);
             senha += alfabeto[randomIndex];
         }
         return senha;
