@@ -327,7 +327,8 @@ const secoesManual: ManualSecao[] = [
         ],
         atencoes: [
           "O sistema aceita anexos PDF, JPG e PNG e grava apenas o caminho do arquivo no cadastro do documento.",
-          "Se o documento já estiver salvo, o anexo é armazenado no storage do sistema e permanece disponível para substituição e exclusão sem duplicar arquivo no banco."
+          "Se o documento já estiver salvo, o anexo é armazenado no storage do sistema e permanece disponível para substituição e exclusão sem duplicar arquivo no banco.",
+          "O envio do anexo principal na aba Cadastro e edição foi ajustado para usar o contrato atual do backend, permitindo anexar e salvar o documento sem erro de envio."
         ]
       },
       {

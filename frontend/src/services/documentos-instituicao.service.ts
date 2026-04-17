@@ -8,18 +8,6 @@ import type {
   DocumentoInstituicaoPayload
 } from "@/types/documentos-instituicao";
 
-type UploadAnexoDocumentoResponse = {
-  arquivo: {
-    registro?: {
-      id: number;
-      nome_original?: string;
-      mime_type?: string;
-      tamanho_bytes?: number;
-    };
-    caminhoArquivo: string;
-  };
-};
-
 export const documentosInstituicaoService = {
   async listar() {
     const { data } = await httpClient.get<DocumentoInstituicao[]>("/api/documentos-instituicao");
@@ -69,29 +57,6 @@ export const documentosInstituicaoService = {
       { timeout: 300000 }
     );
     return data;
-  },
-
-  async uploadArquivoAnexo(id: string, arquivo: File) {
-    const formData = new FormData();
-    formData.append("scope", "instituicao_documento");
-    formData.append("entidadeTipo", "instituicao");
-    formData.append("entidadeId", id);
-    formData.append("observacao", "Anexo de documento institucional");
-    formData.append("arquivo", arquivo);
-
-    const { data } = await httpClient.post<UploadAnexoDocumentoResponse>(
-      "/api/arquivos/upload",
-      formData,
-      { timeout: 300000 }
-    );
-
-    return {
-      id: data.arquivo.registro?.id,
-      caminhoArquivo: data.arquivo.caminhoArquivo,
-      nomeOriginal: data.arquivo.registro?.nome_original,
-      mimeType: data.arquivo.registro?.mime_type,
-      tamanhoBytes: data.arquivo.registro?.tamanho_bytes
-    };
   },
 
   async excluirAnexo(id: string, anexoId: string) {

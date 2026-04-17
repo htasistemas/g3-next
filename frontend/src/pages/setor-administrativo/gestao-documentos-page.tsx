@@ -41,12 +41,11 @@ import {
 } from "@/features/documentos-instituicao/use-documentos-instituicao";
 import { abrirArquivoAutenticado, imprimirArquivoAutenticado } from "@/lib/arquivos";
 import { formatarDataPtBr } from "@/lib/br-utils";
+import { montarPayloadAnexoDocumentoInstituicao } from "@/lib/documentos-instituicao-anexo";
 import { imprimirConteudoAtual } from "@/lib/report-utils";
-import { documentosInstituicaoService } from "@/services/documentos-instituicao.service";
 import type {
   DocumentoInstituicao,
   DocumentoInstituicaoAnexo,
-  DocumentoInstituicaoAnexoPayload,
   DocumentoInstituicaoPayload
 } from "@/types/documentos-instituicao";
 import { useAuth } from "@/hooks/use-auth";
@@ -56,13 +55,13 @@ type AbaId = "lista" | "cadastro" | "anexos" | "alertas" | "relatorios" | "links
 
 const abas: AdminTab[] = [
   { id: "lista", label: "Lista de documentos", icon: FolderOpen },
-  { id: "cadastro", label: "Cadastro e edição", icon: FileStack },
+  { id: "cadastro", label: "Cadastro e ediÃ§Ã£o", icon: FileStack },
   { id: "links", label: "Links externos", icon: ExternalLink },
   { id: "alertas", label: "Alertas e vencimentos", icon: AlertTriangle },
-  { id: "relatorios", label: "Relatórios e dashboard", icon: Bell }
+  { id: "relatorios", label: "RelatÃ³rios e dashboard", icon: Bell }
 ];
 
-const tituloTela = "Gestão de documentos";
+const tituloTela = "GestÃ£o de documentos";
 
 interface LinkExterno {
   id?: number;
@@ -74,52 +73,52 @@ interface LinkExterno {
 
 const tiposDocumentoTerceiroSetor = [
   "Estatuto social",
-  "Ata de fundação",
-  "Ata de eleição da diretoria",
+  "Ata de fundaÃ§Ã£o",
+  "Ata de eleiÃ§Ã£o da diretoria",
   "Ata de posse da diretoria",
   "Regimento interno",
-  "Cartão do CNPJ",
-  "Comprovante de inscrição municipal",
-  "Comprovante de inscrição estadual",
-  "Alvará de funcionamento",
+  "CartÃ£o do CNPJ",
+  "Comprovante de inscriÃ§Ã£o municipal",
+  "Comprovante de inscriÃ§Ã£o estadual",
+  "AlvarÃ¡ de funcionamento",
   "AVCB ou CLCB",
-  "Licença sanitária",
-  "Licença ambiental",
-  "Certidão negativa federal",
-  "Certidão negativa estadual",
-  "Certidão negativa municipal",
-  "Certidão do FGTS",
-  "Certidão trabalhista",
-  "Balanço patrimonial",
-  "Demonstração do resultado",
+  "LicenÃ§a sanitÃ¡ria",
+  "LicenÃ§a ambiental",
+  "CertidÃ£o negativa federal",
+  "CertidÃ£o negativa estadual",
+  "CertidÃ£o negativa municipal",
+  "CertidÃ£o do FGTS",
+  "CertidÃ£o trabalhista",
+  "BalanÃ§o patrimonial",
+  "DemonstraÃ§Ã£o do resultado",
   "Plano de trabalho",
-  "Termo de fomento ou colaboração",
-  "Prestação de contas",
-  "Procuração",
-  "Apólice de seguro",
-  "Contrato de locação",
-  "Contrato de prestação de serviços",
+  "Termo de fomento ou colaboraÃ§Ã£o",
+  "PrestaÃ§Ã£o de contas",
+  "ProcuraÃ§Ã£o",
+  "ApÃ³lice de seguro",
+  "Contrato de locaÃ§Ã£o",
+  "Contrato de prestaÃ§Ã£o de serviÃ§os",
   "Certificado digital",
-  "Política de proteção de dados",
+  "PolÃ­tica de proteÃ§Ã£o de dados",
   "Manual de compliance",
-  "Certificado de utilidade pública",
-  "Qualificação OSCIP",
+  "Certificado de utilidade pÃºblica",
+  "QualificaÃ§Ã£o OSCIP",
   "Certificado CEBAS"
 ] as const;
 
 const categoriasDocumentoInstitucional = [
-  "Governança institucional",
-  "Jurídica",
-  "Fiscal e tributária",
-  "Contábil e financeira",
+  "GovernanÃ§a institucional",
+  "JurÃ­dica",
+  "Fiscal e tributÃ¡ria",
+  "ContÃ¡bil e financeira",
   "Trabalhista e RH",
-  "Parcerias e convênios",
-  "Certidões e regularidade",
-  "Licenças e alvarás",
+  "Parcerias e convÃªnios",
+  "CertidÃµes e regularidade",
+  "LicenÃ§as e alvarÃ¡s",
   "Patrimonial e seguros",
-  "Compliance e políticas internas",
+  "Compliance e polÃ­ticas internas",
   "Operacional",
-  "Prestação de contas"
+  "PrestaÃ§Ã£o de contas"
 ] as const;
 
 const formasAlertaOptions = ["Sistema", "E-mail", "WhatsApp", "Ambos"] as const;
@@ -130,7 +129,7 @@ const defaultForm: FormState = {
   tipoDocumento: "",
   orgaoEmissor: "",
   descricao: "",
-  categoria: "Fiscal e tributária",
+  categoria: "Fiscal e tributÃ¡ria",
   emissao: "",
   validade: "",
   responsavelInterno: "",
@@ -166,27 +165,6 @@ function mesclarOpcaoAtual(opcoes: readonly string[], valorAtual?: string | null
   return [valor, ...opcoes];
 }
 
-function obterTipoAnexoArquivo(file: File) {
-  const nome = file.name.trim().toLowerCase();
-  const indiceExtensao = nome.lastIndexOf(".");
-  if (indiceExtensao >= 0 && indiceExtensao < nome.length - 1) {
-    return nome.slice(indiceExtensao + 1).toUpperCase().slice(0, 30);
-  }
-
-  const mime = file.type.trim().toLowerCase();
-  if (!mime) return "ARQUIVO";
-
-  const tipoCurto = mime.includes("/") ? mime.split("/").at(-1) ?? mime : mime;
-  const valor = tipoCurto
-    .replace(/[\s._/-]+/g, " ")
-    .replace(/[^a-z0-9 ]+/g, "")
-    .trim()
-    .toUpperCase()
-    .slice(0, 30);
-
-  return valor || "ARQUIVO";
-}
-
 function ehArquivoPermitido(file: File) {
   return file.size > 0;
 }
@@ -198,11 +176,11 @@ function formatarSituacaoDocumento(situacao?: string | null) {
     case "vence_em_breve":
       return "Vence em breve";
     case "em_renovacao":
-      return "Em renovação";
+      return "Em renovaÃ§Ã£o";
     case "sem_vencimento":
       return "Sem vencimento";
     case "valido":
-      return "Válido";
+      return "VÃ¡lido";
     default:
       return "---";
   }
@@ -427,8 +405,8 @@ export function GestaoDocumentosPage() {
     if (!form.tipoDocumento.trim() || !form.orgaoEmissor.trim() || !form.emissao) {
       setPopupMensagem({
         tipo: "aviso",
-        titulo: "Validação",
-        texto: "Informe tipo, órgão emissor e data de emissão."
+        titulo: "ValidaÃ§Ã£o",
+        texto: "Informe tipo, Ã³rgÃ£o emissor e data de emissÃ£o."
       });
       return;
     }
@@ -450,12 +428,12 @@ export function GestaoDocumentosPage() {
       const proximo = { ...payload, id: response.id };
       setForm(proximo);
       setSnapshot(proximo);
-      setPopupMensagem({ tipo: "sucesso", titulo: "Confirmação", texto: "Documento salvo com sucesso." });
+      setPopupMensagem({ tipo: "sucesso", titulo: "ConfirmaÃ§Ã£o", texto: "Documento salvo com sucesso." });
     } catch (error: any) {
       setPopupMensagem({
         tipo: "erro",
         titulo: "Erro",
-        texto: error?.response?.data?.message ?? "Não foi possível salvar o documento."
+        texto: error?.response?.data?.message ?? "NÃ£o foi possÃ­vel salvar o documento."
       });
     }
   }
@@ -464,7 +442,7 @@ export function GestaoDocumentosPage() {
     if (!form.id) {
       setPopupMensagem({
         tipo: "aviso",
-        titulo: "Atenção",
+        titulo: "AtenÃ§Ã£o",
         texto: "Selecione um documento para excluir."
       });
       return;
@@ -480,14 +458,14 @@ export function GestaoDocumentosPage() {
       novo();
       setPopupMensagem({
         tipo: "sucesso",
-        titulo: "Confirmação",
-        texto: "Documento excluído com sucesso."
+        titulo: "ConfirmaÃ§Ã£o",
+        texto: "Documento excluÃ­do com sucesso."
       });
     } catch (error: any) {
       setPopupMensagem({
         tipo: "erro",
         titulo: "Erro",
-        texto: error?.response?.data?.message ?? "Não foi possível excluir o documento."
+        texto: error?.response?.data?.message ?? "NÃ£o foi possÃ­vel excluir o documento."
       });
     }
   }
@@ -496,83 +474,38 @@ export function GestaoDocumentosPage() {
     if (!ehArquivoPermitido(file)) {
       setPopupMensagem({
         tipo: "aviso",
-        titulo: "Validação",
-        texto: "Selecione um arquivo válido para envio."
+        titulo: "ValidaÃ§Ã£o",
+        texto: "Selecione um arquivo vÃ¡lido para envio."
       });
-      return;
-    }
-
-    if (form.id) {
-      try {
-        const upload = await documentosInstituicaoService.uploadArquivoAnexo(form.id, file);
-        const payload: DocumentoInstituicaoAnexoPayload = {
-          nomeArquivo: upload.nomeOriginal || file.name,
-          tipo: obterTipoAnexoArquivo(file),
-          tipoMime: upload.mimeType || file.type || "application/octet-stream",
-          caminhoArquivo: upload.caminhoArquivo,
-          tamanho: `${Math.round((upload.tamanhoBytes ?? file.size) / 1024)} KB`,
-          dataUpload: new Date().toISOString().slice(0, 10),
-          usuario: responsavelLogado || "Usuário"
-        };
-
-        const anexo = await anexoMutation.mutateAsync({ id: form.id, payload });
-        setAnexoPrincipalLocal(anexo);
-        setPopupMensagem({
-          tipo: "sucesso",
-          titulo: "Confirmação",
-          texto: "Anexo enviado com sucesso."
-        });
-      } catch (error: any) {
-        setPopupMensagem({
-          tipo: "erro",
-          titulo: "Erro",
-          texto: error?.response?.data?.message ?? "Não foi possível enviar o anexo."
-        });
-      }
       return;
     }
 
     if (!form.id) {
       setPopupMensagem({
         tipo: "aviso",
-        titulo: "Atenção",
+        titulo: "AtenÃƒÂ§ÃƒÂ£o",
         texto: "Selecione um documento antes de anexar arquivo."
       });
       return;
     }
 
-    const conteudoBase64 = await file.arrayBuffer().then((buffer) => {
-      const bytes = new Uint8Array(buffer);
-      let binary = "";
-      bytes.forEach((byte) => {
-        binary += String.fromCharCode(byte);
-      });
-      return btoa(binary);
-    });
-
-    const payload: DocumentoInstituicaoAnexoPayload = {
-      nomeArquivo: file.name,
-      tipo: obterTipoAnexoArquivo(file),
-      tipoMime: file.type || "application/octet-stream",
-      conteudoBase64,
-      tamanho: `${Math.round(file.size / 1024)} KB`,
-      dataUpload: new Date().toISOString().slice(0, 10),
-      usuario: responsavelLogado || "Usuário"
-    };
-
     try {
+      const payload = await montarPayloadAnexoDocumentoInstituicao({
+        arquivo: file,
+        usuario: responsavelLogado || "UsuÃƒÂ¡rio"
+      });
       const anexo = await anexoMutation.mutateAsync({ id: form.id, payload });
       setAnexoPrincipalLocal(anexo);
       setPopupMensagem({
         tipo: "sucesso",
-        titulo: "Confirmação",
+        titulo: "ConfirmaÃƒÂ§ÃƒÂ£o",
         texto: "Anexo enviado com sucesso."
       });
     } catch (error: any) {
       setPopupMensagem({
         tipo: "erro",
         titulo: "Erro",
-        texto: error?.response?.data?.message ?? "Não foi possível enviar o anexo."
+        texto: error?.response?.data?.message ?? "NÃƒÂ£o foi possÃƒÂ­vel enviar o anexo."
       });
     }
   }
@@ -581,88 +514,40 @@ export function GestaoDocumentosPage() {
     if (!ehArquivoPermitido(file)) {
       setPopupMensagem({
         tipo: "aviso",
-        titulo: "Validação",
-        texto: "Selecione um arquivo válido para envio."
+        titulo: "ValidaÃ§Ã£o",
+        texto: "Selecione um arquivo vÃ¡lido para envio."
       });
       setAnexoParaSubstituirId(null);
-      return;
-    }
-
-    if (form.id) {
-      setAnexoProcessandoId(anexoId);
-      try {
-        const upload = await documentosInstituicaoService.uploadArquivoAnexo(form.id, file);
-        const payload: DocumentoInstituicaoAnexoPayload = {
-          nomeArquivo: upload.nomeOriginal || file.name,
-          tipo: obterTipoAnexoArquivo(file),
-          tipoMime: upload.mimeType || file.type || "application/octet-stream",
-          caminhoArquivo: upload.caminhoArquivo,
-          tamanho: `${Math.round((upload.tamanhoBytes ?? file.size) / 1024)} KB`,
-          dataUpload: new Date().toISOString().slice(0, 10),
-          usuario: responsavelLogado || "Usuário"
-        };
-
-        const anexo = await substituirAnexoMutation.mutateAsync({ id: form.id, anexoId, payload });
-        setAnexoPrincipalLocal(anexo);
-        setPopupMensagem({
-          tipo: "sucesso",
-          titulo: "Confirmação",
-          texto: "Anexo substituído com sucesso."
-        });
-      } catch (error: any) {
-        setPopupMensagem({
-          tipo: "erro",
-          titulo: "Erro",
-          texto: error?.response?.data?.message ?? "Não foi possível substituir o anexo."
-        });
-      } finally {
-        setAnexoProcessandoId(null);
-        setAnexoParaSubstituirId(null);
-      }
       return;
     }
 
     if (!form.id) {
       setPopupMensagem({
         tipo: "aviso",
-        titulo: "Atenção",
+        titulo: "AtenÃƒÂ§ÃƒÂ£o",
         texto: "Selecione um documento antes de substituir o anexo."
       });
       return;
     }
 
-    const conteudoBase64 = await file.arrayBuffer().then((buffer) => {
-      const bytes = new Uint8Array(buffer);
-      let binary = "";
-      bytes.forEach((byte) => {
-        binary += String.fromCharCode(byte);
-      });
-      return btoa(binary);
-    });
-
-    const payload: DocumentoInstituicaoAnexoPayload = {
-      nomeArquivo: file.name,
-      tipo: obterTipoAnexoArquivo(file),
-      tipoMime: file.type || "application/octet-stream",
-      conteudoBase64,
-      tamanho: `${Math.round(file.size / 1024)} KB`,
-      dataUpload: new Date().toISOString().slice(0, 10),
-      usuario: responsavelLogado || "Usuário"
-    };
-
     setAnexoProcessandoId(anexoId);
     try {
-      await substituirAnexoMutation.mutateAsync({ id: form.id, anexoId, payload });
+      const payload = await montarPayloadAnexoDocumentoInstituicao({
+        arquivo: file,
+        usuario: responsavelLogado || "UsuÃƒÂ¡rio"
+      });
+      const anexo = await substituirAnexoMutation.mutateAsync({ id: form.id, anexoId, payload });
+      setAnexoPrincipalLocal(anexo);
       setPopupMensagem({
         tipo: "sucesso",
-        titulo: "Confirmação",
-        texto: "Anexo substituído com sucesso."
+        titulo: "ConfirmaÃƒÂ§ÃƒÂ£o",
+        texto: "Anexo substituÃƒÂ­do com sucesso."
       });
     } catch (error: any) {
       setPopupMensagem({
         tipo: "erro",
         titulo: "Erro",
-        texto: error?.response?.data?.message ?? "Não foi possível substituir o anexo."
+        texto: error?.response?.data?.message ?? "NÃƒÂ£o foi possÃƒÂ­vel substituir o anexo."
       });
     } finally {
       setAnexoProcessandoId(null);
@@ -677,7 +562,7 @@ export function GestaoDocumentosPage() {
       setPopupMensagem({
         tipo: "erro",
         titulo: "Erro",
-        texto: error?.message ?? "Não foi possível visualizar o anexo."
+        texto: error?.message ?? "NÃ£o foi possÃ­vel visualizar o anexo."
       });
     }
   }
@@ -690,7 +575,7 @@ export function GestaoDocumentosPage() {
       setPopupMensagem({
         tipo: "erro",
         titulo: "Erro",
-        texto: error?.message ?? "Não foi possível imprimir o anexo."
+        texto: error?.message ?? "NÃ£o foi possÃ­vel imprimir o anexo."
       });
     } finally {
       setAnexoProcessandoId(null);
@@ -706,7 +591,7 @@ export function GestaoDocumentosPage() {
     if (!form.id) {
       setPopupMensagem({
         tipo: "aviso",
-        titulo: "Atenção",
+        titulo: "AtenÃ§Ã£o",
         texto: "Selecione um documento antes de excluir o anexo."
       });
       return;
@@ -718,14 +603,14 @@ export function GestaoDocumentosPage() {
       setAnexoPrincipalLocal(null);
       setPopupMensagem({
         tipo: "sucesso",
-        titulo: "Confirmação",
-        texto: "Anexo excluído com sucesso."
+        titulo: "ConfirmaÃ§Ã£o",
+        texto: "Anexo excluÃ­do com sucesso."
       });
     } catch (error: any) {
       setPopupMensagem({
         tipo: "erro",
         titulo: "Erro",
-        texto: error?.response?.data?.message ?? "Não foi possível excluir o anexo."
+        texto: error?.response?.data?.message ?? "NÃ£o foi possÃ­vel excluir o anexo."
       });
     } finally {
       setAnexoProcessandoId(null);
@@ -736,16 +621,16 @@ export function GestaoDocumentosPage() {
     if (!form.id) {
       setPopupMensagem({
         tipo: "aviso",
-        titulo: "Atenção",
-        texto: "Selecione um documento antes de registrar histórico."
+        titulo: "AtenÃ§Ã£o",
+        texto: "Selecione um documento antes de registrar histÃ³rico."
       });
       return;
     }
     if (!historicoTexto.trim()) {
       setPopupMensagem({
         tipo: "aviso",
-        titulo: "Validação",
-        texto: "Informe a descrição do histórico."
+        titulo: "ValidaÃ§Ã£o",
+        texto: "Informe a descriÃ§Ã£o do histÃ³rico."
       });
       return;
     }
@@ -754,8 +639,8 @@ export function GestaoDocumentosPage() {
       await historicoMutation.mutateAsync({
         id: form.id,
         payload: {
-          usuario: responsavelLogado || "Usuário",
-          tipoAlteracao: "Atualização",
+          usuario: responsavelLogado || "UsuÃ¡rio",
+          tipoAlteracao: "AtualizaÃ§Ã£o",
           observacao: historicoTexto.trim(),
           dataHora: new Date().toISOString()
         }
@@ -763,26 +648,26 @@ export function GestaoDocumentosPage() {
       setHistoricoTexto("");
       setPopupMensagem({
         tipo: "sucesso",
-        titulo: "Confirmação",
-        texto: "Histórico registrado com sucesso."
+        titulo: "ConfirmaÃ§Ã£o",
+        texto: "HistÃ³rico registrado com sucesso."
       });
     } catch (error: any) {
       setPopupMensagem({
         tipo: "erro",
         titulo: "Erro",
-        texto: error?.response?.data?.message ?? "Não foi possível registrar o histórico."
+        texto: error?.response?.data?.message ?? "NÃ£o foi possÃ­vel registrar o histÃ³rico."
       });
     }
   }
 
   function imprimir() {
     try {
-      imprimirConteudoAtual({ titulo: "Relatório de documentos" });
+      imprimirConteudoAtual({ titulo: "RelatÃ³rio de documentos" });
     } catch (error: any) {
       setPopupMensagem({
         tipo: "erro",
         titulo: "Erro",
-        texto: error?.message ?? "Não foi possível preparar a impressão."
+        texto: error?.message ?? "NÃ£o foi possÃ­vel preparar a impressÃ£o."
       });
     }
   }
@@ -791,7 +676,7 @@ export function GestaoDocumentosPage() {
     navigate("/dashboard/visao-geral");
   }
 
-  // Funções de Gerenciamento de Links
+  // FunÃ§Ãµes de Gerenciamento de Links
   function novoLink() {
     setFormLink({ nome: "", url: "", tiposRelacionados: "", observacao: "" });
     setModoEdicaoLink(true);
@@ -804,7 +689,7 @@ export function GestaoDocumentosPage() {
 
   async function salvarLink() {
     if (!formLink.nome.trim() || !formLink.url.trim()) {
-      setPopupMensagem({ tipo: "aviso", titulo: "Validação", texto: "Nome e URL são obrigatórios." });
+      setPopupMensagem({ tipo: "aviso", titulo: "ValidaÃ§Ã£o", texto: "Nome e URL sÃ£o obrigatÃ³rios." });
       return;
     }
     try {
@@ -868,14 +753,14 @@ export function GestaoDocumentosPage() {
         sectionLabel="Setor administrativo"
         pageTitle={tituloTela}
         activeTitle={abaAtiva === "lista" ? "Lista de documentos" : abas.find((item) => item.id === abaAtiva)?.label}
-        codeBadge={form.id ? `Código: ${form.id}` : "Novo"}
+        codeBadge={form.id ? `CÃ³digo: ${form.id}` : "Novo"}
       >
         {abaAtiva === "lista" ? (
           <section className="space-y-3">
             <div className="space-y-1">
               <Label>Buscar documento</Label>
               <Input
-                placeholder="Tipo, órgão emissor, categoria ou situação"
+                placeholder="Tipo, Ã³rgÃ£o emissor, categoria ou situaÃ§Ã£o"
                 value={busca}
                 onChange={(event) => setBusca(event.target.value)}
               />
@@ -886,10 +771,10 @@ export function GestaoDocumentosPage() {
                 <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]">
                   <tr>
                     <th className="px-3 py-2 text-left">Tipo</th>
-                    <th className="px-3 py-2 text-left">Órgão emissor</th>
-                    <th className="px-3 py-2 text-left">Emissão</th>
+                    <th className="px-3 py-2 text-left">Ã“rgÃ£o emissor</th>
+                    <th className="px-3 py-2 text-left">EmissÃ£o</th>
                     <th className="px-3 py-2 text-left">Validade</th>
-                    <th className="px-3 py-2 text-left">Situação</th>
+                    <th className="px-3 py-2 text-left">SituaÃ§Ã£o</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -968,7 +853,7 @@ export function GestaoDocumentosPage() {
                   const novoTipo = event.target.value;
                   setForm((atual) => ({ ...atual, tipoDocumento: novoTipo }));
                   
-                  // Se houver links cadastrados para este tipo, abre o popup de sugestão
+                  // Se houver links cadastrados para este tipo, abre o popup de sugestÃ£o
                   if (novoTipo) {
                     const links = linksExternos.filter((item) => {
                       const relacionados = (item.tiposRelacionados || "").toLowerCase();
@@ -990,7 +875,7 @@ export function GestaoDocumentosPage() {
               </Select>
             </div>
             <div className="space-y-1">
-              <Label>Órgão emissor *</Label>
+              <Label>Ã“rgÃ£o emissor *</Label>
               <Input
                 value={form.orgaoEmissor}
                 onChange={(event) =>
@@ -1013,7 +898,7 @@ export function GestaoDocumentosPage() {
               </Select>
             </div>
             <div className="space-y-1">
-              <Label>Responsável interno</Label>
+              <Label>ResponsÃ¡vel interno</Label>
               <Input
                 value={form.responsavelInterno ?? responsavelLogado}
                 readOnly
@@ -1025,7 +910,7 @@ export function GestaoDocumentosPage() {
               <div className="rounded-md border border-[var(--g3-active)]/30 bg-[var(--g3-primary-soft)]/20 p-2 md:col-span-2 xl:col-span-4">
                 <p className="flex items-center gap-2 text-xs font-semibold text-[var(--g3-active)]">
                   <ExternalLink className="h-3.5 w-3.5" />
-                  Site sugerido para emissão/atualização deste documento:
+                  Site sugerido para emissÃ£o/atualizaÃ§Ã£o deste documento:
                 </p>
                 <div className="mt-1 flex flex-wrap gap-3">
                   {linksSugeridosParaTipo.map((link, idx) => (
@@ -1048,7 +933,7 @@ export function GestaoDocumentosPage() {
             )}
 
             <div className="space-y-1">
-              <Label>Data de emissão *</Label>
+              <Label>Data de emissÃ£o *</Label>
               <Input
                 type="date"
                 value={form.emissao}
@@ -1065,7 +950,7 @@ export function GestaoDocumentosPage() {
               />
             </div>
             <div className="space-y-1">
-              <Label>Modo de renovação</Label>
+              <Label>Modo de renovaÃ§Ã£o</Label>
               <Select
                 value={form.modoRenovacao ?? "Manual"}
                 onChange={(event) =>
@@ -1073,7 +958,7 @@ export function GestaoDocumentosPage() {
                 }
               >
                 <option value="Manual">Manual</option>
-                <option value="Automática">Automática</option>
+                <option value="AutomÃ¡tica">AutomÃ¡tica</option>
               </Select>
             </div>
             <div className="space-y-1">
@@ -1123,10 +1008,10 @@ export function GestaoDocumentosPage() {
                   setForm((atual) => ({ ...atual, emRenovacao: event.target.checked }))
                 }
               />
-              Em renovação
+              Em renovaÃ§Ã£o
             </label>
             <div className="space-y-1 md:col-span-2 xl:col-span-4">
-              <Label>Descrição</Label>
+              <Label>DescriÃ§Ã£o</Label>
               <Textarea
                 rows={3}
                 value={form.descricao ?? ""}
@@ -1134,7 +1019,7 @@ export function GestaoDocumentosPage() {
               />
             </div>
             <div className="space-y-1 md:col-span-2 xl:col-span-4">
-              <Label>Observação de renovação</Label>
+              <Label>ObservaÃ§Ã£o de renovaÃ§Ã£o</Label>
               <Textarea
                 rows={2}
                 value={form.observacaoRenovacao ?? ""}
@@ -1186,11 +1071,11 @@ export function GestaoDocumentosPage() {
                         <div className="min-w-0 flex-1 space-y-1">
                           <p className="truncate text-sm font-semibold">{anexoPrincipal.nomeArquivo}</p>
                           <p className="text-xs text-[var(--g3-muted)]">
-                            {anexoPrincipal.tipoMime ?? "application/pdf"} • {anexoPrincipal.tamanho ?? "---"}
+                            {anexoPrincipal.tipoMime ?? "application/pdf"} â€¢ {anexoPrincipal.tamanho ?? "---"}
                           </p>
                           {anexosOcultos ? (
                             <p className="text-xs text-[var(--g3-muted)]">
-                              Há {anexosOcultos} arquivo(s) anterior(es) mantido(s) no histórico interno.
+                              HÃ¡ {anexosOcultos} arquivo(s) anterior(es) mantido(s) no histÃ³rico interno.
                             </p>
                           ) : null}
                         </div>
@@ -1247,7 +1132,7 @@ export function GestaoDocumentosPage() {
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-semibold">Nenhum arquivo enviado</p>
                           <p className="text-xs text-[var(--g3-muted)]">
-                            Use o botão acima para anexar o arquivo principal deste documento.
+                            Use o botÃ£o acima para anexar o arquivo principal deste documento.
                           </p>
                         </div>
                       </div>
@@ -1268,7 +1153,7 @@ export function GestaoDocumentosPage() {
                   Gerenciar Links Externos
                 </h3>
                 <p className="text-sm text-[var(--g3-muted)]">
-                  Mantenha a lista de sites de certidões atualizada. Eles aparecerão no cadastro por tipo.
+                  Mantenha a lista de sites de certidÃµes atualizada. Eles aparecerÃ£o no cadastro por tipo.
                 </p>
               </div>
               <Button onClick={novoLink}>
@@ -1292,7 +1177,7 @@ export function GestaoDocumentosPage() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label>URL (Endereço do Site) *</Label>
+                    <Label>URL (EndereÃ§o do Site) *</Label>
                     <Input
                       placeholder="https://..."
                       value={formLink.url}
@@ -1327,9 +1212,9 @@ export function GestaoDocumentosPage() {
                     )}
                   </div>
                   <div className="space-y-1 sm:col-span-2">
-                    <Label>Observação</Label>
+                    <Label>ObservaÃ§Ã£o</Label>
                     <Input
-                      placeholder="Dica extra para o usuário"
+                      placeholder="Dica extra para o usuÃ¡rio"
                       value={formLink.observacao}
                       onChange={(e) => setFormLink({ ...formLink, observacao: e.target.value })}
                     />
@@ -1348,8 +1233,8 @@ export function GestaoDocumentosPage() {
                   <tr>
                     <th className="px-3 py-2 text-left w-12">Acesso</th>
                     <th className="px-3 py-2 text-left">Nome do Site</th>
-                    <th className="px-3 py-2 text-left">Vínculos (Tipos)</th>
-                    <th className="px-3 py-2 text-center w-24">Ações</th>
+                    <th className="px-3 py-2 text-left">VÃ­nculos (Tipos)</th>
+                    <th className="px-3 py-2 text-center w-24">AÃ§Ãµes</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1514,12 +1399,12 @@ export function GestaoDocumentosPage() {
 
               <Card className="border-[var(--g3-border)]">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">Histórico</CardTitle>
+                  <CardTitle className="text-sm">HistÃ³rico</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
                   <div className="flex flex-col gap-2 sm:flex-row">
                     <Input
-                      placeholder="Descreva a atualização realizada"
+                      placeholder="Descreva a atualizaÃ§Ã£o realizada"
                       value={historicoTexto}
                       onChange={(event) => setHistoricoTexto(event.target.value)}
                     />
@@ -1542,7 +1427,7 @@ export function GestaoDocumentosPage() {
                         </article>
                       ))
                     ) : (
-                      <p className="text-sm text-[var(--g3-muted)]">Nenhum histórico registrado.</p>
+                      <p className="text-sm text-[var(--g3-muted)]">Nenhum histÃ³rico registrado.</p>
                     )}
                   </div>
                 </CardContent>
@@ -1560,7 +1445,7 @@ export function GestaoDocumentosPage() {
                     <th className="px-3 py-2 text-left">Documento</th>
                     <th className="px-3 py-2 text-left">Validade</th>
                     <th className="px-3 py-2 text-left">Dias para vencer</th>
-                    <th className="px-3 py-2 text-left">Situação</th>
+                    <th className="px-3 py-2 text-left">SituaÃ§Ã£o</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1606,7 +1491,7 @@ export function GestaoDocumentosPage() {
             </Card>
             <Card className="border-[var(--g3-border)]">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Em renovação</CardTitle>
+                <CardTitle className="text-sm">Em renovaÃ§Ã£o</CardTitle>
               </CardHeader>
               <CardContent className="text-3xl font-semibold text-amber-600">
                 {documentos.filter((item) => item.emRenovacao).length}
@@ -1628,8 +1513,8 @@ export function GestaoDocumentosPage() {
       
       <PopupConfirmacao
         aberto={confirmarExcluir}
-        titulo="Confirmar Exclusão"
-        texto="Esta ação é irreversível. Deseja continuar?"
+        titulo="Confirmar ExclusÃ£o"
+        texto="Esta aÃ§Ã£o Ã© irreversÃ­vel. Deseja continuar?"
         processando={excluirMutation.isPending}
         onCancel={() => setConfirmarExcluir(false)}
         onConfirm={() => void confirmarExclusao()}
@@ -1645,7 +1530,7 @@ export function GestaoDocumentosPage() {
         confirmarTexto="Sim, Remover"
       />
 
-      {/* Popup de Sugestão de Link Externo */}
+      {/* Popup de SugestÃ£o de Link Externo */}
       {sugestaoLinkAberto && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
           <Card className="w-full max-w-md border-[var(--g3-active)] shadow-2xl animate-in fade-in zoom-in duration-200">
@@ -1662,14 +1547,14 @@ export function GestaoDocumentosPage() {
             </CardHeader>
             <CardContent className="space-y-4 pt-4">
               <p className="text-sm text-[var(--g3-muted)]">
-                Para o tipo de documento <strong>{form.tipoDocumento}</strong>, recomendamos acessar o site oficial para emissão ou conferência:
+                Para o tipo de documento <strong>{form.tipoDocumento}</strong>, recomendamos acessar o site oficial para emissÃ£o ou conferÃªncia:
               </p>
               
               <div className="space-y-3">
                 {linksParaSugerir.map((link) => (
                   <div key={link.id} className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card)] p-3 transition-colors hover:bg-[var(--g3-primary-soft)]/10">
                     <div className="mb-1 font-semibold text-sm">{link.nome}</div>
-                    {link.observacao && <p className="mb-3 text-[11px] text-amber-600 font-medium">⚠️ {link.observacao}</p>}
+                    {link.observacao && <p className="mb-3 text-[11px] text-amber-600 font-medium">âš ï¸ {link.observacao}</p>}
                     <Button 
                       className="w-full gap-2 text-xs" 
                       onClick={() => {

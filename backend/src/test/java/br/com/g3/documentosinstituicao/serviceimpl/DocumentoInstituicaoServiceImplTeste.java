@@ -6,11 +6,14 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 import br.com.g3.documentosinstituicao.domain.DocumentoInstituicao;
+import br.com.g3.documentosinstituicao.domain.DocumentoInstituicaoAnexo;
 import br.com.g3.documentosinstituicao.domain.DocumentoInstituicaoHistorico;
+import br.com.g3.documentosinstituicao.dto.DocumentoInstituicaoAnexoRequest;
 import br.com.g3.documentosinstituicao.dto.DocumentoInstituicaoRequest;
 import br.com.g3.documentosinstituicao.repository.DocumentoInstituicaoAnexoRepository;
 import br.com.g3.documentosinstituicao.repository.DocumentoInstituicaoHistoricoRepository;
 import br.com.g3.documentosinstituicao.repository.DocumentoInstituicaoRepository;
+import br.com.g3.documentosinstituicao.service.ArmazenamentoDocumentoInstituicaoAnexoService;
 import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,6 +33,9 @@ class DocumentoInstituicaoServiceImplTeste {
 
   @Mock
   private DocumentoInstituicaoHistoricoRepository historicoRepository;
+
+  @Mock
+  private ArmazenamentoDocumentoInstituicaoAnexoService armazenamentoService;
 
   @InjectMocks
   private DocumentoInstituicaoServiceImpl service;
@@ -72,5 +78,40 @@ class DocumentoInstituicaoServiceImplTeste {
         assertThrows(ResponseStatusException.class, () -> service.criar(request));
 
     assertEquals(HttpStatus.BAD_REQUEST, erro.getStatusCode());
+  }
+
+  @Test
+  void adicionarAnexoDeveSalvarRegistroQuandoRecebeConteudoBase64() {
+    DocumentoInstituicao documento = new DocumentoInstituicao();
+    documento.setId(10L);
+
+    DocumentoInstituicaoAnexoRequest request = new DocumentoInstituicaoAnexoRequest();
+    request.setNomeArquivo("comprovante.pdf");
+    request.setTipo("PDF");
+    request.setTipoMime("application/pdf");
+    request.setConteudoBase64("Y29udGV1ZG8=");
+    request.setUsuario("Adriano");
+    request.setDataUpload(LocalDate.of(2026, 4, 16));
+    request.setTamanho("1 KB");
+
+    when(repository.buscarPorId(10L)).thenReturn(java.util.Optional.of(documento));
+    when(armazenamentoService.salvarArquivo(10L, request))
+        .thenReturn("storage/documentos-instituicao/10/arquivo.pdf");
+    when(anexoRepository.salvar(any(DocumentoInstituicaoAnexo.class)))
+        .thenAnswer(
+            invocation -> {
+              DocumentoInstituicaoAnexo anexo = invocation.getArgument(0);
+              anexo.setId(22L);
+              return anexo;
+            });
+    when(repository.salvar(any(DocumentoInstituicao.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+    when(historicoRepository.salvar(any(DocumentoInstituicaoHistorico.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    var response = service.adicionarAnexo(10L, request);
+
+    assertEquals("comprovante.pdf", response.getNomeArquivo());
+    assertEquals("/api/documentos-instituicao/10/anexos/22/arquivo", response.getArquivoUrl());
   }
 }
