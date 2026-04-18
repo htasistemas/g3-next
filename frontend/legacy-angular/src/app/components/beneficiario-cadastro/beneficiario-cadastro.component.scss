@@ -91,6 +91,30 @@
   gap: 0.6rem;
 }
 
+.tab-card--listagem {
+  min-height: 0;
+  height: calc(100vh - 180px);
+  overflow: hidden;
+}
+
+.tab-card--listagem .list-filters {
+  flex: 0 0 auto;
+}
+
+.tab-card--listagem .unit-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 0.25rem;
+  scrollbar-width: thin;
+}
+
+.tab-card--listagem .unit-list__pagination,
+.tab-card--listagem > .muted {
+  flex: 0 0 auto;
+}
+
 .unit-list__item {
   display: flex;
   justify-content: space-between;
@@ -273,41 +297,6 @@
   width: fit-content;
 }
 
-.unit-active {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
-  padding: 0.85rem 1rem;
-  border-radius: 14px;
-  border: 1px solid #e2e8f0;
-  background: #f8fafc;
-  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.08);
-  margin-bottom: 0.75rem;
-}
-
-.unit-active__eyebrow {
-  margin: 0 0 0.2rem;
-  font-size: 0.7rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  font-weight: 800;
-  color: #64748b;
-}
-
-.unit-active__name {
-  margin: 0 0 0.2rem;
-  font-weight: 800;
-  color: #0f172a;
-}
-
-.unit-active__meta {
-  margin: 0 auto;
-  color: #475569;
-  font-weight: 600;
-  font-size: 0.9rem;
-}
-
 .unit-list__pagination {
   display: flex;
   align-items: center;
@@ -415,6 +404,81 @@
   min-height: 520px;
   display: flex;
   flex-direction: column;
+}
+
+.tab-card--dados-pessoais {
+  min-height: 0;
+}
+
+.tab-card--dados-pessoais .dados-topo {
+  gap: 0.65rem;
+  padding: 0.35rem 0 0.6rem;
+}
+
+.tab-card--dados-pessoais .photo-section {
+  grid-template-columns: 118px 1fr;
+  gap: 0.65rem;
+  margin: 0.25rem 0;
+}
+
+.tab-card--dados-pessoais .photo-preview {
+  width: 110px;
+  height: 142px;
+}
+
+.tab-card--dados-pessoais .photo-hint {
+  font-size: 0.78rem;
+}
+
+.tab-card--dados-pessoais .status-panel {
+  gap: 0.35rem;
+  padding: 0.7rem;
+}
+
+.tab-card--dados-pessoais .grid-campos {
+  row-gap: 6px;
+  column-gap: 6px;
+  margin-top: 0.45rem;
+}
+
+.tab-card--dados-pessoais .field {
+  gap: 0.22rem;
+  font-size: 0.9rem;
+}
+
+.tab-card--dados-pessoais .field input,
+.tab-card--dados-pessoais .field select {
+  height: 36px;
+  padding: 0.45rem 0.65rem;
+  border-radius: 9px;
+}
+
+.tab-card--documentos {
+  min-height: 0;
+  height: calc(100vh - 180px);
+  overflow: hidden;
+}
+
+.tab-card--documentos .document-tab__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.tab-card--documentos .documentos-dados {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  padding: 1rem;
+}
+
+.tab-card--documentos .documentos-dados__table {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
 }
 
 .tab-card__header {

@@ -74,9 +74,10 @@ const secoesManual: ManualSecao[] = [
         objetivo: "Cadastrar, revisar e atualizar dados pessoais, documentos, endereço e histórico do beneficiário.",
         comoUsar: [
           "Preencha os dados pessoais principais e confira campos obrigatórios destacados.",
-          "Revise a aba de documentos e use a regra de obrigatoriedade definida em parâmetros do sistema.",
+          "Na aba Dados pessoais, os campos e o bloco de foto usam layout compacto para reduzir rolagem da tela durante o cadastro.",
+          "Revise a aba Documentos e use a regra de obrigatoriedade definida em parâmetros do sistema; quando houver muitos documentos, a rolagem fica dentro do card da lista de documentos.",
           "Ao abrir um beneficiário, leia o aviso de pendências antes de continuar o atendimento.",
-          "Na aba Listagem de beneficiários, a tarja do cabeçalho da tabela usa fundo verde claro e permite ordenar por clique os campos Código, Nome, Data de nascimento, CPF, Telefone, Bairro e Status."
+          "Na aba Listagem de beneficiários, use os filtros no topo e o botão Limpar para localizar registros. A listagem não exibe mais o resumo do beneficiário selecionado acima dos resultados, mantendo a rolagem apenas na grade de beneficiários."
         ],
         atencoes: [
           "CPF, e-mail, telefone e CEP devem respeitar as máscaras e validações padronizadas.",
@@ -103,6 +104,7 @@ const secoesManual: ManualSecao[] = [
         comoUsar: [
           "Use a aba Listagem de famílias para localizar um núcleo já cadastrado ou iniciar uma nova família.",
           "Na aba Composição familiar, adicione membros, informe o parentesco e defina um único responsável ativo.",
+          "A aba Composição familiar usa layout compacto; quando houver muitos beneficiários ou membros, a rolagem permanece dentro da área da composição, sem travar a tela geral.",
           "Quando o membro sair do núcleo, use transferência ou desmembramento para preservar histórico e rastreabilidade."
         ],
         atencoes: [

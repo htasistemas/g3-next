@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
@@ -70,11 +70,6 @@ import {
   classesTelaPadraoBeneficiario,
   ordemAcoesCrudPadrao
 } from "@/lib/tela-padrao-beneficiario";
-
-const BeneficiariosStatusChart = lazy(async () => {
-  const module = await import("@/components/beneficiarios/beneficiarios-status-chart");
-  return { default: module.BeneficiariosStatusChart };
-});
 
 const abas = [
   { id: "listagem", label: "Listagem de beneficiários", icon: ListFilter },
@@ -964,18 +959,6 @@ export function CadastroBeneficiarioPage() {
   const documentoWebcamAtual = documentoWebcamId
     ? documentos.find((documento) => documento.id === documentoWebcamId)
     : null;
-
-  const dadosGrafico = useMemo(() => {
-    const agrupado = new Map<string, number>();
-    for (const item of beneficiarios) {
-      const chave = item.status ?? "EM_ANALISE";
-      agrupado.set(chave, (agrupado.get(chave) ?? 0) + 1);
-    }
-    return [...agrupado.entries()].map(([status, total]) => ({
-      status: formatarStatus(status),
-      total
-    }));
-  }, [beneficiarios]);
 
   const bloqueadoAcao =
     salvarMutation.isPending || removerMutation.isPending || carregandoDetalhes || imprimindoRelatorio;
@@ -2028,7 +2011,7 @@ export function CadastroBeneficiarioPage() {
           </CardHeader>
           <CardContent>
             {abaAtiva === "listagem" ? (
-              <section className="space-y-4">
+              <section className="flex h-[calc(100vh-250px)] min-h-[420px] flex-col gap-4 overflow-hidden">
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-12">
                   <div className="sm:col-span-2 lg:col-span-4">
                     <Label>Nome</Label>
@@ -2110,7 +2093,7 @@ export function CadastroBeneficiarioPage() {
                   Limpar filtros
                 </Button>
 
-                <div className="max-h-[420px] overflow-auto rounded-md border border-slate-200">
+                <div className="min-h-0 flex-1 overflow-auto rounded-md border border-slate-200">
                   {carregandoLista ? (
                     <p className="p-3 text-sm text-slate-500">Carregando beneficiários...</p>
                   ) : beneficiarios.length === 0 ? (
@@ -2172,26 +2155,15 @@ export function CadastroBeneficiarioPage() {
                   )}
                 </div>
 
-                <div className="h-52 min-w-0 rounded-md border border-slate-200 bg-slate-50 p-2">
-                  <Suspense
-                    fallback={
-                      <div className="flex h-full items-center justify-center text-sm text-slate-500">
-                        Carregando gráfico...
-                      </div>
-                    }
-                  >
-                    <BeneficiariosStatusChart dados={dadosGrafico} />
-                  </Suspense>
-                </div>
               </section>
             ) : (
               <form className="min-w-0 space-y-4" onSubmit={onSubmit}>
                 {abaAtiva === "dados" && (
-                  <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-12">
+                  <section className="grid gap-2 sm:grid-cols-2 xl:grid-cols-12 [&_button]:h-8 [&_input]:h-8 [&_label]:text-xs [&_select]:h-8">
                     <input type="hidden" {...register("foto_3x4")} />
-                    <div className="sm:col-span-2 xl:col-span-12 rounded-lg border border-emerald-200 bg-emerald-50/40 p-3">
-                      <div className="flex flex-col gap-4 md:flex-row md:items-center">
-                        <div className="mx-auto flex w-44">
+                    <div className="sm:col-span-2 xl:col-span-12 rounded-lg border border-emerald-200 bg-emerald-50/40 p-2">
+                      <div className="flex flex-col gap-2 md:flex-row md:items-center">
+                        <div className="mx-auto flex w-28 md:mx-0">
                           <div className="flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-md border border-emerald-200 bg-white">
                             {foto3x4PreviewUrl ? (
                               <img
@@ -2207,7 +2179,7 @@ export function CadastroBeneficiarioPage() {
                           </div>
                         </div>
 
-                        <div className="flex-1 space-y-3">
+                        <div className="flex-1 space-y-2">
                           <Label>Foto 4x3 do beneficiário</Label>
                           <input
                             ref={inputArquivoRef}
@@ -2241,12 +2213,12 @@ export function CadastroBeneficiarioPage() {
                               Remover foto
                             </Button>
                           </div>
-                          <p className="text-xs text-slate-600">
+                          <p className="text-[11px] text-slate-600">
                             A foto será ajustada automaticamente no formato 4x3.
                           </p>
                         </div>
 
-                        <div className="w-32 self-end rounded-md border border-emerald-200 bg-white px-2 py-1.5 text-center md:ml-auto md:w-36 md:self-center">
+                        <div className="w-28 self-end rounded-md border border-emerald-200 bg-white px-2 py-1 text-center md:ml-auto md:self-center">
                           <p className="text-[10px] font-medium text-emerald-700">Idade</p>
                           <p className="text-xs font-semibold text-slate-900">
                             {idadeAtual === "---" ? "Informe a data" : idadeAtual}
@@ -2770,7 +2742,7 @@ export function CadastroBeneficiarioPage() {
                 )}
 
                 {abaAtiva === "documentos" && (
-                  <section className="space-y-3">
+                  <section className="flex h-[calc(100vh-250px)] min-h-[420px] flex-col gap-3 overflow-hidden">
                     <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
                       {listarDocumentosObrigatorios(documentos).length
                         ? `${listarDocumentosObrigatorios(documentos).join(", ")} ${
@@ -2781,7 +2753,7 @@ export function CadastroBeneficiarioPage() {
                       ignorados.
                     </div>
 
-                    <div className="space-y-3">
+                    <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
                       {documentos.map((documento) => {
                         const statusDocumento = obterStatusDocumento(documento);
                         const cpfInvalido =

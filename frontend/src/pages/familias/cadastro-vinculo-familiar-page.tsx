@@ -338,14 +338,124 @@ export function CadastroVinculoFamiliarPage() {
   return (
     <>
       <AdminPageLayout tabs={abas} activeTab={abaAtiva} onChangeTab={(id) => setAbaAtiva(id as AbaId)} actions={acoes} sectionLabel="Cadastros" pageTitle="Vínculo familiar" activeTitle={abas.find((item) => item.id === abaAtiva)?.label} codeBadge={familiaIdSelecionada ? `Código da família: ${familiaIdSelecionada}` : "Nova família"}>
-        <section className="space-y-4">
-          <Card><CardHeader><CardTitle className="text-base">Cabeçalho da família</CardTitle></CardHeader><CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"><div className="rounded-xl border border-[var(--g3-border)] p-3"><p className="text-xs uppercase tracking-wide text-[var(--g3-muted)]">Nome</p><p className="mt-1 font-semibold">{familiaForm.nome_familia || "Nova família"}</p></div><div className="rounded-xl border border-[var(--g3-border)] p-3"><p className="text-xs uppercase tracking-wide text-[var(--g3-muted)]">Responsável</p><p className="mt-1 font-semibold">{nomePessoa(membros.find((item) => item.responsavel_familiar)?.beneficiario)}</p></div><div className="rounded-xl border border-[var(--g3-border)] p-3"><p className="text-xs uppercase tracking-wide text-[var(--g3-muted)]">Membros</p><p className="mt-1 font-semibold">{membros.length}</p></div><div className="rounded-xl border border-[var(--g3-border)] p-3"><p className="text-xs uppercase tracking-wide text-[var(--g3-muted)]">Alertas</p><p className="mt-1 font-semibold">{alertas.length}</p></div></CardContent></Card>
+        <section className={abaAtiva === "composicao" ? "flex max-h-[calc(100vh-185px)] min-h-0 flex-col gap-2 overflow-hidden" : "space-y-4"}>
+          <Card className={abaAtiva === "composicao" ? "shrink-0 overflow-hidden" : undefined}><CardHeader className={abaAtiva === "composicao" ? "px-3 py-2" : undefined}><CardTitle className="text-base">Cabeçalho da família</CardTitle></CardHeader><CardContent className={abaAtiva === "composicao" ? "grid gap-2 px-3 pb-2 pt-0 md:grid-cols-2 xl:grid-cols-4" : "grid gap-3 md:grid-cols-2 xl:grid-cols-4"}><div className={abaAtiva === "composicao" ? "rounded-xl border border-[var(--g3-border)] p-2" : "rounded-xl border border-[var(--g3-border)] p-3"}><p className="text-xs uppercase tracking-wide text-[var(--g3-muted)]">Nome</p><p className={abaAtiva === "composicao" ? "mt-0.5 truncate text-sm font-semibold" : "mt-1 font-semibold"}>{familiaForm.nome_familia || "Nova família"}</p></div><div className={abaAtiva === "composicao" ? "rounded-xl border border-[var(--g3-border)] p-2" : "rounded-xl border border-[var(--g3-border)] p-3"}><p className="text-xs uppercase tracking-wide text-[var(--g3-muted)]">Responsável</p><p className={abaAtiva === "composicao" ? "mt-0.5 truncate text-sm font-semibold" : "mt-1 font-semibold"}>{nomePessoa(membros.find((item) => item.responsavel_familiar)?.beneficiario)}</p></div><div className={abaAtiva === "composicao" ? "rounded-xl border border-[var(--g3-border)] p-2" : "rounded-xl border border-[var(--g3-border)] p-3"}><p className="text-xs uppercase tracking-wide text-[var(--g3-muted)]">Membros</p><p className={abaAtiva === "composicao" ? "mt-0.5 text-sm font-semibold" : "mt-1 font-semibold"}>{membros.length}</p></div><div className={abaAtiva === "composicao" ? "rounded-xl border border-[var(--g3-border)] p-2" : "rounded-xl border border-[var(--g3-border)] p-3"}><p className="text-xs uppercase tracking-wide text-[var(--g3-muted)]">Alertas</p><p className={abaAtiva === "composicao" ? "mt-0.5 text-sm font-semibold" : "mt-1 font-semibold"}>{alertas.length}</p></div></CardContent></Card>
 
           {abaAtiva === "listagem" ? <Card><CardHeader><CardTitle className="text-base">Listagem de famílias</CardTitle></CardHeader><CardContent className="space-y-4"><div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-12"><div className="sm:col-span-2 lg:col-span-5"><Label>Nome da família</Label><Input className="h-8 text-xs" value={filtros.nome_familia ?? ""} onChange={(event) => setFiltros((atual) => ({ ...atual, nome_familia: event.target.value || undefined }))} placeholder="Buscar por nome da família" /></div><div className="lg:col-span-3"><Label>Município</Label><Input className="h-8 text-xs" value={filtros.municipio ?? ""} onChange={(event) => setFiltros((atual) => ({ ...atual, municipio: event.target.value || undefined }))} placeholder="Buscar por município" /></div><div className="lg:col-span-2"><Label>Status</Label><Select className="h-8 text-xs" value={filtros.status ?? ""} onChange={(event) => setFiltros((atual) => ({ ...atual, status: event.target.value || undefined }))}><option value="">Todos</option><option value="ATIVO">Ativo</option><option value="INATIVO">Inativo</option><option value="BLOQUEADO">Bloqueado</option></Select></div><div className="lg:col-span-2"><Label>Responsável</Label><Input className="h-8 text-xs" value={filtros.referencia ?? ""} onChange={(event) => setFiltros((atual) => ({ ...atual, referencia: event.target.value || undefined }))} placeholder="Buscar responsável" /></div></div><Button type="button" variant="outline" className="w-full border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100" onClick={() => setFiltros({ status: "ATIVO" })}>Limpar filtros</Button><div className="max-h-[420px] overflow-auto rounded-md border border-slate-200">{familiasQuery.isLoading ? <p className="p-3 text-sm text-slate-500">Carregando famílias...</p> : !familias.length ? <p className="p-3 text-sm text-slate-500">Nenhuma família encontrada.</p> : <table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs text-slate-500"><tr><th className="px-2 py-2">Família</th><th className="px-2 py-2">Responsável</th><th className="px-2 py-2">Membros</th><th className="px-2 py-2">Município</th><th className="px-2 py-2">Status</th></tr></thead><tbody>{familias.map((item, indice) => <tr key={item.id_familia} className={`cursor-pointer border-t border-[var(--g3-border)] hover:bg-[var(--g3-primary-soft-hover)] ${item.id_familia === familiaIdSelecionada ? "bg-[var(--g3-primary-soft-hover)]" : indice % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-card-soft)]"}`} onClick={() => selecionarFamilia(item.id_familia)}><td className="px-2 py-2">{item.nome_familia}</td><td className="px-2 py-2">{item.referencia_familiar?.nome_completo || "Sem responsável"}</td><td className="px-2 py-2">{item.membros?.length ?? 0}</td><td className="px-2 py-2">{item.municipio ?? "---"}</td><td className="px-2 py-2"><Badge variant={(item.status ?? "ATIVO") === "ATIVO" ? "success" : (item.status ?? "ATIVO") === "INATIVO" ? "default" : "warning"}>{item.status ?? "ATIVO"}</Badge></td></tr>)}</tbody></table>}</div></CardContent></Card> : null}
 
           {abaAtiva === "resumo" ? <Card><CardHeader><CardTitle className="text-base">Resumo familiar</CardTitle></CardHeader><CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{resumoCards.map((item) => <div key={item.titulo} className="rounded-xl border border-[var(--g3-border)] p-3"><p className="text-xs uppercase tracking-wide text-[var(--g3-muted)]">{item.titulo}</p><p className="mt-1 font-semibold">{String(item.valor)}</p></div>)}<div className="space-y-1 md:col-span-2 xl:col-span-4"><Label>Nome de referência</Label><Input value={familiaForm.nome_familia} onChange={(event) => setFamiliaForm((atual) => ({ ...atual, nome_familia: event.target.value }))} /></div><div className="space-y-1"><Label>Status</Label><Select value={familiaForm.status ?? "ATIVO"} onChange={(event) => setFamiliaForm((atual) => ({ ...atual, status: event.target.value as Familia["status"] }))}><option value="ATIVO">Ativo</option><option value="INATIVO">Inativo</option><option value="BLOQUEADO">Bloqueado</option></Select></div><div className="space-y-1"><Label>Renda familiar total</Label><Input value={familiaForm.renda_familiar_total ?? ""} onChange={(event) => setFamiliaForm((atual) => ({ ...atual, renda_familiar_total: event.target.value }))} /></div></CardContent></Card> : null}
 
-          {abaAtiva === "composicao" ? <Card><CardHeader><CardTitle className="text-base">Composição familiar</CardTitle></CardHeader><CardContent className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]"><div className="space-y-2"><Label>Buscar beneficiário</Label><Input value={buscaBeneficiario} onChange={(event) => setBuscaBeneficiario(event.target.value)} />{beneficiarios.map((beneficiario) => <div key={beneficiario.id_beneficiario} className="rounded-xl border border-[var(--g3-border)] p-3"><p className="font-medium">{beneficiario.nome_completo}</p><div className="mt-2 flex gap-2"><Button size="sm" variant="outline" onClick={() => selecionarBeneficiario(beneficiario)}>Adicionar</Button><Button size="sm" onClick={() => selecionarBeneficiario(beneficiario, true)}>Definir responsável</Button></div></div>)}</div><div className="space-y-4"><Card className="border-dashed"><CardHeader><CardTitle className="text-sm">{membroEmEdicaoId ? "Editar membro" : "Novo membro"}</CardTitle></CardHeader><CardContent className="grid gap-3 md:grid-cols-2"><div className="space-y-1"><Label>Beneficiário</Label><Input value={nomePessoa(membroForm.beneficiario)} readOnly /></div><div className="space-y-1"><Label>Parentesco</Label><Select value={membroForm.parentesco} onChange={(event) => setMembroForm((atual) => ({ ...atual, parentesco: event.target.value }))}><option value="">Selecione</option>{parentescoOptions.map((item) => <option key={item} value={item}>{item}</option>)}</Select></div><label className="flex items-center gap-2 text-sm"><Checkbox checked={Boolean(membroForm.responsavel_familiar)} disabled={Boolean(membros.find((item) => item.responsavel_familiar && item.id_beneficiario !== membroForm.id_beneficiario))} onChange={(event) => setMembroForm((atual) => ({ ...atual, responsavel_familiar: event.target.checked, parentesco: event.target.checked ? "Responsável familiar" : atual.parentesco }))} />Responsável familiar</label><label className="flex items-center gap-2 text-sm"><Checkbox checked={Boolean(membroForm.usa_endereco_familia)} onChange={(event) => setMembroForm((atual) => ({ ...atual, usa_endereco_familia: event.target.checked }))} />Usa endereço da família</label><div className="md:col-span-2 flex gap-2"><Button onClick={() => void adicionarMembroLocal()} disabled={!membroForm.id_beneficiario}>{membroEmEdicaoId ? "Atualizar membro" : "Salvar membro"}</Button>{membroEmEdicaoId ? <Button variant="outline" onClick={() => { setMembroForm(membroVazio); setMembroEmEdicaoId(undefined); }}>Cancelar edição</Button> : null}</div></CardContent></Card><Card><CardHeader><CardTitle className="text-sm">Membros cadastrados</CardTitle></CardHeader><CardContent className="space-y-2">{membros.map((membro) => <div key={membro.id_beneficiario} className="flex items-center justify-between rounded-xl border border-[var(--g3-border)] px-3 py-2"><div><p className="font-medium">{nomePessoa(membro.beneficiario)}</p><p className="text-xs text-[var(--g3-muted)]">{membro.parentesco}</p><p className="text-xs text-[var(--g3-muted)]">{membro.usa_endereco_familia ? "Herdará o endereço principal da família" : "Mantém endereço próprio"}</p></div><div className="flex gap-1">{membro.responsavel_familiar ? <Badge variant="success">Responsável</Badge> : null}<Button size="sm" variant="outline" onClick={() => editarMembro(membro)}>Editar</Button><Button size="sm" variant="outline" onClick={() => void tornarResponsavel(membro)} disabled={membro.responsavel_familiar}>Tornar responsável</Button><Button size="sm" variant="danger" onClick={() => setMembros((atual) => atual.filter((item) => item.id_beneficiario !== membro.id_beneficiario))}>Remover</Button></div></div>)}</CardContent></Card>{familiaIdSelecionada ? <Card><CardHeader><CardTitle className="text-sm">Saída do núcleo familiar</CardTitle></CardHeader><CardContent className="grid gap-3 md:grid-cols-2"><div className="space-y-1"><Label>Membro</Label><Select value={membroTransferenciaId} onChange={(event) => setMembroTransferenciaId(event.target.value)}><option value="">Selecione</option>{membros.filter((item) => !item.responsavel_familiar).map((item) => <option key={item.id_beneficiario} value={item.id_beneficiario}>{nomePessoa(item.beneficiario)}</option>)}</Select></div><div className="space-y-1"><Label>Transferir para família existente</Label><Select value={familiaDestinoId} onChange={(event) => setFamiliaDestinoId(event.target.value)}><option value="">Selecione</option>{familias.filter((item) => item.id_familia !== familiaIdSelecionada).map((item) => <option key={item.id_familia} value={item.id_familia}>{item.nome_familia}</option>)}</Select></div><div><Button variant="outline" onClick={() => void transferirParaOutraFamilia()} disabled={!membroTransferenciaId || !familiaDestinoId}>Transferir para outra família</Button></div><div className="space-y-1"><Label>Ou criar nova família</Label><Input value={novoNomeFamilia} onChange={(event) => setNovoNomeFamilia(event.target.value)} placeholder="Nome da nova família" /></div><div><Button variant="outline" onClick={() => void criarNovaFamiliaPorDesmembramento()} disabled={!membroTransferenciaId || !novoNomeFamilia.trim()}>Transformar em nova família</Button></div></CardContent></Card> : null}</div></CardContent></Card> : null}
+          {abaAtiva === "composicao" ? (
+            <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              <CardHeader className="shrink-0 py-3">
+                <CardTitle className="text-base">Composição familiar</CardTitle>
+              </CardHeader>
+              <CardContent className="grid min-h-0 flex-1 gap-3 overflow-hidden xl:grid-cols-[280px_minmax(0,1fr)] [&_button]:h-8 [&_input]:h-8 [&_label]:text-xs [&_select]:h-8">
+                <div className="flex min-h-0 flex-col gap-2 overflow-hidden">
+                  <Label>Buscar beneficiário</Label>
+                  <Input value={buscaBeneficiario} onChange={(event) => setBuscaBeneficiario(event.target.value)} />
+                  <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+                    {beneficiarios.map((beneficiario) => (
+                      <div key={beneficiario.id_beneficiario} className="rounded-xl border border-[var(--g3-border)] p-2">
+                        <p className="text-sm font-medium">{beneficiario.nome_completo}</p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <Button size="sm" variant="outline" onClick={() => selecionarBeneficiario(beneficiario)}>Adicionar</Button>
+                          <Button size="sm" onClick={() => selecionarBeneficiario(beneficiario, true)}>Definir responsável</Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex min-h-0 flex-col gap-3 overflow-hidden pr-1">
+                  <Card className="shrink-0 border-dashed">
+                    <CardHeader className="py-3">
+                      <CardTitle className="text-sm">{membroEmEdicaoId ? "Editar membro" : "Novo membro"}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid gap-2 md:grid-cols-2">
+                      <div className="space-y-1">
+                        <Label>Beneficiário</Label>
+                        <Input value={nomePessoa(membroForm.beneficiario)} readOnly />
+                      </div>
+                      <div className="space-y-1">
+                        <Label>Parentesco</Label>
+                        <Select value={membroForm.parentesco} onChange={(event) => setMembroForm((atual) => ({ ...atual, parentesco: event.target.value }))}>
+                          <option value="">Selecione</option>
+                          {parentescoOptions.map((item) => <option key={item} value={item}>{item}</option>)}
+                        </Select>
+                      </div>
+                      <label className="flex items-center gap-2 text-xs">
+                        <Checkbox checked={Boolean(membroForm.responsavel_familiar)} disabled={Boolean(membros.find((item) => item.responsavel_familiar && item.id_beneficiario !== membroForm.id_beneficiario))} onChange={(event) => setMembroForm((atual) => ({ ...atual, responsavel_familiar: event.target.checked, parentesco: event.target.checked ? "Responsável familiar" : atual.parentesco }))} />
+                        Responsável familiar
+                      </label>
+                      <label className="flex items-center gap-2 text-xs">
+                        <Checkbox checked={Boolean(membroForm.usa_endereco_familia)} onChange={(event) => setMembroForm((atual) => ({ ...atual, usa_endereco_familia: event.target.checked }))} />
+                        Usa endereço da família
+                      </label>
+                      <div className="flex flex-wrap gap-2 md:col-span-2">
+                        <Button onClick={() => void adicionarMembroLocal()} disabled={!membroForm.id_beneficiario}>{membroEmEdicaoId ? "Atualizar membro" : "Salvar membro"}</Button>
+                        {membroEmEdicaoId ? <Button variant="outline" onClick={() => { setMembroForm(membroVazio); setMembroEmEdicaoId(undefined); }}>Cancelar edição</Button> : null}
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                    <CardHeader className="shrink-0 py-3">
+                      <CardTitle className="text-sm">Membros cadastrados</CardTitle>
+                    </CardHeader>
+                    <CardContent className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+                      {membros.map((membro) => (
+                        <div key={membro.id_beneficiario} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--g3-border)] px-3 py-2">
+                          <div>
+                            <p className="text-sm font-medium">{nomePessoa(membro.beneficiario)}</p>
+                            <p className="text-xs text-[var(--g3-muted)]">{membro.parentesco}</p>
+                            <p className="text-xs text-[var(--g3-muted)]">{membro.usa_endereco_familia ? "Herdará o endereço principal da família" : "Mantém endereço próprio"}</p>
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {membro.responsavel_familiar ? <Badge variant="success">Responsável</Badge> : null}
+                            <Button size="sm" variant="outline" onClick={() => editarMembro(membro)}>Editar</Button>
+                            <Button size="sm" variant="outline" onClick={() => void tornarResponsavel(membro)} disabled={membro.responsavel_familiar}>Tornar responsável</Button>
+                            <Button size="sm" variant="danger" onClick={() => setMembros((atual) => atual.filter((item) => item.id_beneficiario !== membro.id_beneficiario))}>Remover</Button>
+                          </div>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+                  {familiaIdSelecionada ? (
+                    <Card className="shrink-0">
+                      <CardHeader className="py-3">
+                        <CardTitle className="text-sm">Saída do núcleo familiar</CardTitle>
+                      </CardHeader>
+                      <CardContent className="grid gap-2 md:grid-cols-2">
+                        <div className="space-y-1">
+                          <Label>Membro</Label>
+                          <Select value={membroTransferenciaId} onChange={(event) => setMembroTransferenciaId(event.target.value)}>
+                            <option value="">Selecione</option>
+                            {membros.filter((item) => !item.responsavel_familiar).map((item) => <option key={item.id_beneficiario} value={item.id_beneficiario}>{nomePessoa(item.beneficiario)}</option>)}
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Transferir para família existente</Label>
+                          <Select value={familiaDestinoId} onChange={(event) => setFamiliaDestinoId(event.target.value)}>
+                            <option value="">Selecione</option>
+                            {familias.filter((item) => item.id_familia !== familiaIdSelecionada).map((item) => <option key={item.id_familia} value={item.id_familia}>{item.nome_familia}</option>)}
+                          </Select>
+                        </div>
+                        <div>
+                          <Button variant="outline" onClick={() => void transferirParaOutraFamilia()} disabled={!membroTransferenciaId || !familiaDestinoId}>Transferir para outra família</Button>
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Ou criar nova família</Label>
+                          <Input value={novoNomeFamilia} onChange={(event) => setNovoNomeFamilia(event.target.value)} placeholder="Nome da nova família" />
+                        </div>
+                        <div>
+                          <Button variant="outline" onClick={() => void criarNovaFamiliaPorDesmembramento()} disabled={!membroTransferenciaId || !novoNomeFamilia.trim()}>Transformar em nova família</Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ) : null}
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
 
           {abaAtiva === "endereco" ? <Card><CardHeader><CardTitle className="text-base">Endereço e moradia</CardTitle></CardHeader><CardContent className="grid gap-3 md:grid-cols-2"><div className="space-y-1"><Label>Logradouro</Label><Input value={familiaForm.logradouro ?? ""} onChange={(event) => setFamiliaForm((atual) => ({ ...atual, logradouro: event.target.value }))} /></div><div className="space-y-1"><Label>Bairro</Label><Input value={familiaForm.bairro ?? ""} onChange={(event) => setFamiliaForm((atual) => ({ ...atual, bairro: event.target.value }))} /></div><div className="space-y-1"><Label>Município</Label><Input value={familiaForm.municipio ?? ""} onChange={(event) => setFamiliaForm((atual) => ({ ...atual, municipio: event.target.value }))} /></div><div className="space-y-1"><Label>UF</Label><Input value={familiaForm.uf ?? ""} onChange={(event) => setFamiliaForm((atual) => ({ ...atual, uf: event.target.value }))} /></div></CardContent></Card> : null}
           {abaAtiva === "renda" ? <Card><CardHeader><CardTitle className="text-base">Renda e perfil social</CardTitle></CardHeader><CardContent className="grid gap-3 md:grid-cols-2"><div className="space-y-1"><Label>Renda familiar total</Label><Input value={familiaForm.renda_familiar_total ?? ""} onChange={(event) => setFamiliaForm((atual) => ({ ...atual, renda_familiar_total: event.target.value }))} /></div><div className="space-y-1"><Label>Observações</Label><Input value={familiaForm.observacoes ?? ""} onChange={(event) => setFamiliaForm((atual) => ({ ...atual, observacoes: event.target.value }))} /></div></CardContent></Card> : null}

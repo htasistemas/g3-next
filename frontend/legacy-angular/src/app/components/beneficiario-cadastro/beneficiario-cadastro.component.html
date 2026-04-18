@@ -190,7 +190,7 @@
       </div>
     </ng-template>
 
-    <div class="tab-card" *ngIf="activeTab === 'dados'">
+    <div class="tab-card tab-card--dados-pessoais" *ngIf="activeTab === 'dados'">
       <div class="tab-card__header tab-card__header--listagem">
         <div class="tab-card__title-stack">
           <p class="tab-card__highlight">{{ getTabLabel('dados') }}</p>
@@ -849,10 +849,10 @@
       <ng-container *ngTemplateOutlet="navigationControls"></ng-container>
     </div>
 
-    <div class="tab-card" *ngIf="activeTab === 'lista'">
+    <div class="tab-card tab-card--listagem" *ngIf="activeTab === 'lista'">
       <div class="tab-card__header">
         <div class="tab-card__title-stack">
-          <p class="tab-card__highlight">Listagem de Beneficiários</p>
+          <p class="tab-card__highlight">Listagem de beneficiários</p>
         </div>
       </div>
 
@@ -879,16 +879,6 @@
           <button type="button" class="btn-outline" (click)="clearSearchFilters()" [disabled]="listLoading">
             Limpar
           </button>
-        </div>
-      </div>
-
-      <div class="unit-active" *ngIf="selectedBeneficiary" (click)="selecionarBeneficiarioNaLista(selectedBeneficiary)">
-        <div>
-          <p class="unit-active__eyebrow">Beneficiário ativo</p>
-          <p class="unit-active__name">{{ selectedBeneficiary ? formatarNomeListagem(selectedBeneficiary) : 'Beneficiário sem nome' }}</p>
-          <p class="unit-active__meta">
-            {{ selectedBeneficiary.cpf || 'CPF não informado' }} - {{ formatDate(selectedBeneficiary.data_nascimento) }}
-          </p>
         </div>
       </div>
 
@@ -943,7 +933,7 @@
 
       <div class="unit-list__pagination" *ngIf="filteredBeneficiarios.length && beneficiariosPaginados.length">
         <span class="unit-list__total">
-          Total: {{ filteredBeneficiarios.length }} Beneficiários
+          Total: {{ filteredBeneficiarios.length }} beneficiários
         </span>
         <button type="button" class="btn-outline" (click)="paginaAnterior()" [disabled]="paginaAtual === 1">
           Anterior
