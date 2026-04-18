@@ -6,6 +6,7 @@ import { DoacaoRealizadaService } from "../../doacoes-realizadas/services/doacao
 import { UnidadeAssistencialService } from "../../unidades-assistenciais/services/unidade-assistencial.service.js";
 import { VoluntarioService } from "../../voluntarios/services/voluntario.service.js";
 import { RegistroPontoService } from "../../registro-ponto/services/registro-ponto.service.js";
+import { AppError } from "../../../shared/errors/app-error.js";
 import { ReportsRepository } from "../repositories/reports.repository.js";
 import {
   RelatorioTemplatePadrao,
@@ -1292,9 +1293,14 @@ export class ReportsService {
 
   async gerarEspelhoPonto(rawPayload: unknown, authUser?: any): Promise<RelatorioResultado> {
     const payload = registroPontoEspelhoRequestSchema.parse(rawPayload);
+    const usuarioIdRelatorio = authUser?.id ?? payload.usuario_id;
+    if (!usuarioIdRelatorio) {
+      throw new AppError("Informe o funcionario para gerar o espelho de ponto.", 400);
+    }
+
     const ator = {
-      id: authUser?.id ? BigInt(authUser.id) : (payload.usuario_id ? BigInt(payload.usuario_id) : undefined),
-      nome_usuario: authUser?.nomeUsuario || payload.usuarioEmissor || "Sistema G3-Next",
+      id: BigInt(usuarioIdRelatorio),
+      nomeUsuario: authUser?.nomeUsuario || payload.usuarioEmissor || "Sistema G3-Next",
       permissoes: authUser?.permissoes || ["ADMINISTRADOR"]
     };
 

@@ -236,9 +236,11 @@ export function GestaoDocumentosPage() {
   const [popupMensagem, setPopupMensagem] = useState<PopupMensagemState | null>(null);
   const [confirmarExcluir, setConfirmarExcluir] = useState(false);
   const [historicoTexto, setHistoricoTexto] = useState("");
-  const [anexoPrincipalLocal, setAnexoPrincipalLocal] = useState<DocumentoInstituicaoAnexo | null>(null);
+  const [anexosLocais, setAnexosLocais] = useState<DocumentoInstituicaoAnexo[]>([]);
   const [anexoParaSubstituirId, setAnexoParaSubstituirId] = useState<string | null>(null);
   const [anexoProcessandoId, setAnexoProcessandoId] = useState<string | null>(null);
+  const [uploadFileProgress, setUploadFileProgress] = useState<number | null>(null);
+  const [uploadFileProgressNome, setUploadFileProgressNome] = useState("");
 
   // Estados para Links Externos
   const [linksExternos, setLinksExternos] = useState<LinkExterno[]>([]);
@@ -286,9 +288,11 @@ export function GestaoDocumentosPage() {
   }, [documentos]);
 
   const anexos = anexosQuery.data ?? [];
-  const anexoPrincipal = anexos[0] ?? anexoPrincipalLocal;
-  const anexosOcultos = Math.max(0, anexos.length > 0 ? anexos.length - 1 : 0);
-  const carregandoAnexo = Boolean(form.id) && (anexosQuery.isLoading || anexosQuery.isFetching) && !anexoPrincipal;
+  const anexosParaExibir = anexos.length > 0 ? anexos : anexosLocais;
+  const anexoPrincipal = anexosParaExibir[0];
+  const anexosOcultos = Math.max(0, anexosParaExibir.length - 1);
+  const carregandoAnexo =
+    Boolean(form.id) && (anexosQuery.isLoading || anexosQuery.isFetching) && anexosParaExibir.length === 0;
   const historico = historicoQuery.data ?? [];
 
   useEffect(() => {
@@ -313,7 +317,9 @@ export function GestaoDocumentosPage() {
   }, [responsavelLogado]);
 
   useEffect(() => {
-    setAnexoPrincipalLocal(null);
+    setAnexosLocais([]);
+    setUploadFileProgress(null);
+    setUploadFileProgressNome("");
   }, [form.id]);
 
   // Carregar Links Externos
@@ -470,12 +476,15 @@ export function GestaoDocumentosPage() {
     }
   }
 
-  async function subirAnexo(file: File) {
-    if (!ehArquivoPermitido(file)) {
+  async function subirAnexos(files: File[]) {
+    if (!files.length) return;
+
+    const arquivosInvalidos = files.filter((file) => !ehArquivoPermitido(file));
+    if (arquivosInvalidos.length > 0) {
       setPopupMensagem({
         tipo: "aviso",
         titulo: "Validação",
-        texto: "Selecione um arquivo válido para envio."
+        texto: "Remova arquivos inválidos antes de enviar."
       });
       return;
     }
@@ -490,16 +499,46 @@ export function GestaoDocumentosPage() {
     }
 
     try {
-      const payload = await montarPayloadAnexoDocumentoInstituicao({
-        arquivo: file,
-        usuario: responsavelLogado || "Usuário"
-      });
-      const anexo = await anexoMutation.mutateAsync({ id: form.id, payload });
-      setAnexoPrincipalLocal(anexo);
+      const anexosEnviados: DocumentoInstituicaoAnexo[] = [];
+      const totalArquivos = files.length;
+      setUploadFileProgress(0);
+
+      for (const [indice, file] of files.entries()) {
+        const progressoBase = Math.round((indice / totalArquivos) * 100);
+        const nomeProgresso =
+          totalArquivos > 1 ? `${file.name} (${indice + 1}/${totalArquivos})` : file.name;
+
+        setUploadFileProgressNome(nomeProgresso);
+        setUploadFileProgress(progressoBase);
+
+        const payload = await montarPayloadAnexoDocumentoInstituicao({
+          arquivo: file,
+          usuario: responsavelLogado || "Usuário"
+        });
+
+        const anexo = await anexoMutation.mutateAsync({
+          id: form.id,
+          payload,
+          onUploadProgress: (event) => {
+            const total = event.total ?? 0;
+            const progressoArquivo = total > 0 ? Math.round((event.loaded * 100) / total) : 95;
+            const progressoTotal = Math.round(((indice + progressoArquivo / 100) / totalArquivos) * 100);
+            setUploadFileProgress(Math.max(progressoBase, Math.min(99, progressoTotal)));
+          }
+        });
+
+        anexosEnviados.push(anexo);
+      }
+
+      setUploadFileProgress(100);
+      setAnexosLocais((atuais) => [...anexosEnviados, ...atuais]);
       setPopupMensagem({
         tipo: "sucesso",
         titulo: "Confirmação",
-        texto: "Anexo enviado com sucesso."
+        texto:
+          totalArquivos > 1
+            ? `${totalArquivos} arquivos enviados com sucesso.`
+            : "Anexo enviado com sucesso."
       });
     } catch (error: any) {
       setPopupMensagem({
@@ -508,6 +547,14 @@ export function GestaoDocumentosPage() {
         texto: error?.response?.data?.message ?? "Não foi possível enviar o anexo."
       });
     }
+    limparUploadFileProgress();
+  }
+
+  function limparUploadFileProgress() {
+    window.setTimeout(() => {
+      setUploadFileProgress(null);
+      setUploadFileProgressNome("");
+    }, 800);
   }
 
   async function substituirAnexoExistente(anexoId: string, file: File) {
@@ -532,12 +579,27 @@ export function GestaoDocumentosPage() {
 
     setAnexoProcessandoId(anexoId);
     try {
+      setUploadFileProgress(0);
+      setUploadFileProgressNome(file.name);
       const payload = await montarPayloadAnexoDocumentoInstituicao({
         arquivo: file,
         usuario: responsavelLogado || "Usuário"
       });
-      const anexo = await substituirAnexoMutation.mutateAsync({ id: form.id, anexoId, payload });
-      setAnexoPrincipalLocal(anexo);
+      setUploadFileProgress(5);
+      const anexo = await substituirAnexoMutation.mutateAsync({
+        id: form.id,
+        anexoId,
+        payload,
+        onUploadProgress: (event) => {
+          const total = event.total ?? 0;
+          const progresso = total > 0 ? Math.round((event.loaded * 100) / total) : 95;
+          setUploadFileProgress(Math.max(5, Math.min(99, progresso)));
+        }
+      });
+      setUploadFileProgress(100);
+      setAnexosLocais((atuais) =>
+        atuais.map((item) => (item.id === anexoId ? anexo : item))
+      );
       setPopupMensagem({
         tipo: "sucesso",
         titulo: "Confirmação",
@@ -552,6 +614,7 @@ export function GestaoDocumentosPage() {
     } finally {
       setAnexoProcessandoId(null);
       setAnexoParaSubstituirId(null);
+      limparUploadFileProgress();
     }
   }
 
@@ -600,7 +663,7 @@ export function GestaoDocumentosPage() {
     setAnexoProcessandoId(item.id);
     try {
       await excluirAnexoMutation.mutateAsync({ id: form.id, anexoId: item.id });
-      setAnexoPrincipalLocal(null);
+      setAnexosLocais((atuais) => atuais.filter((anexo) => anexo.id !== item.id));
       setPopupMensagem({
         tipo: "sucesso",
         titulo: "Confirmação",
@@ -821,11 +884,12 @@ export function GestaoDocumentosPage() {
             <input
               id="arquivoDocumento"
               type="file"
+              multiple
               className="hidden"
               onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) {
-                  void subirAnexo(file);
+                const files = Array.from(event.target.files ?? []);
+                if (files.length > 0) {
+                  void subirAnexos(files);
                 }
                 event.target.value = "";
               }}
@@ -1033,27 +1097,44 @@ export function GestaoDocumentosPage() {
                 <CardHeader className="pb-2">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="space-y-1">
-                      <CardTitle className="text-sm">Arquivo do documento</CardTitle>
+                      <CardTitle className="text-sm">Arquivos do documento</CardTitle>
                       <p className="text-xs text-[var(--g3-muted)]">
-                        Envie o arquivo principal deste cadastro para visualizar, imprimir, substituir ou excluir.
+                        Envie um ou mais arquivos deste cadastro para visualizar, imprimir, substituir ou excluir.
                       </p>
                     </div>
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() =>
-                        anexoPrincipal
-                          ? solicitarSubstituicaoAnexo(anexoPrincipal.id)
-                          : document.getElementById("arquivoDocumento")?.click()
-                      }
-                      disabled={!form.id || carregandoAcoes || anexoProcessandoId === anexoPrincipal?.id}
+                      onClick={() => document.getElementById("arquivoDocumento")?.click()}
+                      disabled={!form.id || carregandoAcoes}
                     >
                       <Upload className="mr-1.5 h-3.5 w-3.5" />
-                      {anexoPrincipal ? "Substituir arquivo" : "Enviar arquivo"}
+                      {anexosParaExibir.length > 0 ? "Adicionar arquivos" : "Enviar arquivos"}
                     </Button>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
+                  {uploadFileProgress !== null ? (
+                    <div
+                      className="rounded-md border border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/20 p-3"
+                      role="status"
+                      aria-live="polite"
+                      aria-label="Progresso do envio do arquivo"
+                    >
+                      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <span className="font-semibold text-[var(--g3-active)]">
+                          Enviando arquivo{uploadFileProgressNome ? `: ${uploadFileProgressNome}` : ""}
+                        </span>
+                        <span className="font-semibold text-[var(--g3-active)]">{uploadFileProgress}%</span>
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-[var(--g3-border)]">
+                        <div
+                          className="h-full rounded-full bg-[var(--g3-active)] transition-all"
+                          style={{ width: `${uploadFileProgress}%` }}
+                        />
+                      </div>
+                    </div>
+                  ) : null}
                   {!form.id ? (
                     <div className="rounded-md border border-dashed border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/20 p-4 text-sm text-[var(--g3-muted)]">
                       Salve o documento primeiro para habilitar o envio do arquivo.
@@ -1075,7 +1156,7 @@ export function GestaoDocumentosPage() {
                           </p>
                           {anexosOcultos ? (
                             <p className="text-xs text-[var(--g3-muted)]">
-                              Há {anexosOcultos} arquivo(s) anterior(es) mantido(s) no histórico interno.
+                              Além deste, há {anexosOcultos} arquivo(s) anexado(s) neste documento.
                             </p>
                           ) : null}
                         </div>
@@ -1122,6 +1203,66 @@ export function GestaoDocumentosPage() {
                           Excluir
                         </Button>
                       </div>
+                      {anexosParaExibir.length > 1 ? (
+                        <div className="space-y-2">
+                          <p className="text-xs font-semibold text-[var(--g3-muted)]">Demais arquivos anexados</p>
+                          {anexosParaExibir.slice(1).map((anexo) => (
+                            <div
+                              key={anexo.id}
+                              className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/10 p-3"
+                            >
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-semibold">{anexo.nomeArquivo}</p>
+                                <p className="text-xs text-[var(--g3-muted)]">
+                                  {anexo.tipoMime ?? "application/pdf"} • {anexo.tamanho ?? "---"}
+                                </p>
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => void abrirAnexo(anexo)}
+                                  disabled={anexoProcessandoId === anexo.id}
+                                >
+                                  <Eye className="mr-1.5 h-3.5 w-3.5" />
+                                  Visualizar
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => void imprimirAnexo(anexo)}
+                                  disabled={anexoProcessandoId === anexo.id}
+                                >
+                                  <Printer className="mr-1.5 h-3.5 w-3.5" />
+                                  Imprimir
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => solicitarSubstituicaoAnexo(anexo.id)}
+                                  disabled={substituirAnexoMutation.isPending || anexoProcessandoId === anexo.id}
+                                >
+                                  <Upload className="mr-1.5 h-3.5 w-3.5" />
+                                  Substituir
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="danger"
+                                  size="sm"
+                                  onClick={() => void excluirAnexoExistente(anexo)}
+                                  disabled={excluirAnexoMutation.isPending || anexoProcessandoId === anexo.id}
+                                >
+                                  <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                                  Excluir
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
                   ) : (
                     <div className="rounded-md border border-dashed border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/15 p-4">
@@ -1132,7 +1273,7 @@ export function GestaoDocumentosPage() {
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-semibold">Nenhum arquivo enviado</p>
                           <p className="text-xs text-[var(--g3-muted)]">
-                            Use o botão acima para anexar o arquivo principal deste documento.
+                            Use o botão acima para anexar um ou mais arquivos deste documento.
                           </p>
                         </div>
                       </div>
@@ -1293,11 +1434,12 @@ export function GestaoDocumentosPage() {
               <input
                 id="arquivoDocumento"
                 type="file"
+                multiple
                 className="hidden"
                 onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) {
-                    void subirAnexo(file);
+                  const files = Array.from(event.target.files ?? []);
+                  if (files.length > 0) {
+                    void subirAnexos(files);
                   }
                   event.target.value = "";
                 }}
@@ -1323,7 +1465,7 @@ export function GestaoDocumentosPage() {
                 disabled={!form.id}
               >
                 <Upload className="mr-1 h-3.5 w-3.5" />
-                Enviar Anexo
+                Enviar anexos
               </Button>
               <span className="text-sm text-[var(--g3-muted)]">
                 Documento selecionado: {form.id ? form.tipoDocumento : "Nenhum"}

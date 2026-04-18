@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { AxiosProgressEvent } from "axios";
 import { documentosInstituicaoService } from "@/services/documentos-instituicao.service";
 import type {
   DocumentoInstituicaoAnexoPayload,
@@ -55,8 +56,15 @@ export function useExcluirDocumentoInstituicao() {
 export function useAdicionarAnexoDocumentoInstituicao() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, payload }: { id: string; payload: DocumentoInstituicaoAnexoPayload }) =>
-      documentosInstituicaoService.adicionarAnexo(id, payload),
+    mutationFn: ({
+      id,
+      payload,
+      onUploadProgress
+    }: {
+      id: string;
+      payload: DocumentoInstituicaoAnexoPayload;
+      onUploadProgress?: (progressEvent: AxiosProgressEvent) => void;
+    }) => documentosInstituicaoService.adicionarAnexo(id, payload, { onUploadProgress }),
     onSuccess: async (_response, vars) => {
       await queryClient.invalidateQueries({ queryKey: ["documentos-instituicao"] });
       await queryClient.invalidateQueries({
@@ -75,12 +83,14 @@ export function useSubstituirAnexoDocumentoInstituicao() {
     mutationFn: ({
       id,
       anexoId,
-      payload
+      payload,
+      onUploadProgress
     }: {
       id: string;
       anexoId: string;
       payload: DocumentoInstituicaoAnexoPayload;
-    }) => documentosInstituicaoService.substituirAnexo(id, anexoId, payload),
+      onUploadProgress?: (progressEvent: AxiosProgressEvent) => void;
+    }) => documentosInstituicaoService.substituirAnexo(id, anexoId, payload, { onUploadProgress }),
     onSuccess: async (_response, vars) => {
       await queryClient.invalidateQueries({ queryKey: ["documentos-instituicao"] });
       await queryClient.invalidateQueries({

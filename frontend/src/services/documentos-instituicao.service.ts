@@ -1,4 +1,5 @@
 import { httpClient } from "./http-client";
+import type { AxiosProgressEvent } from "axios";
 import type {
   DocumentoInstituicao,
   DocumentoInstituicaoAnexo,
@@ -7,6 +8,10 @@ import type {
   DocumentoInstituicaoHistoricoPayload,
   DocumentoInstituicaoPayload
 } from "@/types/documentos-instituicao";
+
+type UploadProgressOptions = {
+  onUploadProgress?: (progressEvent: AxiosProgressEvent) => void;
+};
 
 export const documentosInstituicaoService = {
   async listar() {
@@ -41,20 +46,29 @@ export const documentosInstituicaoService = {
     return data;
   },
 
-  async adicionarAnexo(id: string, payload: DocumentoInstituicaoAnexoPayload) {
+  async adicionarAnexo(
+    id: string,
+    payload: DocumentoInstituicaoAnexoPayload,
+    options?: UploadProgressOptions
+  ) {
     const { data } = await httpClient.post<DocumentoInstituicaoAnexo>(
       `/api/documentos-instituicao/${id}/anexos`,
       payload,
-      { timeout: 300000 }
+      { timeout: 300000, onUploadProgress: options?.onUploadProgress }
     );
     return data;
   },
 
-  async substituirAnexo(id: string, anexoId: string, payload: DocumentoInstituicaoAnexoPayload) {
+  async substituirAnexo(
+    id: string,
+    anexoId: string,
+    payload: DocumentoInstituicaoAnexoPayload,
+    options?: UploadProgressOptions
+  ) {
     const { data } = await httpClient.put<DocumentoInstituicaoAnexo>(
       `/api/documentos-instituicao/${id}/anexos/${anexoId}`,
       payload,
-      { timeout: 300000 }
+      { timeout: 300000, onUploadProgress: options?.onUploadProgress }
     );
     return data;
   },

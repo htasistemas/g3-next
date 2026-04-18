@@ -54,6 +54,7 @@ import {
 import {
   useAdicionarOcorrenciaPonto,
   useAjustarRegistroPonto,
+  useCatalogoUsuariosRegistroPonto,
   useConfiguracaoRegistroPonto,
   useEspelhoPonto,
   useFaceRegistroPonto,
@@ -412,6 +413,7 @@ export function RegistroPontoPage() {
   const { data: historicoData, isLoading: carregandoHistorico } = useHistoricoRegistroPonto(registroSelecionadoId);
   const { data: configuracaoHorarioData, isLoading: carregandoConfiguracaoHorario } = useConfiguracaoRegistroPonto();
   const { data: faceData, isLoading: carregandoFace } = useFaceRegistroPonto();
+  const { data: usuariosCatalogoData } = useCatalogoUsuariosRegistroPonto(isAdmin ? "" : undefined);
 
   const marcarMutation = useMarcarPonto();
   const ajusteMutation = useAjustarRegistroPonto();
@@ -448,6 +450,7 @@ export function RegistroPontoPage() {
   const registros = listaData?.registros ?? [];
   const espelho = espelhoData?.registros ?? [];
   const totaisEspelho = espelhoData?.totais;
+  const usuariosCatalogo = usuariosCatalogoData?.usuarios ?? [];
 
   const registroSelecionado = useMemo(
     () => registros.find((item) => item.id === registroSelecionadoId),
@@ -480,6 +483,18 @@ export function RegistroPontoPage() {
     const usuarioId = usuario?.id;
     if (!usuarioId) return;
 
+    if (isAdmin) {
+      setFiltroDraft((prev) => ({
+        ...prev,
+        usuario_id: prev.usuario_id || usuarioId
+      }));
+      setFiltros((prev) => ({
+        ...prev,
+        usuario_id: prev.usuario_id || usuarioId
+      }));
+      return;
+    }
+
     setFiltroDraft((prev) => ({
       ...prev,
       usuario_id: usuarioId
@@ -488,12 +503,27 @@ export function RegistroPontoPage() {
       ...prev,
       usuario_id: usuarioId
     }));
-  }, [usuario?.id]);
+  }, [isAdmin, usuario?.id]);
 
   useEffect(() => {
     const abaDaUrl = normalizarAbaRegistroPonto(searchParams.get("aba"));
     setAbaAtiva((atual) => (atual === abaDaUrl ? atual : abaDaUrl));
   }, [searchParams]);
+
+  useEffect(() => {
+    if (abaAtiva !== "espelho") return;
+
+    const overflowBodyAnterior = document.body.style.overflow;
+    const overflowHtmlAnterior = document.documentElement.style.overflow;
+
+    document.body.style.overflow = "auto";
+    document.documentElement.style.overflow = "auto";
+
+    return () => {
+      document.body.style.overflow = overflowBodyAnterior;
+      document.documentElement.style.overflow = overflowHtmlAnterior;
+    };
+  }, [abaAtiva]);
 
   useEffect(() => {
     setConfirmacaoLogin(usuario?.nomeUsuario ?? "");
@@ -1057,10 +1087,23 @@ export function RegistroPontoPage() {
   async function gerarRelatorioEspelho() {
     const janela = reservarJanelaRelatorio("Espelho de Ponto Individual");
     try {
-      const blob = await reportsService.gerarEspelhoPonto({
+      const usuarioIdEspelho = isAdmin ? filtros.usuario_id || usuario?.id : usuario?.id;
+      const payloadEspelho = {
         ...filtros,
+        usuario_id: usuarioIdEspelho,
         usuarioEmissor: usuario?.nome ?? usuario?.nomeUsuario
-      });
+      };
+
+      let blob: Blob;
+      try {
+        blob = await registroPontoService.gerarEspelhoPontoPdf(payloadEspelho);
+      } catch (error: any) {
+        if (error?.response?.status !== 401) {
+          throw error;
+        }
+        blob = await reportsService.gerarEspelhoPonto(payloadEspelho);
+      }
+
       janela.publicar(blob);
     } catch (error: any) {
       janela.fechar();
@@ -1092,7 +1135,31 @@ export function RegistroPontoPage() {
     return "Registrar ponto agora";
   }
 
+  function alterarUsuarioEspelho(usuarioId: string) {
+    setFiltroDraft((prev) => ({
+      ...prev,
+      usuario_id: usuarioId
+    }));
+    setFiltros((prev) => ({
+      ...prev,
+      usuario_id: usuarioId
+    }));
+  }
+
   function renderFiltros() {
+    const usuarioAtualNoCatalogo = usuariosCatalogo.some((item) => item.id === filtroDraft.usuario_id);
+    const opcoesUsuarioEspelho =
+      isAdmin && filtroDraft.usuario_id && !usuarioAtualNoCatalogo
+        ? [
+            {
+              id: filtroDraft.usuario_id,
+              nome: filtroDraft.usuario_id === usuario?.id ? usuario?.nome ?? usuario?.nomeUsuario ?? "Usuário atual" : "Usuário selecionado",
+              login: filtroDraft.usuario_id === usuario?.id ? usuario?.nomeUsuario ?? "" : ""
+            },
+            ...usuariosCatalogo
+          ]
+        : usuariosCatalogo;
+
     return (
       <Card>
         <CardHeader>
@@ -1118,6 +1185,25 @@ export function RegistroPontoPage() {
               disabled
             />
           </div>
+
+          {isAdmin && abaAtiva === "espelho" ? (
+            <div>
+              <Label>Funcionário</Label>
+              <Select
+                value={filtroDraft.usuario_id ?? usuario?.id ?? ""}
+                onChange={(event) => alterarUsuarioEspelho(event.target.value)}
+              >
+                {opcoesUsuarioEspelho.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.nome}{item.login ? ` (${item.login})` : ""}
+                  </option>
+                ))}
+              </Select>
+              <p className="mt-1 text-xs text-[var(--g3-muted)]">
+                Administradores podem escolher o funcionário para consulta e impressão do espelho.
+              </p>
+            </div>
+          ) : null}
 
           <div>
             <Label>Status</Label>
@@ -1810,7 +1896,7 @@ export function RegistroPontoPage() {
                 </span>
               )}
             </CardHeader>
-            <CardContent className="space-y-3 p-3">
+            <CardContent className={`space-y-3 p-3 ${abaAtiva === "espelho" ? "overflow-visible" : ""}`}>
               {carregandoLista && abaAtiva === "listagem" && (
                 <p className="text-sm text-[var(--g3-muted)]">Carregando registros...</p>
               )}

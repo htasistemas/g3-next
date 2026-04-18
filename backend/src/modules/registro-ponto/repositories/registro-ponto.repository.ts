@@ -275,8 +275,16 @@ export class RegistroPontoRepository {
     }
 
     const where: Prisma.Sql[] = [];
+    let usuarioIdFiltro = usuarioId;
 
-    where.push(Prisma.sql`AND r.usuario_id = ${usuarioId}`);
+    if (this.isAdmin(ator) && filters.usuario_id) {
+      if (!/^\d+$/.test(filters.usuario_id)) {
+        throw new AppError("Funcionario informado para o espelho de ponto e invalido.", 400);
+      }
+      usuarioIdFiltro = BigInt(filters.usuario_id);
+    }
+
+    where.push(Prisma.sql`AND r.usuario_id = ${usuarioIdFiltro}`);
 
     if (filters.data_inicial) {
       where.push(Prisma.sql`AND r.data_referencia >= ${new Date(`${filters.data_inicial}T00:00:00.000Z`)}`);

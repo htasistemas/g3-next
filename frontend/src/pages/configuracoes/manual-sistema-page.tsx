@@ -319,16 +319,16 @@ const secoesManual: ManualSecao[] = [
       },
       {
         nome: "Gestão de documentos",
-        objetivo: "Controlar documentos institucionais, anexar o arquivo principal e manter histórico de atualizações do documento.",
+        objetivo: "Controlar documentos institucionais, anexar arquivos e manter histórico de atualizações do documento.",
         comoUsar: [
           "Cadastre ou selecione um documento na lista para abrir o detalhamento completo.",
-          "Use a seção Arquivo do documento para anexar, substituir, visualizar, imprimir ou excluir o arquivo principal em um clique.",
+          "Use a seção Arquivos do documento para anexar um ou mais arquivos, substituir, visualizar, imprimir ou excluir cada arquivo em um clique.",
           "Após cada alteração relevante, consulte o histórico do documento para acompanhar registros de cadastro, envio, troca e remoção de anexo."
         ],
         atencoes: [
           "O sistema aceita anexos PDF, JPG e PNG e grava apenas o caminho do arquivo no cadastro do documento.",
           "Se o documento já estiver salvo, o anexo é armazenado no storage do sistema e permanece disponível para substituição e exclusão sem duplicar arquivo no banco.",
-          "O envio do anexo principal na aba Cadastro e edição foi ajustado para usar o contrato atual do backend, permitindo anexar e salvar o documento sem erro de envio."
+          "O envio dos anexos na aba Cadastro e edição aceita seleção múltipla e mostra a evolução do upload em barra percentual até a conclusão."
         ]
       },
       {
@@ -589,13 +589,13 @@ const secoesManual: ManualSecao[] = [
           "Acesse a aba Cadastro facial para capturar a face pela webcam e salvar o cadastro facial do usuário.",
           "Durante a captura pela câmera, use o molde do rosto na tela para centralizar a face antes de confirmar a imagem.",
           "Depois volte para a aba Registrar ponto para consultar a próxima batida, o espelho do dia e o saldo atual antes de marcar.",
-          "Na aba Espelho de ponto, use o botão Gerar espelho de ponto PDF para emitir o relatório individual em um clique, com o mesmo padrão visual dos formulários do G3N.",
+          "Na aba Espelho de ponto, use o botão Gerar espelho de ponto PDF para emitir o relatório individual em um clique; administradores podem selecionar o funcionário antes da emissão, enquanto usuários comuns emitem apenas o próprio espelho.",
           "Somente após o cadastro da face o botão Registrar ponto agora fica liberado para a confirmação da batida.",
           "Ao clicar em Registrar ponto agora, informe o usuário e a senha. Se o modo escolhido for Somente senha, a marcação é concluída sem captura facial. Se o modo escolhido for Senha + captura facial, faça também a validação da face atual com prova de vida por duas piscadas ou leve virada do rosto antes do envio.",
           "Na aba Ajuste administrativo, escolha entre Somente senha ou Senha + captura facial antes de salvar a correção do registro."
         ],
         atencoes: [
-          "A geração do espelho em PDF segue a mesma permissão de leitura da aba Espelho de ponto para evitar bloqueio indevido por autenticação quando o usuário já pode consultar o espelho na tela.",
+          "A geração do espelho em PDF usa o endpoint autenticado do registro de ponto e respeita a regra de acesso por usuário: administrador pode emitir para funcionários, demais perfis somente para si mesmos.",
           "A marcação pode ser configurada para Somente senha ou para Senha + captura facial, conforme a necessidade operacional.",
           "Na confirmação da marcação, o sistema exige duas piscadas ou uma leve virada do rosto para reduzir o risco de uso de foto estática no lugar de uma pessoa real.",
           "Se a face capturada na confirmação não conferir com a face cadastrada do usuário, o registro do ponto é recusado. A comparação considera variações controladas de enquadramento e espelhamento para reduzir reprovações indevidas da webcam.",

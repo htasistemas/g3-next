@@ -27,7 +27,7 @@ export function useCatalogoUsuariosRegistroPonto(termo?: string) {
   return useQuery({
     queryKey: ["registro-ponto", "usuarios", termo ?? ""],
     queryFn: () => registroPontoService.listarUsuarios(termo),
-    enabled: (termo?.trim().length ?? 0) >= 2
+    enabled: termo !== undefined && (termo.trim().length === 0 || termo.trim().length >= 2)
   });
 }
 

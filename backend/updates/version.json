@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.432",
-  "releaseDate": "2026-04-09",
-  "description": "Versão oficial alinhada com o endurecimento de segurança de ambiente, autenticação e WebSocket.",
+  "latestVersion": "1.00.435",
+  "releaseDate": "2026-04-18",
+  "description": "Versão oficial alinhada com seleção administrativa de funcionário no espelho de ponto PDF.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.432",
+  "minCompatibleVersion": "1.00.435",
   "releaseType": "stable"
 }
 
