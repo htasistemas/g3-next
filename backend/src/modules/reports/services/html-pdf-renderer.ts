@@ -402,14 +402,33 @@ export class HtmlPdfRenderer {
           desenharLinhaTabela(titulos, true);
         };
 
+        const obterFonteTamanhoColuna = (index: number, cabecalho: boolean) => {
+          const coluna = tabela.colunas[index];
+          if (cabecalho) return coluna?.fonteTamanhoCabecalho ?? 9;
+          return coluna?.fonteTamanho ?? 10;
+        };
+
         const desenharLinhaTabela = (cels: string[], cabecalho = false) => {
           const textos = cels.map((cel) => toSafeText(cel));
-          const alturas = textos.map((texto, index) =>
-            doc.heightOfString(texto || " ", {
-              width: Math.max(20, larguras[index] - paddingX * 2),
-              align: "left"
-            }) + paddingY * 2
-          );
+          const alturas = textos.map((texto, index) => {
+            const coluna = tabela.colunas[index];
+            const larguraTexto = Math.max(20, larguras[index] - paddingX * 2);
+            const fonteTamanho = obterFonteTamanhoColuna(index, cabecalho);
+
+            doc.font(cabecalho ? fonteNegrito : fonteRegular).fontSize(fonteTamanho);
+
+            if (coluna?.semQuebra) {
+              return Math.max(16, fonteTamanho + paddingY * 2 + 2);
+            }
+
+            return (
+              doc.heightOfString(texto || " ", {
+                width: larguraTexto,
+                align: "left"
+              }) +
+              paddingY * 2
+            );
+          });
           const alturaLinha = Math.max(18, ...alturas);
 
           if (doc.y + alturaLinha > bottomLimite()) {
@@ -421,7 +440,11 @@ export class HtmlPdfRenderer {
           const topoLinha = doc.y;
 
           for (let index = 0; index < larguras.length; index += 1) {
+            const coluna = tabela.colunas[index];
             const largura = larguras[index];
+            const larguraTexto = Math.max(20, largura - paddingX * 2);
+            const fonteTamanho = obterFonteTamanhoColuna(index, cabecalho);
+            const textoBase = textos[index] || "---";
             doc
               .rect(cursorX, topoLinha, largura, alturaLinha)
               .lineWidth(0.6)
@@ -431,11 +454,17 @@ export class HtmlPdfRenderer {
             doc
               .fillColor("#111827")
               .font(cabecalho ? fonteNegrito : fonteRegular)
-              .fontSize(cabecalho ? 9 : 10)
-              .text(textos[index] || "---", cursorX + paddingX, topoLinha + paddingY, {
-                width: largura - paddingX * 2,
-                align: "left"
-              });
+              .fontSize(fonteTamanho)
+              .text(
+                coluna?.semQuebra ? fitTextToWidth(doc, textoBase, larguraTexto) : textoBase,
+                cursorX + paddingX,
+                topoLinha + paddingY,
+                {
+                  width: larguraTexto,
+                  align: "left",
+                  lineBreak: !coluna?.semQuebra
+                }
+              );
 
             cursorX += largura;
           }

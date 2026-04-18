@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.435",
+  "latestVersion": "1.00.436",
   "releaseDate": "2026-04-18",
-  "description": "Versão oficial alinhada com seleção administrativa de funcionário no espelho de ponto PDF.",
+  "description": "Versão oficial alinhada ao novo layout compacto do espelho de ponto individual em PDF.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.435",
+  "minCompatibleVersion": "1.00.436",
   "releaseType": "stable"
 }
 

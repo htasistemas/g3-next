@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.435",
+  "latestVersion": "1.00.436",
   "releaseDate": "2026-04-18",
-  "description": "Registro de ponto passou a permitir seleção de funcionário por administrador no espelho PDF e corrigiu a geração autenticada.",
+  "description": "Espelho de ponto individual em PDF passou a destacar o colaborador e compactar a tabela para evitar quebras nos horários.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.435",
+  "minCompatibleVersion": "1.00.436",
   "releaseType": "stable",
   "downloadUrl": null
 }

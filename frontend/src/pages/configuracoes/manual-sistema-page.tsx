@@ -598,6 +598,7 @@ const secoesManual: ManualSecao[] = [
         ],
         atencoes: [
           "A geração do espelho em PDF usa o endpoint autenticado do registro de ponto e respeita a regra de acesso por usuário: administrador pode emitir para funcionários, demais perfis somente para si mesmos.",
+          "No espelho de ponto individual em PDF, o nome do colaborador aparece em destaque e a tabela mantém data e horários em linha única, deixando a ocorrência em fonte reduzida com quebra de linha quando necessário.",
           "A marcação pode ser configurada para Somente senha ou para Senha + captura facial, conforme a necessidade operacional.",
           "Na confirmação da marcação, o sistema exige duas piscadas ou uma leve virada do rosto para reduzir o risco de uso de foto estática no lugar de uma pessoa real.",
           "Se a face capturada na confirmação não conferir com a face cadastrada do usuário, o registro do ponto é recusado. A comparação considera variações controladas de enquadramento e espelhamento para reduzir reprovações indevidas da webcam.",

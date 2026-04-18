@@ -1319,17 +1319,33 @@ export class ReportsService {
 
     const registros = espelhoData.registros ?? [];
     const totais = espelhoData.totais;
+    const nomeColaborador = registros[0]?.usuario_nome || "Colaborador não informado";
+    const colunaSemQuebra = {
+      classe: "coluna-compacta",
+      semQuebra: true,
+      fonteTamanho: 7,
+      fonteTamanhoCabecalho: 7
+    };
+    const colunaOcorrencia = {
+      classe: "coluna-ocorrencia",
+      fonteTamanho: 6.5,
+      fonteTamanhoCabecalho: 7
+    };
 
     const contexto = await this.montarContextoInstitucional();
     const relatorioInput: RelatorioHtmlInput = {
-      titulo: "Espelho de Ponto Individual",
+      titulo: "Espelho de ponto individual",
       metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),
-      descricao: `Relatório detalhado de marcações de ponto e apuração de horas${
-        registros[0]?.usuario_nome ? ` para o colaborador ${registros[0].usuario_nome}` : ""
-      }.`,
+      descricao: "Relatório detalhado de marcações de ponto e apuração de horas.",
       blocos: [
         {
-          titulo: "Resumo do Período",
+          titulo: "Colaborador",
+          colunas: 1,
+          destaque: true,
+          campos: [this.campo("Nome", nomeColaborador)]
+        },
+        {
+          titulo: "Resumo do período",
           colunas: 3,
           destaque: true,
           campos: [
@@ -1344,16 +1360,16 @@ export class ReportsService {
       ],
       tabela: {
         colunas: [
-          { titulo: "Data", largura: "10%" },
-          { titulo: "E1", largura: "7%" },
-          { titulo: "S1", largura: "7%" },
-          { titulo: "E2", largura: "7%" },
-          { titulo: "S2", largura: "7%" },
-          { titulo: "Extra", largura: "10%" },
-          { titulo: "Banco", largura: "10%" },
-          { titulo: "Atraso", largura: "10%" },
-          { titulo: "Falta", largura: "10%" },
-          { titulo: "Ocorrências", largura: "22%" }
+          { titulo: "Data", largura: "12%", ...colunaSemQuebra },
+          { titulo: "E1", largura: "5.5%", ...colunaSemQuebra },
+          { titulo: "S1", largura: "5.5%", ...colunaSemQuebra },
+          { titulo: "E2", largura: "5.5%", ...colunaSemQuebra },
+          { titulo: "S2", largura: "5.5%", ...colunaSemQuebra },
+          { titulo: "Extra", largura: "8%", ...colunaSemQuebra },
+          { titulo: "Banco", largura: "8%", ...colunaSemQuebra },
+          { titulo: "Atraso", largura: "7.5%", ...colunaSemQuebra },
+          { titulo: "Falta", largura: "7.5%", ...colunaSemQuebra },
+          { titulo: "Ocorrência", largura: "35%", ...colunaOcorrencia }
         ],
         linhas: registros.map((item) => [
           this.formatarData(item.data),
@@ -1365,7 +1381,7 @@ export class ReportsService {
           this.formatarMinutosRelatorio(item.banco_horas_minutos),
           this.formatarMinutosRelatorio(item.atrasos_minutos),
           this.formatarMinutosRelatorio(item.faltas_minutos),
-          item.ocorrencias?.join(", ") || "---"
+          item.ocorrencias?.map((ocorrencia) => ocorrencia.replace(/_/g, " ")).join(", ") || "---"
         ])
       },
       cabecalho: contexto.cabecalho,

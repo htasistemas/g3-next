@@ -17,6 +17,10 @@ export type RodapeTemplate = {
 export type ColunaRelatorio = {
   titulo: string;
   largura?: string;
+  classe?: string;
+  semQuebra?: boolean;
+  fonteTamanho?: number;
+  fonteTamanhoCabecalho?: number;
 };
 
 export type RelatorioTabela = {
@@ -78,16 +82,44 @@ export class RelatorioTemplatePadrao {
       .join("");
   }
 
+  private montarClasseColuna(coluna?: ColunaRelatorio): string {
+    if (!coluna) return "";
+    const classes = [coluna.classe, coluna.semQuebra ? "coluna-sem-quebra" : ""].filter(Boolean).join(" ");
+    return classes ? ` class="${this.escapeHtml(classes)}"` : "";
+  }
+
+  private montarEstiloColuna(coluna?: ColunaRelatorio, cabecalho = false): string {
+    const fonteTamanho = cabecalho ? coluna?.fonteTamanhoCabecalho : coluna?.fonteTamanho;
+    return fonteTamanho ? ` style="font-size:${fonteTamanho}px;"` : "";
+  }
+
   montarHtml(input: RelatorioHtmlInput) {
     const colgroupHtml =
       input.tabela?.colunas
         .map((coluna) => `<col style="width:${coluna.largura ?? "auto"};" />`)
         .join("") ?? "";
     const headerCols =
-      input.tabela?.colunas.map((coluna) => `<th>${this.escapeHtml(coluna.titulo)}</th>`).join("") ?? "";
+      input.tabela?.colunas
+        .map(
+          (coluna) =>
+            `<th${this.montarClasseColuna(coluna)}${this.montarEstiloColuna(coluna, true)}>${this.escapeHtml(
+              coluna.titulo
+            )}</th>`
+        )
+        .join("") ?? "";
     const bodyRows =
       input.tabela?.linhas
-        .map((linha) => `<tr>${linha.map((valor) => `<td>${this.escapeHtml(valor)}</td>`).join("")}</tr>`)
+        .map(
+          (linha) =>
+            `<tr>${linha
+              .map((valor, index) => {
+                const coluna = input.tabela?.colunas[index];
+                return `<td${this.montarClasseColuna(coluna)}${this.montarEstiloColuna(coluna)}>${this.escapeHtml(
+                  valor
+                )}</td>`;
+              })
+              .join("")}</tr>`
+        )
         .join("") ?? "";
 
     const secoesHtml =
@@ -353,6 +385,24 @@ export class RelatorioTemplatePadrao {
               vertical-align: top;
               overflow-wrap: anywhere;
               word-break: break-word;
+            }
+            th.coluna-sem-quebra,
+            td.coluna-sem-quebra {
+              white-space: nowrap;
+              overflow-wrap: normal;
+              word-break: normal;
+              padding-left: 4px;
+              padding-right: 4px;
+            }
+            th.coluna-ocorrencia,
+            td.coluna-ocorrencia {
+              padding: 4px;
+            }
+            td.coluna-ocorrencia {
+              white-space: normal;
+              overflow-wrap: anywhere;
+              word-break: break-word;
+              line-height: 1.15;
             }
             tr {
               page-break-inside: avoid;
