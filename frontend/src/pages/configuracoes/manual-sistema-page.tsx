@@ -448,6 +448,25 @@ const secoesManual: ManualSecao[] = [
         ]
       },
       {
+        nome: "Prestação de contas",
+        objetivo: "Organizar a prestação de contas em fluxo guiado, com leitura simples, conferência visual e revisão final antes do envio ou da impressão.",
+        comoUsar: [
+          "Comece pela aba Listagem para localizar um registro existente ou usar Novo para abrir uma nova prestação.",
+          "Na listagem, use os filtros no topo para pesquisar por código, resumo, fontes, aplicações ou documentos, selecione a situação desejada e use Limpar filtros quando precisar reiniciar a busca.",
+          "As linhas da tabela são clicáveis e o registro selecionado fica destacado visualmente para reduzir erro de operação.",
+          "Na aba Visão geral, informe total recebido, total aplicado, saldo disponível, prestado no mês e o resumo executivo da prestação em linguagem simples.",
+          "Na aba Receitas, cadastre cada entrada com fonte, valor, periodicidade e situação para consolidar a composição do total recebido.",
+          "Na aba Aplicação dos recursos, detalhe onde o recurso foi utilizado, com percentual e descrição, para facilitar a leitura por quem analisa a prestação.",
+          "Na aba Documentos e checklist, lance os comprovantes e monte o checklist de conferência antes de avançar.",
+          "Na aba Revisão e envio, acompanhe a situação geral, as pendências encontradas pela tela, a timeline da prestação e os indicadores finais de conferência antes de salvar ou imprimir."
+        ],
+        atencoes: [
+          "Os campos monetários exibem formatação brasileira e a tela alerta quando o saldo informado divergir do saldo calculado pelos totais.",
+          "A prestação só fica realmente pronta para conferência quando houver receitas ou total recebido, aplicação ou total aplicado, comprovantes e checklist sem pendências.",
+          "A revisão final mostra claramente o que ainda falta, evitando depender de treinamento informal para concluir a operação."
+        ]
+      },
+      {
         nome: "Doações realizadas",
         objetivo: "Consultar o histórico de entregas e imprimir relatórios e recibos das doações realizadas a beneficiários e famílias.",
         comoUsar: [

@@ -1,22 +1,51 @@
 package br.com.g3.transparencia.dto;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.util.List;
 
 public class TransparenciaRequest {
   private Long unidadeId;
+
+  @Digits(integer = 12, fraction = 2, message = "totalRecebido deve ter no maximo 12 digitos inteiros e 2 decimais")
   private BigDecimal totalRecebido;
+
+  @Size(max = 200, message = "totalRecebidoHelper deve ter no maximo 200 caracteres")
   private String totalRecebidoHelper;
+
+  @Digits(integer = 12, fraction = 2, message = "totalAplicado deve ter no maximo 12 digitos inteiros e 2 decimais")
   private BigDecimal totalAplicado;
+
+  @Size(max = 200, message = "totalAplicadoHelper deve ter no maximo 200 caracteres")
   private String totalAplicadoHelper;
+
+  @Digits(integer = 12, fraction = 2, message = "saldoDisponivel deve ter no maximo 12 digitos inteiros e 2 decimais")
   private BigDecimal saldoDisponivel;
+
+  @Size(max = 200, message = "saldoDisponivelHelper deve ter no maximo 200 caracteres")
   private String saldoDisponivelHelper;
+
+  @Digits(integer = 12, fraction = 2, message = "prestadoMes deve ter no maximo 12 digitos inteiros e 2 decimais")
   private BigDecimal prestadoMes;
+
+  @Size(max = 200, message = "prestadoMesHelper deve ter no maximo 200 caracteres")
   private String prestadoMesHelper;
+
+  @Valid
   private List<TransparenciaRecebimentoRequest> recebimentos;
+
+  @Valid
   private List<TransparenciaDestinacaoRequest> destinacoes;
+
+  @Valid
   private List<TransparenciaComprovanteRequest> comprovantes;
+
+  @Valid
   private List<TransparenciaTimelineRequest> timelines;
+
+  @Valid
   private List<TransparenciaChecklistRequest> checklist;
 
   public Long getUnidadeId() {

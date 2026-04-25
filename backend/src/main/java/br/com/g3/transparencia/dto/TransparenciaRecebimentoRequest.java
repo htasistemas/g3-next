@@ -1,12 +1,22 @@
 package br.com.g3.transparencia.dto;
 
+import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 
 public class TransparenciaRecebimentoRequest {
   private Long id;
+
+  @Size(max = 200, message = "fonte deve ter no maximo 200 caracteres")
   private String fonte;
+
+  @Digits(integer = 12, fraction = 2, message = "valor deve ter no maximo 12 digitos inteiros e 2 decimais")
   private BigDecimal valor;
+
+  @Size(max = 200, message = "periodicidade deve ter no maximo 200 caracteres")
   private String periodicidade;
+
+  @Size(max = 60, message = "status deve ter no maximo 60 caracteres")
   private String status;
 
   public Long getId() {

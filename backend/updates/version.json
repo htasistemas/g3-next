@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.436",
-  "releaseDate": "2026-04-18",
-  "description": "Versão oficial alinhada ao novo layout compacto do espelho de ponto individual em PDF.",
+  "latestVersion": "1.00.438",
+  "releaseDate": "2026-04-24",
+  "description": "Versão oficial alinhada à validação segura da API de prestação de contas.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.436",
+  "minCompatibleVersion": "1.00.438",
   "releaseType": "stable"
 }
 

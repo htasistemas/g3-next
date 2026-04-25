@@ -1,9 +1,15 @@
 package br.com.g3.transparencia.dto;
 
+import jakarta.validation.constraints.Size;
+
 public class TransparenciaTimelineRequest {
   private Long id;
+
+  @Size(max = 200, message = "titulo deve ter no maximo 200 caracteres")
   private String titulo;
   private String detalhe;
+
+  @Size(max = 30, message = "status deve ter no maximo 30 caracteres")
   private String status;
 
   public Long getId() {

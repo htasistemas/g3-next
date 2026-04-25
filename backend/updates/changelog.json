@@ -1,6 +1,32 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.438",
+                        "releaseDate":  "2026-04-24",
+                        "title":  "Prestação de contas com validação segura no backend",
+                        "description":  "A API da prestação de contas passou a validar tamanhos e formatos antes de persistir, evitando erro interno do servidor em campos fora do limite aceito pelo banco.",
+                        "changes":  [
+                                        "DTOs do módulo de transparência passaram a validar tamanho máximo dos campos e formato numérico dos valores monetários.",
+                                        "Listas aninhadas agora também passam por validação declarativa antes do salvamento.",
+                                        "Quando houver dado acima do limite do banco, a API responde erro de requisição com mensagem clara em vez de erro interno do servidor.",
+                                        "Versão oficial atualizada na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.437",
+                        "releaseDate":  "2026-04-24",
+                        "title":  "Prestação de contas com fluxo guiado e revisão visual",
+                        "description":  "A tela de prestação de contas do setor financeiro foi reorganizada para leitura didática, filtros melhores e revisão final com pendências visíveis.",
+                        "changes":  [
+                                        "A tela passou a usar as abas Listagem, Visão geral, Receitas, Aplicação dos recursos, Documentos e checklist e Revisão e envio.",
+                                        "A listagem agora tem filtros claros, limpeza em um clique, situação derivada da prestação e destaque visual do registro selecionado.",
+                                        "A revisão final mostra pendências, resumo financeiro, checklist, timeline e orientações objetivas para conferência sem depender de treinamento informal.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.415",
                         "releaseDate":  "2026-04-01",
                         "title":  "Licença de uso com nova implantação do Enterprise",

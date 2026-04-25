@@ -1,9 +1,15 @@
 package br.com.g3.transparencia.dto;
 
+import jakarta.validation.constraints.Size;
+
 public class TransparenciaComprovanteRequest {
   private Long id;
+
+  @Size(max = 200, message = "titulo deve ter no maximo 200 caracteres")
   private String titulo;
   private String descricao;
+
+  @Size(max = 255, message = "arquivoNome deve ter no maximo 255 caracteres")
   private String arquivoNome;
   private String arquivoUrl;
 
