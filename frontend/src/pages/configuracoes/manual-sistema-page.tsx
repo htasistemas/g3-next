@@ -240,6 +240,20 @@ const secoesManual: ManualSecao[] = [
     icon: Search,
     telas: [
       {
+        nome: "Indicadores",
+        objetivo: "Acompanhar a leitura gerencial da assistência com distribuição por idade, renda, vulnerabilidades, bairros e alertas de termos.",
+        comoUsar: [
+          "Use os filtros de data inicial e data final no topo da tela e depois clique em Visualizar para atualizar os indicadores do período.",
+          "O card Faixa etária agora organiza os beneficiários por fases da vida em leitura direta: 0-12 crianças, 13-17 adolescentes, 18-29 jovens, 30-59 adultos e 60+ idosos.",
+          "O gráfico Distribuição por idade continua disponível para análise detalhada por idade exata quando você precisar de leitura mais fina.",
+          "Use Atualizar para recarregar os dados sem sair da tela quando houver novos cadastros ou mudanças recentes no período."
+        ],
+        atencoes: [
+          "A leitura por faixa etária foi padronizada para fases da vida e não deve mais ser interpretada como lista solta de idades.",
+          "Se não houver data de nascimento válida no cadastro, o beneficiário pode ficar fora da consolidação da faixa etária até a regularização do dado."
+        ]
+      },
+      {
         nome: "Georreferenciamento",
         objetivo: "Cruzar camadas do território para localizar beneficiários, famílias, cestas, violência, instituições e doadores em um único mapa.",
         comoUsar: [
@@ -381,6 +395,27 @@ const secoesManual: ManualSecao[] = [
           "A remoção da foto principal limpa a capa atual do evento e exige nova definição visual quando necessário.",
           "As fotos ficam armazenadas no storage do sistema com persistência real; o banco guarda apenas os metadados e caminhos do arquivo.",
           "As ações mudam conforme a aba para evitar botões genéricos e reduzir clique desnecessário durante a operação."
+        ]
+      }
+    ]
+  },
+  {
+    id: "juridico",
+    titulo: "Setor jurídico",
+    descricao: "Formalização, acompanhamento e organização documental de instrumentos e planos institucionais.",
+    icon: Link2,
+    telas: [
+      {
+        nome: "Plano de trabalho",
+        objetivo: "Montar e revisar o plano de trabalho por etapas guiadas, com ações de salvamento, validação, envio, aprovação e emissão documental no padrão do G3N.",
+        comoUsar: [
+          "Use a barra superior da tela conforme a aba atual: cada etapa mostra apenas os botões de ação que fazem sentido para aquele conteúdo.",
+          "Na aba Anexos, por exemplo, aparecem ações de documento, PDF, impressão e exportação; nas abas sem anexo esse botão não é exibido.",
+          "Os botões do topo continuam organizados em grade responsiva para não invadir o título da tela e facilitar a leitura em resoluções menores e maiores."
+        ],
+        atencoes: [
+          "Os botões continuam executando em um clique e respeitam bloqueio temporário durante processamentos para evitar acionamento duplo.",
+          "Se uma ação estiver desabilitada, revise o status do plano e os campos mínimos obrigatórios antes de tentar novamente."
         ]
       }
     ]

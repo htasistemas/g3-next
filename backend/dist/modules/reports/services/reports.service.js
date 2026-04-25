@@ -6,6 +6,7 @@ import { DoacaoRealizadaService } from "../../doacoes-realizadas/services/doacao
 import { UnidadeAssistencialService } from "../../unidades-assistenciais/services/unidade-assistencial.service.js";
 import { VoluntarioService } from "../../voluntarios/services/voluntario.service.js";
 import { RegistroPontoService } from "../../registro-ponto/services/registro-ponto.service.js";
+import { AppError } from "../../../shared/errors/app-error.js";
 import { ReportsRepository } from "../repositories/reports.repository.js";
 import { RelatorioTemplatePadrao } from "../templates/relatorio-template-padrao.js";
 import { HtmlPdfRenderer } from "./html-pdf-renderer.js";
@@ -1102,9 +1103,13 @@ export class ReportsService {
     }
     async gerarEspelhoPonto(rawPayload, authUser) {
         const payload = registroPontoEspelhoRequestSchema.parse(rawPayload);
+        const usuarioIdRelatorio = authUser?.id ?? payload.usuario_id;
+        if (!usuarioIdRelatorio) {
+            throw new AppError("Informe o funcionario para gerar o espelho de ponto.", 400);
+        }
         const ator = {
-            id: authUser?.id ? BigInt(authUser.id) : (payload.usuario_id ? BigInt(payload.usuario_id) : undefined),
-            nome_usuario: authUser?.nomeUsuario || payload.usuarioEmissor || "Sistema G3-Next",
+            id: BigInt(usuarioIdRelatorio),
+            nomeUsuario: authUser?.nomeUsuario || payload.usuarioEmissor || "Sistema G3-Next",
             permissoes: authUser?.permissoes || ["ADMINISTRADOR"]
         };
         const espelhoData = await this.registroPontoService.listarEspelho({
@@ -1118,14 +1123,32 @@ export class ReportsService {
         }, ator);
         const registros = espelhoData.registros ?? [];
         const totais = espelhoData.totais;
+        const nomeColaborador = registros[0]?.usuario_nome || "Colaborador não informado";
+        const colunaSemQuebra = {
+            classe: "coluna-compacta",
+            semQuebra: true,
+            fonteTamanho: 7,
+            fonteTamanhoCabecalho: 7
+        };
+        const colunaOcorrencia = {
+            classe: "coluna-ocorrencia",
+            fonteTamanho: 6.5,
+            fonteTamanhoCabecalho: 7
+        };
         const contexto = await this.montarContextoInstitucional();
         const relatorioInput = {
-            titulo: "Espelho de Ponto Individual",
+            titulo: "Espelho de ponto individual",
             metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),
-            descricao: `Relatório detalhado de marcações de ponto e apuração de horas${registros[0]?.usuario_nome ? ` para o colaborador ${registros[0].usuario_nome}` : ""}.`,
+            descricao: "Relatório detalhado de marcações de ponto e apuração de horas.",
             blocos: [
                 {
-                    titulo: "Resumo do Período",
+                    titulo: "Colaborador",
+                    colunas: 1,
+                    destaque: true,
+                    campos: [this.campo("Nome", nomeColaborador)]
+                },
+                {
+                    titulo: "Resumo do período",
                     colunas: 3,
                     destaque: true,
                     campos: [
@@ -1140,16 +1163,16 @@ export class ReportsService {
             ],
             tabela: {
                 colunas: [
-                    { titulo: "Data", largura: "10%" },
-                    { titulo: "E1", largura: "7%" },
-                    { titulo: "S1", largura: "7%" },
-                    { titulo: "E2", largura: "7%" },
-                    { titulo: "S2", largura: "7%" },
-                    { titulo: "Extra", largura: "10%" },
-                    { titulo: "Banco", largura: "10%" },
-                    { titulo: "Atraso", largura: "10%" },
-                    { titulo: "Falta", largura: "10%" },
-                    { titulo: "Ocorrências", largura: "22%" }
+                    { titulo: "Data", largura: "12%", ...colunaSemQuebra },
+                    { titulo: "E1", largura: "5.5%", ...colunaSemQuebra },
+                    { titulo: "S1", largura: "5.5%", ...colunaSemQuebra },
+                    { titulo: "E2", largura: "5.5%", ...colunaSemQuebra },
+                    { titulo: "S2", largura: "5.5%", ...colunaSemQuebra },
+                    { titulo: "Extra", largura: "8%", ...colunaSemQuebra },
+                    { titulo: "Banco", largura: "8%", ...colunaSemQuebra },
+                    { titulo: "Atraso", largura: "7.5%", ...colunaSemQuebra },
+                    { titulo: "Falta", largura: "7.5%", ...colunaSemQuebra },
+                    { titulo: "Ocorrência", largura: "35%", ...colunaOcorrencia }
                 ],
                 linhas: registros.map((item) => [
                     this.formatarData(item.data),
@@ -1161,7 +1184,7 @@ export class ReportsService {
                     this.formatarMinutosRelatorio(item.banco_horas_minutos),
                     this.formatarMinutosRelatorio(item.atrasos_minutos),
                     this.formatarMinutosRelatorio(item.faltas_minutos),
-                    item.ocorrencias?.join(", ") || "---"
+                    item.ocorrencias?.map((ocorrencia) => ocorrencia.replace(/_/g, " ")).join(", ") || "---"
                 ])
             },
             cabecalho: contexto.cabecalho,

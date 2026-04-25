@@ -10,6 +10,14 @@ import { useDashboardAssistencia } from "@/features/dashboard/use-dashboard";
 import { classesTelaPadraoBeneficiario } from "@/lib/tela-padrao-beneficiario";
 import type { DashboardFiltros } from "@/types/dashboard";
 
+const FAIXAS_ETARIAS_VIDA = [
+  { chave: "0-12", rotulo: "0-12 crianças", idadeMinima: 0, idadeMaxima: 12 },
+  { chave: "13-17", rotulo: "13-17 adolescentes", idadeMinima: 13, idadeMaxima: 17 },
+  { chave: "18-29", rotulo: "18-29 jovens", idadeMinima: 18, idadeMaxima: 29 },
+  { chave: "30-59", rotulo: "30-59 adultos", idadeMinima: 30, idadeMaxima: 59 },
+  { chave: "60+", rotulo: "60+ idosos", idadeMinima: 60, idadeMaxima: Number.POSITIVE_INFINITY }
+] as const;
+
 function formatarMoeda(valor: number) {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
@@ -29,6 +37,40 @@ function formatarPercentual(valor: number) {
   return `${Number.isFinite(valor) ? valor.toFixed(1) : "0.0"}%`;
 }
 
+function agruparFaixasEtariasPorFaseVida(idades: Record<string, number>, faixasOriginais: Record<string, number>) {
+  const totais = new Map<string, number>(FAIXAS_ETARIAS_VIDA.map((faixa) => [faixa.chave, 0]));
+  let encontrouIdadeValida = false;
+
+  for (const [idadeTexto, quantidade] of Object.entries(idades)) {
+    const idade = Number(idadeTexto);
+    if (!Number.isFinite(idade) || idade < 0) {
+      continue;
+    }
+
+    encontrouIdadeValida = true;
+
+    const faixa = FAIXAS_ETARIAS_VIDA.find(
+      (item) => idade >= item.idadeMinima && idade <= item.idadeMaxima
+    );
+    if (!faixa) {
+      continue;
+    }
+
+    totais.set(faixa.chave, (totais.get(faixa.chave) ?? 0) + quantidade);
+  }
+
+  if (!encontrouIdadeValida) {
+    for (const faixa of FAIXAS_ETARIAS_VIDA) {
+      totais.set(faixa.chave, faixasOriginais[faixa.chave] ?? 0);
+    }
+  }
+
+  return FAIXAS_ETARIAS_VIDA.map((faixa) => ({
+    faixa: faixa.rotulo,
+    quantidade: totais.get(faixa.chave) ?? 0
+  }));
+}
+
 export function IndicadoresPage() {
   const [filtroForm, setFiltroForm] = useState({ startDate: "", endDate: "" });
   const [filtrosAplicados, setFiltrosAplicados] = useState<DashboardFiltros>({});
@@ -45,10 +87,7 @@ export function IndicadoresPage() {
 
   const dadosFaixaEtaria = useMemo(() => {
     if (!data) return [];
-    return Object.entries(data.atendimento.faixaEtaria).map(([faixa, quantidade]) => ({
-      faixa,
-      quantidade
-    }));
+    return agruparFaixasEtariasPorFaseVida(data.atendimento.idades, data.atendimento.faixaEtaria);
   }, [data]);
 
   const dadosVulnerabilidade = useMemo(() => {
@@ -223,7 +262,7 @@ export function IndicadoresPage() {
                           dataKey="faixa"
                           stroke="var(--g3-muted)"
                           fontSize={11}
-                          width={68}
+                          width={126}
                         />
                         <Tooltip
                           cursor={{ fill: "var(--g3-primary-soft)" }}

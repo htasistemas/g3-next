@@ -1,6 +1,42 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.441",
+                        "releaseDate":  "2026-04-25",
+                        "title":  "Plano de trabalho com ações contextuais por aba",
+                        "description":  "A barra superior do plano de trabalho passou a mostrar somente os botões compatíveis com a aba ativa.",
+                        "changes":  [
+                                        "A tela deixou de exibir ações genéricas em todas as abas e passou a liberar cada botão conforme o contexto da etapa atual.",
+                                        "O botão Anexar documento ficou restrito às etapas em que o fluxo realmente depende de anexos.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.440",
+                        "releaseDate":  "2026-04-25",
+                        "title":  "Plano de trabalho com ações melhor distribuídas no cabeçalho",
+                        "description":  "A barra superior da tela de plano de trabalho foi reorganizada para evitar sobreposição dos botões com o título da página.",
+                        "changes":  [
+                                        "Os botões do topo passaram a usar grade responsiva com quebra automática em novas linhas quando necessário.",
+                                        "As ações ficaram com largura mais equilibrada e alinhamento consistente para leitura mais limpa no cabeçalho da tela.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.439",
+                        "releaseDate":  "2026-04-25",
+                        "title":  "Indicadores com faixa etária por fases da vida",
+                        "description":  "O card de faixa etária da tela de indicadores passou a exibir grupos etários didáticos e padronizados para leitura institucional.",
+                        "changes":  [
+                                        "O gráfico Faixa etária passou a mostrar 0-12 crianças, 13-17 adolescentes, 18-29 jovens, 30-59 adultos e 60+ idosos.",
+                                        "A agregação da visualização foi padronizada a partir das idades cadastradas, mantendo leitura mais clara para usuários leigos.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.438",
                         "releaseDate":  "2026-04-24",
                         "title":  "Prestação de contas com validação segura no backend",

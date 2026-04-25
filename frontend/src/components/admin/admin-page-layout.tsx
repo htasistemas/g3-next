@@ -15,6 +15,7 @@ export type AdminTab = {
 };
 
 export type AdminAction = {
+  id?: string;
   label: string;
   icon: LucideIcon;
   onClick: () => void;
@@ -83,7 +84,7 @@ export function AdminPageLayout({
           <div className={cn(classesTelaPadraoBeneficiario.gradeAcoes, actionsClassName)}>
             {actions.map((action) => (
               <Button
-                key={action.label}
+                key={action.id ?? action.label}
                 type="button"
                 variant={action.variant}
                 size="sm"

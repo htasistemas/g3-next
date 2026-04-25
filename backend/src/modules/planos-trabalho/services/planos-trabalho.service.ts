@@ -1,9 +1,12 @@
 import { AppError } from "../../../shared/errors/app-error.js";
-import { mapaCamposTextoPlanoTrabalho } from "../../../utils/text-format-config.js";
-import { normalizarObjetoTexto } from "../../../utils/text-formatter.js";
 import { mapPlanoTrabalhoToResponse } from "../planos-trabalho.mapper.js";
 import { planoTrabalhoInputSchema } from "../planos-trabalho.schema.js";
+import type { PlanoTrabalhoInput } from "../planos-trabalho.types.js";
 import { PlanosTrabalhoRepository } from "../repositories/planos-trabalho.repository.js";
+import {
+  garantirConformidadeParaEnvio,
+  normalizarPlanoTrabalhoInput
+} from "../planos-trabalho.utils.js";
 
 export class PlanosTrabalhoService {
   private readonly repository = new PlanosTrabalhoRepository();
@@ -13,11 +16,12 @@ export class PlanosTrabalhoService {
     return registros.map((item) =>
       mapPlanoTrabalhoToResponse(
         item.plano,
+        item.objetivosEspecificos,
         item.metas,
-        item.atividades,
         item.etapas,
-        item.cronograma,
-        item.equipe
+        item.aplicacaoRecursos,
+        item.desembolso,
+        item.checklistPrestacao
       )
     );
   }
@@ -27,38 +31,41 @@ export class PlanosTrabalhoService {
     const registro = await this.repository.buscarPorIdOuFalhar(id);
     return mapPlanoTrabalhoToResponse(
       registro.plano,
+      registro.objetivosEspecificos,
       registro.metas,
-      registro.atividades,
       registro.etapas,
-      registro.cronograma,
-      registro.equipe
+      registro.aplicacaoRecursos,
+      registro.desembolso,
+      registro.checklistPrestacao
     );
   }
 
   async criar(rawInput: unknown) {
-    const input = planoTrabalhoInputSchema.parse(this.normalizarPayload(rawInput));
+    const input = this.parseInput(rawInput);
     const registro = await this.repository.criar(input);
     return mapPlanoTrabalhoToResponse(
       registro.plano,
+      registro.objetivosEspecificos,
       registro.metas,
-      registro.atividades,
       registro.etapas,
-      registro.cronograma,
-      registro.equipe
+      registro.aplicacaoRecursos,
+      registro.desembolso,
+      registro.checklistPrestacao
     );
   }
 
   async atualizar(rawId: string, rawInput: unknown) {
     const id = this.parseId(rawId);
-    const input = planoTrabalhoInputSchema.parse(this.normalizarPayload(rawInput));
+    const input = this.parseInput(rawInput);
     const registro = await this.repository.atualizar(id, input);
     return mapPlanoTrabalhoToResponse(
       registro.plano,
+      registro.objetivosEspecificos,
       registro.metas,
-      registro.atividades,
       registro.etapas,
-      registro.cronograma,
-      registro.equipe
+      registro.aplicacaoRecursos,
+      registro.desembolso,
+      registro.checklistPrestacao
     );
   }
 
@@ -75,11 +82,10 @@ export class PlanosTrabalhoService {
     return BigInt(parsed);
   }
 
-  private normalizarPayload(rawInput: unknown) {
-    if (!rawInput || typeof rawInput !== "object") return rawInput;
-    return normalizarObjetoTexto(
-      rawInput as Record<string, unknown>,
-      mapaCamposTextoPlanoTrabalho
-    );
+  private parseInput(rawInput: unknown) {
+    const input = planoTrabalhoInputSchema.parse(rawInput) as PlanoTrabalhoInput;
+    const normalizado = normalizarPlanoTrabalhoInput(input);
+    garantirConformidadeParaEnvio(normalizado);
+    return normalizado;
   }
 }

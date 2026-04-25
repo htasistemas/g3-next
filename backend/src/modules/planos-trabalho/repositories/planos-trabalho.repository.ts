@@ -1,121 +1,426 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../../database/prisma.js";
 import { AppError } from "../../../shared/errors/app-error.js";
-import { toOptionalDate, trimOrUndefined } from "../../../utils/string-utils.js";
+import { toIsoDate, toOptionalDate, toStringId, trimOrUndefined } from "../../../utils/string-utils.js";
 import type {
-  PlanoAtividadeInput,
-  PlanoAtividadeRow,
-  PlanoCronogramaInput,
-  PlanoCronogramaRow,
-  PlanoEquipeInput,
-  PlanoEquipeRow,
-  PlanoEtapaInput,
-  PlanoEtapaRow,
+  PlanoAplicacaoRecursoInput,
+  PlanoAplicacaoRecursoRow,
+  PlanoChecklistPrestacaoInput,
+  PlanoChecklistPrestacaoRow,
+  PlanoDesembolsoInput,
+  PlanoDesembolsoRow,
+  PlanoMetaEtapaInput,
+  PlanoMetaEtapaRow,
   PlanoMetaInput,
   PlanoMetaRow,
+  PlanoObjetivoEspecificoInput,
+  PlanoObjetivoEspecificoRow,
   PlanoTrabalhoInput,
   PlanoTrabalhoRow
 } from "../planos-trabalho.types.js";
 
 type TransactionClient = Prisma.TransactionClient;
 
+const estruturaSql = [
+  `ALTER TABLE IF EXISTS plano_trabalho ALTER COLUMN termo_fomento_id DROP NOT NULL`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS tipo_parceria VARCHAR(80)`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS orgao_parceiro VARCHAR(200)`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS edital_chamamento VARCHAR(200)`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS periodo_inicio DATE`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS periodo_fim DATE`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS responsavel_tecnico VARCHAR(200)`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS responsavel_legal VARCHAR(200)`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS razao_social VARCHAR(200)`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS nome_fantasia VARCHAR(200)`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS cnpj VARCHAR(20)`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS cep VARCHAR(10)`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS logradouro VARCHAR(200)`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS numero VARCHAR(40)`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS complemento VARCHAR(200)`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS bairro VARCHAR(120)`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS cidade VARCHAR(120)`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS uf VARCHAR(2)`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS telefone VARCHAR(20)`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS email VARCHAR(200)`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS representante_legal VARCHAR(200)`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS representante_cpf VARCHAR(14)`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS representante_cargo VARCHAR(200)`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS banco_nome VARCHAR(120)`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS banco_agencia VARCHAR(40)`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS banco_conta VARCHAR(60)`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS banco_operacao VARCHAR(40)`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS banco_pix VARCHAR(120)`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS banco_observacao TEXT`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS historico_osc TEXT`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS finalidade_institucional TEXT`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS experiencia_anterior TEXT`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS conselhos_certificacoes TEXT`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS publico_atendido_atual TEXT`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS capacidade_tecnica_operacional TEXT`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS descricao_objeto TEXT`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS area_atuacao VARCHAR(120)`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS local_execucao TEXT`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS abrangencia_territorial VARCHAR(160)`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS publico_alvo TEXT`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS quantidade_beneficiarios INTEGER`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS criterios_selecao TEXT`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS problema_social TEXT`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS causas_consequencias TEXT`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS dados_indicadores TEXT`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS capacidade_execucao TEXT`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS impacto_esperado TEXT`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS objetivo_geral TEXT`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS forma_acompanhamento TEXT`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS indicadores_monitoramento TEXT`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS periodicidade_monitoramento VARCHAR(80)`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS responsavel_coleta_dados VARCHAR(200)`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS instrumentos_monitoramento TEXT`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS resultado_esperado_monitoramento TEXT`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS evidencias_obrigatorias TEXT`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS periodicidade_prestacao VARCHAR(60)`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS data_limite_prestacao DATE`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS documentos_exigidos TEXT`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS responsavel_prestacao VARCHAR(200)`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS observacoes_prestacao TEXT`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS local_declaracao VARCHAR(160)`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS data_declaracao DATE`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS nome_representante_declaracao VARCHAR(200)`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS cpf_representante_declaracao VARCHAR(14)`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS cargo_representante_declaracao VARCHAR(200)`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS declaracao_veracidade BOOLEAN NOT NULL DEFAULT FALSE`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS aprovacao_interna VARCHAR(80)`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS situacao_aprovacao VARCHAR(80)`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS observacao_aprovador TEXT`,
+  `ALTER TABLE IF EXISTS plano_trabalho_metas ADD COLUMN IF NOT EXISTS numero_meta VARCHAR(30)`,
+  `ALTER TABLE IF EXISTS plano_trabalho_metas ADD COLUMN IF NOT EXISTS indicador_resultado TEXT`,
+  `ALTER TABLE IF EXISTS plano_trabalho_metas ADD COLUMN IF NOT EXISTS meio_verificacao TEXT`,
+  `ALTER TABLE IF EXISTS plano_trabalho_metas ADD COLUMN IF NOT EXISTS data_inicio DATE`,
+  `ALTER TABLE IF EXISTS plano_trabalho_metas ADD COLUMN IF NOT EXISTS data_fim DATE`,
+  `ALTER TABLE IF EXISTS plano_trabalho_metas ADD COLUMN IF NOT EXISTS responsavel VARCHAR(200)`,
+  `ALTER TABLE IF EXISTS plano_trabalho_metas ADD COLUMN IF NOT EXISTS situacao VARCHAR(60)`,
+  `ALTER TABLE IF EXISTS plano_trabalho_metas ADD COLUMN IF NOT EXISTS ordem INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE IF EXISTS plano_trabalho_atividades ADD COLUMN IF NOT EXISTS nome_etapa VARCHAR(200)`,
+  `ALTER TABLE IF EXISTS plano_trabalho_atividades ADD COLUMN IF NOT EXISTS acao_executar TEXT`,
+  `ALTER TABLE IF EXISTS plano_trabalho_atividades ADD COLUMN IF NOT EXISTS descricao_detalhada TEXT`,
+  `ALTER TABLE IF EXISTS plano_trabalho_atividades ADD COLUMN IF NOT EXISTS publico_atendido TEXT`,
+  `ALTER TABLE IF EXISTS plano_trabalho_atividades ADD COLUMN IF NOT EXISTS quantidade NUMERIC(14,2)`,
+  `ALTER TABLE IF EXISTS plano_trabalho_atividades ADD COLUMN IF NOT EXISTS unidade VARCHAR(60)`,
+  `ALTER TABLE IF EXISTS plano_trabalho_atividades ADD COLUMN IF NOT EXISTS data_inicio DATE`,
+  `ALTER TABLE IF EXISTS plano_trabalho_atividades ADD COLUMN IF NOT EXISTS data_fim DATE`,
+  `ALTER TABLE IF EXISTS plano_trabalho_atividades ADD COLUMN IF NOT EXISTS valor_estimado NUMERIC(14,2)`,
+  `ALTER TABLE IF EXISTS plano_trabalho_atividades ADD COLUMN IF NOT EXISTS documento_comprobatorio TEXT`,
+  `ALTER TABLE IF EXISTS plano_trabalho_atividades ADD COLUMN IF NOT EXISTS responsavel VARCHAR(200)`,
+  `ALTER TABLE IF EXISTS plano_trabalho_atividades ADD COLUMN IF NOT EXISTS situacao VARCHAR(60)`,
+  `ALTER TABLE IF EXISTS plano_trabalho_atividades ADD COLUMN IF NOT EXISTS ordem INTEGER NOT NULL DEFAULT 0`,
+  `CREATE TABLE IF NOT EXISTS plano_trabalho_objetivos (
+    id BIGSERIAL PRIMARY KEY,
+    plano_trabalho_id BIGINT NOT NULL REFERENCES plano_trabalho(id) ON DELETE CASCADE,
+    descricao TEXT NOT NULL,
+    resultado_esperado TEXT,
+    metas_vinculadas TEXT,
+    ordem INTEGER NOT NULL DEFAULT 0,
+    criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+  )`,
+  `CREATE TABLE IF NOT EXISTS plano_trabalho_aplicacao_recursos (
+    id BIGSERIAL PRIMARY KEY,
+    plano_trabalho_id BIGINT NOT NULL REFERENCES plano_trabalho(id) ON DELETE CASCADE,
+    categoria_despesa VARCHAR(120) NOT NULL,
+    item VARCHAR(160) NOT NULL,
+    descricao TEXT,
+    quantidade NUMERIC(14,2),
+    unidade VARCHAR(60),
+    valor_unitario NUMERIC(14,2),
+    valor_total NUMERIC(14,2),
+    fonte_recurso VARCHAR(120),
+    meta_numero VARCHAR(30),
+    etapa_nome VARCHAR(200),
+    natureza_despesa VARCHAR(120),
+    observacao TEXT,
+    ordem INTEGER NOT NULL DEFAULT 0,
+    criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+  )`,
+  `CREATE TABLE IF NOT EXISTS plano_trabalho_desembolso (
+    id BIGSERIAL PRIMARY KEY,
+    plano_trabalho_id BIGINT NOT NULL REFERENCES plano_trabalho(id) ON DELETE CASCADE,
+    mes_ano VARCHAR(7) NOT NULL,
+    valor_previsto NUMERIC(14,2),
+    fonte_recurso VARCHAR(120),
+    meta_numero VARCHAR(30),
+    observacao TEXT,
+    ordem INTEGER NOT NULL DEFAULT 0,
+    criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+  )`,
+  `CREATE TABLE IF NOT EXISTS plano_trabalho_checklist_prestacao (
+    id BIGSERIAL PRIMARY KEY,
+    plano_trabalho_id BIGINT NOT NULL REFERENCES plano_trabalho(id) ON DELETE CASCADE,
+    descricao TEXT NOT NULL,
+    obrigatorio BOOLEAN NOT NULL DEFAULT TRUE,
+    concluido BOOLEAN NOT NULL DEFAULT FALSE,
+    ordem INTEGER NOT NULL DEFAULT 0,
+    criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+  )`,
+  `CREATE INDEX IF NOT EXISTS plano_trabalho_objetivos_plano_idx ON plano_trabalho_objetivos(plano_trabalho_id)`,
+  `CREATE INDEX IF NOT EXISTS plano_trabalho_aplicacao_plano_idx ON plano_trabalho_aplicacao_recursos(plano_trabalho_id)`,
+  `CREATE INDEX IF NOT EXISTS plano_trabalho_desembolso_plano_idx ON plano_trabalho_desembolso(plano_trabalho_id)`,
+  `CREATE INDEX IF NOT EXISTS plano_trabalho_checklist_plano_idx ON plano_trabalho_checklist_prestacao(plano_trabalho_id)`
+] as const;
+
+let estruturaPromise: Promise<void> | null = null;
+
+async function ensurePlanosTrabalhoEstrutura() {
+  if (!estruturaPromise) {
+    estruturaPromise = (async () => {
+      for (const comando of estruturaSql) {
+        await prisma.$executeRawUnsafe(comando);
+      }
+    })();
+  }
+  await estruturaPromise;
+}
+
+function parseOptionalBigInt(value?: string | null) {
+  if (!value?.trim()) return null;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new AppError("Termo de fomento inválido.", 400);
+  }
+  return BigInt(parsed);
+}
+
+function joinMetasVinculadas(values: string[]) {
+  return values.map((item) => item.trim()).filter(Boolean).join("|") || null;
+}
+
 export class PlanosTrabalhoRepository {
   async listar() {
+    await ensurePlanosTrabalhoEstrutura();
     const planos = await prisma.$queryRaw<PlanoTrabalhoRow[]>(Prisma.sql`
       SELECT
         p.id,
         p.codigo_interno,
         p.titulo,
-        p.descricao_geral,
+        p.tipo_parceria,
+        COALESCE(p.orgao_parceiro, p.orgao_concedente) AS orgao_parceiro,
+        p.edital_chamamento,
+        COALESCE(p.periodo_inicio, p.vigencia_inicio) AS periodo_inicio,
+        COALESCE(p.periodo_fim, p.vigencia_fim) AS periodo_fim,
         p.status,
-        p.orgao_concedente,
-        p.orgao_outro_descricao,
-        p.area_programa,
-        p.data_elaboracao,
-        p.data_aprovacao,
-        p.vigencia_inicio,
-        p.vigencia_fim,
+        p.responsavel_tecnico,
+        p.responsavel_legal,
         p.termo_fomento_id,
         p.numero_processo,
-        p.modalidade,
-        p.observacoes_vinculacao,
+        p.razao_social,
+        p.nome_fantasia,
+        p.cnpj,
+        p.cep,
+        p.logradouro,
+        p.numero,
+        p.complemento,
+        p.bairro,
+        p.cidade,
+        p.uf,
+        p.telefone,
+        p.email,
+        p.representante_legal,
+        p.representante_cpf,
+        p.representante_cargo,
+        p.banco_nome,
+        p.banco_agencia,
+        p.banco_conta,
+        p.banco_operacao,
+        p.banco_pix,
+        p.banco_observacao,
+        p.historico_osc,
+        p.finalidade_institucional,
+        p.experiencia_anterior,
+        p.conselhos_certificacoes,
+        p.publico_atendido_atual,
+        p.capacidade_tecnica_operacional,
+        COALESCE(p.descricao_objeto, p.descricao_geral) AS descricao_objeto,
+        COALESCE(p.area_atuacao, p.area_programa) AS area_atuacao,
+        p.local_execucao,
+        p.abrangencia_territorial,
+        p.publico_alvo,
+        p.quantidade_beneficiarios,
+        p.criterios_selecao,
+        p.problema_social,
+        p.causas_consequencias,
+        p.dados_indicadores,
+        p.capacidade_execucao,
+        p.impacto_esperado,
+        p.objetivo_geral,
+        p.forma_acompanhamento,
+        p.indicadores_monitoramento,
+        p.periodicidade_monitoramento,
+        p.responsavel_coleta_dados,
+        p.instrumentos_monitoramento,
+        p.resultado_esperado_monitoramento,
+        p.evidencias_obrigatorias,
+        p.periodicidade_prestacao,
+        p.data_limite_prestacao,
+        p.documentos_exigidos,
+        p.responsavel_prestacao,
+        p.observacoes_prestacao,
+        p.local_declaracao,
+        p.data_declaracao,
+        p.nome_representante_declaracao,
+        p.cpf_representante_declaracao,
+        p.cargo_representante_declaracao,
+        p.declaracao_veracidade,
+        p.aprovacao_interna,
+        p.situacao_aprovacao,
+        p.observacao_aprovador,
         p.arquivo_formato,
         p.criado_em,
         p.atualizado_em,
         t.numero_termo AS termo_numero,
         t.descricao_objeto AS termo_objeto
       FROM plano_trabalho p
-      INNER JOIN termo_fomento t ON t.id = p.termo_fomento_id
+      LEFT JOIN termo_fomento t ON t.id = p.termo_fomento_id
       ORDER BY p.id DESC
     `);
 
     const ids = planos.map((item) => item.id);
-    const metas = ids.length ? await this.listarMetas(ids) : [];
-    const atividades = metas.length ? await this.listarAtividades(metas.map((item) => item.id)) : [];
-    const etapas = atividades.length ? await this.listarEtapas(atividades.map((item) => item.id)) : [];
-    const cronograma = ids.length ? await this.listarCronograma(ids) : [];
-    const equipe = ids.length ? await this.listarEquipe(ids) : [];
+    const [objetivosEspecificos, metas, etapas, aplicacaoRecursos, desembolso, checklistPrestacao] =
+      ids.length
+        ? await Promise.all([
+            this.listarObjetivos(ids),
+            this.listarMetas(ids),
+            this.listarEtapasPorPlanos(ids),
+            this.listarAplicacaoRecursos(ids),
+            this.listarDesembolso(ids),
+            this.listarChecklistPrestacao(ids)
+          ])
+        : [[], [], [], [], [], []];
 
     return planos.map((plano) => ({
       plano,
+      objetivosEspecificos,
       metas,
-      atividades,
       etapas,
-      cronograma,
-      equipe
+      aplicacaoRecursos,
+      desembolso,
+      checklistPrestacao
     }));
   }
 
   async buscarPorId(id: bigint) {
+    await ensurePlanosTrabalhoEstrutura();
     const rows = await prisma.$queryRaw<PlanoTrabalhoRow[]>(Prisma.sql`
       SELECT
         p.id,
         p.codigo_interno,
         p.titulo,
-        p.descricao_geral,
+        p.tipo_parceria,
+        COALESCE(p.orgao_parceiro, p.orgao_concedente) AS orgao_parceiro,
+        p.edital_chamamento,
+        COALESCE(p.periodo_inicio, p.vigencia_inicio) AS periodo_inicio,
+        COALESCE(p.periodo_fim, p.vigencia_fim) AS periodo_fim,
         p.status,
-        p.orgao_concedente,
-        p.orgao_outro_descricao,
-        p.area_programa,
-        p.data_elaboracao,
-        p.data_aprovacao,
-        p.vigencia_inicio,
-        p.vigencia_fim,
+        p.responsavel_tecnico,
+        p.responsavel_legal,
         p.termo_fomento_id,
         p.numero_processo,
-        p.modalidade,
-        p.observacoes_vinculacao,
+        p.razao_social,
+        p.nome_fantasia,
+        p.cnpj,
+        p.cep,
+        p.logradouro,
+        p.numero,
+        p.complemento,
+        p.bairro,
+        p.cidade,
+        p.uf,
+        p.telefone,
+        p.email,
+        p.representante_legal,
+        p.representante_cpf,
+        p.representante_cargo,
+        p.banco_nome,
+        p.banco_agencia,
+        p.banco_conta,
+        p.banco_operacao,
+        p.banco_pix,
+        p.banco_observacao,
+        p.historico_osc,
+        p.finalidade_institucional,
+        p.experiencia_anterior,
+        p.conselhos_certificacoes,
+        p.publico_atendido_atual,
+        p.capacidade_tecnica_operacional,
+        COALESCE(p.descricao_objeto, p.descricao_geral) AS descricao_objeto,
+        COALESCE(p.area_atuacao, p.area_programa) AS area_atuacao,
+        p.local_execucao,
+        p.abrangencia_territorial,
+        p.publico_alvo,
+        p.quantidade_beneficiarios,
+        p.criterios_selecao,
+        p.problema_social,
+        p.causas_consequencias,
+        p.dados_indicadores,
+        p.capacidade_execucao,
+        p.impacto_esperado,
+        p.objetivo_geral,
+        p.forma_acompanhamento,
+        p.indicadores_monitoramento,
+        p.periodicidade_monitoramento,
+        p.responsavel_coleta_dados,
+        p.instrumentos_monitoramento,
+        p.resultado_esperado_monitoramento,
+        p.evidencias_obrigatorias,
+        p.periodicidade_prestacao,
+        p.data_limite_prestacao,
+        p.documentos_exigidos,
+        p.responsavel_prestacao,
+        p.observacoes_prestacao,
+        p.local_declaracao,
+        p.data_declaracao,
+        p.nome_representante_declaracao,
+        p.cpf_representante_declaracao,
+        p.cargo_representante_declaracao,
+        p.declaracao_veracidade,
+        p.aprovacao_interna,
+        p.situacao_aprovacao,
+        p.observacao_aprovador,
         p.arquivo_formato,
         p.criado_em,
         p.atualizado_em,
         t.numero_termo AS termo_numero,
         t.descricao_objeto AS termo_objeto
       FROM plano_trabalho p
-      INNER JOIN termo_fomento t ON t.id = p.termo_fomento_id
+      LEFT JOIN termo_fomento t ON t.id = p.termo_fomento_id
       WHERE p.id = ${id}
       LIMIT 1
     `);
     const plano = rows[0] ?? null;
     if (!plano) return null;
-    const metas = await this.listarMetas([id]);
-    const atividades = metas.length ? await this.listarAtividades(metas.map((item) => item.id)) : [];
-    const etapas = atividades.length ? await this.listarEtapas(atividades.map((item) => item.id)) : [];
-    const cronograma = await this.listarCronograma([id]);
-    const equipe = await this.listarEquipe([id]);
-    return { plano, metas, atividades, etapas, cronograma, equipe };
+
+    const [objetivosEspecificos, metas, etapas, aplicacaoRecursos, desembolso, checklistPrestacao] =
+      await Promise.all([
+        this.listarObjetivos([id]),
+        this.listarMetas([id]),
+        this.listarEtapasPorPlanos([id]),
+        this.listarAplicacaoRecursos([id]),
+        this.listarDesembolso([id]),
+        this.listarChecklistPrestacao([id])
+      ]);
+
+    return { plano, objetivosEspecificos, metas, etapas, aplicacaoRecursos, desembolso, checklistPrestacao };
   }
 
   async buscarPorIdOuFalhar(id: bigint) {
     const registro = await this.buscarPorId(id);
     if (!registro) {
-      throw new AppError("Plano de trabalho nao encontrado.", 404);
+      throw new AppError("Plano de trabalho não encontrado.", 404);
     }
     return registro;
   }
 
-  async criar(input: PlanoTrabalhoInput) {
+  async criar(input: PlanoTrabalhoInput, usuarioId?: bigint) {
+    await ensurePlanosTrabalhoEstrutura();
     const id = await prisma.$transaction(async (tx) => {
       const codigoInterno = trimOrUndefined(input.codigoInterno ?? undefined) ?? (await this.gerarCodigoInterno());
+      const termoFomentoId = parseOptionalBigInt(input.termoFomentoId);
       const insert = await tx.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
         INSERT INTO plano_trabalho (
           codigo_interno,
@@ -123,35 +428,163 @@ export class PlanosTrabalhoRepository {
           descricao_geral,
           status,
           orgao_concedente,
-          orgao_outro_descricao,
           area_programa,
-          data_elaboracao,
-          data_aprovacao,
           vigencia_inicio,
           vigencia_fim,
           termo_fomento_id,
           numero_processo,
           modalidade,
-          observacoes_vinculacao,
+          tipo_parceria,
+          orgao_parceiro,
+          edital_chamamento,
+          periodo_inicio,
+          periodo_fim,
+          responsavel_tecnico,
+          responsavel_legal,
+          razao_social,
+          nome_fantasia,
+          cnpj,
+          cep,
+          logradouro,
+          numero,
+          complemento,
+          bairro,
+          cidade,
+          uf,
+          telefone,
+          email,
+          representante_legal,
+          representante_cpf,
+          representante_cargo,
+          banco_nome,
+          banco_agencia,
+          banco_conta,
+          banco_operacao,
+          banco_pix,
+          banco_observacao,
+          historico_osc,
+          finalidade_institucional,
+          experiencia_anterior,
+          conselhos_certificacoes,
+          publico_atendido_atual,
+          capacidade_tecnica_operacional,
+          descricao_objeto,
+          area_atuacao,
+          local_execucao,
+          abrangencia_territorial,
+          publico_alvo,
+          quantidade_beneficiarios,
+          criterios_selecao,
+          problema_social,
+          causas_consequencias,
+          dados_indicadores,
+          capacidade_execucao,
+          impacto_esperado,
+          objetivo_geral,
+          forma_acompanhamento,
+          indicadores_monitoramento,
+          periodicidade_monitoramento,
+          responsavel_coleta_dados,
+          instrumentos_monitoramento,
+          resultado_esperado_monitoramento,
+          evidencias_obrigatorias,
+          periodicidade_prestacao,
+          data_limite_prestacao,
+          documentos_exigidos,
+          responsavel_prestacao,
+          observacoes_prestacao,
+          local_declaracao,
+          data_declaracao,
+          nome_representante_declaracao,
+          cpf_representante_declaracao,
+          cargo_representante_declaracao,
+          declaracao_veracidade,
+          aprovacao_interna,
+          situacao_aprovacao,
+          observacao_aprovador,
           arquivo_formato,
           criado_em,
           atualizado_em
         ) VALUES (
           ${codigoInterno},
           ${input.titulo},
-          ${input.descricaoGeral},
+          ${input.descricaoObjeto},
           ${input.status},
-          ${trimOrUndefined(input.orgaoConcedente ?? undefined)},
-          ${trimOrUndefined(input.orgaoOutroDescricao ?? undefined)},
-          ${trimOrUndefined(input.areaPrograma ?? undefined)},
-          ${toOptionalDate(input.dataElaboracao ?? undefined)},
-          ${toOptionalDate(input.dataAprovacao ?? undefined)},
-          ${toOptionalDate(input.vigenciaInicio ?? undefined)},
-          ${toOptionalDate(input.vigenciaFim ?? undefined)},
-          ${BigInt(input.termoFomentoId)},
+          ${trimOrUndefined(input.orgaoParceiro)},
+          ${trimOrUndefined(input.areaAtuacao)},
+          ${toOptionalDate(input.periodoInicio)},
+          ${toOptionalDate(input.periodoFim)},
+          ${termoFomentoId},
           ${trimOrUndefined(input.numeroProcesso ?? undefined)},
-          ${trimOrUndefined(input.modalidade ?? undefined)},
-          ${trimOrUndefined(input.observacoesVinculacao ?? undefined)},
+          ${trimOrUndefined(input.tipoParceria)},
+          ${trimOrUndefined(input.tipoParceria)},
+          ${trimOrUndefined(input.orgaoParceiro)},
+          ${trimOrUndefined(input.editalChamamento ?? undefined)},
+          ${toOptionalDate(input.periodoInicio)},
+          ${toOptionalDate(input.periodoFim)},
+          ${trimOrUndefined(input.responsavelTecnico)},
+          ${trimOrUndefined(input.responsavelLegal)},
+          ${trimOrUndefined(input.razaoSocial)},
+          ${trimOrUndefined(input.nomeFantasia ?? undefined)},
+          ${trimOrUndefined(input.cnpj)},
+          ${trimOrUndefined(input.cep ?? undefined)},
+          ${trimOrUndefined(input.logradouro ?? undefined)},
+          ${trimOrUndefined(input.numero ?? undefined)},
+          ${trimOrUndefined(input.complemento ?? undefined)},
+          ${trimOrUndefined(input.bairro ?? undefined)},
+          ${trimOrUndefined(input.cidade ?? undefined)},
+          ${trimOrUndefined(input.uf ?? undefined)},
+          ${trimOrUndefined(input.telefone ?? undefined)},
+          ${trimOrUndefined(input.email ?? undefined)},
+          ${trimOrUndefined(input.representanteLegal)},
+          ${trimOrUndefined(input.representanteCpf)},
+          ${trimOrUndefined(input.representanteCargo ?? undefined)},
+          ${trimOrUndefined(input.bancoNome ?? undefined)},
+          ${trimOrUndefined(input.bancoAgencia ?? undefined)},
+          ${trimOrUndefined(input.bancoConta ?? undefined)},
+          ${trimOrUndefined(input.bancoOperacao ?? undefined)},
+          ${trimOrUndefined(input.bancoPix ?? undefined)},
+          ${trimOrUndefined(input.bancoObservacao ?? undefined)},
+          ${trimOrUndefined(input.historicoOsc ?? undefined)},
+          ${trimOrUndefined(input.finalidadeInstitucional ?? undefined)},
+          ${trimOrUndefined(input.experienciaAnterior ?? undefined)},
+          ${trimOrUndefined(input.conselhosCertificacoes ?? undefined)},
+          ${trimOrUndefined(input.publicoAtendidoAtual ?? undefined)},
+          ${trimOrUndefined(input.capacidadeTecnicaOperacional ?? undefined)},
+          ${trimOrUndefined(input.descricaoObjeto)},
+          ${trimOrUndefined(input.areaAtuacao)},
+          ${trimOrUndefined(input.localExecucao)},
+          ${trimOrUndefined(input.abrangenciaTerritorial ?? undefined)},
+          ${trimOrUndefined(input.publicoAlvo)},
+          ${input.quantidadeBeneficiarios ?? null},
+          ${trimOrUndefined(input.criteriosSelecao ?? undefined)},
+          ${trimOrUndefined(input.problemaSocial)},
+          ${trimOrUndefined(input.causasConsequencias ?? undefined)},
+          ${trimOrUndefined(input.dadosIndicadores ?? undefined)},
+          ${trimOrUndefined(input.capacidadeExecucao ?? undefined)},
+          ${trimOrUndefined(input.impactoEsperado ?? undefined)},
+          ${trimOrUndefined(input.objetivoGeral)},
+          ${trimOrUndefined(input.formaAcompanhamento ?? undefined)},
+          ${trimOrUndefined(input.indicadoresMonitoramento ?? undefined)},
+          ${trimOrUndefined(input.periodicidadeMonitoramento ?? undefined)},
+          ${trimOrUndefined(input.responsavelColetaDados ?? undefined)},
+          ${trimOrUndefined((input.instrumentosMonitoramento ?? []).join("|"))},
+          ${trimOrUndefined(input.resultadoEsperadoMonitoramento ?? undefined)},
+          ${trimOrUndefined(input.evidenciasObrigatorias ?? undefined)},
+          ${trimOrUndefined(input.periodicidadePrestacao ?? undefined)},
+          ${toOptionalDate(input.dataLimitePrestacao ?? undefined)},
+          ${trimOrUndefined(input.documentosExigidos ?? undefined)},
+          ${trimOrUndefined(input.responsavelPrestacao ?? undefined)},
+          ${trimOrUndefined(input.observacoesPrestacao ?? undefined)},
+          ${trimOrUndefined(input.localDeclaracao ?? undefined)},
+          ${toOptionalDate(input.dataDeclaracao ?? undefined)},
+          ${trimOrUndefined(input.nomeRepresentanteDeclaracao ?? undefined)},
+          ${trimOrUndefined(input.cpfRepresentanteDeclaracao ?? undefined)},
+          ${trimOrUndefined(input.cargoRepresentanteDeclaracao ?? undefined)},
+          ${Boolean(input.declaracaoVeracidade)},
+          ${trimOrUndefined(input.aprovacaoInterna ?? undefined)},
+          ${trimOrUndefined(input.situacaoAprovacao ?? undefined)},
+          ${trimOrUndefined(input.observacaoAprovador ?? undefined)},
           ${trimOrUndefined(input.arquivoFormato ?? undefined)},
           NOW(),
           NOW()
@@ -159,49 +592,119 @@ export class PlanosTrabalhoRepository {
         RETURNING id
       `);
       const planoId = insert[0]?.id;
-      if (!planoId) throw new AppError("Nao foi possivel criar plano de trabalho.", 500);
+      if (!planoId) throw new AppError("Não foi possível criar o plano de trabalho.", 500);
       await this.salvarRelacionamentos(tx, planoId, input);
       return planoId;
     });
+    await this.registrarAuditoria("CREATE", id, input, usuarioId);
     return this.buscarPorIdOuFalhar(id);
   }
 
-  async atualizar(id: bigint, input: PlanoTrabalhoInput) {
+  async atualizar(id: bigint, input: PlanoTrabalhoInput, usuarioId?: bigint) {
+    await ensurePlanosTrabalhoEstrutura();
     await this.buscarPorIdOuFalhar(id);
     await prisma.$transaction(async (tx) => {
+      const termoFomentoId = parseOptionalBigInt(input.termoFomentoId);
       await tx.$executeRaw(Prisma.sql`
         UPDATE plano_trabalho
         SET
           codigo_interno = ${trimOrUndefined(input.codigoInterno ?? undefined) ?? (await this.gerarCodigoInterno())},
           titulo = ${input.titulo},
-          descricao_geral = ${input.descricaoGeral},
+          descricao_geral = ${input.descricaoObjeto},
           status = ${input.status},
-          orgao_concedente = ${trimOrUndefined(input.orgaoConcedente ?? undefined)},
-          orgao_outro_descricao = ${trimOrUndefined(input.orgaoOutroDescricao ?? undefined)},
-          area_programa = ${trimOrUndefined(input.areaPrograma ?? undefined)},
-          data_elaboracao = ${toOptionalDate(input.dataElaboracao ?? undefined)},
-          data_aprovacao = ${toOptionalDate(input.dataAprovacao ?? undefined)},
-          vigencia_inicio = ${toOptionalDate(input.vigenciaInicio ?? undefined)},
-          vigencia_fim = ${toOptionalDate(input.vigenciaFim ?? undefined)},
-          termo_fomento_id = ${BigInt(input.termoFomentoId)},
+          orgao_concedente = ${trimOrUndefined(input.orgaoParceiro)},
+          area_programa = ${trimOrUndefined(input.areaAtuacao)},
+          vigencia_inicio = ${toOptionalDate(input.periodoInicio)},
+          vigencia_fim = ${toOptionalDate(input.periodoFim)},
+          termo_fomento_id = ${termoFomentoId},
           numero_processo = ${trimOrUndefined(input.numeroProcesso ?? undefined)},
-          modalidade = ${trimOrUndefined(input.modalidade ?? undefined)},
-          observacoes_vinculacao = ${trimOrUndefined(input.observacoesVinculacao ?? undefined)},
+          modalidade = ${trimOrUndefined(input.tipoParceria)},
+          tipo_parceria = ${trimOrUndefined(input.tipoParceria)},
+          orgao_parceiro = ${trimOrUndefined(input.orgaoParceiro)},
+          edital_chamamento = ${trimOrUndefined(input.editalChamamento ?? undefined)},
+          periodo_inicio = ${toOptionalDate(input.periodoInicio)},
+          periodo_fim = ${toOptionalDate(input.periodoFim)},
+          responsavel_tecnico = ${trimOrUndefined(input.responsavelTecnico)},
+          responsavel_legal = ${trimOrUndefined(input.responsavelLegal)},
+          razao_social = ${trimOrUndefined(input.razaoSocial)},
+          nome_fantasia = ${trimOrUndefined(input.nomeFantasia ?? undefined)},
+          cnpj = ${trimOrUndefined(input.cnpj)},
+          cep = ${trimOrUndefined(input.cep ?? undefined)},
+          logradouro = ${trimOrUndefined(input.logradouro ?? undefined)},
+          numero = ${trimOrUndefined(input.numero ?? undefined)},
+          complemento = ${trimOrUndefined(input.complemento ?? undefined)},
+          bairro = ${trimOrUndefined(input.bairro ?? undefined)},
+          cidade = ${trimOrUndefined(input.cidade ?? undefined)},
+          uf = ${trimOrUndefined(input.uf ?? undefined)},
+          telefone = ${trimOrUndefined(input.telefone ?? undefined)},
+          email = ${trimOrUndefined(input.email ?? undefined)},
+          representante_legal = ${trimOrUndefined(input.representanteLegal)},
+          representante_cpf = ${trimOrUndefined(input.representanteCpf)},
+          representante_cargo = ${trimOrUndefined(input.representanteCargo ?? undefined)},
+          banco_nome = ${trimOrUndefined(input.bancoNome ?? undefined)},
+          banco_agencia = ${trimOrUndefined(input.bancoAgencia ?? undefined)},
+          banco_conta = ${trimOrUndefined(input.bancoConta ?? undefined)},
+          banco_operacao = ${trimOrUndefined(input.bancoOperacao ?? undefined)},
+          banco_pix = ${trimOrUndefined(input.bancoPix ?? undefined)},
+          banco_observacao = ${trimOrUndefined(input.bancoObservacao ?? undefined)},
+          historico_osc = ${trimOrUndefined(input.historicoOsc ?? undefined)},
+          finalidade_institucional = ${trimOrUndefined(input.finalidadeInstitucional ?? undefined)},
+          experiencia_anterior = ${trimOrUndefined(input.experienciaAnterior ?? undefined)},
+          conselhos_certificacoes = ${trimOrUndefined(input.conselhosCertificacoes ?? undefined)},
+          publico_atendido_atual = ${trimOrUndefined(input.publicoAtendidoAtual ?? undefined)},
+          capacidade_tecnica_operacional = ${trimOrUndefined(input.capacidadeTecnicaOperacional ?? undefined)},
+          descricao_objeto = ${trimOrUndefined(input.descricaoObjeto)},
+          area_atuacao = ${trimOrUndefined(input.areaAtuacao)},
+          local_execucao = ${trimOrUndefined(input.localExecucao)},
+          abrangencia_territorial = ${trimOrUndefined(input.abrangenciaTerritorial ?? undefined)},
+          publico_alvo = ${trimOrUndefined(input.publicoAlvo)},
+          quantidade_beneficiarios = ${input.quantidadeBeneficiarios ?? null},
+          criterios_selecao = ${trimOrUndefined(input.criteriosSelecao ?? undefined)},
+          problema_social = ${trimOrUndefined(input.problemaSocial)},
+          causas_consequencias = ${trimOrUndefined(input.causasConsequencias ?? undefined)},
+          dados_indicadores = ${trimOrUndefined(input.dadosIndicadores ?? undefined)},
+          capacidade_execucao = ${trimOrUndefined(input.capacidadeExecucao ?? undefined)},
+          impacto_esperado = ${trimOrUndefined(input.impactoEsperado ?? undefined)},
+          objetivo_geral = ${trimOrUndefined(input.objetivoGeral)},
+          forma_acompanhamento = ${trimOrUndefined(input.formaAcompanhamento ?? undefined)},
+          indicadores_monitoramento = ${trimOrUndefined(input.indicadoresMonitoramento ?? undefined)},
+          periodicidade_monitoramento = ${trimOrUndefined(input.periodicidadeMonitoramento ?? undefined)},
+          responsavel_coleta_dados = ${trimOrUndefined(input.responsavelColetaDados ?? undefined)},
+          instrumentos_monitoramento = ${trimOrUndefined((input.instrumentosMonitoramento ?? []).join("|"))},
+          resultado_esperado_monitoramento = ${trimOrUndefined(input.resultadoEsperadoMonitoramento ?? undefined)},
+          evidencias_obrigatorias = ${trimOrUndefined(input.evidenciasObrigatorias ?? undefined)},
+          periodicidade_prestacao = ${trimOrUndefined(input.periodicidadePrestacao ?? undefined)},
+          data_limite_prestacao = ${toOptionalDate(input.dataLimitePrestacao ?? undefined)},
+          documentos_exigidos = ${trimOrUndefined(input.documentosExigidos ?? undefined)},
+          responsavel_prestacao = ${trimOrUndefined(input.responsavelPrestacao ?? undefined)},
+          observacoes_prestacao = ${trimOrUndefined(input.observacoesPrestacao ?? undefined)},
+          local_declaracao = ${trimOrUndefined(input.localDeclaracao ?? undefined)},
+          data_declaracao = ${toOptionalDate(input.dataDeclaracao ?? undefined)},
+          nome_representante_declaracao = ${trimOrUndefined(input.nomeRepresentanteDeclaracao ?? undefined)},
+          cpf_representante_declaracao = ${trimOrUndefined(input.cpfRepresentanteDeclaracao ?? undefined)},
+          cargo_representante_declaracao = ${trimOrUndefined(input.cargoRepresentanteDeclaracao ?? undefined)},
+          declaracao_veracidade = ${Boolean(input.declaracaoVeracidade)},
+          aprovacao_interna = ${trimOrUndefined(input.aprovacaoInterna ?? undefined)},
+          situacao_aprovacao = ${trimOrUndefined(input.situacaoAprovacao ?? undefined)},
+          observacao_aprovador = ${trimOrUndefined(input.observacaoAprovador ?? undefined)},
           arquivo_formato = ${trimOrUndefined(input.arquivoFormato ?? undefined)},
           atualizado_em = NOW()
         WHERE id = ${id}
       `);
       await this.salvarRelacionamentos(tx, id, input);
     });
+    await this.registrarAuditoria("UPDATE", id, input, usuarioId);
     return this.buscarPorIdOuFalhar(id);
   }
 
-  async remover(id: bigint) {
-    await this.buscarPorIdOuFalhar(id);
+  async remover(id: bigint, usuarioId?: bigint) {
+    await ensurePlanosTrabalhoEstrutura();
+    const atual = await this.buscarPorIdOuFalhar(id);
     await prisma.$executeRaw(Prisma.sql`
       DELETE FROM plano_trabalho
       WHERE id = ${id}
     `);
+    await this.registrarAuditoria("DELETE", id, { codigoInterno: atual.plano.codigo_interno, titulo: atual.plano.titulo }, usuarioId);
   }
 
   private async gerarCodigoInterno() {
@@ -209,8 +712,16 @@ export class PlanosTrabalhoRepository {
       SELECT COALESCE(MAX(id), 0) + 1 AS proximo
       FROM plano_trabalho
     `);
-    const proximo = rows[0]?.proximo ?? 1;
-    return `PLN-${String(proximo).padStart(4, "0")}`;
+    return `PLN-${String(rows[0]?.proximo ?? 1).padStart(4, "0")}`;
+  }
+
+  private async listarObjetivos(planosIds: bigint[]) {
+    return prisma.$queryRaw<PlanoObjetivoEspecificoRow[]>(Prisma.sql`
+      SELECT id, plano_trabalho_id, descricao, resultado_esperado, metas_vinculadas, ordem
+      FROM plano_trabalho_objetivos
+      WHERE plano_trabalho_id IN (${Prisma.join(planosIds)})
+      ORDER BY plano_trabalho_id, ordem, id
+    `);
   }
 
   private async listarMetas(planosIds: bigint[]) {
@@ -218,12 +729,16 @@ export class PlanosTrabalhoRepository {
       SELECT
         id,
         plano_trabalho_id,
-        codigo,
+        numero_meta,
         descricao,
-        indicador,
+        COALESCE(indicador_resultado, indicador) AS indicador_resultado,
         unidade_medida,
         quantidade_prevista::float8 AS quantidade_prevista,
-        resultado_esperado,
+        meio_verificacao,
+        data_inicio,
+        data_fim,
+        responsavel,
+        situacao,
         ordem
       FROM plano_trabalho_metas
       WHERE plano_trabalho_id IN (${Prisma.join(planosIds)})
@@ -231,142 +746,178 @@ export class PlanosTrabalhoRepository {
     `);
   }
 
-  private async listarAtividades(metaIds: bigint[]) {
-    return prisma.$queryRaw<PlanoAtividadeRow[]>(Prisma.sql`
+  private async listarEtapasPorPlanos(planosIds: bigint[]) {
+    return prisma.$queryRaw<PlanoMetaEtapaRow[]>(Prisma.sql`
       SELECT
-        id,
-        meta_id,
-        descricao,
-        justificativa,
-        publico_alvo,
-        local_execucao,
-        produto_esperado,
-        ordem
-      FROM plano_trabalho_atividades
-      WHERE meta_id IN (${Prisma.join(metaIds)})
-      ORDER BY meta_id, ordem, id
+        a.id,
+        a.meta_id,
+        COALESCE(a.nome_etapa, a.descricao) AS nome_etapa,
+        a.acao_executar,
+        a.descricao_detalhada,
+        COALESCE(a.publico_atendido, a.publico_alvo) AS publico_atendido,
+        a.quantidade::float8 AS quantidade,
+        a.unidade,
+        COALESCE(a.local_execucao, NULL) AS local_execucao,
+        a.data_inicio,
+        a.data_fim,
+        a.valor_estimado::float8 AS valor_estimado,
+        a.documento_comprobatorio,
+        a.responsavel,
+        COALESCE(a.situacao, NULL) AS situacao,
+        a.ordem
+      FROM plano_trabalho_atividades a
+      INNER JOIN plano_trabalho_metas m ON m.id = a.meta_id
+      WHERE m.plano_trabalho_id IN (${Prisma.join(planosIds)})
+      ORDER BY m.plano_trabalho_id, m.ordem, a.ordem, a.id
     `);
   }
 
-  private async listarEtapas(atividadeIds: bigint[]) {
-    return prisma.$queryRaw<PlanoEtapaRow[]>(Prisma.sql`
-      SELECT
-        id,
-        atividade_id,
-        descricao,
-        status,
-        data_inicio_prevista,
-        data_fim_prevista,
-        data_conclusao,
-        responsavel,
-        ordem
-      FROM plano_trabalho_etapas
-      WHERE atividade_id IN (${Prisma.join(atividadeIds)})
-      ORDER BY atividade_id, ordem, id
-    `);
-  }
-
-  private async listarCronograma(planosIds: bigint[]) {
-    return prisma.$queryRaw<PlanoCronogramaRow[]>(Prisma.sql`
+  private async listarAplicacaoRecursos(planosIds: bigint[]) {
+    return prisma.$queryRaw<PlanoAplicacaoRecursoRow[]>(Prisma.sql`
       SELECT
         id,
         plano_trabalho_id,
-        referencia_tipo,
-        referencia_id,
-        referencia_descricao,
-        competencia,
-        descricao_resumida,
+        categoria_despesa,
+        item,
+        descricao,
+        quantidade::float8 AS quantidade,
+        unidade,
+        valor_unitario::float8 AS valor_unitario,
+        valor_total::float8 AS valor_total,
+        fonte_recurso,
+        meta_numero,
+        etapa_nome,
+        natureza_despesa,
+        observacao,
+        ordem
+      FROM plano_trabalho_aplicacao_recursos
+      WHERE plano_trabalho_id IN (${Prisma.join(planosIds)})
+      ORDER BY plano_trabalho_id, ordem, id
+    `);
+  }
+
+  private async listarDesembolso(planosIds: bigint[]) {
+    return prisma.$queryRaw<PlanoDesembolsoRow[]>(Prisma.sql`
+      SELECT
+        id,
+        plano_trabalho_id,
+        mes_ano,
         valor_previsto::float8 AS valor_previsto,
         fonte_recurso,
-        natureza_despesa,
-        observacoes,
+        meta_numero,
+        observacao,
         ordem
-      FROM plano_trabalho_cronograma
+      FROM plano_trabalho_desembolso
       WHERE plano_trabalho_id IN (${Prisma.join(planosIds)})
       ORDER BY plano_trabalho_id, ordem, id
     `);
   }
 
-  private async listarEquipe(planosIds: bigint[]) {
-    return prisma.$queryRaw<PlanoEquipeRow[]>(Prisma.sql`
+  private async listarChecklistPrestacao(planosIds: bigint[]) {
+    return prisma.$queryRaw<PlanoChecklistPrestacaoRow[]>(Prisma.sql`
       SELECT
         id,
         plano_trabalho_id,
-        nome,
-        funcao,
-        cpf,
-        carga_horaria,
-        tipo_vinculo,
-        contato,
+        descricao,
+        obrigatorio,
+        concluido,
         ordem
-      FROM plano_trabalho_equipe
+      FROM plano_trabalho_checklist_prestacao
       WHERE plano_trabalho_id IN (${Prisma.join(planosIds)})
       ORDER BY plano_trabalho_id, ordem, id
     `);
   }
 
-  private async salvarRelacionamentos(
-    tx: TransactionClient,
-    planoId: bigint,
-    input: PlanoTrabalhoInput
-  ) {
-    await tx.$executeRaw(Prisma.sql`
-      DELETE FROM plano_trabalho_cronograma
-      WHERE plano_trabalho_id = ${planoId}
-    `);
-    await tx.$executeRaw(Prisma.sql`
-      DELETE FROM plano_trabalho_equipe
-      WHERE plano_trabalho_id = ${planoId}
-    `);
-    await tx.$executeRaw(Prisma.sql`
-      DELETE FROM plano_trabalho_metas
-      WHERE plano_trabalho_id = ${planoId}
-    `);
+  private async salvarRelacionamentos(tx: TransactionClient, planoId: bigint, input: PlanoTrabalhoInput) {
+    await tx.$executeRaw(Prisma.sql`DELETE FROM plano_trabalho_objetivos WHERE plano_trabalho_id = ${planoId}`);
+    await tx.$executeRaw(Prisma.sql`DELETE FROM plano_trabalho_aplicacao_recursos WHERE plano_trabalho_id = ${planoId}`);
+    await tx.$executeRaw(Prisma.sql`DELETE FROM plano_trabalho_desembolso WHERE plano_trabalho_id = ${planoId}`);
+    await tx.$executeRaw(Prisma.sql`DELETE FROM plano_trabalho_checklist_prestacao WHERE plano_trabalho_id = ${planoId}`);
+    await tx.$executeRaw(Prisma.sql`DELETE FROM plano_trabalho_cronograma WHERE plano_trabalho_id = ${planoId}`);
+    await tx.$executeRaw(Prisma.sql`DELETE FROM plano_trabalho_equipe WHERE plano_trabalho_id = ${planoId}`);
+    await tx.$executeRaw(Prisma.sql`DELETE FROM plano_trabalho_metas WHERE plano_trabalho_id = ${planoId}`);
 
+    await this.inserirObjetivos(tx, planoId, input.objetivosEspecificos ?? []);
     await this.inserirMetas(tx, planoId, input.metas ?? []);
-    await this.inserirCronograma(tx, planoId, input.cronograma ?? []);
-    await this.inserirEquipe(tx, planoId, input.equipe ?? []);
+    await this.inserirAplicacaoRecursos(tx, planoId, input.aplicacaoRecursos ?? []);
+    await this.inserirDesembolso(tx, planoId, input.desembolso ?? []);
+    await this.inserirChecklistPrestacao(tx, planoId, input.checklistPrestacao ?? []);
   }
 
-  private async inserirMetas(tx: TransactionClient, planoId: bigint, metas: PlanoMetaInput[]) {
-    for (let metaIndex = 0; metaIndex < metas.length; metaIndex += 1) {
-      const meta = metas[metaIndex];
-      const insertedMeta = await tx.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
-        INSERT INTO plano_trabalho_metas (
+  private async inserirObjetivos(
+    tx: TransactionClient,
+    planoId: bigint,
+    objetivos: PlanoObjetivoEspecificoInput[]
+  ) {
+    for (let index = 0; index < objetivos.length; index += 1) {
+      const objetivo = objetivos[index];
+      await tx.$executeRaw(Prisma.sql`
+        INSERT INTO plano_trabalho_objetivos (
           plano_trabalho_id,
-          codigo,
           descricao,
-          indicador,
-          unidade_medida,
-          quantidade_prevista,
           resultado_esperado,
+          metas_vinculadas,
           ordem
         ) VALUES (
           ${planoId},
-          ${trimOrUndefined(meta.codigo ?? undefined)},
-          ${meta.descricao},
-          ${trimOrUndefined(meta.indicador ?? undefined)},
-          ${trimOrUndefined(meta.unidadeMedida ?? undefined)},
-          ${meta.quantidadePrevista ?? null},
-          ${trimOrUndefined(meta.resultadoEsperado ?? undefined)},
-          ${metaIndex}
+          ${objetivo.descricao},
+          ${trimOrUndefined(objetivo.resultadoEsperado ?? undefined)},
+          ${joinMetasVinculadas(objetivo.metasVinculadas ?? [])},
+          ${index}
         )
-        RETURNING id
       `);
-      const metaId = insertedMeta[0]?.id;
-      if (!metaId) throw new AppError("Nao foi possivel salvar meta do plano.", 500);
-      await this.inserirAtividades(tx, metaId, meta.atividades ?? []);
     }
   }
 
-  private async inserirAtividades(
-    tx: TransactionClient,
-    metaId: bigint,
-    atividades: PlanoAtividadeInput[]
-  ) {
-    for (let atividadeIndex = 0; atividadeIndex < atividades.length; atividadeIndex += 1) {
-      const atividade = atividades[atividadeIndex];
-      const insertedAtividade = await tx.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+  private async inserirMetas(tx: TransactionClient, planoId: bigint, metas: PlanoMetaInput[]) {
+    for (let index = 0; index < metas.length; index += 1) {
+      const meta = metas[index];
+      const inserted = await tx.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+        INSERT INTO plano_trabalho_metas (
+          plano_trabalho_id,
+          codigo,
+          numero_meta,
+          descricao,
+          indicador,
+          indicador_resultado,
+          unidade_medida,
+          quantidade_prevista,
+          resultado_esperado,
+          meio_verificacao,
+          data_inicio,
+          data_fim,
+          responsavel,
+          situacao,
+          ordem
+        ) VALUES (
+          ${planoId},
+          ${trimOrUndefined(meta.numeroMeta)},
+          ${trimOrUndefined(meta.numeroMeta)},
+          ${meta.descricao},
+          ${trimOrUndefined(meta.indicadorResultado ?? undefined)},
+          ${trimOrUndefined(meta.indicadorResultado ?? undefined)},
+          ${trimOrUndefined(meta.unidadeMedida ?? undefined)},
+          ${meta.quantidadePrevista ?? null},
+          ${null},
+          ${trimOrUndefined(meta.meioVerificacao ?? undefined)},
+          ${toOptionalDate(meta.dataInicio ?? undefined)},
+          ${toOptionalDate(meta.dataFim ?? undefined)},
+          ${trimOrUndefined(meta.responsavel ?? undefined)},
+          ${trimOrUndefined(meta.situacao ?? undefined)},
+          ${index}
+        )
+        RETURNING id
+      `);
+      const metaId = inserted[0]?.id;
+      if (!metaId) throw new AppError("Não foi possível salvar uma meta do plano.", 500);
+      await this.inserirEtapas(tx, metaId, meta.etapas ?? []);
+    }
+  }
+
+  private async inserirEtapas(tx: TransactionClient, metaId: bigint, etapas: PlanoMetaEtapaInput[]) {
+    for (let index = 0; index < etapas.length; index += 1) {
+      const etapa = etapas[index];
+      await tx.$executeRaw(Prisma.sql`
         INSERT INTO plano_trabalho_atividades (
           meta_id,
           descricao,
@@ -374,112 +925,157 @@ export class PlanosTrabalhoRepository {
           publico_alvo,
           local_execucao,
           produto_esperado,
+          nome_etapa,
+          acao_executar,
+          descricao_detalhada,
+          publico_atendido,
+          quantidade,
+          unidade,
+          data_inicio,
+          data_fim,
+          valor_estimado,
+          documento_comprobatorio,
+          responsavel,
+          situacao,
           ordem
         ) VALUES (
           ${metaId},
-          ${atividade.descricao},
-          ${trimOrUndefined(atividade.justificativa ?? undefined)},
-          ${trimOrUndefined(atividade.publicoAlvo ?? undefined)},
-          ${trimOrUndefined(atividade.localExecucao ?? undefined)},
-          ${trimOrUndefined(atividade.produtoEsperado ?? undefined)},
-          ${atividadeIndex}
-        )
-        RETURNING id
-      `);
-      const atividadeId = insertedAtividade[0]?.id;
-      if (!atividadeId) throw new AppError("Nao foi possivel salvar atividade da meta.", 500);
-      await this.inserirEtapas(tx, atividadeId, atividade.etapas ?? []);
-    }
-  }
-
-  private async inserirEtapas(tx: TransactionClient, atividadeId: bigint, etapas: PlanoEtapaInput[]) {
-    for (let etapaIndex = 0; etapaIndex < etapas.length; etapaIndex += 1) {
-      const etapa = etapas[etapaIndex];
-      await tx.$executeRaw(Prisma.sql`
-        INSERT INTO plano_trabalho_etapas (
-          atividade_id,
-          descricao,
-          status,
-          data_inicio_prevista,
-          data_fim_prevista,
-          data_conclusao,
-          responsavel,
-          ordem
-        ) VALUES (
-          ${atividadeId},
-          ${etapa.descricao},
-          ${trimOrUndefined(etapa.status ?? undefined)},
-          ${toOptionalDate(etapa.dataInicioPrevista ?? undefined)},
-          ${toOptionalDate(etapa.dataFimPrevista ?? undefined)},
-          ${toOptionalDate(etapa.dataConclusao ?? undefined)},
+          ${etapa.nome},
+          ${null},
+          ${trimOrUndefined(etapa.publicoAtendido ?? undefined)},
+          ${trimOrUndefined(etapa.local ?? undefined)},
+          ${null},
+          ${trimOrUndefined(etapa.nome)},
+          ${trimOrUndefined(etapa.acaoExecutar ?? undefined)},
+          ${trimOrUndefined(etapa.descricaoDetalhada ?? undefined)},
+          ${trimOrUndefined(etapa.publicoAtendido ?? undefined)},
+          ${etapa.quantidade ?? null},
+          ${trimOrUndefined(etapa.unidade ?? undefined)},
+          ${toOptionalDate(etapa.dataInicio ?? undefined)},
+          ${toOptionalDate(etapa.dataFim ?? undefined)},
+          ${etapa.valorEstimado ?? null},
+          ${trimOrUndefined(etapa.documentoComprobatorioEsperado ?? undefined)},
           ${trimOrUndefined(etapa.responsavel ?? undefined)},
-          ${etapaIndex}
+          ${trimOrUndefined(etapa.situacao ?? undefined)},
+          ${index}
         )
       `);
     }
   }
 
-  private async inserirCronograma(
+  private async inserirAplicacaoRecursos(
     tx: TransactionClient,
     planoId: bigint,
-    cronograma: PlanoCronogramaInput[]
+    itens: PlanoAplicacaoRecursoInput[]
   ) {
-    for (let index = 0; index < cronograma.length; index += 1) {
-      const item = cronograma[index];
+    for (let index = 0; index < itens.length; index += 1) {
+      const item = itens[index];
       await tx.$executeRaw(Prisma.sql`
-        INSERT INTO plano_trabalho_cronograma (
+        INSERT INTO plano_trabalho_aplicacao_recursos (
           plano_trabalho_id,
-          referencia_tipo,
-          referencia_id,
-          referencia_descricao,
-          competencia,
-          descricao_resumida,
-          valor_previsto,
+          categoria_despesa,
+          item,
+          descricao,
+          quantidade,
+          unidade,
+          valor_unitario,
+          valor_total,
           fonte_recurso,
+          meta_numero,
+          etapa_nome,
           natureza_despesa,
-          observacoes,
+          observacao,
           ordem
         ) VALUES (
           ${planoId},
-          ${trimOrUndefined(item.referenciaTipo ?? undefined)},
-          ${trimOrUndefined(item.referenciaId ?? undefined)},
-          ${trimOrUndefined(item.referenciaDescricao ?? undefined)},
-          ${item.competencia},
-          ${trimOrUndefined(item.descricaoResumida ?? undefined)},
-          ${item.valorPrevisto ?? null},
+          ${item.categoriaDespesa},
+          ${item.item},
+          ${trimOrUndefined(item.descricao ?? undefined)},
+          ${item.quantidade ?? null},
+          ${trimOrUndefined(item.unidade ?? undefined)},
+          ${item.valorUnitario ?? null},
+          ${item.valorTotal ?? null},
           ${trimOrUndefined(item.fonteRecurso ?? undefined)},
+          ${trimOrUndefined(item.metaNumero ?? undefined)},
+          ${trimOrUndefined(item.etapaNome ?? undefined)},
           ${trimOrUndefined(item.naturezaDespesa ?? undefined)},
-          ${trimOrUndefined(item.observacoes ?? undefined)},
+          ${trimOrUndefined(item.observacao ?? undefined)},
           ${index}
         )
       `);
     }
   }
 
-  private async inserirEquipe(tx: TransactionClient, planoId: bigint, equipe: PlanoEquipeInput[]) {
-    for (let index = 0; index < equipe.length; index += 1) {
-      const item = equipe[index];
+  private async inserirDesembolso(tx: TransactionClient, planoId: bigint, itens: PlanoDesembolsoInput[]) {
+    for (let index = 0; index < itens.length; index += 1) {
+      const item = itens[index];
       await tx.$executeRaw(Prisma.sql`
-        INSERT INTO plano_trabalho_equipe (
+        INSERT INTO plano_trabalho_desembolso (
           plano_trabalho_id,
-          nome,
-          funcao,
-          cpf,
-          carga_horaria,
-          tipo_vinculo,
-          contato,
+          mes_ano,
+          valor_previsto,
+          fonte_recurso,
+          meta_numero,
+          observacao,
           ordem
         ) VALUES (
           ${planoId},
-          ${item.nome},
-          ${trimOrUndefined(item.funcao ?? undefined)},
-          ${trimOrUndefined(item.cpf ?? undefined)},
-          ${trimOrUndefined(item.cargaHoraria ?? undefined)},
-          ${trimOrUndefined(item.tipoVinculo ?? undefined)},
-          ${trimOrUndefined(item.contato ?? undefined)},
+          ${item.mesAno},
+          ${item.valorPrevisto ?? null},
+          ${trimOrUndefined(item.fonteRecurso ?? undefined)},
+          ${trimOrUndefined(item.metaNumero ?? undefined)},
+          ${trimOrUndefined(item.observacao ?? undefined)},
           ${index}
         )
       `);
+    }
+  }
+
+  private async inserirChecklistPrestacao(
+    tx: TransactionClient,
+    planoId: bigint,
+    itens: PlanoChecklistPrestacaoInput[]
+  ) {
+    for (let index = 0; index < itens.length; index += 1) {
+      const item = itens[index];
+      await tx.$executeRaw(Prisma.sql`
+        INSERT INTO plano_trabalho_checklist_prestacao (
+          plano_trabalho_id,
+          descricao,
+          obrigatorio,
+          concluido,
+          ordem
+        ) VALUES (
+          ${planoId},
+          ${item.descricao},
+          ${item.obrigatorio !== false},
+          ${Boolean(item.concluido)},
+          ${index}
+        )
+      `);
+    }
+  }
+
+  private async registrarAuditoria(
+    acao: "CREATE" | "UPDATE" | "DELETE",
+    planoId: bigint,
+    dados: unknown,
+    usuarioId?: bigint
+  ) {
+    try {
+      await prisma.$executeRaw(Prisma.sql`
+        INSERT INTO auditoria_evento (usuario_id, acao, entidade, entidade_id, dados_json, criado_em)
+        VALUES (
+          ${usuarioId ?? null},
+          ${acao},
+          'plano_trabalho',
+          ${toStringId(planoId)},
+          ${JSON.stringify({ planoId: toStringId(planoId), dados, data: toIsoDate(new Date()) })},
+          NOW()
+        )
+      `);
+    } catch (error) {
+      console.warn("[planos-trabalho] falha ao registrar auditoria_evento:", error);
     }
   }
 }

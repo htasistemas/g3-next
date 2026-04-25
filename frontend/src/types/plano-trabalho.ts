@@ -1,86 +1,177 @@
 export type PlanoStatus =
-  | "EM_ELABORACAO"
-  | "ENVIADO_ANALISE"
+  | "RASCUNHO"
+  | "EM_ANALISE"
   | "APROVADO"
   | "EM_EXECUCAO"
   | "CONCLUIDO"
+  | "CANCELADO"
   | "REPROVADO";
 
-export type PlanoEtapa = {
+export type PlanoObjetivoEspecifico = {
   id?: string;
   descricao: string;
-  status?: string;
-  dataInicioPrevista?: string;
-  dataFimPrevista?: string;
-  dataConclusao?: string;
-  responsavel?: string;
+  resultadoEsperado?: string;
+  metasVinculadas: string[];
 };
 
-export type PlanoAtividade = {
+export type PlanoMetaEtapa = {
   id?: string;
-  descricao: string;
-  justificativa?: string;
-  publicoAlvo?: string;
-  localExecucao?: string;
-  produtoEsperado?: string;
-  etapas: PlanoEtapa[];
+  nome: string;
+  acaoExecutar?: string;
+  descricaoDetalhada?: string;
+  publicoAtendido?: string;
+  quantidade?: number;
+  unidade?: string;
+  local?: string;
+  dataInicio?: string;
+  dataFim?: string;
+  valorEstimado?: number;
+  documentoComprobatorioEsperado?: string;
+  responsavel?: string;
+  situacao?: string;
 };
 
 export type PlanoMeta = {
   id?: string;
-  codigo?: string;
+  numeroMeta: string;
   descricao: string;
-  indicador?: string;
+  indicadorResultado?: string;
   unidadeMedida?: string;
   quantidadePrevista?: number;
-  resultadoEsperado?: string;
-  atividades: PlanoAtividade[];
+  meioVerificacao?: string;
+  dataInicio?: string;
+  dataFim?: string;
+  responsavel?: string;
+  situacao?: string;
+  etapas: PlanoMetaEtapa[];
 };
 
-export type PlanoCronograma = {
+export type PlanoAplicacaoRecurso = {
   id?: string;
-  referenciaTipo?: string;
-  referenciaId?: string;
-  referenciaDescricao?: string;
-  competencia: string;
-  descricaoResumida?: string;
+  categoriaDespesa: string;
+  item: string;
+  descricao?: string;
+  quantidade?: number;
+  unidade?: string;
+  valorUnitario?: number;
+  valorTotal?: number;
+  fonteRecurso?: string;
+  metaNumero?: string;
+  etapaNome?: string;
+  naturezaDespesa?: string;
+  observacao?: string;
+};
+
+export type PlanoDesembolso = {
+  id?: string;
+  mesAno: string;
   valorPrevisto?: number;
   fonteRecurso?: string;
-  naturezaDespesa?: string;
-  observacoes?: string;
+  metaNumero?: string;
+  observacao?: string;
 };
 
-export type PlanoEquipe = {
+export type PlanoChecklistPrestacao = {
   id?: string;
-  nome: string;
-  funcao?: string;
-  cpf?: string;
-  cargaHoraria?: string;
-  tipoVinculo?: string;
-  contato?: string;
+  descricao: string;
+  obrigatorio?: boolean;
+  concluido?: boolean;
 };
 
 export type PlanoTrabalhoPayload = {
   id?: string;
   codigoInterno?: string;
   titulo: string;
-  descricaoGeral: string;
+  tipoParceria: string;
+  orgaoParceiro: string;
+  editalChamamento?: string;
+  periodoInicio: string;
+  periodoFim: string;
   status: PlanoStatus | string;
-  orgaoConcedente?: string;
-  orgaoOutroDescricao?: string;
-  areaPrograma?: string;
-  dataElaboracao?: string;
-  dataAprovacao?: string;
-  vigenciaInicio?: string;
-  vigenciaFim?: string;
-  termoFomentoId: string;
+  responsavelTecnico: string;
+  responsavelLegal: string;
+  termoFomentoId?: string;
   numeroProcesso?: string;
-  modalidade?: string;
-  observacoesVinculacao?: string;
-  arquivoFormato?: string;
+  razaoSocial: string;
+  nomeFantasia?: string;
+  cnpj: string;
+  cep?: string;
+  logradouro?: string;
+  numero?: string;
+  complemento?: string;
+  bairro?: string;
+  cidade?: string;
+  uf?: string;
+  telefone?: string;
+  email?: string;
+  representanteLegal: string;
+  representanteCpf: string;
+  representanteCargo?: string;
+  bancoNome?: string;
+  bancoAgencia?: string;
+  bancoConta?: string;
+  bancoOperacao?: string;
+  bancoPix?: string;
+  bancoObservacao?: string;
+  historicoOsc?: string;
+  finalidadeInstitucional?: string;
+  experienciaAnterior?: string;
+  conselhosCertificacoes?: string;
+  publicoAtendidoAtual?: string;
+  capacidadeTecnicaOperacional?: string;
+  descricaoObjeto: string;
+  areaAtuacao: string;
+  localExecucao: string;
+  abrangenciaTerritorial?: string;
+  publicoAlvo: string;
+  quantidadeBeneficiarios?: number;
+  criteriosSelecao?: string;
+  problemaSocial: string;
+  causasConsequencias?: string;
+  dadosIndicadores?: string;
+  capacidadeExecucao?: string;
+  impactoEsperado?: string;
+  objetivoGeral: string;
+  objetivosEspecificos: PlanoObjetivoEspecifico[];
   metas: PlanoMeta[];
-  cronograma: PlanoCronograma[];
-  equipe: PlanoEquipe[];
+  aplicacaoRecursos: PlanoAplicacaoRecurso[];
+  desembolso: PlanoDesembolso[];
+  formaAcompanhamento?: string;
+  indicadoresMonitoramento?: string;
+  periodicidadeMonitoramento?: string;
+  responsavelColetaDados?: string;
+  instrumentosMonitoramento: string[];
+  resultadoEsperadoMonitoramento?: string;
+  evidenciasObrigatorias?: string;
+  periodicidadePrestacao?: string;
+  dataLimitePrestacao?: string;
+  documentosExigidos?: string;
+  responsavelPrestacao?: string;
+  observacoesPrestacao?: string;
+  checklistPrestacao: PlanoChecklistPrestacao[];
+  localDeclaracao?: string;
+  dataDeclaracao?: string;
+  nomeRepresentanteDeclaracao?: string;
+  cpfRepresentanteDeclaracao?: string;
+  cargoRepresentanteDeclaracao?: string;
+  declaracaoVeracidade?: boolean;
+  aprovacaoInterna?: string;
+  situacaoAprovacao?: string;
+  observacaoAprovador?: string;
+  arquivoFormato?: string;
+};
+
+export type PlanoCronogramaExecucaoItem = {
+  metaNumero: string;
+  etapaNome: string;
+  especificacao: string;
+  unidade?: string;
+  quantidade?: number;
+  inicio?: string;
+  termino?: string;
+  responsavel?: string;
+  status?: string;
+  valorEstimado?: number;
 };
 
 export type PlanoTrabalho = PlanoTrabalhoPayload & {

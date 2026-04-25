@@ -42,6 +42,7 @@ export const requiredStorageDirectories = [
     "chamados-tecnicos/anexos",
     "ocorrencias/anexos",
     "oficios/documentos",
+    "planos-trabalho/documentos",
     "compras/anexos",
     "contabilidade/anexos",
     "captacao/doadores/anexos",
@@ -225,6 +226,15 @@ export const storagePolicies = {
         allowedExtensions: documentExtensions,
         allowedMimeTypes: documentMimeTypes,
         maxSizeBytes: 20 * 1024 * 1024,
+        generateThumbnail: true
+    },
+    plano_trabalho_documento: {
+        entidadeTipo: "plano_trabalho",
+        categoria: "documento",
+        subdirectory: "planos-trabalho/documentos",
+        allowedExtensions: documentExtensions,
+        allowedMimeTypes: documentMimeTypes,
+        maxSizeBytes: 25 * 1024 * 1024,
         generateThumbnail: true
     },
     autorizacao_compra_anexo: {

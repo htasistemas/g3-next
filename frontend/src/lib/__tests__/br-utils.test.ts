@@ -10,7 +10,7 @@ describe("br-utils moeda", () => {
   });
 
   it("formata valores para exibicao monetaria", () => {
-    expect(formatarMoeda(1000)).toBe("R$ 1.000,00");
+    expect(formatarMoeda(1000).replace(/\s/g, " ")).toBe("R$ 1.000,00");
     expect(formatarMoedaInput("1000")).toBe("1.000,00");
     expect(formatarMoedaInput("1.000,5")).toBe("1.000,50");
   });
