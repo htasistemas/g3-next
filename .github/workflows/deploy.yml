@@ -8,7 +8,7 @@ on:
 
 concurrency:
   group: deploy-g3-next-main
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   deploy:
