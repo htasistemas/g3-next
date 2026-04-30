@@ -397,6 +397,9 @@ export function LoginPage() {
                 </p>
               </div>
             </div>
+            <div className="mt-auto px-8 pb-6">
+              <p className="text-center text-xs text-emerald-100/80">Versão do sistema: {versaoSistema}</p>
+            </div>
           </aside>
 
           <section className="flex items-center lg:order-1">
@@ -578,7 +581,7 @@ export function LoginPage() {
                 </div>
               </div>
 
-              <p className="text-center text-xs text-slate-500">Versão do sistema: {versaoSistema}</p>
+              <p className="text-center text-xs text-slate-500 lg:hidden">Versão do sistema: {versaoSistema}</p>
             </div>
           </section>
         </div>
