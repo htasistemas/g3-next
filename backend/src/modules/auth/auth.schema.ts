@@ -22,15 +22,15 @@ export const authLoginSchema = z.object({
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["email"],
-      message: "Informe o e-mail ou usuário."
+      message: "Informe o e-mail ou usuario."
     });
   }
 
-  if (!possuiInstituicao && possuiEmail && !possuiUsuario) {
+  if (!possuiInstituicao) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["cnpj"],
-      message: "Informe o CNPJ, código ou slug da instituição."
+      message: "Informe o CNPJ, codigo ou slug da instituicao."
     });
   }
 });
@@ -44,6 +44,17 @@ export const authGoogleSchema = z.object({
     .transform((value) => normalizarCnpj(value) ?? undefined),
   slug: z.string().trim().optional(),
   codigoInstituicao: z.string().trim().optional()
+}).superRefine((value, ctx) => {
+  const possuiInstituicao =
+    Boolean(value.cnpj?.trim()) || Boolean(value.codigoInstituicao?.trim()) || Boolean(value.slug?.trim());
+
+  if (!possuiInstituicao) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["cnpj"],
+      message: "Informe o CNPJ, codigo ou slug da instituicao."
+    });
+  }
 });
 
 export const authEsqueciSenhaSchema = z.object({
@@ -55,4 +66,15 @@ export const authEsqueciSenhaSchema = z.object({
     .transform((value) => normalizarCnpj(value) ?? undefined),
   codigoInstituicao: z.string().trim().optional(),
   slug: z.string().trim().optional()
+}).superRefine((value, ctx) => {
+  const possuiInstituicao =
+    Boolean(value.cnpj?.trim()) || Boolean(value.codigoInstituicao?.trim()) || Boolean(value.slug?.trim());
+
+  if (!possuiInstituicao) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["cnpj"],
+      message: "Informe o CNPJ, codigo ou slug da instituicao."
+    });
+  }
 });

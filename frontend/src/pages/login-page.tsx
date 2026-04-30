@@ -192,7 +192,6 @@ export function LoginPage() {
           cnpj: slugSubdominio ? undefined : cnpjNormalizado,
           slug: slugSubdominio,
           email: email.trim().toLowerCase(),
-          nomeUsuario: email.trim().toLowerCase(),
           senha
         }),
         precarregarRota(destino)
