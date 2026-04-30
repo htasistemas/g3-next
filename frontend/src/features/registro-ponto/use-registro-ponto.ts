@@ -1,4 +1,5 @@
-﻿import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
 import { registroPontoService } from "@/services/registro-ponto.service";
 import type {
   RegistroPontoAjustePayload,
@@ -9,83 +10,97 @@ import type {
   RegistroPontoOcorrenciaPayload
 } from "@/types/registro-ponto";
 
+function useRegistroPontoTenantKey() {
+  const { usuario } = useAuth();
+  return usuario?.tenant_id ?? "sem-tenant";
+}
+
 export function useRegistrosPonto(filtros: RegistroPontoFiltro) {
+  const tenantId = useRegistroPontoTenantKey();
   return useQuery({
-    queryKey: ["registro-ponto", "lista", filtros],
+    queryKey: ["registro-ponto", tenantId, "lista", filtros],
     queryFn: () => registroPontoService.listar(filtros)
   });
 }
 
 export function useEspelhoPonto(filtros: RegistroPontoFiltro) {
+  const tenantId = useRegistroPontoTenantKey();
   return useQuery({
-    queryKey: ["registro-ponto", "espelho", filtros],
+    queryKey: ["registro-ponto", tenantId, "espelho", filtros],
     queryFn: () => registroPontoService.listarEspelho(filtros)
   });
 }
 
 export function useCatalogoUsuariosRegistroPonto(termo?: string) {
+  const tenantId = useRegistroPontoTenantKey();
   return useQuery({
-    queryKey: ["registro-ponto", "usuarios", termo ?? ""],
+    queryKey: ["registro-ponto", tenantId, "usuarios", termo ?? ""],
     queryFn: () => registroPontoService.listarUsuarios(termo),
     enabled: termo !== undefined && (termo.trim().length === 0 || termo.trim().length >= 2)
   });
 }
 
 export function useConfiguracaoRegistroPonto() {
+  const tenantId = useRegistroPontoTenantKey();
   return useQuery({
-    queryKey: ["registro-ponto", "configuracao"],
+    queryKey: ["registro-ponto", tenantId, "configuracao"],
     queryFn: () => registroPontoService.buscarConfiguracao()
   });
 }
 
 export function useFaceRegistroPonto() {
+  const tenantId = useRegistroPontoTenantKey();
   return useQuery({
-    queryKey: ["registro-ponto", "face"],
+    queryKey: ["registro-ponto", tenantId, "face"],
     queryFn: () => registroPontoService.buscarFace()
   });
 }
 
 export function useMarcarPonto() {
   const queryClient = useQueryClient();
+  const tenantId = useRegistroPontoTenantKey();
 
   return useMutation({
     mutationFn: (payload: RegistroPontoMarcarPayload) => registroPontoService.marcarPonto(payload),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["registro-ponto", "lista"] });
-      await queryClient.invalidateQueries({ queryKey: ["registro-ponto", "espelho"] });
+      await queryClient.invalidateQueries({ queryKey: ["registro-ponto", tenantId, "lista"] });
+      await queryClient.invalidateQueries({ queryKey: ["registro-ponto", tenantId, "espelho"] });
     }
   });
 }
 
 export function useAjustarRegistroPonto() {
   const queryClient = useQueryClient();
+  const tenantId = useRegistroPontoTenantKey();
 
   return useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: RegistroPontoAjustePayload }) =>
       registroPontoService.ajustarRegistro(id, payload),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["registro-ponto", "lista"] });
-      await queryClient.invalidateQueries({ queryKey: ["registro-ponto", "espelho"] });
+      await queryClient.invalidateQueries({ queryKey: ["registro-ponto", tenantId, "lista"] });
+      await queryClient.invalidateQueries({ queryKey: ["registro-ponto", tenantId, "espelho"] });
     }
   });
 }
 
 export function useAdicionarOcorrenciaPonto() {
   const queryClient = useQueryClient();
+  const tenantId = useRegistroPontoTenantKey();
 
   return useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: RegistroPontoOcorrenciaPayload }) =>
       registroPontoService.adicionarOcorrencia(id, payload),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["registro-ponto", "lista"] });
-      await queryClient.invalidateQueries({ queryKey: ["registro-ponto", "espelho"] });
+      await queryClient.invalidateQueries({ queryKey: ["registro-ponto", tenantId, "lista"] });
+      await queryClient.invalidateQueries({ queryKey: ["registro-ponto", tenantId, "espelho"] });
     }
   });
 }
 
 export function useHistoricoRegistroPonto(id?: string) {
+  const tenantId = useRegistroPontoTenantKey();
   return useQuery({
-    queryKey: ["registro-ponto", "historico", id],
+    queryKey: ["registro-ponto", tenantId, "historico", id],
     queryFn: () => registroPontoService.buscarHistorico(id as string),
     enabled: !!id
   });
@@ -93,22 +108,27 @@ export function useHistoricoRegistroPonto(id?: string) {
 
 export function useSalvarConfiguracaoRegistroPonto() {
   const queryClient = useQueryClient();
+  const tenantId = useRegistroPontoTenantKey();
 
   return useMutation({
-    mutationFn: (payload: RegistroPontoHorarioTrabalhoPayload) => registroPontoService.salvarConfiguracao(payload),
+    mutationFn: (payload: RegistroPontoHorarioTrabalhoPayload) =>
+      registroPontoService.salvarConfiguracao(payload),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["registro-ponto", "configuracao"] });
+      await queryClient.invalidateQueries({
+        queryKey: ["registro-ponto", tenantId, "configuracao"]
+      });
     }
   });
 }
 
 export function useSalvarFaceRegistroPonto() {
   const queryClient = useQueryClient();
+  const tenantId = useRegistroPontoTenantKey();
 
   return useMutation({
     mutationFn: (payload: RegistroPontoFacePayload) => registroPontoService.salvarFace(payload),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["registro-ponto", "face"] });
+      await queryClient.invalidateQueries({ queryKey: ["registro-ponto", tenantId, "face"] });
     }
   });
 }

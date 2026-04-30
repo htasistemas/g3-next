@@ -32,8 +32,73 @@ function toJsonString(value: unknown) {
   }
 }
 
+let estruturaPromise: Promise<void> | null = null;
+
+async function ensureRhContratacaoEstrutura() {
+  if (!estruturaPromise) {
+    estruturaPromise = (async () => {
+      const comandos = [
+        "ALTER TABLE IF EXISTS rh_candidato ADD COLUMN IF NOT EXISTS tenant_id UUID",
+        "ALTER TABLE IF EXISTS rh_processo_contratacao ADD COLUMN IF NOT EXISTS tenant_id UUID",
+        "ALTER TABLE IF EXISTS rh_entrevista ADD COLUMN IF NOT EXISTS tenant_id UUID",
+        "ALTER TABLE IF EXISTS rh_ficha_admissao ADD COLUMN IF NOT EXISTS tenant_id UUID",
+        "ALTER TABLE IF EXISTS rh_documento_item ADD COLUMN IF NOT EXISTS tenant_id UUID",
+        "ALTER TABLE IF EXISTS rh_arquivo ADD COLUMN IF NOT EXISTS tenant_id UUID",
+        "ALTER TABLE IF EXISTS rh_termo ADD COLUMN IF NOT EXISTS tenant_id UUID",
+        "ALTER TABLE IF EXISTS rh_ppd ADD COLUMN IF NOT EXISTS tenant_id UUID",
+        "ALTER TABLE IF EXISTS rh_carta_banco ADD COLUMN IF NOT EXISTS tenant_id UUID",
+        "ALTER TABLE IF EXISTS rh_auditoria_contratacao ADD COLUMN IF NOT EXISTS tenant_id UUID",
+        "CREATE INDEX IF NOT EXISTS rh_candidato_tenant_idx ON rh_candidato(tenant_id, nome_completo)",
+        "CREATE INDEX IF NOT EXISTS rh_processo_contratacao_tenant_idx ON rh_processo_contratacao(tenant_id, candidato_id)",
+        "CREATE INDEX IF NOT EXISTS rh_documento_item_tenant_idx ON rh_documento_item(tenant_id, processo_id)",
+        "CREATE INDEX IF NOT EXISTS rh_arquivo_tenant_idx ON rh_arquivo(tenant_id, processo_id)",
+        "CREATE INDEX IF NOT EXISTS rh_auditoria_contratacao_tenant_idx ON rh_auditoria_contratacao(tenant_id, processo_id, criado_em DESC)"
+      ];
+
+      for (const comando of comandos) {
+        await prisma.$executeRawUnsafe(comando);
+      }
+
+      await prisma.$executeRawUnsafe(`
+        UPDATE rh_candidato
+        SET tenant_id = origem.tenant_id
+        FROM (
+          SELECT tenant_id
+          FROM unidade_assistencial
+          WHERE tenant_id IS NOT NULL
+          ORDER BY unidade_principal DESC, atualizado_em DESC, criado_em ASC
+          LIMIT 1
+        ) origem
+        WHERE rh_candidato.tenant_id IS NULL
+      `);
+
+      const backfills = [
+        "UPDATE rh_processo_contratacao p SET tenant_id = c.tenant_id FROM rh_candidato c WHERE p.tenant_id IS NULL AND c.id = p.candidato_id AND c.tenant_id IS NOT NULL",
+        "UPDATE rh_entrevista i SET tenant_id = p.tenant_id FROM rh_processo_contratacao p WHERE i.tenant_id IS NULL AND p.id = i.processo_id AND p.tenant_id IS NOT NULL",
+        "UPDATE rh_ficha_admissao f SET tenant_id = p.tenant_id FROM rh_processo_contratacao p WHERE f.tenant_id IS NULL AND p.id = f.processo_id AND p.tenant_id IS NOT NULL",
+        "UPDATE rh_documento_item d SET tenant_id = p.tenant_id FROM rh_processo_contratacao p WHERE d.tenant_id IS NULL AND p.id = d.processo_id AND p.tenant_id IS NOT NULL",
+        "UPDATE rh_arquivo a SET tenant_id = p.tenant_id FROM rh_processo_contratacao p WHERE a.tenant_id IS NULL AND p.id = a.processo_id AND p.tenant_id IS NOT NULL",
+        "UPDATE rh_termo t SET tenant_id = p.tenant_id FROM rh_processo_contratacao p WHERE t.tenant_id IS NULL AND p.id = t.processo_id AND p.tenant_id IS NOT NULL",
+        "UPDATE rh_ppd r SET tenant_id = p.tenant_id FROM rh_processo_contratacao p WHERE r.tenant_id IS NULL AND p.id = r.processo_id AND p.tenant_id IS NOT NULL",
+        "UPDATE rh_carta_banco c SET tenant_id = p.tenant_id FROM rh_processo_contratacao p WHERE c.tenant_id IS NULL AND p.id = c.processo_id AND p.tenant_id IS NOT NULL",
+        "UPDATE rh_auditoria_contratacao a SET tenant_id = p.tenant_id FROM rh_processo_contratacao p WHERE a.tenant_id IS NULL AND p.id = a.processo_id AND p.tenant_id IS NOT NULL"
+      ];
+
+      for (const sql of backfills) {
+        await prisma.$executeRawUnsafe(sql);
+      }
+    })().catch((error) => {
+      estruturaPromise = null;
+      throw error;
+    });
+  }
+
+  await estruturaPromise;
+}
+
 export class RhContratacaoRepository {
-  async listarCandidatos(termo?: string | null) {
+  async listarCandidatos(termo: string | null | undefined, tenantId: string) {
+    await ensureRhContratacaoEstrutura();
     const filtro = trimOrUndefined(termo ?? undefined);
     if (filtro) {
       return prisma.$queryRaw<any[]>(Prisma.sql`
@@ -49,8 +114,11 @@ export class RhContratacaoRepository {
           p.atualizado_em AS processo_atualizado_em
         FROM rh_candidato c
         LEFT JOIN rh_processo_contratacao p ON p.candidato_id = c.id
-        WHERE c.nome_completo ILIKE ${`%${filtro}%`}
-           OR c.cpf ILIKE ${`%${filtro}%`}
+        WHERE c.tenant_id::text = ${tenantId}
+          AND (
+            c.nome_completo ILIKE ${`%${filtro}%`}
+            OR c.cpf ILIKE ${`%${filtro}%`}
+          )
         ORDER BY c.nome_completo ASC
       `);
     }
@@ -67,11 +135,13 @@ export class RhContratacaoRepository {
         p.atualizado_em AS processo_atualizado_em
       FROM rh_candidato c
       LEFT JOIN rh_processo_contratacao p ON p.candidato_id = c.id
+      WHERE c.tenant_id::text = ${tenantId}
       ORDER BY c.nome_completo ASC
     `);
   }
 
-  async buscarCandidato(candidatoId: bigint) {
+  async buscarCandidato(candidatoId: bigint, tenantId: string) {
+    await ensureRhContratacaoEstrutura();
     const rows = await prisma.$queryRaw<any[]>(Prisma.sql`
       SELECT
         id,
@@ -100,23 +170,26 @@ export class RhContratacaoRepository {
         atualizado_em
       FROM rh_candidato
       WHERE id = ${candidatoId}
+        AND tenant_id::text = ${tenantId}
       LIMIT 1
     `);
     return rows[0] ?? null;
   }
 
-  async buscarCandidatoOuFalhar(candidatoId: bigint) {
-    const candidato = await this.buscarCandidato(candidatoId);
+  async buscarCandidatoOuFalhar(candidatoId: bigint, tenantId: string) {
+    const candidato = await this.buscarCandidato(candidatoId, tenantId);
     if (!candidato) {
       throw new AppError("Candidato nao encontrado.", 404);
     }
     return candidato;
   }
 
-  async criarCandidato(input: RhCandidatoInput, usuarioId?: bigint | null) {
+  async criarCandidato(input: RhCandidatoInput, usuarioId?: bigint | null, tenantId?: string) {
+    await ensureRhContratacaoEstrutura();
     const resultado = await prisma.$transaction(async (tx) => {
       const candidatoRows = await tx.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
         INSERT INTO rh_candidato (
+          tenant_id,
           nome_completo,
           cpf,
           rg,
@@ -141,6 +214,7 @@ export class RhContratacaoRepository {
           criado_em,
           atualizado_em
         ) VALUES (
+          ${tenantId ?? null},
           ${input.nomeCompleto},
           ${trimOrUndefined(input.cpf ?? undefined)},
           ${trimOrUndefined(input.rg ?? undefined)},
@@ -174,6 +248,7 @@ export class RhContratacaoRepository {
 
       const processoRows = await tx.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
         INSERT INTO rh_processo_contratacao (
+          tenant_id,
           candidato_id,
           status,
           responsavel_id,
@@ -182,6 +257,7 @@ export class RhContratacaoRepository {
           atualizado_em,
           ultima_movimentacao_em
         ) VALUES (
+          ${tenantId ?? null},
           ${candidatoId},
           ${trimOrUndefined(input.statusProcesso ?? undefined) ?? "TRIAGEM"},
           ${usuarioId ?? null},
@@ -200,6 +276,7 @@ export class RhContratacaoRepository {
       for (const tipoDocumento of documentosPadrao) {
         await tx.$executeRaw(Prisma.sql`
           INSERT INTO rh_documento_item (
+            tenant_id,
             processo_id,
             tipo_documento,
             obrigatorio,
@@ -209,6 +286,7 @@ export class RhContratacaoRepository {
             criado_em,
             atualizado_em
           ) VALUES (
+            ${tenantId ?? null},
             ${processoId},
             ${tipoDocumento},
             TRUE,
@@ -226,6 +304,7 @@ export class RhContratacaoRepository {
       await this.registrarAuditoria(
         tx,
         processoId,
+        tenantId ?? null,
         usuarioId ?? null,
         "CANDIDATO_CRIADO",
         `Candidato ${input.nomeCompleto} criado.`
@@ -234,11 +313,12 @@ export class RhContratacaoRepository {
       return { candidatoId, processoId };
     });
 
-    return this.buscarProcessoPorCandidato(resultado.candidatoId);
+    return this.buscarProcessoPorCandidato(resultado.candidatoId, tenantId ?? "");
   }
 
-  async atualizarCandidato(candidatoId: bigint, input: RhCandidatoInput, usuarioId?: bigint | null) {
-    await this.buscarCandidatoOuFalhar(candidatoId);
+  async atualizarCandidato(candidatoId: bigint, input: RhCandidatoInput, usuarioId?: bigint | null, tenantId?: string) {
+    await ensureRhContratacaoEstrutura();
+    await this.buscarCandidatoOuFalhar(candidatoId, tenantId ?? "");
 
     await prisma.$executeRaw(Prisma.sql`
       UPDATE rh_candidato
@@ -265,9 +345,10 @@ export class RhContratacaoRepository {
         anexos_json = ${toJsonString(input.anexos)},
         atualizado_em = NOW()
       WHERE id = ${candidatoId}
+        AND tenant_id::text = ${tenantId ?? ""}
     `);
 
-    const processo = await this.buscarProcessoPorCandidato(candidatoId);
+    const processo = await this.buscarProcessoPorCandidato(candidatoId, tenantId ?? "");
     if (processo?.id) {
       await prisma.$transaction(async (tx) => {
         await tx.$executeRaw(Prisma.sql`
@@ -280,6 +361,7 @@ export class RhContratacaoRepository {
         await this.registrarAuditoria(
           tx,
           BigInt(processo.id),
+          tenantId ?? null,
           usuarioId ?? null,
           "CANDIDATO_ATUALIZADO",
           `Candidato ${input.nomeCompleto} atualizado.`
@@ -287,17 +369,19 @@ export class RhContratacaoRepository {
       });
     }
 
-    return this.buscarProcessoPorCandidato(candidatoId);
+    return this.buscarProcessoPorCandidato(candidatoId, tenantId ?? "");
   }
 
-  async inativarCandidato(candidatoId: bigint, usuarioId?: bigint | null) {
-    await this.buscarCandidatoOuFalhar(candidatoId);
-    const processo = await this.buscarProcessoPorCandidato(candidatoId);
+  async inativarCandidato(candidatoId: bigint, usuarioId?: bigint | null, tenantId?: string) {
+    await ensureRhContratacaoEstrutura();
+    await this.buscarCandidatoOuFalhar(candidatoId, tenantId ?? "");
+    const processo = await this.buscarProcessoPorCandidato(candidatoId, tenantId ?? "");
     await prisma.$transaction(async (tx) => {
       await tx.$executeRaw(Prisma.sql`
         UPDATE rh_candidato
         SET ativo = FALSE, atualizado_em = NOW()
         WHERE id = ${candidatoId}
+          AND tenant_id::text = ${tenantId ?? ""}
       `);
       if (processo?.id) {
         await tx.$executeRaw(Prisma.sql`
@@ -311,6 +395,7 @@ export class RhContratacaoRepository {
         await this.registrarAuditoria(
           tx,
           BigInt(processo.id),
+          tenantId ?? null,
           usuarioId ?? null,
           "CANDIDATO_INATIVADO",
           `Candidato ${processo.nomeCompleto} inativado.`
@@ -319,7 +404,8 @@ export class RhContratacaoRepository {
     });
   }
 
-  async buscarProcessoPorCandidato(candidatoId: bigint) {
+  async buscarProcessoPorCandidato(candidatoId: bigint, tenantId: string) {
+    await ensureRhContratacaoEstrutura();
     const rows = await prisma.$queryRaw<any[]>(Prisma.sql`
       SELECT
         p.id,
@@ -338,12 +424,15 @@ export class RhContratacaoRepository {
       FROM rh_processo_contratacao p
       INNER JOIN rh_candidato c ON c.id = p.candidato_id
       WHERE p.candidato_id = ${candidatoId}
+        AND p.tenant_id::text = ${tenantId}
+        AND c.tenant_id::text = ${tenantId}
       LIMIT 1
     `);
     return rows[0] ?? null;
   }
 
-  async buscarProcessoOuFalhar(processoId: bigint) {
+  async buscarProcessoOuFalhar(processoId: bigint, tenantId: string) {
+    await ensureRhContratacaoEstrutura();
     const rows = await prisma.$queryRaw<any[]>(Prisma.sql`
       SELECT
         p.id,
@@ -362,6 +451,8 @@ export class RhContratacaoRepository {
       FROM rh_processo_contratacao p
       INNER JOIN rh_candidato c ON c.id = p.candidato_id
       WHERE p.id = ${processoId}
+        AND p.tenant_id::text = ${tenantId}
+        AND c.tenant_id::text = ${tenantId}
       LIMIT 1
     `);
     const processo = rows[0] ?? null;
@@ -369,8 +460,8 @@ export class RhContratacaoRepository {
     return processo;
   }
 
-  async atualizarStatusProcesso(processoId: bigint, status: string, usuarioId?: bigint | null) {
-    const processo = await this.buscarProcessoOuFalhar(processoId);
+  async atualizarStatusProcesso(processoId: bigint, status: string, usuarioId?: bigint | null, tenantId?: string) {
+    const processo = await this.buscarProcessoOuFalhar(processoId, tenantId ?? "");
     await prisma.$transaction(async (tx) => {
       await tx.$executeRaw(Prisma.sql`
         UPDATE rh_processo_contratacao
@@ -379,20 +470,22 @@ export class RhContratacaoRepository {
           atualizado_em = NOW(),
           ultima_movimentacao_em = NOW()
         WHERE id = ${processoId}
+          AND tenant_id::text = ${tenantId ?? ""}
       `);
       await this.registrarAuditoria(
         tx,
         processoId,
+        tenantId ?? null,
         usuarioId ?? null,
         "STATUS_ATUALIZADO",
         `Status alterado de ${processo.status} para ${status}.`
       );
     });
-    return this.buscarProcessoOuFalhar(processoId);
+    return this.buscarProcessoOuFalhar(processoId, tenantId ?? "");
   }
 
-  async listarEntrevistas(processoId: bigint) {
-    await this.buscarProcessoOuFalhar(processoId);
+  async listarEntrevistas(processoId: bigint, tenantId: string) {
+    await this.buscarProcessoOuFalhar(processoId, tenantId);
     return prisma.$queryRaw<any[]>(Prisma.sql`
       SELECT
         id,
@@ -407,14 +500,16 @@ export class RhContratacaoRepository {
         criado_em
       FROM rh_entrevista
       WHERE processo_id = ${processoId}
+        AND tenant_id::text = ${tenantId}
       ORDER BY criado_em DESC, id DESC
     `);
   }
 
-  async salvarEntrevista(processoId: bigint, input: RhEntrevistaInput, usuarioId?: bigint | null) {
-    await this.buscarProcessoOuFalhar(processoId);
+  async salvarEntrevista(processoId: bigint, input: RhEntrevistaInput, usuarioId?: bigint | null, tenantId?: string) {
+    await this.buscarProcessoOuFalhar(processoId, tenantId ?? "");
     const rows = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
       INSERT INTO rh_entrevista (
+        tenant_id,
         processo_id,
         tipo_roteiro,
         perguntas_json,
@@ -425,6 +520,7 @@ export class RhContratacaoRepository {
         criado_por,
         criado_em
       ) VALUES (
+        ${tenantId ?? null},
         ${processoId},
         ${trimOrUndefined(input.tipoRoteiro ?? undefined) ?? "PADRAO"},
         ${toJsonString(input.perguntas)},
@@ -444,21 +540,23 @@ export class RhContratacaoRepository {
         UPDATE rh_processo_contratacao
         SET atualizado_em = NOW(), ultima_movimentacao_em = NOW()
         WHERE id = ${processoId}
+          AND tenant_id::text = ${tenantId ?? ""}
       `);
       await this.registrarAuditoria(
         tx,
         processoId,
+        tenantId ?? null,
         usuarioId ?? null,
         "ENTREVISTA_ADICIONADA",
         "Entrevista registrada no processo."
       );
     });
-    const entrevistas = await this.listarEntrevistas(processoId);
+    const entrevistas = await this.listarEntrevistas(processoId, tenantId ?? "");
     return entrevistas.find((item) => Number(item.id) === Number(id)) ?? entrevistas[0];
   }
 
-  async buscarFicha(processoId: bigint) {
-    await this.buscarProcessoOuFalhar(processoId);
+  async buscarFicha(processoId: bigint, tenantId: string) {
+    await this.buscarProcessoOuFalhar(processoId, tenantId);
     const rows = await prisma.$queryRaw<any[]>(Prisma.sql`
       SELECT
         id,
@@ -470,16 +568,18 @@ export class RhContratacaoRepository {
         atualizado_em
       FROM rh_ficha_admissao
       WHERE processo_id = ${processoId}
+        AND tenant_id::text = ${tenantId}
       LIMIT 1
     `);
     return rows[0] ?? null;
   }
 
-  async salvarFicha(processoId: bigint, input: RhFichaInput, usuarioId?: bigint | null) {
-    await this.buscarProcessoOuFalhar(processoId);
+  async salvarFicha(processoId: bigint, input: RhFichaInput, usuarioId?: bigint | null, tenantId?: string) {
+    await this.buscarProcessoOuFalhar(processoId, tenantId ?? "");
     await prisma.$transaction(async (tx) => {
       await tx.$executeRaw(Prisma.sql`
         INSERT INTO rh_ficha_admissao (
+          tenant_id,
           processo_id,
           dados_pessoais_json,
           dependentes_json,
@@ -487,6 +587,7 @@ export class RhContratacaoRepository {
           criado_em,
           atualizado_em
         ) VALUES (
+          ${tenantId ?? null},
           ${processoId},
           ${toJsonString(input.dadosPessoais)},
           ${toJsonString(input.dependentes)},
@@ -504,16 +605,17 @@ export class RhContratacaoRepository {
       await this.registrarAuditoria(
         tx,
         processoId,
+        tenantId ?? null,
         usuarioId ?? null,
         "FICHA_ADMISSAO_SALVA",
         "Ficha de admissao atualizada."
       );
     });
-    return this.buscarFicha(processoId);
+    return this.buscarFicha(processoId, tenantId ?? "");
   }
 
-  async listarDocumentos(processoId: bigint) {
-    await this.buscarProcessoOuFalhar(processoId);
+  async listarDocumentos(processoId: bigint, tenantId: string) {
+    await this.buscarProcessoOuFalhar(processoId, tenantId);
     return prisma.$queryRaw<any[]>(Prisma.sql`
       SELECT
         id,
@@ -527,15 +629,17 @@ export class RhContratacaoRepository {
         atualizado_em
       FROM rh_documento_item
       WHERE processo_id = ${processoId}
+        AND tenant_id::text = ${tenantId}
       ORDER BY id ASC
     `);
   }
 
-  async atualizarDocumento(documentoId: bigint, input: RhDocumentoInput, usuarioId?: bigint | null) {
+  async atualizarDocumento(documentoId: bigint, input: RhDocumentoInput, usuarioId?: bigint | null, tenantId?: string) {
     const rows = await prisma.$queryRaw<Array<{ processo_id: bigint }>>(Prisma.sql`
       SELECT processo_id
       FROM rh_documento_item
       WHERE id = ${documentoId}
+        AND tenant_id::text = ${tenantId ?? ""}
       LIMIT 1
     `);
     const processoId = rows[0]?.processo_id;
@@ -552,22 +656,24 @@ export class RhContratacaoRepository {
           atualizado_por = ${usuarioId ?? null},
           atualizado_em = NOW()
         WHERE id = ${documentoId}
+          AND tenant_id::text = ${tenantId ?? ""}
       `);
       await this.registrarAuditoria(
         tx,
         processoId,
+        tenantId ?? null,
         usuarioId ?? null,
         "DOCUMENTO_ATUALIZADO",
         `Documento ${documentoId.toString()} atualizado.`
       );
     });
 
-    const documentos = await this.listarDocumentos(processoId);
+    const documentos = await this.listarDocumentos(processoId, tenantId ?? "");
     return documentos.find((item) => Number(item.id) === Number(documentoId)) ?? null;
   }
 
-  async listarArquivos(processoId: bigint) {
-    await this.buscarProcessoOuFalhar(processoId);
+  async listarArquivos(processoId: bigint, tenantId: string) {
+    await this.buscarProcessoOuFalhar(processoId, tenantId);
     return prisma.$queryRaw<any[]>(Prisma.sql`
       SELECT
         id,
@@ -583,14 +689,16 @@ export class RhContratacaoRepository {
         criado_em
       FROM rh_arquivo
       WHERE processo_id = ${processoId}
+        AND tenant_id::text = ${tenantId}
       ORDER BY criado_em DESC, id DESC
     `);
   }
 
-  async adicionarArquivo(processoId: bigint, input: RhArquivoInput, usuarioId?: bigint | null) {
-    await this.buscarProcessoOuFalhar(processoId);
+  async adicionarArquivo(processoId: bigint, input: RhArquivoInput, usuarioId?: bigint | null, tenantId?: string) {
+    await this.buscarProcessoOuFalhar(processoId, tenantId ?? "");
     const rows = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
       INSERT INTO rh_arquivo (
+        tenant_id,
         processo_id,
         categoria,
         tipo_documento,
@@ -602,6 +710,7 @@ export class RhContratacaoRepository {
         criado_por,
         criado_em
       ) VALUES (
+        ${tenantId ?? null},
         ${processoId},
         ${input.categoria},
         ${trimOrUndefined(input.tipoDocumento ?? undefined)},
@@ -622,18 +731,19 @@ export class RhContratacaoRepository {
       await this.registrarAuditoria(
         tx,
         processoId,
+        tenantId ?? null,
         usuarioId ?? null,
         "ARQUIVO_ADICIONADO",
         `Arquivo ${input.nomeArquivo} adicionado.`
       );
     });
 
-    const arquivos = await this.listarArquivos(processoId);
+    const arquivos = await this.listarArquivos(processoId, tenantId ?? "");
     return arquivos.find((item) => Number(item.id) === Number(id)) ?? arquivos[0];
   }
 
-  async listarTermos(processoId: bigint) {
-    await this.buscarProcessoOuFalhar(processoId);
+  async listarTermos(processoId: bigint, tenantId: string) {
+    await this.buscarProcessoOuFalhar(processoId, tenantId);
     return prisma.$queryRaw<any[]>(Prisma.sql`
       SELECT
         id,
@@ -647,15 +757,17 @@ export class RhContratacaoRepository {
         atualizado_em
       FROM rh_termo
       WHERE processo_id = ${processoId}
+        AND tenant_id::text = ${tenantId}
       ORDER BY atualizado_em DESC, id DESC
     `);
   }
 
-  async salvarTermo(processoId: bigint, input: RhTermoInput, usuarioId?: bigint | null) {
-    await this.buscarProcessoOuFalhar(processoId);
+  async salvarTermo(processoId: bigint, input: RhTermoInput, usuarioId?: bigint | null, tenantId?: string) {
+    await this.buscarProcessoOuFalhar(processoId, tenantId ?? "");
     await prisma.$transaction(async (tx) => {
       await tx.$executeRaw(Prisma.sql`
         INSERT INTO rh_termo (
+          tenant_id,
           processo_id,
           tipo,
           dados_json,
@@ -665,6 +777,7 @@ export class RhContratacaoRepository {
           criado_em,
           atualizado_em
         ) VALUES (
+          ${tenantId ?? null},
           ${processoId},
           ${input.tipo},
           ${toJsonString(input.dados)},
@@ -685,17 +798,18 @@ export class RhContratacaoRepository {
       await this.registrarAuditoria(
         tx,
         processoId,
+        tenantId ?? null,
         usuarioId ?? null,
         "TERMO_SALVO",
         `Termo ${input.tipo} atualizado.`
       );
     });
-    const termos = await this.listarTermos(processoId);
+    const termos = await this.listarTermos(processoId, tenantId ?? "");
     return termos.find((item) => String(item.tipo) === input.tipo) ?? termos[0];
   }
 
-  async buscarPpd(processoId: bigint) {
-    await this.buscarProcessoOuFalhar(processoId);
+  async buscarPpd(processoId: bigint, tenantId: string) {
+    await this.buscarProcessoOuFalhar(processoId, tenantId);
     const rows = await prisma.$queryRaw<any[]>(Prisma.sql`
       SELECT
         id,
@@ -707,16 +821,18 @@ export class RhContratacaoRepository {
         atualizado_em
       FROM rh_ppd
       WHERE processo_id = ${processoId}
+        AND tenant_id::text = ${tenantId}
       LIMIT 1
     `);
     return rows[0] ?? null;
   }
 
-  async salvarPpd(processoId: bigint, input: RhPpdInput, usuarioId?: bigint | null) {
-    await this.buscarProcessoOuFalhar(processoId);
+  async salvarPpd(processoId: bigint, input: RhPpdInput, usuarioId?: bigint | null, tenantId?: string) {
+    await this.buscarProcessoOuFalhar(processoId, tenantId ?? "");
     await prisma.$transaction(async (tx) => {
       await tx.$executeRaw(Prisma.sql`
         INSERT INTO rh_ppd (
+          tenant_id,
           processo_id,
           cabecalho_json,
           lado_a_json,
@@ -724,6 +840,7 @@ export class RhContratacaoRepository {
           criado_em,
           atualizado_em
         ) VALUES (
+          ${tenantId ?? null},
           ${processoId},
           ${toJsonString(input.cabecalho)},
           ${toJsonString(input.ladoA)},
@@ -741,16 +858,17 @@ export class RhContratacaoRepository {
       await this.registrarAuditoria(
         tx,
         processoId,
+        tenantId ?? null,
         usuarioId ?? null,
         "PPD_SALVO",
         "Informacoes do PPD atualizadas."
       );
     });
-    return this.buscarPpd(processoId);
+    return this.buscarPpd(processoId, tenantId ?? "");
   }
 
-  async buscarCartaBanco(processoId: bigint) {
-    await this.buscarProcessoOuFalhar(processoId);
+  async buscarCartaBanco(processoId: bigint, tenantId: string) {
+    await this.buscarProcessoOuFalhar(processoId, tenantId);
     const rows = await prisma.$queryRaw<any[]>(Prisma.sql`
       SELECT
         id,
@@ -760,21 +878,24 @@ export class RhContratacaoRepository {
         atualizado_em
       FROM rh_carta_banco
       WHERE processo_id = ${processoId}
+        AND tenant_id::text = ${tenantId}
       LIMIT 1
     `);
     return rows[0] ?? null;
   }
 
-  async salvarCartaBanco(processoId: bigint, input: RhCartaBancoInput, usuarioId?: bigint | null) {
-    await this.buscarProcessoOuFalhar(processoId);
+  async salvarCartaBanco(processoId: bigint, input: RhCartaBancoInput, usuarioId?: bigint | null, tenantId?: string) {
+    await this.buscarProcessoOuFalhar(processoId, tenantId ?? "");
     await prisma.$transaction(async (tx) => {
       await tx.$executeRaw(Prisma.sql`
         INSERT INTO rh_carta_banco (
+          tenant_id,
           processo_id,
           dados_json,
           criado_em,
           atualizado_em
         ) VALUES (
+          ${tenantId ?? null},
           ${processoId},
           ${toJsonString(input.dados)},
           NOW(),
@@ -788,16 +909,17 @@ export class RhContratacaoRepository {
       await this.registrarAuditoria(
         tx,
         processoId,
+        tenantId ?? null,
         usuarioId ?? null,
         "CARTA_BANCO_SALVA",
         "Carta ao banco atualizada."
       );
     });
-    return this.buscarCartaBanco(processoId);
+    return this.buscarCartaBanco(processoId, tenantId ?? "");
   }
 
-  async listarAuditoria(processoId: bigint) {
-    await this.buscarProcessoOuFalhar(processoId);
+  async listarAuditoria(processoId: bigint, tenantId: string) {
+    await this.buscarProcessoOuFalhar(processoId, tenantId);
     return prisma.$queryRaw<any[]>(Prisma.sql`
       SELECT
         a.id,
@@ -810,6 +932,7 @@ export class RhContratacaoRepository {
       FROM rh_auditoria_contratacao a
       LEFT JOIN usuarios u ON u.id = a.ator_id
       WHERE a.processo_id = ${processoId}
+        AND a.tenant_id::text = ${tenantId}
       ORDER BY a.criado_em DESC, a.id DESC
     `);
   }
@@ -817,18 +940,21 @@ export class RhContratacaoRepository {
   private async registrarAuditoria(
     tx: TransactionClient,
     processoId: bigint,
+    tenantId: string | null,
     usuarioId: bigint | null,
     acao: string,
     detalhes?: string | null
   ) {
     await tx.$executeRaw(Prisma.sql`
       INSERT INTO rh_auditoria_contratacao (
+        tenant_id,
         processo_id,
         ator_id,
         acao,
         detalhes,
         criado_em
       ) VALUES (
+        ${tenantId},
         ${processoId},
         ${usuarioId},
         ${acao},

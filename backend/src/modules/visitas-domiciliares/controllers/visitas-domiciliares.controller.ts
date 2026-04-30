@@ -1,26 +1,31 @@
-﻿import type { Request, Response } from "express";
+import type { Response } from "express";
+import type { AuthenticatedRequest } from "../../auth/middlewares/auth.middleware.js";
 import { VisitasDomiciliaresService } from "../services/visitas-domiciliares.service.js";
 
 const service = new VisitasDomiciliaresService();
 
 export class VisitasDomiciliaresController {
-  async listar(_request: Request, response: Response) {
-    const visitas = await service.listar();
+  async listar(request: AuthenticatedRequest, response: Response) {
+    const visitas = await service.listar(request.authUser?.tenant_id);
     return response.json({ visitas });
   }
 
-  async criar(request: Request, response: Response) {
-    const visita = await service.criar(request.body);
+  async criar(request: AuthenticatedRequest, response: Response) {
+    const visita = await service.criar(request.body, request.authUser?.tenant_id);
     return response.status(201).json(visita);
   }
 
-  async atualizar(request: Request, response: Response) {
-    const visita = await service.atualizar(request.params.id, request.body);
+  async atualizar(request: AuthenticatedRequest, response: Response) {
+    const visita = await service.atualizar(
+      request.params.id,
+      request.body,
+      request.authUser?.tenant_id
+    );
     return response.json(visita);
   }
 
-  async excluir(request: Request, response: Response) {
-    await service.remover(request.params.id);
+  async excluir(request: AuthenticatedRequest, response: Response) {
+    await service.remover(request.params.id, request.authUser?.tenant_id);
     return response.status(204).send();
   }
 }

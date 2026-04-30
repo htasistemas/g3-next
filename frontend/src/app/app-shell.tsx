@@ -537,6 +537,12 @@ export const menuSections: MenuSection[] = [
         label: "Usuários",
         icon: UsersRound,
         requiredPermissions: ["ADMINISTRADOR"]
+      },
+      {
+        id: "configuracoes-master-instituicoes",
+        to: "/configuracoes/master-instituicoes",
+        label: "Instituições SaaS",
+        icon: Building2
       }
     ]
   }
@@ -577,6 +583,7 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/configuracoes/chamado-tecnico")) return "Chamado técnico";
   if (pathname.startsWith("/configuracoes/licenca-uso")) return "Licença de uso";
   if (pathname.startsWith("/configuracoes/manual-do-sistema")) return "Manual do sistema";
+  if (pathname.startsWith("/configuracoes/master-instituicoes")) return "Instituições SaaS";
   if (pathname.startsWith("/configuracoes/pesquise-na-ia")) return "Pesquise na IA";
   if (pathname.startsWith("/configuracoes/sobre-o-sistema")) return "Sobre o sistema";
   if (pathname.startsWith("/configuracoes/mensagens-personalizadas")) return "Mensagens personalizadas";
@@ -656,9 +663,11 @@ export function AppShell() {
   const [logomarcaTopoUrl, setLogomarcaTopoUrl] = useState("");
   const logomarcaInstituicao = unidadeAtualData?.unidade?.logomarca;
   const nomeInstituicao =
+    usuario?.instituicao_nome ??
     unidadeAtualData?.unidade?.nome_fantasia ??
     unidadeAtualData?.unidade?.razao_social ??
     "Sistema G3";
+  const nomeUsuarioExibicao = usuario?.nome?.trim() || usuario?.nomeUsuario || "";
 
   const permissoesUsuario = usuario?.permissoes ?? [];
   const totalPendentes = lembretesResumoData?.totalPendentes ?? 0;
@@ -684,11 +693,17 @@ export function AppShell() {
       .map((secao) => ({
         ...secao,
         itens: ordenarItensMenu(
-          secao.itens.filter((item) => possuiPermissao(item.requiredPermissions))
+          secao.itens.filter((item) => {
+            const emailAdminPadrao = usuario?.nomeUsuario?.trim().toLowerCase() === "htasistemas@gmail.com";
+            if (item.id === "configuracoes-master-instituicoes" && !usuario?.is_superadmin && !emailAdminPadrao) {
+              return false;
+            }
+            return possuiPermissao(item.requiredPermissions);
+          })
         )
       }))
       .filter((secao) => secao.itens.length > 0);
-  }, [possuiPermissao]);
+  }, [possuiPermissao, usuario?.is_superadmin, usuario?.nomeUsuario]);
 
   const secaoAtivaId = useMemo(() => {
     for (const secao of menuSectionsVisiveis) {
@@ -1193,7 +1208,14 @@ export function AppShell() {
                 <span className="rounded-full bg-[var(--g3-primary-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--g3-active)]">
                   G3 Next
                 </span>
-                <span className="text-[11px] text-[var(--g3-muted)]">{usuario?.nomeUsuario}</span>
+                <div className="hidden text-right sm:block">
+                  <p className="max-w-[220px] truncate text-[11px] font-medium text-[var(--g3-foreground)]">
+                    {nomeInstituicao}
+                  </p>
+                  <p className="text-[10px] text-[var(--g3-muted)]">
+                    {nomeUsuarioExibicao}
+                  </p>
+                </div>
                 <Button
                   type="button"
                   variant="outline"

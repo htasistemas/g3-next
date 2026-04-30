@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
 import { agendamentosService } from "@/services/agendamentos.service";
 import type {
   Agendamento,
@@ -9,54 +10,65 @@ import type {
 } from "@/types/agendamento";
 
 export function useAgendamentos(filtros: AgendamentoFiltros) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["agendamentos", filtros],
-    queryFn: () => agendamentosService.listar(filtros)
+    queryKey: ["agendamentos", usuario?.tenant_id ?? "sem-tenant", filtros],
+    queryFn: () => agendamentosService.listar(filtros),
+    enabled: !!usuario
   });
 }
 
 export function useAgendamento(id?: string | number) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["agendamento", id],
+    queryKey: ["agendamento", usuario?.tenant_id ?? "sem-tenant", id],
     queryFn: () => agendamentosService.obter(id as string),
-    enabled: !!id
+    enabled: !!usuario && !!id
   });
 }
 
 export function useIndicadoresAgendamentos(filtros: AgendamentoFiltros) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["agendamentos", "indicadores", filtros],
-    queryFn: () => agendamentosService.listarIndicadores(filtros)
+    queryKey: ["agendamentos", "indicadores", usuario?.tenant_id ?? "sem-tenant", filtros],
+    queryFn: () => agendamentosService.listarIndicadores(filtros),
+    enabled: !!usuario
   });
 }
 
 export function useCatalogosAgendamentos() {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["agendamentos", "catalogos"],
-    queryFn: () => agendamentosService.listarCatalogos()
+    queryKey: ["agendamentos", "catalogos", usuario?.tenant_id ?? "sem-tenant"],
+    queryFn: () => agendamentosService.listarCatalogos(),
+    enabled: !!usuario
   });
 }
 
 export function useListaEsperaAgendamentos() {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["agendamentos", "lista-espera"],
-    queryFn: () => agendamentosService.listarListaEspera()
+    queryKey: ["agendamentos", "lista-espera", usuario?.tenant_id ?? "sem-tenant"],
+    queryFn: () => agendamentosService.listarListaEspera(),
+    enabled: !!usuario
   });
 }
 
 export function useItensOperacionaisAgendamento(tipo?: AgendamentoOperacionalTipo, busca?: string) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["agendamentos", "itens", tipo, busca],
+    queryKey: ["agendamentos", "itens", usuario?.tenant_id ?? "sem-tenant", tipo, busca],
     queryFn: () => agendamentosService.listarItens(tipo as AgendamentoOperacionalTipo, busca),
-    enabled: Boolean(tipo)
+    enabled: !!usuario && Boolean(tipo)
   });
 }
 
 export function useBeneficiariosOperacionaisAgendamento(itemId?: number | null) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["agendamentos", "beneficiarios", itemId],
+    queryKey: ["agendamentos", "beneficiarios", usuario?.tenant_id ?? "sem-tenant", itemId],
     queryFn: () => agendamentosService.listarBeneficiarios(itemId as number),
-    enabled: Boolean(itemId)
+    enabled: !!usuario && Boolean(itemId)
   });
 }
 

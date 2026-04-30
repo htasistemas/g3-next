@@ -51,58 +51,116 @@ function statusPermiteIntegracaoAlmoxarifado(status?: string | null) {
 
 function tipoDoacaoIntegraAlmoxarifado(tipoDoacao?: string | null) {
   const tipoNormalizado = normalizarTextoBusca(tipoDoacao);
-  return tipoNormalizado === "doação de bens de consumo" || tipoNormalizado === "doacao de bens de consumo";
+  return tipoNormalizado === "doaÃ§Ã£o de bens de consumo" || tipoNormalizado === "doacao de bens de consumo";
+}
+
+function tenantSql(alias: string, tenantId: string) {
+  return Prisma.sql`${Prisma.raw(alias)}.tenant_id::text = ${tenantId}`;
 }
 
 async function ensureRegistroDoacaoEstrutura() {
   if (!estruturaPromise) {
-    estruturaPromise = prisma
-      .$executeRawUnsafe(`
+    estruturaPromise = (async () => {
+      const comandos = [
+        `
         ALTER TABLE recebimento_doacao
           ADD COLUMN IF NOT EXISTS numero_recibo VARCHAR(80)
-      `)
-      .then(() => undefined);
+        `,
+        `
+        ALTER TABLE recebimento_doacao
+          ADD COLUMN IF NOT EXISTS tenant_id UUID
+        `,
+        `
+        ALTER TABLE recebimento_doacao_item
+          ADD COLUMN IF NOT EXISTS tenant_id UUID
+        `,
+        `
+        ALTER TABLE doador
+          ADD COLUMN IF NOT EXISTS tenant_id UUID
+        `,
+        `
+        CREATE INDEX IF NOT EXISTS recebimento_doacao_tenant_id_idx
+          ON recebimento_doacao (tenant_id, data_recebimento DESC)
+        `,
+        `
+        CREATE INDEX IF NOT EXISTS recebimento_doacao_item_tenant_id_idx
+          ON recebimento_doacao_item (tenant_id, recebimento_doacao_id)
+        `,
+        `
+        CREATE INDEX IF NOT EXISTS doador_tenant_id_idx
+          ON doador (tenant_id, nome)
+        `,
+        `
+        UPDATE doador AS d
+        SET tenant_id = ref.tenant_id
+        FROM (
+          SELECT tenant_id
+          FROM instituicoes
+          ORDER BY criado_em ASC
+          LIMIT 1
+        ) ref
+        WHERE d.tenant_id IS NULL
+        `,
+        `
+        UPDATE recebimento_doacao AS r
+        SET tenant_id = COALESCE(d.tenant_id, ref.tenant_id)
+        FROM (
+          SELECT tenant_id
+          FROM instituicoes
+          ORDER BY criado_em ASC
+          LIMIT 1
+        ) ref
+        LEFT JOIN doador d ON d.id = r.doador_id
+        WHERE r.tenant_id IS NULL
+        `,
+        `
+        UPDATE recebimento_doacao_item AS i
+        SET tenant_id = r.tenant_id
+        FROM recebimento_doacao r
+        WHERE i.tenant_id IS NULL
+          AND r.id = i.recebimento_doacao_id
+          AND r.tenant_id IS NOT NULL
+        `
+      ];
+
+      for (const comando of comandos) {
+        await prisma.$executeRawUnsafe(comando);
+      }
+    })();
   }
 
   await estruturaPromise;
 }
 
 export class RegistroDoacaoRepository {
-  async listar(filters: RegistroDoacaoFilters) {
+  async listar(filters: RegistroDoacaoFilters, tenantId: string) {
     await ensureRegistroDoacaoEstrutura();
-    const where: Prisma.Sql[] = [];
+    const where: Prisma.Sql[] = [tenantSql("r", tenantId)];
 
     const doadorNome = trimOrUndefined(filters.doador_nome);
     if (doadorNome) {
-      where.push(Prisma.sql`AND d.nome ILIKE ${`%${doadorNome}%`}`);
+      where.push(Prisma.sql`d.nome ILIKE ${`%${doadorNome}%`}`);
     }
 
     const tipoDoacao = trimOrUndefined(filters.tipo_doacao);
     if (tipoDoacao) {
-      where.push(Prisma.sql`AND r.tipo_doacao ILIKE ${`%${tipoDoacao}%`}`);
+      where.push(Prisma.sql`r.tipo_doacao ILIKE ${`%${tipoDoacao}%`}`);
     }
 
     const status = trimOrUndefined(filters.status);
     if (status) {
-      where.push(Prisma.sql`AND r.status ILIKE ${`%${status}%`}`);
+      where.push(Prisma.sql`r.status ILIKE ${`%${status}%`}`);
     }
 
     const dataInicial = toOptionalDate(filters.data_inicial);
     if (dataInicial) {
-      where.push(Prisma.sql`AND r.data_recebimento >= ${dataInicial}`);
+      where.push(Prisma.sql`r.data_recebimento >= ${dataInicial}`);
     }
 
     const dataFinal = toOptionalDate(filters.data_final);
     if (dataFinal) {
-      where.push(Prisma.sql`AND r.data_recebimento <= ${dataFinal}`);
+      where.push(Prisma.sql`r.data_recebimento <= ${dataFinal}`);
     }
-
-    const whereClause =
-      where.length === 0
-        ? Prisma.empty
-        : where.length === 1
-          ? where[0]
-          : Prisma.sql`${Prisma.join(where, " ")}`;
 
     return prisma.$queryRaw<RegistroDoacaoRow[]>(Prisma.sql`
       SELECT
@@ -129,14 +187,13 @@ export class RegistroDoacaoRepository {
         r.criado_em,
         r.atualizado_em
       FROM recebimento_doacao r
-      LEFT JOIN doador d ON d.id = r.doador_id
-      WHERE 1 = 1
-      ${whereClause}
+      LEFT JOIN doador d ON d.id = r.doador_id AND ${tenantSql("d", tenantId)}
+      WHERE ${Prisma.join(where, " AND ")}
       ORDER BY r.data_recebimento DESC, r.id DESC
     `);
   }
 
-  async buscarPorId(id: bigint) {
+  async buscarPorId(id: bigint, tenantId: string) {
     await ensureRegistroDoacaoEstrutura();
     const registros = await prisma.$queryRaw<RegistroDoacaoRow[]>(Prisma.sql`
       SELECT
@@ -163,8 +220,9 @@ export class RegistroDoacaoRepository {
         r.criado_em,
         r.atualizado_em
       FROM recebimento_doacao r
-      LEFT JOIN doador d ON d.id = r.doador_id
+      LEFT JOIN doador d ON d.id = r.doador_id AND ${tenantSql("d", tenantId)}
       WHERE r.id = ${id}
+        AND ${tenantSql("r", tenantId)}
       LIMIT 1
     `);
 
@@ -186,25 +244,28 @@ export class RegistroDoacaoRepository {
         observacoes
       FROM recebimento_doacao_item
       WHERE recebimento_doacao_id = ${id}
+        AND tenant_id::text = ${tenantId}
       ORDER BY id ASC
     `);
 
     return { registro, itens };
   }
 
-  async buscarPorIdOuFalhar(id: bigint) {
-    const item = await this.buscarPorId(id);
+  async buscarPorIdOuFalhar(id: bigint, tenantId: string) {
+    const item = await this.buscarPorId(id, tenantId);
     if (!item) {
       throw new AppError("Registro de doacao nao encontrado.", 404);
     }
     return item;
   }
 
-  async criar(input: RegistroDoacaoInput) {
+  async criar(input: RegistroDoacaoInput, tenantId: string) {
     await ensureRegistroDoacaoEstrutura();
+    await this.validarDoador(input.doador_id, tenantId);
     const registroId = await prisma.$transaction(async (tx) => {
       const inserted = await tx.$queryRaw<{ id: bigint }[]>(Prisma.sql`
         INSERT INTO recebimento_doacao (
+          tenant_id,
           doador_id,
           numero_recibo,
           tipo_doacao,
@@ -224,6 +285,7 @@ export class RegistroDoacaoRepository {
           criado_em,
           atualizado_em
         ) VALUES (
+          ${tenantId}::uuid,
           ${input.doador_id ? BigInt(input.doador_id) : null},
           ${trimOrUndefined(input.numero_recibo)},
           ${input.tipo_doacao},
@@ -246,22 +308,23 @@ export class RegistroDoacaoRepository {
         RETURNING id
       `);
 
-      const registroId = inserted[0]?.id;
-      if (!registroId) {
+      const id = inserted[0]?.id;
+      if (!id) {
         throw new AppError("Nao foi possivel criar o registro de doacao.", 500);
       }
 
-      await this.inserirItens(tx, registroId, input.itens ?? []);
-      await this.integrarAoAlmoxarifadoSeAplicavel(tx, registroId, input);
-      return registroId;
+      await this.inserirItens(tx, id, input.itens ?? [], tenantId);
+      await this.integrarAoAlmoxarifadoSeAplicavel(tx, id, input, tenantId);
+      return id;
     });
 
-    return this.buscarPorIdOuFalhar(registroId);
+    return this.buscarPorIdOuFalhar(registroId, tenantId);
   }
 
-  async atualizar(id: bigint, input: RegistroDoacaoInput) {
+  async atualizar(id: bigint, input: RegistroDoacaoInput, tenantId: string) {
     await ensureRegistroDoacaoEstrutura();
-    await this.buscarPorIdOuFalhar(id);
+    await this.buscarPorIdOuFalhar(id, tenantId);
+    await this.validarDoador(input.doador_id, tenantId);
 
     await prisma.$transaction(async (tx) => {
       await tx.$executeRaw(Prisma.sql`
@@ -285,29 +348,33 @@ export class RegistroDoacaoRepository {
           conta_recebimento_id = ${input.conta_recebimento_id ? BigInt(input.conta_recebimento_id) : null},
           atualizado_em = NOW()
         WHERE id = ${id}
+          AND tenant_id::text = ${tenantId}
       `);
 
       await tx.$executeRaw(Prisma.sql`
         DELETE FROM recebimento_doacao_item
         WHERE recebimento_doacao_id = ${id}
+          AND tenant_id::text = ${tenantId}
       `);
 
-      await this.inserirItens(tx, id, input.itens ?? []);
-      await this.integrarAoAlmoxarifadoSeAplicavel(tx, id, input);
+      await this.inserirItens(tx, id, input.itens ?? [], tenantId);
+      await this.integrarAoAlmoxarifadoSeAplicavel(tx, id, input, tenantId);
     });
 
-    return this.buscarPorIdOuFalhar(id);
+    return this.buscarPorIdOuFalhar(id, tenantId);
   }
 
-  async remover(id: bigint) {
-    await this.buscarPorIdOuFalhar(id);
+  async remover(id: bigint, tenantId: string) {
+    await this.buscarPorIdOuFalhar(id, tenantId);
     await prisma.$executeRaw(Prisma.sql`
       DELETE FROM recebimento_doacao
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
   }
 
-  async listarDoadores(termo?: string) {
+  async listarDoadores(termo: string | undefined, tenantId: string) {
+    await ensureRegistroDoacaoEstrutura();
     const termoSanitizado = trimOrUndefined(termo);
     const like = termoSanitizado ? `%${termoSanitizado}%` : undefined;
     const filtroBusca = like
@@ -340,15 +407,17 @@ export class RegistroDoacaoRepository {
         criado_em,
         atualizado_em
       FROM doador
-      WHERE 1 = 1
+      WHERE tenant_id::text = ${tenantId}
       ${filtroBusca}
       ORDER BY nome ASC
     `);
   }
 
-  async criarDoador(input: DoadorInput) {
+  async criarDoador(input: DoadorInput, tenantId: string) {
+    await ensureRegistroDoacaoEstrutura();
     const inserted = await prisma.$queryRaw<{ id: bigint }[]>(Prisma.sql`
       INSERT INTO doador (
+        tenant_id,
         nome,
         tipo_pessoa,
         documento,
@@ -366,6 +435,7 @@ export class RegistroDoacaoRepository {
         criado_em,
         atualizado_em
       ) VALUES (
+        ${tenantId}::uuid,
         ${input.nome},
         ${trimOrUndefined(input.tipo_pessoa)},
         ${normalizeDigits(input.documento) ?? trimOrUndefined(input.documento)},
@@ -391,6 +461,27 @@ export class RegistroDoacaoRepository {
       throw new AppError("Nao foi possivel criar o doador.", 500);
     }
 
+    const doador = await this.buscarDoadorPorId(id, tenantId);
+    if (!doador) {
+      throw new AppError("Doador nao encontrado apos criacao.", 500);
+    }
+    return doador;
+  }
+
+  async removerDoador(id: bigint, tenantId: string) {
+    const doador = await this.buscarDoadorPorId(id, tenantId);
+    if (!doador) {
+      throw new AppError("Doador nao encontrado.", 404);
+    }
+
+    await prisma.$executeRaw(Prisma.sql`
+      DELETE FROM doador
+      WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
+    `);
+  }
+
+  private async buscarDoadorPorId(id: bigint, tenantId: string) {
     const doadores = await prisma.$queryRaw<DoadorRow[]>(Prisma.sql`
       SELECT
         id,
@@ -412,41 +503,31 @@ export class RegistroDoacaoRepository {
         atualizado_em
       FROM doador
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
       LIMIT 1
     `);
 
-    const doador = doadores[0];
-    if (!doador) {
-      throw new AppError("Doador nao encontrado apos criacao.", 500);
-    }
-    return doador;
+    return doadores[0] ?? null;
   }
 
-  async removerDoador(id: bigint) {
-    const existentes = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
-      SELECT id
-      FROM doador
-      WHERE id = ${id}
-      LIMIT 1
-    `);
-    if (!existentes[0]) {
-      throw new AppError("Doador nao encontrado.", 404);
+  private async validarDoador(doadorId: number | undefined, tenantId: string) {
+    if (!doadorId) return;
+    const doador = await this.buscarDoadorPorId(BigInt(doadorId), tenantId);
+    if (!doador) {
+      throw new AppError("Doador nao encontrado para a instituicao autenticada.", 404);
     }
-
-    await prisma.$executeRaw(Prisma.sql`
-      DELETE FROM doador
-      WHERE id = ${id}
-    `);
   }
 
   private async inserirItens(
     tx: TransactionClient,
     registroId: bigint,
-    itens: RegistroDoacaoItemInput[]
+    itens: RegistroDoacaoItemInput[],
+    tenantId: string
   ) {
     for (const item of itens) {
       await tx.$executeRaw(Prisma.sql`
         INSERT INTO recebimento_doacao_item (
+          tenant_id,
           recebimento_doacao_id,
           descricao,
           quantidade,
@@ -459,6 +540,7 @@ export class RegistroDoacaoRepository {
           observacoes,
           criado_em
         ) VALUES (
+          ${tenantId}::uuid,
           ${registroId},
           ${item.descricao},
           ${item.quantidade},
@@ -478,7 +560,8 @@ export class RegistroDoacaoRepository {
   private async integrarAoAlmoxarifadoSeAplicavel(
     tx: TransactionClient,
     registroId: bigint,
-    input: RegistroDoacaoInput
+    input: RegistroDoacaoInput,
+    tenantId: string
   ) {
     if (!tipoDoacaoIntegraAlmoxarifado(input.tipo_doacao)) {
       return;
@@ -497,6 +580,7 @@ export class RegistroDoacaoRepository {
       SELECT id
       FROM almoxarifado_movimentacao
       WHERE doacao_id = ${registroId}
+        AND tenant_id::text = ${tenantId}
       LIMIT 1
     `);
 
@@ -509,29 +593,34 @@ export class RegistroDoacaoRepository {
           SELECT nome
           FROM doador
           WHERE id = ${BigInt(input.doador_id)}
+            AND tenant_id::text = ${tenantId}
           LIMIT 1
         `)
       : [];
 
-    const responsavel = normalizarTextoLivre(doadorRows[0]?.nome) || "Doador não informado";
-    const categoria = "Doação";
-    const referencia = `Doação ${registroId.toString()}`;
+    const responsavel = normalizarTextoLivre(doadorRows[0]?.nome) || "Doador nÃ£o informado";
+    const categoria = "DoaÃ§Ã£o";
+    const referencia = `DoaÃ§Ã£o ${registroId.toString()}`;
 
     for (const item of itens) {
       const descricao = formatarDescricaoProdutoAlmoxarifado(item.descricao);
       if (!descricao) continue;
 
       const unidade = normalizarTextoLivre(item.unidade) || "UN";
-      let almoxItem = await this.buscarItemAlmoxarifadoDuplicado(tx, descricao, categoria, unidade);
+      let almoxItem = await this.buscarItemAlmoxarifadoDuplicado(tx, descricao, categoria, unidade, tenantId);
 
       if (!almoxItem) {
-        almoxItem = await this.criarItemAlmoxarifadoViaDoacao(tx, {
-          descricao,
-          categoria,
-          unidade,
-          valor_unitario: item.valor_unitario,
-          observacoes: `Item criado automaticamente a partir da doação ${registroId.toString()}.`
-        });
+        almoxItem = await this.criarItemAlmoxarifadoViaDoacao(
+          tx,
+          {
+            descricao,
+            categoria,
+            unidade,
+            valor_unitario: item.valor_unitario,
+            observacoes: `Item criado automaticamente a partir da doaÃ§Ã£o ${registroId.toString()}.`
+          },
+          tenantId
+        );
       }
 
       if (!almoxItem) {
@@ -545,10 +634,12 @@ export class RegistroDoacaoRepository {
         UPDATE almoxarifado_item
         SET estoque_atual = ${saldoApos}, atualizado_em = NOW()
         WHERE id = ${almoxItem.id}
+          AND tenant_id::text = ${tenantId}
       `);
 
       await tx.$executeRaw(Prisma.sql`
         INSERT INTO almoxarifado_movimentacao (
+          tenant_id,
           item_id,
           data_movimentacao,
           tipo,
@@ -560,6 +651,7 @@ export class RegistroDoacaoRepository {
           doacao_id,
           criado_em
         ) VALUES (
+          ${tenantId}::uuid,
           ${almoxItem.id},
           ${toOptionalDate(input.data_recebimento)},
           ${"Entrada"},
@@ -567,7 +659,7 @@ export class RegistroDoacaoRepository {
           ${saldoApos},
           ${referencia},
           ${responsavel},
-          ${normalizarTextoLivre(input.descricao) || "Entrada gerada automaticamente pelo recebimento de doação."},
+          ${normalizarTextoLivre(input.descricao) || "Entrada gerada automaticamente pelo recebimento de doaÃ§Ã£o."},
           ${registroId},
           NOW()
         )
@@ -578,6 +670,7 @@ export class RegistroDoacaoRepository {
       UPDATE recebimento_doacao
       SET lancamentos_gerados = TRUE, atualizado_em = NOW()
       WHERE id = ${registroId}
+        AND tenant_id::text = ${tenantId}
     `);
   }
 
@@ -585,7 +678,8 @@ export class RegistroDoacaoRepository {
     tx: TransactionClient,
     descricao: string,
     categoria: string,
-    unidade: string
+    unidade: string,
+    tenantId: string
   ) {
     const rows = await tx.$queryRaw<Array<{
       id: bigint;
@@ -597,6 +691,7 @@ export class RegistroDoacaoRepository {
       SELECT id, estoque_atual, descricao, categoria, unidade
       FROM almoxarifado_item
       WHERE LOWER(categoria) = ${normalizarTextoBusca(categoria)}
+        AND tenant_id::text = ${tenantId}
       ORDER BY id ASC
     `);
 
@@ -621,12 +716,14 @@ export class RegistroDoacaoRepository {
       unidade: string;
       valor_unitario?: number;
       observacoes?: string;
-    }
+    },
+    tenantId: string
   ) {
     const proximoCodigoRows = await tx.$queryRaw<Array<{ proximo: number }>>(Prisma.sql`
       SELECT COALESCE(MAX(CAST(codigo AS INTEGER)), 0) + 1 AS proximo
       FROM almoxarifado_item
       WHERE codigo ~ '^[0-9]+$'
+        AND tenant_id::text = ${tenantId}
     `);
 
     const codigo = String(proximoCodigoRows[0]?.proximo ?? 1).padStart(4, "0");
@@ -634,6 +731,7 @@ export class RegistroDoacaoRepository {
       Array<{ id: bigint; estoque_atual: number; descricao: string; categoria: string; unidade: string }>
     >(Prisma.sql`
       INSERT INTO almoxarifado_item (
+        tenant_id,
         codigo,
         descricao,
         categoria,
@@ -648,6 +746,7 @@ export class RegistroDoacaoRepository {
         criado_em,
         atualizado_em
       ) VALUES (
+        ${tenantId}::uuid,
         ${codigo},
         ${input.descricao},
         ${input.categoria},

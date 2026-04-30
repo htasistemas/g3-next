@@ -54,7 +54,19 @@ export class AuthController {
     await authService.esqueciSenha(request.body);
     return response.status(200).json({
       message:
-        "Se o e-mail informado estiver cadastrado, uma senha temporaria foi enviada."
+        "Se o e-mail informado estiver cadastrado nesta instituicao, uma senha temporaria foi enviada. Use o mesmo CNPJ e o mesmo e-mail na tela de login."
     });
+  }
+
+  async tenantContext(request: Request, response: Response) {
+    const contexto = await authService.obterContextoTenant({
+      cnpj: typeof request.query.cnpj === "string" ? request.query.cnpj : undefined,
+      slug: typeof request.query.slug === "string" ? request.query.slug : undefined,
+      codigoInstituicao:
+        typeof request.query.codigoInstituicao === "string" ? request.query.codigoInstituicao : undefined,
+      host: request.headers.host
+    });
+
+    return response.status(200).json({ instituicao: contexto });
   }
 }

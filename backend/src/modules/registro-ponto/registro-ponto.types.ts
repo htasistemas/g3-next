@@ -63,6 +63,7 @@ export type RegistroPontoHorarioUsuarioInput = {
 export type RegistroPontoAtor = {
   id?: bigint;
   nome_usuario: string;
+  tenant_id: string;
   permissoes: string[];
 };
 

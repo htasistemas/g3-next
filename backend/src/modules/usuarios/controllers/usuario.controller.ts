@@ -5,13 +5,22 @@ import { UsuarioService } from "../services/usuario.service.js";
 const service = new UsuarioService();
 
 export class UsuarioController {
+  private buildAtor(request: AuthenticatedRequest) {
+    return {
+      id: request.authUser?.id,
+      nomeUsuario: request.authUser?.nomeUsuario,
+      tenant_id: request.authUser?.tenant_id,
+      instituicao_id: request.authUser?.instituicao_id
+    };
+  }
+
   async listar(request: AuthenticatedRequest, response: Response) {
-    const resultado = await service.listar(request.query);
+    const resultado = await service.listar(request.query, this.buildAtor(request));
     return response.json(resultado);
   }
 
   async buscarPorId(request: AuthenticatedRequest, response: Response) {
-    const resultado = await service.buscarPorId(request.params.id);
+    const resultado = await service.buscarPorId(request.params.id, this.buildAtor(request));
     return response.json(resultado);
   }
 
@@ -21,42 +30,27 @@ export class UsuarioController {
   }
 
   async criar(request: AuthenticatedRequest, response: Response) {
-    const resultado = await service.criar(request.body, {
-      id: request.authUser?.id,
-      nomeUsuario: request.authUser?.nomeUsuario
-    });
+    const resultado = await service.criar(request.body, this.buildAtor(request));
     return response.status(201).json(resultado);
   }
 
   async atualizar(request: AuthenticatedRequest, response: Response) {
-    const resultado = await service.atualizar(request.params.id, request.body, {
-      id: request.authUser?.id,
-      nomeUsuario: request.authUser?.nomeUsuario
-    });
+    const resultado = await service.atualizar(request.params.id, request.body, this.buildAtor(request));
     return response.json(resultado);
   }
 
   async atualizarStatus(request: AuthenticatedRequest, response: Response) {
-    const resultado = await service.atualizarStatus(request.params.id, request.body, {
-      id: request.authUser?.id,
-      nomeUsuario: request.authUser?.nomeUsuario
-    });
+    const resultado = await service.atualizarStatus(request.params.id, request.body, this.buildAtor(request));
     return response.json(resultado);
   }
 
   async resetarSenha(request: AuthenticatedRequest, response: Response) {
-    const resultado = await service.resetarSenha(request.params.id, request.body, {
-      id: request.authUser?.id,
-      nomeUsuario: request.authUser?.nomeUsuario
-    });
+    const resultado = await service.resetarSenha(request.params.id, request.body, this.buildAtor(request));
     return response.json(resultado);
   }
 
   async remover(request: AuthenticatedRequest, response: Response) {
-    const resultado = await service.remover(request.params.id, {
-      id: request.authUser?.id,
-      nomeUsuario: request.authUser?.nomeUsuario
-    });
+    const resultado = await service.remover(request.params.id, this.buildAtor(request));
     return response.json(resultado);
   }
 }

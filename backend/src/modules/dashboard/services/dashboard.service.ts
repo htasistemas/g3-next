@@ -49,22 +49,31 @@ function calcularIdade(dataNascimento: Date, dataReferencia = new Date()): numbe
 }
 
 export class DashboardService {
-  private readonly repository = new DashboardRepository();
   private readonly cache = new TtlCache<DashboardAssistenciaResponse>(20_000, 24);
 
-  async obterAssistencia(rawFilters: unknown): Promise<DashboardAssistenciaResponse> {
+  async obterAssistencia(rawFilters: unknown, tenantId?: string): Promise<DashboardAssistenciaResponse> {
     const filters = dashboardFiltrosSchema.parse(rawFilters);
     this.validarPeriodo(filters);
+    const tenantNormalizado = tenantId?.trim();
+    if (!tenantNormalizado) {
+      throw new AppError("Tenant da sessao nao identificado.", 401);
+    }
+
+    const repository = new DashboardRepository(tenantNormalizado);
 
     const cacheKey = JSON.stringify({
+      tenantId: tenantNormalizado,
       startDate: filters.startDate ?? null,
       endDate: filters.endDate ?? null
     });
 
-    return this.cache.getOrSet(cacheKey, async () => this.gerarAssistencia(filters));
+    return this.cache.getOrSet(cacheKey, async () => this.gerarAssistencia(repository, filters));
   }
 
-  private async gerarAssistencia(filters: DashboardFiltros): Promise<DashboardAssistenciaResponse> {
+  private async gerarAssistencia(
+    repository: DashboardRepository,
+    filters: DashboardFiltros
+  ): Promise<DashboardAssistenciaResponse> {
     const [
       totalBeneficiarios,
       totalProfissionais,
@@ -99,38 +108,38 @@ export class DashboardService {
       execucaoFinanceira,
       absenteismo
     ] = await Promise.all([
-      this.repository.contarBeneficiarios(),
-      this.repository.contarProfissionais(),
-      this.repository.contarVoluntarios(),
-      this.repository.contarFamilias(),
-      this.repository.contarBensPatrimonio(),
-      this.repository.contarItensAlmoxarifado(),
-      this.repository.somarLivrosDisponiveis(),
-      this.repository.contarVeiculos(),
-      this.repository.contarBeneficiariosPeriodo(filters.startDate, filters.endDate),
-      this.repository.contarBeneficiariosPorStatus(),
-      this.repository.contarCadastroCompleto(),
-      this.repository.listarDatasNascimento(),
-      this.repository.contarSituacaoSocialTotal(),
-      this.repository.calcularMediaPessoas(),
-      this.repository.listarRendasFamiliares(),
-      this.repository.contarBeneficiariosPorBairro(),
-      this.repository.contarVulnerabilidades(),
-      this.repository.contarInsegurancaAlimentar(),
-      this.repository.contarTermosAtivos(),
-      this.repository.somarValorTotalTermosAtivos(),
-      this.repository.listarAlertasTermos(),
-      this.repository.listarContasFinanceiras(),
-      this.repository.listarLancamentosFinanceiros(),
-      this.repository.contarCursosAtivos(),
-      this.repository.calcularTaxaMediaOcupacaoCursos(),
-      this.repository.contarCertificadosEmitidos(),
-      this.repository.contarDoacoesPeriodo(filters.startDate, filters.endDate),
-      this.repository.obterResumoItensDoacao(filters.startDate, filters.endDate),
-      this.repository.contarVisitasDomiciliares(filters.startDate, filters.endDate),
-      this.repository.contarTermosVencendo(),
-      this.repository.calcularExecucaoFinanceira(),
-      this.repository.calcularAbsenteismo()
+      repository.contarBeneficiarios(),
+      repository.contarProfissionais(),
+      repository.contarVoluntarios(),
+      repository.contarFamilias(),
+      repository.contarBensPatrimonio(),
+      repository.contarItensAlmoxarifado(),
+      repository.somarLivrosDisponiveis(),
+      repository.contarVeiculos(),
+      repository.contarBeneficiariosPeriodo(filters.startDate, filters.endDate),
+      repository.contarBeneficiariosPorStatus(),
+      repository.contarCadastroCompleto(),
+      repository.listarDatasNascimento(),
+      repository.contarSituacaoSocialTotal(),
+      repository.calcularMediaPessoas(),
+      repository.listarRendasFamiliares(),
+      repository.contarBeneficiariosPorBairro(),
+      repository.contarVulnerabilidades(),
+      repository.contarInsegurancaAlimentar(),
+      repository.contarTermosAtivos(),
+      repository.somarValorTotalTermosAtivos(),
+      repository.listarAlertasTermos(),
+      repository.listarContasFinanceiras(),
+      repository.listarLancamentosFinanceiros(),
+      repository.contarCursosAtivos(),
+      repository.calcularTaxaMediaOcupacaoCursos(),
+      repository.contarCertificadosEmitidos(),
+      repository.contarDoacoesPeriodo(filters.startDate, filters.endDate),
+      repository.obterResumoItensDoacao(filters.startDate, filters.endDate),
+      repository.contarVisitasDomiciliares(filters.startDate, filters.endDate),
+      repository.contarTermosVencendo(),
+      repository.calcularExecucaoFinanceira(),
+      repository.calcularAbsenteismo()
     ]);
 
     const pendentes = porStatus["INCOMPLETO"] ?? 0;

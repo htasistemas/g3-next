@@ -24,6 +24,7 @@ type ThemeContextValue = {
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 const STORAGE_KEY = "g3_theme_settings";
+const STORAGE_KEY_LEGADO = "g3_theme_settings";
 
 function getSistemaEscuroPreferido() {
   if (typeof window === "undefined" || !window.matchMedia) return false;
@@ -109,8 +110,13 @@ function aplicarVariaveisCss(settings: ThemeSettings) {
   root.style.setProperty("--g3-header-border", temaEscuro ? "#1F2937" : lighten(paleta.corPrimaria, 0.55));
 }
 
-function carregarLocalStorage(): ThemeSettings {
-  const bruto = localStorage.getItem(STORAGE_KEY);
+function chaveStoragePorTenant(tenantId?: string | null) {
+  const normalizado = tenantId?.trim();
+  return normalizado ? `${STORAGE_KEY}:${normalizado}` : STORAGE_KEY;
+}
+
+function carregarLocalStorage(tenantId?: string | null): ThemeSettings {
+  const bruto = localStorage.getItem(chaveStoragePorTenant(tenantId));
   if (!bruto) return defaultThemeSettings;
   try {
     const parsed = JSON.parse(bruto) as ThemeSettings;
@@ -128,7 +134,8 @@ function carregarLocalStorage(): ThemeSettings {
 }
 
 export function ThemeProvider({ children }: PropsWithChildren) {
-  const { autenticado } = useAuth();
+  const { autenticado, usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? null;
   const [settings, setSettings] = useState<ThemeSettings>(() => carregarLocalStorage());
   const [carregando, setCarregando] = useState(true);
   const [previewAtivo, setPreviewAtivo] = useState<ThemeSettings | null>(null);
@@ -153,6 +160,8 @@ export function ThemeProvider({ children }: PropsWithChildren) {
     let ativo = true;
 
     if (!autenticado) {
+      setPreviewAtivo(null);
+      setSettings(defaultThemeSettings);
       setCarregando(false);
       return () => {
         ativo = false;
@@ -167,9 +176,13 @@ export function ThemeProvider({ children }: PropsWithChildren) {
         if (!ativo) return;
         const normalizado = normalizarSettings(remoto);
         setSettings(normalizado);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(normalizado));
+        localStorage.setItem(chaveStoragePorTenant(tenantId), JSON.stringify(normalizado));
+        if (tenantId) {
+          localStorage.removeItem(STORAGE_KEY_LEGADO);
+        }
       } catch {
-        // Mantem personalizacao local em caso de erro ou usuario sem autenticacao.
+        if (!ativo) return;
+        setSettings(carregarLocalStorage(tenantId));
       } finally {
         if (ativo) {
           setCarregando(false);
@@ -180,7 +193,7 @@ export function ThemeProvider({ children }: PropsWithChildren) {
     return () => {
       ativo = false;
     };
-  }, [autenticado]);
+  }, [autenticado, tenantId]);
 
   const applyPreview = useCallback((draft: ThemeSettings) => {
     setPreviewAtivo(normalizarSettings(draft));
@@ -197,8 +210,11 @@ export function ThemeProvider({ children }: PropsWithChildren) {
 
     setPreviewAtivo(null);
     setSettings(remotoNormalizado);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(remotoNormalizado));
-  }, []);
+    localStorage.setItem(chaveStoragePorTenant(tenantId), JSON.stringify(remotoNormalizado));
+    if (tenantId) {
+      localStorage.removeItem(STORAGE_KEY_LEGADO);
+    }
+  }, [tenantId]);
 
   const value = useMemo<ThemeContextValue>(
     () => ({

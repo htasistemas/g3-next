@@ -46,15 +46,67 @@ function montarCaminhoOuDataUri(conteudoBase64: string, tipoMime?: string | null
   return `data:${mime};base64,${conteudoBase64}`;
 }
 
+const estruturaSql = [
+  "ALTER TABLE documentos_instituicao ADD COLUMN IF NOT EXISTS tenant_id UUID",
+  "ALTER TABLE IF EXISTS documentos_instituicao_historico ADD COLUMN IF NOT EXISTS tenant_id UUID",
+  `
+    CREATE INDEX IF NOT EXISTS documentos_instituicao_tenant_idx
+      ON documentos_instituicao (tenant_id, emissao DESC, id DESC)
+  `,
+  `
+    CREATE INDEX IF NOT EXISTS documentos_instituicao_historico_tenant_idx
+      ON documentos_instituicao_historico (tenant_id, documento_id, data_hora DESC)
+  `,
+  `
+    UPDATE documentos_instituicao AS d
+    SET tenant_id = ref.tenant_id
+    FROM (
+      SELECT tenant_id
+      FROM instituicoes
+      ORDER BY criado_em ASC
+      LIMIT 1
+    ) ref
+    WHERE d.tenant_id IS NULL
+  `,
+  `
+    UPDATE documentos_instituicao_historico AS h
+    SET tenant_id = d.tenant_id
+    FROM documentos_instituicao d
+    WHERE h.tenant_id IS NULL
+      AND d.id = h.documento_id
+      AND d.tenant_id IS NOT NULL
+  `
+] as const;
+
+let estruturaPromise: Promise<void> | null = null;
+
 export class DocumentosInstituicaoRepository {
   private anexosSchemaReady?: Promise<void>;
+
+  private async garantirEstrutura() {
+    if (!estruturaPromise) {
+      estruturaPromise = (async () => {
+        for (const sql of estruturaSql) {
+          await prisma.$executeRawUnsafe(sql);
+        }
+      })().catch((error) => {
+        estruturaPromise = null;
+        throw error;
+      });
+    }
+
+    await estruturaPromise;
+  }
 
   private async garantirSchemaAnexos() {
     if (!this.anexosSchemaReady) {
       this.anexosSchemaReady = (async () => {
+        await this.garantirEstrutura();
+
         await prisma.$executeRaw(Prisma.sql`
           CREATE TABLE IF NOT EXISTS documentos_instituicao_anexos (
             id BIGSERIAL PRIMARY KEY,
+            tenant_id UUID,
             documento_id BIGINT NOT NULL REFERENCES documentos_instituicao(id) ON DELETE CASCADE,
             nome_arquivo VARCHAR(200) NOT NULL,
             tipo VARCHAR(30) NOT NULL,
@@ -67,60 +119,46 @@ export class DocumentosInstituicaoRepository {
           )
         `);
 
-        await prisma.$executeRaw(Prisma.sql`
-          ALTER TABLE IF EXISTS documentos_instituicao_anexos
-            ADD COLUMN IF NOT EXISTS nome_arquivo VARCHAR(200)
-        `);
+        const comandos = [
+          "ALTER TABLE IF EXISTS documentos_instituicao_anexos ADD COLUMN IF NOT EXISTS tenant_id UUID",
+          "ALTER TABLE IF EXISTS documentos_instituicao_anexos ADD COLUMN IF NOT EXISTS nome_arquivo VARCHAR(200)",
+          "ALTER TABLE IF EXISTS documentos_instituicao_anexos ADD COLUMN IF NOT EXISTS tipo VARCHAR(30)",
+          "ALTER TABLE IF EXISTS documentos_instituicao_anexos ADD COLUMN IF NOT EXISTS tipo_mime VARCHAR(120)",
+          "ALTER TABLE IF EXISTS documentos_instituicao_anexos ADD COLUMN IF NOT EXISTS tamanho VARCHAR(40)",
+          "ALTER TABLE IF EXISTS documentos_instituicao_anexos ADD COLUMN IF NOT EXISTS caminho_arquivo TEXT",
+          "ALTER TABLE IF EXISTS documentos_instituicao_anexos ADD COLUMN IF NOT EXISTS data_upload DATE DEFAULT CURRENT_DATE",
+          "ALTER TABLE IF EXISTS documentos_instituicao_anexos ADD COLUMN IF NOT EXISTS usuario VARCHAR(120) DEFAULT 'Sistema'",
+          "ALTER TABLE IF EXISTS documentos_instituicao_anexos ADD COLUMN IF NOT EXISTS criado_em TIMESTAMP NOT NULL DEFAULT NOW()",
+          `
+            ALTER TABLE IF EXISTS documentos_instituicao_anexos
+              ALTER COLUMN nome_arquivo TYPE VARCHAR(200),
+              ALTER COLUMN tipo TYPE VARCHAR(30),
+              ALTER COLUMN tipo_mime TYPE VARCHAR(120),
+              ALTER COLUMN tamanho TYPE VARCHAR(40),
+              ALTER COLUMN caminho_arquivo TYPE TEXT,
+              ALTER COLUMN usuario TYPE VARCHAR(120)
+          `,
+          `
+            CREATE INDEX IF NOT EXISTS documentos_instituicao_anexos_documento_idx
+              ON documentos_instituicao_anexos (documento_id)
+          `,
+          `
+            CREATE INDEX IF NOT EXISTS documentos_instituicao_anexos_tenant_idx
+              ON documentos_instituicao_anexos (tenant_id, documento_id, data_upload DESC)
+          `,
+          `
+            UPDATE documentos_instituicao_anexos AS a
+            SET tenant_id = d.tenant_id
+            FROM documentos_instituicao d
+            WHERE a.tenant_id IS NULL
+              AND d.id = a.documento_id
+              AND d.tenant_id IS NOT NULL
+          `
+        ];
 
-        await prisma.$executeRaw(Prisma.sql`
-          ALTER TABLE IF EXISTS documentos_instituicao_anexos
-            ADD COLUMN IF NOT EXISTS tipo VARCHAR(30)
-        `);
-
-        await prisma.$executeRaw(Prisma.sql`
-          ALTER TABLE IF EXISTS documentos_instituicao_anexos
-            ADD COLUMN IF NOT EXISTS tipo_mime VARCHAR(120)
-        `);
-
-        await prisma.$executeRaw(Prisma.sql`
-          ALTER TABLE IF EXISTS documentos_instituicao_anexos
-            ADD COLUMN IF NOT EXISTS tamanho VARCHAR(40)
-        `);
-
-        await prisma.$executeRaw(Prisma.sql`
-          ALTER TABLE IF EXISTS documentos_instituicao_anexos
-            ADD COLUMN IF NOT EXISTS caminho_arquivo TEXT
-        `);
-
-        await prisma.$executeRaw(Prisma.sql`
-          ALTER TABLE IF EXISTS documentos_instituicao_anexos
-            ADD COLUMN IF NOT EXISTS data_upload DATE DEFAULT CURRENT_DATE
-        `);
-
-        await prisma.$executeRaw(Prisma.sql`
-          ALTER TABLE IF EXISTS documentos_instituicao_anexos
-            ADD COLUMN IF NOT EXISTS usuario VARCHAR(120) DEFAULT 'Sistema'
-        `);
-
-        await prisma.$executeRaw(Prisma.sql`
-          ALTER TABLE IF EXISTS documentos_instituicao_anexos
-            ADD COLUMN IF NOT EXISTS criado_em TIMESTAMP NOT NULL DEFAULT NOW()
-        `);
-
-        await prisma.$executeRaw(Prisma.sql`
-          ALTER TABLE IF EXISTS documentos_instituicao_anexos
-            ALTER COLUMN nome_arquivo TYPE VARCHAR(200),
-            ALTER COLUMN tipo TYPE VARCHAR(30),
-            ALTER COLUMN tipo_mime TYPE VARCHAR(120),
-            ALTER COLUMN tamanho TYPE VARCHAR(40),
-            ALTER COLUMN caminho_arquivo TYPE TEXT,
-            ALTER COLUMN usuario TYPE VARCHAR(120)
-        `);
-
-        await prisma.$executeRaw(Prisma.sql`
-          CREATE INDEX IF NOT EXISTS documentos_instituicao_anexos_documento_idx
-            ON documentos_instituicao_anexos (documento_id)
-        `);
+        for (const comando of comandos) {
+          await prisma.$executeRawUnsafe(comando);
+        }
       })().catch((error) => {
         this.anexosSchemaReady = undefined;
         throw error;
@@ -130,7 +168,8 @@ export class DocumentosInstituicaoRepository {
     await this.anexosSchemaReady;
   }
 
-  async listar() {
+  async listar(tenantId: string) {
+    await this.garantirEstrutura();
     return prisma.$queryRaw<DocumentoInstituicaoRow[]>(Prisma.sql`
       SELECT
         id,
@@ -153,11 +192,13 @@ export class DocumentosInstituicaoRepository {
         criado_em,
         atualizado_em
       FROM documentos_instituicao
+      WHERE tenant_id::text = ${tenantId}
       ORDER BY emissao DESC, id DESC
     `);
   }
 
-  async buscarPorId(id: bigint) {
+  async buscarPorId(id: bigint, tenantId: string) {
+    await this.garantirEstrutura();
     const rows = await prisma.$queryRaw<DocumentoInstituicaoRow[]>(Prisma.sql`
       SELECT
         id,
@@ -181,24 +222,27 @@ export class DocumentosInstituicaoRepository {
         atualizado_em
       FROM documentos_instituicao
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
       LIMIT 1
     `);
     return rows[0] ?? null;
   }
 
-  async buscarPorIdOuFalhar(id: bigint) {
-    const registro = await this.buscarPorId(id);
+  async buscarPorIdOuFalhar(id: bigint, tenantId: string) {
+    const registro = await this.buscarPorId(id, tenantId);
     if (!registro) {
       throw new AppError("Documento institucional nao encontrado.", 404);
     }
     return registro;
   }
 
-  async criar(input: DocumentoInstituicaoInput) {
+  async criar(input: DocumentoInstituicaoInput, tenantId: string) {
+    await this.garantirEstrutura();
     const situacao = calcularSituacao(input);
     const diasAntecedencia = JSON.stringify(input.diasAntecedencia ?? []);
     const inserted = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
       INSERT INTO documentos_instituicao (
+        tenant_id,
         tipo_documento,
         orgao_emissor,
         descricao,
@@ -218,6 +262,7 @@ export class DocumentosInstituicaoRepository {
         criado_em,
         atualizado_em
       ) VALUES (
+        CAST(${tenantId} AS UUID),
         ${input.tipoDocumento},
         ${input.orgaoEmissor},
         ${trimOrUndefined(input.descricao ?? undefined)},
@@ -244,11 +289,12 @@ export class DocumentosInstituicaoRepository {
     if (!id) {
       throw new AppError("Nao foi possivel criar documento institucional.", 500);
     }
-    return this.buscarPorIdOuFalhar(id);
+    return this.buscarPorIdOuFalhar(id, tenantId);
   }
 
-  async atualizar(id: bigint, input: DocumentoInstituicaoInput) {
-    await this.buscarPorIdOuFalhar(id);
+  async atualizar(id: bigint, input: DocumentoInstituicaoInput, tenantId: string) {
+    await this.garantirEstrutura();
+    await this.buscarPorIdOuFalhar(id, tenantId);
     const situacao = calcularSituacao(input);
     const diasAntecedencia = JSON.stringify(input.diasAntecedencia ?? []);
 
@@ -273,22 +319,25 @@ export class DocumentosInstituicaoRepository {
         situacao = ${situacao},
         atualizado_em = NOW()
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
 
-    return this.buscarPorIdOuFalhar(id);
+    return this.buscarPorIdOuFalhar(id, tenantId);
   }
 
-  async excluir(id: bigint) {
-    await this.buscarPorIdOuFalhar(id);
+  async excluir(id: bigint, tenantId: string) {
+    await this.garantirEstrutura();
+    await this.buscarPorIdOuFalhar(id, tenantId);
     await prisma.$executeRaw(Prisma.sql`
       DELETE FROM documentos_instituicao
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
   }
 
-  async listarAnexos(documentoId: bigint) {
+  async listarAnexos(documentoId: bigint, tenantId: string) {
     await this.garantirSchemaAnexos();
-    await this.buscarPorIdOuFalhar(documentoId);
+    await this.buscarPorIdOuFalhar(documentoId, tenantId);
     return prisma.$queryRaw<DocumentoInstituicaoAnexoRow[]>(Prisma.sql`
       SELECT
         id,
@@ -303,11 +352,12 @@ export class DocumentosInstituicaoRepository {
         criado_em
       FROM documentos_instituicao_anexos
       WHERE documento_id = ${documentoId}
+        AND tenant_id::text = ${tenantId}
       ORDER BY data_upload DESC, id DESC
     `);
   }
 
-  async buscarAnexoPorId(documentoId: bigint, anexoId: bigint) {
+  async buscarAnexoPorId(documentoId: bigint, anexoId: bigint, tenantId: string) {
     await this.garantirSchemaAnexos();
     const rows = await prisma.$queryRaw<DocumentoInstituicaoAnexoRow[]>(Prisma.sql`
       SELECT
@@ -324,25 +374,31 @@ export class DocumentosInstituicaoRepository {
       FROM documentos_instituicao_anexos
       WHERE documento_id = ${documentoId}
         AND id = ${anexoId}
+        AND tenant_id::text = ${tenantId}
       LIMIT 1
     `);
     return rows[0] ?? null;
   }
 
-  async buscarAnexoPorIdOuFalhar(documentoId: bigint, anexoId: bigint) {
-    const anexo = await this.buscarAnexoPorId(documentoId, anexoId);
+  async buscarAnexoPorIdOuFalhar(documentoId: bigint, anexoId: bigint, tenantId: string) {
+    const anexo = await this.buscarAnexoPorId(documentoId, anexoId, tenantId);
     if (!anexo) {
       throw new AppError("Anexo nao encontrado.", 404);
     }
     return anexo;
   }
 
-  async adicionarAnexo(documentoId: bigint, input: DocumentoInstituicaoAnexoInput) {
+  async adicionarAnexo(
+    documentoId: bigint,
+    input: DocumentoInstituicaoAnexoInput,
+    tenantId: string
+  ) {
     await this.garantirSchemaAnexos();
-    await this.buscarPorIdOuFalhar(documentoId);
+    await this.buscarPorIdOuFalhar(documentoId, tenantId);
 
     const inserted = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
       INSERT INTO documentos_instituicao_anexos (
+        tenant_id,
         documento_id,
         nome_arquivo,
         tipo,
@@ -353,6 +409,7 @@ export class DocumentosInstituicaoRepository {
         usuario,
         criado_em
       ) VALUES (
+        CAST(${tenantId} AS UUID),
         ${documentoId},
         ${input.nomeArquivo},
         ${input.tipo},
@@ -370,12 +427,17 @@ export class DocumentosInstituicaoRepository {
     if (!id) {
       throw new AppError("Nao foi possivel adicionar anexo.", 500);
     }
-    return this.buscarAnexoPorIdOuFalhar(documentoId, id);
+    return this.buscarAnexoPorIdOuFalhar(documentoId, id, tenantId);
   }
 
-  async atualizarAnexo(documentoId: bigint, anexoId: bigint, input: DocumentoInstituicaoAnexoInput) {
+  async atualizarAnexo(
+    documentoId: bigint,
+    anexoId: bigint,
+    input: DocumentoInstituicaoAnexoInput,
+    tenantId: string
+  ) {
     await this.garantirSchemaAnexos();
-    await this.buscarAnexoPorIdOuFalhar(documentoId, anexoId);
+    await this.buscarAnexoPorIdOuFalhar(documentoId, anexoId, tenantId);
 
     await prisma.$executeRaw(Prisma.sql`
       UPDATE documentos_instituicao_anexos
@@ -389,30 +451,34 @@ export class DocumentosInstituicaoRepository {
         usuario = ${input.usuario}
       WHERE documento_id = ${documentoId}
         AND id = ${anexoId}
+        AND tenant_id::text = ${tenantId}
     `);
 
-    return this.buscarAnexoPorIdOuFalhar(documentoId, anexoId);
+    return this.buscarAnexoPorIdOuFalhar(documentoId, anexoId, tenantId);
   }
 
-  async excluirAnexo(documentoId: bigint, anexoId: bigint) {
+  async excluirAnexo(documentoId: bigint, anexoId: bigint, tenantId: string) {
     await this.garantirSchemaAnexos();
-    const anexo = await this.buscarAnexoPorIdOuFalhar(documentoId, anexoId);
+    const anexo = await this.buscarAnexoPorIdOuFalhar(documentoId, anexoId, tenantId);
 
     await prisma.$executeRaw(Prisma.sql`
       DELETE FROM documentos_instituicao_anexos
       WHERE documento_id = ${documentoId}
         AND id = ${anexoId}
+        AND tenant_id::text = ${tenantId}
     `);
 
     return anexo;
   }
 
-  async existeHistoricoAlertaEmail(documentoId: bigint, observacao: string) {
+  async existeHistoricoAlertaEmail(documentoId: bigint, observacao: string, tenantId: string) {
+    await this.garantirEstrutura();
     const rows = await prisma.$queryRaw<Array<{ existe: boolean }>>(Prisma.sql`
       SELECT EXISTS (
         SELECT 1
         FROM documentos_instituicao_historico
         WHERE documento_id = ${documentoId}
+          AND tenant_id::text = ${tenantId}
           AND tipo_alteracao = 'Alerta por e-mail'
           AND observacao = ${observacao}
       ) AS existe
@@ -421,8 +487,9 @@ export class DocumentosInstituicaoRepository {
     return Boolean(rows[0]?.existe);
   }
 
-  async listarHistorico(documentoId: bigint) {
-    await this.buscarPorIdOuFalhar(documentoId);
+  async listarHistorico(documentoId: bigint, tenantId: string) {
+    await this.garantirEstrutura();
+    await this.buscarPorIdOuFalhar(documentoId, tenantId);
     return prisma.$queryRaw<DocumentoInstituicaoHistoricoRow[]>(Prisma.sql`
       SELECT
         id,
@@ -434,12 +501,18 @@ export class DocumentosInstituicaoRepository {
         criado_em
       FROM documentos_instituicao_historico
       WHERE documento_id = ${documentoId}
+        AND tenant_id::text = ${tenantId}
       ORDER BY data_hora DESC, id DESC
     `);
   }
 
-  async adicionarHistorico(documentoId: bigint, input: DocumentoInstituicaoHistoricoInput) {
-    await this.buscarPorIdOuFalhar(documentoId);
+  async adicionarHistorico(
+    documentoId: bigint,
+    input: DocumentoInstituicaoHistoricoInput,
+    tenantId: string
+  ) {
+    await this.garantirEstrutura();
+    await this.buscarPorIdOuFalhar(documentoId, tenantId);
     const dataHora = trimOrUndefined(input.dataHora ?? undefined);
     const data = dataHora ? new Date(dataHora) : new Date();
     if (Number.isNaN(data.getTime())) {
@@ -448,6 +521,7 @@ export class DocumentosInstituicaoRepository {
 
     const inserted = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
       INSERT INTO documentos_instituicao_historico (
+        tenant_id,
         documento_id,
         data_hora,
         usuario,
@@ -455,6 +529,7 @@ export class DocumentosInstituicaoRepository {
         observacao,
         criado_em
       ) VALUES (
+        CAST(${tenantId} AS UUID),
         ${documentoId},
         ${data},
         ${input.usuario},
@@ -481,6 +556,7 @@ export class DocumentosInstituicaoRepository {
         criado_em
       FROM documentos_instituicao_historico
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
       LIMIT 1
     `);
 

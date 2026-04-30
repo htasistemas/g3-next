@@ -21,6 +21,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useUnidadeAssistencialAtual } from "@/features/unidades-assistenciais/use-unidades-assistenciais";
+import { useAuth } from "@/hooks/use-auth";
 import {
   beneficiosComerciais,
   comparativoLinhas,
@@ -230,6 +231,7 @@ function SectionHeader({
 }
 
 export function LicencaUsoPage() {
+  const { usuario } = useAuth();
   const [abaAtiva, setAbaAtiva] = useState("licenca");
   const [config, setConfig] = useState<LicencaUsoConfiguracao>(configuracaoInicial);
   const [carregando, setCarregando] = useState(true);
@@ -243,12 +245,16 @@ export function LicencaUsoPage() {
     realizados: []
   });
   const { data: unidadeAtualData } = useUnidadeAssistencialAtual();
+  const tenantId = usuario?.tenant_id ?? "sem-tenant";
 
   useEffect(() => {
     let ativo = true;
 
     void (async () => {
       setCarregando(true);
+      setMensagem(null);
+      setCheckoutGeradoUrl("");
+      setHistorico({ pendentes: [], realizados: [] });
       try {
         const data = await licencaUsoService.obterConfiguracao();
         if (!ativo) return;
@@ -284,7 +290,7 @@ export function LicencaUsoPage() {
     return () => {
       ativo = false;
     };
-  }, []);
+  }, [tenantId]);
 
   const cnpjAtual = unidadeAtualData?.unidade?.cnpj ?? config.instituicaoCnpj ?? "";
   const emailUnidadeAtual =

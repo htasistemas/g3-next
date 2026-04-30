@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
 import { beneficiariosService } from "@/services/beneficiarios.service";
 import type { Beneficiario, BeneficiarioFiltro } from "@/types/beneficiario";
 
@@ -7,18 +8,20 @@ type UseBeneficiariosOptions = {
 };
 
 export function useBeneficiarios(filtros: BeneficiarioFiltro, options?: UseBeneficiariosOptions) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["beneficiarios", filtros],
+    queryKey: ["beneficiarios", usuario?.tenant_id ?? "sem-tenant", filtros],
     queryFn: () => beneficiariosService.listar(filtros),
-    enabled: options?.enabled ?? true
+    enabled: (options?.enabled ?? true) && !!usuario
   });
 }
 
 export function useBeneficiario(id?: string) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["beneficiario", id],
+    queryKey: ["beneficiario", usuario?.tenant_id ?? "sem-tenant", id],
     queryFn: () => beneficiariosService.buscarPorId(id as string),
-    enabled: !!id
+    enabled: !!usuario && !!id
   });
 }
 
@@ -55,8 +58,10 @@ export function useRemoverBeneficiario() {
 }
 
 export function useProximoCodigo() {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["beneficiarios", "proximo-codigo"],
-    queryFn: () => beneficiariosService.obterProximoCodigo()
+    queryKey: ["beneficiarios", "proximo-codigo", usuario?.tenant_id ?? "sem-tenant"],
+    queryFn: () => beneficiariosService.obterProximoCodigo(),
+    enabled: !!usuario
   });
 }

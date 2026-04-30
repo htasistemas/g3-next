@@ -24,7 +24,7 @@ export class BeneficiarioService {
   private readonly repository = new BeneficiarioRepository();
   private readonly emailService = new EmailService();
 
-  async listar(rawFilters: unknown) {
+  async listar(rawFilters: unknown, tenantId?: string) {
     const filtersNormalizados =
       rawFilters && typeof rawFilters === "object"
         ? normalizarObjetoTexto(
@@ -37,25 +37,26 @@ export class BeneficiarioService {
         : rawFilters;
 
     const filters = beneficiarioFiltersSchema.parse(filtersNormalizados);
-    const beneficiarios = await this.repository.listar(filters);
+    const beneficiarios = await this.repository.listar(filters, this.parseTenantId(tenantId));
     return beneficiarios.map(mapBeneficiarioToResponse);
   }
 
-  async buscarPorId(rawId: string) {
+  async buscarPorId(rawId: string, tenantId?: string) {
     const id = this.parseId(rawId);
-    const beneficiario = await this.repository.buscarPorIdOuFalhar(id);
+    const beneficiario = await this.repository.buscarPorIdOuFalhar(id, this.parseTenantId(tenantId));
     return mapBeneficiarioToResponse(beneficiario);
   }
 
-  async criar(rawInput: unknown, rawUsuarioId?: string) {
+  async criar(rawInput: unknown, rawUsuarioId?: string, tenantId?: string) {
     const inputNormalizado = this.normalizarPayload(rawInput);
     const input = beneficiarioInputSchema.parse(inputNormalizado);
-    await this.validarDuplicidadeCadastro(input);
+    const tenantObrigatorio = this.parseTenantId(tenantId);
+    await this.validarDuplicidadeCadastro(input, tenantObrigatorio);
     const usuarioId = this.parseUsuarioId(rawUsuarioId);
     const preparado = await this.prepararArquivosPayload(input, usuarioId);
 
     try {
-      const beneficiario = await this.repository.criar(preparado.input);
+      const beneficiario = await this.repository.criar(preparado.input, tenantObrigatorio);
       await this.vincularArquivos(preparado.novosCaminhos, beneficiario.id);
       return mapBeneficiarioToResponse(beneficiario);
     } catch (error) {
@@ -64,19 +65,21 @@ export class BeneficiarioService {
     }
   }
 
-  async atualizar(rawId: string, rawInput: unknown, rawUsuarioId?: string) {
+  async atualizar(rawId: string, rawInput: unknown, rawUsuarioId?: string, tenantId?: string) {
     const id = this.parseId(rawId);
     const inputNormalizado = this.normalizarPayload(rawInput);
     const input = beneficiarioInputSchema.parse(inputNormalizado);
+    const tenantObrigatorio = this.parseTenantId(tenantId);
     const usuarioId = this.parseUsuarioId(rawUsuarioId);
-    const existente = await this.repository.buscarPorIdOuFalhar(id);
+    await this.validarDuplicidadeCadastro(input, tenantObrigatorio, id);
+    const existente = await this.repository.buscarPorIdOuFalhar(id, tenantObrigatorio);
     const snapshotAnterior = mapBeneficiarioToResponse(existente);
     const preparado = await this.prepararArquivosPayload(input, usuarioId, id);
 
     try {
       let beneficiario;
       try {
-        beneficiario = await this.repository.atualizar(id, preparado.input);
+        beneficiario = await this.repository.atualizar(id, preparado.input, tenantObrigatorio);
       } catch (error) {
         if (error instanceof AppError) {
           throw error;
@@ -124,22 +127,23 @@ export class BeneficiarioService {
     }
   }
 
-  async remover(rawId: string, rawUsuarioId?: string) {
+  async remover(rawId: string, rawUsuarioId?: string, tenantId?: string) {
     const id = this.parseId(rawId);
+    const tenantObrigatorio = this.parseTenantId(tenantId);
     const usuarioId = this.parseUsuarioId(rawUsuarioId);
-    const existente = await this.repository.buscarPorIdOuFalhar(id);
-    await this.repository.remover(id);
+    const existente = await this.repository.buscarPorIdOuFalhar(id, tenantObrigatorio);
+    await this.repository.remover(id, tenantObrigatorio);
     await this.limparArquivosSubstituidos(this.coletarCaminhosRegistro(existente), [], usuarioId);
   }
 
-  async obterProximoCodigo() {
-    const codigo = await this.repository.obterProximoCodigo();
+  async obterProximoCodigo(tenantId?: string) {
+    const codigo = await this.repository.obterProximoCodigo(this.parseTenantId(tenantId));
     return { codigo };
   }
 
-  async obterSugestaoEndereco(rawQuery: unknown) {
+  async obterSugestaoEndereco(rawQuery: unknown, tenantId?: string) {
     const query = beneficiarioAddressSuggestionSchema.parse(rawQuery);
-    return this.repository.buscarSugestaoEndereco(query);
+    return this.repository.buscarSugestaoEndereco(query, this.parseTenantId(tenantId));
   }
 
   private parseId(rawId: string): bigint {
@@ -170,8 +174,12 @@ export class BeneficiarioService {
     return inputBase;
   }
 
-  private async validarDuplicidadeCadastro(input: BeneficiarioInput, idIgnorado?: bigint) {
-    const duplicidade = await this.repository.buscarDuplicidadeCadastro(input, idIgnorado);
+  private async validarDuplicidadeCadastro(
+    input: BeneficiarioInput,
+    tenantId: string,
+    idIgnorado?: bigint
+  ) {
+    const duplicidade = await this.repository.buscarDuplicidadeCadastro(input, tenantId, idIgnorado);
     if (!duplicidade) {
       return;
     }
@@ -323,6 +331,14 @@ export class BeneficiarioService {
       return undefined;
     }
     return BigInt(parsed);
+  }
+
+  private parseTenantId(rawTenantId?: string) {
+    const tenantId = rawTenantId?.trim();
+    if (!tenantId) {
+      throw new AppError("Tenant da sessao nao identificado.", 401);
+    }
+    return tenantId;
   }
 
   private async enviarEmailAtualizacaoCadastro(

@@ -32,6 +32,7 @@ export type MensagemHistoricoStatus = (typeof mensagemHistoricoStatusValues)[num
 export type MensagemAtor = {
   id?: string;
   nomeUsuario?: string;
+  tenant_id?: string;
 };
 
 export type MensagemTaxonomiaInput = {
@@ -203,6 +204,7 @@ export type MensagemAuditoriaInput = {
   modeloId?: bigint | null;
   usuarioId?: string | null;
   usuarioNome?: string | null;
+  tenantId?: string | null;
   dadosJson?: string | null;
 };
 

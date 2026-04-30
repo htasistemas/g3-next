@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, History, Home, List, MapPinned, Plus, Printer, Save, Trash2, UserRound, UsersRound } from "lucide-react";
 import { AdminPageLayout, type AdminAction, type AdminTab } from "@/components/admin/admin-page-layout";
 import { PopupMensagem, type PopupMensagemState } from "@/components/admin/admin-popups";
+import { useAuth } from "@/hooks/use-auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -65,6 +66,7 @@ const mensagemErroApi = (error: unknown) => {
 };
 
 export function CadastroVinculoFamiliarPage() {
+  const { usuario } = useAuth();
   const queryClient = useQueryClient();
   const [abaAtiva, setAbaAtiva] = useState<AbaId>("listagem");
   const [popup, setPopup] = useState<PopupMensagemState | null>(null);
@@ -89,9 +91,9 @@ export function CadastroVinculoFamiliarPage() {
   const transferirMembro = useTransferirMembroFamilia();
   const desmembrarFamilia = useDesmembrarFamilia();
   const buscaBeneficiarios = useQuery({
-    queryKey: ["familias", "busca-beneficiario", buscaBeneficiario],
+    queryKey: ["familias", "busca-beneficiario", usuario?.tenant_id ?? "sem-tenant", buscaBeneficiario],
     queryFn: () => beneficiariosService.listar({ nome: buscaBeneficiario || undefined }),
-    enabled: buscaBeneficiario.trim().length >= 2
+    enabled: !!usuario && buscaBeneficiario.trim().length >= 2
   });
 
   const familias = familiasQuery.data?.familias ?? [];

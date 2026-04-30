@@ -12,7 +12,7 @@ const georreferenciamentoService = new DashboardGeorreferenciamentoService();
 
 export class DashboardController {
   async obterAssistencia(request: AuthenticatedRequest, response: Response) {
-    const dashboard = await service.obterAssistencia(request.query);
+    const dashboard = await service.obterAssistencia(request.query, request.authUser?.tenant_id);
     return response.json(dashboard);
   }
 
@@ -31,21 +31,22 @@ export class DashboardController {
     return response.json(detalhamento);
   }
 
-  async obterVulnerabilidade(_request: AuthenticatedRequest, response: Response) {
-    const dashboard = await vulnerabilidadeService.obterMapa();
+  async obterVulnerabilidade(request: AuthenticatedRequest, response: Response) {
+    const dashboard = await vulnerabilidadeService.obterMapa(request.authUser?.tenant_id);
     return response.json(dashboard);
   }
 
   async geocodificarVulnerabilidade(request: AuthenticatedRequest, response: Response) {
     const limite = typeof request.body?.limite === "number" ? request.body.limite : Number(request.body?.limite);
     const resultado = await vulnerabilidadeService.geocodificarPendentes(
-      Number.isFinite(limite) ? limite : 15
+      Number.isFinite(limite) ? limite : 15,
+      request.authUser?.tenant_id
     );
     return response.json(resultado);
   }
 
-  async listarOpcoesGeorreferenciamento(_request: AuthenticatedRequest, response: Response) {
-    const payload = await georreferenciamentoService.listarOpcoesFiltros();
+  async listarOpcoesGeorreferenciamento(request: AuthenticatedRequest, response: Response) {
+    const payload = await georreferenciamentoService.listarOpcoesFiltros(request.authUser);
     return response.json(payload);
   }
 
@@ -63,7 +64,7 @@ export class DashboardController {
   }
 
   async buscarVinculosGeorreferenciamento(request: AuthenticatedRequest, response: Response) {
-    const payload = await georreferenciamentoService.buscarVinculos(request.query);
+    const payload = await georreferenciamentoService.buscarVinculos(request.query, request.authUser);
     return response.json({ itens: payload });
   }
 

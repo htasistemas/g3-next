@@ -9,29 +9,42 @@ import {
 import { CentralAtendimentosRepository } from "../repositories/central-atendimentos.repository.js";
 import type { CentralRelatorioTipo } from "../central-atendimentos.types.js";
 
-type AuthUser = { id?: string; nome?: string; nomeUsuario?: string };
+type AuthUser = {
+  id?: string;
+  nome?: string;
+  nomeUsuario?: string;
+  tenant_id?: string;
+  instituicao_id?: string;
+};
 
 export class CentralAtendimentosService {
   private readonly repository = new CentralAtendimentosRepository();
 
-  async buscarBeneficiarios(rawFilters: unknown) {
+  async buscarBeneficiarios(rawFilters: unknown, authUser?: AuthUser) {
     const filters = centralAtendimentosBuscaFiltersSchema.parse(rawFilters ?? {});
-    return this.repository.buscarBeneficiarios(filters);
+    return this.repository.buscarBeneficiarios(filters, this.parseTenant(authUser));
   }
 
-  async obterVisaoGeral(rawBeneficiarioId: string) {
-    return this.repository.obterVisaoGeral(this.parseId(rawBeneficiarioId, "beneficiário"));
+  async obterVisaoGeral(rawBeneficiarioId: string, authUser?: AuthUser) {
+    return this.repository.obterVisaoGeral(
+      this.parseId(rawBeneficiarioId, "beneficiario"),
+      this.parseTenant(authUser)
+    );
   }
 
-  async listarAtendimentos(rawBeneficiarioId: string) {
-    return this.repository.listarAtendimentos(this.parseId(rawBeneficiarioId, "beneficiário"));
+  async listarAtendimentos(rawBeneficiarioId: string, authUser?: AuthUser) {
+    return this.repository.listarAtendimentos(
+      this.parseId(rawBeneficiarioId, "beneficiario"),
+      this.parseTenant(authUser)
+    );
   }
 
   async criarAtendimento(rawBeneficiarioId: string, rawInput: unknown, authUser?: AuthUser) {
     return this.repository.criarAtendimento(
-      this.parseId(rawBeneficiarioId, "beneficiário"),
+      this.parseId(rawBeneficiarioId, "beneficiario"),
       centralAtendimentoInputSchema.parse(rawInput),
-      authUser
+      authUser,
+      this.parseTenant(authUser)
     );
   }
 
@@ -43,29 +56,35 @@ export class CentralAtendimentosService {
   ) {
     return this.repository.atualizarAtendimento(
       this.parseId(rawAtendimentoId, "atendimento"),
-      this.parseId(rawBeneficiarioId, "beneficiário"),
+      this.parseId(rawBeneficiarioId, "beneficiario"),
       centralAtendimentoInputSchema.parse(rawInput),
-      authUser
+      authUser,
+      this.parseTenant(authUser)
     );
   }
 
   async removerAtendimento(rawBeneficiarioId: string, rawAtendimentoId: string, authUser?: AuthUser) {
     await this.repository.removerAtendimento(
       this.parseId(rawAtendimentoId, "atendimento"),
-      this.parseId(rawBeneficiarioId, "beneficiário"),
-      authUser
+      this.parseId(rawBeneficiarioId, "beneficiario"),
+      authUser,
+      this.parseTenant(authUser)
     );
   }
 
-  async listarBeneficios(rawBeneficiarioId: string) {
-    return this.repository.listarBeneficios(this.parseId(rawBeneficiarioId, "beneficiário"));
+  async listarBeneficios(rawBeneficiarioId: string, authUser?: AuthUser) {
+    return this.repository.listarBeneficios(
+      this.parseId(rawBeneficiarioId, "beneficiario"),
+      this.parseTenant(authUser)
+    );
   }
 
   async criarBeneficio(rawBeneficiarioId: string, rawInput: unknown, authUser?: AuthUser) {
     return this.repository.criarBeneficio(
-      this.parseId(rawBeneficiarioId, "beneficiário"),
+      this.parseId(rawBeneficiarioId, "beneficiario"),
       centralBeneficioInputSchema.parse(rawInput),
-      authUser
+      authUser,
+      this.parseTenant(authUser)
     );
   }
 
@@ -76,30 +95,36 @@ export class CentralAtendimentosService {
     authUser?: AuthUser
   ) {
     return this.repository.atualizarBeneficio(
-      this.parseId(rawBeneficioId, "benefício"),
-      this.parseId(rawBeneficiarioId, "beneficiário"),
+      this.parseId(rawBeneficioId, "beneficio"),
+      this.parseId(rawBeneficiarioId, "beneficiario"),
       centralBeneficioInputSchema.parse(rawInput),
-      authUser
+      authUser,
+      this.parseTenant(authUser)
     );
   }
 
   async removerBeneficio(rawBeneficiarioId: string, rawBeneficioId: string, authUser?: AuthUser) {
     await this.repository.removerBeneficio(
-      this.parseId(rawBeneficioId, "benefício"),
-      this.parseId(rawBeneficiarioId, "beneficiário"),
-      authUser
+      this.parseId(rawBeneficioId, "beneficio"),
+      this.parseId(rawBeneficiarioId, "beneficiario"),
+      authUser,
+      this.parseTenant(authUser)
     );
   }
 
-  async listarEncaminhamentos(rawBeneficiarioId: string) {
-    return this.repository.listarEncaminhamentos(this.parseId(rawBeneficiarioId, "beneficiário"));
+  async listarEncaminhamentos(rawBeneficiarioId: string, authUser?: AuthUser) {
+    return this.repository.listarEncaminhamentos(
+      this.parseId(rawBeneficiarioId, "beneficiario"),
+      this.parseTenant(authUser)
+    );
   }
 
   async criarEncaminhamento(rawBeneficiarioId: string, rawInput: unknown, authUser?: AuthUser) {
     return this.repository.criarEncaminhamento(
-      this.parseId(rawBeneficiarioId, "beneficiário"),
+      this.parseId(rawBeneficiarioId, "beneficiario"),
       centralEncaminhamentoInputSchema.parse(rawInput),
-      authUser
+      authUser,
+      this.parseTenant(authUser)
     );
   }
 
@@ -111,9 +136,10 @@ export class CentralAtendimentosService {
   ) {
     return this.repository.atualizarEncaminhamento(
       this.parseId(rawEncaminhamentoId, "encaminhamento"),
-      this.parseId(rawBeneficiarioId, "beneficiário"),
+      this.parseId(rawBeneficiarioId, "beneficiario"),
       centralEncaminhamentoInputSchema.parse(rawInput),
-      authUser
+      authUser,
+      this.parseTenant(authUser)
     );
   }
 
@@ -124,37 +150,55 @@ export class CentralAtendimentosService {
   ) {
     await this.repository.removerEncaminhamento(
       this.parseId(rawEncaminhamentoId, "encaminhamento"),
-      this.parseId(rawBeneficiarioId, "beneficiário"),
-      authUser
+      this.parseId(rawBeneficiarioId, "beneficiario"),
+      authUser,
+      this.parseTenant(authUser)
     );
   }
 
-  async listarHistorico(rawBeneficiarioId: string) {
-    return this.repository.listarHistorico(this.parseId(rawBeneficiarioId, "beneficiário"));
+  async listarHistorico(rawBeneficiarioId: string, authUser?: AuthUser) {
+    return this.repository.listarHistorico(
+      this.parseId(rawBeneficiarioId, "beneficiario"),
+      this.parseTenant(authUser)
+    );
   }
 
-  async listarCustos(rawBeneficiarioId: string) {
-    return this.repository.listarCustos(this.parseId(rawBeneficiarioId, "beneficiário"));
+  async listarCustos(rawBeneficiarioId: string, authUser?: AuthUser) {
+    return this.repository.listarCustos(
+      this.parseId(rawBeneficiarioId, "beneficiario"),
+      this.parseTenant(authUser)
+    );
   }
 
-  async listarGrupoFamiliar(rawBeneficiarioId: string) {
-    return this.repository.listarGrupoFamiliar(this.parseId(rawBeneficiarioId, "beneficiário"));
+  async listarGrupoFamiliar(rawBeneficiarioId: string, authUser?: AuthUser) {
+    return this.repository.listarGrupoFamiliar(
+      this.parseId(rawBeneficiarioId, "beneficiario"),
+      this.parseTenant(authUser)
+    );
   }
 
-  async listarAlertas(rawBeneficiarioId: string) {
-    return this.repository.listarAlertas(this.parseId(rawBeneficiarioId, "beneficiário"));
+  async listarAlertas(rawBeneficiarioId: string, authUser?: AuthUser) {
+    return this.repository.listarAlertas(
+      this.parseId(rawBeneficiarioId, "beneficiario"),
+      this.parseTenant(authUser)
+    );
   }
 
-  async gerarRelatorio(rawBeneficiarioId: string, rawTipo: string) {
+  async gerarRelatorio(rawBeneficiarioId: string, rawTipo: string, authUser?: AuthUser) {
     const tipo = this.parseTipoRelatorio(rawTipo);
-    return this.repository.gerarRelatorio(this.parseId(rawBeneficiarioId, "beneficiário"), tipo);
+    return this.repository.gerarRelatorio(
+      this.parseId(rawBeneficiarioId, "beneficiario"),
+      tipo,
+      this.parseTenant(authUser)
+    );
   }
 
-  async gerarRelatorioPdf(rawBeneficiarioId: string, rawTipo: string) {
+  async gerarRelatorioPdf(rawBeneficiarioId: string, rawTipo: string, authUser?: AuthUser) {
     const tipo = this.parseTipoRelatorio(rawTipo);
-    const beneficiarioId = this.parseId(rawBeneficiarioId, "beneficiário");
-    const visao = await this.repository.obterVisaoGeral(beneficiarioId);
-    const relatorio = await this.repository.gerarRelatorio(beneficiarioId, tipo);
+    const beneficiarioId = this.parseId(rawBeneficiarioId, "beneficiario");
+    const tenantId = this.parseTenant(authUser);
+    const visao = await this.repository.obterVisaoGeral(beneficiarioId, tenantId);
+    const relatorio = await this.repository.gerarRelatorio(beneficiarioId, tipo, tenantId);
     return this.renderizarPdf(visao.beneficiario.nomeCompleto, relatorio, tipo);
   }
 
@@ -172,9 +216,9 @@ export class CentralAtendimentosService {
       });
       doc.on("error", reject);
 
-      doc.fontSize(18).text("Central de Atendimentos", { align: "center" });
+      doc.fontSize(18).text("Central de atendimentos", { align: "center" });
       doc.moveDown(0.5);
-      doc.fontSize(11).fillColor("#475569").text(`Relatório: ${this.nomeRelatorio(tipo)}`, { align: "center" });
+      doc.fontSize(11).fillColor("#475569").text(`Relatorio: ${this.nomeRelatorio(tipo)}`, { align: "center" });
       doc.text(`Emitido em: ${new Date().toLocaleString("pt-BR")}`, { align: "center" });
       doc.moveDown(1.5);
       doc.fillColor("#0f172a");
@@ -231,7 +275,7 @@ export class CentralAtendimentosService {
   private parseTipoRelatorio(rawTipo: string) {
     const tipo = rawTipo.trim() as CentralRelatorioTipo;
     if (!["individual", "familiar", "financeiro-social", "social"].includes(tipo)) {
-      throw new AppError("Tipo de relatório inválido.", 400);
+      throw new AppError("Tipo de relatorio invalido.", 400);
     }
     return tipo;
   }
@@ -239,9 +283,18 @@ export class CentralAtendimentosService {
   private parseId(rawId: string, label: string) {
     const id = Number(rawId);
     if (!Number.isInteger(id) || id <= 0) {
-      throw new AppError(`Identificador de ${label} inválido.`, 400);
+      throw new AppError(`Identificador de ${label} invalido.`, 400);
     }
     return BigInt(id);
+  }
+
+  private parseTenant(authUser?: AuthUser) {
+    const tenantId = authUser?.tenant_id?.trim();
+    const instituicaoId = authUser?.instituicao_id?.trim();
+    if (!tenantId || !instituicaoId) {
+      throw new AppError("Tenant da sessao nao identificado.", 401);
+    }
+    return tenantId;
   }
 
   private nomeRelatorio(tipo: CentralRelatorioTipo) {

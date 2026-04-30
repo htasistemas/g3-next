@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
 import { familiasService } from "@/services/familias.service";
 import type {
   Familia,
@@ -10,41 +11,47 @@ import type {
 } from "@/types/familia";
 
 export function useFamilias(filtros: FamiliaFiltro) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["familias", filtros],
-    queryFn: () => familiasService.listar(filtros)
+    queryKey: ["familias", usuario?.tenant_id ?? "sem-tenant", filtros],
+    queryFn: () => familiasService.listar(filtros),
+    enabled: !!usuario
   });
 }
 
 export function useFamilia(id?: string) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["familia", id],
+    queryKey: ["familia", usuario?.tenant_id ?? "sem-tenant", id],
     queryFn: () => familiasService.buscarPorId(id as string),
-    enabled: Boolean(id)
+    enabled: !!usuario && Boolean(id)
   });
 }
 
 export function useFamiliaHistorico(id?: string) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["familia", id, "historico"],
+    queryKey: ["familia", usuario?.tenant_id ?? "sem-tenant", id, "historico"],
     queryFn: () => familiasService.listarHistorico(id as string),
-    enabled: Boolean(id)
+    enabled: !!usuario && Boolean(id)
   });
 }
 
 export function useFamiliaAlertas(id?: string) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["familia", id, "alertas"],
+    queryKey: ["familia", usuario?.tenant_id ?? "sem-tenant", id, "alertas"],
     queryFn: () => familiasService.listarAlertas(id as string),
-    enabled: Boolean(id)
+    enabled: !!usuario && Boolean(id)
   });
 }
 
 export function useValidacaoBeneficioFamiliar(id?: string, beneficioNome?: string) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["familia", id, "validacao-beneficio", beneficioNome],
+    queryKey: ["familia", usuario?.tenant_id ?? "sem-tenant", id, "validacao-beneficio", beneficioNome],
     queryFn: () => familiasService.validarBeneficioFamiliar(id as string, beneficioNome as string),
-    enabled: Boolean(id && beneficioNome)
+    enabled: !!usuario && Boolean(id && beneficioNome)
   });
 }
 

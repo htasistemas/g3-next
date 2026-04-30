@@ -45,6 +45,7 @@ export type ContabilidadeAtor = {
   permissoes?: string[];
   ip?: string | null;
   maquina?: string | null;
+  tenantId?: string;
 };
 
 export type ContaBancariaInput = {

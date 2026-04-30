@@ -39,6 +39,7 @@ export type AutorizacaoCompraAtor = {
   usuarioId?: bigint;
   nomeUsuario?: string;
   permissoes?: string[];
+  tenantId?: string;
   ip?: string | null;
   maquina?: string | null;
 };

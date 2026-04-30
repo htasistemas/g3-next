@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
 import { fotosEventosService } from "@/services/fotos-eventos.service";
 import type { FotoEventoFotosLotePayload, FotoEventoPayload } from "@/types/fotos-eventos";
 
@@ -15,15 +16,17 @@ type FiltrosFotoEvento = {
 };
 
 export function useFotosEventos(filtros: FiltrosFotoEvento) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["fotos-eventos", filtros],
+    queryKey: ["fotos-eventos", usuario?.tenant_id ?? "sem-tenant", filtros],
     queryFn: () => fotosEventosService.listar(filtros)
   });
 }
 
 export function useFotoEvento(id?: number) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["fotos-eventos", "detalhe", id ?? 0],
+    queryKey: ["fotos-eventos", "detalhe", usuario?.tenant_id ?? "sem-tenant", id ?? 0],
     queryFn: () => fotosEventosService.obter(id as number),
     enabled: !!id
   });

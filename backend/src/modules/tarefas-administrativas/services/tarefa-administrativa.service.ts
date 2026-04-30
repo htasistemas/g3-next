@@ -11,20 +11,23 @@ import { TarefaAdministrativaRepository } from "../repositories/tarefa-administr
 export class TarefaAdministrativaService {
   private readonly repository = new TarefaAdministrativaRepository();
 
-  async listar() {
-    const registros = await this.repository.listar();
+  async listar(rawTenantId?: string) {
+    const tenantId = this.parseTenant(rawTenantId);
+    const registros = await this.repository.listar(tenantId);
     return registros.map((item) =>
       mapTarefaAdministrativaToResponse(item.tarefa, item.checklist, item.historico)
     );
   }
 
-  async obterResumo() {
-    return this.repository.obterResumo();
+  async obterResumo(rawTenantId?: string) {
+    const tenantId = this.parseTenant(rawTenantId);
+    return this.repository.obterResumo(tenantId);
   }
 
-  async buscarPorId(rawId: string) {
+  async buscarPorId(rawId: string, rawTenantId?: string) {
     const id = this.parseId(rawId);
-    const registro = await this.repository.buscarPorIdOuFalhar(id);
+    const tenantId = this.parseTenant(rawTenantId);
+    const registro = await this.repository.buscarPorIdOuFalhar(id, tenantId);
     return mapTarefaAdministrativaToResponse(
       registro.tarefa,
       registro.checklist,
@@ -32,9 +35,10 @@ export class TarefaAdministrativaService {
     );
   }
 
-  async criar(rawInput: unknown) {
+  async criar(rawInput: unknown, rawTenantId?: string) {
     const input = tarefaAdministrativaInputSchema.parse(this.normalizarPayload(rawInput));
-    const registro = await this.repository.criar(input);
+    const tenantId = this.parseTenant(rawTenantId);
+    const registro = await this.repository.criar(input, tenantId);
     return mapTarefaAdministrativaToResponse(
       registro.tarefa,
       registro.checklist,
@@ -42,10 +46,11 @@ export class TarefaAdministrativaService {
     );
   }
 
-  async atualizar(rawId: string, rawInput: unknown) {
+  async atualizar(rawId: string, rawInput: unknown, rawTenantId?: string) {
     const id = this.parseId(rawId);
     const input = tarefaAdministrativaInputSchema.parse(this.normalizarPayload(rawInput));
-    const registro = await this.repository.atualizar(id, input);
+    const tenantId = this.parseTenant(rawTenantId);
+    const registro = await this.repository.atualizar(id, input, tenantId);
     return mapTarefaAdministrativaToResponse(
       registro.tarefa,
       registro.checklist,
@@ -53,10 +58,11 @@ export class TarefaAdministrativaService {
     );
   }
 
-  async adicionarHistorico(rawId: string, rawInput: unknown) {
+  async adicionarHistorico(rawId: string, rawInput: unknown, rawTenantId?: string) {
     const id = this.parseId(rawId);
     const input = tarefaAdministrativaHistoricoInputSchema.parse(rawInput);
-    const registro = await this.repository.adicionarHistorico(id, input.mensagem);
+    const tenantId = this.parseTenant(rawTenantId);
+    const registro = await this.repository.adicionarHistorico(id, input.mensagem, tenantId);
     return mapTarefaAdministrativaToResponse(
       registro.tarefa,
       registro.checklist,
@@ -64,9 +70,10 @@ export class TarefaAdministrativaService {
     );
   }
 
-  async remover(rawId: string) {
+  async remover(rawId: string, rawTenantId?: string) {
     const id = this.parseId(rawId);
-    await this.repository.remover(id);
+    const tenantId = this.parseTenant(rawTenantId);
+    await this.repository.remover(id, tenantId);
   }
 
   private parseId(rawId: string): bigint {
@@ -75,6 +82,14 @@ export class TarefaAdministrativaService {
       throw new AppError("Identificador inválido.", 400);
     }
     return BigInt(parsed);
+  }
+
+  private parseTenant(rawTenantId?: string) {
+    const tenantId = rawTenantId?.trim();
+    if (!tenantId) {
+      throw new AppError("Tenant da sessao nao identificado.", 401);
+    }
+    return tenantId;
   }
 
   private normalizarPayload(rawInput: unknown) {

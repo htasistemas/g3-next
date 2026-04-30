@@ -5,33 +5,43 @@ import type { AuthenticatedRequest } from "../../auth/middlewares/auth.middlewar
 const service = new ParametrosSistemaService();
 
 export class ParametrosSistemaController {
-  async obterPersonalizacao(_request: AuthenticatedRequest, response: Response) {
-    const resultado = await service.obterPersonalizacao();
+  async obterPersonalizacao(request: AuthenticatedRequest, response: Response) {
+    const resultado = await service.obterPersonalizacao(request.authUser?.tenant_id);
     return response.json(resultado);
   }
 
   async atualizarPersonalizacao(request: AuthenticatedRequest, response: Response) {
     const usuario = request.authUser?.nomeUsuario ?? "sistema";
-    const resultado = await service.atualizarPersonalizacao(request.body, usuario);
+    const resultado = await service.atualizarPersonalizacao(
+      request.body,
+      usuario,
+      request.authUser?.tenant_id ?? ""
+    );
     return response.json(resultado);
   }
 
-  async obterCarenciaDoacaoRealizada(_request: AuthenticatedRequest, response: Response) {
-    const resultado = await service.obterCarenciaDoacaoRealizada();
+  async obterCarenciaDoacaoRealizada(request: AuthenticatedRequest, response: Response) {
+    const resultado = await service.obterCarenciaDoacaoRealizada(request.authUser?.tenant_id);
     return response.json(resultado);
   }
 
   async atualizarCarenciaDoacaoRealizada(request: AuthenticatedRequest, response: Response) {
     const usuario = request.authUser?.nomeUsuario ?? "sistema";
-    const resultado = await service.atualizarCarenciaDoacaoRealizada(request.body, usuario);
+    const resultado = await service.atualizarCarenciaDoacaoRealizada(
+      request.body,
+      usuario,
+      request.authUser?.tenant_id ?? ""
+    );
     return response.json(resultado);
   }
 
   async obterObrigatoriedadeDocumentosBeneficiario(
-    _request: AuthenticatedRequest,
+    request: AuthenticatedRequest,
     response: Response
   ) {
-    const resultado = await service.obterObrigatoriedadeDocumentosBeneficiario();
+    const resultado = await service.obterObrigatoriedadeDocumentosBeneficiario(
+      request.authUser?.tenant_id
+    );
     return response.json(resultado);
   }
 
@@ -42,16 +52,17 @@ export class ParametrosSistemaController {
     const usuario = request.authUser?.nomeUsuario ?? "sistema";
     const resultado = await service.atualizarObrigatoriedadeDocumentosBeneficiario(
       request.body,
-      usuario
+      usuario,
+      request.authUser?.tenant_id ?? ""
     );
     return response.json(resultado);
   }
 
   async obterAlertasCentralAtendimentos(
-    _request: AuthenticatedRequest,
+    request: AuthenticatedRequest,
     response: Response
   ) {
-    const resultado = await service.obterAlertasCentralAtendimentos();
+    const resultado = await service.obterAlertasCentralAtendimentos(request.authUser?.tenant_id);
     return response.json(resultado);
   }
 
@@ -62,7 +73,8 @@ export class ParametrosSistemaController {
     const usuario = request.authUser?.nomeUsuario ?? "sistema";
     const resultado = await service.atualizarAlertasCentralAtendimentos(
       request.body,
-      usuario
+      usuario,
+      request.authUser?.tenant_id ?? ""
     );
     return response.json(resultado);
   }

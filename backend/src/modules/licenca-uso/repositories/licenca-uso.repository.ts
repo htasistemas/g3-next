@@ -76,7 +76,8 @@ type RegistroLicencaUsoPagamento = {
 
 const criarTabelaConfiguracaoSql = `
   CREATE TABLE IF NOT EXISTS licenca_uso_configuracoes (
-    id BIGINT PRIMARY KEY,
+    id BIGSERIAL PRIMARY KEY,
+    tenant_id UUID UNIQUE,
     instituicao_nome VARCHAR(255),
     instituicao_cnpj VARCHAR(20),
     plano_id VARCHAR(30) NOT NULL,
@@ -127,6 +128,9 @@ const criarTabelaConfiguracaoSql = `
 `;
 
 const alteracoesEstruturaSql = [
+  "CREATE SEQUENCE IF NOT EXISTS licenca_uso_configuracoes_id_seq",
+  "ALTER TABLE licenca_uso_configuracoes ALTER COLUMN id SET DEFAULT nextval('licenca_uso_configuracoes_id_seq')",
+  "ALTER TABLE licenca_uso_configuracoes ADD COLUMN IF NOT EXISTS tenant_id UUID",
   "ALTER TABLE licenca_uso_configuracoes ADD COLUMN IF NOT EXISTS vigencia_inicial_dias INTEGER",
   "ALTER TABLE licenca_uso_configuracoes ADD COLUMN IF NOT EXISTS checkout_handle VARCHAR(120)",
   "ALTER TABLE licenca_uso_configuracoes ADD COLUMN IF NOT EXISTS checkout_redirect_url TEXT",
@@ -142,6 +146,7 @@ const alteracoesEstruturaSql = [
 const criarTabelaPagamentosSql = `
   CREATE TABLE IF NOT EXISTS licenca_uso_pagamentos (
     id BIGSERIAL PRIMARY KEY,
+    tenant_id UUID,
     status VARCHAR(20) NOT NULL,
     descricao VARCHAR(255) NOT NULL,
     plano_id VARCHAR(30) NOT NULL,
@@ -165,6 +170,7 @@ const criarTabelaPagamentosSql = `
 const criarTabelaAlertasSql = `
   CREATE TABLE IF NOT EXISTS licenca_uso_alertas (
     id BIGSERIAL PRIMARY KEY,
+    tenant_id UUID,
     destinatario VARCHAR(255) NOT NULL,
     dias_antecedencia INTEGER NOT NULL,
     referencia_vencimento DATE NOT NULL,
@@ -272,24 +278,35 @@ function mapPagamentoRow(row: RegistroLicencaUsoPagamento): LicencaUsoPagamentoH
 }
 
 export class LicencaUsoRepository {
-  async buscarConfiguracao() {
+  async listarTenantsComConfiguracao() {
+    await ensureLicencaUsoEstrutura();
+    const rows = await prisma.$queryRawUnsafe<Array<{ tenant_id: string | null }>>(`
+      SELECT tenant_id::text AS tenant_id
+      FROM licenca_uso_configuracoes
+      WHERE tenant_id IS NOT NULL
+      ORDER BY updated_at DESC, id DESC
+    `);
+    return rows.map((item) => String(item.tenant_id ?? "").trim()).filter(Boolean);
+  }
+
+  async buscarConfiguracao(tenantId: string) {
     await ensureLicencaUsoEstrutura();
     const rows = await prisma.$queryRawUnsafe<RegistroLicencaUso[]>(`
       SELECT *
       FROM licenca_uso_configuracoes
-      WHERE id = 1
+      WHERE tenant_id::text = $1
       LIMIT 1
-    `);
+    `, tenantId);
     if (!rows.length) return null;
     return mapRow(rows[0]);
   }
 
-  async salvarConfiguracao(configuracao: LicencaUsoConfiguracao, usuarioAtualizacao: string) {
+  async salvarConfiguracao(configuracao: LicencaUsoConfiguracao, usuarioAtualizacao: string, tenantId: string) {
     await ensureLicencaUsoEstrutura();
     const rows = await prisma.$queryRawUnsafe<RegistroLicencaUso[]>(
       `
         INSERT INTO licenca_uso_configuracoes (
-          id, instituicao_nome, instituicao_cnpj, plano_id, ciclo_cobranca, vigencia_inicial_dias, valor_base_mensal,
+          tenant_id, instituicao_nome, instituicao_cnpj, plano_id, ciclo_cobranca, vigencia_inicial_dias, valor_base_mensal,
           percentual_desconto, valor_cobranca, valor_implantacao, implantacao_isenta,
           data_inicio_vigencia, data_vencimento, status_licenca, alertas_email_ativos,
           dias_alerta_email, emails_alerta, observacoes, pix_chave, pix_recebedor, pix_cidade,
@@ -301,12 +318,13 @@ export class LicencaUsoRepository {
           ultimo_checkout_pago, ultimo_valor_pago, updated_at, updated_by
         )
         VALUES (
-          1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15::jsonb, $16::jsonb,
-          $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33,
-          $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, NOW(), $44
+          $1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16::jsonb, $17::jsonb,
+          $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34,
+          $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, NOW(), $45
         )
-        ON CONFLICT (id)
+        ON CONFLICT (tenant_id)
         DO UPDATE SET
+          tenant_id = EXCLUDED.tenant_id,
           instituicao_nome = EXCLUDED.instituicao_nome,
           instituicao_cnpj = EXCLUDED.instituicao_cnpj,
           plano_id = EXCLUDED.plano_id,
@@ -354,6 +372,7 @@ export class LicencaUsoRepository {
           updated_by = EXCLUDED.updated_by
         RETURNING *
       `,
+      tenantId,
       configuracao.instituicaoNome ?? null,
       configuracao.instituicaoCnpj ?? null,
       configuracao.planoId,
@@ -402,17 +421,19 @@ export class LicencaUsoRepository {
     return mapRow(rows[0]);
   }
 
-  async listarPagamentos() {
+  async listarPagamentos(tenantId: string) {
     await ensureLicencaUsoEstrutura();
     const rows = await prisma.$queryRawUnsafe<RegistroLicencaUsoPagamento[]>(`
       SELECT *
       FROM licenca_uso_pagamentos
+      WHERE tenant_id::text = $1
       ORDER BY created_at DESC, id DESC
-    `);
+    `, tenantId);
     return rows.map(mapPagamentoRow);
   }
 
   async registrarPagamentoPendente(input: {
+    tenantId: string;
     descricao: string;
     planoId: LicencaUsoConfiguracao["planoId"];
     cicloCobranca: LicencaUsoConfiguracao["cicloCobranca"];
@@ -430,12 +451,13 @@ export class LicencaUsoRepository {
     const rows = await prisma.$queryRawUnsafe<RegistroLicencaUsoPagamento[]>(
       `
         INSERT INTO licenca_uso_pagamentos (
-          status, descricao, plano_id, ciclo_cobranca, vigencia_inicio, vigencia_fim, vigencia_dias,
+          tenant_id, status, descricao, plano_id, ciclo_cobranca, vigencia_inicio, vigencia_fim, vigencia_dias,
           valor_licenca, valor_implantacao, valor_total, order_nsu, invoice_slug, checkout_url
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
         RETURNING *
       `,
+      input.tenantId,
       "pendente",
       input.descricao,
       input.planoId,
@@ -453,7 +475,23 @@ export class LicencaUsoRepository {
     return mapPagamentoRow(rows[0]);
   }
 
+  async buscarPagamentoPorOrderNsu(orderNsu: string) {
+    await ensureLicencaUsoEstrutura();
+    const rows = await prisma.$queryRawUnsafe<Array<RegistroLicencaUsoPagamento & { tenant_id: string | null }>>(
+      `
+        SELECT *
+        FROM licenca_uso_pagamentos
+        WHERE order_nsu = $1
+        ORDER BY created_at DESC, id DESC
+        LIMIT 1
+      `,
+      orderNsu
+    );
+    return rows[0] ?? null;
+  }
+
   async marcarPagamentoComoPago(input: {
+    tenantId: string;
     orderNsu: string;
     invoiceSlug?: string;
     transactionNsu?: string;
@@ -478,6 +516,7 @@ export class LicencaUsoRepository {
           vigencia_dias = COALESCE($8, vigencia_dias),
           paid_at = NOW()
         WHERE order_nsu = $1
+          AND tenant_id::text = $9
         RETURNING *
       `,
       input.orderNsu,
@@ -487,22 +526,25 @@ export class LicencaUsoRepository {
       input.valorTotal ?? null,
       input.vigenciaInicio ?? null,
       input.vigenciaFim ?? null,
-      input.vigenciaDias ?? null
+      input.vigenciaDias ?? null,
+      input.tenantId
     );
     return rows[0] ? mapPagamentoRow(rows[0]) : null;
   }
 
-  async alertaJaEnviado(destinatario: string, diasAntecedencia: number, referenciaVencimento: string) {
+  async alertaJaEnviado(tenantId: string, destinatario: string, diasAntecedencia: number, referenciaVencimento: string) {
     await ensureLicencaUsoEstrutura();
     const rows = await prisma.$queryRawUnsafe<Array<{ total: bigint }>>(
       `
         SELECT COUNT(*)::bigint AS total
         FROM licenca_uso_alertas
-        WHERE destinatario = $1
-          AND dias_antecedencia = $2
-          AND referencia_vencimento = $3::date
+        WHERE tenant_id::text = $1
+          AND destinatario = $2
+          AND dias_antecedencia = $3
+          AND referencia_vencimento = $4::date
           AND status_envio = 'enviado'
       `,
+      tenantId,
       destinatario,
       diasAntecedencia,
       referenciaVencimento
@@ -510,19 +552,21 @@ export class LicencaUsoRepository {
     return Number(rows[0]?.total ?? 0) > 0;
   }
 
-  async registrarAlerta(processado: LicencaUsoAlertaProcessado) {
+  async registrarAlerta(tenantId: string, processado: LicencaUsoAlertaProcessado) {
     await ensureLicencaUsoEstrutura();
     await prisma.$executeRawUnsafe(
       `
         INSERT INTO licenca_uso_alertas (
+          tenant_id,
           destinatario,
           dias_antecedencia,
           referencia_vencimento,
           status_envio,
           erro
         )
-        VALUES ($1, $2, $3::date, $4, $5)
+        VALUES ($1::uuid, $2, $3, $4::date, $5, $6)
       `,
+      tenantId,
       processado.destinatario,
       processado.diasAntecedencia,
       processado.referenciaVencimento,
@@ -544,4 +588,45 @@ export async function ensureLicencaUsoEstrutura() {
   for (const sql of alteracoesEstruturaSql) {
     await prisma.$executeRawUnsafe(sql);
   }
+  await prisma.$executeRawUnsafe("ALTER TABLE licenca_uso_pagamentos ADD COLUMN IF NOT EXISTS tenant_id UUID");
+  await prisma.$executeRawUnsafe("ALTER TABLE licenca_uso_alertas ADD COLUMN IF NOT EXISTS tenant_id UUID");
+  await prisma.$executeRawUnsafe("CREATE UNIQUE INDEX IF NOT EXISTS licenca_uso_configuracoes_tenant_uidx ON licenca_uso_configuracoes(tenant_id)");
+  await prisma.$executeRawUnsafe("CREATE INDEX IF NOT EXISTS licenca_uso_pagamentos_tenant_idx ON licenca_uso_pagamentos(tenant_id, created_at DESC)");
+  await prisma.$executeRawUnsafe("CREATE INDEX IF NOT EXISTS licenca_uso_alertas_tenant_idx ON licenca_uso_alertas(tenant_id, referencia_vencimento DESC)");
+  await prisma.$executeRawUnsafe(`
+    UPDATE licenca_uso_configuracoes
+    SET tenant_id = origem.tenant_id
+    FROM (
+      SELECT tenant_id
+      FROM unidade_assistencial
+      WHERE tenant_id IS NOT NULL
+      ORDER BY unidade_principal DESC, atualizado_em DESC, criado_em ASC
+      LIMIT 1
+    ) origem
+    WHERE licenca_uso_configuracoes.tenant_id IS NULL
+  `);
+  await prisma.$executeRawUnsafe(`
+    UPDATE licenca_uso_pagamentos
+    SET tenant_id = configuracao.tenant_id
+    FROM (
+      SELECT tenant_id
+      FROM licenca_uso_configuracoes
+      WHERE tenant_id IS NOT NULL
+      ORDER BY updated_at DESC, id DESC
+      LIMIT 1
+    ) configuracao
+    WHERE licenca_uso_pagamentos.tenant_id IS NULL
+  `);
+  await prisma.$executeRawUnsafe(`
+    UPDATE licenca_uso_alertas
+    SET tenant_id = configuracao.tenant_id
+    FROM (
+      SELECT tenant_id
+      FROM licenca_uso_configuracoes
+      WHERE tenant_id IS NOT NULL
+      ORDER BY updated_at DESC, id DESC
+      LIMIT 1
+    ) configuracao
+    WHERE licenca_uso_alertas.tenant_id IS NULL
+  `);
 }

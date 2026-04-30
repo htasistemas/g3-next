@@ -5,9 +5,55 @@ import { toOptionalDate, trimOrUndefined } from "../../../utils/string-utils.js"
 import type { VendaFilters, VendaInput } from "../venda.types.js";
 import type { VendaItemRow, VendaRow } from "../venda.mapper.js";
 
+let estruturaPromise: Promise<void> | null = null;
+
+async function ensureVendaEstrutura() {
+  if (!estruturaPromise) {
+    estruturaPromise = (async () => {
+      await prisma.$executeRawUnsafe("ALTER TABLE IF EXISTS venda_setor ADD COLUMN IF NOT EXISTS tenant_id UUID");
+      await prisma.$executeRawUnsafe("ALTER TABLE IF EXISTS venda_setor_item ADD COLUMN IF NOT EXISTS tenant_id UUID");
+      await prisma.$executeRawUnsafe("CREATE INDEX IF NOT EXISTS venda_setor_tenant_idx ON venda_setor(tenant_id, criado_em DESC)");
+      await prisma.$executeRawUnsafe("CREATE INDEX IF NOT EXISTS venda_setor_item_tenant_idx ON venda_setor_item(tenant_id, venda_id)");
+
+      await prisma.$executeRawUnsafe(`
+        UPDATE venda_setor
+        SET tenant_id = origem.tenant_id
+        FROM (
+          SELECT tenant_id
+          FROM unidade_assistencial
+          WHERE tenant_id IS NOT NULL
+          ORDER BY unidade_principal DESC, atualizado_em DESC, criado_em ASC
+          LIMIT 1
+        ) origem
+        WHERE venda_setor.tenant_id IS NULL
+      `);
+
+      await prisma.$executeRawUnsafe(`
+        UPDATE venda_setor_item AS item
+        SET tenant_id = venda.tenant_id
+        FROM venda_setor AS venda
+        WHERE item.tenant_id IS NULL
+          AND item.venda_id = venda.id
+          AND venda.tenant_id IS NOT NULL
+      `);
+    })().catch((error) => {
+      estruturaPromise = null;
+      throw error;
+    });
+  }
+
+  await estruturaPromise;
+}
+
+function tenantSql(alias: string, tenantId: string) {
+  return Prisma.sql`${Prisma.raw(alias)}.tenant_id::text = ${tenantId}`;
+}
+
 export class VendaRepository {
-  async listar(filters: VendaFilters) {
-    const where: Prisma.Sql[] = [];
+  async listar(filters: VendaFilters, tenantId: string) {
+    await ensureVendaEstrutura();
+
+    const where: Prisma.Sql[] = [Prisma.sql`AND ${tenantSql("v", tenantId)}`];
     const clienteNome = trimOrUndefined(filters.cliente_nome);
     if (clienteNome) {
       where.push(Prisma.sql`AND COALESCE(v.cliente_nome, '') ILIKE ${`%${clienteNome}%`}`);
@@ -29,7 +75,6 @@ export class VendaRepository {
     }
 
     const limite = Number.isInteger(filters.limite) ? Number(filters.limite) : 20;
-    const whereClause = where.length ? Prisma.sql`${Prisma.join(where, " ")}` : Prisma.empty;
 
     return prisma.$queryRaw<VendaRow[]>(Prisma.sql`
       SELECT
@@ -43,13 +88,15 @@ export class VendaRepository {
         v.atualizado_em
       FROM venda_setor v
       WHERE 1 = 1
-      ${whereClause}
+      ${Prisma.join(where, " ")}
       ORDER BY v.id DESC
       LIMIT ${limite}
     `);
   }
 
-  async buscarPorId(id: bigint) {
+  async buscarPorId(id: bigint, tenantId: string) {
+    await ensureVendaEstrutura();
+
     const rows = await prisma.$queryRaw<VendaRow[]>(Prisma.sql`
       SELECT
         v.id,
@@ -62,20 +109,23 @@ export class VendaRepository {
         v.atualizado_em
       FROM venda_setor v
       WHERE v.id = ${id}
+        AND ${tenantSql("v", tenantId)}
       LIMIT 1
     `);
     return rows[0] ?? null;
   }
 
-  async buscarPorIdOuFalhar(id: bigint) {
-    const venda = await this.buscarPorId(id);
+  async buscarPorIdOuFalhar(id: bigint, tenantId: string) {
+    const venda = await this.buscarPorId(id, tenantId);
     if (!venda) {
       throw new AppError("Venda nao encontrada.", 404);
     }
     return venda;
   }
 
-  async listarItensPorVendaId(vendaId: bigint) {
+  async listarItensPorVendaId(vendaId: bigint, tenantId: string) {
+    await ensureVendaEstrutura();
+
     return prisma.$queryRaw<VendaItemRow[]>(Prisma.sql`
       SELECT
         vi.id,
@@ -88,11 +138,14 @@ export class VendaRepository {
         vi.valor_total
       FROM venda_setor_item vi
       WHERE vi.venda_id = ${vendaId}
+        AND ${tenantSql("vi", tenantId)}
       ORDER BY vi.id ASC
     `);
   }
 
-  async criar(input: VendaInput) {
+  async criar(input: VendaInput, tenantId: string) {
+    await ensureVendaEstrutura();
+
     return prisma.$transaction(async (tx) => {
       let valorTotal = 0;
       const itensNormalizados: Array<{
@@ -115,12 +168,13 @@ export class VendaRepository {
           SELECT id, codigo, descricao, estoque_atual, valor_unitario
           FROM almoxarifado_item
           WHERE codigo = ${item.codigo_item}
+            AND tenant_id::text = ${tenantId}
           LIMIT 1
         `);
 
         const encontrado = rows[0];
         if (!encontrado) {
-          throw new AppError(`Item ${item.codigo_item} nao encontrado no almoxarifado.`, 400);
+          throw new AppError(`Item ${item.codigo_item} nao encontrado no almoxarifado da instituicao.`, 400);
         }
 
         const estoqueAtual = Number(encontrado.estoque_atual ?? 0);
@@ -136,10 +190,12 @@ export class VendaRepository {
           UPDATE almoxarifado_item
           SET estoque_atual = ${estoqueAtual - item.quantidade}, atualizado_em = NOW()
           WHERE id = ${encontrado.id}
+            AND tenant_id::text = ${tenantId}
         `);
 
         await tx.$executeRaw(Prisma.sql`
           INSERT INTO almoxarifado_movimentacao (
+            tenant_id,
             item_id,
             data_movimentacao,
             tipo,
@@ -150,6 +206,7 @@ export class VendaRepository {
             observacoes,
             criado_em
           ) VALUES (
+            ${tenantId}::uuid,
             ${encontrado.id},
             CURRENT_DATE,
             'Saida',
@@ -174,6 +231,7 @@ export class VendaRepository {
 
       const inserted = await tx.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
         INSERT INTO venda_setor (
+          tenant_id,
           cliente_nome,
           cliente_documento,
           forma_pagamento,
@@ -182,6 +240,7 @@ export class VendaRepository {
           criado_em,
           atualizado_em
         ) VALUES (
+          ${tenantId}::uuid,
           ${trimOrUndefined(input.cliente_nome)},
           ${trimOrUndefined(input.cliente_documento)},
           ${input.forma_pagamento},
@@ -201,6 +260,7 @@ export class VendaRepository {
       for (const item of itensNormalizados) {
         await tx.$executeRaw(Prisma.sql`
           INSERT INTO venda_setor_item (
+            tenant_id,
             venda_id,
             almoxarifado_item_id,
             codigo_item,
@@ -209,6 +269,7 @@ export class VendaRepository {
             valor_unitario,
             valor_total
           ) VALUES (
+            ${tenantId}::uuid,
             ${vendaId},
             ${item.almoxarifadoItemId},
             ${item.codigoItem},
@@ -232,6 +293,7 @@ export class VendaRepository {
           v.atualizado_em
         FROM venda_setor v
         WHERE v.id = ${vendaId}
+          AND ${tenantSql("v", tenantId)}
         LIMIT 1
       `);
 

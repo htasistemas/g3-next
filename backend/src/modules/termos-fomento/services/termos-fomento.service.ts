@@ -8,41 +8,47 @@ import { TermosFomentoRepository } from "../repositories/termos-fomento.reposito
 export class TermosFomentoService {
   private readonly repository = new TermosFomentoRepository();
 
-  async listar() {
-    const registros = await this.repository.listar();
+  async listar(rawTenantId?: string) {
+    const tenantId = this.parseTenant(rawTenantId);
+    const registros = await this.repository.listar(tenantId);
     return registros.map((item) =>
       mapTermoFomentoToResponse(item.termo, item.aditivos, item.documentos)
     );
   }
 
-  async obter(rawId: string) {
+  async obter(rawId: string, rawTenantId?: string) {
     const id = this.parseId(rawId);
-    const registro = await this.repository.buscarPorIdOuFalhar(id);
+    const tenantId = this.parseTenant(rawTenantId);
+    const registro = await this.repository.buscarPorIdOuFalhar(id, tenantId);
     return mapTermoFomentoToResponse(registro.termo, registro.aditivos, registro.documentos);
   }
 
-  async criar(rawInput: unknown) {
+  async criar(rawInput: unknown, rawTenantId?: string) {
     const input = termoFomentoInputSchema.parse(this.normalizarPayload(rawInput));
-    const registro = await this.repository.criar(input);
+    const tenantId = this.parseTenant(rawTenantId);
+    const registro = await this.repository.criar(input, tenantId);
     return mapTermoFomentoToResponse(registro.termo, registro.aditivos, registro.documentos);
   }
 
-  async atualizar(rawId: string, rawInput: unknown) {
+  async atualizar(rawId: string, rawInput: unknown, rawTenantId?: string) {
     const id = this.parseId(rawId);
     const input = termoFomentoInputSchema.parse(this.normalizarPayload(rawInput));
-    const registro = await this.repository.atualizar(id, input);
+    const tenantId = this.parseTenant(rawTenantId);
+    const registro = await this.repository.atualizar(id, input, tenantId);
     return mapTermoFomentoToResponse(registro.termo, registro.aditivos, registro.documentos);
   }
 
-  async remover(rawId: string) {
+  async remover(rawId: string, rawTenantId?: string) {
     const id = this.parseId(rawId);
-    await this.repository.remover(id);
+    const tenantId = this.parseTenant(rawTenantId);
+    await this.repository.remover(id, tenantId);
   }
 
-  async adicionarAditivo(rawId: string, rawInput: unknown) {
+  async adicionarAditivo(rawId: string, rawInput: unknown, rawTenantId?: string) {
     const id = this.parseId(rawId);
     const input = termoAditivoInputSchema.parse(this.normalizarPayload(rawInput));
-    const registro = await this.repository.adicionarAditivo(id, input);
+    const tenantId = this.parseTenant(rawTenantId);
+    const registro = await this.repository.adicionarAditivo(id, input, tenantId);
     return mapTermoFomentoToResponse(registro.termo, registro.aditivos, registro.documentos);
   }
 
@@ -52,6 +58,14 @@ export class TermosFomentoService {
       throw new AppError("Identificador invalido.", 400);
     }
     return BigInt(parsed);
+  }
+
+  private parseTenant(rawTenantId?: string) {
+    const tenantId = rawTenantId?.trim();
+    if (!tenantId) {
+      throw new AppError("Tenant da sessao nao identificado.", 401);
+    }
+    return tenantId;
   }
 
   private normalizarPayload(rawInput: unknown) {

@@ -200,4 +200,5 @@ export type CarteiraEventoAtor = {
   id?: bigint;
   nome_usuario: string;
   nome?: string;
+  tenantId?: string;
 };

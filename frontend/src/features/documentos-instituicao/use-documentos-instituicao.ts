@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AxiosProgressEvent } from "axios";
+import { useAuth } from "@/hooks/use-auth";
 import { documentosInstituicaoService } from "@/services/documentos-instituicao.service";
 import type {
   DocumentoInstituicaoAnexoPayload,
@@ -8,23 +9,36 @@ import type {
 } from "@/types/documentos-instituicao";
 
 export function useDocumentosInstituicao() {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["documentos-instituicao"],
+    queryKey: ["documentos-instituicao", usuario?.tenant_id ?? "sem-tenant"],
     queryFn: () => documentosInstituicaoService.listar()
   });
 }
 
 export function useAnexosDocumentoInstituicao(documentoId?: string) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["documentos-instituicao", documentoId ?? "", "anexos"],
+    queryKey: [
+      "documentos-instituicao",
+      usuario?.tenant_id ?? "sem-tenant",
+      documentoId ?? "",
+      "anexos"
+    ],
     queryFn: () => documentosInstituicaoService.listarAnexos(documentoId as string),
     enabled: !!documentoId
   });
 }
 
 export function useHistoricoDocumentoInstituicao(documentoId?: string) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["documentos-instituicao", documentoId ?? "", "historico"],
+    queryKey: [
+      "documentos-instituicao",
+      usuario?.tenant_id ?? "sem-tenant",
+      documentoId ?? "",
+      "historico"
+    ],
     queryFn: () => documentosInstituicaoService.listarHistorico(documentoId as string),
     enabled: !!documentoId
   });

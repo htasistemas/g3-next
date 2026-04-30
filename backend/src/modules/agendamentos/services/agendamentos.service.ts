@@ -15,104 +15,115 @@ type UsuarioActor = { id?: string; nome?: string; nomeUsuario?: string };
 export class AgendamentosService {
   private readonly repository = new AgendamentosRepository();
 
-  async listar(rawFilters: unknown) {
+  async listar(rawFilters: unknown, tenantId?: string) {
     const filtros = agendamentoFiltrosSchema.parse(rawFilters ?? {});
-    return this.repository.listar(filtros);
+    return this.repository.listar(filtros, this.parseTenantId(tenantId));
   }
 
-  async obter(rawId: string) {
-    return this.repository.obter(this.parseId(rawId));
+  async obter(rawId: string, tenantId?: string) {
+    return this.repository.obter(this.parseId(rawId), this.parseTenantId(tenantId));
   }
 
-  async criar(rawInput: unknown, usuario?: UsuarioActor) {
+  async criar(rawInput: unknown, usuario?: UsuarioActor, tenantId?: string) {
+    const tenantObrigatorio = this.parseTenantId(tenantId);
     const body = rawInput as Record<string, unknown>;
     if (body && "itemId" in body && "tipo" in body && ("beneficiariosIds" in body || "matriculasIds" in body)) {
       const input = agendamentoOperacionalInputSchema.parse(rawInput);
       if (input.id) {
-        return this.repository.atualizarOperacional(this.parseId(input.id), input, usuario);
+        return this.repository.atualizarOperacional(this.parseId(input.id), input, usuario, tenantObrigatorio);
       }
-      return this.repository.criarOperacional(input, usuario);
+      return this.repository.criarOperacional(input, usuario, tenantObrigatorio);
     }
     const input = agendamentoInputSchema.parse(rawInput);
-    return this.repository.criar(input, usuario);
+    return this.repository.criar(input, usuario, tenantObrigatorio);
   }
 
-  async atualizar(rawId: string, rawInput: unknown, usuario?: UsuarioActor) {
+  async atualizar(rawId: string, rawInput: unknown, usuario?: UsuarioActor, tenantId?: string) {
     const input = agendamentoInputSchema.parse(rawInput);
-    return this.repository.atualizar(this.parseId(rawId), input, usuario);
+    return this.repository.atualizar(this.parseId(rawId), input, usuario, this.parseTenantId(tenantId));
   }
 
-  async cancelar(rawId: string, rawInput: unknown, usuario?: UsuarioActor) {
+  async cancelar(rawId: string, rawInput: unknown, usuario?: UsuarioActor, tenantId?: string) {
     const body = (rawInput ?? {}) as { motivo?: string };
-    return this.repository.cancelar(this.parseId(rawId), body.motivo, usuario);
+    return this.repository.cancelar(this.parseId(rawId), body.motivo, usuario, this.parseTenantId(tenantId));
   }
 
-  async remarcar(rawId: string, rawInput: unknown, usuario?: UsuarioActor) {
+  async remarcar(rawId: string, rawInput: unknown, usuario?: UsuarioActor, tenantId?: string) {
     const input = agendamentoRemarcacaoInputSchema.parse(rawInput);
-    return this.repository.remarcar(this.parseId(rawId), input, usuario);
+    return this.repository.remarcar(this.parseId(rawId), input, usuario, this.parseTenantId(tenantId));
   }
 
-  async confirmar(rawId: string, rawInput: unknown, usuario?: UsuarioActor) {
+  async confirmar(rawId: string, rawInput: unknown, usuario?: UsuarioActor, tenantId?: string) {
     const body = (rawInput ?? {}) as { canal?: string; observacao?: string };
-    return this.repository.confirmar(this.parseId(rawId), body.canal, body.observacao, usuario);
+    return this.repository.confirmar(
+      this.parseId(rawId),
+      body.canal,
+      body.observacao,
+      usuario,
+      this.parseTenantId(tenantId)
+    );
   }
 
-  async checkIn(rawId: string, rawInput: unknown, usuario?: UsuarioActor) {
+  async checkIn(rawId: string, rawInput: unknown, usuario?: UsuarioActor, tenantId?: string) {
     const input = agendamentoCheckInInputSchema.parse(rawInput);
-    return this.repository.checkIn(this.parseId(rawId), input, usuario);
+    return this.repository.checkIn(this.parseId(rawId), input, usuario, this.parseTenantId(tenantId));
   }
 
-  async concluir(rawId: string, rawInput: unknown, usuario?: UsuarioActor) {
+  async concluir(rawId: string, rawInput: unknown, usuario?: UsuarioActor, tenantId?: string) {
     const input = agendamentoConclusaoInputSchema.parse(rawInput);
-    return this.repository.concluir(this.parseId(rawId), input, usuario);
+    return this.repository.concluir(this.parseId(rawId), input, usuario, this.parseTenantId(tenantId));
   }
 
-  async listarListaEspera() {
-    return this.repository.listarListaEspera();
+  async listarListaEspera(tenantId?: string) {
+    return this.repository.listarListaEspera(this.parseTenantId(tenantId));
   }
 
-  async criarListaEspera(rawInput: unknown) {
+  async criarListaEspera(rawInput: unknown, tenantId?: string) {
     const input = agendamentoListaEsperaInputSchema.parse(rawInput);
-    return this.repository.criarListaEspera(input);
+    return this.repository.criarListaEspera(input, this.parseTenantId(tenantId));
   }
 
-  async converterListaEspera(rawId: string, rawInput: unknown, usuario?: UsuarioActor) {
+  async converterListaEspera(rawId: string, rawInput: unknown, usuario?: UsuarioActor, tenantId?: string) {
     const input = agendamentoInputSchema.parse(rawInput);
-    return this.repository.converterListaEspera(this.parseId(rawId), input, usuario);
+    return this.repository.converterListaEspera(this.parseId(rawId), input, usuario, this.parseTenantId(tenantId));
   }
 
-  async indicadores(rawFilters: unknown) {
+  async indicadores(rawFilters: unknown, tenantId?: string) {
     const filtros = agendamentoFiltrosSchema.parse(rawFilters ?? {});
-    return this.repository.indicadores(filtros);
+    return this.repository.indicadores(filtros, this.parseTenantId(tenantId));
   }
 
-  async catalogos() {
-    return this.repository.catalogos();
+  async catalogos(tenantId?: string) {
+    return this.repository.catalogos(this.parseTenantId(tenantId));
   }
 
-  async listarItens(rawTipo: unknown, rawBusca: unknown) {
+  async listarItens(rawTipo: unknown, rawBusca: unknown, tenantId?: string) {
     const tipo = String(rawTipo ?? "").trim().toLowerCase();
     if (!["curso", "atendimento", "oficina"].includes(tipo)) {
       throw new AppError("Tipo operacional invalido.", 400);
     }
-    return this.repository.listarItensOperacionais(tipo as "curso" | "atendimento" | "oficina", typeof rawBusca === "string" ? rawBusca : undefined);
+    return this.repository.listarItensOperacionais(
+      tipo as "curso" | "atendimento" | "oficina",
+      typeof rawBusca === "string" ? rawBusca : undefined,
+      this.parseTenantId(tenantId)
+    );
   }
 
-  async listarBeneficiarios(rawItemId: unknown) {
+  async listarBeneficiarios(rawItemId: unknown, tenantId?: string) {
     const itemId = Number(rawItemId);
     if (!Number.isInteger(itemId) || itemId <= 0) {
       throw new AppError("Item operacional invalido.", 400);
     }
-    return this.repository.listarBeneficiariosOperacionais(BigInt(itemId));
+    return this.repository.listarBeneficiariosOperacionais(BigInt(itemId), this.parseTenantId(tenantId));
   }
 
-  async notificar(rawId: string, rawBody: unknown, usuario?: UsuarioActor) {
+  async notificar(rawId: string, rawBody: unknown, usuario?: UsuarioActor, tenantId?: string) {
     const body = (rawBody ?? {}) as { canal?: string };
     const canal = String(body.canal ?? "").trim().toUpperCase();
     if (canal !== "WHATSAPP" && canal !== "EMAIL") {
       throw new AppError("Canal de notificacao invalido.", 400);
     }
-    return this.repository.notificar(this.parseId(rawId), canal, usuario);
+    return this.repository.notificar(this.parseId(rawId), canal, usuario, this.parseTenantId(tenantId));
   }
 
   private parseId(rawId: string): bigint {
@@ -121,5 +132,13 @@ export class AgendamentosService {
       throw new AppError("Identificador invalido.", 400);
     }
     return BigInt(parsed);
+  }
+
+  private parseTenantId(rawTenantId?: string) {
+    const tenantId = rawTenantId?.trim();
+    if (!tenantId) {
+      throw new AppError("Tenant da sessao nao identificado.", 401);
+    }
+    return tenantId;
   }
 }

@@ -1086,7 +1086,7 @@ export function PlanoTrabalhoPage() {
     declaracao: [
       "Salvar rascunho",
       "Validar plano",
-      "Enviar para anÃ¡lise",
+      "Enviar para análise",
       "Aprovar",
       "Reprovar",
       "Gerar PDF",

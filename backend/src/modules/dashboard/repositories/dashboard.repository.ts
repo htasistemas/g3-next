@@ -48,6 +48,8 @@ function normalizarTextoSql(coluna: string) {
 }
 
 export class DashboardRepository {
+  constructor(private readonly tenantId?: string) {}
+
   private readonly tabelaCache = new Map<string, boolean>();
   private readonly colunaCache = new Map<string, boolean>();
 
@@ -83,9 +85,15 @@ export class DashboardRepository {
     if (!possuiQuantidadeDisponivel) return 0;
 
     const possuiStatus = await this.colunaExiste(tabelaBiblioteca, "status");
-    const filtroStatus = possuiStatus
-      ? "WHERE COALESCE(UPPER(TRIM(status)), 'ATIVO') <> 'INATIVO'"
-      : "";
+    const condicoes: string[] = [];
+    const tenant = await this.montarFiltroTenant(tabelaBiblioteca);
+    if (tenant.sql) {
+      condicoes.push(tenant.sql);
+    }
+    if (possuiStatus) {
+      condicoes.push("COALESCE(UPPER(TRIM(status)), 'ATIVO') <> 'INATIVO'");
+    }
+    const filtroStatus = condicoes.length ? `WHERE ${condicoes.join(" AND ")}` : "";
 
     return this.consultarTotal(
       `
@@ -93,7 +101,7 @@ export class DashboardRepository {
       FROM ${tabelaBiblioteca}
       ${filtroStatus}
       `,
-      []
+      tenant.params
     );
   }
 
@@ -114,9 +122,10 @@ export class DashboardRepository {
       `
       SELECT COALESCE(NULLIF(TRIM(status), ''), 'EM_ANALISE') AS status, COUNT(*)::bigint AS total
       FROM cadastro_beneficiario
+      ${await this.whereTenant("cadastro_beneficiario")}
       GROUP BY COALESCE(NULLIF(TRIM(status), ''), 'EM_ANALISE')
       `,
-      []
+      await this.paramsTenant("cadastro_beneficiario")
     );
 
     const resultado: Record<string, number> = {};
@@ -171,9 +180,9 @@ export class DashboardRepository {
       `
       SELECT data_nascimento
       FROM cadastro_beneficiario
-      WHERE data_nascimento IS NOT NULL
+      ${await this.whereComTenant("cadastro_beneficiario", ["data_nascimento IS NOT NULL"])}
       `,
-      []
+      await this.paramsTenant("cadastro_beneficiario")
     );
 
     return rows
@@ -191,8 +200,8 @@ export class DashboardRepository {
     if (!possuiTabela || !possuiColuna) return 0;
 
     return this.consultarTotal(
-      "SELECT COUNT(DISTINCT beneficiario_id)::bigint AS total FROM situacao_social",
-      []
+      `SELECT COUNT(DISTINCT beneficiario_id)::bigint AS total FROM situacao_social ${await this.whereTenant("situacao_social")}`,
+      await this.paramsTenant("situacao_social")
     );
   }
 
@@ -207,7 +216,7 @@ export class DashboardRepository {
       SELECT COALESCE(AVG(COALESCE(criancas_adolescentes, 0) + COALESCE(idosos, 0)), 0) AS total
       FROM situacao_social
       `,
-      []
+      await this.paramsTenant("situacao_social")
     );
   }
 
@@ -220,9 +229,9 @@ export class DashboardRepository {
       `
       SELECT renda_mensal AS valor
       FROM escolaridade_beneficiario
-      WHERE renda_mensal IS NOT NULL AND TRIM(renda_mensal) <> ''
+      ${await this.whereComTenant("escolaridade_beneficiario", ["renda_mensal IS NOT NULL", "TRIM(renda_mensal) <> ''"])}
       `,
-      []
+      await this.paramsTenant("escolaridade_beneficiario")
     );
 
     return rows.map((row) => row.valor ?? "").filter((valor) => valor.length > 0);
@@ -247,10 +256,11 @@ export class DashboardRepository {
       SELECT COALESCE(NULLIF(TRIM(situacao_inseguranca_alimentar), ''), 'Nao informado') AS chave,
              COUNT(*)::bigint AS total
       FROM vinculo_familiar
+      ${await this.whereTenant("vinculo_familiar")}
       GROUP BY COALESCE(NULLIF(TRIM(situacao_inseguranca_alimentar), ''), 'Nao informado')
       ORDER BY total DESC, chave ASC
       `,
-      []
+      await this.paramsTenant("vinculo_familiar")
     );
 
     return rows.reduce<Record<string, number>>((acc, row) => {
@@ -269,6 +279,7 @@ export class DashboardRepository {
       return {} as Record<string, number>;
     }
 
+    const tenant = await this.montarFiltroTenant("cadastro_beneficiario", "b");
     const rows = await this.consultarRows<ChaveValorRow>(
       `
       SELECT
@@ -276,11 +287,12 @@ export class DashboardRepository {
         COUNT(*)::bigint AS total
       FROM cadastro_beneficiario b
       LEFT JOIN endereco e ON e.id = b.endereco_id
+      ${tenant.sql ? `WHERE ${tenant.sql}` : ""}
       GROUP BY COALESCE(NULLIF(TRIM(e.bairro), ''), 'Nao informado')
       ORDER BY total DESC, chave ASC
-      LIMIT $1
+      LIMIT $${tenant.params.length + 1}
       `,
-      [limit]
+      [...tenant.params, limit]
     );
 
     return rows.reduce<Record<string, number>>((acc, row) => {
@@ -297,20 +309,27 @@ export class DashboardRepository {
     const tipoNormalizado = normalizarTextoSql("tipo");
     const situacaoNormalizada = normalizarTextoSql("situacao");
 
-    return this.consultarTotal(
-      `
-      SELECT COALESCE(SUM(valor), 0) AS total
-      FROM lancamento_financeiro
-      WHERE (
+    const tenant = await this.montarFiltroTenant("lancamento_financeiro");
+    const condicoes = [
+      `(
           ${tipoNormalizado} IN ('receber', 'a receber', 'receita', 'entrada', 'credito')
           OR ${tipoNormalizado} LIKE '%receber%'
           OR ${tipoNormalizado} LIKE 'receita%'
           OR ${tipoNormalizado} LIKE '%entrada%'
           OR ${tipoNormalizado} LIKE '%credito%'
-        )
-        AND ${situacaoNormalizada} NOT IN ('pago', 'paga', 'recebido', 'recebida', 'liquidado', 'liquidada', 'concluido', 'concluida')
+        )`,
+      `${situacaoNormalizada} NOT IN ('pago', 'paga', 'recebido', 'recebida', 'liquidado', 'liquidada', 'concluido', 'concluida')`
+    ];
+    if (tenant.sql) {
+      condicoes.unshift(tenant.sql);
+    }
+    return this.consultarTotal(
+      `
+      SELECT COALESCE(SUM(valor), 0) AS total
+      FROM lancamento_financeiro
+      WHERE ${condicoes.join(" AND ")}
       `,
-      []
+      tenant.params
     );
   }
 
@@ -324,6 +343,7 @@ export class DashboardRepository {
     const possuiTipo = await this.colunaExiste("conta_bancaria", "tipo");
     const possuiRecebimentoLocal = await this.colunaExiste("conta_bancaria", "recebimento_local");
 
+    const tenant = await this.montarFiltroTenant("conta_bancaria");
     return this.consultarRows<DashboardFinanceiroContaRow>(
       `
       SELECT
@@ -334,11 +354,12 @@ export class DashboardRepository {
         ${possuiRecebimentoLocal ? "recebimento_local" : "NULL::boolean"} AS recebimento_local,
         saldo
       FROM conta_bancaria
+      ${tenant.sql ? `WHERE ${tenant.sql}` : ""}
       ORDER BY COALESCE(NULLIF(TRIM(${possuiBanco ? "banco" : "''"}), ''), 'Conta') ASC,
                COALESCE(NULLIF(TRIM(${possuiNumero ? "numero" : "''"}), ''), '0') ASC,
                id ASC
       `,
-      []
+      tenant.params
     );
   }
 
@@ -364,13 +385,17 @@ export class DashboardRepository {
       return 0;
     }
 
+    const tenant = await this.montarFiltroTenant("conta_bancaria");
+    const where = tenant.sql
+      ? `${tenant.sql} AND ${condicoes.map((condicao) => `(${condicao})`).join(" OR ")}`
+      : condicoes.map((condicao) => `(${condicao})`).join(" OR ");
     return this.consultarTotal(
       `
       SELECT COALESCE(SUM(saldo), 0) AS total
       FROM conta_bancaria
-      WHERE ${condicoes.map((condicao) => `(${condicao})`).join(" OR ")}
+      WHERE ${where}
       `,
-      []
+      tenant.params
     );
   }
 
@@ -400,13 +425,15 @@ export class DashboardRepository {
           ? `${tipoNormalizado} NOT LIKE '%caixa%'`
           : "TRUE";
 
+    const tenant = await this.montarFiltroTenant("conta_bancaria");
+    const where = tenant.sql ? `${tenant.sql} AND ${filtroBanco}` : filtroBanco;
     return this.consultarTotal(
       `
       SELECT COALESCE(SUM(saldo), 0) AS total
       FROM conta_bancaria
-      WHERE ${filtroBanco}
+      WHERE ${where}
       `,
-      []
+      tenant.params
     );
   }
 
@@ -415,12 +442,14 @@ export class DashboardRepository {
     const colunas = await this.verificarColunas("lancamento_financeiro", ["tipo", "situacao", "valor"]);
     if (!possuiTabela || !colunas) return [] as DashboardLancamentoFinanceiroRow[];
 
+    const tenant = await this.montarFiltroTenant("lancamento_financeiro");
     return this.consultarRows<DashboardLancamentoFinanceiroRow>(
       `
       SELECT tipo, situacao, valor
       FROM lancamento_financeiro
+      ${tenant.sql ? `WHERE ${tenant.sql}` : ""}
       `,
-      []
+      tenant.params
     );
   }
 
@@ -433,13 +462,17 @@ export class DashboardRepository {
       return this.contarTabela("cursos_atendimentos");
     }
 
+    const tenant = await this.montarFiltroTenant("cursos_atendimentos");
+    const where = tenant.sql
+      ? `WHERE ${tenant.sql} AND UPPER(COALESCE(status, '')) IN ('ATIVO', 'ABERTO', 'EM_ANDAMENTO', 'EM ANDAMENTO')`
+      : "WHERE UPPER(COALESCE(status, '')) IN ('ATIVO', 'ABERTO', 'EM_ANDAMENTO', 'EM ANDAMENTO')";
     return this.consultarTotal(
       `
       SELECT COUNT(*)::bigint AS total
       FROM cursos_atendimentos
-      WHERE UPPER(COALESCE(status, '')) IN ('ATIVO', 'ABERTO', 'EM_ANDAMENTO', 'EM ANDAMENTO')
+      ${where}
       `,
-      []
+      tenant.params
     );
   }
 
@@ -448,6 +481,7 @@ export class DashboardRepository {
     const colunas = await this.verificarColunas("cursos_atendimentos", ["vagas_totais", "vagas_disponiveis"]);
     if (!possuiTabela || !colunas) return 0;
 
+    const tenant = await this.montarFiltroTenant("cursos_atendimentos");
     return this.consultarTotal(
       `
       SELECT COALESCE(
@@ -464,7 +498,7 @@ export class DashboardRepository {
       ) AS total
       FROM cursos_atendimentos
       `,
-      []
+      tenant.params
     );
   }
 
@@ -473,13 +507,17 @@ export class DashboardRepository {
     const possuiStatus = await this.colunaExiste("cursos_atendimentos_matriculas", "status");
     if (!possuiTabela || !possuiStatus) return 0;
 
+    const tenant = await this.montarFiltroTenant("cursos_atendimentos_matriculas");
+    const where = tenant.sql
+      ? `WHERE ${tenant.sql} AND UPPER(COALESCE(status, '')) IN ('CERTIFICADO', 'CONCLUIDO', 'FINALIZADO')`
+      : "WHERE UPPER(COALESCE(status, '')) IN ('CERTIFICADO', 'CONCLUIDO', 'FINALIZADO')";
     return this.consultarTotal(
       `
       SELECT COUNT(*)::bigint AS total
       FROM cursos_atendimentos_matriculas
-      WHERE UPPER(COALESCE(status, '')) IN ('CERTIFICADO', 'CONCLUIDO', 'FINALIZADO')
+      ${where}
       `,
-      []
+      tenant.params
     );
   }
 
@@ -518,6 +556,10 @@ export class DashboardRepository {
       }
     }
 
+    const tenant = await this.montarFiltroTenant("doacao_realizada", "dr");
+    if (tenant.sql) {
+      filtros.unshift(tenant.sql);
+    }
     const where = filtros.length ? `WHERE ${filtros.join(" AND ")}` : "";
     const rows = await this.consultarRows<ChaveValorRow>(
       `
@@ -532,7 +574,7 @@ export class DashboardRepository {
       ORDER BY total DESC, chave ASC
       LIMIT 5
       `,
-      params
+      [...tenant.params, ...params]
     );
 
     return rows.reduce<Record<string, number>>((acc, row) => {
@@ -564,15 +606,24 @@ export class DashboardRepository {
       ? "AND COALESCE(UPPER(TRIM(situacao)), 'ATIVO') NOT IN ('CANCELADO', 'ENCERRADO', 'CONCLUIDO', 'INATIVO')"
       : "";
 
+    const tenant = await this.montarFiltroTenant("termo_fomento");
+    const condicoes = [
+      "data_fim_vigencia >= CURRENT_DATE",
+      "data_fim_vigencia <= (CURRENT_DATE + INTERVAL '60 days')"
+    ];
+    if (tenant.sql) {
+      condicoes.unshift(tenant.sql);
+    }
+    if (possuiSituacao) {
+      condicoes.push("COALESCE(UPPER(TRIM(situacao)), 'ATIVO') NOT IN ('CANCELADO', 'ENCERRADO', 'CONCLUIDO', 'INATIVO')");
+    }
     return this.consultarTotal(
       `
       SELECT COUNT(*)::bigint AS total
       FROM termo_fomento
-      WHERE data_fim_vigencia >= CURRENT_DATE
-        AND data_fim_vigencia <= (CURRENT_DATE + INTERVAL '60 days')
-        ${filtroSituacao}
+      WHERE ${condicoes.join(" AND ")}
       `,
-      []
+      tenant.params
     );
   }
 
@@ -585,13 +636,17 @@ export class DashboardRepository {
       return this.contarTabela("termo_fomento");
     }
 
+    const tenant = await this.montarFiltroTenant("termo_fomento");
+    const where = tenant.sql
+      ? `WHERE ${tenant.sql} AND COALESCE(UPPER(TRIM(situacao)), 'ATIVO') NOT IN ('CANCELADO', 'ENCERRADO', 'CONCLUIDO', 'INATIVO')`
+      : "WHERE COALESCE(UPPER(TRIM(situacao)), 'ATIVO') NOT IN ('CANCELADO', 'ENCERRADO', 'CONCLUIDO', 'INATIVO')";
     return this.consultarTotal(
       `
       SELECT COUNT(*)::bigint AS total
       FROM termo_fomento
-      WHERE COALESCE(UPPER(TRIM(situacao)), 'ATIVO') NOT IN ('CANCELADO', 'ENCERRADO', 'CONCLUIDO', 'INATIVO')
+      ${where}
       `,
-      []
+      tenant.params
     );
   }
 
@@ -601,9 +656,15 @@ export class DashboardRepository {
     if (!possuiTabela || !possuiValor) return 0;
 
     const possuiSituacao = await this.colunaExiste("termo_fomento", "situacao");
-    const filtroSituacao = possuiSituacao
-      ? "WHERE COALESCE(UPPER(TRIM(situacao)), 'ATIVO') NOT IN ('CANCELADO', 'ENCERRADO', 'CONCLUIDO', 'INATIVO')"
-      : "";
+    const tenant = await this.montarFiltroTenant("termo_fomento");
+    const condicoes: string[] = [];
+    if (tenant.sql) {
+      condicoes.push(tenant.sql);
+    }
+    if (possuiSituacao) {
+      condicoes.push("COALESCE(UPPER(TRIM(situacao)), 'ATIVO') NOT IN ('CANCELADO', 'ENCERRADO', 'CONCLUIDO', 'INATIVO')");
+    }
+    const filtroSituacao = condicoes.length ? `WHERE ${condicoes.join(" AND ")}` : "";
 
     return this.consultarTotal(
       `
@@ -611,7 +672,7 @@ export class DashboardRepository {
       FROM termo_fomento
       ${filtroSituacao}
       `,
-      []
+      tenant.params
     );
   }
 
@@ -626,6 +687,15 @@ export class DashboardRepository {
 
     if (!possuiTabela || !colunasMinimas) return [] as DashboardTermoAlerta[];
 
+    const tenant = await this.montarFiltroTenant("termo_fomento");
+    const condicoes = [
+      "data_fim_vigencia IS NOT NULL",
+      "data_fim_vigencia <= (CURRENT_DATE + INTERVAL '120 days')",
+      "COALESCE(UPPER(TRIM(situacao)), 'ATIVO') NOT IN ('CANCELADO', 'ENCERRADO', 'CONCLUIDO', 'INATIVO')"
+    ];
+    if (tenant.sql) {
+      condicoes.unshift(tenant.sql);
+    }
     const rows = await this.consultarRows<TermoAlertaRow>(
       `
       SELECT
@@ -633,13 +703,11 @@ export class DashboardRepository {
         data_fim_vigencia AS vigencia_fim,
         COALESCE(NULLIF(TRIM(situacao), ''), 'ATIVO') AS status
       FROM termo_fomento
-      WHERE data_fim_vigencia IS NOT NULL
-        AND data_fim_vigencia <= (CURRENT_DATE + INTERVAL '120 days')
-        AND COALESCE(UPPER(TRIM(situacao)), 'ATIVO') NOT IN ('CANCELADO', 'ENCERRADO', 'CONCLUIDO', 'INATIVO')
+      WHERE ${condicoes.join(" AND ")}
       ORDER BY data_fim_vigencia ASC
       LIMIT 10
       `,
-      []
+      tenant.params
     );
 
     return rows.map((row) => ({
@@ -657,6 +725,8 @@ export class DashboardRepository {
     const tipoNormalizado = normalizarTextoSql("tipo");
     const situacaoNormalizada = normalizarTextoSql("situacao");
 
+    const tenant = await this.montarFiltroTenant("lancamento_financeiro");
+    const tenantWhere = tenant.sql ? `WHERE ${tenant.sql} AND ` : "WHERE ";
     return this.consultarTotal(
       `
       SELECT
@@ -668,7 +738,7 @@ export class DashboardRepository {
         (
           SELECT COALESCE(SUM(valor), 0)::numeric AS total
           FROM lancamento_financeiro
-          WHERE (
+          ${tenantWhere}(
             ${tipoNormalizado} IN ('receber', 'a receber', 'receita', 'entrada', 'credito')
             OR ${tipoNormalizado} LIKE '%receber%'
             OR ${tipoNormalizado} LIKE 'receita%'
@@ -679,7 +749,7 @@ export class DashboardRepository {
         (
           SELECT COALESCE(SUM(valor), 0)::numeric AS total
           FROM lancamento_financeiro
-          WHERE (
+          ${tenantWhere}(
             ${tipoNormalizado} IN ('receber', 'a receber', 'receita', 'entrada', 'credito')
             OR ${tipoNormalizado} LIKE '%receber%'
             OR ${tipoNormalizado} LIKE 'receita%'
@@ -689,7 +759,7 @@ export class DashboardRepository {
             AND ${situacaoNormalizada} IN ('pago', 'paga', 'recebido', 'recebida', 'liquidado', 'liquidada', 'concluido', 'concluida')
         ) total_pago
       `,
-      []
+      [...tenant.params, ...tenant.params]
     );
   }
 
@@ -698,6 +768,9 @@ export class DashboardRepository {
     const possuiStatus = await this.colunaExiste("cursos_atendimentos_presencas", "status");
     if (!possuiTabela || !possuiStatus) return 0;
 
+    const tenant = await this.montarFiltroTenant("cursos_atendimentos_presencas");
+    const tenantWhere = tenant.sql ? `WHERE ${tenant.sql}` : "";
+    const tenantWhereFaltas = tenant.sql ? `WHERE ${tenant.sql} AND ` : "WHERE ";
     return this.consultarTotal(
       `
       SELECT
@@ -706,14 +779,14 @@ export class DashboardRepository {
           ELSE (faltas.total::numeric / totais.total::numeric) * 100
         END AS total
       FROM
-        (SELECT COUNT(*)::bigint AS total FROM cursos_atendimentos_presencas) totais,
+        (SELECT COUNT(*)::bigint AS total FROM cursos_atendimentos_presencas ${tenantWhere}) totais,
         (
           SELECT COUNT(*)::bigint AS total
           FROM cursos_atendimentos_presencas
-          WHERE UPPER(COALESCE(status, '')) IN ('FALTA', 'AUSENTE')
+          ${tenantWhereFaltas}UPPER(COALESCE(status, '')) IN ('FALTA', 'AUSENTE')
         ) faltas
       `,
-      []
+      [...tenant.params, ...tenant.params]
     );
   }
 
@@ -722,24 +795,59 @@ export class DashboardRepository {
     const possuiColuna = await this.colunaExiste(tabela, coluna);
     if (!possuiTabela || !possuiColuna) return 0;
 
-    return this.consultarTotal(
-      `SELECT COUNT(*)::bigint AS total FROM ${tabela} WHERE ${coluna} = TRUE`,
-      []
-    );
+    const tenant = await this.montarFiltroTenant(tabela);
+    const where = tenant.sql ? `WHERE ${tenant.sql} AND ${coluna} = TRUE` : `WHERE ${coluna} = TRUE`;
+    return this.consultarTotal(`SELECT COUNT(*)::bigint AS total FROM ${tabela} ${where}`, tenant.params);
   }
 
   private async contarTabela(tabela: string, where?: string, params: unknown[] = []) {
     const existe = await this.tabelaExiste(tabela);
     if (!existe) return 0;
 
-    const whereSql = where ? ` WHERE ${where}` : "";
+    const tenant = await this.montarFiltroTenant(tabela, tabela, params.length + 1);
+    const condicoes = [where, tenant.sql].filter(Boolean);
+    const whereSql = condicoes.length ? ` WHERE ${condicoes.join(" AND ")}` : "";
     return this.consultarTotal(
       `
       SELECT COUNT(*)::bigint AS total
       FROM ${tabela}${whereSql}
       `,
-      params
+      [...params, ...tenant.params]
     );
+  }
+
+  private async whereTenant(tabela: string, alias?: string) {
+    const tenant = await this.montarFiltroTenant(tabela, alias);
+    return tenant.sql ? `WHERE ${tenant.sql}` : "";
+  }
+
+  private async whereComTenant(tabela: string, condicoes: string[], alias?: string) {
+    const tenant = await this.montarFiltroTenant(tabela, alias);
+    const todas = [...(tenant.sql ? [tenant.sql] : []), ...condicoes];
+    return todas.length ? `WHERE ${todas.join(" AND ")}` : "";
+  }
+
+  private async paramsTenant(tabela: string, alias?: string) {
+    const tenant = await this.montarFiltroTenant(tabela, alias);
+    return tenant.params;
+  }
+
+  private async montarFiltroTenant(tabela: string, alias?: string, parametroIndex = 1) {
+    const tenantId = this.tenantId?.trim();
+    if (!tenantId) {
+      return { sql: "", params: [] as unknown[] };
+    }
+
+    const possuiTenantId = await this.colunaExiste(tabela, "tenant_id");
+    if (!possuiTenantId) {
+      return { sql: "", params: [] as unknown[] };
+    }
+
+    const prefixo = alias?.trim() || tabela;
+    return {
+      sql: `${prefixo}.tenant_id::text = $${parametroIndex}`,
+      params: [tenantId]
+    };
   }
 
   private montarFiltroPeriodo(coluna: string, startDate?: string, endDate?: string) {

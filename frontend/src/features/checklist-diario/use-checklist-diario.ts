@@ -1,45 +1,52 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
 import { checklistDiarioService } from "@/services/checklist-diario.service";
 import type { ChecklistFiltros, ChecklistModeloPayload } from "@/types/checklist-diario";
 
 export function useChecklistDiario(filtros: ChecklistFiltros) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["checklist-diario", "lista", filtros],
+    queryKey: ["checklist-diario", "lista", usuario?.tenant_id ?? "sem-tenant", filtros],
     queryFn: () => checklistDiarioService.listar(filtros)
   });
 }
 
 export function useChecklistSemanal(filtros: ChecklistFiltros) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["checklist-diario", "semana", filtros],
+    queryKey: ["checklist-diario", "semana", usuario?.tenant_id ?? "sem-tenant", filtros],
     queryFn: () => checklistDiarioService.listarSemana(filtros)
   });
 }
 
 export function useChecklistIndicadores(filtros: ChecklistFiltros) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["checklist-diario", "indicadores", filtros],
+    queryKey: ["checklist-diario", "indicadores", usuario?.tenant_id ?? "sem-tenant", filtros],
     queryFn: () => checklistDiarioService.obterIndicadores(filtros)
   });
 }
 
 export function useChecklistHistorico(execucaoId?: string) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["checklist-diario", "historico", execucaoId ?? ""],
+    queryKey: ["checklist-diario", "historico", usuario?.tenant_id ?? "sem-tenant", execucaoId ?? ""],
     queryFn: () => checklistDiarioService.listarHistorico(execucaoId ? { execucaoId } : undefined)
   });
 }
 
 export function useChecklistModelos() {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["checklist-diario", "modelos"],
+    queryKey: ["checklist-diario", "modelos", usuario?.tenant_id ?? "sem-tenant"],
     queryFn: () => checklistDiarioService.listarModelos()
   });
 }
 
 export function useChecklistConfiguracao() {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["checklist-diario", "configuracao"],
+    queryKey: ["checklist-diario", "configuracao", usuario?.tenant_id ?? "sem-tenant"],
     queryFn: () => checklistDiarioService.obterConfiguracao()
   });
 }

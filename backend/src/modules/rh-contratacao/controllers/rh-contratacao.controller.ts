@@ -5,6 +5,10 @@ import { RhContratacaoService } from "../services/rh-contratacao.service.js";
 const service = new RhContratacaoService();
 
 export class RhContratacaoController {
+  private obterTenantId(request: Request) {
+    return (request as AuthenticatedRequest).authUser?.tenant_id;
+  }
+
   private obterUsuarioId(request: Request) {
     const authUserId = (request as AuthenticatedRequest).authUser?.id;
     if (authUserId) return authUserId;
@@ -12,17 +16,17 @@ export class RhContratacaoController {
   }
 
   async listarCandidatos(request: Request, response: Response) {
-    const lista = await service.listarCandidatos(String(request.query.termo ?? ""));
+    const lista = await service.listarCandidatos(String(request.query.termo ?? ""), this.obterTenantId(request));
     return response.json(lista);
   }
 
   async buscarCandidato(request: Request, response: Response) {
-    const candidato = await service.buscarCandidato(request.params.id);
+    const candidato = await service.buscarCandidato(request.params.id, this.obterTenantId(request));
     return response.json(candidato);
   }
 
   async criarCandidato(request: Request, response: Response) {
-    const candidato = await service.criarCandidato(request.body, this.obterUsuarioId(request));
+    const candidato = await service.criarCandidato(request.body, this.obterUsuarioId(request), this.obterTenantId(request));
     return response.status(201).json(candidato);
   }
 
@@ -30,18 +34,19 @@ export class RhContratacaoController {
     const candidato = await service.atualizarCandidato(
       request.params.id,
       request.body,
-      this.obterUsuarioId(request)
+      this.obterUsuarioId(request),
+      this.obterTenantId(request)
     );
     return response.json(candidato);
   }
 
   async inativarCandidato(request: Request, response: Response) {
-    await service.inativarCandidato(request.params.id, this.obterUsuarioId(request));
+    await service.inativarCandidato(request.params.id, this.obterUsuarioId(request), this.obterTenantId(request));
     return response.status(204).send();
   }
 
   async buscarProcessoPorCandidato(request: Request, response: Response) {
-    const processo = await service.buscarProcessoPorCandidato(request.params.candidatoId);
+    const processo = await service.buscarProcessoPorCandidato(request.params.candidatoId, this.obterTenantId(request));
     return response.json(processo);
   }
 
@@ -49,13 +54,14 @@ export class RhContratacaoController {
     const processo = await service.atualizarStatus(
       request.params.processoId,
       request.body,
-      this.obterUsuarioId(request)
+      this.obterUsuarioId(request),
+      this.obterTenantId(request)
     );
     return response.json(processo);
   }
 
   async listarEntrevistas(request: Request, response: Response) {
-    const lista = await service.listarEntrevistas(request.params.processoId);
+    const lista = await service.listarEntrevistas(request.params.processoId, this.obterTenantId(request));
     return response.json(lista);
   }
 
@@ -63,13 +69,14 @@ export class RhContratacaoController {
     const entrevista = await service.salvarEntrevista(
       request.params.processoId,
       request.body,
-      this.obterUsuarioId(request)
+      this.obterUsuarioId(request),
+      this.obterTenantId(request)
     );
     return response.status(201).json(entrevista);
   }
 
   async buscarFicha(request: Request, response: Response) {
-    const ficha = await service.buscarFicha(request.params.processoId);
+    const ficha = await service.buscarFicha(request.params.processoId, this.obterTenantId(request));
     return response.json(ficha);
   }
 
@@ -77,13 +84,14 @@ export class RhContratacaoController {
     const ficha = await service.salvarFicha(
       request.params.processoId,
       request.body,
-      this.obterUsuarioId(request)
+      this.obterUsuarioId(request),
+      this.obterTenantId(request)
     );
     return response.json(ficha);
   }
 
   async listarDocumentos(request: Request, response: Response) {
-    const lista = await service.listarDocumentos(request.params.processoId);
+    const lista = await service.listarDocumentos(request.params.processoId, this.obterTenantId(request));
     return response.json(lista);
   }
 
@@ -91,13 +99,14 @@ export class RhContratacaoController {
     const documento = await service.atualizarDocumento(
       request.params.documentoId,
       request.body,
-      this.obterUsuarioId(request)
+      this.obterUsuarioId(request),
+      this.obterTenantId(request)
     );
     return response.json(documento);
   }
 
   async listarArquivos(request: Request, response: Response) {
-    const lista = await service.listarArquivos(request.params.processoId);
+    const lista = await service.listarArquivos(request.params.processoId, this.obterTenantId(request));
     return response.json(lista);
   }
 
@@ -105,13 +114,14 @@ export class RhContratacaoController {
     const arquivo = await service.adicionarArquivo(
       request.params.processoId,
       request.body,
-      this.obterUsuarioId(request)
+      this.obterUsuarioId(request),
+      this.obterTenantId(request)
     );
     return response.status(201).json(arquivo);
   }
 
   async listarTermos(request: Request, response: Response) {
-    const lista = await service.listarTermos(request.params.processoId);
+    const lista = await service.listarTermos(request.params.processoId, this.obterTenantId(request));
     return response.json(lista);
   }
 
@@ -119,13 +129,14 @@ export class RhContratacaoController {
     const termo = await service.salvarTermo(
       request.params.processoId,
       request.body,
-      this.obterUsuarioId(request)
+      this.obterUsuarioId(request),
+      this.obterTenantId(request)
     );
     return response.status(201).json(termo);
   }
 
   async buscarPpd(request: Request, response: Response) {
-    const ppd = await service.buscarPpd(request.params.processoId);
+    const ppd = await service.buscarPpd(request.params.processoId, this.obterTenantId(request));
     return response.json(ppd);
   }
 
@@ -133,13 +144,14 @@ export class RhContratacaoController {
     const ppd = await service.salvarPpd(
       request.params.processoId,
       request.body,
-      this.obterUsuarioId(request)
+      this.obterUsuarioId(request),
+      this.obterTenantId(request)
     );
     return response.json(ppd);
   }
 
   async buscarCartaBanco(request: Request, response: Response) {
-    const carta = await service.buscarCartaBanco(request.params.processoId);
+    const carta = await service.buscarCartaBanco(request.params.processoId, this.obterTenantId(request));
     return response.json(carta);
   }
 
@@ -147,13 +159,14 @@ export class RhContratacaoController {
     const carta = await service.salvarCartaBanco(
       request.params.processoId,
       request.body,
-      this.obterUsuarioId(request)
+      this.obterUsuarioId(request),
+      this.obterTenantId(request)
     );
     return response.json(carta);
   }
 
   async listarAuditoria(request: Request, response: Response) {
-    const lista = await service.listarAuditoria(request.params.processoId);
+    const lista = await service.listarAuditoria(request.params.processoId, this.obterTenantId(request));
     return response.json(lista);
   }
 }

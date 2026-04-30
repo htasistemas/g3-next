@@ -12,7 +12,7 @@ import { storageService } from "../../arquivos/services/storage-instance.js";
 export class ProfissionalService {
   private readonly repository = new ProfissionalRepository();
 
-  async listar(rawFilters: unknown) {
+  async listar(rawFilters: unknown, rawTenantId?: string) {
     const filtersNormalizados =
       rawFilters && typeof rawFilters === "object"
         ? normalizarObjetoTexto(
@@ -27,26 +27,32 @@ export class ProfissionalService {
         : rawFilters;
 
     const filters = profissionalFiltersSchema.parse(filtersNormalizados);
-    const profissionais = await this.repository.listar(filters);
+    const tenantId = this.parseTenant(rawTenantId);
+    const profissionais = await this.repository.listar(filters, tenantId);
     return profissionais.map(mapProfissionalToResponse);
   }
 
-  async buscarPorId(rawId: string) {
+  async buscarPorId(rawId: string, rawTenantId?: string) {
     const id = this.parseId(rawId);
-    const profissional = await this.repository.buscarPorIdOuFalhar(id);
+    const tenantId = this.parseTenant(rawTenantId);
+    const profissional = await this.repository.buscarPorIdOuFalhar(id, tenantId);
     return mapProfissionalToResponse(profissional);
   }
 
-  async criar(rawInput: unknown, rawUsuarioId?: string) {
+  async criar(rawInput: unknown, rawUsuarioId?: string, rawTenantId?: string) {
     const inputNormalizado = this.normalizarPayload(rawInput);
     const input = profissionalInputSchema.parse(inputNormalizado);
     const usuarioId = this.parseUsuarioId(rawUsuarioId);
+    const tenantId = this.parseTenant(rawTenantId);
     const foto = await this.prepararFoto(input.foto_3x4, input.nome_completo, usuarioId);
 
     try {
       let profissional;
       try {
-        profissional = await this.repository.criar({ ...input, foto_3x4: foto.caminhoArquivo });
+        profissional = await this.repository.criar(
+          { ...input, foto_3x4: foto.caminhoArquivo },
+          tenantId
+        );
       } catch (error) {
         if (error instanceof AppError) {
           throw error;
@@ -84,18 +90,23 @@ export class ProfissionalService {
     }
   }
 
-  async atualizar(rawId: string, rawInput: unknown, rawUsuarioId?: string) {
+  async atualizar(rawId: string, rawInput: unknown, rawUsuarioId?: string, rawTenantId?: string) {
     const id = this.parseId(rawId);
     const inputNormalizado = this.normalizarPayload(rawInput);
     const input = profissionalInputSchema.parse(inputNormalizado);
     const usuarioId = this.parseUsuarioId(rawUsuarioId);
-    const existente = await this.repository.buscarPorIdOuFalhar(id);
+    const tenantId = this.parseTenant(rawTenantId);
+    const existente = await this.repository.buscarPorIdOuFalhar(id, tenantId);
     const foto = await this.prepararFoto(input.foto_3x4, input.nome_completo, usuarioId, id);
 
     try {
       let profissional;
       try {
-        profissional = await this.repository.atualizar(id, { ...input, foto_3x4: foto.caminhoArquivo });
+        profissional = await this.repository.atualizar(
+          id,
+          { ...input, foto_3x4: foto.caminhoArquivo },
+          tenantId
+        );
       } catch (error) {
         if (error instanceof AppError) {
           throw error;
@@ -143,11 +154,12 @@ export class ProfissionalService {
     }
   }
 
-  async remover(rawId: string, rawUsuarioId?: string) {
+  async remover(rawId: string, rawUsuarioId?: string, rawTenantId?: string) {
     const id = this.parseId(rawId);
     const usuarioId = this.parseUsuarioId(rawUsuarioId);
-    const existente = await this.repository.buscarPorIdOuFalhar(id);
-    await this.repository.remover(id);
+    const tenantId = this.parseTenant(rawTenantId);
+    const existente = await this.repository.buscarPorIdOuFalhar(id, tenantId);
+    await this.repository.remover(id, tenantId);
     if (this.isManagedStoragePath(existente.foto3x4)) {
       await storageService.desativarPorCaminho(existente.foto3x4, usuarioId);
     }
@@ -221,5 +233,13 @@ export class ProfissionalService {
       return undefined;
     }
     return BigInt(parsed);
+  }
+
+  private parseTenant(rawTenantId?: string) {
+    const tenantId = rawTenantId?.trim();
+    if (!tenantId) {
+      throw new AppError("Tenant da sessao nao identificado.", 401);
+    }
+    return tenantId;
   }
 }

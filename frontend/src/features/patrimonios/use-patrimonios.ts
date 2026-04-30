@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
 import { patrimoniosService } from "@/services/patrimonios.service";
 import type { Patrimonio, PatrimonioMovimento } from "@/types/patrimonio";
 
 export function usePatrimonios() {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["patrimonios"],
+    queryKey: ["patrimonios", usuario?.tenant_id ?? "sem-tenant"],
     queryFn: () => patrimoniosService.listar()
   });
 }

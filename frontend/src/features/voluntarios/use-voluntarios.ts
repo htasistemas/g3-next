@@ -1,17 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
 import { voluntariosService } from "@/services/voluntarios.service";
 import type { Voluntario, VoluntarioFiltro } from "@/types/voluntario";
 
 export function useVoluntarios(filtros: VoluntarioFiltro) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["voluntarios", filtros],
+    queryKey: ["voluntarios", usuario?.tenant_id ?? "sem-tenant", filtros],
     queryFn: () => voluntariosService.listar(filtros)
   });
 }
 
 export function useVoluntario(id?: string) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["voluntario", id],
+    queryKey: ["voluntario", usuario?.tenant_id ?? "sem-tenant", id],
     queryFn: () => voluntariosService.buscarPorId(id as string),
     enabled: !!id
   });

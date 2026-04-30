@@ -22,93 +22,93 @@ function responderRelatorio(
 }
 
 export class ReportsController {
-  async relacaoUnidadesAssistenciais(request: Request, response: Response) {
+  async relacaoUnidadesAssistenciais(request: AuthenticatedRequest, response: Response) {
     const formato = formatoRelatorioSchema.parse(request.query.formato);
-    const resultado = await service.gerarRelacaoUnidadesAssistenciais(request.body);
+    const resultado = await service.gerarRelacaoUnidadesAssistenciais(request.body, request.authUser);
     return responderRelatorio(response, resultado, formato);
   }
 
-  async relacaoBeneficiarios(request: Request, response: Response) {
+  async relacaoBeneficiarios(request: AuthenticatedRequest, response: Response) {
     const formato = formatoRelatorioSchema.parse(request.query.formato);
-    const resultado = await service.gerarRelacaoBeneficiarios(request.body);
+    const resultado = await service.gerarRelacaoBeneficiarios(request.body, request.authUser);
     return responderRelatorio(response, resultado, formato);
   }
 
-  async fichaBeneficiario(request: Request, response: Response) {
+  async fichaBeneficiario(request: AuthenticatedRequest, response: Response) {
     const formato = formatoRelatorioSchema.parse(request.query.formato);
-    const resultado = await service.gerarFichaBeneficiario(request.body);
+    const resultado = await service.gerarFichaBeneficiario(request.body, request.authUser);
     return responderRelatorio(response, resultado, formato);
   }
 
-  async termoAutorizacao(request: Request, response: Response) {
+  async termoAutorizacao(request: AuthenticatedRequest, response: Response) {
     const formato = formatoRelatorioSchema.parse(request.query.formato);
-    const resultado = await service.gerarTermoAutorizacao(request.body);
+    const resultado = await service.gerarTermoAutorizacao(request.body, request.authUser);
     return responderRelatorio(response, resultado, formato);
   }
 
-  async relacaoProfissionais(request: Request, response: Response) {
+  async relacaoProfissionais(request: AuthenticatedRequest, response: Response) {
     const formato = formatoRelatorioSchema.parse(request.query.formato);
-    const resultado = await service.gerarRelacaoProfissionais(request.body);
+    const resultado = await service.gerarRelacaoProfissionais(request.body, request.authUser);
     return responderRelatorio(response, resultado, formato);
   }
 
-  async fichaProfissional(request: Request, response: Response) {
+  async fichaProfissional(request: AuthenticatedRequest, response: Response) {
     const formato = formatoRelatorioSchema.parse(request.query.formato);
-    const resultado = await service.gerarFichaProfissional(request.body);
+    const resultado = await service.gerarFichaProfissional(request.body, request.authUser);
     return responderRelatorio(response, resultado, formato);
   }
 
-  async relacaoVoluntarios(request: Request, response: Response) {
+  async relacaoVoluntarios(request: AuthenticatedRequest, response: Response) {
     const formato = formatoRelatorioSchema.parse(request.query.formato);
-    const resultado = await service.gerarRelacaoVoluntarios(request.body);
+    const resultado = await service.gerarRelacaoVoluntarios(request.body, request.authUser);
     return responderRelatorio(response, resultado, formato);
   }
 
-  async fichaVoluntario(request: Request, response: Response) {
+  async fichaVoluntario(request: AuthenticatedRequest, response: Response) {
     const formato = formatoRelatorioSchema.parse(request.query.formato);
-    const resultado = await service.gerarFichaVoluntario(request.body);
+    const resultado = await service.gerarFichaVoluntario(request.body, request.authUser);
     return responderRelatorio(response, resultado, formato);
   }
 
-  async relacaoMatriculas(request: Request, response: Response) {
+  async relacaoMatriculas(request: AuthenticatedRequest, response: Response) {
     const formato = formatoRelatorioSchema.parse(request.query.formato);
-    const resultado = await service.gerarRelacaoMatriculas(request.body);
+    const resultado = await service.gerarRelacaoMatriculas(request.body, request.authUser);
     return responderRelatorio(response, resultado, formato);
   }
 
-  async listaPresencaMatricula(request: Request, response: Response) {
+  async listaPresencaMatricula(request: AuthenticatedRequest, response: Response) {
     const formato = formatoRelatorioSchema.parse(request.query.formato);
-    const resultado = await service.gerarListaPresencaMatricula(request.body);
+    const resultado = await service.gerarListaPresencaMatricula(request.body, request.authUser);
     return responderRelatorio(response, resultado, formato);
   }
 
-  async comprovanteMatricula(request: Request, response: Response) {
+  async comprovanteMatricula(request: AuthenticatedRequest, response: Response) {
     const formato = formatoRelatorioSchema.parse(request.query.formato);
-    const resultado = await service.gerarComprovanteMatricula(request.body);
+    const resultado = await service.gerarComprovanteMatricula(request.body, request.authUser);
     return responderRelatorio(response, resultado, formato);
   }
 
-  async comprovantePreMatriculaEspera(request: Request, response: Response) {
+  async comprovantePreMatriculaEspera(request: AuthenticatedRequest, response: Response) {
     const formato = formatoRelatorioSchema.parse(request.query.formato);
-    const resultado = await service.gerarComprovantePreMatriculaEspera(request.body);
+    const resultado = await service.gerarComprovantePreMatriculaEspera(request.body, request.authUser);
     return responderRelatorio(response, resultado, formato);
   }
 
-  async relacaoRegistroDoacao(request: Request, response: Response) {
+  async relacaoRegistroDoacao(request: AuthenticatedRequest, response: Response) {
     const formato = formatoRelatorioSchema.parse(request.query.formato);
-    const resultado = await service.gerarRelacaoRegistroDoacao(request.body);
+    const resultado = await service.gerarRelacaoRegistroDoacao(request.body, request.authUser);
     return responderRelatorio(response, resultado, formato);
   }
 
-  async relacaoDoacoesRealizadas(request: Request, response: Response) {
+  async relacaoDoacoesRealizadas(request: AuthenticatedRequest, response: Response) {
     const formato = formatoRelatorioSchema.parse(request.query.formato);
-    const resultado = await service.gerarRelacaoDoacoesRealizadas(request.body);
+    const resultado = await service.gerarRelacaoDoacoesRealizadas(request.body, request.authUser);
     return responderRelatorio(response, resultado, formato);
   }
 
-  async reciboDoacaoRealizada(request: Request, response: Response) {
+  async reciboDoacaoRealizada(request: AuthenticatedRequest, response: Response) {
     const formato = formatoRelatorioSchema.parse(request.query.formato);
-    const resultado = await service.gerarReciboDoacaoRealizada(request.body);
+    const resultado = await service.gerarReciboDoacaoRealizada(request.body, request.authUser);
     return responderRelatorio(response, resultado, formato);
   }
 

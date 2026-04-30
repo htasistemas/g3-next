@@ -1,4 +1,4 @@
-﻿import PDFDocument from "pdfkit";
+import PDFDocument from "pdfkit";
 import { AppError } from "../../../shared/errors/app-error.js";
 import {
   mapOcorrenciaCriancaAnexoRowToResponse,
@@ -14,45 +14,51 @@ import { storageService } from "../../arquivos/services/storage-instance.js";
 export class OcorrenciasCriancaService {
   private readonly repository = new OcorrenciasCriancaRepository();
 
-  async listar() {
-    const rows = await this.repository.listar();
+  async listar(rawTenantId?: string) {
+    const rows = await this.repository.listar(this.parseTenantId(rawTenantId));
     return rows.map(mapOcorrenciaCriancaRowToResponse);
   }
 
-  async obter(rawId: string) {
+  async obter(rawId: string, rawTenantId?: string) {
     const id = this.parseId(rawId);
-    const row = await this.repository.obterOuFalhar(id);
+    const row = await this.repository.obterOuFalhar(id, this.parseTenantId(rawTenantId));
     return mapOcorrenciaCriancaRowToResponse(row);
   }
 
-  async criar(rawInput: unknown) {
+  async criar(rawInput: unknown, rawTenantId?: string) {
     const input = ocorrenciaCriancaInputSchema.parse(rawInput);
-    const row = await this.repository.criar(input);
+    const row = await this.repository.criar(input, this.parseTenantId(rawTenantId));
     return mapOcorrenciaCriancaRowToResponse(row);
   }
 
-  async atualizar(rawId: string, rawInput: unknown) {
+  async atualizar(rawId: string, rawInput: unknown, rawTenantId?: string) {
     const id = this.parseId(rawId);
     const input = ocorrenciaCriancaInputSchema.parse(rawInput);
-    const row = await this.repository.atualizar(id, input);
+    const row = await this.repository.atualizar(id, input, this.parseTenantId(rawTenantId));
     return mapOcorrenciaCriancaRowToResponse(row);
   }
 
-  async remover(rawId: string) {
+  async remover(rawId: string, rawTenantId?: string) {
     const id = this.parseId(rawId);
-    await this.repository.remover(id);
+    await this.repository.remover(id, this.parseTenantId(rawTenantId));
   }
 
-  async listarAnexos(rawId: string) {
+  async listarAnexos(rawId: string, rawTenantId?: string) {
     const id = this.parseId(rawId);
-    const rows = await this.repository.listarAnexos(id);
+    const rows = await this.repository.listarAnexos(id, this.parseTenantId(rawTenantId));
     return rows.map(mapOcorrenciaCriancaAnexoRowToResponse);
   }
 
-  async adicionarAnexo(rawId: string, rawInput: unknown, rawUsuarioId?: string) {
+  async adicionarAnexo(
+    rawId: string,
+    rawInput: unknown,
+    rawUsuarioId?: string,
+    rawTenantId?: string
+  ) {
     const id = this.parseId(rawId);
     const input = ocorrenciaCriancaAnexoInputSchema.parse(rawInput);
     const usuarioId = this.parseUsuarioId(rawUsuarioId);
+    const tenantId = this.parseTenantId(rawTenantId);
     const arquivo = await storageService.salvarArquivo({
       scope: "ocorrencia_anexo",
       conteudo: input.conteudoBase64,
@@ -64,11 +70,15 @@ export class OcorrenciasCriancaService {
     });
 
     try {
-      const row = await this.repository.adicionarAnexo(id, {
-        ...input,
-        conteudoBase64: arquivo.caminhoArquivo,
-        tipoMime: arquivo.registro.mime_type
-      });
+      const row = await this.repository.adicionarAnexo(
+        id,
+        {
+          ...input,
+          conteudoBase64: arquivo.caminhoArquivo,
+          tipoMime: arquivo.registro.mime_type
+        },
+        tenantId
+      );
       return mapOcorrenciaCriancaAnexoRowToResponse(row);
     } catch (error) {
       await storageService.rollbackArquivos([arquivo.caminhoArquivo]);
@@ -76,21 +86,27 @@ export class OcorrenciasCriancaService {
     }
   }
 
-  async removerAnexo(rawId: string, rawAnexoId: string, rawUsuarioId?: string) {
+  async removerAnexo(
+    rawId: string,
+    rawAnexoId: string,
+    rawUsuarioId?: string,
+    rawTenantId?: string
+  ) {
     const id = this.parseId(rawId);
     const anexoId = this.parseId(rawAnexoId);
     const usuarioId = this.parseUsuarioId(rawUsuarioId);
-    const anexos = await this.repository.listarAnexos(id);
+    const tenantId = this.parseTenantId(rawTenantId);
+    const anexos = await this.repository.listarAnexos(id, tenantId);
     const anexo = anexos.find((item) => item.id === anexoId);
-    await this.repository.removerAnexo(id, anexoId);
+    await this.repository.removerAnexo(id, anexoId, tenantId);
     if (this.isManagedStoragePath(anexo?.conteudo_base64)) {
       await storageService.desativarPorCaminho(anexo?.conteudo_base64, usuarioId);
     }
   }
 
-  async gerarPdfDenuncia(rawId: string) {
+  async gerarPdfDenuncia(rawId: string, rawTenantId?: string) {
     const id = this.parseId(rawId);
-    const row = await this.repository.obterOuFalhar(id);
+    const row = await this.repository.obterOuFalhar(id, this.parseTenantId(rawTenantId));
     const payload = mapOcorrenciaCriancaRowToResponse(row) as Record<string, unknown>;
 
     return this.gerarPdf(
@@ -105,9 +121,9 @@ export class OcorrenciasCriancaService {
     );
   }
 
-  async gerarPdfConselhoTutelar(rawId: string) {
+  async gerarPdfConselhoTutelar(rawId: string, rawTenantId?: string) {
     const id = this.parseId(rawId);
-    const row = await this.repository.obterOuFalhar(id);
+    const row = await this.repository.obterOuFalhar(id, this.parseTenantId(rawTenantId));
     const payload = mapOcorrenciaCriancaRowToResponse(row) as Record<string, unknown>;
 
     return this.gerarPdf(
@@ -163,5 +179,13 @@ export class OcorrenciasCriancaService {
       return undefined;
     }
     return BigInt(parsed);
+  }
+
+  private parseTenantId(rawTenantId?: string) {
+    const tenantId = rawTenantId?.trim();
+    if (!tenantId) {
+      throw new AppError("Tenant nao identificado.", 401);
+    }
+    return tenantId;
   }
 }

@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
 import { lembretesDiariosService } from "@/services/lembretes-diarios.service";
 import type { LembreteDiarioPayload } from "@/types/lembrete-diario";
 
@@ -7,8 +8,9 @@ type ResumoQueryOptions = {
 };
 
 export function useLembretesDiarios(usuarioId?: number, options?: ResumoQueryOptions) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["lembretes-diarios", usuarioId ?? "todos"],
+    queryKey: ["lembretes-diarios", usuario?.tenant_id ?? "sem-tenant", usuarioId ?? "todos"],
     queryFn: () => lembretesDiariosService.listar(usuarioId),
     enabled: options?.enabled ?? true,
     staleTime: 60_000
@@ -16,8 +18,14 @@ export function useLembretesDiarios(usuarioId?: number, options?: ResumoQueryOpt
 }
 
 export function useResumoLembretesDiarios(usuarioId?: number, options?: ResumoQueryOptions) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["lembretes-diarios", "resumo", usuarioId ?? "atual"],
+    queryKey: [
+      "lembretes-diarios",
+      "resumo",
+      usuario?.tenant_id ?? "sem-tenant",
+      usuarioId ?? "atual"
+    ],
     queryFn: () => lembretesDiariosService.obterResumo(),
     enabled: options?.enabled ?? true,
     staleTime: 60_000,

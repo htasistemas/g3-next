@@ -26,6 +26,7 @@ export type ChecklistUsuarioAtual = {
   id: string;
   nomeUsuario: string;
   nome?: string;
+  tenant_id?: string;
   permissoes: string[];
 };
 

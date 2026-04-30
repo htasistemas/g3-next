@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
 
 @Entity
 @Table(name = "usuarios")
@@ -141,6 +142,9 @@ public class Usuario {
 
   @Column(name = "atualizado_em", nullable = false)
   private LocalDateTime atualizadoEm;
+
+  @Column(name = "tenant_id")
+  private UUID tenantId;
 
   @ManyToMany(fetch = FetchType.LAZY)
   @JoinTable(
@@ -475,6 +479,14 @@ public class Usuario {
 
   public void setAtualizadoEm(LocalDateTime atualizadoEm) {
     this.atualizadoEm = atualizadoEm;
+  }
+
+  public UUID getTenantId() {
+    return tenantId;
+  }
+
+  public void setTenantId(UUID tenantId) {
+    this.tenantId = tenantId;
   }
 
   public Set<Permissao> getPermissoes() {

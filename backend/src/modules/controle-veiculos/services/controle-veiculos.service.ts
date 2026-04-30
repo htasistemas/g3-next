@@ -20,22 +20,25 @@ import { ControleVeiculosRepository } from "../repositories/controle-veiculos.re
 export class ControleVeiculosService {
   private readonly repository = new ControleVeiculosRepository();
 
-  async listarVeiculos() {
-    const registros = await this.repository.listarVeiculos();
+  async listarVeiculos(rawTenantId?: string) {
+    const tenantId = this.parseTenant(rawTenantId);
+    const registros = await this.repository.listarVeiculos(tenantId);
     return registros.map(mapVeiculoToResponse);
   }
 
-  async criarVeiculo(rawInput: unknown) {
+  async criarVeiculo(rawInput: unknown, rawTenantId?: string) {
     const input = veiculoInputSchema.parse(this.normalizarPayload(rawInput));
-    const registro = await this.repository.criarVeiculo(input);
+    const tenantId = this.parseTenant(rawTenantId);
+    const registro = await this.repository.criarVeiculo(input, tenantId);
     return mapVeiculoToResponse(registro);
   }
 
-  async atualizarVeiculo(rawId: string, rawInput: unknown) {
+  async atualizarVeiculo(rawId: string, rawInput: unknown, rawTenantId?: string) {
     const id = this.parseId(rawId);
-    const registroAtual = await this.repository.buscarVeiculoPorIdOuFalhar(id);
+    const tenantId = this.parseTenant(rawTenantId);
+    const registroAtual = await this.repository.buscarVeiculoPorIdOuFalhar(id, tenantId);
     const input = veiculoInputSchema.parse(this.normalizarPayload(rawInput));
-    const registro = await this.repository.atualizarVeiculo(id, input);
+    const registro = await this.repository.atualizarVeiculo(id, input, tenantId);
     await storageService.rollbackArquivos([
       registroAtual.foto_frente && registroAtual.foto_frente !== registro.foto_frente
         ? registroAtual.foto_frente
@@ -59,10 +62,11 @@ export class ControleVeiculosService {
     return mapVeiculoToResponse(registro);
   }
 
-  async removerVeiculo(rawId: string) {
+  async removerVeiculo(rawId: string, rawTenantId?: string) {
     const id = this.parseId(rawId);
-    const registro = await this.repository.buscarVeiculoPorIdOuFalhar(id);
-    await this.repository.removerVeiculo(id);
+    const tenantId = this.parseTenant(rawTenantId);
+    const registro = await this.repository.buscarVeiculoPorIdOuFalhar(id, tenantId);
+    await this.repository.removerVeiculo(id, tenantId);
     await storageService.rollbackArquivos([
       registro.foto_frente ?? undefined,
       registro.foto_lateral_esquerda ?? undefined,
@@ -72,65 +76,74 @@ export class ControleVeiculosService {
     ]);
   }
 
-  async listarDiario() {
-    const registros = await this.repository.listarDiario();
+  async listarDiario(rawTenantId?: string) {
+    const tenantId = this.parseTenant(rawTenantId);
+    const registros = await this.repository.listarDiario(tenantId);
     return registros.map(mapDiarioBordoToResponse);
   }
 
-  async criarDiario(rawInput: unknown) {
+  async criarDiario(rawInput: unknown, rawTenantId?: string) {
     const input = diarioBordoInputSchema.parse(this.normalizarPayload(rawInput));
-    const registro = await this.repository.criarDiario(input);
+    const tenantId = this.parseTenant(rawTenantId);
+    const registro = await this.repository.criarDiario(input, tenantId);
     return mapDiarioBordoToResponse(registro);
   }
 
-  async atualizarDiario(rawId: string, rawInput: unknown) {
+  async atualizarDiario(rawId: string, rawInput: unknown, rawTenantId?: string) {
     const id = this.parseId(rawId);
+    const tenantId = this.parseTenant(rawTenantId);
     const input = diarioBordoInputSchema.parse(this.normalizarPayload(rawInput));
-    const registro = await this.repository.atualizarDiario(id, input);
+    const registro = await this.repository.atualizarDiario(id, input, tenantId);
     return mapDiarioBordoToResponse(registro);
   }
 
-  async removerDiario(rawId: string) {
+  async removerDiario(rawId: string, rawTenantId?: string) {
     const id = this.parseId(rawId);
-    await this.repository.removerDiario(id);
+    const tenantId = this.parseTenant(rawTenantId);
+    await this.repository.removerDiario(id, tenantId);
   }
 
-  async listarLocaisDestino() {
-    const registros = await this.repository.listarLocaisDestino();
+  async listarLocaisDestino(rawTenantId?: string) {
+    const tenantId = this.parseTenant(rawTenantId);
+    const registros = await this.repository.listarLocaisDestino(tenantId);
     return registros.map(mapLocalDestinoToResponse);
   }
 
-  async criarLocalDestino(rawInput: unknown) {
+  async criarLocalDestino(rawInput: unknown, rawTenantId?: string) {
     const input = this.normalizarLocalDestinoInput(
       localDestinoInputSchema.parse(this.normalizarPayload(rawInput))
     );
+    const tenantId = this.parseTenant(rawTenantId);
     if (!input.nome) {
       throw new AppError("Informe o nome do local de destino.", 400);
     }
-    const registro = await this.repository.criarLocalDestino(input);
+    const registro = await this.repository.criarLocalDestino(input, tenantId);
     return mapLocalDestinoToResponse(registro);
   }
 
-  async atualizarLocalDestino(rawId: string, rawInput: unknown) {
+  async atualizarLocalDestino(rawId: string, rawInput: unknown, rawTenantId?: string) {
     const id = this.parseId(rawId);
     const input = this.normalizarLocalDestinoInput(
       localDestinoInputSchema.parse(this.normalizarPayload(rawInput))
     );
+    const tenantId = this.parseTenant(rawTenantId);
     if (!input.nome) {
       throw new AppError("Informe o nome do local de destino.", 400);
     }
-    const registro = await this.repository.atualizarLocalDestino(id, input);
+    const registro = await this.repository.atualizarLocalDestino(id, input, tenantId);
     return mapLocalDestinoToResponse(registro);
   }
 
-  async removerLocalDestino(rawId: string) {
+  async removerLocalDestino(rawId: string, rawTenantId?: string) {
     const id = this.parseId(rawId);
-    await this.repository.removerLocalDestino(id);
+    const tenantId = this.parseTenant(rawTenantId);
+    await this.repository.removerLocalDestino(id, tenantId);
   }
 
-  async listarMotoristasDisponiveis(rawNome?: unknown) {
+  async listarMotoristasDisponiveis(rawNome?: unknown, rawTenantId?: string) {
     const nome = typeof rawNome === "string" ? rawNome : undefined;
-    const registros = await this.repository.listarMotoristasDisponiveis(nome);
+    const tenantId = this.parseTenant(rawTenantId);
+    const registros = await this.repository.listarMotoristasDisponiveis(nome, tenantId);
     return registros.map((item) => ({
       id: Number(item.id),
       tipoOrigem: item.tipo_origem,
@@ -138,7 +151,8 @@ export class ControleVeiculosService {
     }));
   }
 
-  async listarMotoristasAutorizados(rawVeiculoId?: unknown) {
+  async listarMotoristasAutorizados(rawVeiculoId?: unknown, rawTenantId?: string) {
+    const tenantId = this.parseTenant(rawTenantId);
     const veiculoId =
       typeof rawVeiculoId === "string" && rawVeiculoId.trim()
         ? Number(rawVeiculoId)
@@ -147,27 +161,31 @@ export class ControleVeiculosService {
           : undefined;
 
     const registros = await this.repository.listarMotoristasAutorizados(
-      Number.isInteger(veiculoId) && (veiculoId as number) > 0 ? (veiculoId as number) : undefined
+      Number.isInteger(veiculoId) && (veiculoId as number) > 0 ? (veiculoId as number) : undefined,
+      tenantId
     );
     return registros.map(mapMotoristaAutorizadoToResponse);
   }
 
-  async criarMotoristaAutorizado(rawInput: unknown) {
+  async criarMotoristaAutorizado(rawInput: unknown, rawTenantId?: string) {
     const input = motoristaAutorizadoInputSchema.parse(this.normalizarPayload(rawInput));
-    const registro = await this.repository.criarMotoristaAutorizado(input);
+    const tenantId = this.parseTenant(rawTenantId);
+    const registro = await this.repository.criarMotoristaAutorizado(input, tenantId);
     return mapMotoristaAutorizadoToResponse(registro);
   }
 
-  async atualizarMotoristaAutorizado(rawId: string, rawInput: unknown) {
+  async atualizarMotoristaAutorizado(rawId: string, rawInput: unknown, rawTenantId?: string) {
     const id = this.parseId(rawId);
+    const tenantId = this.parseTenant(rawTenantId);
     const input = motoristaAutorizadoInputSchema.parse(this.normalizarPayload(rawInput));
-    const registro = await this.repository.atualizarMotoristaAutorizado(id, input);
+    const registro = await this.repository.atualizarMotoristaAutorizado(id, input, tenantId);
     return mapMotoristaAutorizadoToResponse(registro);
   }
 
-  async removerMotoristaAutorizado(rawId: string) {
+  async removerMotoristaAutorizado(rawId: string, rawTenantId?: string) {
     const id = this.parseId(rawId);
-    await this.repository.removerMotoristaAutorizado(id);
+    const tenantId = this.parseTenant(rawTenantId);
+    await this.repository.removerMotoristaAutorizado(id, tenantId);
   }
 
   private parseId(rawId: string): bigint {
@@ -176,6 +194,14 @@ export class ControleVeiculosService {
       throw new AppError("Identificador inválido.", 400);
     }
     return BigInt(id);
+  }
+
+  private parseTenant(rawTenantId?: string) {
+    const tenantId = rawTenantId?.trim();
+    if (!tenantId) {
+      throw new AppError("Tenant da sessao nao identificado.", 401);
+    }
+    return tenantId;
   }
 
   private normalizarPayload(rawInput: unknown) {

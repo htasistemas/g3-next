@@ -23,6 +23,8 @@ import { ensureUsuariosGestaoEstrutura } from "./usuario-estrutura.repository.js
 type UsuarioAtor = {
   id?: bigint;
   nome_usuario: string;
+  tenant_id: string;
+  instituicao_id: string;
 };
 
 type CountRow = {
@@ -39,10 +41,10 @@ type DuplicidadeRow = {
 };
 
 export class UsuarioRepository {
-  async listar(filters: UsuarioFilters) {
+  async listar(filters: UsuarioFilters, tenantId: string) {
     await ensureUsuariosGestaoEstrutura(prisma);
 
-    const where = this.buildWhereClause(filters);
+    const where = this.buildWhereClause(filters, tenantId);
     const limite = Math.min(Math.max(filters.tamanho_pagina, 1), 100);
     const offset = (Math.max(filters.pagina, 1) - 1) * limite;
 
@@ -126,15 +128,15 @@ export class UsuarioRepository {
     };
   }
 
-  async buscarPorId(id: bigint): Promise<UsuarioDetalheResponse> {
+  async buscarPorId(id: bigint, tenantId: string): Promise<UsuarioDetalheResponse> {
     await ensureUsuariosGestaoEstrutura(prisma);
 
-    const usuario = await this.buscarUsuarioRowPorId(id);
+    const usuario = await this.buscarUsuarioRowPorId(id, tenantId);
     if (!usuario) {
       throw new AppError("Usuario nao encontrado.", 404);
     }
 
-    const auditoria = await this.buscarAuditoriaPorUsuarioId(id);
+    const auditoria = await this.buscarAuditoriaPorUsuarioId(id, tenantId);
 
     return {
       usuario: mapUsuarioRowParaResponse(usuario),
@@ -166,13 +168,14 @@ export class UsuarioRepository {
     const email = input.email.trim().toLowerCase();
     const cpf = normalizeDigits(input.cpf);
 
-    await this.validarDuplicidades({
-      nome_usuario: nomeUsuario,
-      email,
-      cpf,
-      origem_tipo: input.origem_tipo,
-      origem_id: trimOrUndefined(input.origem_id)
-    });
+      await this.validarDuplicidades({
+        nome_usuario: nomeUsuario,
+        email,
+        cpf,
+        origem_tipo: input.origem_tipo,
+        origem_id: trimOrUndefined(input.origem_id),
+        tenant_id: ator.tenant_id
+      });
 
     const permissoesNormalizadas = this.normalizarPermissoes(
       input.permissoes,
@@ -192,17 +195,23 @@ export class UsuarioRepository {
         }
       });
 
-      await this.atualizarCamposComplementaresTx(tx, usuario.id, {
-        ...input,
-        email
-      }, ator.nome_usuario);
+      await this.atualizarCamposComplementaresTx(
+        tx,
+        usuario.id,
+        {
+          ...input,
+          email
+        },
+        ator
+      );
       await this.sincronizarPermissoesTx(tx, usuario.id, permissoesNormalizadas);
       await this.registrarAuditoriaTx(
         tx,
         {
           ator_id: ator.id,
           acao: "CREATE",
-          entidade_id: usuario.id.toString()
+          entidade_id: usuario.id.toString(),
+          tenant_id: ator.tenant_id
         },
         {
           nome_usuario: nomeUsuario,
@@ -217,7 +226,7 @@ export class UsuarioRepository {
       return usuario.id;
     });
 
-    return this.buscarPorId(usuarioId);
+    return this.buscarPorId(usuarioId, ator.tenant_id);
   }
 
   async atualizar(
@@ -227,7 +236,7 @@ export class UsuarioRepository {
   ): Promise<UsuarioDetalheResponse> {
     await ensureUsuariosGestaoEstrutura(prisma);
 
-    const existente = await this.buscarUsuarioRowPorId(id);
+    const existente = await this.buscarUsuarioRowPorId(id, ator.tenant_id);
     if (!existente) {
       throw new AppError("Usuario nao encontrado.", 404);
     }
@@ -242,19 +251,27 @@ export class UsuarioRepository {
       cpf,
       ignorar_id: id,
       origem_tipo: input.origem_tipo,
-      origem_id: trimOrUndefined(input.origem_id)
+      origem_id: trimOrUndefined(input.origem_id),
+      tenant_id: ator.tenant_id
     });
 
     await prisma.$transaction(async (tx) => {
-      await tx.usuario.update({
-        where: { id },
-        data: {
-          nomeUsuario,
-          nome: input.nome_completo.trim(),
-          email,
-          atualizadoEm: new Date()
-        }
-      });
+      await tx.$executeRawUnsafe(
+        `
+          UPDATE usuarios
+          SET nome_usuario = $2,
+              nome = $3,
+              email = $4,
+              atualizado_em = NOW()
+          WHERE id = $1
+            AND tenant_id::text = $5
+        `,
+        id,
+        nomeUsuario,
+        input.nome_completo.trim(),
+        email,
+        ator.tenant_id
+      );
 
       const permissoesAtuais = await this.listarPermissoesUsuarioTx(tx, id);
       const permissoesNormalizadas = this.normalizarPermissoes(
@@ -271,7 +288,7 @@ export class UsuarioRepository {
           email,
           status: input.status ?? this.mapStatusPersistido(existente.status)
         },
-        ator.nome_usuario
+        ator
       );
       await this.sincronizarPermissoesTx(tx, id, permissoesNormalizadas);
       await this.registrarAuditoriaTx(
@@ -279,7 +296,8 @@ export class UsuarioRepository {
         {
           ator_id: ator.id,
           acao: "UPDATE",
-          entidade_id: id.toString()
+          entidade_id: id.toString(),
+          tenant_id: ator.tenant_id
         },
         {
           nome_usuario: nomeUsuario,
@@ -292,7 +310,7 @@ export class UsuarioRepository {
       );
     });
 
-    return this.buscarPorId(id);
+    return this.buscarPorId(id, ator.tenant_id);
   }
 
   async atualizarStatus(
@@ -302,7 +320,7 @@ export class UsuarioRepository {
   ): Promise<UsuarioDetalheResponse> {
     await ensureUsuariosGestaoEstrutura(prisma);
 
-    const usuario = await this.buscarUsuarioRowPorId(id);
+    const usuario = await this.buscarUsuarioRowPorId(id, ator.tenant_id);
     if (!usuario) {
       throw new AppError("Usuario nao encontrado.", 404);
     }
@@ -315,10 +333,12 @@ export class UsuarioRepository {
               atualizado_em = NOW(),
               atualizado_por = $3
           WHERE id = $1
+            AND tenant_id::text = $4
         `,
         id,
         status,
-        ator.nome_usuario
+        ator.nome_usuario,
+        ator.tenant_id
       );
 
       await this.registrarAuditoriaTx(
@@ -326,7 +346,8 @@ export class UsuarioRepository {
         {
           ator_id: ator.id,
           acao: "STATUS_CHANGE",
-          entidade_id: id.toString()
+          entidade_id: id.toString(),
+          tenant_id: ator.tenant_id
         },
         {
           status_anterior: this.mapStatusPersistido(usuario.status),
@@ -335,7 +356,7 @@ export class UsuarioRepository {
       );
     });
 
-    return this.buscarPorId(id);
+    return this.buscarPorId(id, ator.tenant_id);
   }
 
   async resetarSenha(
@@ -346,19 +367,24 @@ export class UsuarioRepository {
   ): Promise<UsuarioDetalheResponse> {
     await ensureUsuariosGestaoEstrutura(prisma);
 
-    const usuario = await this.buscarUsuarioRowPorId(id);
+    const usuario = await this.buscarUsuarioRowPorId(id, ator.tenant_id);
     if (!usuario) {
       throw new AppError("Usuario nao encontrado.", 404);
     }
 
     await prisma.$transaction(async (tx) => {
-      await tx.usuario.update({
-        where: { id },
-        data: {
-          senhaHash: novaSenhaHash,
-          atualizadoEm: new Date()
-        }
-      });
+      await tx.$executeRawUnsafe(
+        `
+          UPDATE usuarios
+          SET senha_hash = $2,
+              atualizado_em = NOW()
+          WHERE id = $1
+            AND tenant_id::text = $3
+        `,
+        id,
+        novaSenhaHash,
+        ator.tenant_id
+      );
 
       await tx.$executeRawUnsafe(
         `
@@ -369,10 +395,12 @@ export class UsuarioRepository {
               atualizado_em = NOW(),
               atualizado_por = $3
           WHERE id = $1
+            AND tenant_id::text = $4
         `,
         id,
         exigirTrocaSenha,
-        ator.nome_usuario
+        ator.nome_usuario,
+        ator.tenant_id
       );
 
       await this.registrarAuditoriaTx(
@@ -380,7 +408,8 @@ export class UsuarioRepository {
         {
           ator_id: ator.id,
           acao: "RESET_PASSWORD",
-          entidade_id: id.toString()
+          entidade_id: id.toString(),
+          tenant_id: ator.tenant_id
         },
         {
           exigir_troca_senha: exigirTrocaSenha
@@ -388,13 +417,13 @@ export class UsuarioRepository {
       );
     });
 
-    return this.buscarPorId(id);
+    return this.buscarPorId(id, ator.tenant_id);
   }
 
   async remover(id: bigint, ator: UsuarioAtor): Promise<UsuarioRemocaoResponse> {
     await ensureUsuariosGestaoEstrutura(prisma);
 
-    const usuario = await this.buscarUsuarioRowPorId(id);
+    const usuario = await this.buscarUsuarioRowPorId(id, ator.tenant_id);
     if (!usuario) {
       throw new AppError("Usuario nao encontrado.", 404);
     }
@@ -410,10 +439,12 @@ export class UsuarioRepository {
               atualizado_em = NOW(),
               atualizado_por = $3
           WHERE id = $1
+            AND tenant_id::text = $4
         `,
         id,
         removidoEm,
-        ator.nome_usuario
+        ator.nome_usuario,
+        ator.tenant_id
       );
 
       await this.registrarAuditoriaTx(
@@ -421,7 +452,8 @@ export class UsuarioRepository {
         {
           ator_id: ator.id,
           acao: "DELETE",
-          entidade_id: id.toString()
+          entidade_id: id.toString(),
+          tenant_id: ator.tenant_id
         },
         {
           status_anterior: this.mapStatusPersistido(usuario.status),
@@ -437,7 +469,7 @@ export class UsuarioRepository {
     };
   }
 
-  private async buscarUsuarioRowPorId(id: bigint): Promise<UsuarioRow | null> {
+  private async buscarUsuarioRowPorId(id: bigint, tenantId: string): Promise<UsuarioRow | null> {
     const rows = await prisma.$queryRaw<UsuarioRow[]>(Prisma.sql`
       SELECT
         u.id,
@@ -469,6 +501,7 @@ export class UsuarioRepository {
       LEFT JOIN usuario_permissao up ON up.usuario_id = u.id
       LEFT JOIN permissao p ON p.id = up.permissao_id
       WHERE u.id = ${id}
+        AND u.tenant_id::text = ${tenantId}
         AND u.deletado_em IS NULL
       GROUP BY
         u.id,
@@ -500,6 +533,7 @@ export class UsuarioRepository {
 
   private async buscarAuditoriaPorUsuarioId(
     id: bigint,
+    tenantId: string,
     limite = 100
   ): Promise<UsuarioAuditoriaItem[]> {
     try {
@@ -515,6 +549,7 @@ export class UsuarioRepository {
         LEFT JOIN usuarios ator ON ator.id = a.usuario_id
         WHERE a.entidade = 'USUARIO'
           AND a.entidade_id = ${id.toString()}
+          AND a.tenant_id::text = ${tenantId}
         ORDER BY a.criado_em DESC
         LIMIT ${limite}
       `);
@@ -526,8 +561,11 @@ export class UsuarioRepository {
     }
   }
 
-  private buildWhereClause(filters: UsuarioFilters): Prisma.Sql {
-    const conditions: Prisma.Sql[] = [Prisma.sql`u.deletado_em IS NULL`];
+  private buildWhereClause(filters: UsuarioFilters, tenantId: string): Prisma.Sql {
+    const conditions: Prisma.Sql[] = [
+      Prisma.sql`u.deletado_em IS NULL`,
+      Prisma.sql`u.tenant_id::text = ${tenantId}`
+    ];
 
     if (filters.nome) {
       const termo = `%${filters.nome.trim()}%`;
@@ -592,7 +630,7 @@ export class UsuarioRepository {
     tx: Prisma.TransactionClient,
     usuarioId: bigint,
     input: UsuarioUpdateInput,
-    usuarioAtualizacao: string
+    ator: UsuarioAtor
   ) {
     await tx.$executeRawUnsafe(
       `
@@ -610,9 +648,12 @@ export class UsuarioRepository {
           origem_tipo = $11,
           origem_id = $12,
           origem_nome = $13,
+          tenant_id = $14::uuid,
+          instituicao_id = $15::uuid,
           atualizado_em = NOW(),
-          atualizado_por = $14
+          atualizado_por = $16
         WHERE id = $1
+          AND (tenant_id::text = $17 OR tenant_id IS NULL)
       `,
       usuarioId,
       trimOrUndefined(input.nome_exibicao) ?? null,
@@ -627,7 +668,10 @@ export class UsuarioRepository {
       trimOrUndefined(input.origem_tipo) ?? null,
       trimOrUndefined(input.origem_id) ?? null,
       trimOrUndefined(input.origem_nome) ?? null,
-      usuarioAtualizacao
+      ator.tenant_id,
+      ator.instituicao_id,
+      ator.nome_usuario,
+      ator.tenant_id
     );
   }
 
@@ -687,6 +731,7 @@ export class UsuarioRepository {
     origem_tipo?: string;
     origem_id?: string;
     ignorar_id?: bigint;
+    tenant_id: string;
   }) {
     const condicoes: Prisma.Sql[] = [
       Prisma.sql`LOWER(u.nome_usuario) = LOWER(${input.nome_usuario})`,
@@ -712,6 +757,7 @@ export class UsuarioRepository {
       FROM usuarios u
       WHERE (${Prisma.join(condicoes, " OR ")})
         AND u.deletado_em IS NULL
+        AND u.tenant_id::text = ${input.tenant_id}
       ${ignorarSql}
       LIMIT 10
     `);
@@ -782,18 +828,19 @@ export class UsuarioRepository {
 
   private async registrarAuditoriaTx(
     tx: Prisma.TransactionClient,
-    payload: { ator_id?: bigint; acao: string; entidade_id: string },
+    payload: { ator_id?: bigint; acao: string; entidade_id: string; tenant_id: string },
     dados: Record<string, unknown>
   ) {
     try {
       await tx.$executeRawUnsafe(
         `
-          INSERT INTO auditoria_evento (usuario_id, acao, entidade, entidade_id, dados_json, criado_em)
-          VALUES ($1, $2, 'USUARIO', $3, $4::jsonb, NOW())
+          INSERT INTO auditoria_evento (usuario_id, acao, entidade, entidade_id, tenant_id, dados_json, criado_em)
+          VALUES ($1, $2, 'USUARIO', $3, $4::uuid, $5::jsonb, NOW())
         `,
         payload.ator_id ?? null,
         payload.acao,
         payload.entidade_id,
+        payload.tenant_id,
         JSON.stringify(dados)
       );
     } catch (error: unknown) {

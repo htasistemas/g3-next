@@ -30,6 +30,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { useAuth } from "@/hooks/use-auth";
 import {
   usuarioDefaultValues,
   usuarioFormSchema,
@@ -319,6 +320,8 @@ function mapVoluntarioOrigem(item: Voluntario): OrigemBuscaItem {
 }
 
 export function UsuariosPage() {
+  const { usuario } = useAuth();
+  const tenantKey = usuario?.tenant_id ?? "sem-tenant";
   const navigate = useNavigate();
   const [abaAtiva, setAbaAtiva] = useState<AbaId>("listagem");
   const [idSelecionado, setIdSelecionado] = useState<string>();
@@ -432,7 +435,7 @@ export function UsuariosPage() {
   const origemBuscaHabilitada = !!origemTipoSelecionada && origemBuscaAplicada.trim().length >= 2;
 
   const { data: origemResultados = [], isFetching: buscandoOrigem } = useQuery({
-    queryKey: ["usuarios", "origem", origemTipoSelecionada, origemBuscaAplicada],
+    queryKey: ["usuarios", tenantKey, "origem", origemTipoSelecionada, origemBuscaAplicada],
     enabled: origemBuscaHabilitada,
     queryFn: async (): Promise<OrigemBuscaItem[]> => {
       const termo = origemBuscaAplicada.trim();

@@ -48,13 +48,13 @@ type ImagemRemota = {
 export class BibliotecaService {
   private readonly repository = new BibliotecaRepository();
 
-  async listarLivros() {
-    const rows = await this.repository.listarLivros();
+  async listarLivros(tenantId?: string) {
+    const rows = await this.repository.listarLivros(this.parseTenantId(tenantId));
     return rows.map(mapLivroRowToResponse);
   }
 
-  async obterProximoCodigoLivro() {
-    const codigo = await this.repository.obterProximoCodigo();
+  async obterProximoCodigoLivro(tenantId?: string) {
+    const codigo = await this.repository.obterProximoCodigo(this.parseTenantId(tenantId));
     return { codigo };
   }
 
@@ -74,13 +74,14 @@ export class BibliotecaService {
     return livro;
   }
 
-  async criarLivro(rawInput: unknown, rawUsuarioId?: string) {
+  async criarLivro(rawInput: unknown, rawUsuarioId?: string, tenantId?: string) {
     const input = bibliotecaLivroInputSchema.parse(rawInput);
     const usuarioId = this.parseUsuarioId(rawUsuarioId);
+    const tenantObrigatorio = this.parseTenantId(tenantId);
     const preparado = await this.prepararLivroPayload(input, usuarioId);
 
     try {
-      const row = await this.repository.criarLivro(preparado.input);
+      const row = await this.repository.criarLivro(preparado.input, tenantObrigatorio);
       await this.vincularArquivos(preparado.novosCaminhos, row.id);
       return mapLivroRowToResponse(row);
     } catch (error) {
@@ -89,15 +90,16 @@ export class BibliotecaService {
     }
   }
 
-  async atualizarLivro(rawId: string, rawInput: unknown, rawUsuarioId?: string) {
+  async atualizarLivro(rawId: string, rawInput: unknown, rawUsuarioId?: string, tenantId?: string) {
     const id = this.parseId(rawId);
     const input = bibliotecaLivroInputSchema.parse(rawInput);
     const usuarioId = this.parseUsuarioId(rawUsuarioId);
-    const existente = await this.repository.obterLivroOuFalhar(id);
+    const tenantObrigatorio = this.parseTenantId(tenantId);
+    const existente = await this.repository.obterLivroOuFalhar(id, tenantObrigatorio);
     const preparado = await this.prepararLivroPayload(input, usuarioId, id);
 
     try {
-      const row = await this.repository.atualizarLivro(id, preparado.input);
+      const row = await this.repository.atualizarLivro(id, preparado.input, tenantObrigatorio);
       await this.vincularArquivos(preparado.novosCaminhos, id);
       await this.limparCapaSubstituida(existente.capa_url, row.capa_url, usuarioId);
       return mapLivroRowToResponse(row);
@@ -107,38 +109,39 @@ export class BibliotecaService {
     }
   }
 
-  async excluirLivro(rawId: string, rawUsuarioId?: string) {
+  async excluirLivro(rawId: string, rawUsuarioId?: string, tenantId?: string) {
     const id = this.parseId(rawId);
     const usuarioId = this.parseUsuarioId(rawUsuarioId);
-    const existente = await this.repository.obterLivroOuFalhar(id);
-    await this.repository.removerLivro(id);
+    const tenantObrigatorio = this.parseTenantId(tenantId);
+    const existente = await this.repository.obterLivroOuFalhar(id, tenantObrigatorio);
+    await this.repository.removerLivro(id, tenantObrigatorio);
     await this.limparCapaSubstituida(existente.capa_url, undefined, usuarioId);
   }
 
-  async listarEmprestimos() {
-    const rows = await this.repository.listarEmprestimos();
+  async listarEmprestimos(tenantId?: string) {
+    const rows = await this.repository.listarEmprestimos(this.parseTenantId(tenantId));
     return rows.map(mapEmprestimoRowToResponse);
   }
 
-  async criarEmprestimo(rawInput: unknown) {
+  async criarEmprestimo(rawInput: unknown, tenantId?: string) {
     const input = bibliotecaEmprestimoInputSchema.parse(rawInput);
-    const row = await this.repository.criarEmprestimo(input);
+    const row = await this.repository.criarEmprestimo(input, this.parseTenantId(tenantId));
     return mapEmprestimoRowToResponse(row);
   }
 
-  async atualizarEmprestimo(rawId: string, rawInput: unknown) {
+  async atualizarEmprestimo(rawId: string, rawInput: unknown, tenantId?: string) {
     const id = this.parseId(rawId);
     const input = bibliotecaEmprestimoInputSchema.parse(rawInput);
-    const row = await this.repository.atualizarEmprestimo(id, input);
+    const row = await this.repository.atualizarEmprestimo(id, input, this.parseTenantId(tenantId));
     return mapEmprestimoRowToResponse(row);
   }
 
-  async excluirEmprestimo(rawId: string) {
+  async excluirEmprestimo(rawId: string, tenantId?: string) {
     const id = this.parseId(rawId);
-    await this.repository.removerEmprestimo(id);
+    await this.repository.removerEmprestimo(id, this.parseTenantId(tenantId));
   }
 
-  async registrarDevolucao(rawId: string, rawInput: unknown) {
+  async registrarDevolucao(rawId: string, rawInput: unknown, tenantId?: string) {
     const id = this.parseId(rawId);
     const input =
       typeof rawInput === "object" &&
@@ -151,12 +154,12 @@ export class BibliotecaService {
       throw new AppError("Informe a data de devolucao no formato YYYY-MM-DD.", 400);
     }
 
-    const row = await this.repository.registrarDevolucao(id, input);
+    const row = await this.repository.registrarDevolucao(id, input, this.parseTenantId(tenantId));
     return mapEmprestimoRowToResponse(row);
   }
 
-  async listarAlertas() {
-    const rows = await this.repository.listarAlertas();
+  async listarAlertas(tenantId?: string) {
+    const rows = await this.repository.listarAlertas(this.parseTenantId(tenantId));
     return rows.map((item) => ({
       emprestimoId: String(item.emprestimo_id),
       livroTitulo: item.livro_titulo,
@@ -420,5 +423,13 @@ export class BibliotecaService {
       return undefined;
     }
     return BigInt(parsed);
+  }
+
+  private parseTenantId(rawTenantId?: string) {
+    const tenantId = rawTenantId?.trim();
+    if (!tenantId) {
+      throw new AppError("Tenant da sessao nao identificado.", 401);
+    }
+    return tenantId;
   }
 }

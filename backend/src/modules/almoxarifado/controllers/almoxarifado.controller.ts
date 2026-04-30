@@ -1,56 +1,68 @@
-import type { Request, Response } from "express";
+import type { Response } from "express";
+import type { AuthenticatedRequest } from "../../auth/middlewares/auth.middleware.js";
 import { AlmoxarifadoService } from "../services/almoxarifado.service.js";
 
 const service = new AlmoxarifadoService();
 
 export class AlmoxarifadoController {
-  async listarItens(_request: Request, response: Response) {
-    const itens = await service.listarItens();
+  async listarItens(request: AuthenticatedRequest, response: Response) {
+    const itens = await service.listarItens(request.authUser?.tenant_id);
     return response.json({ itens });
   }
 
-  async obterProximoCodigo(_request: Request, response: Response) {
-    const codigo = await service.obterProximoCodigo();
+  async obterProximoCodigo(request: AuthenticatedRequest, response: Response) {
+    const codigo = await service.obterProximoCodigo(request.authUser?.tenant_id);
     return response.json({ codigo });
   }
 
-  async criarItem(request: Request, response: Response) {
-    const item = await service.criarItem(request.body);
+  async criarItem(request: AuthenticatedRequest, response: Response) {
+    const item = await service.criarItem(request.body, request.authUser?.tenant_id);
     return response.status(201).json(item);
   }
 
-  async atualizarItem(request: Request, response: Response) {
-    const item = await service.atualizarItem(request.params.id, request.body);
+  async atualizarItem(request: AuthenticatedRequest, response: Response) {
+    const item = await service.atualizarItem(
+      request.params.id,
+      request.body,
+      request.authUser?.tenant_id
+    );
     return response.json(item);
   }
 
-  async removerItem(request: Request, response: Response) {
-    await service.removerItem(request.params.id);
+  async removerItem(request: AuthenticatedRequest, response: Response) {
+    await service.removerItem(request.params.id, request.authUser?.tenant_id);
     return response.status(204).send();
   }
 
-  async listarMovimentacoes(_request: Request, response: Response) {
-    const movimentacoes = await service.listarMovimentacoes();
+  async listarMovimentacoes(request: AuthenticatedRequest, response: Response) {
+    const movimentacoes = await service.listarMovimentacoes(request.authUser?.tenant_id);
     return response.json({ movimentacoes });
   }
 
-  async registrarMovimentacao(request: Request, response: Response) {
-    const resultado = await service.registrarMovimentacao(request.body);
+  async registrarMovimentacao(request: AuthenticatedRequest, response: Response) {
+    const resultado = await service.registrarMovimentacao(request.body, request.authUser?.tenant_id);
     return response.status(201).json(resultado);
   }
 
-  async listarComposicaoKit(request: Request, response: Response) {
-    const itens = await service.listarComposicaoKit(request.params.id);
+  async listarComposicaoKit(request: AuthenticatedRequest, response: Response) {
+    const itens = await service.listarComposicaoKit(request.params.id, request.authUser?.tenant_id);
     return response.json(itens);
   }
 
-  async atualizarComposicaoKit(request: Request, response: Response) {
-    const itens = await service.atualizarComposicaoKit(request.params.id, request.body);
+  async atualizarComposicaoKit(request: AuthenticatedRequest, response: Response) {
+    const itens = await service.atualizarComposicaoKit(
+      request.params.id,
+      request.body,
+      request.authUser?.tenant_id
+    );
     return response.json(itens);
   }
 
-  async listarVinculosKit(request: Request, response: Response) {
-    const vinculos = await service.listarVinculosKit(request.params.id);
+  async listarVinculosKit(request: AuthenticatedRequest, response: Response) {
+    const vinculos = await service.listarVinculosKit(
+      request.params.id,
+      request.authUser?.tenant_id
+    );
     return response.json(vinculos);
   }
 }

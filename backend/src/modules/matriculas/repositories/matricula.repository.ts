@@ -65,8 +65,9 @@ type MatriculaResumoRow = {
 };
 
 export class MatriculaRepository {
-  async listar(filters: MatriculaFilters) {
+  async listar(filters: MatriculaFilters, tenantId: string) {
     const where: Prisma.Sql[] = [];
+    const tenantClause = Prisma.sql`AND c.tenant_id::text = ${tenantId}`;
 
     const nome = trimOrUndefined(filters.nome);
     if (nome) {
@@ -96,12 +97,14 @@ export class MatriculaRepository {
             SELECT 1
             FROM cursos_atendimentos_matriculas m
             WHERE m.curso_id = c.id
+              AND m.tenant_id::text = ${tenantId}
               AND m.beneficiario_nome ILIKE ${`%${beneficiario}%`}
           )
           OR EXISTS (
             SELECT 1
             FROM cursos_atendimentos_fila_espera f
             WHERE f.curso_id = c.id
+              AND f.tenant_id::text = ${tenantId}
               AND f.beneficiario_nome ILIKE ${`%${beneficiario}%`}
           )
         )`
@@ -146,15 +149,18 @@ export class MatriculaRepository {
           SELECT COUNT(*)
           FROM cursos_atendimentos_matriculas m
           WHERE m.curso_id = c.id
+            AND m.tenant_id::text = ${tenantId}
         )::BIGINT AS total_matriculas,
         (
           SELECT COUNT(*)
           FROM cursos_atendimentos_fila_espera f
           WHERE f.curso_id = c.id
+            AND f.tenant_id::text = ${tenantId}
         )::BIGINT AS total_fila_espera
       FROM cursos_atendimentos c
-      LEFT JOIN salas_unidade s ON s.id = c.sala_id
+      LEFT JOIN salas_unidade s ON s.id = c.sala_id AND s.tenant_id::text = ${tenantId}
       WHERE 1 = 1
+      ${tenantClause}
       ${whereClause}
       ORDER BY c.nome ASC
     `);
@@ -162,7 +168,7 @@ export class MatriculaRepository {
     return cursos;
   }
 
-  async obterResumoCatalogo() {
+  async obterResumoCatalogo(tenantId: string) {
     const rows = await prisma.$queryRaw<MatriculaResumoRow[]>(Prisma.sql`
       SELECT
         COUNT(*)::BIGINT AS cursos_no_catalogo,
@@ -171,8 +177,10 @@ export class MatriculaRepository {
         (
           SELECT COUNT(*)::BIGINT
           FROM cursos_atendimentos_matriculas
+          WHERE tenant_id::text = ${tenantId}
         ) AS inscricoes_ativas
       FROM cursos_atendimentos c
+      WHERE c.tenant_id::text = ${tenantId}
     `);
 
     const row = rows[0];
@@ -184,7 +192,7 @@ export class MatriculaRepository {
     };
   }
 
-  async buscarPorId(id: bigint) {
+  async buscarPorId(id: bigint, tenantId: string) {
     const cursos = await prisma.$queryRaw<MatriculaCursoRow[]>(Prisma.sql`
       SELECT
         c.id,
@@ -216,15 +224,18 @@ export class MatriculaRepository {
           SELECT COUNT(*)
           FROM cursos_atendimentos_matriculas m
           WHERE m.curso_id = c.id
+            AND m.tenant_id::text = ${tenantId}
         )::BIGINT AS total_matriculas,
         (
           SELECT COUNT(*)
           FROM cursos_atendimentos_fila_espera f
           WHERE f.curso_id = c.id
+            AND f.tenant_id::text = ${tenantId}
         )::BIGINT AS total_fila_espera
       FROM cursos_atendimentos c
-      LEFT JOIN salas_unidade s ON s.id = c.sala_id
+      LEFT JOIN salas_unidade s ON s.id = c.sala_id AND s.tenant_id::text = ${tenantId}
       WHERE c.id = ${id}
+        AND c.tenant_id::text = ${tenantId}
       LIMIT 1
     `);
 
@@ -252,11 +263,12 @@ export class MatriculaRepository {
       LEFT JOIN LATERAL (
         SELECT c.telefone_principal, c.email
         FROM cadastro_beneficiario b
-        LEFT JOIN contato_beneficiario c ON c.beneficiario_id = b.id
+        LEFT JOIN contato_beneficiario c ON c.beneficiario_id = b.id AND c.tenant_id::text = ${tenantId}
         LEFT JOIN LATERAL (
           SELECT d.numero_documento
           FROM documentos d
           WHERE d.beneficiario_id = b.id
+            AND d.tenant_id::text = ${tenantId}
             AND (
               UPPER(COALESCE(d.tipo_documento, '')) = 'CPF'
               OR UPPER(COALESCE(d.nome_documento, '')) LIKE '%CPF%'
@@ -264,19 +276,23 @@ export class MatriculaRepository {
           ORDER BY d.id DESC
           LIMIT 1
         ) cpf_doc ON TRUE
-        WHERE (
-          regexp_replace(COALESCE(m.cpf, ''), '\\D', '', 'g') <> ''
-          AND regexp_replace(COALESCE(cpf_doc.numero_documento, ''), '\\D', '', 'g') =
-            regexp_replace(COALESCE(m.cpf, ''), '\\D', '', 'g')
-        )
-        OR (
-          regexp_replace(COALESCE(m.cpf, ''), '\\D', '', 'g') = ''
-          AND LOWER(TRIM(COALESCE(b.nome_completo, ''))) = LOWER(TRIM(COALESCE(m.beneficiario_nome, '')))
-        )
+        WHERE b.tenant_id::text = ${tenantId}
+          AND (
+            (
+              regexp_replace(COALESCE(m.cpf, ''), '\\D', '', 'g') <> ''
+              AND regexp_replace(COALESCE(cpf_doc.numero_documento, ''), '\\D', '', 'g') =
+                regexp_replace(COALESCE(m.cpf, ''), '\\D', '', 'g')
+            )
+            OR (
+              regexp_replace(COALESCE(m.cpf, ''), '\\D', '', 'g') = ''
+              AND LOWER(TRIM(COALESCE(b.nome_completo, ''))) = LOWER(TRIM(COALESCE(m.beneficiario_nome, '')))
+            )
+          )
         ORDER BY c.id DESC NULLS LAST
         LIMIT 1
       ) contato ON TRUE
       WHERE m.curso_id = ${id}
+        AND m.tenant_id::text = ${tenantId}
       ORDER BY m.data_matricula DESC, m.id DESC
     `);
 
@@ -292,11 +308,12 @@ export class MatriculaRepository {
       LEFT JOIN LATERAL (
         SELECT c.telefone_principal
         FROM cadastro_beneficiario b
-        LEFT JOIN contato_beneficiario c ON c.beneficiario_id = b.id
+        LEFT JOIN contato_beneficiario c ON c.beneficiario_id = b.id AND c.tenant_id::text = ${tenantId}
         LEFT JOIN LATERAL (
           SELECT d.numero_documento
           FROM documentos d
           WHERE d.beneficiario_id = b.id
+            AND d.tenant_id::text = ${tenantId}
             AND (
               UPPER(COALESCE(d.tipo_documento, '')) = 'CPF'
               OR UPPER(COALESCE(d.nome_documento, '')) LIKE '%CPF%'
@@ -304,34 +321,38 @@ export class MatriculaRepository {
           ORDER BY d.id DESC
           LIMIT 1
         ) cpf_doc ON TRUE
-        WHERE (
-          regexp_replace(COALESCE(f.cpf, ''), '\\D', '', 'g') <> ''
-          AND regexp_replace(COALESCE(cpf_doc.numero_documento, ''), '\\D', '', 'g') =
-            regexp_replace(COALESCE(f.cpf, ''), '\\D', '', 'g')
-        )
-        OR (
-          regexp_replace(COALESCE(f.cpf, ''), '\\D', '', 'g') = ''
-          AND LOWER(TRIM(COALESCE(b.nome_completo, ''))) = LOWER(TRIM(COALESCE(f.beneficiario_nome, '')))
-        )
+        WHERE b.tenant_id::text = ${tenantId}
+          AND (
+            (
+              regexp_replace(COALESCE(f.cpf, ''), '\\D', '', 'g') <> ''
+              AND regexp_replace(COALESCE(cpf_doc.numero_documento, ''), '\\D', '', 'g') =
+                regexp_replace(COALESCE(f.cpf, ''), '\\D', '', 'g')
+            )
+            OR (
+              regexp_replace(COALESCE(f.cpf, ''), '\\D', '', 'g') = ''
+              AND LOWER(TRIM(COALESCE(b.nome_completo, ''))) = LOWER(TRIM(COALESCE(f.beneficiario_nome, '')))
+            )
+          )
         ORDER BY c.id DESC NULLS LAST
         LIMIT 1
       ) contato ON TRUE
       WHERE f.curso_id = ${id}
+        AND f.tenant_id::text = ${tenantId}
       ORDER BY f.data_entrada DESC, f.id DESC
     `);
 
     return { curso, matriculas, filaEspera };
   }
 
-  async buscarPorIdOuFalhar(id: bigint) {
-    const record = await this.buscarPorId(id);
+  async buscarPorIdOuFalhar(id: bigint, tenantId: string) {
+    const record = await this.buscarPorId(id, tenantId);
     if (!record) {
       throw new AppError("Registro de matricula nao encontrado.", 404);
     }
     return record;
   }
 
-  async criar(input: MatriculaInput) {
+  async criar(input: MatriculaInput, tenantId: string) {
     const cursoId = await prisma.$transaction(async (tx) => {
       const diasSemana = joinList(input.dias_semana);
       const faixaEtaria = joinList(input.faixa_etaria);
@@ -342,6 +363,7 @@ export class MatriculaRepository {
 
       const inserted = await tx.$queryRaw<{ id: bigint }[]>(Prisma.sql`
         INSERT INTO cursos_atendimentos (
+          tenant_id,
           tipo,
           nome,
           descricao,
@@ -366,6 +388,7 @@ export class MatriculaRepository {
           criado_em,
           atualizado_em
         ) VALUES (
+          ${tenantId}::uuid,
           ${input.tipo},
           ${input.nome},
           ${trimOrUndefined(input.descricao)},
@@ -398,17 +421,17 @@ export class MatriculaRepository {
         throw new AppError("Nao foi possivel criar a matricula.", 500);
       }
 
-      await this.inserirMatriculas(tx, cursoId, input.matriculas ?? []);
-      await this.inserirFilaEspera(tx, cursoId, input.fila_espera ?? []);
+      await this.inserirMatriculas(tx, cursoId, input.matriculas ?? [], tenantId);
+      await this.inserirFilaEspera(tx, cursoId, input.fila_espera ?? [], tenantId);
 
       return cursoId;
     });
 
-    return this.buscarPorIdOuFalhar(cursoId);
+    return this.buscarPorIdOuFalhar(cursoId, tenantId);
   }
 
-  async atualizar(id: bigint, input: MatriculaInput) {
-    await this.buscarPorIdOuFalhar(id);
+  async atualizar(id: bigint, input: MatriculaInput, tenantId: string) {
+    await this.buscarPorIdOuFalhar(id, tenantId);
 
     await prisma.$transaction(async (tx) => {
       const diasSemana = joinList(input.dias_semana);
@@ -444,34 +467,38 @@ export class MatriculaRepository {
           data_conclusao = ${dataConclusao},
           atualizado_em = NOW()
         WHERE id = ${id}
+          AND tenant_id::text = ${tenantId}
       `);
 
       await tx.$executeRaw(Prisma.sql`
         DELETE FROM cursos_atendimentos_matriculas
         WHERE curso_id = ${id}
+          AND tenant_id::text = ${tenantId}
       `);
 
       await tx.$executeRaw(Prisma.sql`
         DELETE FROM cursos_atendimentos_fila_espera
         WHERE curso_id = ${id}
+          AND tenant_id::text = ${tenantId}
       `);
 
-      await this.inserirMatriculas(tx, id, input.matriculas ?? []);
-      await this.inserirFilaEspera(tx, id, input.fila_espera ?? []);
+      await this.inserirMatriculas(tx, id, input.matriculas ?? [], tenantId);
+      await this.inserirFilaEspera(tx, id, input.fila_espera ?? [], tenantId);
     });
 
-    return this.buscarPorIdOuFalhar(id);
+    return this.buscarPorIdOuFalhar(id, tenantId);
   }
 
-  async remover(id: bigint) {
-    await this.buscarPorIdOuFalhar(id);
+  async remover(id: bigint, tenantId: string) {
+    await this.buscarPorIdOuFalhar(id, tenantId);
     await prisma.$executeRaw(Prisma.sql`
       DELETE FROM cursos_atendimentos
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
   }
 
-  async listarBeneficiarios(termo?: string) {
+  async listarBeneficiarios(termo: string | undefined, tenantId: string) {
     const termoSanitizado = trimOrUndefined(termo);
     const termoLike = termoSanitizado ? `%${termoSanitizado}%` : undefined;
     const termoDigits = termoSanitizado ? normalizeDigits(termoSanitizado) : undefined;
@@ -504,6 +531,7 @@ export class MatriculaRepository {
         SELECT c.telefone_principal, c.email
         FROM contato_beneficiario c
         WHERE c.beneficiario_id = b.id
+          AND c.tenant_id::text = ${tenantId}
         ORDER BY c.id DESC
         LIMIT 1
       ) contato ON TRUE
@@ -511,6 +539,7 @@ export class MatriculaRepository {
         SELECT d.numero_documento
         FROM documentos d
         WHERE d.beneficiario_id = b.id
+          AND d.tenant_id::text = ${tenantId}
           AND (
             UPPER(COALESCE(d.tipo_documento, '')) = 'CPF'
             OR UPPER(COALESCE(d.nome_documento, '')) LIKE '%CPF%'
@@ -519,82 +548,68 @@ export class MatriculaRepository {
         LIMIT 1
       ) cpf_doc ON TRUE
       WHERE 1 = 1
+        AND b.tenant_id::text = ${tenantId}
       ${filtroBusca}
       ORDER BY b.nome_completo ASC
       LIMIT 20
     `);
   }
 
-  async listarProfissionais(termo?: string) {
+  async listarProfissionais(termo: string | undefined, tenantId: string) {
     const termoSanitizado = trimOrUndefined(termo);
 
-    const profissionais = await prisma.cadastroProfissional.findMany({
-      where: termoSanitizado
-        ? {
-            OR: [
-              { nomeCompleto: { contains: termoSanitizado, mode: "insensitive" } },
-              { categoria: { contains: termoSanitizado, mode: "insensitive" } }
-            ]
-          }
-        : undefined,
-      select: {
-        id: true,
-        nomeCompleto: true,
-        categoria: true
-      },
-      orderBy: { nomeCompleto: "asc" },
-      take: 30
-    });
+    const termoLike = termoSanitizado ? `%${termoSanitizado}%` : undefined;
+    const filtroProfissional = termoLike
+      ? Prisma.sql`AND (nome_completo ILIKE ${termoLike} OR categoria ILIKE ${termoLike})`
+      : Prisma.empty;
+    const filtroVoluntario = termoLike
+      ? Prisma.sql`AND (nome_completo ILIKE ${termoLike} OR profissao ILIKE ${termoLike} OR area_interesse ILIKE ${termoLike})`
+      : Prisma.empty;
 
-    const voluntarios = await prisma.cadastroVoluntario.findMany({
-      where: termoSanitizado
-        ? {
-            OR: [
-              { nomeCompleto: { contains: termoSanitizado, mode: "insensitive" } },
-              { profissao: { contains: termoSanitizado, mode: "insensitive" } },
-              { areaInteresse: { contains: termoSanitizado, mode: "insensitive" } }
-            ]
-          }
-        : undefined,
-      select: {
-        id: true,
-        nomeCompleto: true,
-        profissao: true
-      },
-      orderBy: { nomeCompleto: "asc" },
-      take: 30
-    });
+    return prisma.$queryRaw<Array<{ id: bigint; nome_completo: string; categoria: string }>>(Prisma.sql`
+      SELECT id, nome_completo, categoria
+      FROM (
+        SELECT
+          id,
+          nome_completo,
+          COALESCE(categoria, 'Profissional') AS categoria
+        FROM cadastro_profissional
+        WHERE tenant_id::text = ${tenantId}
+        ${filtroProfissional}
 
-    return [...profissionais, ...voluntarios.map((voluntario) => ({
-      id: voluntario.id,
-      nomeCompleto: voluntario.nomeCompleto,
-      categoria: voluntario.profissao?.trim()
-        ? `Voluntariado - ${voluntario.profissao.trim()}`
-        : "Voluntariado"
-    }))]
-      .sort((a, b) => a.nomeCompleto.localeCompare(b.nomeCompleto, "pt-BR"))
-      .slice(0, 20)
-      .map((item) => ({
-        id: item.id,
-        nome_completo: item.nomeCompleto,
-        categoria: item.categoria
-      }));
+        UNION ALL
+
+        SELECT
+          id,
+          nome_completo,
+          CASE
+            WHEN COALESCE(TRIM(profissao), '') <> '' THEN 'Voluntariado - ' || TRIM(profissao)
+            ELSE 'Voluntariado'
+          END AS categoria
+        FROM cadastro_voluntario
+        WHERE tenant_id::text = ${tenantId}
+        ${filtroVoluntario}
+      ) profissionais
+      ORDER BY nome_completo ASC
+      LIMIT 20
+    `);
   }
 
-  async listarSalas() {
+  async listarSalas(tenantId: string) {
     return prisma.$queryRaw<Array<{ id: bigint; nome: string; unidade_nome: string | null }>>(Prisma.sql`
       SELECT
         s.id,
         s.nome,
         u.nome_fantasia AS unidade_nome
       FROM salas_unidade s
-      LEFT JOIN unidade_assistencial u ON u.id = s.unidade_id
+      LEFT JOIN unidade_assistencial u ON u.id = s.unidade_id AND u.tenant_id::text = ${tenantId}
+      WHERE s.tenant_id::text = ${tenantId}
       ORDER BY u.nome_fantasia ASC, s.nome ASC
     `);
   }
 
-  async listarPresencaDatas(cursoId: bigint, somentePendentes = false) {
-    await this.buscarPorIdOuFalhar(cursoId);
+  async listarPresencaDatas(cursoId: bigint, tenantId: string, somentePendentes = false) {
+    await this.buscarPorIdOuFalhar(cursoId, tenantId);
 
     const filtroStatus = somentePendentes
       ? Prisma.sql`AND pd.status = 'GERADA'`
@@ -610,6 +625,7 @@ export class MatriculaRepository {
           SELECT COUNT(*)
           FROM cursos_atendimentos_presencas p
           WHERE p.curso_id = pd.curso_id
+            AND p.tenant_id::text = ${tenantId}
             AND p.data_aula = pd.data_aula
             AND p.status = 'PRESENTE'
         )::BIGINT AS total_presencas,
@@ -617,18 +633,20 @@ export class MatriculaRepository {
           SELECT COUNT(*)
           FROM cursos_atendimentos_presenca_anexos a
           WHERE a.presenca_data_id = pd.id
+            AND a.tenant_id::text = ${tenantId}
         )::BIGINT AS total_anexos,
         pd.criado_em,
         pd.atualizado_em
       FROM cursos_atendimentos_presenca_datas pd
       WHERE pd.curso_id = ${cursoId}
+        AND pd.tenant_id::text = ${tenantId}
       ${filtroStatus}
       ORDER BY pd.data_aula DESC
     `);
   }
 
-  async criarPresencaData(cursoId: bigint, input: MatriculaPresencaDataInput) {
-    await this.buscarPorIdOuFalhar(cursoId);
+  async criarPresencaData(cursoId: bigint, input: MatriculaPresencaDataInput, tenantId: string) {
+    await this.buscarPorIdOuFalhar(cursoId, tenantId);
 
     const dataAula = toOptionalDate(input.data_aula);
     if (!dataAula) {
@@ -639,6 +657,7 @@ export class MatriculaRepository {
 
     const inserted = await prisma.$queryRaw<MatriculaPresencaDataRow[]>(Prisma.sql`
       INSERT INTO cursos_atendimentos_presenca_datas (
+        tenant_id,
         curso_id,
         data_aula,
         status,
@@ -646,6 +665,7 @@ export class MatriculaRepository {
         criado_em,
         atualizado_em
       ) VALUES (
+        ${tenantId}::uuid,
         ${cursoId},
         ${dataAula},
         'GERADA',
@@ -676,8 +696,8 @@ export class MatriculaRepository {
     return presencaData;
   }
 
-  async atualizarPresencaData(cursoId: bigint, presencaDataId: bigint, input: MatriculaPresencaDataUpdateInput) {
-    await this.buscarPresencaDataOuFalhar(cursoId, presencaDataId);
+  async atualizarPresencaData(cursoId: bigint, presencaDataId: bigint, input: MatriculaPresencaDataUpdateInput, tenantId: string) {
+    await this.buscarPresencaDataOuFalhar(cursoId, presencaDataId, tenantId);
 
     const observacoes = trimOrUndefined(input.observacoes);
     const status = trimOrUndefined(input.status);
@@ -690,6 +710,7 @@ export class MatriculaRepository {
         atualizado_em = NOW()
       WHERE id = ${presencaDataId}
         AND curso_id = ${cursoId}
+        AND tenant_id::text = ${tenantId}
       RETURNING
         id,
         data_aula,
@@ -709,26 +730,28 @@ export class MatriculaRepository {
     return presencaData;
   }
 
-  async cancelarPresencaData(cursoId: bigint, presencaDataId: bigint) {
-    return this.atualizarPresencaData(cursoId, presencaDataId, { status: "CANCELADA" });
+  async cancelarPresencaData(cursoId: bigint, presencaDataId: bigint, tenantId: string) {
+    return this.atualizarPresencaData(cursoId, presencaDataId, { status: "CANCELADA" }, tenantId);
   }
 
-  async removerPresencaData(cursoId: bigint, presencaDataId: bigint) {
-    const presencaData = await this.buscarPresencaDataOuFalhar(cursoId, presencaDataId);
+  async removerPresencaData(cursoId: bigint, presencaDataId: bigint, tenantId: string) {
+    const presencaData = await this.buscarPresencaDataOuFalhar(cursoId, presencaDataId, tenantId);
     await prisma.$executeRaw(Prisma.sql`
       DELETE FROM cursos_atendimentos_presencas
       WHERE curso_id = ${cursoId}
+        AND tenant_id::text = ${tenantId}
         AND data_aula = ${presencaData.data_aula}
     `);
     await prisma.$executeRaw(Prisma.sql`
       DELETE FROM cursos_atendimentos_presenca_datas
       WHERE id = ${presencaDataId}
         AND curso_id = ${cursoId}
+        AND tenant_id::text = ${tenantId}
     `);
   }
 
-  async listarPresencasPorData(cursoId: bigint, presencaDataId: bigint) {
-    const presencaData = await this.buscarPresencaDataOuFalhar(cursoId, presencaDataId);
+  async listarPresencasPorData(cursoId: bigint, presencaDataId: bigint, tenantId: string) {
+    const presencaData = await this.buscarPresencaDataOuFalhar(cursoId, presencaDataId, tenantId);
 
     const itens = await prisma.$queryRaw<MatriculaPresencaItemRow[]>(Prisma.sql`
       SELECT
@@ -740,8 +763,10 @@ export class MatriculaRepository {
       LEFT JOIN cursos_atendimentos_presencas p
         ON p.curso_id = m.curso_id
        AND p.matricula_id = m.id
+       AND p.tenant_id::text = ${tenantId}
        AND p.data_aula = ${presencaData.data_aula}
       WHERE m.curso_id = ${cursoId}
+        AND m.tenant_id::text = ${tenantId}
         AND UPPER(COALESCE(m.status, 'ATIVO')) <> 'CANCELADO'
       ORDER BY m.beneficiario_nome ASC
     `);
@@ -752,8 +777,8 @@ export class MatriculaRepository {
     };
   }
 
-  async salvarPresencasPorData(cursoId: bigint, presencaDataId: bigint, input: MatriculaPresencaSalvarInput) {
-    const presencaData = await this.buscarPresencaDataOuFalhar(cursoId, presencaDataId);
+  async salvarPresencasPorData(cursoId: bigint, presencaDataId: bigint, input: MatriculaPresencaSalvarInput, tenantId: string) {
+    const presencaData = await this.buscarPresencaDataOuFalhar(cursoId, presencaDataId, tenantId);
     const dataAula = toOptionalDate(input.data_aula) ?? presencaData.data_aula;
 
     await prisma.$transaction(async (tx) => {
@@ -765,6 +790,7 @@ export class MatriculaRepository {
           FROM cursos_atendimentos_matriculas
           WHERE id = ${matriculaId}
             AND curso_id = ${cursoId}
+            AND tenant_id::text = ${tenantId}
           LIMIT 1
         `);
 
@@ -774,6 +800,7 @@ export class MatriculaRepository {
 
         await tx.$executeRaw(Prisma.sql`
           INSERT INTO cursos_atendimentos_presencas (
+            tenant_id,
             curso_id,
             matricula_id,
             data_aula,
@@ -781,6 +808,7 @@ export class MatriculaRepository {
             criado_em,
             atualizado_em
           ) VALUES (
+            ${tenantId}::uuid,
             ${cursoId},
             ${matriculaId},
             ${dataAula},
@@ -803,13 +831,14 @@ export class MatriculaRepository {
           atualizado_em = NOW()
         WHERE id = ${presencaDataId}
           AND curso_id = ${cursoId}
+          AND tenant_id::text = ${tenantId}
       `);
     });
 
-    return this.listarPresencasPorData(cursoId, presencaDataId);
+    return this.listarPresencasPorData(cursoId, presencaDataId, tenantId);
   }
 
-  private async buscarPresencaDataOuFalhar(cursoId: bigint, presencaDataId: bigint) {
+  private async buscarPresencaDataOuFalhar(cursoId: bigint, presencaDataId: bigint, tenantId: string) {
     const registros = await prisma.$queryRaw<Array<{ id: bigint; data_aula: Date; status: string; observacoes: string | null }>>(
       Prisma.sql`
         SELECT
@@ -820,6 +849,7 @@ export class MatriculaRepository {
         FROM cursos_atendimentos_presenca_datas
         WHERE id = ${presencaDataId}
           AND curso_id = ${cursoId}
+          AND tenant_id::text = ${tenantId}
         LIMIT 1
       `
     );
@@ -834,7 +864,8 @@ export class MatriculaRepository {
   private async inserirMatriculas(
     tx: TransactionClient,
     cursoId: bigint,
-    matriculas: MatriculaInscricaoInput[]
+    matriculas: MatriculaInscricaoInput[],
+    tenantId: string
   ) {
     for (const matricula of matriculas) {
       const dataMatricula = toOptionalDateTime(matricula.data_matricula);
@@ -843,6 +874,7 @@ export class MatriculaRepository {
 
       await tx.$executeRaw(Prisma.sql`
         INSERT INTO cursos_atendimentos_matriculas (
+          tenant_id,
           curso_id,
           beneficiario_nome,
           cpf,
@@ -856,6 +888,7 @@ export class MatriculaRepository {
           profissional_tipo,
           confirmacao_presenca
         ) VALUES (
+          ${tenantId}::uuid,
           ${cursoId},
           ${matricula.beneficiario_nome},
           ${cpf},
@@ -876,7 +909,8 @@ export class MatriculaRepository {
   private async inserirFilaEspera(
     tx: TransactionClient,
     cursoId: bigint,
-    filaEspera: MatriculaFilaEsperaInput[]
+    filaEspera: MatriculaFilaEsperaInput[],
+    tenantId: string
   ) {
     for (const fila of filaEspera) {
       const dataEntrada = toOptionalDateTime(fila.data_entrada);
@@ -884,11 +918,13 @@ export class MatriculaRepository {
 
       await tx.$executeRaw(Prisma.sql`
         INSERT INTO cursos_atendimentos_fila_espera (
+          tenant_id,
           curso_id,
           beneficiario_nome,
           cpf,
           data_entrada
         ) VALUES (
+          ${tenantId}::uuid,
           ${cursoId},
           ${fila.beneficiario_nome},
           ${cpf},

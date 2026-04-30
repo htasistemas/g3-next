@@ -12,6 +12,7 @@ import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import java.time.LocalDate;
 import br.com.g3.unidadeassistencial.domain.Endereco;
+import java.util.UUID;
 
 @Entity
 @Table(name = "cadastro_profissionais")
@@ -104,6 +105,9 @@ public class CadastroProfissional {
 
   @Column(name = "atualizado_em", nullable = false)
   private LocalDateTime atualizadoEm;
+
+  @Column(name = "tenant_id")
+  private UUID tenantId;
 
   public Long getId() {
     return id;
@@ -335,5 +339,13 @@ public class CadastroProfissional {
 
   public void setAtualizadoEm(LocalDateTime atualizadoEm) {
     this.atualizadoEm = atualizadoEm;
+  }
+
+  public UUID getTenantId() {
+    return tenantId;
+  }
+
+  public void setTenantId(UUID tenantId) {
+    this.tenantId = tenantId;
   }
 }

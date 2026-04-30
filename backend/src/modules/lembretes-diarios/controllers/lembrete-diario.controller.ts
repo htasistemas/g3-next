@@ -1,44 +1,53 @@
-import type { Request, Response } from "express";
+import type { Response } from "express";
 import type { AuthenticatedRequest } from "../../auth/middlewares/auth.middleware.js";
 import { LembreteDiarioService } from "../services/lembrete-diario.service.js";
 
 const service = new LembreteDiarioService();
 
 export class LembreteDiarioController {
-  async listar(request: Request, response: Response) {
-    const lembretes = await service.listar(request.query.usuario_id);
+  async listar(request: AuthenticatedRequest, response: Response) {
+    const lembretes = await service.listar(
+      request.query.usuario_id,
+      request.authUser?.tenant_id
+    );
     return response.json(lembretes);
   }
 
-  async obterResumo(request: Request, response: Response) {
-    const resumo = await service.obterResumo(
-      (request as AuthenticatedRequest).authUser?.id
-    );
+  async obterResumo(request: AuthenticatedRequest, response: Response) {
+    const resumo = await service.obterResumo(request.authUser?.id, request.authUser?.tenant_id);
     return response.json({ resumo });
   }
 
-  async criar(request: Request, response: Response) {
-    const lembrete = await service.criar(request.body);
+  async criar(request: AuthenticatedRequest, response: Response) {
+    const lembrete = await service.criar(request.body, request.authUser?.tenant_id);
     return response.status(201).json(lembrete);
   }
 
-  async atualizar(request: Request, response: Response) {
-    const lembrete = await service.atualizar(request.params.id, request.body);
+  async atualizar(request: AuthenticatedRequest, response: Response) {
+    const lembrete = await service.atualizar(
+      request.params.id,
+      request.body,
+      request.authUser?.tenant_id
+    );
     return response.json(lembrete);
   }
 
-  async concluir(request: Request, response: Response) {
-    const lembrete = await service.concluir(request.params.id);
+  async concluir(request: AuthenticatedRequest, response: Response) {
+    const lembrete = await service.concluir(request.params.id, request.authUser?.tenant_id);
     return response.json(lembrete);
   }
 
-  async adiar(request: Request, response: Response) {
-    const lembrete = await service.adiar(request.params.id, request.body);
+  async adiar(request: AuthenticatedRequest, response: Response) {
+    const lembrete = await service.adiar(
+      request.params.id,
+      request.body,
+      request.authUser?.tenant_id
+    );
     return response.json(lembrete);
   }
 
-  async excluir(request: Request, response: Response) {
-    await service.excluir(request.params.id);
+  async excluir(request: AuthenticatedRequest, response: Response) {
+    await service.excluir(request.params.id, request.authUser?.tenant_id);
     return response.status(204).send();
   }
 }

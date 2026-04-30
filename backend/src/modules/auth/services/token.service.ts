@@ -8,6 +8,14 @@ export class TokenService {
       sub: usuario.id,
       nomeUsuario: usuario.nomeUsuario,
       nome: usuario.nome,
+      tenant_id: usuario.tenant_id,
+      instituicao_id: usuario.instituicao_id,
+      instituicao_nome: usuario.instituicao_nome,
+      instituicao_slug: usuario.instituicao_slug,
+      cnpj: usuario.cnpj,
+      plano: usuario.plano,
+      perfil: usuario.perfil,
+      is_superadmin: usuario.is_superadmin,
       permissoes: usuario.permissoes
     };
 

@@ -1,5 +1,5 @@
 import multer from "multer";
-import type { Request, Response } from "express";
+import type { Response } from "express";
 import type { AuthenticatedRequest } from "../../auth/middlewares/auth.middleware.js";
 import { BancoEmpregosService } from "../services/banco-empregos.service.js";
 
@@ -13,18 +13,23 @@ export const bancoEmpregosUploadMiddleware = multer({
 }).single("arquivo");
 
 export class BancoEmpregosController {
-  async dashboard(request: Request, response: Response) {
-    const resultado = await service.listarDashboard(request.query);
+  async dashboard(request: AuthenticatedRequest, response: Response) {
+    const resultado = await service.listarDashboard(request.query, request.authUser?.tenant_id);
     return response.json(resultado);
   }
 
-  async exportar(request: Request, response: Response) {
+  async exportar(request: AuthenticatedRequest, response: Response) {
     const tipo =
       request.params.tipo === "candidatos" || request.params.tipo === "triagem"
         ? request.params.tipo
         : "vagas";
     const formato = request.query.formato === "pdf" ? "pdf" : "csv";
-    const resultado = await service.exportar(request.query, tipo, formato);
+    const resultado = await service.exportar(
+      request.query,
+      tipo,
+      formato,
+      request.authUser?.tenant_id
+    );
     return response
       .status(200)
       .type(resultado.contentType)
@@ -48,13 +53,13 @@ export class BancoEmpregosController {
       .send(resultado.buffer);
   }
 
-  async listar(request: Request, response: Response) {
-    const vagas = await service.listar(request.query);
+  async listar(request: AuthenticatedRequest, response: Response) {
+    const vagas = await service.listar(request.query, request.authUser?.tenant_id);
     return response.json(vagas);
   }
 
-  async obter(request: Request, response: Response) {
-    const vaga = await service.obter(request.params.id);
+  async obter(request: AuthenticatedRequest, response: Response) {
+    const vaga = await service.obter(request.params.id, request.authUser?.tenant_id);
     return response.json(vaga);
   }
 
@@ -73,13 +78,16 @@ export class BancoEmpregosController {
     return response.status(204).send();
   }
 
-  async listarCandidatos(request: Request, response: Response) {
-    const candidatos = await service.listarCandidatos(request.query);
+  async listarCandidatos(request: AuthenticatedRequest, response: Response) {
+    const candidatos = await service.listarCandidatos(request.query, request.authUser?.tenant_id);
     return response.json(candidatos);
   }
 
-  async buscarCandidato(request: Request, response: Response) {
-    const candidato = await service.buscarCandidato(request.params.candidatoId);
+  async buscarCandidato(request: AuthenticatedRequest, response: Response) {
+    const candidato = await service.buscarCandidato(
+      request.params.candidatoId,
+      request.authUser?.tenant_id
+    );
     return response.json(candidato);
   }
 
@@ -102,8 +110,11 @@ export class BancoEmpregosController {
     return response.status(204).send();
   }
 
-  async listarDocumentos(request: Request, response: Response) {
-    const documentos = await service.listarDocumentos(request.params.candidatoId);
+  async listarDocumentos(request: AuthenticatedRequest, response: Response) {
+    const documentos = await service.listarDocumentos(
+      request.params.candidatoId,
+      request.authUser?.tenant_id
+    );
     return response.json(documentos);
   }
 
@@ -122,13 +133,16 @@ export class BancoEmpregosController {
     return response.status(204).send();
   }
 
-  async listarProcessos(request: Request, response: Response) {
-    const processos = await service.listarProcessos(request.query);
+  async listarProcessos(request: AuthenticatedRequest, response: Response) {
+    const processos = await service.listarProcessos(request.query, request.authUser?.tenant_id);
     return response.json(processos);
   }
 
-  async buscarProcesso(request: Request, response: Response) {
-    const processo = await service.buscarProcesso(request.params.processoId);
+  async buscarProcesso(request: AuthenticatedRequest, response: Response) {
+    const processo = await service.buscarProcesso(
+      request.params.processoId,
+      request.authUser?.tenant_id
+    );
     return response.json(processo);
   }
 
@@ -138,17 +152,25 @@ export class BancoEmpregosController {
   }
 
   async atualizarProcesso(request: AuthenticatedRequest, response: Response) {
-    const processo = await service.atualizarProcesso(request.params.processoId, request.body, request.authUser);
+    const processo = await service.atualizarProcesso(
+      request.params.processoId,
+      request.body,
+      request.authUser
+    );
     return response.json(processo);
   }
 
   async salvarAvaliacao(request: AuthenticatedRequest, response: Response) {
-    const avaliacao = await service.salvarAvaliacao(request.params.processoId, request.body, request.authUser);
+    const avaliacao = await service.salvarAvaliacao(
+      request.params.processoId,
+      request.body,
+      request.authUser
+    );
     return response.json(avaliacao);
   }
 
-  async listarHistorico(request: Request, response: Response) {
-    const historico = await service.listarHistorico(request.query);
+  async listarHistorico(request: AuthenticatedRequest, response: Response) {
+    const historico = await service.listarHistorico(request.query, request.authUser?.tenant_id);
     return response.json(historico);
   }
 }

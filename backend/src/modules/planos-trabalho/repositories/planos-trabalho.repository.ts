@@ -23,6 +23,7 @@ type TransactionClient = Prisma.TransactionClient;
 
 const estruturaSql = [
   `ALTER TABLE IF EXISTS plano_trabalho ALTER COLUMN termo_fomento_id DROP NOT NULL`,
+  `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS tenant_id UUID`,
   `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS tipo_parceria VARCHAR(80)`,
   `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS orgao_parceiro VARCHAR(200)`,
   `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS edital_chamamento VARCHAR(200)`,
@@ -92,6 +93,7 @@ const estruturaSql = [
   `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS situacao_aprovacao VARCHAR(80)`,
   `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS observacao_aprovador TEXT`,
   `ALTER TABLE IF EXISTS plano_trabalho_metas ADD COLUMN IF NOT EXISTS numero_meta VARCHAR(30)`,
+  `ALTER TABLE IF EXISTS plano_trabalho_metas ADD COLUMN IF NOT EXISTS tenant_id UUID`,
   `ALTER TABLE IF EXISTS plano_trabalho_metas ADD COLUMN IF NOT EXISTS indicador_resultado TEXT`,
   `ALTER TABLE IF EXISTS plano_trabalho_metas ADD COLUMN IF NOT EXISTS meio_verificacao TEXT`,
   `ALTER TABLE IF EXISTS plano_trabalho_metas ADD COLUMN IF NOT EXISTS data_inicio DATE`,
@@ -100,6 +102,7 @@ const estruturaSql = [
   `ALTER TABLE IF EXISTS plano_trabalho_metas ADD COLUMN IF NOT EXISTS situacao VARCHAR(60)`,
   `ALTER TABLE IF EXISTS plano_trabalho_metas ADD COLUMN IF NOT EXISTS ordem INTEGER NOT NULL DEFAULT 0`,
   `ALTER TABLE IF EXISTS plano_trabalho_atividades ADD COLUMN IF NOT EXISTS nome_etapa VARCHAR(200)`,
+  `ALTER TABLE IF EXISTS plano_trabalho_atividades ADD COLUMN IF NOT EXISTS tenant_id UUID`,
   `ALTER TABLE IF EXISTS plano_trabalho_atividades ADD COLUMN IF NOT EXISTS acao_executar TEXT`,
   `ALTER TABLE IF EXISTS plano_trabalho_atividades ADD COLUMN IF NOT EXISTS descricao_detalhada TEXT`,
   `ALTER TABLE IF EXISTS plano_trabalho_atividades ADD COLUMN IF NOT EXISTS publico_atendido TEXT`,
@@ -115,6 +118,7 @@ const estruturaSql = [
   `CREATE TABLE IF NOT EXISTS plano_trabalho_objetivos (
     id BIGSERIAL PRIMARY KEY,
     plano_trabalho_id BIGINT NOT NULL REFERENCES plano_trabalho(id) ON DELETE CASCADE,
+    tenant_id UUID,
     descricao TEXT NOT NULL,
     resultado_esperado TEXT,
     metas_vinculadas TEXT,
@@ -124,6 +128,7 @@ const estruturaSql = [
   `CREATE TABLE IF NOT EXISTS plano_trabalho_aplicacao_recursos (
     id BIGSERIAL PRIMARY KEY,
     plano_trabalho_id BIGINT NOT NULL REFERENCES plano_trabalho(id) ON DELETE CASCADE,
+    tenant_id UUID,
     categoria_despesa VARCHAR(120) NOT NULL,
     item VARCHAR(160) NOT NULL,
     descricao TEXT,
@@ -142,6 +147,7 @@ const estruturaSql = [
   `CREATE TABLE IF NOT EXISTS plano_trabalho_desembolso (
     id BIGSERIAL PRIMARY KEY,
     plano_trabalho_id BIGINT NOT NULL REFERENCES plano_trabalho(id) ON DELETE CASCADE,
+    tenant_id UUID,
     mes_ano VARCHAR(7) NOT NULL,
     valor_previsto NUMERIC(14,2),
     fonte_recurso VARCHAR(120),
@@ -153,12 +159,69 @@ const estruturaSql = [
   `CREATE TABLE IF NOT EXISTS plano_trabalho_checklist_prestacao (
     id BIGSERIAL PRIMARY KEY,
     plano_trabalho_id BIGINT NOT NULL REFERENCES plano_trabalho(id) ON DELETE CASCADE,
+    tenant_id UUID,
     descricao TEXT NOT NULL,
     obrigatorio BOOLEAN NOT NULL DEFAULT TRUE,
     concluido BOOLEAN NOT NULL DEFAULT FALSE,
     ordem INTEGER NOT NULL DEFAULT 0,
     criado_em TIMESTAMP NOT NULL DEFAULT NOW()
   )`,
+  `ALTER TABLE IF EXISTS plano_trabalho_objetivos ADD COLUMN IF NOT EXISTS tenant_id UUID`,
+  `ALTER TABLE IF EXISTS plano_trabalho_aplicacao_recursos ADD COLUMN IF NOT EXISTS tenant_id UUID`,
+  `ALTER TABLE IF EXISTS plano_trabalho_desembolso ADD COLUMN IF NOT EXISTS tenant_id UUID`,
+  `ALTER TABLE IF EXISTS plano_trabalho_checklist_prestacao ADD COLUMN IF NOT EXISTS tenant_id UUID`,
+  `CREATE INDEX IF NOT EXISTS plano_trabalho_tenant_idx ON plano_trabalho(tenant_id, atualizado_em DESC, id DESC)`,
+  `CREATE INDEX IF NOT EXISTS plano_trabalho_metas_tenant_idx ON plano_trabalho_metas(tenant_id, plano_trabalho_id, ordem, id)`,
+  `CREATE INDEX IF NOT EXISTS plano_trabalho_atividades_tenant_idx ON plano_trabalho_atividades(tenant_id, meta_id, ordem, id)`,
+  `CREATE INDEX IF NOT EXISTS plano_trabalho_objetivos_tenant_idx ON plano_trabalho_objetivos(tenant_id, plano_trabalho_id, ordem, id)`,
+  `CREATE INDEX IF NOT EXISTS plano_trabalho_aplicacao_tenant_idx ON plano_trabalho_aplicacao_recursos(tenant_id, plano_trabalho_id, ordem, id)`,
+  `CREATE INDEX IF NOT EXISTS plano_trabalho_desembolso_tenant_idx ON plano_trabalho_desembolso(tenant_id, plano_trabalho_id, ordem, id)`,
+  `CREATE INDEX IF NOT EXISTS plano_trabalho_checklist_tenant_idx ON plano_trabalho_checklist_prestacao(tenant_id, plano_trabalho_id, ordem, id)`,
+  `UPDATE plano_trabalho p
+    SET tenant_id = ref.tenant_id
+    FROM (
+      SELECT id AS tenant_id
+      FROM instituicoes
+      ORDER BY criado_em ASC NULLS LAST, id ASC
+      LIMIT 1
+    ) ref
+    WHERE p.tenant_id IS NULL`,
+  `UPDATE plano_trabalho_objetivos o
+    SET tenant_id = p.tenant_id
+    FROM plano_trabalho p
+    WHERE o.tenant_id IS NULL
+      AND p.id = o.plano_trabalho_id
+      AND p.tenant_id IS NOT NULL`,
+  `UPDATE plano_trabalho_metas m
+    SET tenant_id = p.tenant_id
+    FROM plano_trabalho p
+    WHERE m.tenant_id IS NULL
+      AND p.id = m.plano_trabalho_id
+      AND p.tenant_id IS NOT NULL`,
+  `UPDATE plano_trabalho_atividades a
+    SET tenant_id = m.tenant_id
+    FROM plano_trabalho_metas m
+    WHERE a.tenant_id IS NULL
+      AND m.id = a.meta_id
+      AND m.tenant_id IS NOT NULL`,
+  `UPDATE plano_trabalho_aplicacao_recursos a
+    SET tenant_id = p.tenant_id
+    FROM plano_trabalho p
+    WHERE a.tenant_id IS NULL
+      AND p.id = a.plano_trabalho_id
+      AND p.tenant_id IS NOT NULL`,
+  `UPDATE plano_trabalho_desembolso d
+    SET tenant_id = p.tenant_id
+    FROM plano_trabalho p
+    WHERE d.tenant_id IS NULL
+      AND p.id = d.plano_trabalho_id
+      AND p.tenant_id IS NOT NULL`,
+  `UPDATE plano_trabalho_checklist_prestacao c
+    SET tenant_id = p.tenant_id
+    FROM plano_trabalho p
+    WHERE c.tenant_id IS NULL
+      AND p.id = c.plano_trabalho_id
+      AND p.tenant_id IS NOT NULL`,
   `CREATE INDEX IF NOT EXISTS plano_trabalho_objetivos_plano_idx ON plano_trabalho_objetivos(plano_trabalho_id)`,
   `CREATE INDEX IF NOT EXISTS plano_trabalho_aplicacao_plano_idx ON plano_trabalho_aplicacao_recursos(plano_trabalho_id)`,
   `CREATE INDEX IF NOT EXISTS plano_trabalho_desembolso_plano_idx ON plano_trabalho_desembolso(plano_trabalho_id)`,
@@ -192,7 +255,7 @@ function joinMetasVinculadas(values: string[]) {
 }
 
 export class PlanosTrabalhoRepository {
-  async listar() {
+  async listar(tenantId: string) {
     await ensurePlanosTrabalhoEstrutura();
     const planos = await prisma.$queryRaw<PlanoTrabalhoRow[]>(Prisma.sql`
       SELECT
@@ -277,6 +340,7 @@ export class PlanosTrabalhoRepository {
         t.descricao_objeto AS termo_objeto
       FROM plano_trabalho p
       LEFT JOIN termo_fomento t ON t.id = p.termo_fomento_id
+      WHERE p.tenant_id::text = ${tenantId}
       ORDER BY p.id DESC
     `);
 
@@ -284,12 +348,12 @@ export class PlanosTrabalhoRepository {
     const [objetivosEspecificos, metas, etapas, aplicacaoRecursos, desembolso, checklistPrestacao] =
       ids.length
         ? await Promise.all([
-            this.listarObjetivos(ids),
-            this.listarMetas(ids),
-            this.listarEtapasPorPlanos(ids),
-            this.listarAplicacaoRecursos(ids),
-            this.listarDesembolso(ids),
-            this.listarChecklistPrestacao(ids)
+            this.listarObjetivos(ids, tenantId),
+            this.listarMetas(ids, tenantId),
+            this.listarEtapasPorPlanos(ids, tenantId),
+            this.listarAplicacaoRecursos(ids, tenantId),
+            this.listarDesembolso(ids, tenantId),
+            this.listarChecklistPrestacao(ids, tenantId)
           ])
         : [[], [], [], [], [], []];
 
@@ -304,7 +368,7 @@ export class PlanosTrabalhoRepository {
     }));
   }
 
-  async buscarPorId(id: bigint) {
+  async buscarPorId(id: bigint, tenantId: string) {
     await ensurePlanosTrabalhoEstrutura();
     const rows = await prisma.$queryRaw<PlanoTrabalhoRow[]>(Prisma.sql`
       SELECT
@@ -390,6 +454,7 @@ export class PlanosTrabalhoRepository {
       FROM plano_trabalho p
       LEFT JOIN termo_fomento t ON t.id = p.termo_fomento_id
       WHERE p.id = ${id}
+        AND p.tenant_id::text = ${tenantId}
       LIMIT 1
     `);
     const plano = rows[0] ?? null;
@@ -397,32 +462,34 @@ export class PlanosTrabalhoRepository {
 
     const [objetivosEspecificos, metas, etapas, aplicacaoRecursos, desembolso, checklistPrestacao] =
       await Promise.all([
-        this.listarObjetivos([id]),
-        this.listarMetas([id]),
-        this.listarEtapasPorPlanos([id]),
-        this.listarAplicacaoRecursos([id]),
-        this.listarDesembolso([id]),
-        this.listarChecklistPrestacao([id])
+        this.listarObjetivos([id], tenantId),
+        this.listarMetas([id], tenantId),
+        this.listarEtapasPorPlanos([id], tenantId),
+        this.listarAplicacaoRecursos([id], tenantId),
+        this.listarDesembolso([id], tenantId),
+        this.listarChecklistPrestacao([id], tenantId)
       ]);
 
     return { plano, objetivosEspecificos, metas, etapas, aplicacaoRecursos, desembolso, checklistPrestacao };
   }
 
-  async buscarPorIdOuFalhar(id: bigint) {
-    const registro = await this.buscarPorId(id);
+  async buscarPorIdOuFalhar(id: bigint, tenantId: string) {
+    const registro = await this.buscarPorId(id, tenantId);
     if (!registro) {
       throw new AppError("Plano de trabalho não encontrado.", 404);
     }
     return registro;
   }
 
-  async criar(input: PlanoTrabalhoInput, usuarioId?: bigint) {
+  async criar(input: PlanoTrabalhoInput, tenantId: string, usuarioId?: bigint) {
     await ensurePlanosTrabalhoEstrutura();
     const id = await prisma.$transaction(async (tx) => {
-      const codigoInterno = trimOrUndefined(input.codigoInterno ?? undefined) ?? (await this.gerarCodigoInterno());
+      const codigoInterno =
+        trimOrUndefined(input.codigoInterno ?? undefined) ?? (await this.gerarCodigoInterno(tenantId));
       const termoFomentoId = parseOptionalBigInt(input.termoFomentoId);
       const insert = await tx.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
         INSERT INTO plano_trabalho (
+          tenant_id,
           codigo_interno,
           titulo,
           descricao_geral,
@@ -506,6 +573,7 @@ export class PlanosTrabalhoRepository {
           criado_em,
           atualizado_em
         ) VALUES (
+          ${tenantId}::uuid,
           ${codigoInterno},
           ${input.titulo},
           ${input.descricaoObjeto},
@@ -593,22 +661,22 @@ export class PlanosTrabalhoRepository {
       `);
       const planoId = insert[0]?.id;
       if (!planoId) throw new AppError("Não foi possível criar o plano de trabalho.", 500);
-      await this.salvarRelacionamentos(tx, planoId, input);
+      await this.salvarRelacionamentos(tx, planoId, input, tenantId);
       return planoId;
     });
     await this.registrarAuditoria("CREATE", id, input, usuarioId);
-    return this.buscarPorIdOuFalhar(id);
+    return this.buscarPorIdOuFalhar(id, tenantId);
   }
 
-  async atualizar(id: bigint, input: PlanoTrabalhoInput, usuarioId?: bigint) {
+  async atualizar(id: bigint, input: PlanoTrabalhoInput, tenantId: string, usuarioId?: bigint) {
     await ensurePlanosTrabalhoEstrutura();
-    await this.buscarPorIdOuFalhar(id);
+    await this.buscarPorIdOuFalhar(id, tenantId);
     await prisma.$transaction(async (tx) => {
       const termoFomentoId = parseOptionalBigInt(input.termoFomentoId);
       await tx.$executeRaw(Prisma.sql`
         UPDATE plano_trabalho
         SET
-          codigo_interno = ${trimOrUndefined(input.codigoInterno ?? undefined) ?? (await this.gerarCodigoInterno())},
+          codigo_interno = ${trimOrUndefined(input.codigoInterno ?? undefined) ?? (await this.gerarCodigoInterno(tenantId))},
           titulo = ${input.titulo},
           descricao_geral = ${input.descricaoObjeto},
           status = ${input.status},
@@ -690,41 +758,45 @@ export class PlanosTrabalhoRepository {
           arquivo_formato = ${trimOrUndefined(input.arquivoFormato ?? undefined)},
           atualizado_em = NOW()
         WHERE id = ${id}
+          AND tenant_id::text = ${tenantId}
       `);
-      await this.salvarRelacionamentos(tx, id, input);
+      await this.salvarRelacionamentos(tx, id, input, tenantId);
     });
     await this.registrarAuditoria("UPDATE", id, input, usuarioId);
-    return this.buscarPorIdOuFalhar(id);
+    return this.buscarPorIdOuFalhar(id, tenantId);
   }
 
-  async remover(id: bigint, usuarioId?: bigint) {
+  async remover(id: bigint, tenantId: string, usuarioId?: bigint) {
     await ensurePlanosTrabalhoEstrutura();
-    const atual = await this.buscarPorIdOuFalhar(id);
+    const atual = await this.buscarPorIdOuFalhar(id, tenantId);
     await prisma.$executeRaw(Prisma.sql`
       DELETE FROM plano_trabalho
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
     await this.registrarAuditoria("DELETE", id, { codigoInterno: atual.plano.codigo_interno, titulo: atual.plano.titulo }, usuarioId);
   }
 
-  private async gerarCodigoInterno() {
+  private async gerarCodigoInterno(tenantId: string) {
     const rows = await prisma.$queryRaw<Array<{ proximo: number }>>(Prisma.sql`
       SELECT COALESCE(MAX(id), 0) + 1 AS proximo
       FROM plano_trabalho
+      WHERE tenant_id::text = ${tenantId}
     `);
     return `PLN-${String(rows[0]?.proximo ?? 1).padStart(4, "0")}`;
   }
 
-  private async listarObjetivos(planosIds: bigint[]) {
+  private async listarObjetivos(planosIds: bigint[], tenantId: string) {
     return prisma.$queryRaw<PlanoObjetivoEspecificoRow[]>(Prisma.sql`
       SELECT id, plano_trabalho_id, descricao, resultado_esperado, metas_vinculadas, ordem
       FROM plano_trabalho_objetivos
       WHERE plano_trabalho_id IN (${Prisma.join(planosIds)})
+        AND tenant_id::text = ${tenantId}
       ORDER BY plano_trabalho_id, ordem, id
     `);
   }
 
-  private async listarMetas(planosIds: bigint[]) {
+  private async listarMetas(planosIds: bigint[], tenantId: string) {
     return prisma.$queryRaw<PlanoMetaRow[]>(Prisma.sql`
       SELECT
         id,
@@ -742,11 +814,12 @@ export class PlanosTrabalhoRepository {
         ordem
       FROM plano_trabalho_metas
       WHERE plano_trabalho_id IN (${Prisma.join(planosIds)})
+        AND tenant_id::text = ${tenantId}
       ORDER BY plano_trabalho_id, ordem, id
     `);
   }
 
-  private async listarEtapasPorPlanos(planosIds: bigint[]) {
+  private async listarEtapasPorPlanos(planosIds: bigint[], tenantId: string) {
     return prisma.$queryRaw<PlanoMetaEtapaRow[]>(Prisma.sql`
       SELECT
         a.id,
@@ -768,11 +841,13 @@ export class PlanosTrabalhoRepository {
       FROM plano_trabalho_atividades a
       INNER JOIN plano_trabalho_metas m ON m.id = a.meta_id
       WHERE m.plano_trabalho_id IN (${Prisma.join(planosIds)})
+        AND m.tenant_id::text = ${tenantId}
+        AND a.tenant_id::text = ${tenantId}
       ORDER BY m.plano_trabalho_id, m.ordem, a.ordem, a.id
     `);
   }
 
-  private async listarAplicacaoRecursos(planosIds: bigint[]) {
+  private async listarAplicacaoRecursos(planosIds: bigint[], tenantId: string) {
     return prisma.$queryRaw<PlanoAplicacaoRecursoRow[]>(Prisma.sql`
       SELECT
         id,
@@ -792,11 +867,12 @@ export class PlanosTrabalhoRepository {
         ordem
       FROM plano_trabalho_aplicacao_recursos
       WHERE plano_trabalho_id IN (${Prisma.join(planosIds)})
+        AND tenant_id::text = ${tenantId}
       ORDER BY plano_trabalho_id, ordem, id
     `);
   }
 
-  private async listarDesembolso(planosIds: bigint[]) {
+  private async listarDesembolso(planosIds: bigint[], tenantId: string) {
     return prisma.$queryRaw<PlanoDesembolsoRow[]>(Prisma.sql`
       SELECT
         id,
@@ -809,11 +885,12 @@ export class PlanosTrabalhoRepository {
         ordem
       FROM plano_trabalho_desembolso
       WHERE plano_trabalho_id IN (${Prisma.join(planosIds)})
+        AND tenant_id::text = ${tenantId}
       ORDER BY plano_trabalho_id, ordem, id
     `);
   }
 
-  private async listarChecklistPrestacao(planosIds: bigint[]) {
+  private async listarChecklistPrestacao(planosIds: bigint[], tenantId: string) {
     return prisma.$queryRaw<PlanoChecklistPrestacaoRow[]>(Prisma.sql`
       SELECT
         id,
@@ -824,42 +901,51 @@ export class PlanosTrabalhoRepository {
         ordem
       FROM plano_trabalho_checklist_prestacao
       WHERE plano_trabalho_id IN (${Prisma.join(planosIds)})
+        AND tenant_id::text = ${tenantId}
       ORDER BY plano_trabalho_id, ordem, id
     `);
   }
 
-  private async salvarRelacionamentos(tx: TransactionClient, planoId: bigint, input: PlanoTrabalhoInput) {
-    await tx.$executeRaw(Prisma.sql`DELETE FROM plano_trabalho_objetivos WHERE plano_trabalho_id = ${planoId}`);
-    await tx.$executeRaw(Prisma.sql`DELETE FROM plano_trabalho_aplicacao_recursos WHERE plano_trabalho_id = ${planoId}`);
-    await tx.$executeRaw(Prisma.sql`DELETE FROM plano_trabalho_desembolso WHERE plano_trabalho_id = ${planoId}`);
-    await tx.$executeRaw(Prisma.sql`DELETE FROM plano_trabalho_checklist_prestacao WHERE plano_trabalho_id = ${planoId}`);
+  private async salvarRelacionamentos(
+    tx: TransactionClient,
+    planoId: bigint,
+    input: PlanoTrabalhoInput,
+    tenantId: string
+  ) {
+    await tx.$executeRaw(Prisma.sql`DELETE FROM plano_trabalho_objetivos WHERE plano_trabalho_id = ${planoId} AND tenant_id::text = ${tenantId}`);
+    await tx.$executeRaw(Prisma.sql`DELETE FROM plano_trabalho_aplicacao_recursos WHERE plano_trabalho_id = ${planoId} AND tenant_id::text = ${tenantId}`);
+    await tx.$executeRaw(Prisma.sql`DELETE FROM plano_trabalho_desembolso WHERE plano_trabalho_id = ${planoId} AND tenant_id::text = ${tenantId}`);
+    await tx.$executeRaw(Prisma.sql`DELETE FROM plano_trabalho_checklist_prestacao WHERE plano_trabalho_id = ${planoId} AND tenant_id::text = ${tenantId}`);
     await tx.$executeRaw(Prisma.sql`DELETE FROM plano_trabalho_cronograma WHERE plano_trabalho_id = ${planoId}`);
     await tx.$executeRaw(Prisma.sql`DELETE FROM plano_trabalho_equipe WHERE plano_trabalho_id = ${planoId}`);
-    await tx.$executeRaw(Prisma.sql`DELETE FROM plano_trabalho_metas WHERE plano_trabalho_id = ${planoId}`);
+    await tx.$executeRaw(Prisma.sql`DELETE FROM plano_trabalho_metas WHERE plano_trabalho_id = ${planoId} AND tenant_id::text = ${tenantId}`);
 
-    await this.inserirObjetivos(tx, planoId, input.objetivosEspecificos ?? []);
-    await this.inserirMetas(tx, planoId, input.metas ?? []);
-    await this.inserirAplicacaoRecursos(tx, planoId, input.aplicacaoRecursos ?? []);
-    await this.inserirDesembolso(tx, planoId, input.desembolso ?? []);
-    await this.inserirChecklistPrestacao(tx, planoId, input.checklistPrestacao ?? []);
+    await this.inserirObjetivos(tx, planoId, input.objetivosEspecificos ?? [], tenantId);
+    await this.inserirMetas(tx, planoId, input.metas ?? [], tenantId);
+    await this.inserirAplicacaoRecursos(tx, planoId, input.aplicacaoRecursos ?? [], tenantId);
+    await this.inserirDesembolso(tx, planoId, input.desembolso ?? [], tenantId);
+    await this.inserirChecklistPrestacao(tx, planoId, input.checklistPrestacao ?? [], tenantId);
   }
 
   private async inserirObjetivos(
     tx: TransactionClient,
     planoId: bigint,
-    objetivos: PlanoObjetivoEspecificoInput[]
+    objetivos: PlanoObjetivoEspecificoInput[],
+    tenantId: string
   ) {
     for (let index = 0; index < objetivos.length; index += 1) {
       const objetivo = objetivos[index];
       await tx.$executeRaw(Prisma.sql`
         INSERT INTO plano_trabalho_objetivos (
           plano_trabalho_id,
+          tenant_id,
           descricao,
           resultado_esperado,
           metas_vinculadas,
           ordem
         ) VALUES (
           ${planoId},
+          ${tenantId}::uuid,
           ${objetivo.descricao},
           ${trimOrUndefined(objetivo.resultadoEsperado ?? undefined)},
           ${joinMetasVinculadas(objetivo.metasVinculadas ?? [])},
@@ -869,12 +955,18 @@ export class PlanosTrabalhoRepository {
     }
   }
 
-  private async inserirMetas(tx: TransactionClient, planoId: bigint, metas: PlanoMetaInput[]) {
+  private async inserirMetas(
+    tx: TransactionClient,
+    planoId: bigint,
+    metas: PlanoMetaInput[],
+    tenantId: string
+  ) {
     for (let index = 0; index < metas.length; index += 1) {
       const meta = metas[index];
       const inserted = await tx.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
         INSERT INTO plano_trabalho_metas (
           plano_trabalho_id,
+          tenant_id,
           codigo,
           numero_meta,
           descricao,
@@ -891,6 +983,7 @@ export class PlanosTrabalhoRepository {
           ordem
         ) VALUES (
           ${planoId},
+          ${tenantId}::uuid,
           ${trimOrUndefined(meta.numeroMeta)},
           ${trimOrUndefined(meta.numeroMeta)},
           ${meta.descricao},
@@ -910,16 +1003,22 @@ export class PlanosTrabalhoRepository {
       `);
       const metaId = inserted[0]?.id;
       if (!metaId) throw new AppError("Não foi possível salvar uma meta do plano.", 500);
-      await this.inserirEtapas(tx, metaId, meta.etapas ?? []);
+      await this.inserirEtapas(tx, metaId, meta.etapas ?? [], tenantId);
     }
   }
 
-  private async inserirEtapas(tx: TransactionClient, metaId: bigint, etapas: PlanoMetaEtapaInput[]) {
+  private async inserirEtapas(
+    tx: TransactionClient,
+    metaId: bigint,
+    etapas: PlanoMetaEtapaInput[],
+    tenantId: string
+  ) {
     for (let index = 0; index < etapas.length; index += 1) {
       const etapa = etapas[index];
       await tx.$executeRaw(Prisma.sql`
         INSERT INTO plano_trabalho_atividades (
           meta_id,
+          tenant_id,
           descricao,
           justificativa,
           publico_alvo,
@@ -940,6 +1039,7 @@ export class PlanosTrabalhoRepository {
           ordem
         ) VALUES (
           ${metaId},
+          ${tenantId}::uuid,
           ${etapa.nome},
           ${null},
           ${trimOrUndefined(etapa.publicoAtendido ?? undefined)},
@@ -966,13 +1066,15 @@ export class PlanosTrabalhoRepository {
   private async inserirAplicacaoRecursos(
     tx: TransactionClient,
     planoId: bigint,
-    itens: PlanoAplicacaoRecursoInput[]
+    itens: PlanoAplicacaoRecursoInput[],
+    tenantId: string
   ) {
     for (let index = 0; index < itens.length; index += 1) {
       const item = itens[index];
       await tx.$executeRaw(Prisma.sql`
         INSERT INTO plano_trabalho_aplicacao_recursos (
           plano_trabalho_id,
+          tenant_id,
           categoria_despesa,
           item,
           descricao,
@@ -988,6 +1090,7 @@ export class PlanosTrabalhoRepository {
           ordem
         ) VALUES (
           ${planoId},
+          ${tenantId}::uuid,
           ${item.categoriaDespesa},
           ${item.item},
           ${trimOrUndefined(item.descricao ?? undefined)},
@@ -1006,12 +1109,18 @@ export class PlanosTrabalhoRepository {
     }
   }
 
-  private async inserirDesembolso(tx: TransactionClient, planoId: bigint, itens: PlanoDesembolsoInput[]) {
+  private async inserirDesembolso(
+    tx: TransactionClient,
+    planoId: bigint,
+    itens: PlanoDesembolsoInput[],
+    tenantId: string
+  ) {
     for (let index = 0; index < itens.length; index += 1) {
       const item = itens[index];
       await tx.$executeRaw(Prisma.sql`
         INSERT INTO plano_trabalho_desembolso (
           plano_trabalho_id,
+          tenant_id,
           mes_ano,
           valor_previsto,
           fonte_recurso,
@@ -1020,6 +1129,7 @@ export class PlanosTrabalhoRepository {
           ordem
         ) VALUES (
           ${planoId},
+          ${tenantId}::uuid,
           ${item.mesAno},
           ${item.valorPrevisto ?? null},
           ${trimOrUndefined(item.fonteRecurso ?? undefined)},
@@ -1034,19 +1144,22 @@ export class PlanosTrabalhoRepository {
   private async inserirChecklistPrestacao(
     tx: TransactionClient,
     planoId: bigint,
-    itens: PlanoChecklistPrestacaoInput[]
+    itens: PlanoChecklistPrestacaoInput[],
+    tenantId: string
   ) {
     for (let index = 0; index < itens.length; index += 1) {
       const item = itens[index];
       await tx.$executeRaw(Prisma.sql`
         INSERT INTO plano_trabalho_checklist_prestacao (
           plano_trabalho_id,
+          tenant_id,
           descricao,
           obrigatorio,
           concluido,
           ordem
         ) VALUES (
           ${planoId},
+          ${tenantId}::uuid,
           ${item.descricao},
           ${item.obrigatorio !== false},
           ${Boolean(item.concluido)},

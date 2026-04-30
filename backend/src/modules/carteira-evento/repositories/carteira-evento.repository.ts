@@ -87,8 +87,12 @@ type TotaisFormaPagamentoRow = {
   total: number;
 };
 
+function tenantSql(alias: string, tenantId: string) {
+  return Prisma.sql`${Prisma.raw(alias)}.tenant_id::text = ${tenantId}`;
+}
+
 export class CarteiraEventoRepository {
-  async listarEventos(filters: EventoCarteiraFilters) {
+  async listarEventos(filters: EventoCarteiraFilters, tenantId: string) {
     await ensureCarteiraEventoEstrutura(prisma);
     const where: Prisma.Sql[] = [];
 
@@ -122,7 +126,7 @@ export class CarteiraEventoRepository {
         e.criado_em,
         e.atualizado_em
       FROM carteira_evento e
-      WHERE 1 = 1
+      WHERE ${tenantSql("e", tenantId)}
       ${where.length ? Prisma.join(where, " ") : Prisma.empty}
       ORDER BY e.data_inicio DESC, e.id DESC
       LIMIT ${limite}
@@ -131,10 +135,11 @@ export class CarteiraEventoRepository {
     return rows.map(mapEventoCarteira);
   }
 
-  async criarEvento(input: EventoCarteiraInput) {
+  async criarEvento(input: EventoCarteiraInput, tenantId: string) {
     await ensureCarteiraEventoEstrutura(prisma);
     const rows = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
       INSERT INTO carteira_evento (
+        tenant_id,
         nome_evento,
         tipo_evento,
         data_inicio,
@@ -151,6 +156,7 @@ export class CarteiraEventoRepository {
         criado_em,
         atualizado_em
       ) VALUES (
+        ${tenantId}::uuid,
         ${input.nome_evento.trim()},
         ${input.tipo_evento},
         ${toOptionalDate(input.data_inicio)},
@@ -170,12 +176,12 @@ export class CarteiraEventoRepository {
       RETURNING id
     `);
 
-    return this.buscarEventoPorIdOuFalhar(rows[0]!.id);
+    return this.buscarEventoPorIdOuFalhar(rows[0]!.id, tenantId);
   }
 
-  async atualizarEvento(id: bigint, input: EventoCarteiraInput) {
+  async atualizarEvento(id: bigint, input: EventoCarteiraInput, tenantId: string) {
     await ensureCarteiraEventoEstrutura(prisma);
-    await this.buscarEventoConfigPorIdOuFalhar(id);
+    await this.buscarEventoConfigPorIdOuFalhar(id, prisma, tenantId);
     await prisma.$executeRaw(Prisma.sql`
       UPDATE carteira_evento
       SET
@@ -194,11 +200,12 @@ export class CarteiraEventoRepository {
         permite_saldo_negativo_adm = ${!!input.permite_saldo_negativo_adm},
         atualizado_em = NOW()
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
-    return this.buscarEventoPorIdOuFalhar(id);
+    return this.buscarEventoPorIdOuFalhar(id, tenantId);
   }
 
-  async listarParticipantes(filters: ParticipanteCarteiraFilters) {
+  async listarParticipantes(filters: ParticipanteCarteiraFilters, tenantId: string) {
     await ensureCarteiraEventoEstrutura(prisma);
     const where: Prisma.Sql[] = [];
     if (filters.evento_id) {
@@ -240,7 +247,7 @@ export class CarteiraEventoRepository {
         p.atualizado_em
       FROM carteira_evento_participante p
       INNER JOIN carteira_evento e ON e.id = p.evento_id
-      WHERE 1 = 1
+      WHERE ${tenantSql("e", tenantId)}
       ${where.length ? Prisma.join(where, " ") : Prisma.empty}
       ORDER BY p.nome ASC, p.id DESC
       LIMIT ${limite}
@@ -249,7 +256,7 @@ export class CarteiraEventoRepository {
     return rows.map(mapParticipanteCarteira);
   }
 
-  async buscarParticipantePorIdOuFalhar(id: bigint) {
+  async buscarParticipantePorIdOuFalhar(id: bigint, tenantId: string) {
     await ensureCarteiraEventoEstrutura(prisma);
     const rows = await prisma.$queryRaw<ParticipanteCarteiraRow[]>(Prisma.sql`
       SELECT
@@ -271,6 +278,7 @@ export class CarteiraEventoRepository {
       FROM carteira_evento_participante p
       INNER JOIN carteira_evento e ON e.id = p.evento_id
       WHERE p.id = ${id}
+        AND ${tenantSql("e", tenantId)}
       LIMIT 1
     `);
 
@@ -281,11 +289,11 @@ export class CarteiraEventoRepository {
     return mapParticipanteCarteira(row);
   }
 
-  async criarParticipante(input: ParticipanteCarteiraInput) {
+  async criarParticipante(input: ParticipanteCarteiraInput, tenantId: string) {
     await ensureCarteiraEventoEstrutura(prisma);
-    const evento = await this.buscarEventoConfigPorIdOuFalhar(BigInt(input.evento_id));
+    const evento = await this.buscarEventoConfigPorIdOuFalhar(BigInt(input.evento_id), prisma, tenantId);
     const numeroCarteira =
-      trimOrUndefined(input.numero_carteira) ?? (await this.gerarNumeroCarteira(BigInt(input.evento_id)));
+      trimOrUndefined(input.numero_carteira) ?? (await this.gerarNumeroCarteira(BigInt(input.evento_id), tenantId));
     const token = this.gerarTokenSeguro();
 
     const rows = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
@@ -321,15 +329,15 @@ export class CarteiraEventoRepository {
       RETURNING id
     `);
 
-    return this.buscarParticipantePorIdOuFalhar(rows[0]!.id);
+    return this.buscarParticipantePorIdOuFalhar(rows[0]!.id, tenantId);
   }
 
-  async atualizarParticipante(id: bigint, input: ParticipanteCarteiraInput) {
+  async atualizarParticipante(id: bigint, input: ParticipanteCarteiraInput, tenantId: string) {
     await ensureCarteiraEventoEstrutura(prisma);
-    await this.buscarParticipanteSaldoPorIdOuFalhar(id);
-    await this.buscarEventoConfigPorIdOuFalhar(BigInt(input.evento_id));
+    await this.buscarParticipanteSaldoPorIdOuFalhar(id, prisma, tenantId);
+    await this.buscarEventoConfigPorIdOuFalhar(BigInt(input.evento_id), prisma, tenantId);
     const numeroCarteira =
-      trimOrUndefined(input.numero_carteira) ?? (await this.gerarNumeroCarteira(BigInt(input.evento_id), id));
+      trimOrUndefined(input.numero_carteira) ?? (await this.gerarNumeroCarteira(BigInt(input.evento_id), tenantId, id));
     await prisma.$executeRaw(Prisma.sql`
       UPDATE carteira_evento_participante
       SET
@@ -344,11 +352,17 @@ export class CarteiraEventoRepository {
         observacoes = ${trimOrUndefined(input.observacoes)},
         atualizado_em = NOW()
       WHERE id = ${id}
+        AND EXISTS (
+          SELECT 1
+          FROM carteira_evento e
+          WHERE e.id = carteira_evento_participante.evento_id
+            AND e.tenant_id::text = ${tenantId}
+        )
     `);
-    return this.buscarParticipantePorIdOuFalhar(id);
+    return this.buscarParticipantePorIdOuFalhar(id, tenantId);
   }
 
-  async listarBarracas(filters: BarracaEventoFilters) {
+  async listarBarracas(filters: BarracaEventoFilters, tenantId: string) {
     await ensureCarteiraEventoEstrutura(prisma);
     const where: Prisma.Sql[] = [];
     if (filters.evento_id) {
@@ -374,16 +388,16 @@ export class CarteiraEventoRepository {
         b.atualizado_em
       FROM carteira_evento_barraca b
       INNER JOIN carteira_evento e ON e.id = b.evento_id
-      WHERE 1 = 1
+      WHERE ${tenantSql("e", tenantId)}
       ${where.length ? Prisma.join(where, " ") : Prisma.empty}
       ORDER BY b.nome_barraca ASC
     `);
     return rows.map(mapBarracaEvento);
   }
 
-  async criarBarraca(input: BarracaEventoInput) {
+  async criarBarraca(input: BarracaEventoInput, tenantId: string) {
     await ensureCarteiraEventoEstrutura(prisma);
-    await this.buscarEventoConfigPorIdOuFalhar(BigInt(input.evento_id));
+    await this.buscarEventoConfigPorIdOuFalhar(BigInt(input.evento_id), prisma, tenantId);
     const rows = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
       INSERT INTO carteira_evento_barraca (
         evento_id,
@@ -410,12 +424,12 @@ export class CarteiraEventoRepository {
       )
       RETURNING id
     `);
-    return this.buscarBarracaPorIdOuFalhar(rows[0]!.id);
+    return this.buscarBarracaPorIdOuFalhar(rows[0]!.id, tenantId);
   }
 
-  async atualizarBarraca(id: bigint, input: BarracaEventoInput) {
+  async atualizarBarraca(id: bigint, input: BarracaEventoInput, tenantId: string) {
     await ensureCarteiraEventoEstrutura(prisma);
-    await this.buscarBarracaPorIdOuFalhar(id);
+    await this.buscarBarracaPorIdOuFalhar(id, tenantId);
     await prisma.$executeRaw(Prisma.sql`
       UPDATE carteira_evento_barraca
       SET
@@ -429,11 +443,17 @@ export class CarteiraEventoRepository {
         observacoes = ${trimOrUndefined(input.observacoes)},
         atualizado_em = NOW()
       WHERE id = ${id}
+        AND EXISTS (
+          SELECT 1
+          FROM carteira_evento e
+          WHERE e.id = carteira_evento_barraca.evento_id
+            AND e.tenant_id::text = ${tenantId}
+        )
     `);
-    return this.buscarBarracaPorIdOuFalhar(id);
+    return this.buscarBarracaPorIdOuFalhar(id, tenantId);
   }
 
-  async listarItens(filters: ItemEventoFilters) {
+  async listarItens(filters: ItemEventoFilters, tenantId: string) {
     await ensureCarteiraEventoEstrutura(prisma);
     const where: Prisma.Sql[] = [];
     if (filters.evento_id) {
@@ -468,18 +488,18 @@ export class CarteiraEventoRepository {
       FROM carteira_evento_item i
       INNER JOIN carteira_evento e ON e.id = i.evento_id
       LEFT JOIN carteira_evento_barraca b ON b.id = i.barraca_id
-      WHERE 1 = 1
+      WHERE ${tenantSql("e", tenantId)}
       ${where.length ? Prisma.join(where, " ") : Prisma.empty}
       ORDER BY i.ordem_exibicao ASC, i.nome_item ASC
     `);
     return rows.map(mapItemEvento);
   }
 
-  async criarItem(input: ItemEventoInput) {
+  async criarItem(input: ItemEventoInput, tenantId: string) {
     await ensureCarteiraEventoEstrutura(prisma);
-    await this.buscarEventoConfigPorIdOuFalhar(BigInt(input.evento_id));
+    await this.buscarEventoConfigPorIdOuFalhar(BigInt(input.evento_id), prisma, tenantId);
     if (input.barraca_id) {
-      await this.buscarBarracaPorIdOuFalhar(BigInt(input.barraca_id));
+      await this.buscarBarracaPorIdOuFalhar(BigInt(input.barraca_id), tenantId);
     }
     const rows = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
       INSERT INTO carteira_evento_item (
@@ -509,12 +529,16 @@ export class CarteiraEventoRepository {
       )
       RETURNING id
     `);
-    return this.buscarItemPorIdOuFalhar(rows[0]!.id);
+    return this.buscarItemPorIdOuFalhar(rows[0]!.id, tenantId);
   }
 
-  async atualizarItem(id: bigint, input: ItemEventoInput) {
+  async atualizarItem(id: bigint, input: ItemEventoInput, tenantId: string) {
     await ensureCarteiraEventoEstrutura(prisma);
-    await this.buscarItemPorIdOuFalhar(id);
+    await this.buscarItemPorIdOuFalhar(id, tenantId);
+    await this.buscarEventoConfigPorIdOuFalhar(BigInt(input.evento_id), prisma, tenantId);
+    if (input.barraca_id) {
+      await this.buscarBarracaPorIdOuFalhar(BigInt(input.barraca_id), tenantId);
+    }
     await prisma.$executeRaw(Prisma.sql`
       UPDATE carteira_evento_item
       SET
@@ -529,15 +553,22 @@ export class CarteiraEventoRepository {
         ordem_exibicao = ${input.ordem_exibicao ?? 0},
         atualizado_em = NOW()
       WHERE id = ${id}
+        AND EXISTS (
+          SELECT 1
+          FROM carteira_evento e
+          WHERE e.id = carteira_evento_item.evento_id
+            AND e.tenant_id::text = ${tenantId}
+        )
     `);
-    return this.buscarItemPorIdOuFalhar(id);
+    return this.buscarItemPorIdOuFalhar(id, tenantId);
   }
 
   async recarregar(input: RecargaCarteiraInput, ator: CarteiraEventoAtor) {
     await ensureCarteiraEventoEstrutura(prisma);
     return prisma.$transaction(async (tx) => {
-      const participante = await this.buscarParticipanteSaldoPorIdOuFalhar(BigInt(input.participante_id), tx, true);
-      const evento = await this.buscarEventoConfigPorIdOuFalhar(participante.evento_id, tx);
+      const tenantId = this.requireTenant(ator.tenantId);
+      const participante = await this.buscarParticipanteSaldoPorIdOuFalhar(BigInt(input.participante_id), tx, tenantId, true);
+      const evento = await this.buscarEventoConfigPorIdOuFalhar(participante.evento_id, tx, tenantId);
       if (!evento.permite_recarga) {
         throw new AppError("Este evento nao permite recarga no momento.", 409);
       }
@@ -564,20 +595,21 @@ export class CarteiraEventoRepository {
         motivo: trimOrUndefined(input.observacao),
         operador: ator
       });
-      return this.buscarParticipantePorIdOuFalhar(participante.id);
+      return this.buscarParticipantePorIdOuFalhar(participante.id, tenantId);
     });
   }
 
   async transferir(input: TransferenciaCarteiraInput, ator: CarteiraEventoAtor) {
     await ensureCarteiraEventoEstrutura(prisma);
     return prisma.$transaction(async (tx) => {
-      const evento = await this.buscarEventoConfigPorIdOuFalhar(BigInt(input.evento_id), tx);
+      const tenantId = this.requireTenant(ator.tenantId);
+      const evento = await this.buscarEventoConfigPorIdOuFalhar(BigInt(input.evento_id), tx, tenantId);
       if (!evento.permite_transferencia) {
         throw new AppError("Este evento nao permite transferencia de creditos.", 409);
       }
 
-      const origem = await this.buscarParticipanteSaldoPorIdOuFalhar(BigInt(input.carteira_origem_id), tx, true);
-      const destino = await this.buscarParticipanteSaldoPorIdOuFalhar(BigInt(input.carteira_destino_id), tx, true);
+      const origem = await this.buscarParticipanteSaldoPorIdOuFalhar(BigInt(input.carteira_origem_id), tx, tenantId, true);
+      const destino = await this.buscarParticipanteSaldoPorIdOuFalhar(BigInt(input.carteira_destino_id), tx, tenantId, true);
       if (origem.evento_id !== evento.id || destino.evento_id !== evento.id) {
         throw new AppError("As carteiras informadas nao pertencem ao evento selecionado.", 409);
       }
@@ -631,8 +663,8 @@ export class CarteiraEventoRepository {
       });
 
       return {
-        origem: await this.buscarParticipantePorIdOuFalhar(origem.id),
-        destino: await this.buscarParticipantePorIdOuFalhar(destino.id),
+        origem: await this.buscarParticipantePorIdOuFalhar(origem.id, tenantId),
+        destino: await this.buscarParticipantePorIdOuFalhar(destino.id, tenantId),
         referencia
       };
     });
@@ -641,8 +673,9 @@ export class CarteiraEventoRepository {
   async ajustar(input: AjusteCarteiraInput, ator: CarteiraEventoAtor) {
     await ensureCarteiraEventoEstrutura(prisma);
     return prisma.$transaction(async (tx) => {
-      const participante = await this.buscarParticipanteSaldoPorIdOuFalhar(BigInt(input.participante_id), tx, true);
-      const evento = await this.buscarEventoConfigPorIdOuFalhar(participante.evento_id, tx);
+      const tenantId = this.requireTenant(ator.tenantId);
+      const participante = await this.buscarParticipanteSaldoPorIdOuFalhar(BigInt(input.participante_id), tx, tenantId, true);
+      const evento = await this.buscarEventoConfigPorIdOuFalhar(participante.evento_id, tx, tenantId);
       const saldoAnterior = Number(participante.saldo_atual);
       let delta = input.valor;
       let tipoMovimentacao = "AJUSTE_CREDITO";
@@ -683,17 +716,24 @@ export class CarteiraEventoRepository {
         motivo: input.motivo,
         operador: ator
       });
-      return this.buscarParticipantePorIdOuFalhar(participante.id);
+      return this.buscarParticipantePorIdOuFalhar(participante.id, tenantId);
     });
   }
 
   async alterarStatusParticipante(id: bigint, status: string, ator: CarteiraEventoAtor) {
     await ensureCarteiraEventoEstrutura(prisma);
-    const participante = await this.buscarParticipanteSaldoPorIdOuFalhar(id);
+    const tenantId = this.requireTenant(ator.tenantId);
+    const participante = await this.buscarParticipanteSaldoPorIdOuFalhar(id, prisma, tenantId);
     await prisma.$executeRaw(Prisma.sql`
       UPDATE carteira_evento_participante
       SET status = ${status}, atualizado_em = NOW()
       WHERE id = ${id}
+        AND EXISTS (
+          SELECT 1
+          FROM carteira_evento e
+          WHERE e.id = carteira_evento_participante.evento_id
+            AND e.tenant_id::text = ${tenantId}
+        )
     `);
     await prisma.$executeRaw(Prisma.sql`
       INSERT INTO carteira_evento_movimentacao (
@@ -722,17 +762,24 @@ export class CarteiraEventoRepository {
         NOW()
       )
     `);
-    return this.buscarParticipantePorIdOuFalhar(id);
+    return this.buscarParticipantePorIdOuFalhar(id, tenantId);
   }
 
   async emitirSegundaVia(id: bigint, invalidarAnterior: boolean, ator: CarteiraEventoAtor) {
     await ensureCarteiraEventoEstrutura(prisma);
-    const participante = await this.buscarParticipanteSaldoPorIdOuFalhar(id);
+    const tenantId = this.requireTenant(ator.tenantId);
+    const participante = await this.buscarParticipanteSaldoPorIdOuFalhar(id, prisma, tenantId);
     const novoToken = invalidarAnterior ? this.gerarTokenSeguro() : participante.qr_code_token_unico;
     await prisma.$executeRaw(Prisma.sql`
       UPDATE carteira_evento_participante
       SET qr_code_token_unico = ${novoToken}, atualizado_em = NOW()
       WHERE id = ${id}
+        AND EXISTS (
+          SELECT 1
+          FROM carteira_evento e
+          WHERE e.id = carteira_evento_participante.evento_id
+            AND e.tenant_id::text = ${tenantId}
+        )
     `);
     await prisma.$executeRaw(Prisma.sql`
       INSERT INTO carteira_evento_movimentacao (
@@ -763,10 +810,10 @@ export class CarteiraEventoRepository {
         NOW()
       )
     `);
-    return this.buscarParticipantePorIdOuFalhar(id);
+    return this.buscarParticipantePorIdOuFalhar(id, tenantId);
   }
 
-  async consultarToken(eventoId: bigint, token: string) {
+  async consultarToken(eventoId: bigint, token: string, tenantId: string) {
     await ensureCarteiraEventoEstrutura(prisma);
     const identificador = token.trim();
     const rows = await prisma.$queryRaw<ParticipanteCarteiraRow[]>(Prisma.sql`
@@ -789,6 +836,7 @@ export class CarteiraEventoRepository {
       FROM carteira_evento_participante p
       INNER JOIN carteira_evento e ON e.id = p.evento_id
       WHERE p.evento_id = ${eventoId}
+        AND ${tenantSql("e", tenantId)}
         AND (
           p.qr_code_token_unico = ${identificador}
           OR p.numero_carteira = ${identificador}
@@ -805,6 +853,7 @@ export class CarteiraEventoRepository {
   async realizarVenda(input: OperacaoVendaInput, ator: CarteiraEventoAtor) {
     await ensureCarteiraEventoEstrutura(prisma);
     return prisma.$transaction(async (tx) => {
+      const tenantId = this.requireTenant(ator.tenantId);
       const vendaExistente = await tx.$queryRaw<VendaCarteiraRow[]>(Prisma.sql`
         SELECT
           v.id,
@@ -831,12 +880,12 @@ export class CarteiraEventoRepository {
         return mapVendaCarteira(vendaExistente[0], itens);
       }
 
-      const evento = await this.buscarEventoConfigPorIdOuFalhar(BigInt(input.evento_id), tx);
+      const evento = await this.buscarEventoConfigPorIdOuFalhar(BigInt(input.evento_id), tx, tenantId);
       if (evento.status !== "ATIVO") {
         throw new AppError("O evento precisa estar ativo para registrar vendas.", 409);
       }
 
-      const barraca = await this.buscarBarracaOperacaoPorIdOuFalhar(BigInt(input.barraca_id), tx);
+      const barraca = await this.buscarBarracaOperacaoPorIdOuFalhar(BigInt(input.barraca_id), tx, tenantId);
       if (barraca.evento_id !== evento.id) {
         throw new AppError("A barraca informada nao pertence ao evento selecionado.", 409);
       }
@@ -848,6 +897,7 @@ export class CarteiraEventoRepository {
         evento.id,
         input.token.trim(),
         tx,
+        tenantId,
         true
       );
       if (participante.status !== "ATIVO") {
@@ -1000,9 +1050,9 @@ export class CarteiraEventoRepository {
     });
   }
 
-  async listarExtrato(filters: ExtratoCarteiraFilters) {
+  async listarExtrato(filters: ExtratoCarteiraFilters, tenantId: string) {
     await ensureCarteiraEventoEstrutura(prisma);
-    const participante = await this.buscarParticipantePorIdOuFalhar(BigInt(filters.participante_id));
+    const participante = await this.buscarParticipantePorIdOuFalhar(BigInt(filters.participante_id), tenantId);
     const limite = Number.isInteger(filters.limite) ? Number(filters.limite) : 200;
     const rows = await prisma.$queryRaw<MovimentacaoCarteiraRow[]>(Prisma.sql`
       SELECT
@@ -1027,9 +1077,11 @@ export class CarteiraEventoRepository {
         i.nome_item AS item_nome
       FROM carteira_evento_movimentacao m
       INNER JOIN carteira_evento_participante p ON p.id = m.participante_id
+      INNER JOIN carteira_evento e ON e.id = m.evento_id
       LEFT JOIN carteira_evento_barraca b ON b.id = m.barraca_id
       LEFT JOIN carteira_evento_item i ON i.id = m.item_id
       WHERE m.participante_id = ${BigInt(filters.participante_id)}
+        AND ${tenantSql("e", tenantId)}
       ORDER BY m.criado_em DESC, m.id DESC
       LIMIT ${limite}
     `);
@@ -1041,10 +1093,10 @@ export class CarteiraEventoRepository {
     };
   }
 
-  async obterDashboard(filters: DashboardCarteiraFilters) {
+  async obterDashboard(filters: DashboardCarteiraFilters, tenantId: string) {
     await ensureCarteiraEventoEstrutura(prisma);
     const eventoId = BigInt(filters.evento_id);
-    const evento = await this.buscarEventoPorIdOuFalhar(eventoId);
+    const evento = await this.buscarEventoPorIdOuFalhar(eventoId, tenantId);
 
     const totais = await prisma.$queryRaw<
       Array<{
@@ -1061,24 +1113,28 @@ export class CarteiraEventoRepository {
         SUM(CASE WHEN tipo_movimentacao = 'ESTORNO' THEN valor ELSE 0 END) AS total_estornos
       FROM carteira_evento_movimentacao
       WHERE evento_id = ${eventoId}
+        AND EXISTS (SELECT 1 FROM carteira_evento e WHERE e.id = carteira_evento_movimentacao.evento_id AND e.tenant_id::text = ${tenantId})
     `);
 
     const saldoRemanescente = await prisma.$queryRaw<Array<{ total: number | null }>>(Prisma.sql`
       SELECT SUM(saldo_atual) AS total
       FROM carteira_evento_participante
       WHERE evento_id = ${eventoId}
+        AND EXISTS (SELECT 1 FROM carteira_evento e WHERE e.id = carteira_evento_participante.evento_id AND e.tenant_id::text = ${tenantId})
     `);
 
     const participantes = await prisma.$queryRaw<Array<{ total: bigint }>>(Prisma.sql`
       SELECT COUNT(*)::bigint AS total
       FROM carteira_evento_participante
       WHERE evento_id = ${eventoId}
+        AND EXISTS (SELECT 1 FROM carteira_evento e WHERE e.id = carteira_evento_participante.evento_id AND e.tenant_id::text = ${tenantId})
     `);
 
     const totalVendas = await prisma.$queryRaw<Array<{ total: bigint; valor: number | null }>>(Prisma.sql`
       SELECT COUNT(*)::bigint AS total, COALESCE(SUM(valor_total), 0) AS valor
       FROM carteira_evento_venda
       WHERE evento_id = ${eventoId}
+        AND EXISTS (SELECT 1 FROM carteira_evento e WHERE e.id = carteira_evento_venda.evento_id AND e.tenant_id::text = ${tenantId})
     `);
 
     const rankingBarracas = await prisma.$queryRaw<Array<{ barraca: string; total: number; quantidade: bigint }>>(Prisma.sql`
@@ -1086,6 +1142,7 @@ export class CarteiraEventoRepository {
       FROM carteira_evento_barraca b
       LEFT JOIN carteira_evento_venda v ON v.barraca_id = b.id
       WHERE b.evento_id = ${eventoId}
+        AND EXISTS (SELECT 1 FROM carteira_evento e WHERE e.id = b.evento_id AND e.tenant_id::text = ${tenantId})
       GROUP BY b.id, b.nome_barraca
       ORDER BY total DESC, quantidade DESC, b.nome_barraca ASC
     `);
@@ -1095,6 +1152,7 @@ export class CarteiraEventoRepository {
       FROM carteira_evento_venda_item vi
       INNER JOIN carteira_evento_venda v ON v.id = vi.venda_id
       WHERE v.evento_id = ${eventoId}
+        AND EXISTS (SELECT 1 FROM carteira_evento e WHERE e.id = v.evento_id AND e.tenant_id::text = ${tenantId})
       GROUP BY vi.nome_item
       ORDER BY quantidade DESC, total DESC
       LIMIT 1
@@ -1104,6 +1162,7 @@ export class CarteiraEventoRepository {
       SELECT forma_pagamento, COALESCE(SUM(valor), 0) AS total
       FROM carteira_evento_movimentacao
       WHERE evento_id = ${eventoId}
+        AND EXISTS (SELECT 1 FROM carteira_evento e WHERE e.id = carteira_evento_movimentacao.evento_id AND e.tenant_id::text = ${tenantId})
         AND tipo_movimentacao = 'RECARGA'
       GROUP BY forma_pagamento
       ORDER BY total DESC
@@ -1146,8 +1205,8 @@ export class CarteiraEventoRepository {
     };
   }
 
-  async obterFechamento(filters: FechamentoCarteiraFilters) {
-    const dashboard = await this.obterDashboard({ evento_id: filters.evento_id });
+  async obterFechamento(filters: FechamentoCarteiraFilters, tenantId: string) {
+    const dashboard = await this.obterDashboard({ evento_id: filters.evento_id }, tenantId);
     const eventoId = BigInt(filters.evento_id);
 
     const vendasPorItem = await prisma.$queryRaw<Array<{ nome_item: string; quantidade: number; total: number }>>(Prisma.sql`
@@ -1155,6 +1214,7 @@ export class CarteiraEventoRepository {
       FROM carteira_evento_venda_item vi
       INNER JOIN carteira_evento_venda v ON v.id = vi.venda_id
       WHERE v.evento_id = ${eventoId}
+        AND EXISTS (SELECT 1 FROM carteira_evento e WHERE e.id = v.evento_id AND e.tenant_id::text = ${tenantId})
       GROUP BY vi.nome_item
       ORDER BY total DESC, quantidade DESC, vi.nome_item ASC
     `);
@@ -1163,6 +1223,7 @@ export class CarteiraEventoRepository {
       SELECT COALESCE(v.operador_nome, 'Nao informado') AS operador_nome, COALESCE(SUM(v.valor_total), 0) AS total, COUNT(v.id)::bigint AS quantidade
       FROM carteira_evento_venda v
       WHERE v.evento_id = ${eventoId}
+        AND EXISTS (SELECT 1 FROM carteira_evento e WHERE e.id = v.evento_id AND e.tenant_id::text = ${tenantId})
       GROUP BY COALESCE(v.operador_nome, 'Nao informado')
       ORDER BY total DESC
     `);
@@ -1190,10 +1251,10 @@ export class CarteiraEventoRepository {
     };
   }
 
-  async obterRelatorio(filters: RelatorioCarteiraFilters) {
+  async obterRelatorio(filters: RelatorioCarteiraFilters, tenantId: string) {
     const eventoId = BigInt(filters.evento_id);
     if (filters.tipo === "PARTICIPANTES" || filters.tipo === "CREDITOS_NAO_UTILIZADOS") {
-      const participantes = await this.listarParticipantes({ evento_id: filters.evento_id, limite: 500 });
+      const participantes = await this.listarParticipantes({ evento_id: filters.evento_id, limite: 500 }, tenantId);
       return {
         tipo: filters.tipo,
         dados:
@@ -1203,18 +1264,18 @@ export class CarteiraEventoRepository {
       };
     }
     if (filters.tipo === "BARRACAS") {
-      return { tipo: filters.tipo, dados: await this.listarBarracas({ evento_id: filters.evento_id }) };
+      return { tipo: filters.tipo, dados: await this.listarBarracas({ evento_id: filters.evento_id }, tenantId) };
     }
     if (filters.tipo === "ITENS") {
-      return { tipo: filters.tipo, dados: await this.listarItens({ evento_id: filters.evento_id }) };
+      return { tipo: filters.tipo, dados: await this.listarItens({ evento_id: filters.evento_id }, tenantId) };
     }
     if (filters.tipo === "EVENTO" || filters.tipo === "RESUMO_FINANCEIRO") {
-      return { tipo: filters.tipo, dados: await this.obterDashboard({ evento_id: filters.evento_id }) };
+      return { tipo: filters.tipo, dados: await this.obterDashboard({ evento_id: filters.evento_id }, tenantId) };
     }
     if (filters.tipo === "RANKING_VENDAS") {
       return {
         tipo: filters.tipo,
-        dados: (await this.obterDashboard({ evento_id: filters.evento_id })).rankingBarracas
+        dados: (await this.obterDashboard({ evento_id: filters.evento_id }, tenantId)).rankingBarracas
       };
     }
     if (filters.tipo === "EXTRATO_GERAL") {
@@ -1241,9 +1302,11 @@ export class CarteiraEventoRepository {
           i.nome_item AS item_nome
         FROM carteira_evento_movimentacao m
         INNER JOIN carteira_evento_participante p ON p.id = m.participante_id
+        INNER JOIN carteira_evento e ON e.id = m.evento_id
         LEFT JOIN carteira_evento_barraca b ON b.id = m.barraca_id
         LEFT JOIN carteira_evento_item i ON i.id = m.item_id
         WHERE m.evento_id = ${eventoId}
+          AND ${tenantSql("e", tenantId)}
         ORDER BY m.criado_em DESC, m.id DESC
       `);
       return { tipo: filters.tipo, dados: rows.map(mapMovimentacaoCarteira) };
@@ -1252,6 +1315,7 @@ export class CarteiraEventoRepository {
       SELECT TO_CHAR(v.criado_em, 'HH24:00') AS hora, COALESCE(SUM(v.valor_total), 0) AS total, COUNT(v.id)::bigint AS quantidade
       FROM carteira_evento_venda v
       WHERE v.evento_id = ${eventoId}
+        AND EXISTS (SELECT 1 FROM carteira_evento e WHERE e.id = v.evento_id AND e.tenant_id::text = ${tenantId})
       GROUP BY TO_CHAR(v.criado_em, 'HH24:00')
       ORDER BY hora ASC
     `);
@@ -1265,7 +1329,7 @@ export class CarteiraEventoRepository {
     };
   }
 
-  private async buscarEventoPorIdOuFalhar(id: bigint) {
+  private async buscarEventoPorIdOuFalhar(id: bigint, tenantId: string) {
     const rows = await prisma.$queryRaw<EventoCarteiraRow[]>(Prisma.sql`
       SELECT
         id,
@@ -1286,6 +1350,7 @@ export class CarteiraEventoRepository {
         atualizado_em
       FROM carteira_evento
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
       LIMIT 1
     `);
     const row = rows[0];
@@ -1295,7 +1360,7 @@ export class CarteiraEventoRepository {
     return mapEventoCarteira(row);
   }
 
-  private async buscarEventoConfigPorIdOuFalhar(id: bigint, tx: Tx | typeof prisma = prisma) {
+  private async buscarEventoConfigPorIdOuFalhar(id: bigint, tx: Tx | typeof prisma = prisma, tenantId: string) {
     const rows = await tx.$queryRaw<EventoConfigRow[]>(Prisma.sql`
       SELECT
         id,
@@ -1310,6 +1375,7 @@ export class CarteiraEventoRepository {
         permite_saldo_negativo_adm
       FROM carteira_evento
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
       LIMIT 1
     `);
     const row = rows[0];
@@ -1319,7 +1385,7 @@ export class CarteiraEventoRepository {
     return row;
   }
 
-  private async buscarBarracaPorIdOuFalhar(id: bigint) {
+  private async buscarBarracaPorIdOuFalhar(id: bigint, tenantId: string) {
     const rows = await prisma.$queryRaw<BarracaEventoRow[]>(Prisma.sql`
       SELECT
         b.id,
@@ -1337,6 +1403,7 @@ export class CarteiraEventoRepository {
       FROM carteira_evento_barraca b
       INNER JOIN carteira_evento e ON e.id = b.evento_id
       WHERE b.id = ${id}
+        AND ${tenantSql("e", tenantId)}
       LIMIT 1
     `);
     const row = rows[0];
@@ -1346,11 +1413,17 @@ export class CarteiraEventoRepository {
     return mapBarracaEvento(row);
   }
 
-  private async buscarBarracaOperacaoPorIdOuFalhar(id: bigint, tx: Tx) {
+  private async buscarBarracaOperacaoPorIdOuFalhar(id: bigint, tx: Tx, tenantId: string) {
     const rows = await tx.$queryRaw<BarracaOperacaoRow[]>(Prisma.sql`
       SELECT id, evento_id, nome_barraca, status
       FROM carteira_evento_barraca
       WHERE id = ${id}
+        AND EXISTS (
+          SELECT 1
+          FROM carteira_evento e
+          WHERE e.id = carteira_evento_barraca.evento_id
+            AND e.tenant_id::text = ${tenantId}
+        )
       LIMIT 1
     `);
     const row = rows[0];
@@ -1360,7 +1433,7 @@ export class CarteiraEventoRepository {
     return row;
   }
 
-  private async buscarItemPorIdOuFalhar(id: bigint) {
+  private async buscarItemPorIdOuFalhar(id: bigint, tenantId: string) {
     const rows = await prisma.$queryRaw<ItemEventoRow[]>(Prisma.sql`
       SELECT
         i.id,
@@ -1381,6 +1454,7 @@ export class CarteiraEventoRepository {
       INNER JOIN carteira_evento e ON e.id = i.evento_id
       LEFT JOIN carteira_evento_barraca b ON b.id = i.barraca_id
       WHERE i.id = ${id}
+        AND ${tenantSql("e", tenantId)}
       LIMIT 1
     `);
     const row = rows[0];
@@ -1393,12 +1467,19 @@ export class CarteiraEventoRepository {
   private async buscarParticipanteSaldoPorIdOuFalhar(
     id: bigint,
     tx: Tx | typeof prisma = prisma,
+    tenantId: string,
     forUpdate = false
   ) {
     const query = Prisma.sql`
       SELECT id, evento_id, nome, status, saldo_atual, qr_code_token_unico
       FROM carteira_evento_participante
       WHERE id = ${id}
+        AND EXISTS (
+          SELECT 1
+          FROM carteira_evento e
+          WHERE e.id = carteira_evento_participante.evento_id
+            AND e.tenant_id::text = ${tenantId}
+        )
       LIMIT 1
       ${forUpdate ? Prisma.sql`FOR UPDATE` : Prisma.empty}
     `;
@@ -1414,6 +1495,7 @@ export class CarteiraEventoRepository {
     eventoId: bigint,
     token: string,
     tx: Tx,
+    tenantId: string,
     forUpdate = false
   ) {
     const identificador = token.trim();
@@ -1421,6 +1503,12 @@ export class CarteiraEventoRepository {
       SELECT id, evento_id, nome, status, saldo_atual, qr_code_token_unico
       FROM carteira_evento_participante
       WHERE evento_id = ${eventoId}
+        AND EXISTS (
+          SELECT 1
+          FROM carteira_evento e
+          WHERE e.id = carteira_evento_participante.evento_id
+            AND e.tenant_id::text = ${tenantId}
+        )
         AND (
           qr_code_token_unico = ${identificador}
           OR numero_carteira = ${identificador}
@@ -1435,11 +1523,17 @@ export class CarteiraEventoRepository {
     return row;
   }
 
-  private async gerarNumeroCarteira(eventoId: bigint, ignorarId?: bigint) {
+  private async gerarNumeroCarteira(eventoId: bigint, tenantId: string, ignorarId?: bigint) {
     const rows = await prisma.$queryRaw<Array<{ numero_carteira: string | null }>>(Prisma.sql`
       SELECT numero_carteira
       FROM carteira_evento_participante
       WHERE evento_id = ${eventoId}
+        AND EXISTS (
+          SELECT 1
+          FROM carteira_evento e
+          WHERE e.id = carteira_evento_participante.evento_id
+            AND e.tenant_id::text = ${tenantId}
+        )
       ${ignorarId ? Prisma.sql`AND id <> ${ignorarId}` : Prisma.empty}
       ORDER BY id DESC
       LIMIT 1
@@ -1450,6 +1544,14 @@ export class CarteiraEventoRepository {
 
   private gerarTokenSeguro() {
     return crypto.randomBytes(24).toString("hex");
+  }
+
+  private requireTenant(tenantId?: string) {
+    const normalized = tenantId?.trim();
+    if (!normalized) {
+      throw new AppError("Tenant da sessao nao identificado.", 401);
+    }
+    return normalized;
   }
 
   private async registrarMovimentacaoTx(

@@ -45,7 +45,7 @@ export class RegistroPontoController {
   }
 
   async listarUsuarios(request: AuthenticatedRequest, response: Response) {
-    const usuarios = await service.listarUsuarios(request.query.termo);
+    const usuarios = await service.listarUsuarios(request.query.termo, request.authUser ?? {});
     return response.json({ usuarios });
   }
 

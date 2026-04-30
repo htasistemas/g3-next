@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { AppShell } from "@/app/app-shell";
 import { RequireAuth } from "@/app/require-auth";
 import { RequirePermission } from "@/app/require-permission";
+import { RequireSuperadmin } from "@/app/require-superadmin";
 import { carregarModuloRota, obterLoaderRota } from "@/routes/route-modules";
 
 const CHUNK_RELOAD_KEY = "g3:chunk-reload";
@@ -224,6 +225,10 @@ const AtualizarSistemaPage = carregarPagina(
   "AtualizarSistemaPage"
 );
 const UsuariosPage = carregarPagina("/configuracoes/usuarios", "UsuariosPage");
+const MasterInstituicoesPage = carregarPagina(
+  "/configuracoes/master-instituicoes",
+  "MasterInstituicoesPage"
+);
 const MensagensPersonalizadasPage = carregarPagina(
   "/configuracoes/mensagens-personalizadas",
   "MensagensPersonalizadasPage"
@@ -529,6 +534,10 @@ export const router = createBrowserRouter([
             {UsuariosPage}
           </RequirePermission>
         )
+      },
+      {
+        path: "/configuracoes/master-instituicoes",
+        element: <RequireSuperadmin>{MasterInstituicoesPage}</RequireSuperadmin>
       },
       {
         path: "/configuracoes/chamado-tecnico",

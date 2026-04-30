@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAuth } from "@/hooks/use-auth";
 import { useDashboardAssistencia } from "@/features/dashboard/use-dashboard";
 import { classesTelaPadraoBeneficiario } from "@/lib/tela-padrao-beneficiario";
 import { matriculasService } from "@/services/matriculas.service";
@@ -57,13 +58,15 @@ const classeCardVerdeSuave =
 
 export function VisaoGeralPage() {
   const navigate = useNavigate();
+  const { usuario } = useAuth();
   const { data, isLoading, isFetching, isError, refetch } = useDashboardAssistencia(
     {},
     { autoRefresh: true }
   );
   const { data: matriculasResumoData, isFetching: atualizandoResumoMatriculas } = useQuery({
-    queryKey: ["dashboard", "visao-geral", "matriculas-resumo"],
+    queryKey: ["dashboard", "visao-geral", "matriculas-resumo", usuario?.tenant_id ?? "sem-tenant"],
     queryFn: () => matriculasService.obterResumoCatalogo(),
+    enabled: !!usuario,
     staleTime: 60_000
   });
 

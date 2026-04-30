@@ -6,6 +6,7 @@ const sqlEstruturaChecklistDiario: string[] = [
   `
   CREATE TABLE IF NOT EXISTS checklist_configuracoes (
     id BIGSERIAL PRIMARY KEY,
+    tenant_id UUID,
     sabado_ativo BOOLEAN NOT NULL DEFAULT FALSE,
     domingo_ativo BOOLEAN NOT NULL DEFAULT FALSE,
     criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -15,6 +16,7 @@ const sqlEstruturaChecklistDiario: string[] = [
   `
   CREATE TABLE IF NOT EXISTS checklist_modelos (
     id BIGSERIAL PRIMARY KEY,
+    tenant_id UUID,
     codigo VARCHAR(80) UNIQUE,
     nome VARCHAR(160) NOT NULL,
     descricao TEXT,
@@ -34,6 +36,7 @@ const sqlEstruturaChecklistDiario: string[] = [
   `
   CREATE TABLE IF NOT EXISTS checklist_modelo_itens (
     id BIGSERIAL PRIMARY KEY,
+    tenant_id UUID,
     modelo_id BIGINT NOT NULL REFERENCES checklist_modelos(id) ON DELETE CASCADE,
     dia_semana SMALLINT NOT NULL,
     titulo VARCHAR(200) NOT NULL,
@@ -55,6 +58,7 @@ const sqlEstruturaChecklistDiario: string[] = [
   `
   CREATE TABLE IF NOT EXISTS checklist_execucoes (
     id BIGSERIAL PRIMARY KEY,
+    tenant_id UUID,
     modelo_id BIGINT REFERENCES checklist_modelos(id) ON DELETE SET NULL,
     modelo_item_id BIGINT REFERENCES checklist_modelo_itens(id) ON DELETE SET NULL,
     usuario_id BIGINT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
@@ -94,6 +98,7 @@ const sqlEstruturaChecklistDiario: string[] = [
   `
   CREATE TABLE IF NOT EXISTS checklist_execucao_historico (
     id BIGSERIAL PRIMARY KEY,
+    tenant_id UUID,
     referencia_tipo VARCHAR(30) NOT NULL DEFAULT 'EXECUCAO',
     execucao_id BIGINT REFERENCES checklist_execucoes(id) ON DELETE CASCADE,
     modelo_id BIGINT REFERENCES checklist_modelos(id) ON DELETE SET NULL,
@@ -111,6 +116,11 @@ const sqlEstruturaChecklistDiario: string[] = [
   )
   `,
   "CREATE UNIQUE INDEX IF NOT EXISTS checklist_execucoes_chave_geracao_uidx ON checklist_execucoes(chave_geracao) WHERE chave_geracao IS NOT NULL",
+  "CREATE INDEX IF NOT EXISTS checklist_configuracoes_tenant_idx ON checklist_configuracoes(tenant_id)",
+  "CREATE INDEX IF NOT EXISTS checklist_modelos_tenant_idx ON checklist_modelos(tenant_id, ativo)",
+  "CREATE INDEX IF NOT EXISTS checklist_modelo_itens_tenant_idx ON checklist_modelo_itens(tenant_id, modelo_id)",
+  "CREATE INDEX IF NOT EXISTS checklist_execucoes_tenant_idx ON checklist_execucoes(tenant_id, referencia_data)",
+  "CREATE INDEX IF NOT EXISTS checklist_execucao_historico_tenant_idx ON checklist_execucao_historico(tenant_id, criado_em DESC)",
   "CREATE INDEX IF NOT EXISTS checklist_execucoes_usuario_data_idx ON checklist_execucoes(usuario_id, referencia_data)",
   "CREATE INDEX IF NOT EXISTS checklist_execucoes_semana_idx ON checklist_execucoes(semana_inicio, dia_semana)",
   "CREATE INDEX IF NOT EXISTS checklist_execucoes_status_idx ON checklist_execucoes(status)",
@@ -225,6 +235,59 @@ export async function ensureChecklistDiarioEstrutura(db: DatabaseLike) {
       for (const sql of sqlEstruturaChecklistDiario) {
         await db.$executeRawUnsafe(sql);
       }
+      await db.$executeRawUnsafe("ALTER TABLE checklist_configuracoes ADD COLUMN IF NOT EXISTS tenant_id UUID");
+      await db.$executeRawUnsafe("ALTER TABLE checklist_modelos ADD COLUMN IF NOT EXISTS tenant_id UUID");
+      await db.$executeRawUnsafe("ALTER TABLE checklist_modelo_itens ADD COLUMN IF NOT EXISTS tenant_id UUID");
+      await db.$executeRawUnsafe("ALTER TABLE checklist_execucoes ADD COLUMN IF NOT EXISTS tenant_id UUID");
+      await db.$executeRawUnsafe("ALTER TABLE checklist_execucao_historico ADD COLUMN IF NOT EXISTS tenant_id UUID");
+      await db.$executeRawUnsafe(`
+        UPDATE checklist_modelos AS m
+        SET tenant_id = ref.tenant_id
+        FROM (
+          SELECT tenant_id
+          FROM instituicoes
+          ORDER BY criado_em ASC
+          LIMIT 1
+        ) ref
+        WHERE m.tenant_id IS NULL
+      `);
+      await db.$executeRawUnsafe(`
+        UPDATE checklist_modelo_itens AS i
+        SET tenant_id = m.tenant_id
+        FROM checklist_modelos m
+        WHERE i.tenant_id IS NULL
+          AND m.id = i.modelo_id
+      `);
+      await db.$executeRawUnsafe(`
+        UPDATE checklist_execucoes AS e
+        SET tenant_id = COALESCE(u.tenant_id, m.tenant_id)
+        FROM usuarios u
+        LEFT JOIN checklist_modelos m ON m.id = e.modelo_id
+        WHERE e.tenant_id IS NULL
+          AND u.id = e.usuario_id
+      `);
+      await db.$executeRawUnsafe(`
+        UPDATE checklist_execucao_historico AS h
+        SET tenant_id = COALESCE(e.tenant_id, m.tenant_id)
+        FROM checklist_execucoes e
+        LEFT JOIN checklist_modelos m ON m.id = h.modelo_id
+        WHERE h.tenant_id IS NULL
+          AND (
+            (e.id = h.execucao_id)
+            OR h.execucao_id IS NULL
+          )
+      `);
+      await db.$executeRawUnsafe(`
+        UPDATE checklist_configuracoes AS c
+        SET tenant_id = ref.tenant_id
+        FROM (
+          SELECT tenant_id
+          FROM instituicoes
+          ORDER BY criado_em ASC
+          LIMIT 1
+        ) ref
+        WHERE c.tenant_id IS NULL
+      `);
       estruturaInicializada = true;
     })().catch((error) => {
       estruturaInicializando = null;

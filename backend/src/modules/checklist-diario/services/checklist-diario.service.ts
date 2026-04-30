@@ -21,6 +21,14 @@ import { ChecklistDiarioRepository } from "../repositories/checklist-diario.repo
 export class ChecklistDiarioService {
   private readonly repository = new ChecklistDiarioRepository();
 
+  private requireTenant(usuario: ChecklistUsuarioAtual) {
+    const tenantId = usuario.tenant_id?.trim();
+    if (!tenantId) {
+      throw new AppError("Tenant da sessao nao identificado.", 401);
+    }
+    return tenantId;
+  }
+
   private hasPermission(usuario: ChecklistUsuarioAtual, permission: string) {
     return usuario.permissoes.includes("ADMINISTRADOR") || usuario.permissoes.includes(permission);
   }
@@ -38,16 +46,18 @@ export class ChecklistDiarioService {
   }
 
   async listarExecucoes(rawFiltros: unknown, usuario: ChecklistUsuarioAtual) {
+    const tenantId = this.requireTenant(usuario);
     const filtros = checklistListagemFiltrosSchema.parse(rawFiltros);
     const scope = this.buildScope(usuario, filtros);
-    const execucoes = await this.repository.listarExecucoes(filtros, scope, usuario);
+    const execucoes = await this.repository.listarExecucoes(filtros, scope, tenantId, usuario);
     return execucoes.map(mapChecklistExecucao);
   }
 
   async listarSemana(rawFiltros: unknown, usuario: ChecklistUsuarioAtual) {
+    const tenantId = this.requireTenant(usuario);
     const filtros = checklistListagemFiltrosSchema.parse(rawFiltros);
     const scope = this.buildScope(usuario, filtros);
-    const execucoes = await this.repository.listarExecucoes(filtros, scope, usuario);
+    const execucoes = await this.repository.listarExecucoes(filtros, scope, tenantId, usuario);
     const agrupado = new Map<number, ReturnType<typeof mapChecklistExecucao>[]>();
 
     execucoes.forEach((item) => {
@@ -62,6 +72,7 @@ export class ChecklistDiarioService {
   }
 
   async obterIndicadores(rawFiltros: unknown, usuario: ChecklistUsuarioAtual) {
+    const tenantId = this.requireTenant(usuario);
     if (
       !this.hasPermission(usuario, "SETOR_ADMINISTRATIVO_CHECKLIST_DIARIO_VISUALIZAR_INDICADORES") &&
       !this.hasPermission(usuario, "SETOR_ADMINISTRATIVO_CHECKLIST_DIARIO_VISUALIZAR_TODOS")
@@ -71,7 +82,7 @@ export class ChecklistDiarioService {
 
     const filtros = checklistListagemFiltrosSchema.parse(rawFiltros);
     const scope = this.buildScope(usuario, filtros);
-    const indicadores = await this.repository.obterIndicadores(filtros, scope, usuario);
+    const indicadores = await this.repository.obterIndicadores(filtros, scope, tenantId, usuario);
 
     return {
       resumo: mapChecklistIndicadores(indicadores.resumo),
@@ -105,12 +116,13 @@ export class ChecklistDiarioService {
   }
 
   async listarHistorico(rawFiltros: unknown, usuario: ChecklistUsuarioAtual) {
+    const tenantId = this.requireTenant(usuario);
     const filtros = rawFiltros as Record<string, unknown>;
     const historico = await this.repository.listarHistorico({
       execucaoId: typeof filtros.execucaoId === "string" && filtros.execucaoId.trim() ? Number(filtros.execucaoId) : undefined,
       usuarioId: typeof filtros.usuarioId === "string" && filtros.usuarioId.trim() ? Number(filtros.usuarioId) : undefined,
       limit: typeof filtros.limit === "string" && filtros.limit.trim() ? Number(filtros.limit) : undefined
-    });
+    }, tenantId);
 
     const visualizarTodos = this.hasPermission(
       usuario,
@@ -127,7 +139,8 @@ export class ChecklistDiarioService {
   }
 
   async obterExecucao(rawId: string, usuario: ChecklistUsuarioAtual) {
-    const detalhe = await this.repository.obterExecucaoComHistorico(this.parseId(rawId));
+    const tenantId = this.requireTenant(usuario);
+    const detalhe = await this.repository.obterExecucaoComHistorico(this.parseId(rawId), tenantId);
     const visualizarTodos = this.hasPermission(
       usuario,
       "SETOR_ADMINISTRATIVO_CHECKLIST_DIARIO_VISUALIZAR_TODOS"
@@ -143,12 +156,13 @@ export class ChecklistDiarioService {
   }
 
   async concluir(rawId: string, rawInput: unknown, usuario: ChecklistUsuarioAtual) {
+    const tenantId = this.requireTenant(usuario);
     if (!this.hasPermission(usuario, "SETOR_ADMINISTRATIVO_CHECKLIST_DIARIO_CONCLUIR_ATIVIDADE")) {
       throw new AppError("Sem permissão para concluir atividades do checklist.", 403);
     }
 
     const input = checklistExecucaoConclusaoSchema.parse(rawInput);
-    const detalheAtual = await this.repository.obterExecucaoComHistorico(this.parseId(rawId));
+    const detalheAtual = await this.repository.obterExecucaoComHistorico(this.parseId(rawId), tenantId);
     if (detalheAtual.execucao.observacao_obrigatoria && !input.observacao?.trim()) {
       throw new AppError("Esta atividade exige observação obrigatória para conclusão.", 422);
     }
@@ -164,7 +178,7 @@ export class ChecklistDiarioService {
       throw new AppError("Sem permissão para concluir atividade de outro usuário.", 403);
     }
 
-    const atualizado = await this.repository.concluirExecucao(this.parseId(rawId), input, usuario);
+    const atualizado = await this.repository.concluirExecucao(this.parseId(rawId), input, usuario, tenantId);
     return {
       execucao: mapChecklistExecucao(atualizado.execucao),
       historico: atualizado.historico.map(mapChecklistHistorico)
@@ -172,6 +186,7 @@ export class ChecklistDiarioService {
   }
 
   async dispensar(rawId: string, rawInput: unknown, usuario: ChecklistUsuarioAtual) {
+    const tenantId = this.requireTenant(usuario);
     if (!this.hasPermission(usuario, "SETOR_ADMINISTRATIVO_CHECKLIST_DIARIO_DISPENSAR_ATIVIDADE")) {
       throw new AppError("Sem permissão para dispensar atividade do checklist.", 403);
     }
@@ -179,7 +194,8 @@ export class ChecklistDiarioService {
       this.parseId(rawId),
       checklistExecucaoDispensaSchema.parse(rawInput),
       usuario,
-      "DISPENSADO"
+      "DISPENSADO",
+      tenantId
     );
     return {
       execucao: mapChecklistExecucao(atualizado.execucao),
@@ -188,6 +204,7 @@ export class ChecklistDiarioService {
   }
 
   async marcarNaoSeAplica(rawId: string, rawInput: unknown, usuario: ChecklistUsuarioAtual) {
+    const tenantId = this.requireTenant(usuario);
     if (!this.hasPermission(usuario, "SETOR_ADMINISTRATIVO_CHECKLIST_DIARIO_DISPENSAR_ATIVIDADE")) {
       throw new AppError("Sem permissão para marcar atividade como não se aplica.", 403);
     }
@@ -195,7 +212,8 @@ export class ChecklistDiarioService {
       this.parseId(rawId),
       checklistExecucaoDispensaSchema.parse(rawInput),
       usuario,
-      "NAO_SE_APLICA"
+      "NAO_SE_APLICA",
+      tenantId
     );
     return {
       execucao: mapChecklistExecucao(atualizado.execucao),
@@ -204,13 +222,15 @@ export class ChecklistDiarioService {
   }
 
   async reabrir(rawId: string, rawInput: unknown, usuario: ChecklistUsuarioAtual) {
+    const tenantId = this.requireTenant(usuario);
     if (!this.hasPermission(usuario, "SETOR_ADMINISTRATIVO_CHECKLIST_DIARIO_REABRIR_ATIVIDADE")) {
       throw new AppError("Sem permissão para reabrir atividade do checklist.", 403);
     }
     const atualizado = await this.repository.reabrirExecucao(
       this.parseId(rawId),
       checklistExecucaoReaberturaSchema.parse(rawInput),
-      usuario
+      usuario,
+      tenantId
     );
     return {
       execucao: mapChecklistExecucao(atualizado.execucao),
@@ -218,14 +238,16 @@ export class ChecklistDiarioService {
     };
   }
 
-  async listarModelos() {
-    const { modelos, itens } = await this.repository.listarModelos();
+  async listarModelos(usuario: ChecklistUsuarioAtual) {
+    const tenantId = this.requireTenant(usuario);
+    const { modelos, itens } = await this.repository.listarModelos(tenantId);
     return modelos.map((modelo) =>
       mapChecklistModelo(modelo, itens.filter((item) => item.modelo_id === modelo.id))
     );
   }
 
   async salvarModelo(rawId: string | undefined, rawInput: unknown, usuario: ChecklistUsuarioAtual) {
+    const tenantId = this.requireTenant(usuario);
     const permission = rawId
       ? "SETOR_ADMINISTRATIVO_CHECKLIST_DIARIO_EDITAR_MODELO"
       : "SETOR_ADMINISTRATIVO_CHECKLIST_DIARIO_CADASTRAR_MODELO";
@@ -237,41 +259,47 @@ export class ChecklistDiarioService {
     const modeloId = await this.repository.salvarModelo(
       rawId ? this.parseId(rawId) : null,
       checklistModeloSchema.parse(rawInput),
-      usuario
+      usuario,
+      tenantId
     );
-    const modelos = await this.listarModelos();
+    const modelos = await this.listarModelos(usuario);
     return modelos.find((item) => item.id === modeloId.toString());
   }
 
   async clonarModelo(rawId: string, usuario: ChecklistUsuarioAtual) {
+    const tenantId = this.requireTenant(usuario);
     if (!this.hasPermission(usuario, "SETOR_ADMINISTRATIVO_CHECKLIST_DIARIO_CADASTRAR_MODELO")) {
       throw new AppError("Sem permissão para clonar modelo do checklist.", 403);
     }
 
-    const modeloId = await this.repository.clonarModelo(this.parseId(rawId), usuario);
-    const modelos = await this.listarModelos();
+    const modeloId = await this.repository.clonarModelo(this.parseId(rawId), usuario, tenantId);
+    const modelos = await this.listarModelos(usuario);
     return modelos.find((item) => item.id === modeloId.toString());
   }
 
   async atualizarStatusModelo(rawId: string, ativo: boolean, usuario: ChecklistUsuarioAtual) {
+    const tenantId = this.requireTenant(usuario);
     if (!this.hasPermission(usuario, "SETOR_ADMINISTRATIVO_CHECKLIST_DIARIO_EDITAR_MODELO")) {
       throw new AppError("Sem permissão para alterar status do modelo.", 403);
     }
-    await this.repository.atualizarStatusModelo(this.parseId(rawId), ativo, usuario);
+    await this.repository.atualizarStatusModelo(this.parseId(rawId), ativo, usuario, tenantId);
   }
 
   async gerarSemana(rawInput: unknown, usuario: ChecklistUsuarioAtual) {
+    const tenantId = this.requireTenant(usuario);
     if (!this.hasPermission(usuario, "SETOR_ADMINISTRATIVO_CHECKLIST_DIARIO_EDITAR_MODELO")) {
       throw new AppError("Sem permissão para gerar checklist semanal.", 403);
     }
-    return this.repository.gerarChecklistDaSemana(checklistGerarSemanaSchema.parse(rawInput), usuario);
+    return this.repository.gerarChecklistDaSemana(checklistGerarSemanaSchema.parse(rawInput), tenantId, usuario);
   }
 
-  async obterConfiguracao() {
-    return mapChecklistConfiguracao(await this.repository.obterConfiguracao());
+  async obterConfiguracao(usuario: ChecklistUsuarioAtual) {
+    const tenantId = this.requireTenant(usuario);
+    return mapChecklistConfiguracao(await this.repository.obterConfiguracao(tenantId));
   }
 
   async atualizarConfiguracao(rawInput: unknown, usuario: ChecklistUsuarioAtual) {
+    const tenantId = this.requireTenant(usuario);
     if (!this.hasPermission(usuario, "SETOR_ADMINISTRATIVO_CHECKLIST_DIARIO_GERENCIAR_CONFIGURACOES")) {
       throw new AppError("Sem permissão para gerenciar configurações do checklist.", 403);
     }
@@ -284,7 +312,7 @@ export class ChecklistDiarioService {
       throw new AppError("Sem permissão para ativar domingo.", 403);
     }
 
-    return mapChecklistConfiguracao(await this.repository.atualizarConfiguracao(input, usuario));
+    return mapChecklistConfiguracao(await this.repository.atualizarConfiguracao(input, usuario, tenantId));
   }
 
   private parseId(rawId: string) {

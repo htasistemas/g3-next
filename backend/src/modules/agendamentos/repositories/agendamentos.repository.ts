@@ -23,6 +23,7 @@ const estruturaSql = [
   `
     CREATE TABLE IF NOT EXISTS agendamento (
       id BIGSERIAL PRIMARY KEY,
+      tenant_id UUID,
       beneficiario_id BIGINT,
       familia_id BIGINT,
       inscricao_origem_id BIGINT,
@@ -90,7 +91,9 @@ const estruturaSql = [
       atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
     )
   `,
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS tenant_id UUID",
   "CREATE INDEX IF NOT EXISTS agendamento_data_idx ON agendamento(data_agendamento, hora_inicial)",
+  "CREATE INDEX IF NOT EXISTS agendamento_tenant_idx ON agendamento(tenant_id, data_agendamento, hora_inicial)",
   "CREATE INDEX IF NOT EXISTS agendamento_beneficiario_idx ON agendamento(beneficiario_id)",
   "CREATE INDEX IF NOT EXISTS agendamento_profissional_idx ON agendamento(profissional_nome, data_agendamento)",
   "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS item_tipo VARCHAR(30)",
@@ -102,6 +105,7 @@ const estruturaSql = [
   `
     CREATE TABLE IF NOT EXISTS agendamento_lista_espera (
       id BIGSERIAL PRIMARY KEY,
+      tenant_id UUID,
       beneficiario_id BIGINT,
       beneficiario_nome VARCHAR(200) NOT NULL,
       familia_id BIGINT,
@@ -121,9 +125,11 @@ const estruturaSql = [
       atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
     )
   `,
+  "ALTER TABLE agendamento_lista_espera ADD COLUMN IF NOT EXISTS tenant_id UUID",
   `
     CREATE TABLE IF NOT EXISTS agendamento_log (
       id BIGSERIAL PRIMARY KEY,
+      tenant_id UUID,
       agendamento_id BIGINT,
       acao VARCHAR(80) NOT NULL,
       usuario_id BIGINT,
@@ -133,9 +139,11 @@ const estruturaSql = [
       criado_em TIMESTAMP NOT NULL DEFAULT NOW()
     )
   `,
+  "ALTER TABLE agendamento_log ADD COLUMN IF NOT EXISTS tenant_id UUID",
   `
     CREATE TABLE IF NOT EXISTS agendamento_beneficiario (
       id BIGSERIAL PRIMARY KEY,
+      tenant_id UUID,
       agendamento_id BIGINT NOT NULL REFERENCES agendamento(id) ON DELETE CASCADE,
       beneficiario_id BIGINT,
       beneficiario_nome VARCHAR(200) NOT NULL,
@@ -146,11 +154,14 @@ const estruturaSql = [
       atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
     )
   `,
+  "ALTER TABLE agendamento_beneficiario ADD COLUMN IF NOT EXISTS tenant_id UUID",
   "CREATE INDEX IF NOT EXISTS agendamento_beneficiario_agendamento_idx ON agendamento_beneficiario(agendamento_id)",
+  "CREATE INDEX IF NOT EXISTS agendamento_beneficiario_tenant_idx ON agendamento_beneficiario(tenant_id, agendamento_id)",
   "CREATE INDEX IF NOT EXISTS agendamento_beneficiario_beneficiario_idx ON agendamento_beneficiario(beneficiario_id)",
   `
     CREATE TABLE IF NOT EXISTS agendamento_envio (
       id BIGSERIAL PRIMARY KEY,
+      tenant_id UUID,
       agendamento_id BIGINT NOT NULL REFERENCES agendamento(id) ON DELETE CASCADE,
       beneficiario_id BIGINT,
       canal VARCHAR(20) NOT NULL,
@@ -159,7 +170,9 @@ const estruturaSql = [
       mensagem TEXT,
       data_envio TIMESTAMP NOT NULL DEFAULT NOW()
     )
-  `
+  `,
+  "ALTER TABLE agendamento_envio ADD COLUMN IF NOT EXISTS tenant_id UUID",
+  "CREATE INDEX IF NOT EXISTS agendamento_envio_tenant_idx ON agendamento_envio(tenant_id, agendamento_id)"
 ];
 
 let estruturaPromise: Promise<void> | null = null;
@@ -236,13 +249,15 @@ export class AgendamentosRepository {
     agendamentoId: bigint | null,
     acao: string,
     usuario: UsuarioActor | undefined,
+    tenantId: string,
     anterior?: unknown,
     novo?: unknown
   ) {
     await prisma.$executeRaw(Prisma.sql`
       INSERT INTO agendamento_log (
-        agendamento_id, acao, usuario_id, usuario_nome, valor_anterior, valor_novo
+        tenant_id, agendamento_id, acao, usuario_id, usuario_nome, valor_anterior, valor_novo
       ) VALUES (
+        ${tenantId}::uuid,
         ${agendamentoId},
         ${acao},
         ${usuario?.id ? BigInt(usuario.id) : null},
@@ -277,15 +292,21 @@ export class AgendamentosRepository {
 
   private async sincronizarBeneficiariosAgendamento(
     agendamentoId: bigint,
+    tenantId: string,
     participantes: Array<{ beneficiarioId?: number | null; beneficiarioNome: string; telefone?: string | null; email?: string | null }>
   ) {
-    await prisma.$executeRaw(Prisma.sql`DELETE FROM agendamento_beneficiario WHERE agendamento_id = ${agendamentoId}`);
+    await prisma.$executeRaw(Prisma.sql`
+      DELETE FROM agendamento_beneficiario
+      WHERE agendamento_id = ${agendamentoId}
+        AND tenant_id::text = ${tenantId}
+    `);
 
     for (const participante of participantes) {
       await prisma.$executeRaw(Prisma.sql`
         INSERT INTO agendamento_beneficiario (
-          agendamento_id, beneficiario_id, beneficiario_nome, telefone, email, status
+          tenant_id, agendamento_id, beneficiario_id, beneficiario_nome, telefone, email, status
         ) VALUES (
+          ${tenantId}::uuid,
           ${agendamentoId},
           ${participante.beneficiarioId ? BigInt(participante.beneficiarioId) : null},
           ${participante.beneficiarioNome},
@@ -297,7 +318,7 @@ export class AgendamentosRepository {
     }
   }
 
-  async listarItensOperacionais(tipo: "curso" | "atendimento" | "oficina", busca?: string) {
+  async listarItensOperacionais(tipo: "curso" | "atendimento" | "oficina", busca: string | undefined, tenantId: string) {
     await this.ensureEstrutura();
     const termo = trimOrUndefined(busca);
 
@@ -316,13 +337,14 @@ export class AgendamentosRepository {
       FROM cursos_atendimentos c
       LEFT JOIN salas_unidade s ON s.id = c.sala_id
       WHERE LOWER(COALESCE(c.tipo, '')) = ${tipo}
+        AND c.tenant_id::text = ${tenantId}
         AND COALESCE(c.status, 'Ativo') <> 'Inativo'
         ${termo ? Prisma.sql`AND (c.nome ILIKE ${`%${termo}%`} OR COALESCE(c.profissional, '') ILIKE ${`%${termo}%`})` : Prisma.empty}
       ORDER BY c.nome ASC
     `);
   }
 
-  async listarBeneficiariosOperacionais(itemId: bigint) {
+  async listarBeneficiariosOperacionais(itemId: bigint, tenantId: string) {
     await this.ensureEstrutura();
 
     return prisma.$queryRaw<AgendamentoOperacionalBeneficiarioRow[]>(Prisma.sql`
@@ -394,6 +416,7 @@ export class AgendamentosRepository {
         LIMIT 1
       ) contato ON TRUE
       WHERE m.curso_id = ${itemId}
+        AND c.tenant_id::text = ${tenantId}
       ORDER BY m.beneficiario_nome ASC
     `);
   }
@@ -406,6 +429,7 @@ export class AgendamentosRepository {
     sala?: string | null;
     recurso?: string | null;
     idIgnorar?: bigint | null;
+    tenantId: string;
   }) {
     const horaInicial = formatarHora(payload.horaInicial);
     const horaFinal = formatarHora(payload.horaFinal) ?? formatarHora(payload.horaInicial);
@@ -439,13 +463,14 @@ export class AgendamentosRepository {
     return prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
       SELECT a.id, a.beneficiario_nome, a.profissional_nome, a.sala, a.recurso, a.hora_inicial, a.hora_final, a.status
       FROM agendamento a
-      WHERE ${Prisma.join(condicoes, " AND ")}
+      WHERE a.tenant_id::text = ${payload.tenantId}
+        AND ${Prisma.join(condicoes, " AND ")}
         AND (${Prisma.join(escopos, " OR ")})
       ORDER BY a.hora_inicial ASC
     `);
   }
 
-  async listar(filtros: AgendamentoFiltros) {
+  async listar(filtros: AgendamentoFiltros, tenantId: string) {
     await this.ensureEstrutura();
     const where: Prisma.Sql[] = [];
     const busca = trimOrUndefined(filtros.busca);
@@ -480,20 +505,21 @@ export class AgendamentosRepository {
     return prisma.$queryRaw<AgendamentoRow[]>(Prisma.sql`
       SELECT *
       FROM agendamento a
-      ${where.length ? Prisma.sql`WHERE ${Prisma.join(where, " AND ")}` : Prisma.empty}
+      WHERE a.tenant_id::text = ${tenantId}
+      ${where.length ? Prisma.sql`AND ${Prisma.join(where, " AND ")}` : Prisma.empty}
       ORDER BY a.data_agendamento ASC, a.hora_inicial ASC, a.id ASC
     `);
   }
 
-  async obter(id: bigint) {
+  async obter(id: bigint, tenantId: string) {
     await this.ensureEstrutura();
     const rows = await prisma.$queryRaw<AgendamentoRow[]>(Prisma.sql`
-      SELECT * FROM agendamento WHERE id = ${id} LIMIT 1
+      SELECT * FROM agendamento WHERE id = ${id} AND tenant_id::text = ${tenantId} LIMIT 1
     `);
     return rows[0] ?? null;
   }
 
-  async criar(input: AgendamentoInput, usuario?: UsuarioActor) {
+  async criar(input: AgendamentoInput, usuario: UsuarioActor | undefined, tenantId: string) {
     await this.ensureEstrutura();
     const familiaResolvida = await this.resolverFamiliaDoBeneficiario(input.beneficiarioId);
     const conflitos = await this.listarConflitos({
@@ -502,7 +528,8 @@ export class AgendamentosRepository {
       horaFinal: input.horaFinal,
       profissionalNome: input.profissionalNome,
       sala: input.sala,
-      recurso: input.recurso
+      recurso: input.recurso,
+      tenantId
     });
 
     if (conflitos.length && !input.permitirConflito) {
@@ -511,7 +538,7 @@ export class AgendamentosRepository {
 
     const inserted = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
       INSERT INTO agendamento (
-        beneficiario_id, familia_id, inscricao_origem_id, beneficiario_nome, familia_nome, responsavel_nome,
+        tenant_id, beneficiario_id, familia_id, inscricao_origem_id, beneficiario_nome, familia_nome, responsavel_nome,
         telefone, email, forma_contato_preferencial, observacoes_importantes, restricoes_alerta, necessidade_especial,
         transporte_apoio, unidade, setor, tipo_atendimento, subcategoria, profissional_id, profissional_nome,
         equipe_apoio, data_agendamento, hora_inicial, hora_final, duracao_minutos, sala, recurso, modalidade,
@@ -520,6 +547,7 @@ export class AgendamentosRepository {
         primeira_vez, retorno, urgencia, documentos_pendentes, autorizacao_pendente, item_tipo, item_origem_id,
         item_nome, item_dias_semana, item_local, dia_semana, criado_por_usuario_id, criado_por_nome
       ) VALUES (
+        ${tenantId}::uuid,
         ${input.beneficiarioId ? BigInt(input.beneficiarioId) : null},
         ${input.familiaId ? BigInt(input.familiaId) : familiaResolvida.familiaId},
         ${trimOrUndefined(input.inscricaoOrigemId) ? BigInt(trimOrUndefined(input.inscricaoOrigemId) as string) : null},
@@ -579,16 +607,16 @@ export class AgendamentosRepository {
 
     const id = inserted[0]?.id;
     if (!id) throw new AppError("Nao foi possivel criar o agendamento.", 500);
-    await this.sincronizarBeneficiariosAgendamento(id, input.participantes ?? []);
-    const criado = await this.obter(id);
-    await this.registrarLog(id, "criar", usuario, null, criado);
+    await this.sincronizarBeneficiariosAgendamento(id, tenantId, input.participantes ?? []);
+    const criado = await this.obter(id, tenantId);
+    await this.registrarLog(id, "criar", usuario, tenantId, null, criado);
     await this.registrarHistoricoFamilia(criado?.familia_id, "Agendamento criado para a família.", criado);
     return criado;
   }
 
-  async atualizar(id: bigint, input: AgendamentoInput, usuario?: UsuarioActor) {
+  async atualizar(id: bigint, input: AgendamentoInput, usuario: UsuarioActor | undefined, tenantId: string) {
     await this.ensureEstrutura();
-    const anterior = await this.obter(id);
+    const anterior = await this.obter(id, tenantId);
     if (!anterior) throw new AppError("Agendamento nao encontrado.", 404);
     const conflitos = await this.listarConflitos({
       data: input.data,
@@ -597,7 +625,8 @@ export class AgendamentosRepository {
       profissionalNome: input.profissionalNome,
       sala: input.sala,
       recurso: input.recurso,
-      idIgnorar: id
+      idIgnorar: id,
+      tenantId
     });
     if (conflitos.length && !input.permitirConflito) {
       throw new AppError("Conflito de agenda identificado.", 409);
@@ -660,31 +689,33 @@ export class AgendamentosRepository {
         dia_semana = ${trimOrUndefined(input.diaSemana) ?? this.formatarDiaSemana(input.data)},
         atualizado_em = NOW()
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
 
-    await this.sincronizarBeneficiariosAgendamento(id, input.participantes ?? []);
-    const atual = await this.obter(id);
-    await this.registrarLog(id, "editar", usuario, anterior, atual);
+    await this.sincronizarBeneficiariosAgendamento(id, tenantId, input.participantes ?? []);
+    const atual = await this.obter(id, tenantId);
+    await this.registrarLog(id, "editar", usuario, tenantId, anterior, atual);
     return atual;
   }
 
-  async cancelar(id: bigint, motivo: string | null | undefined, usuario?: UsuarioActor) {
-    const anterior = await this.obter(id);
+  async cancelar(id: bigint, motivo: string | null | undefined, usuario: UsuarioActor | undefined, tenantId: string) {
+    const anterior = await this.obter(id, tenantId);
     if (!anterior) throw new AppError("Agendamento nao encontrado.", 404);
 
     await prisma.$executeRaw(Prisma.sql`
       UPDATE agendamento
       SET status = 'Cancelado', observacao_interna = ${trimOrUndefined(motivo) ?? anterior.observacao_interna}, atualizado_em = NOW()
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
 
-    const atual = await this.obter(id);
-    await this.registrarLog(id, "cancelar", usuario, anterior, atual);
+    const atual = await this.obter(id, tenantId);
+    await this.registrarLog(id, "cancelar", usuario, tenantId, anterior, atual);
     return atual;
   }
 
-  async remarcar(id: bigint, input: AgendamentoRemarcacaoInput, usuario?: UsuarioActor) {
-    const anterior = await this.obter(id);
+  async remarcar(id: bigint, input: AgendamentoRemarcacaoInput, usuario: UsuarioActor | undefined, tenantId: string) {
+    const anterior = await this.obter(id, tenantId);
     if (!anterior) throw new AppError("Agendamento nao encontrado.", 404);
 
     const conflitos = await this.listarConflitos({
@@ -694,7 +725,8 @@ export class AgendamentosRepository {
       profissionalNome: input.profissionalNome ?? anterior.profissional_nome,
       sala: input.sala ?? anterior.sala,
       recurso: input.recurso ?? anterior.recurso,
-      idIgnorar: id
+      idIgnorar: id,
+      tenantId
     });
 
     if (conflitos.length && !input.permitirConflito) {
@@ -714,15 +746,22 @@ export class AgendamentosRepository {
         observacao_interna = ${trimOrUndefined(input.motivo) ?? anterior.observacao_interna},
         atualizado_em = NOW()
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
 
-    const atual = await this.obter(id);
-    await this.registrarLog(id, "remarcar", usuario, anterior, atual);
+    const atual = await this.obter(id, tenantId);
+    await this.registrarLog(id, "remarcar", usuario, tenantId, anterior, atual);
     return atual;
   }
 
-  async confirmar(id: bigint, canal: string | null | undefined, observacao: string | null | undefined, usuario?: UsuarioActor) {
-    const anterior = await this.obter(id);
+  async confirmar(
+    id: bigint,
+    canal: string | null | undefined,
+    observacao: string | null | undefined,
+    usuario: UsuarioActor | undefined,
+    tenantId: string
+  ) {
+    const anterior = await this.obter(id, tenantId);
     if (!anterior) throw new AppError("Agendamento nao encontrado.", 404);
 
     await prisma.$executeRaw(Prisma.sql`
@@ -735,15 +774,16 @@ export class AgendamentosRepository {
         confirmado_por_nome = ${trimOrUndefined(usuario?.nome ?? usuario?.nomeUsuario)},
         atualizado_em = NOW()
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
 
-    const atual = await this.obter(id);
-    await this.registrarLog(id, "confirmar", usuario, anterior, atual);
+    const atual = await this.obter(id, tenantId);
+    await this.registrarLog(id, "confirmar", usuario, tenantId, anterior, atual);
     return atual;
   }
 
-  async checkIn(id: bigint, input: AgendamentoCheckInInput, usuario?: UsuarioActor) {
-    const anterior = await this.obter(id);
+  async checkIn(id: bigint, input: AgendamentoCheckInInput, usuario: UsuarioActor | undefined, tenantId: string) {
+    const anterior = await this.obter(id, tenantId);
     if (!anterior) throw new AppError("Agendamento nao encontrado.", 404);
 
     const statusFinal =
@@ -768,15 +808,21 @@ export class AgendamentosRepository {
         observacao_interna = ${trimOrUndefined(input.observacao) ?? anterior.observacao_interna},
         atualizado_em = NOW()
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
 
-    const atual = await this.obter(id);
-    await this.registrarLog(id, "check_in", usuario, anterior, atual);
+    const atual = await this.obter(id, tenantId);
+    await this.registrarLog(id, "check_in", usuario, tenantId, anterior, atual);
     return atual;
   }
 
-  private async inserirCentralAtendimentoSeNecessario(agendamentoId: bigint, payload: AgendamentoConclusaoInput, usuario?: UsuarioActor) {
-    const atual = await this.obter(agendamentoId);
+  private async inserirCentralAtendimentoSeNecessario(
+    agendamentoId: bigint,
+    payload: AgendamentoConclusaoInput,
+    usuario: UsuarioActor | undefined,
+    tenantId: string
+  ) {
+    const atual = await this.obter(agendamentoId, tenantId);
     if (!atual) throw new AppError("Agendamento nao encontrado.", 404);
     if (atual.central_atendimento_id) return atual.central_atendimento_id;
 
@@ -813,15 +859,16 @@ export class AgendamentosRepository {
       UPDATE agendamento
       SET central_atendimento_id = ${centralId}, atualizado_em = NOW()
       WHERE id = ${agendamentoId}
+        AND tenant_id::text = ${tenantId}
     `);
 
     return centralId;
   }
 
-  async concluir(id: bigint, input: AgendamentoConclusaoInput, usuario?: UsuarioActor) {
-    const anterior = await this.obter(id);
+  async concluir(id: bigint, input: AgendamentoConclusaoInput, usuario: UsuarioActor | undefined, tenantId: string) {
+    const anterior = await this.obter(id, tenantId);
     if (!anterior) throw new AppError("Agendamento nao encontrado.", 404);
-    const centralId = await this.inserirCentralAtendimentoSeNecessario(id, input, usuario);
+    const centralId = await this.inserirCentralAtendimentoSeNecessario(id, input, usuario, tenantId);
 
     await prisma.$executeRaw(Prisma.sql`
       UPDATE agendamento
@@ -838,19 +885,21 @@ export class AgendamentosRepository {
         central_atendimento_id = ${centralId},
         atualizado_em = NOW()
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
 
-    const atual = await this.obter(id);
-    await this.registrarLog(id, "concluir", usuario, anterior, atual);
+    const atual = await this.obter(id, tenantId);
+    await this.registrarLog(id, "concluir", usuario, tenantId, anterior, atual);
     await this.registrarHistoricoFamilia(atual?.familia_id, "Atendimento concluído para a família.", atual);
     return atual;
   }
 
-  async listarListaEspera() {
+  async listarListaEspera(tenantId: string) {
     await this.ensureEstrutura();
     return prisma.$queryRaw<AgendamentoListaEsperaRow[]>(Prisma.sql`
       SELECT *
       FROM agendamento_lista_espera
+      WHERE tenant_id::text = ${tenantId}
       ORDER BY
         CASE prioridade
           WHEN 'Urgencia' THEN 1
@@ -863,13 +912,14 @@ export class AgendamentosRepository {
     `);
   }
 
-  async criarListaEspera(input: AgendamentoListaEsperaInput) {
+  async criarListaEspera(input: AgendamentoListaEsperaInput, tenantId: string) {
     await this.ensureEstrutura();
     const inserted = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
       INSERT INTO agendamento_lista_espera (
-        beneficiario_id, beneficiario_nome, familia_id, familia_nome, unidade, setor, tipo_atendimento,
+        tenant_id, beneficiario_id, beneficiario_nome, familia_id, familia_nome, unidade, setor, tipo_atendimento,
         profissional_preferencial, faixa_horario_preferida, prioridade, motivo, observacao, data_entrada, encaixe_automatico
       ) VALUES (
+        ${tenantId}::uuid,
         ${input.beneficiarioId ? BigInt(input.beneficiarioId) : null},
         ${input.beneficiarioNome},
         ${input.familiaId ? BigInt(input.familiaId) : null},
@@ -889,32 +939,33 @@ export class AgendamentosRepository {
 
     const id = inserted[0]?.id;
     const rows = await prisma.$queryRaw<AgendamentoListaEsperaRow[]>(Prisma.sql`
-      SELECT * FROM agendamento_lista_espera WHERE id = ${id}
+      SELECT * FROM agendamento_lista_espera WHERE id = ${id} AND tenant_id::text = ${tenantId}
     `);
     return rows[0] ?? null;
   }
 
-  async converterListaEspera(id: bigint, input: AgendamentoInput, usuario?: UsuarioActor) {
-    const created = await this.criar({ ...input, permitirConflito: input.permitirConflito ?? false }, usuario);
+  async converterListaEspera(id: bigint, input: AgendamentoInput, usuario: UsuarioActor | undefined, tenantId: string) {
+    const created = await this.criar({ ...input, permitirConflito: input.permitirConflito ?? false }, usuario, tenantId);
     if (!created) throw new AppError("Nao foi possivel converter a lista de espera.", 500);
 
     await prisma.$executeRaw(Prisma.sql`
       UPDATE agendamento_lista_espera
       SET convertido_agendamento_id = ${BigInt(created.id)}, atualizado_em = NOW()
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
 
     return created;
   }
 
-  private async montarPayloadOperacional(input: AgendamentoOperacionalInput): Promise<AgendamentoInput> {
-    const itens = await this.listarItensOperacionais(input.tipo);
+  private async montarPayloadOperacional(input: AgendamentoOperacionalInput, tenantId: string): Promise<AgendamentoInput> {
+    const itens = await this.listarItensOperacionais(input.tipo, undefined, tenantId);
     const item = itens.find((entry) => Number(entry.id) === input.itemId);
     if (!item) {
       throw new AppError("Item de inscricao nao encontrado para agendamento.", 404);
     }
 
-    const beneficiarios = await this.listarBeneficiariosOperacionais(BigInt(input.itemId));
+    const beneficiarios = await this.listarBeneficiariosOperacionais(BigInt(input.itemId), tenantId);
     const idsMatriculas = new Set(input.matriculasIds ?? []);
     const idsBeneficiarios = new Set(input.beneficiariosIds ?? []);
     const usarMatriculas = idsMatriculas.size > 0;
@@ -971,22 +1022,25 @@ export class AgendamentosRepository {
     };
   }
 
-  async criarOperacional(input: AgendamentoOperacionalInput, usuario?: UsuarioActor) {
-    const payload = await this.montarPayloadOperacional(input);
-    return this.criar(payload, usuario);
+  async criarOperacional(input: AgendamentoOperacionalInput, usuario: UsuarioActor | undefined, tenantId: string) {
+    const payload = await this.montarPayloadOperacional(input, tenantId);
+    return this.criar(payload, usuario, tenantId);
   }
 
-  async atualizarOperacional(id: bigint, input: AgendamentoOperacionalInput, usuario?: UsuarioActor) {
-    const payload = await this.montarPayloadOperacional(input);
-    return this.atualizar(id, payload, usuario);
+  async atualizarOperacional(id: bigint, input: AgendamentoOperacionalInput, usuario: UsuarioActor | undefined, tenantId: string) {
+    const payload = await this.montarPayloadOperacional(input, tenantId);
+    return this.atualizar(id, payload, usuario, tenantId);
   }
 
-  async notificar(id: bigint, canal: AgendamentoEnvioCanal, usuario?: UsuarioActor) {
-    const agendamento = await this.obter(id);
+  async notificar(id: bigint, canal: AgendamentoEnvioCanal, usuario: UsuarioActor | undefined, tenantId: string) {
+    const agendamento = await this.obter(id, tenantId);
     if (!agendamento) throw new AppError("Agendamento nao encontrado.", 404);
 
     const beneficiarios = await prisma.$queryRaw<AgendamentoBeneficiarioRow[]>(Prisma.sql`
-      SELECT * FROM agendamento_beneficiario WHERE agendamento_id = ${id} ORDER BY beneficiario_nome ASC
+      SELECT * FROM agendamento_beneficiario
+      WHERE agendamento_id = ${id}
+        AND tenant_id::text = ${tenantId}
+      ORDER BY beneficiario_nome ASC
     `);
     if (!beneficiarios.length) {
       throw new AppError("Este agendamento nao possui beneficiarios vinculados.", 400);
@@ -1020,8 +1074,8 @@ export class AgendamentosRepository {
         });
         resultado.enviados += 1;
         await prisma.$executeRaw(Prisma.sql`
-          INSERT INTO agendamento_envio (agendamento_id, beneficiario_id, canal, status, destinatario, mensagem)
-          VALUES (${id}, ${beneficiario.beneficiario_id}, 'EMAIL', 'ENVIADO', ${beneficiario.email}, ${mensagemBase})
+          INSERT INTO agendamento_envio (tenant_id, agendamento_id, beneficiario_id, canal, status, destinatario, mensagem)
+          VALUES (${tenantId}::uuid, ${id}, ${beneficiario.beneficiario_id}, 'EMAIL', 'ENVIADO', ${beneficiario.email}, ${mensagemBase})
         `);
         continue;
       }
@@ -1037,17 +1091,17 @@ export class AgendamentosRepository {
       resultado.links.push(link);
       resultado.enviados += 1;
       await prisma.$executeRaw(Prisma.sql`
-        INSERT INTO agendamento_envio (agendamento_id, beneficiario_id, canal, status, destinatario, mensagem)
-        VALUES (${id}, ${beneficiario.beneficiario_id}, 'WHATSAPP', 'PREPARADO', ${telefone}, ${texto})
+        INSERT INTO agendamento_envio (tenant_id, agendamento_id, beneficiario_id, canal, status, destinatario, mensagem)
+        VALUES (${tenantId}::uuid, ${id}, ${beneficiario.beneficiario_id}, 'WHATSAPP', 'PREPARADO', ${telefone}, ${texto})
       `);
     }
 
-    await this.registrarLog(id, "envio", usuario, null, resultado);
+    await this.registrarLog(id, "envio", usuario, tenantId, null, resultado);
     return resultado;
   }
 
-  async indicadores(filtros: AgendamentoFiltros) {
-    const rows = await this.listar(filtros);
+  async indicadores(filtros: AgendamentoFiltros, tenantId: string) {
+    const rows = await this.listar(filtros, tenantId);
     const hoje = new Date().toISOString().slice(0, 10);
     return {
       totalNoPeriodo: rows.length,
@@ -1063,32 +1117,46 @@ export class AgendamentosRepository {
     };
   }
 
-  async catalogos() {
+  async catalogos(tenantId: string) {
     await this.ensureEstrutura();
     const [unidades, setores, profissionais, tipos, salas, recursos] = await Promise.all([
-      prisma.$queryRaw<Array<{ nome_fantasia: string | null }>>(Prisma.sql`SELECT nome_fantasia FROM unidade_assistencial ORDER BY nome_fantasia ASC`),
+      prisma.$queryRaw<Array<{ nome_fantasia: string | null }>>(Prisma.sql`
+        SELECT nome_fantasia
+        FROM unidade_assistencial
+        WHERE tenant_id::text = ${tenantId}
+        ORDER BY nome_fantasia ASC
+      `),
       prisma.$queryRaw<Array<{ setor: string | null }>>(Prisma.sql`
         SELECT DISTINCT NULLIF(TRIM(setor), '') AS setor
         FROM usuario
-        WHERE NULLIF(TRIM(setor), '') IS NOT NULL
+        WHERE tenant_id::text = ${tenantId}
+          AND NULLIF(TRIM(setor), '') IS NOT NULL
         ORDER BY setor ASC
       `),
       prisma.$queryRaw<Array<{ nome_completo: string | null }>>(Prisma.sql`
         SELECT nome_completo
         FROM cadastro_profissional
+        WHERE tenant_id::text = ${tenantId}
         ORDER BY nome_completo ASC
       `),
       prisma.$queryRaw<Array<{ tipo_atendimento: string | null }>>(Prisma.sql`
         SELECT DISTINCT NULLIF(TRIM(tipo_atendimento), '') AS tipo_atendimento
         FROM central_atendimento
-        WHERE NULLIF(TRIM(tipo_atendimento), '') IS NOT NULL
+        WHERE tenant_id::text = ${tenantId}
+          AND NULLIF(TRIM(tipo_atendimento), '') IS NOT NULL
         ORDER BY tipo_atendimento ASC
       `),
-      prisma.$queryRaw<Array<{ nome: string | null }>>(Prisma.sql`SELECT nome FROM salas ORDER BY nome ASC`),
+      prisma.$queryRaw<Array<{ nome: string | null }>>(Prisma.sql`
+        SELECT nome
+        FROM salas
+        WHERE tenant_id::text = ${tenantId}
+        ORDER BY nome ASC
+      `),
       prisma.$queryRaw<Array<{ descricao: string | null }>>(Prisma.sql`
         SELECT DISTINCT NULLIF(TRIM(descricao), '') AS descricao
         FROM item_almoxarifado
-        WHERE NULLIF(TRIM(descricao), '') IS NOT NULL
+        WHERE tenant_id::text = ${tenantId}
+          AND NULLIF(TRIM(descricao), '') IS NOT NULL
         ORDER BY descricao ASC
         LIMIT 100
       `)

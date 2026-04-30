@@ -41,8 +41,8 @@ export class ChecklistDiarioController {
     return response.json(await service.reabrir(request.params.id, request.body, request.authUser!));
   }
 
-  async listarModelos(_request: AuthenticatedRequest, response: Response) {
-    return response.json(await service.listarModelos());
+  async listarModelos(request: AuthenticatedRequest, response: Response) {
+    return response.json(await service.listarModelos(request.authUser!));
   }
 
   async criarModelo(request: AuthenticatedRequest, response: Response) {
@@ -66,8 +66,8 @@ export class ChecklistDiarioController {
     return response.json(await service.gerarSemana(request.body, request.authUser!));
   }
 
-  async obterConfiguracao(_request: AuthenticatedRequest, response: Response) {
-    return response.json(await service.obterConfiguracao());
+  async obterConfiguracao(request: AuthenticatedRequest, response: Response) {
+    return response.json(await service.obterConfiguracao(request.authUser!));
   }
 
   async atualizarConfiguracao(request: AuthenticatedRequest, response: Response) {

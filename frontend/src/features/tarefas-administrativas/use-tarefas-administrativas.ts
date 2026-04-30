@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
 import { tarefasAdministrativasService } from "@/services/tarefas-administrativas.service";
 import type { TarefaAdministrativaPayload } from "@/types/tarefa-administrativa";
 
@@ -7,8 +8,9 @@ type ResumoQueryOptions = {
 };
 
 export function useTarefasAdministrativas(options?: ResumoQueryOptions) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["tarefas-administrativas"],
+    queryKey: ["tarefas-administrativas", usuario?.tenant_id ?? "sem-tenant"],
     queryFn: () => tarefasAdministrativasService.listar(),
     enabled: options?.enabled ?? true,
     staleTime: 60_000
@@ -16,8 +18,9 @@ export function useTarefasAdministrativas(options?: ResumoQueryOptions) {
 }
 
 export function useResumoTarefasAdministrativas(options?: ResumoQueryOptions) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["tarefas-administrativas", "resumo"],
+    queryKey: ["tarefas-administrativas", "resumo", usuario?.tenant_id ?? "sem-tenant"],
     queryFn: () => tarefasAdministrativasService.obterResumo(),
     enabled: options?.enabled ?? true,
     staleTime: 60_000,
@@ -26,8 +29,9 @@ export function useResumoTarefasAdministrativas(options?: ResumoQueryOptions) {
 }
 
 export function useTarefaAdministrativa(id?: string) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["tarefas-administrativas", id ?? ""],
+    queryKey: ["tarefas-administrativas", usuario?.tenant_id ?? "sem-tenant", id ?? ""],
     queryFn: () => tarefasAdministrativasService.buscarPorId(id as string),
     enabled: !!id
   });

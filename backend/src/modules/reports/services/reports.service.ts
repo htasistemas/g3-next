@@ -41,6 +41,15 @@ type RelatorioResultado = {
   filename: string;
 };
 
+type AuthUser = {
+  id?: string;
+  nome?: string;
+  nomeUsuario?: string;
+  tenant_id?: string;
+  instituicao_id?: string;
+  permissoes?: string[];
+};
+
 type BeneficiarioFicha = Awaited<ReturnType<BeneficiarioService["buscarPorId"]>>;
 type ProfissionalFicha = Awaited<ReturnType<ProfissionalService["buscarPorId"]>>;
 type VoluntarioFicha = Awaited<ReturnType<VoluntarioService["buscarPorId"]>>;
@@ -81,8 +90,8 @@ export class ReportsService {
     minute: "2-digit"
   });
 
-  private async montarContextoInstitucional() {
-    const instituicao = await this.repository.obterInstituicaoRelatorio();
+  private async montarContextoInstitucional(rawTenantId?: string) {
+    const instituicao = await this.repository.obterInstituicaoRelatorio(this.parseTenant(rawTenantId));
 
     const cnpj = instituicao.cnpj ? `CNPJ: ${instituicao.cnpj}` : "CNPJ: Não informado";
     const endereco = instituicao.enderecoCompleto || "Endereço: Não informado";
@@ -101,6 +110,14 @@ export class ReportsService {
         linha3: site ? `${telefone} | ${email} | ${site}` : `${telefone} | ${email}`
       }
     };
+  }
+
+  private parseTenant(rawTenantId?: string) {
+    const tenantId = rawTenantId?.trim();
+    if (!tenantId) {
+      throw new AppError("Tenant da sessao nao identificado.", 401);
+    }
+    return tenantId;
   }
 
   private normalizarTexto(valor?: string | number | null): string | undefined {
@@ -484,15 +501,16 @@ export class ReportsService {
       ])
     ].filter((bloco): bloco is RelatorioBloco => !!bloco);
   }
-  async gerarRelacaoBeneficiarios(rawPayload: unknown): Promise<RelatorioResultado> {
+  async gerarRelacaoBeneficiarios(rawPayload: unknown, authUser?: AuthUser): Promise<RelatorioResultado> {
     const payload = beneficiarioRelacaoRequestSchema.parse(rawPayload);
+    const tenantId = this.parseTenant(authUser?.tenant_id);
     const beneficiarios = await this.beneficiarioService.listar({
       nome: payload.nome,
       cpf: payload.cpf,
       codigo: payload.codigo,
       status: payload.status,
       data_nascimento: payload.dataNascimento
-    });
+    }, tenantId);
 
     const listaOrdenada = [...beneficiarios].sort((a, b) => {
       const nomeA = (a.nome_completo || "").toLowerCase();
@@ -500,7 +518,7 @@ export class ReportsService {
       return nomeA.localeCompare(nomeB);
     });
 
-    const contexto = await this.montarContextoInstitucional();
+    const contexto = await this.montarContextoInstitucional(tenantId);
     const relatorioInput: RelatorioHtmlInput = {
       titulo: "Relação de Beneficiários",
       metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),
@@ -530,10 +548,11 @@ export class ReportsService {
     return { html, pdf, filename: "relacao-beneficiarios.pdf" };
   }
 
-  async gerarFichaBeneficiario(rawPayload: unknown): Promise<RelatorioResultado> {
+  async gerarFichaBeneficiario(rawPayload: unknown, authUser?: AuthUser): Promise<RelatorioResultado> {
     const payload = beneficiarioFichaRequestSchema.parse(rawPayload);
-    const beneficiario = await this.beneficiarioService.buscarPorId(payload.beneficiarioId);
-    const contexto = await this.montarContextoInstitucional();
+    const tenantId = this.parseTenant(authUser?.tenant_id);
+    const beneficiario = await this.beneficiarioService.buscarPorId(payload.beneficiarioId, tenantId);
+    const contexto = await this.montarContextoInstitucional(tenantId);
 
     const relatorioInput: RelatorioHtmlInput = {
       titulo: "Ficha Cadastral de Beneficiário",
@@ -550,7 +569,7 @@ export class ReportsService {
     return { html, pdf, filename: "ficha-beneficiario.pdf" };
   }
 
-  async gerarRelacaoProfissionais(rawPayload: unknown): Promise<RelatorioResultado> {
+  async gerarRelacaoProfissionais(rawPayload: unknown, authUser?: AuthUser): Promise<RelatorioResultado> {
     const payload = profissionalRelacaoRequestSchema.parse(rawPayload);
     const profissionais = await this.profissionalService.listar({
       nome: payload.nome,
@@ -564,7 +583,7 @@ export class ReportsService {
       (a.nome_completo || "").toLowerCase().localeCompare((b.nome_completo || "").toLowerCase())
     );
 
-    const contexto = await this.montarContextoInstitucional();
+    const contexto = await this.montarContextoInstitucional(authUser?.tenant_id);
     const relatorioInput: RelatorioHtmlInput = {
       titulo: "Relacao de Profissionais",
       metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),
@@ -596,10 +615,10 @@ export class ReportsService {
     return { html, pdf, filename: "relacao-profissionais.pdf" };
   }
 
-  async gerarFichaProfissional(rawPayload: unknown): Promise<RelatorioResultado> {
+  async gerarFichaProfissional(rawPayload: unknown, authUser?: AuthUser): Promise<RelatorioResultado> {
     const payload = profissionalFichaRequestSchema.parse(rawPayload);
     const profissional = await this.profissionalService.buscarPorId(payload.profissionalId);
-    const contexto = await this.montarContextoInstitucional();
+    const contexto = await this.montarContextoInstitucional(authUser?.tenant_id);
 
     const relatorioInput: RelatorioHtmlInput = {
       titulo: "Ficha Cadastral de Profissional",
@@ -615,7 +634,7 @@ export class ReportsService {
     return { html, pdf, filename: "ficha-profissional.pdf" };
   }
 
-  async gerarRelacaoVoluntarios(rawPayload: unknown): Promise<RelatorioResultado> {
+  async gerarRelacaoVoluntarios(rawPayload: unknown, authUser?: AuthUser): Promise<RelatorioResultado> {
     const payload = voluntarioRelacaoRequestSchema.parse(rawPayload);
     const voluntarios = await this.voluntarioService.listar({
       nome: payload.nome,
@@ -628,7 +647,7 @@ export class ReportsService {
       (a.nome_completo || "").toLowerCase().localeCompare((b.nome_completo || "").toLowerCase())
     );
 
-    const contexto = await this.montarContextoInstitucional();
+    const contexto = await this.montarContextoInstitucional(authUser?.tenant_id);
     const relatorioInput: RelatorioHtmlInput = {
       titulo: "Relacao de Voluntarios",
       metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),
@@ -660,21 +679,22 @@ export class ReportsService {
     return { html, pdf, filename: "relacao-voluntarios.pdf" };
   }
 
-  async gerarRelacaoMatriculas(rawPayload: unknown): Promise<RelatorioResultado> {
+  async gerarRelacaoMatriculas(rawPayload: unknown, authUser?: AuthUser): Promise<RelatorioResultado> {
     const payload = matriculasRelacaoRequestSchema.parse(rawPayload);
+    const tenantId = this.parseTenant(authUser?.tenant_id);
     const matriculas = await this.matriculaService.listar({
       nome: payload.nome,
       tipo: payload.tipo,
       status: payload.status,
       profissional: payload.profissional,
       beneficiario: payload.beneficiario
-    });
+    }, tenantId);
 
     const listaOrdenada = [...matriculas].sort((a, b) =>
       (a.nome || "").toLowerCase().localeCompare((b.nome || "").toLowerCase())
     );
 
-    const contexto = await this.montarContextoInstitucional();
+    const contexto = await this.montarContextoInstitucional(tenantId);
     const relatorioInput: RelatorioHtmlInput = {
       titulo: "Relacao de Matriculas",
       metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),
@@ -708,10 +728,11 @@ export class ReportsService {
     return { html, pdf, filename: "relacao-matriculas.pdf" };
   }
 
-  async gerarListaPresencaMatricula(rawPayload: unknown): Promise<RelatorioResultado> {
+  async gerarListaPresencaMatricula(rawPayload: unknown, authUser?: AuthUser): Promise<RelatorioResultado> {
     const payload = matriculaListaPresencaRequestSchema.parse(rawPayload);
-    const matricula = await this.matriculaService.buscarPorId(payload.matriculaId);
-    const contexto = await this.montarContextoInstitucional();
+    const tenantId = this.parseTenant(authUser?.tenant_id);
+    const matricula = await this.matriculaService.buscarPorId(payload.matriculaId, tenantId);
+    const contexto = await this.montarContextoInstitucional(tenantId);
     const participantes = [...(matricula.matriculas ?? [])]
       .filter((item) => (item.status ?? "ATIVO").trim().toUpperCase() !== "CANCELADO")
       .sort((a, b) => (a.beneficiario_nome || "").localeCompare(b.beneficiario_nome || "", "pt-BR"));
@@ -832,9 +853,9 @@ export class ReportsService {
     };
   }
 
-  async gerarComprovanteMatricula(rawPayload: unknown): Promise<RelatorioResultado> {
+  async gerarComprovanteMatricula(rawPayload: unknown, authUser?: AuthUser): Promise<RelatorioResultado> {
     const payload = comprovanteMatriculaRequestSchema.parse(rawPayload);
-    const contexto = await this.montarContextoInstitucional();
+    const contexto = await this.montarContextoInstitucional(authUser?.tenant_id);
 
     const relatorioInput: RelatorioHtmlInput = {
       titulo: "Comprovante de Matricula",
@@ -878,9 +899,9 @@ export class ReportsService {
     return { html, pdf, filename: "comprovante-matricula.pdf" };
   }
 
-  async gerarComprovantePreMatriculaEspera(rawPayload: unknown): Promise<RelatorioResultado> {
+  async gerarComprovantePreMatriculaEspera(rawPayload: unknown, authUser?: AuthUser): Promise<RelatorioResultado> {
     const payload = comprovantePreMatriculaEsperaRequestSchema.parse(rawPayload);
-    const contexto = await this.montarContextoInstitucional();
+    const contexto = await this.montarContextoInstitucional(authUser?.tenant_id);
 
     const relatorioInput: RelatorioHtmlInput = {
       titulo: "Comprovante de Pre-Matricula em Lista de Espera",
@@ -925,7 +946,7 @@ export class ReportsService {
     return { html, pdf, filename: "comprovante-pre-matricula-lista-espera.pdf" };
   }
 
-  async gerarRelacaoRegistroDoacao(rawPayload: unknown): Promise<RelatorioResultado> {
+  async gerarRelacaoRegistroDoacao(rawPayload: unknown, authUser?: AuthUser): Promise<RelatorioResultado> {
     const payload = registroDoacaoRelacaoRequestSchema.parse(rawPayload);
     const registros = await this.registroDoacaoService.listar({
       doador_nome: payload.doador_nome,
@@ -941,7 +962,7 @@ export class ReportsService {
       return dataB.localeCompare(dataA);
     });
 
-    const contexto = await this.montarContextoInstitucional();
+    const contexto = await this.montarContextoInstitucional(authUser?.tenant_id);
     const relatorioInput: RelatorioHtmlInput = {
       titulo: "Relacao de Registro de Doacao",
       metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),
@@ -985,7 +1006,7 @@ export class ReportsService {
     return { html, pdf, filename: "relacao-registro-doacao.pdf" };
   }
 
-  async gerarRelacaoDoacoesRealizadas(rawPayload: unknown): Promise<RelatorioResultado> {
+  async gerarRelacaoDoacoesRealizadas(rawPayload: unknown, authUser?: AuthUser): Promise<RelatorioResultado> {
     const payload = doacaoRealizadaRelacaoRequestSchema.parse(rawPayload);
     const doacoes = await this.doacaoRealizadaService.listar({
       beneficiario_nome: payload.beneficiario_nome,
@@ -1001,7 +1022,7 @@ export class ReportsService {
       return dataB.localeCompare(dataA);
     });
 
-    const contexto = await this.montarContextoInstitucional();
+    const contexto = await this.montarContextoInstitucional(authUser?.tenant_id);
     const relatorioInput: RelatorioHtmlInput = {
       titulo: "Relação de doações realizadas",
       metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),
@@ -1033,10 +1054,10 @@ export class ReportsService {
     return { html, pdf, filename: "relacao-doacoes-realizadas.pdf" };
   }
 
-  async gerarReciboDoacaoRealizada(rawPayload: unknown): Promise<RelatorioResultado> {
+  async gerarReciboDoacaoRealizada(rawPayload: unknown, authUser?: AuthUser): Promise<RelatorioResultado> {
     const payload = doacaoRealizadaReciboRequestSchema.parse(rawPayload);
     const doacao = await this.doacaoRealizadaService.buscarPorId(payload.doacaoRealizadaId);
-    const contexto = await this.montarContextoInstitucional();
+    const contexto = await this.montarContextoInstitucional(authUser?.tenant_id);
     const beneficiarioFamilia = doacao.beneficiario_nome || doacao.familia_nome || "---";
     const possuiBeneficiario = !!this.normalizarTexto(doacao.beneficiario_nome);
     const blocos = [
@@ -1107,10 +1128,10 @@ export class ReportsService {
     return { html, pdf, filename: `recibo-doacao-realizada-${doacao.id_doacao_realizada}.pdf` };
   }
 
-  async gerarFichaVoluntario(rawPayload: unknown): Promise<RelatorioResultado> {
+  async gerarFichaVoluntario(rawPayload: unknown, authUser?: AuthUser): Promise<RelatorioResultado> {
     const payload = voluntarioFichaRequestSchema.parse(rawPayload);
     const voluntario = await this.voluntarioService.buscarPorId(payload.voluntarioId);
-    const contexto = await this.montarContextoInstitucional();
+    const contexto = await this.montarContextoInstitucional(authUser?.tenant_id);
 
     const relatorioInput: RelatorioHtmlInput = {
       titulo: "Ficha Cadastral de Voluntario",
@@ -1126,9 +1147,9 @@ export class ReportsService {
     return { html, pdf, filename: "ficha-voluntario.pdf" };
   }
 
-  async gerarTermoAutorizacao(rawPayload: unknown): Promise<RelatorioResultado> {
+  async gerarTermoAutorizacao(rawPayload: unknown, authUser?: AuthUser): Promise<RelatorioResultado> {
     const payload = termoAutorizacaoRequestSchema.parse(rawPayload);
-    const contexto = await this.montarContextoInstitucional();
+    const contexto = await this.montarContextoInstitucional(authUser?.tenant_id);
 
     const nomeInstituicao = this.normalizarTexto(contexto.cabecalho.razaoSocial) ?? "Instituição não informada";
     const cnpjInstituicao =
@@ -1235,14 +1256,15 @@ export class ReportsService {
     const pdf = await this.renderer.render(html, contexto.rodape, relatorioInput);
     return { html, pdf, filename: "termo-consentimento-lgpd.pdf" };
   }
-  async gerarRelacaoUnidadesAssistenciais(rawPayload: unknown): Promise<RelatorioResultado> {
+  async gerarRelacaoUnidadesAssistenciais(rawPayload: unknown, authUser?: AuthUser): Promise<RelatorioResultado> {
     const payload = unidadeAssistencialRelacaoRequestSchema.parse(rawPayload);
+    const tenantId = this.parseTenant(authUser?.tenant_id);
     const unidades = await this.unidadeAssistencialService.listar({
       nome_fantasia: payload.nome_fantasia,
       cnpj: payload.cnpj,
       cidade: payload.cidade,
       unidade_principal: payload.unidade_principal
-    });
+    }, tenantId);
 
     const listaOrdenada = [...unidades].sort((a, b) => {
       const nomeA = (a.nome_fantasia || "").toLowerCase();
@@ -1250,7 +1272,7 @@ export class ReportsService {
       return nomeA.localeCompare(nomeB);
     });
 
-    const contexto = await this.montarContextoInstitucional();
+    const contexto = await this.montarContextoInstitucional(tenantId);
     const relatorioInput: RelatorioHtmlInput = {
       titulo: "Relação de Unidades Assistenciais",
       metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),
@@ -1293,6 +1315,7 @@ export class ReportsService {
 
   async gerarEspelhoPonto(rawPayload: unknown, authUser?: any): Promise<RelatorioResultado> {
     const payload = registroPontoEspelhoRequestSchema.parse(rawPayload);
+    const tenantId = this.parseTenant(authUser?.tenant_id);
     const usuarioIdRelatorio = authUser?.id ?? payload.usuario_id;
     if (!usuarioIdRelatorio) {
       throw new AppError("Informe o funcionario para gerar o espelho de ponto.", 400);
@@ -1301,6 +1324,7 @@ export class ReportsService {
     const ator = {
       id: BigInt(usuarioIdRelatorio),
       nomeUsuario: authUser?.nomeUsuario || payload.usuarioEmissor || "Sistema G3-Next",
+      tenant_id: tenantId,
       permissoes: authUser?.permissoes || ["ADMINISTRADOR"]
     };
 
@@ -1332,7 +1356,7 @@ export class ReportsService {
       fonteTamanhoCabecalho: 7
     };
 
-    const contexto = await this.montarContextoInstitucional();
+    const contexto = await this.montarContextoInstitucional(tenantId);
     const relatorioInput: RelatorioHtmlInput = {
       titulo: "Espelho de ponto individual",
       metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),

@@ -1,31 +1,39 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
 import { usuariosService } from "@/services/usuarios.service";
 import type { UsuarioFiltros, UsuarioPayload, UsuarioStatus } from "@/types/usuario";
 
 export function useUsuarios(filtros: UsuarioFiltros) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["usuarios", filtros],
-    queryFn: () => usuariosService.listar(filtros)
+    queryKey: ["usuarios", usuario?.tenant_id ?? "sem-tenant", filtros],
+    queryFn: () => usuariosService.listar(filtros),
+    enabled: !!usuario
   });
 }
 
 export function useUsuario(id?: string) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["usuario", id],
+    queryKey: ["usuario", usuario?.tenant_id ?? "sem-tenant", id],
     queryFn: () => usuariosService.buscarPorId(id as string),
-    enabled: !!id
+    enabled: !!usuario && !!id
   });
 }
 
 export function usePermissoesUsuarios() {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["usuarios", "permissoes"],
-    queryFn: () => usuariosService.listarPermissoes()
+    queryKey: ["usuarios", "permissoes", usuario?.tenant_id ?? "sem-tenant"],
+    queryFn: () => usuariosService.listarPermissoes(),
+    enabled: !!usuario
   });
 }
 
 export function useSalvarUsuario() {
+  const { usuario } = useAuth();
   const queryClient = useQueryClient();
+  const tenantKey = usuario?.tenant_id ?? "sem-tenant";
 
   return useMutation({
     mutationFn: async (payload: UsuarioPayload & { id_usuario?: string }) => {
@@ -38,28 +46,32 @@ export function useSalvarUsuario() {
     },
     onSuccess: async (resultado) => {
       const id = resultado.usuario.id_usuario;
-      await queryClient.invalidateQueries({ queryKey: ["usuarios"] });
-      await queryClient.invalidateQueries({ queryKey: ["usuario", id] });
+      await queryClient.invalidateQueries({ queryKey: ["usuarios", tenantKey] });
+      await queryClient.invalidateQueries({ queryKey: ["usuario", tenantKey, id] });
     }
   });
 }
 
 export function useAtualizarStatusUsuario() {
+  const { usuario } = useAuth();
   const queryClient = useQueryClient();
+  const tenantKey = usuario?.tenant_id ?? "sem-tenant";
 
   return useMutation({
     mutationFn: ({ id_usuario, status }: { id_usuario: string; status: UsuarioStatus }) =>
       usuariosService.atualizarStatus(id_usuario, status),
     onSuccess: async (resultado) => {
       const id = resultado.usuario.id_usuario;
-      await queryClient.invalidateQueries({ queryKey: ["usuarios"] });
-      await queryClient.invalidateQueries({ queryKey: ["usuario", id] });
+      await queryClient.invalidateQueries({ queryKey: ["usuarios", tenantKey] });
+      await queryClient.invalidateQueries({ queryKey: ["usuario", tenantKey, id] });
     }
   });
 }
 
 export function useResetarSenhaUsuario() {
+  const { usuario } = useAuth();
   const queryClient = useQueryClient();
+  const tenantKey = usuario?.tenant_id ?? "sem-tenant";
 
   return useMutation({
     mutationFn: (payload: {
@@ -75,21 +87,23 @@ export function useResetarSenhaUsuario() {
       }),
     onSuccess: async (resultado) => {
       const id = resultado.usuario.id_usuario;
-      await queryClient.invalidateQueries({ queryKey: ["usuarios"] });
-      await queryClient.invalidateQueries({ queryKey: ["usuario", id] });
+      await queryClient.invalidateQueries({ queryKey: ["usuarios", tenantKey] });
+      await queryClient.invalidateQueries({ queryKey: ["usuario", tenantKey, id] });
     }
   });
 }
 
 export function useRemoverUsuario() {
+  const { usuario } = useAuth();
   const queryClient = useQueryClient();
+  const tenantKey = usuario?.tenant_id ?? "sem-tenant";
 
   return useMutation({
     mutationFn: (id_usuario: string) => usuariosService.remover(id_usuario),
     onSuccess: async (resultado) => {
       const id = resultado.id_usuario;
-      await queryClient.invalidateQueries({ queryKey: ["usuarios"] });
-      await queryClient.removeQueries({ queryKey: ["usuario", id] });
+      await queryClient.invalidateQueries({ queryKey: ["usuarios", tenantKey] });
+      await queryClient.removeQueries({ queryKey: ["usuario", tenantKey, id] });
     }
   });
 }

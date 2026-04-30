@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
 import { centralAtendimentosService } from "@/services/central-atendimentos.service";
 import type {
   CentralAtendimentoForm,
@@ -13,17 +14,20 @@ function invalidarCentral(queryClient: ReturnType<typeof useQueryClient>, benefi
 }
 
 export function useCentralBuscaBeneficiarios(filtros: CentralBuscaBeneficiarioFiltro) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["central-atendimentos", "busca", filtros],
-    queryFn: () => centralAtendimentosService.buscarBeneficiarios(filtros)
+    queryKey: ["central-atendimentos", "busca", usuario?.tenant_id ?? "sem-tenant", filtros],
+    queryFn: () => centralAtendimentosService.buscarBeneficiarios(filtros),
+    enabled: !!usuario
   });
 }
 
 export function useCentralVisaoGeral(beneficiarioId?: string) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["central-atendimentos", "visao-geral", beneficiarioId],
+    queryKey: ["central-atendimentos", "visao-geral", usuario?.tenant_id ?? "sem-tenant", beneficiarioId],
     queryFn: () => centralAtendimentosService.obterVisaoGeral(String(beneficiarioId)),
-    enabled: Boolean(beneficiarioId)
+    enabled: !!usuario && Boolean(beneficiarioId)
   });
 }
 

@@ -1,17 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
 import { profissionaisService } from "@/services/profissionais.service";
 import type { Profissional, ProfissionalFiltro } from "@/types/profissional";
 
 export function useProfissionais(filtros: ProfissionalFiltro) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["profissionais", filtros],
+    queryKey: ["profissionais", usuario?.tenant_id ?? "sem-tenant", filtros],
     queryFn: () => profissionaisService.listar(filtros)
   });
 }
 
 export function useProfissional(id?: string) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["profissional", id],
+    queryKey: ["profissional", usuario?.tenant_id ?? "sem-tenant", id],
     queryFn: () => profissionaisService.buscarPorId(id as string),
     enabled: !!id
   });

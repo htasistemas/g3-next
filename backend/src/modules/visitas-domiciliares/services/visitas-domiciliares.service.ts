@@ -1,4 +1,4 @@
-﻿import { AppError } from "../../../shared/errors/app-error.js";
+import { AppError } from "../../../shared/errors/app-error.js";
 import { mapVisitaRowToResponse } from "../visitas-domiciliares.mapper.js";
 import { visitaDomiciliarInputSchema } from "../visitas-domiciliares.schema.js";
 import { VisitasDomiciliaresRepository } from "../repositories/visitas-domiciliares.repository.js";
@@ -6,27 +6,31 @@ import { VisitasDomiciliaresRepository } from "../repositories/visitas-domicilia
 export class VisitasDomiciliaresService {
   private readonly repository = new VisitasDomiciliaresRepository();
 
-  async listar() {
-    const rows = await this.repository.listar();
+  async listar(rawTenantId?: string) {
+    const tenantId = this.parseTenant(rawTenantId);
+    const rows = await this.repository.listar(tenantId);
     return rows.map(mapVisitaRowToResponse);
   }
 
-  async criar(rawInput: unknown) {
+  async criar(rawInput: unknown, rawTenantId?: string) {
     const input = visitaDomiciliarInputSchema.parse(rawInput);
-    const row = await this.repository.criar(input);
+    const tenantId = this.parseTenant(rawTenantId);
+    const row = await this.repository.criar(input, tenantId);
     return mapVisitaRowToResponse(row);
   }
 
-  async atualizar(rawId: string, rawInput: unknown) {
+  async atualizar(rawId: string, rawInput: unknown, rawTenantId?: string) {
     const id = this.parseId(rawId);
     const input = visitaDomiciliarInputSchema.parse(rawInput);
-    const row = await this.repository.atualizar(id, input);
+    const tenantId = this.parseTenant(rawTenantId);
+    const row = await this.repository.atualizar(id, input, tenantId);
     return mapVisitaRowToResponse(row);
   }
 
-  async remover(rawId: string) {
+  async remover(rawId: string, rawTenantId?: string) {
     const id = this.parseId(rawId);
-    await this.repository.remover(id);
+    const tenantId = this.parseTenant(rawTenantId);
+    await this.repository.remover(id, tenantId);
   }
 
   private parseId(rawId: string): bigint {
@@ -35,5 +39,13 @@ export class VisitasDomiciliaresService {
       throw new AppError("Identificador invalido.", 400);
     }
     return BigInt(parsed);
+  }
+
+  private parseTenant(rawTenantId?: string) {
+    const tenantId = rawTenantId?.trim();
+    if (!tenantId) {
+      throw new AppError("Tenant da sessao nao identificado.", 401);
+    }
+    return tenantId;
   }
 }

@@ -285,6 +285,8 @@ export class RegistroPontoRepository {
     }
 
     where.push(Prisma.sql`AND r.usuario_id = ${usuarioIdFiltro}`);
+    where.push(Prisma.sql`AND r.tenant_id::text = ${ator.tenant_id}`);
+    where.push(Prisma.sql`AND u.tenant_id::text = ${ator.tenant_id}`);
 
     if (filters.data_inicial) {
       where.push(Prisma.sql`AND r.data_referencia >= ${new Date(`${filters.data_inicial}T00:00:00.000Z`)}`);
@@ -435,7 +437,7 @@ export class RegistroPontoRepository {
     return { registros, totais };
   }
 
-  async listarUsuarios(termo?: string) {
+  async listarUsuarios(termo: string | undefined, tenantId: string) {
     await ensureRegistroPontoEstrutura(prisma);
 
     const whereTermo = termo?.trim();
@@ -448,6 +450,7 @@ export class RegistroPontoRepository {
         u.unidade
       FROM usuarios u
       WHERE COALESCE(u.status, 'ATIVO') <> 'INATIVO'
+        AND u.tenant_id::text = ${tenantId}
         AND (
           ${whereTermo ? Prisma.sql`u.nome ILIKE ${`%${whereTermo}%`} OR u.nome_usuario ILIKE ${`%${whereTermo}%`}` : Prisma.sql`TRUE`}
         )
@@ -465,7 +468,7 @@ export class RegistroPontoRepository {
       throw new AppError("Usuario autenticado invalido.", 401);
     }
 
-    const usuario = await this.buscarHorarioUsuarioTx(prisma, ator.id);
+    const usuario = await this.buscarHorarioUsuarioTx(prisma, ator.id, ator.tenant_id);
     if (!usuario) {
       throw new AppError("Usuario autenticado nao encontrado.", 404);
     }
@@ -496,7 +499,7 @@ export class RegistroPontoRepository {
     }
 
     return prisma.$transaction(async (tx) => {
-      const antes = await this.buscarHorarioUsuarioTx(tx, ator.id as bigint);
+      const antes = await this.buscarHorarioUsuarioTx(tx, ator.id as bigint, ator.tenant_id);
       if (!antes) {
         throw new AppError("Usuario autenticado nao encontrado.", 404);
       }
@@ -511,7 +514,7 @@ export class RegistroPontoRepository {
         WHERE id = ${ator.id}
       `);
 
-      const depois = await this.buscarHorarioUsuarioTx(tx, ator.id as bigint);
+      const depois = await this.buscarHorarioUsuarioTx(tx, ator.id as bigint, ator.tenant_id);
       if (!depois) {
         throw new AppError("Usuario autenticado nao encontrado.", 404);
       }
@@ -559,7 +562,7 @@ export class RegistroPontoRepository {
     }
     const agoraBrasilia = obterCarimboBrasilia();
 
-    const usuario = await this.buscarHorarioUsuarioTx(prisma, ator.id);
+    const usuario = await this.buscarHorarioUsuarioTx(prisma, ator.id, ator.tenant_id);
     if (!usuario) {
       throw new AppError("Usuario autenticado nao encontrado.", 404);
     }
@@ -574,7 +577,7 @@ export class RegistroPontoRepository {
       return { exibir_alerta: false };
     }
 
-    const [registroHoje] = await prisma.$queryRaw<RegistroLinha[]>(Prisma.sql`
+      const [registroHoje] = await prisma.$queryRaw<RegistroLinha[]>(Prisma.sql`
       SELECT
         id,
         usuario_id,
@@ -586,6 +589,7 @@ export class RegistroPontoRepository {
         observacoes
       FROM registro_ponto
       WHERE usuario_id = ${ator.id}
+        AND tenant_id::text = ${ator.tenant_id}
         AND data_referencia = CAST(${agoraBrasilia.data} AS DATE)
       LIMIT 1
     `);
@@ -629,7 +633,7 @@ export class RegistroPontoRepository {
     }
 
     return prisma.$transaction(async (tx) => {
-      const usuario = await this.buscarContextoUsuarioTx(tx, ator.id as bigint);
+      const usuario = await this.buscarContextoUsuarioTx(tx, ator.id as bigint, ator.tenant_id);
       if (!usuario) {
         throw new AppError("Usuario autenticado nao encontrado.", 404);
       }
@@ -659,11 +663,12 @@ export class RegistroPontoRepository {
       const registroId = await this.ensureRegistroHojeTx(
         tx,
         ator.id as bigint,
+        ator.tenant_id,
         usuario.unidade_id ?? null
       );
 
-      const _registro = await this.buscarRegistroParaAtualizacaoTx(tx, registroId);
-      const batidas = await this.listarBatidasTx(tx, registroId);
+      const _registro = await this.buscarRegistroParaAtualizacaoTx(tx, registroId, ator.tenant_id);
+      const batidas = await this.listarBatidasTx(tx, registroId, ator.tenant_id);
 
       if (batidas.length >= 4) {
         throw new AppError("Limite de marcacoes do dia atingido.", 409);
@@ -697,6 +702,7 @@ export class RegistroPontoRepository {
       const insertedBatida = await tx.$queryRaw<{ id: bigint }[]>(Prisma.sql`
         INSERT INTO registro_ponto_batida (
           registro_ponto_id,
+          tenant_id,
           sequencia,
           tipo,
           horario_servidor,
@@ -710,6 +716,7 @@ export class RegistroPontoRepository {
           criado_em
         ) VALUES (
           ${registroId},
+          ${ator.tenant_id},
           ${sequencia},
           ${tipo},
           CAST(${agoraBrasilia.timestamp} AS TIMESTAMP),
@@ -726,7 +733,7 @@ export class RegistroPontoRepository {
 
       const batidaId = insertedBatida[0]?.id ?? null;
 
-      await this.recalcularTotaisTx(tx, registroId, usuario.horario_funcionamento);
+      await this.recalcularTotaisTx(tx, registroId, ator.tenant_id, usuario.horario_funcionamento);
 
       await this.registrarAuditoriaTx(tx, {
         registro_ponto_id: registroId,
@@ -755,7 +762,7 @@ export class RegistroPontoRepository {
         }
       });
 
-      const listaRow = await this.buscarListaRowPorIdTx(tx, registroId);
+      const listaRow = await this.buscarListaRowPorIdTx(tx, registroId, ator.tenant_id);
       if (!listaRow) {
         throw new AppError("Nao foi possivel atualizar o espelho de ponto.", 500);
       }
@@ -787,7 +794,7 @@ export class RegistroPontoRepository {
     const registroId = this.parseId(registroIdRaw, "Registro de ponto");
 
     return prisma.$transaction(async (tx) => {
-      const registroAtual = await this.buscarRegistroParaAtualizacaoTx(tx, registroId);
+      const registroAtual = await this.buscarRegistroParaAtualizacaoTx(tx, registroId, ator.tenant_id);
       const agoraBrasilia = obterCarimboBrasilia();
 
       const ajusteCompleto = {
@@ -812,10 +819,12 @@ export class RegistroPontoRepository {
           alterado_manualmente = TRUE,
           atualizado_em = CAST(${agoraBrasilia.timestamp} AS TIMESTAMP)
         WHERE id = ${registroId}
+          AND tenant_id::text = ${ator.tenant_id}
       `);
 
       await this.registrarOcorrenciaTx(tx, {
         registro_ponto_id: registroId,
+        tenant_id: ator.tenant_id,
         tipo: "CORRECAO_ADMINISTRATIVA",
         descricao: input.justificativa,
         origem: "ADMIN",
@@ -823,9 +832,9 @@ export class RegistroPontoRepository {
         criado_por_nome: ator.nome_usuario
       });
 
-      await this.recalcularTotaisTx(tx, registroId, null);
+      await this.recalcularTotaisTx(tx, registroId, ator.tenant_id, null);
 
-      const registroDepois = await this.buscarRegistroParaAtualizacaoTx(tx, registroId);
+      const registroDepois = await this.buscarRegistroParaAtualizacaoTx(tx, registroId, ator.tenant_id);
 
       await this.registrarAuditoriaTx(tx, {
         registro_ponto_id: registroId,
@@ -839,7 +848,7 @@ export class RegistroPontoRepository {
         dados_depois: registroDepois
       });
 
-      const row = await this.buscarListaRowPorIdTx(tx, registroId);
+      const row = await this.buscarListaRowPorIdTx(tx, registroId, ator.tenant_id);
       if (!row) {
         throw new AppError("Nao foi possivel carregar o registro atualizado.", 500);
       }
@@ -860,7 +869,7 @@ export class RegistroPontoRepository {
     const isAdmin = this.isAdmin(ator);
 
     return prisma.$transaction(async (tx) => {
-      const registro = await this.buscarRegistroParaAtualizacaoTx(tx, registroId);
+      const registro = await this.buscarRegistroParaAtualizacaoTx(tx, registroId, ator.tenant_id);
 
       if (!isAdmin && ator.id !== registro.usuario_id) {
         throw new AppError("Sem permissao para adicionar ocorrencia neste registro.", 403);
@@ -868,6 +877,7 @@ export class RegistroPontoRepository {
 
       await this.registrarOcorrenciaTx(tx, {
         registro_ponto_id: registroId,
+        tenant_id: ator.tenant_id,
         tipo: input.tipo,
         descricao: input.descricao,
         origem: isAdmin ? "ADMIN" : "OPERACIONAL",
@@ -890,7 +900,7 @@ export class RegistroPontoRepository {
         }
       });
 
-      const row = await this.buscarListaRowPorIdTx(tx, registroId);
+      const row = await this.buscarListaRowPorIdTx(tx, registroId, ator.tenant_id);
       if (!row) {
         throw new AppError("Registro de ponto nao encontrado.", 404);
       }
@@ -917,6 +927,7 @@ export class RegistroPontoRepository {
         observacoes
       FROM registro_ponto
       WHERE id = ${registroId}
+        AND tenant_id::text = ${ator.tenant_id}
       LIMIT 1
     `);
 
@@ -943,6 +954,7 @@ export class RegistroPontoRepository {
         criado_em
       FROM registro_ponto_auditoria
       WHERE registro_ponto_id = ${registroId}
+        AND tenant_id::text = ${ator.tenant_id}
       ORDER BY criado_em DESC, id DESC
     `);
 
@@ -956,6 +968,7 @@ export class RegistroPontoRepository {
         criado_em
       FROM registro_ponto_ocorrencia
       WHERE registro_ponto_id = ${registroId}
+        AND tenant_id::text = ${ator.tenant_id}
       ORDER BY criado_em DESC, id DESC
     `);
 
@@ -966,17 +979,24 @@ export class RegistroPontoRepository {
     };
   }
 
-  private async ensureRegistroHojeTx(tx: DatabaseTx, usuarioId: bigint, unidadeId?: bigint | null) {
+  private async ensureRegistroHojeTx(
+    tx: DatabaseTx,
+    usuarioId: bigint,
+    tenantId: string,
+    unidadeId?: bigint | null
+  ) {
     const agoraBrasilia = obterCarimboBrasilia();
     const rows = await tx.$queryRaw<{ id: bigint }[]>(Prisma.sql`
       INSERT INTO registro_ponto (
         usuario_id,
+        tenant_id,
         unidade_id,
         data_referencia,
         criado_em,
         atualizado_em
       ) VALUES (
         ${usuarioId},
+        ${tenantId},
         ${unidadeId ?? null},
         CAST(${agoraBrasilia.data} AS DATE),
         CAST(${agoraBrasilia.timestamp} AS TIMESTAMP),
@@ -984,6 +1004,7 @@ export class RegistroPontoRepository {
       )
       ON CONFLICT (usuario_id, data_referencia)
       DO UPDATE SET
+        tenant_id = COALESCE(registro_ponto.tenant_id, EXCLUDED.tenant_id),
         unidade_id = COALESCE(registro_ponto.unidade_id, EXCLUDED.unidade_id),
         atualizado_em = CAST(${agoraBrasilia.timestamp} AS TIMESTAMP)
       RETURNING id
@@ -997,7 +1018,11 @@ export class RegistroPontoRepository {
     return registroId;
   }
 
-  private async buscarRegistroParaAtualizacaoTx(tx: DatabaseTx, registroId: bigint): Promise<RegistroLinha> {
+  private async buscarRegistroParaAtualizacaoTx(
+    tx: DatabaseTx,
+    registroId: bigint,
+    tenantId: string
+  ): Promise<RegistroLinha> {
     const rows = await tx.$queryRaw<RegistroLinha[]>(Prisma.sql`
       SELECT
         id,
@@ -1010,6 +1035,7 @@ export class RegistroPontoRepository {
         observacoes
       FROM registro_ponto
       WHERE id = ${registroId}
+        AND tenant_id::text = ${tenantId}
       FOR UPDATE
     `);
 
@@ -1021,16 +1047,17 @@ export class RegistroPontoRepository {
     return registro;
   }
 
-  private async listarBatidasTx(tx: DatabaseTx, registroId: bigint) {
+  private async listarBatidasTx(tx: DatabaseTx, registroId: bigint, tenantId: string) {
     return tx.$queryRaw<BatidaLinha[]>(Prisma.sql`
       SELECT id, sequencia, tipo, horario_servidor
       FROM registro_ponto_batida
       WHERE registro_ponto_id = ${registroId}
+        AND tenant_id::text = ${tenantId}
       ORDER BY sequencia ASC
     `);
   }
 
-  private async buscarListaRowPorIdTx(tx: DatabaseTx, registroId: bigint) {
+  private async buscarListaRowPorIdTx(tx: DatabaseTx, registroId: bigint, tenantId: string) {
     const rows = await tx.$queryRaw<ListaRow[]>(Prisma.sql`
       SELECT
         r.id,
@@ -1068,6 +1095,8 @@ export class RegistroPontoRepository {
       INNER JOIN usuarios u ON u.id = r.usuario_id
       LEFT JOIN registro_ponto_ocorrencia o ON o.registro_ponto_id = r.id
       WHERE r.id = ${registroId}
+        AND r.tenant_id::text = ${tenantId}
+        AND u.tenant_id::text = ${tenantId}
       GROUP BY
         r.id,
         r.usuario_id,
@@ -1095,7 +1124,8 @@ export class RegistroPontoRepository {
 
   private async buscarHorarioUsuarioTx(
     tx: DatabaseTx | typeof prisma,
-    usuarioId: bigint
+    usuarioId: bigint,
+    tenantId: string
   ): Promise<UsuarioHorarioRow | null> {
     const rows = await tx.$queryRaw<UsuarioHorarioRow[]>(Prisma.sql`
       SELECT
@@ -1105,13 +1135,14 @@ export class RegistroPontoRepository {
         horario_saida_2::text
       FROM usuarios
       WHERE id = ${usuarioId}
+        AND tenant_id::text = ${tenantId}
       LIMIT 1
     `);
 
     return rows[0] ?? null;
   }
 
-  private async buscarContextoUsuarioTx(tx: DatabaseTx, usuarioId: bigint) {
+  private async buscarContextoUsuarioTx(tx: DatabaseTx, usuarioId: bigint, tenantId: string) {
     const rows = await tx.$queryRaw<UsuarioContexto[]>(Prisma.sql`
       WITH usuario_atual AS (
         SELECT
@@ -1125,6 +1156,7 @@ export class RegistroPontoRepository {
           u.horario_saida_2::text
         FROM usuarios u
         WHERE u.id = ${usuarioId}
+          AND u.tenant_id::text = ${tenantId}
         LIMIT 1
       )
       SELECT
@@ -1152,13 +1184,14 @@ export class RegistroPontoRepository {
         SELECT ux.*
         FROM unidade_assistencial ux
         WHERE (
-          COALESCE(ua.unidade, '') <> ''
+          ux.tenant_id::text = ${tenantId}
+          AND COALESCE(ua.unidade, '') <> ''
           AND (
             LOWER(TRIM(COALESCE(ux.nome_fantasia, ''))) = LOWER(TRIM(COALESCE(ua.unidade, '')))
             OR LOWER(TRIM(COALESCE(ux.razao_social, ''))) = LOWER(TRIM(COALESCE(ua.unidade, '')))
           )
         )
-        OR ux.unidade_principal = TRUE
+        OR (ux.tenant_id::text = ${tenantId} AND ux.unidade_principal = TRUE)
         ORDER BY
           CASE
             WHEN COALESCE(ua.unidade, '') <> ''
@@ -1355,9 +1388,10 @@ export class RegistroPontoRepository {
   private async recalcularTotaisTx(
     tx: DatabaseTx,
     registroId: bigint,
+    tenantId: string,
     horarioFuncionamento?: string | null
   ) {
-    const registro = await this.buscarRegistroParaAtualizacaoTx(tx, registroId);
+    const registro = await this.buscarRegistroParaAtualizacaoTx(tx, registroId, tenantId);
 
     const totalTrabalhado =
       diferencaMinutos(registro.entrada_1, registro.saida_1) +
@@ -1389,7 +1423,7 @@ export class RegistroPontoRepository {
       WHERE id = ${registroId}
     `);
 
-    await this.reconstruirOcorrenciasSistemaTx(tx, registroId, {
+    await this.reconstruirOcorrenciasSistemaTx(tx, registroId, tenantId, {
       atrasoMinutos: atrasos,
       faltasMinutos: faltas,
       horasExtrasMinutos: horasExtras,
@@ -1401,6 +1435,7 @@ export class RegistroPontoRepository {
   private async reconstruirOcorrenciasSistemaTx(
     tx: DatabaseTx,
     registroId: bigint,
+    tenantId: string,
     contexto: {
       atrasoMinutos: number;
       faltasMinutos: number;
@@ -1412,12 +1447,14 @@ export class RegistroPontoRepository {
     await tx.$executeRaw(Prisma.sql`
       DELETE FROM registro_ponto_ocorrencia
       WHERE registro_ponto_id = ${registroId}
+        AND tenant_id::text = ${tenantId}
         AND origem = 'SISTEMA'
     `);
 
     if (contexto.atrasoMinutos > 0) {
       await this.registrarOcorrenciaTx(tx, {
         registro_ponto_id: registroId,
+        tenant_id: tenantId,
         tipo: "ATRASO",
         descricao: `Atraso de ${contexto.atrasoMinutos} minuto(s).`,
         origem: "SISTEMA"
@@ -1427,6 +1464,7 @@ export class RegistroPontoRepository {
     if (contexto.faltasMinutos > 0) {
       await this.registrarOcorrenciaTx(tx, {
         registro_ponto_id: registroId,
+        tenant_id: tenantId,
         tipo: "FALTA",
         descricao: `Saldo de falta de ${contexto.faltasMinutos} minuto(s).`,
         origem: "SISTEMA"
@@ -1436,6 +1474,7 @@ export class RegistroPontoRepository {
     if (contexto.horasExtrasMinutos > 0) {
       await this.registrarOcorrenciaTx(tx, {
         registro_ponto_id: registroId,
+        tenant_id: tenantId,
         tipo: "HORA_EXTRA",
         descricao: `Hora extra de ${contexto.horasExtrasMinutos} minuto(s).`,
         origem: "SISTEMA"
@@ -1445,6 +1484,7 @@ export class RegistroPontoRepository {
     if (contexto.bancoHorasMinutos !== 0) {
       await this.registrarOcorrenciaTx(tx, {
         registro_ponto_id: registroId,
+        tenant_id: tenantId,
         tipo: "BANCO_HORAS",
         descricao: `Banco de horas com saldo de ${contexto.bancoHorasMinutos} minuto(s).`,
         origem: "SISTEMA"
@@ -1461,6 +1501,7 @@ export class RegistroPontoRepository {
     if (!sequenciaValida) {
       await this.registrarOcorrenciaTx(tx, {
         registro_ponto_id: registroId,
+        tenant_id: tenantId,
         tipo: "INCONSISTENCIA_SEQUENCIA",
         descricao: "Sequencia de horarios inconsistente no espelho de ponto.",
         origem: "SISTEMA"
@@ -1477,6 +1518,7 @@ export class RegistroPontoRepository {
     if (batidasDoDia > 0 && batidasDoDia < 4) {
       await this.registrarOcorrenciaTx(tx, {
         registro_ponto_id: registroId,
+        tenant_id: tenantId,
         tipo: "ESQUECIMENTO_BATIDA",
         descricao: "Existem batidas pendentes para fechamento completo do dia.",
         origem: "SISTEMA"
@@ -1488,6 +1530,7 @@ export class RegistroPontoRepository {
     tx: DatabaseTx,
     payload: {
       registro_ponto_id: bigint;
+      tenant_id: string;
       tipo: string;
       descricao?: string;
       origem: string;
@@ -1499,6 +1542,7 @@ export class RegistroPontoRepository {
     await tx.$executeRaw(Prisma.sql`
       INSERT INTO registro_ponto_ocorrencia (
         registro_ponto_id,
+        tenant_id,
         tipo,
         descricao,
         origem,
@@ -1507,6 +1551,7 @@ export class RegistroPontoRepository {
         criado_em
       ) VALUES (
         ${payload.registro_ponto_id},
+        ${payload.tenant_id},
         ${payload.tipo},
         ${payload.descricao ?? null},
         ${payload.origem},
@@ -1543,6 +1588,7 @@ export class RegistroPontoRepository {
       INSERT INTO registro_ponto_auditoria (
         registro_ponto_id,
         registro_ponto_batida_id,
+        tenant_id,
         acao,
         usuario_id,
         usuario_nome,
@@ -1555,6 +1601,7 @@ export class RegistroPontoRepository {
       ) VALUES (
         ${payload.registro_ponto_id},
         ${payload.registro_ponto_batida_id},
+        ${payload.ator.tenant_id},
         ${payload.acao},
         ${payload.ator.id ?? null},
         ${payload.ator.nome_usuario},

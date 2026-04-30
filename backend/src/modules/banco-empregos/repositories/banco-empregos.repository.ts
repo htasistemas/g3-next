@@ -25,6 +25,7 @@ const estruturaSql = [
   `
   CREATE TABLE IF NOT EXISTS banco_empregos_candidato (
     id BIGSERIAL PRIMARY KEY,
+    tenant_id UUID,
     beneficiario_id BIGINT REFERENCES cadastro_beneficiario(id) ON DELETE SET NULL,
     nome_completo VARCHAR(200) NOT NULL,
     cpf VARCHAR(20),
@@ -68,6 +69,7 @@ const estruturaSql = [
   `
   CREATE TABLE IF NOT EXISTS banco_empregos_vaga (
     id BIGSERIAL PRIMARY KEY,
+    tenant_id UUID,
     titulo VARCHAR(200) NOT NULL,
     empresa_nome VARCHAR(200) NOT NULL,
     area VARCHAR(160),
@@ -96,6 +98,7 @@ const estruturaSql = [
   `
   CREATE TABLE IF NOT EXISTS banco_empregos_processo (
     id BIGSERIAL PRIMARY KEY,
+    tenant_id UUID,
     vaga_id BIGINT NOT NULL REFERENCES banco_empregos_vaga(id) ON DELETE CASCADE,
     candidato_id BIGINT NOT NULL REFERENCES banco_empregos_candidato(id) ON DELETE CASCADE,
     etapa VARCHAR(40) NOT NULL DEFAULT 'TRIAGEM_INICIAL',
@@ -146,6 +149,7 @@ const estruturaSql = [
   `
   CREATE TABLE IF NOT EXISTS banco_empregos_historico (
     id BIGSERIAL PRIMARY KEY,
+    tenant_id UUID,
     entidade_tipo VARCHAR(40) NOT NULL,
     entidade_id BIGINT NOT NULL,
     candidato_id BIGINT,
@@ -158,7 +162,76 @@ const estruturaSql = [
     criado_em TIMESTAMP NOT NULL DEFAULT NOW()
   )
   `,
+  "ALTER TABLE banco_empregos_candidato ADD COLUMN IF NOT EXISTS tenant_id UUID",
+  "ALTER TABLE banco_empregos_vaga ADD COLUMN IF NOT EXISTS tenant_id UUID",
+  "ALTER TABLE banco_empregos_processo ADD COLUMN IF NOT EXISTS tenant_id UUID",
+  "ALTER TABLE banco_empregos_historico ADD COLUMN IF NOT EXISTS tenant_id UUID",
+  `
+  UPDATE banco_empregos_candidato c
+  SET tenant_id = b.tenant_id
+  FROM cadastro_beneficiario b
+  WHERE c.tenant_id IS NULL
+    AND c.beneficiario_id = b.id
+    AND b.tenant_id IS NOT NULL
+  `,
+  `
+  UPDATE banco_empregos_vaga v
+  SET tenant_id = origem.tenant_id
+  FROM (
+    SELECT tenant_id
+    FROM unidade_assistencial
+    WHERE tenant_id IS NOT NULL
+    ORDER BY unidade_principal DESC, atualizado_em DESC, criado_em ASC
+    LIMIT 1
+  ) origem
+  WHERE v.tenant_id IS NULL
+  `,
+  `
+  UPDATE banco_empregos_candidato c
+  SET tenant_id = origem.tenant_id
+  FROM (
+    SELECT tenant_id
+    FROM unidade_assistencial
+    WHERE tenant_id IS NOT NULL
+    ORDER BY unidade_principal DESC, atualizado_em DESC, criado_em ASC
+    LIMIT 1
+  ) origem
+  WHERE c.tenant_id IS NULL
+  `,
+  `
+  UPDATE banco_empregos_processo p
+  SET tenant_id = COALESCE(v.tenant_id, c.tenant_id)
+  FROM banco_empregos_vaga v, banco_empregos_candidato c
+  WHERE p.vaga_id = v.id
+    AND p.candidato_id = c.id
+    AND p.tenant_id IS NULL
+  `,
+  `
+  UPDATE banco_empregos_historico h
+  SET tenant_id = p.tenant_id
+  FROM banco_empregos_processo p
+  WHERE h.tenant_id IS NULL
+    AND h.processo_id = p.id
+    AND p.tenant_id IS NOT NULL
+  `,
+  `
+  UPDATE banco_empregos_historico h
+  SET tenant_id = v.tenant_id
+  FROM banco_empregos_vaga v
+  WHERE h.tenant_id IS NULL
+    AND h.vaga_id = v.id
+    AND v.tenant_id IS NOT NULL
+  `,
+  `
+  UPDATE banco_empregos_historico h
+  SET tenant_id = c.tenant_id
+  FROM banco_empregos_candidato c
+  WHERE h.tenant_id IS NULL
+    AND h.candidato_id = c.id
+    AND c.tenant_id IS NOT NULL
+  `,
   "CREATE INDEX IF NOT EXISTS banco_empregos_candidato_nome_idx ON banco_empregos_candidato (nome_completo)",
+  "CREATE INDEX IF NOT EXISTS banco_empregos_candidato_tenant_idx ON banco_empregos_candidato (tenant_id, atualizado_em DESC)",
   "CREATE INDEX IF NOT EXISTS banco_empregos_candidato_cpf_idx ON banco_empregos_candidato (cpf)",
   "CREATE INDEX IF NOT EXISTS banco_empregos_candidato_bairro_idx ON banco_empregos_candidato (bairro)",
   "CREATE INDEX IF NOT EXISTS banco_empregos_candidato_cidade_idx ON banco_empregos_candidato (cidade)",
@@ -166,17 +239,20 @@ const estruturaSql = [
   "CREATE INDEX IF NOT EXISTS banco_empregos_candidato_area_idx ON banco_empregos_candidato (area_interesse)",
   "CREATE INDEX IF NOT EXISTS banco_empregos_candidato_criado_idx ON banco_empregos_candidato (criado_em DESC)",
   "CREATE INDEX IF NOT EXISTS banco_empregos_vaga_titulo_idx ON banco_empregos_vaga (titulo)",
+  "CREATE INDEX IF NOT EXISTS banco_empregos_vaga_tenant_idx ON banco_empregos_vaga (tenant_id, data_abertura DESC)",
   "CREATE INDEX IF NOT EXISTS banco_empregos_vaga_empresa_idx ON banco_empregos_vaga (empresa_nome)",
   "CREATE INDEX IF NOT EXISTS banco_empregos_vaga_cidade_idx ON banco_empregos_vaga (cidade)",
   "CREATE INDEX IF NOT EXISTS banco_empregos_vaga_situacao_idx ON banco_empregos_vaga (situacao)",
   "CREATE INDEX IF NOT EXISTS banco_empregos_vaga_data_abertura_idx ON banco_empregos_vaga (data_abertura DESC)",
   "CREATE INDEX IF NOT EXISTS banco_empregos_processo_vaga_idx ON banco_empregos_processo (vaga_id)",
+  "CREATE INDEX IF NOT EXISTS banco_empregos_processo_tenant_idx ON banco_empregos_processo (tenant_id, atualizado_em DESC)",
   "CREATE INDEX IF NOT EXISTS banco_empregos_processo_candidato_idx ON banco_empregos_processo (candidato_id)",
   "CREATE INDEX IF NOT EXISTS banco_empregos_processo_etapa_idx ON banco_empregos_processo (etapa)",
   "CREATE INDEX IF NOT EXISTS banco_empregos_processo_status_idx ON banco_empregos_processo (status)",
   "CREATE INDEX IF NOT EXISTS banco_empregos_documento_candidato_idx ON banco_empregos_documento (candidato_id)",
   "CREATE INDEX IF NOT EXISTS banco_empregos_documento_categoria_idx ON banco_empregos_documento (categoria)",
   "CREATE INDEX IF NOT EXISTS banco_empregos_historico_entidade_idx ON banco_empregos_historico (entidade_tipo, entidade_id)",
+  "CREATE INDEX IF NOT EXISTS banco_empregos_historico_tenant_idx ON banco_empregos_historico (tenant_id, criado_em DESC)",
   "CREATE INDEX IF NOT EXISTS banco_empregos_historico_candidato_idx ON banco_empregos_historico (candidato_id)",
   "CREATE INDEX IF NOT EXISTS banco_empregos_historico_vaga_idx ON banco_empregos_historico (vaga_id)",
   "CREATE INDEX IF NOT EXISTS banco_empregos_historico_processo_idx ON banco_empregos_historico (processo_id)",
@@ -229,15 +305,20 @@ function idadeSql() {
   return Prisma.sql`EXTRACT(YEAR FROM age(CURRENT_DATE, c.data_nascimento))::int`;
 }
 
+function tenantClause(alias: string, tenantId: string) {
+  return Prisma.sql`${Prisma.raw(alias)}.tenant_id::text = ${tenantId}`;
+}
+
 function whereCandidatos(
   filters: BancoEmpregosDashboardFiltersInput & {
     termo?: string | null;
     nome?: string | null;
     cpf?: string | null;
     disponibilidade?: string | null;
-  }
+  },
+  tenantId: string
 ) {
-  const condicoes: Prisma.Sql[] = [];
+  const condicoes: Prisma.Sql[] = [tenantClause("c", tenantId)];
   const termo = filters.termo?.trim() || filters.nome?.trim();
 
   if (termo) {
@@ -292,8 +373,8 @@ function whereCandidatos(
   return condicoes.length ? Prisma.sql`WHERE ${Prisma.join(condicoes, " AND ")}` : Prisma.empty;
 }
 
-function whereVagas(filters: BancoEmpregosVagaFiltersInput) {
-  const condicoes: Prisma.Sql[] = [];
+function whereVagas(filters: BancoEmpregosVagaFiltersInput, tenantId: string) {
+  const condicoes: Prisma.Sql[] = [tenantClause("v", tenantId)];
   const termo = filters.termo?.trim();
 
   if (termo) {
@@ -310,7 +391,7 @@ function whereVagas(filters: BancoEmpregosVagaFiltersInput) {
   if (filters.dataAberturaAte) condicoes.push(Prisma.sql`v.data_abertura <= ${filters.dataAberturaAte}::date`);
   if (filters.semSelecionado === true) {
     condicoes.push(
-      Prisma.sql`NOT EXISTS (SELECT 1 FROM banco_empregos_processo p WHERE p.vaga_id = v.id AND p.ativo = TRUE AND p.selecionado = TRUE)`
+      Prisma.sql`NOT EXISTS (SELECT 1 FROM banco_empregos_processo p WHERE p.vaga_id = v.id AND p.ativo = TRUE AND p.selecionado = TRUE AND p.tenant_id::text = ${tenantId})`
     );
   }
 
@@ -330,12 +411,12 @@ export async function ensureBancoEmpregosEstrutura() {
 }
 
 export class BancoEmpregosRepository {
-  async listarCandidatos(filters: BancoEmpregosCandidatoFiltersInput) {
+  async listarCandidatos(filters: BancoEmpregosCandidatoFiltersInput, tenantId: string) {
     await ensureBancoEmpregosEstrutura();
     const pagina = toPage(filters.pagina);
     const limite = toLimit(filters.limite);
     const offset = (pagina - 1) * limite;
-    const where = whereCandidatos(filters);
+    const where = whereCandidatos(filters, tenantId);
 
     const rows = await prisma.$queryRaw<BancoEmpregosCandidatoRow[]>(Prisma.sql`
       SELECT
@@ -373,7 +454,7 @@ export class BancoEmpregosRepository {
     };
   }
 
-  async buscarCandidato(id: bigint) {
+  async buscarCandidato(id: bigint, tenantId: string) {
     await ensureBancoEmpregosEstrutura();
     const rows = await prisma.$queryRaw<BancoEmpregosCandidatoRow[]>(Prisma.sql`
       SELECT
@@ -392,21 +473,22 @@ export class BancoEmpregosRepository {
         WHERE d.candidato_id = c.id
       ) d ON TRUE
       WHERE c.id = ${id}
+        AND c.tenant_id::text = ${tenantId}
       LIMIT 1
     `);
 
     return rows[0] ?? null;
   }
 
-  async buscarCandidatoOuFalhar(id: bigint) {
-    const candidato = await this.buscarCandidato(id);
+  async buscarCandidatoOuFalhar(id: bigint, tenantId: string) {
+    const candidato = await this.buscarCandidato(id, tenantId);
     if (!candidato) {
       throw new AppError("Candidato não encontrado.", 404);
     }
     return candidato;
   }
 
-  async salvarCandidato(id: bigint | undefined, input: BancoEmpregosCandidatoInput) {
+  async salvarCandidato(id: bigint | undefined, input: BancoEmpregosCandidatoInput, tenantId: string) {
     await ensureBancoEmpregosEstrutura();
     return prisma.$transaction(async (tx) => {
       const beneficiarioId = input.beneficiarioId ? BigInt(input.beneficiarioId) : null;
@@ -420,6 +502,7 @@ export class BancoEmpregosRepository {
       if (!id) {
         const rows = await tx.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
           INSERT INTO banco_empregos_candidato (
+            tenant_id,
             beneficiario_id,
             nome_completo,
             cpf,
@@ -457,6 +540,7 @@ export class BancoEmpregosRepository {
             criado_em,
             atualizado_em
           ) VALUES (
+            ${tenantId}::uuid,
             ${beneficiarioId},
             ${input.nomeCompleto},
             ${input.cpf ?? null},
@@ -537,6 +621,7 @@ export class BancoEmpregosRepository {
             curriculo_extraido_json = ${(toJson(input.curriculoExtraido ?? {}) ?? {}) as unknown as Prisma.JsonObject},
             atualizado_em = NOW()
           WHERE id = ${id}
+            AND tenant_id::text = ${tenantId}
         `);
       }
 
@@ -548,7 +633,7 @@ export class BancoEmpregosRepository {
     });
   }
 
-  async inativarCandidato(id: bigint) {
+  async inativarCandidato(id: bigint, tenantId: string) {
     await ensureBancoEmpregosEstrutura();
     await prisma.$executeRaw(Prisma.sql`
       UPDATE banco_empregos_candidato
@@ -556,10 +641,11 @@ export class BancoEmpregosRepository {
           ativo = FALSE,
           atualizado_em = NOW()
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
   }
 
-  async listarDocumentos(candidatoId: bigint) {
+  async listarDocumentos(candidatoId: bigint, tenantId: string) {
     await ensureBancoEmpregosEstrutura();
     return prisma.$queryRaw<BancoEmpregosDocumentoRow[]>(Prisma.sql`
       SELECT
@@ -573,11 +659,17 @@ export class BancoEmpregosRepository {
       FROM banco_empregos_documento d
       INNER JOIN arquivos a ON a.id = d.arquivo_id
       WHERE d.candidato_id = ${candidatoId}
+        AND EXISTS (
+          SELECT 1
+          FROM banco_empregos_candidato c
+          WHERE c.id = d.candidato_id
+            AND c.tenant_id::text = ${tenantId}
+        )
       ORDER BY d.categoria ASC, d.versao DESC, d.id DESC
     `);
   }
 
-  async buscarDocumentoOuFalhar(documentoId: bigint) {
+  async buscarDocumentoOuFalhar(documentoId: bigint, tenantId: string) {
     await ensureBancoEmpregosEstrutura();
     const rows = await prisma.$queryRaw<BancoEmpregosDocumentoRow[]>(Prisma.sql`
       SELECT
@@ -591,6 +683,12 @@ export class BancoEmpregosRepository {
       FROM banco_empregos_documento d
       INNER JOIN arquivos a ON a.id = d.arquivo_id
       WHERE d.id = ${documentoId}
+        AND EXISTS (
+          SELECT 1
+          FROM banco_empregos_candidato c
+          WHERE c.id = d.candidato_id
+            AND c.tenant_id::text = ${tenantId}
+        )
       LIMIT 1
     `);
     const documento = rows[0];
@@ -603,10 +701,12 @@ export class BancoEmpregosRepository {
   async adicionarDocumento(
     candidatoId: bigint,
     arquivoId: bigint,
-    payload: { categoria: string; descricao?: string | null; extraido?: Record<string, unknown> | null }
+    payload: { categoria: string; descricao?: string | null; extraido?: Record<string, unknown> | null },
+    tenantId: string
   ) {
     await ensureBancoEmpregosEstrutura();
     return prisma.$transaction(async (tx) => {
+      await this.buscarCandidatoOuFalhar(candidatoId, tenantId);
       const versaoRows = await tx.$queryRaw<Array<{ versao: number | null }>>(Prisma.sql`
         SELECT MAX(versao) AS versao
         FROM banco_empregos_documento
@@ -665,12 +765,13 @@ export class BancoEmpregosRepository {
       if (!documentoId) {
         throw new AppError("Não foi possível registrar o documento.", 500);
       }
-      return this.buscarDocumentoOuFalhar(documentoId);
+      return this.buscarDocumentoOuFalhar(documentoId, tenantId);
     });
   }
 
-  async desativarDocumento(documentoId: bigint) {
+  async desativarDocumento(documentoId: bigint, tenantId: string) {
     await ensureBancoEmpregosEstrutura();
+    await this.buscarDocumentoOuFalhar(documentoId, tenantId);
     await prisma.$executeRaw(Prisma.sql`
       UPDATE banco_empregos_documento
       SET ativo = FALSE,
@@ -680,12 +781,12 @@ export class BancoEmpregosRepository {
     `);
   }
 
-  async listarVagas(filters: BancoEmpregosVagaFiltersInput) {
+  async listarVagas(filters: BancoEmpregosVagaFiltersInput, tenantId: string) {
     await ensureBancoEmpregosEstrutura();
     const pagina = toPage(filters.pagina);
     const limite = toLimit(filters.limite);
     const offset = (pagina - 1) * limite;
-    const where = whereVagas(filters);
+    const where = whereVagas(filters, tenantId);
 
     const rows = await prisma.$queryRaw<BancoEmpregosVagaRow[]>(Prisma.sql`
       SELECT
@@ -723,7 +824,7 @@ export class BancoEmpregosRepository {
     };
   }
 
-  async buscarVaga(id: bigint) {
+  async buscarVaga(id: bigint, tenantId: string) {
     await ensureBancoEmpregosEstrutura();
     const rows = await prisma.$queryRaw<BancoEmpregosVagaRow[]>(Prisma.sql`
       SELECT
@@ -742,21 +843,22 @@ export class BancoEmpregosRepository {
           AND p.ativo = TRUE
       ) p ON TRUE
       WHERE v.id = ${id}
+        AND v.tenant_id::text = ${tenantId}
       LIMIT 1
     `);
 
     return rows[0] ?? null;
   }
 
-  async buscarVagaOuFalhar(id: bigint) {
-    const vaga = await this.buscarVaga(id);
+  async buscarVagaOuFalhar(id: bigint, tenantId: string) {
+    const vaga = await this.buscarVaga(id, tenantId);
     if (!vaga) {
       throw new AppError("Vaga não encontrada.", 404);
     }
     return vaga;
   }
 
-  async salvarVaga(id: bigint | undefined, input: BancoEmpregosVagaInput) {
+  async salvarVaga(id: bigint | undefined, input: BancoEmpregosVagaInput, tenantId: string) {
     await ensureBancoEmpregosEstrutura();
     return prisma.$transaction(async (tx) => {
       const situacao = input.situacao ?? "ABERTA";
@@ -766,6 +868,7 @@ export class BancoEmpregosRepository {
       if (!id) {
         const rows = await tx.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
           INSERT INTO banco_empregos_vaga (
+            tenant_id,
             titulo,
             empresa_nome,
             area,
@@ -790,6 +893,7 @@ export class BancoEmpregosRepository {
             criado_em,
             atualizado_em
           ) VALUES (
+            ${tenantId}::uuid,
             ${input.titulo},
             ${input.empresaNome},
             ${input.area ?? null},
@@ -843,6 +947,7 @@ export class BancoEmpregosRepository {
             criterios_json = ${(toJson(input.criterios ?? []) ?? []) as unknown as Prisma.JsonArray},
             atualizado_em = NOW()
           WHERE id = ${id}
+            AND tenant_id::text = ${tenantId}
         `);
       }
 
@@ -854,7 +959,7 @@ export class BancoEmpregosRepository {
     });
   }
 
-  async removerVaga(id: bigint) {
+  async removerVaga(id: bigint, tenantId: string) {
     await ensureBancoEmpregosEstrutura();
     await prisma.$executeRaw(Prisma.sql`
       UPDATE banco_empregos_vaga
@@ -862,15 +967,16 @@ export class BancoEmpregosRepository {
           situacao = 'CANCELADA',
           atualizado_em = NOW()
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
   }
 
-  async listarProcessos(filters: BancoEmpregosProcessoFiltersInput) {
+  async listarProcessos(filters: BancoEmpregosProcessoFiltersInput, tenantId: string) {
     await ensureBancoEmpregosEstrutura();
     const pagina = toPage(filters.pagina);
     const limite = toLimit(filters.limite, 40);
     const offset = (pagina - 1) * limite;
-    const where = whereProcessos(filters);
+    const where = whereProcessos(filters, tenantId);
 
     const rows = await prisma.$queryRaw<BancoEmpregosProcessoRow[]>(Prisma.sql`
       SELECT
@@ -908,7 +1014,7 @@ export class BancoEmpregosRepository {
     };
   }
 
-  async buscarProcesso(id: bigint) {
+  async buscarProcesso(id: bigint, tenantId: string) {
     await ensureBancoEmpregosEstrutura();
     const rows = await prisma.$queryRaw<BancoEmpregosProcessoRow[]>(Prisma.sql`
       SELECT
@@ -927,27 +1033,29 @@ export class BancoEmpregosRepository {
       INNER JOIN banco_empregos_candidato c ON c.id = p.candidato_id
       LEFT JOIN banco_empregos_avaliacao a ON a.processo_id = p.id
       WHERE p.id = ${id}
+        AND p.tenant_id::text = ${tenantId}
       LIMIT 1
     `);
 
     return rows[0] ?? null;
   }
 
-  async buscarProcessoOuFalhar(id: bigint) {
-    const processo = await this.buscarProcesso(id);
+  async buscarProcessoOuFalhar(id: bigint, tenantId: string) {
+    const processo = await this.buscarProcesso(id, tenantId);
     if (!processo) {
       throw new AppError("Processo seletivo não encontrado.", 404);
     }
     return processo;
   }
 
-  async buscarProcessoPorVagaECandidato(vagaId: bigint, candidatoId: bigint) {
+  async buscarProcessoPorVagaECandidato(vagaId: bigint, candidatoId: bigint, tenantId: string) {
     await ensureBancoEmpregosEstrutura();
     const rows = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
       SELECT id
       FROM banco_empregos_processo
       WHERE vaga_id = ${vagaId}
         AND candidato_id = ${candidatoId}
+        AND tenant_id::text = ${tenantId}
       LIMIT 1
     `);
     return rows[0]?.id ?? null;
@@ -956,14 +1064,15 @@ export class BancoEmpregosRepository {
   async salvarProcesso(
     id: bigint | undefined,
     input: BancoEmpregosProcessoInput,
-    usuarioId?: bigint | null
+    usuarioId: bigint | null | undefined,
+    tenantId: string
   ) {
     await ensureBancoEmpregosEstrutura();
     return prisma.$transaction(async (tx) => {
       const vagaId = BigInt(input.vagaId);
       const candidatoId = BigInt(input.candidatoId);
-      const vaga = await this.buscarVagaOuFalhar(vagaId);
-      await this.buscarCandidatoOuFalhar(candidatoId);
+      const vaga = await this.buscarVagaOuFalhar(vagaId, tenantId);
+      await this.buscarCandidatoOuFalhar(candidatoId, tenantId);
 
       const etapa = input.etapa ?? "TRIAGEM_INICIAL";
       const status = input.status ?? "EM_ANALISE";
@@ -971,7 +1080,7 @@ export class BancoEmpregosRepository {
       const contratado = input.contratado ?? false;
 
       if (selecionado) {
-        const totalSelecionados = await obterQuantidadeSelecionados(tx, vagaId, id);
+        const totalSelecionados = await obterQuantidadeSelecionados(tx, vagaId, tenantId, id);
         if (totalSelecionados >= vaga.quantidade_vagas) {
           throw new AppError("A vaga já atingiu a quantidade máxima de candidatos selecionados.", 422);
         }
@@ -982,6 +1091,7 @@ export class BancoEmpregosRepository {
       if (!id) {
         const rows = await tx.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
           INSERT INTO banco_empregos_processo (
+            tenant_id,
             vaga_id,
             candidato_id,
             etapa,
@@ -998,6 +1108,7 @@ export class BancoEmpregosRepository {
             criado_em,
             atualizado_em
           ) VALUES (
+            ${tenantId}::uuid,
             ${vagaId},
             ${candidatoId},
             ${etapa},
@@ -1035,6 +1146,7 @@ export class BancoEmpregosRepository {
             contratado = ${contratado},
             atualizado_em = NOW()
           WHERE id = ${id}
+            AND tenant_id::text = ${tenantId}
         `);
       }
 
@@ -1048,9 +1160,10 @@ export class BancoEmpregosRepository {
             ativo = TRUE,
             atualizado_em = NOW()
         WHERE id = ${candidatoId}
+          AND tenant_id::text = ${tenantId}
       `);
 
-      await atualizarSituacaoVaga(tx, vagaId);
+      await atualizarSituacaoVaga(tx, vagaId, tenantId);
       return savedId;
     });
   }
@@ -1059,10 +1172,15 @@ export class BancoEmpregosRepository {
     processoId: bigint,
     input: BancoEmpregosAvaliacaoInput,
     usuarioId?: bigint | null,
-    usuarioNome?: string | null
+    usuarioNome?: string | null,
+    tenantId?: string
   ) {
     await ensureBancoEmpregosEstrutura();
     return prisma.$transaction(async (tx) => {
+      if (!tenantId) {
+        throw new AppError("Tenant nao identificado.", 401);
+      }
+      await this.buscarProcessoOuFalhar(processoId, tenantId);
       const totalPesos = input.criterios.reduce((acc, item) => acc + Number(item.peso ?? 1), 0) || 1;
       const somaPonderada = input.criterios.reduce(
         (acc, item) => acc + Number(item.nota ?? 0) * Number(item.peso ?? 1),
@@ -1132,23 +1250,25 @@ export class BancoEmpregosRepository {
     });
   }
 
-  async buscarAvaliacaoPorProcesso(processoId: bigint) {
+  async buscarAvaliacaoPorProcesso(processoId: bigint, tenantId: string) {
     await ensureBancoEmpregosEstrutura();
     const rows = await prisma.$queryRaw<BancoEmpregosAvaliacaoRow[]>(Prisma.sql`
-      SELECT *
-      FROM banco_empregos_avaliacao
-      WHERE processo_id = ${processoId}
+      SELECT a.*
+      FROM banco_empregos_avaliacao a
+      INNER JOIN banco_empregos_processo p ON p.id = a.processo_id
+      WHERE a.processo_id = ${processoId}
+        AND p.tenant_id::text = ${tenantId}
       LIMIT 1
     `);
     return rows[0] ?? null;
   }
 
-  async listarHistorico(filters: BancoEmpregosHistoricoFiltersInput) {
+  async listarHistorico(filters: BancoEmpregosHistoricoFiltersInput, tenantId: string) {
     await ensureBancoEmpregosEstrutura();
     const pagina = toPage(filters.pagina);
     const limite = toLimit(filters.limite, 60);
     const offset = (pagina - 1) * limite;
-    const where = whereHistorico(filters);
+    const where = whereHistorico(filters, tenantId);
 
     const rows = await prisma.$queryRaw<BancoEmpregosHistoricoRow[]>(Prisma.sql`
       SELECT *
@@ -1183,12 +1303,14 @@ export class BancoEmpregosRepository {
     usuarioNome?: string | null;
     acao: string;
     observacao?: string | null;
+    tenantId: string;
   }) {
     await ensureBancoEmpregosEstrutura();
     await prisma.$executeRaw(Prisma.sql`
       INSERT INTO banco_empregos_historico (
         entidade_tipo,
         entidade_id,
+        tenant_id,
         candidato_id,
         vaga_id,
         processo_id,
@@ -1200,6 +1322,7 @@ export class BancoEmpregosRepository {
       ) VALUES (
         ${input.entidadeTipo},
         ${input.entidadeId},
+        ${input.tenantId}::uuid,
         ${input.candidatoId ?? null},
         ${input.vagaId ?? null},
         ${input.processoId ?? null},
@@ -1212,12 +1335,12 @@ export class BancoEmpregosRepository {
     `);
   }
 
-  async obterDashboard(filters: BancoEmpregosDashboardFiltersInput) {
+  async obterDashboard(filters: BancoEmpregosDashboardFiltersInput, tenantId: string) {
     await ensureBancoEmpregosEstrutura();
-    const where = whereCandidatos(filters);
+    const where = whereCandidatos(filters, tenantId);
     const vagaWhere = filters.statusVaga?.trim()
-      ? Prisma.sql`WHERE v.situacao = ${filters.statusVaga.trim()}`
-      : Prisma.empty;
+      ? Prisma.sql`WHERE v.tenant_id::text = ${tenantId} AND v.situacao = ${filters.statusVaga.trim()}`
+      : Prisma.sql`WHERE v.tenant_id::text = ${tenantId}`;
 
     const [resumoCandidatos, resumoVagas, entrevistas, bairros, cidades, areas] = await Promise.all([
       prisma.$queryRaw<
@@ -1266,6 +1389,7 @@ export class BancoEmpregosRepository {
         SELECT COUNT(*)::bigint AS total
         FROM banco_empregos_processo p
         WHERE p.ativo = TRUE
+          AND p.tenant_id::text = ${tenantId}
           AND p.data_entrevista IS NOT NULL
       `),
       prisma.$queryRaw<Array<{ nome: string | null; total: bigint }>>(Prisma.sql`
@@ -1325,8 +1449,8 @@ export class BancoEmpregosRepository {
   }
 }
 
-function whereProcessos(filters: BancoEmpregosProcessoFiltersInput) {
-  const condicoes: Prisma.Sql[] = [];
+function whereProcessos(filters: BancoEmpregosProcessoFiltersInput, tenantId: string) {
+  const condicoes: Prisma.Sql[] = [tenantClause("p", tenantId)];
   if (filters.vagaId?.trim()) condicoes.push(Prisma.sql`p.vaga_id = ${BigInt(filters.vagaId.trim())}`);
   if (filters.candidatoId?.trim()) condicoes.push(Prisma.sql`p.candidato_id = ${BigInt(filters.candidatoId.trim())}`);
   if (filters.etapa?.trim()) condicoes.push(Prisma.sql`p.etapa = ${filters.etapa.trim()}`);
@@ -1336,8 +1460,8 @@ function whereProcessos(filters: BancoEmpregosProcessoFiltersInput) {
   return condicoes.length ? Prisma.sql`WHERE ${Prisma.join(condicoes, " AND ")}` : Prisma.empty;
 }
 
-function whereHistorico(filters: BancoEmpregosHistoricoFiltersInput) {
-  const condicoes: Prisma.Sql[] = [];
+function whereHistorico(filters: BancoEmpregosHistoricoFiltersInput, tenantId: string) {
+  const condicoes: Prisma.Sql[] = [tenantClause("h", tenantId)];
   if (filters.entidadeTipo?.trim()) condicoes.push(Prisma.sql`h.entidade_tipo = ${filters.entidadeTipo.trim()}`);
   if (filters.candidatoId?.trim()) condicoes.push(Prisma.sql`h.candidato_id = ${BigInt(filters.candidatoId.trim())}`);
   if (filters.vagaId?.trim()) condicoes.push(Prisma.sql`h.vaga_id = ${BigInt(filters.vagaId.trim())}`);
@@ -1345,13 +1469,19 @@ function whereHistorico(filters: BancoEmpregosHistoricoFiltersInput) {
   return condicoes.length ? Prisma.sql`WHERE ${Prisma.join(condicoes, " AND ")}` : Prisma.empty;
 }
 
-async function obterQuantidadeSelecionados(tx: TransactionClient, vagaId: bigint, processoIgnorado?: bigint) {
+async function obterQuantidadeSelecionados(
+  tx: TransactionClient,
+  vagaId: bigint,
+  tenantId: string,
+  processoIgnorado?: bigint
+) {
   const filtroIgnorado =
     typeof processoIgnorado === "bigint" ? Prisma.sql`AND id <> ${processoIgnorado}` : Prisma.empty;
   const rows = await tx.$queryRaw<Array<{ total: bigint }>>(Prisma.sql`
     SELECT COUNT(*)::bigint AS total
     FROM banco_empregos_processo
     WHERE vaga_id = ${vagaId}
+      AND tenant_id::text = ${tenantId}
       AND ativo = TRUE
       AND selecionado = TRUE
       ${filtroIgnorado}
@@ -1359,11 +1489,12 @@ async function obterQuantidadeSelecionados(tx: TransactionClient, vagaId: bigint
   return Number(rows[0]?.total ?? 0);
 }
 
-async function atualizarSituacaoVaga(tx: TransactionClient, vagaId: bigint) {
+async function atualizarSituacaoVaga(tx: TransactionClient, vagaId: bigint, tenantId: string) {
   const vagaRows = await tx.$queryRaw<Array<{ quantidade_vagas: number; situacao: string }>>(Prisma.sql`
     SELECT quantidade_vagas, situacao
     FROM banco_empregos_vaga
     WHERE id = ${vagaId}
+      AND tenant_id::text = ${tenantId}
     LIMIT 1
   `);
   const vaga = vagaRows[0];
@@ -1386,6 +1517,7 @@ async function atualizarSituacaoVaga(tx: TransactionClient, vagaId: bigint) {
       COUNT(*) FILTER (WHERE contratado = TRUE)::bigint AS total_contratados
     FROM banco_empregos_processo
     WHERE vaga_id = ${vagaId}
+      AND tenant_id::text = ${tenantId}
       AND ativo = TRUE
   `);
 
@@ -1409,6 +1541,7 @@ async function atualizarSituacaoVaga(tx: TransactionClient, vagaId: bigint) {
     SET situacao = ${situacao},
         atualizado_em = NOW()
     WHERE id = ${vagaId}
+      AND tenant_id::text = ${tenantId}
   `);
 }
 

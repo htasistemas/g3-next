@@ -68,8 +68,8 @@ const alertasCentralAtendimentosPadrao: AlertasCentralAtendimentosSistema = {
 export class ParametrosSistemaService {
   private readonly repository = new ParametrosSistemaRepository();
 
-  async obterPersonalizacao() {
-    const registro = await this.repository.buscarPersonalizacao();
+  async obterPersonalizacao(tenantId?: string) {
+    const registro = await this.repository.buscarPersonalizacao(tenantId);
     if (!registro) {
       return {
         personalizacao: personalizacaoPadrao,
@@ -92,7 +92,7 @@ export class ParametrosSistemaService {
     };
   }
 
-  async atualizarPersonalizacao(rawPayload: unknown, usuarioAtualizacao: string) {
+  async atualizarPersonalizacao(rawPayload: unknown, usuarioAtualizacao: string, tenantId: string) {
     const payload = atualizarPersonalizacaoPayloadSchema.parse(rawPayload);
 
     const normalizado = personalizacaoSistemaSchema.parse({
@@ -104,7 +104,11 @@ export class ParametrosSistemaService {
       }
     });
 
-    const salvo = await this.repository.salvarPersonalizacao(normalizado, usuarioAtualizacao);
+    const salvo = await this.repository.salvarPersonalizacao(
+      normalizado,
+      usuarioAtualizacao,
+      tenantId
+    );
 
     return {
       personalizacao: normalizado,
@@ -116,8 +120,8 @@ export class ParametrosSistemaService {
     return personalizacaoPadrao;
   }
 
-  async obterCarenciaDoacaoRealizada() {
-    const registro = await this.repository.buscarCarenciaDoacaoRealizada();
+  async obterCarenciaDoacaoRealizada(tenantId?: string) {
+    const registro = await this.repository.buscarCarenciaDoacaoRealizada(tenantId);
     if (!registro) {
       return {
         carencia: carenciaDoacaoRealizadaPadrao,
@@ -136,7 +140,11 @@ export class ParametrosSistemaService {
     };
   }
 
-  async atualizarCarenciaDoacaoRealizada(rawPayload: unknown, usuarioAtualizacao: string) {
+  async atualizarCarenciaDoacaoRealizada(
+    rawPayload: unknown,
+    usuarioAtualizacao: string,
+    tenantId: string
+  ) {
     const payload = atualizarCarenciaDoacaoRealizadaPayloadSchema.parse(rawPayload);
     const normalizado = carenciaDoacaoRealizadaSchema.parse({
       ...carenciaDoacaoRealizadaPadrao,
@@ -145,7 +153,8 @@ export class ParametrosSistemaService {
 
     const salvo = await this.repository.salvarCarenciaDoacaoRealizada(
       normalizado,
-      usuarioAtualizacao
+      usuarioAtualizacao,
+      tenantId
     );
 
     return {
@@ -158,8 +167,8 @@ export class ParametrosSistemaService {
     return carenciaDoacaoRealizadaPadrao;
   }
 
-  async obterObrigatoriedadeDocumentosBeneficiario() {
-    const registro = await this.repository.buscarObrigatoriedadeDocumentosBeneficiario();
+  async obterObrigatoriedadeDocumentosBeneficiario(tenantId?: string) {
+    const registro = await this.repository.buscarObrigatoriedadeDocumentosBeneficiario(tenantId);
     if (!registro) {
       return {
         obrigatoriedade: obrigatoriedadeDocumentosBeneficiarioPadrao,
@@ -194,7 +203,8 @@ export class ParametrosSistemaService {
 
   async atualizarObrigatoriedadeDocumentosBeneficiario(
     rawPayload: unknown,
-    usuarioAtualizacao: string
+    usuarioAtualizacao: string,
+    tenantId: string
   ) {
     const payload = atualizarObrigatoriedadeDocumentosBeneficiarioPayloadSchema.parse(rawPayload);
     const documentosRecebidos = Array.isArray(payload.obrigatoriedade?.documentos)
@@ -217,7 +227,8 @@ export class ParametrosSistemaService {
 
     const salvo = await this.repository.salvarObrigatoriedadeDocumentosBeneficiario(
       normalizado,
-      usuarioAtualizacao
+      usuarioAtualizacao,
+      tenantId
     );
 
     return {
@@ -230,8 +241,8 @@ export class ParametrosSistemaService {
     return obrigatoriedadeDocumentosBeneficiarioPadrao;
   }
 
-  async obterAlertasCentralAtendimentos() {
-    const registro = await this.repository.buscarAlertasCentralAtendimentos();
+  async obterAlertasCentralAtendimentos(tenantId?: string) {
+    const registro = await this.repository.buscarAlertasCentralAtendimentos(tenantId);
     if (!registro) {
       return {
         alertas: alertasCentralAtendimentosPadrao,
@@ -250,7 +261,11 @@ export class ParametrosSistemaService {
     };
   }
 
-  async atualizarAlertasCentralAtendimentos(rawPayload: unknown, usuarioAtualizacao: string) {
+  async atualizarAlertasCentralAtendimentos(
+    rawPayload: unknown,
+    usuarioAtualizacao: string,
+    tenantId: string
+  ) {
     const payload = atualizarAlertasCentralAtendimentosPayloadSchema.parse(rawPayload);
     const normalizado = alertasCentralAtendimentosSchema.parse({
       ...alertasCentralAtendimentosPadrao,
@@ -259,7 +274,8 @@ export class ParametrosSistemaService {
 
     const salvo = await this.repository.salvarAlertasCentralAtendimentos(
       normalizado,
-      usuarioAtualizacao
+      usuarioAtualizacao,
+      tenantId
     );
 
     return {

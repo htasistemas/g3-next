@@ -140,89 +140,121 @@ async function obterProximoCodigoTransacao(tx: TransactionClient): Promise<strin
 }
 
 export class BeneficiarioRepository {
-  async listar(filters: BeneficiarioFilters) {
-    const where: Prisma.CadastroBeneficiarioWhereInput = {};
-    const andFilters: Prisma.CadastroBeneficiarioWhereInput[] = [];
+  private tenantSql(alias: string, tenantId: string) {
+    return Prisma.sql`${Prisma.raw(alias)}.tenant_id::text = ${tenantId}`;
+  }
 
+  async listar(filters: BeneficiarioFilters, tenantId: string) {
+    const condicoes: Prisma.Sql[] = [this.tenantSql("b", tenantId)];
     const nome = trimOrUndefined(filters.nome);
     if (nome) {
-      where.OR = [
-        { nomeCompleto: { contains: nome, mode: "insensitive" } },
-        { nomeSocial: { contains: nome, mode: "insensitive" } },
-        { apelido: { contains: nome, mode: "insensitive" } }
-      ];
+      const like = `%${nome}%`;
+      condicoes.push(Prisma.sql`
+        (
+          b.nome_completo ILIKE ${like}
+          OR COALESCE(b.nome_social, '') ILIKE ${like}
+          OR COALESCE(b.apelido, '') ILIKE ${like}
+        )
+      `);
     }
 
     const status = trimOrUndefined(filters.status);
     if (status) {
-      where.status = status;
+      condicoes.push(Prisma.sql`b.status = ${status}`);
     }
 
     const codigoVariants = buildCodigoVariants(filters.codigo);
     if (codigoVariants.length) {
-      andFilters.push({ codigo: { in: codigoVariants } });
+      condicoes.push(Prisma.sql`b.codigo IN (${Prisma.join(codigoVariants)})`);
     }
 
     const cpf = normalizeDigits(filters.cpf);
     if (cpf) {
-      andFilters.push({
-        documentos: {
-          some: {
-            tipoDocumento: "CPF",
-            numeroDocumento: { contains: cpf }
-          }
-        }
-      });
+      condicoes.push(Prisma.sql`
+        EXISTS (
+          SELECT 1
+          FROM documentos d
+          WHERE d.beneficiario_id = b.id
+            AND upper(coalesce(d.tipo_documento, '')) = 'CPF'
+            AND regexp_replace(coalesce(d.numero_documento, ''), '[^0-9]', '', 'g') LIKE ${`%${cpf}%`}
+        )
+      `);
     }
 
     const nis = normalizeDigits(filters.nis);
     if (nis) {
-      andFilters.push({
-        documentos: {
-          some: {
-            tipoDocumento: "NIS",
-            numeroDocumento: { contains: nis }
-          }
-        }
-      });
+      condicoes.push(Prisma.sql`
+        EXISTS (
+          SELECT 1
+          FROM documentos d
+          WHERE d.beneficiario_id = b.id
+            AND upper(coalesce(d.tipo_documento, '')) = 'NIS'
+            AND regexp_replace(coalesce(d.numero_documento, ''), '[^0-9]', '', 'g') LIKE ${`%${nis}%`}
+        )
+      `);
     }
 
     const dataNascimento = toOptionalDate(filters.data_nascimento);
     if (dataNascimento) {
-      andFilters.push({ dataNascimento });
+      condicoes.push(Prisma.sql`b.data_nascimento = ${dataNascimento}`);
     }
 
-    if (andFilters.length) {
-      where.AND = andFilters;
+    const ids = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+      SELECT b.id
+      FROM cadastro_beneficiario b
+      WHERE ${Prisma.join(condicoes, " AND ")}
+      ORDER BY b.nome_completo ASC
+    `);
+
+    if (!ids.length) {
+      return [];
     }
 
-    return prisma.cadastroBeneficiario.findMany({
-      where,
+    const encontrados = await prisma.cadastroBeneficiario.findMany({
+      where: { id: { in: ids.map((item) => item.id) } },
       include: beneficiarioInclude,
       orderBy: [{ nomeCompleto: "asc" }]
     });
+
+    return encontrados;
   }
 
-  async buscarPorId(id: bigint) {
+  async buscarPorId(id: bigint, tenantId: string) {
+    const rows = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+      SELECT b.id
+      FROM cadastro_beneficiario b
+      WHERE b.id = ${id}
+        AND ${this.tenantSql("b", tenantId)}
+      LIMIT 1
+    `);
+    if (!rows[0]) return null;
     return prisma.cadastroBeneficiario.findUnique({
       where: { id },
       include: beneficiarioInclude
     });
   }
 
-  async buscarPorIdOuFalhar(id: bigint) {
-    const beneficiario = await this.buscarPorId(id);
+  async buscarPorIdOuFalhar(id: bigint, tenantId: string) {
+    const beneficiario = await this.buscarPorId(id, tenantId);
     if (!beneficiario) {
       throw new AppError("Beneficiario nao encontrado.", 404);
     }
     return beneficiario;
   }
 
-  async obterProximoCodigo() {
-    return obterProximoCodigoTransacao(prisma as unknown as TransactionClient);
+  async obterProximoCodigo(tenantId: string) {
+    const result = await prisma.$queryRaw<Array<{ max_code: number | null }>>(Prisma.sql`
+      SELECT MAX(CAST(codigo AS INTEGER)) AS max_code
+      FROM cadastro_beneficiario
+      WHERE codigo IS NOT NULL
+        AND codigo ~ '^[0-9]+$'
+        AND tenant_id::text = ${tenantId}
+    `);
+    const maxCode = result[0]?.max_code ?? 0;
+    return String(maxCode + 1).padStart(4, "0");
   }
 
-  async buscarDuplicidadeCadastro(input: BeneficiarioInput, idIgnorado?: bigint) {
+  async buscarDuplicidadeCadastro(input: BeneficiarioInput, tenantId: string, idIgnorado?: bigint) {
     const nomeCompleto = normalizarTextoBusca(input.nome_completo);
     const nomeMae = normalizarTextoBusca(input.nome_mae);
     const dataNascimento = toOptionalDate(input.data_nascimento);
@@ -249,7 +281,8 @@ export class BeneficiarioRepository {
           LIMIT 1
         ) AS cpf
       FROM cadastro_beneficiario b
-      WHERE b.data_nascimento = ${dataNascimento}
+      WHERE ${this.tenantSql("b", tenantId)}
+        AND b.data_nascimento = ${dataNascimento}
         AND ${sqlNomeCompletoNormalizadoBusca} = ${nomeCompleto}
         AND ${sqlNomeMaeNormalizadoBusca} = ${nomeMae}
         ${filtroIdIgnorado}
@@ -271,7 +304,8 @@ export class BeneficiarioRepository {
         b.nome_completo,
         ${cpf} AS cpf
       FROM cadastro_beneficiario b
-      WHERE EXISTS (
+      WHERE ${this.tenantSql("b", tenantId)}
+        AND EXISTS (
         SELECT 1
         FROM documentos d
         WHERE d.beneficiario_id = b.id
@@ -285,7 +319,7 @@ export class BeneficiarioRepository {
     return duplicadosPorCpf[0] ?? null;
   }
 
-  async buscarSugestaoEndereco(filters: BeneficiarioAddressSuggestionFilters) {
+  async buscarSugestaoEndereco(filters: BeneficiarioAddressSuggestionFilters, tenantId: string) {
     const municipio = normalizarTextoBusca(filters.municipio);
     if (!municipio) {
       return null;
@@ -300,7 +334,9 @@ export class BeneficiarioRepository {
           NULLIF(TRIM(subzona), '') AS subzona,
           COUNT(*)::integer AS total
         FROM endereco
-        WHERE ${sqlCidadeNormalizadaBusca} = ${municipio}
+        INNER JOIN cadastro_beneficiario b ON b.endereco_id = endereco.id
+        WHERE ${this.tenantSql("b", tenantId)}
+          AND ${sqlCidadeNormalizadaBusca} = ${municipio}
           AND (
             COALESCE(TRIM(zona), '') <> ''
             OR COALESCE(TRIM(subzona), '') <> ''
@@ -329,7 +365,7 @@ export class BeneficiarioRepository {
     return (await buscarCombinacao(true)) ?? (await buscarCombinacao(false));
   }
 
-  async criar(input: BeneficiarioInput) {
+  async criar(input: BeneficiarioInput, tenantId: string) {
     return prisma.$transaction(async (tx) => {
       const now = new Date();
       let enderecoId: bigint | undefined;
@@ -356,7 +392,7 @@ export class BeneficiarioRepository {
         enderecoId = endereco.id;
       }
 
-      const codigo = trimOrUndefined(input.codigo) ?? (await obterProximoCodigoTransacao(tx));
+      const codigo = trimOrUndefined(input.codigo) ?? (await this.obterProximoCodigoTransacaoTenant(tx, tenantId));
       const beneficiario = await tx.cadastroBeneficiario.create({
         data: {
           codigo,
@@ -384,15 +420,14 @@ export class BeneficiarioRepository {
       });
 
       await this.recriarDadosRelacionados(tx, beneficiario.id, input, now);
+      await this.aplicarTenantDoBeneficiario(tx, beneficiario.id, tenantId);
       return this.buscarPorIdTransacao(tx, beneficiario.id);
     });
   }
 
-  async atualizar(id: bigint, input: BeneficiarioInput) {
+  async atualizar(id: bigint, input: BeneficiarioInput, tenantId: string) {
     return prisma.$transaction(async (tx) => {
-      const existing = await tx.cadastroBeneficiario.findUnique({
-        where: { id }
-      });
+      const existing = await this.buscarPorIdTransacao(tx, id, tenantId);
 
       if (!existing) {
         throw new AppError("Beneficiario nao encontrado.", 404);
@@ -475,16 +510,29 @@ export class BeneficiarioRepository {
 
       await this.limparDadosRelacionados(tx, id);
       await this.recriarDadosRelacionados(tx, id, input, now);
-      return this.buscarPorIdTransacao(tx, id);
+      await this.aplicarTenantDoBeneficiario(tx, id, tenantId);
+      return this.buscarPorIdTransacao(tx, id, tenantId);
     });
   }
 
-  async remover(id: bigint) {
-    await this.buscarPorIdOuFalhar(id);
+  async remover(id: bigint, tenantId: string) {
+    await this.buscarPorIdOuFalhar(id, tenantId);
     await prisma.cadastroBeneficiario.delete({ where: { id } });
   }
 
-  private async buscarPorIdTransacao(tx: TransactionClient, id: bigint) {
+  private async buscarPorIdTransacao(tx: TransactionClient, id: bigint, tenantId?: string) {
+    if (tenantId) {
+      const rows = await tx.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+        SELECT b.id
+        FROM cadastro_beneficiario b
+        WHERE b.id = ${id}
+          AND ${this.tenantSql("b", tenantId)}
+        LIMIT 1
+      `);
+      if (!rows[0]) {
+        throw new AppError("Beneficiario nao encontrado.", 404);
+      }
+    }
     const beneficiario = await tx.cadastroBeneficiario.findUnique({
       where: { id },
       include: beneficiarioInclude
@@ -493,6 +541,39 @@ export class BeneficiarioRepository {
       throw new AppError("Beneficiario nao encontrado.", 404);
     }
     return beneficiario;
+  }
+
+  private async obterProximoCodigoTransacaoTenant(tx: TransactionClient, tenantId: string) {
+    const result = await tx.$queryRaw<Array<{ max_code: number | null }>>(Prisma.sql`
+      SELECT MAX(CAST(codigo AS INTEGER)) AS max_code
+      FROM cadastro_beneficiario
+      WHERE codigo IS NOT NULL
+        AND codigo ~ '^[0-9]+$'
+        AND tenant_id::text = ${tenantId}
+    `);
+    const maxCode = result[0]?.max_code ?? 0;
+    return String(maxCode + 1).padStart(4, "0");
+  }
+
+  private async aplicarTenantDoBeneficiario(
+    tx: TransactionClient,
+    beneficiarioId: bigint,
+    tenantId: string
+  ) {
+    const comandos = [
+      Prisma.sql`UPDATE cadastro_beneficiario SET tenant_id = ${tenantId}::uuid WHERE id = ${beneficiarioId}`,
+      Prisma.sql`UPDATE contato_beneficiario SET tenant_id = ${tenantId}::uuid WHERE beneficiario_id = ${beneficiarioId}`,
+      Prisma.sql`UPDATE documentos SET tenant_id = ${tenantId}::uuid WHERE beneficiario_id = ${beneficiarioId}`,
+      Prisma.sql`UPDATE situacao_social SET tenant_id = ${tenantId}::uuid WHERE beneficiario_id = ${beneficiarioId}`,
+      Prisma.sql`UPDATE escolaridade_beneficiario SET tenant_id = ${tenantId}::uuid WHERE beneficiario_id = ${beneficiarioId}`,
+      Prisma.sql`UPDATE saude_beneficiario SET tenant_id = ${tenantId}::uuid WHERE beneficiario_id = ${beneficiarioId}`,
+      Prisma.sql`UPDATE beneficios_beneficiario SET tenant_id = ${tenantId}::uuid WHERE beneficiario_id = ${beneficiarioId}`,
+      Prisma.sql`UPDATE observacoes_beneficiario SET tenant_id = ${tenantId}::uuid WHERE beneficiario_id = ${beneficiarioId}`
+    ];
+
+    for (const comando of comandos) {
+      await tx.$executeRaw(comando);
+    }
   }
 
   private async limparDadosRelacionados(tx: TransactionClient, id: bigint) {

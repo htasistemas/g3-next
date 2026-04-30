@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { arquivosService } from '@/services/arquivos.service';
 import { contabilidadeService } from '@/services/contabilidade.service';
+import { useAuth } from '@/hooks/use-auth';
 import type {
   CategoriaFinanceiraPayload,
   CentroCustoPayload,
@@ -13,99 +14,121 @@ import type {
   TransferenciaFinanceiraPayload
 } from '@/types/contabilidade';
 
-const baseKey = ['contabilidade'] as const;
+const baseKey = (tenantId: string) => ['contabilidade', tenantId] as const;
 
 type QueryOptions = {
   enabled?: boolean;
 };
 
-async function invalidarTudoContabilidade(queryClient: ReturnType<typeof useQueryClient>) {
-  await queryClient.invalidateQueries({ queryKey: baseKey });
+async function invalidarTudoContabilidade(queryClient: ReturnType<typeof useQueryClient>, tenantId: string) {
+  await queryClient.invalidateQueries({ queryKey: baseKey(tenantId) });
 }
 
 export function useContasBancarias(options?: QueryOptions) {
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? 'sem-tenant';
   return useQuery({
-    queryKey: [...baseKey, 'contas-bancarias'],
+    queryKey: [...baseKey(tenantId), 'contas-bancarias'],
     queryFn: () => contabilidadeService.listarContasBancarias(),
     enabled: options?.enabled ?? true
   });
 }
 
 export function useCategoriasFinanceiras(options?: QueryOptions) {
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? 'sem-tenant';
   return useQuery({
-    queryKey: [...baseKey, 'categorias'],
+    queryKey: [...baseKey(tenantId), 'categorias'],
     queryFn: () => contabilidadeService.listarCategorias(),
     enabled: options?.enabled ?? true
   });
 }
 
 export function useCentrosCustoContabeis(options?: QueryOptions) {
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? 'sem-tenant';
   return useQuery({
-    queryKey: [...baseKey, 'centros-custo'],
+    queryKey: [...baseKey(tenantId), 'centros-custo'],
     queryFn: () => contabilidadeService.listarCentrosCusto(),
     enabled: options?.enabled ?? true
   });
 }
 
 export function useLancamentosContabeis(options?: QueryOptions) {
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? 'sem-tenant';
   return useQuery({
-    queryKey: [...baseKey, 'lancamentos'],
+    queryKey: [...baseKey(tenantId), 'lancamentos'],
     queryFn: () => contabilidadeService.listarLancamentos(),
     enabled: options?.enabled ?? true
   });
 }
 
 export function useMovimentacoesContabeis(options?: QueryOptions) {
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? 'sem-tenant';
   return useQuery({
-    queryKey: [...baseKey, 'movimentacoes'],
+    queryKey: [...baseKey(tenantId), 'movimentacoes'],
     queryFn: () => contabilidadeService.listarMovimentacoes(),
     enabled: options?.enabled ?? true
   });
 }
 
 export function useTransferenciasContabeis(options?: QueryOptions) {
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? 'sem-tenant';
   return useQuery({
-    queryKey: [...baseKey, 'transferencias'],
+    queryKey: [...baseKey(tenantId), 'transferencias'],
     queryFn: () => contabilidadeService.listarTransferencias(),
     enabled: options?.enabled ?? true
   });
 }
 
 export function useConciliacoesContabeis(options?: QueryOptions) {
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? 'sem-tenant';
   return useQuery({
-    queryKey: [...baseKey, 'conciliacoes'],
+    queryKey: [...baseKey(tenantId), 'conciliacoes'],
     queryFn: () => contabilidadeService.listarConciliacoes(),
     enabled: options?.enabled ?? true
   });
 }
 
 export function useHistoricoContabil(options?: QueryOptions) {
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? 'sem-tenant';
   return useQuery({
-    queryKey: [...baseKey, 'historico'],
+    queryKey: [...baseKey(tenantId), 'historico'],
     queryFn: () => contabilidadeService.listarHistorico(),
     enabled: options?.enabled ?? true
   });
 }
 
 export function useComprasIntegradasContabilidade(options?: QueryOptions) {
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? 'sem-tenant';
   return useQuery({
-    queryKey: [...baseKey, 'compras-integradas'],
+    queryKey: [...baseKey(tenantId), 'compras-integradas'],
     queryFn: () => contabilidadeService.listarComprasIntegradas(),
     enabled: options?.enabled ?? true
   });
 }
 
 export function useEmendasContabeis(options?: QueryOptions) {
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? 'sem-tenant';
   return useQuery({
-    queryKey: [...baseKey, 'emendas'],
+    queryKey: [...baseKey(tenantId), 'emendas'],
     queryFn: () => contabilidadeService.listarEmendas(),
     enabled: options?.enabled ?? true
   });
 }
 
 export function useArquivosLancamentoContabil(lancamentoId?: string | number) {
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? 'sem-tenant';
   return useQuery({
-    queryKey: [...baseKey, 'arquivos', lancamentoId],
+    queryKey: [...baseKey(tenantId), 'arquivos', lancamentoId],
     queryFn: () => arquivosService.listarPorLancamentoContabil(lancamentoId as string),
     enabled: !!lancamentoId
   });
@@ -113,6 +136,8 @@ export function useArquivosLancamentoContabil(lancamentoId?: string | number) {
 
 export function useSalvarContaBancaria() {
   const queryClient = useQueryClient();
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? 'sem-tenant';
   return useMutation({
     mutationFn: async ({ id, payload }: { id?: number; payload: ContaBancariaPayload }) => {
       if (id) {
@@ -120,20 +145,24 @@ export function useSalvarContaBancaria() {
       }
       return contabilidadeService.criarContaBancaria(payload);
     },
-    onSuccess: async () => invalidarTudoContabilidade(queryClient)
+    onSuccess: async () => invalidarTudoContabilidade(queryClient, tenantId)
   });
 }
 
 export function useRemoverContaBancaria() {
   const queryClient = useQueryClient();
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? 'sem-tenant';
   return useMutation({
     mutationFn: (id: number) => contabilidadeService.removerContaBancaria(id),
-    onSuccess: async () => invalidarTudoContabilidade(queryClient)
+    onSuccess: async () => invalidarTudoContabilidade(queryClient, tenantId)
   });
 }
 
 export function useSalvarCategoriaFinanceira() {
   const queryClient = useQueryClient();
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? 'sem-tenant';
   return useMutation({
     mutationFn: async ({ id, payload }: { id?: number; payload: CategoriaFinanceiraPayload }) => {
       if (id) {
@@ -141,20 +170,24 @@ export function useSalvarCategoriaFinanceira() {
       }
       return contabilidadeService.criarCategoria(payload);
     },
-    onSuccess: async () => invalidarTudoContabilidade(queryClient)
+    onSuccess: async () => invalidarTudoContabilidade(queryClient, tenantId)
   });
 }
 
 export function useRemoverCategoriaFinanceira() {
   const queryClient = useQueryClient();
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? 'sem-tenant';
   return useMutation({
     mutationFn: (id: number) => contabilidadeService.removerCategoria(id),
-    onSuccess: async () => invalidarTudoContabilidade(queryClient)
+    onSuccess: async () => invalidarTudoContabilidade(queryClient, tenantId)
   });
 }
 
 export function useSalvarCentroCustoContabil() {
   const queryClient = useQueryClient();
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? 'sem-tenant';
   return useMutation({
     mutationFn: async ({ id, payload }: { id?: number; payload: CentroCustoPayload }) => {
       if (id) {
@@ -162,20 +195,24 @@ export function useSalvarCentroCustoContabil() {
       }
       return contabilidadeService.criarCentroCusto(payload);
     },
-    onSuccess: async () => invalidarTudoContabilidade(queryClient)
+    onSuccess: async () => invalidarTudoContabilidade(queryClient, tenantId)
   });
 }
 
 export function useRemoverCentroCustoContabil() {
   const queryClient = useQueryClient();
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? 'sem-tenant';
   return useMutation({
     mutationFn: (id: number) => contabilidadeService.removerCentroCusto(id),
-    onSuccess: async () => invalidarTudoContabilidade(queryClient)
+    onSuccess: async () => invalidarTudoContabilidade(queryClient, tenantId)
   });
 }
 
 export function useSalvarLancamentoContabil() {
   const queryClient = useQueryClient();
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? 'sem-tenant';
   return useMutation({
     mutationFn: async ({ id, payload }: { id?: number; payload: LancamentoFinanceiroPayload }) => {
       if (id) {
@@ -183,46 +220,56 @@ export function useSalvarLancamentoContabil() {
       }
       return contabilidadeService.criarLancamento(payload);
     },
-    onSuccess: async () => invalidarTudoContabilidade(queryClient)
+    onSuccess: async () => invalidarTudoContabilidade(queryClient, tenantId)
   });
 }
 
 export function useRemoverLancamentoContabil() {
   const queryClient = useQueryClient();
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? 'sem-tenant';
   return useMutation({
     mutationFn: (id: number) => contabilidadeService.removerLancamento(id),
-    onSuccess: async () => invalidarTudoContabilidade(queryClient)
+    onSuccess: async () => invalidarTudoContabilidade(queryClient, tenantId)
   });
 }
 
 export function useAtualizarSituacaoLancamento() {
   const queryClient = useQueryClient();
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? 'sem-tenant';
   return useMutation({
     mutationFn: ({ id, status }: { id: number; status: string }) =>
       contabilidadeService.atualizarSituacaoLancamento(id, status),
-    onSuccess: async () => invalidarTudoContabilidade(queryClient)
+    onSuccess: async () => invalidarTudoContabilidade(queryClient, tenantId)
   });
 }
 
 export function usePagarLancamento() {
   const queryClient = useQueryClient();
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? 'sem-tenant';
   return useMutation({
     mutationFn: ({ id, payload }: { id: number; payload: LancamentoFinanceiroBaixaPayload }) =>
       contabilidadeService.pagarLancamento(id, payload),
-    onSuccess: async () => invalidarTudoContabilidade(queryClient)
+    onSuccess: async () => invalidarTudoContabilidade(queryClient, tenantId)
   });
 }
 
 export function useEstornarLancamento() {
   const queryClient = useQueryClient();
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? 'sem-tenant';
   return useMutation({
     mutationFn: (id: number) => contabilidadeService.estornarLancamento(id),
-    onSuccess: async () => invalidarTudoContabilidade(queryClient)
+    onSuccess: async () => invalidarTudoContabilidade(queryClient, tenantId)
   });
 }
 
 export function useSalvarMovimentacaoContabil() {
   const queryClient = useQueryClient();
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? 'sem-tenant';
   return useMutation({
     mutationFn: async ({ id, payload }: { id?: number; payload: MovimentacaoFinanceiraPayload }) => {
       if (id) {
@@ -230,95 +277,115 @@ export function useSalvarMovimentacaoContabil() {
       }
       return contabilidadeService.criarMovimentacao(payload);
     },
-    onSuccess: async () => invalidarTudoContabilidade(queryClient)
+    onSuccess: async () => invalidarTudoContabilidade(queryClient, tenantId)
   });
 }
 
 export function useRemoverMovimentacaoContabil() {
   const queryClient = useQueryClient();
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? 'sem-tenant';
   return useMutation({
     mutationFn: (id: number) => contabilidadeService.removerMovimentacao(id),
-    onSuccess: async () => invalidarTudoContabilidade(queryClient)
+    onSuccess: async () => invalidarTudoContabilidade(queryClient, tenantId)
   });
 }
 
 export function useCriarTransferenciaContabil() {
   const queryClient = useQueryClient();
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? 'sem-tenant';
   return useMutation({
     mutationFn: (payload: TransferenciaFinanceiraPayload) =>
       contabilidadeService.criarTransferencia(payload),
-    onSuccess: async () => invalidarTudoContabilidade(queryClient)
+    onSuccess: async () => invalidarTudoContabilidade(queryClient, tenantId)
   });
 }
 
 export function useEstornarTransferenciaContabil() {
   const queryClient = useQueryClient();
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? 'sem-tenant';
   return useMutation({
     mutationFn: (id: number) => contabilidadeService.estornarTransferencia(id),
-    onSuccess: async () => invalidarTudoContabilidade(queryClient)
+    onSuccess: async () => invalidarTudoContabilidade(queryClient, tenantId)
   });
 }
 
 export function useCriarConciliacaoContabil() {
   const queryClient = useQueryClient();
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? 'sem-tenant';
   return useMutation({
     mutationFn: (payload: ConciliacaoFinanceiraPayload) =>
       contabilidadeService.criarConciliacao(payload),
-    onSuccess: async () => invalidarTudoContabilidade(queryClient)
+    onSuccess: async () => invalidarTudoContabilidade(queryClient, tenantId)
   });
 }
 
 export function useAtualizarSituacaoConciliacao() {
   const queryClient = useQueryClient();
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? 'sem-tenant';
   return useMutation({
     mutationFn: ({ id, situacao }: { id: number; situacao: string }) =>
       contabilidadeService.atualizarSituacaoConciliacao(id, situacao),
-    onSuccess: async () => invalidarTudoContabilidade(queryClient)
+    onSuccess: async () => invalidarTudoContabilidade(queryClient, tenantId)
   });
 }
 
 export function useGerarObrigacaoFinanceiraCompra() {
   const queryClient = useQueryClient();
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? 'sem-tenant';
   return useMutation({
     mutationFn: (compraId: number) => contabilidadeService.gerarObrigacaoFinanceiraPorCompra(compraId),
-    onSuccess: async () => invalidarTudoContabilidade(queryClient)
+    onSuccess: async () => invalidarTudoContabilidade(queryClient, tenantId)
   });
 }
 
 export function useCriarEmendaContabil() {
   const queryClient = useQueryClient();
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? 'sem-tenant';
   return useMutation({
     mutationFn: (payload: EmendaImpositivaPayload) => contabilidadeService.criarEmenda(payload),
-    onSuccess: async () => invalidarTudoContabilidade(queryClient)
+    onSuccess: async () => invalidarTudoContabilidade(queryClient, tenantId)
   });
 }
 
 export function useAtualizarStatusEmendaContabil() {
   const queryClient = useQueryClient();
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? 'sem-tenant';
   return useMutation({
     mutationFn: ({ id, status }: { id: number; status: string }) =>
       contabilidadeService.atualizarStatusEmenda(id, status),
-    onSuccess: async () => invalidarTudoContabilidade(queryClient)
+    onSuccess: async () => invalidarTudoContabilidade(queryClient, tenantId)
   });
 }
 
 export function useUploadArquivoLancamentoContabil(lancamentoId?: number) {
   const queryClient = useQueryClient();
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? 'sem-tenant';
   return useMutation({
     mutationFn: ({ arquivo, observacao }: { arquivo: File; observacao?: string }) =>
       arquivosService.uploadParaLancamentoContabil(lancamentoId as number, arquivo, observacao),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: [...baseKey, 'arquivos', lancamentoId] });
+      await queryClient.invalidateQueries({ queryKey: [...baseKey(tenantId), 'arquivos', lancamentoId] });
     }
   });
 }
 
 export function useExcluirArquivoLancamentoContabil(lancamentoId?: number) {
   const queryClient = useQueryClient();
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? 'sem-tenant';
   return useMutation({
     mutationFn: (arquivoId: number) => arquivosService.excluir(arquivoId),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: [...baseKey, 'arquivos', lancamentoId] });
+      await queryClient.invalidateQueries({ queryKey: [...baseKey(tenantId), 'arquivos', lancamentoId] });
     }
   });
 }

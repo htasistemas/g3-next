@@ -42,85 +42,112 @@ function toBigIntOrUndefined(value?: number): bigint | undefined {
   return BigInt(value);
 }
 
-async function validarProfissional(tx: TransactionClient, profissionalId?: bigint): Promise<void> {
+async function validarProfissional(
+  tx: TransactionClient,
+  tenantId: string,
+  profissionalId?: bigint
+): Promise<void> {
   if (!profissionalId) return;
-  const profissional = await tx.cadastroProfissional.findUnique({
-    where: { id: profissionalId },
-    select: { id: true }
-  });
+  const profissional = await tx.$queryRaw<Array<{ id: bigint }>>`
+    SELECT p.id
+    FROM cadastro_profissionais p
+    WHERE p.id = ${profissionalId}
+      AND p.tenant_id::text = ${tenantId}
+    LIMIT 1
+  `;
 
-  if (!profissional) {
+  if (!profissional.length) {
     throw new AppError("Profissional vinculado nao encontrado.", 404);
   }
 }
 
 export class VoluntarioRepository {
-  async listar(filters: VoluntarioFilters) {
-    const where: Prisma.CadastroVoluntarioWhereInput = {};
-    const andFilters: Prisma.CadastroVoluntarioWhereInput[] = [];
+  async listar(filters: VoluntarioFilters, tenantId: string) {
+    const condicoes: Prisma.Sql[] = [Prisma.sql`v.tenant_id::text = ${tenantId}`];
 
     const nome = trimOrUndefined(filters.nome);
     if (nome) {
-      where.OR = [
-        { nomeCompleto: { contains: nome, mode: "insensitive" } },
-        {
-          profissional: {
-            is: {
-              nomeCompleto: { contains: nome, mode: "insensitive" }
-            }
-          }
-        }
-      ];
+      condicoes.push(
+        Prisma.sql`(
+          v.nome_completo ILIKE ${`%${nome}%`}
+          OR COALESCE(p.nome_completo, '') ILIKE ${`%${nome}%`}
+        )`
+      );
     }
 
     const status = trimOrUndefined(filters.status);
     if (status) {
-      andFilters.push({ status: status.toUpperCase() });
+      condicoes.push(Prisma.sql`COALESCE(v.status, '') = ${status.toUpperCase()}`);
     }
 
     const cpf = normalizeDigits(filters.cpf);
     if (cpf) {
-      andFilters.push({ cpf: { contains: cpf } });
+      condicoes.push(Prisma.sql`COALESCE(v.cpf, '') LIKE ${`%${cpf}%`}`);
     }
 
     const email = trimOrUndefined(filters.email);
     if (email) {
-      andFilters.push({ email: { contains: email, mode: "insensitive" } });
+      condicoes.push(Prisma.sql`COALESCE(v.email, '') ILIKE ${`%${email}%`}`);
     }
 
-    if (andFilters.length) {
-      where.AND = andFilters;
+    const rows = await prisma.$queryRaw<Array<{ id: bigint }>>`
+      SELECT v.id
+      FROM cadastro_voluntario v
+      LEFT JOIN cadastro_profissionais p ON p.id = v.profissional_id
+      WHERE ${Prisma.join(condicoes, " AND ")}
+      ORDER BY v.nome_completo ASC
+    `;
+
+    if (!rows.length) {
+      return [];
     }
 
-    return prisma.cadastroVoluntario.findMany({
-      where,
-      include: voluntarioInclude,
-      orderBy: [{ nomeCompleto: "asc" }]
+    const ids = rows.map((row) => row.id);
+    const voluntarios = await prisma.cadastroVoluntario.findMany({
+      where: { id: { in: ids } },
+      include: voluntarioInclude
     });
+
+    const ordem = new Map(ids.map((id, index) => [id.toString(), index]));
+    return voluntarios.sort(
+      (a, b) => (ordem.get(a.id.toString()) ?? 0) - (ordem.get(b.id.toString()) ?? 0)
+    );
   }
 
-  async buscarPorId(id: bigint) {
+  async buscarPorId(id: bigint, tenantId: string) {
+    const row = await prisma.$queryRaw<Array<{ id: bigint }>>`
+      SELECT v.id
+      FROM cadastro_voluntario v
+      WHERE v.id = ${id}
+        AND v.tenant_id::text = ${tenantId}
+      LIMIT 1
+    `;
+
+    if (!row.length) {
+      return null;
+    }
+
     return prisma.cadastroVoluntario.findUnique({
       where: { id },
       include: voluntarioInclude
     });
   }
 
-  async buscarPorIdOuFalhar(id: bigint) {
-    const voluntario = await this.buscarPorId(id);
+  async buscarPorIdOuFalhar(id: bigint, tenantId: string) {
+    const voluntario = await this.buscarPorId(id, tenantId);
     if (!voluntario) {
       throw new AppError("Voluntario nao encontrado.", 404);
     }
     return voluntario;
   }
 
-  async criar(input: VoluntarioInput) {
+  async criar(input: VoluntarioInput, tenantId: string) {
     return prisma.$transaction(async (tx) => {
       const now = new Date();
       let enderecoId: bigint | undefined;
       const profissionalId = toBigIntOrUndefined(input.profissional_id);
 
-      await validarProfissional(tx, profissionalId);
+      await validarProfissional(tx, tenantId, profissionalId);
 
       if (hasAnyAddressData(input)) {
         const endereco = await tx.endereco.create({
@@ -180,15 +207,23 @@ export class VoluntarioRepository {
         }
       });
 
-      return this.buscarPorIdTransacao(tx, voluntario.id);
+      await tx.$executeRaw`
+        UPDATE cadastro_voluntario
+        SET tenant_id = ${tenantId}::uuid
+        WHERE id = ${voluntario.id}
+      `;
+
+      const salvo = await this.buscarPorIdTransacao(tx, voluntario.id, tenantId);
+      if (!salvo) {
+        throw new AppError("Voluntario nao encontrado apos criar o registro.", 500);
+      }
+      return salvo;
     });
   }
 
-  async atualizar(id: bigint, input: VoluntarioInput) {
+  async atualizar(id: bigint, input: VoluntarioInput, tenantId: string) {
     return prisma.$transaction(async (tx) => {
-      const existing = await tx.cadastroVoluntario.findUnique({
-        where: { id }
-      });
+      const existing = await this.buscarPorIdTransacao(tx, id, tenantId);
       if (!existing) {
         throw new AppError("Voluntario nao encontrado.", 404);
       }
@@ -198,7 +233,7 @@ export class VoluntarioRepository {
       const possuiEndereco = hasAnyAddressData(input);
       const profissionalId = toBigIntOrUndefined(input.profissional_id);
 
-      await validarProfissional(tx, profissionalId);
+      await validarProfissional(tx, tenantId, profissionalId);
 
       if (possuiEndereco) {
         if (existing.enderecoId) {
@@ -279,23 +314,40 @@ export class VoluntarioRepository {
         }
       });
 
-      return this.buscarPorIdTransacao(tx, id);
+      await tx.$executeRaw`
+        UPDATE cadastro_voluntario
+        SET tenant_id = ${tenantId}::uuid
+        WHERE id = ${id}
+      `;
+
+      const atualizado = await this.buscarPorIdTransacao(tx, id, tenantId);
+      if (!atualizado) {
+        throw new AppError("Voluntario nao encontrado apos atualizar o registro.", 500);
+      }
+      return atualizado;
     });
   }
 
-  async remover(id: bigint) {
-    await this.buscarPorIdOuFalhar(id);
+  async remover(id: bigint, tenantId: string) {
+    await this.buscarPorIdOuFalhar(id, tenantId);
     await prisma.cadastroVoluntario.delete({ where: { id } });
   }
 
-  private async buscarPorIdTransacao(tx: TransactionClient, id: bigint) {
-    const voluntario = await tx.cadastroVoluntario.findUnique({
+  private async buscarPorIdTransacao(tx: TransactionClient, id: bigint, tenantId: string) {
+    const row = await tx.$queryRaw<Array<{ id: bigint }>>`
+      SELECT v.id
+      FROM cadastro_voluntario v
+      WHERE v.id = ${id}
+        AND v.tenant_id::text = ${tenantId}
+      LIMIT 1
+    `;
+    if (!row.length) {
+      return null;
+    }
+
+    return tx.cadastroVoluntario.findUnique({
       where: { id },
       include: voluntarioInclude
     });
-    if (!voluntario) {
-      throw new AppError("Voluntario nao encontrado.", 404);
-    }
-    return voluntario;
   }
 }

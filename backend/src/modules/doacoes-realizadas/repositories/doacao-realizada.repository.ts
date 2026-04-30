@@ -50,6 +50,36 @@ type UltimaEntregaMesmoItemRow = {
 
 const estruturaDoacaoRealizadaSql = [
   `
+    ALTER TABLE doacao_realizada
+    ADD COLUMN IF NOT EXISTS tenant_id UUID
+  `,
+  `
+    UPDATE doacao_realizada d
+    SET tenant_id = b.tenant_id
+    FROM cadastro_beneficiario b
+    WHERE d.tenant_id IS NULL
+      AND d.beneficiario_id = b.id
+      AND b.tenant_id IS NOT NULL
+  `,
+  `
+    UPDATE doacao_realizada d
+    SET tenant_id = vf.tenant_id
+    FROM vinculo_familiar vf
+    WHERE d.tenant_id IS NULL
+      AND d.vinculo_familiar_id = vf.id
+      AND vf.tenant_id IS NOT NULL
+  `,
+  `
+    UPDATE doacao_realizada d
+    SET tenant_id = ai.tenant_id
+    FROM doacao_realizada_item di
+    INNER JOIN almoxarifado_item ai ON ai.id = di.almoxarifado_item_id
+    WHERE d.tenant_id IS NULL
+      AND di.doacao_realizada_id = d.id
+      AND ai.tenant_id IS NOT NULL
+  `,
+  "CREATE INDEX IF NOT EXISTS doacao_realizada_tenant_idx ON doacao_realizada(tenant_id, data_doacao DESC)",
+  `
     ALTER TABLE doacao_realizada_item
     ADD COLUMN IF NOT EXISTS fora_carencia BOOLEAN NOT NULL DEFAULT FALSE
   `,
@@ -111,7 +141,7 @@ export function calcularSaldoMovimentacaoDoacao(
 }
 
 export class DoacaoRealizadaRepository {
-  async listar(filters: DoacaoRealizadaFilters) {
+  async listar(filters: DoacaoRealizadaFilters, tenantId: string) {
     await this.ensureEstrutura();
 
     const where: Prisma.Sql[] = [];
@@ -179,15 +209,15 @@ export class DoacaoRealizadaRepository {
             AND COALESCE(di.fora_carencia, FALSE) = TRUE
         ) AS possui_item_fora_carencia
       FROM doacao_realizada d
-      LEFT JOIN cadastro_beneficiario b ON b.id = d.beneficiario_id
-      LEFT JOIN vinculo_familiar vf ON vf.id = d.vinculo_familiar_id
-      WHERE 1 = 1
+      LEFT JOIN cadastro_beneficiario b ON b.id = d.beneficiario_id AND b.tenant_id::text = ${tenantId}
+      LEFT JOIN vinculo_familiar vf ON vf.id = d.vinculo_familiar_id AND vf.tenant_id::text = ${tenantId}
+      WHERE d.tenant_id::text = ${tenantId}
       ${whereClause}
       ORDER BY d.data_doacao DESC, d.id DESC
     `);
   }
 
-  async buscarPorId(id: bigint) {
+  async buscarPorId(id: bigint, tenantId: string) {
     await this.ensureEstrutura();
 
     const registros = await prisma.$queryRaw<DoacaoRealizadaRow[]>(Prisma.sql`
@@ -216,9 +246,10 @@ export class DoacaoRealizadaRepository {
             AND COALESCE(di.fora_carencia, FALSE) = TRUE
         ) AS possui_item_fora_carencia
       FROM doacao_realizada d
-      LEFT JOIN cadastro_beneficiario b ON b.id = d.beneficiario_id
-      LEFT JOIN vinculo_familiar vf ON vf.id = d.vinculo_familiar_id
+      LEFT JOIN cadastro_beneficiario b ON b.id = d.beneficiario_id AND b.tenant_id::text = ${tenantId}
+      LEFT JOIN vinculo_familiar vf ON vf.id = d.vinculo_familiar_id AND vf.tenant_id::text = ${tenantId}
       WHERE d.id = ${id}
+        AND d.tenant_id::text = ${tenantId}
       LIMIT 1
     `);
 
@@ -241,7 +272,7 @@ export class DoacaoRealizadaRepository {
         di.autorizacao_carencia_em,
         di.ultima_entrega_em
       FROM doacao_realizada_item di
-      INNER JOIN almoxarifado_item ai ON ai.id = di.almoxarifado_item_id
+      INNER JOIN almoxarifado_item ai ON ai.id = di.almoxarifado_item_id AND ai.tenant_id::text = ${tenantId}
       WHERE di.doacao_realizada_id = ${id}
       ORDER BY di.id ASC
     `);
@@ -249,20 +280,21 @@ export class DoacaoRealizadaRepository {
     return { registro, itens };
   }
 
-  async buscarPorIdOuFalhar(id: bigint) {
-    const registro = await this.buscarPorId(id);
+  async buscarPorIdOuFalhar(id: bigint, tenantId: string) {
+    const registro = await this.buscarPorId(id, tenantId);
     if (!registro) {
       throw new AppError("Doacao realizada nao encontrada.", 404);
     }
     return registro;
   }
 
-  async criar(input: DoacaoRealizadaInput) {
+  async criar(input: DoacaoRealizadaInput, tenantId: string) {
     await this.ensureEstrutura();
 
     const id = await prisma.$transaction(async (tx) => {
       const inserted = await tx.$queryRaw<{ id: bigint }[]>(Prisma.sql`
         INSERT INTO doacao_realizada (
+          tenant_id,
           beneficiario_id,
           vinculo_familiar_id,
           tipo_doacao,
@@ -273,6 +305,7 @@ export class DoacaoRealizadaRepository {
           criado_em,
           atualizado_em
         ) VALUES (
+          ${tenantId}::uuid,
           ${input.beneficiario_id ? BigInt(input.beneficiario_id) : null},
           ${input.vinculo_familiar_id ? BigInt(input.vinculo_familiar_id) : null},
           ${input.tipo_doacao},
@@ -292,21 +325,23 @@ export class DoacaoRealizadaRepository {
       }
 
       await this.inserirItens(tx, registroId, input.itens, {
+        tenantId,
         dataMovimentacao: input.data_doacao,
         responsavel: input.responsavel
       });
       return registroId;
     });
 
-    return this.buscarPorIdOuFalhar(id);
+    return this.buscarPorIdOuFalhar(id, tenantId);
   }
 
-  async atualizar(id: bigint, input: DoacaoRealizadaInput) {
+  async atualizar(id: bigint, input: DoacaoRealizadaInput, tenantId: string) {
     await this.ensureEstrutura();
-    const atual = await this.buscarPorIdOuFalhar(id);
+    const atual = await this.buscarPorIdOuFalhar(id, tenantId);
 
     await prisma.$transaction(async (tx) => {
       await this.restaurarEstoqueItens(tx, id, {
+        tenantId,
         dataMovimentacao: toIsoDateInput(atual.registro.data_doacao),
         responsavel: atual.registro.responsavel ?? input.responsavel ?? undefined
       });
@@ -323,6 +358,7 @@ export class DoacaoRealizadaRepository {
           data_doacao = ${toOptionalDate(input.data_doacao)},
           atualizado_em = NOW()
         WHERE id = ${id}
+          AND tenant_id::text = ${tenantId}
       `);
 
       await tx.$executeRaw(Prisma.sql`
@@ -331,20 +367,22 @@ export class DoacaoRealizadaRepository {
       `);
 
       await this.inserirItens(tx, id, input.itens, {
+        tenantId,
         dataMovimentacao: input.data_doacao,
         responsavel: input.responsavel
       });
     });
 
-    return this.buscarPorIdOuFalhar(id);
+    return this.buscarPorIdOuFalhar(id, tenantId);
   }
 
-  async remover(id: bigint) {
+  async remover(id: bigint, tenantId: string) {
     await this.ensureEstrutura();
-    const atual = await this.buscarPorIdOuFalhar(id);
+    const atual = await this.buscarPorIdOuFalhar(id, tenantId);
 
     await prisma.$transaction(async (tx) => {
       await this.restaurarEstoqueItens(tx, id, {
+        tenantId,
         dataMovimentacao: toIsoDateInput(atual.registro.data_doacao),
         responsavel: atual.registro.responsavel ?? undefined
       });
@@ -352,11 +390,12 @@ export class DoacaoRealizadaRepository {
       await tx.$executeRaw(Prisma.sql`
         DELETE FROM doacao_realizada
         WHERE id = ${id}
+          AND tenant_id::text = ${tenantId}
       `);
     });
   }
 
-  async listarBeneficiarios(termo?: string) {
+  async listarBeneficiarios(termo: string | undefined, tenantId: string) {
     const termoSanitizado = trimOrUndefined(termo);
     const like = termoSanitizado ? `%${termoSanitizado}%` : undefined;
     const digits = termoSanitizado ? normalizeDigits(termoSanitizado) : undefined;
@@ -378,7 +417,8 @@ export class DoacaoRealizadaRepository {
       filtros.push(Prisma.sql`(${Prisma.join(filtrosBusca, " OR ")})`);
     }
 
-    const whereClause = filtros.length ? Prisma.sql`WHERE ${Prisma.join(filtros, " AND ")}` : Prisma.empty;
+    filtros.unshift(Prisma.sql`b.tenant_id::text = ${tenantId}`);
+    const whereClause = Prisma.sql`WHERE ${Prisma.join(filtros, " AND ")}`;
 
     return prisma.$queryRaw<
       Array<{ id: bigint; nome_completo: string; codigo: string | null; cpf: string | null }>
@@ -406,10 +446,12 @@ export class DoacaoRealizadaRepository {
     `);
   }
 
-  async listarFamilias(termo?: string) {
+  async listarFamilias(termo: string | undefined, tenantId: string) {
     const termoSanitizado = trimOrUndefined(termo);
     const like = termoSanitizado ? `%${termoSanitizado}%` : undefined;
-    const whereClause = like ? Prisma.sql`WHERE nome_familia ILIKE ${like}` : Prisma.empty;
+    const whereClause = like
+      ? Prisma.sql`WHERE tenant_id::text = ${tenantId} AND nome_familia ILIKE ${like}`
+      : Prisma.sql`WHERE tenant_id::text = ${tenantId}`;
 
     return prisma.$queryRaw<Array<{ id: bigint; nome_familia: string }>>(Prisma.sql`
       SELECT id, nome_familia
@@ -420,12 +462,12 @@ export class DoacaoRealizadaRepository {
     `);
   }
 
-  async listarItensEstoque(termo?: string) {
+  async listarItensEstoque(termo: string | undefined, tenantId: string) {
     const termoSanitizado = trimOrUndefined(termo);
     const like = termoSanitizado ? `%${termoSanitizado}%` : undefined;
     const whereClause = like
-      ? Prisma.sql`WHERE (codigo ILIKE ${like} OR descricao ILIKE ${like})`
-      : Prisma.empty;
+      ? Prisma.sql`WHERE tenant_id::text = ${tenantId} AND (codigo ILIKE ${like} OR descricao ILIKE ${like})`
+      : Prisma.sql`WHERE tenant_id::text = ${tenantId}`;
 
     return prisma.$queryRaw<
       Array<{
@@ -448,10 +490,11 @@ export class DoacaoRealizadaRepository {
       ${whereClause}
       ORDER BY descricao ASC
       LIMIT 30
-    `).then(async (itens) => this.aplicarEstoqueDisponivelKit(itens));
+    `).then(async (itens) => this.aplicarEstoqueDisponivelKit(itens, prisma, tenantId));
   }
 
   async buscarUltimaEntregaMesmoItem(payload: {
+    tenantId: string;
     beneficiario_id?: number;
     vinculo_familiar_id?: number;
     item_id: number;
@@ -477,8 +520,9 @@ export class DoacaoRealizadaRepository {
         ai.descricao AS descricao_item
       FROM doacao_realizada_item di
       INNER JOIN doacao_realizada d ON d.id = di.doacao_realizada_id
-      INNER JOIN almoxarifado_item ai ON ai.id = di.almoxarifado_item_id
+      INNER JOIN almoxarifado_item ai ON ai.id = di.almoxarifado_item_id AND ai.tenant_id::text = ${payload.tenantId}
       WHERE di.almoxarifado_item_id = ${itemId}
+        AND d.tenant_id::text = ${payload.tenantId}
       ${destinatarioClause}
       ${ignorarClause}
       ORDER BY d.data_doacao DESC, d.id DESC
@@ -490,16 +534,17 @@ export class DoacaoRealizadaRepository {
 
   private async inserirItens(
     tx: TransactionClient,
-    registroId: bigint,
-    itens: DoacaoRealizadaItemInput[],
-    contexto: {
+      registroId: bigint,
+      itens: DoacaoRealizadaItemInput[],
+      contexto: {
+      tenantId: string;
       dataMovimentacao: string;
       responsavel?: string;
     }
   ) {
     for (const item of itens) {
       const itemId = BigInt(item.item_id);
-      await this.buscarItemEstoqueOuFalhar(tx, itemId);
+      await this.buscarItemEstoqueOuFalhar(tx, itemId, contexto.tenantId);
 
       await tx.$executeRaw(Prisma.sql`
         INSERT INTO doacao_realizada_item (
@@ -530,6 +575,7 @@ export class DoacaoRealizadaRepository {
       `);
 
       await this.movimentarEstoqueDoacao(tx, {
+        tenantId: contexto.tenantId,
         itemId,
         registroId,
         quantidade: item.quantidade,
@@ -544,7 +590,8 @@ export class DoacaoRealizadaRepository {
   private async restaurarEstoqueItens(
     tx: TransactionClient,
     registroId: bigint,
-    contexto: {
+      contexto: {
+      tenantId: string;
       dataMovimentacao: string;
       responsavel?: string;
     }
@@ -561,6 +608,7 @@ export class DoacaoRealizadaRepository {
 
     for (const item of itens) {
       await this.movimentarEstoqueDoacao(tx, {
+        tenantId: contexto.tenantId,
         itemId: item.almoxarifado_item_id,
         registroId,
         quantidade: item.quantidade,
@@ -572,7 +620,7 @@ export class DoacaoRealizadaRepository {
     }
   }
 
-  private async buscarItemEstoqueOuFalhar(tx: TransactionClient, itemId: bigint) {
+  private async buscarItemEstoqueOuFalhar(tx: TransactionClient, itemId: bigint, tenantId: string) {
     const itens = await tx.$queryRaw<AlmoxarifadoItemEstoqueRow[]>(Prisma.sql`
       SELECT
         id,
@@ -582,6 +630,7 @@ export class DoacaoRealizadaRepository {
         is_kit
       FROM almoxarifado_item
       WHERE id = ${itemId}
+        AND tenant_id::text = ${tenantId}
       LIMIT 1
     `);
 
@@ -590,13 +639,14 @@ export class DoacaoRealizadaRepository {
       throw new AppError("Item de almoxarifado nao encontrado para doacao.", 400);
     }
 
-    return (await this.aplicarEstoqueDisponivelKit([item], tx))[0];
+    return (await this.aplicarEstoqueDisponivelKit([item], tx, tenantId))[0];
   }
 
   private async movimentarEstoqueDoacao(
     tx: TransactionClient,
     payload: {
       itemId: bigint;
+      tenantId: string;
       registroId: bigint;
       quantidade: number;
       tipo: "Entrada" | "Saida";
@@ -605,12 +655,12 @@ export class DoacaoRealizadaRepository {
       observacoes?: string;
     }
   ) {
-    const item = await this.buscarItemEstoqueOuFalhar(tx, payload.itemId);
+    const item = await this.buscarItemEstoqueOuFalhar(tx, payload.itemId, payload.tenantId);
     const estoqueAtual = Number(item.estoque_atual ?? 0);
     const estoqueFisico = Number(item.estoque_fisico ?? item.estoque_atual ?? 0);
     const composicaoKit =
       item.is_kit && item.possui_composicao_kit
-        ? await this.listarComposicaoKitComEstoque([payload.itemId], tx)
+        ? await this.listarComposicaoKitComEstoque([payload.itemId], tx, payload.tenantId)
         : [];
 
     let saldoApos: number;
@@ -685,10 +735,12 @@ export class DoacaoRealizadaRepository {
         estoque_atual = ${estoqueFisicoApos},
         atualizado_em = NOW()
       WHERE id = ${payload.itemId}
+        AND tenant_id::text = ${payload.tenantId}
     `);
 
     if (quantidadeConsumirComponentes > 0) {
       await this.consumirComponentesKit(tx, {
+        tenantId: payload.tenantId,
         item,
         quantidadeKits: quantidadeConsumirComponentes,
         dataMovimentacao: payload.dataMovimentacao,
@@ -702,7 +754,8 @@ export class DoacaoRealizadaRepository {
 
   private async listarComposicaoKitComEstoque(
     produtoKitIds: bigint[],
-    tx: TransactionClient = prisma
+    tx: TransactionClient = prisma,
+    tenantId?: string
   ) {
     if (!produtoKitIds.length) {
       return [] as AlmoxarifadoKitComponenteEstoqueRow[];
@@ -718,6 +771,7 @@ export class DoacaoRealizadaRepository {
       INNER JOIN almoxarifado_item i ON i.id = c.produto_item_id
       WHERE c.ativo = TRUE
         AND c.produto_kit_id IN (${Prisma.join(produtoKitIds)})
+        ${tenantId ? Prisma.sql`AND i.tenant_id::text = ${tenantId}` : Prisma.empty}
     `);
   }
 
@@ -727,7 +781,7 @@ export class DoacaoRealizadaRepository {
       estoque_atual: number;
       is_kit: boolean;
     }
-  >(itens: T[], tx: TransactionClient = prisma) {
+  >(itens: T[], tx: TransactionClient = prisma, tenantId?: string) {
     const idsKit = itens.filter((item) => item.is_kit).map((item) => item.id);
     if (!idsKit.length) {
       return itens.map((item) => ({
@@ -737,7 +791,7 @@ export class DoacaoRealizadaRepository {
       }));
     }
 
-    const composicoes = await this.listarComposicaoKitComEstoque(idsKit, tx);
+    const composicoes = await this.listarComposicaoKitComEstoque(idsKit, tx, tenantId);
     const composicaoPorKit = new Map<string, AlmoxarifadoKitComponenteEstoqueRow[]>();
 
     for (const componente of composicoes) {
@@ -772,6 +826,7 @@ export class DoacaoRealizadaRepository {
     tx: TransactionClient,
     payload: {
       item: AlmoxarifadoItemEstoqueRow;
+      tenantId: string;
       quantidadeKits: number;
       dataMovimentacao: string;
       responsavel?: string;
@@ -781,7 +836,11 @@ export class DoacaoRealizadaRepository {
     }
   ) {
     for (const componente of payload.composicao) {
-      const itemComponente = await this.buscarItemEstoqueOuFalhar(tx, componente.produto_item_id);
+      const itemComponente = await this.buscarItemEstoqueOuFalhar(
+        tx,
+        componente.produto_item_id,
+        payload.tenantId
+      );
       const quantidadeConsumida = Number(componente.quantidade_item) * Number(payload.quantidadeKits);
       const saldoApos = Number(itemComponente.estoque_fisico ?? itemComponente.estoque_atual ?? 0) - quantidadeConsumida;
 
@@ -815,6 +874,7 @@ export class DoacaoRealizadaRepository {
           estoque_atual = ${saldoApos},
           atualizado_em = NOW()
         WHERE id = ${componente.produto_item_id}
+          AND tenant_id::text = ${payload.tenantId}
       `);
     }
   }

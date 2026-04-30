@@ -72,7 +72,7 @@ export class BibliotecaRepository {
     await ensureBibliotecaEstrutura();
   }
 
-  async listarLivros() {
+  async listarLivros(tenantId: string) {
     await this.garantirEstrutura();
     return prisma.$queryRaw<BibliotecaLivroRow[]>(Prisma.sql`
       SELECT
@@ -94,11 +94,12 @@ export class BibliotecaRepository {
         criado_em,
         atualizado_em
       FROM biblioteca_livro
+      WHERE tenant_id::text = ${tenantId}
       ORDER BY titulo ASC, codigo ASC
     `);
   }
 
-  async obterLivroPorId(id: bigint) {
+  async obterLivroPorId(id: bigint, tenantId: string) {
     await this.garantirEstrutura();
     const rows = await prisma.$queryRaw<BibliotecaLivroRow[]>(Prisma.sql`
       SELECT
@@ -121,12 +122,13 @@ export class BibliotecaRepository {
         atualizado_em
       FROM biblioteca_livro
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
       LIMIT 1
     `);
     return rows[0] ?? null;
   }
 
-  async obterLivroPorCodigo(codigo: string) {
+  async obterLivroPorCodigo(codigo: string, tenantId: string) {
     await this.garantirEstrutura();
     const rows = await prisma.$queryRaw<BibliotecaLivroRow[]>(Prisma.sql`
       SELECT
@@ -149,33 +151,36 @@ export class BibliotecaRepository {
         atualizado_em
       FROM biblioteca_livro
       WHERE codigo = ${codigo}
+        AND tenant_id::text = ${tenantId}
       LIMIT 1
     `);
     return rows[0] ?? null;
   }
 
-  async obterLivroOuFalhar(id: bigint) {
-    const livro = await this.obterLivroPorId(id);
+  async obterLivroOuFalhar(id: bigint, tenantId: string) {
+    const livro = await this.obterLivroPorId(id, tenantId);
     if (!livro) throw new AppError("Livro nao encontrado.", 404);
     return livro;
   }
 
-  async obterProximoCodigo() {
+  async obterProximoCodigo(tenantId: string) {
     await this.garantirEstrutura();
     const rows = await prisma.$queryRaw<Array<{ proximo: number }>>(Prisma.sql`
       SELECT COALESCE(MAX(CAST(codigo AS INTEGER)), 0) + 1 AS proximo
       FROM biblioteca_livro
       WHERE codigo ~ '^[0-9]+$'
+        AND tenant_id::text = ${tenantId}
     `);
     const proximo = rows[0]?.proximo ?? 1;
     return String(proximo).padStart(5, "0");
   }
 
-  async criarLivro(input: BibliotecaLivroInput) {
+  async criarLivro(input: BibliotecaLivroInput, tenantId: string) {
     await this.garantirEstrutura();
 
     const inserted = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
       INSERT INTO biblioteca_livro (
+        tenant_id,
         codigo,
         titulo,
         autor,
@@ -193,6 +198,7 @@ export class BibliotecaRepository {
         criado_em,
         atualizado_em
       ) VALUES (
+        ${tenantId}::uuid,
         ${input.codigo},
         ${input.titulo},
         ${input.autor},
@@ -215,12 +221,12 @@ export class BibliotecaRepository {
 
     const id = inserted[0]?.id;
     if (!id) throw new AppError("Nao foi possivel criar livro.", 500);
-    return this.obterLivroOuFalhar(id);
+    return this.obterLivroOuFalhar(id, tenantId);
   }
 
-  async atualizarLivro(id: bigint, input: BibliotecaLivroInput) {
+  async atualizarLivro(id: bigint, input: BibliotecaLivroInput, tenantId: string) {
     await this.garantirEstrutura();
-    await this.obterLivroOuFalhar(id);
+    await this.obterLivroOuFalhar(id, tenantId);
 
     await prisma.$executeRaw(Prisma.sql`
       UPDATE biblioteca_livro
@@ -241,19 +247,21 @@ export class BibliotecaRepository {
         observacoes = ${input.observacoes ?? null},
         atualizado_em = NOW()
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
 
-    return this.obterLivroOuFalhar(id);
+    return this.obterLivroOuFalhar(id, tenantId);
   }
 
-  async removerLivro(id: bigint) {
+  async removerLivro(id: bigint, tenantId: string) {
     await this.garantirEstrutura();
-    await this.obterLivroOuFalhar(id);
+    await this.obterLivroOuFalhar(id, tenantId);
 
     const emprestimosAtivos = await prisma.$queryRaw<Array<{ total: bigint }>>(Prisma.sql`
       SELECT COUNT(*)::bigint AS total
       FROM biblioteca_emprestimo
       WHERE livro_id = ${id}
+        AND tenant_id::text = ${tenantId}
         AND status IN ('ATIVO', 'ATRASADO')
     `);
 
@@ -264,10 +272,11 @@ export class BibliotecaRepository {
     await prisma.$executeRaw(Prisma.sql`
       DELETE FROM biblioteca_livro
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
   }
 
-  async listarEmprestimos() {
+  async listarEmprestimos(tenantId: string) {
     await this.garantirEstrutura();
     return prisma.$queryRaw<BibliotecaEmprestimoRow[]>(Prisma.sql`
       SELECT
@@ -286,11 +295,12 @@ export class BibliotecaRepository {
         e.observacoes
       FROM biblioteca_emprestimo e
       INNER JOIN biblioteca_livro l ON l.id = e.livro_id
+      WHERE e.tenant_id::text = ${tenantId}
       ORDER BY e.data_emprestimo DESC, e.id DESC
     `);
   }
 
-  async obterEmprestimoPorId(id: bigint) {
+  async obterEmprestimoPorId(id: bigint, tenantId: string) {
     await this.garantirEstrutura();
     const rows = await prisma.$queryRaw<BibliotecaEmprestimoRow[]>(Prisma.sql`
       SELECT
@@ -310,18 +320,19 @@ export class BibliotecaRepository {
       FROM biblioteca_emprestimo e
       INNER JOIN biblioteca_livro l ON l.id = e.livro_id
       WHERE e.id = ${id}
+        AND e.tenant_id::text = ${tenantId}
       LIMIT 1
     `);
     return rows[0] ?? null;
   }
 
-  async obterEmprestimoOuFalhar(id: bigint) {
-    const emprestimo = await this.obterEmprestimoPorId(id);
+  async obterEmprestimoOuFalhar(id: bigint, tenantId: string) {
+    const emprestimo = await this.obterEmprestimoPorId(id, tenantId);
     if (!emprestimo) throw new AppError("Emprestimo nao encontrado.", 404);
     return emprestimo;
   }
 
-  async criarEmprestimo(input: BibliotecaEmprestimoInput) {
+  async criarEmprestimo(input: BibliotecaEmprestimoInput, tenantId: string) {
     await this.garantirEstrutura();
     return prisma.$transaction(async (tx) => {
       const livroId = BigInt(Number(input.livroId));
@@ -346,6 +357,7 @@ export class BibliotecaRepository {
           atualizado_em
         FROM biblioteca_livro
         WHERE id = ${livroId}
+          AND tenant_id::text = ${tenantId}
         LIMIT 1
       `);
       const livro = livroRows[0];
@@ -356,6 +368,7 @@ export class BibliotecaRepository {
 
       const inserted = await tx.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
         INSERT INTO biblioteca_emprestimo (
+          tenant_id,
           livro_id,
           beneficiario_id,
           beneficiario_nome,
@@ -369,6 +382,7 @@ export class BibliotecaRepository {
           criado_em,
           atualizado_em
         ) VALUES (
+          ${tenantId}::uuid,
           ${livroId},
           ${input.beneficiarioId ?? null},
           ${input.beneficiarioNome ?? null},
@@ -414,15 +428,16 @@ export class BibliotecaRepository {
         FROM biblioteca_emprestimo e
         INNER JOIN biblioteca_livro l ON l.id = e.livro_id
         WHERE e.id = ${emprestimoId}
+          AND e.tenant_id::text = ${tenantId}
         LIMIT 1
       `);
       return rows[0] as BibliotecaEmprestimoRow;
     });
   }
 
-  async atualizarEmprestimo(id: bigint, input: BibliotecaEmprestimoInput) {
+  async atualizarEmprestimo(id: bigint, input: BibliotecaEmprestimoInput, tenantId: string) {
     await this.garantirEstrutura();
-    const atual = await this.obterEmprestimoOuFalhar(id);
+    const atual = await this.obterEmprestimoOuFalhar(id, tenantId);
     const novoLivroId = BigInt(Number(input.livroId));
 
     return prisma.$transaction(async (tx) => {
@@ -454,6 +469,7 @@ export class BibliotecaRepository {
           observacoes = ${input.observacoes ?? null},
           atualizado_em = NOW()
         WHERE id = ${id}
+          AND tenant_id::text = ${tenantId}
       `);
 
       const rows = await tx.$queryRaw<BibliotecaEmprestimoRow[]>(Prisma.sql`
@@ -474,15 +490,16 @@ export class BibliotecaRepository {
         FROM biblioteca_emprestimo e
         INNER JOIN biblioteca_livro l ON l.id = e.livro_id
         WHERE e.id = ${id}
+          AND e.tenant_id::text = ${tenantId}
         LIMIT 1
       `);
       return rows[0] as BibliotecaEmprestimoRow;
     });
   }
 
-  async removerEmprestimo(id: bigint) {
+  async removerEmprestimo(id: bigint, tenantId: string) {
     await this.garantirEstrutura();
-    const emprestimo = await this.obterEmprestimoOuFalhar(id);
+    const emprestimo = await this.obterEmprestimoOuFalhar(id, tenantId);
 
     await prisma.$transaction(async (tx) => {
       if (emprestimo.status !== "DEVOLVIDO") {
@@ -496,13 +513,14 @@ export class BibliotecaRepository {
       await tx.$executeRaw(Prisma.sql`
         DELETE FROM biblioteca_emprestimo
         WHERE id = ${id}
+          AND tenant_id::text = ${tenantId}
       `);
     });
   }
 
-  async registrarDevolucao(id: bigint, dataDevolucaoReal: string) {
+  async registrarDevolucao(id: bigint, dataDevolucaoReal: string, tenantId: string) {
     await this.garantirEstrutura();
-    const emprestimo = await this.obterEmprestimoOuFalhar(id);
+    const emprestimo = await this.obterEmprestimoOuFalhar(id, tenantId);
 
     await prisma.$transaction(async (tx) => {
       await tx.$executeRaw(Prisma.sql`
@@ -512,6 +530,7 @@ export class BibliotecaRepository {
           status = 'DEVOLVIDO',
           atualizado_em = NOW()
         WHERE id = ${id}
+          AND tenant_id::text = ${tenantId}
       `);
 
       if (emprestimo.status !== "DEVOLVIDO") {
@@ -523,10 +542,10 @@ export class BibliotecaRepository {
       }
     });
 
-    return this.obterEmprestimoOuFalhar(id);
+    return this.obterEmprestimoOuFalhar(id, tenantId);
   }
 
-  async listarAlertas() {
+  async listarAlertas(tenantId: string) {
     await this.garantirEstrutura();
     return prisma.$queryRaw<Array<{
       emprestimo_id: bigint;
@@ -550,6 +569,7 @@ export class BibliotecaRepository {
       FROM biblioteca_emprestimo e
       INNER JOIN biblioteca_livro l ON l.id = e.livro_id
       WHERE e.status IN ('ATIVO', 'ATRASADO')
+        AND e.tenant_id::text = ${tenantId}
       ORDER BY e.data_devolucao_prevista ASC
     `);
   }

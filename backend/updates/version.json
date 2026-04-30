@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.441",
-  "releaseDate": "2026-04-25",
-  "description": "Plano de trabalho com ações contextuais por aba.",
+  "latestVersion": "1.00.470",
+  "releaseDate": "2026-04-27",
+  "description": "Relatórios institucionais principais e dashboards territoriais endurecidos por tenant.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.441",
+  "minCompatibleVersion": "1.00.470",
   "releaseType": "stable"
 }
 

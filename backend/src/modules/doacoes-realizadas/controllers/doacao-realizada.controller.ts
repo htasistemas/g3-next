@@ -1,17 +1,17 @@
-import type { Request, Response } from "express";
+import type { Response } from "express";
 import type { AuthenticatedRequest } from "../../auth/middlewares/auth.middleware.js";
 import { DoacaoRealizadaService } from "../services/doacao-realizada.service.js";
 
 const service = new DoacaoRealizadaService();
 
 export class DoacaoRealizadaController {
-  async listar(request: Request, response: Response) {
-    const doacoes = await service.listar(request.query);
+  async listar(request: AuthenticatedRequest, response: Response) {
+    const doacoes = await service.listar(request.query, request.authUser?.tenant_id);
     return response.json({ doacoes });
   }
 
-  async buscarPorId(request: Request, response: Response) {
-    const doacao = await service.buscarPorId(request.params.id);
+  async buscarPorId(request: AuthenticatedRequest, response: Response) {
+    const doacao = await service.buscarPorId(request.params.id, request.authUser?.tenant_id);
     return response.json({ doacao });
   }
 
@@ -25,23 +25,26 @@ export class DoacaoRealizadaController {
     return response.json({ doacao });
   }
 
-  async remover(request: Request, response: Response) {
-    await service.remover(request.params.id);
+  async remover(request: AuthenticatedRequest, response: Response) {
+    await service.remover(request.params.id, request.authUser?.tenant_id);
     return response.status(204).send();
   }
 
-  async listarBeneficiarios(request: Request, response: Response) {
-    const beneficiarios = await service.listarBeneficiarios(request.query.termo);
+  async listarBeneficiarios(request: AuthenticatedRequest, response: Response) {
+    const beneficiarios = await service.listarBeneficiarios(
+      request.query.termo,
+      request.authUser?.tenant_id
+    );
     return response.json({ beneficiarios });
   }
 
-  async listarFamilias(request: Request, response: Response) {
-    const familias = await service.listarFamilias(request.query.termo);
+  async listarFamilias(request: AuthenticatedRequest, response: Response) {
+    const familias = await service.listarFamilias(request.query.termo, request.authUser?.tenant_id);
     return response.json({ familias });
   }
 
-  async listarItensEstoque(request: Request, response: Response) {
-    const itens = await service.listarItensEstoque(request.query.termo);
+  async listarItensEstoque(request: AuthenticatedRequest, response: Response) {
+    const itens = await service.listarItensEstoque(request.query.termo, request.authUser?.tenant_id);
     return response.json({ itens });
   }
 }

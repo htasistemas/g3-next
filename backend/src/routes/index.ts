@@ -5,7 +5,8 @@ import { familiaRoutes } from "../modules/familias/routes/familia.routes.js";
 import { emailRoutes } from "../modules/email/routes/email.routes.js";
 import {
   ensureAuthenticated,
-  ensurePermissions
+  ensurePermissions,
+  ensureSuperadmin
 } from "../modules/auth/middlewares/auth.middleware.js";
 import { reportsRoutes } from "../modules/reports/routes/reports.routes.js";
 import { unidadeAssistencialRoutes } from "../modules/unidades-assistenciais/routes/unidade-assistencial.routes.js";
@@ -54,6 +55,7 @@ import { licencaUsoRoutes } from "../modules/licenca-uso/routes/licenca-uso.rout
 import { vendaRoutes } from "../modules/vendas/routes/venda.routes.js";
 import { carteiraEventoRoutes } from "../modules/carteira-evento/routes/carteira-evento.routes.js";
 import { agendamentosRoutes } from "../modules/agendamentos/routes/agendamentos.routes.js";
+import { instituicoesRoutes } from "../modules/instituicoes/routes/instituicoes.routes.js";
 
 export const appRoutes = Router();
 
@@ -62,6 +64,7 @@ appRoutes.get("/health", (_request, response) => {
 });
 
 appRoutes.use("/api/auth", authRoutes);
+appRoutes.use("/api/master/instituicoes", ensureAuthenticated, ensureSuperadmin, instituicoesRoutes);
 appRoutes.use("/api/ai", ensureAuthenticated, aiRoutes);
 appRoutes.use("/api/semente", ensureAuthenticated, sementeRoutes);
 appRoutes.use("/api/central-atendimentos", centralAtendimentosRoutes);

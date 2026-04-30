@@ -15,12 +15,14 @@ import { UsuarioRepository } from "../repositories/usuario.repository.js";
 type AtorRaw = {
   id?: string;
   nomeUsuario?: string;
+  tenant_id?: string;
+  instituicao_id?: string;
 };
 
 export class UsuarioService {
   private readonly repository = new UsuarioRepository();
 
-  async listar(rawFilters: unknown) {
+  async listar(rawFilters: unknown, atorRaw: AtorRaw) {
     const filtersNormalizados =
       rawFilters && typeof rawFilters === "object"
         ? normalizarObjetoTexto(
@@ -34,12 +36,14 @@ export class UsuarioService {
         : rawFilters;
 
     const filters = usuarioFiltersSchema.parse(filtersNormalizados);
-    return this.repository.listar(filters);
+    const ator = this.parseAtor(atorRaw);
+    return this.repository.listar(filters, ator.tenant_id);
   }
 
-  async buscarPorId(rawId: string) {
+  async buscarPorId(rawId: string, atorRaw: AtorRaw) {
     const id = this.parseId(rawId);
-    return this.repository.buscarPorId(id);
+    const ator = this.parseAtor(atorRaw);
+    return this.repository.buscarPorId(id, ator.tenant_id);
   }
 
   async listarPermissoes() {
@@ -58,31 +62,31 @@ export class UsuarioService {
 
   async atualizar(rawId: string, rawInput: unknown, atorRaw: AtorRaw) {
     const id = this.parseId(rawId);
-    await this.validarProtecaoAdmin(id);
+    const ator = this.parseAtor(atorRaw);
+    await this.validarProtecaoAdmin(id, ator.tenant_id);
 
     const inputNormalizado = this.normalizarPayload(rawInput);
     const input = atualizarUsuarioSchema.parse(inputNormalizado);
-    const ator = this.parseAtor(atorRaw);
 
     return this.repository.atualizar(id, input, ator);
   }
 
   async atualizarStatus(rawId: string, rawInput: unknown, atorRaw: AtorRaw) {
     const id = this.parseId(rawId);
-    await this.validarProtecaoAdmin(id);
+    const ator = this.parseAtor(atorRaw);
+    await this.validarProtecaoAdmin(id, ator.tenant_id);
 
     const input = atualizarStatusUsuarioSchema.parse(rawInput);
-    const ator = this.parseAtor(atorRaw);
 
     return this.repository.atualizarStatus(id, input.status, ator);
   }
 
   async resetarSenha(rawId: string, rawInput: unknown, atorRaw: AtorRaw) {
     const id = this.parseId(rawId);
-    await this.validarProtecaoAdmin(id);
+    const ator = this.parseAtor(atorRaw);
+    await this.validarProtecaoAdmin(id, ator.tenant_id);
 
     const input = resetarSenhaUsuarioSchema.parse(rawInput);
-    const ator = this.parseAtor(atorRaw);
 
     const novaSenhaHash = await bcrypt.hash(input.nova_senha, 10);
     return this.repository.resetarSenha(
@@ -95,14 +99,13 @@ export class UsuarioService {
 
   async remover(rawId: string, atorRaw: AtorRaw) {
     const id = this.parseId(rawId);
-    await this.validarProtecaoAdmin(id);
-
     const ator = this.parseAtor(atorRaw);
+    await this.validarProtecaoAdmin(id, ator.tenant_id);
     return this.repository.remover(id, ator);
   }
 
-  private async validarProtecaoAdmin(id: bigint) {
-    const resultado = await this.repository.buscarPorId(id);
+  private async validarProtecaoAdmin(id: bigint, tenantId: string) {
+    const resultado = await this.repository.buscarPorId(id, tenantId);
     const emailAdmin = "htasistemas@gmail.com";
 
     if (resultado.usuario.email?.toLowerCase() === emailAdmin) {
@@ -128,10 +131,18 @@ export class UsuarioService {
       Number.isInteger(idNumerico) && idNumerico > 0
         ? BigInt(idNumerico)
         : undefined;
+    const tenant_id = atorRaw.tenant_id?.trim();
+    const instituicao_id = atorRaw.instituicao_id?.trim();
+
+    if (!tenant_id || !instituicao_id) {
+      throw new AppError("Tenant da sessao nao identificado.", 401);
+    }
 
     return {
       id,
-      nome_usuario
+      nome_usuario,
+      tenant_id,
+      instituicao_id
     };
   }
 

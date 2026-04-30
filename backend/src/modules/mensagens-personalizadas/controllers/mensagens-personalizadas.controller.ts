@@ -6,17 +6,17 @@ const service = new MensagensPersonalizadasService();
 
 export class MensagensPersonalizadasController {
   async obterSuporte(request: AuthenticatedRequest, response: Response) {
-    const suporte = await service.obterSuporte();
+    const suporte = await service.obterSuporte(request.authUser?.tenant_id);
     return response.json(suporte);
   }
 
   async listarModelos(request: AuthenticatedRequest, response: Response) {
-    const modelos = await service.listarModelos(request.query);
+    const modelos = await service.listarModelos(request.query, request.authUser);
     return response.json({ modelos });
   }
 
   async obterModelo(request: AuthenticatedRequest, response: Response) {
-    const modelo = await service.obterModelo(request.params.id);
+    const modelo = await service.obterModelo(request.params.id, request.authUser);
     return response.json({ modelo });
   }
 
@@ -50,7 +50,7 @@ export class MensagensPersonalizadasController {
   }
 
   async listarTaxonomias(_request: AuthenticatedRequest, response: Response) {
-    const taxonomias = await service.listarTaxonomias();
+    const taxonomias = await service.listarTaxonomias(_request.authUser);
     return response.json({ taxonomias });
   }
 
@@ -70,12 +70,12 @@ export class MensagensPersonalizadasController {
   }
 
   async listarHistorico(request: AuthenticatedRequest, response: Response) {
-    const historico = await service.listarHistorico(request.query);
+    const historico = await service.listarHistorico(request.query, request.authUser);
     return response.json({ historico });
   }
 
   async buscarDestinatarios(request: AuthenticatedRequest, response: Response) {
-    const destinatarios = await service.buscarDestinatarios(request.query);
+    const destinatarios = await service.buscarDestinatarios(request.query, request.authUser);
     return response.json({ destinatarios });
   }
 

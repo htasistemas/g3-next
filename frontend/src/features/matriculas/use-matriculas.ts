@@ -1,19 +1,23 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
 import { matriculasService } from "@/services/matriculas.service";
 import type { Matricula, MatriculaFiltro } from "@/types/matricula";
 
 export function useMatriculas(filtros: MatriculaFiltro) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["matriculas", filtros],
-    queryFn: () => matriculasService.listar(filtros)
+    queryKey: ["matriculas", usuario?.tenant_id ?? "sem-tenant", filtros],
+    queryFn: () => matriculasService.listar(filtros),
+    enabled: !!usuario
   });
 }
 
 export function useMatricula(id?: string) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["matricula", id],
+    queryKey: ["matricula", usuario?.tenant_id ?? "sem-tenant", id],
     queryFn: () => matriculasService.buscarPorId(id as string),
-    enabled: !!id
+    enabled: !!usuario && !!id
   });
 }
 

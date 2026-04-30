@@ -33,8 +33,8 @@ import { ContabilidadeRepository } from "../repositories/contabilidade.repositor
 export class ContabilidadeService {
   private readonly repository = new ContabilidadeRepository();
 
-  async listarContasBancarias() {
-    const rows = await this.repository.listarContasBancarias();
+  async listarContasBancarias(ator?: ContabilidadeAtor) {
+    const rows = await this.repository.listarContasBancarias(ator);
     return rows.map(mapContaBancariaToResponse);
   }
 
@@ -56,8 +56,8 @@ export class ContabilidadeService {
     await this.repository.removerContaBancaria(id, ator);
   }
 
-  async listarCategorias() {
-    const rows = await this.repository.listarCategorias();
+  async listarCategorias(ator?: ContabilidadeAtor) {
+    const rows = await this.repository.listarCategorias(ator);
     return rows.map(mapCategoriaFinanceiraToResponse);
   }
 
@@ -79,8 +79,8 @@ export class ContabilidadeService {
     await this.repository.removerCategoria(id, ator);
   }
 
-  async listarCentrosCusto() {
-    const rows = await this.repository.listarCentrosCusto();
+  async listarCentrosCusto(ator?: ContabilidadeAtor) {
+    const rows = await this.repository.listarCentrosCusto(ator);
     return rows.map(mapCentroCustoToResponse);
   }
 
@@ -102,8 +102,8 @@ export class ContabilidadeService {
     await this.repository.removerCentroCusto(id, ator);
   }
 
-  async listarLancamentos() {
-    const rows = await this.repository.listarLancamentos();
+  async listarLancamentos(ator?: ContabilidadeAtor) {
+    const rows = await this.repository.listarLancamentos(ator);
     return rows.map(mapLancamentoToResponse);
   }
 
@@ -144,8 +144,8 @@ export class ContabilidadeService {
     await this.repository.removerLancamento(id, ator);
   }
 
-  async listarMovimentacoes() {
-    const rows = await this.repository.listarMovimentacoes();
+  async listarMovimentacoes(ator?: ContabilidadeAtor) {
+    const rows = await this.repository.listarMovimentacoes(ator);
     return rows.map(mapMovimentacaoToResponse);
   }
 
@@ -195,8 +195,8 @@ export class ContabilidadeService {
     await this.repository.removerMovimentacao(id, ator);
   }
 
-  async listarTransferencias() {
-    const rows = await this.repository.listarTransferencias();
+  async listarTransferencias(ator?: ContabilidadeAtor) {
+    const rows = await this.repository.listarTransferencias(ator);
     return rows.map(mapTransferenciaToResponse);
   }
 
@@ -212,8 +212,8 @@ export class ContabilidadeService {
     return mapTransferenciaToResponse(row);
   }
 
-  async listarConciliacoes() {
-    const rows = await this.repository.listarConciliacoes();
+  async listarConciliacoes(ator?: ContabilidadeAtor) {
+    const rows = await this.repository.listarConciliacoes(ator);
     return rows.map(mapConciliacaoToResponse);
   }
 
@@ -230,13 +230,13 @@ export class ContabilidadeService {
     return mapConciliacaoToResponse(row);
   }
 
-  async listarHistorico() {
-    const rows = await this.repository.listarHistorico();
+  async listarHistorico(ator?: ContabilidadeAtor) {
+    const rows = await this.repository.listarHistorico(ator);
     return rows.map(mapHistoricoContabilToResponse);
   }
 
-  async listarComprasIntegradas() {
-    const rows = await this.repository.listarComprasIntegradas();
+  async listarComprasIntegradas(ator?: ContabilidadeAtor) {
+    const rows = await this.repository.listarComprasIntegradas(ator);
     return rows.map(mapCompraIntegradaToResponse);
   }
 
@@ -246,21 +246,21 @@ export class ContabilidadeService {
     return mapLancamentoToResponse(row);
   }
 
-  async listarEmendas() {
-    const rows = await this.repository.listarEmendas();
+  async listarEmendas(ator?: ContabilidadeAtor) {
+    const rows = await this.repository.listarEmendas(ator);
     return rows.map(mapEmendaToResponse);
   }
 
-  async criarEmenda(rawInput: unknown) {
+  async criarEmenda(rawInput: unknown, ator?: ContabilidadeAtor) {
     const input = emendaImpositivaInputSchema.parse(this.normalizarPayload(rawInput));
-    const row = await this.repository.criarEmenda(input);
+    const row = await this.repository.criarEmenda(input, ator);
     return mapEmendaToResponse(row);
   }
 
-  async atualizarStatusEmenda(rawId: string, rawInput: unknown) {
+  async atualizarStatusEmenda(rawId: string, rawInput: unknown, ator?: ContabilidadeAtor) {
     const id = this.parseId(rawId);
     const { status } = statusLivreInputSchema.parse(this.normalizarPayload(rawInput));
-    const row = await this.repository.atualizarStatusEmenda(id, status);
+    const row = await this.repository.atualizarStatusEmenda(id, status, ator);
     return mapEmendaToResponse(row);
   }
 

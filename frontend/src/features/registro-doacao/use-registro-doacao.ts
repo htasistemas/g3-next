@@ -1,19 +1,24 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
 import { registroDoacaoService } from "@/services/registro-doacao.service";
 import type { Doador, RegistroDoacao, RegistroDoacaoFiltro } from "@/types/registro-doacao";
 
 export { useItensAlmoxarifado } from "@/features/almoxarifado/use-almoxarifado";
 
 export function useRegistrosDoacao(filtros: RegistroDoacaoFiltro) {
+  const { usuario } = useAuth();
+
   return useQuery({
-    queryKey: ["registro-doacao", filtros],
+    queryKey: ["registro-doacao", usuario?.tenant_id ?? "sem-tenant", filtros],
     queryFn: () => registroDoacaoService.listar(filtros)
   });
 }
 
 export function useRegistroDoacao(id?: string) {
+  const { usuario } = useAuth();
+
   return useQuery({
-    queryKey: ["registro-doacao-item", id],
+    queryKey: ["registro-doacao-item", usuario?.tenant_id ?? "sem-tenant", id],
     queryFn: () => registroDoacaoService.buscarPorId(id as string),
     enabled: !!id
   });
@@ -21,6 +26,7 @@ export function useRegistroDoacao(id?: string) {
 
 export function useSalvarRegistroDoacao() {
   const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: async (payload: RegistroDoacao) => {
       if (payload.id_registro_doacao) {
@@ -34,7 +40,7 @@ export function useSalvarRegistroDoacao() {
       await queryClient.invalidateQueries({ queryKey: ["almoxarifado", "movimentacoes"] });
       const id = response.registro?.id_registro_doacao;
       if (id) {
-        await queryClient.invalidateQueries({ queryKey: ["registro-doacao-item", id] });
+        await queryClient.invalidateQueries({ queryKey: ["registro-doacao-item"] });
       }
     }
   });
@@ -42,6 +48,7 @@ export function useSalvarRegistroDoacao() {
 
 export function useRemoverRegistroDoacao() {
   const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: (id: string) => registroDoacaoService.remover(id),
     onSuccess: async () => {
@@ -51,8 +58,10 @@ export function useRemoverRegistroDoacao() {
 }
 
 export function useDoadores(termo?: string) {
+  const { usuario } = useAuth();
+
   return useQuery({
-    queryKey: ["registro-doacao", "doadores", termo ?? ""],
+    queryKey: ["registro-doacao", "doadores", usuario?.tenant_id ?? "sem-tenant", termo ?? ""],
     queryFn: () => registroDoacaoService.listarDoadores(termo),
     enabled: termo === undefined || (termo?.trim().length ?? 0) >= 2
   });
@@ -60,6 +69,7 @@ export function useDoadores(termo?: string) {
 
 export function useCriarDoador() {
   const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: (payload: Doador) => registroDoacaoService.criarDoador(payload),
     onSuccess: async () => {
@@ -70,6 +80,7 @@ export function useCriarDoador() {
 
 export function useRemoverDoador() {
   const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: (id: string) => registroDoacaoService.removerDoador(id),
     onSuccess: async () => {

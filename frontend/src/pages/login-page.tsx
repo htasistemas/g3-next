@@ -1,15 +1,19 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { HandHeart } from "lucide-react";
+import { Building2, HandHeart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
 import { APP_VERSION } from "@/lib/app-version";
+import { formatarCnpj, normalizarCnpj } from "@/lib/br-utils";
 import { precarregarRota } from "@/routes/route-modules";
 import { authService } from "@/services/auth.service";
+import type { TenantContextoLogin } from "@/types/auth";
 
 const FOTO_LATERAL_URL = "/images/loguim.jpg";
+const LEMBRAR_ACESSO_STORAGE_KEY = "g3n_login_lembrar_acesso";
+const CNPJ_STORAGE_KEY = "g3n_login_cnpj";
 
 function normalizarValorAmbiente(valor: string | undefined) {
   const normalizado = valor?.trim();
@@ -79,15 +83,46 @@ function BandeiraBrasilIcon() {
   );
 }
 
+function extrairSlugSubdominio() {
+  if (typeof window === "undefined") return undefined;
+  const hostname = window.location.hostname.trim().toLowerCase();
+  if (!hostname || hostname === "localhost" || /^\d+\.\d+\.\d+\.\d+$/.test(hostname)) {
+    return undefined;
+  }
+
+  const partes = hostname.split(".").filter(Boolean);
+  if (partes.length < 3) return undefined;
+
+  const primeiroSegmento = partes[0];
+  if (!primeiroSegmento || ["www", "app", "g3n"].includes(primeiroSegmento)) {
+    return undefined;
+  }
+
+  return primeiroSegmento;
+}
+
+function obterMensagemErro(error: any, fallback: string) {
+  return error?.response?.data?.message ?? error?.response?.data?.mensagem ?? fallback;
+}
+
 export function LoginPage() {
   const [modalAberto, setModalAberto] = useState<"termos" | "politica" | "acesso" | null>(null);
   const [popupEsqueciSenhaAberto, setPopupEsqueciSenhaAberto] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { login, loginGoogle } = useAuth();
-  const [nomeUsuario, setNomeUsuario] = useState("");
+  const slugSubdominio = useMemo(() => extrairSlugSubdominio(), []);
+  const cnpjSalvo =
+    typeof window !== "undefined" ? window.localStorage.getItem(CNPJ_STORAGE_KEY) ?? "" : "";
+  const lembrarSalvo =
+    typeof window !== "undefined" ? window.localStorage.getItem(LEMBRAR_ACESSO_STORAGE_KEY) === "1" : false;
+  const [cnpj, setCnpj] = useState(cnpjSalvo);
+  const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [emailRecuperacao, setEmailRecuperacao] = useState("");
+  const [lembrarAcesso, setLembrarAcesso] = useState(lembrarSalvo);
+  const [instituicaoContexto, setInstituicaoContexto] = useState<TenantContextoLogin | null>(null);
+  const [carregandoInstituicao, setCarregandoInstituicao] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const [carregandoGoogle, setCarregandoGoogle] = useState(false);
   const [carregandoRecuperacao, setCarregandoRecuperacao] = useState(false);
@@ -104,19 +139,78 @@ export function LoginPage() {
       ? "Login com Google indisponível neste ambiente."
       : null;
   const googleDisponivel = googleAviso === null;
+  const tituloInstituicao = instituicaoContexto?.nome_fantasia || instituicaoContexto?.razao_social;
+
+  async function carregarContextoInstituicao(parametros: {
+    cnpj?: string;
+    slug?: string;
+    codigoInstituicao?: string;
+  }) {
+    if (!parametros.slug && !parametros.cnpj && !parametros.codigoInstituicao) {
+      setInstituicaoContexto(null);
+      return;
+    }
+
+    setCarregandoInstituicao(true);
+    try {
+      const contexto = await authService.obterTenantContexto(parametros);
+      setInstituicaoContexto(contexto);
+    } catch {
+      setInstituicaoContexto(null);
+    } finally {
+      setCarregandoInstituicao(false);
+    }
+  }
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setErro(null);
     setAviso(null);
+
+    const cnpjNormalizado = normalizarCnpj(cnpj);
+    if (!slugSubdominio && cnpjNormalizado.length !== 14) {
+      setErro("Informe o CNPJ da instituição para continuar.");
+      return;
+    }
+
+    if (!email.trim()) {
+      setErro("Informe o e-mail de acesso.");
+      return;
+    }
+
+    if (!senha.trim()) {
+      setErro("Informe a senha.");
+      return;
+    }
+
     setCarregando(true);
     try {
       const from = (location.state as { from?: string } | null)?.from;
       const destino = from || "/cadastros/beneficiarios";
-      await Promise.all([login(nomeUsuario, senha), precarregarRota(destino)]);
+      await Promise.all([
+        login({
+          cnpj: slugSubdominio ? undefined : cnpjNormalizado,
+          slug: slugSubdominio,
+          email: email.trim().toLowerCase(),
+          nomeUsuario: email.trim().toLowerCase(),
+          senha
+        }),
+        precarregarRota(destino)
+      ]);
+
+      if (typeof window !== "undefined") {
+        if (lembrarAcesso && cnpjNormalizado) {
+          window.localStorage.setItem(CNPJ_STORAGE_KEY, cnpjNormalizado);
+          window.localStorage.setItem(LEMBRAR_ACESSO_STORAGE_KEY, "1");
+        } else {
+          window.localStorage.removeItem(CNPJ_STORAGE_KEY);
+          window.localStorage.removeItem(LEMBRAR_ACESSO_STORAGE_KEY);
+        }
+      }
+
       navigate(destino, { replace: true });
     } catch (error: any) {
-      setErro(error?.response?.data?.message ?? "Não foi possível autenticar.");
+      setErro(obterMensagemErro(error, "Não foi possível autenticar."));
     } finally {
       setCarregando(false);
     }
@@ -129,10 +223,19 @@ export function LoginPage() {
     try {
       const from = (location.state as { from?: string } | null)?.from;
       const destino = from || "/cadastros/beneficiarios";
-      await Promise.all([loginGoogle(idToken), precarregarRota(destino)]);
+      const cnpjNormalizado = normalizarCnpj(cnpj);
+
+      await Promise.all([
+        loginGoogle({
+          idToken,
+          cnpj: slugSubdominio ? undefined : cnpjNormalizado || undefined,
+          slug: slugSubdominio
+        }),
+        precarregarRota(destino)
+      ]);
       navigate(destino, { replace: true });
     } catch (error: any) {
-      setErro(error?.response?.data?.message ?? "Não foi possível autenticar com Google.");
+      setErro(obterMensagemErro(error, "Não foi possível autenticar com Google."));
     } finally {
       setCarregandoGoogle(false);
     }
@@ -203,7 +306,22 @@ export function LoginPage() {
       setErro("Não foi possível carregar o login com Google.");
     };
     document.head.appendChild(script);
-  }, [googleAviso, googleDisponivel, location.state, navigate]);
+  }, [googleAviso, googleDisponivel, location.state, navigate, slugSubdominio, cnpj]);
+
+  useEffect(() => {
+    if (slugSubdominio) {
+      void carregarContextoInstituicao({ slug: slugSubdominio });
+      return;
+    }
+
+    const cnpjNormalizado = normalizarCnpj(cnpj);
+    if (cnpjNormalizado.length === 14) {
+      void carregarContextoInstituicao({ cnpj: cnpjNormalizado });
+      return;
+    }
+
+    setInstituicaoContexto(null);
+  }, [cnpj, slugSubdominio]);
 
   async function onEnviarRecuperacaoSenha(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -211,11 +329,15 @@ export function LoginPage() {
     setCarregandoRecuperacao(true);
 
     try {
-      const resultado = await authService.esqueciSenha(emailRecuperacao);
+      const resultado = await authService.esqueciSenha({
+        email: emailRecuperacao,
+        cnpj: slugSubdominio ? undefined : normalizarCnpj(cnpj) || undefined,
+        slug: slugSubdominio
+      });
       setMensagemRecuperacao(resultado.message);
     } catch (error: any) {
       setMensagemRecuperacao(
-        error?.response?.data?.message ?? "Não foi possível enviar a recuperação de senha."
+        obterMensagemErro(error, "Não foi possível enviar a recuperação de senha.")
       );
     } finally {
       setCarregandoRecuperacao(false);
@@ -228,22 +350,50 @@ export function LoginPage() {
       <section className="relative z-10 w-full max-w-6xl overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-2xl shadow-emerald-300/35">
         <div className="grid min-h-[620px] lg:grid-cols-[1.05fr_1fr]">
           <aside className="hidden bg-[linear-gradient(180deg,#064e3b_0%,#022c22_100%)] lg:order-2 lg:flex lg:flex-col">
-            <div className="px-8 pt-8">
+            <div className="px-8 pt-6">
               <div className="overflow-hidden rounded-[28px] border border-emerald-800 bg-emerald-900 shadow-xl shadow-emerald-950/30">
                 <img
                   src={FOTO_LATERAL_URL}
                   alt="Crianças brincando"
-                  className="h-56 w-full object-cover xl:h-64"
+                  className="h-64 w-full object-cover xl:h-72"
                 />
               </div>
             </div>
-            <div className="flex flex-1 items-end px-8 pb-8 pt-6">
-              <div className="space-y-3 rounded-[28px] border border-emerald-800 bg-emerald-950 px-7 py-8 text-white shadow-2xl shadow-emerald-950/30">
+            <div className="px-8 pt-2">
+              <div className="rounded-[24px] border border-emerald-800 bg-emerald-950/90 px-5 py-4 text-white shadow-2xl shadow-emerald-950/30">
+                <div className="flex items-start gap-3">
+                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-emerald-100">
+                    <Building2 className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-100">
+                      {slugSubdominio ? "Instituição identificada pelo endereço" : "Instituição do acesso"}
+                    </p>
+                    {carregandoInstituicao ? (
+                      <p className="text-xs leading-5 text-emerald-50/90">Carregando dados da instituição...</p>
+                    ) : tituloInstituicao ? (
+                      <>
+                        <p className="truncate text-sm font-semibold text-white">{tituloInstituicao}</p>
+                        <p className="text-xs text-emerald-50/80">
+                          CNPJ {formatarCnpj(instituicaoContexto?.cnpj)} â€¢ Plano {instituicaoContexto?.plano}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-xs leading-5 text-emerald-50/90">
+                        Informe o CNPJ da instituição para localizar o ambiente correto.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="px-8 pb-6 pt-0">
+              <div className="space-y-2 rounded-[24px] border border-emerald-800 bg-emerald-950 px-5 py-5 text-white shadow-2xl shadow-emerald-950/30">
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-100">Sistema G3</p>
-                <h1 className="text-3xl font-semibold leading-tight">
+                <h1 className="text-2xl font-semibold leading-tight">
                   Gestão social moderna, organizada e preparada para crescer.
                 </h1>
-                <p className="text-sm leading-6 text-emerald-50/90">
+                <p className="text-xs leading-5 text-emerald-50/90">
                   Plataforma integrada para cadastro, acompanhamento e atendimento de beneficiários.
                 </p>
               </div>
@@ -270,24 +420,83 @@ export function LoginPage() {
                 </span>
               </div>
 
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4 lg:hidden">
+                <div className="flex items-start gap-3">
+                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white text-emerald-700 shadow-sm">
+                    <Building2 className="h-5 w-5" />
+                  </span>
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
+                      {slugSubdominio ? "Instituição identificada pelo endereço" : "Instituição do acesso"}
+                    </p>
+                    {carregandoInstituicao ? (
+                      <p className="text-sm text-slate-600">Carregando dados da instituição...</p>
+                    ) : tituloInstituicao ? (
+                      <>
+                        <p className="truncate text-base font-semibold text-slate-900">{tituloInstituicao}</p>
+                        <p className="text-xs text-slate-600">
+                          CNPJ {formatarCnpj(instituicaoContexto?.cnpj)} • Plano {instituicaoContexto?.plano}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-sm text-slate-600">
+                        Informe o CNPJ da instituição para localizar o ambiente correto.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <form className="space-y-4" onSubmit={onSubmit}>
+                {!slugSubdominio && (
+                  <div>
+                    <Label htmlFor="cnpj">CNPJ da instituição</Label>
+                    <Input
+                      id="cnpj"
+                      inputMode="numeric"
+                      value={formatarCnpj(cnpj)}
+                      onChange={(event) => setCnpj(normalizarCnpj(event.target.value).slice(0, 14))}
+                      placeholder="00.000.000/0000-00"
+                      disabled={carregando || carregandoGoogle}
+                    />
+                  </div>
+                )}
+
                 <div>
-                  <Label>Usuário</Label>
+                  <Label htmlFor="email">E-mail de acesso</Label>
                   <Input
-                    value={nomeUsuario}
-                    onChange={(event) => setNomeUsuario(event.target.value)}
-                    placeholder="Usuário ou e-mail"
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    placeholder="voce@instituicao.org.br"
+                    autoComplete="username"
+                    disabled={carregando || carregandoGoogle}
                   />
                 </div>
                 <div>
-                  <Label>Senha</Label>
+                  <Label htmlFor="senha">Senha</Label>
                   <Input
+                    id="senha"
                     type="password"
                     value={senha}
                     onChange={(event) => setSenha(event.target.value)}
-                    placeholder="Senha"
+                    placeholder="Digite sua senha"
+                    autoComplete="current-password"
+                    disabled={carregando || carregandoGoogle}
                   />
                 </div>
+
+                <label className="flex items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-slate-300 text-emerald-600"
+                    checked={lembrarAcesso}
+                    onChange={(event) => setLembrarAcesso(event.target.checked)}
+                    disabled={carregando || carregandoGoogle}
+                  />
+                  Lembrar identificação da instituição neste dispositivo
+                </label>
 
                 <div className="flex justify-center">
                   <button
@@ -298,7 +507,7 @@ export function LoginPage() {
                       setMensagemRecuperacao(null);
                     }}
                   >
-                    Esqueceu sua senha? Vou te ajudar, clique aqui para recuperar.
+                    Esqueceu sua senha? Clique aqui para recuperar.
                   </button>
                 </div>
 
@@ -413,8 +622,8 @@ export function LoginPage() {
                 <>
                   <p>Este sistema é destinado ao uso institucional da equipe autorizada para gestão social.</p>
                   <p>
-                    O usuário deve manter sigilo das credenciais, respeitar perfis de acesso e utilizar os dados apenas
-                    para finalidades administrativas e assistenciais.
+                    O usuário deve manter sigilo das credenciais, respeitar perfis de acesso e utilizar os
+                    dados apenas para finalidades administrativas e assistenciais.
                   </p>
                   <p>As ações podem ser registradas para auditoria, segurança e conformidade legal.</p>
                 </>

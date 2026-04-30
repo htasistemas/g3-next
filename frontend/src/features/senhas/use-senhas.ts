@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
 import { senhasService } from "@/services/senhas.service";
 import type {
   SenhaChamarRequest,
@@ -8,15 +9,19 @@ import type {
 } from "@/types/senhas";
 
 export function useSenhasAguardando(unidadeId?: number | null) {
+  const { usuario } = useAuth();
+
   return useQuery({
-    queryKey: ["senhas", "aguardando", unidadeId ?? "todas"],
+    queryKey: ["senhas", "aguardando", usuario?.tenant_id ?? "sem-tenant", unidadeId ?? "todas"],
     queryFn: () => senhasService.listarAguardando(unidadeId)
   });
 }
 
 export function useSenhaPainel(unidadeId?: number | null, limite = 10, refetchInterval = 5000) {
+  const { usuario } = useAuth();
+
   return useQuery({
-    queryKey: ["senhas", "painel", unidadeId ?? "todas", limite],
+    queryKey: ["senhas", "painel", usuario?.tenant_id ?? "sem-tenant", unidadeId ?? "todas", limite],
     queryFn: () => senhasService.painel(unidadeId, limite),
     refetchInterval,
     refetchIntervalInBackground: true
@@ -24,8 +29,10 @@ export function useSenhaPainel(unidadeId?: number | null, limite = 10, refetchIn
 }
 
 export function useSenhaAtual(unidadeId?: number | null) {
+  const { usuario } = useAuth();
+
   return useQuery({
-    queryKey: ["senhas", "atual", unidadeId ?? "todas"],
+    queryKey: ["senhas", "atual", usuario?.tenant_id ?? "sem-tenant", unidadeId ?? "todas"],
     queryFn: () => senhasService.atual(unidadeId),
     refetchInterval: 5000,
     refetchIntervalInBackground: true
@@ -33,14 +40,17 @@ export function useSenhaAtual(unidadeId?: number | null) {
 }
 
 export function useSenhasConfig() {
+  const { usuario } = useAuth();
+
   return useQuery({
-    queryKey: ["senhas", "config"],
+    queryKey: ["senhas", "config", usuario?.tenant_id ?? "sem-tenant"],
     queryFn: () => senhasService.obterConfig()
   });
 }
 
 export function useEmitirSenha() {
   const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: (payload: SenhaEmitirRequest) => senhasService.emitir(payload),
     onSuccess: async () => {
@@ -52,6 +62,7 @@ export function useEmitirSenha() {
 
 export function useChamarSenha() {
   const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: (payload: SenhaChamarRequest) => senhasService.chamar(payload),
     onSuccess: async () => {
@@ -64,6 +75,7 @@ export function useChamarSenha() {
 
 export function useFinalizarSenha() {
   const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: (payload: SenhaFinalizarRequest) => senhasService.finalizar(payload),
     onSuccess: async () => {
@@ -76,6 +88,7 @@ export function useFinalizarSenha() {
 
 export function useFinalizarSenhaFila() {
   const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: (filaId: number) => senhasService.finalizarFila(filaId),
     onSuccess: async () => {
@@ -88,6 +101,7 @@ export function useFinalizarSenhaFila() {
 
 export function useAtualizarSenhasConfig() {
   const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: (payload: SenhasConfigRequest) => senhasService.atualizarConfig(payload),
     onSuccess: async () => {

@@ -22,20 +22,43 @@ export class AuthService {
 
   async login(rawInput: unknown) {
     const input = authLoginSchema.parse(rawInput);
-    const usuario = await this.repository.buscarUsuarioPorLogin(input.nomeUsuario);
+    const usuario = await this.repository.buscarUsuarioPorLogin({
+      nomeUsuario: input.nomeUsuario,
+      email: input.email,
+      cnpj: input.cnpj,
+      slug: input.slug,
+      codigoInstituicao: input.codigoInstituicao
+    });
+    const identificador = input.email ?? input.nomeUsuario ?? "";
 
     if (!usuario) {
-      console.warn(`[auth] tentativa de login invalida para usuario: ${input.nomeUsuario}`);
+      await this.repository.registrarEventoAcesso({
+        evento: "LOGIN_FALHA",
+        identificador,
+        detalhes_json: {
+          cnpj: input.cnpj,
+          slug: input.slug,
+          codigoInstituicao: input.codigoInstituicao
+        }
+      });
+      console.warn(`[auth] tentativa de login invalida para usuario: ${identificador}`);
       throw new AppError("Credenciais invalidas.", 401);
     }
 
     const controle = await this.repository.buscarControleAcessoPorUsuarioId(usuario.id);
-    this.validarAcessoUsuario(controle?.status);
+    this.validarAcessoUsuario(controle?.status, usuario.instituicaoStatus);
 
     const senhaValida = await bcrypt.compare(input.senha, usuario.senhaHash);
     if (!senhaValida) {
       const atualizado = await this.repository.registrarFalhaLogin(usuario.id);
-      console.warn(`[auth] tentativa de login invalida para usuario: ${input.nomeUsuario}`);
+      await this.repository.registrarEventoAcesso({
+        tenant_id: usuario.tenantId ?? undefined,
+        instituicao_id: usuario.instituicaoId ?? undefined,
+        usuario_id: usuario.id,
+        evento: "LOGIN_FALHA",
+        identificador
+      });
+      console.warn(`[auth] tentativa de login invalida para usuario: ${identificador}`);
       if ((atualizado?.status ?? "").toUpperCase() === "BLOQUEADO") {
         throw new AppError("Usuario bloqueado por tentativas invalidas de acesso.", 403);
       }
@@ -43,6 +66,13 @@ export class AuthService {
     }
 
     await this.repository.registrarLoginSucesso(usuario.id);
+    await this.repository.registrarEventoAcesso({
+      tenant_id: usuario.tenantId ?? undefined,
+      instituicao_id: usuario.instituicaoId ?? undefined,
+      usuario_id: usuario.id,
+      evento: "LOGIN_SUCESSO",
+      identificador
+    });
 
     const usuarioAutenticado = this.mapUsuarioAutenticado(usuario);
     const token = this.tokenService.gerarToken(usuarioAutenticado);
@@ -73,9 +103,17 @@ export class AuthService {
     const emailNormalizado = payload.email.trim().toLowerCase();
     const googleId = payload.sub;
 
-    let usuario = await this.repository.buscarUsuarioPorGoogleId(googleId);
+    let usuario = await this.repository.buscarUsuarioPorGoogleId(googleId, {
+      cnpj: input.cnpj,
+      slug: input.slug,
+      codigoInstituicao: input.codigoInstituicao
+    });
     if (!usuario) {
-      const usuarioPorEmail = await this.repository.buscarUsuarioPorEmail(emailNormalizado);
+      const usuarioPorEmail = await this.repository.buscarUsuarioPorEmail(emailNormalizado, {
+        cnpj: input.cnpj,
+        slug: input.slug,
+        codigoInstituicao: input.codigoInstituicao
+      });
       if (!usuarioPorEmail) {
         console.warn(`[auth] login google nao autorizado para email: ${emailNormalizado}`);
         throw new AppError("Usuario Google nao autorizado. Solicite acesso ao administrador.", 403);
@@ -88,9 +126,20 @@ export class AuthService {
       );
     }
 
+    if (!usuario) {
+      throw new AppError("Usuario Google nao autorizado. Solicite acesso ao administrador.", 403);
+    }
+
     const controle = await this.repository.buscarControleAcessoPorUsuarioId(usuario.id);
-    this.validarAcessoUsuario(controle?.status);
+    this.validarAcessoUsuario(controle?.status, usuario.instituicaoStatus);
     await this.repository.registrarLoginSucesso(usuario.id);
+    await this.repository.registrarEventoAcesso({
+      tenant_id: usuario.tenantId ?? undefined,
+      instituicao_id: usuario.instituicaoId ?? undefined,
+      usuario_id: usuario.id,
+      evento: "LOGIN_SUCESSO_GOOGLE",
+      identificador: emailNormalizado
+    });
 
     const usuarioAutenticado = this.mapUsuarioAutenticado(usuario);
     const token = this.tokenService.gerarToken(usuarioAutenticado);
@@ -113,7 +162,7 @@ export class AuthService {
     }
 
     const controle = await this.repository.buscarControleAcessoPorUsuarioId(usuario.id);
-    this.validarAcessoUsuario(controle?.status);
+    this.validarAcessoUsuario(controle?.status, usuario.instituicaoStatus);
 
     return this.mapUsuarioAutenticado(usuario);
   }
@@ -124,7 +173,11 @@ export class AuthService {
     const senhaTemporaria = this.gerarSenhaTemporaria();
     const senhaHash = await bcrypt.hash(senhaTemporaria, 10);
 
-    const usuario = await this.repository.redefinirSenhaPorEmail(input.email, senhaHash);
+    const usuario = await this.repository.redefinirSenhaPorEmail(input.email, senhaHash, {
+      cnpj: input.cnpj,
+      slug: input.slug,
+      codigoInstituicao: input.codigoInstituicao
+    });
 
     if (!usuario) {
       return {
@@ -161,6 +214,15 @@ export class AuthService {
     return this.tokenService.validarToken(token);
   }
 
+  async obterContextoTenant(rawInput: {
+    cnpj?: string;
+    slug?: string;
+    codigoInstituicao?: string;
+    host?: string;
+  }) {
+    return this.repository.buscarTenantContextoPublico(rawInput);
+  }
+
   private async validarIdTokenGoogle(idToken: string, audience: string[]) {
     try {
       return await googleClient.verifyIdToken({
@@ -182,11 +244,19 @@ export class AuthService {
       nomeUsuario: usuario.nomeUsuario,
       nome: usuario.nome ?? undefined,
       email: usuario.email ?? undefined,
+      tenant_id: usuario.tenantId ?? undefined,
+      instituicao_id: usuario.instituicaoId ?? undefined,
+      instituicao_nome: usuario.instituicaoNome ?? undefined,
+      instituicao_slug: usuario.instituicaoSlug ?? undefined,
+      cnpj: usuario.instituicaoCnpj ?? undefined,
+      plano: usuario.instituicaoPlano ?? undefined,
+      perfil: usuario.perfilAcesso ?? (usuario.isSuperadmin ? "MASTER" : undefined),
+      is_superadmin: usuario.isSuperadmin,
       permissoes: usuario.permissoes.map((item) => item.permissao.nome)
     };
   }
 
-  private validarAcessoUsuario(status?: string | null) {
+  private validarAcessoUsuario(status?: string | null, statusInstituicao?: string | null) {
     const statusNormalizado = (status ?? "").trim().toUpperCase();
     if (statusNormalizado === "INATIVO") {
       throw new AppError("Usuario inativo. Procure o administrador.", 403);
@@ -194,6 +264,15 @@ export class AuthService {
 
     if (statusNormalizado === "BLOQUEADO") {
       throw new AppError("Usuario bloqueado. Procure o administrador.", 403);
+    }
+
+    const statusTenant = (statusInstituicao ?? "").trim().toUpperCase();
+    if (statusTenant === "INATIVO") {
+      throw new AppError("Instituicao inativa. Procure o suporte da plataforma.", 403);
+    }
+
+    if (statusTenant === "BLOQUEADO") {
+      throw new AppError("Instituicao bloqueada. Regularize o acesso com o suporte da plataforma.", 403);
     }
   }
 

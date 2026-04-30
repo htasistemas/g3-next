@@ -42,6 +42,7 @@ type AuthUser = {
   id?: string;
   nomeUsuario?: string;
   permissoes?: string[];
+  tenant_id?: string;
 };
 
 type InternalGeoPoint = Omit<GeoPointRecord, "latitude" | "longitude"> & {
@@ -351,8 +352,9 @@ export class DashboardGeorreferenciamentoService {
   private readonly optionsCache = new TtlCache<Awaited<ReturnType<DashboardGeorreferenciamentoRepository["listarOpcoesFiltros"]>>>(300_000, 4);
   private readonly queryCache = new TtlCache<GeoQueryResponse>(25_000, 16);
 
-  async listarOpcoesFiltros() {
-    return this.optionsCache.getOrSet("opcoes", async () => this.repository.listarOpcoesFiltros());
+  async listarOpcoesFiltros(authUser?: AuthUser) {
+    const tenantId = this.parseTenant(authUser);
+    return this.optionsCache.getOrSet(`opcoes:${tenantId}`, async () => this.repository.listarOpcoesFiltros());
   }
 
   async consultar(rawInput: unknown, authUser?: AuthUser): Promise<GeoQueryResponse> {
@@ -604,95 +606,109 @@ export class DashboardGeorreferenciamentoService {
     throw new AppError("Registro territorial nÃ£o encontrado.", 404);
   }
 
-  async buscarVinculos(rawInput: unknown): Promise<GeoLinkSearchItem[]> {
+  async buscarVinculos(rawInput: unknown, authUser?: AuthUser): Promise<GeoLinkSearchItem[]> {
     const input = dashboardGeorreferenciamentoBuscaVinculoSchema.parse(rawInput);
+    const tenantId = this.parseTenant(authUser);
     const termo = input.termo.trim();
     const resultados: GeoLinkSearchItem[] = [];
 
     if (input.tipos.includes("BENEFICIARIO")) {
-      const rows = await prisma.cadastroBeneficiario.findMany({
-        where: {
-          OR: [
-            { nomeCompleto: { contains: termo, mode: "insensitive" } },
-            { codigo: { contains: termo, mode: "insensitive" } }
-          ]
-        },
-        orderBy: { nomeCompleto: "asc" },
-        take: 8,
-        select: { id: true, nomeCompleto: true, codigo: true }
-      });
+      const like = `%${termo}%`;
+      const rows = await prisma.$queryRaw<Array<{ id: bigint; nome_completo: string; codigo: string | null }>>(Prisma.sql`
+        SELECT id, nome_completo, codigo
+        FROM cadastro_beneficiario
+        WHERE tenant_id::text = ${tenantId}
+          AND (
+            nome_completo ILIKE ${like}
+            OR codigo ILIKE ${like}
+          )
+        ORDER BY nome_completo ASC
+        LIMIT 8
+      `);
       resultados.push(
         ...rows.map((item) => ({
           entidadeTipo: "BENEFICIARIO" as const,
           id: item.id.toString(),
-          titulo: item.nomeCompleto,
+          titulo: item.nome_completo,
           subtitulo: item.codigo ?? undefined
         }))
       );
     }
 
     if (input.tipos.includes("FAMILIA")) {
-      const rows = await prisma.vinculoFamiliar.findMany({
-        where: { nomeFamilia: { contains: termo, mode: "insensitive" } },
-        orderBy: { nomeFamilia: "asc" },
-        take: 8,
-        select: { id: true, nomeFamilia: true }
-      });
+      const like = `%${termo}%`;
+      const rows = await prisma.$queryRaw<Array<{ id: bigint; nome_familia: string }>>(Prisma.sql`
+        SELECT id, nome_familia
+        FROM vinculo_familiar
+        WHERE tenant_id::text = ${tenantId}
+          AND nome_familia ILIKE ${like}
+        ORDER BY nome_familia ASC
+        LIMIT 8
+      `);
       resultados.push(
         ...rows.map((item) => ({
           entidadeTipo: "FAMILIA" as const,
           id: item.id.toString(),
-          titulo: item.nomeFamilia
+          titulo: item.nome_familia
         }))
       );
     }
 
     if (input.tipos.includes("PROFISSIONAL")) {
-      const rows = await prisma.cadastroProfissional.findMany({
-        where: { nomeCompleto: { contains: termo, mode: "insensitive" } },
-        orderBy: { nomeCompleto: "asc" },
-        take: 8,
-        select: { id: true, nomeCompleto: true, categoria: true }
-      });
+      const like = `%${termo}%`;
+      const rows = await prisma.$queryRaw<Array<{ id: bigint; nome_completo: string; categoria: string | null }>>(Prisma.sql`
+        SELECT id, nome_completo, categoria
+        FROM cadastro_profissional
+        WHERE tenant_id::text = ${tenantId}
+          AND nome_completo ILIKE ${like}
+        ORDER BY nome_completo ASC
+        LIMIT 8
+      `);
       resultados.push(
         ...rows.map((item) => ({
           entidadeTipo: "PROFISSIONAL" as const,
           id: item.id.toString(),
-          titulo: item.nomeCompleto,
-          subtitulo: item.categoria
+          titulo: item.nome_completo,
+          subtitulo: item.categoria ?? undefined
         }))
       );
     }
 
     if (input.tipos.includes("VOLUNTARIO")) {
-      const rows = await prisma.cadastroVoluntario.findMany({
-        where: { nomeCompleto: { contains: termo, mode: "insensitive" } },
-        orderBy: { nomeCompleto: "asc" },
-        take: 8,
-        select: { id: true, nomeCompleto: true, areaInteresse: true }
-      });
+      const like = `%${termo}%`;
+      const rows = await prisma.$queryRaw<Array<{ id: bigint; nome_completo: string; area_interesse: string | null }>>(Prisma.sql`
+        SELECT id, nome_completo, area_interesse
+        FROM cadastro_voluntario
+        WHERE tenant_id::text = ${tenantId}
+          AND nome_completo ILIKE ${like}
+        ORDER BY nome_completo ASC
+        LIMIT 8
+      `);
       resultados.push(
         ...rows.map((item) => ({
           entidadeTipo: "VOLUNTARIO" as const,
           id: item.id.toString(),
-          titulo: item.nomeCompleto,
-          subtitulo: item.areaInteresse ?? undefined
+          titulo: item.nome_completo,
+          subtitulo: item.area_interesse ?? undefined
         }))
       );
     }
 
     if (input.tipos.includes("INSTITUICAO")) {
-      const rows = await prisma.unidadeAssistencial.findMany({
-        where: { nomeFantasia: { contains: termo, mode: "insensitive" } },
-        orderBy: { nomeFantasia: "asc" },
-        take: 8,
-        select: { id: true, nomeFantasia: true }
-      });
+      const like = `%${termo}%`;
+      const rows = await prisma.$queryRaw<Array<{ id: bigint; nome_fantasia: string }>>(Prisma.sql`
+        SELECT id, nome_fantasia
+        FROM unidade_assistencial
+        WHERE tenant_id::text = ${tenantId}
+          AND nome_fantasia ILIKE ${like}
+        ORDER BY nome_fantasia ASC
+        LIMIT 8
+      `);
       resultados.push(
         ...rows.map((item) => ({
           entidadeTipo: "INSTITUICAO" as const,
           id: item.id.toString(),
-          titulo: item.nomeFantasia
+          titulo: item.nome_fantasia
         }))
       );
     }
@@ -702,7 +718,8 @@ export class DashboardGeorreferenciamentoService {
       const rows = await prisma.$queryRaw<Array<{ id: bigint; nome: string; cidade: string | null }>>(Prisma.sql`
         SELECT id, nome, cidade
         FROM doador
-        WHERE nome ILIKE ${like}
+        WHERE tenant_id::text = ${tenantId}
+          AND nome ILIKE ${like}
         ORDER BY nome ASC
         LIMIT 8
       `);
@@ -717,6 +734,14 @@ export class DashboardGeorreferenciamentoService {
     }
 
     return resultados.slice(0, 20);
+  }
+
+  private parseTenant(authUser?: AuthUser) {
+    const tenantId = authUser?.tenant_id?.trim();
+    if (!tenantId) {
+      throw new AppError("Tenant da sessao nao identificado.", 401);
+    }
+    return tenantId;
   }
 
   async salvarMarcacao(rawInput: unknown, authUser?: AuthUser) {

@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { useTheme } from "@/hooks/use-theme";
+import { useAuth } from "@/hooks/use-auth";
 import { defaultThemeSettings, themePresets } from "@/lib/theme-presets";
 import {
   classeBotaoAbaLateral,
@@ -68,7 +69,9 @@ const obrigatoriedadePadrao: ObrigatoriedadeDocumentosBeneficiarioSettings = {
 };
 
 export function ParametrosSistemaPage() {
+  const { usuario } = useAuth();
   const { settings, applyPreview, clearPreview, saveSettings, carregando: carregandoTema } = useTheme();
+  const tenantId = usuario?.tenant_id ?? "sem-tenant";
   const [abaAtiva, setAbaAtiva] = useState<AbaId>("personalizacao");
   const [draft, setDraft] = useState<ThemeSettings>(settings);
   const [carenciaDraft, setCarenciaDraft] = useState<CarenciaDoacaoRealizadaSettings>(carenciaPadrao);
@@ -95,6 +98,7 @@ export function ParametrosSistemaPage() {
     let ativo = true;
 
     void (async () => {
+      setMensagem(null);
       setCarregandoCarencia(true);
       setCarregandoObrigatoriedade(true);
       setCarregandoAlertasCentral(true);
@@ -129,7 +133,7 @@ export function ParametrosSistemaPage() {
     return () => {
       ativo = false;
     };
-  }, []);
+  }, [tenantId]);
 
   const abaAtual = abas.find((aba) => aba.id === abaAtiva);
   const IconeAbaAtual = abaAtual?.icon ?? SlidersHorizontal;

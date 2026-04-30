@@ -1,49 +1,51 @@
-import type { Request, Response } from "express";
+import type { Response } from "express";
 import type { AuthenticatedRequest } from "../../auth/middlewares/auth.middleware.js";
 import { BeneficiarioService } from "../services/beneficiario.service.js";
 
 const service = new BeneficiarioService();
 
 export class BeneficiarioController {
-  async listar(request: Request, response: Response) {
-    const beneficiarios = await service.listar(request.query);
+  async listar(request: AuthenticatedRequest, response: Response) {
+    const beneficiarios = await service.listar(request.query, request.authUser?.tenant_id);
     return response.json({ beneficiarios });
   }
 
-  async buscarPorId(request: Request, response: Response) {
-    const beneficiario = await service.buscarPorId(request.params.id);
+  async buscarPorId(request: AuthenticatedRequest, response: Response) {
+    const beneficiario = await service.buscarPorId(request.params.id, request.authUser?.tenant_id);
     return response.json({ beneficiario });
   }
 
-  async criar(request: Request, response: Response) {
+  async criar(request: AuthenticatedRequest, response: Response) {
     const beneficiario = await service.criar(
       request.body,
-      (request as AuthenticatedRequest).authUser?.id
+      request.authUser?.id,
+      request.authUser?.tenant_id
     );
     return response.status(201).json({ beneficiario });
   }
 
-  async atualizar(request: Request, response: Response) {
+  async atualizar(request: AuthenticatedRequest, response: Response) {
     const beneficiario = await service.atualizar(
       request.params.id,
       request.body,
-      (request as AuthenticatedRequest).authUser?.id
+      request.authUser?.id,
+      request.authUser?.tenant_id
     );
     return response.json({ beneficiario });
   }
 
-  async remover(request: Request, response: Response) {
-    await service.remover(request.params.id, (request as AuthenticatedRequest).authUser?.id);
+  async remover(request: AuthenticatedRequest, response: Response) {
+    await service.remover(request.params.id, request.authUser?.id, request.authUser?.tenant_id);
     return response.status(204).send();
   }
 
-  async obterProximoCodigo(_request: Request, response: Response) {
-    const data = await service.obterProximoCodigo();
+  async obterProximoCodigo(request: AuthenticatedRequest, response: Response) {
+    const data = await service.obterProximoCodigo(request.authUser?.tenant_id);
     return response.json(data);
   }
 
-  async obterSugestaoEndereco(request: Request, response: Response) {
-    const sugestao = await service.obterSugestaoEndereco(request.query);
+  async obterSugestaoEndereco(request: AuthenticatedRequest, response: Response) {
+    const sugestao = await service.obterSugestaoEndereco(request.query, request.authUser?.tenant_id);
     return response.json({ sugestao });
   }
 }

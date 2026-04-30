@@ -11,8 +11,53 @@ import type {
 
 type TransactionClient = Prisma.TransactionClient;
 
+const estruturaSql = [
+  "ALTER TABLE patrimonio_item ADD COLUMN IF NOT EXISTS tenant_id UUID",
+  "ALTER TABLE IF EXISTS patrimonio_movimentacao ADD COLUMN IF NOT EXISTS tenant_id UUID",
+  "CREATE INDEX IF NOT EXISTS patrimonio_item_tenant_idx ON patrimonio_item(tenant_id, nome, id DESC)",
+  "CREATE INDEX IF NOT EXISTS patrimonio_item_numero_tenant_idx ON patrimonio_item(tenant_id, numero_patrimonio)",
+  "CREATE INDEX IF NOT EXISTS patrimonio_movimentacao_tenant_idx ON patrimonio_movimentacao(tenant_id, patrimonio_id, data_movimento DESC)",
+  `
+    UPDATE patrimonio_item AS p
+    SET tenant_id = ref.tenant_id
+    FROM (
+      SELECT tenant_id
+      FROM instituicoes
+      ORDER BY criado_em ASC
+      LIMIT 1
+    ) ref
+    WHERE p.tenant_id IS NULL
+  `,
+  `
+    UPDATE patrimonio_movimentacao AS m
+    SET tenant_id = p.tenant_id
+    FROM patrimonio_item p
+    WHERE m.tenant_id IS NULL
+      AND p.id = m.patrimonio_id
+      AND p.tenant_id IS NOT NULL
+  `
+] as const;
+
+let estruturaPromise: Promise<void> | null = null;
+
 export class PatrimonioRepository {
-  async listar() {
+  private async garantirEstrutura() {
+    if (!estruturaPromise) {
+      estruturaPromise = (async () => {
+        for (const sql of estruturaSql) {
+          await prisma.$executeRawUnsafe(sql);
+        }
+      })().catch((error) => {
+        estruturaPromise = null;
+        throw error;
+      });
+    }
+
+    await estruturaPromise;
+  }
+
+  async listar(tenantId: string) {
+    await this.garantirEstrutura();
     const patrimonios = await prisma.$queryRaw<PatrimonioRow[]>(Prisma.sql`
       SELECT
         id,
@@ -33,6 +78,7 @@ export class PatrimonioRepository {
         criado_em,
         atualizado_em
       FROM patrimonio_item
+      WHERE tenant_id::text = ${tenantId}
       ORDER BY nome ASC, id DESC
     `);
 
@@ -46,6 +92,7 @@ export class PatrimonioRepository {
         observacao,
         data_movimento
       FROM patrimonio_movimentacao
+      WHERE tenant_id::text = ${tenantId}
       ORDER BY data_movimento DESC, id DESC
     `);
 
@@ -55,7 +102,8 @@ export class PatrimonioRepository {
     }));
   }
 
-  async buscarPorId(id: bigint) {
+  async buscarPorId(id: bigint, tenantId: string) {
+    await this.garantirEstrutura();
     const rows = await prisma.$queryRaw<PatrimonioRow[]>(Prisma.sql`
       SELECT
         id,
@@ -77,6 +125,7 @@ export class PatrimonioRepository {
         atualizado_em
       FROM patrimonio_item
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
       LIMIT 1
     `);
 
@@ -94,25 +143,28 @@ export class PatrimonioRepository {
         data_movimento
       FROM patrimonio_movimentacao
       WHERE patrimonio_id = ${id}
+        AND tenant_id::text = ${tenantId}
       ORDER BY data_movimento DESC, id DESC
     `);
 
     return { patrimonio, movimentos };
   }
 
-  async buscarPorIdOuFalhar(id: bigint) {
-    const registro = await this.buscarPorId(id);
+  async buscarPorIdOuFalhar(id: bigint, tenantId: string) {
+    const registro = await this.buscarPorId(id, tenantId);
     if (!registro) {
-      throw new AppError("Patrimônio não encontrado.", 404);
+      throw new AppError("Patrimonio nao encontrado.", 404);
     }
     return registro;
   }
 
-  async criar(input: PatrimonioInput) {
+  async criar(input: PatrimonioInput, tenantId: string) {
+    await this.garantirEstrutura();
     const id = await prisma.$transaction(async (tx) => {
-      await this.validarNumeroUnico(tx, input.numeroPatrimonio);
+      await this.validarNumeroUnico(tx, input.numeroPatrimonio, tenantId);
       const inserted = await tx.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
         INSERT INTO patrimonio_item (
+          tenant_id,
           numero_patrimonio,
           nome,
           categoria,
@@ -130,6 +182,7 @@ export class PatrimonioRepository {
           criado_em,
           atualizado_em
         ) VALUES (
+          CAST(${tenantId} AS UUID),
           ${input.numeroPatrimonio},
           ${input.nome},
           ${trimOrUndefined(input.categoria)},
@@ -152,20 +205,21 @@ export class PatrimonioRepository {
 
       const patrimonioId = inserted[0]?.id;
       if (!patrimonioId) {
-        throw new AppError("Não foi possível criar o patrimônio.", 500);
+        throw new AppError("Nao foi possivel criar o patrimonio.", 500);
       }
 
       return patrimonioId;
     });
 
-    return this.buscarPorIdOuFalhar(id);
+    return this.buscarPorIdOuFalhar(id, tenantId);
   }
 
-  async atualizar(id: bigint, input: PatrimonioInput) {
-    await this.buscarPorIdOuFalhar(id);
+  async atualizar(id: bigint, input: PatrimonioInput, tenantId: string) {
+    await this.garantirEstrutura();
+    await this.buscarPorIdOuFalhar(id, tenantId);
 
     await prisma.$transaction(async (tx) => {
-      await this.validarNumeroUnico(tx, input.numeroPatrimonio, id);
+      await this.validarNumeroUnico(tx, input.numeroPatrimonio, tenantId, id);
       await tx.$executeRaw(Prisma.sql`
         UPDATE patrimonio_item
         SET
@@ -185,17 +239,20 @@ export class PatrimonioRepository {
           observacoes = ${trimOrUndefined(input.observacoes)},
           atualizado_em = NOW()
         WHERE id = ${id}
+          AND tenant_id::text = ${tenantId}
       `);
     });
 
-    return this.buscarPorIdOuFalhar(id);
+    return this.buscarPorIdOuFalhar(id, tenantId);
   }
 
-  async registrarMovimento(id: bigint, input: PatrimonioMovimentoInput) {
-    await this.buscarPorIdOuFalhar(id);
+  async registrarMovimento(id: bigint, input: PatrimonioMovimentoInput, tenantId: string) {
+    await this.garantirEstrutura();
+    await this.buscarPorIdOuFalhar(id, tenantId);
 
     await prisma.$executeRaw(Prisma.sql`
       INSERT INTO patrimonio_movimentacao (
+        tenant_id,
         patrimonio_id,
         tipo,
         destino,
@@ -204,6 +261,7 @@ export class PatrimonioRepository {
         data_movimento,
         criado_em
       ) VALUES (
+        CAST(${tenantId} AS UUID),
         ${id},
         ${input.tipo},
         ${trimOrUndefined(input.destino)},
@@ -223,26 +281,29 @@ export class PatrimonioRepository {
         END,
         atualizado_em = NOW()
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
 
-    return this.buscarPorIdOuFalhar(id);
+    return this.buscarPorIdOuFalhar(id, tenantId);
   }
 
   private async validarNumeroUnico(
     tx: TransactionClient,
     numeroPatrimonio: string,
+    tenantId: string,
     idAtual?: bigint
   ) {
     const rows = await tx.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
       SELECT id
       FROM patrimonio_item
       WHERE numero_patrimonio = ${numeroPatrimonio}
+        AND tenant_id::text = ${tenantId}
       ${idAtual ? Prisma.sql`AND id <> ${idAtual}` : Prisma.empty}
       LIMIT 1
     `);
 
     if (rows.length) {
-      throw new AppError("Já existe patrimônio com este número.", 409);
+      throw new AppError("Ja existe patrimonio com este numero.", 409);
     }
   }
 }

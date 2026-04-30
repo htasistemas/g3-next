@@ -17,6 +17,7 @@ const unidadeInclude = {
 } satisfies Prisma.UnidadeAssistencialInclude;
 
 type TransactionClient = Prisma.TransactionClient;
+type IdRow = { id: bigint };
 
 function hasAnyAddressData(input: UnidadeAssistencialInput): boolean {
   return !!(
@@ -75,40 +76,54 @@ function normalizarSalas(salas?: SalaUnidadeInput[]) {
 }
 
 export class UnidadeAssistencialRepository {
-  async listar(filters: UnidadeAssistencialFilters) {
-    const where: Prisma.UnidadeAssistencialWhereInput = {};
+  async listar(filters: UnidadeAssistencialFilters, tenantId?: string) {
+    if (!tenantId) {
+      const where: Prisma.UnidadeAssistencialWhereInput = {};
 
-    const nome = trimOrUndefined(filters.nome_fantasia);
-    if (nome) {
-      where.OR = [
-        { nomeFantasia: { contains: nome, mode: "insensitive" } },
-        { razaoSocial: { contains: nome, mode: "insensitive" } }
-      ];
+      const nome = trimOrUndefined(filters.nome_fantasia);
+      if (nome) {
+        where.OR = [
+          { nomeFantasia: { contains: nome, mode: "insensitive" } },
+          { razaoSocial: { contains: nome, mode: "insensitive" } }
+        ];
+      }
+
+      const cnpj = normalizeDigits(filters.cnpj);
+      if (cnpj) {
+        where.cnpj = { contains: cnpj };
+      }
+
+      const cidade = trimOrUndefined(filters.cidade);
+      if (cidade) {
+        where.endereco = {
+          is: {
+            cidade: { contains: cidade, mode: "insensitive" }
+          }
+        };
+      }
+
+      if (typeof filters.unidade_principal === "boolean") {
+        where.unidadePrincipal = filters.unidade_principal;
+      }
+
+      return prisma.unidadeAssistencial.findMany({
+        where,
+        include: unidadeInclude,
+        orderBy: [{ nomeFantasia: "asc" }]
+      });
     }
 
-    const cnpj = normalizeDigits(filters.cnpj);
-    if (cnpj) {
-      where.cnpj = { contains: cnpj };
-    }
+    const ids = await this.listarIdsPorTenant(filters, tenantId);
+    if (!ids.length) return [];
 
-    const cidade = trimOrUndefined(filters.cidade);
-    if (cidade) {
-      where.endereco = {
-        is: {
-          cidade: { contains: cidade, mode: "insensitive" }
-        }
-      };
-    }
-
-    if (typeof filters.unidade_principal === "boolean") {
-      where.unidadePrincipal = filters.unidade_principal;
-    }
-
-    return prisma.unidadeAssistencial.findMany({
-      where,
+    const unidades = await prisma.unidadeAssistencial.findMany({
+      where: { id: { in: ids } },
       include: unidadeInclude,
       orderBy: [{ nomeFantasia: "asc" }]
     });
+
+    const ordem = new Map(ids.map((id, indice) => [id.toString(), indice]));
+    return unidades.sort((a, b) => (ordem.get(a.id.toString()) ?? 0) - (ordem.get(b.id.toString()) ?? 0));
   }
 
   async buscarPorId(id: bigint) {
@@ -118,40 +133,84 @@ export class UnidadeAssistencialRepository {
     });
   }
 
-  async buscarPorIdOuFalhar(id: bigint) {
-    const unidade = await this.buscarPorId(id);
+  async buscarPorIdDoTenant(id: bigint, tenantId?: string) {
+    if (!tenantId) {
+      return this.buscarPorId(id);
+    }
+
+    const pertenceAoTenant = await this.unidadePertenceAoTenant(id, tenantId);
+    if (!pertenceAoTenant) {
+      return null;
+    }
+
+    return prisma.unidadeAssistencial.findUnique({
+      where: { id },
+      include: unidadeInclude
+    });
+  }
+
+  async buscarPorIdOuFalhar(id: bigint, tenantId?: string) {
+    const unidade = await this.buscarPorIdDoTenant(id, tenantId);
     if (!unidade) {
       throw new AppError("Unidade assistencial nao encontrada.", 404);
     }
     return unidade;
   }
 
-  async buscarAtual() {
-    const unidadePrincipal = await prisma.unidadeAssistencial.findFirst({
-      where: { unidadePrincipal: true },
-      include: unidadeInclude,
-      orderBy: [{ atualizadoEm: "desc" }]
-    });
+  async buscarAtual(tenantId?: string) {
+    if (!tenantId) {
+      const unidadePrincipal = await prisma.unidadeAssistencial.findFirst({
+        where: { unidadePrincipal: true },
+        include: unidadeInclude,
+        orderBy: [{ atualizadoEm: "desc" }]
+      });
 
-    if (unidadePrincipal) return unidadePrincipal;
+      if (unidadePrincipal) return unidadePrincipal;
 
-    return prisma.unidadeAssistencial.findFirst({
-      include: unidadeInclude,
-      orderBy: [{ criadoEm: "asc" }]
+      return prisma.unidadeAssistencial.findFirst({
+        include: unidadeInclude,
+        orderBy: [{ criadoEm: "asc" }]
+      });
+    }
+
+    const rows = await prisma.$queryRawUnsafe<IdRow[]>(
+      `
+      SELECT id
+      FROM unidade_assistencial
+      WHERE tenant_id::text = $1
+      ORDER BY unidade_principal DESC, atualizado_em DESC, criado_em ASC
+      LIMIT 1
+      `,
+      tenantId
+    );
+
+    const unidadeId = rows[0]?.id;
+    if (!unidadeId) return null;
+
+    return prisma.unidadeAssistencial.findUnique({
+      where: { id: unidadeId },
+      include: unidadeInclude
     });
   }
 
-  async criar(input: UnidadeAssistencialInput) {
+  async criar(input: UnidadeAssistencialInput, tenantId?: string) {
     return prisma.$transaction(async (tx) => {
       const now = new Date();
       let enderecoId: bigint | undefined;
       const possuiEndereco = hasAnyAddressData(input);
 
-      if (input.unidade_principal) {
-        await tx.unidadeAssistencial.updateMany({
-          where: { unidadePrincipal: true },
-          data: { unidadePrincipal: false, atualizadoEm: now }
-        });
+      if (input.unidade_principal && tenantId) {
+        await tx.$executeRawUnsafe(
+          `
+          UPDATE unidade_assistencial
+          SET unidade_principal = FALSE,
+              atualizado_em = $2
+          WHERE tenant_id::text = $1
+            AND unidade_principal = TRUE
+          `,
+          tenantId,
+          now
+        );
       }
 
       if (possuiEndereco) {
@@ -200,6 +259,18 @@ export class UnidadeAssistencialRepository {
         }
       });
 
+      if (tenantId) {
+        await tx.$executeRawUnsafe(
+          `
+          UPDATE unidade_assistencial
+          SET tenant_id = $2::uuid
+          WHERE id = $1
+          `,
+          unidade.id,
+          tenantId
+        );
+      }
+
       const logomarca = trimOrUndefined(input.logomarca);
       const logomarcaRelatorio = trimOrUndefined(input.logomarca_relatorio);
       if (logomarca || logomarcaRelatorio) {
@@ -242,13 +313,13 @@ export class UnidadeAssistencialRepository {
         });
       }
 
-      return this.buscarPorIdTransacao(tx, unidade.id);
+      return this.buscarPorIdTransacao(tx, unidade.id, tenantId);
     });
   }
 
-  async atualizar(id: bigint, input: UnidadeAssistencialInput) {
+  async atualizar(id: bigint, input: UnidadeAssistencialInput, tenantId?: string) {
     return prisma.$transaction(async (tx) => {
-      const existing = await tx.unidadeAssistencial.findUnique({ where: { id } });
+      const existing = await this.buscarPorIdTransacao(tx, id, tenantId);
       if (!existing) {
         throw new AppError("Unidade assistencial nao encontrada.", 404);
       }
@@ -257,14 +328,20 @@ export class UnidadeAssistencialRepository {
       let enderecoId = existing.enderecoId ?? undefined;
       const possuiEndereco = hasAnyAddressData(input);
 
-      if (input.unidade_principal) {
-        await tx.unidadeAssistencial.updateMany({
-          where: {
-            unidadePrincipal: true,
-            id: { not: id }
-          },
-          data: { unidadePrincipal: false, atualizadoEm: now }
-        });
+      if (input.unidade_principal && tenantId) {
+        await tx.$executeRawUnsafe(
+          `
+          UPDATE unidade_assistencial
+          SET unidade_principal = FALSE,
+              atualizado_em = $3
+          WHERE tenant_id::text = $1
+            AND unidade_principal = TRUE
+            AND id <> $2
+          `,
+          tenantId,
+          id,
+          now
+        );
       }
 
       if (possuiEndereco) {
@@ -397,23 +474,89 @@ export class UnidadeAssistencialRepository {
         }
       }
 
-      return this.buscarPorIdTransacao(tx, id);
+      return this.buscarPorIdTransacao(tx, id, tenantId);
     });
   }
 
-  async remover(id: bigint) {
-    await this.buscarPorIdOuFalhar(id);
+  async remover(id: bigint, tenantId?: string) {
+    await this.buscarPorIdOuFalhar(id, tenantId);
     await prisma.unidadeAssistencial.delete({ where: { id } });
   }
 
-  private async buscarPorIdTransacao(tx: TransactionClient, id: bigint) {
-    const unidade = await tx.unidadeAssistencial.findUnique({
+  private async buscarPorIdTransacao(tx: TransactionClient, id: bigint, tenantId?: string) {
+    if (tenantId) {
+      const pertenceAoTenant = await this.unidadePertenceAoTenant(id, tenantId, tx);
+      if (!pertenceAoTenant) {
+        return null;
+      }
+    }
+
+    return tx.unidadeAssistencial.findUnique({
       where: { id },
       include: unidadeInclude
     });
-    if (!unidade) {
-      throw new AppError("Unidade assistencial nao encontrada.", 404);
+  }
+
+  private async listarIdsPorTenant(filters: UnidadeAssistencialFilters, tenantId: string) {
+    const params: unknown[] = [tenantId];
+    const condicoes = ["ua.tenant_id::text = $1"];
+
+    const nome = trimOrUndefined(filters.nome_fantasia);
+    if (nome) {
+      params.push(`%${nome}%`);
+      condicoes.push(
+        `(COALESCE(ua.nome_fantasia, '') ILIKE $${params.length} OR COALESCE(ua.razao_social, '') ILIKE $${params.length})`
+      );
     }
-    return unidade;
+
+    const cnpj = normalizeDigits(filters.cnpj);
+    if (cnpj) {
+      params.push(`%${cnpj}%`);
+      condicoes.push(`COALESCE(ua.cnpj, '') LIKE $${params.length}`);
+    }
+
+    const cidade = trimOrUndefined(filters.cidade);
+    if (cidade) {
+      params.push(`%${cidade}%`);
+      condicoes.push(`COALESCE(e.cidade, '') ILIKE $${params.length}`);
+    }
+
+    if (typeof filters.unidade_principal === "boolean") {
+      params.push(filters.unidade_principal);
+      condicoes.push(`ua.unidade_principal = $${params.length}`);
+    }
+
+    const rows = await prisma.$queryRawUnsafe<IdRow[]>(
+      `
+      SELECT ua.id
+      FROM unidade_assistencial ua
+      LEFT JOIN endereco e ON e.id = ua.endereco_id
+      WHERE ${condicoes.join(" AND ")}
+      ORDER BY ua.nome_fantasia ASC, ua.id ASC
+      `,
+      ...params
+    );
+
+    return rows.map((row) => row.id);
+  }
+
+  private async unidadePertenceAoTenant(
+    id: bigint,
+    tenantId: string,
+    db: Pick<TransactionClient, "$queryRawUnsafe"> = prisma
+  ) {
+    const rows = await db.$queryRawUnsafe<IdRow[]>(
+      `
+      SELECT id
+      FROM unidade_assistencial
+      WHERE id = $1
+        AND tenant_id::text = $2
+      LIMIT 1
+      `,
+      id,
+      tenantId
+    );
+
+    return !!rows[0];
   }
 }

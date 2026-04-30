@@ -5,40 +5,42 @@ import { UnidadeAssistencialService } from "../services/unidade-assistencial.ser
 const service = new UnidadeAssistencialService();
 
 export class UnidadeAssistencialController {
-  async listar(request: Request, response: Response) {
-    const unidades = await service.listar(request.query);
+  async listar(request: AuthenticatedRequest, response: Response) {
+    const unidades = await service.listar(request.query, request.authUser?.tenant_id);
     return response.json({ unidades });
   }
 
-  async buscarPorId(request: Request, response: Response) {
-    const unidade = await service.buscarPorId(request.params.id);
+  async buscarPorId(request: AuthenticatedRequest, response: Response) {
+    const unidade = await service.buscarPorId(request.params.id, request.authUser?.tenant_id);
     return response.json({ unidade });
   }
 
-  async buscarAtual(_request: Request, response: Response) {
-    const unidade = await service.buscarAtual();
+  async buscarAtual(request: AuthenticatedRequest, response: Response) {
+    const unidade = await service.buscarAtual(request.authUser?.tenant_id);
     return response.json({ unidade });
   }
 
-  async criar(request: Request, response: Response) {
+  async criar(request: AuthenticatedRequest, response: Response) {
     const unidade = await service.criar(
       request.body,
-      (request as AuthenticatedRequest).authUser?.id
+      request.authUser?.id,
+      request.authUser?.tenant_id
     );
     return response.status(201).json({ unidade });
   }
 
-  async atualizar(request: Request, response: Response) {
+  async atualizar(request: AuthenticatedRequest, response: Response) {
     const unidade = await service.atualizar(
       request.params.id,
       request.body,
-      (request as AuthenticatedRequest).authUser?.id
+      request.authUser?.id,
+      request.authUser?.tenant_id
     );
     return response.json({ unidade });
   }
 
-  async remover(request: Request, response: Response) {
-    await service.remover(request.params.id, (request as AuthenticatedRequest).authUser?.id);
+  async remover(request: AuthenticatedRequest, response: Response) {
+    await service.remover(request.params.id, request.authUser?.id, request.authUser?.tenant_id);
     return response.status(204).send();
   }
 }

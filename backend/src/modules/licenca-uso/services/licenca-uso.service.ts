@@ -162,8 +162,16 @@ export class LicencaUsoService {
   private readonly emailService = new EmailService();
   private readonly infinitePayService = new InfinitePayService();
 
-  private async montarResposta(configuracao: LicencaUsoConfiguracao) {
-    const pagamentos = await this.repository.listarPagamentos();
+  private parseTenant(rawTenantId?: string | null) {
+    const tenantId = String(rawTenantId ?? "").trim();
+    if (!tenantId) {
+      throw new AppError("Tenant da sessao nao identificado.", 401);
+    }
+    return tenantId;
+  }
+
+  private async montarResposta(configuracao: LicencaUsoConfiguracao, tenantId: string) {
+    const pagamentos = await this.repository.listarPagamentos(tenantId);
     return {
       configuracao,
       resumo: montarResumo(configuracao),
@@ -175,9 +183,10 @@ export class LicencaUsoService {
     };
   }
 
-  async obterConfiguracao() {
-    const unidadeAtual = await this.unidadeRepository.buscarAtual();
-    const registro = await this.repository.buscarConfiguracao();
+  async obterConfiguracao(rawTenantId?: string | null) {
+    const tenantId = this.parseTenant(rawTenantId);
+    const unidadeAtual = await this.unidadeRepository.buscarAtual(tenantId);
+    const registro = await this.repository.buscarConfiguracao(tenantId);
 
     const base = licencaUsoConfiguracaoSchema.parse({
       ...configuracaoPadrao,
@@ -194,13 +203,18 @@ export class LicencaUsoService {
       statusLicenca: calcularStatusLicenca(registro?.dataVencimento)
     });
 
-    return this.montarResposta(base);
+    return this.montarResposta(base, tenantId);
   }
 
-  async atualizarConfiguracao(rawPayload: unknown, usuarioAtualizacao: string) {
+  async atualizarConfiguracao(
+    rawPayload: unknown,
+    usuarioAtualizacao: string,
+    rawTenantId?: string | null
+  ) {
+    const tenantId = this.parseTenant(rawTenantId);
     const payload = atualizarLicencaUsoPayloadSchema.parse(rawPayload);
-    const atual = await this.repository.buscarConfiguracao();
-    const unidadeAtual = await this.unidadeRepository.buscarAtual();
+    const atual = await this.repository.buscarConfiguracao(tenantId);
+    const unidadeAtual = await this.unidadeRepository.buscarAtual(tenantId);
 
     const planoId = (payload.configuracao.planoId ?? atual?.planoId ?? configuracaoPadrao.planoId) as LicencaUsoPlano;
     const cicloCobranca = (payload.configuracao.cicloCobranca ??
@@ -270,12 +284,13 @@ export class LicencaUsoService {
       )
     });
 
-    const salvo = await this.repository.salvarConfiguracao(normalizado, usuarioAtualizacao);
-    return this.montarResposta(salvo);
+    const salvo = await this.repository.salvarConfiguracao(normalizado, usuarioAtualizacao, tenantId);
+    return this.montarResposta(salvo, tenantId);
   }
 
-  async gerarCheckoutLink() {
-    const { configuracao } = await this.obterConfiguracao();
+  async gerarCheckoutLink(rawTenantId?: string | null) {
+    const tenantId = this.parseTenant(rawTenantId);
+    const { configuracao } = await this.obterConfiguracao(tenantId);
     if (!configuracao.checkoutHandle?.trim()) {
       throw new AppError("Configure o handle da InfinitePay antes de gerar o checkout.", 422);
     }
@@ -323,10 +338,12 @@ export class LicencaUsoService {
         ultimoInvoiceSlug: resposta.invoice_slug,
         ultimoCheckoutPago: false
       }),
-      "infinitepay-checkout"
+      "infinitepay-checkout",
+      tenantId
     );
 
     await this.repository.registrarPagamentoPendente({
+      tenantId,
       descricao: `Licença G3N ${plano.nome}`,
       planoId: configuracao.planoId,
       cicloCobranca: configuracao.cicloCobranca,
@@ -341,7 +358,7 @@ export class LicencaUsoService {
       checkoutUrl: resposta.url
     });
 
-    const respostaCompleta = await this.montarResposta(salvo);
+    const respostaCompleta = await this.montarResposta(salvo, tenantId);
 
     return {
       ...respostaCompleta,
@@ -358,10 +375,15 @@ export class LicencaUsoService {
       slug?: string;
       receipt_url?: string;
     };
-    const { configuracao } = await this.obterConfiguracao();
     const orderNsu = String(payload.order_nsu ?? "").trim();
     const transactionNsu = String(payload.transaction_nsu ?? "").trim();
     const slug = String(payload.slug ?? "").trim();
+    if (!orderNsu || !transactionNsu || !slug) {
+      throw new AppError("ParÃ¢metros de retorno do checkout incompletos.", 422);
+    }
+    const pagamento = orderNsu ? await this.repository.buscarPagamentoPorOrderNsu(orderNsu) : null;
+    const tenantId = this.parseTenant(pagamento?.tenant_id);
+    const { configuracao } = await this.obterConfiguracao(tenantId);
 
     if (!configuracao.checkoutHandle?.trim()) {
       throw new AppError("Handle da InfinitePay não configurado.", 422);
@@ -396,11 +418,13 @@ export class LicencaUsoService {
         ultimoCheckoutPago: pago,
         ultimoValorPago: valorPago
       }),
-      "infinitepay-retorno"
+      "infinitepay-retorno",
+      tenantId
     );
 
     if (pago) {
       await this.repository.marcarPagamentoComoPago({
+        tenantId,
         orderNsu: resposta.order_nsu ?? orderNsu,
         invoiceSlug: resposta.slug ?? slug,
         transactionNsu: resposta.transaction_nsu ?? transactionNsu,
@@ -412,7 +436,7 @@ export class LicencaUsoService {
       });
     }
 
-    const respostaCompleta = await this.montarResposta(salvo);
+    const respostaCompleta = await this.montarResposta(salvo, tenantId);
 
     return {
       pago,
@@ -423,9 +447,9 @@ export class LicencaUsoService {
 
   async processarWebhookInfinitePay(rawPayload: unknown) {
     const payload = (rawPayload ?? {}) as Record<string, unknown>;
-    const { configuracao } = await this.obterConfiguracao();
     const orderNsu = String(payload.order_nsu ?? "").trim();
-    if (!orderNsu || orderNsu !== (configuracao.ultimoOrderNsu ?? "")) {
+    const pagamento = orderNsu ? await this.repository.buscarPagamentoPorOrderNsu(orderNsu) : null;
+    if (!orderNsu || !pagamento?.tenant_id) {
       return { acknowledged: true, ignored: true };
     }
     return this.confirmarPagamentoRetorno({
@@ -437,59 +461,64 @@ export class LicencaUsoService {
   }
 
   async processarAlertasEmailPendentes() {
-    const { configuracao } = await this.obterConfiguracao();
-    if (!configuracao.alertasEmailAtivos) return [];
-    if (!configuracao.dataVencimento) return [];
-    if (!configuracao.emailsAlerta.length) return [];
-
-    const diasParaVencimento = diferencaDias(configuracao.dataVencimento);
-    if (diasParaVencimento == null) return [];
-
+    const tenants = await this.repository.listarTenantsComConfiguracao();
     const alertasProcessados: LicencaUsoAlertaProcessado[] = [];
-    const diasElegiveis =
-      diasParaVencimento < 0
-        ? [-1]
-        : configuracao.diasAlertaEmail.filter((dia) => diasParaVencimento <= dia);
 
-    if (!diasElegiveis.length) return [];
+    for (const tenantId of tenants) {
+      const { configuracao } = await this.obterConfiguracao(tenantId);
+      if (!configuracao.alertasEmailAtivos) continue;
+      if (!configuracao.dataVencimento) continue;
+      if (!configuracao.emailsAlerta.length) continue;
 
-    for (const destinatario of configuracao.emailsAlerta) {
-      for (const diasAntecedencia of diasElegiveis) {
-        const jaEnviado = await this.repository.alertaJaEnviado(
-          destinatario,
-          diasAntecedencia,
-          configuracao.dataVencimento
-        );
-        if (jaEnviado) continue;
+      const diasParaVencimento = diferencaDias(configuracao.dataVencimento);
+      if (diasParaVencimento == null) continue;
 
-        try {
-          await this.emailService.enviarEmailSimples({
-            destinatario,
-            assunto:
-              diasAntecedencia < 0
-                ? "Licença de uso do G3N vencida"
-                : `Licença de uso do G3N vence em ${diasParaVencimento} dia(s)`,
-            mensagem: this.montarMensagemAlerta(configuracao, diasParaVencimento)
-          });
+      const diasElegiveis =
+        diasParaVencimento < 0
+          ? [-1]
+          : configuracao.diasAlertaEmail.filter((dia) => diasParaVencimento <= dia);
 
-          const processado: LicencaUsoAlertaProcessado = {
+      if (!diasElegiveis.length) continue;
+
+      for (const destinatario of configuracao.emailsAlerta) {
+        for (const diasAntecedencia of diasElegiveis) {
+          const jaEnviado = await this.repository.alertaJaEnviado(
+            tenantId,
             destinatario,
             diasAntecedencia,
-            referenciaVencimento: configuracao.dataVencimento,
-            statusEnvio: "enviado"
-          };
-          await this.repository.registrarAlerta(processado);
-          alertasProcessados.push(processado);
-        } catch (error: any) {
-          const processado: LicencaUsoAlertaProcessado = {
-            destinatario,
-            diasAntecedencia,
-            referenciaVencimento: configuracao.dataVencimento,
-            statusEnvio: "falha",
-            erro: error?.message ?? "Falha ao enviar alerta de licença."
-          };
-          await this.repository.registrarAlerta(processado);
-          alertasProcessados.push(processado);
+            configuracao.dataVencimento
+          );
+          if (jaEnviado) continue;
+
+          try {
+            await this.emailService.enviarEmailSimples({
+              destinatario,
+              assunto:
+                diasAntecedencia < 0
+                  ? "Licença de uso do G3N vencida"
+                  : `Licença de uso do G3N vence em ${diasParaVencimento} dia(s)`,
+              mensagem: this.montarMensagemAlerta(configuracao, diasParaVencimento)
+            });
+
+            const processado: LicencaUsoAlertaProcessado = {
+              destinatario,
+              diasAntecedencia,
+              referenciaVencimento: configuracao.dataVencimento,
+              statusEnvio: "enviado"
+            };
+            await this.repository.registrarAlerta(tenantId, processado);
+            alertasProcessados.push(processado);
+          } catch (error: any) {
+            const processado: LicencaUsoAlertaProcessado = {
+              destinatario,
+              diasAntecedencia,
+              referenciaVencimento: configuracao.dataVencimento,
+              statusEnvio: "falha",
+              erro: error?.message ?? "Falha ao enviar alerta de licença."
+            };
+            await this.repository.registrarAlerta(tenantId, processado);
+            alertasProcessados.push(processado);
+          }
         }
       }
     }
@@ -520,3 +549,4 @@ export class LicencaUsoService {
     ].join("\n");
   }
 }
+

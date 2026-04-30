@@ -1,5 +1,5 @@
 import { httpClient } from "./http-client";
-import type { UsuarioAutenticado } from "@/types/auth";
+import type { TenantContextoLogin, UsuarioAutenticado } from "@/types/auth";
 
 type LoginResponse = {
   token: string;
@@ -10,11 +10,26 @@ type MeResponse = {
   usuario: UsuarioAutenticado | null;
 };
 
+type TenantContextResponse = {
+  instituicao: TenantContextoLogin | null;
+};
+
 export const authService = {
-  async login(nomeUsuario: string, senha: string): Promise<UsuarioAutenticado> {
+  async login(input: {
+    cnpj?: string;
+    codigoInstituicao?: string;
+    slug?: string;
+    email?: string;
+    nomeUsuario?: string;
+    senha: string;
+  }): Promise<UsuarioAutenticado> {
     const { data } = await httpClient.post<LoginResponse>("/api/auth/login", {
-      nomeUsuario,
-      senha
+      cnpj: input.cnpj,
+      codigoInstituicao: input.codigoInstituicao,
+      slug: input.slug,
+      email: input.email,
+      nomeUsuario: input.nomeUsuario,
+      senha: input.senha
     });
     return data.usuario;
   },
@@ -24,9 +39,17 @@ export const authService = {
     return data.usuario;
   },
 
-  async loginGoogle(idToken: string): Promise<UsuarioAutenticado> {
+  async loginGoogle(input: {
+    idToken: string;
+    cnpj?: string;
+    slug?: string;
+    codigoInstituicao?: string;
+  }): Promise<UsuarioAutenticado> {
     const { data } = await httpClient.post<LoginResponse>("/api/auth/google", {
-      idToken
+      idToken: input.idToken,
+      cnpj: input.cnpj,
+      slug: input.slug,
+      codigoInstituicao: input.codigoInstituicao
     });
     return data.usuario;
   },
@@ -35,10 +58,29 @@ export const authService = {
     await httpClient.post("/api/auth/logout");
   },
 
-  async esqueciSenha(email: string): Promise<{ message: string }> {
+  async esqueciSenha(input: {
+    email: string;
+    cnpj?: string;
+    slug?: string;
+    codigoInstituicao?: string;
+  }): Promise<{ message: string }> {
     const { data } = await httpClient.post<{ message: string }>("/api/auth/esqueci-senha", {
-      email
+      email: input.email,
+      cnpj: input.cnpj,
+      slug: input.slug,
+      codigoInstituicao: input.codigoInstituicao
     });
     return data;
+  },
+
+  async obterTenantContexto(params: {
+    cnpj?: string;
+    slug?: string;
+    codigoInstituicao?: string;
+  }): Promise<TenantContextoLogin | null> {
+    const { data } = await httpClient.get<TenantContextResponse>("/api/auth/tenant-context", {
+      params
+    });
+    return data.instituicao;
   }
 };

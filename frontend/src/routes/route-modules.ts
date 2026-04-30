@@ -203,6 +203,10 @@ const routeModules: RouteModuleDefinition[] = [
   },
   { path: "/configuracoes/usuarios", loader: () => import("@/pages/configuracoes/usuarios-page") },
   {
+    path: "/configuracoes/master-instituicoes",
+    loader: () => import("@/pages/configuracoes/master-instituicoes-page")
+  },
+  {
     path: "/configuracoes/mensagens-personalizadas",
     loader: () => import("@/pages/configuracoes/mensagens-personalizadas-page")
   },

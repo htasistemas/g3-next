@@ -110,7 +110,8 @@ const secoesManual: ManualSecao[] = [
         atencoes: [
           "Não marque outro responsável se já existir um responsável ativo.",
           "Membros configurados para usar o endereço da família herdam o endereço principal do núcleo.",
-          "A aba Listagem de famílias segue o mesmo padrão visual e estrutural da aba Listagem de beneficiários, com filtros no topo, limpeza rápida e tabela clicável."
+          "A aba Listagem de famílias segue o mesmo padrão visual e estrutural da aba Listagem de beneficiários, com filtros no topo, limpeza rápida e tabela clicável.",
+          "A tela Vínculo familiar agora lista, abre, cria, atualiza, transfere, desmembra e inativa famílias sempre dentro do tenant autenticado, impedindo que uma instituição veja ou altere núcleos familiares de outra."
         ]
       }
     ]
@@ -131,7 +132,8 @@ const secoesManual: ManualSecao[] = [
         ],
         atencoes: [
           "Antes de conceder benefícios críticos, confira alertas automáticos de duplicidade no beneficiário e no grupo familiar.",
-          "A aba Custos resume impacto mensal, anual e histórico do beneficiário e da família."
+          "A aba Custos resume impacto mensal, anual e histórico do beneficiário e da família.",
+          "A Central de Atendimentos agora carrega busca, visão geral, atendimentos, benefícios, encaminhamentos, histórico, custos, alertas e relatórios sempre dentro da instituição autenticada, sem misturar dados de outros CNPJs."
         ]
       },
       {
@@ -148,7 +150,8 @@ const secoesManual: ManualSecao[] = [
         ],
         atencoes: [
           "O botão Excluir da barra superior remove todo o curso configurado e exige confirmação específica antes da exclusão.",
-          "Na aba Presença, a data exibida na lista e a data impressa na lista de presença agora seguem exatamente o mesmo dia informado, sem recuo por fuso horário."
+          "Na aba Presença, a data exibida na lista e a data impressa na lista de presença agora seguem exatamente o mesmo dia informado, sem recuo por fuso horário.",
+          "A tela de Inscrições agora carrega catálogo, listagem, detalhe, fila de espera, presença, beneficiários, profissionais e salas sempre dentro da instituição autenticada, sem exibir dados de outro CNPJ."
         ]
       },
       {
@@ -194,7 +197,8 @@ const secoesManual: ManualSecao[] = [
           "Ao concluir a doação, o sistema agora também invalida o cache do almoxarifado para que a listagem e as movimentações reflitam os novos itens ao abrir a tela.",
           "A identificação de item existente considera diferenças de maiúsculas, minúsculas, espaços e acentos para evitar duplicidade como cesta basica e cesta básica.",
           "O salvamento pela aba Itens recebidos não deve mais bloquear o registro por campo opcional numérico vazio no formulário principal.",
-          "Quando faltar algum campo obrigatório real, o sistema continuará informando a pendência nominalmente no alerta."
+          "Quando faltar algum campo obrigatório real, o sistema continuará informando a pendência nominalmente no alerta.",
+          "A tela Recebimento de doações agora lista, abre, salva, exclui e consulta beneficiários, famílias, estoque e carência sempre dentro do tenant autenticado."
         ]
       },
       {
@@ -207,7 +211,8 @@ const secoesManual: ManualSecao[] = [
         ],
         atencoes: [
           "Os botões Excluir ocorrência e Imprimir ocorrência continuam vinculados ao registro atual selecionado.",
-          "A troca de nomes na barra superior foi feita para reduzir ambiguidade operacional, sem alterar a lógica de cadastro, busca, exclusão ou impressão."
+          "A troca de nomes na barra superior foi feita para reduzir ambiguidade operacional, sem alterar a lógica de cadastro, busca, exclusão ou impressão.",
+          "A tela Ocorrências agora lista, abre, salva, exclui, anexa arquivos e gera PDFs sempre dentro do tenant autenticado."
         ]
       },
       {
@@ -227,6 +232,7 @@ const secoesManual: ManualSecao[] = [
           "O salvamento da identificação da visita foi ajustado para bases em que a consulta retorna datas e horários como texto, evitando erro interno do servidor no retorno do cadastro.",
           "O backend de visitas também passou a compatibilizar automaticamente colunas faltantes da tabela visita_domiciliar em bases antigas de produção antes de salvar ou consultar registros.",
           "O backend de visitas passou a converter automaticamente os horários para TIME e os blocos de endereço, condições, situação social, registro e anexos para JSONB compatível com PostgreSQL, evitando erro interno do servidor ao salvar novas visitas.",
+          "A tela Registro de visitas agora lista, cadastra, atualiza e exclui visitas sempre dentro do tenant autenticado, impedindo que uma instituição visualize ou altere visitas domiciliares de outra.",
           "Os botões Excluir visita e Imprimir visita continuam vinculados ao registro atual selecionado.",
           "A troca de nomes na barra superior foi feita para reduzir ambiguidade operacional, sem alterar a lógica de cadastro, histórico, exclusão ou impressão."
         ]
@@ -250,7 +256,8 @@ const secoesManual: ManualSecao[] = [
         ],
         atencoes: [
           "A leitura por faixa etária foi padronizada para fases da vida e não deve mais ser interpretada como lista solta de idades.",
-          "Se não houver data de nascimento válida no cadastro, o beneficiário pode ficar fora da consolidação da faixa etária até a regularização do dado."
+          "Se não houver data de nascimento válida no cadastro, o beneficiário pode ficar fora da consolidação da faixa etária até a regularização do dado.",
+          "Os indicadores da tela agora continuam segregados por tenant também no backend de relatórios e consolidações principais, evitando misturar instituição logada com dados de outro CNPJ."
         ]
       },
       {
@@ -268,7 +275,8 @@ const secoesManual: ManualSecao[] = [
           "Os atalhos estratégicos ajustam filtros automaticamente e podem ser combinados com bairro e período.",
           "As camadas Instituições e Doadores ficam disponíveis na lista O que ver no mapa? para aprofundar a análise territorial.",
           "A base gratuita da CARTO é carregada diretamente no navegador e não exige configuração de chave no frontend.",
-          "Se o mapa não carregar, valide apenas a conectividade do navegador com os tiles externos da CARTO."
+          "Se o mapa não carregar, valide apenas a conectividade do navegador com os tiles externos da CARTO.",
+          "O mapa de vulnerabilidade e a busca de vínculos territoriais agora respeitam a instituição autenticada, sem sugerir beneficiários, famílias, profissionais, voluntários, unidades ou doadores de outro tenant."
         ]
       }
     ]
@@ -292,7 +300,8 @@ const secoesManual: ManualSecao[] = [
         atencoes: [
           "A consulta de produtos fica centralizada na aba Listagem de produtos.",
           "Cadastros e movimentações devem permanecer coerentes para evitar divergência de saldo.",
-          "Em kits com composição, a disponibilidade exibida pode ser maior que o estoque físico do item porque o sistema também considera os componentes suficientes para montar novas unidades."
+          "Em kits com composição, a disponibilidade exibida pode ser maior que o estoque físico do item porque o sistema também considera os componentes suficientes para montar novas unidades.",
+          "A tela Almoxarifado agora lista, gera próximo código, cadastra, atualiza, exclui, movimenta estoque e opera kits sempre dentro do tenant autenticado, impedindo mistura de itens e movimentações entre instituições."
         ]
       },
       {
@@ -312,7 +321,8 @@ const secoesManual: ManualSecao[] = [
           "Na aba Listagem de veículos, a ação principal da barra superior passa a ser Editar veículo, evitando confusão com o salvamento do cadastro.",
           "Os botões da barra superior foram compactados e balanceados em largura para respeitar melhor o espaço do card e não avançar sobre o título da tela.",
           "O vínculo de motorista autorizado foi ajustado para funcionar tanto em bases que usam cadastro_profissional quanto em bases que usam cadastro_profissionais.",
-          "A impressão do mapa de bordo é gerada no próprio navegador sem abrir aba auxiliar, respeita o período informado no modal de impressão e segue o padrão institucional do G3N com nome da instituição, logomarca de relatório e rodapé oficial da unidade."
+          "A impressão do mapa de bordo é gerada no próprio navegador sem abrir aba auxiliar, respeita o período informado no modal de impressão e segue o padrão institucional do G3N com nome da instituição, logomarca de relatório e rodapé oficial da unidade.",
+          "A tela Controle de veículos agora lista, cadastra, atualiza e exclui veículos, diário de bordo, locais de destino e motoristas autorizados sempre dentro do tenant autenticado, impedindo mistura de dados entre instituições."
         ]
       },
       {
@@ -330,7 +340,8 @@ const secoesManual: ManualSecao[] = [
         atencoes: [
           "Quando o navegador bloquear a janela dedicada de impressão, a tela usa a impressão da própria página como contingência, sem deixar a operação travada em tela em branco.",
           "O módulo passou a manter cadastro próprio de responsáveis para retirada, sem depender apenas da lista de usuários internos.",
-          "O cadastro do empréstimo mantém compatibilidade com bases antigas criando automaticamente as colunas e a tabela novas necessárias quando ainda não existirem."
+          "O cadastro do empréstimo mantém compatibilidade com bases antigas criando automaticamente as colunas e a tabela novas necessárias quando ainda não existirem.",
+          "A tela Empréstimo para eventos agora lista, cadastra, atualiza e exclui empréstimos, agenda, eventos, responsáveis, itens vinculados e movimentações sempre dentro do tenant autenticado, impedindo mistura de reservas entre instituições."
         ]
       },
       {
@@ -344,7 +355,23 @@ const secoesManual: ManualSecao[] = [
         atencoes: [
           "O sistema aceita anexos PDF, JPG e PNG e grava apenas o caminho do arquivo no cadastro do documento.",
           "Se o documento já estiver salvo, o anexo é armazenado no storage do sistema e permanece disponível para substituição e exclusão sem duplicar arquivo no banco.",
-          "O envio dos anexos na aba Cadastro e edição aceita seleção múltipla e mostra a evolução do upload em barra percentual até a conclusão."
+          "O envio dos anexos na aba Cadastro e edição aceita seleção múltipla e mostra a evolução do upload em barra percentual até a conclusão.",
+          "A tela Gestão de documentos agora lista, cadastra, atualiza e exclui documentos, anexos, arquivos e histórico sempre dentro do tenant autenticado, impedindo mistura de documentos entre instituições."
+        ]
+      },
+      {
+        nome: "Ofícios e protocolos",
+        objetivo: "Emitir, receber e acompanhar ofícios com protocolo, trâmites, imagens e PDF assinado dentro do fluxo institucional.",
+        comoUsar: [
+          "Use a listagem para localizar rapidamente os ofícios já cadastrados e abrir o registro completo para edição ou consulta.",
+          "Ao criar um novo ofício, o sistema gera o próximo número automaticamente com base na data informada e no tenant da instituição logada.",
+          "Na edição do ofício, mantenha identificação, conteúdo, protocolo e trâmites atualizados para preservar a rastreabilidade do documento.",
+          "Use PDF assinado para anexar a versão final oficial do ofício e use Imagens quando precisar complementar o registro com arquivos visuais vinculados ao documento.",
+          "Na geração do documento, o PDF institucional usa automaticamente o contexto da unidade e os dados da instituição do tenant autenticado."
+        ],
+        atencoes: [
+          "A tela Ofícios e protocolos agora lista, numera, cadastra, atualiza, exclui, protocola, tramita, anexa imagens, guarda PDF assinado e gera documento sempre dentro do tenant autenticado, impedindo mistura de ofícios entre instituições.",
+          "A numeração sequencial do ofício passou a ser independente por instituição, evitando colisão de números entre tenants diferentes."
         ]
       },
       {
@@ -373,7 +400,8 @@ const secoesManual: ManualSecao[] = [
           "Pendência, atraso, conclusão, dispensa e não se aplica são status operacionais reais e devem refletir a execução do dia, não apenas controle visual.",
           "Toda conclusão, dispensa, reabertura, alteração de modelo e atualização de configuração gera histórico de auditoria do checklist.",
           "A geração semanal evita duplicidade por usuário, atividade e data e mantém o snapshot da atividade mesmo após edição posterior do modelo.",
-          "Os indicadores do topo e da visão gerencial usam dados reais do banco e devem ser lidos como acompanhamento operacional da rotina."
+          "Os indicadores do topo e da visão gerencial usam dados reais do banco e devem ser lidos como acompanhamento operacional da rotina.",
+          "A tela Checklist diário agora lista execuções, semana, histórico, modelos, indicadores e configurações sempre dentro do tenant autenticado, impedindo mistura de rotinas administrativas entre instituições."
         ]
       },
       {
@@ -394,7 +422,50 @@ const secoesManual: ManualSecao[] = [
           "A capa do evento é persistida por vínculo com a foto cadastrada no álbum e pode ser substituída sem duplicar imagem ou deixar referência órfã.",
           "A remoção da foto principal limpa a capa atual do evento e exige nova definição visual quando necessário.",
           "As fotos ficam armazenadas no storage do sistema com persistência real; o banco guarda apenas os metadados e caminhos do arquivo.",
-          "As ações mudam conforme a aba para evitar botões genéricos e reduzir clique desnecessário durante a operação."
+          "As ações mudam conforme a aba para evitar botões genéricos e reduzir clique desnecessário durante a operação.",
+          "A tela Fotos e eventos agora lista, cadastra, atualiza e exclui eventos, fotos, capa, tags e galeria sempre dentro do tenant autenticado, impedindo mistura de álbuns entre instituições."
+        ]
+      },
+      {
+        nome: "Lembretes diários",
+        objetivo: "Organizar lembretes operacionais com execução diária, conclusão, adiamento e visão rápida de pendências.",
+        comoUsar: [
+          "Use a listagem para acompanhar os lembretes do usuário ou os lembretes marcados para todos os usuários da instituição.",
+          "Ao cadastrar um lembrete, informe título, data inicial, hora do aviso e, quando necessário, o usuário responsável.",
+          "Use Concluir para encerrar um lembrete já executado e Adiar para mover a próxima execução para nova data e hora sem perder o registro.",
+          "O resumo da tela mostra rapidamente quantos lembretes ainda estão pendentes e quantos já estão vencidos no momento."
+        ],
+        atencoes: [
+          "A tela Lembretes diários agora lista, resume, cadastra, atualiza, conclui, adia e exclui lembretes sempre dentro do tenant autenticado, impedindo mistura de lembretes entre instituições.",
+          "Quando um lembrete for marcado para todos os usuários, ele continua restrito à instituição logada e não aparece em outros tenants."
+        ]
+      },
+      {
+        nome: "Patrimônio",
+        objetivo: "Controlar bens patrimoniais com cadastro, atualização de estado e histórico de movimentações por instituição.",
+        comoUsar: [
+          "Use a listagem para localizar rapidamente o patrimônio e abrir o item para edição ou conferência do cadastro.",
+          "Ao cadastrar um bem, informe número do patrimônio, nome, categoria, conservação, status, origem, responsável, unidade e demais dados de identificação.",
+          "Use Registrar movimento para lançar movimentação, manutenção ou baixa, mantendo a trilha operacional do bem ao longo do tempo.",
+          "Quando o tipo do movimento for Baixa, o sistema atualiza automaticamente o status do patrimônio para refletir a saída do item."
+        ],
+        atencoes: [
+          "A tela Patrimônio agora lista, cadastra, atualiza e movimenta bens sempre dentro do tenant autenticado, impedindo mistura de patrimônios entre instituições.",
+          "A validação do número do patrimônio passou a ser exclusiva por tenant, permitindo que instituições diferentes mantenham suas próprias sequências sem conflito."
+        ]
+      },
+      {
+        nome: "Tarefas e pendências",
+        objetivo: "Controlar tarefas administrativas com checklist, histórico operacional e leitura rápida das pendências da instituição.",
+        comoUsar: [
+          "Use a listagem para acompanhar as tarefas cadastradas e abrir o item desejado para edição ou atualização do andamento.",
+          "Ao cadastrar uma tarefa, informe título, descrição, responsável, prioridade, prazo, status e os itens do checklist quando houver etapas internas.",
+          "Use o histórico da tarefa para registrar observações, avanços e ocorrências relevantes sem perder a trilha operacional.",
+          "O resumo da tela mostra rapidamente o total de pendências e a quantidade de tarefas já classificadas como em atraso."
+        ],
+        atencoes: [
+          "A tela Tarefas e pendências agora lista, resume, cadastra, atualiza, exclui tarefas, checklist e histórico sempre dentro do tenant autenticado, impedindo mistura de tarefas entre instituições.",
+          "Checklist e histórico seguem vinculados apenas às tarefas da instituição logada e não são compartilhados entre tenants."
         ]
       }
     ]
@@ -406,6 +477,20 @@ const secoesManual: ManualSecao[] = [
     icon: Link2,
     telas: [
       {
+        nome: "Termo de fomento",
+        objetivo: "Cadastrar, acompanhar e atualizar termos, aditivos e documentos oficiais vinculados aos instrumentos da instituição.",
+        comoUsar: [
+          "Use a listagem para localizar rapidamente os termos já cadastrados e abrir o registro completo para edição ou consulta.",
+          "Ao cadastrar um termo, informe número, tipo, órgão concedente, vigência, situação, objeto, valor global e responsável interno.",
+          "Use os aditivos para registrar alterações de prazo, valor ou condição do instrumento sem perder o histórico do termo principal.",
+          "Os documentos relacionados e anexos de aditivos ficam vinculados ao termo para manter a organização documental do processo."
+        ],
+        atencoes: [
+          "A tela Termo de fomento agora lista, abre, cadastra, atualiza, exclui termos, aditivos e documentos sempre dentro do tenant autenticado, impedindo mistura de instrumentos entre instituições.",
+          "Aditivos e documentos permanecem vinculados apenas ao termo da instituição logada e não podem ser acessados por outro tenant."
+        ]
+      },
+      {
         nome: "Plano de trabalho",
         objetivo: "Montar e revisar o plano de trabalho por etapas guiadas, com ações de salvamento, validação, envio, aprovação e emissão documental no padrão do G3N.",
         comoUsar: [
@@ -415,6 +500,8 @@ const secoesManual: ManualSecao[] = [
         ],
         atencoes: [
           "Os botões continuam executando em um clique e respeitam bloqueio temporário durante processamentos para evitar acionamento duplo.",
+          "A tela Plano de trabalho agora lista, abre, cadastra, atualiza e exclui planos sempre dentro do tenant autenticado, impedindo mistura de dados entre instituições.",
+          "Metas, etapas, aplicação de recursos, desembolso e checklist de prestação seguem vinculados apenas aos planos da instituição logada.",
           "Se uma ação estiver desabilitada, revise o status do plano e os campos mínimos obrigatórios antes de tentar novamente."
         ]
       }
@@ -426,6 +513,21 @@ const secoesManual: ManualSecao[] = [
     descricao: "Controle financeiro simplificado, com foco em lançamentos e contas bancárias.",
     icon: PiggyBank,
     telas: [
+      {
+        nome: "Autorização de compras",
+        objetivo: "Controlar solicitações de compra com itens, aprovação, cotações, reserva bancária e integração com financeiro, almoxarifado e patrimônio.",
+        comoUsar: [
+          "Use a listagem para localizar rapidamente as solicitações e abrir o processo desejado para edição, aprovação ou conclusão.",
+          "Ao cadastrar uma solicitação, informe solicitante, setor, centro de custo, tipo de compra, prioridade, justificativa e os itens que compõem o pedido.",
+          "Depois do cadastro, use o fluxo da tela para enviar para aprovação, registrar pareceres, lançar cotações, definir fornecedor vencedor e efetuar a reserva financeira.",
+          "Quando a compra for concluída, a tela também pode gerar autorização de pagamento e integrar automaticamente materiais ao almoxarifado e bens ao patrimônio."
+        ],
+        atencoes: [
+          "A tela Autorização de compras agora lista, abre, cadastra, atualiza, cancela, aprova, cota, reserva e conclui compras sempre dentro do tenant autenticado, impedindo mistura de processos entre instituições.",
+          "Indicadores, setores solicitantes, orçamento setorial e níveis de aprovação passam a ser tratados por tenant para evitar reaproveitamento de configuração entre instituições.",
+          "Cotações, reservas, histórico, anexos e integrações seguem vinculados apenas às compras da instituição logada."
+        ]
+      },
       {
         nome: "Contabilidade / financeiro",
         objetivo: "Permitir que qualquer usuário registre receitas e despesas e acompanhe as contas bancárias com o mínimo de complexidade.",
@@ -450,7 +552,8 @@ const secoesManual: ManualSecao[] = [
           "O estorno continua disponível somente para lançamentos já pagos, recebidos ou conciliados.",
           "O cadastro de centro de custo deixou de fazer parte do fluxo simplificado dessa tela.",
           "Ao salvar um centro de custo no backend, o sistema agora suporta perfis longos de permissões no histórico sem retornar erro interno do servidor.",
-          "Se o valor do lançamento for digitado com vírgula, a tela passa a interpretar corretamente o número antes do salvamento."
+          "Se o valor do lançamento for digitado com vírgula, a tela passa a interpretar corretamente o número antes do salvamento.",
+          "A tela Contabilidade / financeiro agora lista contas, lançamentos, movimentações, transferências, conciliações, histórico, compras integradas e emendas sempre dentro do tenant autenticado."
         ]
       },
       {
@@ -483,6 +586,21 @@ const secoesManual: ManualSecao[] = [
         ]
       },
       {
+        nome: "Captação de recursos",
+        objetivo: "Organizar doadores, campanhas, doações, comprovantes e indicadores da captação sem cruzar dados entre instituições.",
+        comoUsar: [
+          "Use o dashboard para acompanhar arrecadação, campanhas ativas, recorrências e desempenho dos principais doadores somente da instituição logada.",
+          "Na gestão de doadores, campanhas, doações e comprovantes, trabalhe normalmente com listagem, cadastro, edição, cobrança, confirmação e emissão de comprovante em um clique por ação.",
+          "Na área de configurações, mantenha mensagens, parâmetros de pagamento e regras operacionais da captação conforme a necessidade da instituição atual.",
+          "Os relatórios e comprovantes emitidos pela tela passam a usar também os dados institucionais do tenant autenticado."
+        ],
+        atencoes: [
+          "A tela Captação de recursos agora lista, abre, cadastra, atualiza e movimenta doadores, campanhas, doações, comprovantes, configurações e logs sempre dentro do tenant autenticado.",
+          "O portal do doador continua vinculado ao tenant do próprio cadastro para impedir acesso ou geração de cobrança em dados de outra instituição.",
+          "Se houver troca de instituição na mesma estação, faça novo login antes de validar a tela para garantir recarga completa do cache por tenant."
+        ]
+      },
+      {
         nome: "Prestação de contas",
         objetivo: "Organizar a prestação de contas em fluxo guiado, com leitura simples, conferência visual e revisão final antes do envio ou da impressão.",
         comoUsar: [
@@ -498,7 +616,8 @@ const secoesManual: ManualSecao[] = [
         atencoes: [
           "Os campos monetários exibem formatação brasileira e a tela alerta quando o saldo informado divergir do saldo calculado pelos totais.",
           "A prestação só fica realmente pronta para conferência quando houver receitas ou total recebido, aplicação ou total aplicado, comprovantes e checklist sem pendências.",
-          "A revisão final mostra claramente o que ainda falta, evitando depender de treinamento informal para concluir a operação."
+          "A revisão final mostra claramente o que ainda falta, evitando depender de treinamento informal para concluir a operação.",
+          "A tela Prestação de contas agora separa os dados por instituição e CNPJ da sessão autenticada, incluindo listagem, detalhe, criação, edição, exclusão, recebimentos, destinações, comprovantes, timeline e checklist."
         ]
       },
       {
@@ -540,7 +659,8 @@ const secoesManual: ManualSecao[] = [
         atencoes: [
           "Falhas de storage antigo não devem mais derrubar a atualização do profissional em produção.",
           "Mensagens de erro do cadastro devem priorizar o motivo real da foto ou da gravação, sem cair em erro interno genérico quando houver tratamento possível.",
-          "A compatibilidade com bases de produção legadas foi mantida removendo do ORM campos ainda não existentes na tabela cadastro_profissionais."
+          "A compatibilidade com bases de produção legadas foi mantida removendo do ORM campos ainda não existentes na tabela cadastro_profissionais.",
+          "A tela Cadastro de profissionais agora lista, abre, cadastra, atualiza e exclui sempre dentro do tenant autenticado, impedindo que uma instituição visualize ou altere profissionais de outra."
         ]
       },
       {
@@ -576,6 +696,7 @@ const secoesManual: ManualSecao[] = [
           "Ao concluir o pagamento, use a impressao da notinha simples como comprovante da venda."
         ],
         atencoes: [
+          "A frente de caixa agora lista o historico e grava vendas apenas dentro da instituicao e do CNPJ autenticados, usando tambem o estoque do almoxarifado do mesmo tenant.",
           "Nesta entrega a frente de caixa usa os produtos reais do almoxarifado e registra a baixa simples de estoque na conclusao da venda.",
           "O fluxo considera impressao de notinha simples, sem emissao de nota fiscal ou TEF, mas com cliente opcional e historico de vendas salvo no sistema.",
           "Ao evoluir o modulo, manter o fluxo com um clique, feedback visual e revisao do manual na mesma entrega."
@@ -591,6 +712,7 @@ const secoesManual: ManualSecao[] = [
           "Use o botao de impressao para reemitir a notinha simples do atendimento selecionado."
         ],
         atencoes: [
+          "O historico de vendas agora mostra apenas registros da instituicao e do CNPJ autenticados, incluindo lista, filtros, detalhe e itens vendidos.",
           "A consulta usa o historico persistido pelo modulo de vendas e mostra os dados gravados no fechamento do caixa.",
           "A reimpressao gera apenas comprovante simples, sem valor fiscal.",
           "Ao alterar filtros, manter o uso com um clique e feedback visual durante o carregamento."
@@ -639,6 +761,22 @@ const secoesManual: ManualSecao[] = [
     icon: UserRound,
     telas: [
       {
+        nome: "Contratação",
+        objetivo: "Gerenciar candidatos, processo de contratação, entrevistas, documentos, ficha admissional, termos, PPD, carta ao banco e auditoria operacional do RH.",
+        comoUsar: [
+          "Use a listagem de candidatos para localizar rapidamente um processo pelo nome ou CPF e abrir o cadastro com um clique.",
+          "Ao criar um novo candidato, preencha os dados principais e salve para o sistema abrir automaticamente o processo de contratação vinculado.",
+          "Dentro do processo, avance pelas abas de entrevista, ficha admissional, documentos, arquivos, termos, PPD e carta ao banco conforme a etapa operacional do RH.",
+          "Sempre revise o status do processo antes de salvar para manter a trilha correta entre triagem, andamento, aprovação e demais etapas adotadas pela instituição.",
+          "Use a aba de auditoria para acompanhar quem criou, atualizou ou movimentou o processo ao longo da contratação."
+        ],
+        atencoes: [
+          "A tela de Contratação agora lista, abre, cria, atualiza, inativa e movimenta candidatos e processos sempre dentro do tenant autenticado, impedindo cruzamento entre instituições com CNPJs diferentes.",
+          "Entrevistas, ficha admissional, documentos, arquivos, termos, PPD, carta ao banco e auditoria seguem o mesmo isolamento institucional do processo principal.",
+          "Quando houver bases antigas sem tenant preenchido, o backend faz adequação automática da estrutura e vincula os registros legados ao tenant correspondente antes de operar a tela."
+        ]
+      },
+      {
         nome: "Registro de ponto",
         objetivo: "Registrar batidas com horário do servidor, localização do dispositivo e confirmação dupla por senha e face do usuário.",
         comoUsar: [
@@ -652,6 +790,7 @@ const secoesManual: ManualSecao[] = [
         ],
         atencoes: [
           "A geração do espelho em PDF usa o endpoint autenticado do registro de ponto e respeita a regra de acesso por usuário: administrador pode emitir para funcionários, demais perfis somente para si mesmos.",
+          "A tela Registro de ponto agora lista usuários, carrega configuração, registra batidas, salva face, aplica ajustes, grava ocorrências, abre histórico e gera espelho sempre dentro do tenant autenticado, sem cruzar dados de outra instituição.",
           "No espelho de ponto individual em PDF, o nome do colaborador aparece em destaque e a tabela mantém data e horários em linha única, deixando a ocorrência em fonte reduzida com quebra de linha quando necessário.",
           "A marcação pode ser configurada para Somente senha ou para Senha + captura facial, conforme a necessidade operacional.",
           "Na confirmação da marcação, o sistema exige duas piscadas ou uma leve virada do rosto para reduzir o risco de uso de foto estática no lugar de uma pessoa real.",
@@ -676,6 +815,10 @@ const secoesManual: ManualSecao[] = [
           "Use Campos obrigatórios para definir quais documentos e campos devem ser exigidos no cadastro.",
           "Revise parâmetros da Central de Atendimentos para controlar alertas e critérios operacionais.",
           "Salve alterações somente após revisar o impacto nas telas relacionadas."
+        ],
+        atencoes: [
+          "A tela Parâmetros do sistema agora lê e grava personalização, carência, obrigatoriedade e alertas sempre dentro do tenant autenticado.",
+          "Ao trocar de instituição na mesma estação, a página recarrega os parâmetros da organização logada e não deve reaproveitar dados de outro CNPJ."
         ]
       },
       {
@@ -692,10 +835,25 @@ const secoesManual: ManualSecao[] = [
         ],
         atencoes: [
           "A licença fica vinculada ao CNPJ da unidade principal registrada no sistema.",
+          "Cada instituição visualiza apenas a própria configuração, os próprios checkouts, o histórico financeiro e os alertas vinculados ao seu tenant/CNPJ.",
           "No plano Enterprise, a implantação inicial vigente é de R$ 2.497,00.",
           "A data final é recalculada automaticamente a partir da data inicial e do ciclo escolhido disponível na página comercial.",
           "Cada checkout gerado entra primeiro no histórico como pendente e migra para realizado quando a InfinitePay confirma o pagamento.",
           "No ciclo anual, a implantação continua isenta conforme a política comercial definida."
+        ]
+      },
+      {
+        nome: "Mensagens personalizadas",
+        objetivo: "Gerenciar mensagens pré-prontas, sugestões da IA, categorias, destinatários e histórico de envios por WhatsApp e e-mail.",
+        comoUsar: [
+          "Use as abas da tela para criar mensagens, revisar sugestões da IA, manter categorias e assuntos e consultar o histórico de utilização.",
+          "Ao preparar um envio, selecione destinatário, canal, assunto e conteúdo e finalize a ação em um clique.",
+          "Use a visualização prévia para validar variáveis, saudação, assinatura e o conteúdo final antes de disparar ou preparar o link de WhatsApp."
+        ],
+        atencoes: [
+          "A tela Mensagens personalizadas agora lista, abre, cria, edita, duplica, inativa, remove e registra histórico sempre dentro do tenant autenticado.",
+          "A busca de destinatários considera apenas beneficiários, profissionais, voluntários, doadores e instituições da própria organização logada.",
+          "Ao trocar de instituição na mesma estação, faça novo login para garantir recarga completa do cache da tela por tenant."
         ]
       },
       {
@@ -733,7 +891,66 @@ const secoesManual: ManualSecao[] = [
         ],
         atencoes: [
           "A exclusão exige confirmação explícita porque a ação é irreversível na operação diária.",
-          "O vínculo de origem importada ajuda a evitar duplicidade e deixa rastreável de onde o cadastro do usuário foi criado."
+          "O vínculo de origem importada ajuda a evitar duplicidade e deixa rastreável de onde o cadastro do usuário foi criado.",
+          "A tela Usuários e permissões agora mantém listagem, detalhe, busca de origem, auditoria e ações administrativas somente dentro do tenant autenticado."
+        ]
+      },
+      {
+        nome: "Chamado técnico",
+        objetivo: "Registrar, acompanhar e organizar chamados técnicos com histórico, comentários, anexos, vínculos, filtros salvos e catálogo operacional da instituição.",
+        comoUsar: [
+          "Use a listagem para localizar chamados por código, resumo, cliente, solicitante, situação, prioridade e demais filtros operacionais da tela.",
+          "Ao abrir um chamado, acompanhe detalhes, comentários, histórico, vínculos e anexos no mesmo fluxo para manter o atendimento técnico centralizado.",
+          "Use comentários e mudanças de situação para registrar evolução real do atendimento, sem depender de anotações externas.",
+          "Salve filtros frequentes quando precisar repetir consultas operacionais do suporte da instituição ao longo do dia.",
+          "Na abertura ou edição do chamado, selecione responsáveis e parâmetros do catálogo apenas dentro dos usuários disponíveis da própria instituição."
+        ],
+        atencoes: [
+          "A tela Chamado técnico agora lista, exporta, abre, cria, atualiza, desativa, altera situação, comenta, vincula, anexa arquivos e salva filtros sempre dentro do tenant autenticado, sem cruzar chamados entre instituições diferentes.",
+          "Comentários, histórico, vínculos, anexos, estado de leitura e filtros salvos seguem o mesmo isolamento institucional do chamado principal.",
+          "O catálogo de usuários do chamado técnico também passou a carregar apenas usuários do tenant autenticado."
+        ]
+      },
+      {
+        nome: "Instituições SaaS",
+        objetivo: "Administrar os tenants do G3N em base PostgreSQL compartilhada, com identificação por instituição e operação exclusiva para superadmin.",
+        comoUsar: [
+          "Use a tela Instituições SaaS para cadastrar cada cliente do G3N como um tenant separado, com CNPJ, slug, plano, status e contato principal.",
+          "Na listagem, pesquise por razão social, nome fantasia, CNPJ, slug, código da instituição ou e-mail e clique na linha para abrir o tenant.",
+          "Na aba Cadastro do tenant, revise os dados da instituição, plano contratado, identidade visual e status operacional antes de salvar.",
+          "Ao preencher a razão social, o sistema gera automaticamente o slug e o código da instituição; se necessário, o usuário pode editar ambos manualmente antes do salvamento.",
+          "Na criação de um novo tenant, a aba Administração inicial exige o administrador inicial com login, e-mail e senha para liberar o primeiro acesso.",
+          "O administrador inicial criado nessa etapa já nasce com acesso administrativo efetivo no tenant, inclusive à tela de usuários e às permissões compatíveis com o perfil administrativo.",
+          "Quando o tenant já existir, use a aba Administração inicial para redefinir a senha provisória do administrador e forçar troca no próximo login.",
+          "A tela de login do sistema agora aceita CNPJ da instituição e e-mail do usuário; quando houver subdomínio configurado, o sistema identifica automaticamente a instituição pelo endereço.",
+          "Na recuperação de senha da tela de login, o sistema passou a considerar também a instituição informada no acesso, evitando redefinir senha em tenant incorreto quando houver e-mails iguais em bases diferentes.",
+          "No desktop, ao informar o CNPJ, o resumo da instituição aparece abaixo da foto lateral direita para liberar mais espaço útil no formulário de acesso.",
+          "Na lateral direita do login, o espaço entre a foto e o card com os dados da instituição foi reduzido para deixar a composição mais próxima e melhor aproveitada.",
+          "Os cards de dados da instituição e de apresentação do Sistema G3 na lateral direita também passaram a ficar sem vão entre si, formando um bloco visual contínuo, sem empurrar o card institucional para o rodapé.",
+          "A foto lateral do login voltou a usar altura maior para ganhar mais presença visual na composição desktop.",
+          "A altura da foto lateral foi ampliada novamente para ocupar mais área vertical no desktop, conforme ajuste visual da tela de acesso.",
+          "O usuário administrativo padrão htasistemas@gmail.com é tratado como superadmin master no acesso SaaS e pode abrir a tela Instituições SaaS mesmo sem depender de configuração manual adicional.",
+          "No topo principal do sistema, o cabeçalho passou a exibir nome da instituição e nome do usuário, sem mostrar o plano contratado.",
+          "Ao entrar com outra instituição, a unidade principal atual, a logomarca do topo e os dados da visão geral passam a ser recarregados por tenant, evitando reaproveitar cache ou identidade visual da instituição anterior.",
+          "A API de unidades assistenciais agora exige o tenant autenticado em leitura e escrita, impedindo que um CNPJ carregue a unidade principal, a logomarca ou os dados institucionais de outro cliente.",
+          "Os indicadores da tela Visão geral também passaram a ser calculados por tenant no backend, impedindo que beneficiários, famílias, financeiro, cursos, doações e termos de uma instituição apareçam para outra.",
+          "O card Catálogo e vagas de matrículas, assim como os cards de Cursos ativos, Doações no período e Visitas domiciliares, agora consideram apenas o tenant autenticado, inclusive nas tabelas reais de cursos, matrículas, visitas e doações.",
+          "Os cards Biblioteca, Patrimônio e Almoxarifado da Visão geral também passaram a depender das tabelas reais segregadas por tenant, impedindo reaproveitamento de acervo, bens e estoque entre instituições.",
+          "A segregação da Biblioteca foi estendida também para a base singular biblioteca_livro e para biblioteca_emprestimo, eliminando o vazamento de acervo legado entre instituições.",
+          "A própria tela Biblioteca agora lista, cria, atualiza e remove livros e empréstimos sempre dentro do tenant autenticado, impedindo que a RNP visualize ou manipule exemplares e empréstimos da ADRA.",
+          "A tela Agendamentos agora lista agenda, indicadores, lista de espera, participantes e notificações sempre dentro do tenant autenticado, impedindo que uma instituição veja pacientes agendados ou histórico operacional de outra.",
+          "As telas Chamada de senhas e Painel de senhas agora emitem, chamam, finalizam e exibem filas, chamadas e configurações sempre dentro do tenant autenticado, impedindo reaproveitamento de senhas entre instituições diferentes.",
+          "A tela Recebimento de doações agora lista, abre, cadastra, atualiza, exclui e pesquisa doadores sempre dentro do tenant autenticado, inclusive na integração automática com o almoxarifado, impedindo mistura de doações e doadores entre instituições.",
+          "A tela Cadastro de beneficiários agora lista, abre, cadastra, atualiza, exclui e gera o próximo código sempre dentro do tenant autenticado, impedindo que uma instituição veja os beneficiários de outra.",
+          "A tela Usuários e permissões agora lista, abre, cadastra, atualiza, altera status, reseta senha e exclui sempre dentro do tenant autenticado, impedindo acesso cruzado entre instituições mesmo quando alguém tenta operar por ID direto.",
+          "A tela Parâmetros do sistema agora salva personalização, carência, obrigatoriedades e alertas por tenant, então mudanças de cor, regras e alertas afetam apenas a instituição logada.",
+          "A estrutura da tabela parametros_sistema também foi ajustada para remover o índice global legado por chave, evitando erro interno do servidor ao salvar a mesma configuração em tenants diferentes.",
+          "Administradores iniciais de tenants criados antes do ajuste de permissões continuam herdando o acesso administrativo pelo perfil no login, evitando bloqueio indevido da visão geral e de outras telas administrativas."
+        ],
+        atencoes: [
+          "A gestão master de instituições aparece apenas para perfil superadmin.",
+          "O tenant_id não deve ser digitado manualmente em nenhuma operação do usuário final; ele é derivado da instituição autenticada.",
+          "Toda consulta operacional do sistema passa a depender do tenant autenticado para evitar mistura de dados entre clientes."
         ]
       },
       {

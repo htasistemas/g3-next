@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
 import { mensagensPersonalizadasService } from "@/services/mensagens-personalizadas.service";
 import type {
   MensagemHistoricoFiltros,
@@ -8,82 +9,96 @@ import type {
 } from "@/types/mensagens-personalizadas";
 
 export function useMensagensPersonalizadasSuporte() {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["mensagens-personalizadas", "suporte"],
+    queryKey: ["mensagens-personalizadas", usuario?.tenant_id ?? "sem-tenant", "suporte"],
     queryFn: () => mensagensPersonalizadasService.obterSuporte()
   });
 }
 
 export function useMensagensPersonalizadasModelos(filtros: MensagemModeloFiltros) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["mensagens-personalizadas", "modelos", filtros],
+    queryKey: ["mensagens-personalizadas", usuario?.tenant_id ?? "sem-tenant", "modelos", filtros],
     queryFn: () => mensagensPersonalizadasService.listarModelos(filtros)
   });
 }
 
 export function useMensagensPersonalizadasTaxonomias() {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["mensagens-personalizadas", "taxonomias"],
+    queryKey: ["mensagens-personalizadas", usuario?.tenant_id ?? "sem-tenant", "taxonomias"],
     queryFn: () => mensagensPersonalizadasService.listarTaxonomias()
   });
 }
 
 export function useMensagensPersonalizadasHistorico(filtros: MensagemHistoricoFiltros, enabled = true) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["mensagens-personalizadas", "historico", filtros],
+    queryKey: ["mensagens-personalizadas", usuario?.tenant_id ?? "sem-tenant", "historico", filtros],
     queryFn: () => mensagensPersonalizadasService.listarHistorico(filtros),
     enabled
   });
 }
 
 export function useSalvarMensagemPersonalizada() {
+  const { usuario } = useAuth();
   const queryClient = useQueryClient();
+  const tenantKey = usuario?.tenant_id ?? "sem-tenant";
   return useMutation({
     mutationFn: ({ id, payload }: { id?: string; payload: MensagemModeloForm }) => {
       if (id) return mensagensPersonalizadasService.atualizarModelo(id, payload);
       return mensagensPersonalizadasService.criarModelo(payload);
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["mensagens-personalizadas", "modelos"] });
-      await queryClient.invalidateQueries({ queryKey: ["mensagens-personalizadas", "taxonomias"] });
+      await queryClient.invalidateQueries({ queryKey: ["mensagens-personalizadas", tenantKey, "modelos"] });
+      await queryClient.invalidateQueries({ queryKey: ["mensagens-personalizadas", tenantKey, "taxonomias"] });
     }
   });
 }
 
 export function useDuplicarMensagemPersonalizada() {
+  const { usuario } = useAuth();
   const queryClient = useQueryClient();
+  const tenantKey = usuario?.tenant_id ?? "sem-tenant";
   return useMutation({
     mutationFn: (id: string) => mensagensPersonalizadasService.duplicarModelo(id),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["mensagens-personalizadas", "modelos"] });
+      await queryClient.invalidateQueries({ queryKey: ["mensagens-personalizadas", tenantKey, "modelos"] });
     }
   });
 }
 
 export function useAtualizarStatusMensagemPersonalizada() {
+  const { usuario } = useAuth();
   const queryClient = useQueryClient();
+  const tenantKey = usuario?.tenant_id ?? "sem-tenant";
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status: "ATIVA" | "INATIVA" }) =>
       mensagensPersonalizadasService.atualizarStatusModelo(id, status),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["mensagens-personalizadas", "modelos"] });
+      await queryClient.invalidateQueries({ queryKey: ["mensagens-personalizadas", tenantKey, "modelos"] });
     }
   });
 }
 
 export function useRemoverMensagemPersonalizada() {
+  const { usuario } = useAuth();
   const queryClient = useQueryClient();
+  const tenantKey = usuario?.tenant_id ?? "sem-tenant";
   return useMutation({
     mutationFn: (id: string) => mensagensPersonalizadasService.removerModelo(id),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["mensagens-personalizadas", "modelos"] });
-      await queryClient.invalidateQueries({ queryKey: ["mensagens-personalizadas", "historico"] });
+      await queryClient.invalidateQueries({ queryKey: ["mensagens-personalizadas", tenantKey, "modelos"] });
+      await queryClient.invalidateQueries({ queryKey: ["mensagens-personalizadas", tenantKey, "historico"] });
     }
   });
 }
 
 export function useSalvarTaxonomiaMensagem() {
+  const { usuario } = useAuth();
   const queryClient = useQueryClient();
+  const tenantKey = usuario?.tenant_id ?? "sem-tenant";
   return useMutation({
     mutationFn: ({
       id,
@@ -101,19 +116,21 @@ export function useSalvarTaxonomiaMensagem() {
       return mensagensPersonalizadasService.criarTaxonomia(payload);
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["mensagens-personalizadas", "taxonomias"] });
-      await queryClient.invalidateQueries({ queryKey: ["mensagens-personalizadas", "modelos"] });
+      await queryClient.invalidateQueries({ queryKey: ["mensagens-personalizadas", tenantKey, "taxonomias"] });
+      await queryClient.invalidateQueries({ queryKey: ["mensagens-personalizadas", tenantKey, "modelos"] });
     }
   });
 }
 
 export function useRemoverTaxonomiaMensagem() {
+  const { usuario } = useAuth();
   const queryClient = useQueryClient();
+  const tenantKey = usuario?.tenant_id ?? "sem-tenant";
   return useMutation({
     mutationFn: (id: string) => mensagensPersonalizadasService.removerTaxonomia(id),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["mensagens-personalizadas", "taxonomias"] });
-      await queryClient.invalidateQueries({ queryKey: ["mensagens-personalizadas", "modelos"] });
+      await queryClient.invalidateQueries({ queryKey: ["mensagens-personalizadas", tenantKey, "taxonomias"] });
+      await queryClient.invalidateQueries({ queryKey: ["mensagens-personalizadas", tenantKey, "modelos"] });
     }
   });
 }
@@ -140,11 +157,13 @@ export function useGerarPreviewMensagem() {
 }
 
 export function useEnviarMensagemPersonalizada() {
+  const { usuario } = useAuth();
   const queryClient = useQueryClient();
+  const tenantKey = usuario?.tenant_id ?? "sem-tenant";
   return useMutation({
     mutationFn: mensagensPersonalizadasService.enviar,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["mensagens-personalizadas", "historico"] });
+      await queryClient.invalidateQueries({ queryKey: ["mensagens-personalizadas", tenantKey, "historico"] });
     }
   });
 }

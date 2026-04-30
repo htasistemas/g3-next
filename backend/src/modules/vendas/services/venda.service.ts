@@ -6,28 +6,31 @@ import { VendaRepository } from "../repositories/venda.repository.js";
 export class VendaService {
   private readonly repository = new VendaRepository();
 
-  async listar(rawFilters: unknown) {
+  async listar(rawFilters: unknown, rawTenantId?: string) {
     const filters = vendaFiltersSchema.parse(rawFilters ?? {});
-    const registros = await this.repository.listar(filters);
+    const tenantId = this.parseTenant(rawTenantId);
+    const registros = await this.repository.listar(filters, tenantId);
     return Promise.all(
       registros.map(async (registro) => {
-        const itens = await this.repository.listarItensPorVendaId(registro.id);
+        const itens = await this.repository.listarItensPorVendaId(registro.id, tenantId);
         return mapVendaToResponse(registro, itens);
       })
     );
   }
 
-  async buscarPorId(rawId: string) {
+  async buscarPorId(rawId: string, rawTenantId?: string) {
     const id = this.parseId(rawId);
-    const venda = await this.repository.buscarPorIdOuFalhar(id);
-    const itens = await this.repository.listarItensPorVendaId(id);
+    const tenantId = this.parseTenant(rawTenantId);
+    const venda = await this.repository.buscarPorIdOuFalhar(id, tenantId);
+    const itens = await this.repository.listarItensPorVendaId(id, tenantId);
     return mapVendaToResponse(venda, itens);
   }
 
-  async criar(rawInput: unknown) {
+  async criar(rawInput: unknown, rawTenantId?: string) {
     const input = vendaInputSchema.parse(rawInput);
-    const venda = await this.repository.criar(input);
-    const itens = await this.repository.listarItensPorVendaId(venda.id);
+    const tenantId = this.parseTenant(rawTenantId);
+    const venda = await this.repository.criar(input, tenantId);
+    const itens = await this.repository.listarItensPorVendaId(venda.id, tenantId);
     return mapVendaToResponse(venda, itens);
   }
 
@@ -37,5 +40,13 @@ export class VendaService {
       throw new AppError("Identificador da venda invalido.", 400);
     }
     return BigInt(id);
+  }
+
+  private parseTenant(rawTenantId?: string) {
+    const tenantId = rawTenantId?.trim();
+    if (!tenantId) {
+      throw new AppError("Tenant da sessao nao identificado.", 401);
+    }
+    return tenantId;
   }
 }

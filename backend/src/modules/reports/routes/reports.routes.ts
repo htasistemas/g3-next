@@ -1,66 +1,109 @@
 import { Router } from "express";
 import { asyncHandler } from "../../../shared/http/async-handler.js";
 import { ReportsController } from "../controllers/reports.controller.js";
+import {
+  ensureAuthenticated,
+  ensurePermissions
+} from "../../auth/middlewares/auth.middleware.js";
 
 const controller = new ReportsController();
 
 export const reportsRoutes = Router();
+const permissoesLeitura = ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"];
 
-reportsRoutes.post("/authorization-term", asyncHandler(controller.termoAutorizacao.bind(controller)));
+reportsRoutes.post(
+  "/authorization-term",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.termoAutorizacao.bind(controller))
+);
 reportsRoutes.post(
   "/unidades-assistenciais/relacao",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
   asyncHandler(controller.relacaoUnidadesAssistenciais.bind(controller))
 );
 reportsRoutes.post(
   "/beneficiarios/relacao",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
   asyncHandler(controller.relacaoBeneficiarios.bind(controller))
 );
-reportsRoutes.post("/beneficiarios/ficha", asyncHandler(controller.fichaBeneficiario.bind(controller)));
+reportsRoutes.post(
+  "/beneficiarios/ficha",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.fichaBeneficiario.bind(controller))
+);
 reportsRoutes.post(
   "/profissionais/relacao",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
   asyncHandler(controller.relacaoProfissionais.bind(controller))
 );
 reportsRoutes.post(
   "/profissionais/ficha",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
   asyncHandler(controller.fichaProfissional.bind(controller))
 );
 reportsRoutes.post(
   "/voluntarios/relacao",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
   asyncHandler(controller.relacaoVoluntarios.bind(controller))
 );
 reportsRoutes.post(
   "/voluntarios/ficha",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
   asyncHandler(controller.fichaVoluntario.bind(controller))
 );
 reportsRoutes.post(
   "/matriculas/relacao",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
   asyncHandler(controller.relacaoMatriculas.bind(controller))
 );
 reportsRoutes.post(
   "/matriculas/lista-presenca",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
   asyncHandler(controller.listaPresencaMatricula.bind(controller))
 );
 reportsRoutes.post(
   "/matriculas/comprovante",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
   asyncHandler(controller.comprovanteMatricula.bind(controller))
 );
 reportsRoutes.post(
   "/matriculas/pre-matricula-lista-espera",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
   asyncHandler(controller.comprovantePreMatriculaEspera.bind(controller))
 );
 reportsRoutes.post(
   "/registro-doacao/relacao",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
   asyncHandler(controller.relacaoRegistroDoacao.bind(controller))
 );
 reportsRoutes.post(
   "/doacoes-realizadas/relacao",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
   asyncHandler(controller.relacaoDoacoesRealizadas.bind(controller))
 );
 reportsRoutes.post(
   "/doacoes-realizadas/recibo",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
   asyncHandler(controller.reciboDoacaoRealizada.bind(controller))
 );
 reportsRoutes.post(
   "/registro-ponto/espelho",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
   asyncHandler(controller.espelhoPonto.bind(controller))
 );

@@ -39,8 +39,62 @@ function normalizarDestinatarios(input: OficioInput) {
   };
 }
 
+const estruturaSql = [
+  "ALTER TABLE oficios ADD COLUMN IF NOT EXISTS tenant_id UUID",
+  "ALTER TABLE IF EXISTS oficios_tramites ADD COLUMN IF NOT EXISTS tenant_id UUID",
+  "ALTER TABLE IF EXISTS oficios_imagens ADD COLUMN IF NOT EXISTS tenant_id UUID",
+  "CREATE INDEX IF NOT EXISTS oficios_tenant_idx ON oficios(tenant_id, data DESC, id DESC)",
+  "CREATE INDEX IF NOT EXISTS oficios_numero_tenant_idx ON oficios(tenant_id, numero)",
+  "CREATE INDEX IF NOT EXISTS oficios_tramites_tenant_idx ON oficios_tramites(tenant_id, oficio_id, data DESC)",
+  "CREATE INDEX IF NOT EXISTS oficios_imagens_tenant_idx ON oficios_imagens(tenant_id, oficio_id, ordem, id)",
+  `
+    UPDATE oficios AS o
+    SET tenant_id = ref.tenant_id
+    FROM (
+      SELECT tenant_id
+      FROM instituicoes
+      ORDER BY criado_em ASC
+      LIMIT 1
+    ) ref
+    WHERE o.tenant_id IS NULL
+  `,
+  `
+    UPDATE oficios_tramites AS t
+    SET tenant_id = o.tenant_id
+    FROM oficios o
+    WHERE t.tenant_id IS NULL
+      AND o.id = t.oficio_id
+      AND o.tenant_id IS NOT NULL
+  `,
+  `
+    UPDATE oficios_imagens AS i
+    SET tenant_id = o.tenant_id
+    FROM oficios o
+    WHERE i.tenant_id IS NULL
+      AND o.id = i.oficio_id
+      AND o.tenant_id IS NOT NULL
+  `
+] as const;
+
+let estruturaPromise: Promise<void> | null = null;
+
 export class OficiosRepository {
   private schemaInfoPromise: Promise<OficioSchemaInfo> | null = null;
+
+  private async garantirEstrutura() {
+    if (!estruturaPromise) {
+      estruturaPromise = (async () => {
+        for (const sql of estruturaSql) {
+          await prisma.$executeRawUnsafe(sql);
+        }
+      })().catch((error) => {
+        estruturaPromise = null;
+        throw error;
+      });
+    }
+
+    await estruturaPromise;
+  }
 
   private async obterSchemaInfo() {
     if (!this.schemaInfoPromise) {
@@ -63,7 +117,8 @@ export class OficiosRepository {
     return this.schemaInfoPromise;
   }
 
-  private async consultarOficios(id?: bigint) {
+  private async consultarOficios(tenantId: string, id?: bigint) {
+    await this.garantirEstrutura();
     const schema = await this.obterSchemaInfo();
     const colunas = [
       "id",
@@ -117,36 +172,45 @@ export class OficiosRepository {
             ${colunas}
           FROM oficios
           WHERE id = $1
+            AND tenant_id::text = $2
           LIMIT 1
         `,
-        id
+        id,
+        tenantId
       );
     }
 
-    return prisma.$queryRawUnsafe<OficioRow[]>(`
-      SELECT
-        ${colunas}
-      FROM oficios
-      ORDER BY data DESC, id DESC
-    `);
+    return prisma.$queryRawUnsafe<OficioRow[]>(
+      `
+        SELECT
+          ${colunas}
+        FROM oficios
+        WHERE tenant_id::text = $1
+        ORDER BY data DESC, id DESC
+      `,
+      tenantId
+    );
   }
 
-  async listar() {
-    const oficios = await this.consultarOficios();
+  async listar(tenantId: string) {
+    const oficios = await this.consultarOficios(tenantId);
 
     if (!oficios.length) {
       return [];
     }
 
-    const tramites = await this.listarTramitesPorOficios(oficios.map((item) => item.id));
+    const tramites = await this.listarTramitesPorOficios(
+      oficios.map((item) => item.id),
+      tenantId
+    );
     return oficios.map((oficio) => ({
       oficio,
       tramites: tramites.filter((tramite) => tramite.oficio_id === oficio.id)
     }));
   }
 
-  async buscarPorId(id: bigint) {
-    const rows = await this.consultarOficios(id);
+  async buscarPorId(id: bigint, tenantId: string) {
+    const rows = await this.consultarOficios(tenantId, id);
 
     const oficio = rows[0];
     if (!oficio) return null;
@@ -165,32 +229,34 @@ export class OficiosRepository {
         atualizado_em
       FROM oficios_tramites
       WHERE oficio_id = ${id}
+        AND tenant_id::text = ${tenantId}
       ORDER BY data DESC NULLS LAST, id DESC
     `);
 
     return { oficio, tramites };
   }
 
-  async buscarPorIdOuFalhar(id: bigint) {
-    const registro = await this.buscarPorId(id);
+  async buscarPorIdOuFalhar(id: bigint, tenantId: string) {
+    const registro = await this.buscarPorId(id, tenantId);
     if (!registro) {
       throw new AppError("Oficio nao encontrado.", 404);
     }
     return registro;
   }
 
-  async obterProximoNumero(dataReferencia?: string) {
+  async obterProximoNumero(dataReferencia: string | undefined, tenantId: string) {
     const ano = this.extrairAnoReferencia(dataReferencia);
-    const proximoNumero = await this.consultarProximoNumero(prisma, ano);
+    const proximoNumero = await this.consultarProximoNumero(prisma, ano, tenantId);
     return this.formatarNumeroOficio(proximoNumero, ano);
   }
 
-  async criar(input: OficioInput) {
+  async criar(input: OficioInput, tenantId: string) {
     const id = await prisma.$transaction(async (tx) => {
       const schema = await this.obterSchemaInfo();
       const destinatarios = normalizarDestinatarios(input);
-      const numeroSequencial = await this.gerarNumeroSequencialTx(tx, input.identificacao.data);
+      const numeroSequencial = await this.gerarNumeroSequencialTx(tx, input.identificacao.data, tenantId);
       const campos: Prisma.Sql[] = [
+        Prisma.raw("tenant_id"),
         Prisma.raw("tipo"),
         Prisma.raw("numero"),
         Prisma.raw("data"),
@@ -227,6 +293,7 @@ export class OficiosRepository {
         Prisma.raw("atualizado_em")
       ];
       const valores: Prisma.Sql[] = [
+        Prisma.sql`CAST(${tenantId} AS UUID)`,
         Prisma.sql`${input.identificacao.tipo}`,
         Prisma.sql`${numeroSequencial}`,
         Prisma.sql`${toOptionalDate(input.identificacao.data)}`,
@@ -275,15 +342,15 @@ export class OficiosRepository {
         throw new AppError("Nao foi possivel criar oficio.", 500);
       }
 
-      await this.salvarTramites(tx, oficioId, input.tramites ?? []);
+      await this.salvarTramites(tx, oficioId, input.tramites ?? [], tenantId);
       return oficioId;
     });
 
-    return this.buscarPorIdOuFalhar(id);
+    return this.buscarPorIdOuFalhar(id, tenantId);
   }
 
-  async atualizar(id: bigint, input: OficioInput) {
-    await this.buscarPorIdOuFalhar(id);
+  async atualizar(id: bigint, input: OficioInput, tenantId: string) {
+    await this.buscarPorIdOuFalhar(id, tenantId);
 
     await prisma.$transaction(async (tx) => {
       const schema = await this.obterSchemaInfo();
@@ -330,28 +397,31 @@ export class OficiosRepository {
         UPDATE oficios
         SET ${Prisma.join(atribuicoes, ", ")}
         WHERE id = ${id}
+          AND tenant_id::text = ${tenantId}
       `);
 
       await tx.$executeRaw(Prisma.sql`
         DELETE FROM oficios_tramites
         WHERE oficio_id = ${id}
+          AND tenant_id::text = ${tenantId}
       `);
-      await this.salvarTramites(tx, id, input.tramites ?? []);
+      await this.salvarTramites(tx, id, input.tramites ?? [], tenantId);
     });
 
-    return this.buscarPorIdOuFalhar(id);
+    return this.buscarPorIdOuFalhar(id, tenantId);
   }
 
-  async remover(id: bigint) {
-    await this.buscarPorIdOuFalhar(id);
+  async remover(id: bigint, tenantId: string) {
+    await this.buscarPorIdOuFalhar(id, tenantId);
     await prisma.$executeRaw(Prisma.sql`
       DELETE FROM oficios
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
   }
 
-  async salvarPdfAssinado(id: bigint, input: OficioPdfAssinadoInput) {
-    await this.buscarPorIdOuFalhar(id);
+  async salvarPdfAssinado(id: bigint, input: OficioPdfAssinadoInput, tenantId: string) {
+    await this.buscarPorIdOuFalhar(id, tenantId);
     await prisma.$executeRaw(Prisma.sql`
       UPDATE oficios
       SET
@@ -360,12 +430,13 @@ export class OficiosRepository {
         pdf_assinado_conteudo = ${input.conteudoBase64},
         atualizado_em = NOW()
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
-    return this.buscarPorIdOuFalhar(id);
+    return this.buscarPorIdOuFalhar(id, tenantId);
   }
 
-  async obterPdfAssinado(id: bigint) {
-    const registro = await this.buscarPorIdOuFalhar(id);
+  async obterPdfAssinado(id: bigint, tenantId: string) {
+    const registro = await this.buscarPorIdOuFalhar(id, tenantId);
     return {
       nome: registro.oficio.pdf_assinado_nome,
       tipo: registro.oficio.pdf_assinado_tipo,
@@ -373,8 +444,8 @@ export class OficiosRepository {
     };
   }
 
-  async removerPdfAssinado(id: bigint) {
-    await this.buscarPorIdOuFalhar(id);
+  async removerPdfAssinado(id: bigint, tenantId: string) {
+    await this.buscarPorIdOuFalhar(id, tenantId);
     await prisma.$executeRaw(Prisma.sql`
       UPDATE oficios
       SET
@@ -383,11 +454,12 @@ export class OficiosRepository {
         pdf_assinado_conteudo = NULL,
         atualizado_em = NOW()
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
     `);
   }
 
-  async listarImagens(oficioId: bigint) {
-    await this.buscarPorIdOuFalhar(oficioId);
+  async listarImagens(oficioId: bigint, tenantId: string) {
+    await this.buscarPorIdOuFalhar(oficioId, tenantId);
     return prisma.$queryRaw<OficioImagemRow[]>(Prisma.sql`
       SELECT
         id,
@@ -400,14 +472,16 @@ export class OficiosRepository {
         atualizado_em
       FROM oficios_imagens
       WHERE oficio_id = ${oficioId}
+        AND tenant_id::text = ${tenantId}
       ORDER BY ordem ASC, id ASC
     `);
   }
 
-  async adicionarImagem(oficioId: bigint, input: OficioImagemInput) {
-    await this.buscarPorIdOuFalhar(oficioId);
+  async adicionarImagem(oficioId: bigint, input: OficioImagemInput, tenantId: string) {
+    await this.buscarPorIdOuFalhar(oficioId, tenantId);
     const inserted = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
       INSERT INTO oficios_imagens (
+        tenant_id,
         oficio_id,
         nome_arquivo,
         tipo_mime,
@@ -416,6 +490,7 @@ export class OficiosRepository {
         criado_em,
         atualizado_em
       ) VALUES (
+        CAST(${tenantId} AS UUID),
         ${oficioId},
         ${input.nomeArquivo},
         ${input.tipoMime},
@@ -444,6 +519,7 @@ export class OficiosRepository {
         atualizado_em
       FROM oficios_imagens
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
       LIMIT 1
     `);
     const registro = rows[0];
@@ -453,13 +529,14 @@ export class OficiosRepository {
     return registro;
   }
 
-  async removerImagem(oficioId: bigint, imagemId: bigint) {
-    await this.buscarPorIdOuFalhar(oficioId);
+  async removerImagem(oficioId: bigint, imagemId: bigint, tenantId: string) {
+    await this.buscarPorIdOuFalhar(oficioId, tenantId);
     const rows = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
       SELECT id
       FROM oficios_imagens
       WHERE oficio_id = ${oficioId}
         AND id = ${imagemId}
+        AND tenant_id::text = ${tenantId}
       LIMIT 1
     `);
     if (!rows.length) {
@@ -470,6 +547,7 @@ export class OficiosRepository {
       DELETE FROM oficios_imagens
       WHERE oficio_id = ${oficioId}
         AND id = ${imagemId}
+        AND tenant_id::text = ${tenantId}
     `);
   }
 
@@ -487,25 +565,31 @@ export class OficiosRepository {
 
   private async consultarProximoNumero(
     client: Pick<TransactionClient, "$queryRaw"> | typeof prisma,
-    ano: number
+    ano: number,
+    tenantId: string
   ) {
     const rows = await client.$queryRaw<Array<{ maior_numero: number | null }>>(Prisma.sql`
       SELECT COALESCE(MAX(CAST(split_part(numero, '/', 1) AS INTEGER)), 0) AS maior_numero
       FROM oficios
-      WHERE numero ~ ${`^[0-9]+/${ano}$`}
+      WHERE tenant_id::text = ${tenantId}
+        AND numero ~ ${`^[0-9]+/${ano}$`}
     `);
 
     return Number(rows[0]?.maior_numero ?? 0) + 1;
   }
 
-  private async gerarNumeroSequencialTx(tx: TransactionClient, dataReferencia?: string) {
+  private async gerarNumeroSequencialTx(
+    tx: TransactionClient,
+    dataReferencia: string | undefined,
+    tenantId: string
+  ) {
     const ano = this.extrairAnoReferencia(dataReferencia);
     await tx.$executeRawUnsafe("LOCK TABLE oficios IN SHARE ROW EXCLUSIVE MODE");
-    const proximoNumero = await this.consultarProximoNumero(tx, ano);
+    const proximoNumero = await this.consultarProximoNumero(tx, ano, tenantId);
     return this.formatarNumeroOficio(proximoNumero, ano);
   }
 
-  private async listarTramitesPorOficios(oficioIds: bigint[]) {
+  private async listarTramitesPorOficios(oficioIds: bigint[], tenantId: string) {
     if (!oficioIds.length) return [];
     return prisma.$queryRaw<OficioTramiteRow[]>(Prisma.sql`
       SELECT
@@ -521,6 +605,7 @@ export class OficiosRepository {
         atualizado_em
       FROM oficios_tramites
       WHERE oficio_id IN (${Prisma.join(oficioIds)})
+        AND tenant_id::text = ${tenantId}
       ORDER BY data DESC NULLS LAST, id DESC
     `);
   }
@@ -528,11 +613,13 @@ export class OficiosRepository {
   private async salvarTramites(
     tx: TransactionClient,
     oficioId: bigint,
-    tramites: OficioTramiteInput[]
+    tramites: OficioTramiteInput[],
+    tenantId: string
   ) {
     for (const tramite of tramites) {
       await tx.$executeRaw(Prisma.sql`
         INSERT INTO oficios_tramites (
+          tenant_id,
           oficio_id,
           data,
           origem,
@@ -543,6 +630,7 @@ export class OficiosRepository {
           criado_em,
           atualizado_em
         ) VALUES (
+          CAST(${tenantId} AS UUID),
           ${oficioId},
           ${toOptionalDate(tramite.data ?? undefined)},
           ${trimOrUndefined(tramite.origem ?? undefined)},

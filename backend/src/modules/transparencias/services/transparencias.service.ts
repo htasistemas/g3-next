@@ -8,8 +8,9 @@ import { TransparenciasRepository } from "../repositories/transparencias.reposit
 export class TransparenciasService {
   private readonly repository = new TransparenciasRepository();
 
-  async listar() {
-    const registros = await this.repository.listar();
+  async listar(rawTenantId?: string) {
+    const tenantId = this.parseTenant(rawTenantId);
+    const registros = await this.repository.listar(tenantId);
     return registros.map((item) =>
       mapTransparenciaToResponse(
         item.transparencia,
@@ -22,9 +23,10 @@ export class TransparenciasService {
     );
   }
 
-  async obter(rawId: string) {
+  async obter(rawId: string, rawTenantId?: string) {
     const id = this.parseId(rawId);
-    const registro = await this.repository.buscarPorIdOuFalhar(id);
+    const tenantId = this.parseTenant(rawTenantId);
+    const registro = await this.repository.buscarPorIdOuFalhar(id, tenantId);
     return mapTransparenciaToResponse(
       registro.transparencia,
       registro.recebimentos,
@@ -35,9 +37,10 @@ export class TransparenciasService {
     );
   }
 
-  async criar(rawInput: unknown) {
+  async criar(rawInput: unknown, rawTenantId?: string) {
     const input = transparenciaInputSchema.parse(this.normalizarPayload(rawInput));
-    const registro = await this.repository.criar(input);
+    const tenantId = this.parseTenant(rawTenantId);
+    const registro = await this.repository.criar(input, tenantId);
     return mapTransparenciaToResponse(
       registro.transparencia,
       registro.recebimentos,
@@ -48,10 +51,11 @@ export class TransparenciasService {
     );
   }
 
-  async atualizar(rawId: string, rawInput: unknown) {
+  async atualizar(rawId: string, rawInput: unknown, rawTenantId?: string) {
     const id = this.parseId(rawId);
     const input = transparenciaInputSchema.parse(this.normalizarPayload(rawInput));
-    const registro = await this.repository.atualizar(id, input);
+    const tenantId = this.parseTenant(rawTenantId);
+    const registro = await this.repository.atualizar(id, input, tenantId);
     return mapTransparenciaToResponse(
       registro.transparencia,
       registro.recebimentos,
@@ -62,9 +66,10 @@ export class TransparenciasService {
     );
   }
 
-  async remover(rawId: string) {
+  async remover(rawId: string, rawTenantId?: string) {
     const id = this.parseId(rawId);
-    await this.repository.remover(id);
+    const tenantId = this.parseTenant(rawTenantId);
+    await this.repository.remover(id, tenantId);
   }
 
   private parseId(rawId: string): bigint {
@@ -73,6 +78,14 @@ export class TransparenciasService {
       throw new AppError("Identificador invalido.", 400);
     }
     return BigInt(parsed);
+  }
+
+  private parseTenant(rawTenantId?: string) {
+    const tenantId = rawTenantId?.trim();
+    if (!tenantId) {
+      throw new AppError("Tenant da sessao nao identificado.", 401);
+    }
+    return tenantId;
   }
 
   private normalizarPayload(rawInput: unknown) {

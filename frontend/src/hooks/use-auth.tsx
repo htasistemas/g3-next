@@ -14,8 +14,20 @@ type AuthContextValue = {
   usuario: UsuarioAutenticado | null;
   carregando: boolean;
   autenticado: boolean;
-  login: (nomeUsuario: string, senha: string) => Promise<void>;
-  loginGoogle: (idToken: string) => Promise<void>;
+  login: (input: {
+    cnpj?: string;
+    codigoInstituicao?: string;
+    slug?: string;
+    email?: string;
+    nomeUsuario?: string;
+    senha: string;
+  }) => Promise<void>;
+  loginGoogle: (input: {
+    idToken: string;
+    cnpj?: string;
+    slug?: string;
+    codigoInstituicao?: string;
+  }) => Promise<void>;
   logout: () => Promise<void>;
   atualizarPerfil: () => Promise<void>;
 };
@@ -53,13 +65,25 @@ export function AuthProvider({ children }: PropsWithChildren) {
     };
   }, []);
 
-  const login = useCallback(async (nomeUsuario: string, senha: string) => {
-    const perfil = await authService.login(nomeUsuario, senha);
+  const login = useCallback(async (input: {
+    cnpj?: string;
+    codigoInstituicao?: string;
+    slug?: string;
+    email?: string;
+    nomeUsuario?: string;
+    senha: string;
+  }) => {
+    const perfil = await authService.login(input);
     setUsuario(perfil);
   }, []);
 
-  const loginGoogle = useCallback(async (idToken: string) => {
-    const perfil = await authService.loginGoogle(idToken);
+  const loginGoogle = useCallback(async (input: {
+    idToken: string;
+    cnpj?: string;
+    slug?: string;
+    codigoInstituicao?: string;
+  }) => {
+    const perfil = await authService.loginGoogle(input);
     setUsuario(perfil);
   }, []);
 

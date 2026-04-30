@@ -5,90 +5,92 @@ import { MatriculaService } from "../services/matricula.service.js";
 const service = new MatriculaService();
 
 export class MatriculaController {
-  async listar(request: Request, response: Response) {
-    const matriculas = await service.listar(request.query);
+  async listar(request: AuthenticatedRequest, response: Response) {
+    const matriculas = await service.listar(request.query, request.authUser?.tenant_id);
     return response.json({ matriculas });
   }
 
-  async obterResumoCatalogo(_request: Request, response: Response) {
-    const resumo = await service.obterResumoCatalogo();
+  async obterResumoCatalogo(request: AuthenticatedRequest, response: Response) {
+    const resumo = await service.obterResumoCatalogo(request.authUser?.tenant_id);
     return response.json({ resumo });
   }
 
-  async buscarPorId(request: Request, response: Response) {
-    const matricula = await service.buscarPorId(request.params.id);
+  async buscarPorId(request: AuthenticatedRequest, response: Response) {
+    const matricula = await service.buscarPorId(request.params.id, request.authUser?.tenant_id);
     return response.json({ matricula });
   }
 
-  async criar(request: Request, response: Response) {
+  async criar(request: AuthenticatedRequest, response: Response) {
     const matricula = await service.criar(
       request.body,
-      (request as AuthenticatedRequest).authUser?.id
+      request.authUser?.id,
+      request.authUser?.tenant_id
     );
     return response.status(201).json({ matricula });
   }
 
-  async atualizar(request: Request, response: Response) {
+  async atualizar(request: AuthenticatedRequest, response: Response) {
     const matricula = await service.atualizar(
       request.params.id,
       request.body,
-      (request as AuthenticatedRequest).authUser?.id
+      request.authUser?.id,
+      request.authUser?.tenant_id
     );
     return response.json({ matricula });
   }
 
-  async remover(request: Request, response: Response) {
-    await service.remover(request.params.id, (request as AuthenticatedRequest).authUser?.id);
+  async remover(request: AuthenticatedRequest, response: Response) {
+    await service.remover(request.params.id, request.authUser?.id, request.authUser?.tenant_id);
     return response.status(204).send();
   }
 
-  async listarBeneficiarios(request: Request, response: Response) {
-    const beneficiarios = await service.listarBeneficiarios(request.query.termo);
+  async listarBeneficiarios(request: AuthenticatedRequest, response: Response) {
+    const beneficiarios = await service.listarBeneficiarios(request.query.termo, request.authUser?.tenant_id);
     return response.json({ beneficiarios });
   }
 
-  async listarProfissionais(request: Request, response: Response) {
-    const profissionais = await service.listarProfissionais(request.query.termo);
+  async listarProfissionais(request: AuthenticatedRequest, response: Response) {
+    const profissionais = await service.listarProfissionais(request.query.termo, request.authUser?.tenant_id);
     return response.json({ profissionais });
   }
 
-  async listarSalas(_request: Request, response: Response) {
-    const salas = await service.listarSalas();
+  async listarSalas(request: AuthenticatedRequest, response: Response) {
+    const salas = await service.listarSalas(request.authUser?.tenant_id);
     return response.json({ salas });
   }
 
-  async listarPresencaDatas(request: Request, response: Response) {
-    const datas = await service.listarPresencaDatas(request.params.id, request.query.pendentes);
+  async listarPresencaDatas(request: AuthenticatedRequest, response: Response) {
+    const datas = await service.listarPresencaDatas(request.params.id, request.query.pendentes, request.authUser?.tenant_id);
     return response.json({ datas });
   }
 
-  async criarPresencaData(request: Request, response: Response) {
-    const data = await service.criarPresencaData(request.params.id, request.body);
+  async criarPresencaData(request: AuthenticatedRequest, response: Response) {
+    const data = await service.criarPresencaData(request.params.id, request.body, request.authUser?.tenant_id);
     return response.status(201).json(data);
   }
 
-  async atualizarPresencaData(request: Request, response: Response) {
-    const data = await service.atualizarPresencaData(request.params.id, request.params.presencaDataId, request.body);
+  async atualizarPresencaData(request: AuthenticatedRequest, response: Response) {
+    const data = await service.atualizarPresencaData(request.params.id, request.params.presencaDataId, request.body, request.authUser?.tenant_id);
     return response.json(data);
   }
 
-  async cancelarPresencaData(request: Request, response: Response) {
-    const data = await service.cancelarPresencaData(request.params.id, request.params.presencaDataId);
+  async cancelarPresencaData(request: AuthenticatedRequest, response: Response) {
+    const data = await service.cancelarPresencaData(request.params.id, request.params.presencaDataId, request.authUser?.tenant_id);
     return response.json(data);
   }
 
-  async removerPresencaData(request: Request, response: Response) {
-    await service.removerPresencaData(request.params.id, request.params.presencaDataId);
+  async removerPresencaData(request: AuthenticatedRequest, response: Response) {
+    await service.removerPresencaData(request.params.id, request.params.presencaDataId, request.authUser?.tenant_id);
     return response.status(204).send();
   }
 
-  async listarPresencasPorData(request: Request, response: Response) {
-    const resultado = await service.listarPresencasPorData(request.params.id, request.params.presencaDataId);
+  async listarPresencasPorData(request: AuthenticatedRequest, response: Response) {
+    const resultado = await service.listarPresencasPorData(request.params.id, request.params.presencaDataId, request.authUser?.tenant_id);
     return response.json(resultado);
   }
 
-  async salvarPresencasPorData(request: Request, response: Response) {
-    const resultado = await service.salvarPresencasPorData(request.params.id, request.params.presencaDataId, request.body);
+  async salvarPresencasPorData(request: AuthenticatedRequest, response: Response) {
+    const resultado = await service.salvarPresencasPorData(request.params.id, request.params.presencaDataId, request.body, request.authUser?.tenant_id);
     return response.json(resultado);
   }
 }

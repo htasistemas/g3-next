@@ -1,6 +1,377 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.470",
+                        "releaseDate":  "2026-04-27",
+                        "title":  "Relatórios e dashboards endurecidos por tenant",
+                        "description":  "As rotas principais de relatórios passaram a exigir autenticação e os relatórios de unidades, beneficiários e matrículas, além do dashboard de vulnerabilidade e da busca de vínculos do georreferenciamento, passaram a respeitar o tenant autenticado.",
+                        "changes":  [
+                                        "As rotas de relatórios agora exigem autenticação e permissão de leitura antes de gerar PDF ou HTML.",
+                                        "O cabeçalho institucional dos relatórios principais passou a ser resolvido pela unidade assistencial do tenant autenticado, sem reaproveitar identidade visual de outra instituição.",
+                                        "Os relatórios de unidades, beneficiários, ficha de beneficiário, relação de matrículas e lista de presença agora usam tenant da sessão nas leituras suportadas.",
+                                        "O dashboard de vulnerabilidade e a busca de vínculos do georreferenciamento passaram a filtrar por tenant no backend.",
+                                        "Manual do sistema, auditoria técnica e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.469",
+                        "releaseDate":  "2026-04-27",
+                        "title":  "Inscrições e cursos isolados por tenant",
+                        "description":  "O módulo de inscrições, cursos e oficinas passou a respeitar o tenant autenticado em catálogo, detalhe, cadastro, fila de espera e presença, impedindo mistura entre instituições.",
+                        "changes":  [
+                                        "Controller e service de Matrículas agora exigem tenant válido da sessão em listagem, detalhe, criação, edição, exclusão, catálogos e presença.",
+                                        "O repositório passou a validar o curso por id + tenant_id e a filtrar cursos_atendimentos, matrículas, fila de espera e presença pelo tenant autenticado.",
+                                        "Beneficiários, profissionais e salas usados como catálogos auxiliares passaram a ser listados somente dentro da instituição autenticada.",
+                                        "Os hooks e o cache da tela de Inscrições foram segregados por tenant no frontend.",
+                                        "Manual do sistema, auditoria técnica e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.468",
+                        "releaseDate":  "2026-04-27",
+                        "title":  "Central de Atendimentos isolada por tenant",
+                        "description":  "A Central de Atendimentos passou a respeitar o tenant autenticado em busca, visão geral, atendimentos, benefícios, encaminhamentos, histórico, custos, alertas e relatórios, impedindo mistura entre instituições.",
+                        "changes":  [
+                                        "Controller e service da Central agora exigem tenant válido da sessão em todas as leituras, gravações e geração de relatório.",
+                                        "O repositório passou a validar o beneficiário-base por id + tenant_id e a filtrar central_atendimento, central_beneficio, central_encaminhamento e central_auditoria pelo tenant autenticado.",
+                                        "A estrutura multi-tenant foi ampliada para as tabelas auxiliares da Central, preservando consistência entre benefícios, encaminhamentos e auditoria.",
+                                        "Os hooks e o cache do frontend da Central de Atendimentos foram segregados por tenant.",
+                                        "Manual do sistema, auditoria técnica e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.467",
+                        "releaseDate":  "2026-04-27",
+                        "title":  "Vínculo familiar isolado por tenant",
+                        "description":  "O módulo de vínculo familiar passou a respeitar o tenant autenticado em listagem, detalhe, criação, edição, membros, histórico, validação de benefício, transferência e desmembramento, impedindo mistura entre instituições.",
+                        "changes":  [
+                                        "Controller e service de Famílias agora exigem tenant válido da sessão em todas as rotas do módulo.",
+                                        "O repositório passou a filtrar vinculo_familiar e vinculo_familiar_membro por tenant_id em leitura e nas operações por ID.",
+                                        "A validação de beneficiários e de família ativa do membro agora considera apenas o tenant autenticado.",
+                                        "A busca interna, os hooks e o cache do frontend da tela Vínculo familiar foram segregados por tenant.",
+                                        "Manual do sistema, auditoria técnica e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.466",
+                        "releaseDate":  "2026-04-27",
+                        "title":  "Gestão de usuários isolada por tenant",
+                        "description":  "O módulo de usuários passou a respeitar o tenant autenticado em listagem, detalhe, criação, edição, status, reset de senha, exclusão e auditoria, impedindo acesso cruzado entre instituições.",
+                        "changes":  [
+                                        "Controller e service de Usuários agora exigem tenant e instituição válidos da sessão antes de operar o módulo.",
+                                        "O repositório passou a filtrar usuários por tenant_id na listagem, no detalhe, na validação de duplicidade, nas alterações cadastrais, na troca de status, no reset de senha e na exclusão lógica.",
+                                        "O cadastro inicial do usuário agora persiste tenant_id e instituicao_id no complemento transacional do registro.",
+                                        "O cache do frontend da tela Usuários e permissões agora é segregado por tenant, evitando reaproveitamento entre instituições.",
+                                        "Manual do sistema, auditoria técnica e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.465",
+                        "releaseDate":  "2026-04-27",
+                        "title":  "Cadastro de beneficiários isolado por tenant",
+                        "description":  "O módulo de beneficiários passou a respeitar o tenant autenticado na listagem, no detalhe, no próximo código, na sugestão de endereço e na persistência do cadastro, impedindo que uma instituição veja os 1446 beneficiários de outra.",
+                        "changes":  [
+                                        "Controller e service de Beneficiários agora recebem o tenant da sessão em leitura, criação, atualização, exclusão, código sequencial e sugestão de endereço.",
+                                        "O repositório passou a filtrar cadastro_beneficiario por tenant_id e a validar detalhe e exclusão dentro do tenant autenticado.",
+                                        "Após criar ou atualizar um beneficiário, o sistema passa a propagar tenant_id também para contato, documentos, situação social, escolaridade, saúde, benefícios e observações.",
+                                        "O cache do frontend da tela de beneficiários agora é segregado por tenant, evitando reaproveitamento entre instituições.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.464",
+                        "releaseDate":  "2026-04-27",
+                        "title":  "Correção do erro interno em Parâmetros do sistema",
+                        "description":  "A estrutura da tabela parametros_sistema foi corrigida para remover a unicidade global por chave e permitir salvamento isolado por tenant sem erro interno do servidor.",
+                        "changes":  [
+                                        "A rotina de estrutura de parametros_sistema passou a executar comandos separados, garantindo a remoção do índice único legado em chave.",
+                                        "Foi criado o índice único composto tenant_id + chave, que permite a mesma configuração existir em instituições diferentes sem colisão.",
+                                        "A correção também foi aplicada diretamente na base atual para restabelecer imediatamente o salvamento da tela.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.463",
+                        "releaseDate":  "2026-04-27",
+                        "title":  "Parâmetros do sistema isolados por tenant",
+                        "description":  "A tela Parâmetros do sistema passou a salvar e carregar personalização visual, carência, obrigatoriedades e alertas por instituição, impedindo que uma alteração de cor ou regra afete outros tenants.",
+                        "changes":  [
+                                        "A tabela parametros_sistema passou a usar tenant_id em conjunto com a chave da configuração, com migração segura dos registros antigos para o tenant padrão.",
+                                        "Os endpoints de parâmetros agora leem e gravam sempre com base no tenant autenticado da sessão.",
+                                        "O tema salvo no navegador passou a ser armazenado por tenant, evitando reaplicar a cor da instituição anterior após trocar de login.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.462",
+                        "releaseDate":  "2026-04-27",
+                        "title":  "Tela Agendamentos isolada por tenant",
+                        "description":  "O módulo de agendamentos passou a respeitar o tenant autenticado em agenda, indicadores, lista de espera, participantes e notificações, impedindo que uma instituição veja pacientes agendados de outra.",
+                        "changes":  [
+                                        "As rotas, serviços e repositório de Agendamentos agora recebem o tenant da sessão em leitura, criação, edição, check-in, conclusão, notificações e lista de espera.",
+                                        "As consultas e gravações das tabelas agendamento, agendamento_lista_espera, agendamento_beneficiario, agendamento_envio e agendamento_log passaram a persistir e filtrar tenant_id.",
+                                        "A estrutura multi-tenant foi ampliada para as tabelas singulares de agendamento e para catálogos operacionais usados pela tela, preservando o isolamento entre instituições.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.461",
+                        "releaseDate":  "2026-04-27",
+                        "title":  "Tela Biblioteca isolada por tenant",
+                        "description":  "O módulo Biblioteca passou a respeitar o tenant autenticado em livros, empréstimos, devoluções e alertas, impedindo que uma instituição veja ou altere o acervo de outra.",
+                        "changes":  [
+                                        "As rotas e serviços da Biblioteca agora recebem o tenant da sessão em todas as operações principais.",
+                                        "O repositório passou a filtrar livros, empréstimos, alertas e devoluções por tenant_id na base singular do módulo.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.460",
+                        "releaseDate":  "2026-04-27",
+                        "title":  "Biblioteca singular isolada por tenant",
+                        "description":  "A estrutura multi-tenant passou a cobrir também biblioteca_livro e biblioteca_emprestimo, corrigindo o card Biblioteca da Visão geral em bases legadas que ainda usam a tabela singular.",
+                        "changes":  [
+                                        "As tabelas biblioteca_livro e biblioteca_emprestimo passaram a integrar a estrutura multi-tenant automática.",
+                                        "O card Biblioteca da Visão geral deixa de somar acervo de outra instituição quando a base usa a modelagem singular do módulo.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.459",
+                        "releaseDate":  "2026-04-27",
+                        "title":  "Biblioteca, patrimônio e almoxarifado isolados por tenant",
+                        "description":  "A estrutura multi-tenant foi ampliada para as tabelas reais de acervo, bens e estoque usadas na Visão geral, impedindo que uma instituição enxergue volumes de outra.",
+                        "changes":  [
+                                        "As tabelas almoxarifado_item, almoxarifado_movimentacao, patrimonio_item e patrimonio_movimentacao passaram a integrar a estrutura multi-tenant automática.",
+                                        "Os cards Biblioteca, Patrimônio e Almoxarifado da Visão geral passam a respeitar o tenant autenticado após a reaplicação da estrutura no backend.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.458",
+                        "releaseDate":  "2026-04-27",
+                        "title":  "Cards restantes da visão geral isolados por tenant",
+                        "description":  "A segregação multi-tenant da visão geral foi concluída para cursos, matrículas, visitas domiciliares e doações, impedindo que instituições recém-cadastradas vejam dados operacionais da base antiga.",
+                        "changes":  [
+                                        "A estrutura multi-tenant passou a cobrir também as tabelas reais de cursos, matrículas, visitas domiciliares e doações usadas pelos cards da visão geral.",
+                                        "O resumo de Catálogo e vagas de matrículas agora recebe o tenant autenticado e deixa de somar inscrições e vagas de outras instituições.",
+                                        "Os cards Cursos ativos, Doações no período e Visitas domiciliares passaram a depender do tenant autenticado nas consultas do dashboard.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.457",
+                        "releaseDate":  "2026-04-27",
+                        "title":  "Visão geral isolada por tenant",
+                        "description":  "As consultas do dashboard de visão geral passaram a respeitar o tenant autenticado no backend, impedindo que uma instituição veja beneficiários, financeiro e indicadores de outra.",
+                        "changes":  [
+                                        "O controller e o serviço do dashboard agora repassam o tenant da sessão para o repositório da visão geral.",
+                                        "As consultas agregadas de beneficiários, famílias, vulnerabilidades, financeiro, cursos, doações, visitas e termos passaram a filtrar tenant_id quando a tabela já possui essa coluna.",
+                                        "A chave de cache da visão geral continua segregada por tenant no frontend, mantendo coerência entre sessão e dados exibidos.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.456",
+                        "releaseDate":  "2026-04-27",
+                        "title":  "Isolamento de unidade assistencial por tenant",
+                        "description":  "A leitura da unidade assistencial atual e das consultas institucionais foi corrigida para respeitar estritamente o tenant autenticado, impedindo que um CNPJ visualize dados de outro cliente.",
+                        "changes":  [
+                                        "Listagem, detalhe, unidade atual, criação, atualização e exclusão de unidades assistenciais agora exigem tenant autenticado no backend.",
+                                        "O topo do sistema e demais pontos que consomem a unidade atual deixam de reaproveitar dados institucionais de outro CNPJ.",
+                                        "As queries de unidades assistenciais no frontend passaram a usar o tenant autenticado na chave de cache.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.455",
+                        "releaseDate":  "2026-04-26",
+                        "title":  "Visão geral corrigida em novos tenants",
+                        "description":  "A abertura da visão geral em instituições recém-criadas foi blindada com herança defensiva de permissões administrativas e segregação de cache por tenant no frontend.",
+                        "changes":  [
+                                        "Usuários administrativos de tenants antigos passam a herdar a permissão do próprio perfil no login, evitando bloqueio indevido das rotas que exigem ADMINISTRADOR.",
+                                        "As consultas do dashboard e o resumo de matrículas da visão geral agora usam o tenant autenticado na chave de cache do React Query.",
+                                        "Ao trocar de instituição, a visão geral deixa de reaproveitar resposta e estado visual de outro tenant.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.454",
+                        "releaseDate":  "2026-04-26",
+                        "title":  "Administrador inicial de tenant com acesso efetivo",
+                        "description":  "O administrador inicial criado na gestão master de instituições passou a receber também a permissão administrativa persistida no tenant.",
+                        "changes":  [
+                                        "Na criação de uma nova instituição SaaS, o usuário administrador inicial agora é vinculado automaticamente à permissão ADMINISTRADOR.",
+                                        "Isso libera o acesso completo administrativo do tenant, incluindo a tela de usuários e demais áreas que dependem da permissão administrativa efetiva.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.453",
+                        "releaseDate":  "2026-04-26",
+                        "title":  "Identidade visual isolada por tenant no frontend",
+                        "description":  "A leitura da unidade atual passou a ser segregada por tenant para impedir que a logomarca e os dados da instituição anterior apareçam ao trocar de acesso.",
+                        "changes":  [
+                                        "O hook da unidade assistencial atual agora usa o tenant autenticado na chave de cache do React Query.",
+                                        "Ao trocar de instituição, o topo e a lateral deixam de reaproveitar a unidade principal e a logomarca do tenant anterior.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.452",
+                        "releaseDate":  "2026-04-26",
+                        "title":  "Instituições SaaS com slug e código automáticos",
+                        "description":  "O cadastro de tenants passou a gerar automaticamente slug e código da instituição a partir da razão social, mantendo edição manual disponível.",
+                        "changes":  [
+                                        "Ao digitar a razão social, o formulário passa a sugerir automaticamente o slug da instituição em formato limpo para uso no SaaS.",
+                                        "O código da instituição também é gerado automaticamente a partir da razão social para acelerar a criação do tenant.",
+                                        "Se o usuário editar slug ou código manualmente, o sistema respeita a alteração e deixa de sobrescrever o valor automaticamente.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.451",
+                        "releaseDate":  "2026-04-26",
+                        "title":  "Superadmin padrão liberado e cabeçalho simplificado",
+                        "description":  "O acesso SaaS passou a reconhecer o usuário administrativo padrão como superadmin master e o topo do sistema foi simplificado.",
+                        "changes":  [
+                                        "O usuário htasistemas@gmail.com passou a ser tratado como superadmin padrão também na navegação e nas proteções da área master.",
+                                        "A tela Instituições SaaS fica disponível para esse usuário mesmo sem depender de ajuste manual adicional de perfil.",
+                                        "No topo principal do sistema, o plano contratado foi removido e o cabeçalho passou a mostrar nome da instituição e nome do usuário.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.450",
+                        "releaseDate":  "2026-04-26",
+                        "title":  "Login com foto lateral ampliada novamente",
+                        "description":  "A foto da lateral direita da tela de login recebeu novo aumento de altura para ganhar ainda mais presença visual no desktop.",
+                        "changes":  [
+                                        "A imagem lateral do login passou a usar altura maior que a configuração anterior no desktop.",
+                                        "O ajuste preserva a estrutura dos cards inferiores e mantém o restante do layout lateral inalterado.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.449",
+                        "releaseDate":  "2026-04-26",
+                        "title":  "Login com foto lateral mais alta",
+                        "description":  "A foto da lateral direita da tela de login foi ampliada para ganhar mais presença visual no desktop.",
+                        "changes":  [
+                                        "A imagem lateral do login passou a usar altura maior na composição desktop.",
+                                        "O restante da estrutura lateral foi mantido, preservando o alinhamento entre foto, card da instituição e card institucional.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.448",
+                        "releaseDate":  "2026-04-26",
+                        "title":  "Login com cards laterais realmente encostados",
+                        "description":  "A lateral direita da tela de login foi corrigida para remover o empurrão vertical que ainda mantinha espaço entre os cards inferiores.",
+                        "changes":  [
+                                        "O card institucional do Sistema G3 deixou de ser empurrado para o rodapé pela estrutura flex da lateral.",
+                                        "Os cards de dados da instituição e de apresentação institucional agora ficam efetivamente encostados entre si no desktop.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.447",
+                        "releaseDate":  "2026-04-26",
+                        "title":  "Login com cards laterais encostados",
+                        "description":  "A lateral direita da tela de login foi ajustada para remover o vão entre o card da instituição e o card institucional do Sistema G3.",
+                        "changes":  [
+                                        "O espaçamento entre os cards de dados da instituição e de apresentação do Sistema G3 foi zerado no desktop.",
+                                        "A foto lateral continua separada acima, mas os dois cards inferiores agora formam um bloco visual contínuo.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.446",
+                        "releaseDate":  "2026-04-26",
+                        "title":  "Recuperação de senha vinculada à instituição do login",
+                        "description":  "O fluxo de esqueci minha senha passou a respeitar o contexto da instituição informada na tela de login para evitar redefinição de senha em tenant incorreto.",
+                        "changes":  [
+                                        "A API de recuperação de senha agora recebe também CNPJ, slug ou código da instituição quando o fluxo parte da tela de login.",
+                                        "A redefinição da senha temporária passou a buscar o usuário dentro da instituição correta antes de atualizar a credencial.",
+                                        "A mensagem de retorno orienta o usuário a usar o mesmo CNPJ e o mesmo e-mail na tela de login após receber a senha temporária.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.445",
+                        "releaseDate":  "2026-04-26",
+                        "title":  "Login com menor espaço entre foto e instituição",
+                        "description":  "A lateral direita da tela de login teve o espaçamento vertical ajustado para aproximar a foto do card de dados da instituição.",
+                        "changes":  [
+                                        "O vão entre a foto lateral e o card da instituição foi reduzido no desktop.",
+                                        "A largura da lateral foi mantida; o ajuste foi apenas no espaçamento vertical entre os blocos.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.444",
+                        "releaseDate":  "2026-04-26",
+                        "title":  "Login com lateral direita mais compacta",
+                        "description":  "A lateral direita da tela de login foi reduzida para ocupar menos altura e liberar mais equilíbrio visual no acesso.",
+                        "changes":  [
+                                        "A foto lateral do login passou a usar altura menor no desktop.",
+                                        "O card com os dados da instituição e o card institucional da lateral direita foram compactados com menos padding e tipografia mais contida.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.443",
+                        "releaseDate":  "2026-04-26",
+                        "title":  "Login com contexto da instituição na lateral direita",
+                        "description":  "A tela de login foi ajustada para liberar mais espaço no formulário principal ao mover o resumo da instituição para a coluna lateral no desktop.",
+                        "changes":  [
+                                        "O bloco com os dados da instituição identificada pelo CNPJ passou a aparecer abaixo da foto lateral direita na versão desktop da tela de login.",
+                                        "No mobile, o resumo da instituição continua visível no corpo da tela para não perder orientação quando a lateral não estiver disponível.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.442",
+                        "releaseDate":  "2026-04-25",
+                        "title":  "Fundação SaaS multi-tenant com login por instituição",
+                        "description":  "O G3N recebeu a base estrutural para operação SaaS multi-tenant em banco compartilhado, com identificação por instituição e painel master inicial.",
+                        "changes":  [
+                                        "Backend passou a estruturar tenant_id, instituicoes, auditoria de acesso e enriquecimento do token JWT com contexto completo do tenant autenticado.",
+                                        "Tela de login foi refeita para acesso por CNPJ da instituição e e-mail do usuário, com preparação para subdomínio e contexto visual da instituição antes do login.",
+                                        "Cabeçalho do sistema passou a exibir instituição e plano do tenant autenticado, e a área master ganhou a tela Instituições SaaS exclusiva para superadmin.",
+                                        "Migration SQL inicial, manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.441",
                         "releaseDate":  "2026-04-25",
                         "title":  "Plano de trabalho com ações contextuais por aba",

@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "../../../database/prisma.js";
 
 export type RelatorioInstituicao = {
@@ -20,17 +21,50 @@ export type RelatorioInstituicao = {
   };
 };
 
-export class ReportsRepository {
-  async obterInstituicaoRelatorio(): Promise<RelatorioInstituicao> {
-    const unidade =
-      (await prisma.unidadeAssistencial.findFirst({
-        where: { unidadePrincipal: true },
-        include: { endereco: true, imagemUnidade: true }
-      })) ??
-      (await prisma.unidadeAssistencial.findFirst({
-        include: { endereco: true, imagemUnidade: true }
-      }));
+type UnidadeRelatorioRow = {
+  razao_social: string | null;
+  nome_fantasia: string | null;
+  cnpj: string | null;
+  telefone: string | null;
+  email: string | null;
+  site: string | null;
+  logradouro: string | null;
+  numero: string | null;
+  bairro: string | null;
+  cidade: string | null;
+  uf: string | null;
+  cep: string | null;
+  logomarca_relatorio: string | null;
+  logomarca: string | null;
+};
 
+export class ReportsRepository {
+  async obterInstituicaoRelatorio(tenantId?: string): Promise<RelatorioInstituicao> {
+    const filtroTenant = tenantId ? Prisma.sql`WHERE ua.tenant_id::text = ${tenantId}` : Prisma.empty;
+    const rows = await prisma.$queryRaw<UnidadeRelatorioRow[]>(Prisma.sql`
+      SELECT
+        ua.razao_social,
+        ua.nome_fantasia,
+        ua.cnpj,
+        ua.telefone,
+        ua.email,
+        ua.site,
+        e.logradouro,
+        e.numero,
+        e.bairro,
+        e.cidade,
+        e.estado AS uf,
+        e.cep,
+        ua.logomarca_relatorio,
+        ua.logomarca
+      FROM unidade_assistencial ua
+      LEFT JOIN endereco e ON e.id = ua.endereco_id
+      ${filtroTenant}
+      ORDER BY ua.unidade_principal DESC, ua.atualizado_em DESC, ua.criado_em ASC
+      LIMIT 1
+    `);
+
+    const unidade = rows[0];
     if (!unidade) {
       return {
         razaoSocial: "Instituicao nao cadastrada",
@@ -53,14 +87,9 @@ export class ReportsRepository {
       };
     }
 
-    const nomeInstituicao = unidade.razaoSocial || unidade.nomeFantasia;
-    const nomeUnidade = unidade.nomeFantasia || unidade.razaoSocial || "";
-    const partesEndereco = [
-      unidade.endereco?.logradouro,
-      unidade.endereco?.numero,
-      unidade.endereco?.bairro,
-      unidade.endereco?.cidade
-    ].filter(Boolean);
+    const nomeInstituicao = unidade.razao_social || unidade.nome_fantasia || "Instituicao nao cadastrada";
+    const nomeUnidade = unidade.nome_fantasia || unidade.razao_social || "";
+    const partesEndereco = [unidade.logradouro, unidade.numero, unidade.bairro, unidade.cidade].filter(Boolean);
     const enderecoCompleto = partesEndereco.join(", ");
 
     const linha2Partes = [];
@@ -71,17 +100,17 @@ export class ReportsRepository {
 
     return {
       razaoSocial: nomeInstituicao,
-      nomeFantasia: unidade.nomeFantasia ?? "",
+      nomeFantasia: unidade.nome_fantasia ?? "",
       unidadeNome: nomeUnidade,
       cnpj: unidade.cnpj ?? "",
       enderecoCompleto,
-      cep: unidade.endereco?.cep ?? "",
-      cidade: unidade.endereco?.cidade ?? "",
-      uf: unidade.endereco?.estado ?? "",
+      cep: unidade.cep ?? "",
+      cidade: unidade.cidade ?? "",
+      uf: unidade.uf ?? "",
       telefone: unidade.telefone ?? "",
       email: unidade.email ?? "",
       site: unidade.site ?? "",
-      logoUrl: unidade.imagemUnidade?.logomarcaRelatorio ?? unidade.imagemUnidade?.logomarca ?? undefined,
+      logoUrl: unidade.logomarca_relatorio ?? unidade.logomarca ?? undefined,
       rodape: {
         linha1: nomeInstituicao,
         linha2: linha2Partes.join(" | "),

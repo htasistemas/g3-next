@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
 import { controleVeiculosService } from "@/services/controle-veiculos.service";
 import type {
   LocalDestinoVeiculo,
@@ -8,36 +9,51 @@ import type {
 } from "@/types/controle-veiculos";
 
 export function useVeiculos() {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["controle-veiculos", "veiculos"],
+    queryKey: ["controle-veiculos", "veiculos", usuario?.tenant_id ?? "sem-tenant"],
     queryFn: () => controleVeiculosService.listarVeiculos()
   });
 }
 
 export function useDiarioBordo() {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["controle-veiculos", "diario-bordo"],
+    queryKey: ["controle-veiculos", "diario-bordo", usuario?.tenant_id ?? "sem-tenant"],
     queryFn: () => controleVeiculosService.listarDiario()
   });
 }
 
 export function useLocaisDestinoVeiculo() {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["controle-veiculos", "locais-destino"],
+    queryKey: ["controle-veiculos", "locais-destino", usuario?.tenant_id ?? "sem-tenant"],
     queryFn: () => controleVeiculosService.listarLocaisDestino()
   });
 }
 
 export function useMotoristasAutorizados(veiculoId?: number | null) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["controle-veiculos", "motoristas-autorizados", veiculoId ?? "todos"],
+    queryKey: [
+      "controle-veiculos",
+      "motoristas-autorizados",
+      usuario?.tenant_id ?? "sem-tenant",
+      veiculoId ?? "todos"
+    ],
     queryFn: () => controleVeiculosService.listarMotoristasAutorizados(veiculoId)
   });
 }
 
 export function useMotoristasDisponiveis(nome?: string) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["controle-veiculos", "motoristas-disponiveis", nome ?? ""],
+    queryKey: [
+      "controle-veiculos",
+      "motoristas-disponiveis",
+      usuario?.tenant_id ?? "sem-tenant",
+      nome ?? ""
+    ],
     queryFn: () => controleVeiculosService.listarMotoristasDisponiveis(nome),
     enabled: (nome?.trim().length ?? 0) >= 2
   });

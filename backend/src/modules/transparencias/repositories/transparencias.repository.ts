@@ -19,8 +19,97 @@ import type {
 
 type TransactionClient = Prisma.TransactionClient;
 
+let estruturaPromise: Promise<void> | null = null;
+
+const estruturaSql = [
+  "ALTER TABLE IF EXISTS transparencia ADD COLUMN IF NOT EXISTS tenant_id UUID",
+  "ALTER TABLE IF EXISTS transparencia_recebimentos ADD COLUMN IF NOT EXISTS tenant_id UUID",
+  "ALTER TABLE IF EXISTS transparencia_destinacoes ADD COLUMN IF NOT EXISTS tenant_id UUID",
+  "ALTER TABLE IF EXISTS transparencia_comprovantes ADD COLUMN IF NOT EXISTS tenant_id UUID",
+  "ALTER TABLE IF EXISTS transparencia_timelines ADD COLUMN IF NOT EXISTS tenant_id UUID",
+  "ALTER TABLE IF EXISTS transparencia_checklist ADD COLUMN IF NOT EXISTS tenant_id UUID",
+  "CREATE INDEX IF NOT EXISTS transparencia_tenant_idx ON transparencia(tenant_id, id DESC)",
+  "CREATE INDEX IF NOT EXISTS transparencia_recebimentos_tenant_idx ON transparencia_recebimentos(tenant_id, transparencia_id, id)",
+  "CREATE INDEX IF NOT EXISTS transparencia_destinacoes_tenant_idx ON transparencia_destinacoes(tenant_id, transparencia_id, id)",
+  "CREATE INDEX IF NOT EXISTS transparencia_comprovantes_tenant_idx ON transparencia_comprovantes(tenant_id, transparencia_id, id)",
+  "CREATE INDEX IF NOT EXISTS transparencia_timelines_tenant_idx ON transparencia_timelines(tenant_id, transparencia_id, id)",
+  "CREATE INDEX IF NOT EXISTS transparencia_checklist_tenant_idx ON transparencia_checklist(tenant_id, transparencia_id, id)"
+];
+
+async function ensureTransparenciasEstrutura() {
+  if (!estruturaPromise) {
+    estruturaPromise = (async () => {
+      for (const comando of estruturaSql) {
+        await prisma.$executeRawUnsafe(comando);
+      }
+
+      await prisma.$executeRawUnsafe(`
+        UPDATE transparencia AS t
+        SET tenant_id = u.tenant_id
+        FROM unidade_assistencial AS u
+        WHERE t.tenant_id IS NULL
+          AND t.unidade_id = u.id
+          AND u.tenant_id IS NOT NULL
+      `);
+
+      await prisma.$executeRawUnsafe(`
+        UPDATE transparencia_recebimentos AS r
+        SET tenant_id = t.tenant_id
+        FROM transparencia AS t
+        WHERE r.tenant_id IS NULL
+          AND r.transparencia_id = t.id
+          AND t.tenant_id IS NOT NULL
+      `);
+
+      await prisma.$executeRawUnsafe(`
+        UPDATE transparencia_destinacoes AS d
+        SET tenant_id = t.tenant_id
+        FROM transparencia AS t
+        WHERE d.tenant_id IS NULL
+          AND d.transparencia_id = t.id
+          AND t.tenant_id IS NOT NULL
+      `);
+
+      await prisma.$executeRawUnsafe(`
+        UPDATE transparencia_comprovantes AS c
+        SET tenant_id = t.tenant_id
+        FROM transparencia AS t
+        WHERE c.tenant_id IS NULL
+          AND c.transparencia_id = t.id
+          AND t.tenant_id IS NOT NULL
+      `);
+
+      await prisma.$executeRawUnsafe(`
+        UPDATE transparencia_timelines AS tl
+        SET tenant_id = t.tenant_id
+        FROM transparencia AS t
+        WHERE tl.tenant_id IS NULL
+          AND tl.transparencia_id = t.id
+          AND t.tenant_id IS NOT NULL
+      `);
+
+      await prisma.$executeRawUnsafe(`
+        UPDATE transparencia_checklist AS cl
+        SET tenant_id = t.tenant_id
+        FROM transparencia AS t
+        WHERE cl.tenant_id IS NULL
+          AND cl.transparencia_id = t.id
+          AND t.tenant_id IS NOT NULL
+      `);
+    })();
+  }
+
+  await estruturaPromise;
+}
+
+function tenantFilter(alias: string, tenantId: string) {
+  return Prisma.sql`${Prisma.raw(alias)}.tenant_id::text = ${tenantId}`;
+}
+
 export class TransparenciasRepository {
-  async listar() {
+  async listar(tenantId: string) {
+    await ensureTransparenciasEstrutura();
+
     const transparencias = await prisma.$queryRaw<TransparenciaRow[]>(Prisma.sql`
       SELECT
         id,
@@ -33,16 +122,17 @@ export class TransparenciasRepository {
         saldo_disponivel_helper,
         prestado_mes::float8 AS prestado_mes,
         prestado_mes_helper
-      FROM transparencia
-      ORDER BY id DESC
+      FROM transparencia AS t
+      WHERE ${tenantFilter("t", tenantId)}
+      ORDER BY t.id DESC
     `);
 
     const ids = transparencias.map((item) => item.id);
-    const recebimentos = ids.length ? await this.listarRecebimentos(ids) : [];
-    const destinacoes = ids.length ? await this.listarDestinacoes(ids) : [];
-    const comprovantes = ids.length ? await this.listarComprovantes(ids) : [];
-    const timelines = ids.length ? await this.listarTimelines(ids) : [];
-    const checklist = ids.length ? await this.listarChecklist(ids) : [];
+    const recebimentos = ids.length ? await this.listarRecebimentos(ids, tenantId) : [];
+    const destinacoes = ids.length ? await this.listarDestinacoes(ids, tenantId) : [];
+    const comprovantes = ids.length ? await this.listarComprovantes(ids, tenantId) : [];
+    const timelines = ids.length ? await this.listarTimelines(ids, tenantId) : [];
+    const checklist = ids.length ? await this.listarChecklist(ids, tenantId) : [];
 
     return transparencias.map((transparencia) => ({
       transparencia,
@@ -54,7 +144,9 @@ export class TransparenciasRepository {
     }));
   }
 
-  async buscarPorId(id: bigint) {
+  async buscarPorId(id: bigint, tenantId: string) {
+    await ensureTransparenciasEstrutura();
+
     const rows = await prisma.$queryRaw<TransparenciaRow[]>(Prisma.sql`
       SELECT
         id,
@@ -67,17 +159,21 @@ export class TransparenciasRepository {
         saldo_disponivel_helper,
         prestado_mes::float8 AS prestado_mes,
         prestado_mes_helper
-      FROM transparencia
-      WHERE id = ${id}
+      FROM transparencia AS t
+      WHERE t.id = ${id}
+        AND ${tenantFilter("t", tenantId)}
       LIMIT 1
     `);
+
     const transparencia = rows[0] ?? null;
     if (!transparencia) return null;
-    const recebimentos = await this.listarRecebimentos([id]);
-    const destinacoes = await this.listarDestinacoes([id]);
-    const comprovantes = await this.listarComprovantes([id]);
-    const timelines = await this.listarTimelines([id]);
-    const checklist = await this.listarChecklist([id]);
+
+    const recebimentos = await this.listarRecebimentos([id], tenantId);
+    const destinacoes = await this.listarDestinacoes([id], tenantId);
+    const comprovantes = await this.listarComprovantes([id], tenantId);
+    const timelines = await this.listarTimelines([id], tenantId);
+    const checklist = await this.listarChecklist([id], tenantId);
+
     return {
       transparencia,
       recebimentos,
@@ -88,16 +184,20 @@ export class TransparenciasRepository {
     };
   }
 
-  async buscarPorIdOuFalhar(id: bigint) {
-    const registro = await this.buscarPorId(id);
+  async buscarPorIdOuFalhar(id: bigint, tenantId: string) {
+    const registro = await this.buscarPorId(id, tenantId);
     if (!registro) throw new AppError("Registro de prestacao de contas nao encontrado.", 404);
     return registro;
   }
 
-  async criar(input: TransparenciaInput) {
+  async criar(input: TransparenciaInput, tenantId: string) {
+    await ensureTransparenciasEstrutura();
+
+    const unidadeId = await this.validarUnidade(input.unidadeId, tenantId);
     const id = await prisma.$transaction(async (tx) => {
       const rows = await tx.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
         INSERT INTO transparencia (
+          tenant_id,
           unidade_id,
           total_recebido,
           total_recebido_helper,
@@ -110,7 +210,8 @@ export class TransparenciasRepository {
           criado_em,
           atualizado_em
         ) VALUES (
-          ${input.unidadeId ? BigInt(input.unidadeId) : null},
+          ${tenantId}::uuid,
+          ${unidadeId},
           ${input.totalRecebido ?? null},
           ${trimOrUndefined(input.totalRecebidoHelper ?? undefined)},
           ${input.totalAplicado ?? null},
@@ -124,21 +225,27 @@ export class TransparenciasRepository {
         )
         RETURNING id
       `);
+
       const transparenciaId = rows[0]?.id;
-      if (!transparenciaId) throw new AppError("Nao foi possivel criar registro de transparência.", 500);
-      await this.salvarRelacionamentos(tx, transparenciaId, input);
+      if (!transparenciaId) throw new AppError("Nao foi possivel criar registro de prestacao de contas.", 500);
+
+      await this.salvarRelacionamentos(tx, transparenciaId, input, tenantId);
       return transparenciaId;
     });
-    return this.buscarPorIdOuFalhar(id);
+
+    return this.buscarPorIdOuFalhar(id, tenantId);
   }
 
-  async atualizar(id: bigint, input: TransparenciaInput) {
-    await this.buscarPorIdOuFalhar(id);
+  async atualizar(id: bigint, input: TransparenciaInput, tenantId: string) {
+    await ensureTransparenciasEstrutura();
+    await this.buscarPorIdOuFalhar(id, tenantId);
+
+    const unidadeId = await this.validarUnidade(input.unidadeId, tenantId);
     await prisma.$transaction(async (tx) => {
       await tx.$executeRaw(Prisma.sql`
-        UPDATE transparencia
+        UPDATE transparencia AS t
         SET
-          unidade_id = ${input.unidadeId ? BigInt(input.unidadeId) : null},
+          unidade_id = ${unidadeId},
           total_recebido = ${input.totalRecebido ?? null},
           total_recebido_helper = ${trimOrUndefined(input.totalRecebidoHelper ?? undefined)},
           total_aplicado = ${input.totalAplicado ?? null},
@@ -148,22 +255,54 @@ export class TransparenciasRepository {
           prestado_mes = ${input.prestadoMes ?? null},
           prestado_mes_helper = ${trimOrUndefined(input.prestadoMesHelper ?? undefined)},
           atualizado_em = NOW()
-        WHERE id = ${id}
+        WHERE t.id = ${id}
+          AND ${tenantFilter("t", tenantId)}
       `);
-      await this.salvarRelacionamentos(tx, id, input);
+
+      await this.salvarRelacionamentos(tx, id, input, tenantId);
     });
-    return this.buscarPorIdOuFalhar(id);
+
+    return this.buscarPorIdOuFalhar(id, tenantId);
   }
 
-  async remover(id: bigint) {
-    await this.buscarPorIdOuFalhar(id);
+  async remover(id: bigint, tenantId: string) {
+    await ensureTransparenciasEstrutura();
+    await this.buscarPorIdOuFalhar(id, tenantId);
+
     await prisma.$executeRaw(Prisma.sql`
-      DELETE FROM transparencia
-      WHERE id = ${id}
+      DELETE FROM transparencia AS t
+      WHERE t.id = ${id}
+        AND ${tenantFilter("t", tenantId)}
     `);
   }
 
-  private async listarRecebimentos(ids: bigint[]) {
+  private async validarUnidade(unidadeId: string | null | undefined, tenantId: string) {
+    if (!unidadeId) {
+      return null;
+    }
+
+    const parsed = Number(unidadeId);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      throw new AppError("Unidade informada invalida.", 400);
+    }
+
+    const rows = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+      SELECT id
+      FROM unidade_assistencial
+      WHERE id = ${BigInt(parsed)}
+        AND tenant_id::text = ${tenantId}
+      LIMIT 1
+    `);
+
+    const unidade = rows[0];
+    if (!unidade) {
+      throw new AppError("A unidade informada nao pertence a instituicao autenticada.", 403);
+    }
+
+    return unidade.id;
+  }
+
+  private async listarRecebimentos(ids: bigint[], tenantId: string) {
     return prisma.$queryRaw<TransparenciaRecebimentoRow[]>(Prisma.sql`
       SELECT
         id,
@@ -173,13 +312,14 @@ export class TransparenciasRepository {
         periodicidade,
         status,
         ordem
-      FROM transparencia_recebimentos
-      WHERE transparencia_id IN (${Prisma.join(ids)})
-      ORDER BY transparencia_id, ordem, id
+      FROM transparencia_recebimentos AS r
+      WHERE r.transparencia_id IN (${Prisma.join(ids)})
+        AND ${tenantFilter("r", tenantId)}
+      ORDER BY r.transparencia_id, r.ordem, r.id
     `);
   }
 
-  private async listarDestinacoes(ids: bigint[]) {
+  private async listarDestinacoes(ids: bigint[], tenantId: string) {
     return prisma.$queryRaw<TransparenciaDestinacaoRow[]>(Prisma.sql`
       SELECT
         id,
@@ -188,13 +328,14 @@ export class TransparenciasRepository {
         descricao,
         percentual::float8 AS percentual,
         ordem
-      FROM transparencia_destinacoes
-      WHERE transparencia_id IN (${Prisma.join(ids)})
-      ORDER BY transparencia_id, ordem, id
+      FROM transparencia_destinacoes AS d
+      WHERE d.transparencia_id IN (${Prisma.join(ids)})
+        AND ${tenantFilter("d", tenantId)}
+      ORDER BY d.transparencia_id, d.ordem, d.id
     `);
   }
 
-  private async listarComprovantes(ids: bigint[]) {
+  private async listarComprovantes(ids: bigint[], tenantId: string) {
     return prisma.$queryRaw<TransparenciaComprovanteRow[]>(Prisma.sql`
       SELECT
         id,
@@ -204,13 +345,14 @@ export class TransparenciasRepository {
         arquivo_nome,
         arquivo_url,
         ordem
-      FROM transparencia_comprovantes
-      WHERE transparencia_id IN (${Prisma.join(ids)})
-      ORDER BY transparencia_id, ordem, id
+      FROM transparencia_comprovantes AS c
+      WHERE c.transparencia_id IN (${Prisma.join(ids)})
+        AND ${tenantFilter("c", tenantId)}
+      ORDER BY c.transparencia_id, c.ordem, c.id
     `);
   }
 
-  private async listarTimelines(ids: bigint[]) {
+  private async listarTimelines(ids: bigint[], tenantId: string) {
     return prisma.$queryRaw<TransparenciaTimelineRow[]>(Prisma.sql`
       SELECT
         id,
@@ -219,13 +361,14 @@ export class TransparenciasRepository {
         detalhe,
         status,
         ordem
-      FROM transparencia_timelines
-      WHERE transparencia_id IN (${Prisma.join(ids)})
-      ORDER BY transparencia_id, ordem, id
+      FROM transparencia_timelines AS tl
+      WHERE tl.transparencia_id IN (${Prisma.join(ids)})
+        AND ${tenantFilter("tl", tenantId)}
+      ORDER BY tl.transparencia_id, tl.ordem, tl.id
     `);
   }
 
-  private async listarChecklist(ids: bigint[]) {
+  private async listarChecklist(ids: bigint[], tenantId: string) {
     return prisma.$queryRaw<TransparenciaChecklistRow[]>(Prisma.sql`
       SELECT
         id,
@@ -234,54 +377,67 @@ export class TransparenciasRepository {
         descricao,
         status,
         ordem
-      FROM transparencia_checklist
-      WHERE transparencia_id IN (${Prisma.join(ids)})
-      ORDER BY transparencia_id, ordem, id
+      FROM transparencia_checklist AS cl
+      WHERE cl.transparencia_id IN (${Prisma.join(ids)})
+        AND ${tenantFilter("cl", tenantId)}
+      ORDER BY cl.transparencia_id, cl.ordem, cl.id
     `);
   }
 
   private async salvarRelacionamentos(
     tx: TransactionClient,
     transparenciaId: bigint,
-    input: TransparenciaInput
+    input: TransparenciaInput,
+    tenantId: string
   ) {
     await tx.$executeRaw(Prisma.sql`
-      DELETE FROM transparencia_recebimentos
-      WHERE transparencia_id = ${transparenciaId}
-    `);
-    await tx.$executeRaw(Prisma.sql`
-      DELETE FROM transparencia_destinacoes
-      WHERE transparencia_id = ${transparenciaId}
-    `);
-    await tx.$executeRaw(Prisma.sql`
-      DELETE FROM transparencia_comprovantes
-      WHERE transparencia_id = ${transparenciaId}
-    `);
-    await tx.$executeRaw(Prisma.sql`
-      DELETE FROM transparencia_timelines
-      WHERE transparencia_id = ${transparenciaId}
-    `);
-    await tx.$executeRaw(Prisma.sql`
-      DELETE FROM transparencia_checklist
-      WHERE transparencia_id = ${transparenciaId}
+      DELETE FROM transparencia_recebimentos AS r
+      WHERE r.transparencia_id = ${transparenciaId}
+        AND ${tenantFilter("r", tenantId)}
     `);
 
-    await this.inserirRecebimentos(tx, transparenciaId, input.recebimentos ?? []);
-    await this.inserirDestinacoes(tx, transparenciaId, input.destinacoes ?? []);
-    await this.inserirComprovantes(tx, transparenciaId, input.comprovantes ?? []);
-    await this.inserirTimelines(tx, transparenciaId, input.timelines ?? []);
-    await this.inserirChecklist(tx, transparenciaId, input.checklist ?? []);
+    await tx.$executeRaw(Prisma.sql`
+      DELETE FROM transparencia_destinacoes AS d
+      WHERE d.transparencia_id = ${transparenciaId}
+        AND ${tenantFilter("d", tenantId)}
+    `);
+
+    await tx.$executeRaw(Prisma.sql`
+      DELETE FROM transparencia_comprovantes AS c
+      WHERE c.transparencia_id = ${transparenciaId}
+        AND ${tenantFilter("c", tenantId)}
+    `);
+
+    await tx.$executeRaw(Prisma.sql`
+      DELETE FROM transparencia_timelines AS tl
+      WHERE tl.transparencia_id = ${transparenciaId}
+        AND ${tenantFilter("tl", tenantId)}
+    `);
+
+    await tx.$executeRaw(Prisma.sql`
+      DELETE FROM transparencia_checklist AS cl
+      WHERE cl.transparencia_id = ${transparenciaId}
+        AND ${tenantFilter("cl", tenantId)}
+    `);
+
+    await this.inserirRecebimentos(tx, transparenciaId, input.recebimentos ?? [], tenantId);
+    await this.inserirDestinacoes(tx, transparenciaId, input.destinacoes ?? [], tenantId);
+    await this.inserirComprovantes(tx, transparenciaId, input.comprovantes ?? [], tenantId);
+    await this.inserirTimelines(tx, transparenciaId, input.timelines ?? [], tenantId);
+    await this.inserirChecklist(tx, transparenciaId, input.checklist ?? [], tenantId);
   }
 
   private async inserirRecebimentos(
     tx: TransactionClient,
     transparenciaId: bigint,
-    lista: TransparenciaRecebimentoInput[]
+    lista: TransparenciaRecebimentoInput[],
+    tenantId: string
   ) {
     for (let index = 0; index < lista.length; index += 1) {
       const item = lista[index];
       await tx.$executeRaw(Prisma.sql`
         INSERT INTO transparencia_recebimentos (
+          tenant_id,
           transparencia_id,
           fonte,
           valor,
@@ -289,6 +445,7 @@ export class TransparenciasRepository {
           status,
           ordem
         ) VALUES (
+          ${tenantId}::uuid,
           ${transparenciaId},
           ${item.fonte},
           ${item.valor ?? null},
@@ -303,18 +460,21 @@ export class TransparenciasRepository {
   private async inserirDestinacoes(
     tx: TransactionClient,
     transparenciaId: bigint,
-    lista: TransparenciaDestinacaoInput[]
+    lista: TransparenciaDestinacaoInput[],
+    tenantId: string
   ) {
     for (let index = 0; index < lista.length; index += 1) {
       const item = lista[index];
       await tx.$executeRaw(Prisma.sql`
         INSERT INTO transparencia_destinacoes (
+          tenant_id,
           transparencia_id,
           titulo,
           descricao,
           percentual,
           ordem
         ) VALUES (
+          ${tenantId}::uuid,
           ${transparenciaId},
           ${item.titulo},
           ${trimOrUndefined(item.descricao ?? undefined)},
@@ -328,12 +488,14 @@ export class TransparenciasRepository {
   private async inserirComprovantes(
     tx: TransactionClient,
     transparenciaId: bigint,
-    lista: TransparenciaComprovanteInput[]
+    lista: TransparenciaComprovanteInput[],
+    tenantId: string
   ) {
     for (let index = 0; index < lista.length; index += 1) {
       const item = lista[index];
       await tx.$executeRaw(Prisma.sql`
         INSERT INTO transparencia_comprovantes (
+          tenant_id,
           transparencia_id,
           titulo,
           descricao,
@@ -341,6 +503,7 @@ export class TransparenciasRepository {
           arquivo_url,
           ordem
         ) VALUES (
+          ${tenantId}::uuid,
           ${transparenciaId},
           ${item.titulo},
           ${trimOrUndefined(item.descricao ?? undefined)},
@@ -355,18 +518,21 @@ export class TransparenciasRepository {
   private async inserirTimelines(
     tx: TransactionClient,
     transparenciaId: bigint,
-    lista: TransparenciaTimelineInput[]
+    lista: TransparenciaTimelineInput[],
+    tenantId: string
   ) {
     for (let index = 0; index < lista.length; index += 1) {
       const item = lista[index];
       await tx.$executeRaw(Prisma.sql`
         INSERT INTO transparencia_timelines (
+          tenant_id,
           transparencia_id,
           titulo,
           detalhe,
           status,
           ordem
         ) VALUES (
+          ${tenantId}::uuid,
           ${transparenciaId},
           ${item.titulo},
           ${trimOrUndefined(item.detalhe ?? undefined)},
@@ -380,18 +546,21 @@ export class TransparenciasRepository {
   private async inserirChecklist(
     tx: TransactionClient,
     transparenciaId: bigint,
-    lista: TransparenciaChecklistInput[]
+    lista: TransparenciaChecklistInput[],
+    tenantId: string
   ) {
     for (let index = 0; index < lista.length; index += 1) {
       const item = lista[index];
       await tx.$executeRaw(Prisma.sql`
         INSERT INTO transparencia_checklist (
+          tenant_id,
           transparencia_id,
           titulo,
           descricao,
           status,
           ordem
         ) VALUES (
+          ${tenantId}::uuid,
           ${transparenciaId},
           ${item.titulo},
           ${trimOrUndefined(item.descricao ?? undefined)},

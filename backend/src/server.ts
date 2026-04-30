@@ -24,9 +24,15 @@ import { iniciarLicencaUsoScheduler } from "./modules/licenca-uso/services/licen
 import { ensureUsuariosGestaoEstrutura } from "./modules/usuarios/repositories/usuario-estrutura.repository.js";
 import { ensureVisitasDomiciliaresEstrutura } from "./modules/visitas-domiciliares/repositories/visitas-domiciliares.repository.js";
 import { ensureAgendamentosEstrutura } from "./modules/agendamentos/repositories/agendamentos.repository.js";
+import { ensureMultiTenantStructure } from "./modules/multi-tenant/tenant-estrutura.service.js";
 
 async function aquecerEstruturasDeTela() {
   const commemorativeImportService = new CommemorativeImportService();
+  const tenantsMensagens = await prisma.$queryRaw<Array<{ tenant_id: string | null }>>`
+    SELECT DISTINCT tenant_id::text AS tenant_id
+    FROM unidade_assistencial
+    WHERE tenant_id IS NOT NULL
+  `;
   const aquecimentos: Array<{ nome: string; promise: Promise<unknown> }> = [
     { nome: "arquivos", promise: ensureArquivosEstrutura(prisma) },
     { nome: "parametros-sistema", promise: ensureParametrosSistemaEstrutura() },
@@ -44,7 +50,13 @@ async function aquecerEstruturasDeTela() {
     { nome: "agendamentos", promise: ensureAgendamentosEstrutura() },
     { nome: "senhas", promise: ensureSenhasEstrutura() },
     { nome: "chamados-tecnicos", promise: ensureChamadoTecnicoParametrosIniciais() },
-    { nome: "mensagens-personalizadas", promise: ensureMensagensPersonalizadasBase() }
+    ...tenantsMensagens
+      .map((item) => String(item.tenant_id ?? "").trim())
+      .filter(Boolean)
+      .map((tenantId) => ({
+        nome: `mensagens-personalizadas:${tenantId}`,
+        promise: ensureMensagensPersonalizadasBase(tenantId)
+      }))
   ];
 
   const resultados = await Promise.allSettled(aquecimentos.map((item) => item.promise));
@@ -61,6 +73,7 @@ async function aquecerEstruturasDeTela() {
 
 async function bootstrap() {
   await Promise.all([
+    ensureMultiTenantStructure(prisma),
     ensureUsuariosGestaoEstrutura(prisma),
     ensureRegistroPontoEstrutura(prisma)
   ]);

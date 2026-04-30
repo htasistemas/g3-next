@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
 import { emprestimosEventosService } from "@/services/emprestimos-eventos.service";
 import type {
   EmprestimoEventoPayload,
@@ -17,45 +18,62 @@ type FiltrosEmprestimo = {
 };
 
 export function useEmprestimosEventos(filtros: FiltrosEmprestimo) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["emprestimos-eventos", filtros],
+    queryKey: ["emprestimos-eventos", usuario?.tenant_id ?? "sem-tenant", filtros],
     queryFn: () => emprestimosEventosService.listar(filtros)
   });
 }
 
 export function useEmprestimoEvento(id?: number) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["emprestimos-eventos", "detalhe", id ?? 0],
+    queryKey: ["emprestimos-eventos", "detalhe", usuario?.tenant_id ?? "sem-tenant", id ?? 0],
     queryFn: () => emprestimosEventosService.obter(id as number),
     enabled: !!id
   });
 }
 
 export function useEventosEmprestimo() {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["emprestimos-eventos", "eventos"],
+    queryKey: ["emprestimos-eventos", "eventos", usuario?.tenant_id ?? "sem-tenant"],
     queryFn: () => emprestimosEventosService.listarEventos()
   });
 }
 
 export function useResponsaveisEmprestimo() {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["emprestimos-eventos", "responsaveis"],
+    queryKey: ["emprestimos-eventos", "responsaveis", usuario?.tenant_id ?? "sem-tenant"],
     queryFn: () => emprestimosEventosService.listarResponsaveis()
   });
 }
 
 export function useAgendaResumoEmprestimos(inicio?: string, fim?: string) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["emprestimos-eventos", "agenda-resumo", inicio ?? "", fim ?? ""],
+    queryKey: [
+      "emprestimos-eventos",
+      "agenda-resumo",
+      usuario?.tenant_id ?? "sem-tenant",
+      inicio ?? "",
+      fim ?? ""
+    ],
     queryFn: () => emprestimosEventosService.agendaResumo(inicio ?? "", fim ?? ""),
     enabled: Boolean(inicio && fim)
   });
 }
 
 export function useAgendaDiaEmprestimos(dataRef?: string) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["emprestimos-eventos", "agenda-dia", dataRef ?? ""],
+    queryKey: [
+      "emprestimos-eventos",
+      "agenda-dia",
+      usuario?.tenant_id ?? "sem-tenant",
+      dataRef ?? ""
+    ],
     queryFn: () => emprestimosEventosService.agendaDia(dataRef as string),
     enabled: !!dataRef
   });

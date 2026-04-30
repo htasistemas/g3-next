@@ -9,11 +9,13 @@ const normalizarSql = (expressao: string) =>
   Prisma.raw(`translate(lower(trim(coalesce(${expressao}, ''))), '${acentos}', '${semAcentos}')`);
 
 export class DashboardVulnerabilidadeRepository {
-  async contarEnderecosPendentes() {
+  async contarEnderecosPendentes(tenantId: string) {
     const rows = await prisma.$queryRaw<Array<{ total: bigint }>>(Prisma.sql`
       SELECT COUNT(*)::BIGINT AS total
       FROM endereco e
+      INNER JOIN cadastro_beneficiario b ON b.endereco_id = e.id
       WHERE (e.latitude IS NULL OR e.longitude IS NULL)
+        AND b.tenant_id::text = ${tenantId}
         AND COALESCE(TRIM(e.cidade), '') <> ''
         AND (
           COALESCE(TRIM(e.logradouro), '') <> ''
@@ -25,7 +27,7 @@ export class DashboardVulnerabilidadeRepository {
     return Number(rows[0]?.total ?? 0n);
   }
 
-  async listarEnderecosPendentes(limit = 20) {
+  async listarEnderecosPendentes(tenantId: string, limit = 20) {
     return prisma.$queryRaw<
       Array<{
         id: bigint;
@@ -46,7 +48,9 @@ export class DashboardVulnerabilidadeRepository {
         e.cidade,
         e.estado
       FROM endereco e
+      INNER JOIN cadastro_beneficiario b ON b.endereco_id = e.id
       WHERE (e.latitude IS NULL OR e.longitude IS NULL)
+        AND b.tenant_id::text = ${tenantId}
         AND COALESCE(TRIM(e.cidade), '') <> ''
         AND (
           COALESCE(TRIM(e.logradouro), '') <> ''
@@ -68,7 +72,7 @@ export class DashboardVulnerabilidadeRepository {
     });
   }
 
-  async listarCestaBasica() {
+  async listarCestaBasica(tenantId: string) {
     return prisma.$queryRaw<
       Array<{
         id: bigint;
@@ -91,18 +95,21 @@ export class DashboardVulnerabilidadeRepository {
         COALESCE(be.longitude, re.longitude) AS longitude,
         d.data_doacao AS data_referencia
       FROM doacao_realizada d
-      LEFT JOIN cadastro_beneficiario b ON b.id = d.beneficiario_id
+      LEFT JOIN cadastro_beneficiario b ON b.id = d.beneficiario_id AND b.tenant_id::text = ${tenantId}
       LEFT JOIN endereco be ON be.id = b.endereco_id
-      LEFT JOIN vinculo_familiar vf ON vf.id = d.vinculo_familiar_id
-      LEFT JOIN cadastro_beneficiario ref_b ON ref_b.id = vf.id_referencia_familiar
+      LEFT JOIN vinculo_familiar vf ON vf.id = d.vinculo_familiar_id AND vf.tenant_id::text = ${tenantId}
+      LEFT JOIN cadastro_beneficiario ref_b ON ref_b.id = vf.id_referencia_familiar AND ref_b.tenant_id::text = ${tenantId}
       LEFT JOIN endereco re ON re.id = ref_b.endereco_id
-      WHERE (
+      WHERE d.tenant_id::text = ${tenantId}
+        AND (
         d.tipo_doacao ILIKE '%cesta%'
         OR EXISTS (
           SELECT 1
           FROM doacao_realizada_item di
           INNER JOIN almoxarifado_item ai ON ai.id = di.almoxarifado_item_id
           WHERE di.doacao_realizada_id = d.id
+            AND di.tenant_id::text = ${tenantId}
+            AND ai.tenant_id::text = ${tenantId}
             AND ai.descricao ILIKE '%cesta%'
         )
       )
@@ -111,7 +118,7 @@ export class DashboardVulnerabilidadeRepository {
     `);
   }
 
-  async listarFamiliasCadastradas() {
+  async listarFamiliasCadastradas(tenantId: string) {
     return prisma.$queryRaw<
       Array<{
         id: bigint;
@@ -134,14 +141,15 @@ export class DashboardVulnerabilidadeRepository {
         re.longitude AS longitude,
         vf.vulnerabilidades_familia AS vulnerabilidades
       FROM vinculo_familiar vf
-      LEFT JOIN cadastro_beneficiario ref_b ON ref_b.id = vf.id_referencia_familiar
+      LEFT JOIN cadastro_beneficiario ref_b ON ref_b.id = vf.id_referencia_familiar AND ref_b.tenant_id::text = ${tenantId}
       LEFT JOIN endereco re ON re.id = ref_b.endereco_id
+      WHERE vf.tenant_id::text = ${tenantId}
       ORDER BY vf.atualizado_em DESC, vf.id DESC
       LIMIT 500
     `);
   }
 
-  async listarSituacoesViolencia() {
+  async listarSituacoesViolencia(tenantId: string) {
     return prisma.$queryRaw<
       Array<{
         id: bigint;
@@ -168,8 +176,11 @@ export class DashboardVulnerabilidadeRepository {
         SELECT b.id, e.bairro, e.cidade, e.latitude, e.longitude
         FROM cadastro_beneficiario b
         LEFT JOIN endereco e ON e.id = b.endereco_id
-        WHERE ${normalizarSql("b.nome_completo")} = ${normalizarSql("o.payload->>'vitimaNome'")}
+        WHERE b.tenant_id::text = ${tenantId}
+          AND (
+            ${normalizarSql("b.nome_completo")} = ${normalizarSql("o.payload->>'vitimaNome'")}
            OR ${normalizarSql("b.nome_social")} = ${normalizarSql("o.payload->>'vitimaNome'")}
+          )
         ORDER BY b.atualizado_em DESC
         LIMIT 1
       ) end_b ON TRUE

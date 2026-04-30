@@ -23,6 +23,7 @@ import {
 type AtorRaw = {
   id?: string | number | bigint;
   nomeUsuario?: string;
+  tenant_id?: string;
   permissoes?: string[];
 };
 
@@ -51,9 +52,10 @@ export class RegistroPontoService {
     return this.repository.listarEspelho(filters, ator);
   }
 
-  async listarUsuarios(rawTermo: unknown) {
+  async listarUsuarios(rawTermo: unknown, atorRaw: AtorRaw) {
     const termo = typeof rawTermo === "string" ? rawTermo : undefined;
-    return this.repository.listarUsuarios(termo);
+    const ator = this.parseAtor(atorRaw);
+    return this.repository.listarUsuarios(termo, ator.tenant_id);
   }
 
   async buscarHorarioUsuario(atorRaw: AtorRaw) {
@@ -74,7 +76,7 @@ export class RegistroPontoService {
 
   async buscarFaceUsuario(atorRaw: AtorRaw) {
     const ator = this.parseAtor(atorRaw);
-    const usuario = await this.buscarUsuarioConfirmacao(ator.id);
+    const usuario = await this.buscarUsuarioConfirmacao(ator.id, ator.tenant_id);
 
     if (!usuario) {
       throw new AppError("Usuario autenticado nao encontrado.", 404);
@@ -86,7 +88,7 @@ export class RegistroPontoService {
   async salvarFaceUsuario(rawInput: unknown, atorRaw: AtorRaw) {
     const input = registroPontoFaceSchema.parse(rawInput ?? {});
     const ator = this.parseAtor(atorRaw);
-    const usuario = await this.buscarUsuarioConfirmacao(ator.id);
+    const usuario = await this.buscarUsuarioConfirmacao(ator.id, ator.tenant_id);
 
     if (!usuario) {
       throw new AppError("Usuario autenticado nao encontrado.", 404);
@@ -112,6 +114,7 @@ export class RegistroPontoService {
                face_cadastrada_em = NOW(),
                atualizado_em = NOW()
          WHERE id = ${ator.id}
+           AND tenant_id::text = ${ator.tenant_id}
       `;
 
       await storageService.vincularEntidade(resultado.caminhoArquivo, ator.id as bigint);
@@ -185,6 +188,10 @@ export class RegistroPontoService {
     if (!nome_usuario) {
       throw new AppError("Usuario autenticado invalido.", 401);
     }
+    const tenant_id = atorRaw.tenant_id?.trim();
+    if (!tenant_id) {
+      throw new AppError("Tenant da sessao nao identificado.", 401);
+    }
 
     const idNumerico = Number(atorRaw.id);
     const id = Number.isInteger(idNumerico) && idNumerico > 0 ? BigInt(idNumerico) : undefined;
@@ -192,6 +199,7 @@ export class RegistroPontoService {
     return {
       id,
       nome_usuario,
+      tenant_id,
       permissoes: atorRaw.permissoes ?? []
     };
   }
@@ -200,13 +208,13 @@ export class RegistroPontoService {
     login: string,
     senha: string,
     faceImagem: string | undefined,
-    ator: { id?: bigint; nome_usuario: string }
+    ator: { id?: bigint; nome_usuario: string; tenant_id: string }
   ) {
     if (!ator.id) {
       throw new AppError("Usuario autenticado invalido.", 401);
     }
 
-    const usuario = await this.buscarUsuarioConfirmacao(ator.id);
+    const usuario = await this.buscarUsuarioConfirmacao(ator.id, ator.tenant_id);
 
     if (!usuario) {
       throw new AppError("Usuario autenticado nao encontrado.", 404);
@@ -250,8 +258,8 @@ export class RegistroPontoService {
     }
   }
 
-  private async buscarUsuarioConfirmacao(usuarioId?: bigint) {
-    if (!usuarioId) {
+  private async buscarUsuarioConfirmacao(usuarioId?: bigint, tenantId?: string) {
+    if (!usuarioId || !tenantId) {
       return null;
     }
 
@@ -268,6 +276,7 @@ export class RegistroPontoService {
         face_cadastrada_em
       FROM usuarios
       WHERE id = ${usuarioId}
+        AND tenant_id::text = ${tenantId}
       LIMIT 1
     `;
 

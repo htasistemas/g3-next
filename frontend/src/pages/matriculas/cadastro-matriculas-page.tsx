@@ -429,36 +429,37 @@ export function CadastroMatriculasPage() {
   const removerMutation = useRemoverMatricula();
 
   const { data: salasData } = useQuery({
-    queryKey: ["matriculas", "catalogo-salas"],
-    queryFn: () => matriculasService.listarSalas()
+    queryKey: ["matriculas", usuario?.tenant_id ?? "sem-tenant", "catalogo-salas"],
+    queryFn: () => matriculasService.listarSalas(),
+    enabled: !!usuario
   });
 
   const { data: beneficiariosCatalogoData, isFetching: carregandoBeneficiariosCatalogo } = useQuery({
-    queryKey: ["matriculas", "catalogo-beneficiarios", termoCatalogoBeneficiario],
+    queryKey: ["matriculas", usuario?.tenant_id ?? "sem-tenant", "catalogo-beneficiarios", termoCatalogoBeneficiario],
     queryFn: () => matriculasService.listarBeneficiarios(termoCatalogoBeneficiario),
-    enabled: termoCatalogoBeneficiario.trim().length >= 2
+    enabled: !!usuario && termoCatalogoBeneficiario.trim().length >= 2
   });
   const { data: beneficiariosFilaCatalogoData, isFetching: carregandoBeneficiariosFilaCatalogo } = useQuery({
-    queryKey: ["matriculas", "catalogo-beneficiarios-fila", termoCatalogoFilaEspera],
+    queryKey: ["matriculas", usuario?.tenant_id ?? "sem-tenant", "catalogo-beneficiarios-fila", termoCatalogoFilaEspera],
     queryFn: () => matriculasService.listarBeneficiarios(termoCatalogoFilaEspera),
-    enabled: termoCatalogoFilaEspera.trim().length >= 2
+    enabled: !!usuario && termoCatalogoFilaEspera.trim().length >= 2
   });
 
   const { data: profissionaisCatalogoData } = useQuery({
-    queryKey: ["matriculas", "catalogo-profissionais", termoCatalogoProfissional],
+    queryKey: ["matriculas", usuario?.tenant_id ?? "sem-tenant", "catalogo-profissionais", termoCatalogoProfissional],
     queryFn: () => matriculasService.listarProfissionais(termoCatalogoProfissional),
-    enabled: true
+    enabled: !!usuario
   });
 
   const { data: profissionaisResponsavelCatalogoData, isFetching: carregandoProfissionaisResponsavelCatalogo } = useQuery({
-    queryKey: ["matriculas", "catalogo-profissionais-responsavel", termoCatalogoProfissionalResponsavel],
+    queryKey: ["matriculas", usuario?.tenant_id ?? "sem-tenant", "catalogo-profissionais-responsavel", termoCatalogoProfissionalResponsavel],
     queryFn: () => matriculasService.listarProfissionais(termoCatalogoProfissionalResponsavel),
-    enabled: termoCatalogoProfissionalResponsavel.trim().length >= 2
+    enabled: !!usuario && termoCatalogoProfissionalResponsavel.trim().length >= 2
   });
   const { data: profissionaisAgendaCatalogoData, isFetching: carregandoProfissionaisAgendaCatalogo } = useQuery({
-    queryKey: ["matriculas", "catalogo-profissionais-agenda", termoCatalogoAgendaProfissional],
+    queryKey: ["matriculas", usuario?.tenant_id ?? "sem-tenant", "catalogo-profissionais-agenda", termoCatalogoAgendaProfissional],
     queryFn: () => matriculasService.listarProfissionais(termoCatalogoAgendaProfissional),
-    enabled: termoCatalogoAgendaProfissional.trim().length >= 2
+    enabled: !!usuario && termoCatalogoAgendaProfissional.trim().length >= 2
   });
 
   const {

@@ -34,13 +34,14 @@ function obterAtor(request: AuthenticatedRequest) {
     nomeUsuario: request.authUser?.nomeUsuario,
     permissoes: request.authUser?.permissoes ?? [],
     ip: obterIp(request),
-    maquina: obterOrigem(request)
+    maquina: obterOrigem(request),
+    tenantId: request.authUser?.tenant_id
   };
 }
 
 export class ContabilidadeController {
-  async listarContasBancarias(_request: AuthenticatedRequest, response: Response) {
-    const lista = await service.listarContasBancarias();
+  async listarContasBancarias(request: AuthenticatedRequest, response: Response) {
+    const lista = await service.listarContasBancarias(obterAtor(request));
     return response.json(lista);
   }
 
@@ -63,8 +64,8 @@ export class ContabilidadeController {
     return response.status(204).send();
   }
 
-  async listarCategorias(_request: AuthenticatedRequest, response: Response) {
-    const lista = await service.listarCategorias();
+  async listarCategorias(request: AuthenticatedRequest, response: Response) {
+    const lista = await service.listarCategorias(obterAtor(request));
     return response.json(lista);
   }
 
@@ -87,8 +88,8 @@ export class ContabilidadeController {
     return response.status(204).send();
   }
 
-  async listarCentrosCusto(_request: AuthenticatedRequest, response: Response) {
-    const lista = await service.listarCentrosCusto();
+  async listarCentrosCusto(request: AuthenticatedRequest, response: Response) {
+    const lista = await service.listarCentrosCusto(obterAtor(request));
     return response.json(lista);
   }
 
@@ -111,8 +112,8 @@ export class ContabilidadeController {
     return response.status(204).send();
   }
 
-  async listarLancamentos(_request: AuthenticatedRequest, response: Response) {
-    const lista = await service.listarLancamentos();
+  async listarLancamentos(request: AuthenticatedRequest, response: Response) {
+    const lista = await service.listarLancamentos(obterAtor(request));
     return response.json(lista);
   }
 
@@ -154,8 +155,8 @@ export class ContabilidadeController {
     return response.status(204).send();
   }
 
-  async listarMovimentacoes(_request: AuthenticatedRequest, response: Response) {
-    const lista = await service.listarMovimentacoes();
+  async listarMovimentacoes(request: AuthenticatedRequest, response: Response) {
+    const lista = await service.listarMovimentacoes(obterAtor(request));
     return response.json(lista);
   }
 
@@ -178,8 +179,8 @@ export class ContabilidadeController {
     return response.status(204).send();
   }
 
-  async listarTransferencias(_request: AuthenticatedRequest, response: Response) {
-    const lista = await service.listarTransferencias();
+  async listarTransferencias(request: AuthenticatedRequest, response: Response) {
+    const lista = await service.listarTransferencias(obterAtor(request));
     return response.json(lista);
   }
 
@@ -193,8 +194,8 @@ export class ContabilidadeController {
     return response.json(registro);
   }
 
-  async listarConciliacoes(_request: AuthenticatedRequest, response: Response) {
-    const lista = await service.listarConciliacoes();
+  async listarConciliacoes(request: AuthenticatedRequest, response: Response) {
+    const lista = await service.listarConciliacoes(obterAtor(request));
     return response.json(lista);
   }
 
@@ -212,13 +213,13 @@ export class ContabilidadeController {
     return response.json(registro);
   }
 
-  async listarHistorico(_request: AuthenticatedRequest, response: Response) {
-    const lista = await service.listarHistorico();
+  async listarHistorico(request: AuthenticatedRequest, response: Response) {
+    const lista = await service.listarHistorico(obterAtor(request));
     return response.json(lista);
   }
 
-  async listarComprasIntegradas(_request: AuthenticatedRequest, response: Response) {
-    const lista = await service.listarComprasIntegradas();
+  async listarComprasIntegradas(request: AuthenticatedRequest, response: Response) {
+    const lista = await service.listarComprasIntegradas(obterAtor(request));
     return response.json(lista);
   }
 
@@ -230,18 +231,18 @@ export class ContabilidadeController {
     return response.status(201).json(registro);
   }
 
-  async listarEmendas(_request: AuthenticatedRequest, response: Response) {
-    const lista = await service.listarEmendas();
+  async listarEmendas(request: AuthenticatedRequest, response: Response) {
+    const lista = await service.listarEmendas(obterAtor(request));
     return response.json(lista);
   }
 
   async criarEmenda(request: AuthenticatedRequest, response: Response) {
-    const registro = await service.criarEmenda(request.body);
+    const registro = await service.criarEmenda(request.body, obterAtor(request));
     return response.status(201).json(registro);
   }
 
   async atualizarStatusEmenda(request: AuthenticatedRequest, response: Response) {
-    const registro = await service.atualizarStatusEmenda(request.params.id, request.body);
+    const registro = await service.atualizarStatusEmenda(request.params.id, request.body, obterAtor(request));
     return response.json(registro);
   }
 }

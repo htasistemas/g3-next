@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
 import { unidadesAssistenciaisService } from "@/services/unidades-assistenciais.service";
 import type { UnidadeAssistencial, UnidadeAssistencialFiltro } from "@/types/unidade-assistencial";
 
@@ -7,25 +8,31 @@ type ResumoQueryOptions = {
 };
 
 export function useUnidadesAssistenciais(filtros: UnidadeAssistencialFiltro) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["unidades-assistenciais", filtros],
-    queryFn: () => unidadesAssistenciaisService.listar(filtros)
+    queryKey: ["unidades-assistenciais", usuario?.tenant_id ?? "sem-tenant", filtros],
+    queryFn: () => unidadesAssistenciaisService.listar(filtros),
+    enabled: !!usuario
   });
 }
 
 export function useUnidadeAssistencial(id?: string) {
+  const { usuario } = useAuth();
   return useQuery({
-    queryKey: ["unidade-assistencial", id],
+    queryKey: ["unidade-assistencial", usuario?.tenant_id ?? "sem-tenant", id],
     queryFn: () => unidadesAssistenciaisService.buscarPorId(id as string),
-    enabled: !!id
+    enabled: !!usuario && !!id
   });
 }
 
 export function useUnidadeAssistencialAtual(options?: ResumoQueryOptions) {
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? "sem-tenant";
+
   return useQuery({
-    queryKey: ["unidade-assistencial", "atual"],
+    queryKey: ["unidade-assistencial", "atual", tenantId],
     queryFn: () => unidadesAssistenciaisService.buscarAtual(),
-    enabled: options?.enabled ?? true,
+    enabled: (options?.enabled ?? true) && !!usuario,
     staleTime: 300_000
   });
 }

@@ -16,7 +16,7 @@ import { storageService } from "../../arquivos/services/storage-instance.js";
 export class UnidadeAssistencialService {
   private readonly repository = new UnidadeAssistencialRepository();
 
-  async listar(rawFilters: unknown) {
+  async listar(rawFilters: unknown, tenantId?: string) {
     const filtersNormalizados =
       rawFilters && typeof rawFilters === "object"
         ? normalizarObjetoTexto(
@@ -29,29 +29,32 @@ export class UnidadeAssistencialService {
         : rawFilters;
 
     const filters = unidadeAssistencialFiltersSchema.parse(filtersNormalizados);
-    const unidades = await this.repository.listar(filters);
+    const unidades = await this.repository.listar(filters, tenantId?.trim());
     return unidades.map(mapUnidadeAssistencialToResponse);
   }
 
-  async buscarPorId(rawId: string) {
+  async buscarPorId(rawId: string, tenantId?: string) {
     const id = this.parseId(rawId);
-    const unidade = await this.repository.buscarPorIdOuFalhar(id);
+    const unidade = await this.repository.buscarPorIdOuFalhar(id, tenantId?.trim());
     return mapUnidadeAssistencialToResponse(unidade);
   }
 
-  async buscarAtual() {
-    const unidade = await this.repository.buscarAtual();
+  async buscarAtual(tenantId?: string) {
+    const unidade = await this.repository.buscarAtual(tenantId?.trim());
     return unidade ? mapUnidadeAssistencialToResponse(unidade) : null;
   }
 
-  async criar(rawInput: unknown, rawUsuarioId?: string) {
+  async criar(rawInput: unknown, rawUsuarioId?: string, tenantId?: string) {
     const inputNormalizado = this.normalizarPayload(rawInput);
     const input = unidadeAssistencialInputSchema.parse(inputNormalizado);
     const usuarioId = this.parseUsuarioId(rawUsuarioId);
     const preparado = await this.prepararImagens(input, usuarioId);
 
     try {
-      const unidade = await this.repository.criar(preparado.input);
+      const unidade = await this.repository.criar(preparado.input, tenantId?.trim());
+      if (!unidade) {
+        throw new AppError("Unidade assistencial nao encontrada apos o salvamento.", 500);
+      }
       await this.vincularArquivos(preparado.novosCaminhos, unidade.id);
       return mapUnidadeAssistencialToResponse(unidade);
     } catch (error) {
@@ -60,16 +63,19 @@ export class UnidadeAssistencialService {
     }
   }
 
-  async atualizar(rawId: string, rawInput: unknown, rawUsuarioId?: string) {
+  async atualizar(rawId: string, rawInput: unknown, rawUsuarioId?: string, tenantId?: string) {
     const id = this.parseId(rawId);
     const inputNormalizado = this.normalizarPayload(rawInput);
     const input = unidadeAssistencialInputSchema.parse(inputNormalizado);
     const usuarioId = this.parseUsuarioId(rawUsuarioId);
-    const existente = await this.repository.buscarPorIdOuFalhar(id);
+    const existente = await this.repository.buscarPorIdOuFalhar(id, tenantId?.trim());
     const preparado = await this.prepararImagens(input, usuarioId, id);
 
     try {
-      const unidade = await this.repository.atualizar(id, preparado.input);
+      const unidade = await this.repository.atualizar(id, preparado.input, tenantId?.trim());
+      if (!unidade) {
+        throw new AppError("Unidade assistencial nao encontrada apos a atualizacao.", 500);
+      }
       await this.vincularArquivos(preparado.novosCaminhos, id);
       await this.limparArquivosSubstituidos(
         [existente.imagemUnidade?.logomarca, existente.imagemUnidade?.logomarcaRelatorio].filter((item) =>
@@ -87,11 +93,11 @@ export class UnidadeAssistencialService {
     }
   }
 
-  async remover(rawId: string, rawUsuarioId?: string) {
+  async remover(rawId: string, rawUsuarioId?: string, tenantId?: string) {
     const id = this.parseId(rawId);
     const usuarioId = this.parseUsuarioId(rawUsuarioId);
-    const existente = await this.repository.buscarPorIdOuFalhar(id);
-    await this.repository.remover(id);
+    const existente = await this.repository.buscarPorIdOuFalhar(id, tenantId?.trim());
+    await this.repository.remover(id, tenantId?.trim());
     await this.limparArquivosSubstituidos(
       [existente.imagemUnidade?.logomarca, existente.imagemUnidade?.logomarcaRelatorio].filter((item) =>
         this.isManagedStoragePath(item)
@@ -214,4 +220,5 @@ export class UnidadeAssistencialService {
     }
     return BigInt(parsed);
   }
+
 }

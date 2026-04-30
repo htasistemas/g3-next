@@ -18,7 +18,8 @@ import { storageService } from "../../arquivos/services/storage-instance.js";
 export class FotosEventosService {
   private readonly repository = new FotosEventosRepository();
 
-  async listar(rawQuery: unknown) {
+  async listar(rawQuery: unknown, rawTenantId?: string) {
+    const tenantId = this.parseTenant(rawTenantId);
     const filtros = (rawQuery ?? {}) as Record<string, string | string[] | undefined>;
     const resultado = await this.repository.listar({
       busca: typeof filtros.busca === "string" ? filtros.busca : undefined,
@@ -30,7 +31,7 @@ export class FotosEventosService {
       ordenacao: typeof filtros.ordenacao === "string" ? filtros.ordenacao : undefined,
       pagina: typeof filtros.pagina === "string" ? filtros.pagina : undefined,
       tamanho: typeof filtros.tamanho === "string" ? filtros.tamanho : undefined
-    });
+    }, tenantId);
 
     return {
       eventos: resultado.eventos.map((item) =>
@@ -43,9 +44,10 @@ export class FotosEventosService {
     };
   }
 
-  async obter(rawId: string) {
+  async obter(rawId: string, rawTenantId?: string) {
     const id = this.parseId(rawId);
-    const registro = await this.repository.buscarPorIdOuFalhar(id);
+    const tenantId = this.parseTenant(rawTenantId);
+    const registro = await this.repository.buscarPorIdOuFalhar(id, tenantId);
     const fotoPrincipal = registro.fotos.find(
       (item) => registro.evento.foto_principal_id && item.id === registro.evento.foto_principal_id
     );
@@ -60,13 +62,14 @@ export class FotosEventosService {
     };
   }
 
-  async criar(rawInput: unknown, rawUsuarioId?: string) {
+  async criar(rawInput: unknown, rawUsuarioId?: string, rawTenantId?: string) {
     const input = fotoEventoInputSchema.parse(this.normalizarPayload(rawInput));
     const usuarioId = this.parseUsuarioId(rawUsuarioId);
+    const tenantId = this.parseTenant(rawTenantId);
     const preparado = await this.prepararFotoPrincipal(input, usuarioId);
 
     try {
-      const registro = await this.repository.criar(preparado.input);
+      const registro = await this.repository.criar(preparado.input, tenantId);
       await this.vincularFotos(registro.evento.id, preparado.novosCaminhos);
       const fotoPrincipal = registro.fotos.find(
         (item) => registro.evento.foto_principal_id && item.id === registro.evento.foto_principal_id
@@ -78,14 +81,15 @@ export class FotosEventosService {
     }
   }
 
-  async atualizar(rawId: string, rawInput: unknown, rawUsuarioId?: string) {
+  async atualizar(rawId: string, rawInput: unknown, rawUsuarioId?: string, rawTenantId?: string) {
     const id = this.parseId(rawId);
     const input = fotoEventoInputSchema.parse(this.normalizarPayload(rawInput));
     const usuarioId = this.parseUsuarioId(rawUsuarioId);
+    const tenantId = this.parseTenant(rawTenantId);
     const preparado = await this.prepararFotoPrincipal(input, usuarioId, id);
 
     try {
-      const registro = await this.repository.atualizar(id, preparado.input);
+      const registro = await this.repository.atualizar(id, preparado.input, tenantId);
       await this.vincularFotos(id, preparado.novosCaminhos);
       const fotoPrincipal = registro.fotos.find(
         (item) => registro.evento.foto_principal_id && item.id === registro.evento.foto_principal_id
@@ -97,25 +101,32 @@ export class FotosEventosService {
     }
   }
 
-  async remover(rawId: string, rawUsuarioId?: string) {
+  async remover(rawId: string, rawUsuarioId?: string, rawTenantId?: string) {
     const id = this.parseId(rawId);
     const usuarioId = this.parseUsuarioId(rawUsuarioId);
-    const registro = await this.repository.buscarPorIdOuFalhar(id);
-    await this.repository.remover(id);
+    const tenantId = this.parseTenant(rawTenantId);
+    const registro = await this.repository.buscarPorIdOuFalhar(id, tenantId);
+    await this.repository.remover(id, tenantId);
     await this.removerCaminhos(
       registro.fotos.map((item) => item.arquivo).filter((item) => this.isManagedStoragePath(item)),
       usuarioId
     );
   }
 
-  async adicionarFoto(rawEventoId: string, rawInput: unknown, rawUsuarioId?: string) {
+  async adicionarFoto(
+    rawEventoId: string,
+    rawInput: unknown,
+    rawUsuarioId?: string,
+    rawTenantId?: string
+  ) {
     const eventoId = this.parseId(rawEventoId);
     const input = fotoEventoFotoInputSchema.parse(this.normalizarPayload(rawInput));
     const usuarioId = this.parseUsuarioId(rawUsuarioId);
+    const tenantId = this.parseTenant(rawTenantId);
     const preparado = await this.prepararFotoItem(input, usuarioId, eventoId);
 
     try {
-      const foto = await this.repository.adicionarFoto(eventoId, preparado.input);
+      const foto = await this.repository.adicionarFoto(eventoId, preparado.input, tenantId);
       await this.vincularFotos(eventoId, preparado.novosCaminhos);
       return mapFotoEventoItemToResponse(foto);
     } catch (error) {
@@ -124,10 +135,16 @@ export class FotosEventosService {
     }
   }
 
-  async adicionarFotosLote(rawEventoId: string, rawInput: unknown, rawUsuarioId?: string) {
+  async adicionarFotosLote(
+    rawEventoId: string,
+    rawInput: unknown,
+    rawUsuarioId?: string,
+    rawTenantId?: string
+  ) {
     const eventoId = this.parseId(rawEventoId);
     const input = fotoEventoFotosLoteInputSchema.parse(this.normalizarPayload(rawInput));
     const usuarioId = this.parseUsuarioId(rawUsuarioId);
+    const tenantId = this.parseTenant(rawTenantId);
     const preparados = [];
     const novosCaminhos: string[] = [];
 
@@ -142,7 +159,7 @@ export class FotosEventosService {
         fotos: preparados,
         fotoPrincipalIndex:
           typeof input.fotoPrincipalIndex === "number" ? input.fotoPrincipalIndex : null
-      });
+      }, tenantId);
       await this.vincularFotos(eventoId, novosCaminhos);
       return fotos.map(mapFotoEventoItemToResponse);
     } catch (error) {
@@ -151,49 +168,65 @@ export class FotosEventosService {
     }
   }
 
-  async definirFotoPrincipal(rawEventoId: string, rawFotoId: string) {
+  async definirFotoPrincipal(rawEventoId: string, rawFotoId: string, rawTenantId?: string) {
     const eventoId = this.parseId(rawEventoId);
     const fotoId = this.parseId(rawFotoId);
-    const foto = await this.repository.definirFotoPrincipalPorId(eventoId, fotoId);
+    const tenantId = this.parseTenant(rawTenantId);
+    const foto = await this.repository.definirFotoPrincipalPorId(eventoId, fotoId, tenantId);
     return mapFotoEventoItemToResponse(foto);
   }
 
-  async atualizarFoto(rawEventoId: string, rawFotoId: string, rawInput: unknown) {
+  async atualizarFoto(
+    rawEventoId: string,
+    rawFotoId: string,
+    rawInput: unknown,
+    rawTenantId?: string
+  ) {
     const eventoId = this.parseId(rawEventoId);
     const fotoId = this.parseId(rawFotoId);
     const input = fotoEventoFotoAtualizacaoSchema.parse(this.normalizarPayload(rawInput));
-    const foto = await this.repository.atualizarFoto(eventoId, fotoId, input);
+    const tenantId = this.parseTenant(rawTenantId);
+    const foto = await this.repository.atualizarFoto(eventoId, fotoId, input, tenantId);
     return mapFotoEventoItemToResponse(foto);
   }
 
-  async reordenarFotos(rawEventoId: string, rawInput: unknown) {
+  async reordenarFotos(rawEventoId: string, rawInput: unknown, rawTenantId?: string) {
     const eventoId = this.parseId(rawEventoId);
     const input = fotoEventoReordenacaoSchema.parse(this.normalizarPayload(rawInput));
-    const fotos = await this.repository.reordenarFotos(eventoId, input.fotoIds);
+    const tenantId = this.parseTenant(rawTenantId);
+    const fotos = await this.repository.reordenarFotos(eventoId, input.fotoIds, tenantId);
     return fotos.map(mapFotoEventoItemToResponse);
   }
 
-  async removerFoto(rawEventoId: string, rawFotoId: string, rawUsuarioId?: string) {
+  async removerFoto(
+    rawEventoId: string,
+    rawFotoId: string,
+    rawUsuarioId?: string,
+    rawTenantId?: string
+  ) {
     const eventoId = this.parseId(rawEventoId);
     const fotoId = this.parseId(rawFotoId);
     const usuarioId = this.parseUsuarioId(rawUsuarioId);
-    const foto = await this.repository.buscarFotoPorIdOuFalhar(eventoId, fotoId);
-    await this.repository.removerFoto(eventoId, fotoId);
+    const tenantId = this.parseTenant(rawTenantId);
+    const foto = await this.repository.buscarFotoPorIdOuFalhar(eventoId, fotoId, tenantId);
+    await this.repository.removerFoto(eventoId, fotoId, tenantId);
     if (this.isManagedStoragePath(foto.arquivo)) {
       await storageService.desativarPorCaminho(foto.arquivo, usuarioId);
     }
   }
 
-  async obterArquivoFoto(rawEventoId: string, rawFotoId: string) {
+  async obterArquivoFoto(rawEventoId: string, rawFotoId: string, rawTenantId?: string) {
     const eventoId = this.parseId(rawEventoId);
     const fotoId = this.parseId(rawFotoId);
-    const foto = await this.repository.buscarFotoPorIdOuFalhar(eventoId, fotoId);
+    const tenantId = this.parseTenant(rawTenantId);
+    const foto = await this.repository.buscarFotoPorIdOuFalhar(eventoId, fotoId, tenantId);
     return foto.arquivo;
   }
 
-  async obterFotoPrincipal(rawEventoId: string) {
+  async obterFotoPrincipal(rawEventoId: string, rawTenantId?: string) {
     const eventoId = this.parseId(rawEventoId);
-    const registro = await this.repository.buscarPorIdOuFalhar(eventoId);
+    const tenantId = this.parseTenant(rawTenantId);
+    const registro = await this.repository.buscarPorIdOuFalhar(eventoId, tenantId);
     if (!registro.evento.foto_principal_id) {
       throw new AppError("Evento nao possui foto principal.", 404);
     }
@@ -210,6 +243,14 @@ export class FotosEventosService {
       throw new AppError("Identificador invalido.", 400);
     }
     return BigInt(parsed);
+  }
+
+  private parseTenant(rawTenantId?: string) {
+    const tenantId = rawTenantId?.trim();
+    if (!tenantId) {
+      throw new AppError("Tenant da sessao nao identificado.", 401);
+    }
+    return tenantId;
   }
 
   private normalizarPayload(rawInput: unknown) {

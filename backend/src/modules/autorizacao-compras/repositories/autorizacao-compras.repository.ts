@@ -130,6 +130,7 @@ export async function ensureAutorizacaoComprasEstrutura() {
 
       await prisma.$executeRawUnsafe(`
         ALTER TABLE autorizacao_compras
+          ADD COLUMN IF NOT EXISTS tenant_id UUID,
           ADD COLUMN IF NOT EXISTS numero_solicitacao VARCHAR(40),
           ADD COLUMN IF NOT EXISTS data_solicitacao DATE,
           ADD COLUMN IF NOT EXISTS solicitante VARCHAR(150),
@@ -203,6 +204,7 @@ export async function ensureAutorizacaoComprasEstrutura() {
       await prisma.$executeRawUnsafe(`
         CREATE TABLE IF NOT EXISTS autorizacao_compras_aprovacao_nivel (
           id BIGSERIAL PRIMARY KEY,
+          tenant_id UUID,
           codigo VARCHAR(60) NOT NULL,
           nome VARCHAR(120) NOT NULL,
           ordem INTEGER NOT NULL,
@@ -269,6 +271,7 @@ export async function ensureAutorizacaoComprasEstrutura() {
       await prisma.$executeRawUnsafe(`
         CREATE TABLE IF NOT EXISTS autorizacao_compras_orcamento (
           id BIGSERIAL PRIMARY KEY,
+          tenant_id UUID,
           setor_solicitante VARCHAR(150) NOT NULL,
           centro_custo VARCHAR(150) NOT NULL,
           orcamento_previsto NUMERIC(14,2) NOT NULL,
@@ -281,6 +284,10 @@ export async function ensureAutorizacaoComprasEstrutura() {
       await prisma.$executeRawUnsafe(`
         CREATE INDEX IF NOT EXISTS autorizacao_compras_numero_idx
           ON autorizacao_compras (numero_solicitacao)
+      `);
+      await prisma.$executeRawUnsafe(`
+        CREATE INDEX IF NOT EXISTS autorizacao_compras_tenant_idx
+          ON autorizacao_compras (tenant_id, criado_em DESC, id DESC)
       `);
       await prisma.$executeRawUnsafe(`
         CREATE INDEX IF NOT EXISTS autorizacao_compras_setor_centro_idx
@@ -303,43 +310,68 @@ export async function ensureAutorizacaoComprasEstrutura() {
           ON autorizacao_compras_aprovacao (autorizacao_compra_id, nivel_id, criado_em DESC)
       `);
       await prisma.$executeRawUnsafe(`
-        CREATE UNIQUE INDEX IF NOT EXISTS autorizacao_compras_aprovacao_nivel_codigo_uidx
-          ON autorizacao_compras_aprovacao_nivel (codigo)
+        ALTER TABLE autorizacao_compras_aprovacao_nivel
+          ADD COLUMN IF NOT EXISTS tenant_id UUID
       `);
       await prisma.$executeRawUnsafe(`
-        CREATE UNIQUE INDEX IF NOT EXISTS autorizacao_compras_orcamento_uidx
-          ON autorizacao_compras_orcamento (LOWER(setor_solicitante), LOWER(centro_custo))
+        ALTER TABLE autorizacao_compras_orcamento
+          ADD COLUMN IF NOT EXISTS tenant_id UUID
       `);
-
-      for (const nivel of DEFAULT_APPROVAL_LEVELS) {
-        await prisma.$executeRawUnsafe(
-          `
-            INSERT INTO autorizacao_compras_aprovacao_nivel (
-              codigo,
-              nome,
-              ordem,
-              valor_minimo,
-              valor_maximo,
-              permissao_requerida,
-              ativo,
-              criado_em,
-              atualizado_em
-            )
-            SELECT $1, $2, $3, $4, $5, $6, TRUE, NOW(), NOW()
-            WHERE NOT EXISTS (
-              SELECT 1
-              FROM autorizacao_compras_aprovacao_nivel
-              WHERE codigo = $1
-            )
-          `,
-          nivel.codigo,
-          nivel.nome,
-          nivel.ordem,
-          nivel.valorMinimo,
-          nivel.valorMaximo,
-          nivel.permissaoRequerida
-        );
-      }
+      await prisma.$executeRawUnsafe(`
+        DROP INDEX IF EXISTS autorizacao_compras_aprovacao_nivel_codigo_uidx
+      `);
+      await prisma.$executeRawUnsafe(`
+        DROP INDEX IF EXISTS autorizacao_compras_orcamento_uidx
+      `);
+      await prisma.$executeRawUnsafe(`
+        CREATE UNIQUE INDEX IF NOT EXISTS autorizacao_compras_aprovacao_nivel_tenant_codigo_uidx
+          ON autorizacao_compras_aprovacao_nivel (tenant_id, codigo)
+      `);
+      await prisma.$executeRawUnsafe(`
+        CREATE UNIQUE INDEX IF NOT EXISTS autorizacao_compras_orcamento_tenant_uidx
+          ON autorizacao_compras_orcamento (tenant_id, LOWER(setor_solicitante), LOWER(centro_custo))
+      `);
+      await prisma.$executeRawUnsafe(`
+        CREATE INDEX IF NOT EXISTS autorizacao_compras_aprovacao_nivel_tenant_idx
+          ON autorizacao_compras_aprovacao_nivel (tenant_id, ativo, ordem)
+      `);
+      await prisma.$executeRawUnsafe(`
+        CREATE INDEX IF NOT EXISTS autorizacao_compras_orcamento_tenant_idx
+          ON autorizacao_compras_orcamento (tenant_id, ativo, setor_solicitante, centro_custo)
+      `);
+      await prisma.$executeRawUnsafe(`
+        UPDATE autorizacao_compras ac
+        SET tenant_id = ref.tenant_id
+        FROM (
+          SELECT id AS tenant_id
+          FROM instituicoes
+          ORDER BY criado_em ASC NULLS LAST, id ASC
+          LIMIT 1
+        ) ref
+        WHERE ac.tenant_id IS NULL
+      `);
+      await prisma.$executeRawUnsafe(`
+        UPDATE autorizacao_compras_aprovacao_nivel an
+        SET tenant_id = ref.tenant_id
+        FROM (
+          SELECT id AS tenant_id
+          FROM instituicoes
+          ORDER BY criado_em ASC NULLS LAST, id ASC
+          LIMIT 1
+        ) ref
+        WHERE an.tenant_id IS NULL
+      `);
+      await prisma.$executeRawUnsafe(`
+        UPDATE autorizacao_compras_orcamento ao
+        SET tenant_id = ref.tenant_id
+        FROM (
+          SELECT id AS tenant_id
+          FROM instituicoes
+          ORDER BY criado_em ASC NULLS LAST, id ASC
+          LIMIT 1
+        ) ref
+        WHERE ao.tenant_id IS NULL
+      `);
     })();
   }
 
@@ -347,16 +379,17 @@ export async function ensureAutorizacaoComprasEstrutura() {
 }
 
 export class AutorizacaoComprasRepository {
-  async listar() {
+  async listar(tenantId: string) {
     await ensureAutorizacaoComprasEstrutura();
     return prisma.$queryRaw<AutorizacaoCompraRow[]>(Prisma.sql`
       ${COMPRA_SELECT}
       WHERE ativo = TRUE
+        AND tenant_id::text = ${tenantId}
       ORDER BY criado_em DESC, id DESC
     `);
   }
 
-  async listarIndicadores() {
+  async listarIndicadores(tenantId: string) {
     await ensureAutorizacaoComprasEstrutura();
     const rows = await prisma.$queryRaw<AutorizacaoCompraPainelRow[]>(Prisma.sql`
       SELECT
@@ -371,35 +404,37 @@ export class AutorizacaoComprasRepository {
         COUNT(*) FILTER (WHERE status = 'DESPESA_LANCADA' AND registro_patrimonio = TRUE)::int AS aguardando_patrimonio
       FROM autorizacao_compras
       WHERE ativo = TRUE
+        AND tenant_id::text = ${tenantId}
     `);
     return rows[0];
   }
 
-  async buscarPorId(id: bigint) {
+  async buscarPorId(id: bigint, tenantId: string) {
     await ensureAutorizacaoComprasEstrutura();
     const rows = await prisma.$queryRaw<AutorizacaoCompraRow[]>(Prisma.sql`
       ${COMPRA_SELECT}
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
       LIMIT 1
     `);
     return rows[0] ?? null;
   }
 
-  async buscarPorIdOuFalhar(id: bigint) {
-    const registro = await this.buscarPorId(id);
+  async buscarPorIdOuFalhar(id: bigint, tenantId: string) {
+    const registro = await this.buscarPorId(id, tenantId);
     if (!registro) {
       throw new AppError("Processo de compra não encontrado.", 404);
     }
     return registro;
   }
 
-  async buscarDetalhePorId(id: bigint) {
+  async buscarDetalhePorId(id: bigint, tenantId: string) {
     await ensureAutorizacaoComprasEstrutura();
-    await this.buscarPorIdOuFalhar(id);
-    return this.obterDetalhe(prisma, id);
+    await this.buscarPorIdOuFalhar(id, tenantId);
+    return this.obterDetalhe(prisma, id, tenantId);
   }
 
-  async listarSetoresSolicitantes() {
+  async listarSetoresSolicitantes(tenantId: string) {
     await ensureAutorizacaoComprasEstrutura();
 
     return prisma.$queryRaw<AutorizacaoCompraSetorSolicitanteRow[]>(Prisma.sql`
@@ -408,22 +443,24 @@ export class AutorizacaoComprasRepository {
         NULLIF(TRIM(u.nome_fantasia), '') AS unidade_nome
       FROM salas_unidade s
       LEFT JOIN unidade_assistencial u ON u.id = s.unidade_id
-      WHERE NULLIF(TRIM(s.nome), '') IS NOT NULL
+      WHERE u.tenant_id::text = ${tenantId}
+        AND NULLIF(TRIM(s.nome), '') IS NOT NULL
       ORDER BY unidade_nome ASC NULLS LAST, nome ASC
     `);
   }
 
-  async criar(input: AutorizacaoCompraInput, ator: AutorizacaoCompraAtor) {
+  async criar(input: AutorizacaoCompraInput, tenantId: string, ator: AutorizacaoCompraAtor) {
     await ensureAutorizacaoComprasEstrutura();
 
     return prisma.$transaction(async (tx) => {
-      const dados = await this.prepararDadosSolicitacao(tx, input);
+      const dados = await this.prepararDadosSolicitacao(tx, input, tenantId);
       const status = dados.extrapolaOrcamento && !dados.autorizacaoEspecialOrcamento
         ? "FORA_DO_ORCAMENTO"
         : normalizarStatusAutorizacao(input.status);
 
       const rows = await tx.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
         INSERT INTO autorizacao_compras (
+          tenant_id,
           titulo,
           tipo,
           area,
@@ -456,6 +493,7 @@ export class AutorizacaoComprasRepository {
           criado_em,
           atualizado_em
         ) VALUES (
+          ${tenantId}::uuid,
           ${dados.titulo},
           ${dados.tipoCompra},
           ${dados.setorSolicitante},
@@ -501,7 +539,8 @@ export class AutorizacaoComprasRepository {
         tx,
         dados.setorSolicitante,
         dados.centroCusto,
-        dados.orcamentoPrevisto
+        dados.orcamentoPrevisto,
+        tenantId
       );
 
       const numeroSolicitacao = gerarNumeroSolicitacao(id);
@@ -523,16 +562,16 @@ export class AutorizacaoComprasRepository {
         ator
       });
 
-      return this.obterDetalhe(tx, id);
+      return this.obterDetalhe(tx, id, tenantId);
     });
   }
 
-  async atualizar(id: bigint, input: AutorizacaoCompraInput, ator: AutorizacaoCompraAtor) {
+  async atualizar(id: bigint, input: AutorizacaoCompraInput, tenantId: string, ator: AutorizacaoCompraAtor) {
     await ensureAutorizacaoComprasEstrutura();
 
     return prisma.$transaction(async (tx) => {
-      const atual = await this.buscarPorIdTxOuFalhar(tx, id);
-      const dados = await this.prepararDadosSolicitacao(tx, input, id);
+      const atual = await this.buscarPorIdTxOuFalhar(tx, id, tenantId);
+      const dados = await this.prepararDadosSolicitacao(tx, input, tenantId, id);
       const statusAtual = normalizarStatusAutorizacao(atual.status);
 
       if (["PAGAMENTO_AUTORIZADO", "DESPESA_LANCADA", "FINALIZADO"].includes(statusAtual)) {
@@ -576,6 +615,7 @@ export class AutorizacaoComprasRepository {
           justificativa_orcamento = ${trimOrUndefined(input.justificativaOrcamento ?? undefined)},
           atualizado_em = NOW()
         WHERE id = ${id}
+          AND tenant_id::text = ${tenantId}
       `);
 
       await this.sincronizarItens(tx, id, dados.itens);
@@ -583,7 +623,8 @@ export class AutorizacaoComprasRepository {
         tx,
         dados.setorSolicitante,
         dados.centroCusto,
-        dados.orcamentoPrevisto
+        dados.orcamentoPrevisto,
+        tenantId
       );
 
       await this.registrarHistorico(tx, {
@@ -597,15 +638,15 @@ export class AutorizacaoComprasRepository {
         ator
       });
 
-      return this.obterDetalhe(tx, id);
+      return this.obterDetalhe(tx, id, tenantId);
     });
   }
 
-  async remover(id: bigint, ator: AutorizacaoCompraAtor) {
+  async remover(id: bigint, tenantId: string, ator: AutorizacaoCompraAtor) {
     await ensureAutorizacaoComprasEstrutura();
 
     await prisma.$transaction(async (tx) => {
-      const atual = await this.buscarPorIdTxOuFalhar(tx, id);
+      const atual = await this.buscarPorIdTxOuFalhar(tx, id, tenantId);
       if (atual.finalizado_em) {
         throw new AppError("Não é possível cancelar uma compra finalizada.", 409);
       }
@@ -618,6 +659,7 @@ export class AutorizacaoComprasRepository {
           cancelado_em = NOW(),
           atualizado_em = NOW()
         WHERE id = ${id}
+          AND tenant_id::text = ${tenantId}
       `);
 
       await this.registrarHistorico(tx, {
@@ -633,11 +675,11 @@ export class AutorizacaoComprasRepository {
     });
   }
 
-  async enviarParaAprovacao(id: bigint, ator: AutorizacaoCompraAtor) {
+  async enviarParaAprovacao(id: bigint, tenantId: string, ator: AutorizacaoCompraAtor) {
     await ensureAutorizacaoComprasEstrutura();
 
     return prisma.$transaction(async (tx) => {
-      const compra = await this.buscarPorIdTxOuFalhar(tx, id);
+      const compra = await this.buscarPorIdTxOuFalhar(tx, id, tenantId);
       const itens = await this.listarItensTx(tx, id);
 
       if (!compra.solicitante || !compra.setor_solicitante || !compra.centro_custo) {
@@ -652,7 +694,7 @@ export class AutorizacaoComprasRepository {
         throw new AppError("A compra excede o orçamento do setor. Informe autorização especial para continuar.", 409);
       }
 
-      const niveis = await this.listarNiveisAprovacaoTx(tx);
+      const niveis = await this.listarNiveisAprovacaoTx(tx, tenantId);
       const obrigatorios = determinarNiveisObrigatorios(
         compra.valor_solicitacao ?? compra.valor_total_itens ?? compra.valor ?? 0,
         niveis
@@ -666,6 +708,7 @@ export class AutorizacaoComprasRepository {
         SET status = 'AGUARDANDO_APROVACAO',
             atualizado_em = NOW()
         WHERE id = ${id}
+          AND tenant_id::text = ${tenantId}
       `);
 
       await this.registrarHistorico(tx, {
@@ -679,24 +722,25 @@ export class AutorizacaoComprasRepository {
         ator
       });
 
-      return this.obterDetalhe(tx, id);
+      return this.obterDetalhe(tx, id, tenantId);
     });
   }
 
   async registrarAprovacao(
     autorizacaoId: bigint,
     input: AutorizacaoCompraAprovacaoInput,
+    tenantId: string,
     ator: AutorizacaoCompraAtor
   ) {
     await ensureAutorizacaoComprasEstrutura();
 
     return prisma.$transaction(async (tx) => {
-      const compra = await this.buscarPorIdTxOuFalhar(tx, autorizacaoId);
+      const compra = await this.buscarPorIdTxOuFalhar(tx, autorizacaoId, tenantId);
       if (compra.status !== "AGUARDANDO_APROVACAO") {
         throw new AppError("O processo não está aguardando aprovação.", 409);
       }
 
-      const niveis = await this.listarNiveisAprovacaoTx(tx);
+      const niveis = await this.listarNiveisAprovacaoTx(tx, tenantId);
       const obrigatorios = determinarNiveisObrigatorios(
         compra.valor_solicitacao ?? compra.valor_total_itens ?? compra.valor ?? 0,
         niveis
@@ -774,6 +818,7 @@ export class AutorizacaoComprasRepository {
           data_aprovacao = CURRENT_DATE,
           atualizado_em = NOW()
         WHERE id = ${autorizacaoId}
+          AND tenant_id::text = ${tenantId}
       `);
 
       await this.registrarHistorico(tx, {
@@ -792,25 +837,26 @@ export class AutorizacaoComprasRepository {
         ator
       });
 
-      return this.obterDetalhe(tx, autorizacaoId);
+      return this.obterDetalhe(tx, autorizacaoId, tenantId);
     });
   }
 
-  async listarCotacoes(autorizacaoId: bigint) {
+  async listarCotacoes(autorizacaoId: bigint, tenantId: string) {
     await ensureAutorizacaoComprasEstrutura();
-    await this.buscarPorIdOuFalhar(autorizacaoId);
+    await this.buscarPorIdOuFalhar(autorizacaoId, tenantId);
     return this.listarCotacoesTx(prisma, autorizacaoId);
   }
 
   async criarCotacao(
     autorizacaoId: bigint,
     input: AutorizacaoCompraCotacaoInput,
+    tenantId: string,
     ator: AutorizacaoCompraAtor
   ) {
     await ensureAutorizacaoComprasEstrutura();
 
     return prisma.$transaction(async (tx) => {
-      const compra = await this.buscarPorIdTxOuFalhar(tx, autorizacaoId);
+      const compra = await this.buscarPorIdTxOuFalhar(tx, autorizacaoId, tenantId);
       if (!["APROVADO", "EM_COTACAO", "COTACAO_CONCLUIDA", "FORNECEDOR_DEFINIDO"].includes(compra.status)) {
         throw new AppError("A cotação só pode ser registrada após a solicitação estar aprovada.", 409);
       }
@@ -879,6 +925,7 @@ export class AutorizacaoComprasRepository {
         SET status = ${novoStatus},
             atualizado_em = NOW()
         WHERE id = ${autorizacaoId}
+          AND tenant_id::text = ${tenantId}
       `);
 
       await this.registrarHistorico(tx, {
@@ -896,11 +943,11 @@ export class AutorizacaoComprasRepository {
     });
   }
 
-  async removerCotacao(autorizacaoId: bigint, cotacaoId: bigint, ator: AutorizacaoCompraAtor) {
+  async removerCotacao(autorizacaoId: bigint, cotacaoId: bigint, tenantId: string, ator: AutorizacaoCompraAtor) {
     await ensureAutorizacaoComprasEstrutura();
 
     await prisma.$transaction(async (tx) => {
-      const compra = await this.buscarPorIdTxOuFalhar(tx, autorizacaoId);
+      const compra = await this.buscarPorIdTxOuFalhar(tx, autorizacaoId, tenantId);
       const cotacao = await this.buscarCotacaoTxOuFalhar(tx, autorizacaoId, cotacaoId);
       if (compra.cotacao_vencedora_id === cotacao.id) {
         throw new AppError("Não é possível remover a cotação do fornecedor vencedor.", 409);
@@ -930,6 +977,7 @@ export class AutorizacaoComprasRepository {
             END,
             atualizado_em = NOW()
         WHERE id = ${autorizacaoId}
+          AND tenant_id::text = ${tenantId}
       `);
 
       await this.registrarHistorico(tx, {
@@ -948,12 +996,13 @@ export class AutorizacaoComprasRepository {
   async definirFornecedor(
     autorizacaoId: bigint,
     input: AutorizacaoCompraEscolhaFornecedorInput,
+    tenantId: string,
     ator: AutorizacaoCompraAtor
   ) {
     await ensureAutorizacaoComprasEstrutura();
 
     return prisma.$transaction(async (tx) => {
-      const compra = await this.buscarPorIdTxOuFalhar(tx, autorizacaoId);
+      const compra = await this.buscarPorIdTxOuFalhar(tx, autorizacaoId, tenantId);
       const cotacoes = await this.listarCotacoesTx(tx, autorizacaoId);
       const resumo = calcularResumoCotacoes(cotacoes, BigInt(input.cotacaoId));
       const escolhida = cotacoes.find((cotacao) => Number(cotacao.id) === input.cotacaoId && cotacao.ativo);
@@ -986,6 +1035,7 @@ export class AutorizacaoComprasRepository {
           justificativa_excecao_menor_preco = ${trimOrUndefined(input.justificativaDivergencia ?? undefined)},
           atualizado_em = NOW()
         WHERE id = ${autorizacaoId}
+          AND tenant_id::text = ${tenantId}
       `);
 
       await this.atualizarResumoCotacoesTx(tx, autorizacaoId, escolhida.id);
@@ -1001,25 +1051,26 @@ export class AutorizacaoComprasRepository {
         ator
       });
 
-      return this.obterDetalhe(tx, autorizacaoId);
+      return this.obterDetalhe(tx, autorizacaoId, tenantId);
     });
   }
 
-  async listarReservas(autorizacaoId: bigint) {
+  async listarReservas(autorizacaoId: bigint, tenantId: string) {
     await ensureAutorizacaoComprasEstrutura();
-    await this.buscarPorIdOuFalhar(autorizacaoId);
+    await this.buscarPorIdOuFalhar(autorizacaoId, tenantId);
     return this.listarReservasTx(prisma, autorizacaoId);
   }
 
   async registrarReservaBancaria(
     autorizacaoId: bigint,
     input: ReservaBancariaInput,
+    tenantId: string,
     ator: AutorizacaoCompraAtor
   ) {
     await ensureAutorizacaoComprasEstrutura();
 
     return prisma.$transaction(async (tx) => {
-      const compra = await this.buscarPorIdTxOuFalhar(tx, autorizacaoId);
+      const compra = await this.buscarPorIdTxOuFalhar(tx, autorizacaoId, tenantId);
       if (compra.status !== "FORNECEDOR_DEFINIDO" && compra.status !== "RESERVA_CANCELADA") {
         throw new AppError("A reserva financeira só pode ser feita após definir o fornecedor vencedor.", 409);
       }
@@ -1072,6 +1123,7 @@ export class AutorizacaoComprasRepository {
           numero_reserva = ${numeroReserva},
           atualizado_em = NOW()
         WHERE id = ${autorizacaoId}
+          AND tenant_id::text = ${tenantId}
       `);
 
       await this.registrarHistorico(tx, {
@@ -1089,11 +1141,16 @@ export class AutorizacaoComprasRepository {
     });
   }
 
-  async removerReservaBancaria(autorizacaoId: bigint, reservaId: bigint, ator: AutorizacaoCompraAtor) {
+  async removerReservaBancaria(
+    autorizacaoId: bigint,
+    reservaId: bigint,
+    tenantId: string,
+    ator: AutorizacaoCompraAtor
+  ) {
     await ensureAutorizacaoComprasEstrutura();
 
     await prisma.$transaction(async (tx) => {
-      const compra = await this.buscarPorIdTxOuFalhar(tx, autorizacaoId);
+      const compra = await this.buscarPorIdTxOuFalhar(tx, autorizacaoId, tenantId);
       await this.buscarReservaTxOuFalhar(tx, autorizacaoId, reservaId);
 
       await tx.$executeRaw(Prisma.sql`
@@ -1110,6 +1167,7 @@ export class AutorizacaoComprasRepository {
         SET status = 'RESERVA_CANCELADA',
             atualizado_em = NOW()
         WHERE id = ${autorizacaoId}
+          AND tenant_id::text = ${tenantId}
       `);
 
       await this.registrarHistorico(tx, {
@@ -1128,12 +1186,13 @@ export class AutorizacaoComprasRepository {
   async gerarAutorizacaoPagamento(
     autorizacaoId: bigint,
     input: AutorizacaoPagamentoInput,
+    tenantId: string,
     ator: AutorizacaoCompraAtor
   ) {
     await ensureAutorizacaoComprasEstrutura();
 
     return prisma.$transaction(async (tx) => {
-      const compra = await this.buscarPorIdTxOuFalhar(tx, autorizacaoId);
+      const compra = await this.buscarPorIdTxOuFalhar(tx, autorizacaoId, tenantId);
       const reservaAtiva = (await this.listarReservasTx(tx, autorizacaoId)).find(
         (reserva) => reserva.status === "RESERVA_EFETUADA" && !reserva.cancelado_em
       );
@@ -1268,11 +1327,11 @@ export class AutorizacaoComprasRepository {
         ator
       });
 
-      return this.obterDetalhe(tx, autorizacaoId);
+      return this.obterDetalhe(tx, autorizacaoId, tenantId);
     });
   }
 
-  async buscarFornecedorPorCnpj(cnpj: string) {
+  async buscarFornecedorPorCnpj(cnpj: string, tenantId: string) {
     await ensureAutorizacaoComprasEstrutura();
 
     const rows = await prisma.$queryRaw<Array<{ cnpj: string | null; razao_social: string | null }>>(Prisma.sql`
@@ -1281,6 +1340,7 @@ export class AutorizacaoComprasRepository {
         razao_social
       FROM unidade_assistencial
       WHERE REGEXP_REPLACE(COALESCE(cnpj, ''), '[^0-9]', '', 'g') = ${cnpj}
+        AND tenant_id::text = ${tenantId}
       LIMIT 1
     `);
 
@@ -1290,6 +1350,7 @@ export class AutorizacaoComprasRepository {
   private async prepararDadosSolicitacao(
     tx: DbClient,
     input: AutorizacaoCompraInput,
+    tenantId: string,
     idAtual?: bigint
   ) {
     const tipoCompra = normalizarTipoCompra(input.tipoCompra);
@@ -1305,9 +1366,20 @@ export class AutorizacaoComprasRepository {
     const valorTotalItens = determinarValorSolicitacao(itens, null);
     const setorSolicitante = input.setorSolicitante.trim();
     const centroCusto = input.centroCusto.trim();
-    const orcamentoPrevistoConfig = await this.obterOrcamentoPrevisto(tx, setorSolicitante, centroCusto);
+    const orcamentoPrevistoConfig = await this.obterOrcamentoPrevisto(
+      tx,
+      setorSolicitante,
+      centroCusto,
+      tenantId
+    );
     const orcamentoPrevisto = Number(input.orcamentoPrevisto ?? orcamentoPrevistoConfig ?? 0);
-    const orcamentoUtilizado = await this.calcularOrcamentoUtilizado(tx, setorSolicitante, centroCusto, idAtual);
+    const orcamentoUtilizado = await this.calcularOrcamentoUtilizado(
+      tx,
+      setorSolicitante,
+      centroCusto,
+      tenantId,
+      idAtual
+    );
     const resumo = resumirOrcamento(orcamentoPrevisto, orcamentoUtilizado, valorTotalItens);
 
     return {
@@ -1336,12 +1408,12 @@ export class AutorizacaoComprasRepository {
     };
   }
 
-  private async obterDetalhe(tx: DbClient, id: bigint) {
-    const compra = await this.buscarPorIdTxOuFalhar(tx, id);
+  private async obterDetalhe(tx: DbClient, id: bigint, tenantId: string) {
+    const compra = await this.buscarPorIdTxOuFalhar(tx, id, tenantId);
     const [itens, niveis, aprovacoes, cotacoes, reservas, historico, integracoes, anexos] =
       await Promise.all([
         this.listarItensTx(tx, id),
-        this.listarNiveisAprovacaoTx(tx),
+        this.listarNiveisAprovacaoTx(tx, tenantId),
         this.listarAprovacoesTx(tx, id),
         this.listarCotacoesTx(tx, id),
         this.listarReservasTx(tx, id),
@@ -1350,7 +1422,12 @@ export class AutorizacaoComprasRepository {
         this.listarArquivosCompraTx(tx, id)
       ]);
 
-    const indicadoresFornecedor = await this.calcularIndicadoresFornecedoresTx(tx, id, cotacoes);
+    const indicadoresFornecedor = await this.calcularIndicadoresFornecedoresTx(
+      tx,
+      id,
+      cotacoes,
+      tenantId
+    );
 
     return {
       compra,
@@ -1434,7 +1511,8 @@ export class AutorizacaoComprasRepository {
     `);
   }
 
-  private async listarNiveisAprovacaoTx(tx: DbClient) {
+  private async listarNiveisAprovacaoTx(tx: DbClient, tenantId: string) {
+    await this.assegurarNiveisAprovacaoPadraoTx(tx, tenantId);
     return tx.$queryRaw<AutorizacaoCompraNivelAprovacaoRow[]>(Prisma.sql`
       SELECT
         id,
@@ -1449,6 +1527,7 @@ export class AutorizacaoComprasRepository {
         atualizado_em
       FROM autorizacao_compras_aprovacao_nivel
       WHERE ativo = TRUE
+        AND tenant_id::text = ${tenantId}
       ORDER BY ordem ASC, id ASC
     `);
   }
@@ -1538,10 +1617,11 @@ export class AutorizacaoComprasRepository {
     `);
   }
 
-  private async buscarPorIdTxOuFalhar(tx: DbClient, id: bigint) {
+  private async buscarPorIdTxOuFalhar(tx: DbClient, id: bigint, tenantId: string) {
     const rows = await tx.$queryRaw<AutorizacaoCompraRow[]>(Prisma.sql`
       ${COMPRA_SELECT}
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
       LIMIT 1
     `);
     const registro = rows[0];
@@ -1750,11 +1830,48 @@ export class AutorizacaoComprasRepository {
     }
   }
 
+  private async assegurarNiveisAprovacaoPadraoTx(tx: DbClient, tenantId: string) {
+    for (const nivel of DEFAULT_APPROVAL_LEVELS) {
+      await tx.$executeRawUnsafe(
+        `
+          INSERT INTO autorizacao_compras_aprovacao_nivel (
+            tenant_id,
+            codigo,
+            nome,
+            ordem,
+            valor_minimo,
+            valor_maximo,
+            permissao_requerida,
+            ativo,
+            criado_em,
+            atualizado_em
+          )
+          SELECT $1::uuid, $2, $3, $4, $5, $6, $7, TRUE, NOW(), NOW()
+          WHERE NOT EXISTS (
+            SELECT 1
+            FROM autorizacao_compras_aprovacao_nivel
+            WHERE tenant_id::text = $8
+              AND codigo = $2
+          )
+        `,
+        tenantId,
+        nivel.codigo,
+        nivel.nome,
+        nivel.ordem,
+        nivel.valorMinimo,
+        nivel.valorMaximo,
+        nivel.permissaoRequerida,
+        tenantId
+      );
+    }
+  }
+
   private async persistirOrcamentoSetorial(
     tx: DbClient,
     setorSolicitante: string,
     centroCusto: string,
-    orcamentoPrevisto: number
+    orcamentoPrevisto: number,
+    tenantId: string
   ) {
     if (!Number.isFinite(orcamentoPrevisto) || orcamentoPrevisto <= 0) {
       return;
@@ -1763,7 +1880,8 @@ export class AutorizacaoComprasRepository {
     const rows = await tx.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
       SELECT id
       FROM autorizacao_compras_orcamento
-      WHERE LOWER(setor_solicitante) = LOWER(${setorSolicitante})
+      WHERE tenant_id::text = ${tenantId}
+        AND LOWER(setor_solicitante) = LOWER(${setorSolicitante})
         AND LOWER(centro_custo) = LOWER(${centroCusto})
       LIMIT 1
     `);
@@ -1777,12 +1895,14 @@ export class AutorizacaoComprasRepository {
           ativo = TRUE,
           atualizado_em = NOW()
         WHERE id = ${existente}
+          AND tenant_id::text = ${tenantId}
       `);
       return;
     }
 
     await tx.$executeRaw(Prisma.sql`
       INSERT INTO autorizacao_compras_orcamento (
+        tenant_id,
         setor_solicitante,
         centro_custo,
         orcamento_previsto,
@@ -1790,6 +1910,7 @@ export class AutorizacaoComprasRepository {
         criado_em,
         atualizado_em
       ) VALUES (
+        ${tenantId}::uuid,
         ${setorSolicitante},
         ${centroCusto},
         ${orcamentoPrevisto},
@@ -1800,11 +1921,17 @@ export class AutorizacaoComprasRepository {
     `);
   }
 
-  private async obterOrcamentoPrevisto(tx: DbClient, setorSolicitante: string, centroCusto: string) {
+  private async obterOrcamentoPrevisto(
+    tx: DbClient,
+    setorSolicitante: string,
+    centroCusto: string,
+    tenantId: string
+  ) {
     const rows = await tx.$queryRaw<Array<{ orcamento_previsto: number }>>(Prisma.sql`
       SELECT orcamento_previsto::float8 AS orcamento_previsto
       FROM autorizacao_compras_orcamento
-      WHERE LOWER(setor_solicitante) = LOWER(${setorSolicitante})
+      WHERE tenant_id::text = ${tenantId}
+        AND LOWER(setor_solicitante) = LOWER(${setorSolicitante})
         AND LOWER(centro_custo) = LOWER(${centroCusto})
         AND ativo = TRUE
       LIMIT 1
@@ -1816,6 +1943,7 @@ export class AutorizacaoComprasRepository {
     tx: DbClient,
     setorSolicitante: string,
     centroCusto: string,
+    tenantId: string,
     idAtual?: bigint
   ) {
     const ativos = [...AUTORIZACAO_COMPRA_STATUS_ATIVOS];
@@ -1824,6 +1952,7 @@ export class AutorizacaoComprasRepository {
         COALESCE(SUM(COALESCE(valor_solicitacao, valor_total_itens, valor, 0)), 0)::float8 AS total
       FROM autorizacao_compras
       WHERE ativo = TRUE
+        AND tenant_id::text = ${tenantId}
         AND LOWER(COALESCE(setor_solicitante, area, '')) = LOWER(${setorSolicitante})
         AND LOWER(COALESCE(centro_custo, '')) = LOWER(${centroCusto})
         AND status IN (${Prisma.join(ativos.map((status) => Prisma.sql`${status}`))})
@@ -1927,14 +2056,19 @@ export class AutorizacaoComprasRepository {
     pagamento: AutorizacaoPagamentoInput,
     ator: AutorizacaoCompraAtor
   ) {
+    const tenantId = ator.tenantId?.trim();
+    if (!tenantId) {
+      throw new AppError("Tenant da sessao nao identificado.", 401);
+    }
     const materiais = itens.filter((item) => item.tipo_item === "material");
     for (const item of materiais) {
       const referenciaId = `ITEM:${item.ordem}`;
       const jaIntegrado = await this.existeIntegracaoTx(tx, autorizacaoId, "ALMOXARIFADO", referenciaId);
       if (jaIntegrado) continue;
 
-      const almoxItem = await this.buscarOuCriarItemAlmoxarifadoTx(tx, item, cotacaoVencedora);
+      const almoxItem = await this.buscarOuCriarItemAlmoxarifadoTx(tx, item, cotacaoVencedora, tenantId);
       await this.registrarMovimentacaoAlmoxarifadoTx(tx, {
+        tenantId,
         itemId: almoxItem.id,
         quantidade: item.quantidade,
         referencia: `${await this.buscarNumeroSolicitacaoTx(tx, autorizacaoId)} / ${pagamento.documentoFiscal ?? "Sem NF"}`,
@@ -1962,6 +2096,10 @@ export class AutorizacaoComprasRepository {
     pagamento: AutorizacaoPagamentoInput,
     ator: AutorizacaoCompraAtor
   ) {
+    const tenantId = ator.tenantId?.trim();
+    if (!tenantId) {
+      throw new AppError("Tenant da sessao nao identificado.", 401);
+    }
     const bens = itens.filter((item) => item.tipo_item === "bem");
     for (const item of bens) {
       const quantidade = Math.max(1, Math.round(item.quantidade));
@@ -1973,6 +2111,7 @@ export class AutorizacaoComprasRepository {
         const numeroPatrimonio = `PAT-${new Date().getFullYear()}-${String(Number(autorizacaoId)).padStart(6, "0")}-${String(item.ordem).padStart(2, "0")}-${String(indice).padStart(2, "0")}`;
         const inserted = await tx.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
           INSERT INTO patrimonio_item (
+            tenant_id,
             numero_patrimonio,
             nome,
             categoria,
@@ -1986,6 +2125,7 @@ export class AutorizacaoComprasRepository {
             criado_em,
             atualizado_em
           ) VALUES (
+            ${tenantId}::uuid,
             ${numeroPatrimonio},
             ${item.descricao},
             ${trimOrUndefined(item.categoria ?? undefined)},
@@ -2009,6 +2149,7 @@ export class AutorizacaoComprasRepository {
 
         await tx.$executeRaw(Prisma.sql`
           INSERT INTO patrimonio_movimentacao (
+            tenant_id,
             patrimonio_id,
             tipo,
             destino,
@@ -2017,6 +2158,7 @@ export class AutorizacaoComprasRepository {
             data_movimento,
             criado_em
           ) VALUES (
+            ${tenantId}::uuid,
             ${patrimonioId},
             'MOVIMENTACAO',
             ${'Incorporação inicial'},
@@ -2093,14 +2235,16 @@ export class AutorizacaoComprasRepository {
   private async buscarOuCriarItemAlmoxarifadoTx(
     tx: DbClient,
     item: AutorizacaoCompraItemRow,
-    cotacaoVencedora: AutorizacaoCompraCotacaoRow
+    cotacaoVencedora: AutorizacaoCompraCotacaoRow,
+    tenantId: string
   ) {
     const existentes = await tx.$queryRaw<Array<{ id: bigint; estoque_atual: number }>>(Prisma.sql`
       SELECT
         id,
         estoque_atual::float8 AS estoque_atual
       FROM almoxarifado_item
-      WHERE LOWER(descricao) = LOWER(${item.descricao})
+      WHERE tenant_id::text = ${tenantId}
+        AND LOWER(descricao) = LOWER(${item.descricao})
         AND LOWER(categoria) = LOWER(${trimOrUndefined(item.categoria ?? undefined) ?? item.tipo_item})
         AND LOWER(unidade) = LOWER(${item.unidade})
       LIMIT 1
@@ -2114,12 +2258,14 @@ export class AutorizacaoComprasRepository {
     const codigoRows = await tx.$queryRaw<Array<{ proximo: number }>>(Prisma.sql`
       SELECT COALESCE(MAX(CAST(codigo AS INTEGER)), 0) + 1 AS proximo
       FROM almoxarifado_item
-      WHERE codigo ~ '^[0-9]+$'
+      WHERE tenant_id::text = ${tenantId}
+        AND codigo ~ '^[0-9]+$'
     `);
     const codigo = String(codigoRows[0]?.proximo ?? 1).padStart(4, "0");
 
     const inserted = await tx.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
       INSERT INTO almoxarifado_item (
+        tenant_id,
         codigo,
         descricao,
         categoria,
@@ -2133,6 +2279,7 @@ export class AutorizacaoComprasRepository {
         criado_em,
         atualizado_em
       ) VALUES (
+        ${tenantId}::uuid,
         ${codigo},
         ${item.descricao},
         ${trimOrUndefined(item.categoria ?? undefined) ?? item.tipo_item},
@@ -2160,6 +2307,7 @@ export class AutorizacaoComprasRepository {
   private async registrarMovimentacaoAlmoxarifadoTx(
     tx: DbClient,
     payload: {
+      tenantId: string;
       itemId: bigint;
       quantidade: number;
       referencia: string;
@@ -2172,6 +2320,7 @@ export class AutorizacaoComprasRepository {
       SELECT estoque_atual::float8 AS estoque_atual
       FROM almoxarifado_item
       WHERE id = ${payload.itemId}
+        AND tenant_id::text = ${payload.tenantId}
       LIMIT 1
     `);
     const estoqueAtual = itemRows[0]?.estoque_atual ?? 0;
@@ -2179,6 +2328,7 @@ export class AutorizacaoComprasRepository {
 
     await tx.$executeRaw(Prisma.sql`
       INSERT INTO almoxarifado_movimentacao (
+        tenant_id,
         item_id,
         data_movimentacao,
         tipo,
@@ -2189,6 +2339,7 @@ export class AutorizacaoComprasRepository {
         observacoes,
         criado_em
       ) VALUES (
+        ${payload.tenantId}::uuid,
         ${payload.itemId},
         ${toOptionalDate(payload.dataMovimentacao)},
         'Entrada',
@@ -2207,6 +2358,7 @@ export class AutorizacaoComprasRepository {
         estoque_atual = ${saldoApos},
         atualizado_em = NOW()
       WHERE id = ${payload.itemId}
+        AND tenant_id::text = ${payload.tenantId}
     `);
   }
 
@@ -2223,12 +2375,13 @@ export class AutorizacaoComprasRepository {
   private async calcularIndicadoresFornecedoresTx(
     tx: DbClient,
     autorizacaoId: bigint,
-    cotacoes: AutorizacaoCompraCotacaoRow[]
+    cotacoes: AutorizacaoCompraCotacaoRow[],
+    tenantId: string
   ) {
     const resultado: Record<number, unknown> = {};
 
     for (const cotacao of cotacoes.filter((item) => item.ativo)) {
-      const historico = await this.buscarHistoricoFornecedorTx(tx, autorizacaoId, cotacao);
+      const historico = await this.buscarHistoricoFornecedorTx(tx, autorizacaoId, cotacao, tenantId);
       const mediaFornecedor =
         historico.reduce(
           (total, item) =>
@@ -2269,7 +2422,8 @@ export class AutorizacaoComprasRepository {
   private async buscarHistoricoFornecedorTx(
     tx: DbClient,
     autorizacaoId: bigint,
-    cotacao: AutorizacaoCompraCotacaoRow
+    cotacao: AutorizacaoCompraCotacaoRow,
+    tenantId: string
   ) {
     return tx.$queryRaw<FornecedorIndicadoresCompraAnteriorRow[]>(Prisma.sql`
       SELECT
@@ -2285,6 +2439,7 @@ export class AutorizacaoComprasRepository {
       INNER JOIN autorizacao_compras_cotacoes cc
         ON cc.id = ac.cotacao_vencedora_id
       WHERE ac.id <> ${autorizacaoId}
+        AND ac.tenant_id::text = ${tenantId}
         AND cc.ativo = TRUE
         AND (
           (${trimOrUndefined(cotacao.cnpj ?? undefined)} IS NOT NULL
