@@ -714,9 +714,9 @@ export class RegistroPontoRepository {
           accuracy_metros,
           origem_json,
           criado_em
-        ) VALUES (
+      ) VALUES (
           ${registroId},
-          ${ator.tenant_id},
+          CAST(${ator.tenant_id} AS UUID),
           ${sequencia},
           ${tipo},
           CAST(${agoraBrasilia.timestamp} AS TIMESTAMP),
@@ -996,7 +996,7 @@ export class RegistroPontoRepository {
         atualizado_em
       ) VALUES (
         ${usuarioId},
-        ${tenantId},
+        CAST(${tenantId} AS UUID),
         ${unidadeId ?? null},
         CAST(${agoraBrasilia.data} AS DATE),
         CAST(${agoraBrasilia.timestamp} AS TIMESTAMP),
@@ -1551,7 +1551,7 @@ export class RegistroPontoRepository {
         criado_em
       ) VALUES (
         ${payload.registro_ponto_id},
-        ${payload.tenant_id},
+        CAST(${payload.tenant_id} AS UUID),
         ${payload.tipo},
         ${payload.descricao ?? null},
         ${payload.origem},
@@ -1601,7 +1601,7 @@ export class RegistroPontoRepository {
       ) VALUES (
         ${payload.registro_ponto_id},
         ${payload.registro_ponto_batida_id},
-        ${payload.ator.tenant_id},
+        CAST(${payload.ator.tenant_id} AS UUID),
         ${payload.acao},
         ${payload.ator.id ?? null},
         ${payload.ator.nome_usuario},

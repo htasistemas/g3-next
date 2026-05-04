@@ -72,8 +72,9 @@ async function aquecerEstruturasDeTela() {
 }
 
 async function bootstrap() {
+  await ensureMultiTenantStructure(prisma);
+
   await Promise.all([
-    ensureMultiTenantStructure(prisma),
     ensureUsuariosGestaoEstrutura(prisma),
     ensureRegistroPontoEstrutura(prisma)
   ]);

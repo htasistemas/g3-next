@@ -514,9 +514,16 @@ export async function ensureContabilidadeEstrutura() {
 
       await prisma.$executeRawUnsafe(`
         UPDATE lancamento_financeiro l
-        SET tenant_id = COALESCE(cb.tenant_id, origem.tenant_id)
-        FROM conta_bancaria cb,
-        (
+        SET tenant_id = COALESCE(
+          (
+            SELECT cb.tenant_id
+            FROM conta_bancaria cb
+            WHERE cb.id IS NOT DISTINCT FROM l.conta_bancaria_id
+            LIMIT 1
+          ),
+          origem.tenant_id
+        )
+        FROM (
           SELECT tenant_id
           FROM unidade_assistencial
           WHERE tenant_id IS NOT NULL
@@ -524,7 +531,6 @@ export async function ensureContabilidadeEstrutura() {
           LIMIT 1
         ) origem
         WHERE l.tenant_id IS NULL
-          AND cb.id IS NOT DISTINCT FROM l.conta_bancaria_id
       `);
 
       await prisma.$executeRawUnsafe(`
@@ -1332,6 +1338,7 @@ export class ContabilidadeRepository {
 
       const rows = await tx.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
         INSERT INTO lancamento_financeiro (
+          tenant_id,
           data_lancamento,
           tipo,
           direcao_ajuste,
@@ -1360,6 +1367,7 @@ export class ContabilidadeRepository {
           criado_em,
           atualizado_em
         ) VALUES (
+          ${ator?.tenantId ? Prisma.sql`CAST(${ator.tenantId} AS UUID)` : Prisma.sql`NULL`},
           ${toOptionalDate(input.dataLancamento)},
           ${tipo},
           ${direcaoAjuste},
@@ -2642,6 +2650,7 @@ export class ContabilidadeRepository {
 
     await tx.$executeRaw(Prisma.sql`
       INSERT INTO financeiro_historico (
+        tenant_id,
         aba,
         acao,
         tipo_registro,
@@ -2659,6 +2668,7 @@ export class ContabilidadeRepository {
         maquina,
         criado_em
       ) VALUES (
+        ${input.ator?.tenantId ? Prisma.sql`CAST(${input.ator.tenantId} AS UUID)` : Prisma.sql`NULL`},
         ${input.aba},
         ${input.acao},
         ${input.tipoRegistro},
