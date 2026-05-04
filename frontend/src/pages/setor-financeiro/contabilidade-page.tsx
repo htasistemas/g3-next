@@ -974,6 +974,8 @@ export function ContabilidadePage() {
     uploadArquivoMutation.isPending ||
     excluirArquivoMutation.isPending;
 
+  const estaEditandoLancamento = abaAtiva === 'lancamentos' && !!lancamentoSelecionadoId;
+
   const carregandoAbaAtiva = (() => {
     switch (abaAtiva) {
       case 'painel':
@@ -1208,10 +1210,24 @@ export function ContabilidadePage() {
         setPopup({ tipo: 'aviso', titulo: 'Validação', texto: 'Informe um valor maior que zero.' });
         return;
       }
+      const eraEdicao = !!lancamentoSelecionadoId;
       const resposta = await salvarLancamentoMutation.mutateAsync({ id: lancamentoSelecionadoId, payload });
-      setLancamentoSelecionadoId(resposta.id);
-      setLancamentoForm(toLancamentoForm(resposta));
-      setPopup({ tipo: 'sucesso', titulo: 'Lançamento salvo', texto: 'O lançamento financeiro foi salvo com sucesso.' });
+
+      if (eraEdicao) {
+        setLancamentoSelecionadoId(resposta.id);
+        setLancamentoForm(toLancamentoForm(resposta));
+      } else {
+        setLancamentoSelecionadoId(undefined);
+        setLancamentoForm(criarLancamentoVazio(visaoLancamentos));
+      }
+
+      setPopup({
+        tipo: 'sucesso',
+        titulo: eraEdicao ? 'Lançamento atualizado' : 'Lançamento cadastrado',
+        texto: eraEdicao
+          ? 'O lançamento financeiro foi atualizado com sucesso.'
+          : 'O lançamento financeiro foi cadastrado e já deve aparecer na lista.'
+      });
     } catch (error: any) {
       setPopup({ tipo: 'erro', titulo: 'Erro', texto: error?.response?.data?.message ?? 'Não foi possível salvar os dados.' });
     } finally {
@@ -2081,7 +2097,7 @@ export function ContabilidadePage() {
     lancamentos: [
       { label: 'Atualizar lançamentos', icon: Search, onClick: () => void atualizarDados(), variant: 'outline', disabled: processando },
       { label: 'Novo lançamento', icon: Plus, onClick: limparFormularioAtual, variant: 'default', disabled: processando },
-      { label: 'Salvar lançamento', icon: Save, onClick: () => void salvarAtual(), variant: 'default', disabled: processando },
+      { label: estaEditandoLancamento ? 'Salvar alterações' : 'Cadastrar lançamento', icon: Save, onClick: () => void salvarAtual(), variant: 'default', disabled: processando },
       { label: 'Cancelar edição', icon: Undo2, onClick: limparFormularioAtual, variant: 'outline', disabled: processando },
       { label: 'Excluir lançamento', icon: Trash2, onClick: solicitarExclusao, variant: 'danger', disabled: processando || !lancamentoSelecionadoId },
       { label: 'Imprimir lançamentos', icon: Printer, onClick: imprimirAbaAtual, variant: 'outline' },
