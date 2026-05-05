@@ -155,7 +155,8 @@ const secoesManual: ManualSecao[] = [
         nome: "Inscrições",
         objetivo: "Gerenciar inscrições em cursos, oficinas e atividades.",
         comoUsar: [
-          "Consulte a listagem de inscrições para localizar cada inscrição individual já incluída, com beneficiário, curso, status, data da inscrição, agendamento e profissional; o agendamento agora fica destacado visualmente como agendado, pendente, cancelado ou finalizado, com filtros rápidos por status acima da tabela.",
+          "Consulte a listagem de inscrições para localizar cada inscrição individual já incluída, com beneficiário, curso, status, data da inscrição, agendamento e profissional; a tabela voltou a carregar os lançamentos reais já salvos na instituição, respeitando os filtros aplicados na própria listagem.",
+          "O agendamento da inscrição fica destacado visualmente como agendado, pendente, cancelado ou finalizado, com filtros rápidos por status acima da tabela.",
           "A aba Catálogo e vagas voltou a usar uma fonte própria de dados, então os cards cadastrados continuam visíveis mesmo quando a listagem estiver filtrada.",
           "Use os dados da inscrição para registrar turma, responsável, datas e observações.",
           "Revise a fila de espera e a situação de vagas para apoiar decisões de encaminhamento.",
@@ -166,7 +167,8 @@ const secoesManual: ManualSecao[] = [
         atencoes: [
           "O botão Excluir da barra superior remove todo o curso configurado e exige confirmação específica antes da exclusão.",
           "Na aba Presença, a data exibida na lista e a data impressa na lista de presença agora seguem exatamente o mesmo dia informado, sem recuo por fuso horário.",
-          "A tela de Inscrições agora carrega catálogo, listagem, detalhe, fila de espera, presença, beneficiários, profissionais e salas sempre dentro da instituição autenticada, sem exibir dados de outro CNPJ."
+          "A tela de Inscrições agora carrega catálogo, listagem, detalhe, fila de espera, presença, beneficiários, profissionais e salas sempre dentro da instituição autenticada, sem exibir dados de outro CNPJ.",
+          "Quando houver inscrições já realizadas e a tabela estiver vazia, revise primeiro os filtros do topo; o botão Limpar filtros restaura a visão completa da listagem."
         ]
       },
       {

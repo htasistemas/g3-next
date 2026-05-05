@@ -486,6 +486,7 @@ export function CadastroMatriculasPage() {
     salvarMutation.isPending || removerMutation.isPending || carregandoDetalhes || atualizandoLista;
 
   const matriculas = catalogoData?.matriculas ?? [];
+  const matriculasListagem = listaData?.matriculas ?? [];
   const salasCatalogo = salasData?.salas ?? [];
   const beneficiariosCatalogo = beneficiariosCatalogoData?.beneficiarios ?? [];
   const beneficiariosFilaCatalogo = beneficiariosFilaCatalogoData?.beneficiarios ?? [];
@@ -513,11 +514,11 @@ export function CadastroMatriculasPage() {
     }, {})
   ).sort(([dataA], [dataB]) => dataA.localeCompare(dataB));
   const resumoListagem = useMemo(() => {
-    const totalCursos = matriculas.length;
-    const totalVagas = matriculas.reduce((total, item) => total + (item.vagas_totais ?? 0), 0);
-    const totalDisponiveis = matriculas.reduce((total, item) => total + (item.vagas_disponiveis ?? 0), 0);
-    const totalInscritos = matriculas.reduce((total, item) => total + (item.total_matriculas ?? 0), 0);
-    const totalFila = matriculas.reduce((total, item) => total + (item.total_fila_espera ?? 0), 0);
+    const totalCursos = matriculasListagem.length;
+    const totalVagas = matriculasListagem.reduce((total, item) => total + (item.vagas_totais ?? 0), 0);
+    const totalDisponiveis = matriculasListagem.reduce((total, item) => total + (item.vagas_disponiveis ?? 0), 0);
+    const totalInscritos = matriculasListagem.reduce((total, item) => total + (item.total_matriculas ?? 0), 0);
+    const totalFila = matriculasListagem.reduce((total, item) => total + (item.total_fila_espera ?? 0), 0);
     const ocupacao = totalVagas > 0 ? Math.round(((totalVagas - totalDisponiveis) / totalVagas) * 100) : 0;
 
     return {
@@ -528,7 +529,7 @@ export function CadastroMatriculasPage() {
       totalFila,
       ocupacao
     };
-  }, [matriculas]);
+  }, [matriculasListagem]);
   const inscricoesListagem = useMemo(() => {
     const termoNome = normalizarNomeComparacaoTexto(filtros.nome);
     const termoTipo = normalizarNomeComparacaoTexto(filtros.tipo);
@@ -536,7 +537,7 @@ export function CadastroMatriculasPage() {
     const termoProfissional = normalizarNomeComparacaoTexto(filtros.profissional);
     const termoBeneficiario = normalizarNomeComparacaoTexto(filtros.beneficiario);
 
-    return matriculas
+    return matriculasListagem
       .flatMap((curso) =>
         (curso.matriculas ?? []).map((inscricao) => ({
           ...inscricao,
@@ -571,7 +572,7 @@ export function CadastroMatriculasPage() {
         if (dataA !== dataB) return dataB.localeCompare(dataA);
         return a.beneficiario_nome.localeCompare(b.beneficiario_nome, "pt-BR");
       });
-  }, [filtroStatusAgendamentoRapido, filtros, matriculas]);
+  }, [filtroStatusAgendamentoRapido, filtros, matriculasListagem]);
   const podeAdicionarInscricao = useMemo(() => {
     const nome = formatarTextoPadrao(novaInscricao.beneficiario_nome);
     if (nome.length < 3) return false;

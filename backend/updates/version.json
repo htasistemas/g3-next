@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.472",
+  "latestVersion": "1.00.473",
   "releaseDate": "2026-05-05",
-  "description": "Histórico geral do beneficiário consolida dados reais com filtros e agenda futura por beneficiário.",
+  "description": "Listagem de inscrições voltou a expor os lançamentos reais salvos por curso na instituição.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.472",
+  "minCompatibleVersion": "1.00.473",
   "releaseType": "stable"
 }
 

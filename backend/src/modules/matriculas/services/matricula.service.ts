@@ -39,10 +39,16 @@ export class MatriculaService {
     const filters = matriculaFiltersSchema.parse(filtersNormalizados);
     const tenantId = this.parseTenant(rawTenantId);
     const registros = await this.repository.listar(filters, tenantId);
-
-    return registros.map((curso) =>
-      mapCursoToResponse(curso, [], [])
+    const registrosDetalhados = await Promise.all(
+      registros.map(async (curso) => {
+        const detalhes = await this.repository.buscarPorId(curso.id, tenantId);
+        return detalhes
+          ? mapCursoToResponse(detalhes.curso, detalhes.matriculas, detalhes.filaEspera)
+          : mapCursoToResponse(curso, [], []);
+      })
     );
+
+    return registrosDetalhados;
   }
 
   async obterResumoCatalogo(rawTenantId?: string) {

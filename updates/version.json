@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.438",
+  "latestVersion": "1.00.439",
   "releaseDate": "2026-05-05",
-  "description": "Nova tela Histórico geral consolida dados do beneficiário com benefícios, atendimentos, atividades atuais e agenda futura.",
+  "description": "Listagem de inscrições voltou a carregar os lançamentos reais salvos na instituição com filtros aplicados.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.438",
+  "minCompatibleVersion": "1.00.439",
   "releaseType": "stable",
   "downloadUrl": null
 }
