@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.475",
+  "latestVersion": "1.00.476",
   "releaseDate": "2026-05-05",
-  "description": "Notificações de WhatsApp e e-mail dos cards de agendamento passaram a ignorar falhas pontuais sem derrubar a ação.",
+  "description": "Cadastro de tenant com administração inicial passou a preparar a estrutura de usuários antes de salvar, evitando erro interno.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.475",
+  "minCompatibleVersion": "1.00.476",
   "releaseType": "stable"
 }
 

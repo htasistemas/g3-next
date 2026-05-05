@@ -942,6 +942,7 @@ const secoesManual: ManualSecao[] = [
           "Ao preencher a razão social, o sistema gera automaticamente o slug e o código da instituição; se necessário, o usuário pode editar ambos manualmente antes do salvamento.",
           "Na criação de um novo tenant, a aba Administração inicial exige o administrador inicial com login, e-mail e senha para liberar o primeiro acesso.",
           "O administrador inicial criado nessa etapa já nasce com acesso administrativo efetivo no tenant, inclusive à tela de usuários e às permissões compatíveis com o perfil administrativo.",
+          "O salvamento de um tenant novo com Administração inicial agora prepara antes a estrutura de usuários e permissões necessária no backend, evitando falha interna do servidor ao concluir o cadastro.",
           "Quando o tenant já existir, use a aba Administração inicial para redefinir a senha provisória do administrador e forçar troca no próximo login.",
           "A tela de login do sistema agora aceita CNPJ da instituição e e-mail do usuário; quando houver subdomínio configurado, o sistema identifica automaticamente a instituição pelo endereço.",
           "Na recuperação de senha da tela de login, o sistema passou a considerar também a instituição informada no acesso, evitando redefinir senha em tenant incorreto quando houver e-mails iguais em bases diferentes.",

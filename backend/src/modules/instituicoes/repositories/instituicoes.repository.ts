@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "../../../database/prisma.js";
 import { AppError } from "../../../shared/errors/app-error.js";
 import { ensureMultiTenantStructure } from "../../multi-tenant/tenant-estrutura.service.js";
+import { ensureUsuariosGestaoEstrutura } from "../../usuarios/repositories/usuario-estrutura.repository.js";
 import type { InstituicaoInput, InstituicaoResumo, InstituicaoUpdateInput } from "../instituicoes.types.js";
 
 type InstituicaoRow = {
@@ -49,8 +50,13 @@ function mapRow(row: InstituicaoRow): InstituicaoResumo {
 }
 
 export class InstituicoesRepository {
-  async listar() {
+  private async ensureEstrutura() {
+    await ensureUsuariosGestaoEstrutura(prisma);
     await ensureMultiTenantStructure(prisma);
+  }
+
+  async listar() {
+    await this.ensureEstrutura();
     const rows = await prisma.$queryRawUnsafe<InstituicaoRow[]>(
       `
       SELECT
@@ -101,7 +107,7 @@ export class InstituicoesRepository {
   }
 
   async criar(input: InstituicaoInput) {
-    await ensureMultiTenantStructure(prisma);
+    await this.ensureEstrutura();
     const senhaHash = input.admin_inicial?.senha ? await bcrypt.hash(input.admin_inicial.senha, 10) : null;
 
     const rows = await prisma.$transaction(async (tx): Promise<InstituicaoRow[]> => {
@@ -208,7 +214,7 @@ export class InstituicoesRepository {
   }
 
   async atualizar(id: string, input: InstituicaoUpdateInput) {
-    await ensureMultiTenantStructure(prisma);
+    await this.ensureEstrutura();
 
     await this.buscarPorId(id);
 
@@ -290,7 +296,7 @@ export class InstituicoesRepository {
   }
 
   async resetarSenhaAdmin(id: string, email: string | undefined, novaSenha: string) {
-    await ensureMultiTenantStructure(prisma);
+    await this.ensureEstrutura();
     const senhaHash = await bcrypt.hash(novaSenha, 10);
     const rows = await prisma.$queryRawUnsafe<{ id: bigint }[]>(
       `
@@ -337,7 +343,7 @@ export class InstituicoesRepository {
   }
 
   async buscarPorId(id: string) {
-    await ensureMultiTenantStructure(prisma);
+    await this.ensureEstrutura();
     const rows = await prisma.$queryRawUnsafe<InstituicaoRow[]>(
       `
       SELECT
