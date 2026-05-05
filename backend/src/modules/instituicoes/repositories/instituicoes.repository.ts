@@ -212,39 +212,79 @@ export class InstituicoesRepository {
 
     await this.buscarPorId(id);
 
-    await prisma.$executeRawUnsafe(
-      `
-      UPDATE instituicoes
-      SET
-        cnpj = COALESCE($2, cnpj),
-        razao_social = COALESCE($3, razao_social),
-        nome_fantasia = COALESCE($4, nome_fantasia),
-        slug = COALESCE($5, slug),
-        codigo = COALESCE($6, codigo),
-        email = COALESCE($7, email),
-        telefone = COALESCE($8, telefone),
-        endereco = COALESCE($9, endereco),
-        plano = COALESCE($10, plano),
-        status = COALESCE($11, status),
-        logo_url = COALESCE($12, logo_url),
-        cor_tema = COALESCE($13, cor_tema),
-        atualizado_em = NOW()
-      WHERE id::text = $1
-      `,
-      id,
-      input.cnpj ?? null,
-      input.razao_social ?? null,
-      input.nome_fantasia ?? null,
-      input.slug ?? null,
-      input.codigo ?? null,
-      input.email ?? null,
-      input.telefone ?? null,
-      input.endereco ?? null,
-      input.plano ?? null,
-      input.status ?? null,
-      input.logo_url ?? null,
-      input.cor_tema ?? null
-    );
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe(
+        `
+        UPDATE instituicoes
+        SET
+          cnpj = COALESCE($2, cnpj),
+          razao_social = COALESCE($3, razao_social),
+          nome_fantasia = COALESCE($4, nome_fantasia),
+          slug = COALESCE($5, slug),
+          codigo = COALESCE($6, codigo),
+          email = COALESCE($7, email),
+          telefone = COALESCE($8, telefone),
+          endereco = COALESCE($9, endereco),
+          plano = COALESCE($10, plano),
+          status = COALESCE($11, status),
+          logo_url = COALESCE($12, logo_url),
+          cor_tema = COALESCE($13, cor_tema),
+          atualizado_em = NOW()
+        WHERE id::text = $1
+        `,
+        id,
+        input.cnpj ?? null,
+        input.razao_social ?? null,
+        input.nome_fantasia ?? null,
+        input.slug ?? null,
+        input.codigo ?? null,
+        input.email ?? null,
+        input.telefone ?? null,
+        input.endereco ?? null,
+        input.plano ?? null,
+        input.status ?? null,
+        input.logo_url ?? null,
+        input.cor_tema ?? null
+      );
+
+      if (typeof input.email === "string" && input.email.trim()) {
+        const adminRows = await tx.$queryRawUnsafe<{ id: bigint }[]>(
+          `
+          SELECT u.id
+          FROM usuarios u
+          WHERE u.instituicao_id::text = $1
+            AND u.deletado_em IS NULL
+            AND (
+              COALESCE(u.perfil_acesso, '') = 'ADMINISTRADOR'
+              OR EXISTS (
+                SELECT 1
+                FROM usuario_permissao up
+                JOIN permissao p ON p.id = up.permissao_id
+                WHERE up.usuario_id = u.id
+                  AND p.nome = 'ADMINISTRADOR'
+              )
+            )
+          ORDER BY u.id ASC
+          LIMIT 1
+          `,
+          id
+        );
+
+        const adminPrincipalId = adminRows[0]?.id;
+        if (adminPrincipalId) {
+          await tx.$executeRawUnsafe(
+            `
+            UPDATE usuarios
+            SET email = $2,
+                atualizado_em = NOW()
+            WHERE id = $1
+            `,
+            adminPrincipalId,
+            input.email.trim().toLowerCase()
+          );
+        }
+      }
+    });
 
     return this.buscarPorId(id);
   }

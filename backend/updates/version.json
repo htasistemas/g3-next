@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.473",
+  "latestVersion": "1.00.474",
   "releaseDate": "2026-05-05",
-  "description": "Listagem de inscrições voltou a expor os lançamentos reais salvos por curso na instituição.",
+  "description": "Atualização de tenant passou a sincronizar o e-mail principal com o administrador para preservar o acesso ao login.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.473",
+  "minCompatibleVersion": "1.00.474",
   "releaseType": "stable"
 }
 

@@ -937,6 +937,7 @@ const secoesManual: ManualSecao[] = [
           "Use a tela Instituições SaaS para cadastrar cada cliente do G3N como um tenant separado, com CNPJ, slug, plano, status e contato principal.",
           "Na listagem, pesquise por razão social, nome fantasia, CNPJ, slug, código da instituição ou e-mail e clique na linha para abrir o tenant.",
           "Na aba Cadastro do tenant, revise os dados da instituição, plano contratado, identidade visual e status operacional antes de salvar.",
+          "Ao atualizar o e-mail principal de um tenant já existente na aba Cadastro do tenant, o sistema sincroniza esse endereço com o administrador inicial principal para preservar o acesso ao login da instituição.",
           "Ao preencher a razão social, o sistema gera automaticamente o slug e o código da instituição; se necessário, o usuário pode editar ambos manualmente antes do salvamento.",
           "Na criação de um novo tenant, a aba Administração inicial exige o administrador inicial com login, e-mail e senha para liberar o primeiro acesso.",
           "O administrador inicial criado nessa etapa já nasce com acesso administrativo efetivo no tenant, inclusive à tela de usuários e às permissões compatíveis com o perfil administrativo.",
