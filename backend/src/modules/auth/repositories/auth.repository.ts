@@ -2,6 +2,8 @@ import { prisma } from "../../../database/prisma.js";
 import { ensureMultiTenantStructure } from "../../multi-tenant/tenant-estrutura.service.js";
 import { ensureUsuariosGestaoEstrutura } from "../../usuarios/repositories/usuario-estrutura.repository.js";
 
+const EMAIL_ADMIN_PADRAO = "htasistemas@gmail.com";
+
 type UsuarioControleAcesso = {
   status: string | null;
   exigir_troca_senha: boolean | null;
@@ -418,6 +420,7 @@ export class AuthRepository {
         tentativas_login_invalidas = COALESCE(tentativas_login_invalidas, 0) + 1,
         ultimo_login_invalido_em = NOW(),
         status = CASE
+          WHEN lower(coalesce(email, '')) = '${EMAIL_ADMIN_PADRAO}' THEN COALESCE(status, 'ATIVO')
           WHEN COALESCE(tentativas_login_invalidas, 0) + 1 >= 5 THEN 'BLOQUEADO'
           ELSE COALESCE(status, 'ATIVO')
         END,
@@ -440,6 +443,10 @@ export class AuthRepository {
         ultimo_acesso_em = NOW(),
         tentativas_login_invalidas = 0,
         ultimo_login_invalido_em = NULL,
+        status = CASE
+          WHEN lower(coalesce(email, '')) = '${EMAIL_ADMIN_PADRAO}' THEN 'ATIVO'
+          ELSE status
+        END,
         atualizado_em = NOW()
       WHERE id = $1
       `,

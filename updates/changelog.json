@@ -1,6 +1,17 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.434",
+                        "releaseDate":  "2026-05-05",
+                        "title":  "Administrador master protegido contra bloqueio de acesso",
+                        "description":  "O usuário master htasistemas@gmail.com passou a ignorar bloqueio por status e por tentativas inválidas de acesso, preservando o acesso administrativo e de desenvolvimento.",
+                        "changes":  [
+                                        "O backend de autenticação passou a desconsiderar status bloqueado ou inativo para o usuário master na validação de login e perfil.",
+                                        "As falhas de login do usuário master deixam de convertê-lo para BLOQUEADO e o sucesso de login o normaliza para ATIVO.",
+                                        "O manual do sistema foi atualizado para registrar que o usuário master não deve ser bloqueado."
+                                    ]
+                    },
+                    {
                         "version":  "1.00.433",
                         "releaseDate":  "2026-05-05",
                         "title":  "Doações realizadas com impressão autenticada do recibo",

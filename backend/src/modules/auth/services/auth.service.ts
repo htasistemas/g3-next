@@ -14,6 +14,7 @@ import type { UsuarioAutenticado } from "../auth.types.js";
 import { EmailService } from "../../email/services/email.service.js";
 
 const googleClient = new OAuth2Client();
+const EMAIL_ADMIN_PADRAO = "htasistemas@gmail.com";
 
 export class AuthService {
   private readonly repository = new AuthRepository();
@@ -46,7 +47,7 @@ export class AuthService {
     }
 
     const controle = await this.repository.buscarControleAcessoPorUsuarioId(usuario.id);
-    this.validarAcessoUsuario(controle?.status, usuario.instituicaoStatus);
+    this.validarAcessoUsuario(controle?.status, usuario.instituicaoStatus, usuario.email);
 
     const senhaValida = await bcrypt.compare(input.senha, usuario.senhaHash);
     if (!senhaValida) {
@@ -131,7 +132,7 @@ export class AuthService {
     }
 
     const controle = await this.repository.buscarControleAcessoPorUsuarioId(usuario.id);
-    this.validarAcessoUsuario(controle?.status, usuario.instituicaoStatus);
+    this.validarAcessoUsuario(controle?.status, usuario.instituicaoStatus, usuario.email);
     await this.repository.registrarLoginSucesso(usuario.id);
     await this.repository.registrarEventoAcesso({
       tenant_id: usuario.tenantId ?? undefined,
@@ -162,7 +163,7 @@ export class AuthService {
     }
 
     const controle = await this.repository.buscarControleAcessoPorUsuarioId(usuario.id);
-    this.validarAcessoUsuario(controle?.status, usuario.instituicaoStatus);
+    this.validarAcessoUsuario(controle?.status, usuario.instituicaoStatus, usuario.email);
 
     return this.mapUsuarioAutenticado(usuario);
   }
@@ -256,13 +257,16 @@ export class AuthService {
     };
   }
 
-  private validarAcessoUsuario(status?: string | null, statusInstituicao?: string | null) {
+  private validarAcessoUsuario(status?: string | null, statusInstituicao?: string | null, email?: string | null) {
     const statusNormalizado = (status ?? "").trim().toUpperCase();
-    if (statusNormalizado === "INATIVO") {
+    const emailNormalizado = (email ?? "").trim().toLowerCase();
+    const ehEmailAdminPadrao = emailNormalizado === EMAIL_ADMIN_PADRAO;
+
+    if (statusNormalizado === "INATIVO" && !ehEmailAdminPadrao) {
       throw new AppError("Usuario inativo. Procure o administrador.", 403);
     }
 
-    if (statusNormalizado === "BLOQUEADO") {
+    if (statusNormalizado === "BLOQUEADO" && !ehEmailAdminPadrao) {
       throw new AppError("Usuario bloqueado. Procure o administrador.", 403);
     }
 

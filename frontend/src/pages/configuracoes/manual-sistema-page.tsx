@@ -893,7 +893,8 @@ const secoesManual: ManualSecao[] = [
         atencoes: [
           "A exclusão exige confirmação explícita porque a ação é irreversível na operação diária.",
           "O vínculo de origem importada ajuda a evitar duplicidade e deixa rastreável de onde o cadastro do usuário foi criado.",
-          "A tela Usuários e permissões agora mantém listagem, detalhe, busca de origem, auditoria e ações administrativas somente dentro do tenant autenticado."
+          "A tela Usuários e permissões agora mantém listagem, detalhe, busca de origem, auditoria e ações administrativas somente dentro do tenant autenticado.",
+          "O usuário master htasistemas@gmail.com é tratado como administrador superadmin e não deve ser bloqueado por status ou por tentativas inválidas de acesso."
         ]
       },
       {
