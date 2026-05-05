@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.440",
+  "latestVersion": "1.00.441",
   "releaseDate": "2026-05-05",
-  "description": "Atualização de tenant passou a sincronizar o e-mail principal com o administrador para preservar o acesso ao login.",
+  "description": "Notificações de WhatsApp e e-mail dos cards de agendamento passaram a ignorar falhas pontuais sem derrubar a ação.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.439",
+  "minCompatibleVersion": "1.00.441",
   "releaseType": "stable",
   "downloadUrl": null
 }

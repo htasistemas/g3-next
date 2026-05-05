@@ -1076,39 +1076,71 @@ export class AgendamentosRepository {
     };
 
     for (const beneficiario of beneficiarios) {
-      if (canal === "EMAIL") {
-        if (!trimOrUndefined(beneficiario.email)) {
+      try {
+        if (canal === "EMAIL") {
+          if (!trimOrUndefined(beneficiario.email)) {
+            resultado.ignorados += 1;
+            continue;
+          }
+
+          await this.emailService.enviarEmailSimples({
+            destinatario: String(beneficiario.email),
+            assunto: `Lembrete de agendamento - ${agendamento.item_nome ?? agendamento.tipo_atendimento}`,
+            mensagem: `Ola, ${beneficiario.beneficiario_nome}.\n\n${mensagemBase}\nLocal: ${agendamento.item_local ?? agendamento.sala ?? agendamento.unidade}.`
+          });
+          resultado.enviados += 1;
+          await prisma.$executeRaw(Prisma.sql`
+            INSERT INTO agendamento_envio (tenant_id, agendamento_id, beneficiario_id, canal, status, destinatario, mensagem)
+            VALUES (${tenantId}::uuid, ${id}, ${beneficiario.beneficiario_id}, 'EMAIL', 'ENVIADO', ${beneficiario.email}, ${mensagemBase})
+          `);
+          continue;
+        }
+
+        const telefone = String(beneficiario.telefone ?? "").replace(/\D/g, "");
+        if (!telefone) {
           resultado.ignorados += 1;
           continue;
         }
 
-        await this.emailService.enviarEmailSimples({
-          destinatario: String(beneficiario.email),
-          assunto: `Lembrete de agendamento - ${agendamento.item_nome ?? agendamento.tipo_atendimento}`,
-          mensagem: `Ola, ${beneficiario.beneficiario_nome}.\n\n${mensagemBase}\nLocal: ${agendamento.item_local ?? agendamento.sala ?? agendamento.unidade}.`
-        });
+        const texto = `${mensagemBase} Local: ${agendamento.item_local ?? agendamento.sala ?? agendamento.unidade}.`;
+        const link = `https://wa.me/55${telefone}?text=${encodeURIComponent(texto)}`;
+        resultado.links.push(link);
         resultado.enviados += 1;
         await prisma.$executeRaw(Prisma.sql`
           INSERT INTO agendamento_envio (tenant_id, agendamento_id, beneficiario_id, canal, status, destinatario, mensagem)
-          VALUES (${tenantId}::uuid, ${id}, ${beneficiario.beneficiario_id}, 'EMAIL', 'ENVIADO', ${beneficiario.email}, ${mensagemBase})
+          VALUES (${tenantId}::uuid, ${id}, ${beneficiario.beneficiario_id}, 'WHATSAPP', 'PREPARADO', ${telefone}, ${texto})
         `);
-        continue;
-      }
-
-      const telefone = String(beneficiario.telefone ?? "").replace(/\D/g, "");
-      if (!telefone) {
+      } catch (error) {
         resultado.ignorados += 1;
-        continue;
-      }
+        console.error("[agendamentos][notificar] falha ao preparar envio", {
+          agendamentoId: id.toString(),
+          tenantId,
+          canal,
+          beneficiarioId: beneficiario.beneficiario_id ? beneficiario.beneficiario_id.toString() : null,
+          destinatario: canal === "EMAIL" ? beneficiario.email : beneficiario.telefone,
+          error
+        });
 
-      const texto = `${mensagemBase} Local: ${agendamento.item_local ?? agendamento.sala ?? agendamento.unidade}.`;
-      const link = `https://wa.me/55${telefone}?text=${encodeURIComponent(texto)}`;
-      resultado.links.push(link);
-      resultado.enviados += 1;
-      await prisma.$executeRaw(Prisma.sql`
-        INSERT INTO agendamento_envio (tenant_id, agendamento_id, beneficiario_id, canal, status, destinatario, mensagem)
-        VALUES (${tenantId}::uuid, ${id}, ${beneficiario.beneficiario_id}, 'WHATSAPP', 'PREPARADO', ${telefone}, ${texto})
-      `);
+        const destinatarioFalho =
+          canal === "EMAIL"
+            ? trimOrUndefined(beneficiario.email)
+            : trimOrUndefined(String(beneficiario.telefone ?? "").replace(/\D/g, ""));
+
+        try {
+          await prisma.$executeRaw(Prisma.sql`
+            INSERT INTO agendamento_envio (tenant_id, agendamento_id, beneficiario_id, canal, status, destinatario, mensagem)
+            VALUES (${tenantId}::uuid, ${id}, ${beneficiario.beneficiario_id}, ${canal}, 'FALHA', ${destinatarioFalho}, ${mensagemBase})
+          `);
+        } catch (registroError) {
+          console.error("[agendamentos][notificar] falha ao registrar erro de envio", {
+            agendamentoId: id.toString(),
+            tenantId,
+            canal,
+            beneficiarioId: beneficiario.beneficiario_id ? beneficiario.beneficiario_id.toString() : null,
+            registroError
+          });
+        }
+      }
     }
 
     await this.registrarLog(id, "envio", usuario, tenantId, null, resultado);
