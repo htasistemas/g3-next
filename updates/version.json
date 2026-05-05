@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.436",
-  "releaseDate": "2026-04-18",
-  "description": "Espelho de ponto individual em PDF passou a destacar o colaborador e compactar a tabela para evitar quebras nos horários.",
+  "latestVersion": "1.00.437",
+  "releaseDate": "2026-05-05",
+  "description": "Impressão do termo de doação foi ajustada para funcionar com autenticação, tenant e logomarca institucional em bases legadas.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.436",
+  "minCompatibleVersion": "1.00.437",
   "releaseType": "stable",
   "downloadUrl": null
 }

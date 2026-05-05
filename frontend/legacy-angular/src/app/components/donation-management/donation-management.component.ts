@@ -1593,50 +1593,57 @@ export class DonationManagementComponent extends TelaBaseComponent implements On
     });
   }
 
-  imprimirTermoRecebimento(record: DonationRecord): void {
-    const html = this.buildTermoRecebimentoHtml(record);
+  async imprimirTermoRecebimento(record: DonationRecord): Promise<void> {
+    try {
+      const html = await this.buildTermoRecebimentoHtml(record);
 
-    const printWindow = window.open('', '_blank', 'width=900,height=700');
-    if (!printWindow) {
-      return;
-    }
-    printWindow.document.write(html);
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.onload = () => {
-      const imagens = Array.from(printWindow.document.images || []);
-      const acionar = () => {
-        printWindow.onafterprint = () => {
-          printWindow.close();
-        };
-        printWindow.print();
-        setTimeout(() => {
-          if (!printWindow.closed) {
+      const printWindow = window.open('', '_blank', 'width=900,height=700');
+      if (!printWindow) {
+        return;
+      }
+      printWindow.document.write(html);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.onload = () => {
+        const imagens = Array.from(printWindow.document.images || []);
+        const acionar = () => {
+          printWindow.onafterprint = () => {
             printWindow.close();
-          }
-        }, 1500);
-      };
-    if (!imagens.length) {
-      acionar();
-      return;
-    }
-      let carregadas = 0;
-      const concluir = () => {
-        carregadas += 1;
-        if (carregadas >= imagens.length) {
+          };
+          printWindow.print();
+          setTimeout(() => {
+            if (!printWindow.closed) {
+              printWindow.close();
+            }
+          }, 1500);
+        };
+        if (!imagens.length) {
           acionar();
+          return;
         }
+        let carregadas = 0;
+        const concluir = () => {
+          carregadas += 1;
+          if (carregadas >= imagens.length) {
+            acionar();
+          }
+        };
+        imagens.forEach((img) => {
+          if (img.complete) {
+            concluir();
+          } else {
+            img.addEventListener('load', concluir);
+            img.addEventListener('error', concluir);
+          }
+        });
       };
-      imagens.forEach((img) => {
-        if (img.complete) {
-          concluir();
-        } else {
-          img.addEventListener('load', concluir);
-          img.addEventListener('error', concluir);
-        }
-      });
-      };
+    } catch (error) {
+      console.error('Erro ao preparar termo de recebimento para impressão', error);
+      this.popupErros = new PopupErrorBuilder()
+        .adicionar('Não foi possível preparar o termo de recebimento para impressão.')
+        .build();
     }
+  }
 
   private abrirPdfEmNovaGuia(arquivo: Blob): void {
     const url = URL.createObjectURL(arquivo);
@@ -1717,9 +1724,11 @@ export class DonationManagementComponent extends TelaBaseComponent implements On
     });
   }
 
-  private buildTermoRecebimentoHtml(record: DonationRecord): string {
+  private async buildTermoRecebimentoHtml(record: DonationRecord): Promise<string> {
     const unidade = this.unidadeAtual;
-    const logo = unidade?.logomarcaRelatorio || unidade?.logomarca || '';
+    const logo = await this.normalizarLogomarcaParaImpressao(
+      unidade?.logomarcaRelatorio || unidade?.logomarca || ''
+    );
     const nomeFantasia = unidade?.nomeFantasia || 'Instituição';
     const razaoSocial = unidade?.razaoSocial || nomeFantasia;
     const cnpj = unidade?.cnpj || '';
@@ -1878,6 +1887,43 @@ export class DonationManagementComponent extends TelaBaseComponent implements On
         </body>
       </html>
     `;
+  }
+
+  private async normalizarLogomarcaParaImpressao(valor: string): Promise<string> {
+    const texto = (valor ?? '').toString().trim();
+
+    if (!texto) {
+      return '';
+    }
+
+    if (texto.startsWith('data:')) {
+      return texto;
+    }
+
+    if (!texto.startsWith('http://') && !texto.startsWith('https://')) {
+      return `data:image/png;base64,${texto}`;
+    }
+
+    const token = this.authService.token;
+    const resposta = await fetch(texto, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined
+    });
+
+    if (!resposta.ok) {
+      throw new Error(`Falha ao carregar logomarca para impressão (${resposta.status})`);
+    }
+
+    const blob = await resposta.blob();
+    return await this.blobParaDataUrl(blob);
+  }
+
+  private blobParaDataUrl(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = () => reject(reader.error ?? new Error('Falha ao converter blob para data URL.'));
+      reader.readAsDataURL(blob);
+    });
   }
 
   onFechar(): void {

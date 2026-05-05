@@ -55,10 +55,11 @@ export class ReportsRepository {
         e.cidade,
         e.estado AS uf,
         e.cep,
-        ua.logomarca_relatorio,
-        ua.logomarca
+        iu.logomarca_relatorio,
+        iu.logomarca
       FROM unidade_assistencial ua
       LEFT JOIN endereco e ON e.id = ua.endereco_id
+      LEFT JOIN imagens_unidade iu ON iu.unidade_id = ua.id
       ${filtroTenant}
       ORDER BY ua.unidade_principal DESC, ua.atualizado_em DESC, ua.criado_em ASC
       LIMIT 1

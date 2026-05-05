@@ -272,6 +272,20 @@ export class ReportsService {
     };
   }
 
+  private async renderizarPdfComFallback(
+    html: string,
+    rodape: { linha1: string; linha2?: string; linha3?: string },
+    layout: RelatorioHtmlInput,
+    contextoLog: string
+  ) {
+    try {
+      return await this.renderer.render(html, rodape, layout);
+    } catch (error) {
+      console.error(`[reports] falha ao renderizar PDF estruturado em ${contextoLog}`, error);
+      return this.renderer.render(html, rodape);
+    }
+  }
+
   private formatarSimNao(valor?: boolean | null): string | undefined {
     if (valor === true) return "Sim";
     if (valor === false) return "Não";
@@ -1014,7 +1028,7 @@ export class ReportsService {
       situacao: payload.situacao,
       data_inicial: payload.data_inicial,
       data_final: payload.data_final
-    });
+    }, authUser?.tenant_id);
 
     const listaOrdenada = [...doacoes].sort((a, b) => {
       const dataA = a.data_doacao || "";
@@ -1050,13 +1064,21 @@ export class ReportsService {
     };
 
     const html = this.template.montarHtml(relatorioInput);
-    const pdf = await this.renderer.render(html, contexto.rodape, relatorioInput);
+    const pdf = await this.renderizarPdfComFallback(
+      html,
+      contexto.rodape,
+      relatorioInput,
+      "relacao-doacoes-realizadas"
+    );
     return { html, pdf, filename: "relacao-doacoes-realizadas.pdf" };
   }
 
   async gerarReciboDoacaoRealizada(rawPayload: unknown, authUser?: AuthUser): Promise<RelatorioResultado> {
     const payload = doacaoRealizadaReciboRequestSchema.parse(rawPayload);
-    const doacao = await this.doacaoRealizadaService.buscarPorId(payload.doacaoRealizadaId);
+    const doacao = await this.doacaoRealizadaService.buscarPorId(
+      payload.doacaoRealizadaId,
+      authUser?.tenant_id
+    );
     const contexto = await this.montarContextoInstitucional(authUser?.tenant_id);
     const beneficiarioFamilia = doacao.beneficiario_nome || doacao.familia_nome || "---";
     const possuiBeneficiario = !!this.normalizarTexto(doacao.beneficiario_nome);
@@ -1124,7 +1146,12 @@ export class ReportsService {
     };
 
     const html = this.template.montarHtml(relatorioInput);
-    const pdf = await this.renderer.render(html, contexto.rodape, relatorioInput);
+    const pdf = await this.renderizarPdfComFallback(
+      html,
+      contexto.rodape,
+      relatorioInput,
+      "recibo-doacao-realizada"
+    );
     return { html, pdf, filename: `recibo-doacao-realizada-${doacao.id_doacao_realizada}.pdf` };
   }
 

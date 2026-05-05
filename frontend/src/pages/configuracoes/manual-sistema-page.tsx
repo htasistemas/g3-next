@@ -625,7 +625,7 @@ const secoesManual: ManualSecao[] = [
         objetivo: "Consultar o histórico de entregas e imprimir relatórios e recibos das doações realizadas a beneficiários e famílias.",
         comoUsar: [
           "Use a aba Histórico de doações para localizar as entregas já registradas e imprimir a relação completa pelo ícone da impressora da tela.",
-          "Quando precisar do comprovante individual, use o ícone da impressora na própria linha da doação para gerar o recibo da entrega.",
+          "Quando precisar do comprovante individual, use o ícone da impressora na própria linha da doação para abrir e imprimir o recibo da entrega em um clique, com a logomarca institucional carregada na própria visualização.",
           "A impressão reaproveita a mesma sessão autenticada do operador para gerar o PDF sem exigir novo login durante a consulta.",
           "A impressão da relação segue o padrão visual do G3N, com colunas ajustadas para leitura e melhor aproveitamento da página.",
           "No recibo individual da entrega, o cabeçalho usa a logomarca institucional configurada na unidade, a tabela de itens mantém o rótulo Quant para a quantidade e a seção de assinaturas exibe apenas o campo do recebedor."

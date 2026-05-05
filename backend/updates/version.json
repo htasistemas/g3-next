@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.470",
-  "releaseDate": "2026-04-27",
-  "description": "Relatórios institucionais principais e dashboards territoriais endurecidos por tenant.",
+  "latestVersion": "1.00.471",
+  "releaseDate": "2026-05-05",
+  "description": "Recibo e histórico de doações foram corrigidos para autenticação, tenant e logomarca institucional em bases legadas.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.470",
+  "minCompatibleVersion": "1.00.471",
   "releaseType": "stable"
 }
 
