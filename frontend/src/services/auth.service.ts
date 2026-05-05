@@ -14,6 +14,31 @@ type TenantContextResponse = {
   instituicao: TenantContextoLogin | null;
 };
 
+const STORAGE_KEY = "g3_session";
+
+function persistirSessao(token: string, usuario: UsuarioAutenticado) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.sessionStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify({
+      token,
+      user: usuario
+    })
+  );
+}
+
+function limparSessao() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.sessionStorage.removeItem(STORAGE_KEY);
+  window.localStorage.removeItem(STORAGE_KEY);
+}
+
 export const authService = {
   async login(input: {
     cnpj?: string;
@@ -31,6 +56,7 @@ export const authService = {
       nomeUsuario: input.nomeUsuario,
       senha: input.senha
     });
+    persistirSessao(data.token, data.usuario);
     return data.usuario;
   },
 
@@ -51,11 +77,16 @@ export const authService = {
       slug: input.slug,
       codigoInstituicao: input.codigoInstituicao
     });
+    persistirSessao(data.token, data.usuario);
     return data.usuario;
   },
 
   async logout(): Promise<void> {
-    await httpClient.post("/api/auth/logout");
+    try {
+      await httpClient.post("/api/auth/logout");
+    } finally {
+      limparSessao();
+    }
   },
 
   async esqueciSenha(input: {

@@ -1,6 +1,17 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.433",
+                        "releaseDate":  "2026-05-05",
+                        "title":  "Doações realizadas com impressão autenticada do recibo",
+                        "description":  "A aba Histórico de doações passou a reaproveitar corretamente a sessão autenticada ao gerar a relação e o recibo individual, evitando falha 401 no clique da impressora.",
+                        "changes":  [
+                                        "O cliente HTTP do React passou a enviar automaticamente o token Bearer salvo na sessão G3 como reforço à autenticação por cookie.",
+                                        "O login do frontend agora persiste a sessão autenticada no mesmo formato g3_session usado pelo legado, mantendo compatibilidade entre as telas da migração.",
+                                        "O manual do sistema foi atualizado na mesma entrega para refletir a impressão autenticada na tela Doações realizadas."
+                                    ]
+                    },
+                    {
                         "version":  "1.00.432",
                         "releaseDate":  "2026-04-09",
                         "title":  "Hardening de segurança em ambiente, autenticação e comunicação em tempo real",
