@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.471",
+  "latestVersion": "1.00.472",
   "releaseDate": "2026-05-05",
-  "description": "Recibo e histórico de doações foram corrigidos para autenticação, tenant e logomarca institucional em bases legadas.",
+  "description": "Histórico geral do beneficiário consolida dados reais com filtros e agenda futura por beneficiário.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.471",
+  "minCompatibleVersion": "1.00.472",
   "releaseType": "stable"
 }
 

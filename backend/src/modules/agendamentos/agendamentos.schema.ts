@@ -197,6 +197,7 @@ export const agendamentoFiltrosSchema = z.object({
   profissional: optionalTrimmedString.optional(),
   tipoAtendimento: optionalTrimmedString.optional(),
   beneficiario: optionalTrimmedString.optional(),
+  beneficiarioId: optionalTrimmedString.optional(),
   familia: optionalTrimmedString.optional(),
   status: optionalTrimmedString.optional(),
   periodoInicio: optionalIsoDate.optional(),

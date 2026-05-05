@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.437",
+  "latestVersion": "1.00.438",
   "releaseDate": "2026-05-05",
-  "description": "Impressão do termo de doação foi ajustada para funcionar com autenticação, tenant e logomarca institucional em bases legadas.",
+  "description": "Nova tela Histórico geral consolida dados do beneficiário com benefícios, atendimentos, atividades atuais e agenda futura.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.437",
+  "minCompatibleVersion": "1.00.438",
   "releaseType": "stable",
   "downloadUrl": null
 }

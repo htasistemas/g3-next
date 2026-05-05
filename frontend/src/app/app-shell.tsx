@@ -45,6 +45,7 @@ import {
   HandHeart,
   HandCoins,
   HeartHandshake,
+  History as HistoryIcon,
   ImageIcon,
   LibraryBig,
   Landmark,
@@ -217,6 +218,12 @@ export const menuSections: MenuSection[] = [
         to: "/atendimentos/central-atendimentos",
         label: "Central de Atendimentos",
         icon: HeartHandshake
+      },
+      {
+        id: "atendimentos-historico-geral",
+        to: "/atendimentos/historico-geral",
+        label: "Histórico geral",
+        icon: HistoryIcon
       },
       {
         id: "atendimentos-matriculas",

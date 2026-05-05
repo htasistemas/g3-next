@@ -137,6 +137,21 @@ const secoesManual: ManualSecao[] = [
         ]
       },
       {
+        nome: "Histórico geral",
+        objetivo: "Concentrar em uma única tela o histórico completo do beneficiário dentro da instituição.",
+        comoUsar: [
+          "No topo da tela, pesquise o beneficiário por nome, CPF, código ou família e selecione o registro desejado com um clique.",
+          "Depois de selecionar, acompanhe os dados cadastrais, os cards de resumo e as abas Visão geral, Benefícios, Atendimentos, Atividades atuais e Agendamentos futuros.",
+          "Use os filtros por período, tipo de benefício, status, responsável e tipo de atendimento para refinar a leitura sem duplicar informações já registradas no sistema.",
+          "O botão Imprimir ou salvar em PDF prepara a visão consolidada da tela atual para impressão ou geração de PDF pelo navegador."
+        ],
+        atencoes: [
+          "A tela reaproveita dados reais já lançados na Central de Atendimentos, em Doações realizadas, em Doações a realizar e em Agendamentos.",
+          "Quando não houver movimentações vinculadas ao beneficiário selecionado, o sistema exibe a mensagem Nenhum histórico encontrado para este beneficiário.",
+          "Os agendamentos futuros são filtrados pelo beneficiário real da agenda, incluindo cards coletivos onde ele esteja vinculado como participante."
+        ]
+      },
+      {
         nome: "Inscrições",
         objetivo: "Gerenciar inscrições em cursos, oficinas e atividades.",
         comoUsar: [

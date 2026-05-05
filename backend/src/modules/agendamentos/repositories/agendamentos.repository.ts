@@ -493,6 +493,21 @@ export class AgendamentosRepository {
     if (trimOrUndefined(filtros.profissional)) where.push(Prisma.sql`a.profissional_nome ILIKE ${`%${trimOrUndefined(filtros.profissional)}%`}`);
     if (trimOrUndefined(filtros.tipoAtendimento)) where.push(Prisma.sql`a.tipo_atendimento ILIKE ${`%${trimOrUndefined(filtros.tipoAtendimento)}%`}`);
     if (trimOrUndefined(filtros.beneficiario)) where.push(Prisma.sql`a.beneficiario_nome ILIKE ${`%${trimOrUndefined(filtros.beneficiario)}%`}`);
+    const beneficiarioId = Number(filtros.beneficiarioId);
+    if (Number.isInteger(beneficiarioId) && beneficiarioId > 0) {
+      where.push(Prisma.sql`
+        (
+          a.beneficiario_id = ${BigInt(beneficiarioId)}
+          OR EXISTS (
+            SELECT 1
+            FROM agendamento_beneficiario ab
+            WHERE ab.agendamento_id = a.id
+              AND ab.tenant_id::text = ${tenantId}
+              AND ab.beneficiario_id = ${BigInt(beneficiarioId)}
+          )
+        )
+      `);
+    }
     if (trimOrUndefined(filtros.familia)) where.push(Prisma.sql`COALESCE(a.familia_nome, '') ILIKE ${`%${trimOrUndefined(filtros.familia)}%`}`);
     if (trimOrUndefined(filtros.status)) where.push(Prisma.sql`a.status = ${trimOrUndefined(filtros.status)}`);
     if (trimOrUndefined(filtros.sala)) where.push(Prisma.sql`COALESCE(a.sala, '') ILIKE ${`%${trimOrUndefined(filtros.sala)}%`}`);

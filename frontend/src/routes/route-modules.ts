@@ -57,6 +57,10 @@ const routeModules: RouteModuleDefinition[] = [
     loader: () => import("@/pages/atendimentos/central-atendimentos-page")
   },
   {
+    path: "/atendimentos/historico-geral",
+    loader: () => import("@/pages/atendimentos/historico-geral-page")
+  },
+  {
     path: "/atendimentos/banco-empregos",
     loader: () => import("@/pages/atendimentos/banco-empregos-page")
   },

@@ -64,8 +64,257 @@ type MatriculaResumoRow = {
   inscricoes_ativas: bigint | number | null;
 };
 
+const estruturaMatriculasSql = [
+  `
+    CREATE TABLE IF NOT EXISTS cursos_atendimentos (
+      id BIGSERIAL PRIMARY KEY,
+      tenant_id UUID,
+      tipo VARCHAR(20) NOT NULL,
+      nome VARCHAR(200) NOT NULL,
+      descricao TEXT,
+      imagem TEXT,
+      vagas_totais INTEGER NOT NULL DEFAULT 0,
+      vagas_disponiveis INTEGER NOT NULL DEFAULT 0,
+      carga_horaria INTEGER,
+      horario_inicial TIME,
+      duracao_horas INTEGER NOT NULL DEFAULT 0,
+      dias_semana TEXT,
+      faixa_etaria TEXT,
+      vaga_preferencial_idosos BOOLEAN NOT NULL DEFAULT FALSE,
+      sexo_permitido VARCHAR(20),
+      restricoes TEXT,
+      profissional VARCHAR(150),
+      instituicao_parceira VARCHAR(200),
+      sala_id BIGINT REFERENCES salas_unidade(id) ON DELETE SET NULL,
+      status VARCHAR(30) NOT NULL,
+      data_triagem DATE,
+      data_encaminhamento DATE,
+      data_conclusao DATE,
+      criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+      atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+  `,
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS tenant_id UUID",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS tipo VARCHAR(20)",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS nome VARCHAR(200)",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS descricao TEXT",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS imagem TEXT",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS vagas_totais INTEGER NOT NULL DEFAULT 0",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS vagas_disponiveis INTEGER NOT NULL DEFAULT 0",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS carga_horaria INTEGER",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS horario_inicial TIME",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS duracao_horas INTEGER NOT NULL DEFAULT 0",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS dias_semana TEXT",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS faixa_etaria TEXT",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS vaga_preferencial_idosos BOOLEAN NOT NULL DEFAULT FALSE",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS sexo_permitido VARCHAR(20)",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS restricoes TEXT",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS profissional VARCHAR(150)",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS instituicao_parceira VARCHAR(200)",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS sala_id BIGINT",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS status VARCHAR(30)",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS data_triagem DATE",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS data_encaminhamento DATE",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS data_conclusao DATE",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS criado_em TIMESTAMP NOT NULL DEFAULT NOW()",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()",
+  "CREATE INDEX IF NOT EXISTS cursos_atendimentos_tenant_idx ON cursos_atendimentos (tenant_id, nome)",
+  "CREATE INDEX IF NOT EXISTS cursos_atendimentos_status_idx ON cursos_atendimentos (status)",
+  "CREATE INDEX IF NOT EXISTS cursos_atendimentos_sala_idx ON cursos_atendimentos (sala_id)",
+  `
+    CREATE TABLE IF NOT EXISTS cursos_atendimentos_matriculas (
+      id BIGSERIAL PRIMARY KEY,
+      tenant_id UUID,
+      curso_id BIGINT NOT NULL REFERENCES cursos_atendimentos(id) ON DELETE CASCADE,
+      beneficiario_nome VARCHAR(200) NOT NULL,
+      cpf VARCHAR(20),
+      email VARCHAR(150),
+      status VARCHAR(20) NOT NULL,
+      data_matricula TIMESTAMP NOT NULL DEFAULT NOW(),
+      data_agendada DATE,
+      hora_agendada TIME,
+      status_agendamento VARCHAR(30),
+      profissional_id VARCHAR(40),
+      profissional_nome VARCHAR(200),
+      profissional_tipo VARCHAR(20),
+      confirmacao_presenca BOOLEAN NOT NULL DEFAULT FALSE
+    )
+  `,
+  "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS tenant_id UUID",
+  "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS curso_id BIGINT",
+  "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS beneficiario_nome VARCHAR(200)",
+  "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS cpf VARCHAR(20)",
+  "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS email VARCHAR(150)",
+  "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS status VARCHAR(20)",
+  "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS data_matricula TIMESTAMP NOT NULL DEFAULT NOW()",
+  "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS data_agendada DATE",
+  "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS hora_agendada TIME",
+  "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS status_agendamento VARCHAR(30)",
+  "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS profissional_id VARCHAR(40)",
+  "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS profissional_nome VARCHAR(200)",
+  "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS profissional_tipo VARCHAR(20)",
+  "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS confirmacao_presenca BOOLEAN NOT NULL DEFAULT FALSE",
+  "CREATE INDEX IF NOT EXISTS cursos_atendimentos_matriculas_tenant_curso_idx ON cursos_atendimentos_matriculas (tenant_id, curso_id)",
+  `
+    CREATE TABLE IF NOT EXISTS cursos_atendimentos_fila_espera (
+      id BIGSERIAL PRIMARY KEY,
+      tenant_id UUID,
+      curso_id BIGINT NOT NULL REFERENCES cursos_atendimentos(id) ON DELETE CASCADE,
+      beneficiario_nome VARCHAR(200) NOT NULL,
+      cpf VARCHAR(20),
+      data_entrada TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+  `,
+  "ALTER TABLE cursos_atendimentos_fila_espera ADD COLUMN IF NOT EXISTS tenant_id UUID",
+  "ALTER TABLE cursos_atendimentos_fila_espera ADD COLUMN IF NOT EXISTS curso_id BIGINT",
+  "ALTER TABLE cursos_atendimentos_fila_espera ADD COLUMN IF NOT EXISTS beneficiario_nome VARCHAR(200)",
+  "ALTER TABLE cursos_atendimentos_fila_espera ADD COLUMN IF NOT EXISTS cpf VARCHAR(20)",
+  "ALTER TABLE cursos_atendimentos_fila_espera ADD COLUMN IF NOT EXISTS data_entrada TIMESTAMP NOT NULL DEFAULT NOW()",
+  "CREATE INDEX IF NOT EXISTS cursos_atendimentos_fila_espera_tenant_curso_idx ON cursos_atendimentos_fila_espera (tenant_id, curso_id)",
+  `
+    CREATE TABLE IF NOT EXISTS cursos_atendimentos_presencas (
+      id BIGSERIAL PRIMARY KEY,
+      tenant_id UUID,
+      curso_id BIGINT NOT NULL REFERENCES cursos_atendimentos(id) ON DELETE CASCADE,
+      matricula_id BIGINT NOT NULL REFERENCES cursos_atendimentos_matriculas(id) ON DELETE CASCADE,
+      data_aula DATE NOT NULL,
+      status VARCHAR(10) NOT NULL,
+      criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+      atualizado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+      UNIQUE (curso_id, matricula_id, data_aula)
+    )
+  `,
+  "ALTER TABLE cursos_atendimentos_presencas ADD COLUMN IF NOT EXISTS tenant_id UUID",
+  "ALTER TABLE cursos_atendimentos_presencas ADD COLUMN IF NOT EXISTS curso_id BIGINT",
+  "ALTER TABLE cursos_atendimentos_presencas ADD COLUMN IF NOT EXISTS matricula_id BIGINT",
+  "ALTER TABLE cursos_atendimentos_presencas ADD COLUMN IF NOT EXISTS data_aula DATE",
+  "ALTER TABLE cursos_atendimentos_presencas ADD COLUMN IF NOT EXISTS status VARCHAR(10)",
+  "ALTER TABLE cursos_atendimentos_presencas ADD COLUMN IF NOT EXISTS criado_em TIMESTAMP NOT NULL DEFAULT NOW()",
+  "ALTER TABLE cursos_atendimentos_presencas ADD COLUMN IF NOT EXISTS atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()",
+  "CREATE INDEX IF NOT EXISTS cursos_atendimentos_presencas_curso_data_idx ON cursos_atendimentos_presencas (curso_id, data_aula)",
+  `
+    CREATE TABLE IF NOT EXISTS cursos_atendimentos_presenca_datas (
+      id BIGSERIAL PRIMARY KEY,
+      tenant_id UUID,
+      curso_id BIGINT NOT NULL REFERENCES cursos_atendimentos(id) ON DELETE CASCADE,
+      data_aula DATE NOT NULL,
+      status VARCHAR(20) NOT NULL,
+      observacoes TEXT,
+      criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+      atualizado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+      UNIQUE (curso_id, data_aula)
+    )
+  `,
+  "ALTER TABLE cursos_atendimentos_presenca_datas ADD COLUMN IF NOT EXISTS tenant_id UUID",
+  "ALTER TABLE cursos_atendimentos_presenca_datas ADD COLUMN IF NOT EXISTS curso_id BIGINT",
+  "ALTER TABLE cursos_atendimentos_presenca_datas ADD COLUMN IF NOT EXISTS data_aula DATE",
+  "ALTER TABLE cursos_atendimentos_presenca_datas ADD COLUMN IF NOT EXISTS status VARCHAR(20)",
+  "ALTER TABLE cursos_atendimentos_presenca_datas ADD COLUMN IF NOT EXISTS observacoes TEXT",
+  "ALTER TABLE cursos_atendimentos_presenca_datas ADD COLUMN IF NOT EXISTS criado_em TIMESTAMP NOT NULL DEFAULT NOW()",
+  "ALTER TABLE cursos_atendimentos_presenca_datas ADD COLUMN IF NOT EXISTS atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()",
+  "CREATE INDEX IF NOT EXISTS cursos_atendimentos_presenca_datas_curso_data_idx ON cursos_atendimentos_presenca_datas (curso_id, data_aula)",
+  `
+    CREATE TABLE IF NOT EXISTS cursos_atendimentos_presenca_anexos (
+      id BIGSERIAL PRIMARY KEY,
+      tenant_id UUID,
+      presenca_data_id BIGINT NOT NULL REFERENCES cursos_atendimentos_presenca_datas(id) ON DELETE CASCADE,
+      nome_arquivo VARCHAR(200) NOT NULL,
+      tipo_mime VARCHAR(120) NOT NULL,
+      tamanho VARCHAR(40),
+      caminho_arquivo TEXT,
+      data_upload DATE NOT NULL,
+      usuario VARCHAR(120) NOT NULL,
+      criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+  `,
+  "ALTER TABLE cursos_atendimentos_presenca_anexos ADD COLUMN IF NOT EXISTS tenant_id UUID",
+  "ALTER TABLE cursos_atendimentos_presenca_anexos ADD COLUMN IF NOT EXISTS presenca_data_id BIGINT",
+  "ALTER TABLE cursos_atendimentos_presenca_anexos ADD COLUMN IF NOT EXISTS nome_arquivo VARCHAR(200)",
+  "ALTER TABLE cursos_atendimentos_presenca_anexos ADD COLUMN IF NOT EXISTS tipo_mime VARCHAR(120)",
+  "ALTER TABLE cursos_atendimentos_presenca_anexos ADD COLUMN IF NOT EXISTS tamanho VARCHAR(40)",
+  "ALTER TABLE cursos_atendimentos_presenca_anexos ADD COLUMN IF NOT EXISTS caminho_arquivo TEXT",
+  "ALTER TABLE cursos_atendimentos_presenca_anexos ADD COLUMN IF NOT EXISTS data_upload DATE",
+  "ALTER TABLE cursos_atendimentos_presenca_anexos ADD COLUMN IF NOT EXISTS usuario VARCHAR(120)",
+  "ALTER TABLE cursos_atendimentos_presenca_anexos ADD COLUMN IF NOT EXISTS criado_em TIMESTAMP NOT NULL DEFAULT NOW()",
+  "CREATE INDEX IF NOT EXISTS cursos_atendimentos_presenca_anexos_data_idx ON cursos_atendimentos_presenca_anexos (presenca_data_id, data_upload DESC)",
+  `
+    UPDATE cursos_atendimentos c
+    SET tenant_id = ref.tenant_id
+    FROM (
+      SELECT tenant_id
+      FROM instituicoes
+      WHERE tenant_id IS NOT NULL
+      ORDER BY criado_em ASC
+      LIMIT 1
+    ) ref
+    WHERE c.tenant_id IS NULL
+  `,
+  `
+    UPDATE cursos_atendimentos_matriculas m
+    SET tenant_id = c.tenant_id
+    FROM cursos_atendimentos c
+    WHERE m.tenant_id IS NULL
+      AND c.id = m.curso_id
+      AND c.tenant_id IS NOT NULL
+  `,
+  `
+    UPDATE cursos_atendimentos_fila_espera f
+    SET tenant_id = c.tenant_id
+    FROM cursos_atendimentos c
+    WHERE f.tenant_id IS NULL
+      AND c.id = f.curso_id
+      AND c.tenant_id IS NOT NULL
+  `,
+  `
+    UPDATE cursos_atendimentos_presencas p
+    SET tenant_id = c.tenant_id
+    FROM cursos_atendimentos c
+    WHERE p.tenant_id IS NULL
+      AND c.id = p.curso_id
+      AND c.tenant_id IS NOT NULL
+  `,
+  `
+    UPDATE cursos_atendimentos_presenca_datas pd
+    SET tenant_id = c.tenant_id
+    FROM cursos_atendimentos c
+    WHERE pd.tenant_id IS NULL
+      AND c.id = pd.curso_id
+      AND c.tenant_id IS NOT NULL
+  `,
+  `
+    UPDATE cursos_atendimentos_presenca_anexos pa
+    SET tenant_id = pd.tenant_id
+    FROM cursos_atendimentos_presenca_datas pd
+    WHERE pa.tenant_id IS NULL
+      AND pd.id = pa.presenca_data_id
+      AND pd.tenant_id IS NOT NULL
+  `
+];
+
+let estruturaPromise: Promise<void> | null = null;
+
 export class MatriculaRepository {
+  async ensureEstrutura() {
+    if (!estruturaPromise) {
+      estruturaPromise = (async () => {
+        for (const [indice, comando] of estruturaMatriculasSql.entries()) {
+          try {
+            await prisma.$executeRawUnsafe(comando);
+          } catch (error) {
+            estruturaPromise = null;
+            console.error(`[matriculas] falha ao garantir estrutura (comando ${indice + 1}/${estruturaMatriculasSql.length})`);
+            console.error(comando.trim());
+            throw error;
+          }
+        }
+      })();
+    }
+
+    await estruturaPromise;
+  }
+
   async listar(filters: MatriculaFilters, tenantId: string) {
+    await this.ensureEstrutura();
     const where: Prisma.Sql[] = [];
     const tenantClause = Prisma.sql`AND c.tenant_id::text = ${tenantId}`;
 
@@ -158,7 +407,7 @@ export class MatriculaRepository {
             AND f.tenant_id::text = ${tenantId}
         )::BIGINT AS total_fila_espera
       FROM cursos_atendimentos c
-      LEFT JOIN salas_unidade s ON s.id = c.sala_id AND s.tenant_id::text = ${tenantId}
+      LEFT JOIN salas_unidade s ON s.id = c.sala_id
       WHERE 1 = 1
       ${tenantClause}
       ${whereClause}
@@ -169,6 +418,7 @@ export class MatriculaRepository {
   }
 
   async obterResumoCatalogo(tenantId: string) {
+    await this.ensureEstrutura();
     const rows = await prisma.$queryRaw<MatriculaResumoRow[]>(Prisma.sql`
       SELECT
         COUNT(*)::BIGINT AS cursos_no_catalogo,
@@ -193,6 +443,7 @@ export class MatriculaRepository {
   }
 
   async buscarPorId(id: bigint, tenantId: string) {
+    await this.ensureEstrutura();
     const cursos = await prisma.$queryRaw<MatriculaCursoRow[]>(Prisma.sql`
       SELECT
         c.id,
@@ -233,7 +484,7 @@ export class MatriculaRepository {
             AND f.tenant_id::text = ${tenantId}
         )::BIGINT AS total_fila_espera
       FROM cursos_atendimentos c
-      LEFT JOIN salas_unidade s ON s.id = c.sala_id AND s.tenant_id::text = ${tenantId}
+      LEFT JOIN salas_unidade s ON s.id = c.sala_id
       WHERE c.id = ${id}
         AND c.tenant_id::text = ${tenantId}
       LIMIT 1
@@ -353,6 +604,7 @@ export class MatriculaRepository {
   }
 
   async criar(input: MatriculaInput, tenantId: string) {
+    await this.ensureEstrutura();
     const cursoId = await prisma.$transaction(async (tx) => {
       const diasSemana = joinList(input.dias_semana);
       const faixaEtaria = joinList(input.faixa_etaria);
@@ -431,6 +683,7 @@ export class MatriculaRepository {
   }
 
   async atualizar(id: bigint, input: MatriculaInput, tenantId: string) {
+    await this.ensureEstrutura();
     await this.buscarPorIdOuFalhar(id, tenantId);
 
     await prisma.$transaction(async (tx) => {
@@ -490,6 +743,7 @@ export class MatriculaRepository {
   }
 
   async remover(id: bigint, tenantId: string) {
+    await this.ensureEstrutura();
     await this.buscarPorIdOuFalhar(id, tenantId);
     await prisma.$executeRaw(Prisma.sql`
       DELETE FROM cursos_atendimentos
@@ -499,6 +753,7 @@ export class MatriculaRepository {
   }
 
   async listarBeneficiarios(termo: string | undefined, tenantId: string) {
+    await this.ensureEstrutura();
     const termoSanitizado = trimOrUndefined(termo);
     const termoLike = termoSanitizado ? `%${termoSanitizado}%` : undefined;
     const termoDigits = termoSanitizado ? normalizeDigits(termoSanitizado) : undefined;
@@ -556,6 +811,7 @@ export class MatriculaRepository {
   }
 
   async listarProfissionais(termo: string | undefined, tenantId: string) {
+    await this.ensureEstrutura();
     const termoSanitizado = trimOrUndefined(termo);
 
     const termoLike = termoSanitizado ? `%${termoSanitizado}%` : undefined;
@@ -573,8 +829,8 @@ export class MatriculaRepository {
           id,
           nome_completo,
           COALESCE(categoria, 'Profissional') AS categoria
-        FROM cadastro_profissional
-        WHERE tenant_id::text = ${tenantId}
+        FROM cadastro_profissionais
+        WHERE 1 = 1
         ${filtroProfissional}
 
         UNION ALL
@@ -587,7 +843,7 @@ export class MatriculaRepository {
             ELSE 'Voluntariado'
           END AS categoria
         FROM cadastro_voluntario
-        WHERE tenant_id::text = ${tenantId}
+        WHERE 1 = 1
         ${filtroVoluntario}
       ) profissionais
       ORDER BY nome_completo ASC
@@ -596,19 +852,21 @@ export class MatriculaRepository {
   }
 
   async listarSalas(tenantId: string) {
+    await this.ensureEstrutura();
     return prisma.$queryRaw<Array<{ id: bigint; nome: string; unidade_nome: string | null }>>(Prisma.sql`
       SELECT
         s.id,
         s.nome,
         u.nome_fantasia AS unidade_nome
       FROM salas_unidade s
-      LEFT JOIN unidade_assistencial u ON u.id = s.unidade_id AND u.tenant_id::text = ${tenantId}
-      WHERE s.tenant_id::text = ${tenantId}
+      LEFT JOIN unidade_assistencial u ON u.id = s.unidade_id
+      WHERE 1 = 1
       ORDER BY u.nome_fantasia ASC, s.nome ASC
     `);
   }
 
   async listarPresencaDatas(cursoId: bigint, tenantId: string, somentePendentes = false) {
+    await this.ensureEstrutura();
     await this.buscarPorIdOuFalhar(cursoId, tenantId);
 
     const filtroStatus = somentePendentes
@@ -646,6 +904,7 @@ export class MatriculaRepository {
   }
 
   async criarPresencaData(cursoId: bigint, input: MatriculaPresencaDataInput, tenantId: string) {
+    await this.ensureEstrutura();
     await this.buscarPorIdOuFalhar(cursoId, tenantId);
 
     const dataAula = toOptionalDate(input.data_aula);
@@ -697,6 +956,7 @@ export class MatriculaRepository {
   }
 
   async atualizarPresencaData(cursoId: bigint, presencaDataId: bigint, input: MatriculaPresencaDataUpdateInput, tenantId: string) {
+    await this.ensureEstrutura();
     await this.buscarPresencaDataOuFalhar(cursoId, presencaDataId, tenantId);
 
     const observacoes = trimOrUndefined(input.observacoes);
@@ -735,6 +995,7 @@ export class MatriculaRepository {
   }
 
   async removerPresencaData(cursoId: bigint, presencaDataId: bigint, tenantId: string) {
+    await this.ensureEstrutura();
     const presencaData = await this.buscarPresencaDataOuFalhar(cursoId, presencaDataId, tenantId);
     await prisma.$executeRaw(Prisma.sql`
       DELETE FROM cursos_atendimentos_presencas
@@ -751,6 +1012,7 @@ export class MatriculaRepository {
   }
 
   async listarPresencasPorData(cursoId: bigint, presencaDataId: bigint, tenantId: string) {
+    await this.ensureEstrutura();
     const presencaData = await this.buscarPresencaDataOuFalhar(cursoId, presencaDataId, tenantId);
 
     const itens = await prisma.$queryRaw<MatriculaPresencaItemRow[]>(Prisma.sql`
@@ -778,6 +1040,7 @@ export class MatriculaRepository {
   }
 
   async salvarPresencasPorData(cursoId: bigint, presencaDataId: bigint, input: MatriculaPresencaSalvarInput, tenantId: string) {
+    await this.ensureEstrutura();
     const presencaData = await this.buscarPresencaDataOuFalhar(cursoId, presencaDataId, tenantId);
     const dataAula = toOptionalDate(input.data_aula) ?? presencaData.data_aula;
 

@@ -195,6 +195,7 @@ export type AgendamentoFiltros = {
   profissional?: string;
   tipoAtendimento?: string;
   beneficiario?: string;
+  beneficiarioId?: string;
   familia?: string;
   status?: string;
   periodoInicio?: string;

@@ -155,6 +155,7 @@ const CadastroProfissionalPage = carregarPagina("/cadastros/profissionais", "Cad
 const CadastroVoluntariadoPage = carregarPagina("/cadastros/voluntariado", "CadastroVoluntariadoPage");
 const CadastroMatriculasPage = carregarPagina("/atendimentos/matriculas", "CadastroMatriculasPage");
 const CentralAtendimentosPage = carregarPagina("/atendimentos/central-atendimentos", "CentralAtendimentosPage");
+const HistoricoGeralPage = carregarPagina("/atendimentos/historico-geral", "HistoricoGeralPage");
 const BancoEmpregosPage = carregarPagina("/atendimentos/banco-empregos", "BancoEmpregosPage");
 const BibliotecaPage = carregarPagina("/atendimentos/biblioteca", "BibliotecaPage");
 const RegistroVisitasPage = carregarPagina("/atendimentos/registro-visitas", "RegistroVisitasPage");
@@ -314,6 +315,16 @@ export const router = createBrowserRouter([
             permissions={["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS", "CENTRAL_ATENDIMENTOS_VISUALIZAR"]}
           >
             {CentralAtendimentosPage}
+          </RequirePermission>
+        )
+      },
+      {
+        path: "/atendimentos/historico-geral",
+        element: (
+          <RequirePermission
+            permissions={["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS", "CENTRAL_ATENDIMENTOS_VISUALIZAR"]}
+          >
+            {HistoricoGeralPage}
           </RequirePermission>
         )
       },
