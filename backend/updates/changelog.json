@@ -1,6 +1,18 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.480",
+                        "releaseDate":  "2026-05-06",
+                        "title":  "Agendamento operacional com fallback por participantes antigos",
+                        "description":  "A agenda operacional passou a recuperar telefone e e-mail diretamente do JSON de participantes quando o card antigo nao tiver registros completos em agendamento_beneficiario, mantendo exibicao e WhatsApp funcionais.",
+                        "changes":  [
+                                        "A hidratação dos cards passou a consultar contatos do cadastro do beneficiario tambem a partir do proprio JSON participantes do agendamento.",
+                                        "O envio de WhatsApp e e-mail passou a usar o mesmo fallback quando a agenda antiga nao tiver linhas auxiliares suficientes para montar os destinatarios.",
+                                        "Manual do sistema e versao oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.479",
                         "releaseDate":  "2026-05-06",
                         "title":  "Agendamento operacional com fallback completo de telefone",

@@ -408,6 +408,63 @@ export class AgendamentosRepository {
     `);
   }
 
+  private async listarContatosPorParticipantes(
+    participantes: Array<{ beneficiarioId?: number | null; beneficiarioNome?: string | null }>,
+    tenantId: string
+  ) {
+    const ids = Array.from(
+      new Set(
+        participantes
+          .map((participante) => participante.beneficiarioId)
+          .filter((valor): valor is number => Number.isInteger(valor) && Number(valor) > 0)
+      )
+    );
+    const nomes = Array.from(
+      new Set(
+        participantes
+          .map((participante) => normalizarTextoComparacao(participante.beneficiarioNome))
+          .filter(Boolean)
+      )
+    );
+
+    if (!ids.length && !nomes.length) {
+      return [];
+    }
+
+    const filtros: Prisma.Sql[] = [];
+    if (ids.length) {
+      filtros.push(Prisma.sql`b.id IN (${Prisma.join(ids.map((id) => BigInt(id)))})`);
+    }
+    if (nomes.length) {
+      filtros.push(Prisma.sql`
+        LOWER(
+          TRANSLATE(
+            REGEXP_REPLACE(TRIM(COALESCE(b.nome_completo, '')), '\s+', ' ', 'g'),
+            'ÁÀÃÂÄáàãâäÉÈÊËéèêëÍÌÎÏíìîïÓÒÕÔÖóòõôöÚÙÛÜúùûüÇçÑñ',
+            'AAAAAaaaaaEEEEeeeeIIIIiiiiOOOOOoooooUUUUuuuuCcNn'
+          )
+        ) IN (${Prisma.join(nomes)})
+      `);
+    }
+
+    return prisma.$queryRaw<Array<{ beneficiario_id: bigint; beneficiario_nome: string; telefone: string | null; email: string | null }>>(Prisma.sql`
+      SELECT
+        b.id AS beneficiario_id,
+        b.nome_completo AS beneficiario_nome,
+        COALESCE(
+          NULLIF(TRIM(c.telefone_principal), ''),
+          NULLIF(TRIM(c.telefone_secundario), ''),
+          NULLIF(TRIM(c.telefone_recado_numero), '')
+        ) AS telefone,
+        NULLIF(TRIM(c.email), '') AS email
+      FROM cadastro_beneficiario b
+      LEFT JOIN contato_beneficiario c ON c.beneficiario_id = b.id AND c.tenant_id::text = ${tenantId}
+      WHERE b.tenant_id::text = ${tenantId}
+        AND (${Prisma.join(filtros, " OR ")})
+      ORDER BY b.id DESC
+    `);
+  }
+
   private async hidratarParticipantesAgendamentos(rows: AgendamentoRow[], tenantId: string) {
     if (!rows.length) {
       return rows;
@@ -427,6 +484,32 @@ export class AgendamentosRepository {
       } else {
         contatosPorAgendamento.set(chave, [contato]);
       }
+    }
+
+    const contatosFallback = await this.listarContatosPorParticipantes(
+      rows.flatMap((row) =>
+        Array.isArray(row.participantes)
+          ? (row.participantes as Array<Record<string, unknown>>).map((participante) => ({
+              beneficiarioId:
+                typeof participante.beneficiarioId === "number" && Number.isInteger(participante.beneficiarioId)
+                  ? participante.beneficiarioId
+                  : null,
+              beneficiarioNome:
+                typeof participante.beneficiarioNome === "string" ? participante.beneficiarioNome : null
+            }))
+          : []
+      ),
+      tenantId
+    );
+    const contatosFallbackPorChave = new Map<
+      string,
+      { beneficiario_id: bigint; beneficiario_nome: string; telefone: string | null; email: string | null }
+    >();
+    for (const contato of contatosFallback) {
+      contatosFallbackPorChave.set(
+        this.chaveParticipante(contato.beneficiario_nome, contato.beneficiario_id),
+        contato
+      );
     }
 
     return rows.map((row) => {
@@ -452,7 +535,9 @@ export class AgendamentosRepository {
                   ? BigInt(participante.beneficiarioId)
                   : null;
               const nome = typeof participante.beneficiarioNome === "string" ? participante.beneficiarioNome : "";
-              const contato = contatosPorChave.get(this.chaveParticipante(nome, beneficiarioId));
+              const chaveParticipante = this.chaveParticipante(nome, beneficiarioId);
+              const contato =
+                contatosPorChave.get(chaveParticipante) ?? contatosFallbackPorChave.get(chaveParticipante);
 
               return {
                 ...participante,
@@ -476,7 +561,10 @@ export class AgendamentosRepository {
 
       const contatoPrincipal =
         contatosDoAgendamento.find((contato) => contato.beneficiario_id && row.beneficiario_id && contato.beneficiario_id === row.beneficiario_id) ??
-        contatosDoAgendamento[0];
+        contatosDoAgendamento[0] ??
+        (row.beneficiario_id
+          ? contatosFallbackPorChave.get(this.chaveParticipante(row.beneficiario_nome, row.beneficiario_id))
+          : contatosFallbackPorChave.get(this.chaveParticipante(row.beneficiario_nome, null)));
 
       return {
         ...row,
@@ -1246,7 +1334,73 @@ export class AgendamentosRepository {
     const agendamento = await this.obter(id, tenantId);
     if (!agendamento) throw new AppError("Agendamento nao encontrado.", 404);
 
-    const beneficiarios = await this.listarBeneficiariosAgendamentoComContato([id], tenantId);
+    const beneficiariosTabela = await this.listarBeneficiariosAgendamentoComContato([id], tenantId);
+    const participantesAgendamento = Array.isArray(agendamento.participantes)
+      ? (agendamento.participantes as Array<Record<string, unknown>>)
+      : [];
+    const fallbackParticipantes =
+      !beneficiariosTabela.length && participantesAgendamento.length
+        ? await this.listarContatosPorParticipantes(
+            participantesAgendamento.map((participante) => ({
+              beneficiarioId:
+                typeof participante.beneficiarioId === "number" && Number.isInteger(participante.beneficiarioId)
+                  ? participante.beneficiarioId
+                  : null,
+              beneficiarioNome:
+                typeof participante.beneficiarioNome === "string" ? participante.beneficiarioNome : null
+            })),
+            tenantId
+          )
+        : [];
+
+    const fallbackPorChave = new Map<string, { telefone: string | null; email: string | null }>();
+    for (const contato of fallbackParticipantes) {
+      fallbackPorChave.set(
+        this.chaveParticipante(contato.beneficiario_nome, contato.beneficiario_id),
+        { telefone: contato.telefone, email: contato.email }
+      );
+    }
+
+    const beneficiarios = beneficiariosTabela.length
+      ? beneficiariosTabela.map((beneficiario) => {
+          const chave = this.chaveParticipante(beneficiario.beneficiario_nome, beneficiario.beneficiario_id);
+          const fallback = fallbackPorChave.get(chave);
+          return {
+            ...beneficiario,
+            telefone: beneficiario.telefone ?? fallback?.telefone ?? null,
+            email: beneficiario.email ?? fallback?.email ?? null
+          };
+        })
+      : participantesAgendamento.map((participante, index) => {
+          const beneficiarioId =
+            typeof participante.beneficiarioId === "number" && Number.isInteger(participante.beneficiarioId)
+              ? BigInt(participante.beneficiarioId)
+              : null;
+          const beneficiarioNome =
+            typeof participante.beneficiarioNome === "string" && participante.beneficiarioNome.trim().length
+              ? participante.beneficiarioNome
+              : `Participante ${index + 1}`;
+          const chave = this.chaveParticipante(beneficiarioNome, beneficiarioId);
+          const fallback = fallbackPorChave.get(chave);
+          return {
+            id: BigInt(index + 1),
+            agendamento_id: id,
+            beneficiario_id: beneficiarioId,
+            beneficiario_nome: beneficiarioNome,
+            telefone:
+              (typeof participante.telefone === "string" && participante.telefone.trim().length
+                ? participante.telefone
+                : fallback?.telefone) ?? null,
+            email:
+              (typeof participante.email === "string" && participante.email.trim().length
+                ? participante.email
+                : fallback?.email) ?? null,
+            status: "Agendado",
+            criado_em: new Date(),
+            atualizado_em: new Date()
+          };
+        });
+
     if (!beneficiarios.length) {
       throw new AppError("Este agendamento nao possui beneficiarios vinculados.", 400);
     }

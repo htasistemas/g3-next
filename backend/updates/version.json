@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.479",
+  "latestVersion": "1.00.480",
   "releaseDate": "2026-05-06",
-  "description": "Agendamentos operacionais passaram a aceitar telefone principal, secundario ou de recado e o envio de WhatsApp foi corrigido para montar data e horario sem erro interno.",
+  "description": "Agendamentos operacionais passaram a hidratar contatos tambem a partir do JSON de participantes em agendas antigas, preservando telefone e evitando falha no WhatsApp.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.479",
+  "minCompatibleVersion": "1.00.480",
   "releaseType": "stable"
 }
 
