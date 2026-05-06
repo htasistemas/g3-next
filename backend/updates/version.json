@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.478",
+  "latestVersion": "1.00.479",
   "releaseDate": "2026-05-06",
-  "description": "Agendamentos operacionais passaram a recarregar telefone e e-mail reais do beneficiario para exibir contatos corretos e evitar erro interno ao usar WhatsApp ou e-mail nos cards.",
+  "description": "Agendamentos operacionais passaram a aceitar telefone principal, secundario ou de recado e o envio de WhatsApp foi corrigido para montar data e horario sem erro interno.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.478",
+  "minCompatibleVersion": "1.00.479",
   "releaseType": "stable"
 }
 

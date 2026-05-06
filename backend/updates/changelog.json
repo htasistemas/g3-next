@@ -1,6 +1,18 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.479",
+                        "releaseDate":  "2026-05-06",
+                        "title":  "Agendamento operacional com fallback completo de telefone",
+                        "description":  "Os cards da agenda operacional passaram a aceitar telefone principal, secundario ou de recado do beneficiario, e o envio de WhatsApp deixou de falhar por montagem invalida de data e horario.",
+                        "changes":  [
+                                        "A resolucao de contato da agenda operacional passou a comparar nomes de forma normalizada e a reaproveitar telefone principal, secundario ou de recado do cadastro do beneficiario.",
+                                        "A preparacao das mensagens do WhatsApp passou a formatar data e hora a partir dos tipos reais retornados pelo banco, eliminando o erro interno reproduzido no clique do card.",
+                                        "Manual do sistema e versao oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.478",
                         "releaseDate":  "2026-05-06",
                         "title":  "Agendamento operacional com contatos reais do beneficiario",

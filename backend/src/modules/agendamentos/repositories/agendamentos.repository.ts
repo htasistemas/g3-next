@@ -202,6 +202,57 @@ function serializarJson(value: unknown) {
   );
 }
 
+function normalizarTextoComparacao(valor?: string | null) {
+  return String(valor ?? "")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function formatarDataMensagem(value?: Date | string | null) {
+  if (!value) return "";
+  if (value instanceof Date) {
+    return new Intl.DateTimeFormat("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      timeZone: "UTC"
+    }).format(value);
+  }
+
+  const texto = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(texto)) {
+    const [ano, mes, dia] = texto.split("-");
+    return `${dia}/${mes}/${ano}`;
+  }
+
+  const data = new Date(texto);
+  if (Number.isNaN(data.getTime())) {
+    return texto;
+  }
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  }).format(data);
+}
+
+function formatarHoraMensagem(value?: Date | string | null) {
+  if (!value) return "";
+  if (value instanceof Date) {
+    const horas = String(value.getUTCHours()).padStart(2, "0");
+    const minutos = String(value.getUTCMinutes()).padStart(2, "0");
+    return `${horas}:${minutos}`;
+  }
+
+  const texto = String(value);
+  const match = texto.match(/(\d{2}):(\d{2})/);
+  return match ? `${match[1]}:${match[2]}` : texto;
+}
+
 type UsuarioActor = { id?: string; nome?: string; nomeUsuario?: string };
 
 export async function ensureAgendamentosEstrutura() {
@@ -294,7 +345,7 @@ export class AgendamentosRepository {
     if (beneficiarioId) {
       return `id:${beneficiarioId.toString()}`;
     }
-    return `nome:${String(nome ?? "").trim().toLowerCase()}`;
+    return `nome:${normalizarTextoComparacao(nome)}`;
   }
 
   private async listarBeneficiariosAgendamentoComContato(agendamentoIds: bigint[], tenantId: string) {
@@ -311,7 +362,8 @@ export class AgendamentosRepository {
         COALESCE(
           NULLIF(TRIM(ab.telefone), ''),
           NULLIF(TRIM(contato.telefone_principal), ''),
-          NULLIF(TRIM(contato.telefone_secundario), '')
+          NULLIF(TRIM(contato.telefone_secundario), ''),
+          NULLIF(TRIM(contato.telefone_recado_numero), '')
         ) AS telefone,
         COALESCE(NULLIF(TRIM(ab.email), ''), NULLIF(TRIM(contato.email), '')) AS email,
         ab.status,
@@ -323,6 +375,7 @@ export class AgendamentosRepository {
           b.id AS beneficiario_id,
           c.telefone_principal,
           c.telefone_secundario,
+          c.telefone_recado_numero,
           c.email
         FROM cadastro_beneficiario b
         LEFT JOIN contato_beneficiario c ON c.beneficiario_id = b.id AND c.tenant_id::text = ${tenantId}
@@ -331,7 +384,19 @@ export class AgendamentosRepository {
             (ab.beneficiario_id IS NOT NULL AND b.id = ab.beneficiario_id)
             OR (
               ab.beneficiario_id IS NULL
-              AND LOWER(TRIM(COALESCE(b.nome_completo, ''))) = LOWER(TRIM(COALESCE(ab.beneficiario_nome, '')))
+              AND LOWER(
+                TRANSLATE(
+                  REGEXP_REPLACE(TRIM(COALESCE(b.nome_completo, '')), '\s+', ' ', 'g'),
+                  'ÁÀÃÂÄáàãâäÉÈÊËéèêëÍÌÎÏíìîïÓÒÕÔÖóòõôöÚÙÛÜúùûüÇçÑñ',
+                  'AAAAAaaaaaEEEEeeeeIIIIiiiiOOOOOoooooUUUUuuuuCcNn'
+                )
+              ) = LOWER(
+                TRANSLATE(
+                  REGEXP_REPLACE(TRIM(COALESCE(ab.beneficiario_nome, '')), '\s+', ' ', 'g'),
+                  'ÁÀÃÂÄáàãâäÉÈÊËéèêëÍÌÎÏíìîïÓÒÕÔÖóòõôöÚÙÛÜúùûüÇçÑñ',
+                  'AAAAAaaaaaEEEEeeeeIIIIiiiiOOOOOoooooUUUUuuuuCcNn'
+                )
+              )
             )
           )
         ORDER BY c.id DESC NULLS LAST, b.id DESC
@@ -484,7 +549,7 @@ export class AgendamentosRepository {
         m.id AS matricula_id,
         contato.beneficiario_id,
         m.beneficiario_nome,
-        contato.telefone_principal AS telefone,
+        contato.telefone AS telefone,
         COALESCE(NULLIF(TRIM(m.email), ''), contato.email) AS email,
         m.status,
         m.cpf,
@@ -494,7 +559,11 @@ export class AgendamentosRepository {
       LEFT JOIN LATERAL (
         SELECT
           b.id AS beneficiario_id,
-          c2.telefone_principal,
+          COALESCE(
+            NULLIF(TRIM(c2.telefone_principal), ''),
+            NULLIF(TRIM(c2.telefone_secundario), ''),
+            NULLIF(TRIM(c2.telefone_recado_numero), '')
+          ) AS telefone,
           c2.email
         FROM cadastro_beneficiario b
         LEFT JOIN contato_beneficiario c2 ON c2.beneficiario_id = b.id AND c2.tenant_id::text = ${tenantId}
@@ -519,7 +588,19 @@ export class AgendamentosRepository {
             )
             OR (
               REGEXP_REPLACE(COALESCE(m.cpf, ''), '\D', '', 'g') = ''
-              AND LOWER(TRIM(COALESCE(b.nome_completo, ''))) = LOWER(TRIM(COALESCE(m.beneficiario_nome, '')))
+              AND LOWER(
+                TRANSLATE(
+                  REGEXP_REPLACE(TRIM(COALESCE(b.nome_completo, '')), '\s+', ' ', 'g'),
+                  'ÁÀÃÂÄáàãâäÉÈÊËéèêëÍÌÎÏíìîïÓÒÕÔÖóòõôöÚÙÛÜúùûüÇçÑñ',
+                  'AAAAAaaaaaEEEEeeeeIIIIiiiiOOOOOoooooUUUUuuuuCcNn'
+                )
+              ) = LOWER(
+                TRANSLATE(
+                  REGEXP_REPLACE(TRIM(COALESCE(m.beneficiario_nome, '')), '\s+', ' ', 'g'),
+                  'ÁÀÃÂÄáàãâäÉÈÊËéèêëÍÌÎÏíìîïÓÒÕÔÖóòõôöÚÙÛÜúùûüÇçÑñ',
+                  'AAAAAaaaaaEEEEeeeeIIIIiiiiOOOOOoooooUUUUuuuuCcNn'
+                )
+              )
             )
           )
         ORDER BY c2.id DESC NULLS LAST, b.id DESC
@@ -1170,13 +1251,9 @@ export class AgendamentosRepository {
       throw new AppError("Este agendamento nao possui beneficiarios vinculados.", 400);
     }
 
-    const dataAgendamento = String(agendamento.data_agendamento).slice(0, 10);
-    const dataMensagem = new Intl.DateTimeFormat("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric"
-    }).format(new Date(`${dataAgendamento}T12:00:00`));
-    const mensagemBase = `Lembrete: ${agendamento.item_nome ?? agendamento.tipo_atendimento} em ${dataMensagem} às ${String(agendamento.hora_inicial).slice(0, 5)}.`;
+    const dataMensagem = formatarDataMensagem(agendamento.data_agendamento);
+    const horaMensagem = formatarHoraMensagem(agendamento.hora_inicial);
+    const mensagemBase = `Lembrete: ${agendamento.item_nome ?? agendamento.tipo_atendimento} em ${dataMensagem} as ${horaMensagem}.`;
     const resultado = {
       canal,
       enviados: 0,
