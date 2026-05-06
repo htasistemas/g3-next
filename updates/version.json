@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.442",
+  "latestVersion": "1.00.443",
   "releaseDate": "2026-05-05",
-  "description": "Cadastro de tenant com administração inicial passou a preparar a estrutura de usuários antes de salvar, evitando erro interno.",
+  "description": "Cadastro inicial de tenant passou a tratar login e e-mail do administrador com unicidade por tenant, evitando erro interno.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.442",
+  "minCompatibleVersion": "1.00.443",
   "releaseType": "stable",
   "downloadUrl": null
 }
