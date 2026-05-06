@@ -253,6 +253,28 @@ function formatarHoraMensagem(value?: Date | string | null) {
   return match ? `${match[1]}:${match[2]}` : texto;
 }
 
+function extrairTelefoneContato(contato?: {
+  telefone?: string | null;
+  telefone_principal?: string | null;
+} | null) {
+  if (!contato) return undefined;
+  if (typeof contato.telefone_principal === "string" && contato.telefone_principal.trim().length) {
+    return contato.telefone_principal;
+  }
+  if (typeof contato.telefone === "string" && contato.telefone.trim().length) {
+    return contato.telefone;
+  }
+  return undefined;
+}
+
+function extrairEmailContato(contato?: { email?: string | null } | null) {
+  if (!contato) return undefined;
+  if (typeof contato.email === "string" && contato.email.trim().length) {
+    return contato.email;
+  }
+  return undefined;
+}
+
 type UsuarioActor = { id?: string; nome?: string; nomeUsuario?: string };
 
 export async function ensureAgendamentosEstrutura() {
@@ -642,25 +664,27 @@ export class AgendamentosRepository {
                 contatoMatricula ??
                 contatosPorChave.get(chaveParticipante) ??
                 contatosFallbackPorChave.get(chaveParticipante);
+              const telefoneContato = extrairTelefoneContato(contato);
+              const emailContato = extrairEmailContato(contato);
+              const telefoneParticipante =
+                typeof participante.telefone === "string" && participante.telefone.trim().length
+                  ? participante.telefone
+                  : undefined;
+              const emailParticipante =
+                typeof participante.email === "string" && participante.email.trim().length
+                  ? participante.email
+                  : undefined;
 
               return {
                 ...participante,
                 telefone:
                   typeof contatoMatricula?.telefone_principal === "string" && contatoMatricula.telefone_principal.trim().length
                     ? contatoMatricula.telefone_principal
-                    : typeof contato?.telefone === "string" && contato.telefone.trim().length
-                      ? contato.telefone
-                      : typeof participante.telefone === "string" && participante.telefone.trim().length
-                        ? participante.telefone
-                        : undefined,
+                    : telefoneContato ?? telefoneParticipante,
                 email:
                   typeof contatoMatricula?.email === "string" && contatoMatricula.email.trim().length
                     ? contatoMatricula.email
-                    : typeof contato?.email === "string" && contato.email.trim().length
-                      ? contato.email
-                      : typeof participante.email === "string" && participante.email.trim().length
-                        ? participante.email
-                        : undefined
+                    : emailContato ?? emailParticipante
               };
             })
           : contatosDoAgendamento.map((contato) => ({
