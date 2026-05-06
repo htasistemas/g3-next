@@ -275,6 +275,28 @@ function extrairEmailContato(contato?: { email?: string | null } | null) {
   return undefined;
 }
 
+function lerInteiroParticipante(value: unknown) {
+  if (typeof value === "number" && Number.isInteger(value) && value > 0) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const normalizado = value.trim();
+    if (/^\d+$/.test(normalizado)) {
+      const parsed = Number(normalizado);
+      if (Number.isInteger(parsed) && parsed > 0) {
+        return parsed;
+      }
+    }
+  }
+  return null;
+}
+
+function lerTextoParticipante(value: unknown) {
+  if (typeof value !== "string") return null;
+  const normalizado = value.trim();
+  return normalizado.length ? normalizado : null;
+}
+
 type UsuarioActor = { id?: string; nome?: string; nomeUsuario?: string };
 
 export async function ensureAgendamentosEstrutura() {
@@ -604,9 +626,7 @@ export class AgendamentosRepository {
         Array.isArray(row.participantes)
           ? (row.participantes as Array<Record<string, unknown>>)
               .map((participante) =>
-                typeof participante.matriculaId === "number" && Number.isInteger(participante.matriculaId)
-                  ? participante.matriculaId
-                  : null
+                lerInteiroParticipante(participante.matriculaId ?? participante.matricula_id)
               )
               .filter((valor): valor is number => Number.isInteger(valor) && Number(valor) > 0)
           : []
@@ -649,15 +669,12 @@ export class AgendamentosRepository {
       const participantes =
         participantesOriginais.length > 0
           ? participantesOriginais.map((participante) => {
-              const matriculaId =
-                typeof participante.matriculaId === "number" && Number.isInteger(participante.matriculaId)
-                  ? participante.matriculaId
-                  : null;
-              const beneficiarioId =
-                typeof participante.beneficiarioId === "number" && Number.isInteger(participante.beneficiarioId)
-                  ? BigInt(participante.beneficiarioId)
-                  : null;
-              const nome = typeof participante.beneficiarioNome === "string" ? participante.beneficiarioNome : "";
+              const matriculaId = lerInteiroParticipante(participante.matriculaId ?? participante.matricula_id);
+              const beneficiarioIdNumero = lerInteiroParticipante(
+                participante.beneficiarioId ?? participante.beneficiario_id
+              );
+              const beneficiarioId = beneficiarioIdNumero ? BigInt(beneficiarioIdNumero) : null;
+              const nome = lerTextoParticipante(participante.beneficiarioNome ?? participante.beneficiario_nome) ?? "";
               const chaveParticipante = this.chaveParticipante(nome, beneficiarioId);
               const contatoMatricula = matriculaId ? contatosPorMatriculaMap.get(matriculaId) : undefined;
               const contato =
@@ -1477,11 +1494,7 @@ export class AgendamentosRepository {
     const contatosMatriculas = participantesAgendamento.length
       ? await this.listarContatosPorMatriculas(
           participantesAgendamento
-            .map((participante) =>
-              typeof participante.matriculaId === "number" && Number.isInteger(participante.matriculaId)
-                ? participante.matriculaId
-                : null
-            )
+            .map((participante) => lerInteiroParticipante(participante.matriculaId ?? participante.matricula_id))
             .filter((valor): valor is number => Number.isInteger(valor) && Number(valor) > 0),
           tenantId
         )
@@ -1497,12 +1510,8 @@ export class AgendamentosRepository {
       !beneficiariosTabela.length && participantesAgendamento.length
         ? await this.listarContatosPorParticipantes(
             participantesAgendamento.map((participante) => ({
-              beneficiarioId:
-                typeof participante.beneficiarioId === "number" && Number.isInteger(participante.beneficiarioId)
-                  ? participante.beneficiarioId
-                  : null,
-              beneficiarioNome:
-                typeof participante.beneficiarioNome === "string" ? participante.beneficiarioNome : null
+              beneficiarioId: lerInteiroParticipante(participante.beneficiarioId ?? participante.beneficiario_id),
+              beneficiarioNome: lerTextoParticipante(participante.beneficiarioNome ?? participante.beneficiario_nome)
             })),
             tenantId
           )
@@ -1520,21 +1529,20 @@ export class AgendamentosRepository {
       ? beneficiariosTabela.map((beneficiario) => {
           const chave = this.chaveParticipante(beneficiario.beneficiario_nome, beneficiario.beneficiario_id);
           const participante = participantesAgendamento.find((item) => {
-            const matriculaId =
-              typeof item.matriculaId === "number" && Number.isInteger(item.matriculaId) ? item.matriculaId : null;
+            const matriculaId = lerInteiroParticipante(item.matriculaId ?? item.matricula_id);
             const contatoMatricula = matriculaId ? contatosMatriculasPorId.get(matriculaId) : undefined;
             if (contatoMatricula?.beneficiario_id && beneficiario.beneficiario_id) {
               return contatoMatricula.beneficiario_id === beneficiario.beneficiario_id;
             }
             return this.chaveParticipante(
-              typeof item.beneficiarioNome === "string" ? item.beneficiarioNome : null,
-              typeof item.beneficiarioId === "number" && Number.isInteger(item.beneficiarioId) ? BigInt(item.beneficiarioId) : null
+              lerTextoParticipante(item.beneficiarioNome ?? item.beneficiario_nome),
+              (() => {
+                const id = lerInteiroParticipante(item.beneficiarioId ?? item.beneficiario_id);
+                return id ? BigInt(id) : null;
+              })()
             ) === chave;
           });
-          const matriculaId =
-            participante && typeof participante.matriculaId === "number" && Number.isInteger(participante.matriculaId)
-              ? participante.matriculaId
-              : null;
+          const matriculaId = participante ? lerInteiroParticipante(participante.matriculaId ?? participante.matricula_id) : null;
           const contatoMatricula = matriculaId ? contatosMatriculasPorId.get(matriculaId) : undefined;
           const fallback = fallbackPorChave.get(chave);
           return {
@@ -1556,18 +1564,10 @@ export class AgendamentosRepository {
           };
         })
       : participantesAgendamento.map((participante, index) => {
-          const matriculaId =
-            typeof participante.matriculaId === "number" && Number.isInteger(participante.matriculaId)
-              ? participante.matriculaId
-              : null;
-          const beneficiarioId =
-            typeof participante.beneficiarioId === "number" && Number.isInteger(participante.beneficiarioId)
-              ? BigInt(participante.beneficiarioId)
-              : null;
-          const beneficiarioNome =
-            typeof participante.beneficiarioNome === "string" && participante.beneficiarioNome.trim().length
-              ? participante.beneficiarioNome
-              : `Participante ${index + 1}`;
+          const matriculaId = lerInteiroParticipante(participante.matriculaId ?? participante.matricula_id);
+          const beneficiarioIdNumero = lerInteiroParticipante(participante.beneficiarioId ?? participante.beneficiario_id);
+          const beneficiarioId = beneficiarioIdNumero ? BigInt(beneficiarioIdNumero) : null;
+          const beneficiarioNome = lerTextoParticipante(participante.beneficiarioNome ?? participante.beneficiario_nome) ?? `Participante ${index + 1}`;
           const chave = this.chaveParticipante(beneficiarioNome, beneficiarioId);
           const contatoMatricula = matriculaId ? contatosMatriculasPorId.get(matriculaId) : undefined;
           const fallback = fallbackPorChave.get(chave);
