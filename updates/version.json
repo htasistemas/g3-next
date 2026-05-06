@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.480",
+  "latestVersion": "1.00.481",
   "releaseDate": "2026-05-06",
-  "description": "Agendamentos operacionais passaram a hidratar contatos tambem a partir do JSON de participantes em agendas antigas, preservando telefone e evitando falha no WhatsApp.",
+  "description": "Agendamentos operacionais passaram a priorizar o telefone principal do cadastro do beneficiario usando a matricula do participante para montar cards e notificacoes.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.480",
+  "minCompatibleVersion": "1.00.481",
   "releaseType": "stable",
   "downloadUrl": null
 }

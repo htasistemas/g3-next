@@ -465,6 +465,82 @@ export class AgendamentosRepository {
     `);
   }
 
+  private async listarContatosPorMatriculas(matriculaIds: number[], tenantId: string) {
+    const ids = Array.from(
+      new Set(matriculaIds.filter((valor) => Number.isInteger(valor) && Number(valor) > 0))
+    );
+
+    if (!ids.length) {
+      return [];
+    }
+
+    return prisma.$queryRaw<
+      Array<{
+        matricula_id: bigint;
+        beneficiario_id: bigint | null;
+        beneficiario_nome: string;
+        telefone_principal: string | null;
+        email: string | null;
+      }>
+    >(Prisma.sql`
+      SELECT
+        m.id AS matricula_id,
+        contato.beneficiario_id,
+        m.beneficiario_nome,
+        contato.telefone_principal,
+        contato.email
+      FROM cursos_atendimentos_matriculas m
+      LEFT JOIN LATERAL (
+        SELECT
+          b.id AS beneficiario_id,
+          NULLIF(TRIM(c2.telefone_principal), '') AS telefone_principal,
+          NULLIF(TRIM(c2.email), '') AS email
+        FROM cadastro_beneficiario b
+        LEFT JOIN contato_beneficiario c2 ON c2.beneficiario_id = b.id AND c2.tenant_id::text = ${tenantId}
+        LEFT JOIN LATERAL (
+          SELECT numero_documento
+          FROM documentos d
+          WHERE d.beneficiario_id = b.id
+            AND d.tenant_id::text = ${tenantId}
+            AND (
+              UPPER(COALESCE(d.tipo_documento, '')) = 'CPF'
+              OR UPPER(COALESCE(d.nome_documento, '')) LIKE '%CPF%'
+            )
+          ORDER BY d.id DESC
+          LIMIT 1
+        ) doc ON TRUE
+        WHERE b.tenant_id::text = ${tenantId}
+          AND (
+            (
+              REGEXP_REPLACE(COALESCE(m.cpf, ''), '\D', '', 'g') <> ''
+              AND REGEXP_REPLACE(COALESCE(doc.numero_documento, ''), '\D', '', 'g') =
+                REGEXP_REPLACE(COALESCE(m.cpf, ''), '\D', '', 'g')
+            )
+            OR (
+              REGEXP_REPLACE(COALESCE(m.cpf, ''), '\D', '', 'g') = ''
+              AND LOWER(
+                TRANSLATE(
+                  REGEXP_REPLACE(TRIM(COALESCE(b.nome_completo, '')), '\s+', ' ', 'g'),
+                  'ÁÀÃÂÄáàãâäÉÈÊËéèêëÍÌÎÏíìîïÓÒÕÔÖóòõôöÚÙÛÜúùûüÇçÑñ',
+                  'AAAAAaaaaaEEEEeeeeIIIIiiiiOOOOOoooooUUUUuuuuCcNn'
+                )
+              ) = LOWER(
+                TRANSLATE(
+                  REGEXP_REPLACE(TRIM(COALESCE(m.beneficiario_nome, '')), '\s+', ' ', 'g'),
+                  'ÁÀÃÂÄáàãâäÉÈÊËéèêëÍÌÎÏíìîïÓÒÕÔÖóòõôöÚÙÛÜúùûüÇçÑñ',
+                  'AAAAAaaaaaEEEEeeeeIIIIiiiiOOOOOoooooUUUUuuuuCcNn'
+                )
+              )
+            )
+          )
+        ORDER BY c2.id DESC NULLS LAST, b.id DESC
+        LIMIT 1
+      ) contato ON TRUE
+      WHERE m.tenant_id::text = ${tenantId}
+        AND m.id IN (${Prisma.join(ids.map((id) => BigInt(id)))})
+    `);
+  }
+
   private async hidratarParticipantesAgendamentos(rows: AgendamentoRow[], tenantId: string) {
     if (!rows.length) {
       return rows;
@@ -501,6 +577,27 @@ export class AgendamentosRepository {
       ),
       tenantId
     );
+    const contatosPorMatricula = await this.listarContatosPorMatriculas(
+      rows.flatMap((row) =>
+        Array.isArray(row.participantes)
+          ? (row.participantes as Array<Record<string, unknown>>)
+              .map((participante) =>
+                typeof participante.matriculaId === "number" && Number.isInteger(participante.matriculaId)
+                  ? participante.matriculaId
+                  : null
+              )
+              .filter((valor): valor is number => Number.isInteger(valor) && Number(valor) > 0)
+          : []
+      ),
+      tenantId
+    );
+    const contatosPorMatriculaMap = new Map<
+      number,
+      { beneficiario_id: bigint | null; beneficiario_nome: string; telefone_principal: string | null; email: string | null }
+    >();
+    for (const contato of contatosPorMatricula) {
+      contatosPorMatriculaMap.set(Number(contato.matricula_id), contato);
+    }
     const contatosFallbackPorChave = new Map<
       string,
       { beneficiario_id: bigint; beneficiario_nome: string; telefone: string | null; email: string | null }
@@ -530,25 +627,40 @@ export class AgendamentosRepository {
       const participantes =
         participantesOriginais.length > 0
           ? participantesOriginais.map((participante) => {
+              const matriculaId =
+                typeof participante.matriculaId === "number" && Number.isInteger(participante.matriculaId)
+                  ? participante.matriculaId
+                  : null;
               const beneficiarioId =
                 typeof participante.beneficiarioId === "number" && Number.isInteger(participante.beneficiarioId)
                   ? BigInt(participante.beneficiarioId)
                   : null;
               const nome = typeof participante.beneficiarioNome === "string" ? participante.beneficiarioNome : "";
               const chaveParticipante = this.chaveParticipante(nome, beneficiarioId);
+              const contatoMatricula = matriculaId ? contatosPorMatriculaMap.get(matriculaId) : undefined;
               const contato =
-                contatosPorChave.get(chaveParticipante) ?? contatosFallbackPorChave.get(chaveParticipante);
+                contatoMatricula ??
+                contatosPorChave.get(chaveParticipante) ??
+                contatosFallbackPorChave.get(chaveParticipante);
 
               return {
                 ...participante,
                 telefone:
-                  typeof participante.telefone === "string" && participante.telefone.trim().length
-                    ? participante.telefone
-                    : (contato?.telefone ?? undefined),
+                  typeof contatoMatricula?.telefone_principal === "string" && contatoMatricula.telefone_principal.trim().length
+                    ? contatoMatricula.telefone_principal
+                    : typeof contato?.telefone === "string" && contato.telefone.trim().length
+                      ? contato.telefone
+                      : typeof participante.telefone === "string" && participante.telefone.trim().length
+                        ? participante.telefone
+                        : undefined,
                 email:
-                  typeof participante.email === "string" && participante.email.trim().length
-                    ? participante.email
-                    : (contato?.email ?? undefined)
+                  typeof contatoMatricula?.email === "string" && contatoMatricula.email.trim().length
+                    ? contatoMatricula.email
+                    : typeof contato?.email === "string" && contato.email.trim().length
+                      ? contato.email
+                      : typeof participante.email === "string" && participante.email.trim().length
+                        ? participante.email
+                        : undefined
               };
             })
           : contatosDoAgendamento.map((contato) => ({
@@ -1338,6 +1450,25 @@ export class AgendamentosRepository {
     const participantesAgendamento = Array.isArray(agendamento.participantes)
       ? (agendamento.participantes as Array<Record<string, unknown>>)
       : [];
+    const contatosMatriculas = participantesAgendamento.length
+      ? await this.listarContatosPorMatriculas(
+          participantesAgendamento
+            .map((participante) =>
+              typeof participante.matriculaId === "number" && Number.isInteger(participante.matriculaId)
+                ? participante.matriculaId
+                : null
+            )
+            .filter((valor): valor is number => Number.isInteger(valor) && Number(valor) > 0),
+          tenantId
+        )
+      : [];
+    const contatosMatriculasPorId = new Map<
+      number,
+      { beneficiario_id: bigint | null; beneficiario_nome: string; telefone_principal: string | null; email: string | null }
+    >();
+    for (const contato of contatosMatriculas) {
+      contatosMatriculasPorId.set(Number(contato.matricula_id), contato);
+    }
     const fallbackParticipantes =
       !beneficiariosTabela.length && participantesAgendamento.length
         ? await this.listarContatosPorParticipantes(
@@ -1364,14 +1495,47 @@ export class AgendamentosRepository {
     const beneficiarios = beneficiariosTabela.length
       ? beneficiariosTabela.map((beneficiario) => {
           const chave = this.chaveParticipante(beneficiario.beneficiario_nome, beneficiario.beneficiario_id);
+          const participante = participantesAgendamento.find((item) => {
+            const matriculaId =
+              typeof item.matriculaId === "number" && Number.isInteger(item.matriculaId) ? item.matriculaId : null;
+            const contatoMatricula = matriculaId ? contatosMatriculasPorId.get(matriculaId) : undefined;
+            if (contatoMatricula?.beneficiario_id && beneficiario.beneficiario_id) {
+              return contatoMatricula.beneficiario_id === beneficiario.beneficiario_id;
+            }
+            return this.chaveParticipante(
+              typeof item.beneficiarioNome === "string" ? item.beneficiarioNome : null,
+              typeof item.beneficiarioId === "number" && Number.isInteger(item.beneficiarioId) ? BigInt(item.beneficiarioId) : null
+            ) === chave;
+          });
+          const matriculaId =
+            participante && typeof participante.matriculaId === "number" && Number.isInteger(participante.matriculaId)
+              ? participante.matriculaId
+              : null;
+          const contatoMatricula = matriculaId ? contatosMatriculasPorId.get(matriculaId) : undefined;
           const fallback = fallbackPorChave.get(chave);
           return {
             ...beneficiario,
-            telefone: beneficiario.telefone ?? fallback?.telefone ?? null,
-            email: beneficiario.email ?? fallback?.email ?? null
+            telefone:
+              contatoMatricula?.telefone_principal ??
+              beneficiario.telefone ??
+              fallback?.telefone ??
+              (participante && typeof participante.telefone === "string" && participante.telefone.trim().length
+                ? participante.telefone
+                : null),
+            email:
+              contatoMatricula?.email ??
+              beneficiario.email ??
+              fallback?.email ??
+              (participante && typeof participante.email === "string" && participante.email.trim().length
+                ? participante.email
+                : null)
           };
         })
       : participantesAgendamento.map((participante, index) => {
+          const matriculaId =
+            typeof participante.matriculaId === "number" && Number.isInteger(participante.matriculaId)
+              ? participante.matriculaId
+              : null;
           const beneficiarioId =
             typeof participante.beneficiarioId === "number" && Number.isInteger(participante.beneficiarioId)
               ? BigInt(participante.beneficiarioId)
@@ -1381,20 +1545,29 @@ export class AgendamentosRepository {
               ? participante.beneficiarioNome
               : `Participante ${index + 1}`;
           const chave = this.chaveParticipante(beneficiarioNome, beneficiarioId);
+          const contatoMatricula = matriculaId ? contatosMatriculasPorId.get(matriculaId) : undefined;
           const fallback = fallbackPorChave.get(chave);
           return {
             id: BigInt(index + 1),
             agendamento_id: id,
-            beneficiario_id: beneficiarioId,
+            beneficiario_id: contatoMatricula?.beneficiario_id ?? beneficiarioId,
             beneficiario_nome: beneficiarioNome,
             telefone:
-              (typeof participante.telefone === "string" && participante.telefone.trim().length
-                ? participante.telefone
-                : fallback?.telefone) ?? null,
+              (typeof contatoMatricula?.telefone_principal === "string" && contatoMatricula.telefone_principal.trim().length
+                ? contatoMatricula.telefone_principal
+                : typeof fallback?.telefone === "string" && fallback.telefone.trim().length
+                  ? fallback.telefone
+                  : typeof participante.telefone === "string" && participante.telefone.trim().length
+                    ? participante.telefone
+                    : null),
             email:
-              (typeof participante.email === "string" && participante.email.trim().length
-                ? participante.email
-                : fallback?.email) ?? null,
+              (typeof contatoMatricula?.email === "string" && contatoMatricula.email.trim().length
+                ? contatoMatricula.email
+                : typeof fallback?.email === "string" && fallback.email.trim().length
+                  ? fallback.email
+                  : typeof participante.email === "string" && participante.email.trim().length
+                    ? participante.email
+                    : null),
             status: "Agendado",
             criado_em: new Date(),
             atualizado_em: new Date()

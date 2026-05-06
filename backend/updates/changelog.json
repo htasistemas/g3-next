@@ -1,6 +1,18 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.481",
+                        "releaseDate":  "2026-05-06",
+                        "title":  "Agendamento operacional com prioridade no telefone principal",
+                        "description":  "Os cards e notificacoes da agenda operacional passaram a priorizar o telefone principal do cadastro do beneficiario, resolvendo participantes que ainda apareciam sem telefone mesmo com contato preenchido.",
+                        "changes":  [
+                                        "A hidratação dos participantes passou a usar a matricula do item para localizar o beneficiario e puxar preferencialmente o telefone principal da aba Contato.",
+                                        "A preparação dos destinatarios de WhatsApp e e-mail passou a reaproveitar a mesma priorização por matricula antes de usar dados antigos do agendamento.",
+                                        "Manual do sistema e versao oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.480",
                         "releaseDate":  "2026-05-06",
                         "title":  "Agendamento operacional com fallback por participantes antigos",
