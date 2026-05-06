@@ -585,6 +585,87 @@ export class AgendamentosRepository {
     `);
   }
 
+  private async listarContatosPorItensOperacionais(itemIds: number[], tenantId: string) {
+    const ids = Array.from(new Set(itemIds.filter((valor) => Number.isInteger(valor) && Number(valor) > 0)));
+
+    if (!ids.length) {
+      return [];
+    }
+
+    return prisma.$queryRaw<
+      Array<{
+        item_origem_id: bigint;
+        matricula_id: bigint;
+        beneficiario_id: bigint | null;
+        beneficiario_nome: string;
+        telefone: string | null;
+        email: string | null;
+      }>
+    >(Prisma.sql`
+      SELECT
+        m.curso_id AS item_origem_id,
+        m.id AS matricula_id,
+        contato.beneficiario_id,
+        m.beneficiario_nome,
+        contato.telefone AS telefone,
+        COALESCE(NULLIF(TRIM(m.email), ''), contato.email) AS email
+      FROM cursos_atendimentos_matriculas m
+      LEFT JOIN LATERAL (
+        SELECT
+          b.id AS beneficiario_id,
+          COALESCE(
+            NULLIF(TRIM(c2.telefone_principal), ''),
+            NULLIF(TRIM(c2.telefone_secundario), ''),
+            NULLIF(TRIM(c2.telefone_recado_numero), '')
+          ) AS telefone,
+          NULLIF(TRIM(c2.email), '') AS email
+        FROM cadastro_beneficiario b
+        LEFT JOIN contato_beneficiario c2 ON c2.beneficiario_id = b.id AND c2.tenant_id::text = ${tenantId}
+        LEFT JOIN LATERAL (
+          SELECT numero_documento
+          FROM documentos d
+          WHERE d.beneficiario_id = b.id
+            AND d.tenant_id::text = ${tenantId}
+            AND (
+              UPPER(COALESCE(d.tipo_documento, '')) = 'CPF'
+              OR UPPER(COALESCE(d.nome_documento, '')) LIKE '%CPF%'
+            )
+          ORDER BY d.id DESC
+          LIMIT 1
+        ) doc ON TRUE
+        WHERE b.tenant_id::text = ${tenantId}
+          AND (
+            (
+              REGEXP_REPLACE(COALESCE(m.cpf, ''), '\D', '', 'g') <> ''
+              AND REGEXP_REPLACE(COALESCE(doc.numero_documento, ''), '\D', '', 'g') =
+                REGEXP_REPLACE(COALESCE(m.cpf, ''), '\D', '', 'g')
+            )
+            OR (
+              REGEXP_REPLACE(COALESCE(m.cpf, ''), '\D', '', 'g') = ''
+              AND LOWER(
+                TRANSLATE(
+                  REGEXP_REPLACE(TRIM(COALESCE(b.nome_completo, '')), '\s+', ' ', 'g'),
+                  'ÁÀÃÂÄáàãâäÉÈÊËéèêëÍÌÎÏíìîïÓÒÕÔÖóòõôöÚÙÛÜúùûüÇçÑñ',
+                  'AAAAAaaaaaEEEEeeeeIIIIiiiiOOOOOoooooUUUUuuuuCcNn'
+                )
+              ) = LOWER(
+                TRANSLATE(
+                  REGEXP_REPLACE(TRIM(COALESCE(m.beneficiario_nome, '')), '\s+', ' ', 'g'),
+                  'ÁÀÃÂÄáàãâäÉÈÊËéèêëÍÌÎÏíìîïÓÒÕÔÖóòõôöÚÙÛÜúùûüÇçÑñ',
+                  'AAAAAaaaaaEEEEeeeeIIIIiiiiOOOOOoooooUUUUuuuuCcNn'
+                )
+              )
+            )
+          )
+        ORDER BY c2.id DESC NULLS LAST, b.id DESC
+        LIMIT 1
+      ) contato ON TRUE
+      WHERE m.curso_id IN (${Prisma.join(ids.map((id) => BigInt(id)))})
+        AND m.tenant_id::text = ${tenantId}
+      ORDER BY m.curso_id ASC, m.beneficiario_nome ASC
+    `);
+  }
+
   private async hidratarParticipantesAgendamentos(rows: AgendamentoRow[], tenantId: string) {
     if (!rows.length) {
       return rows;
@@ -633,12 +714,31 @@ export class AgendamentosRepository {
       ),
       tenantId
     );
+    const contatosItensOperacionais = await this.listarContatosPorItensOperacionais(
+      rows
+        .map((row) => (row.item_origem_id ? Number(row.item_origem_id) : null))
+        .filter((valor): valor is number => Number.isInteger(valor) && Number(valor) > 0),
+      tenantId
+    );
     const contatosPorMatriculaMap = new Map<
       number,
       { beneficiario_id: bigint | null; beneficiario_nome: string; telefone_principal: string | null; email: string | null }
     >();
     for (const contato of contatosPorMatricula) {
       contatosPorMatriculaMap.set(Number(contato.matricula_id), contato);
+    }
+    const contatosItensPorChave = new Map<string, { telefone: string | null; email: string | null }>();
+    for (const contato of contatosItensOperacionais) {
+      const itemOrigemId = Number(contato.item_origem_id);
+      const matriculaId = Number(contato.matricula_id);
+      contatosItensPorChave.set(`item:${itemOrigemId}:matricula:${matriculaId}`, {
+        telefone: contato.telefone,
+        email: contato.email
+      });
+      contatosItensPorChave.set(
+        `item:${itemOrigemId}:participante:${this.chaveParticipante(contato.beneficiario_nome, contato.beneficiario_id)}`,
+        { telefone: contato.telefone, email: contato.email }
+      );
     }
     const contatosFallbackPorChave = new Map<
       string,
@@ -673,12 +773,20 @@ export class AgendamentosRepository {
               const beneficiarioIdNumero = lerInteiroParticipante(
                 participante.beneficiarioId ?? participante.beneficiario_id
               );
+              const itemOrigemId = row.item_origem_id ? Number(row.item_origem_id) : null;
               const beneficiarioId = beneficiarioIdNumero ? BigInt(beneficiarioIdNumero) : null;
               const nome = lerTextoParticipante(participante.beneficiarioNome ?? participante.beneficiario_nome) ?? "";
               const chaveParticipante = this.chaveParticipante(nome, beneficiarioId);
               const contatoMatricula = matriculaId ? contatosPorMatriculaMap.get(matriculaId) : undefined;
+              const contatoItem =
+                itemOrigemId && matriculaId
+                  ? contatosItensPorChave.get(`item:${itemOrigemId}:matricula:${matriculaId}`)
+                  : itemOrigemId
+                    ? contatosItensPorChave.get(`item:${itemOrigemId}:participante:${chaveParticipante}`)
+                    : undefined;
               const contato =
                 contatoMatricula ??
+                contatoItem ??
                 contatosPorChave.get(chaveParticipante) ??
                 contatosFallbackPorChave.get(chaveParticipante);
               const telefoneContato = extrairTelefoneContato(contato);

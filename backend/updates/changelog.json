@@ -1,6 +1,18 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.483",
+                        "releaseDate":  "2026-05-06",
+                        "title":  "Agendamento operacional com fallback pelos matriculados do item",
+                        "description":  "Os cards da agenda operacional passaram a buscar o telefone do participante tambem a partir dos matriculados atuais do proprio item, evitando cards antigos com sem telefone cadastrado.",
+                        "changes":  [
+                                        "A hidratação dos cards agora consulta os matriculados do item operacional e cruza por matricula ou nome do participante antes de exibir o telefone.",
+                                        "Esse fallback usa o telefone principal da aba Contato do cadastro do beneficiario e cobre agendas antigas com JSON incompleto ou legados inconsistentes.",
+                                        "Manual do sistema e versao oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.482",
                         "releaseDate":  "2026-05-06",
                         "title":  "Agendamento operacional com leitura legada dos contatos nos cards",

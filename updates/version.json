@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.482",
+  "latestVersion": "1.00.483",
   "releaseDate": "2026-05-06",
-  "description": "Agendamentos operacionais passaram a hidratar os telefones dos cards tambem para participantes legados usando beneficiario e matricula salvos no JSON do agendamento.",
+  "description": "Agendamentos operacionais passaram a hidratar os telefones dos cards diretamente dos matriculados do item operacional quando o agendamento antigo nao trouxer vinculos suficientes.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.482",
+  "minCompatibleVersion": "1.00.483",
   "releaseType": "stable",
   "downloadUrl": null
 }
