@@ -1,6 +1,18 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.482",
+                        "releaseDate":  "2026-05-06",
+                        "title":  "Agendamento operacional com leitura legada dos contatos nos cards",
+                        "description":  "Os cards da agenda operacional passaram a hidratar corretamente o telefone dos participantes mesmo quando o JSON antigo do agendamento salvar beneficiario e matricula em formatos legados.",
+                        "changes":  [
+                                        "A hidratação da listagem passou a ler beneficiarioId, beneficiario_nome, matriculaId e matricula_id antes de consultar o cadastro do beneficiario.",
+                                        "Os cards agora conseguem reaproveitar o telefone principal da aba Contato tambem em participantes legados que antes apareciam como sem telefone cadastrado.",
+                                        "Manual do sistema e versao oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.481",
                         "releaseDate":  "2026-05-06",
                         "title":  "Agendamento operacional com prioridade no telefone principal",

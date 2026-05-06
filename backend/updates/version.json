@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.481",
+  "latestVersion": "1.00.482",
   "releaseDate": "2026-05-06",
-  "description": "Agendamentos operacionais passaram a priorizar o telefone principal do cadastro do beneficiario usando a matricula do participante para montar cards e notificacoes.",
+  "description": "Agendamentos operacionais passaram a hidratar os telefones dos cards tambem para participantes legados usando beneficiario e matricula salvos no JSON do agendamento.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.481",
+  "minCompatibleVersion": "1.00.482",
   "releaseType": "stable"
 }
 

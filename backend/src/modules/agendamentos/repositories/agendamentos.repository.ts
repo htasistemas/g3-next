@@ -610,12 +610,12 @@ export class AgendamentosRepository {
       rows.flatMap((row) =>
         Array.isArray(row.participantes)
           ? (row.participantes as Array<Record<string, unknown>>).map((participante) => ({
-              beneficiarioId:
-                typeof participante.beneficiarioId === "number" && Number.isInteger(participante.beneficiarioId)
-                  ? participante.beneficiarioId
-                  : null,
-              beneficiarioNome:
-                typeof participante.beneficiarioNome === "string" ? participante.beneficiarioNome : null
+              beneficiarioId: lerInteiroParticipante(
+                participante.beneficiarioId ?? participante.beneficiario_id
+              ),
+              beneficiarioNome: lerTextoParticipante(
+                participante.beneficiarioNome ?? participante.beneficiario_nome
+              )
             }))
           : []
       ),
