@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.443",
-  "releaseDate": "2026-05-05",
-  "description": "Cadastro inicial de tenant passou a tratar login e e-mail do administrador com unicidade por tenant, evitando erro interno.",
+  "latestVersion": "1.00.478",
+  "releaseDate": "2026-05-06",
+  "description": "Agendamentos operacionais passaram a recarregar telefone e e-mail reais do beneficiario para exibir contatos corretos e evitar erro interno ao usar WhatsApp ou e-mail nos cards.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.443",
+  "minCompatibleVersion": "1.00.478",
   "releaseType": "stable",
   "downloadUrl": null
 }

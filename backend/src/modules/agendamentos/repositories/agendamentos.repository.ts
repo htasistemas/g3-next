@@ -290,6 +290,138 @@ export class AgendamentosRepository {
     return new Intl.DateTimeFormat("pt-BR", { weekday: "long" }).format(data);
   }
 
+  private chaveParticipante(nome?: string | null, beneficiarioId?: bigint | null) {
+    if (beneficiarioId) {
+      return `id:${beneficiarioId.toString()}`;
+    }
+    return `nome:${String(nome ?? "").trim().toLowerCase()}`;
+  }
+
+  private async listarBeneficiariosAgendamentoComContato(agendamentoIds: bigint[], tenantId: string) {
+    if (!agendamentoIds.length) {
+      return [];
+    }
+
+    return prisma.$queryRaw<AgendamentoBeneficiarioRow[]>(Prisma.sql`
+      SELECT
+        ab.id,
+        ab.agendamento_id,
+        COALESCE(ab.beneficiario_id, contato.beneficiario_id) AS beneficiario_id,
+        ab.beneficiario_nome,
+        COALESCE(
+          NULLIF(TRIM(ab.telefone), ''),
+          NULLIF(TRIM(contato.telefone_principal), ''),
+          NULLIF(TRIM(contato.telefone_secundario), '')
+        ) AS telefone,
+        COALESCE(NULLIF(TRIM(ab.email), ''), NULLIF(TRIM(contato.email), '')) AS email,
+        ab.status,
+        ab.criado_em,
+        ab.atualizado_em
+      FROM agendamento_beneficiario ab
+      LEFT JOIN LATERAL (
+        SELECT
+          b.id AS beneficiario_id,
+          c.telefone_principal,
+          c.telefone_secundario,
+          c.email
+        FROM cadastro_beneficiario b
+        LEFT JOIN contato_beneficiario c ON c.beneficiario_id = b.id AND c.tenant_id::text = ${tenantId}
+        WHERE b.tenant_id::text = ${tenantId}
+          AND (
+            (ab.beneficiario_id IS NOT NULL AND b.id = ab.beneficiario_id)
+            OR (
+              ab.beneficiario_id IS NULL
+              AND LOWER(TRIM(COALESCE(b.nome_completo, ''))) = LOWER(TRIM(COALESCE(ab.beneficiario_nome, '')))
+            )
+          )
+        ORDER BY c.id DESC NULLS LAST, b.id DESC
+        LIMIT 1
+      ) contato ON TRUE
+      WHERE ab.agendamento_id IN (${Prisma.join(agendamentoIds)})
+        AND ab.tenant_id::text = ${tenantId}
+      ORDER BY ab.agendamento_id ASC, ab.beneficiario_nome ASC
+    `);
+  }
+
+  private async hidratarParticipantesAgendamentos(rows: AgendamentoRow[], tenantId: string) {
+    if (!rows.length) {
+      return rows;
+    }
+
+    const contatos = await this.listarBeneficiariosAgendamentoComContato(
+      rows.map((row) => row.id),
+      tenantId
+    );
+
+    const contatosPorAgendamento = new Map<string, AgendamentoBeneficiarioRow[]>();
+    for (const contato of contatos) {
+      const chave = contato.agendamento_id.toString();
+      const lista = contatosPorAgendamento.get(chave);
+      if (lista) {
+        lista.push(contato);
+      } else {
+        contatosPorAgendamento.set(chave, [contato]);
+      }
+    }
+
+    return rows.map((row) => {
+      const contatosDoAgendamento = contatosPorAgendamento.get(row.id.toString()) ?? [];
+      const contatosPorChave = new Map<string, AgendamentoBeneficiarioRow>();
+
+      for (const contato of contatosDoAgendamento) {
+        contatosPorChave.set(
+          this.chaveParticipante(contato.beneficiario_nome, contato.beneficiario_id),
+          contato
+        );
+      }
+
+      const participantesOriginais = Array.isArray(row.participantes)
+        ? (row.participantes as Array<Record<string, unknown>>)
+        : [];
+
+      const participantes =
+        participantesOriginais.length > 0
+          ? participantesOriginais.map((participante) => {
+              const beneficiarioId =
+                typeof participante.beneficiarioId === "number" && Number.isInteger(participante.beneficiarioId)
+                  ? BigInt(participante.beneficiarioId)
+                  : null;
+              const nome = typeof participante.beneficiarioNome === "string" ? participante.beneficiarioNome : "";
+              const contato = contatosPorChave.get(this.chaveParticipante(nome, beneficiarioId));
+
+              return {
+                ...participante,
+                telefone:
+                  typeof participante.telefone === "string" && participante.telefone.trim().length
+                    ? participante.telefone
+                    : (contato?.telefone ?? undefined),
+                email:
+                  typeof participante.email === "string" && participante.email.trim().length
+                    ? participante.email
+                    : (contato?.email ?? undefined)
+              };
+            })
+          : contatosDoAgendamento.map((contato) => ({
+              beneficiarioId: contato.beneficiario_id ? Number(contato.beneficiario_id) : undefined,
+              beneficiarioNome: contato.beneficiario_nome,
+              telefone: contato.telefone ?? undefined,
+              email: contato.email ?? undefined,
+              comparecimento: "Pendente"
+            }));
+
+      const contatoPrincipal =
+        contatosDoAgendamento.find((contato) => contato.beneficiario_id && row.beneficiario_id && contato.beneficiario_id === row.beneficiario_id) ??
+        contatosDoAgendamento[0];
+
+      return {
+        ...row,
+        telefone: row.telefone ?? contatoPrincipal?.telefone ?? null,
+        email: row.email ?? contatoPrincipal?.email ?? null,
+        participantes
+      };
+    });
+  }
+
   private async sincronizarBeneficiariosAgendamento(
     agendamentoId: bigint,
     tenantId: string,
@@ -350,10 +482,10 @@ export class AgendamentosRepository {
     return prisma.$queryRaw<AgendamentoOperacionalBeneficiarioRow[]>(Prisma.sql`
       SELECT
         m.id AS matricula_id,
-        vinculo.beneficiario_id,
+        contato.beneficiario_id,
         m.beneficiario_nome,
-        COALESCE(vinculo.telefone, contato.telefone) AS telefone,
-        COALESCE(vinculo.email, contato.email) AS email,
+        contato.telefone_principal AS telefone,
+        COALESCE(NULLIF(TRIM(m.email), ''), contato.email) AS email,
         m.status,
         m.cpf,
         COALESCE(NULLIF(TRIM(m.profissional_nome), ''), NULLIF(TRIM(c.profissional), '')) AS profissional_nome
@@ -362,14 +494,15 @@ export class AgendamentosRepository {
       LEFT JOIN LATERAL (
         SELECT
           b.id AS beneficiario_id,
-          COALESCE(to_jsonb(c2)->>'telefone_principal', to_jsonb(c2)->>'telefone') AS telefone,
+          c2.telefone_principal,
           c2.email
         FROM cadastro_beneficiario b
-        LEFT JOIN contato_beneficiario c2 ON c2.beneficiario_id = b.id
+        LEFT JOIN contato_beneficiario c2 ON c2.beneficiario_id = b.id AND c2.tenant_id::text = ${tenantId}
         LEFT JOIN LATERAL (
           SELECT numero_documento
           FROM documentos d
           WHERE d.beneficiario_id = b.id
+            AND d.tenant_id::text = ${tenantId}
             AND (
               UPPER(COALESCE(d.tipo_documento, '')) = 'CPF'
               OR UPPER(COALESCE(d.nome_documento, '')) LIKE '%CPF%'
@@ -377,45 +510,23 @@ export class AgendamentosRepository {
           ORDER BY d.id DESC
           LIMIT 1
         ) doc ON TRUE
-        WHERE (
-          REGEXP_REPLACE(COALESCE(m.cpf, ''), '\D', '', 'g') <> ''
-          AND REGEXP_REPLACE(COALESCE(doc.numero_documento, ''), '\D', '', 'g') = REGEXP_REPLACE(COALESCE(m.cpf, ''), '\D', '', 'g')
-        ) OR (
-          REGEXP_REPLACE(COALESCE(m.cpf, ''), '\D', '', 'g') = ''
-          AND LOWER(TRIM(COALESCE(b.nome_completo, ''))) = LOWER(TRIM(COALESCE(m.beneficiario_nome, '')))
-        )
-        ORDER BY b.id DESC NULLS LAST
-        LIMIT 1
-      ) vinculo ON TRUE
-      LEFT JOIN LATERAL (
-        SELECT
-          COALESCE(to_jsonb(c3)->>'telefone_principal', to_jsonb(c3)->>'telefone') AS telefone,
-          c3.email
-        FROM cadastro_beneficiario b3
-        LEFT JOIN contato_beneficiario c3 ON c3.beneficiario_id = b3.id
-        LEFT JOIN LATERAL (
-          SELECT d.numero_documento
-          FROM documentos d
-          WHERE d.beneficiario_id = b3.id
-            AND (
-              UPPER(COALESCE(d.tipo_documento, '')) = 'CPF'
-              OR UPPER(COALESCE(d.nome_documento, '')) LIKE '%CPF%'
+        WHERE b.tenant_id::text = ${tenantId}
+          AND (
+            (
+              REGEXP_REPLACE(COALESCE(m.cpf, ''), '\D', '', 'g') <> ''
+              AND REGEXP_REPLACE(COALESCE(doc.numero_documento, ''), '\D', '', 'g') =
+                REGEXP_REPLACE(COALESCE(m.cpf, ''), '\D', '', 'g')
             )
-          ORDER BY d.id DESC
-          LIMIT 1
-        ) cpf_doc ON TRUE
-        WHERE (
-          REGEXP_REPLACE(COALESCE(m.cpf, ''), '\D', '', 'g') <> ''
-          AND REGEXP_REPLACE(COALESCE(cpf_doc.numero_documento, ''), '\D', '', 'g') =
-            REGEXP_REPLACE(COALESCE(m.cpf, ''), '\D', '', 'g')
-        )
-        OR (
-          REGEXP_REPLACE(COALESCE(m.cpf, ''), '\D', '', 'g') = ''
-          AND LOWER(TRIM(COALESCE(b3.nome_completo, ''))) = LOWER(TRIM(COALESCE(m.beneficiario_nome, '')))
-        )
+            OR (
+              REGEXP_REPLACE(COALESCE(m.cpf, ''), '\D', '', 'g') = ''
+              AND LOWER(TRIM(COALESCE(b.nome_completo, ''))) = LOWER(TRIM(COALESCE(m.beneficiario_nome, '')))
+            )
+          )
+        ORDER BY c2.id DESC NULLS LAST, b.id DESC
         LIMIT 1
       ) contato ON TRUE
       WHERE m.curso_id = ${itemId}
+        AND m.tenant_id::text = ${tenantId}
         AND c.tenant_id::text = ${tenantId}
       ORDER BY m.beneficiario_nome ASC
     `);
@@ -517,13 +628,14 @@ export class AgendamentosRepository {
     if (trimOrUndefined(filtros.periodoInicio)) where.push(Prisma.sql`a.data_agendamento >= ${formatarData(filtros.periodoInicio)}`);
     if (trimOrUndefined(filtros.periodoFim)) where.push(Prisma.sql`a.data_agendamento <= ${formatarData(filtros.periodoFim)}`);
 
-    return prisma.$queryRaw<AgendamentoRow[]>(Prisma.sql`
+    const rows = await prisma.$queryRaw<AgendamentoRow[]>(Prisma.sql`
       SELECT *
       FROM agendamento a
       WHERE a.tenant_id::text = ${tenantId}
       ${where.length ? Prisma.sql`AND ${Prisma.join(where, " AND ")}` : Prisma.empty}
       ORDER BY a.data_agendamento ASC, a.hora_inicial ASC, a.id ASC
     `);
+    return this.hidratarParticipantesAgendamentos(rows, tenantId);
   }
 
   async obter(id: bigint, tenantId: string) {
@@ -531,7 +643,8 @@ export class AgendamentosRepository {
     const rows = await prisma.$queryRaw<AgendamentoRow[]>(Prisma.sql`
       SELECT * FROM agendamento WHERE id = ${id} AND tenant_id::text = ${tenantId} LIMIT 1
     `);
-    return rows[0] ?? null;
+    const hidratados = await this.hidratarParticipantesAgendamentos(rows, tenantId);
+    return hidratados[0] ?? null;
   }
 
   async criar(input: AgendamentoInput, usuario: UsuarioActor | undefined, tenantId: string) {
@@ -1048,15 +1161,11 @@ export class AgendamentosRepository {
   }
 
   async notificar(id: bigint, canal: AgendamentoEnvioCanal, usuario: UsuarioActor | undefined, tenantId: string) {
+    await this.ensureEstrutura();
     const agendamento = await this.obter(id, tenantId);
     if (!agendamento) throw new AppError("Agendamento nao encontrado.", 404);
 
-    const beneficiarios = await prisma.$queryRaw<AgendamentoBeneficiarioRow[]>(Prisma.sql`
-      SELECT * FROM agendamento_beneficiario
-      WHERE agendamento_id = ${id}
-        AND tenant_id::text = ${tenantId}
-      ORDER BY beneficiario_nome ASC
-    `);
+    const beneficiarios = await this.listarBeneficiariosAgendamentoComContato([id], tenantId);
     if (!beneficiarios.length) {
       throw new AppError("Este agendamento nao possui beneficiarios vinculados.", 400);
     }

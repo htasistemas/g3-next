@@ -1,6 +1,19 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.478",
+                        "releaseDate":  "2026-05-06",
+                        "title":  "Agendamento operacional com contatos reais do beneficiario",
+                        "description":  "Os cards da agenda operacional passaram a reaproveitar telefone e e-mail atuais do cadastro do beneficiario, e os botões de WhatsApp e e-mail deixaram de falhar com erro interno quando houver contatos mistos ou dados antigos no agendamento.",
+                        "changes":  [
+                                        "A leitura dos beneficiarios vinculados ao item operacional passou a filtrar cadastro, documentos e contato pelo tenant autenticado antes de montar telefone e e-mail.",
+                                        "A listagem e o detalhe dos agendamentos agora reidratam os participantes do card com os contatos atuais do cadastro do beneficiario, corrigindo cards ja gerados sem exigir recriacao da agenda.",
+                                        "Os envios de WhatsApp e e-mail passaram a recalcular os destinatarios a partir do cadastro vigente e a garantir a estrutura do modulo antes do processamento.",
+                                        "Manual do sistema e versao oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.472",
                         "releaseDate":  "2026-05-05",
                         "title":  "Administrador master protegido contra bloqueio de acesso",
