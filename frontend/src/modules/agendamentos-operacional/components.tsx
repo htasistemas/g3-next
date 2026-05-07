@@ -4,6 +4,7 @@ import {
   CircleHelp,
   Clock3,
   Copy,
+  LoaderCircle,
   Mail,
   MapPin,
   MessageCircle,
@@ -282,6 +283,11 @@ export function GenerateCardButton(props: { disabled?: boolean; loading?: boolea
 export function AgendaCardList(props: {
   cards: Agendamento[];
   selecionadoId?: number | null;
+  envioEmAndamento?: {
+    agendamentoId: number;
+    canal: "WHATSAPP" | "EMAIL";
+    etapa: number;
+  } | null;
   onAlternarConfirmacao: (item: Agendamento, index: number) => void;
   onMoverParticipante: (item: Agendamento, index: number) => void;
   onExcluirParticipante: (item: Agendamento, index: number) => void;
@@ -311,6 +317,11 @@ export function AgendaCardList(props: {
           key={item.id ?? `${item.itemOrigemId}-${item.data}`}
           item={item}
           ativo={props.selecionadoId === item.id}
+          envioEmAndamento={
+            props.envioEmAndamento && Number(item.id) === props.envioEmAndamento.agendamentoId
+              ? props.envioEmAndamento
+              : null
+          }
           onAlternarConfirmacao={(index) => props.onAlternarConfirmacao(item, index)}
           onMoverParticipante={(index) => props.onMoverParticipante(item, index)}
           onExcluirParticipante={(index) => props.onExcluirParticipante(item, index)}
@@ -331,6 +342,11 @@ export function AgendaCardList(props: {
 export function AgendaCard(props: {
   item: Agendamento;
   ativo?: boolean;
+  envioEmAndamento?: {
+    agendamentoId: number;
+    canal: "WHATSAPP" | "EMAIL";
+    etapa: number;
+  } | null;
   onAlternarConfirmacao: (index: number) => void;
   onMoverParticipante: (index: number) => void;
   onExcluirParticipante: (index: number) => void;
@@ -344,6 +360,22 @@ export function AgendaCard(props: {
   onCancelar: () => void;
 }) {
   const participantes = props.item.participantes ?? [];
+  const canalEmEnvio = props.envioEmAndamento?.canal;
+  const progressoEnvio = props.envioEmAndamento ? ((props.envioEmAndamento.etapa + 1) / 3) * 100 : 0;
+  const textoEnvio =
+    canalEmEnvio === "WHATSAPP"
+      ? [
+          "Preparando links e validando contatos do WhatsApp...",
+          "Montando a fila de mensagens da agenda operacional...",
+          "Finalizando os links para abertura do WhatsApp..."
+        ][props.envioEmAndamento?.etapa ?? 0]
+      : canalEmEnvio === "EMAIL"
+        ? [
+            "Preparando envio e validando e-mails dos participantes...",
+            "Processando os destinatários da agenda operacional...",
+            "Finalizando o disparo dos e-mails da agenda..."
+          ][props.envioEmAndamento?.etapa ?? 0]
+        : "";
 
   return (
     <Card
@@ -492,11 +524,27 @@ export function AgendaCard(props: {
           >
             <Printer className="h-4 w-4" />
           </Button>
-          <Button type="button" variant="outline" className="h-8 min-w-8 px-2" onClick={props.onWhatsApp} title="WhatsApp" aria-label="WhatsApp">
-            <MessageCircle className="h-4 w-4" />
+          <Button
+            type="button"
+            variant="outline"
+            className="h-8 min-w-8 px-2"
+            onClick={props.onWhatsApp}
+            title="WhatsApp"
+            aria-label="WhatsApp"
+            disabled={Boolean(props.envioEmAndamento)}
+          >
+            {canalEmEnvio === "WHATSAPP" ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
           </Button>
-          <Button type="button" variant="outline" className="h-8 min-w-8 px-2" onClick={props.onEmail} title="E-mail" aria-label="E-mail">
-            <Mail className="h-4 w-4" />
+          <Button
+            type="button"
+            variant="outline"
+            className="h-8 min-w-8 px-2"
+            onClick={props.onEmail}
+            title="E-mail"
+            aria-label="E-mail"
+            disabled={Boolean(props.envioEmAndamento)}
+          >
+            {canalEmEnvio === "EMAIL" ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
           </Button>
           <Button type="button" variant="outline" className="h-8 min-w-8 px-2" onClick={props.onExcluir} title="Excluir agenda" aria-label="Excluir agenda">
             <Trash2 className="h-4 w-4" />
@@ -508,6 +556,24 @@ export function AgendaCard(props: {
             <XCircle className="h-4 w-4" /> Cancelar
           </Button>
         </div>
+
+        {props.envioEmAndamento ? (
+          <div className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-3 text-sm text-sky-900">
+            <div className="flex items-center gap-2">
+              <LoaderCircle className="h-4 w-4 animate-spin text-sky-700" />
+              <p className="font-medium">
+                {canalEmEnvio === "WHATSAPP" ? "Enviando via WhatsApp" : "Enviando via e-mail"}
+              </p>
+            </div>
+            <p className="mt-1 text-xs text-sky-800">{textoEnvio}</p>
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-sky-100">
+              <div
+                className="h-full rounded-full bg-sky-600 transition-[width] duration-500"
+                style={{ width: `${progressoEnvio}%` }}
+              />
+            </div>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );

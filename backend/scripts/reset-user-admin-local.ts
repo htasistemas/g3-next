@@ -6,8 +6,8 @@ const prisma = new PrismaClient({
   datasourceUrl: env.DATABASE_URL
 });
 
-const TARGET_EMAIL = "htasistemas@gmail.com";
-const NEW_PASSWORD = "Hta@2026!";
+const TARGET_EMAIL = process.env.TARGET_EMAIL?.trim() || "htasistemas@gmail.com";
+const NEW_PASSWORD = process.env.NEW_PASSWORD?.trim() || "Hta@2026!";
 const REQUIRED_PERMISSIONS = ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"];
 
 async function ensurePermissions(): Promise<bigint[]> {

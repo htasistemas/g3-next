@@ -14,6 +14,7 @@ import type { TenantContextoLogin } from "@/types/auth";
 const FOTO_LATERAL_URL = "/images/loguim.jpg";
 const LEMBRAR_ACESSO_STORAGE_KEY = "g3n_login_lembrar_acesso";
 const CNPJ_STORAGE_KEY = "g3n_login_cnpj";
+const EMAIL_MASTER_SEM_TENANT = "htasistemas@gmail.com";
 
 function normalizarValorAmbiente(valor: string | undefined) {
   const normalizado = valor?.trim();
@@ -105,6 +106,10 @@ function obterMensagemErro(error: any, fallback: string) {
   return error?.response?.data?.message ?? error?.response?.data?.mensagem ?? fallback;
 }
 
+function ehEmailMasterSemTenant(email: string) {
+  return email.trim().toLowerCase() === EMAIL_MASTER_SEM_TENANT;
+}
+
 export function LoginPage() {
   const [modalAberto, setModalAberto] = useState<"termos" | "politica" | "acesso" | null>(null);
   const [popupEsqueciSenhaAberto, setPopupEsqueciSenhaAberto] = useState(false);
@@ -168,7 +173,9 @@ export function LoginPage() {
     setAviso(null);
 
     const cnpjNormalizado = normalizarCnpj(cnpj);
-    if (!slugSubdominio && cnpjNormalizado.length !== 14) {
+    const emailNormalizado = email.trim().toLowerCase();
+    const dispensarInstituicao = !slugSubdominio && ehEmailMasterSemTenant(emailNormalizado);
+    if (!dispensarInstituicao && !slugSubdominio && cnpjNormalizado.length !== 14) {
       setErro("Informe o CNPJ da instituição para continuar.");
       return;
     }
@@ -189,9 +196,9 @@ export function LoginPage() {
       const destino = from || "/cadastros/beneficiarios";
       await Promise.all([
         login({
-          cnpj: slugSubdominio ? undefined : cnpjNormalizado,
+          cnpj: slugSubdominio || dispensarInstituicao ? undefined : cnpjNormalizado,
           slug: slugSubdominio,
-          email: email.trim().toLowerCase(),
+          email: emailNormalizado,
           senha
         }),
         precarregarRota(destino)
@@ -328,9 +335,11 @@ export function LoginPage() {
     setCarregandoRecuperacao(true);
 
     try {
+      const emailRecuperacaoNormalizado = emailRecuperacao.trim().toLowerCase();
+      const dispensarInstituicao = !slugSubdominio && ehEmailMasterSemTenant(emailRecuperacaoNormalizado);
       const resultado = await authService.esqueciSenha({
-        email: emailRecuperacao,
-        cnpj: slugSubdominio ? undefined : normalizarCnpj(cnpj) || undefined,
+        email: emailRecuperacaoNormalizado,
+        cnpj: slugSubdominio || dispensarInstituicao ? undefined : normalizarCnpj(cnpj) || undefined,
         slug: slugSubdominio
       });
       setMensagemRecuperacao(resultado.message);

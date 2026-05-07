@@ -54,6 +54,27 @@ type DashboardCard = {
   icon: LucideIcon;
 };
 
+type EnvioAgendamentoEmAndamento = {
+  agendamentoId: number;
+  canal: "WHATSAPP" | "EMAIL";
+  etapa: number;
+};
+
+const ETAPAS_ENVIO: Array<Record<"WHATSAPP" | "EMAIL", string>> = [
+  {
+    WHATSAPP: "Preparando links e validando contatos do WhatsApp...",
+    EMAIL: "Preparando envio e validando e-mails dos participantes..."
+  },
+  {
+    WHATSAPP: "Montando a fila de mensagens da agenda operacional...",
+    EMAIL: "Processando os destinatários da agenda operacional..."
+  },
+  {
+    WHATSAPP: "Finalizando os links para abertura do WhatsApp...",
+    EMAIL: "Finalizando o disparo dos e-mails da agenda..."
+  }
+];
+
 let janelaFichaAgendamentoAtual: Window | null = null;
 let urlFichaAgendamentoAtual: string | null = null;
 
@@ -364,6 +385,7 @@ export function AgendamentosPage() {
   const [beneficiariosSelecionados, setBeneficiariosSelecionados] = useState<number[]>([]);
   const [selecionadoId, setSelecionadoId] = useState<number | null>(null);
   const [popup, setPopup] = useState<PopupMensagemState | null>(null);
+  const [envioEmAndamento, setEnvioEmAndamento] = useState<EnvioAgendamentoEmAndamento | null>(null);
   const [confirmarCancelar, setConfirmarCancelar] = useState<Agendamento | null>(null);
   const [agendaParaExcluir, setAgendaParaExcluir] = useState<Agendamento | null>(null);
   const [agendaParaData, setAgendaParaData] = useState<{ acao: "copiar" | "mover"; item: Agendamento } | null>(null);
@@ -488,11 +510,32 @@ export function AgendamentosPage() {
 
   async function executarNotificacao(item: Agendamento, canal: "WHATSAPP" | "EMAIL") {
     if (!item.id) return;
+    const agendamentoId = Number(item.id);
+    let etapaAtual = 0;
+    setEnvioEmAndamento({ agendamentoId, canal, etapa: etapaAtual });
+
+    const intervalo = window.setInterval(() => {
+      etapaAtual = Math.min(etapaAtual + 1, ETAPAS_ENVIO.length - 1);
+      setEnvioEmAndamento((atual) => {
+        if (!atual || atual.agendamentoId !== agendamentoId || atual.canal !== canal) {
+          return atual;
+        }
+        return { ...atual, etapa: etapaAtual };
+      });
+    }, 1200);
+
     try {
       const resultado = await notificarMutation.mutateAsync({ id: item.id, canal });
       if (canal === "WHATSAPP") {
         (resultado.links ?? []).slice(0, 10).forEach((link) => window.open(link, "_blank", "noopener,noreferrer"));
       }
+      window.clearInterval(intervalo);
+      setEnvioEmAndamento((atual) => {
+        if (!atual || atual.agendamentoId !== agendamentoId || atual.canal !== canal) {
+          return atual;
+        }
+        return null;
+      });
       setPopup({
         tipo: "sucesso",
         titulo: "Confirmação",
@@ -502,6 +545,13 @@ export function AgendamentosPage() {
             : `Links de WhatsApp preparados. Enviados: ${resultado.enviados}. Ignorados: ${resultado.ignorados}.`
       });
     } catch (error: any) {
+      window.clearInterval(intervalo);
+      setEnvioEmAndamento((atual) => {
+        if (!atual || atual.agendamentoId !== agendamentoId || atual.canal !== canal) {
+          return atual;
+        }
+        return null;
+      });
       setPopup({ tipo: "erro", titulo: "Erro", texto: error?.response?.data?.message ?? "Não foi possível enviar a comunicação." });
     }
   }
@@ -928,6 +978,7 @@ export function AgendamentosPage() {
                   <AgendaCardList
                     cards={cardsDoDia}
                     selecionadoId={selecionadoId}
+                    envioEmAndamento={envioEmAndamento}
                     onAlternarConfirmacao={(item, index) => void alternarConfirmacaoParticipante(item, index)}
                     onMoverParticipante={(item, index) => solicitarMoverParticipante(item, index)}
                     onExcluirParticipante={(item, index) => solicitarExcluirParticipante(item, index)}

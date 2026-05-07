@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.483",
-  "releaseDate": "2026-05-06",
-  "description": "Agendamentos operacionais passaram a hidratar os telefones dos cards diretamente dos matriculados do item operacional quando o agendamento antigo nao trouxer vinculos suficientes.",
+  "latestVersion": "1.00.485",
+  "releaseDate": "2026-05-07",
+  "description": "Os cards da aba Agendamento passaram a mostrar andamento visual durante o envio por WhatsApp e e-mail.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.483",
+  "minCompatibleVersion": "1.00.485",
   "releaseType": "stable"
 }
 

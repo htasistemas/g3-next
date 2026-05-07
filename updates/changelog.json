@@ -1,6 +1,28 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.485",
+                        "releaseDate":  "2026-05-07",
+                        "title":  "Agendamentos com progresso visual no envio",
+                        "description":  "A aba Agendamento passou a mostrar o andamento do envio por WhatsApp e e-mail nos cards da agenda operacional.",
+                        "changes":  [
+                                        "Os botões de WhatsApp e e-mail agora exibem carregamento no próprio card durante o processamento.",
+                                        "A tela passou a mostrar faixa de andamento com etapas visuais para o usuário entender que o envio ainda está em curso.",
+                                        "O manual do sistema e a versão oficial foram atualizados na mesma entrega."
+                                    ]
+                    },
+                    {
+                        "version":  "1.00.484",
+                        "releaseDate":  "2026-05-07",
+                        "title":  "Login master sem exigencia de CNPJ",
+                        "description":  "O e-mail master htasistemas@gmail.com passou a acessar e recuperar senha sem precisar informar CNPJ, codigo ou slug da instituicao.",
+                        "changes":  [
+                                        "A validacao de login do backend passou a dispensar identificacao da instituicao apenas para o e-mail master.",
+                                        "A tela de login do frontend deixou de exigir CNPJ para esse e-mail e envia o acesso sem tenant manual.",
+                                        "O manual do sistema e a versao oficial foram atualizados na mesma entrega."
+                                    ]
+                    },
+                    {
                         "version":  "1.00.434",
                         "releaseDate":  "2026-05-05",
                         "title":  "Administrador master protegido contra bloqueio de acesso",
