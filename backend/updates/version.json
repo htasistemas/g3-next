@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.485",
+  "latestVersion": "1.00.486",
   "releaseDate": "2026-05-07",
-  "description": "Os cards da aba Agendamento passaram a mostrar andamento visual durante o envio por WhatsApp e e-mail.",
+  "description": "A interface passou a ler a versão instalada em runtime pelo backend para evitar número defasado em produção.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.485",
+  "minCompatibleVersion": "1.00.486",
   "releaseType": "stable"
 }
 

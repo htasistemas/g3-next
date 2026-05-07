@@ -1,6 +1,17 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.486",
+                        "releaseDate":  "2026-05-07",
+                        "title":  "Versão da interface sincronizada em runtime",
+                        "description":  "A interface passou a consultar a versão instalada diretamente no backend para evitar número desatualizado em produção.",
+                        "changes":  [
+                                        "O endpoint público de saúde agora informa a versão instalada da instância.",
+                                        "Login, cabeçalho e tela Sobre o sistema passaram a usar a versão retornada em runtime pelo backend.",
+                                        "O manual do sistema e a versão oficial foram atualizados na mesma entrega."
+                                    ]
+                    },
+                    {
                         "version":  "1.00.485",
                         "releaseDate":  "2026-05-07",
                         "title":  "Agendamentos com progresso visual no envio",

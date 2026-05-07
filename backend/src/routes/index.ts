@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { readFileSync } from "node:fs";
 import { authRoutes } from "../modules/auth/routes/auth.routes.js";
 import { beneficiarioRoutes } from "../modules/beneficiarios/routes/beneficiario.routes.js";
 import { familiaRoutes } from "../modules/familias/routes/familia.routes.js";
@@ -56,11 +57,22 @@ import { vendaRoutes } from "../modules/vendas/routes/venda.routes.js";
 import { carteiraEventoRoutes } from "../modules/carteira-evento/routes/carteira-evento.routes.js";
 import { agendamentosRoutes } from "../modules/agendamentos/routes/agendamentos.routes.js";
 import { instituicoesRoutes } from "../modules/instituicoes/routes/instituicoes.routes.js";
+import { obterAtualizacaoSistemaPaths } from "../modules/atualizacao-sistema/services/atualizacao-sistema.paths.js";
 
 export const appRoutes = Router();
 
+function obterVersaoSaude() {
+  try {
+    const conteudo = readFileSync(obterAtualizacaoSistemaPaths().arquivoVersaoInstalada, "utf-8");
+    const versao = conteudo.trim();
+    return versao || "0.0.0";
+  } catch {
+    return "0.0.0";
+  }
+}
+
 appRoutes.get("/health", (_request, response) => {
-  response.json({ status: "ok", service: "g3-backend-node" });
+  response.json({ status: "ok", service: "g3-backend-node", version: obterVersaoSaude() });
 });
 
 appRoutes.use("/api/auth", authRoutes);

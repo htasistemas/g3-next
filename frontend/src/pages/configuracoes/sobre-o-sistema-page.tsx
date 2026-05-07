@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/use-auth";
+import { useSystemVersion } from "@/hooks/use-system-version";
 import { APP_VERSION } from "@/lib/app-version";
 
 type AbaId = "geral";
@@ -94,7 +95,7 @@ function obterUltimaAtualizacao() {
   return valor;
 }
 
-function obterInformacoesTela(): InformacoesTela {
+function obterInformacoesTela(versaoSistema: string): InformacoesTela {
   const agora = new Date();
   const ultimaAtualizacao = obterUltimaAtualizacao();
   const baseAplicacao = typeof window !== "undefined" ? window.location.origin : "Não informado";
@@ -104,8 +105,8 @@ function obterInformacoesTela(): InformacoesTela {
   const idioma = typeof navigator !== "undefined" ? navigator.language || "pt-BR" : "pt-BR";
 
   return {
-    versao: APP_VERSION || "Não informado",
-    release: APP_VERSION || "Não informado",
+    versao: versaoSistema || "Não informado",
+    release: versaoSistema || "Não informado",
     ambiente: detectarAmbiente(),
     ultimaAtualizacaoData: formatarData(ultimaAtualizacao),
     ultimaAtualizacaoHora: formatarHora(ultimaAtualizacao),
@@ -137,13 +138,14 @@ function montarTextoTecnico(informacoes: InformacoesTela, usuarioLogado: string,
 }
 
 export function SobreOSistemaPage() {
+  const { version: versaoSistema } = useSystemVersion();
   const navigate = useNavigate();
   const location = useLocation();
   const { usuario } = useAuth();
   const [abaAtiva, setAbaAtiva] = useState<AbaId>("geral");
   const [popup, setPopup] = useState<PopupMensagemState | null>(null);
   const [loading, setLoading] = useState(false);
-  const [informacoes, setInformacoes] = useState<InformacoesTela>(() => obterInformacoesTela());
+  const [informacoes, setInformacoes] = useState<InformacoesTela>(() => obterInformacoesTela(versaoSistema || APP_VERSION));
 
   const usuarioLogado = usuario?.nome || usuario?.nomeUsuario || "Não informado";
   const instituicaoVinculada = "Não informado";
@@ -151,11 +153,11 @@ export function SobreOSistemaPage() {
 
   useEffect(() => {
     const intervalo = window.setInterval(() => {
-      setInformacoes(obterInformacoesTela());
+      setInformacoes(obterInformacoesTela(versaoSistema || APP_VERSION));
     }, 60_000);
 
     return () => window.clearInterval(intervalo);
-  }, []);
+  }, [versaoSistema]);
 
   const cardsProduto = useMemo(
     () => [
@@ -207,7 +209,7 @@ export function SobreOSistemaPage() {
   const atualizarInformacoes = async () => {
     setLoading(true);
     try {
-      setInformacoes(obterInformacoesTela());
+      setInformacoes(obterInformacoesTela(versaoSistema || APP_VERSION));
       setPopup({
         tipo: "sucesso",
         titulo: "Informações atualizadas",

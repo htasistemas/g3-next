@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
-import { APP_VERSION } from "@/lib/app-version";
+import { useSystemVersion } from "@/hooks/use-system-version";
 import { formatarCnpj, normalizarCnpj } from "@/lib/br-utils";
 import { precarregarRota } from "@/routes/route-modules";
 import { authService } from "@/services/auth.service";
@@ -135,7 +135,7 @@ export function LoginPage() {
   const [aviso, setAviso] = useState<string | null>(null);
   const [mensagemRecuperacao, setMensagemRecuperacao] = useState<string | null>(null);
   const [googleBotaoPronto, setGoogleBotaoPronto] = useState(false);
-  const versaoSistema = APP_VERSION;
+  const { version: versaoSistema } = useSystemVersion();
   const googleButtonRef = useRef<HTMLDivElement | null>(null);
   const origemAtual = typeof window === "undefined" ? "" : window.location.origin;
   const googleAviso = !GOOGLE_CLIENT_ID

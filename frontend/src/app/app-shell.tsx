@@ -6,7 +6,7 @@ import { DatasComemorativasPopup } from "@/components/system/datas-comemorativas
 import { AIChatWidget } from "@/modules/ai/components/AIChatWidget";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
-import { APP_VERSION } from "@/lib/app-version";
+import { useSystemVersion } from "@/hooks/use-system-version";
 import { obterUrlArquivoAutenticado, resolverUrlArquivo } from "@/lib/arquivos";
 import { precarregarRota, precarregarRotas } from "@/routes/route-modules";
 import { useResumoLembretesDiarios } from "@/features/lembretes-diarios/use-lembretes-diarios";
@@ -663,7 +663,7 @@ export function AppShell() {
   const navigate = useNavigate();
   const titulo = obterTitulo(location.pathname);
   const semTituloNoTopo = ocultarTituloTopo(location.pathname);
-  const versaoSistema = APP_VERSION;
+  const { version: versaoSistema } = useSystemVersion();
   const [sidebarRecolhida, setSidebarRecolhida] = useState(false);
   const [gruposAbertos, setGruposAbertos] = useState<Record<string, boolean>>({});
   const [lembreteAlertaAtivo, setLembreteAlertaAtivo] = useState(false);
