@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.486",
-  "releaseDate": "2026-05-07",
-  "description": "A interface passou a ler a versão instalada em runtime pelo backend para evitar número defasado em produção.",
+  "latestVersion": "1.00.487",
+  "releaseDate": "2026-05-12",
+  "description": "A nova tela Projetos foi adicionada ao Setor Administrativo com cards, dashboard, tarefas, Kanban e relatórios em PDF por instituição.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.486",
+  "minCompatibleVersion": "1.00.487",
   "releaseType": "stable"
 }
 

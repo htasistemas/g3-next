@@ -1,6 +1,18 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.487",
+                        "releaseDate":  "2026-05-12",
+                        "title":  "Setor Administrativo com nova tela Projetos",
+                        "description":  "O G3N passou a contar com a tela Projetos no Setor Administrativo para gestão simples de projetos sociais, tarefas, Kanban, indicadores e relatórios por instituição.",
+                        "changes":  [
+                                        "A nova tela Projetos foi adicionada ao menu Setor Administrativo com listagem em cards, filtros, cadastro, edição, inativação e visualização detalhada.",
+                                        "Cada projeto agora permite tarefas vinculadas com Kanban por arraste, atualização automática de status, histórico de movimentações e indicadores reais do banco.",
+                                        "Foram incluídos dashboard, relatórios PDF por tipo e permissões granulares específicas do módulo, respeitando o isolamento multi-tenant por instituição.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ]
+                    },
+                    {
                         "version":  "1.00.486",
                         "releaseDate":  "2026-05-07",
                         "title":  "Versão da interface sincronizada em runtime",

@@ -43,6 +43,7 @@ import { SenhasPainelComponent } from './components/senhas-painel/senhas-painel.
 import { LembretesDiariosComponent } from './components/lembretes-diarios/lembretes-diarios.component';
 import { FolhaPontoComponent } from './components/folha-ponto/folha-ponto.component';
 import { ContratacaoComponent } from './components/contratacao/contratacao.component';
+import { ProjetosComponent } from './components/projetos/projetos.component';
 
 export const routes: Routes = [
   { path: 'login', component: LoginComponent },
@@ -173,6 +174,11 @@ export const routes: Routes = [
         path: 'administrativo/tarefas',
         component: TarefasPendenciasComponent,
         data: { title: 'Tarefas e pendencias' }
+      },
+      {
+        path: 'administrativo/projetos',
+        component: ProjetosComponent,
+        data: { title: 'Projetos' }
       },
       {
         path: 'administrativo/fotos-eventos',

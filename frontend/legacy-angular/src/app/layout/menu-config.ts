@@ -146,6 +146,11 @@ const rawMenuSections: MenuItem[] = [
       },
       { label: 'Fotos e Eventos', icon: faImages, route: '/administrativo/fotos-eventos' },
       {
+        label: 'Projetos',
+        icon: faClipboardCheck,
+        route: '/administrativo/projetos'
+      },
+      {
         label: 'Gestão de Documentos',
         icon: faFolderOpen,
         route: '/administrativo/documentos',

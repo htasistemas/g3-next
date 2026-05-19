@@ -60,13 +60,20 @@ export class AuthService {
   constructor(private readonly http: HttpClient, private readonly router: Router) {}
 
   login(nomeUsuario: string, senha: string): Observable<LoginResponse> {
+    const loginNormalizado = nomeUsuario.trim();
+    const email = loginNormalizado.includes('@') ? loginNormalizado.toLowerCase() : undefined;
+
     return this.http
-      .post<LoginResponse>(`${this.baseUrl}/login`, { nomeUsuario, senha })
+      .post<LoginResponse>(`${this.baseUrl}/login`, {
+        nomeUsuario: loginNormalizado,
+        email,
+        senha
+      })
       .pipe(
         timeout(this.requestTimeoutMs),
         tap((response) => {
           const usuario =
-            response.usuario ?? { id: '0', nomeUsuario };
+            response.usuario ?? { id: '0', nomeUsuario: loginNormalizado };
           this.persistSession({
             ...response,
             user: usuario,

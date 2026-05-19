@@ -7,6 +7,10 @@ function ehEmailMasterSemTenant(email?: string) {
   return email?.trim().toLowerCase() === EMAIL_MASTER_SEM_TENANT;
 }
 
+function ehLoginMasterSemTenant(login?: string) {
+  return login?.trim().toLowerCase() === EMAIL_MASTER_SEM_TENANT;
+}
+
 export const authLoginSchema = z.object({
   cnpj: z
     .string()
@@ -23,7 +27,8 @@ export const authLoginSchema = z.object({
   const possuiUsuario = Boolean(value.nomeUsuario?.trim());
   const possuiInstituicao =
     Boolean(value.cnpj?.trim()) || Boolean(value.codigoInstituicao?.trim()) || Boolean(value.slug?.trim());
-  const dispensarInstituicao = ehEmailMasterSemTenant(value.email);
+  const dispensarInstituicao =
+    ehEmailMasterSemTenant(value.email) || ehLoginMasterSemTenant(value.nomeUsuario);
 
   if (!possuiEmail && !possuiUsuario) {
     ctx.addIssue({

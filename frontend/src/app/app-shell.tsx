@@ -319,6 +319,12 @@ export const menuSections: MenuSection[] = [
         icon: ImageIcon
       },
       {
+        id: "setor-administrativo-projetos",
+        to: "/setor-administrativo/projetos",
+        label: "Projetos",
+        icon: FolderKanban
+      },
+      {
         id: "setor-administrativo-gestao-documentos",
         to: "/setor-administrativo/gestao-documentos",
         label: "Gestão de documentos",
@@ -602,6 +608,7 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/setor-administrativo/controle-veiculos")) return "Controle de veículos";
   if (pathname.startsWith("/setor-administrativo/emprestimo-eventos")) return "Empréstimo para eventos";
   if (pathname.startsWith("/setor-administrativo/fotos-eventos")) return "Fotos e eventos";
+  if (pathname.startsWith("/setor-administrativo/projetos")) return "Projetos";
   if (pathname.startsWith("/setor-administrativo/gestao-documentos")) return "Gestão de documentos";
   if (pathname.startsWith("/setor-administrativo/oficios-protocolos")) return "Ofícios e protocolos";
   if (pathname.startsWith("/setor-administrativo/patrimonio")) return "Patrimônio";

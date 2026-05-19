@@ -176,6 +176,7 @@ const EmprestimoEventosPage = carregarPagina(
   "EmprestimoEventosPage"
 );
 const FotosEventosPage = carregarPagina("/setor-administrativo/fotos-eventos", "FotosEventosPage");
+const ProjetosPage = carregarPagina("/setor-administrativo/projetos", "ProjetosPage");
 const GestaoDocumentosPage = carregarPagina(
   "/setor-administrativo/gestao-documentos",
   "GestaoDocumentosPage"
@@ -366,6 +367,7 @@ export const router = createBrowserRouter([
       { path: "/setor-administrativo/controle-veiculos", element: ControleVeiculosPage },
       { path: "/setor-administrativo/emprestimo-eventos", element: EmprestimoEventosPage },
       { path: "/setor-administrativo/fotos-eventos", element: FotosEventosPage },
+      { path: "/setor-administrativo/projetos", element: ProjetosPage },
       { path: "/setor-administrativo/gestao-documentos", element: GestaoDocumentosPage },
       { path: "/setor-administrativo/oficios-protocolos", element: OficiosProtocolosPage },
       { path: "/setor-administrativo/patrimonio", element: PatrimonioPage },

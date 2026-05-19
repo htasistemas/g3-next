@@ -105,6 +105,10 @@ const routeModules: RouteModuleDefinition[] = [
     loader: () => import("@/pages/setor-administrativo/fotos-eventos-page")
   },
   {
+    path: "/setor-administrativo/projetos",
+    loader: () => import("@/pages/setor-administrativo/projetos-page")
+  },
+  {
     path: "/setor-administrativo/gestao-documentos",
     loader: () => import("@/pages/setor-administrativo/gestao-documentos-page")
   },

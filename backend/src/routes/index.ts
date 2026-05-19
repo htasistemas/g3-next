@@ -57,6 +57,7 @@ import { vendaRoutes } from "../modules/vendas/routes/venda.routes.js";
 import { carteiraEventoRoutes } from "../modules/carteira-evento/routes/carteira-evento.routes.js";
 import { agendamentosRoutes } from "../modules/agendamentos/routes/agendamentos.routes.js";
 import { instituicoesRoutes } from "../modules/instituicoes/routes/instituicoes.routes.js";
+import { projetoRoutes } from "../modules/projetos/routes/projeto.routes.js";
 import { obterAtualizacaoSistemaPaths } from "../modules/atualizacao-sistema/services/atualizacao-sistema.paths.js";
 
 export const appRoutes = Router();
@@ -95,6 +96,7 @@ appRoutes.use("/api/almoxarifado", almoxarifadoRoutes);
 appRoutes.use("/api/controle-veiculos", controleVeiculosRoutes);
 appRoutes.use("/api/patrimonios", patrimonioRoutes);
 appRoutes.use("/api/administrativo/tarefas", tarefaAdministrativaRoutes);
+appRoutes.use("/api/administrativo/projetos", projetoRoutes);
 appRoutes.use("/api/administrativo/checklist-diario", checklistDiarioRoutes);
 appRoutes.use("/api/lembretes-diarios", lembreteDiarioRoutes);
 appRoutes.use("/api/emprestimos-eventos", emprestimosEventosRoutes);

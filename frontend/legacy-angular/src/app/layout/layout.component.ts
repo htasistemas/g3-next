@@ -223,7 +223,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
         const children =
           section.children?.filter((child) => {
             if (!child.permissao) return true;
-            return permissoes.includes(child.permissao);
+            return permissoes.includes('ADMINISTRADOR') || permissoes.includes(child.permissao);
           }) ?? [];
         return { ...section, children };
       })
