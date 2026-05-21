@@ -56,6 +56,11 @@ export function mapCaptacaoDoador(row: SqlRow) {
     aceitaWhatsapp: Boolean(row.aceita_whatsapp),
     aceitaReceberCampanhas: Boolean(row.aceita_receber_campanhas),
     categoriaDoador: toOptionalString(row.categoria_doador),
+    segmentoRelacionamento: toOptionalString(row.segmento_relacionamento),
+    statusRetencao: toOptionalString(row.status_retencao),
+    motivoRisco: toOptionalString(row.motivo_risco),
+    proximaAcaoSugerida: toOptionalString(row.proxima_acao_sugerida),
+    scoreRelacionamento: toNumber(row.score_relacionamento),
     responsavelRelacionamento: toOptionalString(row.responsavel_relacionamento),
     observacoesInternas: toOptionalString(row.observacoes_internas),
     portalAtivo: Boolean(row.portal_ativo),
@@ -67,6 +72,25 @@ export function mapCaptacaoDoador(row: SqlRow) {
     maiorDoacao: toNumber(row.maior_doacao),
     campanhasApoiadas: toNumber(row.campanhas_apoiadas),
     recorrenciaAtiva: Boolean(row.recorrencia_ativa),
+    createdAt: toOptionalDateTime(row.created_at),
+    updatedAt: toOptionalDateTime(row.updated_at)
+  };
+}
+
+export function mapCaptacaoTarefaRelacionamento(row: SqlRow) {
+  return {
+    id: toStringId(row.id as bigint | number),
+    uuid: toOptionalString(row.uuid) ?? "",
+    doadorId: toOptionalString(row.doador_id) ?? "",
+    titulo: toOptionalString(row.titulo) ?? "",
+    descricao: toOptionalString(row.descricao),
+    status: toOptionalString(row.status) ?? "pendente",
+    prioridade: toOptionalString(row.prioridade) ?? "media",
+    tipo: toOptionalString(row.tipo) ?? "follow_up",
+    responsavel: toOptionalString(row.responsavel),
+    dataPrevista: toOptionalDate(row.data_prevista),
+    concluidaEm: toOptionalDateTime(row.concluida_em),
+    origem: toOptionalString(row.origem) ?? "manual",
     createdAt: toOptionalDateTime(row.created_at),
     updatedAt: toOptionalDateTime(row.updated_at)
   };

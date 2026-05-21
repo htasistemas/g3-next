@@ -82,6 +82,11 @@ export type CaptacaoDoador = {
   aceitaWhatsapp: boolean;
   aceitaReceberCampanhas: boolean;
   categoriaDoador?: string;
+  segmentoRelacionamento?: string;
+  statusRetencao?: string;
+  motivoRisco?: string;
+  proximaAcaoSugerida?: string;
+  scoreRelacionamento?: number;
   responsavelRelacionamento?: string;
   observacoesInternas?: string;
   portalAtivo: boolean;
@@ -93,6 +98,23 @@ export type CaptacaoDoador = {
   maiorDoacao: number;
   campanhasApoiadas: number;
   recorrenciaAtiva: boolean;
+};
+
+export type CaptacaoTarefaRelacionamento = {
+  id: string;
+  uuid: string;
+  doadorId: string;
+  titulo: string;
+  descricao?: string;
+  status: string;
+  prioridade: string;
+  tipo: string;
+  responsavel?: string;
+  dataPrevista?: string;
+  concluidaEm?: string;
+  origem: string;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type CaptacaoCampanha = {

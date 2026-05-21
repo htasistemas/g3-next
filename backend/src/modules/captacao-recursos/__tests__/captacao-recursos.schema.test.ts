@@ -3,7 +3,8 @@ import test from "node:test";
 import {
   captacaoCampanhaInputSchema,
   captacaoDoadorInputSchema,
-  captacaoPortalLoginSchema
+  captacaoPortalLoginSchema,
+  captacaoTarefaRelacionamentoInputSchema
 } from "../captacao-recursos.schema.js";
 
 test("captacaoDoadorInputSchema aceita doador anonimo sem documento", () => {
@@ -49,4 +50,32 @@ test("captacaoPortalLoginSchema normaliza e-mail informado pelo doador", () => {
   });
 
   assert.equal(resultado.email, "doador@exemplo.org");
+});
+
+test("captacaoDoadorInputSchema aceita campos de retencao e segmentacao", () => {
+  const resultado = captacaoDoadorInputSchema.parse({
+    tipoDoador: "pessoa_fisica",
+    nome: "Carlos doador",
+    status: "ativo",
+    segmentoRelacionamento: "Base recorrente",
+    statusRetencao: "em_recuperacao",
+    motivoRisco: "Ultima doacao acima de 120 dias",
+    proximaAcaoSugerida: "Ligar e oferecer retomada mensal",
+    scoreRelacionamento: "78"
+  });
+
+  assert.equal(resultado.segmentoRelacionamento, "Base recorrente");
+  assert.equal(resultado.statusRetencao, "em_recuperacao");
+  assert.equal(resultado.scoreRelacionamento, 78);
+});
+
+test("captacaoTarefaRelacionamentoInputSchema exige titulo minimo e normaliza data", () => {
+  const resultado = captacaoTarefaRelacionamentoInputSchema.parse({
+    titulo: "Ligar para reter doador",
+    dataPrevista: "21-05-2026"
+  });
+
+  assert.equal(resultado.titulo, "Ligar para reter doador");
+  assert.equal(resultado.dataPrevista, "2026-05-21");
+  assert.equal(resultado.status, "pendente");
 });

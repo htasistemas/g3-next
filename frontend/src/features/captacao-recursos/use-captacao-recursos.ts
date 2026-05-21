@@ -80,6 +80,17 @@ export function useCaptacaoLogs(enabled = true) {
   });
 }
 
+export function useCaptacaoTarefasRelacionamento(doadorId?: string, enabled = true) {
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? "sem-tenant";
+  return useQuery({
+    queryKey: ["captacao-recursos", tenantId, "tarefas-relacionamento", doadorId ?? ""],
+    queryFn: () => captacaoRecursosService.listarTarefasRelacionamento(doadorId as string),
+    enabled: enabled && Boolean(doadorId),
+    staleTime: 15_000
+  });
+}
+
 function invalidateBase(queryClient: ReturnType<typeof useQueryClient>, tenantId: string) {
   return Promise.all([
     queryClient.invalidateQueries({ queryKey: ["captacao-recursos", tenantId, "dashboard"] }),
@@ -108,6 +119,37 @@ export function useInativarDoadorCaptacao() {
   return useMutation({
     mutationFn: (id: string) => captacaoRecursosService.inativarDoador(id),
     onSuccess: () => invalidateBase(queryClient, tenantId)
+  });
+}
+
+export function useSalvarTarefaRelacionamentoCaptacao() {
+  const queryClient = useQueryClient();
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? "sem-tenant";
+  return useMutation({
+    mutationFn: ({ doadorId, payload }: { doadorId: string; payload: Record<string, unknown> }) =>
+      captacaoRecursosService.salvarTarefaRelacionamento(doadorId, payload),
+    onSuccess: async (_, vars) => {
+      await invalidateBase(queryClient, tenantId);
+      await queryClient.invalidateQueries({
+        queryKey: ["captacao-recursos", tenantId, "tarefas-relacionamento", vars.doadorId]
+      });
+    }
+  });
+}
+
+export function useConcluirTarefaRelacionamentoCaptacao() {
+  const queryClient = useQueryClient();
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? "sem-tenant";
+  return useMutation({
+    mutationFn: ({ id }: { id: string }) => captacaoRecursosService.concluirTarefaRelacionamento(id),
+    onSuccess: async (tarefa) => {
+      await invalidateBase(queryClient, tenantId);
+      await queryClient.invalidateQueries({
+        queryKey: ["captacao-recursos", tenantId, "tarefas-relacionamento", tarefa.doadorId]
+      });
+    }
   });
 }
 

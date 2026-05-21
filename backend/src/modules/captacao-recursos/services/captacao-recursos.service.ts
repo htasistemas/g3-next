@@ -16,7 +16,8 @@ import {
   mapCaptacaoDoacao,
   mapCaptacaoDoador,
   mapCaptacaoLog,
-  mapCaptacaoRecorrencia
+  mapCaptacaoRecorrencia,
+  mapCaptacaoTarefaRelacionamento
 } from "../captacao-recursos.mapper.js";
 import {
   captacaoAcaoDoacaoSchema,
@@ -26,7 +27,8 @@ import {
   captacaoDoadorInputSchema,
   captacaoListFiltersSchema,
   captacaoPortalLoginSchema,
-  captacaoPortalTokenSchema
+  captacaoPortalTokenSchema,
+  captacaoTarefaRelacionamentoInputSchema
 } from "../captacao-recursos.schema.js";
 import { CaptacaoRecursosRepository } from "../repositories/captacao-recursos.repository.js";
 import { MockPaymentProviderService } from "../providers/mock-payment-provider.service.js";
@@ -244,6 +246,47 @@ export class CaptacaoRecursosService {
     const row = await this.repository.inativarDoador(parseId(rawId), parseUserId(userId), tenantId);
     await this.repository.registrarLog("doador", BigInt(String(row.id)), "INATIVACAO", "Doador inativado.", { doadorId: rawId }, parseUserId(userId), tenantId);
     return { doador: mapCaptacaoDoador(await this.repository.buscarDoadorPorIdOuFalhar(BigInt(String(row.id)), tenantId)) };
+  }
+
+  async listTarefasRelacionamento(rawDoadorId: string, rawTenantId?: string) {
+    const tenantId = parseTenant(rawTenantId);
+    const doadorId = parseId(rawDoadorId);
+    await this.repository.buscarDoadorPorIdOuFalhar(doadorId, tenantId);
+    const rows = await this.repository.listarTarefasRelacionamentoPorDoador(doadorId, tenantId);
+    return { tarefas: rows.map(mapCaptacaoTarefaRelacionamento) };
+  }
+
+  async saveTarefaRelacionamento(rawDoadorId: string, rawInput: unknown, userId?: string, rawTenantId?: string) {
+    const tenantId = parseTenant(rawTenantId);
+    const doadorId = parseId(rawDoadorId);
+    await this.repository.buscarDoadorPorIdOuFalhar(doadorId, tenantId);
+    const payload = captacaoTarefaRelacionamentoInputSchema.parse(rawInput ?? {});
+    const row = await this.repository.salvarTarefaRelacionamento(doadorId, payload, parseUserId(userId), tenantId);
+    await this.repository.registrarLog(
+      "doador",
+      doadorId,
+      "TAREFA_RELACIONAMENTO_CRIADA",
+      `Tarefa de relacionamento criada: ${payload.titulo}`,
+      { doadorId: rawDoadorId, tarefaId: String(row.id), titulo: payload.titulo },
+      parseUserId(userId),
+      tenantId
+    );
+    return { tarefa: mapCaptacaoTarefaRelacionamento(row) };
+  }
+
+  async concluirTarefaRelacionamento(rawId: string, userId?: string, rawTenantId?: string) {
+    const tenantId = parseTenant(rawTenantId);
+    const row = await this.repository.concluirTarefaRelacionamento(parseId(rawId), parseUserId(userId), tenantId);
+    await this.repository.registrarLog(
+      "doador",
+      BigInt(String(row.doador_id)),
+      "TAREFA_RELACIONAMENTO_CONCLUIDA",
+      `Tarefa de relacionamento concluída: ${String(row.titulo ?? "")}`,
+      { tarefaId: rawId, doadorId: String(row.doador_id ?? "") },
+      parseUserId(userId),
+      tenantId
+    );
+    return { tarefa: mapCaptacaoTarefaRelacionamento(row) };
   }
 
   async listCampanhas(rawFilters: unknown, rawTenantId?: string) {

@@ -54,7 +54,7 @@ export class AuthController {
     await authService.esqueciSenha(request.body);
     return response.status(200).json({
       message:
-        "Se o e-mail informado estiver cadastrado nesta instituicao, uma senha temporaria foi enviada. Use o mesmo CNPJ e o mesmo e-mail na tela de login."
+        "Se o e-mail informado estiver cadastrado, uma senha temporaria foi enviada. Para acessos institucionais, use o mesmo CNPJ e o mesmo e-mail na tela de login."
     });
   }
 

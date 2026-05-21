@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
+  CheckCircle2,
   CircleDollarSign,
   Copy,
   Download,
@@ -55,6 +56,8 @@ import {
   useCaptacaoDoacoes,
   useCaptacaoDoadores,
   useCaptacaoLogs,
+  useCaptacaoTarefasRelacionamento,
+  useConcluirTarefaRelacionamentoCaptacao,
   useConfirmarDoacaoCaptacao,
   useEmitirComprovanteCaptacao,
   useEstornarDoacaoCaptacao,
@@ -64,7 +67,8 @@ import {
   useSalvarCampanhaCaptacao,
   useSalvarConfiguracoesCaptacao,
   useSalvarDoacaoCaptacao,
-  useSalvarDoadorCaptacao
+  useSalvarDoadorCaptacao,
+  useSalvarTarefaRelacionamentoCaptacao
 } from "@/features/captacao-recursos/use-captacao-recursos";
 import { useAuth } from "@/hooks/use-auth";
 import { abrirArquivoAutenticado, imprimirArquivoAutenticado } from "@/lib/arquivos";
@@ -95,7 +99,8 @@ import type {
   CaptacaoDoacao,
   CaptacaoDoador,
   CaptacaoListFilters,
-  CaptacaoLogItem
+  CaptacaoLogItem,
+  CaptacaoTarefaRelacionamento
 } from "@/types/captacao-recursos";
 import {
   badgeClasseStatus,
@@ -154,10 +159,24 @@ type DoadorFormState = {
   aceitaWhatsapp: boolean;
   aceitaReceberCampanhas: boolean;
   categoriaDoador: string;
+  segmentoRelacionamento: string;
+  statusRetencao: string;
+  motivoRisco: string;
+  proximaAcaoSugerida: string;
+  scoreRelacionamento: string;
   responsavelRelacionamento: string;
   observacoesInternas: string;
   portalAtivo: boolean;
   anexoPrincipalCaminho: string;
+};
+
+type TarefaRelacionamentoFormState = {
+  titulo: string;
+  descricao: string;
+  prioridade: string;
+  tipo: string;
+  responsavel: string;
+  dataPrevista: string;
 };
 
 type CampanhaFormState = {
@@ -214,6 +233,7 @@ type DoadorAbaInterna =
   | "dados"
   | "contato"
   | "endereco"
+  | "retencao"
   | "historico"
   | "campanhas"
   | "comprovantes"
@@ -221,8 +241,8 @@ type DoadorAbaInterna =
   | "anexos";
 
 const abas: AdminTab[] = [
-  { id: "dashboard", label: "Dashboard de captação", icon: LayoutDashboard },
-  { id: "doadores", label: "Doadores", icon: UsersRound },
+  { id: "dashboard", label: "Cockpit de captação", icon: LayoutDashboard },
+  { id: "doadores", label: "Doadores 360", icon: UsersRound },
   { id: "doacoes", label: "Doações", icon: CircleDollarSign },
   { id: "campanhas", label: "Campanhas", icon: HandCoins },
   { id: "portal", label: "Portal doador", icon: ShieldUser },
@@ -256,10 +276,24 @@ const defaultDoadorForm: DoadorFormState = {
   aceitaWhatsapp: true,
   aceitaReceberCampanhas: true,
   categoriaDoador: "individual",
+  segmentoRelacionamento: "",
+  statusRetencao: "",
+  motivoRisco: "",
+  proximaAcaoSugerida: "",
+  scoreRelacionamento: "",
   responsavelRelacionamento: "",
   observacoesInternas: "",
   portalAtivo: true,
   anexoPrincipalCaminho: ""
+};
+
+const defaultTarefaRelacionamentoForm: TarefaRelacionamentoFormState = {
+  titulo: "",
+  descricao: "",
+  prioridade: "media",
+  tipo: "follow_up",
+  responsavel: "",
+  dataPrevista: ""
 };
 
 const defaultCampanhaForm: CampanhaFormState = {
@@ -327,6 +361,138 @@ const defaultFiltros: CaptacaoListFilters = {
 
 const coresGraficos = ["#0f766e", "#2563eb", "#7c3aed", "#d97706", "#dc2626", "#0891b2"];
 
+function formatarPercentual(valor?: number | null) {
+  return `${Number(valor ?? 0).toLocaleString("pt-BR", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1
+  })}%`;
+}
+
+function somarValores(lista: Array<number | undefined | null>) {
+  return lista.reduce((total, item) => total + Number(item ?? 0), 0);
+}
+
+function diasDesde(valor?: string | null) {
+  if (!valor) return null;
+  const data = new Date(valor);
+  if (Number.isNaN(data.getTime())) return null;
+  const agora = new Date();
+  const diff = agora.getTime() - data.getTime();
+  return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
+}
+
+function calcularScoreRelacionamento(item?: CaptacaoDoador) {
+  if (!item) return 0;
+  let score = 10;
+  if (item.status === "ativo") score += 15;
+  if (item.quantidadeDoacoes >= 1) score += 10;
+  if (item.quantidadeDoacoes >= 3) score += 10;
+  if (item.totalDoado >= 500) score += 10;
+  if (item.totalDoado >= 2000) score += 10;
+  if (item.recorrenciaAtiva) score += 20;
+  if (item.portalAtivo) score += 10;
+  if (item.aceitaEmail) score += 5;
+  if (item.aceitaWhatsapp) score += 5;
+  if (item.aceitaReceberCampanhas) score += 5;
+  const dias = diasDesde(item.ultimaDoacao);
+  if (dias !== null && dias <= 30) score += 10;
+  if (dias !== null && dias > 120) score -= 10;
+  return Math.max(0, Math.min(100, score));
+}
+
+function classificarRiscoRelacionamento(item?: CaptacaoDoador) {
+  if (!item) return "Sem dados";
+  if (item.status === "prospecto" || item.quantidadeDoacoes === 0) return "Prospecção";
+  const dias = diasDesde(item.ultimaDoacao);
+  if (item.recorrenciaAtiva && (dias === null || dias > 45)) return "Alto";
+  if (dias !== null && dias > 180) return "Alto";
+  if (dias !== null && dias > 90) return "Médio";
+  return "Baixo";
+}
+
+function classeBadgeRisco(risco: string) {
+  switch (risco) {
+    case "Alto":
+      return "bg-rose-100 text-rose-700";
+    case "Médio":
+      return "bg-amber-100 text-amber-700";
+    case "Baixo":
+      return "bg-emerald-100 text-emerald-700";
+    case "Prospecção":
+      return "bg-sky-100 text-sky-700";
+    default:
+      return "bg-slate-100 text-slate-700";
+  }
+}
+
+function obterProximaAcaoDoador(item?: CaptacaoDoador) {
+  if (!item) return "Selecione um doador para ver a próxima ação.";
+  const risco = classificarRiscoRelacionamento(item);
+  if (risco === "Prospecção") return "Fazer primeiro contato e converter a primeira doação.";
+  if (risco === "Alto") return "Acionar retenção com contato humano e oferta de continuidade.";
+  if (!item.portalAtivo) return "Convidar o doador para ativar o portal e o autoatendimento.";
+  if (!item.aceitaReceberCampanhas) return "Revisar permissões de comunicação e reengajar com consentimento.";
+  if (!item.recorrenciaAtiva && item.totalDoado > 0) return "Oferecer upgrade para recorrência com valor sugerido.";
+  return "Manter relacionamento ativo com prestação de contas e impacto.";
+}
+
+function obterResumoSegmento(item?: CaptacaoDoador) {
+  if (!item) return "Sem classificação";
+  if (item.segmentoRelacionamento) return item.segmentoRelacionamento;
+  if (item.recorrenciaAtiva) return "Base recorrente";
+  if (item.categoriaDoador === "patrocinador" || item.tipoDoador === "patrocinador") return "Patrocínio";
+  if (item.totalDoado >= 2000) return "Alto potencial";
+  if (item.status === "prospecto") return "Prospecto";
+  return "Base ativa";
+}
+
+function obterStatusRetencao(item?: CaptacaoDoador) {
+  if (!item) return "Sem definição";
+  if (item.statusRetencao) return item.statusRetencao;
+  const risco = classificarRiscoRelacionamento(item);
+  if (risco === "Alto") return "em_recuperacao";
+  if (risco === "Médio") return "monitorar";
+  if (item.recorrenciaAtiva) return "recorrente_estavel";
+  if (item.quantidadeDoacoes === 0) return "novo";
+  return "ativo";
+}
+
+function tituloStatusRetencao(status?: string) {
+  return (status ?? "sem_definicao")
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letra) => letra.toUpperCase());
+}
+
+function classeBadgeRetencao(status?: string) {
+  switch (status) {
+    case "em_recuperacao":
+      return "bg-rose-100 text-rose-700";
+    case "monitorar":
+      return "bg-amber-100 text-amber-700";
+    case "recorrente_estavel":
+      return "bg-emerald-100 text-emerald-700";
+    case "novo":
+      return "bg-sky-100 text-sky-700";
+    case "ativo":
+      return "bg-indigo-100 text-indigo-700";
+    default:
+      return "bg-slate-100 text-slate-700";
+  }
+}
+
+function classeBadgePrioridade(prioridade?: string) {
+  switch (prioridade) {
+    case "alta":
+      return "bg-rose-100 text-rose-700";
+    case "media":
+      return "bg-amber-100 text-amber-700";
+    case "baixa":
+      return "bg-emerald-100 text-emerald-700";
+    default:
+      return "bg-slate-100 text-slate-700";
+  }
+}
+
 function tooltipMoedaFormatter(value: number | string | readonly (number | string)[] | undefined) {
   const valorNormalizado = Array.isArray(value) ? value[0] : value;
   return formatarMoeda(Number(valorNormalizado ?? 0));
@@ -379,6 +545,9 @@ export function CaptacaoRecursosPage() {
   const abaAtiva = obterAbaPeloPath(location.pathname);
   const [filtros, setFiltros] = useState<CaptacaoListFilters>(defaultFiltros);
   const [doadorForm, setDoadorForm] = useState<DoadorFormState>(defaultDoadorForm);
+  const [tarefaRelacionamentoForm, setTarefaRelacionamentoForm] = useState<TarefaRelacionamentoFormState>(
+    defaultTarefaRelacionamentoForm
+  );
   const [campanhaForm, setCampanhaForm] = useState<CampanhaFormState>(defaultCampanhaForm);
   const [doacaoForm, setDoacaoForm] = useState<DoacaoFormState>(defaultDoacaoForm);
   const [configForm, setConfigForm] = useState<Partial<CaptacaoConfiguracoes>>({});
@@ -417,14 +586,24 @@ export function CaptacaoRecursosPage() {
   ]);
 
   const dashboardQuery = useCaptacaoDashboard(filtros, abaAtiva === "dashboard" && podeVerDashboard);
-  const doadoresQuery = useCaptacaoDoadores(filtros, (abaAtiva === "doadores" || abaAtiva === "doacoes" || abaAtiva === "portal") && podeVerDoadores);
+  const doadoresQuery = useCaptacaoDoadores(
+    filtros,
+    (abaAtiva === "dashboard" || abaAtiva === "doadores" || abaAtiva === "doacoes" || abaAtiva === "portal") &&
+      podeVerDoadores
+  );
   const campanhasQuery = useCaptacaoCampanhas(filtros, (abaAtiva === "campanhas" || abaAtiva === "dashboard" || abaAtiva === "doacoes" || abaAtiva === "portal" || abaAtiva === "relatorios") && podeVerCampanhas);
   const doacoesQuery = useCaptacaoDoacoes(filtros, (abaAtiva === "doacoes" || abaAtiva === "dashboard" || abaAtiva === "doadores" || abaAtiva === "comprovantes" || abaAtiva === "relatorios" || abaAtiva === "portal") && podeVerDoacoes);
   const comprovantesQuery = useCaptacaoComprovantes(filtros, (abaAtiva === "comprovantes" || abaAtiva === "doadores") && podeVerDoacoes);
   const configuracoesQuery = useCaptacaoConfiguracoes((abaAtiva === "configuracoes" || abaAtiva === "portal") && podeConfigurar);
   const logsQuery = useCaptacaoLogs((abaAtiva === "permissoes" || abaAtiva === "relatorios") && podeVerRelatorios);
+  const tarefasRelacionamentoQuery = useCaptacaoTarefasRelacionamento(
+    doadorForm.id,
+    abaAtiva === "doadores" && Boolean(doadorForm.id) && podeVerDoadores
+  );
 
   const salvarDoadorMutation = useSalvarDoadorCaptacao();
+  const salvarTarefaRelacionamentoMutation = useSalvarTarefaRelacionamentoCaptacao();
+  const concluirTarefaRelacionamentoMutation = useConcluirTarefaRelacionamentoCaptacao();
   const inativarDoadorMutation = useInativarDoadorCaptacao();
   const salvarCampanhaMutation = useSalvarCampanhaCaptacao();
   const alterarStatusCampanhaMutation = useAlterarStatusCampanhaCaptacao();
@@ -442,6 +621,7 @@ export function CaptacaoRecursosPage() {
   const doacoes = doacoesQuery.data?.doacoes ?? [];
   const comprovantes = comprovantesQuery.data?.comprovantes ?? [];
   const logs = logsQuery.data ?? [];
+  const tarefasRelacionamento = tarefasRelacionamentoQuery.data ?? [];
   const doadorSelecionado = doadores.find((item) => item.id === doadorForm.id);
   const historicoDoacoesDoador = doacoes.filter((item) => item.doadorId && item.doadorId === doadorForm.id);
   const comprovantesDoador = comprovantes.filter((item) => item.doadorId && item.doadorId === doadorForm.id);
@@ -452,10 +632,93 @@ export function CaptacaoRecursosPage() {
         .map((item) => [item.campanhaId as string, { id: item.campanhaId as string, nome: item.campanhaNome as string }])
     ).values()
   );
+  const scoreDoadorSelecionado = useMemo(
+    () => doadorSelecionado?.scoreRelacionamento ?? calcularScoreRelacionamento(doadorSelecionado),
+    [doadorSelecionado]
+  );
+  const riscoDoadorSelecionado = useMemo(
+    () => classificarRiscoRelacionamento(doadorSelecionado),
+    [doadorSelecionado]
+  );
+  const proximaAcaoDoadorSelecionado = useMemo(
+    () => doadorSelecionado?.proximaAcaoSugerida || obterProximaAcaoDoador(doadorSelecionado),
+    [doadorSelecionado]
+  );
+  const segmentoDoadorSelecionado = useMemo(
+    () => obterResumoSegmento(doadorSelecionado),
+    [doadorSelecionado]
+  );
+  const statusRetencaoSelecionado = useMemo(
+    () => obterStatusRetencao(doadorSelecionado),
+    [doadorSelecionado]
+  );
+  const resumoCockpit = useMemo(() => {
+    const doadoresAtivos = doadores.filter((item) => item.status === "ativo");
+    const prospectos = doadores.filter((item) => item.status === "prospecto");
+    const recorrentes = doadores.filter((item) => item.recorrenciaAtiva);
+    const riscoAlto = doadores.filter((item) => classificarRiscoRelacionamento(item) === "Alto");
+    const semPortal = doadores.filter((item) => item.status === "ativo" && !item.portalAtivo);
+    const reativacao = doadores.filter((item) => {
+      const dias = diasDesde(item.ultimaDoacao);
+      return item.quantidadeDoacoes > 0 && dias !== null && dias > 120;
+    });
+    const totalConfirmadas = doacoes.filter((item) => item.situacao === "confirmado" || item.situacao === "pago");
+    const totalPendentes = doacoes.filter(
+      (item) => item.situacao === "pendente" || item.situacao === "aguardando_pagamento"
+    );
+    const ticketMaior = doadores.reduce((maior, atual) => Math.max(maior, atual.maiorDoacao ?? 0), 0);
+    const receitaRecorrenteProjetada = somarValores(
+      doacoes
+        .filter(
+          (item) =>
+            item.tipoDoacao === "recorrente" &&
+            item.situacao !== "cancelado" &&
+            item.situacao !== "estornado"
+        )
+        .map((item) => item.valorLiquido || item.valor)
+    );
+    const taxaConversao = doacoes.length ? (totalConfirmadas.length / doacoes.length) * 100 : 0;
+    const campanhasPublicas = campanhas.filter((item) => item.visivelAoPublico || item.destaqueNoPortal);
+    const proximasAcoes = doadores
+      .map((item) => ({
+        id: item.id,
+        nome: item.nome,
+        valor: item.totalDoado,
+        risco: classificarRiscoRelacionamento(item),
+        score: calcularScoreRelacionamento(item),
+        acao: obterProximaAcaoDoador(item),
+        ultimaDoacao: item.ultimaDoacao
+      }))
+      .sort((a, b) => {
+        const peso = { Alto: 4, Médio: 3, Prospecção: 2, Baixo: 1, "Sem dados": 0 } as Record<string, number>;
+        return (peso[b.risco] ?? 0) - (peso[a.risco] ?? 0) || b.valor - a.valor || a.score - b.score;
+      })
+      .slice(0, 5);
+
+    return {
+      doadoresAtivos: doadoresAtivos.length,
+      prospectos: prospectos.length,
+      recorrentes: recorrentes.length,
+      riscoAlto: riscoAlto.length,
+      semPortal: semPortal.length,
+      reativacao: reativacao.length,
+      ticketMaior,
+      receitaRecorrenteProjetada,
+      taxaConversao,
+      totalPendentes: totalPendentes.length,
+      campanhasPublicas: campanhasPublicas.length,
+      campanhasRascunho: campanhas.filter((item) => item.status === "rascunho").length,
+      proximasAcoes
+    };
+  }, [campanhas, doacoes, doadores]);
 
   useEffect(() => {
     if (!usuario) return;
     setDoadorForm((atual) => ({ ...atual, responsavelRelacionamento: atual.responsavelRelacionamento || usuario.nome || usuario.nomeUsuario }));
+    setTarefaRelacionamentoForm((atual) => ({
+      ...atual,
+      responsavel: atual.responsavel || usuario.nome || usuario.nomeUsuario
+    }));
     setCampanhaForm((atual) => ({ ...atual, responsavel: atual.responsavel || usuario.nome || usuario.nomeUsuario }));
     setDoacaoForm((atual) => ({ ...atual, usuarioResponsavel: atual.usuarioResponsavel || usuario.nome || usuario.nomeUsuario }));
   }, [usuario]);
@@ -520,11 +783,20 @@ export function CaptacaoRecursosPage() {
       aceitaWhatsapp: item.aceitaWhatsapp,
       aceitaReceberCampanhas: item.aceitaReceberCampanhas,
       categoriaDoador: item.categoriaDoador ?? "individual",
+      segmentoRelacionamento: item.segmentoRelacionamento ?? obterResumoSegmento(item),
+      statusRetencao: item.statusRetencao ?? obterStatusRetencao(item),
+      motivoRisco: item.motivoRisco ?? "",
+      proximaAcaoSugerida: item.proximaAcaoSugerida ?? obterProximaAcaoDoador(item),
+      scoreRelacionamento: String(item.scoreRelacionamento ?? calcularScoreRelacionamento(item)),
       responsavelRelacionamento: item.responsavelRelacionamento ?? "",
       observacoesInternas: item.observacoesInternas ?? "",
       portalAtivo: item.portalAtivo,
       anexoPrincipalCaminho: item.anexoPrincipalCaminho ?? ""
     });
+    setTarefaRelacionamentoForm((atual) => ({
+      ...defaultTarefaRelacionamentoForm,
+      responsavel: item.responsavelRelacionamento ?? atual.responsavel ?? usuario?.nome ?? usuario?.nomeUsuario ?? ""
+    }));
     setErrosDoador({});
   }
 
@@ -663,6 +935,11 @@ export function CaptacaoRecursosPage() {
           aceitaWhatsapp: doadorForm.aceitaWhatsapp,
           aceitaReceberCampanhas: doadorForm.aceitaReceberCampanhas,
           categoriaDoador: doadorForm.categoriaDoador || undefined,
+          segmentoRelacionamento: doadorForm.segmentoRelacionamento.trim() || undefined,
+          statusRetencao: doadorForm.statusRetencao.trim() || undefined,
+          motivoRisco: doadorForm.motivoRisco.trim() || undefined,
+          proximaAcaoSugerida: doadorForm.proximaAcaoSugerida.trim() || undefined,
+          scoreRelacionamento: doadorForm.scoreRelacionamento ? Number(doadorForm.scoreRelacionamento) : undefined,
           responsavelRelacionamento: doadorForm.responsavelRelacionamento.trim() || undefined,
           observacoesInternas: doadorForm.observacoesInternas.trim() || undefined,
           portalAtivo: doadorForm.portalAtivo,
@@ -671,6 +948,10 @@ export function CaptacaoRecursosPage() {
       });
       abrirMensagem("sucesso", "Doador salvo", "O cadastro do doador foi salvo com sucesso.");
       setDoadorForm((atual) => ({ ...defaultDoadorForm, responsavelRelacionamento: atual.responsavelRelacionamento }));
+      setTarefaRelacionamentoForm((atual) => ({
+        ...defaultTarefaRelacionamentoForm,
+        responsavel: atual.responsavel
+      }));
     } catch (error) {
       abrirMensagem("erro", "Erro ao salvar", error instanceof Error ? error.message : "Não foi possível salvar o doador.");
     }
@@ -705,6 +986,48 @@ export function CaptacaoRecursosPage() {
       setCampanhaForm((atual) => ({ ...defaultCampanhaForm, responsavel: atual.responsavel }));
     } catch (error) {
       abrirMensagem("erro", "Erro ao salvar", error instanceof Error ? error.message : "Não foi possível salvar a campanha.");
+    }
+  }
+
+  async function salvarTarefaRelacionamento() {
+    if (!doadorForm.id) {
+      abrirMensagem("erro", "Selecione um doador", "Escolha um doador antes de criar uma tarefa de relacionamento.");
+      return;
+    }
+    if (!tarefaRelacionamentoForm.titulo.trim() || tarefaRelacionamentoForm.titulo.trim().length < 3) {
+      abrirMensagem("erro", "Título obrigatório", "Informe um título com pelo menos 3 caracteres para a tarefa.");
+      return;
+    }
+    try {
+      await salvarTarefaRelacionamentoMutation.mutateAsync({
+        doadorId: doadorForm.id,
+        payload: {
+          titulo: tarefaRelacionamentoForm.titulo.trim(),
+          descricao: tarefaRelacionamentoForm.descricao.trim() || undefined,
+          prioridade: tarefaRelacionamentoForm.prioridade,
+          tipo: tarefaRelacionamentoForm.tipo,
+          responsavel: tarefaRelacionamentoForm.responsavel.trim() || undefined,
+          dataPrevista: tarefaRelacionamentoForm.dataPrevista || undefined,
+          status: "pendente",
+          origem: "manual"
+        }
+      });
+      abrirMensagem("sucesso", "Tarefa criada", "A tarefa de relacionamento foi incluída no plano de retenção.");
+      setTarefaRelacionamentoForm((atual) => ({
+        ...defaultTarefaRelacionamentoForm,
+        responsavel: atual.responsavel
+      }));
+    } catch (error) {
+      abrirMensagem("erro", "Erro ao salvar", error instanceof Error ? error.message : "Não foi possível salvar a tarefa de relacionamento.");
+    }
+  }
+
+  async function concluirTarefaRelacionamento(tarefa: CaptacaoTarefaRelacionamento) {
+    try {
+      await concluirTarefaRelacionamentoMutation.mutateAsync({ id: tarefa.id });
+      abrirMensagem("sucesso", "Tarefa concluída", "A tarefa foi marcada como concluída.");
+    } catch (error) {
+      abrirMensagem("erro", "Erro ao concluir", error instanceof Error ? error.message : "Não foi possível concluir a tarefa.");
     }
   }
 
@@ -848,7 +1171,15 @@ export function CaptacaoRecursosPage() {
     switch (abaAtiva) {
       case "doadores":
         return [
-          { label: "Novo doador", icon: Plus, variant: "outline", onClick: () => setDoadorForm((atual) => ({ ...defaultDoadorForm, responsavelRelacionamento: atual.responsavelRelacionamento })) },
+          {
+            label: "Novo doador",
+            icon: Plus,
+            variant: "outline",
+            onClick: () => {
+              setDoadorForm((atual) => ({ ...defaultDoadorForm, responsavelRelacionamento: atual.responsavelRelacionamento }));
+              setTarefaRelacionamentoForm((atual) => ({ ...defaultTarefaRelacionamentoForm, responsavel: atual.responsavel }));
+            }
+          },
           { label: salvarDoadorMutation.isPending ? "Salvando..." : "Salvar doador", icon: Save, variant: "default", disabled: salvarDoadorMutation.isPending, onClick: () => void salvarDoador() }
         ];
       case "doacoes":
@@ -984,6 +1315,235 @@ export function CaptacaoRecursosPage() {
             </div>
           </SecaoCard>
           <SecaoCard titulo="Evolução de novos doadores">
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={graficos?.evolucaoNovosDoadores ?? []}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="mes" />
+                  <YAxis />
+                  <Tooltip formatter={tooltipNumeroFormatter} />
+                  <Line type="monotone" dataKey="quantidade" stroke="#7c3aed" strokeWidth={3} dot={{ r: 4 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </SecaoCard>
+        </div>
+      </div>
+    );
+  }
+
+  function renderCockpit() {
+    const indicadores = dashboardQuery.data?.indicadores;
+    const graficos = dashboardQuery.data?.graficos;
+    return (
+      <div className="space-y-3">
+        {renderFiltros()}
+        <div className="overflow-hidden rounded-[28px] bg-[linear-gradient(135deg,#022c22_0%,#0f766e_48%,#2563eb_100%)] px-5 py-5 text-white shadow-[0_30px_90px_-42px_rgba(15,118,110,0.9)]">
+          <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">
+                  Cockpit de captação
+                </p>
+                <h2 className="text-3xl font-semibold tracking-tight">
+                  Receita social, retenção e relacionamento em uma só visão
+                </h2>
+                <p className="max-w-3xl text-sm leading-6 text-white/80">
+                  O cockpit agora prioriza receita recorrente, risco de cancelamento, campanhas
+                  públicas e ações comerciais para a equipe de captação.
+                </p>
+              </div>
+              <div className="grid gap-3 md:grid-cols-3">
+                <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-white/65">Receita recorrente</p>
+                  <p className="mt-2 text-2xl font-semibold">
+                    {formatarMoeda(resumoCockpit.receitaRecorrenteProjetada)}
+                  </p>
+                  <p className="mt-1 text-xs text-white/75">
+                    Base para previsibilidade e sustentabilidade da operação.
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-white/65">Risco alto</p>
+                  <p className="mt-2 text-2xl font-semibold">{formatarNumero(resumoCockpit.riscoAlto)}</p>
+                  <p className="mt-1 text-xs text-white/75">
+                    Doadores pedindo contato humano e ação de retenção.
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-white/65">Campanhas públicas</p>
+                  <p className="mt-2 text-2xl font-semibold">{formatarNumero(resumoCockpit.campanhasPublicas)}</p>
+                  <p className="mt-1 text-xs text-white/75">
+                    Frentes prontas para aquisição em canais digitais e offline.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-white/65">Conversão</p>
+                <p className="mt-2 text-2xl font-semibold">{formatarPercentual(resumoCockpit.taxaConversao)}</p>
+                <p className="mt-1 text-xs text-white/75">Doações pagas ou confirmadas.</p>
+              </div>
+              <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-white/65">Maior ticket</p>
+                <p className="mt-2 text-2xl font-semibold">{formatarMoeda(resumoCockpit.ticketMaior)}</p>
+                <p className="mt-1 text-xs text-white/75">Maior apoio individual da base filtrada.</p>
+              </div>
+              <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-white/65">Sem portal ativo</p>
+                <p className="mt-2 text-2xl font-semibold">{formatarNumero(resumoCockpit.semPortal)}</p>
+                <p className="mt-1 text-xs text-white/75">Oportunidade de ativar autoatendimento.</p>
+              </div>
+              <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-white/65">Cobranças pendentes</p>
+                <p className="mt-2 text-2xl font-semibold">{formatarNumero(resumoCockpit.totalPendentes)}</p>
+                <p className="mt-1 text-xs text-white/75">Fila prioritária de cobrança e recuperação.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <IndicadorCard titulo="Total arrecadado no dia" valor={formatarMoeda(indicadores?.totalArrecadadoDia)} />
+          <IndicadorCard titulo="Total arrecadado no mês" valor={formatarMoeda(indicadores?.totalArrecadadoMes)} />
+          <IndicadorCard titulo="Total arrecadado no ano" valor={formatarMoeda(indicadores?.totalArrecadadoAno)} />
+          <IndicadorCard titulo="Quantidade de doações" valor={formatarNumero(indicadores?.quantidadeDoacoesRecebidas)} />
+          <IndicadorCard titulo="Ticket médio" valor={formatarMoeda(indicadores?.ticketMedio)} />
+          <IndicadorCard titulo="Doadores ativos" valor={formatarNumero(resumoCockpit.doadoresAtivos)} />
+          <IndicadorCard titulo="Prospectos" valor={formatarNumero(resumoCockpit.prospectos)} />
+          <IndicadorCard titulo="Recorrências ativas" valor={formatarNumero(resumoCockpit.recorrentes)} />
+          <IndicadorCard titulo="Campanha destaque" valor={indicadores?.campanhaMaiorArrecadacao || "—"} />
+          <IndicadorCard titulo="Doações confirmadas" valor={formatarNumero(indicadores?.doacoesConfirmadas)} />
+          <IndicadorCard titulo="Doações canceladas" valor={formatarNumero(indicadores?.doacoesCanceladas)} />
+          <IndicadorCard titulo="Reativação pendente" valor={formatarNumero(resumoCockpit.reativacao)} />
+        </div>
+        <div className="grid gap-3 xl:grid-cols-[1.05fr_0.95fr]">
+          <SecaoCard
+            titulo="Prioridades comerciais da operação"
+            descricao="Fila de ações com maior impacto para retenção, conversão e expansão da base."
+          >
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-2xl border border-[var(--g3-border)] bg-rose-50 px-4 py-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-rose-700">Reter agora</p>
+                <p className="mt-2 text-2xl font-semibold text-rose-900">
+                  {formatarNumero(resumoCockpit.riscoAlto)}
+                </p>
+                <p className="mt-1 text-sm text-rose-800">
+                  Doadores com risco alto ou recorrência fragilizada.
+                </p>
+              </div>
+              <div className="rounded-2xl border border-[var(--g3-border)] bg-amber-50 px-4 py-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-700">
+                  Cobrar e converter
+                </p>
+                <p className="mt-2 text-2xl font-semibold text-amber-900">
+                  {formatarNumero(resumoCockpit.totalPendentes)}
+                </p>
+                <p className="mt-1 text-sm text-amber-800">
+                  Cobranças pendentes pedindo régua e acompanhamento diário.
+                </p>
+              </div>
+              <div className="rounded-2xl border border-[var(--g3-border)] bg-sky-50 px-4 py-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-sky-700">
+                  Expandir base
+                </p>
+                <p className="mt-2 text-2xl font-semibold text-sky-900">
+                  {formatarNumero(resumoCockpit.prospectos)}
+                </p>
+                <p className="mt-1 text-sm text-sky-800">
+                  Leads e prospects ainda sem a primeira doação registrada.
+                </p>
+              </div>
+            </div>
+          </SecaoCard>
+          <SecaoCard
+            titulo="Próximas ações sugeridas"
+            descricao="Lista priorizada para orientar o relacionamento da equipe de captação."
+          >
+            <div className="space-y-2">
+              {resumoCockpit.proximasAcoes.length ? (
+                resumoCockpit.proximasAcoes.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className="w-full rounded-xl border border-[var(--g3-border)] px-3 py-3 text-left transition hover:border-[var(--g3-active)] hover:bg-[var(--g3-primary-soft)]/35"
+                    onClick={() => {
+                      const selecionado = doadores.find((doador) => doador.id === item.id);
+                      if (selecionado) {
+                        editarDoador(selecionado);
+                        navigate(captacaoTabPaths.doadores);
+                      }
+                    }}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-[var(--g3-foreground)]">{item.nome}</p>
+                        <p className="text-xs text-[var(--g3-muted)]">
+                          Última doação: {formatarData(item.ultimaDoacao)}
+                        </p>
+                      </div>
+                      <span className={`rounded-full px-2 py-1 text-xs font-semibold ${classeBadgeRisco(item.risco)}`}>
+                        {item.risco}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm text-[var(--g3-foreground)]">{item.acao}</p>
+                    <div className="mt-2 flex items-center justify-between text-xs text-[var(--g3-muted)]">
+                      <span>Score {item.score}/100</span>
+                      <span>Total doado {formatarMoeda(item.valor)}</span>
+                    </div>
+                  </button>
+                ))
+              ) : (
+                <p className="text-sm text-[var(--g3-muted)]">
+                  Nenhuma prioridade calculada com os filtros atuais.
+                </p>
+              )}
+            </div>
+          </SecaoCard>
+        </div>
+        <div className="grid gap-3 xl:grid-cols-2">
+          <SecaoCard titulo="ArrecadaÃ§Ã£o por mÃªs">
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={graficos?.arrecadacaoPorMes ?? []}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="mes" />
+                  <YAxis />
+                  <Tooltip formatter={tooltipMoedaFormatter} />
+                  <Bar dataKey="valor" fill="#0f766e" radius={[8, 8, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </SecaoCard>
+          <SecaoCard titulo="ArrecadaÃ§Ã£o por forma de pagamento">
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={graficos?.arrecadacaoPorFormaPagamento ?? []} dataKey="valor" nameKey="label" outerRadius={96}>
+                    {(graficos?.arrecadacaoPorFormaPagamento ?? []).map((item, index) => <Cell key={`${item.label}-${index}`} fill={coresGraficos[index % coresGraficos.length]} />)}
+                  </Pie>
+                  <Tooltip formatter={tooltipMoedaFormatter} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </SecaoCard>
+          <SecaoCard titulo="Meta x arrecadado por campanha">
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={graficos?.metaPorCampanha ?? []}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="label" />
+                  <YAxis />
+                  <Tooltip formatter={tooltipMoedaFormatter} />
+                  <Legend />
+                  <Bar dataKey="meta" fill="#cbd5e1" radius={[8, 8, 0, 0]} />
+                  <Bar dataKey="arrecadado" fill="#2563eb" radius={[8, 8, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </SecaoCard>
+          <SecaoCard titulo="EvoluÃ§Ã£o de novos doadores">
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={graficos?.evolucaoNovosDoadores ?? []}>
@@ -1208,6 +1768,672 @@ export function CaptacaoRecursosPage() {
     );
   }
 
+  function renderDoadores360() {
+    const abaInternaLabel: Record<DoadorAbaInterna, string> = {
+      dados: "Dados principais",
+      contato: "Contato e consentimento",
+      endereco: "Endereço",
+      retencao: "Retenção e tarefas",
+      historico: "Histórico",
+      campanhas: "Campanhas",
+      comprovantes: "Comprovantes",
+      observacoes: "Relacionamento",
+      anexos: "Anexos"
+    };
+
+    return (
+      <div className="space-y-3">
+        {renderFiltros()}
+        <div className="grid gap-3 xl:grid-cols-[0.82fr_1.18fr]">
+          <SecaoCard
+            titulo="Base de doadores"
+            descricao="Selecione um doador com 1 clique para abrir a visão 360 e orientar a próxima ação."
+          >
+            <div className="space-y-2">
+              {doadores.length ? (
+                doadores.map((item) => {
+                  const risco = classificarRiscoRelacionamento(item);
+                  const score = calcularScoreRelacionamento(item);
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={`w-full rounded-xl border px-3 py-3 text-left transition ${
+                        doadorForm.id === item.id
+                          ? "border-[var(--g3-active)] bg-[var(--g3-primary-soft)]/55"
+                          : "border-[var(--g3-border)] bg-[var(--g3-card)] hover:border-[var(--g3-active)] hover:bg-[var(--g3-primary-soft)]/20"
+                      }`}
+                      onClick={() => editarDoador(item)}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-[var(--g3-foreground)]">
+                            {item.nome}
+                          </p>
+                          <p className="text-xs text-[var(--g3-muted)]">
+                            {item.tipoDoador.replaceAll("_", " ")} • {obterResumoSegmento(item)}
+                          </p>
+                        </div>
+                        <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${classeBadgeRisco(risco)}`}>
+                          {risco}
+                        </span>
+                      </div>
+                      <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                        <div>
+                          <p className="text-[11px] uppercase tracking-[0.12em] text-[var(--g3-muted)]">Score</p>
+                          <p className="text-sm font-semibold text-[var(--g3-foreground)]">{score}/100</p>
+                        </div>
+                        <div>
+                          <p className="text-[11px] uppercase tracking-[0.12em] text-[var(--g3-muted)]">Total doado</p>
+                          <p className="text-sm font-semibold text-[var(--g3-foreground)]">
+                            {formatarMoeda(item.totalDoado)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[11px] uppercase tracking-[0.12em] text-[var(--g3-muted)]">Última doação</p>
+                          <p className="text-sm font-semibold text-[var(--g3-foreground)]">
+                            {formatarData(item.ultimaDoacao)}
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })
+              ) : (
+                <p className="text-sm text-[var(--g3-muted)]">Nenhum doador encontrado.</p>
+              )}
+            </div>
+          </SecaoCard>
+
+          <div className="space-y-3">
+            <div className="overflow-hidden rounded-[28px] border border-emerald-100 bg-[linear-gradient(135deg,#f0fdf4_0%,#eff6ff_100%)] p-4 shadow-[0_20px_60px_-40px_rgba(37,99,235,0.65)]">
+              <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
+                        Doador 360
+                      </p>
+                      <h2 className="mt-1 text-2xl font-semibold text-slate-900">
+                        {doadorSelecionado?.nome || "Novo doador"}
+                      </h2>
+                      <p className="mt-1 text-sm text-slate-600">
+                        {doadorSelecionado
+                          ? `${doadorSelecionado.tipoDoador.replaceAll("_", " ")} • ${segmentoDoadorSelecionado}`
+                          : "Cadastre um novo doador ou selecione um registro para analisar relacionamento, risco e histórico."}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <span className={`rounded-full px-3 py-1 text-xs font-semibold ${classeBadgeRisco(riscoDoadorSelecionado)}`}>
+                        {riscoDoadorSelecionado}
+                      </span>
+                      <span className={`rounded-full px-3 py-1 text-xs font-semibold ${badgeClasseStatus(doadorSelecionado?.status)}`}>
+                        {doadorSelecionado?.status || "novo"}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-4">
+                    <IndicadorCard titulo="Score de relacionamento" valor={`${scoreDoadorSelecionado}/100`} />
+                    <IndicadorCard titulo="Total doado" valor={formatarMoeda(doadorSelecionado?.totalDoado)} />
+                    <IndicadorCard titulo="Doações" valor={formatarNumero(doadorSelecionado?.quantidadeDoacoes)} />
+                    <IndicadorCard titulo="Ticket médio" valor={formatarMoeda(doadorSelecionado?.ticketMedio)} />
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-white/60 bg-white/75 p-4 shadow-sm">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    Próxima ação recomendada
+                  </p>
+                  <p className="mt-2 text-base font-semibold text-slate-900">
+                    {proximaAcaoDoadorSelecionado}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${classeBadgeRetencao(statusRetencaoSelecionado)}`}>
+                      {tituloStatusRetencao(statusRetencaoSelecionado)}
+                    </span>
+                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${classeBadgeRisco(riscoDoadorSelecionado)}`}>
+                      Risco {riscoDoadorSelecionado}
+                    </span>
+                  </div>
+                  <div className="mt-4 space-y-2 text-sm text-slate-600">
+                    <p>Portal ativo: {doadorSelecionado?.portalAtivo ? "Sim" : "Não"}</p>
+                    <p>Recorrência ativa: {doadorSelecionado?.recorrenciaAtiva ? "Sim" : "Não"}</p>
+                    <p>Responsável: {doadorForm.responsavelRelacionamento || "Não definido"}</p>
+                    <p>Maior doação: {formatarMoeda(doadorSelecionado?.maiorDoacao)}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <SecaoCard
+              titulo={abaInternaLabel[doadorAbaInterna]}
+              descricao="Navegue pela ficha do doador sem sair da visão de relacionamento."
+              right={
+                <div className="flex flex-wrap gap-2">
+                  {(
+                    [
+                      "dados",
+                      "contato",
+                      "endereco",
+                      "retencao",
+                      "observacoes",
+                      "historico",
+                      "comprovantes",
+                      "campanhas",
+                      "anexos"
+                    ] as DoadorAbaInterna[]
+                  ).map((aba) => (
+                    <Button
+                      key={aba}
+                      size="sm"
+                      variant={doadorAbaInterna === aba ? "default" : "outline"}
+                      onClick={() => setDoadorAbaInterna(aba)}
+                    >
+                      {abaInternaLabel[aba]}
+                    </Button>
+                  ))}
+                </div>
+              }
+            >
+              {doadorAbaInterna === "dados" ? (
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label>Tipo de doador</Label>
+                    <Select value={doadorForm.tipoDoador} onChange={(event) => setDoadorForm((atual) => ({ ...atual, tipoDoador: event.target.value }))}>
+                      {tipoDoadorOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Categoria</Label>
+                    <Select value={doadorForm.categoriaDoador} onChange={(event) => setDoadorForm((atual) => ({ ...atual, categoriaDoador: event.target.value }))}>
+                      {categoriaDoadorOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+                    </Select>
+                  </div>
+                  <div className="space-y-1 md:col-span-2">
+                    <Label>Nome / razão social</Label>
+                    <Input value={doadorForm.nome} onChange={(event) => setDoadorForm((atual) => ({ ...atual, nome: event.target.value }))} onBlur={validarDoador} />
+                    <CampoErro texto={errosDoador.nome} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Nome fantasia</Label>
+                    <Input value={doadorForm.nomeFantasia} onChange={(event) => setDoadorForm((atual) => ({ ...atual, nomeFantasia: event.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>CPF / CNPJ</Label>
+                    <Input value={doadorForm.cpfCnpj} onChange={(event) => setDoadorForm((atual) => ({ ...atual, cpfCnpj: event.target.value }))} onBlur={validarDoador} />
+                    <CampoErro texto={errosDoador.cpfCnpj} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Data de nascimento / fundação</Label>
+                    <Input type="date" value={doadorForm.dataNascimentoFundacao} onChange={(event) => setDoadorForm((atual) => ({ ...atual, dataNascimentoFundacao: event.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Status</Label>
+                    <Select value={doadorForm.status} onChange={(event) => setDoadorForm((atual) => ({ ...atual, status: event.target.value }))}>
+                      {statusDoadorOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+                    </Select>
+                  </div>
+                </div>
+              ) : null}
+
+              {doadorAbaInterna === "contato" ? (
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label>E-mail principal</Label>
+                    <Input value={doadorForm.emailPrincipal} onChange={(event) => setDoadorForm((atual) => ({ ...atual, emailPrincipal: normalizarEmail(event.target.value) }))} onBlur={validarDoador} />
+                    <CampoErro texto={errosDoador.emailPrincipal} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>E-mail secundário</Label>
+                    <Input value={doadorForm.emailSecundario} onChange={(event) => setDoadorForm((atual) => ({ ...atual, emailSecundario: normalizarEmail(event.target.value) }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Telefone</Label>
+                    <Input value={mascararTelefoneInput(doadorForm.telefone)} onChange={(event) => setDoadorForm((atual) => ({ ...atual, telefone: normalizarTelefone(event.target.value) }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>WhatsApp</Label>
+                    <Input value={mascararTelefoneInput(doadorForm.whatsapp)} onChange={(event) => setDoadorForm((atual) => ({ ...atual, whatsapp: normalizarTelefone(event.target.value) }))} />
+                  </div>
+                  <label className="flex items-center gap-2 rounded-md border border-[var(--g3-border)] px-3 py-2">
+                    <Checkbox checked={doadorForm.aceitaEmail} onChange={(event) => setDoadorForm((atual) => ({ ...atual, aceitaEmail: event.currentTarget.checked }))} />
+                    Aceita contato por e-mail
+                  </label>
+                  <label className="flex items-center gap-2 rounded-md border border-[var(--g3-border)] px-3 py-2">
+                    <Checkbox checked={doadorForm.aceitaWhatsapp} onChange={(event) => setDoadorForm((atual) => ({ ...atual, aceitaWhatsapp: event.currentTarget.checked }))} />
+                    Aceita contato por WhatsApp
+                  </label>
+                  <label className="flex items-center gap-2 rounded-md border border-[var(--g3-border)] px-3 py-2 md:col-span-2">
+                    <Checkbox checked={doadorForm.aceitaReceberCampanhas} onChange={(event) => setDoadorForm((atual) => ({ ...atual, aceitaReceberCampanhas: event.currentTarget.checked }))} />
+                    Aceita receber campanhas, chamadas de captação e comunicação de relacionamento
+                  </label>
+                  <label className="flex items-center gap-2 rounded-md border border-[var(--g3-border)] px-3 py-2 md:col-span-2">
+                    <Checkbox checked={doadorForm.portalAtivo} onChange={(event) => setDoadorForm((atual) => ({ ...atual, portalAtivo: event.currentTarget.checked }))} />
+                    Portal doador ativo
+                  </label>
+                </div>
+              ) : null}
+
+              {doadorAbaInterna === "endereco" ? (
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="space-y-1 md:col-span-2">
+                    <Label>Endereço completo</Label>
+                    <Input value={doadorForm.enderecoCompleto} onChange={(event) => setDoadorForm((atual) => ({ ...atual, enderecoCompleto: event.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Bairro</Label>
+                    <Input value={doadorForm.bairro} onChange={(event) => setDoadorForm((atual) => ({ ...atual, bairro: event.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Cidade</Label>
+                    <Input value={doadorForm.cidade} onChange={(event) => setDoadorForm((atual) => ({ ...atual, cidade: event.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>UF</Label>
+                    <Input maxLength={2} value={doadorForm.uf} onChange={(event) => setDoadorForm((atual) => ({ ...atual, uf: event.target.value.toUpperCase() }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>CEP</Label>
+                    <Input value={formatarCep(doadorForm.cep)} onChange={(event) => setDoadorForm((atual) => ({ ...atual, cep: normalizarCep(event.target.value) }))} onBlur={validarDoador} />
+                    <CampoErro texto={errosDoador.cep} />
+                  </div>
+                </div>
+              ) : null}
+
+              {doadorAbaInterna === "retencao" ? (
+                <div className="space-y-4">
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <div className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] px-3 py-3">
+                      <p className="text-xs uppercase tracking-[0.14em] text-[var(--g3-muted)]">Status de retenção</p>
+                      <span className={`mt-2 inline-flex rounded-full px-3 py-1 text-xs font-semibold ${classeBadgeRetencao(doadorForm.statusRetencao || statusRetencaoSelecionado)}`}>
+                        {tituloStatusRetencao(doadorForm.statusRetencao || statusRetencaoSelecionado)}
+                      </span>
+                    </div>
+                    <div className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] px-3 py-3">
+                      <p className="text-xs uppercase tracking-[0.14em] text-[var(--g3-muted)]">Segmento</p>
+                      <p className="mt-2 text-sm font-semibold text-[var(--g3-foreground)]">
+                        {doadorForm.segmentoRelacionamento || segmentoDoadorSelecionado}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] px-3 py-3">
+                      <p className="text-xs uppercase tracking-[0.14em] text-[var(--g3-muted)]">Score salvo</p>
+                      <p className="mt-2 text-sm font-semibold text-[var(--g3-foreground)]">
+                        {doadorForm.scoreRelacionamento || scoreDoadorSelecionado}/100
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] px-3 py-3">
+                      <p className="text-xs uppercase tracking-[0.14em] text-[var(--g3-muted)]">Tarefas abertas</p>
+                      <p className="mt-2 text-sm font-semibold text-[var(--g3-foreground)]">
+                        {tarefasRelacionamento.filter((item) => item.status !== "concluida").length}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 xl:grid-cols-[0.9fr_1.1fr]">
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div className="space-y-1">
+                        <Label>Segmento de relacionamento</Label>
+                        <Input
+                          value={doadorForm.segmentoRelacionamento}
+                          onChange={(event) => setDoadorForm((atual) => ({ ...atual, segmentoRelacionamento: event.target.value }))}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label>Status de retenção</Label>
+                        <Select
+                          value={doadorForm.statusRetencao}
+                          onChange={(event) => setDoadorForm((atual) => ({ ...atual, statusRetencao: event.target.value }))}
+                        >
+                          <option value="">Selecione</option>
+                          <option value="novo">Novo</option>
+                          <option value="ativo">Ativo</option>
+                          <option value="monitorar">Monitorar</option>
+                          <option value="em_recuperacao">Em recuperação</option>
+                          <option value="recorrente_estavel">Recorrente estável</option>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label>Score salvo</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={100}
+                          value={doadorForm.scoreRelacionamento}
+                          onChange={(event) => setDoadorForm((atual) => ({ ...atual, scoreRelacionamento: event.target.value }))}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label>Próxima ação sugerida</Label>
+                        <Input
+                          value={doadorForm.proximaAcaoSugerida}
+                          onChange={(event) => setDoadorForm((atual) => ({ ...atual, proximaAcaoSugerida: event.target.value }))}
+                        />
+                      </div>
+                      <div className="space-y-1 md:col-span-2">
+                        <Label>Motivo de risco</Label>
+                        <Textarea
+                          value={doadorForm.motivoRisco}
+                          onChange={(event) => setDoadorForm((atual) => ({ ...atual, motivoRisco: event.target.value }))}
+                          rows={3}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-[var(--g3-border)] bg-[var(--g3-card)] p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-[var(--g3-foreground)]">Recuperação de recorrência</p>
+                          <p className="text-xs text-[var(--g3-muted)]">
+                            Use este quadro para orientar retenção, pausa e reativação com 1 clique.
+                          </p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={!doadorForm.id}
+                          onClick={() => {
+                            const acaoRapida = doadorForm.proximaAcaoSugerida || proximaAcaoDoadorSelecionado;
+                            setTarefaRelacionamentoForm((atual) => ({
+                              ...atual,
+                              titulo: acaoRapida,
+                              descricao: doadorForm.motivoRisco || `Plano automático para ${doadorSelecionado?.nome || "doador selecionado"}.`,
+                              prioridade: riscoDoadorSelecionado === "Alto" ? "alta" : "media",
+                              tipo: doadorSelecionado?.recorrenciaAtiva ? "retencao" : "upgrade",
+                              responsavel: doadorForm.responsavelRelacionamento || atual.responsavel,
+                              dataPrevista: dataHojeIso()
+                            }));
+                            setDoadorAbaInterna("retencao");
+                          }}
+                        >
+                          Preparar ação
+                        </Button>
+                      </div>
+                      <div className="mt-4 grid gap-3 md:grid-cols-3">
+                        <div className="rounded-xl border border-[var(--g3-border)] px-3 py-3">
+                          <p className="text-xs uppercase tracking-[0.14em] text-[var(--g3-muted)]">Risco atual</p>
+                          <p className="mt-2 text-sm font-semibold text-[var(--g3-foreground)]">{riscoDoadorSelecionado}</p>
+                        </div>
+                        <div className="rounded-xl border border-[var(--g3-border)] px-3 py-3">
+                          <p className="text-xs uppercase tracking-[0.14em] text-[var(--g3-muted)]">Portal</p>
+                          <p className="mt-2 text-sm font-semibold text-[var(--g3-foreground)]">{doadorSelecionado?.portalAtivo ? "Ativo" : "Desligado"}</p>
+                        </div>
+                        <div className="rounded-xl border border-[var(--g3-border)] px-3 py-3">
+                          <p className="text-xs uppercase tracking-[0.14em] text-[var(--g3-muted)]">Recorrência</p>
+                          <p className="mt-2 text-sm font-semibold text-[var(--g3-foreground)]">{doadorSelecionado?.recorrenciaAtiva ? "Ativa" : "Sem recorrência"}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 xl:grid-cols-[0.92fr_1.08fr]">
+                    <div className="rounded-2xl border border-[var(--g3-border)] bg-[var(--g3-card)] p-4">
+                      <p className="text-sm font-semibold text-[var(--g3-foreground)]">Nova tarefa de relacionamento</p>
+                      <div className="mt-3 grid gap-3 md:grid-cols-2">
+                        <div className="space-y-1 md:col-span-2">
+                          <Label>Título</Label>
+                          <Input
+                            value={tarefaRelacionamentoForm.titulo}
+                            onChange={(event) => setTarefaRelacionamentoForm((atual) => ({ ...atual, titulo: event.target.value }))}
+                          />
+                        </div>
+                        <div className="space-y-1 md:col-span-2">
+                          <Label>Descrição</Label>
+                          <Textarea
+                            value={tarefaRelacionamentoForm.descricao}
+                            onChange={(event) => setTarefaRelacionamentoForm((atual) => ({ ...atual, descricao: event.target.value }))}
+                            rows={3}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Prioridade</Label>
+                          <Select
+                            value={tarefaRelacionamentoForm.prioridade}
+                            onChange={(event) => setTarefaRelacionamentoForm((atual) => ({ ...atual, prioridade: event.target.value }))}
+                          >
+                            <option value="alta">Alta</option>
+                            <option value="media">Média</option>
+                            <option value="baixa">Baixa</option>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Tipo</Label>
+                          <Select
+                            value={tarefaRelacionamentoForm.tipo}
+                            onChange={(event) => setTarefaRelacionamentoForm((atual) => ({ ...atual, tipo: event.target.value }))}
+                          >
+                            <option value="follow_up">Follow-up</option>
+                            <option value="retencao">Retenção</option>
+                            <option value="upgrade">Upgrade</option>
+                            <option value="reativacao">Reativação</option>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Responsável</Label>
+                          <Input
+                            value={tarefaRelacionamentoForm.responsavel}
+                            onChange={(event) => setTarefaRelacionamentoForm((atual) => ({ ...atual, responsavel: event.target.value }))}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Data prevista</Label>
+                          <Input
+                            type="date"
+                            value={tarefaRelacionamentoForm.dataPrevista}
+                            onChange={(event) => setTarefaRelacionamentoForm((atual) => ({ ...atual, dataPrevista: event.target.value }))}
+                          />
+                        </div>
+                      </div>
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <Button
+                          onClick={() => void salvarTarefaRelacionamento()}
+                          disabled={!doadorForm.id || salvarTarefaRelacionamentoMutation.isPending}
+                        >
+                          <Save className="mr-1.5 h-4 w-4" />
+                          {salvarTarefaRelacionamentoMutation.isPending ? "Salvando..." : "Salvar tarefa"}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() =>
+                            setTarefaRelacionamentoForm((atual) => ({
+                              ...defaultTarefaRelacionamentoForm,
+                              responsavel: atual.responsavel
+                            }))
+                          }
+                        >
+                          Limpar
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-[var(--g3-border)] bg-[var(--g3-card)] p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-[var(--g3-foreground)]">Fila de relacionamento</p>
+                          <p className="text-xs text-[var(--g3-muted)]">
+                            Acompanhe retenção, recuperação e próximas ações do doador selecionado.
+                          </p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => void tarefasRelacionamentoQuery.refetch()}
+                          disabled={!doadorForm.id || tarefasRelacionamentoQuery.isFetching}
+                        >
+                          <RefreshCcw className="mr-1.5 h-4 w-4" />
+                          Atualizar
+                        </Button>
+                      </div>
+                      <div className="mt-3 space-y-2">
+                        {tarefasRelacionamentoQuery.isLoading ? (
+                          <p className="text-sm text-[var(--g3-muted)]">Carregando tarefas...</p>
+                        ) : tarefasRelacionamento.length ? (
+                          tarefasRelacionamento.map((item) => (
+                            <div key={item.id} className="rounded-xl border border-[var(--g3-border)] px-3 py-3">
+                              <div className="flex flex-wrap items-start justify-between gap-2">
+                                <div>
+                                  <p className="text-sm font-semibold text-[var(--g3-foreground)]">{item.titulo}</p>
+                                  <p className="mt-1 text-xs text-[var(--g3-muted)]">
+                                    {item.tipo.replaceAll("_", " ")} • {item.responsavel || "Sem responsável"} • {formatarData(item.dataPrevista)}
+                                  </p>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                  <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${classeBadgePrioridade(item.prioridade)}`}>
+                                    {item.prioridade}
+                                  </span>
+                                  <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${item.status === "concluida" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-700"}`}>
+                                    {item.status.replaceAll("_", " ")}
+                                  </span>
+                                </div>
+                              </div>
+                              {item.descricao ? (
+                                <p className="mt-2 text-sm text-[var(--g3-foreground)]">{item.descricao}</p>
+                              ) : null}
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={item.status === "concluida" || concluirTarefaRelacionamentoMutation.isPending}
+                                  onClick={() => void concluirTarefaRelacionamento(item)}
+                                >
+                                  <CheckCircle2 className="mr-1.5 h-4 w-4" />
+                                  Concluir
+                                </Button>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-sm text-[var(--g3-muted)]">Nenhuma tarefa de relacionamento cadastrada para este doador.</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              {doadorAbaInterna === "observacoes" ? (
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label>Responsável pelo relacionamento</Label>
+                    <Input value={doadorForm.responsavelRelacionamento} onChange={(event) => setDoadorForm((atual) => ({ ...atual, responsavelRelacionamento: event.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Origem do cadastro</Label>
+                    <Input value={doadorForm.origemCadastro} onChange={(event) => setDoadorForm((atual) => ({ ...atual, origemCadastro: event.target.value }))} />
+                  </div>
+                  <div className="space-y-1 md:col-span-2">
+                    <Label>Observações públicas</Label>
+                    <Textarea value={doadorForm.observacoes} onChange={(event) => setDoadorForm((atual) => ({ ...atual, observacoes: event.target.value }))} rows={3} />
+                  </div>
+                  <div className="space-y-1 md:col-span-2">
+                    <Label>Observações internas</Label>
+                    <Textarea value={doadorForm.observacoesInternas} onChange={(event) => setDoadorForm((atual) => ({ ...atual, observacoesInternas: event.target.value }))} rows={4} />
+                  </div>
+                  <label className="flex items-center gap-2 rounded-md border border-[var(--g3-border)] px-3 py-2 md:col-span-2">
+                    <Checkbox checked={doadorForm.aceitouLgpd} onChange={(event) => setDoadorForm((atual) => ({ ...atual, aceitouLgpd: event.currentTarget.checked }))} />
+                    Aceitou LGPD
+                  </label>
+                </div>
+              ) : null}
+
+              {doadorAbaInterna === "historico" ? (
+                <div className="overflow-auto">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]">
+                      <tr>
+                        <th className="px-3 py-2 text-left">Número</th>
+                        <th className="px-3 py-2 text-left">Campanha</th>
+                        <th className="px-3 py-2 text-left">Valor</th>
+                        <th className="px-3 py-2 text-left">Situação</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {historicoDoacoesDoador.length ? (
+                        historicoDoacoesDoador.map((item) => (
+                          <tr key={item.id} className="border-t border-[var(--g3-border)]">
+                            <td className="px-3 py-2">{item.numeroDoacao}</td>
+                            <td className="px-3 py-2">{item.campanhaNome || "—"}</td>
+                            <td className="px-3 py-2">{formatarMoeda(item.valorLiquido || item.valor)}</td>
+                            <td className="px-3 py-2">{item.situacao}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <TabelaVazia texto="Nenhuma doação vinculada ao doador selecionado." colSpan={4} />
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              ) : null}
+
+              {doadorAbaInterna === "comprovantes" ? (
+                <div className="space-y-2">
+                  {comprovantesDoador.length ? (
+                    comprovantesDoador.map((item) => (
+                      <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--g3-border)] px-3 py-2">
+                        <span className="text-sm">{item.numeroComprovante}</span>
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="outline" onClick={() => void abrirArquivoAutenticado(item.arquivoCaminho, item.numeroComprovante)}>
+                            <Eye className="mr-1.5 h-4 w-4" />
+                            Visualizar
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => void imprimirArquivoAutenticado(item.arquivoCaminho, item.numeroComprovante)}>
+                            <Printer className="mr-1.5 h-4 w-4" />
+                            Imprimir
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-[var(--g3-muted)]">Nenhum comprovante disponível.</p>
+                  )}
+                </div>
+              ) : null}
+
+              {doadorAbaInterna === "campanhas" ? (
+                <div className="space-y-2">
+                  {campanhasDoador.length ? (
+                    campanhasDoador.map((item) => (
+                      <div key={item.id} className="rounded-lg border border-[var(--g3-border)] px-3 py-2 text-sm">
+                        {item.nome}
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-[var(--g3-muted)]">Nenhuma campanha apoiada ainda.</p>
+                  )}
+                </div>
+              ) : null}
+
+              {doadorAbaInterna === "anexos" ? (
+                <div className="space-y-2">
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-[var(--g3-border)] px-3 py-2 text-sm text-[var(--g3-muted)]">
+                    <Upload className="h-4 w-4" />
+                    Anexar arquivo
+                    <input className="hidden" type="file" onChange={(event) => void carregarAnexoDoador(event.target.files?.[0])} />
+                  </label>
+                  {anexosDoador.length ? (
+                    anexosDoador.map((item) => (
+                      <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--g3-border)] px-3 py-2">
+                        <span className="text-sm">{item.nomeOriginal}</span>
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="outline" onClick={() => void abrirArquivoAutenticado(item.caminhoArquivo, item.nomeOriginal)}>
+                            Visualizar
+                          </Button>
+                          <Button size="sm" variant="danger" onClick={() => setConfirmacao({ titulo: "Excluir anexo", texto: `Deseja excluir ${item.nomeOriginal}?`, acao: async () => { await arquivosService.excluir(item.id); abrirMensagem("sucesso", "Anexo excluído", "O arquivo foi removido."); } })}>
+                            Excluir
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-[var(--g3-muted)]">Nenhum anexo enviado.</p>
+                  )}
+                </div>
+              ) : null}
+            </SecaoCard>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   function renderCampanhas() {
     return (
       <div className="space-y-3">
@@ -1277,9 +2503,9 @@ export function CaptacaoRecursosPage() {
   function renderConteudo() {
     switch (abaAtiva) {
       case "dashboard":
-        return renderDashboard();
+        return renderCockpit();
       case "doadores":
-        return renderDoadores();
+        return renderDoadores360();
       case "doacoes":
         return renderDoacoes();
       case "campanhas":

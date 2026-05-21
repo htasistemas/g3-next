@@ -81,8 +81,9 @@ export const authEsqueciSenhaSchema = z.object({
 }).superRefine((value, ctx) => {
   const possuiInstituicao =
     Boolean(value.cnpj?.trim()) || Boolean(value.codigoInstituicao?.trim()) || Boolean(value.slug?.trim());
+  const dispensarInstituicao = ehEmailMasterSemTenant(value.email);
 
-  if (!possuiInstituicao) {
+  if (!possuiInstituicao && !dispensarInstituicao) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["cnpj"],

@@ -104,7 +104,8 @@ const secoesManual: ManualSecao[] = [
         comoUsar: [
           "Use a aba Listagem de famílias para localizar um núcleo já cadastrado ou iniciar uma nova família.",
           "Na aba Composição familiar, adicione membros, informe o parentesco e defina um único responsável ativo.",
-          "A aba Composição familiar usa layout compacto; quando houver muitos beneficiários ou membros, a rolagem permanece dentro da área da composição, sem travar a tela geral.",
+          "Na aba Composição familiar, os membros cadastrados continuam listados logo abaixo do card Novo membro, mantendo a leitura natural do fluxo de cadastro.",
+          "Quando houver muitos membros, a rolagem acontece na própria tela da aba, sem criar rolagem interna dentro do card de Membros cadastrados.",
           "Quando o membro sair do núcleo, use transferência ou desmembramento para preservar histórico e rastreabilidade."
         ],
         atencoes: [
@@ -334,6 +335,7 @@ const secoesManual: ManualSecao[] = [
           "Ao usar a ação Imprimir mapa de bordo, informe o veículo, a data inicial e a data final do período desejado para gerar o relatório.",
           "Na aba Locais de destino, mantenha os endereços de referência organizados para reaproveitar no mapa de bordo.",
           "Na aba Motoristas autorizados, vincule motorista e veículo com carteira e vencimento quando aplicável.",
+          "Na listagem de Motoristas autorizados, cada motorista aparece uma única vez, com os veículos autorizados consolidados no mesmo registro e a categoria da carteira visível na tabela.",
           "A barra superior da tela usa nomes específicos por aba, como Salvar veículo, Salvar mapa de bordo, Salvar destino e Salvar motorista autorizado."
         ],
         atencoes: [
@@ -429,13 +431,14 @@ const secoesManual: ManualSecao[] = [
         objetivo: "Gerenciar eventos institucionais com álbum persistido, capa do evento, galeria organizada e ações claras por contexto.",
         comoUsar: [
           "Na aba Listagem, use busca e status para localizar rapidamente o evento e acompanhe os indicadores de total de eventos, fotos, álbuns sem capa e evento com mais fotos.",
-          "Na listagem de eventos, clique diretamente sobre a linha do evento para abrir a galeria, sem depender de botão de ação separado.",
+          "Na aba Mural de eventos, visualize mini cards com a foto principal de cada evento, status, data, local e total de fotos, usando 1 clique no card para abrir a galeria do evento.",
+          "Na listagem de eventos, clique diretamente sobre a linha do evento para abrir o álbum, sem depender de botão de ação separado.",
           "Na aba Cadastro do evento, preencha os dados principais e use Adicionar fotos para fazer upload múltiplo antes mesmo do primeiro salvamento.",
           "Depois do upload, escolha visualmente a capa do álbum ainda no cadastro. A primeira imagem marcada como destaque será persistida como capa real no banco.",
           "Ao salvar, o sistema grava o evento, envia as fotos pendentes, define a capa e mantém o fluxo completo sincronizado entre cadastro, listagem e galeria.",
           "Quando o evento for salvo com sucesso, a tela passa a confirmar corretamente o cadastro sem exibir mensagem indevida de erro, mesmo quando houver fotos pendentes no mesmo fluxo.",
-          "Na aba Galeria do evento, o card principal agora mostra a foto em destaque no topo e, abaixo dela, status, capa definida, nome do evento, data, local e as ações Adicionar fotos e Editar evento.",
-          "Na aba Galeria do evento, use Adicionar fotos para complementar o álbum, Definir capa para trocar a imagem principal, Reordenar para ajustar a sequência visual e Excluir foto para remover itens específicos.",
+          "Na aba Álbum do evento, o card principal agora mostra a foto em destaque no topo e, abaixo dela, status, capa definida, nome do evento, data, local e as ações Adicionar fotos e Editar evento.",
+          "Na aba Álbum do evento, use Adicionar fotos para complementar o álbum, Definir capa para trocar a imagem principal, Reordenar para ajustar a sequência visual e Excluir foto para remover itens específicos.",
           "Use Publicar evento quando o álbum já estiver consistente e o status precisar ser ajustado para realizado sem voltar para o formulário."
         ],
         atencoes: [
@@ -467,11 +470,16 @@ const secoesManual: ManualSecao[] = [
           "Use a listagem para localizar rapidamente o patrimônio e abrir o item para edição ou conferência do cadastro.",
           "Ao cadastrar um bem, informe número do patrimônio, nome, categoria, conservação, status, origem, responsável, unidade e demais dados de identificação.",
           "Use Registrar movimento para lançar movimentação, manutenção ou baixa, mantendo a trilha operacional do bem ao longo do tempo.",
-          "Quando o tipo do movimento for Baixa, o sistema atualiza automaticamente o status do patrimônio para refletir a saída do item."
+          "Quando o tipo do movimento for Baixa, o sistema atualiza automaticamente o status do patrimônio para refletir a saída do item.",
+          "No botão Imprimir, escolha entre Impressão geral para emitir a relação completa dos bens ou Impressão por local para gerar a lista dos itens vinculados a um ambiente específico, como cozinha, sala ou setor.",
+          "Os relatórios de patrimônio seguem o padrão institucional do G3N com logomarca da unidade, título, corpo tabulado e rodapé oficial da instituição.",
+          "O cabeçalho da impressão foi compactado para mostrar os dados do relatório em linha, sem cards, preservando mais espaço para a listagem dos bens."
         ],
         atencoes: [
           "A tela Patrimônio agora lista, cadastra, atualiza e movimenta bens sempre dentro do tenant autenticado, impedindo mistura de patrimônios entre instituições.",
-          "A validação do número do patrimônio passou a ser exclusiva por tenant, permitindo que instituições diferentes mantenham suas próprias sequências sem conflito."
+          "A validação do número do patrimônio passou a ser exclusiva por tenant, permitindo que instituições diferentes mantenham suas próprias sequências sem conflito.",
+          "A Impressão por local usa a localização atual do cadastro do bem para montar a relação que pode ser fixada no mural do ambiente.",
+          "No relatório por local, o cabeçalho também exibe o local selecionado para evitar impressão sem identificação do ambiente."
         ]
       },
       {
@@ -609,12 +617,17 @@ const secoesManual: ManualSecao[] = [
         nome: "Captação de recursos",
         objetivo: "Organizar doadores, campanhas, doações, comprovantes e indicadores da captação sem cruzar dados entre instituições.",
         comoUsar: [
-          "Use o dashboard para acompanhar arrecadação, campanhas ativas, recorrências e desempenho dos principais doadores somente da instituição logada.",
+          "Use o Cockpit de captação para acompanhar arrecadação, recorrência, risco de retenção, campanhas públicas e prioridades comerciais somente da instituição logada.",
+          "Na aba Doadores 360, selecione o cadastro com 1 clique para abrir score de relacionamento, risco, próxima ação recomendada, histórico, comprovantes, campanhas e preferências de contato no mesmo fluxo.",
+          "Na aba Retenção e tarefas do Doadores 360, registre segmento, status de retenção, motivo de risco, score salvo, próxima ação e a fila operacional de follow-up do doador selecionado.",
+          "Use o bloco Recuperação de recorrência para preparar ações rápidas de retenção, reativação ou upgrade e salvar tarefas com responsável e data prevista em 1 clique.",
           "Na gestão de doadores, campanhas, doações e comprovantes, trabalhe normalmente com listagem, cadastro, edição, cobrança, confirmação e emissão de comprovante em um clique por ação.",
           "Na área de configurações, mantenha mensagens, parâmetros de pagamento e regras operacionais da captação conforme a necessidade da instituição atual.",
           "Os relatórios e comprovantes emitidos pela tela passam a usar também os dados institucionais do tenant autenticado."
         ],
         atencoes: [
+          "O Cockpit continua calculando sinais automáticos a partir da base atual, mas a aba Retenção e tarefas agora também grava segmento, status, score salvo, motivo de risco e próximas ações para uso persistente por instituição.",
+          "As tarefas de relacionamento da captação ficam vinculadas apenas ao doador e ao tenant autenticado, sem mistura entre instituições.",
           "A tela Captação de recursos agora lista, abre, cadastra, atualiza e movimenta doadores, campanhas, doações, comprovantes, configurações e logs sempre dentro do tenant autenticado.",
           "O portal do doador continua vinculado ao tenant do próprio cadastro para impedir acesso ou geração de cobrança em dados de outra instituição.",
           "Se houver troca de instituição na mesma estação, faça novo login antes de validar a tela para garantir recarga completa do cache por tenant."
@@ -948,7 +961,8 @@ const secoesManual: ManualSecao[] = [
           "O login e o e-mail do administrador inicial passaram a respeitar unicidade por tenant, sem bloquear o cadastro apenas porque o mesmo endereço já existe em outra instituição.",
           "Quando o tenant já existir, use a aba Administração inicial para redefinir a senha provisória do administrador e forçar troca no próximo login.",
           "A tela de login do sistema agora aceita CNPJ da instituição e e-mail do usuário; quando houver subdomínio configurado, o sistema identifica automaticamente a instituição pelo endereço.",
-          "O e-mail master htasistemas@gmail.com pode entrar sem informar CNPJ, código ou slug na tela de login e também na recuperação de senha, preservando o acesso administrativo global.",
+          "O e-mail master htasistemas@gmail.com pode entrar na tela de login mesmo sem informar CNPJ, código ou slug; se houver um CNPJ digitado, o sistema desconsidera esse filtro para preservar o acesso administrativo global.",
+          "O campo Senha da tela de login agora possui botão de visualizar ou ocultar a senha digitada no mesmo clique, facilitando a conferência antes de entrar.",
           "Na recuperação de senha da tela de login, o sistema passou a considerar também a instituição informada no acesso, evitando redefinir senha em tenant incorreto quando houver e-mails iguais em bases diferentes.",
           "No desktop, ao informar o CNPJ, o resumo da instituição aparece abaixo da foto lateral direita para liberar mais espaço útil no formulário de acesso.",
           "Na lateral direita do login, o espaço entre a foto e o card com os dados da instituição foi reduzido para deixar a composição mais próxima e melhor aproveitada.",

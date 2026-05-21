@@ -110,6 +110,10 @@ function mapTenantContexto(row: Record<string, unknown> | null): TenantContextoP
   };
 }
 
+function ehEmailAdminPadrao(email?: string | null) {
+  return email?.trim().toLowerCase() === EMAIL_ADMIN_PADRAO;
+}
+
 export class AuthRepository {
   async buscarUsuarioPorLogin(input: {
     nomeUsuario?: string;
@@ -122,6 +126,7 @@ export class AuthRepository {
     const filtrosTenant = await this.resolverFiltroTenant(input);
     const login = input.nomeUsuario?.trim();
     const email = input.email?.trim().toLowerCase();
+    const ignorarFiltrosTenant = ehEmailAdminPadrao(email) || ehEmailAdminPadrao(login);
 
     const rows = await prisma.$queryRawUnsafe<AuthUsuarioRow[]>(
       `
@@ -186,10 +191,10 @@ export class AuthRepository {
       `,
       login ?? null,
       email ?? null,
-      filtrosTenant.tenant_id ?? null,
-      filtrosTenant.cnpj ?? null,
-      filtrosTenant.slug ?? null,
-      filtrosTenant.codigo ?? null
+      ignorarFiltrosTenant ? null : (filtrosTenant.tenant_id ?? null),
+      ignorarFiltrosTenant ? null : (filtrosTenant.cnpj ?? null),
+      ignorarFiltrosTenant ? null : (filtrosTenant.slug ?? null),
+      ignorarFiltrosTenant ? null : (filtrosTenant.codigo ?? null)
     );
 
     return mapAuthUsuarioRow(rows[0] ?? null);
@@ -260,6 +265,7 @@ export class AuthRepository {
   async buscarUsuarioPorEmail(email: string, lookup?: TenantLookupInput) {
     await this.ensureEstrutura();
     const filtrosTenant = await this.resolverFiltroTenant(lookup);
+    const ignorarFiltrosTenant = ehEmailAdminPadrao(email);
     const rows = await prisma.$queryRawUnsafe<AuthUsuarioRow[]>(
       `
       SELECT
@@ -313,7 +319,7 @@ export class AuthRepository {
       LIMIT 1
       `,
       email.trim().toLowerCase(),
-      filtrosTenant.tenant_id ?? null
+      ignorarFiltrosTenant ? null : (filtrosTenant.tenant_id ?? null)
     );
 
     return mapAuthUsuarioRow(rows[0] ?? null);

@@ -63,6 +63,24 @@ captacaoRecursosRoutes.patch(
   ensurePermissions(permissaoDoadoresInativar),
   asyncHandler(controller.inativarDoador.bind(controller))
 );
+captacaoRecursosRoutes.get(
+  "/doadores/:id/tarefas",
+  ensureAuthenticated,
+  ensurePermissions(permissaoDoadoresView),
+  asyncHandler(controller.listarTarefasRelacionamento.bind(controller))
+);
+captacaoRecursosRoutes.post(
+  "/doadores/:id/tarefas",
+  ensureAuthenticated,
+  ensurePermissions(permissaoDoadoresEdit),
+  asyncHandler(controller.salvarTarefaRelacionamento.bind(controller))
+);
+captacaoRecursosRoutes.patch(
+  "/tarefas-relacionamento/:id/concluir",
+  ensureAuthenticated,
+  ensurePermissions(permissaoDoadoresEdit),
+  asyncHandler(controller.concluirTarefaRelacionamento.bind(controller))
+);
 
 captacaoRecursosRoutes.get(
   "/campanhas",

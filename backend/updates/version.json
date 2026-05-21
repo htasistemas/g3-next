@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.487",
-  "releaseDate": "2026-05-12",
-  "description": "A nova tela Projetos foi adicionada ao Setor Administrativo com cards, dashboard, tarefas, Kanban e relatórios em PDF por instituição.",
+  "latestVersion": "1.00.500",
+  "releaseDate": "2026-05-20",
+  "description": "O cabeçalho dos relatórios de Patrimônio foi compactado para remover cards de metadados e mostrar setor, tipo, local, total e emissão em linha, preservando mais espaço útil para a relação impressa.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.487",
+  "minCompatibleVersion": "1.00.500",
   "releaseType": "stable"
 }
 

@@ -42,7 +42,10 @@ import {
   useRegistrarMovimentoPatrimonio,
   useSalvarPatrimonio
 } from "@/features/patrimonios/use-patrimonios";
-import { imprimirConteudoAtual } from "@/lib/report-utils";
+import { useUnidadeAssistencialAtual } from "@/features/unidades-assistenciais/use-unidades-assistenciais";
+import { resolverUrlArquivo } from "@/lib/arquivos";
+import { formatarCnpj, formatarTelefone } from "@/lib/br-utils";
+import { imprimirConteudoAtual, imprimirHtmlSemJanela } from "@/lib/report-utils";
 import type { Patrimonio, PatrimonioMovimento } from "@/types/patrimonio";
 
 type AbaId =
@@ -76,6 +79,11 @@ type EdicaoLote = {
   responsavel: string;
   status: string;
   conservacao: string;
+};
+
+type PopupImpressaoState = {
+  aberto: boolean;
+  localSelecionado: string;
 };
 
 const abas: AdminTab[] = [
@@ -269,6 +277,46 @@ function somarDistribuicao(
 
 function normalizarCodigoEtiqueta(numeroPatrimonio?: string) {
   return (numeroPatrimonio ?? "").trim().replace(/\s+/g, " ");
+}
+
+function escaparHtmlRelatorio(valor?: string | number | null) {
+  return String(valor ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function montarRodapeInstitucional(unidade?: {
+  razao_social?: string;
+  nome_fantasia?: string;
+  cnpj?: string;
+  telefone?: string;
+  email?: string;
+  logradouro?: string;
+  numero?: string;
+  complemento?: string;
+  bairro?: string;
+  cidade?: string;
+  estado?: string;
+}) {
+  const linha1 = unidade?.razao_social?.trim() || unidade?.nome_fantasia?.trim() || "Instituição não cadastrada";
+  const detalhes = [formatarCnpj(unidade?.cnpj), formatarTelefone(unidade?.telefone), unidade?.email?.trim()]
+    .filter(Boolean)
+    .join(" • ");
+  const endereco = [
+    unidade?.logradouro?.trim(),
+    unidade?.numero?.trim(),
+    unidade?.complemento?.trim(),
+    unidade?.bairro?.trim(),
+    unidade?.cidade?.trim(),
+    unidade?.estado?.trim()
+  ]
+    .filter(Boolean)
+    .join(" • ");
+
+  return { linha1, linha2: detalhes, linha3: endereco };
 }
 
 function montarConteudoQr(item: Partial<Patrimonio>, codigoEtiqueta: string) {
@@ -506,13 +554,25 @@ export function PatrimonioPage() {
   const [erros, setErros] = useState<Partial<Record<CampoFormulario, string>>>({});
   const [errosMovimento, setErrosMovimento] = useState<Partial<Record<CampoMovimento, string>>>({});
   const [popupMensagem, setPopupMensagem] = useState<PopupMensagemState | null>(null);
+  const [popupImpressao, setPopupImpressao] = useState<PopupImpressaoState>({
+    aberto: false,
+    localSelecionado: ""
+  });
 
   const { data, isLoading } = usePatrimonios();
+  const unidadeAtualQuery = useUnidadeAssistencialAtual();
   const salvarMutation = useSalvarPatrimonio();
   const atualizarLoteMutation = useAtualizarPatrimoniosEmLote();
   const movimentoMutation = useRegistrarMovimentoPatrimonio();
 
   const patrimonios = data?.patrimonios ?? [];
+  const unidadeAtual = unidadeAtualQuery.data?.unidade;
+  const nomeInstituicao =
+    unidadeAtual?.razao_social?.trim() ||
+    unidadeAtual?.nome_fantasia?.trim() ||
+    "Instituição não cadastrada";
+  const logomarcaRelatorio = resolverUrlArquivo(unidadeAtual?.logomarca_relatorio || unidadeAtual?.logomarca);
+  const rodapeInstitucional = montarRodapeInstitucional(unidadeAtual ?? undefined);
   const carregandoAcoes =
     salvarMutation.isPending || movimentoMutation.isPending || atualizarLoteMutation.isPending;
   const possuiRegistroSelecionado = Boolean(form.idPatrimonio);
@@ -538,6 +598,18 @@ export function PatrimonioPage() {
       Array.from(new Set(patrimonios.map((item) => item.sala?.trim() || "").filter(Boolean))).sort((a, b) =>
         a.localeCompare(b, "pt-BR")
       ),
+    [patrimonios]
+  );
+
+  const locaisPatrimonioDisponiveis = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          patrimonios
+            .map((item) => gerarResumoLocalizacao(item.unidade, item.sala))
+            .filter((item) => item && item !== "---")
+        )
+      ).sort((a, b) => a.localeCompare(b, "pt-BR")),
     [patrimonios]
   );
 
@@ -1061,9 +1133,264 @@ export function PatrimonioPage() {
     });
   }
 
-  function imprimir() {
+  function abrirPopupImpressao() {
+    setPopupImpressao((atual) => ({
+      aberto: true,
+      localSelecionado:
+        atual.localSelecionado && locaisPatrimonioDisponiveis.includes(atual.localSelecionado)
+          ? atual.localSelecionado
+          : locaisPatrimonioDisponiveis[0] ?? ""
+    }));
+  }
+
+  function fecharPopupImpressao() {
+    setPopupImpressao((atual) => ({ ...atual, aberto: false }));
+  }
+
+  function montarHtmlRelatorioPatrimonio(
+    titulo: string,
+    subtitulo: string,
+    itens: Patrimonio[],
+    localSelecionado?: string
+  ) {
+    const linhas = itens
+      .map(
+        (item) => `
+          <tr>
+            <td>${escaparHtmlRelatorio(item.nome || "---")}</td>
+            <td>${escaparHtmlRelatorio(item.numeroPatrimonio || "---")}</td>
+            <td>${escaparHtmlRelatorio(item.categoria || "---")}</td>
+          </tr>
+        `
+      )
+      .join("");
+    const emitidoEm = formatarDataInterface(new Date().toISOString().slice(0, 10));
+
+    return `
+      <section class="folha">
+        <header class="topo">
+          <div class="g3-topo-faixa">
+            <span class="g3-topo-marca">G3N</span>
+            <span class="g3-topo-selo">Patrimônio</span>
+          </div>
+          <div class="g3-topo-corpo">
+            ${logomarcaRelatorio ? `<img src="${escaparHtmlRelatorio(logomarcaRelatorio)}" alt="Logomarca da instituição" class="g3-topo-logo" />` : ""}
+            <div class="g3-topo-texto">
+              <h1>${escaparHtmlRelatorio(nomeInstituicao)}</h1>
+              <h2>${escaparHtmlRelatorio(titulo)}</h2>
+              <p class="subtitulo">${escaparHtmlRelatorio(subtitulo)}</p>
+            </div>
+          </div>
+          <div class="meta-resumo">
+            <span><strong>Setor:</strong> Patrimônio</span>
+            <span><strong>Tipo de impressão:</strong> ${escaparHtmlRelatorio(titulo)}</span>
+            <span><strong>Local selecionado:</strong> ${escaparHtmlRelatorio(localSelecionado?.trim() || "Todos os locais")}</span>
+            <span><strong>Total de itens:</strong> ${escaparHtmlRelatorio(itens.length)}</span>
+            <span><strong>Emitido em:</strong> ${escaparHtmlRelatorio(emitidoEm)}</span>
+          </div>
+        </header>
+        <div class="tabela-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Nome do bem</th>
+                <th>Número do patrimônio</th>
+                <th>Categoria</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${
+                linhas ||
+                '<tr><td colspan="3" class="g3-relatorio__vazio">Nenhum item encontrado para este relatório.</td></tr>'
+              }
+            </tbody>
+          </table>
+        </div>
+        <footer class="rodape">
+          <div>${escaparHtmlRelatorio(rodapeInstitucional.linha1)}</div>
+          ${rodapeInstitucional.linha2 ? `<div>${escaparHtmlRelatorio(rodapeInstitucional.linha2)}</div>` : ""}
+          ${rodapeInstitucional.linha3 ? `<div>${escaparHtmlRelatorio(rodapeInstitucional.linha3)}</div>` : ""}
+          <div>Emitido em ${escaparHtmlRelatorio(emitidoEm)}</div>
+        </footer>
+      </section>
+    `;
+  }
+
+  function imprimirRelatorioPatrimonio(
+    titulo: string,
+    subtitulo: string,
+    itens: Patrimonio[],
+    localSelecionado?: string
+  ) {
     try {
-      imprimirConteudoAtual({ titulo: "Relatório de patrimônio" });
+      imprimirHtmlSemJanela({
+        titulo,
+        html: montarHtmlRelatorioPatrimonio(titulo, subtitulo, itens, localSelecionado),
+        tamanhoPagina: "A4 portrait",
+        margemPagina: "10mm",
+        paddingRaiz: "18px",
+        estilosExtras: `
+          * {
+            box-sizing: border-box;
+          }
+
+          body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            color: #0f172a;
+            background: #fff;
+          }
+
+          .folha {
+            padding: 18px;
+          }
+
+          .topo {
+            border: 1px solid #bbf7d0;
+            border-radius: 18px;
+            background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 100%);
+            margin-bottom: 16px;
+            overflow: hidden;
+          }
+
+          .g3-topo-faixa {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 14px 18px;
+            background: #0f8a57;
+            color: #ffffff;
+          }
+
+          .g3-topo-marca {
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+          }
+
+          .g3-topo-selo {
+            border: 1px solid rgba(255,255,255,0.35);
+            border-radius: 999px;
+            padding: 4px 10px;
+            font-size: 11px;
+            font-weight: 600;
+            background: rgba(255,255,255,0.12);
+          }
+
+          .g3-topo-corpo {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            align-items: center;
+            gap: 16px;
+            padding: 18px;
+          }
+
+          .g3-topo-logo {
+            width: 88px;
+            height: 88px;
+            object-fit: contain;
+            border-radius: 16px;
+            background: #ffffff;
+            border: 1px solid #dbe7df;
+            padding: 10px;
+          }
+
+          .g3-topo-texto {
+            text-align: center;
+          }
+
+          h1 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 700;
+            color: #14532d;
+          }
+
+          h2 {
+            margin: 4px 0 6px;
+            font-size: 24px;
+            line-height: 1.1;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #1f2937;
+            font-weight: 800;
+          }
+
+          .subtitulo {
+            margin: 0;
+            font-size: 13px;
+            color: #475569;
+          }
+
+          .meta-resumo {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 16px;
+            padding: 0 18px 18px;
+            font-size: 12px;
+            color: #334155;
+          }
+
+          .meta-resumo span {
+            white-space: nowrap;
+          }
+
+          .meta-resumo strong {
+            color: #166534;
+          }
+
+          .tabela-wrap {
+            overflow: hidden;
+            border: 1px solid #cbd5e1;
+            border-radius: 18px;
+          }
+
+          table {
+            width: 100%;
+            border-collapse: collapse;
+          }
+
+          th {
+            background: #166534;
+            color: #fff;
+            padding: 10px 8px;
+            border: 1px solid #166534;
+            font-size: 11px;
+            text-align: left;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+          }
+
+          td {
+            border: 1px solid #cbd5e1;
+            padding: 8px;
+            font-size: 12px;
+          }
+
+          tbody tr:nth-child(even) td {
+            background: #f8fafc;
+          }
+
+          .g3-relatorio__vazio {
+            text-align: center;
+            color: #64748b;
+          }
+
+          .rodape {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #dbe7df;
+            font-size: 11px;
+            color: #6b7f75;
+            text-align: center;
+          }
+
+          .rodape div + div {
+            margin-top: 2px;
+          }
+        `
+      });
     } catch (error: any) {
       setPopupMensagem({
         tipo: "erro",
@@ -1071,6 +1398,40 @@ export function PatrimonioPage() {
         texto: error?.message ?? "Não foi possível preparar a impressão."
       });
     }
+  }
+
+  function imprimirRelacaoGeral() {
+    imprimirRelatorioPatrimonio(
+      "Impressão geral do patrimônio",
+      "Relação completa dos bens patrimoniais cadastrados.",
+      [...patrimonios].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
+    );
+    fecharPopupImpressao();
+  }
+
+  function imprimirRelacaoPorLocal() {
+    const localSelecionado = popupImpressao.localSelecionado.trim();
+
+    if (!localSelecionado) {
+      setPopupMensagem({
+        tipo: "aviso",
+        titulo: "Local obrigatório",
+        texto: "Selecione o local que deseja imprimir."
+      });
+      return;
+    }
+
+    const itensLocal = patrimonios
+      .filter((item) => gerarResumoLocalizacao(item.unidade, item.sala) === localSelecionado)
+      .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+
+    imprimirRelatorioPatrimonio(
+      "Impressão patrimonial por local",
+      `Itens patrimoniais vinculados ao local ${localSelecionado}.`,
+      itensLocal,
+      localSelecionado
+    );
+    fecharPopupImpressao();
   }
 
   function imprimirEtiquetaTermica() {
@@ -1122,7 +1483,7 @@ export function PatrimonioPage() {
     { label: "Salvar", icon: Save, onClick: () => void salvar(), variant: "default", disabled: carregandoAcoes },
     { label: "Cancelar", icon: Undo2, onClick: cancelar, variant: "outline", disabled: carregandoAcoes },
     { label: "Excluir", icon: Trash2, onClick: excluir, variant: "danger", disabled: carregandoAcoes },
-    { label: "Imprimir", icon: Printer, onClick: imprimir, variant: "outline", disabled: carregandoAcoes },
+    { label: "Imprimir", icon: Printer, onClick: abrirPopupImpressao, variant: "outline", disabled: carregandoAcoes },
     { label: "Fechar", icon: X, onClick: fechar, variant: "outline" }
   ];
 
@@ -2676,6 +3037,81 @@ export function PatrimonioPage() {
           ))}
         </datalist>
       </AdminPageLayout>
+
+      {popupImpressao.aberto ? (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/45 px-4"
+          onClick={fecharPopupImpressao}
+        >
+          <div
+            className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="border-b border-slate-100 px-5 py-4">
+              <h3 className="text-base font-semibold text-slate-900">Imprimir patrimônio</h3>
+              <p className="mt-1 text-sm text-slate-600">
+                Escolha o tipo de relatório que deseja gerar.
+              </p>
+            </div>
+
+            <div className="space-y-4 px-5 py-4">
+              <div className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] p-4">
+                <p className="text-sm font-semibold text-[var(--g3-foreground)]">Impressão geral</p>
+                <p className="mt-1 text-sm text-[var(--g3-muted)]">
+                  Gera a relação completa com nome do bem, número do patrimônio e categoria.
+                </p>
+                <Button className="mt-3" type="button" onClick={imprimirRelacaoGeral}>
+                  Impressão geral
+                </Button>
+              </div>
+
+              <div className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] p-4">
+                <p className="text-sm font-semibold text-[var(--g3-foreground)]">Impressão por local</p>
+                <p className="mt-1 text-sm text-[var(--g3-muted)]">
+                  Gere a relação dos itens do local selecionado para uso no mural do ambiente.
+                </p>
+
+                <div className="mt-3 space-y-1">
+                  <Label htmlFor="patrimonio-impressao-local">Local</Label>
+                  <Select
+                    id="patrimonio-impressao-local"
+                    value={popupImpressao.localSelecionado}
+                    onChange={(event) =>
+                      setPopupImpressao((atual) => ({
+                        ...atual,
+                        localSelecionado: event.target.value
+                      }))
+                    }
+                  >
+                    <option value="">Selecione</option>
+                    {locaisPatrimonioDisponiveis.map((item) => (
+                      <option key={item} value={item}>
+                        {item}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+
+                <Button
+                  className="mt-3"
+                  type="button"
+                  variant="outline"
+                  onClick={imprimirRelacaoPorLocal}
+                  disabled={!popupImpressao.localSelecionado}
+                >
+                  Impressão por local
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex justify-end border-t border-slate-100 px-5 py-3">
+              <Button type="button" variant="outline" onClick={fecharPopupImpressao}>
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {popupMensagem ? <PopupMensagem popup={popupMensagem} onClose={() => setPopupMensagem(null)} /> : null}
     </>

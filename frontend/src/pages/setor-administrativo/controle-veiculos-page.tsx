@@ -127,6 +127,17 @@ const defaultMotorista: MotoristaAutorizado = {
   vencimentoCarteira: ""
 };
 
+type MotoristaAutorizadoAgrupado = {
+  chave: string;
+  nomeMotorista: string;
+  tipoOrigem: "PROFISSIONAL" | "VOLUNTARIO";
+  categoriaCarteira?: string | null;
+  numeroCarteira?: string | null;
+  vencimentoCarteira?: string | null;
+  veiculos: string[];
+  registros: MotoristaAutorizado[];
+};
+
 type PeriodoImpressaoDiario = {
   aberto: boolean;
   dataInicial: string;
@@ -418,6 +429,46 @@ export function ControleVeiculosPage() {
       motoristasAutorizados: motoristasAutorizados.length
     };
   }, [diarios, locaisDestinoAtivos.length, motoristasAutorizados.length, veiculos]);
+
+  const motoristasAutorizadosAgrupados = useMemo<MotoristaAutorizadoAgrupado[]>(() => {
+    const grupos = new Map<string, MotoristaAutorizadoAgrupado>();
+
+    for (const item of motoristasAutorizados) {
+      const chave = `${item.tipoOrigem}-${item.motoristaId}`;
+      const veiculoRotulo = [item.placaVeiculo, item.modeloVeiculo].filter(Boolean).join(" - ") || String(item.veiculoId);
+      const grupoExistente = grupos.get(chave);
+
+      if (grupoExistente) {
+        if (!grupoExistente.veiculos.includes(veiculoRotulo)) {
+          grupoExistente.veiculos.push(veiculoRotulo);
+        }
+        grupoExistente.registros.push(item);
+        if (!grupoExistente.categoriaCarteira && item.categoriaCarteira) {
+          grupoExistente.categoriaCarteira = item.categoriaCarteira;
+        }
+        if (!grupoExistente.numeroCarteira && item.numeroCarteira) {
+          grupoExistente.numeroCarteira = item.numeroCarteira;
+        }
+        if (!grupoExistente.vencimentoCarteira && item.vencimentoCarteira) {
+          grupoExistente.vencimentoCarteira = item.vencimentoCarteira;
+        }
+        continue;
+      }
+
+      grupos.set(chave, {
+        chave,
+        nomeMotorista: item.nomeMotorista || String(item.motoristaId),
+        tipoOrigem: item.tipoOrigem,
+        categoriaCarteira: item.categoriaCarteira,
+        numeroCarteira: item.numeroCarteira,
+        vencimentoCarteira: item.vencimentoCarteira,
+        veiculos: [veiculoRotulo],
+        registros: [item]
+      });
+    }
+
+    return Array.from(grupos.values()).sort((a, b) => a.nomeMotorista.localeCompare(b.nomeMotorista, "pt-BR"));
+  }, [motoristasAutorizados]);
 
   const rotasRecentes = useMemo(() => diarios.slice(0, 6), [diarios]);
 
@@ -1566,8 +1617,8 @@ export function ControleVeiculosPage() {
             </div>
             <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]">
               <table className="min-w-full text-sm">
-                <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"><tr><th className="px-3 py-2 text-left">Veículo</th><th className="px-3 py-2 text-left">Motorista</th><th className="px-3 py-2 text-left">Origem</th><th className="px-3 py-2 text-left">Carteira</th></tr></thead>
-                <tbody>{motoristasAutorizados.length ? motoristasAutorizados.map((item, index) => <tr key={item.id ?? `${item.veiculoId}-${index}`} className={`cursor-pointer border-t border-[var(--g3-border)] ${index % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35"}`} onClick={() => { setMotoristaForm({ ...item, vencimentoCarteira: item.vencimentoCarteira ?? "" }); setTermoMotorista(item.nomeMotorista ?? ""); }}><td className="px-3 py-2">{item.placaVeiculo ?? item.veiculoId}</td><td className="px-3 py-2">{item.nomeMotorista ?? item.motoristaId}</td><td className="px-3 py-2">{item.tipoOrigem === "PROFISSIONAL" ? "Profissional" : "Voluntário"}</td><td className="px-3 py-2">{item.numeroCarteira ?? "---"}</td></tr>) : <tr><td className="px-3 py-4 text-center" colSpan={4}>Nenhum motorista autorizado cadastrado.</td></tr>}</tbody>
+                <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"><tr><th className="px-3 py-2 text-left">Motorista</th><th className="px-3 py-2 text-left">Origem</th><th className="px-3 py-2 text-left">Categoria da carteira</th><th className="px-3 py-2 text-left">Número da carteira</th><th className="px-3 py-2 text-left">Veículos autorizados</th></tr></thead>
+                <tbody>{motoristasAutorizadosAgrupados.length ? motoristasAutorizadosAgrupados.map((grupo, index) => <tr key={grupo.chave} className={`cursor-pointer border-t border-[var(--g3-border)] ${index % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35"}`} onClick={() => { const item = grupo.registros[0]; setMotoristaForm({ ...item, vencimentoCarteira: item.vencimentoCarteira ?? "" }); setTermoMotorista(item.nomeMotorista ?? ""); }}><td className="px-3 py-2 font-medium">{grupo.nomeMotorista}</td><td className="px-3 py-2">{grupo.tipoOrigem === "PROFISSIONAL" ? "Profissional" : "Voluntário"}</td><td className="px-3 py-2">{grupo.categoriaCarteira ?? "---"}</td><td className="px-3 py-2">{grupo.numeroCarteira ?? "---"}</td><td className="px-3 py-2"><div className="flex flex-wrap gap-1">{grupo.veiculos.map((veiculo) => <span key={`${grupo.chave}-${veiculo}`} className="rounded-full border border-[var(--g3-border)] bg-[var(--g3-card)] px-2 py-1 text-xs">{veiculo}</span>)}</div></td></tr>) : <tr><td className="px-3 py-4 text-center" colSpan={5}>Nenhum motorista autorizado cadastrado.</td></tr>}</tbody>
               </table>
             </div>
           </section>

@@ -581,8 +581,8 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/financeiro/doacoes-realizadas")) return "Doação realizada";
   if (pathname.startsWith("/cadastros/unidades-assistenciais")) return "Cadastro de unidade assistencial";
   if (pathname.startsWith("/cadastros/vinculo-familiar")) return "Cadastro de vínculo familiar";
-  if (pathname.startsWith("/captacao-recursos/dashboard")) return "Dashboard de captação";
-  if (pathname.startsWith("/captacao-recursos/doadores")) return "Doadores";
+  if (pathname.startsWith("/captacao-recursos/dashboard")) return "Cockpit de captação";
+  if (pathname.startsWith("/captacao-recursos/doadores")) return "Doadores 360";
   if (pathname.startsWith("/captacao-recursos/doacoes")) return "Doações";
   if (pathname.startsWith("/captacao-recursos/campanhas")) return "Campanhas";
   if (pathname.startsWith("/captacao-recursos/portal-doador")) return "Portal doador";

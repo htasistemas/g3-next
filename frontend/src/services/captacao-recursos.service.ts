@@ -8,7 +8,8 @@ import type {
   CaptacaoDoador,
   CaptacaoListFilters,
   CaptacaoLogItem,
-  CaptacaoPortalPainel
+  CaptacaoPortalPainel,
+  CaptacaoTarefaRelacionamento
 } from "@/types/captacao-recursos";
 
 export const captacaoRecursosService = {
@@ -37,6 +38,28 @@ export const captacaoRecursosService = {
   async inativarDoador(id: string) {
     const { data } = await httpClient.patch<{ doador: CaptacaoDoador }>(`/api/captacao-recursos/doadores/${id}/inativar`);
     return data.doador;
+  },
+
+  async listarTarefasRelacionamento(doadorId: string) {
+    const { data } = await httpClient.get<{ tarefas: CaptacaoTarefaRelacionamento[] }>(
+      `/api/captacao-recursos/doadores/${doadorId}/tarefas`
+    );
+    return data.tarefas;
+  },
+
+  async salvarTarefaRelacionamento(doadorId: string, payload: Record<string, unknown>) {
+    const { data } = await httpClient.post<{ tarefa: CaptacaoTarefaRelacionamento }>(
+      `/api/captacao-recursos/doadores/${doadorId}/tarefas`,
+      payload
+    );
+    return data.tarefa;
+  },
+
+  async concluirTarefaRelacionamento(id: string) {
+    const { data } = await httpClient.patch<{ tarefa: CaptacaoTarefaRelacionamento }>(
+      `/api/captacao-recursos/tarefas-relacionamento/${id}/concluir`
+    );
+    return data.tarefa;
   },
 
   async listarCampanhas(filters: CaptacaoListFilters = {}) {

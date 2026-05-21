@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Building2, HandHeart } from "lucide-react";
+import { Building2, Eye, EyeOff, HandHeart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -124,6 +124,7 @@ export function LoginPage() {
   const [cnpj, setCnpj] = useState(cnpjSalvo);
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
+  const [senhaVisivel, setSenhaVisivel] = useState(false);
   const [emailRecuperacao, setEmailRecuperacao] = useState("");
   const [lembrarAcesso, setLembrarAcesso] = useState(lembrarSalvo);
   const [instituicaoContexto, setInstituicaoContexto] = useState<TenantContextoLogin | null>(null);
@@ -487,15 +488,28 @@ export function LoginPage() {
                 </div>
                 <div>
                   <Label htmlFor="senha">Senha</Label>
-                  <Input
-                    id="senha"
-                    type="password"
-                    value={senha}
-                    onChange={(event) => setSenha(event.target.value)}
-                    placeholder="Digite sua senha"
-                    autoComplete="current-password"
-                    disabled={carregando || carregandoGoogle}
-                  />
+                  <div className="relative">
+                    <Input
+                      id="senha"
+                      type={senhaVisivel ? "text" : "password"}
+                      value={senha}
+                      onChange={(event) => setSenha(event.target.value)}
+                      placeholder="Digite sua senha"
+                      autoComplete="current-password"
+                      disabled={carregando || carregandoGoogle}
+                      className="pr-11"
+                    />
+                    <button
+                      type="button"
+                      className="absolute inset-y-0 right-0 inline-flex w-10 items-center justify-center text-slate-500 transition hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      onClick={() => setSenhaVisivel((atual) => !atual)}
+                      disabled={carregando || carregandoGoogle}
+                      aria-label={senhaVisivel ? "Ocultar senha" : "Visualizar senha"}
+                      title={senhaVisivel ? "Ocultar senha" : "Visualizar senha"}
+                    >
+                      {senhaVisivel ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                 </div>
 
                 <label className="flex items-center gap-2 text-sm text-slate-700">

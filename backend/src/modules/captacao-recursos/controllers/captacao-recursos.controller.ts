@@ -42,6 +42,29 @@ export class CaptacaoRecursosController {
     );
   }
 
+  async listarTarefasRelacionamento(request: AuthenticatedRequest, response: Response) {
+    return response.json(await service.listTarefasRelacionamento(request.params.id, obterTenantId(request)));
+  }
+
+  async salvarTarefaRelacionamento(request: AuthenticatedRequest, response: Response) {
+    return response
+      .status(201)
+      .json(
+        await service.saveTarefaRelacionamento(
+          request.params.id,
+          request.body,
+          obterUsuarioId(request),
+          obterTenantId(request)
+        )
+      );
+  }
+
+  async concluirTarefaRelacionamento(request: AuthenticatedRequest, response: Response) {
+    return response.json(
+      await service.concluirTarefaRelacionamento(request.params.id, obterUsuarioId(request), obterTenantId(request))
+    );
+  }
+
   async listarCampanhas(request: AuthenticatedRequest, response: Response) {
     return response.json(await service.listCampanhas(request.query, obterTenantId(request)));
   }

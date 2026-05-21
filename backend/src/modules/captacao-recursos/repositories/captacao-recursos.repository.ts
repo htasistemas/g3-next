@@ -42,6 +42,11 @@ const sqlEstrutura = [
       aceita_whatsapp BOOLEAN NOT NULL DEFAULT TRUE,
       aceita_receber_campanhas BOOLEAN NOT NULL DEFAULT TRUE,
       categoria_doador VARCHAR(40),
+      segmento_relacionamento VARCHAR(60),
+      status_retencao VARCHAR(30),
+      motivo_risco VARCHAR(255),
+      proxima_acao_sugerida VARCHAR(255),
+      score_relacionamento INTEGER NOT NULL DEFAULT 0,
       responsavel_relacionamento VARCHAR(120),
       observacoes_internas TEXT,
       portal_ativo BOOLEAN NOT NULL DEFAULT TRUE,
@@ -64,6 +69,28 @@ const sqlEstrutura = [
       valor_norm VARCHAR(255),
       principal BOOLEAN NOT NULL DEFAULT FALSE,
       observacao VARCHAR(255),
+      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      created_by BIGINT,
+      updated_by BIGINT
+    );
+  `,
+  `
+    CREATE TABLE IF NOT EXISTS captacao_tarefas_relacionamento (
+      id BIGSERIAL PRIMARY KEY,
+      uuid VARCHAR(40) NOT NULL UNIQUE,
+      instituicao_id BIGINT,
+      doador_id BIGINT NOT NULL REFERENCES captacao_doadores(id) ON DELETE CASCADE,
+      titulo VARCHAR(160) NOT NULL,
+      descricao TEXT,
+      status VARCHAR(20) NOT NULL DEFAULT 'pendente',
+      prioridade VARCHAR(20) NOT NULL DEFAULT 'media',
+      tipo VARCHAR(40) NOT NULL DEFAULT 'follow_up',
+      responsavel VARCHAR(120),
+      data_prevista DATE,
+      concluida_em TIMESTAMP,
+      origem VARCHAR(40) NOT NULL DEFAULT 'manual',
+      tenant_id UUID,
       created_at TIMESTAMP NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
       created_by BIGINT,
@@ -371,8 +398,16 @@ const sqlEstrutura = [
   `ALTER TABLE captacao_logs ADD COLUMN IF NOT EXISTS tenant_id UUID;`,
   `ALTER TABLE captacao_preferencias_comunicacao ADD COLUMN IF NOT EXISTS tenant_id UUID;`,
   `ALTER TABLE captacao_portal_acessos ADD COLUMN IF NOT EXISTS tenant_id UUID;`,
+  `ALTER TABLE captacao_doadores ADD COLUMN IF NOT EXISTS segmento_relacionamento VARCHAR(60);`,
+  `ALTER TABLE captacao_doadores ADD COLUMN IF NOT EXISTS status_retencao VARCHAR(30);`,
+  `ALTER TABLE captacao_doadores ADD COLUMN IF NOT EXISTS motivo_risco VARCHAR(255);`,
+  `ALTER TABLE captacao_doadores ADD COLUMN IF NOT EXISTS proxima_acao_sugerida VARCHAR(255);`,
+  `ALTER TABLE captacao_doadores ADD COLUMN IF NOT EXISTS score_relacionamento INTEGER NOT NULL DEFAULT 0;`,
   `CREATE INDEX IF NOT EXISTS captacao_doadores_status_idx ON captacao_doadores (status) WHERE deleted_at IS NULL;`,
   `CREATE INDEX IF NOT EXISTS captacao_doadores_nome_idx ON captacao_doadores (nome);`,
+  `CREATE INDEX IF NOT EXISTS captacao_tarefas_relacionamento_doador_idx ON captacao_tarefas_relacionamento (doador_id);`,
+  `CREATE INDEX IF NOT EXISTS captacao_tarefas_relacionamento_status_idx ON captacao_tarefas_relacionamento (status);`,
+  `CREATE INDEX IF NOT EXISTS captacao_tarefas_relacionamento_tenant_idx ON captacao_tarefas_relacionamento (tenant_id, status, data_prevista DESC);`,
   `DROP INDEX IF EXISTS captacao_doadores_documento_unique_idx;`,
   `DROP INDEX IF EXISTS captacao_doadores_email_unique_idx;`,
   `CREATE UNIQUE INDEX IF NOT EXISTS captacao_doadores_documento_unique_idx ON captacao_doadores (tenant_id, cpf_cnpj_norm) WHERE deleted_at IS NULL AND tenant_id IS NOT NULL AND cpf_cnpj_norm IS NOT NULL;`,
@@ -538,6 +573,13 @@ const sqlEstrutura = [
       FROM captacao_doadores d
      WHERE captacao_portal_acessos.tenant_id IS NULL
        AND d.id = captacao_portal_acessos.doador_id;
+  `,
+  `
+    UPDATE captacao_tarefas_relacionamento
+       SET tenant_id = d.tenant_id
+      FROM captacao_doadores d
+     WHERE captacao_tarefas_relacionamento.tenant_id IS NULL
+       AND d.id = captacao_tarefas_relacionamento.doador_id;
   `,
   `
     INSERT INTO captacao_configuracoes (
@@ -846,6 +888,11 @@ export class CaptacaoRecursosRepository {
       aceitaWhatsapp: Boolean(input.aceitaWhatsapp),
       aceitaReceberCampanhas: Boolean(input.aceitaReceberCampanhas),
       categoriaDoador: input.categoriaDoador ?? null,
+      segmentoRelacionamento: input.segmentoRelacionamento ?? null,
+      statusRetencao: input.statusRetencao ?? null,
+      motivoRisco: input.motivoRisco ?? null,
+      proximaAcaoSugerida: input.proximaAcaoSugerida ?? null,
+      scoreRelacionamento: Number(input.scoreRelacionamento ?? 0) || 0,
       responsavelRelacionamento: input.responsavelRelacionamento ?? null,
       observacoesInternas: input.observacoesInternas ?? null,
       portalAtivo: Boolean(input.portalAtivo),
@@ -883,6 +930,11 @@ export class CaptacaoRecursosRepository {
       payload.aceitaWhatsapp,
       payload.aceitaReceberCampanhas,
       payload.categoriaDoador,
+      payload.segmentoRelacionamento,
+      payload.statusRetencao,
+      payload.motivoRisco,
+      payload.proximaAcaoSugerida,
+      payload.scoreRelacionamento,
       payload.responsavelRelacionamento,
       payload.observacoesInternas,
       payload.portalAtivo,
@@ -901,11 +953,12 @@ export class CaptacaoRecursosRepository {
               data_nascimento_fundacao, email_principal, email_principal_norm, email_secundario, email_secundario_norm,
               telefone, telefone_norm, whatsapp, whatsapp_norm, endereco_completo, bairro, cidade, uf, cep, cep_norm,
               observacoes, origem_cadastro, status, aceitou_lgpd, data_aceite_lgpd, aceita_email, aceita_whatsapp,
-              aceita_receber_campanhas, categoria_doador, responsavel_relacionamento, observacoes_internas,
+              aceita_receber_campanhas, categoria_doador, segmento_relacionamento, status_retencao, motivo_risco,
+              proxima_acao_sugerida, score_relacionamento, responsavel_relacionamento, observacoes_internas,
               portal_ativo, anexo_principal_caminho, created_by, updated_by, tenant_id
             )
             VALUES (
-              $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$35,$36
+              $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$40,$41
             )
             RETURNING *
           `,
@@ -946,13 +999,18 @@ export class CaptacaoRecursosRepository {
                    aceita_whatsapp = $28,
                    aceita_receber_campanhas = $29,
                    categoria_doador = $30,
-                   responsavel_relacionamento = $31,
-                   observacoes_internas = $32,
-                   portal_ativo = $33,
-                   anexo_principal_caminho = $34,
-                   updated_by = $35,
+                   segmento_relacionamento = $31,
+                   status_retencao = $32,
+                   motivo_risco = $33,
+                   proxima_acao_sugerida = $34,
+                   score_relacionamento = $35,
+                   responsavel_relacionamento = $36,
+                   observacoes_internas = $37,
+                   portal_ativo = $38,
+                   anexo_principal_caminho = $39,
+                   updated_by = $40,
                    updated_at = NOW()
-             WHERE id = $36 AND deleted_at IS NULL AND ${tenantFilter("captacao_doadores", tenantId)}
+             WHERE id = $41 AND deleted_at IS NULL AND ${tenantFilter("captacao_doadores", tenantId)}
             RETURNING *
           `,
           [...params, id]
@@ -1032,6 +1090,101 @@ export class CaptacaoRecursosRepository {
       )
     )[0];
     if (!row) throw new AppError("Doador nao encontrado.", 404);
+    return row;
+  }
+
+  async listarTarefasRelacionamentoPorDoador(doadorId: bigint, tenantId?: string) {
+    return this.query(
+      `
+        SELECT *
+        FROM captacao_tarefas_relacionamento
+        WHERE doador_id = $1 AND ${tenantFilter("captacao_tarefas_relacionamento", tenantId)}
+        ORDER BY
+          CASE status
+            WHEN 'pendente' THEN 0
+            WHEN 'em_andamento' THEN 1
+            WHEN 'concluida' THEN 2
+            ELSE 3
+          END,
+          data_prevista ASC NULLS LAST,
+          created_at DESC,
+          id DESC
+      `,
+      [doadorId]
+    );
+  }
+
+  async salvarTarefaRelacionamento(
+    doadorId: bigint,
+    input: Record<string, unknown>,
+    userId?: bigint,
+    tenantId?: string
+  ) {
+    const payload = {
+      titulo: trimOrUndefined(String(input.titulo ?? "")),
+      descricao: trimOrUndefined(String(input.descricao ?? "")),
+      status: trimOrUndefined(String(input.status ?? "")) ?? "pendente",
+      prioridade: trimOrUndefined(String(input.prioridade ?? "")) ?? "media",
+      tipo: trimOrUndefined(String(input.tipo ?? "")) ?? "follow_up",
+      responsavel: trimOrUndefined(String(input.responsavel ?? "")),
+      dataPrevista: toPgDate(String(input.dataPrevista ?? "")),
+      origem: trimOrUndefined(String(input.origem ?? "")) ?? "manual"
+    };
+
+    const row = (
+      await this.query(
+        `
+          INSERT INTO captacao_tarefas_relacionamento (
+            uuid, doador_id, titulo, descricao, status, prioridade, tipo, responsavel, data_prevista, origem,
+            created_by, updated_by, tenant_id
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $11, $12)
+          RETURNING *
+        `,
+        [
+          randomUUID(),
+          doadorId,
+          payload.titulo,
+          payload.descricao,
+          payload.status,
+          payload.prioridade,
+          payload.tipo,
+          payload.responsavel,
+          payload.dataPrevista,
+          payload.origem,
+          userId ?? null,
+          tenantId ?? null
+        ]
+      )
+    )[0];
+
+    if (!row) {
+      throw new AppError("Nao foi possivel salvar a tarefa de relacionamento.", 500);
+    }
+
+    return row;
+  }
+
+  async concluirTarefaRelacionamento(id: bigint, userId?: bigint, tenantId?: string) {
+    const row = (
+      await this.query(
+        `
+          UPDATE captacao_tarefas_relacionamento
+             SET status = 'concluida',
+                 concluida_em = NOW(),
+                 updated_by = $2,
+                 updated_at = NOW()
+           WHERE id = $1 AND ${tenantFilter("captacao_tarefas_relacionamento", tenantId)}
+           RETURNING *
+        `,
+        [id, userId ?? null]
+      )
+    )[0];
+
+    if (!row) {
+      throw new AppError("Tarefa de relacionamento nao encontrada.", 404);
+    }
+
     return row;
   }
 

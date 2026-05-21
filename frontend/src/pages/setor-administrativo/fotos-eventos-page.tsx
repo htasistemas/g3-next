@@ -44,7 +44,7 @@ import { resolverUrlArquivo } from "@/lib/arquivos";
 import { imprimirConteudoAtual } from "@/lib/report-utils";
 import type { FotoEventoFotoPayload, FotoEventoPayload, FotoUploadPayload } from "@/types/fotos-eventos";
 
-type AbaId = "lista" | "cadastro" | "detalhe";
+type AbaId = "lista" | "cards" | "cadastro" | "detalhe";
 
 type FormState = FotoEventoPayload & { id?: number };
 
@@ -56,8 +56,9 @@ type UploadPendente = {
 
 const abas: AdminTab[] = [
   { id: "lista", label: "Listagem", icon: List },
+  { id: "cards", label: "Mural de eventos", icon: Images },
   { id: "cadastro", label: "Cadastro do evento", icon: Camera },
-  { id: "detalhe", label: "Galeria do evento", icon: FolderOpen }
+  { id: "detalhe", label: "Álbum do evento", icon: FolderOpen }
 ];
 
 const tituloTela = "Fotos e eventos";
@@ -215,6 +216,10 @@ export function FotosEventosPage() {
 
   function buscar() {
     setAbaAtiva("lista");
+  }
+
+  function abrirCards() {
+    setAbaAtiva("cards");
   }
 
   function cancelar() {
@@ -510,10 +515,17 @@ export function FotosEventosPage() {
     abaAtiva === "lista"
       ? [
           { label: "Buscar eventos", icon: Search, onClick: buscar, variant: "outline" },
+          { label: "Abrir mural", icon: Images, onClick: abrirCards, variant: "ghost" },
           { label: "Novo evento", icon: Plus, onClick: novo, variant: "default", disabled: carregandoAcoes },
           { label: "Imprimir", icon: Upload, onClick: imprimir, variant: "ghost", disabled: carregandoAcoes },
           { label: "Fechar", icon: X, onClick: fechar, variant: "outline" }
         ]
+      : abaAtiva === "cards"
+        ? [
+            { label: "Voltar para listagem", icon: List, onClick: buscar, variant: "outline" },
+            { label: "Novo evento", icon: Plus, onClick: novo, variant: "default", disabled: carregandoAcoes },
+            { label: "Fechar", icon: X, onClick: fechar, variant: "outline" }
+          ]
       : abaAtiva === "cadastro"
         ? [
             {
@@ -531,7 +543,7 @@ export function FotosEventosPage() {
               disabled: carregandoAcoes
             },
             {
-              label: "Abrir galeria",
+              label: "Abrir álbum",
               icon: FolderOpen,
               onClick: () => setAbaAtiva("detalhe"),
               variant: "ghost",
@@ -679,6 +691,90 @@ export function FotosEventosPage() {
                   )}
                 </tbody>
               </table>
+            </div>
+          </section>
+        ) : null}
+
+        {abaAtiva === "cards" ? (
+          <section className="space-y-4">
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="space-y-1 md:col-span-2">
+                <Label>Busca</Label>
+                <Input
+                  placeholder="Título, local ou tags"
+                  value={busca}
+                  onChange={(event) => setBusca(event.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Status</Label>
+                <Select value={filtroStatus} onChange={(event) => setFiltroStatus(event.target.value)}>
+                  <option value="">Todos</option>
+                  <option value="PLANEJADO">Planejado</option>
+                  <option value="REALIZADO">Realizado</option>
+                  <option value="CANCELADO">Cancelado</option>
+                  <option value="ARQUIVADO">Arquivado</option>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+              {isLoading ? (
+                <Card className="sm:col-span-2 xl:col-span-3 2xl:col-span-4 border-[var(--g3-border)]">
+                  <CardContent className="py-10 text-center text-sm text-[var(--g3-muted)]">
+                    Carregando cards dos eventos...
+                  </CardContent>
+                </Card>
+              ) : eventos.length ? (
+                eventos.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className="overflow-hidden rounded-2xl border border-[var(--g3-border)] bg-[var(--g3-card)] text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[var(--g3-active)] hover:shadow-md"
+                    onClick={() => selecionar(item.id)}
+                  >
+                    <div className="relative aspect-[4/3] overflow-hidden bg-[var(--g3-primary-soft)]">
+                      {item.fotoPrincipalUrl ? (
+                        <img
+                          src={resolverUrlArquivo(item.fotoPrincipalUrl)}
+                          alt={item.titulo}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-[var(--g3-muted)]">
+                          <Images className="h-8 w-8" />
+                          <span className="text-xs font-medium">Sem foto principal</span>
+                        </div>
+                      )}
+                      <div className="absolute left-3 top-3">
+                        <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold backdrop-blur ${classeStatus(item.status)}`}>
+                          {item.status ?? "---"}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="space-y-2 p-4">
+                      <div>
+                        <p className="line-clamp-2 text-sm font-semibold text-[var(--g3-foreground)]">
+                          {item.titulo}
+                        </p>
+                        <p className="mt-1 text-xs text-[var(--g3-muted)]">
+                          {item.local ?? "Local não informado"}
+                        </p>
+                      </div>
+                      <div className="flex items-center justify-between gap-3 text-xs text-[var(--g3-muted)]">
+                        <span>{formatarData(item.dataEvento)}</span>
+                        <span>{item.totalFotos ?? 0} fotos</span>
+                      </div>
+                    </div>
+                  </button>
+                ))
+              ) : (
+                <Card className="sm:col-span-2 xl:col-span-3 2xl:col-span-4 border-[var(--g3-border)]">
+                  <CardContent className="py-10 text-center text-sm text-[var(--g3-muted)]">
+                    Nenhum evento encontrado para os filtros informados.
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </section>
         ) : null}
