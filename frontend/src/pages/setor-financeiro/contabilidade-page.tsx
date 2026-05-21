@@ -3,13 +3,18 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowRightLeft,
+  CalendarClock,
   Banknote,
+  CircleArrowDown,
+  CircleArrowUp,
   BookOpenText,
   Building2,
+  CalendarRange,
   FileText,
   FolderTree,
   HandCoins,
   History,
+  Lock,
   Landmark,
   List,
   Paperclip,
@@ -66,6 +71,8 @@ import {
   useEstornarLancamento,
   useEstornarTransferenciaContabil,
   useExcluirArquivoLancamentoContabil,
+  useFecharMesContabil,
+  useFechamentosMensaisContabeis,
   useGerarObrigacaoFinanceiraCompra,
   useHistoricoContabil,
   useLancamentosContabeis,
@@ -97,6 +104,7 @@ import type {
   ContaBancariaPayload,
   DirecaoAjusteFinanceiro,
   EmendaImpositivaPayload,
+  FechamentoMensalPayload,
   HistoricoContabilidade,
   LancamentoFinanceiro,
   LancamentoFinanceiroPayload,
@@ -137,6 +145,8 @@ type ExclusaoTipo =
   | 'lancamento'
   | 'movimentacao'
   | null;
+
+type ModoLancamentoRapido = 'entrada' | 'saida' | 'programacao' | 'transferencia';
 
 const abas: AdminTab[] = [
   { id: 'painel', label: 'Painel financeiro', icon: List },
@@ -183,6 +193,7 @@ const statusFluxoDisponiveis = [
 ];
 const formatarDataInput = (data: Date) => data.toISOString().slice(0, 10);
 const hoje = formatarDataInput(new Date());
+const competenciaAtual = hoje.slice(0, 7);
 const periodoInicialPadrao = (() => {
   const data = new Date();
   data.setMonth(data.getMonth() - 12);
@@ -398,6 +409,19 @@ function formatarDataHora(valor?: string) {
   return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(
     new Date(valor)
   );
+}
+
+function formatarCompetencia(valor?: string) {
+  if (!valor || !/^\d{4}-\d{2}$/.test(valor)) return 'Não informada';
+  const [ano, mes] = valor.split('-');
+  return `${mes}/${ano}`;
+}
+
+function proximaCompetencia(valor: string) {
+  const [ano, mes] = valor.split('-').map(Number);
+  const data = new Date(ano, (mes || 1) - 1, 1);
+  data.setMonth(data.getMonth() + 1);
+  return `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}`;
 }
 
 function formatarStatus(valor?: string | null) {
@@ -668,9 +692,12 @@ function ResumoCard({
   centralizado?: boolean;
 }) {
   return (
-    <div className={`rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] p-3 shadow-sm ${className ?? ''}`}>
+    <div className={`min-w-0 rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] p-3 shadow-sm ${className ?? ''}`}>
       <p className={`text-xs font-semibold text-[var(--g3-muted)] ${centralizado ? 'text-center' : ''}`}>{titulo}</p>
-      <p className={`mt-1 text-2xl font-bold ${centralizado ? 'text-center' : ''}`} style={{ color: destaque }}>
+      <p
+        className={`mt-1 overflow-hidden text-[clamp(0.85rem,0.7vw+0.75rem,1.5rem)] font-bold leading-tight tracking-tight whitespace-nowrap ${centralizado ? 'text-center' : ''}`}
+        style={{ color: destaque }}
+      >
         {valor}
       </p>
       {subtitulo ? <p className={`mt-1 text-xs text-[var(--g3-muted)] ${centralizado ? 'text-center' : ''}`}>{subtitulo}</p> : null}
@@ -726,6 +753,7 @@ export function ContabilidadePage() {
   const [movimentacaoSelecionadaId, setMovimentacaoSelecionadaId] = useState<number>();
   const [lancamentoValorInput, setLancamentoValorInput] = useState('');
   const [editandoValorLancamento, setEditandoValorLancamento] = useState(false);
+  const [modoLancamentoRapido, setModoLancamentoRapido] = useState<ModoLancamentoRapido>('entrada');
 
   const [contaForm, setContaForm] = useState<ContaBancariaPayload>(contaVazia);
   const [categoriaForm, setCategoriaForm] = useState<CategoriaFinanceiraPayload>(categoriaVazia);
@@ -737,6 +765,10 @@ export function ContabilidadePage() {
   const [emendaForm, setEmendaForm] = useState<EmendaImpositivaPayload>(emendaVazia);
   const [arquivoSelecionado, setArquivoSelecionado] = useState<File | null>(null);
   const [arquivoObservacao, setArquivoObservacao] = useState('');
+  const [fechamentoForm, setFechamentoForm] = useState<FechamentoMensalPayload>({
+    competencia: competenciaAtual,
+    observacao: ''
+  });
 
   useEffect(() => {
     if (editandoValorLancamento) return;
@@ -751,11 +783,11 @@ export function ContabilidadePage() {
   const carregarCategorias = abaEstaNaLista(abaAtiva, ['painel', 'lancamentos']);
   const carregarCentros = false;
   const carregarLancamentos = abaEstaNaLista(abaAtiva, ['painel', 'lancamentos']);
-  const carregarMovimentacoes = abaEstaNaLista(abaAtiva, ['painel', 'contas']);
-  const carregarTransferencias = false;
+  const carregarMovimentacoes = abaEstaNaLista(abaAtiva, ['painel', 'lancamentos', 'contas']);
+  const carregarTransferencias = abaEstaNaLista(abaAtiva, ['painel', 'lancamentos', 'contas']);
   const carregarConciliacoes = false;
   const carregarCompras = false;
-  const carregarHistorico = false;
+  const carregarHistorico = abaAtiva === 'contas';
   const carregarEmendas = false;
   const carregarDadosConta = abaAtiva === 'contas';
 
@@ -770,6 +802,7 @@ export function ContabilidadePage() {
   const conciliacoesQuery = useConciliacoesContabeis({ enabled: carregarConciliacoes });
   const comprasQuery = useComprasIntegradasContabilidade({ enabled: carregarCompras });
   const historicoQuery = useHistoricoContabil({ enabled: carregarHistorico });
+  const fechamentosMensaisQuery = useFechamentosMensaisContabeis({ enabled: carregarDadosConta });
   const emendasQuery = useEmendasContabeis({ enabled: carregarEmendas });
   const arquivosQuery = useArquivosLancamentoContabil(lancamentoSelecionadoId);
 
@@ -792,6 +825,7 @@ export function ContabilidadePage() {
   const atualizarSituacaoConciliacaoMutation = useAtualizarSituacaoConciliacao();
   const gerarObrigacaoMutation = useGerarObrigacaoFinanceiraCompra();
   const criarEmendaMutation = useCriarEmendaContabil();
+  const fecharMesMutation = useFecharMesContabil();
   const atualizarStatusEmendaMutation = useAtualizarStatusEmendaContabil();
   const uploadArquivoMutation = useUploadArquivoLancamentoContabil(lancamentoSelecionadoId);
   const excluirArquivoMutation = useExcluirArquivoLancamentoContabil(lancamentoSelecionadoId);
@@ -800,6 +834,7 @@ export function ContabilidadePage() {
   const conciliacoes = conciliacoesQuery.data ?? [];
   const comprasIntegradas = comprasQuery.data ?? [];
   const historico = historicoQuery.data ?? [];
+  const fechamentosMensais = fechamentosMensaisQuery.data ?? [];
   const emendas = emendasQuery.data ?? [];
   const arquivos = arquivosQuery.data ?? [];
   const planosTrabalho = planosTrabalhoQuery.data ?? [];
@@ -949,6 +984,14 @@ export function ContabilidadePage() {
   const projecaoCaixa = saldoGeral + totalContasReceber - totalContasPagar;
   const comprasAguardandoPagamento = useMemo(() => comprasIntegradas.filter((item) => !item.statusFinanceiro || !['PAGO', 'RECEBIDO', 'CONCILIADO'].includes(item.statusFinanceiro)), [comprasIntegradas]);
   const contasSaldoBaixo = useMemo(() => contas.filter((item) => Number(item.limiteMinimoAlerta || 0) > 0 && item.saldoAtual <= Number(item.limiteMinimoAlerta || 0)), [contas]);
+  const agendaFinanceira = useMemo(
+    () =>
+      [...contasPagar, ...contasReceber]
+        .sort((a, b) => (a.vencimento || '').localeCompare(b.vencimento || ''))
+        .slice(0, 10),
+    [contasPagar, contasReceber]
+  );
+  const fechamentosRecentes = useMemo(() => fechamentosMensais.slice(0, 6), [fechamentosMensais]);
 
   const graficoMensal = useMemo(() => {
     const mapa = new Map<string, { periodo: string; receitas: number; despesas: number }>();
@@ -999,6 +1042,7 @@ export function ContabilidadePage() {
     criarConciliacaoMutation.isPending ||
     atualizarSituacaoConciliacaoMutation.isPending ||
     gerarObrigacaoMutation.isPending ||
+    fecharMesMutation.isPending ||
     criarEmendaMutation.isPending ||
     atualizarStatusEmendaMutation.isPending ||
     uploadArquivoMutation.isPending ||
@@ -1015,16 +1059,18 @@ export function ContabilidadePage() {
           centrosQuery.isLoading ||
           lancamentosQuery.isLoading ||
           movimentacoesQuery.isLoading ||
+          transferenciasQuery.isLoading ||
           comprasQuery.isLoading
         );
       case 'lancamentos':
         return (
           contasQuery.isLoading ||
           categoriasQuery.isLoading ||
-          lancamentosQuery.isLoading
+          lancamentosQuery.isLoading ||
+          transferenciasQuery.isLoading
         );
       case 'contas':
-        return contasQuery.isLoading || planosTrabalhoQuery.isLoading || unidadeAtualQuery.isLoading || movimentacoesQuery.isLoading;
+        return contasQuery.isLoading || planosTrabalhoQuery.isLoading || unidadeAtualQuery.isLoading || movimentacoesQuery.isLoading || fechamentosMensaisQuery.isLoading;
       default:
         return false;
     }
@@ -1093,9 +1139,73 @@ export function ContabilidadePage() {
     });
   }
 
+  function prepararLancamentoRapido(modo: ModoLancamentoRapido) {
+    setModoLancamentoRapido(modo);
+    setAbaAtiva('lancamentos');
+    setLancamentoSelecionadoId(undefined);
+
+    if (modo === 'transferencia') {
+      return;
+    }
+
+    if (modo === 'entrada') {
+      setVisaoLancamentos('receitas');
+      setLancamentoForm({
+        ...criarLancamentoVazio('receitas'),
+        tipo: 'RECEITA',
+        status: 'AGUARDANDO_RECEBIMENTO',
+        natureza: 'Entrada financeira',
+        origem: 'MANUAL'
+      });
+      return;
+    }
+
+    if (modo === 'saida') {
+      setVisaoLancamentos('despesas');
+      setLancamentoForm({
+        ...criarLancamentoVazio('despesas'),
+        tipo: 'DESPESA',
+        status: 'PENDENTE',
+        natureza: 'SaÃ­da financeira',
+        origem: 'MANUAL'
+      });
+      return;
+    }
+
+    setVisaoLancamentos('contasPagar');
+    setLancamentoForm({
+      ...criarLancamentoVazio('contasPagar'),
+      tipo: 'DESPESA',
+      status: 'AGUARDANDO_PAGAMENTO',
+      natureza: 'Pagamento programado',
+      origem: 'PROGRAMACAO'
+    });
+  }
+
+  async function fecharCompetenciaAtual() {
+    try {
+      const resposta = await fecharMesMutation.mutateAsync(fechamentoForm);
+      setFechamentoForm({
+        competencia: resposta.proximaCompetencia,
+        observacao: ''
+      });
+      setPopup({
+        tipo: 'sucesso',
+        titulo: 'MÃªs fechado',
+        texto: `A competÃªncia ${formatarCompetencia(resposta.competencia)} foi fechada com sucesso. A abertura de ${formatarCompetencia(resposta.proximaCompetencia)} jÃ¡ foi preparada com os saldos fechados.`
+      });
+    } catch (error: any) {
+      setPopup({
+        tipo: 'erro',
+        titulo: 'Erro no fechamento',
+        texto: error?.response?.data?.message ?? 'NÃ£o foi possÃ­vel fechar a competÃªncia informada.'
+      });
+    }
+  }
+
   function lancamentoAjustado(): LancamentoFinanceiroPayload {
     if (visaoLancamentos === 'receitas' || visaoLancamentos === 'contasReceber') {
-      const lancamento = {
+      const lancamento: LancamentoFinanceiroPayload = {
         ...lancamentoForm,
         tipo: 'RECEITA',
         status: visaoLancamentos === 'contasReceber' ? 'AGUARDANDO_RECEBIMENTO' : lancamentoForm.status || 'PENDENTE'
@@ -1106,7 +1216,7 @@ export function ContabilidadePage() {
       };
     }
     if (visaoLancamentos === 'despesas' || visaoLancamentos === 'contasPagar') {
-      const lancamento = {
+      const lancamento: LancamentoFinanceiroPayload = {
         ...lancamentoForm,
         tipo: 'DESPESA',
         status: visaoLancamentos === 'contasPagar' ? 'AGUARDANDO_PAGAMENTO' : lancamentoForm.status || 'PENDENTE'
@@ -1397,12 +1507,31 @@ export function ContabilidadePage() {
           descricao="Tela simplificada para acompanhar o essencial: saldo atual, contas em aberto e últimos lançamentos."
           className="border-emerald-200 bg-[linear-gradient(180deg,#f6fff9_0%,#eefbf3_100%)] shadow-[0_18px_48px_-30px_rgba(22,163,74,0.28)]"
         >
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
             <ResumoCard titulo="Saldo geral" valor={formatarMoeda(saldoGeral)} />
             <ResumoCard titulo="Saldo em bancos" valor={formatarMoeda(saldoBancos)} destaque="#0f766e" />
             <ResumoCard titulo="Saldo em caixa" valor={formatarMoeda(saldoCaixa)} destaque="#2563eb" />
             <ResumoCard titulo="Contas a pagar" valor={formatarMoeda(totalContasPagar)} destaque="#b45309" />
             <ResumoCard titulo="Contas a receber" valor={formatarMoeda(totalContasReceber)} destaque="#15803d" />
+            <ResumoCard titulo="Saldo projetado" valor={formatarMoeda(projecaoCaixa)} destaque="#1d4ed8" />
+          </div>
+          <div className="grid gap-3 xl:grid-cols-4">
+            <button type="button" onClick={() => prepararLancamentoRapido('entrada')} className="rounded-xl border border-emerald-200 bg-white/90 p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md">
+              <div className="flex items-center gap-2 text-emerald-700"><CircleArrowDown className="h-4 w-4" /><span className="text-sm font-semibold">Lançar entrada</span></div>
+              <p className="mt-2 text-sm text-slate-700">Use para doações, repasses, mensalidades e recebimentos.</p>
+            </button>
+            <button type="button" onClick={() => prepararLancamentoRapido('saida')} className="rounded-xl border border-orange-200 bg-white/90 p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-orange-300 hover:shadow-md">
+              <div className="flex items-center gap-2 text-orange-700"><CircleArrowUp className="h-4 w-4" /><span className="text-sm font-semibold">Lançar saída</span></div>
+              <p className="mt-2 text-sm text-slate-700">Use para compras, contas, pagamentos e despesas do dia.</p>
+            </button>
+            <button type="button" onClick={() => prepararLancamentoRapido('programacao')} className="rounded-xl border border-amber-200 bg-white/90 p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-md">
+              <div className="flex items-center gap-2 text-amber-700"><CalendarClock className="h-4 w-4" /><span className="text-sm font-semibold">Programar pagamento</span></div>
+              <p className="mt-2 text-sm text-slate-700">Crie obrigações a pagar com vencimento e acompanhe na agenda.</p>
+            </button>
+            <button type="button" onClick={() => prepararLancamentoRapido('transferencia')} className="rounded-xl border border-sky-200 bg-white/90 p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-md">
+              <div className="flex items-center gap-2 text-sky-700"><ArrowRightLeft className="h-4 w-4" /><span className="text-sm font-semibold">Transferir entre contas</span></div>
+              <p className="mt-2 text-sm text-slate-700">Movimente valores entre banco, caixa interno e contas de projeto.</p>
+            </button>
           </div>
           <div className="grid gap-3 lg:grid-cols-[1.4fr_1fr]">
             <div className="rounded-xl border border-emerald-200/80 bg-white/85 p-4 shadow-sm">
@@ -1516,9 +1645,39 @@ export function ContabilidadePage() {
           descricao="Preencha somente o essencial para registrar uma receita ou despesa sem etapas desnecessárias."
           className="border-emerald-200 bg-[linear-gradient(180deg,#f3fff7_0%,#ebfbf1_100%)] shadow-[0_20px_50px_-28px_rgba(22,163,74,0.32)]"
         >
+          <div className="grid gap-3 xl:grid-cols-4">
+            <button type="button" onClick={() => prepararLancamentoRapido('entrada')} className={`rounded-xl border p-3 text-left shadow-sm transition ${modoLancamentoRapido === 'entrada' ? 'border-emerald-300 bg-emerald-50' : 'border-emerald-100 bg-white/85 hover:border-emerald-300'}`}>
+              <div className="flex items-center gap-2 text-emerald-700"><CircleArrowDown className="h-4 w-4" /><span className="text-sm font-semibold">Entrada</span></div>
+              <p className="mt-1 text-xs text-slate-600">Recebimentos e créditos.</p>
+            </button>
+            <button type="button" onClick={() => prepararLancamentoRapido('saida')} className={`rounded-xl border p-3 text-left shadow-sm transition ${modoLancamentoRapido === 'saida' ? 'border-orange-300 bg-orange-50' : 'border-orange-100 bg-white/85 hover:border-orange-300'}`}>
+              <div className="flex items-center gap-2 text-orange-700"><CircleArrowUp className="h-4 w-4" /><span className="text-sm font-semibold">Saída</span></div>
+              <p className="mt-1 text-xs text-slate-600">Pagamentos e débitos.</p>
+            </button>
+            <button type="button" onClick={() => prepararLancamentoRapido('programacao')} className={`rounded-xl border p-3 text-left shadow-sm transition ${modoLancamentoRapido === 'programacao' ? 'border-amber-300 bg-amber-50' : 'border-amber-100 bg-white/85 hover:border-amber-300'}`}>
+              <div className="flex items-center gap-2 text-amber-700"><CalendarClock className="h-4 w-4" /><span className="text-sm font-semibold">Programação</span></div>
+              <p className="mt-1 text-xs text-slate-600">Contas a pagar futuras.</p>
+            </button>
+            <button type="button" onClick={() => prepararLancamentoRapido('transferencia')} className={`rounded-xl border p-3 text-left shadow-sm transition ${modoLancamentoRapido === 'transferencia' ? 'border-sky-300 bg-sky-50' : 'border-sky-100 bg-white/85 hover:border-sky-300'}`}>
+              <div className="flex items-center gap-2 text-sky-700"><ArrowRightLeft className="h-4 w-4" /><span className="text-sm font-semibold">Transferência</span></div>
+              <p className="mt-1 text-xs text-slate-600">Mover saldo entre contas.</p>
+            </button>
+          </div>
           <div className="rounded-xl border border-emerald-200/80 bg-white/85 p-3 text-sm text-emerald-900">
             Passo a passo: escolha o tipo, informe a conta, descreva para quem foi ou de quem veio, preencha o histórico e digite o valor.
           </div>
+          {modoLancamentoRapido === 'transferencia' ? (
+            <div className="grid gap-3 rounded-xl border border-sky-200 bg-white/90 p-4 md:grid-cols-2 xl:grid-cols-4">
+              <div className="space-y-1"><Label>Conta origem</Label><Select value={transferenciaForm.contaOrigemId ? String(transferenciaForm.contaOrigemId) : ''} onChange={(event) => setTransferenciaForm((atual) => ({ ...atual, contaOrigemId: Number(event.target.value) || 0 }))}><option value="">Selecione</option>{contas.map((conta) => <option key={conta.id} value={conta.id}>{conta.nomeConta}</option>)}</Select></div>
+              <div className="space-y-1"><Label>Conta destino</Label><Select value={transferenciaForm.contaDestinoId ? String(transferenciaForm.contaDestinoId) : ''} onChange={(event) => setTransferenciaForm((atual) => ({ ...atual, contaDestinoId: Number(event.target.value) || 0 }))}><option value="">Selecione</option>{contas.map((conta) => <option key={conta.id} value={conta.id}>{conta.nomeConta}</option>)}</Select></div>
+              <div className="space-y-1"><Label>Data</Label><Input type="date" value={transferenciaForm.dataTransferencia} onChange={(event) => setTransferenciaForm((atual) => ({ ...atual, dataTransferencia: event.target.value }))} /></div>
+              <div className="space-y-1"><Label>Valor</Label><Input type="number" min={0} step="0.01" value={transferenciaForm.valor} onChange={(event) => setTransferenciaForm((atual) => ({ ...atual, valor: Number(event.target.value) || 0 }))} /></div>
+              <div className="space-y-1 md:col-span-2 xl:col-span-2"><Label>Descrição</Label><Input value={transferenciaForm.descricao} onChange={(event) => setTransferenciaForm((atual) => ({ ...atual, descricao: event.target.value }))} placeholder="Ex.: reforço do caixa do projeto" /></div>
+              <div className="space-y-1"><Label>Responsável</Label><Input value={transferenciaForm.responsavel} onChange={(event) => setTransferenciaForm((atual) => ({ ...atual, responsavel: event.target.value }))} placeholder="Quem autorizou" /></div>
+              <div className="flex items-end"><Button type="button" className="w-full" onClick={() => void salvarAtual()} disabled={processando}>Salvar transferência</Button></div>
+            </div>
+          ) : null}
+          {modoLancamentoRapido !== 'transferencia' ? (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <div className="space-y-1"><Label>Tipo</Label><Select value={lancamentoForm.tipo} onChange={(event) => setLancamentoForm((atual) => {
               const tipo = event.target.value as LancamentoFinanceiro['tipo'];
@@ -1564,6 +1723,7 @@ export function ContabilidadePage() {
             <div className="space-y-1 md:col-span-2 xl:col-span-4"><Label>Histórico</Label><Textarea rows={3} value={lancamentoForm.historico} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, historico: event.target.value }))} placeholder="Descreva em poucas palavras o lançamento" /></div>
             <div className="space-y-1 md:col-span-2 xl:col-span-4"><Label>Observação</Label><Textarea rows={2} value={lancamentoForm.observacao ?? ''} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, observacao: event.target.value }))} placeholder="Opcional" /></div>
           </div>
+          ) : null}
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <ResumoCard titulo="Todos" valor={String(lancamentosFiltrados.length)} subtitulo={formatarMoeda(lancamentosFiltrados.reduce((acc, item) => acc + item.valor, 0))} className="border-emerald-100 bg-white/80" />
             <ResumoCard titulo="Receitas" valor={String(receitas.length)} subtitulo={formatarMoeda(receitas.reduce((acc, item) => acc + item.valor, 0))} destaque="#15803d" className="border-emerald-100 bg-white/80" />
@@ -1838,6 +1998,54 @@ export function ContabilidadePage() {
           <ResumoCard titulo="Com projeto vinculado" valor={String(resumoContas.comProjeto)} destaque="#2563eb" centralizado className="bg-gradient-to-br from-sky-50 via-white to-blue-50" />
           <ResumoCard titulo="Com Pix habilitado" valor={String(resumoContas.comPix)} destaque="#9333ea" centralizado className="bg-gradient-to-br from-fuchsia-50 via-white to-violet-50" />
         </div>
+
+        <Bloco
+          titulo="Fechamento mensal e abertura do próximo mês"
+          descricao="Feche a competência quando terminar a conferência. O sistema guarda os saldos das contas e usa esse fechamento como abertura do mês seguinte."
+          className="border-sky-200 bg-[linear-gradient(180deg,#f8fbff_0%,#eef6ff_100%)]"
+        >
+          <div className="grid gap-3 xl:grid-cols-[1.2fr_0.8fr]">
+            <div className="space-y-3 rounded-xl border border-sky-200 bg-white/90 p-4">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                <div className="space-y-1"><Label>Competência</Label><Input type="month" value={fechamentoForm.competencia} onChange={(event) => setFechamentoForm((atual) => ({ ...atual, competencia: event.target.value }))} /></div>
+                <div className="space-y-1 xl:col-span-2"><Label>Observação</Label><Input value={fechamentoForm.observacao ?? ''} onChange={(event) => setFechamentoForm((atual) => ({ ...atual, observacao: event.target.value }))} placeholder="Opcional" /></div>
+              </div>
+              <div className="grid gap-3 md:grid-cols-3">
+                <ResumoCard titulo="Saldo total atual" valor={formatarMoeda(saldoGeral)} className="bg-sky-50/70" />
+                <ResumoCard titulo="Saldo em bancos" valor={formatarMoeda(saldoBancos)} destaque="#0f766e" className="bg-sky-50/70" />
+                <ResumoCard titulo="Próxima abertura" valor={formatarCompetencia(proximaCompetencia(fechamentoForm.competencia || competenciaAtual))} destaque="#1d4ed8" className="bg-sky-50/70" />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" onClick={() => void fecharCompetenciaAtual()} disabled={processando}>
+                  <Lock className="mr-2 h-4 w-4" />
+                  Fechar competência
+                </Button>
+                <p className="self-center text-xs text-slate-600">O fechamento grava os saldos das contas e registra auditoria.</p>
+              </div>
+            </div>
+            <div className="rounded-xl border border-sky-200 bg-white/90 p-4">
+              <p className="text-sm font-semibold text-[var(--g3-foreground)]">Fechamentos recentes</p>
+              <div className="mt-3 space-y-2">
+                {fechamentosRecentes.map((item) => (
+                  <div key={item.id} className="rounded-lg border border-sky-100 bg-sky-50/60 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">{formatarCompetencia(item.competencia)}</p>
+                        <p className="text-xs text-slate-600">Abertura seguinte: {formatarCompetencia(item.proximaCompetencia)}</p>
+                      </div>
+                      <p className="text-sm font-bold text-sky-800">{formatarMoeda(item.saldoTotal)}</p>
+                    </div>
+                  </div>
+                ))}
+                {!fechamentosRecentes.length ? (
+                  <div className="rounded-lg border border-dashed border-sky-200 p-4 text-sm text-slate-600">
+                    Nenhum fechamento mensal registrado ainda.
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </Bloco>
 
         <Bloco
           titulo="Cadastro de conta bancária"
@@ -2322,7 +2530,7 @@ export function ContabilidadePage() {
               placeholder="Digite a sua senha para confirmar"
             />
           </div>
-        ) : null}
+          ) : null}
       </PopupConfirmacao>
     </>
   );

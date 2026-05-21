@@ -225,6 +225,20 @@ contabilidadeRoutes.get(
 );
 
 contabilidadeRoutes.get(
+  "/fechamentos-mensais",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.listarFechamentosMensais.bind(controller))
+);
+
+contabilidadeRoutes.post(
+  "/fechar-mes",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.fecharMes.bind(controller))
+);
+
+contabilidadeRoutes.get(
   "/compras-integradas",
   ensureAuthenticated,
   ensurePermissions(permissoesLeitura),

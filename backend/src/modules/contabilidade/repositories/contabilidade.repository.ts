@@ -32,6 +32,8 @@ import type {
   ContabilidadeHistoricoRow,
   EmendaImpositivaInput,
   EmendaImpositivaRow,
+  FechamentoMensalInput,
+  FechamentoMensalRow,
   LancamentoFinanceiroBaixaInput,
   LancamentoFinanceiroInput,
   LancamentoFinanceiroRow,
@@ -385,6 +387,22 @@ export async function ensureContabilidadeEstrutura() {
       `);
 
       await prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS financeiro_fechamento_mensal (
+          id BIGSERIAL PRIMARY KEY,
+          tenant_id UUID,
+          competencia VARCHAR(7) NOT NULL,
+          saldo_total NUMERIC(14,2) NOT NULL DEFAULT 0,
+          saldo_bancos NUMERIC(14,2) NOT NULL DEFAULT 0,
+          saldo_caixa NUMERIC(14,2) NOT NULL DEFAULT 0,
+          contas_snapshot JSONB NOT NULL DEFAULT '[]'::jsonb,
+          observacao TEXT,
+          usuario_id BIGINT REFERENCES usuarios(id) ON DELETE SET NULL,
+          usuario_nome VARCHAR(160),
+          criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+      `);
+
+      await prisma.$executeRawUnsafe(`
         ALTER TABLE financeiro_historico
           ADD COLUMN IF NOT EXISTS tenant_id UUID,
           ADD COLUMN IF NOT EXISTS aba VARCHAR(80),
@@ -437,6 +455,7 @@ export async function ensureContabilidadeEstrutura() {
         `CREATE INDEX IF NOT EXISTS financeiro_transferencia_status_idx ON financeiro_transferencia(status, data_transferencia)`,
         `CREATE INDEX IF NOT EXISTS financeiro_conciliacao_situacao_idx ON financeiro_conciliacao(situacao, conta_bancaria_id)`,
         `CREATE INDEX IF NOT EXISTS financeiro_historico_aba_idx ON financeiro_historico(aba, criado_em DESC)`,
+        `CREATE INDEX IF NOT EXISTS financeiro_fechamento_mensal_competencia_idx ON financeiro_fechamento_mensal(competencia, criado_em DESC)`,
       ];
 
       for (const comandoIndice of comandosIndices) {
@@ -466,7 +485,8 @@ export async function ensureContabilidadeEstrutura() {
         `CREATE INDEX IF NOT EXISTS movimentacao_financeira_tenant_idx ON movimentacao_financeira(tenant_id, ativo)`,
         `CREATE INDEX IF NOT EXISTS financeiro_transferencia_tenant_idx ON financeiro_transferencia(tenant_id, ativo)`,
         `CREATE INDEX IF NOT EXISTS financeiro_conciliacao_tenant_idx ON financeiro_conciliacao(tenant_id, ativo)`,
-        `CREATE INDEX IF NOT EXISTS financeiro_historico_tenant_idx ON financeiro_historico(tenant_id, criado_em DESC)`
+        `CREATE INDEX IF NOT EXISTS financeiro_historico_tenant_idx ON financeiro_historico(tenant_id, criado_em DESC)`,
+        `CREATE INDEX IF NOT EXISTS financeiro_fechamento_mensal_tenant_idx ON financeiro_fechamento_mensal(tenant_id, competencia DESC)`
       ];
 
       for (const comandoTenant of comandosTenant) {
@@ -1147,7 +1167,7 @@ export class ContabilidadeRepository {
     `);
   }
 
-  async buscarCentroCustoPorIdOuFalhar(id: bigint, tx: DbClient = prisma) {
+  async buscarCentroCustoPorIdOuFalhar(id: bigint, tx: DbClient = prisma, tenantId?: string) {
     await ensureContabilidadeEstrutura();
     const rows = await tx.$queryRaw<CentroCustoRow[]>(Prisma.sql`
       SELECT
@@ -1160,6 +1180,7 @@ export class ContabilidadeRepository {
         ativo
       FROM financeiro_centro_custo
       WHERE id = ${id}
+      ${tenantSql("financeiro_centro_custo", tenantId)}
       LIMIT 1
     `);
     const centro = rows[0];
@@ -1306,6 +1327,7 @@ export class ContabilidadeRepository {
   async criarLancamento(input: LancamentoFinanceiroInput, ator?: ContabilidadeAtor) {
     await ensureContabilidadeEstrutura();
     return prisma.$transaction(async (tx) => {
+      const tenantId = ator?.tenantId;
       const tipo = normalizarTipoLancamento(input.tipo);
       const direcaoAjuste = tipo === "AJUSTE" ? input.direcaoAjuste ?? "DIMINUIR" : null;
       const status = normalizarStatusLancamento(input.status, tipo, direcaoAjuste);
@@ -1313,15 +1335,25 @@ export class ContabilidadeRepository {
       const contaId = input.contaBancariaId ? BigInt(input.contaBancariaId) : null;
       const categoriaId = input.categoriaId ? BigInt(input.categoriaId) : null;
       const centroId = input.centroCustoId ? BigInt(input.centroCustoId) : null;
+      const descricaoLancamento =
+        trimOrUndefined(input.historico ?? undefined) ??
+        trimOrUndefined(input.natureza ?? undefined) ??
+        input.contraparte;
 
       if (contaId) {
         await this.validarContaMovimentavel(tx, contaId);
       }
       if (categoriaId) {
-        await this.buscarCategoriaPorIdOuFalhar(categoriaId, tx);
+        await this.buscarCategoriaPorIdOuFalhar(categoriaId, tx, tenantId);
       }
       if (centroId) {
-        await this.buscarCentroCustoPorIdOuFalhar(centroId, tx);
+        await this.buscarCentroCustoPorIdOuFalhar(centroId, tx, tenantId);
+      }
+      if (["PAGO", "RECEBIDO", "CONCILIADO"].includes(status) && !contaId) {
+        throw new AppError(
+          "Selecione a conta bancária para salvar um lançamento já pago ou recebido.",
+          400
+        );
       }
       if (input.compraId) {
         const existente = await tx.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
@@ -1329,6 +1361,7 @@ export class ContabilidadeRepository {
           FROM lancamento_financeiro
           WHERE compra_id = ${BigInt(input.compraId)}
             AND ativo = TRUE
+            ${tenantSql("lancamento_financeiro", tenantId)}
           LIMIT 1
         `);
         if (existente[0]) {
@@ -1367,7 +1400,7 @@ export class ContabilidadeRepository {
           criado_em,
           atualizado_em
         ) VALUES (
-          ${ator?.tenantId ? Prisma.sql`CAST(${ator.tenantId} AS UUID)` : Prisma.sql`NULL`},
+          ${tenantId ?? null},
           ${toOptionalDate(input.dataLancamento)},
           ${tipo},
           ${direcaoAjuste},
@@ -1376,7 +1409,7 @@ export class ContabilidadeRepository {
           ${categoriaId},
           ${centroId},
           ${trimOrUndefined(input.setor ?? undefined)},
-          ${input.historico},
+          ${descricaoLancamento},
           ${input.contraparte},
           ${trimOrUndefined(input.documento ?? undefined)},
           ${input.historico},
@@ -1431,6 +1464,7 @@ export class ContabilidadeRepository {
   async atualizarLancamento(id: bigint, input: LancamentoFinanceiroInput, ator?: ContabilidadeAtor) {
     await ensureContabilidadeEstrutura();
     return prisma.$transaction(async (tx) => {
+      const tenantId = ator?.tenantId;
       const atual = await this.buscarLancamentoPorIdOuFalhar(id, tx);
       const tipo = normalizarTipoLancamento(input.tipo);
       const direcaoAjuste = tipo === "AJUSTE" ? input.direcaoAjuste ?? "DIMINUIR" : null;
@@ -1438,6 +1472,10 @@ export class ContabilidadeRepository {
       const contaId = input.contaBancariaId ? BigInt(input.contaBancariaId) : null;
       const categoriaId = input.categoriaId ? BigInt(input.categoriaId) : null;
       const centroId = input.centroCustoId ? BigInt(input.centroCustoId) : null;
+      const descricaoLancamento =
+        trimOrUndefined(input.historico ?? undefined) ??
+        trimOrUndefined(input.natureza ?? undefined) ??
+        input.contraparte;
 
       if (atual.bloqueado_origem) {
         const camposCriticosAlterados =
@@ -1450,8 +1488,14 @@ export class ContabilidadeRepository {
         }
       }
       if (contaId) await this.validarContaMovimentavel(tx, contaId);
-      if (categoriaId) await this.buscarCategoriaPorIdOuFalhar(categoriaId, tx);
-      if (centroId) await this.buscarCentroCustoPorIdOuFalhar(centroId, tx);
+      if (categoriaId) await this.buscarCategoriaPorIdOuFalhar(categoriaId, tx, tenantId);
+      if (centroId) await this.buscarCentroCustoPorIdOuFalhar(centroId, tx, tenantId);
+      if (["PAGO", "RECEBIDO", "CONCILIADO"].includes(status) && !contaId) {
+        throw new AppError(
+          "Selecione a conta bancária para salvar um lançamento já pago ou recebido.",
+          400
+        );
+      }
 
       await tx.$executeRaw(Prisma.sql`
         UPDATE lancamento_financeiro
@@ -1464,7 +1508,7 @@ export class ContabilidadeRepository {
           categoria_financeira_id = ${categoriaId},
           centro_custo_id = ${centroId},
           setor = ${trimOrUndefined(input.setor ?? undefined)},
-          descricao = ${input.historico},
+          descricao = ${descricaoLancamento},
           contraparte = ${input.contraparte},
           documento = ${trimOrUndefined(input.documento ?? undefined)},
           historico = ${input.historico},
@@ -1727,6 +1771,9 @@ export class ContabilidadeRepository {
       let saldoAtual: number | null = null;
       if (contaId) {
         const conta = await this.validarContaMovimentavel(tx, contaId, true, true);
+        if (tipo === "SAIDA" && conta.saldo < input.valor) {
+          throw new AppError("Não há saldo suficiente nesta conta para concluir o débito informado.", 409);
+        }
         saldoAnterior = conta.saldo;
         saldoAtual = calcularSaldoConta(conta.saldo, input.valor, tipo);
         await tx.$executeRaw(Prisma.sql`
@@ -2156,6 +2203,147 @@ export class ContabilidadeRepository {
     `);
   }
 
+  async listarFechamentosMensais(ator?: ContabilidadeAtor) {
+    await ensureContabilidadeEstrutura();
+    const tenantId = ator?.tenantId;
+    return prisma.$queryRaw<FechamentoMensalRow[]>(Prisma.sql`
+      SELECT
+        id,
+        competencia,
+        saldo_total::float8 AS saldo_total,
+        saldo_bancos::float8 AS saldo_bancos,
+        saldo_caixa::float8 AS saldo_caixa,
+        observacao,
+        usuario_nome,
+        contas_snapshot,
+        criado_em
+      FROM financeiro_fechamento_mensal
+      WHERE 1 = 1
+      ${tenantSql("financeiro_fechamento_mensal", tenantId)}
+      ORDER BY competencia DESC, id DESC
+    `);
+  }
+
+  async fecharMes(input: FechamentoMensalInput, ator?: ContabilidadeAtor) {
+    await ensureContabilidadeEstrutura();
+    return prisma.$transaction(async (tx) => {
+      const tenantId = ator?.tenantId;
+      const existente = await tx.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+        SELECT id
+        FROM financeiro_fechamento_mensal
+        WHERE competencia = ${input.competencia}
+          ${tenantId ? Prisma.sql`AND tenant_id::text = ${tenantId}` : Prisma.empty}
+        LIMIT 1
+      `);
+
+      if (existente[0]) {
+        throw new AppError("Esta competência já foi fechada no financeiro.", 409);
+      }
+
+      const contas = await tx.$queryRaw<Array<{
+        id: bigint;
+        banco: string | null;
+        nome_conta: string | null;
+        tipo: string;
+        saldo: number;
+      }>>(Prisma.sql`
+        SELECT
+          cb.id,
+          cb.banco,
+          cb.nome_conta,
+          cb.tipo,
+          cb.saldo::float8 AS saldo
+        FROM conta_bancaria cb
+        WHERE cb.ativo = TRUE
+          ${tenantId ? Prisma.sql`AND cb.tenant_id::text = ${tenantId}` : Prisma.empty}
+        ORDER BY cb.nome_conta ASC, cb.id ASC
+      `);
+
+      const snapshot = contas.map((conta) => ({
+        contaId: Number(conta.id),
+        banco: conta.banco,
+        nomeConta: conta.nome_conta ?? `Conta ${String(conta.id)}`,
+        tipo: conta.tipo,
+        saldo: Number(conta.saldo ?? 0)
+      }));
+
+      const saldoTotal = snapshot.reduce((acc, item) => acc + item.saldo, 0);
+      const saldoBancos = snapshot
+        .filter((item) => normalizarTipoConta(item.tipo) !== "CAIXA_INTERNO")
+        .reduce((acc, item) => acc + item.saldo, 0);
+      const saldoCaixa = snapshot
+        .filter((item) => normalizarTipoConta(item.tipo) === "CAIXA_INTERNO")
+        .reduce((acc, item) => acc + item.saldo, 0);
+
+      const rows = await tx.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+        INSERT INTO financeiro_fechamento_mensal (
+          tenant_id,
+          competencia,
+          saldo_total,
+          saldo_bancos,
+          saldo_caixa,
+          contas_snapshot,
+          observacao,
+          usuario_id,
+          usuario_nome,
+          criado_em
+        ) VALUES (
+          ${tenantId ? Prisma.sql`CAST(${tenantId} AS UUID)` : Prisma.sql`NULL`},
+          ${input.competencia},
+          ${saldoTotal},
+          ${saldoBancos},
+          ${saldoCaixa},
+          ${JSON.stringify(snapshot)}::jsonb,
+          ${trimOrUndefined(input.observacao ?? undefined)},
+          ${ator?.usuarioId ?? null},
+          ${trimOrUndefined(ator?.nomeUsuario ?? undefined)},
+          NOW()
+        )
+        RETURNING id
+      `);
+
+      const id = rows[0]?.id;
+      if (!id) {
+        throw new AppError("Não foi possível fechar a competência informada.", 500);
+      }
+
+      await this.registrarHistorico(tx, {
+        aba: "Fechamento mensal",
+        acao: "Mês fechado",
+        tipoRegistro: "FECHAMENTO_MENSAL",
+        registroId: String(id),
+        valor: saldoTotal,
+        conta: "Todas as contas",
+        statusNovo: input.competencia,
+        observacao: `Fechamento realizado para ${input.competencia} com abertura automática do mês seguinte baseada nos saldos fechados.`,
+        origem: "FECHAMENTO_MENSAL",
+        ator
+      });
+
+      const registros = await tx.$queryRaw<FechamentoMensalRow[]>(Prisma.sql`
+        SELECT
+          id,
+          competencia,
+          saldo_total::float8 AS saldo_total,
+          saldo_bancos::float8 AS saldo_bancos,
+          saldo_caixa::float8 AS saldo_caixa,
+          observacao,
+          usuario_nome,
+          contas_snapshot,
+          criado_em
+        FROM financeiro_fechamento_mensal
+        WHERE id = ${id}
+        LIMIT 1
+      `);
+
+      const registro = registros[0];
+      if (!registro) {
+        throw new AppError("Não foi possível localizar o fechamento recém-criado.", 500);
+      }
+      return registro;
+    });
+  }
+
   async listarComprasIntegradas(ator?: ContabilidadeAtor) {
     await ensureContabilidadeEstrutura();
     const tenantId = ator?.tenantId;
@@ -2468,6 +2656,9 @@ export class ContabilidadeRepository {
     let saldoAtual: number | null = null;
     if (input.contaId) {
       const conta = await this.validarContaMovimentavel(tx, input.contaId, true, true);
+      if (input.tipo === "SAIDA" && conta.saldo < input.valor) {
+        throw new AppError("Não há saldo suficiente nesta conta para concluir o débito informado.", 409);
+      }
       saldoAnterior = conta.saldo;
       saldoAtual = calcularSaldoConta(conta.saldo, input.valor, input.tipo);
       await tx.$executeRaw(Prisma.sql`

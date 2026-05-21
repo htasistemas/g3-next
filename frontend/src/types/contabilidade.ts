@@ -140,6 +140,32 @@ export type RemocaoLancamentoFinanceiroPayload = {
   senha: string;
 };
 
+export type FechamentoMensalPayload = {
+  competencia: string;
+  observacao?: string;
+};
+
+export type FechamentoMensalConta = {
+  contaId: number;
+  banco?: string;
+  nomeConta: string;
+  tipo: ContaBancariaTipo;
+  saldo: number;
+};
+
+export type FechamentoMensal = {
+  id: number;
+  competencia: string;
+  proximaCompetencia: string;
+  dataFechamento: string;
+  saldoTotal: number;
+  saldoBancos: number;
+  saldoCaixa: number;
+  observacao?: string;
+  usuarioNome?: string;
+  contas: FechamentoMensalConta[];
+};
+
 export type ReciboPagamento = {
   numeroRecibo?: string;
   dataPagamento?: string;

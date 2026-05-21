@@ -16,6 +16,8 @@ import type {
   ContaBancariaRow,
   ContabilidadeHistoricoRow,
   EmendaImpositivaRow,
+  FechamentoMensalContaSnapshotRow,
+  FechamentoMensalRow,
   LancamentoFinanceiroRow,
   MovimentacaoFinanceiraRow,
   TransferenciaFinanceiraRow
@@ -224,5 +226,35 @@ export function mapEmendaToResponse(row: EmendaImpositivaRow) {
     diasAlerta: row.dias_alerta,
     status: row.status,
     observacoes: row.observacoes ?? undefined
+  };
+}
+
+export function mapFechamentoMensalToResponse(row: FechamentoMensalRow) {
+  const contas =
+    Array.isArray(row.contas_snapshot)
+      ? (row.contas_snapshot as FechamentoMensalContaSnapshotRow[]).map((item) => ({
+          contaId: Number(item.contaId),
+          banco: item.banco ?? undefined,
+          nomeConta: item.nomeConta,
+          tipo: item.tipo,
+          saldo: Number(item.saldo ?? 0)
+        }))
+      : [];
+
+  const [ano, mes] = row.competencia.split("-");
+  const proximo = new Date(Number(ano), Number(mes) - 1, 1);
+  proximo.setMonth(proximo.getMonth() + 1);
+
+  return {
+    id: Number(row.id),
+    competencia: row.competencia,
+    proximaCompetencia: `${proximo.getFullYear()}-${String(proximo.getMonth() + 1).padStart(2, "0")}`,
+    dataFechamento: row.criado_em.toISOString(),
+    saldoTotal: row.saldo_total ?? 0,
+    saldoBancos: row.saldo_bancos ?? 0,
+    saldoCaixa: row.saldo_caixa ?? 0,
+    observacao: row.observacao ?? undefined,
+    usuarioNome: row.usuario_nome ?? undefined,
+    contas
   };
 }

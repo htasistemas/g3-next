@@ -369,7 +369,7 @@ function formatarPercentual(valor?: number | null) {
 }
 
 function somarValores(lista: Array<number | undefined | null>) {
-  return lista.reduce((total, item) => total + Number(item ?? 0), 0);
+  return lista.reduce<number>((total, item) => total + Number(item ?? 0), 0);
 }
 
 function diasDesde(valor?: string | null) {

@@ -1473,6 +1473,20 @@ export function PatrimonioPage() {
     }
   }
 
+  function imprimirFichaAtual() {
+    imprimirRelatorioPatrimonio(
+      "Ficha patrimonial",
+      "Relação detalhada do bem patrimonial selecionado.",
+      [
+        {
+          ...form,
+          nome: form.nome?.trim() || "Bem patrimonial sem nome"
+        }
+      ],
+      gerarResumoLocalizacao(form.unidade, form.sala)
+    );
+  }
+
   function fechar() {
     navigate("/dashboard/visao-geral");
   }
@@ -2425,7 +2439,7 @@ export function PatrimonioPage() {
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" onClick={imprimir}>
+                    <Button variant="outline" onClick={imprimirFichaAtual}>
                       <Printer className="mr-2 h-4 w-4" />
                       Imprimir ficha atual
                     </Button>

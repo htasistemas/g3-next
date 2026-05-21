@@ -565,7 +565,9 @@ const secoesManual: ManualSecao[] = [
         comoUsar: [
           "A tela foi simplificada para trabalhar somente com três abas principais: Painel financeiro, Lançamentos e Contas bancárias.",
           "Use Painel financeiro para ver saldo geral, contas a pagar, contas a receber, últimos lançamentos e próximos vencimentos em leitura rápida.",
+          "O topo do Painel financeiro agora destaca quatro ações rápidas e autoexplicativas: Lançar entrada, Lançar saída, Programar pagamento e Transferir entre contas.",
           "Use Lançamentos para registrar receitas, despesas e ajustes com poucos campos: tipo, datas, conta bancária, natureza, favorecido ou pagador, histórico, valor e status.",
+          "Na aba Lançamentos, o sistema também permite trabalhar no modo Transferência entre contas com formulário separado e mais simples.",
           "Na aba Lançamentos, o campo Valor aplica a máscara brasileira ao sair do campo, convertendo entradas como 1000 para 1.000,00 sem alterar o valor numérico salvo.",
           "O salvamento da aba Lançamentos passou a aceitar somente uma execução por vez, evitando duplicidade de débitos ou créditos quando houver clique repetido no botão de salvar.",
           "No campo Tipo da aba Lançamentos, a opção Estorno não aparece mais na criação manual; o estorno continua disponível apenas como ação específica para lançamentos já baixados.",
@@ -573,10 +575,12 @@ const secoesManual: ManualSecao[] = [
           "Na aba Lançamentos, os cards de resumo mostram rapidamente quantos lançamentos existem, quanto entrou, quanto saiu e o que ainda está em aberto.",
           "Ao salvar um lançamento em aberto, o sistema mantém o valor apenas como previsão financeira. O saldo bancário realizado só muda na baixa do lançamento.",
           "Quando o lançamento for de receita, a baixa soma o valor ao saldo da conta. Quando for despesa, a baixa subtrai o valor do saldo. Ajustes seguem a direção informada no cadastro.",
+          "Quando não houver saldo suficiente na conta para um débito, pagamento ou outra saída, o sistema bloqueia a operação e informa que não há saldo para concluir o débito.",
           "Ao efetivar receita, despesa ou ajuste em qualquer conta bancária, o saldo realizado passa a seguir exatamente o valor informado no lançamento, sem duplicar débito ou crédito em nenhuma conta do sistema.",
           "Quando o lançamento for salvo já como Pago, Recebido ou Conciliado, o sistema também atualiza automaticamente o saldo realizado da conta bancária vinculada.",
           "Para excluir um lançamento, o sistema agora pede a senha do usuário autenticado e mantém o registro da exclusão no histórico financeiro para auditoria.",
           "Use Contas bancárias para cadastrar contas e depois acompanhar cada conta em cards com banco, agência, número, saldo atual, Pix, projeto vinculado e status.",
+          "Na aba Contas bancárias, o bloco Fechamento mensal permite fechar a competência, gravar o saldo das contas e preparar a abertura do mês seguinte com base nesses saldos.",
           "Para editar uma conta, clique em Editar no card correspondente. Para iniciar um novo cadastro, use Nova conta bancária na barra superior ou no formulário."
         ],
         atencoes: [

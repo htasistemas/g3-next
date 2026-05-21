@@ -218,6 +218,16 @@ export class ContabilidadeController {
     return response.json(lista);
   }
 
+  async listarFechamentosMensais(request: AuthenticatedRequest, response: Response) {
+    const lista = await service.listarFechamentosMensais(obterAtor(request));
+    return response.json(lista);
+  }
+
+  async fecharMes(request: AuthenticatedRequest, response: Response) {
+    const registro = await service.fecharMes(request.body, obterAtor(request));
+    return response.status(201).json(registro);
+  }
+
   async listarComprasIntegradas(request: AuthenticatedRequest, response: Response) {
     const lista = await service.listarComprasIntegradas(obterAtor(request));
     return response.json(lista);

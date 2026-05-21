@@ -8,6 +8,7 @@ import type {
   ConciliacaoFinanceiraPayload,
   ContaBancariaPayload,
   EmendaImpositivaPayload,
+  FechamentoMensalPayload,
   LancamentoFinanceiroBaixaPayload,
   LancamentoFinanceiroPayload,
   MovimentacaoFinanceiraPayload,
@@ -105,6 +106,16 @@ export function useHistoricoContabil(options?: QueryOptions) {
   });
 }
 
+export function useFechamentosMensaisContabeis(options?: QueryOptions) {
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? 'sem-tenant';
+  return useQuery({
+    queryKey: [...baseKey(tenantId), 'fechamentos-mensais'],
+    queryFn: () => contabilidadeService.listarFechamentosMensais(),
+    enabled: options?.enabled ?? true
+  });
+}
+
 export function useComprasIntegradasContabilidade(options?: QueryOptions) {
   const { usuario } = useAuth();
   const tenantId = usuario?.tenant_id ?? 'sem-tenant';
@@ -122,6 +133,16 @@ export function useEmendasContabeis(options?: QueryOptions) {
     queryKey: [...baseKey(tenantId), 'emendas'],
     queryFn: () => contabilidadeService.listarEmendas(),
     enabled: options?.enabled ?? true
+  });
+}
+
+export function useFecharMesContabil() {
+  const queryClient = useQueryClient();
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? 'sem-tenant';
+  return useMutation({
+    mutationFn: (payload: FechamentoMensalPayload) => contabilidadeService.fecharMes(payload),
+    onSuccess: async () => invalidarTudoContabilidade(queryClient, tenantId)
   });
 }
 

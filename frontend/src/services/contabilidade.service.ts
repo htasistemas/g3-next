@@ -11,6 +11,8 @@ import type {
   ContaBancariaPayload,
   EmendaImpositiva,
   EmendaImpositivaPayload,
+  FechamentoMensal,
+  FechamentoMensalPayload,
   HistoricoContabilidade,
   LancamentoFinanceiro,
   LancamentoFinanceiroBaixaPayload,
@@ -187,6 +189,16 @@ export const contabilidadeService = {
 
   async listarHistorico() {
     const { data } = await httpClient.get<HistoricoContabilidade[]>(`${baseUrl}/historico`);
+    return data;
+  },
+
+  async listarFechamentosMensais() {
+    const { data } = await httpClient.get<FechamentoMensal[]>(`${baseUrl}/fechamentos-mensais`);
+    return data;
+  },
+
+  async fecharMes(payload: FechamentoMensalPayload) {
+    const { data } = await httpClient.post<FechamentoMensal>(`${baseUrl}/fechar-mes`, payload);
     return data;
   },
 

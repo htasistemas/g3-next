@@ -175,6 +175,11 @@ export const emendaImpositivaInputSchema = z.object({
   observacoes: optionalTrimmedString.nullable().optional()
 });
 
+export const fechamentoMensalInputSchema = z.object({
+  competencia: z.string().trim().regex(/^\d{4}-\d{2}$/, "Informe a competÃªncia no formato aaaa-mm."),
+  observacao: optionalTrimmedString.nullable().optional()
+});
+
 export const statusInputSchema = z.object({
   status: z.enum(LANCAMENTO_FINANCEIRO_STATUS, {
     errorMap: () => ({ message: "Selecione o status." })

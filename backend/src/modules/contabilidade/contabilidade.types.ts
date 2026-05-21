@@ -169,6 +169,11 @@ export type EmendaImpositivaInput = {
   observacoes?: string | null;
 };
 
+export type FechamentoMensalInput = {
+  competencia: string;
+  observacao?: string | null;
+};
+
 export type ContaBancariaRow = {
   id: bigint;
   banco: string;
@@ -323,6 +328,26 @@ export type ContabilidadeHistoricoRow = {
   perfil: string | null;
   ip: string | null;
   maquina: string | null;
+  criado_em: Date;
+};
+
+export type FechamentoMensalContaSnapshotRow = {
+  contaId: number;
+  banco: string | null;
+  nomeConta: string;
+  tipo: string;
+  saldo: number;
+};
+
+export type FechamentoMensalRow = {
+  id: bigint;
+  competencia: string;
+  saldo_total: number;
+  saldo_bancos: number;
+  saldo_caixa: number;
+  observacao: string | null;
+  usuario_nome: string | null;
+  contas_snapshot: unknown;
   criado_em: Date;
 };
 

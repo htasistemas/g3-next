@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.506",
+  "latestVersion": "1.00.508",
   "releaseDate": "2026-05-21",
-  "description": "A tela Contabilidade / financeiro passou a aplicar saldo corretamente na baixa dos lançamentos, somando receitas, subtraindo despesas e exigindo senha na exclusão com registro de auditoria.",
+  "description": "A tela Contabilidade / financeiro foi finalizada com painel simplificado, ações rápidas, bloqueio de saldo negativo, transferências entre contas e fechamento mensal com abertura do mês seguinte.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.506",
+  "minCompatibleVersion": "1.00.508",
   "releaseType": "stable",
   "downloadUrl": null
 }

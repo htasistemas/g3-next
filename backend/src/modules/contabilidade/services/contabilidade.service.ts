@@ -10,6 +10,7 @@ import {
   mapConciliacaoToResponse,
   mapContaBancariaToResponse,
   mapEmendaToResponse,
+  mapFechamentoMensalToResponse,
   mapHistoricoContabilToResponse,
   mapLancamentoToResponse,
   mapMovimentacaoToResponse,
@@ -21,6 +22,7 @@ import {
   conciliacaoFinanceiraInputSchema,
   contaBancariaInputSchema,
   emendaImpositivaInputSchema,
+  fechamentoMensalInputSchema,
   lancamentoFinanceiroInputSchema,
   movimentacaoFinanceiraInputSchema,
   pagamentoInputSchema,
@@ -242,6 +244,17 @@ export class ContabilidadeService {
   async listarHistorico(ator?: ContabilidadeAtor) {
     const rows = await this.repository.listarHistorico(ator);
     return rows.map(mapHistoricoContabilToResponse);
+  }
+
+  async listarFechamentosMensais(ator?: ContabilidadeAtor) {
+    const rows = await this.repository.listarFechamentosMensais(ator);
+    return rows.map(mapFechamentoMensalToResponse);
+  }
+
+  async fecharMes(rawInput: unknown, ator?: ContabilidadeAtor) {
+    const input = fechamentoMensalInputSchema.parse(this.normalizarPayload(rawInput));
+    const row = await this.repository.fecharMes(input, ator);
+    return mapFechamentoMensalToResponse(row);
   }
 
   async listarComprasIntegradas(ator?: ContabilidadeAtor) {

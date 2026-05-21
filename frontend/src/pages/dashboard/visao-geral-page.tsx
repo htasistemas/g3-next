@@ -101,7 +101,7 @@ export function VisaoGeralPage() {
   const { data: motoristasAutorizadosData } = useMotoristasAutorizados();
   const { data: documentosInstituicaoData } = useDocumentosInstituicao();
 
-  const itensAlmoxarifado = itensAlmoxarifadoData ?? [];
+  const itensAlmoxarifado = itensAlmoxarifadoData?.itens ?? [];
   const patrimonios = patrimoniosData?.patrimonios ?? [];
   const motoristasAutorizados = motoristasAutorizadosData ?? [];
   const documentosInstituicao = documentosInstituicaoData ?? [];
