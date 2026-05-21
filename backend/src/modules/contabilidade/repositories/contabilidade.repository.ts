@@ -854,7 +854,7 @@ export class ContabilidadeRepository {
           ${trimOrUndefined(input.observacao ?? undefined)},
           ${toOptionalDate(input.dataSaldoInicial)},
           TRUE,
-          ${tenantId ?? null},
+          ${tenantId ? Prisma.sql`CAST(${tenantId} AS UUID)` : Prisma.sql`NULL`},
           NOW(),
           NOW()
         )
@@ -1052,7 +1052,7 @@ export class ContabilidadeRepository {
           ${normalizarStatusConta(input.status)},
           ${trimOrUndefined(input.observacao ?? undefined)},
           TRUE,
-          ${tenantId ?? null},
+          ${tenantId ? Prisma.sql`CAST(${tenantId} AS UUID)` : Prisma.sql`NULL`},
           NOW(),
           NOW()
         )
@@ -1400,7 +1400,7 @@ export class ContabilidadeRepository {
           criado_em,
           atualizado_em
         ) VALUES (
-          ${tenantId ?? null},
+          ${tenantId ? Prisma.sql`CAST(${tenantId} AS UUID)` : Prisma.sql`NULL`},
           ${toOptionalDate(input.dataLancamento)},
           ${tipo},
           ${direcaoAjuste},
@@ -2505,7 +2505,7 @@ export class ContabilidadeRepository {
         criado_em,
         atualizado_em
       ) VALUES (
-        ${tenantId ?? null},
+        ${tenantId ? Prisma.sql`CAST(${tenantId} AS UUID)` : Prisma.sql`NULL`},
         ${input.identificacao},
         ${trimOrUndefined(input.referenciaLegal ?? undefined)},
         ${toOptionalDate(input.dataPrevista)},
