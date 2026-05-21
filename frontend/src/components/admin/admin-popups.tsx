@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import type { ButtonProps } from "@/components/ui/button";
 
@@ -58,7 +59,8 @@ export function PopupConfirmacao({
   onConfirm,
   confirmarTexto = "Confirmar",
   cancelarTexto = "Cancelar",
-  confirmarVariant = "danger"
+  confirmarVariant = "danger",
+  children
 }: {
   aberto: boolean;
   titulo: string;
@@ -69,6 +71,7 @@ export function PopupConfirmacao({
   confirmarTexto?: string;
   cancelarTexto?: string;
   confirmarVariant?: ButtonProps["variant"];
+  children?: ReactNode;
 }) {
   if (!aberto) return null;
 
@@ -88,6 +91,7 @@ export function PopupConfirmacao({
         </div>
         <div className="px-5 py-4">
           <p className="text-sm text-slate-700">{texto}</p>
+          {children ? <div className="mt-4">{children}</div> : null}
         </div>
         <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3">
           <Button type="button" variant="outline" disabled={processando} onClick={onCancel}>

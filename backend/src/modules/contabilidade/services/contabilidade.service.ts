@@ -1,6 +1,8 @@
+import bcrypt from "bcryptjs";
 import { AppError } from "../../../shared/errors/app-error.js";
 import { mapaCamposTextoContabilidade } from "../../../utils/text-format-config.js";
 import { normalizarObjetoTexto } from "../../../utils/text-formatter.js";
+import { AuthRepository } from "../../auth/repositories/auth.repository.js";
 import {
   mapCategoriaFinanceiraToResponse,
   mapCentroCustoToResponse,
@@ -22,6 +24,7 @@ import {
   lancamentoFinanceiroInputSchema,
   movimentacaoFinanceiraInputSchema,
   pagamentoInputSchema,
+  remocaoLancamentoInputSchema,
   situacaoConciliacaoInputSchema,
   statusInputSchema,
   statusLivreInputSchema,
@@ -32,6 +35,7 @@ import { ContabilidadeRepository } from "../repositories/contabilidade.repositor
 
 export class ContabilidadeService {
   private readonly repository = new ContabilidadeRepository();
+  private readonly authRepository = new AuthRepository();
 
   async listarContasBancarias(ator?: ContabilidadeAtor) {
     const rows = await this.repository.listarContasBancarias(ator);
@@ -139,9 +143,14 @@ export class ContabilidadeService {
     return mapLancamentoToResponse(row);
   }
 
-  async removerLancamento(rawId: string, ator?: ContabilidadeAtor) {
+  async removerLancamento(rawId: string, rawInput: unknown, ator?: ContabilidadeAtor) {
     const id = this.parseId(rawId);
-    await this.repository.removerLancamento(id, ator);
+    const input = remocaoLancamentoInputSchema.parse(this.normalizarPayload(rawInput));
+    await this.validarSenhaExclusaoLancamento(input.senha, ator);
+    await this.repository.removerLancamento(id, {
+      observacaoAuditoria: "Exclusão confirmada com senha do usuário autenticado.",
+      ator
+    });
   }
 
   async listarMovimentacoes(ator?: ContabilidadeAtor) {
@@ -281,5 +290,21 @@ export class ContabilidadeService {
       rawInput as Record<string, unknown>,
       mapaCamposTextoContabilidade
     );
+  }
+
+  private async validarSenhaExclusaoLancamento(senha: string, ator?: ContabilidadeAtor) {
+    if (!ator?.usuarioId) {
+      throw new AppError("Usuário autenticado inválido para confirmar a exclusão.", 401);
+    }
+
+    const usuario = await this.authRepository.buscarUsuarioPorId(ator.usuarioId);
+    if (!usuario?.senhaHash) {
+      throw new AppError("Usuário autenticado não encontrado para confirmar a exclusão.", 404);
+    }
+
+    const senhaValida = await bcrypt.compare(senha, usuario.senhaHash);
+    if (!senhaValida) {
+      throw new AppError("Senha inválida para excluir o lançamento.", 401);
+    }
   }
 }

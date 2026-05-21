@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.500",
-  "releaseDate": "2026-05-20",
-  "description": "O cabeçalho dos relatórios de Patrimônio foi compactado para remover cards de metadados e mostrar setor, tipo, local, total e emissão em linha, preservando mais espaço útil para a relação impressa.",
+  "latestVersion": "1.00.506",
+  "releaseDate": "2026-05-21",
+  "description": "A tela Contabilidade / financeiro passou a aplicar saldo corretamente na baixa dos lançamentos, somando receitas, subtraindo despesas e exigindo senha na exclusão com registro de auditoria.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.500",
+  "minCompatibleVersion": "1.00.506",
   "releaseType": "stable"
 }
 

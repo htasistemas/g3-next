@@ -121,6 +121,10 @@ export type LancamentoFinanceiroBaixaInput = {
   observacao?: string | null;
 };
 
+export type RemocaoLancamentoInput = {
+  senha: string;
+};
+
 export type MovimentacaoFinanceiraInput = {
   tipo: string;
   descricao: string;

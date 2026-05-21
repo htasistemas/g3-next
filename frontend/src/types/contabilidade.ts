@@ -136,6 +136,10 @@ export type LancamentoFinanceiroBaixaPayload = {
   observacao?: string;
 };
 
+export type RemocaoLancamentoFinanceiroPayload = {
+  senha: string;
+};
+
 export type ReciboPagamento = {
   numeroRecibo?: string;
   dataPagamento?: string;

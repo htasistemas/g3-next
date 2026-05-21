@@ -1594,12 +1594,32 @@ export class ContabilidadeRepository {
     });
   }
 
-  async removerLancamento(id: bigint, ator?: ContabilidadeAtor) {
+  async removerLancamento(
+    id: bigint,
+    input?: {
+      observacaoAuditoria?: string | null;
+      ator?: ContabilidadeAtor;
+    }
+  ) {
     await ensureContabilidadeEstrutura();
     await prisma.$transaction(async (tx) => {
       const atual = await this.buscarLancamentoPorIdOuFalhar(id, tx);
       if (atual.bloqueado_origem) {
         throw new AppError("Lançamentos integrados de compras não podem ser removidos manualmente.", 409);
+      }
+      const movimentacoesVinculadas = await tx.$queryRaw<MovimentacaoFinanceiraRow[]>(Prisma.sql`
+        ${MOVIMENTACAO_SELECT}
+        WHERE m.ativo = TRUE
+          AND m.lancamento_financeiro_id = ${id}
+        ORDER BY m.id ASC
+      `);
+      for (const movimentacao of movimentacoesVinculadas) {
+        await this.reverterMovimentacaoConta(tx, movimentacao);
+        await tx.$executeRaw(Prisma.sql`
+          UPDATE movimentacao_financeira
+          SET ativo = FALSE, atualizado_em = NOW()
+          WHERE id = ${movimentacao.id}
+        `);
       }
       await tx.$executeRaw(Prisma.sql`
         UPDATE lancamento_financeiro
@@ -1615,9 +1635,11 @@ export class ContabilidadeRepository {
         conta: atual.conta_bancaria_nome,
         statusAnterior: atual.situacao,
         statusNovo: "CANCELADO",
-        observacao: "Lançamento cancelado e mantido no histórico.",
+        observacao:
+          trimOrUndefined(input?.observacaoAuditoria ?? undefined) ??
+          "Lançamento cancelado e mantido no histórico para auditoria.",
         origem: atual.origem,
-        ator
+        ator: input?.ator
       });
     });
   }

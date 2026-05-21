@@ -198,3 +198,7 @@ export const pagamentoInputSchema = z.object({
   formaPagamento: optionalTrimmedString.nullable().optional(),
   observacao: optionalTrimmedString.nullable().optional()
 });
+
+export const remocaoLancamentoInputSchema = z.object({
+  senha: z.string().trim().min(1, "Informe a senha para excluir o lançamento.")
+});

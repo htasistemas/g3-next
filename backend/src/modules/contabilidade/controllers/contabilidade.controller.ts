@@ -151,7 +151,7 @@ export class ContabilidadeController {
   }
 
   async removerLancamento(request: AuthenticatedRequest, response: Response) {
-    await service.removerLancamento(request.params.id, obterAtor(request));
+    await service.removerLancamento(request.params.id, request.body, obterAtor(request));
     return response.status(204).send();
   }
 

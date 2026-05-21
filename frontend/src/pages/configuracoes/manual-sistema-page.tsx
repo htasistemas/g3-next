@@ -47,6 +47,8 @@ const secoesManual: ManualSecao[] = [
           "Comece pelos cadastros para garantir base confiável de beneficiários, famílias e profissionais.",
           "Use Atendimentos para registrar movimentações sociais, benefícios, inscrições e acompanhamentos.",
           "Use Configurações gerais para manter parâmetros, usuários, IA e o próprio manual atualizados.",
+          "Na tela Visão geral, acompanhe também os cards de Termos vencidos, Documentos vencidos, Documentos a vencer, Motoristas autorizados, Itens no almoxarifado e Itens no patrimônio para leitura operacional rápida logo na entrada do sistema.",
+          "Os cards da Visão geral funcionam como atalhos: ao clicar em cada indicador, o sistema abre a tela correspondente para aprofundar a análise ou continuar a operação.",
           "No acesso local pela tela de login, o botão Entrar com Google depende do client ID configurado no ambiente do frontend e do backend.",
           "Quando o backend estiver em desenvolvimento sem envio de e-mail configurado, a recuperação de senha conclui localmente e grava a senha temporária no log do servidor."
         ],
@@ -57,6 +59,7 @@ const secoesManual: ManualSecao[] = [
           "Em produção, o backend não deve operar com o segredo padrão de desenvolvimento para autenticação; configure APP_AUTH_TOKEN_SECRET próprio antes de publicar.",
           "O envio de e-mail deve permanecer desabilitado enquanto MAIL_PASS não estiver configurada no ambiente da instância.",
           "Essa recuperação local sem e-mail é apenas de apoio ao desenvolvimento; em ambientes com envio ativo, a senha temporária continua sendo enviada ao endereço cadastrado.",
+          "O card Famílias em extrema pobreza foi removido da Visão geral para liberar espaço aos indicadores operacionais de termos, documentos, motoristas, almoxarifado e patrimônio.",
           "Na impressão da ficha cadastral do beneficiário e no recibo de doação entregue, a logomarca do cabeçalho é carregada diretamente do storage local da unidade quando estiver salva como caminho lógico do sistema.",
           "No cadastro da unidade assistencial, a Logomarca da unidade vazado preserva o arquivo original enviado pelo cliente, incluindo SVG e imagens com transparência, enquanto a Logomarca do relatório pode ser normalizada para manter compatibilidade de impressão."
         ]
@@ -568,10 +571,11 @@ const secoesManual: ManualSecao[] = [
           "No campo Tipo da aba Lançamentos, a opção Estorno não aparece mais na criação manual; o estorno continua disponível apenas como ação específica para lançamentos já baixados.",
           "Quando o tipo for Ajuste, a tela exige informar se o ajuste deve aumentar ou diminuir o saldo da conta antes do salvamento.",
           "Na aba Lançamentos, os cards de resumo mostram rapidamente quantos lançamentos existem, quanto entrou, quanto saiu e o que ainda está em aberto.",
-          "Ao salvar um lançamento vinculado a uma conta bancária, os cards de Contas bancárias passam a refletir imediatamente o impacto financeiro esperado daquela conta, mesmo antes da baixa.",
-          "O saldo exibido nas contas bancárias usa o saldo real da conta somado apenas à projeção dos lançamentos ainda em aberto, sem duplicar créditos ou débitos já baixados, pagos, recebidos ou conciliados.",
+          "Ao salvar um lançamento em aberto, o sistema mantém o valor apenas como previsão financeira. O saldo bancário realizado só muda na baixa do lançamento.",
+          "Quando o lançamento for de receita, a baixa soma o valor ao saldo da conta. Quando for despesa, a baixa subtrai o valor do saldo. Ajustes seguem a direção informada no cadastro.",
           "Ao efetivar receita, despesa ou ajuste em qualquer conta bancária, o saldo realizado passa a seguir exatamente o valor informado no lançamento, sem duplicar débito ou crédito em nenhuma conta do sistema.",
           "Quando o lançamento for salvo já como Pago, Recebido ou Conciliado, o sistema também atualiza automaticamente o saldo realizado da conta bancária vinculada.",
+          "Para excluir um lançamento, o sistema agora pede a senha do usuário autenticado e mantém o registro da exclusão no histórico financeiro para auditoria.",
           "Use Contas bancárias para cadastrar contas e depois acompanhar cada conta em cards com banco, agência, número, saldo atual, Pix, projeto vinculado e status.",
           "Para editar uma conta, clique em Editar no card correspondente. Para iniciar um novo cadastro, use Nova conta bancária na barra superior ou no formulário."
         ],
@@ -814,9 +818,11 @@ const secoesManual: ManualSecao[] = [
         nome: "Registro de ponto",
         objetivo: "Registrar batidas com horário do servidor, localização do dispositivo e confirmação dupla por senha e face do usuário.",
         comoUsar: [
+          "Ao abrir a tela Registro de ponto, a página inicial já destaca o botão Registrar ponto agora para acelerar a batida sem precisar entrar primeiro na aba específica de marcação.",
           "Acesse a aba Cadastro facial para capturar a face pela webcam e salvar o cadastro facial do usuário.",
           "Durante a captura pela câmera, use o molde do rosto na tela para centralizar a face antes de confirmar a imagem.",
           "Depois volte para a aba Registrar ponto para consultar a próxima batida, o espelho do dia e o saldo atual antes de marcar.",
+          "Na aba Espelho de ponto, os campos Período inicial e Período final aceitam preenchimento manual para consultar qualquer intervalo antes de clicar em Buscar ou gerar o PDF.",
           "Na aba Espelho de ponto, use o botão Gerar espelho de ponto PDF para emitir o relatório individual em um clique; administradores podem selecionar o funcionário antes da emissão, enquanto usuários comuns emitem apenas o próprio espelho.",
           "Somente após o cadastro da face o botão Registrar ponto agora fica liberado para a confirmação da batida.",
           "Ao clicar em Registrar ponto agora, informe o usuário e a senha. Se o modo escolhido for Somente senha, a marcação é concluída sem captura facial. Se o modo escolhido for Senha + captura facial, faça também a validação da face atual com prova de vida por duas piscadas ou leve virada do rosto antes do envio.",

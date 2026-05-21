@@ -17,6 +17,7 @@ import type {
   LancamentoFinanceiroPayload,
   MovimentacaoFinanceira,
   MovimentacaoFinanceiraPayload,
+  RemocaoLancamentoFinanceiroPayload,
   ReciboPagamento,
   TransferenciaFinanceira,
   TransferenciaFinanceiraPayload
@@ -120,8 +121,8 @@ export const contabilidadeService = {
     return data;
   },
 
-  async removerLancamento(id: string | number) {
-    await httpClient.delete(`${baseUrl}/lancamentos/${id}`);
+  async removerLancamento(id: string | number, payload: RemocaoLancamentoFinanceiroPayload) {
+    await httpClient.delete(`${baseUrl}/lancamentos/${id}`, { data: payload });
   },
 
   async listarMovimentacoes() {

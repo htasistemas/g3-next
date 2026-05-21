@@ -198,6 +198,35 @@ const statusEmAberto = new Set([
   'RENEGOCIADO'
 ]);
 
+function normalizarStatusPorTipoLancamento(
+  tipo: LancamentoFinanceiro['tipo'],
+  status: LancamentoFinanceiro['status'],
+  direcaoAjuste?: DirecaoAjusteFinanceiro
+): LancamentoFinanceiro['status'] {
+  if (tipo === 'RECEITA') {
+    if (status === 'AGUARDANDO_PAGAMENTO') return 'AGUARDANDO_RECEBIMENTO';
+    if (status === 'PAGO') return 'RECEBIDO';
+    return status;
+  }
+
+  if (tipo === 'DESPESA') {
+    if (status === 'AGUARDANDO_RECEBIMENTO') return 'AGUARDANDO_PAGAMENTO';
+    if (status === 'RECEBIDO') return 'PAGO';
+    return status;
+  }
+
+  if (tipo === 'AJUSTE') {
+    if (status === 'RECEBIDO' || status === 'PAGO') {
+      return direcaoAjuste === 'AUMENTAR' ? 'RECEBIDO' : 'PAGO';
+    }
+    if (status === 'AGUARDANDO_RECEBIMENTO' || status === 'AGUARDANDO_PAGAMENTO') {
+      return direcaoAjuste === 'AUMENTAR' ? 'AGUARDANDO_RECEBIMENTO' : 'AGUARDANDO_PAGAMENTO';
+    }
+  }
+
+  return status;
+}
+
 const visoesLancamento: Array<{
   id: LancamentoVisaoId;
   label: string;
@@ -688,6 +717,7 @@ export function ContabilidadePage() {
   const [popup, setPopup] = useState<PopupMensagemState | null>(null);
   const [confirmarExclusao, setConfirmarExclusao] = useState(false);
   const [tipoExclusao, setTipoExclusao] = useState<ExclusaoTipo>(null);
+  const [senhaExclusaoLancamento, setSenhaExclusaoLancamento] = useState('');
 
   const [contaSelecionadaId, setContaSelecionadaId] = useState<number>();
   const [categoriaSelecionadaId, setCategoriaSelecionadaId] = useState<number>();
@@ -1065,20 +1095,35 @@ export function ContabilidadePage() {
 
   function lancamentoAjustado(): LancamentoFinanceiroPayload {
     if (visaoLancamentos === 'receitas' || visaoLancamentos === 'contasReceber') {
-      return {
+      const lancamento = {
         ...lancamentoForm,
         tipo: 'RECEITA',
         status: visaoLancamentos === 'contasReceber' ? 'AGUARDANDO_RECEBIMENTO' : lancamentoForm.status || 'PENDENTE'
       };
+      return {
+        ...lancamento,
+        status: normalizarStatusPorTipoLancamento(lancamento.tipo, lancamento.status, lancamento.direcaoAjuste)
+      };
     }
     if (visaoLancamentos === 'despesas' || visaoLancamentos === 'contasPagar') {
-      return {
+      const lancamento = {
         ...lancamentoForm,
         tipo: 'DESPESA',
         status: visaoLancamentos === 'contasPagar' ? 'AGUARDANDO_PAGAMENTO' : lancamentoForm.status || 'PENDENTE'
       };
+      return {
+        ...lancamento,
+        status: normalizarStatusPorTipoLancamento(lancamento.tipo, lancamento.status, lancamento.direcaoAjuste)
+      };
     }
-    return lancamentoForm;
+    return {
+      ...lancamentoForm,
+      status: normalizarStatusPorTipoLancamento(
+        lancamentoForm.tipo,
+        lancamentoForm.status,
+        lancamentoForm.direcaoAjuste
+      )
+    };
   }
 
   async function salvarAtual() {
@@ -1240,17 +1285,32 @@ export function ContabilidadePage() {
     if (abaAtiva === 'contas' && contaSelecionadaId) return setTipoExclusao('conta'), setConfirmarExclusao(true);
     if (abaAtiva === 'categorias' && categoriaSelecionadaId) return setTipoExclusao('categoria'), setConfirmarExclusao(true);
     if (abaAtiva === 'centros' && centroSelecionadoId) return setTipoExclusao('centro'), setConfirmarExclusao(true);
-    if (abaAtiva === 'lancamentos' && lancamentoSelecionadoId) return setTipoExclusao('lancamento'), setConfirmarExclusao(true);
+    if (abaAtiva === 'lancamentos' && lancamentoSelecionadoId) {
+      setSenhaExclusaoLancamento('');
+      setTipoExclusao('lancamento');
+      setConfirmarExclusao(true);
+      return;
+    }
     if (abaAtiva === 'fluxoCaixa' && movimentacaoSelecionadaId) return setTipoExclusao('movimentacao'), setConfirmarExclusao(true);
     setPopup({ tipo: 'aviso', titulo: 'Seleção necessária', texto: 'Selecione um registro válido para excluir.' });
   }
 
   async function confirmarExclusaoRegistro() {
+    if (tipoExclusao === 'lancamento' && !senhaExclusaoLancamento.trim()) {
+      setPopup({ tipo: 'aviso', titulo: 'Senha obrigatória', texto: 'Informe a senha para excluir o lançamento e registrar a auditoria.' });
+      return;
+    }
+
     try {
       if (tipoExclusao === 'conta' && contaSelecionadaId) await removerContaMutation.mutateAsync(contaSelecionadaId);
       if (tipoExclusao === 'categoria' && categoriaSelecionadaId) await removerCategoriaMutation.mutateAsync(categoriaSelecionadaId);
       if (tipoExclusao === 'centro' && centroSelecionadoId) await removerCentroMutation.mutateAsync(centroSelecionadoId);
-      if (tipoExclusao === 'lancamento' && lancamentoSelecionadoId) await removerLancamentoMutation.mutateAsync(lancamentoSelecionadoId);
+      if (tipoExclusao === 'lancamento' && lancamentoSelecionadoId) {
+        await removerLancamentoMutation.mutateAsync({
+          id: lancamentoSelecionadoId,
+          payload: { senha: senhaExclusaoLancamento }
+        });
+      }
       if (tipoExclusao === 'movimentacao' && movimentacaoSelecionadaId) await removerMovimentacaoMutation.mutateAsync(movimentacaoSelecionadaId);
       limparFormularioAtual();
       setPopup({ tipo: 'sucesso', titulo: 'Exclusão concluída', texto: 'O registro foi removido com sucesso.' });
@@ -1259,6 +1319,7 @@ export function ContabilidadePage() {
     } finally {
       setConfirmarExclusao(false);
       setTipoExclusao(null);
+      setSenhaExclusaoLancamento('');
     }
   }
 
@@ -1459,7 +1520,16 @@ export function ContabilidadePage() {
             Passo a passo: escolha o tipo, informe a conta, descreva para quem foi ou de quem veio, preencha o histórico e digite o valor.
           </div>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <div className="space-y-1"><Label>Tipo</Label><Select value={lancamentoForm.tipo} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, tipo: event.target.value as LancamentoFinanceiro['tipo'], direcaoAjuste: event.target.value === 'AJUSTE' ? (atual.direcaoAjuste ?? 'DIMINUIR') : undefined }))}><option value="RECEITA">Receita</option><option value="DESPESA">Despesa</option><option value="AJUSTE">Ajuste</option></Select></div>
+            <div className="space-y-1"><Label>Tipo</Label><Select value={lancamentoForm.tipo} onChange={(event) => setLancamentoForm((atual) => {
+              const tipo = event.target.value as LancamentoFinanceiro['tipo'];
+              const direcaoAjuste = tipo === 'AJUSTE' ? (atual.direcaoAjuste ?? 'DIMINUIR') : undefined;
+              return {
+                ...atual,
+                tipo,
+                direcaoAjuste,
+                status: normalizarStatusPorTipoLancamento(tipo, atual.status, direcaoAjuste)
+              };
+            })}><option value="RECEITA">Receita</option><option value="DESPESA">Despesa</option><option value="AJUSTE">Ajuste</option></Select></div>
             {lancamentoForm.tipo === 'AJUSTE' ? <div className="space-y-1"><Label>Direção do ajuste</Label><Select value={lancamentoForm.direcaoAjuste ?? 'DIMINUIR'} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, direcaoAjuste: event.target.value as DirecaoAjusteFinanceiro }))}><option value="DIMINUIR">Diminuir saldo</option><option value="AUMENTAR">Aumentar saldo</option></Select></div> : null}
             <div className="space-y-1"><Label>Data do lançamento</Label><Input type="date" value={lancamentoForm.dataLancamento} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, dataLancamento: event.target.value }))} /></div>
             <div className="space-y-1"><Label>Vencimento</Label><Input type="date" value={lancamentoForm.vencimento} onChange={(event) => setLancamentoForm((atual) => ({ ...atual, vencimento: event.target.value }))} /></div>
@@ -2231,10 +2301,29 @@ export function ContabilidadePage() {
         titulo="Confirmar exclusão"
         texto="Esta ação é irreversível. Deseja continuar?"
         processando={processando}
-        onCancel={() => setConfirmarExclusao(false)}
+        onCancel={() => {
+          setConfirmarExclusao(false);
+          setSenhaExclusaoLancamento('');
+        }}
         onConfirm={() => void confirmarExclusaoRegistro()}
         confirmarTexto="Excluir"
-      />
+      >
+        {tipoExclusao === 'lancamento' ? (
+          <div className="space-y-2">
+            <p className="text-xs text-slate-500">
+              Esta exclusão será registrada no banco de dados e nos logs do sistema para efeito de auditoria.
+            </p>
+            <Label htmlFor="senha-exclusao-lancamento">Senha do usuário</Label>
+            <Input
+              id="senha-exclusao-lancamento"
+              type="password"
+              value={senhaExclusaoLancamento}
+              onChange={(event) => setSenhaExclusaoLancamento(event.target.value)}
+              placeholder="Digite a sua senha para confirmar"
+            />
+          </div>
+        ) : null}
+      </PopupConfirmacao>
     </>
   );
 }

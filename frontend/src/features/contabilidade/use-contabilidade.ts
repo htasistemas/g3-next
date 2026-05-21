@@ -11,6 +11,7 @@ import type {
   LancamentoFinanceiroBaixaPayload,
   LancamentoFinanceiroPayload,
   MovimentacaoFinanceiraPayload,
+  RemocaoLancamentoFinanceiroPayload,
   TransferenciaFinanceiraPayload
 } from '@/types/contabilidade';
 
@@ -229,7 +230,8 @@ export function useRemoverLancamentoContabil() {
   const { usuario } = useAuth();
   const tenantId = usuario?.tenant_id ?? 'sem-tenant';
   return useMutation({
-    mutationFn: (id: number) => contabilidadeService.removerLancamento(id),
+    mutationFn: ({ id, payload }: { id: number; payload: RemocaoLancamentoFinanceiroPayload }) =>
+      contabilidadeService.removerLancamento(id, payload),
     onSuccess: async () => invalidarTudoContabilidade(queryClient, tenantId)
   });
 }
