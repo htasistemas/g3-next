@@ -1121,7 +1121,7 @@ export function RegistroPontoPage() {
   const marcacaoEmAndamento = marcarMutation.isPending || etapaMarcacao !== "idle";
   const acoesDesabilitadas =
     marcacaoEmAndamento || ajusteMutation.isPending || ocorrenciaMutation.isPending;
-  const filtrosTravados = true;
+  const filtrosTravados = abaAtiva !== "espelho";
   const previewFaceAtual = obterPreviewFaceAtual({
     modoFace,
     rascunhoFaceCadastro,
@@ -1171,8 +1171,14 @@ export function RegistroPontoPage() {
             <Input
               type="date"
               value={filtroDraft.data_inicial ?? ""}
-              readOnly
-              disabled
+              onChange={(event) =>
+                setFiltroDraft((prev) => ({
+                  ...prev,
+                  data_inicial: event.target.value || undefined
+                }))
+              }
+              readOnly={abaAtiva !== "espelho"}
+              disabled={abaAtiva !== "espelho"}
             />
           </div>
 
@@ -1181,9 +1187,20 @@ export function RegistroPontoPage() {
             <Input
               type="date"
               value={filtroDraft.data_final ?? ""}
-              readOnly
-              disabled
+              onChange={(event) =>
+                setFiltroDraft((prev) => ({
+                  ...prev,
+                  data_final: event.target.value || undefined
+                }))
+              }
+              readOnly={abaAtiva !== "espelho"}
+              disabled={abaAtiva !== "espelho"}
             />
+            {abaAtiva === "espelho" ? (
+              <p className="mt-1 text-xs text-[var(--g3-muted)]">
+                Informe manualmente o período desejado e depois clique em Buscar.
+              </p>
+            ) : null}
           </div>
 
           {isAdmin && abaAtiva === "espelho" ? (
@@ -1325,10 +1342,68 @@ export function RegistroPontoPage() {
     );
   }
 
+  function renderPainelMarcacaoDestaque() {
+    return (
+      <Card className="overflow-hidden border-emerald-200 bg-gradient-to-r from-emerald-50 via-white to-emerald-50/80 shadow-sm">
+        <CardContent className="space-y-4 p-4 sm:p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white/90 px-3 py-1 text-xs font-semibold text-emerald-700">
+                <Fingerprint className="h-4 w-4" />
+                Marcação rápida
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-semibold text-slate-900">Registrar ponto agora</h3>
+                <p className="text-sm text-slate-700">
+                  Faça a próxima batida diretamente da página inicial do registro de ponto.
+                </p>
+              </div>
+            </div>
+
+            <Button
+              type="button"
+              className="w-full border-emerald-700 bg-emerald-600 text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-700 hover:shadow-xl hover:shadow-emerald-200/80 sm:w-auto sm:min-w-[240px]"
+              onClick={() => setPopupMarcarAberto(true)}
+              disabled={marcacaoEmAndamento}
+            >
+              {obterTextoBotaoMarcacao()}
+            </Button>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-lg border border-emerald-100 bg-white/90 p-3">
+              <p className="text-xs text-[var(--g3-muted)]">Hoje</p>
+              <p className="text-sm font-semibold text-emerald-700">{formatarData(toLocalDateISO())}</p>
+            </div>
+            <div className="rounded-lg border border-emerald-100 bg-white/90 p-3">
+              <p className="text-xs text-[var(--g3-muted)]">Próxima batida</p>
+              <p className="text-sm font-semibold text-[var(--g3-foreground)]">
+                {registroHojeUsuario?.proxima_batida ?? "Entrada 1"}
+              </p>
+            </div>
+            <div className="rounded-lg border border-emerald-100 bg-white/90 p-3">
+              <p className="text-xs text-[var(--g3-muted)]">Usuário</p>
+              <p className="text-sm font-semibold text-[var(--g3-foreground)]">
+                {usuario?.nome ?? usuario?.nomeUsuario ?? "---"}
+              </p>
+            </div>
+            <div className="rounded-lg border border-emerald-100 bg-white/90 p-3">
+              <p className="text-xs text-[var(--g3-muted)]">Saldo de banco</p>
+              <p className="text-sm font-semibold text-[var(--g3-foreground)]">
+                {formatarMinutos(registroHojeUsuario?.banco_horas_minutos ?? 0)}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   function renderAbaConteudo() {
     if (abaAtiva === "listagem") {
       return (
         <section className="space-y-3">
+          {renderPainelMarcacaoDestaque()}
           {renderFiltros()}
           {renderTabelaRegistros(registros, false)}
         </section>

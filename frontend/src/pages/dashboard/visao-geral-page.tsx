@@ -15,20 +15,26 @@ import {
 } from "recharts";
 import { ResponsiveChart } from "@/components/charts/responsive-chart";
 import {
+  Archive,
   BanknoteArrowUp,
   BriefcaseBusiness,
   Building2,
+  CarFront,
   FolderHeart,
   HandHeart,
   LayoutDashboard,
+  Package,
   RefreshCw,
-  ShieldAlert,
   UsersRound
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useDocumentosInstituicao } from "@/features/documentos-instituicao/use-documentos-instituicao";
 import { useAuth } from "@/hooks/use-auth";
+import { useItensAlmoxarifado } from "@/features/almoxarifado/use-almoxarifado";
+import { useMotoristasAutorizados } from "@/features/controle-veiculos/use-controle-veiculos";
 import { useDashboardAssistencia } from "@/features/dashboard/use-dashboard";
+import { usePatrimonios } from "@/features/patrimonios/use-patrimonios";
 import { classesTelaPadraoBeneficiario } from "@/lib/tela-padrao-beneficiario";
 import { matriculasService } from "@/services/matriculas.service";
 
@@ -56,6 +62,27 @@ const classeCardVerdeInterativo = `${classeCardVerde} transition-all duration-20
 const classeCardVerdeSuave =
   "rounded-xl border border-emerald-100/90 bg-[rgba(255,255,255,0.72)] shadow-[0_14px_32px_-26px_rgba(22,101,52,0.28)] backdrop-blur-[2px]";
 
+function obterRotaCadastro(nome: string) {
+  switch (nome) {
+    case "Almoxarifado":
+      return "/setor-administrativo/almoxarifado";
+    case "Biblioteca":
+      return "/atendimentos/biblioteca";
+    case "Veículos":
+      return "/setor-administrativo/controle-veiculos";
+    case "Profissionais":
+      return "/cadastros/profissionais";
+    case "Voluntários":
+      return "/cadastros/voluntariado";
+    case "Famílias":
+      return "/cadastros/vinculo-familiar";
+    case "Patrimônio":
+      return "/setor-administrativo/patrimonio";
+    default:
+      return "/dashboard/visao-geral";
+  }
+}
+
 export function VisaoGeralPage() {
   const navigate = useNavigate();
   const { usuario } = useAuth();
@@ -69,24 +96,62 @@ export function VisaoGeralPage() {
     enabled: !!usuario,
     staleTime: 60_000
   });
+  const { data: itensAlmoxarifadoData } = useItensAlmoxarifado();
+  const { data: patrimoniosData } = usePatrimonios();
+  const { data: motoristasAutorizadosData } = useMotoristasAutorizados();
+  const { data: documentosInstituicaoData } = useDocumentosInstituicao();
+
+  const itensAlmoxarifado = itensAlmoxarifadoData ?? [];
+  const patrimonios = patrimoniosData?.patrimonios ?? [];
+  const motoristasAutorizados = motoristasAutorizadosData ?? [];
+  const documentosInstituicao = documentosInstituicaoData ?? [];
+
+  const termosVencidos = useMemo(() => {
+    const hoje = new Intl.DateTimeFormat("sv-SE", {
+      timeZone: "America/Sao_Paulo"
+    }).format(new Date());
+
+    return (data?.termos.alertas ?? []).filter((alerta) => {
+      const vigenciaFim = alerta.vigenciaFim?.slice(0, 10);
+      return Boolean(vigenciaFim && vigenciaFim < hoje);
+    }).length;
+  }, [data?.termos.alertas]);
+
+  const totalMotoristasAutorizados = useMemo(() => {
+    const grupos = new Set<string>();
+    for (const item of motoristasAutorizados) {
+      grupos.add(`${item.tipoOrigem}-${item.motoristaId}`);
+    }
+    return grupos.size;
+  }, [motoristasAutorizados]);
+
+  const documentosVencidos = useMemo(
+    () => documentosInstituicao.filter((item) => item.situacao === "vencido").length,
+    [documentosInstituicao]
+  );
+
+  const documentosAVencer = useMemo(
+    () => documentosInstituicao.filter((item) => item.situacao === "vence_em_breve").length,
+    [documentosInstituicao]
+  );
 
   const dadosCadastros = useMemo(() => {
     if (!data) return [];
     return [
-      { nome: "Almoxarifado", valor: data.cadastros.itensAlmoxarifado },
+      { nome: "Almoxarifado", valor: itensAlmoxarifado.length || data.cadastros.itensAlmoxarifado },
       { nome: "Biblioteca", valor: data.cadastros.livrosDisponiveis },
       { nome: "Veículos", valor: data.cadastros.veiculos },
       { nome: "Profissionais", valor: data.cadastros.profissionais },
       { nome: "Voluntários", valor: data.cadastros.voluntarios },
       { nome: "Famílias", valor: data.cadastros.familias },
-      { nome: "Patrimônio", valor: data.cadastros.bensPatrimonio }
+      { nome: "Patrimônio", valor: patrimonios.length || data.cadastros.bensPatrimonio }
     ]
       .sort((a, b) => b.valor - a.valor)
       .map((item, index) => ({
         ...item,
         cor: coresCadastros[index % coresCadastros.length]
       }));
-  }, [data]);
+  }, [data, itensAlmoxarifado.length, patrimonios.length]);
 
   const dadosFinanceiro = useMemo(() => {
     if (!data) return [];
@@ -128,13 +193,6 @@ export function VisaoGeralPage() {
         rota: "/cadastros/beneficiarios"
       },
       {
-        label: "Famílias em extrema pobreza",
-        valor: String(data.top12.familiasExtremaPobreza),
-        hint: "Faixa até R$ 200",
-        icone: ShieldAlert,
-        rota: "/cadastros/vinculo-familiar"
-      },
-      {
         label: "Cursos ativos",
         valor: String(data.top12.cursosAtivos),
         hint: `Ocupação média ${formatarPercentual(data.top12.taxaMediaOcupacaoCursos)}`,
@@ -156,14 +214,57 @@ export function VisaoGeralPage() {
         rota: "/cadastros/beneficiarios"
       },
       {
-        label: "Termos vencendo",
-        valor: String(data.top12.termosVencendo),
-        hint: "Próximos 60 dias",
+        label: "Termos vencidos",
+        valor: String(termosVencidos),
+        hint: "Alertas com vigência encerrada",
         icone: Building2,
-        rota: "/dashboard/indicadores"
+        rota: "/setor-juridico/termo-fomento"
+      },
+      {
+        label: "Documentos vencidos",
+        valor: String(documentosVencidos),
+        hint: "Registros com validade expirada",
+        icone: Archive,
+        rota: "/setor-administrativo/gestao-documentos"
+      },
+      {
+        label: "Documentos a vencer",
+        valor: String(documentosAVencer),
+        hint: "Registros em alerta de renovação",
+        icone: Archive,
+        rota: "/setor-administrativo/gestao-documentos"
+      },
+      {
+        label: "Motoristas autorizados",
+        valor: String(totalMotoristasAutorizados),
+        hint: "Quantidade única de condutores",
+        icone: CarFront,
+        rota: "/setor-administrativo/controle-veiculos"
+      },
+      {
+        label: "Itens no almoxarifado",
+        valor: String(itensAlmoxarifado.length || data.cadastros.itensAlmoxarifado),
+        hint: "Total de itens cadastrados",
+        icone: Package,
+        rota: "/setor-administrativo/almoxarifado"
+      },
+      {
+        label: "Itens no patrimônio",
+        valor: String(patrimonios.length || data.cadastros.bensPatrimonio),
+        hint: "Bens patrimoniais cadastrados",
+        icone: Archive,
+        rota: "/setor-administrativo/patrimonio"
       }
     ];
-  }, [data]);
+  }, [
+    data,
+    documentosAVencer,
+    documentosVencidos,
+    itensAlmoxarifado.length,
+    patrimonios.length,
+    termosVencidos,
+    totalMotoristasAutorizados
+  ]);
 
   const resumoCatalogoVagas = useMemo(() => {
     return {
@@ -210,7 +311,7 @@ export function VisaoGeralPage() {
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
                 {cardsResumo.map((card) => (
                   <button
                     key={card.label}
@@ -369,9 +470,11 @@ export function VisaoGeralPage() {
                             : 0;
 
                         return (
-                          <div
+                          <button
                             key={item.nome}
-                            className={`${classeCardVerdeSuave} p-3`}
+                            type="button"
+                            className={`${classeCardVerdeSuave} p-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-[0_22px_48px_-22px_rgba(22,101,52,0.32)]`}
+                            onClick={() => navigate(obterRotaCadastro(item.nome))}
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div className="flex items-center gap-2">
@@ -397,7 +500,7 @@ export function VisaoGeralPage() {
                                 </p>
                               </div>
                             </div>
-                          </div>
+                          </button>
                         );
                       })}
                     </div>
@@ -410,9 +513,11 @@ export function VisaoGeralPage() {
                   </p>
                   <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3">
                     {dadosFinanceiro.map((item) => (
-                      <div
+                      <button
                         key={item.nome}
-                        className={`${classeCardVerdeSuave} px-3 py-3`}
+                        type="button"
+                        className={`${classeCardVerdeSuave} px-3 py-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-[0_22px_48px_-22px_rgba(22,101,52,0.32)]`}
+                        onClick={() => navigate("/setor-financeiro/contabilidade")}
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div>
@@ -432,10 +537,14 @@ export function VisaoGeralPage() {
                             ? `${formatarPercentual((item.valor / totalFinanceiroMonitorado) * 100)} do total monitorado`
                             : "Sem valores registrados"}
                         </p>
-                      </div>
+                      </button>
                     ))}
                   </div>
-                  <div className={`${classeCardVerdeSuave} mt-3 p-3`}>
+                  <button
+                    type="button"
+                    className={`${classeCardVerdeSuave} mt-3 w-full p-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-[0_22px_48px_-22px_rgba(22,101,52,0.32)]`}
+                    onClick={() => navigate("/setor-financeiro/contabilidade")}
+                  >
                     <div className="flex items-center justify-between gap-2">
                       <div>
                         <p className="text-sm font-semibold text-[var(--g3-foreground)]">
@@ -506,28 +615,40 @@ export function VisaoGeralPage() {
                         Nenhuma conta com saldo disponível foi encontrada para montar o gráfico financeiro.
                       </div>
                     )}
-                  </div>
+                  </button>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                <div className={`${classeCardVerde} px-3 py-3`}>
+                <button
+                  type="button"
+                  className={`${classeCardVerdeInterativo} px-3 py-3 text-left`}
+                  onClick={() => navigate("/setor-financeiro/prestacao-contas")}
+                >
                   <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
                     Execução financeira
                   </p>
                   <p className="mt-1 text-lg font-semibold text-[var(--g3-foreground)]">
                     {formatarPercentual(data.top12.execucaoFinanceira)}
                   </p>
-                </div>
-                <div className={`${classeCardVerde} px-3 py-3`}>
+                </button>
+                <button
+                  type="button"
+                  className={`${classeCardVerdeInterativo} px-3 py-3 text-left`}
+                  onClick={() => navigate("/setor-rh/registro-ponto")}
+                >
                   <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
                     Absenteísmo
                   </p>
                   <p className="mt-1 text-lg font-semibold text-[var(--g3-foreground)]">
                     {formatarPercentual(data.top12.absenteismo)}
                   </p>
-                </div>
-                <div className={`${classeCardVerde} px-3 py-3`}>
+                </button>
+                <button
+                  type="button"
+                  className={`${classeCardVerdeInterativo} px-3 py-3 text-left`}
+                  onClick={() => navigate("/setor-financeiro/contabilidade")}
+                >
                   <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
                     Valores a receber
                   </p>
@@ -535,7 +656,7 @@ export function VisaoGeralPage() {
                     <BanknoteArrowUp className="h-4 w-4 text-[var(--g3-warning)]" />
                     {formatarMoeda(data.financeiro.valoresAReceber)}
                   </p>
-                </div>
+                </button>
               </div>
             </>
           )}
