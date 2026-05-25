@@ -1,6 +1,17 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.509",
+                        "releaseDate":  "2026-05-25",
+                        "title":  "Renovação de documentos vencidos corrigida",
+                        "description":  "A tela Gestão de documentos passou a atualizar corretamente documentos vencidos sem deslocar a validade por efeito de fuso horário.",
+                        "changes":  [
+                                        "O backend passou a recalcular a situação do documento usando a data civil informada no cadastro, sem converter a validade para o dia anterior em ambientes como America/Sao_Paulo.",
+                                        "A tela Gestão de documentos passou a usar a mesma regra ao montar alertas e vencimentos, mantendo a leitura da situação alinhada com o salvamento.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ]
+                    },
+                    {
                         "version":  "1.00.487",
                         "releaseDate":  "2026-05-12",
                         "title":  "Setor Administrativo com nova tela Projetos",

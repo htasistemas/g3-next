@@ -42,6 +42,7 @@ import {
 import { abrirArquivoAutenticado, imprimirArquivoAutenticado } from "@/lib/arquivos";
 import { formatarDataPtBr } from "@/lib/br-utils";
 import { montarPayloadAnexoDocumentoInstituicao } from "@/lib/documentos-instituicao-anexo";
+import { calcularDiasParaVencerDocumento } from "@/lib/documentos-instituicao-datas";
 import { imprimirConteudoAtual } from "@/lib/report-utils";
 import type {
   DocumentoInstituicao,
@@ -277,11 +278,10 @@ export function GestaoDocumentosPage() {
     return documentos
       .filter((item) => !!item.validade)
       .map((item) => {
-        const validade = new Date(String(item.validade));
-        const diffDias = Math.ceil((validade.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
+        const diffDias = calcularDiasParaVencerDocumento(item.validade, hoje);
         return {
           ...item,
-          diasParaVencer: diffDias
+          diasParaVencer: diffDias ?? 0
         };
       })
       .sort((a, b) => a.diasParaVencer - b.diasParaVencer);

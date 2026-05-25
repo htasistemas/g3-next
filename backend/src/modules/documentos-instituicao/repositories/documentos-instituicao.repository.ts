@@ -9,35 +9,10 @@ import type {
   DocumentoInstituicaoHistoricoRow,
   DocumentoInstituicaoInput,
   DocumentoInstituicaoRow,
-  DocumentoSituacao
 } from "../documentos-instituicao.types.js";
+import { calcularSituacaoDocumentoInstituicao } from "../documentos-instituicao-status.js";
 
 type TransactionClient = Prisma.TransactionClient;
-
-function calcularSituacao(input: DocumentoInstituicaoInput): DocumentoSituacao {
-  if (input.emRenovacao) return "em_renovacao";
-  if (input.semVencimento || input.vencimentoIndeterminado || !input.validade) {
-    return "sem_vencimento";
-  }
-
-  const diasAlerta = Math.max(
-    0,
-    ...(input.diasAntecedencia ?? []).filter((item) => Number.isFinite(item) && item >= 0)
-  );
-
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
-  const validade = new Date(`${input.validade}T00:00:00.000Z`);
-  if (Number.isNaN(validade.getTime())) return "valido";
-
-  if (validade < hoje) return "vencido";
-
-  const alerta = new Date(hoje);
-  alerta.setDate(alerta.getDate() + (diasAlerta || 30));
-  if (validade <= alerta) return "vence_em_breve";
-
-  return "valido";
-}
 
 function montarCaminhoOuDataUri(conteudoBase64: string, tipoMime?: string | null) {
   if (conteudoBase64.startsWith("data:")) return conteudoBase64;
@@ -238,7 +213,7 @@ export class DocumentosInstituicaoRepository {
 
   async criar(input: DocumentoInstituicaoInput, tenantId: string) {
     await this.garantirEstrutura();
-    const situacao = calcularSituacao(input);
+    const situacao = calcularSituacaoDocumentoInstituicao(input);
     const diasAntecedencia = JSON.stringify(input.diasAntecedencia ?? []);
     const inserted = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
       INSERT INTO documentos_instituicao (
@@ -295,7 +270,7 @@ export class DocumentosInstituicaoRepository {
   async atualizar(id: bigint, input: DocumentoInstituicaoInput, tenantId: string) {
     await this.garantirEstrutura();
     await this.buscarPorIdOuFalhar(id, tenantId);
-    const situacao = calcularSituacao(input);
+    const situacao = calcularSituacaoDocumentoInstituicao(input);
     const diasAntecedencia = JSON.stringify(input.diasAntecedencia ?? []);
 
     await prisma.$executeRaw(Prisma.sql`

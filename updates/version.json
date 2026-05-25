@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.508",
-  "releaseDate": "2026-05-21",
-  "description": "A tela Contabilidade / financeiro foi finalizada com painel simplificado, ações rápidas, bloqueio de saldo negativo, transferências entre contas e fechamento mensal com abertura do mês seguinte.",
+  "latestVersion": "1.00.509",
+  "releaseDate": "2026-05-25",
+  "description": "A gestão de documentos passou a renovar corretamente documentos vencidos respeitando a data de validade informada no cadastro e nos alertas da tela.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.508",
+  "minCompatibleVersion": "1.00.509",
   "releaseType": "stable",
   "downloadUrl": null
 }

@@ -374,11 +374,13 @@ const secoesManual: ManualSecao[] = [
         objetivo: "Controlar documentos institucionais, anexar arquivos e manter histórico de atualizações do documento.",
         comoUsar: [
           "Cadastre ou selecione um documento na lista para abrir o detalhamento completo.",
+          "Quando um documento vencido for renovado, atualize a validade e salve o cadastro. A nova data passa a ser considerada exatamente pelo dia informado.",
           "Use a seção Arquivos do documento para anexar um ou mais arquivos, substituir, visualizar, imprimir ou excluir cada arquivo em um clique.",
           "Após cada alteração relevante, consulte o histórico do documento para acompanhar registros de cadastro, envio, troca e remoção de anexo."
         ],
         atencoes: [
           "O sistema aceita anexos PDF, JPG e PNG e grava apenas o caminho do arquivo no cadastro do documento.",
+          "A renovação de documento vencido agora respeita corretamente a data de validade informada, inclusive quando a nova validade for o dia atual.",
           "Se o documento já estiver salvo, o anexo é armazenado no storage do sistema e permanece disponível para substituição e exclusão sem duplicar arquivo no banco.",
           "O envio dos anexos na aba Cadastro e edição aceita seleção múltipla e mostra a evolução do upload em barra percentual até a conclusão.",
           "A tela Gestão de documentos agora lista, cadastra, atualiza e exclui documentos, anexos, arquivos e histórico sempre dentro do tenant autenticado, impedindo mistura de documentos entre instituições."
