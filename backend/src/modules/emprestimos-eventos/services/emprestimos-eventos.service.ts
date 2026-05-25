@@ -13,13 +13,17 @@ import {
   eventoEmprestimoInputSchema,
   responsavelEmprestimoInputSchema
 } from "../emprestimos-eventos.schema.js";
+import { parseDateOnlyLocal } from "../emprestimos-eventos-datetime.js";
 import { EmprestimosEventosRepository } from "../repositories/emprestimos-eventos.repository.js";
 
 function parseDateOnly(rawValue: unknown, label: string) {
   if (typeof rawValue !== "string" || !rawValue.trim()) {
     throw new AppError(`${label} invalida.`, 400);
   }
-  const parsed = new Date(`${rawValue.trim()}T00:00:00.000Z`);
+  const parsed = parseDateOnlyLocal(rawValue.trim());
+  if (!parsed) {
+    throw new AppError(`${label} invalida.`, 400);
+  }
   if (Number.isNaN(parsed.getTime())) {
     throw new AppError(`${label} invalida.`, 400);
   }

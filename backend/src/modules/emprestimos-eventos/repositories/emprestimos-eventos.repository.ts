@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../../database/prisma.js";
 import { AppError } from "../../../shared/errors/app-error.js";
 import { trimOrUndefined } from "../../../utils/string-utils.js";
+import { formatDateLocal, formatDateTimeLocal, parseDateTimeLocal } from "../emprestimos-eventos-datetime.js";
 import type {
   EmprestimoEventoFiltros,
   EmprestimoEventoInput,
@@ -22,8 +23,8 @@ type TransactionClient = Prisma.TransactionClient;
 function toOptionalDateTime(value?: string | null) {
   const text = trimOrUndefined(value);
   if (!text) return undefined;
-  const parsed = new Date(text);
-  if (Number.isNaN(parsed.getTime())) {
+  const parsed = parseDateTimeLocal(text);
+  if (!parsed || Number.isNaN(parsed.getTime())) {
     throw new AppError("Data e hora invalida.", 400);
   }
   return parsed;
@@ -330,6 +331,10 @@ export class EmprestimosEventosRepository {
         throw new AppError("Nao foi possivel criar o emprestimo.", 500);
       }
 
+      await this.validarItensEmprestimo(tx, input.itens ?? [], {
+        dataRetiradaPrevista: input.dataRetiradaPrevista,
+        dataDevolucaoPrevista: input.dataDevolucaoPrevista
+      }, tenantId);
       await this.salvarItens(tx, emprestimoId, input.itens ?? [], tenantId);
       await this.registrarMovimentacao(
         tx,
@@ -380,6 +385,11 @@ export class EmprestimosEventosRepository {
           AND tenant_id::text = ${tenantId}
       `);
 
+      await this.validarItensEmprestimo(tx, input.itens ?? [], {
+        dataRetiradaPrevista: input.dataRetiradaPrevista,
+        dataDevolucaoPrevista: input.dataDevolucaoPrevista,
+        emprestimoId: Number(id)
+      }, tenantId);
       await this.salvarItens(tx, id, input.itens ?? [], tenantId);
       await this.registrarMovimentacao(
         tx,
@@ -410,7 +420,8 @@ export class EmprestimosEventosRepository {
     usuarioId?: number
   ) {
     await this.ensureEstrutura();
-    await this.buscarEmprestimoPorIdOuFalhar(id, tenantId);
+    const atual = await this.buscarEmprestimoPorIdOuFalhar(id, tenantId);
+    this.validarTransicaoStatus(atual.registro.status as StatusEmprestimoEvento, status);
 
     await prisma.$transaction(async (tx) => {
       const camposAtualizacao: Prisma.Sql[] = [
@@ -717,7 +728,7 @@ export class EmprestimosEventosRepository {
     >();
 
     for (const registro of emprestimos) {
-      const dia = registro.inicio.toISOString().slice(0, 10);
+      const dia = formatDateLocal(registro.inicio) ?? "";
       const atual = resultado.get(dia) ?? {
         data: dia,
         temBloqueio: false,
@@ -868,8 +879,8 @@ export class EmprestimosEventosRepository {
       conflitos: conflitos.map((item) => ({
         emprestimoId: Number(item.emprestimo_id),
         eventoTitulo: item.evento_titulo,
-        inicio: item.inicio.toISOString(),
-        fim: item.fim.toISOString(),
+        inicio: formatDateTimeLocal(item.inicio),
+        fim: formatDateTimeLocal(item.fim),
         status: item.status,
         quantidadeReservada: Number(item.quantidade_reservada)
       }))
@@ -989,6 +1000,58 @@ export class EmprestimosEventosRepository {
     }
   }
 
+  private async validarItensEmprestimo(
+    tx: TransactionClient,
+    itens: EmprestimoEventoItemInput[],
+    contexto: {
+      dataRetiradaPrevista: string;
+      dataDevolucaoPrevista: string;
+      emprestimoId?: number;
+    },
+    tenantId: string
+  ) {
+    const agrupados = new Map<string, EmprestimoEventoItemInput>();
+
+    for (const item of itens) {
+      const chave = `${item.tipoItem}:${item.itemId}`;
+      const atual = agrupados.get(chave);
+      if (atual) {
+        atual.quantidade += item.quantidade;
+        atual.observacaoItem = [atual.observacaoItem, item.observacaoItem].filter(Boolean).join(" | ");
+        continue;
+      }
+      agrupados.set(chave, { ...item });
+    }
+
+    const inicio = toOptionalDateTime(contexto.dataRetiradaPrevista);
+    const fim = toOptionalDateTime(contexto.dataDevolucaoPrevista);
+    if (!inicio || !fim) {
+      throw new AppError("Periodo do emprestimo invalido.", 400);
+    }
+
+    for (const item of agrupados.values()) {
+      await this.validarItemExiste(tx, item.itemId, item.tipoItem, tenantId);
+      const disponibilidade = await this.consultarDisponibilidade(
+        {
+          itemId: item.itemId,
+          tipoItem: item.tipoItem,
+          quantidade: item.quantidade,
+          inicio,
+          fim,
+          emprestimoId: contexto.emprestimoId
+        },
+        tenantId
+      );
+
+      if (!disponibilidade.disponivel) {
+        throw new AppError(
+          `Item indisponivel para o periodo informado: ${item.tipoItem} ${item.itemId}.`,
+          409
+        );
+      }
+    }
+  }
+
   private async validarItemExiste(
     tx: TransactionClient,
     itemId: number,
@@ -1046,5 +1109,26 @@ export class EmprestimosEventosRepository {
         NOW()
       )
     `);
+  }
+
+  private validarTransicaoStatus(
+    statusAtual: StatusEmprestimoEvento,
+    proximoStatus: StatusEmprestimoEvento
+  ) {
+    if (statusAtual === proximoStatus) {
+      throw new AppError("O emprestimo ja esta com este status.", 409);
+    }
+
+    if (proximoStatus === "RETIRADO" && ["DEVOLVIDO", "CANCELADO"].includes(statusAtual)) {
+      throw new AppError("Nao e possivel confirmar retirada para emprestimo devolvido ou cancelado.", 409);
+    }
+
+    if (proximoStatus === "DEVOLVIDO" && statusAtual !== "RETIRADO") {
+      throw new AppError("A devolucao so pode ser confirmada apos a retirada.", 409);
+    }
+
+    if (proximoStatus === "CANCELADO" && ["DEVOLVIDO", "CANCELADO"].includes(statusAtual)) {
+      throw new AppError("Nao e possivel cancelar emprestimo devolvido ou ja cancelado.", 409);
+    }
   }
 }

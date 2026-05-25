@@ -1,6 +1,18 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.510",
+                        "releaseDate":  "2026-05-25",
+                        "title":  "Empréstimo para eventos com datas e reservas corrigidas",
+                        "description":  "A tela Empréstimo para eventos passou a manter datas e horários sem deslocamento e a proteger melhor o salvamento de itens e status.",
+                        "changes":  [
+                                        "O frontend e o backend passaram a tratar retirada, devolução, agenda e eventos com data e hora locais, evitando deslocamento por UTC ao reabrir empréstimos e consultar a agenda.",
+                                        "O salvamento do empréstimo agora revalida a disponibilidade no backend e consolida itens repetidos do mesmo cadastro para impedir reserva acima do disponível.",
+                                        "As ações de retirada, devolução e cancelamento passaram a invalidar a listagem corretamente na interface e a rejeitar transições incoerentes no backend.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ]
+                    },
+                    {
                         "version":  "1.00.509",
                         "releaseDate":  "2026-05-25",
                         "title":  "Renovação de documentos vencidos corrigida",

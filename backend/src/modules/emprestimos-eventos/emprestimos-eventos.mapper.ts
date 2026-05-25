@@ -5,9 +5,10 @@ import type {
   EventoEmprestimoRow,
   ResponsavelEmprestimoRow
 } from "./emprestimos-eventos.types.js";
+import { formatDateTimeLocal } from "./emprestimos-eventos-datetime.js";
 
 function toIsoDateTime(value?: Date | null) {
-  return value ? value.toISOString() : null;
+  return formatDateTimeLocal(value);
 }
 
 export function mapEventoEmprestimoToResponse(row: EventoEmprestimoRow) {
@@ -16,8 +17,8 @@ export function mapEventoEmprestimoToResponse(row: EventoEmprestimoRow) {
     titulo: row.titulo,
     descricao: row.descricao ?? null,
     local: row.local ?? null,
-    dataInicio: row.data_inicio.toISOString(),
-    dataFim: row.data_fim.toISOString(),
+    dataInicio: formatDateTimeLocal(row.data_inicio),
+    dataFim: formatDateTimeLocal(row.data_fim),
     status: row.status
   };
 }
@@ -46,8 +47,8 @@ export function mapEmprestimoToResponse(
       titulo: row.evento_titulo,
       descricao: row.evento_descricao ?? null,
       local: row.evento_local ?? null,
-      dataInicio: row.evento_data_inicio.toISOString(),
-      dataFim: row.evento_data_fim.toISOString(),
+      dataInicio: formatDateTimeLocal(row.evento_data_inicio),
+      dataFim: formatDateTimeLocal(row.evento_data_fim),
       status: row.evento_status
     },
     unidadeId: row.unidade_id ? Number(row.unidade_id) : null,
@@ -57,8 +58,8 @@ export function mapEmprestimoToResponse(
           nome: row.responsavel_nome ?? ""
         }
       : null,
-    dataRetiradaPrevista: row.data_retirada_prevista.toISOString(),
-    dataDevolucaoPrevista: row.data_devolucao_prevista.toISOString(),
+    dataRetiradaPrevista: formatDateTimeLocal(row.data_retirada_prevista),
+    dataDevolucaoPrevista: formatDateTimeLocal(row.data_devolucao_prevista),
     dataRetiradaReal: toIsoDateTime(row.data_retirada_real),
     dataDevolucaoReal: toIsoDateTime(row.data_devolucao_real),
     status: row.status,
@@ -74,7 +75,7 @@ export function mapMovimentacaoToResponse(row: EmprestimoEventoMovimentacaoRow) 
     acao: row.acao,
     descricao: row.descricao ?? null,
     usuarioId: row.usuario_id ? Number(row.usuario_id) : null,
-    criadoEm: row.criado_em.toISOString()
+    criadoEm: formatDateTimeLocal(row.criado_em)
   };
 }
 
@@ -86,7 +87,7 @@ export function mapResponsavelEmprestimoToResponse(row: ResponsavelEmprestimoRow
     telefone: row.telefone ?? null,
     email: row.email ?? null,
     observacoes: row.observacoes ?? null,
-    criadoEm: row.criado_em.toISOString(),
-    atualizadoEm: row.atualizado_em.toISOString()
+    criadoEm: formatDateTimeLocal(row.criado_em),
+    atualizadoEm: formatDateTimeLocal(row.atualizado_em)
   };
 }

@@ -357,6 +357,7 @@ const secoesManual: ManualSecao[] = [
           "Na aba Dados do empréstimo, selecione o evento, informe unidade, período, observações e o responsável pela retirada ou acompanhamento.",
           "Na aba Responsáveis, cadastre previamente os dados da pessoa que pode retirar os produtos, como nome, documento, telefone, e-mail e observações.",
           "Depois disso, na aba Dados do empréstimo, o campo Responsável passa a sugerir os nomes cadastrados na aba Responsáveis.",
+          "Ao abrir um empréstimo já cadastrado, o sistema agora reapresenta retirada, devolução, evento e agenda com a mesma data e hora salvas, sem deslocamento de fuso horário.",
           "Na aba Itens vinculados, digite o nome do item para localizar rapidamente patrimônio ou almoxarifado, depois informe quantidade e observação antes de adicionar.",
           "Ao imprimir a partir da aba Dados do empréstimo ou Itens vinculados, o sistema gera o termo de empréstimo no padrão de relatórios do G3N com dados do evento, responsável, período e itens.",
           "Na aba Agenda de empréstimos, consulte a ocupação por período e por dia para verificar reservas já programadas.",
@@ -365,6 +366,8 @@ const secoesManual: ManualSecao[] = [
         atencoes: [
           "Quando o navegador bloquear a janela dedicada de impressão, a tela usa a impressão da própria página como contingência, sem deixar a operação travada em tela em branco.",
           "O módulo passou a manter cadastro próprio de responsáveis para retirada, sem depender apenas da lista de usuários internos.",
+          "O backend agora revalida disponibilidade de itens no salvamento e bloqueia reserva acima do disponível, inclusive quando o mesmo item for informado mais de uma vez no mesmo empréstimo.",
+          "As ações de retirada, devolução e cancelamento passaram a respeitar transições válidas de status para evitar movimentações incoerentes.",
           "O cadastro do empréstimo mantém compatibilidade com bases antigas criando automaticamente as colunas e a tabela novas necessárias quando ainda não existirem.",
           "A tela Empréstimo para eventos agora lista, cadastra, atualiza e exclui empréstimos, agenda, eventos, responsáveis, itens vinculados e movimentações sempre dentro do tenant autenticado, impedindo mistura de reservas entre instituições."
         ]

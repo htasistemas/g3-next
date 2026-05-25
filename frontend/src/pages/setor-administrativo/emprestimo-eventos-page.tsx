@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { CalendarDays, ClipboardList, List, Plus, Printer, Save, Search, Trash2, Undo2, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,7 +26,13 @@ import {
 import { useItensAlmoxarifado } from "@/features/almoxarifado/use-almoxarifado";
 import { usePatrimonios } from "@/features/patrimonios/use-patrimonios";
 import { useUnidadesAssistenciais } from "@/features/unidades-assistenciais/use-unidades-assistenciais";
+import { formatarDataPtBr } from "@/lib/br-utils";
 import { imprimirConteudoAtual } from "@/lib/report-utils";
+import {
+  agoraLocalInputDateTime,
+  formatarDateTimeLocalPtBr,
+  normalizarDateTimeLocal
+} from "@/lib/emprestimos-eventos-datetime";
 import { emprestimosEventosService } from "@/services/emprestimos-eventos.service";
 import type {
   EmprestimoEvento,
@@ -92,9 +99,9 @@ const statusOpcoes: Array<{ value: StatusEmprestimoEvento; label: string }> = [
 
 const eventoStatusOpcoes = ["PLANEJADO", "EM_ANDAMENTO", "FINALIZADO", "CANCELADO"];
 
-const nowLocal = () => new Date().toISOString().slice(0, 16);
-const fmt = (v?: string | null) => (v ? v.replace("T", " ").slice(0, 16) : "---");
-const dt = (v?: string | null) => (v ? String(v).slice(0, 16) : "");
+const nowLocal = () => agoraLocalInputDateTime();
+const fmt = (v?: string | null) => formatarDateTimeLocalPtBr(v);
+const dt = (v?: string | null) => normalizarDateTimeLocal(v);
 
 const defaultForm = (): FormState => ({
   eventoId: "",
@@ -128,6 +135,7 @@ const defaultResponsavel: ResponsavelFormState = {
 export function EmprestimoEventosPage() {
   const navigate = useNavigate();
   const { usuario } = useAuth();
+  const queryClient = useQueryClient();
   const [abaAtiva, setAbaAtiva] = useState<AbaId>("listagem");
 
   const [fInicio, setFInicio] = useState("");
@@ -244,6 +252,10 @@ export function EmprestimoEventosPage() {
       setPopup({ tipo: "aviso", titulo: "Validação", texto: "Preencha evento e período do empréstimo." });
       return;
     }
+    if (form.dataDevolucaoPrevista < form.dataRetiradaPrevista) {
+      setPopup({ tipo: "aviso", titulo: "Validação", texto: "A devolução prevista não pode ser menor que a retirada." });
+      return;
+    }
     if (!form.itens.length) {
       setPopup({ tipo: "aviso", titulo: "Validação", texto: "Adicione ao menos um item no empréstimo." });
       return;
@@ -306,6 +318,7 @@ export function EmprestimoEventosPage() {
           : tipo === "DEVOLUCAO"
             ? await emprestimosEventosService.confirmarDevolucao(form.id, usuarioId)
             : await emprestimosEventosService.cancelar(form.id, usuarioId);
+      await queryClient.invalidateQueries({ queryKey: ["emprestimos-eventos"] });
       selecionarEmprestimo(resp);
       setPopup({ tipo: "sucesso", titulo: "Confirmação", texto: "Status atualizado com sucesso." });
     } catch (error: any) {
@@ -339,17 +352,36 @@ export function EmprestimoEventosPage() {
 
     setForm((atual) => ({
       ...atual,
-      itens: [
-        ...atual.itens,
-        {
-          itemId: Number(itemId),
-          tipoItem: itemTipo,
-          quantidade: Number(itemQtd),
-          statusItem: "RESERVADO",
-          observacaoItem: itemObs || undefined,
-          nomeItem: nomeItem ?? undefined
+      itens: (() => {
+        const indiceExistente = atual.itens.findIndex(
+          (item) => item.tipoItem === itemTipo && item.itemId === Number(itemId)
+        );
+
+        if (indiceExistente < 0) {
+          return [
+            ...atual.itens,
+            {
+              itemId: Number(itemId),
+              tipoItem: itemTipo,
+              quantidade: Number(itemQtd),
+              statusItem: "RESERVADO",
+              observacaoItem: itemObs || undefined,
+              nomeItem: nomeItem ?? undefined
+            }
+          ];
         }
-      ]
+
+        return atual.itens.map((item, indice) =>
+          indice === indiceExistente
+            ? {
+                ...item,
+                quantidade: item.quantidade + Number(itemQtd),
+                observacaoItem: [item.observacaoItem, itemObs].filter(Boolean).join(" | ") || undefined,
+                nomeItem: item.nomeItem ?? nomeItem ?? undefined
+              }
+            : item
+        );
+      })()
     }));
     setItemId("");
     setItemBusca("");
@@ -446,6 +478,10 @@ export function EmprestimoEventosPage() {
   async function salvarEvento() {
     if (!eventoForm.titulo.trim() || !eventoForm.dataInicio || !eventoForm.dataFim) {
       setPopup({ tipo: "aviso", titulo: "Validação", texto: "Preencha título e período do evento." });
+      return;
+    }
+    if (eventoForm.dataFim < eventoForm.dataInicio) {
+      setPopup({ tipo: "aviso", titulo: "Validação", texto: "O fim do evento não pode ser menor que o início." });
       return;
     }
     try {
@@ -592,7 +628,7 @@ export function EmprestimoEventosPage() {
               <div className="space-y-1"><Label>Devolução Prevista</Label><Input type="datetime-local" value={form.dataDevolucaoPrevista} onChange={(e) => setForm((a) => ({ ...a, dataDevolucaoPrevista: e.target.value }))} /></div>
               <div className="space-y-1 md:col-span-2 xl:col-span-4"><Label>Observações</Label><Textarea rows={2} value={form.observacoes} onChange={(e) => setForm((a) => ({ ...a, observacoes: e.target.value }))} /></div>
             </div>
-            <Card className="border-[var(--g3-border)]"><CardHeader className="pb-2"><CardTitle className="text-sm">Ações Rápidas</CardTitle></CardHeader><CardContent className="flex flex-wrap gap-2"><Button variant="outline" disabled={!form.id} onClick={() => void confirmarStatus("RETIRADA")}>Confirmar Retirada</Button><Button variant="outline" disabled={!form.id} onClick={() => void confirmarStatus("DEVOLUCAO")}>Confirmar Devolução</Button><Button variant="danger" disabled={!form.id} onClick={() => void confirmarStatus("CANCELAR")}>Cancelar Empréstimo</Button></CardContent></Card>
+            <Card className="border-[var(--g3-border)]"><CardHeader className="pb-2"><CardTitle className="text-sm">Ações Rápidas</CardTitle></CardHeader><CardContent className="flex flex-wrap gap-2"><Button variant="outline" disabled={!form.id || form.status === "RETIRADO" || form.status === "DEVOLVIDO" || form.status === "CANCELADO"} onClick={() => void confirmarStatus("RETIRADA")}>Confirmar Retirada</Button><Button variant="outline" disabled={!form.id || form.status !== "RETIRADO"} onClick={() => void confirmarStatus("DEVOLUCAO")}>Confirmar Devolução</Button><Button variant="danger" disabled={!form.id || form.status === "DEVOLVIDO" || form.status === "CANCELADO"} onClick={() => void confirmarStatus("CANCELAR")}>Cancelar Empréstimo</Button></CardContent></Card>
           </section>
         ) : null}
 
@@ -620,7 +656,7 @@ export function EmprestimoEventosPage() {
               <div className="space-y-1"><Label>Agenda Final</Label><Input type="date" value={agendaFim} onChange={(e) => setAgendaFim(e.target.value)} /></div>
               <div className="space-y-1 xl:col-span-2"><Label>Dia</Label><Input type="date" value={agendaDia} onChange={(e) => setAgendaDia(e.target.value)} /></div>
             </div>
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{agendaResumo.map((a) => <Card key={a.data} className="border-[var(--g3-border)]"><CardHeader className="pb-2"><CardTitle className="text-sm">{a.data}</CardTitle></CardHeader><CardContent className="text-sm">Empréstimos: {a.qtdEmprestimos}</CardContent></Card>)}</div>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{agendaResumo.map((a) => <Card key={a.data} className="border-[var(--g3-border)]"><CardHeader className="pb-2"><CardTitle className="text-sm">{formatarDataPtBr(a.data)}</CardTitle></CardHeader><CardContent className="text-sm">Empréstimos: {a.qtdEmprestimos}</CardContent></Card>)}</div>
             <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]"><table className="min-w-full text-sm"><thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"><tr><th className="px-3 py-2 text-left">Empréstimo</th><th className="px-3 py-2 text-left">Evento</th><th className="px-3 py-2 text-left">Período</th><th className="px-3 py-2 text-left">Status</th></tr></thead><tbody>{agendaDetalhe.length ? agendaDetalhe.map((a, i) => <tr key={`${a.emprestimoId}-${i}`} className={`border-t border-[var(--g3-border)] ${i % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35"}`}><td className="px-3 py-2">#{a.emprestimoId}</td><td className="px-3 py-2">{a.evento.titulo}</td><td className="px-3 py-2">{fmt(a.periodo.retiradaPrevista)} a {fmt(a.periodo.devolucaoPrevista)}</td><td className="px-3 py-2">{a.status}</td></tr>) : <tr><td colSpan={4} className="px-3 py-4 text-center">Nenhum empréstimo para a data selecionada.</td></tr>}</tbody></table></div>
           </section>
         ) : null}

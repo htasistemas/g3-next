@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.509",
+  "latestVersion": "1.00.510",
   "releaseDate": "2026-05-25",
-  "description": "A gestão de documentos passou a renovar corretamente documentos vencidos respeitando a data de validade informada no cadastro e nos alertas da tela.",
+  "description": "A tela Empréstimo para eventos passou a preservar horários corretamente, revalidar disponibilidade no salvamento e bloquear transições inválidas de status.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.509",
+  "minCompatibleVersion": "1.00.510",
   "releaseType": "stable",
   "downloadUrl": null
 }
