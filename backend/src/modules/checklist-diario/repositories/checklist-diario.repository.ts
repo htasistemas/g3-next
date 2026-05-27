@@ -28,6 +28,11 @@ type ChecklistScope = {
   usuarioId?: number;
 };
 
+const CHECKLIST_GERACAO_SEMANA_TRANSACTION_OPTIONS = {
+  maxWait: 10_000,
+  timeout: 120_000
+} as const;
+
 function startOfWeek(date: Date) {
   const copy = new Date(date);
   copy.setHours(0, 0, 0, 0);
@@ -397,6 +402,7 @@ export class ChecklistDiarioRepository {
               NOW(),
               NOW()
             )
+            ON CONFLICT DO NOTHING
             RETURNING id
           `);
 
@@ -425,7 +431,7 @@ export class ChecklistDiarioRepository {
         semanaInicio: semanaInicio.toISOString().slice(0, 10),
         totalGerado: geradas
       };
-    });
+    }, CHECKLIST_GERACAO_SEMANA_TRANSACTION_OPTIONS);
   }
 
   private async garantirSemanaAtualGerada(

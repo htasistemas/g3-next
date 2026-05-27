@@ -57,6 +57,55 @@ export const reportsService = {
     return data as Blob;
   },
 
+  async gerarRelacaoLivrosBiblioteca(payload: Record<string, unknown>) {
+    const { data } = await httpClient.post("/api/reports/biblioteca/livros/relacao", payload, {
+      responseType: "blob"
+    });
+    return data as Blob;
+  },
+
+  async gerarFichaLivroBiblioteca(payload: { livroId: string; usuarioEmissor?: string }) {
+    const { data } = await httpClient.post("/api/reports/biblioteca/livros/ficha", payload, {
+      responseType: "blob"
+    });
+    return data as Blob;
+  },
+
+  async gerarRelacaoEmprestimosBiblioteca(payload: Record<string, unknown>) {
+    const { data } = await httpClient.post("/api/reports/biblioteca/emprestimos/relacao", payload, {
+      responseType: "blob"
+    });
+    return data as Blob;
+  },
+
+  async gerarDevolucoesPendentesBiblioteca(payload: Record<string, unknown>) {
+    const { data } = await httpClient.post("/api/reports/biblioteca/devolucoes/pendentes", payload, {
+      responseType: "blob"
+    });
+    return data as Blob;
+  },
+
+  async gerarLivrosDisponiveisBiblioteca(payload: Record<string, unknown>) {
+    const { data } = await httpClient.post("/api/reports/biblioteca/livros/disponiveis", payload, {
+      responseType: "blob"
+    });
+    return data as Blob;
+  },
+
+  async gerarAlertasBiblioteca(payload: Record<string, unknown>) {
+    const { data } = await httpClient.post("/api/reports/biblioteca/alertas/devolucao", payload, {
+      responseType: "blob"
+    });
+    return data as Blob;
+  },
+
+  async gerarPainelBiblioteca(payload: Record<string, unknown>) {
+    const { data } = await httpClient.post("/api/reports/biblioteca/painel", payload, {
+      responseType: "blob"
+    });
+    return data as Blob;
+  },
+
   async gerarRelacaoMatriculas(payload: Record<string, unknown>) {
     const { data } = await httpClient.post("/api/reports/matriculas/relacao", payload, {
       responseType: "blob"

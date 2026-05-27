@@ -1,4 +1,5 @@
 import { BeneficiarioService } from "../../beneficiarios/services/beneficiario.service.js";
+import { BibliotecaService } from "../../biblioteca/services/biblioteca.service.js";
 import { ProfissionalService } from "../../profissionais/services/profissional.service.js";
 import { MatriculaService } from "../../matriculas/services/matricula.service.js";
 import { RegistroDoacaoService } from "../../registro-doacao/services/registro-doacao.service.js";
@@ -19,6 +20,10 @@ import { HtmlPdfRenderer } from "./html-pdf-renderer.js";
 import {
   beneficiarioFichaRequestSchema,
   beneficiarioRelacaoRequestSchema,
+  bibliotecaEmprestimoRelacaoRequestSchema,
+  bibliotecaLivroFichaRequestSchema,
+  bibliotecaLivroRelacaoRequestSchema,
+  bibliotecaRelatorioRequestSchema,
   comprovanteMatriculaRequestSchema,
   comprovantePreMatriculaEsperaRequestSchema,
   doacaoRealizadaReciboRequestSchema,
@@ -53,9 +58,11 @@ type AuthUser = {
 type BeneficiarioFicha = Awaited<ReturnType<BeneficiarioService["buscarPorId"]>>;
 type ProfissionalFicha = Awaited<ReturnType<ProfissionalService["buscarPorId"]>>;
 type VoluntarioFicha = Awaited<ReturnType<VoluntarioService["buscarPorId"]>>;
+type BibliotecaLivroFicha = Awaited<ReturnType<BibliotecaService["listarLivros"]>>[number];
 
 export class ReportsService {
   private readonly beneficiarioService = new BeneficiarioService();
+  private readonly bibliotecaService = new BibliotecaService();
   private readonly profissionalService = new ProfissionalService();
   private readonly matriculaService = new MatriculaService();
   private readonly registroDoacaoService = new RegistroDoacaoService();
@@ -225,7 +232,7 @@ export class ReportsService {
     return [
       {
         rotulo: "Data",
-        valor: this.dateFormatter.format(agora)
+        valor: this.dateFormatter.format(agora).replaceAll("/", "-")
       },
       {
         rotulo: "Hora",
@@ -383,7 +390,7 @@ export class ReportsService {
   private montarBlocosFichaProfissional(profissional: ProfissionalFicha): RelatorioBloco[] {
     return [
       this.blocoComCampos(
-        "Identificacao do profissional",
+        "Identificação do profissional",
         2,
         [
           this.campoPreenchido("Nome completo", profissional.nome_completo),
@@ -393,23 +400,23 @@ export class ReportsService {
       ),
       this.blocoComCampos("Dados pessoais", 3, [
         this.campoPreenchido("CPF", profissional.cpf),
-        this.campoPreenchido("Data de nascimento", this.formatarData(profissional.data_nascimento)),
+        this.campoPreenchido("Data de nascimento", this.formatarDataComHifen(profissional.data_nascimento)),
         this.campoPreenchido("Sexo", this.formatarValorEnumerado(profissional.sexo_biologico)),
         this.campoPreenchido("Estado civil", this.formatarValorEnumerado(profissional.estado_civil)),
         this.campoPreenchido("Nacionalidade", profissional.nacionalidade),
         this.campoPreenchido("Naturalidade (cidade)", profissional.naturalidade_cidade),
         this.campoPreenchido("Naturalidade (UF)", profissional.naturalidade_uf),
-        this.campoPreenchido("Nome da mae", profissional.nome_mae),
+        this.campoPreenchido("Nome da mãe", profissional.nome_mae),
         this.campoPreenchido("Nome do pai", profissional.nome_pai)
       ]),
       this.blocoComCampos("Perfil profissional", 3, [
-        this.campoPreenchido("Vinculo", profissional.vinculo),
+        this.campoPreenchido("Vínculo", profissional.vinculo),
         this.campoPreenchido("Especialidade", profissional.especialidade),
         this.campoPreenchido("Registro conselho", profissional.registro_conselho),
         this.campoPreenchido("Status", this.formatarStatus(profissional.status)),
         this.campoPreenchido("Unidade", profissional.unidade),
         this.campoPreenchido("Sala de atendimento", profissional.sala_atendimento),
-        this.campoPreenchido("Carga horaria", profissional.carga_horaria),
+        this.campoPreenchido("Carga horária", profissional.carga_horaria),
         this.campoPreenchido(
           "Disponibilidade",
           profissional.disponibilidade?.length ? profissional.disponibilidade.join(", ") : undefined
@@ -421,25 +428,25 @@ export class ReportsService {
             : undefined
         )
       ]),
-      this.blocoComCampos("Contato e endereco", 3, [
+      this.blocoComCampos("Contato e endereço", 3, [
         this.campoPreenchido("E-mail", profissional.email),
         this.campoPreenchido("Telefone", profissional.telefone),
         this.campoPreenchido("CEP", profissional.cep),
-        this.campoPreenchido("Endereco", profissional.logradouro),
-        this.campoPreenchido("Numero", profissional.numero),
+        this.campoPreenchido("Endereço", profissional.logradouro),
+        this.campoPreenchido("Número", profissional.numero),
         this.campoPreenchido("Complemento", profissional.complemento),
         this.campoPreenchido("Bairro", profissional.bairro),
-        this.campoPreenchido("Ponto de referencia", profissional.ponto_referencia),
-        this.campoPreenchido("Municipio", profissional.municipio),
+        this.campoPreenchido("Ponto de referência", profissional.ponto_referencia),
+        this.campoPreenchido("Município", profissional.municipio),
         this.campoPreenchido("UF", profissional.uf)
       ]),
-      this.blocoComCampos("Observacoes", 1, [
+      this.blocoComCampos("Observações", 1, [
         this.campoPreenchido("Resumo", profissional.resumo),
         this.campoPreenchido(
           "Tags",
           profissional.tags?.length ? profissional.tags.join(", ") : undefined
         ),
-        this.campoPreenchido("Observacoes internas", profissional.observacoes)
+        this.campoPreenchido("Observações internas", profissional.observacoes)
       ])
     ].filter((bloco): bloco is RelatorioBloco => !!bloco);
   }
@@ -447,7 +454,7 @@ export class ReportsService {
   private montarBlocosFichaVoluntario(voluntario: VoluntarioFicha): RelatorioBloco[] {
     return [
       this.blocoComCampos(
-        "Identificacao do voluntario",
+        "Identificação do voluntário",
         2,
         [
           this.campoPreenchido("Nome completo", voluntario.nome_completo),
@@ -457,31 +464,31 @@ export class ReportsService {
       ),
       this.blocoComCampos("Dados pessoais", 3, [
         this.campoPreenchido("RG", voluntario.rg),
-        this.campoPreenchido("Data de nascimento", this.formatarData(voluntario.data_nascimento)),
-        this.campoPreenchido("Genero", voluntario.genero),
-        this.campoPreenchido("Profissao", voluntario.profissao),
+        this.campoPreenchido("Data de nascimento", this.formatarDataComHifen(voluntario.data_nascimento)),
+        this.campoPreenchido("Gênero", voluntario.genero),
+        this.campoPreenchido("Profissão", voluntario.profissao),
         this.campoPreenchido("Status", this.formatarStatus(voluntario.status)),
         this.campoPreenchido("Profissional vinculado", voluntario.profissional_nome),
         this.campoPreenchido("Categoria profissional", voluntario.profissional_categoria),
-        this.campoPreenchido("Inicio previsto", this.formatarData(voluntario.inicio_previsto))
+        this.campoPreenchido("Início previsto", this.formatarDataComHifen(voluntario.inicio_previsto))
       ]),
       this.blocoComCampos("Contato", 3, [
         this.campoPreenchido("E-mail", voluntario.email),
         this.campoPreenchido("Telefone", voluntario.telefone),
         this.campoPreenchido("Cidade", voluntario.cidade),
         this.campoPreenchido("Estado", voluntario.estado),
-        this.campoPreenchido("Area de interesse", voluntario.area_interesse),
+        this.campoPreenchido("Área de interesse", voluntario.area_interesse),
         this.campoPreenchido("Idiomas", voluntario.idiomas),
         this.campoPreenchido("LinkedIn", voluntario.linkedin)
       ]),
-      this.blocoComCampos("Endereco", 3, [
+      this.blocoComCampos("Endereço", 3, [
         this.campoPreenchido("CEP", voluntario.cep),
-        this.campoPreenchido("Endereco", voluntario.logradouro),
-        this.campoPreenchido("Numero", voluntario.numero),
+        this.campoPreenchido("Endereço", voluntario.logradouro),
+        this.campoPreenchido("Número", voluntario.numero),
         this.campoPreenchido("Complemento", voluntario.complemento),
         this.campoPreenchido("Bairro", voluntario.bairro),
-        this.campoPreenchido("Ponto de referencia", voluntario.ponto_referencia),
-        this.campoPreenchido("Municipio", voluntario.municipio),
+        this.campoPreenchido("Ponto de referência", voluntario.ponto_referencia),
+        this.campoPreenchido("Município", voluntario.municipio),
         this.campoPreenchido("UF", voluntario.uf),
         this.campoPreenchido("Zona", voluntario.zona),
         this.campoPreenchido("Subzona", voluntario.subzona)
@@ -494,27 +501,61 @@ export class ReportsService {
             : undefined
         ),
         this.campoPreenchido(
-          "Periodos",
+          "Períodos",
           voluntario.disponibilidade_periodos?.length
             ? voluntario.disponibilidade_periodos.join(", ")
             : undefined
         ),
-        this.campoPreenchido("Carga horaria semanal", voluntario.carga_horaria_semanal),
+        this.campoPreenchido("Carga horária semanal", voluntario.carga_horaria_semanal),
         this.campoPreenchido("Presencial", this.formatarSimNao(voluntario.presencial)),
         this.campoPreenchido("Remoto", this.formatarSimNao(voluntario.remoto))
       ]),
-      this.blocoComCampos("Termos e observacoes", 1, [
+      this.blocoComCampos("Termos e observações", 1, [
         this.campoPreenchido("Aceite voluntariado", this.formatarSimNao(voluntario.aceite_voluntariado)),
         this.campoPreenchido("Aceite imagem", this.formatarSimNao(voluntario.aceite_imagem)),
-        this.campoPreenchido("Motivacao", voluntario.motivacao),
+        this.campoPreenchido("Motivação", voluntario.motivacao),
         this.campoPreenchido("Habilidades", voluntario.habilidades),
-        this.campoPreenchido("Observacoes", voluntario.observacoes),
-        this.campoPreenchido("Documento identificacao", voluntario.documento_identificacao),
-        this.campoPreenchido("Comprovante endereco", voluntario.comprovante_endereco),
+        this.campoPreenchido("Observações", voluntario.observacoes),
+        this.campoPreenchido("Documento de identificação", voluntario.documento_identificacao),
+        this.campoPreenchido("Comprovante de endereço", voluntario.comprovante_endereco),
         this.campoPreenchido("Assinatura digital", voluntario.assinatura_digital)
       ])
     ].filter((bloco): bloco is RelatorioBloco => !!bloco);
   }
+
+  private montarBlocosFichaLivroBiblioteca(livro: BibliotecaLivroFicha): RelatorioBloco[] {
+    return [
+      this.blocoComCampos(
+        "Identificação do livro",
+        2,
+        [
+          this.campoPreenchido("Código", livro.codigo),
+          this.campoPreenchido("Título", livro.titulo),
+          this.campoPreenchido("Autor", livro.autor),
+          this.campoPreenchido("ISBN", livro.isbn)
+        ],
+        true
+      ),
+      this.blocoComCampos("Dados editoriais", 3, [
+        this.campoPreenchido("Editora", livro.editora),
+        this.campoPreenchido("Ano de publicação", livro.anoPublicacao),
+        this.campoPreenchido("Categoria", livro.categoria),
+        this.campoPreenchido("Estado do livro", livro.estadoLivro),
+        this.campoPreenchido("Status", this.formatarStatus(livro.status))
+      ]),
+      this.blocoComCampos("Controle do acervo", 3, [
+        this.campoPreenchido("Localização", livro.localizacao),
+        this.campoPreenchido("Quantidade total", livro.quantidadeTotal),
+        this.campoPreenchido("Quantidade disponível", livro.quantidadeDisponivel),
+        this.campoPreenchido("Cadastrado em", this.formatarDataComHifen(livro.criadoEm)),
+        this.campoPreenchido("Atualizado em", this.formatarDataComHifen(livro.atualizadoEm))
+      ]),
+      this.blocoComCampos("Observações", 1, [
+        this.campoPreenchido("Observações", livro.observacoes)
+      ])
+    ].filter((bloco): bloco is RelatorioBloco => !!bloco);
+  }
+
   async gerarRelacaoBeneficiarios(rawPayload: unknown, authUser?: AuthUser): Promise<RelatorioResultado> {
     const payload = beneficiarioRelacaoRequestSchema.parse(rawPayload);
     const tenantId = this.parseTenant(authUser?.tenant_id);
@@ -591,7 +632,7 @@ export class ReportsService {
       status: payload.status,
       cpf: payload.cpf,
       vinculo: payload.vinculo
-    });
+    }, authUser?.tenant_id);
 
     const listaOrdenada = [...profissionais].sort((a, b) =>
       (a.nome_completo || "").toLowerCase().localeCompare((b.nome_completo || "").toLowerCase())
@@ -599,9 +640,9 @@ export class ReportsService {
 
     const contexto = await this.montarContextoInstitucional(authUser?.tenant_id);
     const relatorioInput: RelatorioHtmlInput = {
-      titulo: "Relacao de Profissionais",
+      titulo: "Relação de profissionais",
       metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),
-      descricao: "Relacao de profissionais cadastrados no sistema G3-Next.",
+      descricao: "Relação de profissionais cadastrados no sistema G3-Next.",
       tabela: {
         colunas: [
           { titulo: "Nome", largura: "30%" },
@@ -631,11 +672,11 @@ export class ReportsService {
 
   async gerarFichaProfissional(rawPayload: unknown, authUser?: AuthUser): Promise<RelatorioResultado> {
     const payload = profissionalFichaRequestSchema.parse(rawPayload);
-    const profissional = await this.profissionalService.buscarPorId(payload.profissionalId);
+    const profissional = await this.profissionalService.buscarPorId(payload.profissionalId, authUser?.tenant_id);
     const contexto = await this.montarContextoInstitucional(authUser?.tenant_id);
 
     const relatorioInput: RelatorioHtmlInput = {
-      titulo: "Ficha Cadastral de Profissional",
+      titulo: "Ficha cadastral de profissional",
       metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),
       fotoUrl: profissional.foto_3x4,
       blocos: this.montarBlocosFichaProfissional(profissional),
@@ -655,7 +696,7 @@ export class ReportsService {
       cpf: payload.cpf,
       status: payload.status,
       email: payload.email
-    });
+    }, authUser?.tenant_id);
 
     const listaOrdenada = [...voluntarios].sort((a, b) =>
       (a.nome_completo || "").toLowerCase().localeCompare((b.nome_completo || "").toLowerCase())
@@ -663,15 +704,15 @@ export class ReportsService {
 
     const contexto = await this.montarContextoInstitucional(authUser?.tenant_id);
     const relatorioInput: RelatorioHtmlInput = {
-      titulo: "Relacao de Voluntarios",
+      titulo: "Relação de voluntários",
       metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),
-      descricao: "Relacao de voluntarios cadastrados no sistema G3-Next.",
+      descricao: "Relação de voluntários cadastrados no sistema G3-Next.",
       tabela: {
         colunas: [
           { titulo: "Nome", largura: "30%" },
           { titulo: "CPF", largura: "14%" },
           { titulo: "E-mail", largura: "24%" },
-          { titulo: "Profissao", largura: "16%" },
+          { titulo: "Profissão", largura: "16%" },
           { titulo: "Status", largura: "8%" },
           { titulo: "Telefone", largura: "8%" }
         ],
@@ -1157,11 +1198,11 @@ export class ReportsService {
 
   async gerarFichaVoluntario(rawPayload: unknown, authUser?: AuthUser): Promise<RelatorioResultado> {
     const payload = voluntarioFichaRequestSchema.parse(rawPayload);
-    const voluntario = await this.voluntarioService.buscarPorId(payload.voluntarioId);
+    const voluntario = await this.voluntarioService.buscarPorId(payload.voluntarioId, authUser?.tenant_id);
     const contexto = await this.montarContextoInstitucional(authUser?.tenant_id);
 
     const relatorioInput: RelatorioHtmlInput = {
-      titulo: "Ficha Cadastral de Voluntario",
+      titulo: "Ficha cadastral de voluntário",
       metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),
       fotoUrl: voluntario.foto_3x4,
       blocos: this.montarBlocosFichaVoluntario(voluntario),
@@ -1172,6 +1213,258 @@ export class ReportsService {
     const html = this.template.montarHtml(relatorioInput);
     const pdf = await this.renderer.render(html, contexto.rodape, relatorioInput);
     return { html, pdf, filename: "ficha-voluntario.pdf" };
+  }
+
+  async gerarRelacaoLivrosBiblioteca(rawPayload: unknown, authUser?: AuthUser): Promise<RelatorioResultado> {
+    const payload = bibliotecaLivroRelacaoRequestSchema.parse(rawPayload);
+    const tenantId = this.parseTenant(authUser?.tenant_id);
+    const termo = payload.termo?.toLocaleLowerCase("pt-BR");
+    const livros = (await this.bibliotecaService.listarLivros(tenantId))
+      .filter((livro) => {
+        if (!termo) return true;
+        return [livro.codigo, livro.titulo, livro.autor, livro.isbn, livro.categoria]
+          .filter(Boolean)
+          .join(" ")
+          .toLocaleLowerCase("pt-BR")
+          .includes(termo);
+      })
+      .sort((a, b) => a.titulo.localeCompare(b.titulo, "pt-BR"));
+    const contexto = await this.montarContextoInstitucional(tenantId);
+    const relatorioInput: RelatorioHtmlInput = {
+      titulo: "Relação do acervo da biblioteca",
+      metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),
+      descricao: "Relação de livros cadastrados no acervo da biblioteca.",
+      tabela: {
+        colunas: [
+          { titulo: "Código", largura: "11%" },
+          { titulo: "Título", largura: "27%" },
+          { titulo: "Autor", largura: "22%" },
+          { titulo: "Categoria", largura: "17%" },
+          { titulo: "Disponíveis", largura: "12%" },
+          { titulo: "Status", largura: "11%" }
+        ],
+        linhas: livros.map((livro) => [
+          livro.codigo || "---",
+          livro.titulo || "---",
+          livro.autor || "---",
+          livro.categoria || "---",
+          String(livro.quantidadeDisponivel),
+          this.formatarStatus(livro.status)
+        ])
+      },
+      cabecalho: contexto.cabecalho,
+      rodape: contexto.rodape
+    };
+
+    const html = this.template.montarHtml(relatorioInput);
+    const pdf = await this.renderer.render(html, contexto.rodape, relatorioInput);
+    return { html, pdf, filename: "relacao-acervo-biblioteca.pdf" };
+  }
+
+  async gerarFichaLivroBiblioteca(rawPayload: unknown, authUser?: AuthUser): Promise<RelatorioResultado> {
+    const payload = bibliotecaLivroFichaRequestSchema.parse(rawPayload);
+    const tenantId = this.parseTenant(authUser?.tenant_id);
+    const livro = (await this.bibliotecaService.listarLivros(tenantId)).find((item) => item.id === payload.livroId);
+    if (!livro) {
+      throw new AppError("Livro nao encontrado.", 404);
+    }
+
+    const contexto = await this.montarContextoInstitucional(tenantId);
+    const relatorioInput: RelatorioHtmlInput = {
+      titulo: "Cadastro do livro",
+      metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),
+      fotoUrl: livro.capaUrl,
+      fotoAjuste: "contain",
+      blocos: this.montarBlocosFichaLivroBiblioteca(livro),
+      cabecalho: contexto.cabecalho,
+      rodape: contexto.rodape
+    };
+
+    const html = this.template.montarHtml(relatorioInput);
+    const pdf = await this.renderer.render(html, contexto.rodape, relatorioInput);
+    return { html, pdf, filename: "cadastro-livro-biblioteca.pdf" };
+  }
+
+  async gerarRelacaoEmprestimosBiblioteca(rawPayload: unknown, authUser?: AuthUser): Promise<RelatorioResultado> {
+    const payload = bibliotecaEmprestimoRelacaoRequestSchema.parse(rawPayload);
+    const tenantId = this.parseTenant(authUser?.tenant_id);
+    const termo = payload.termo?.toLocaleLowerCase("pt-BR");
+    const emprestimos = (await this.bibliotecaService.listarEmprestimos(tenantId)).filter((item) => {
+      if (!termo) return true;
+      return [item.livroTitulo, item.livroCodigo, item.beneficiarioNome, item.responsavelNome]
+        .filter(Boolean)
+        .join(" ")
+        .toLocaleLowerCase("pt-BR")
+        .includes(termo);
+    });
+    const contexto = await this.montarContextoInstitucional(tenantId);
+    const relatorioInput: RelatorioHtmlInput = {
+      titulo: "Relação de empréstimos da biblioteca",
+      metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),
+      descricao: "Relação de movimentações de empréstimo registradas na biblioteca.",
+      tabela: {
+        colunas: [
+          { titulo: "Livro", largura: "25%" },
+          { titulo: "Beneficiário", largura: "23%" },
+          { titulo: "Empréstimo", largura: "15%" },
+          { titulo: "Devolução prevista", largura: "20%" },
+          { titulo: "Status", largura: "17%" }
+        ],
+        linhas: emprestimos.map((item) => [
+          item.livroTitulo || "---",
+          item.beneficiarioNome || "---",
+          this.formatarDataComHifen(item.dataEmprestimo),
+          this.formatarDataComHifen(item.dataDevolucaoPrevista),
+          this.formatarStatus(item.status)
+        ])
+      },
+      cabecalho: contexto.cabecalho,
+      rodape: contexto.rodape
+    };
+
+    const html = this.template.montarHtml(relatorioInput);
+    const pdf = await this.renderer.render(html, contexto.rodape, relatorioInput);
+    return { html, pdf, filename: "relacao-emprestimos-biblioteca.pdf" };
+  }
+
+  async gerarDevolucoesPendentesBiblioteca(rawPayload: unknown, authUser?: AuthUser): Promise<RelatorioResultado> {
+    const payload = bibliotecaRelatorioRequestSchema.parse(rawPayload);
+    const tenantId = this.parseTenant(authUser?.tenant_id);
+    const emprestimos = (await this.bibliotecaService.listarEmprestimos(tenantId)).filter(
+      (item) => item.status === "ATIVO" || item.status === "ATRASADO"
+    );
+    const contexto = await this.montarContextoInstitucional(tenantId);
+    const relatorioInput: RelatorioHtmlInput = {
+      titulo: "Devoluções pendentes da biblioteca",
+      metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),
+      descricao: "Relação de empréstimos que aguardam devolução.",
+      tabela: {
+        colunas: [
+          { titulo: "Livro", largura: "30%" },
+          { titulo: "Beneficiário", largura: "30%" },
+          { titulo: "Data prevista", largura: "20%" },
+          { titulo: "Status", largura: "20%" }
+        ],
+        linhas: emprestimos.map((item) => [
+          item.livroTitulo || "---",
+          item.beneficiarioNome || "---",
+          this.formatarDataComHifen(item.dataDevolucaoPrevista),
+          this.formatarStatus(item.status)
+        ])
+      },
+      cabecalho: contexto.cabecalho,
+      rodape: contexto.rodape
+    };
+
+    const html = this.template.montarHtml(relatorioInput);
+    const pdf = await this.renderer.render(html, contexto.rodape, relatorioInput);
+    return { html, pdf, filename: "devolucoes-pendentes-biblioteca.pdf" };
+  }
+
+  async gerarLivrosDisponiveisBiblioteca(rawPayload: unknown, authUser?: AuthUser): Promise<RelatorioResultado> {
+    const payload = bibliotecaRelatorioRequestSchema.parse(rawPayload);
+    const tenantId = this.parseTenant(authUser?.tenant_id);
+    const livros = (await this.bibliotecaService.listarLivros(tenantId)).filter(
+      (item) => item.status === "ATIVO" && item.quantidadeDisponivel > 0
+    );
+    const contexto = await this.montarContextoInstitucional(tenantId);
+    const relatorioInput: RelatorioHtmlInput = {
+      titulo: "Livros disponíveis na biblioteca",
+      metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),
+      descricao: "Relação de livros disponíveis para novos empréstimos.",
+      tabela: {
+        colunas: [
+          { titulo: "Código", largura: "16%" },
+          { titulo: "Título", largura: "35%" },
+          { titulo: "Autor", largura: "31%" },
+          { titulo: "Disponíveis", largura: "18%" }
+        ],
+        linhas: livros.map((item) => [
+          item.codigo || "---",
+          item.titulo || "---",
+          item.autor || "---",
+          String(item.quantidadeDisponivel)
+        ])
+      },
+      cabecalho: contexto.cabecalho,
+      rodape: contexto.rodape
+    };
+
+    const html = this.template.montarHtml(relatorioInput);
+    const pdf = await this.renderer.render(html, contexto.rodape, relatorioInput);
+    return { html, pdf, filename: "livros-disponiveis-biblioteca.pdf" };
+  }
+
+  async gerarAlertasBiblioteca(rawPayload: unknown, authUser?: AuthUser): Promise<RelatorioResultado> {
+    const payload = bibliotecaRelatorioRequestSchema.parse(rawPayload);
+    const tenantId = this.parseTenant(authUser?.tenant_id);
+    const alertas = await this.bibliotecaService.listarAlertas(tenantId);
+    const contexto = await this.montarContextoInstitucional(tenantId);
+    const relatorioInput: RelatorioHtmlInput = {
+      titulo: "Alertas de devolução da biblioteca",
+      metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),
+      descricao: "Acompanhamento dos prazos de devolução de livros.",
+      tabela: {
+        colunas: [
+          { titulo: "Livro", largura: "30%" },
+          { titulo: "Beneficiário", largura: "25%" },
+          { titulo: "Data prevista", largura: "19%" },
+          { titulo: "Dias", largura: "10%" },
+          { titulo: "Status", largura: "16%" }
+        ],
+        linhas: alertas.map((item) => [
+          item.livroTitulo || "---",
+          item.beneficiarioNome || "---",
+          this.formatarDataComHifen(item.dataDevolucaoPrevista),
+          String(item.diasParaVencimento),
+          this.formatarStatus(item.status)
+        ])
+      },
+      cabecalho: contexto.cabecalho,
+      rodape: contexto.rodape
+    };
+
+    const html = this.template.montarHtml(relatorioInput);
+    const pdf = await this.renderer.render(html, contexto.rodape, relatorioInput);
+    return { html, pdf, filename: "alertas-devolucao-biblioteca.pdf" };
+  }
+
+  async gerarPainelBiblioteca(rawPayload: unknown, authUser?: AuthUser): Promise<RelatorioResultado> {
+    const payload = bibliotecaRelatorioRequestSchema.parse(rawPayload);
+    const tenantId = this.parseTenant(authUser?.tenant_id);
+    const [livros, emprestimos, alertas] = await Promise.all([
+      this.bibliotecaService.listarLivros(tenantId),
+      this.bibliotecaService.listarEmprestimos(tenantId),
+      this.bibliotecaService.listarAlertas(tenantId)
+    ]);
+    const totalExemplares = livros.reduce((total, item) => total + item.quantidadeTotal, 0);
+    const disponiveis = livros.reduce((total, item) => total + item.quantidadeDisponivel, 0);
+    const contexto = await this.montarContextoInstitucional(tenantId);
+    const relatorioInput: RelatorioHtmlInput = {
+      titulo: "Painel da biblioteca",
+      metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),
+      descricao: "Resumo operacional do acervo e dos empréstimos.",
+      tabela: {
+        colunas: [
+          { titulo: "Indicador", largura: "70%" },
+          { titulo: "Valor", largura: "30%" }
+        ],
+        linhas: [
+          ["Títulos cadastrados", String(livros.length)],
+          ["Exemplares", String(totalExemplares)],
+          ["Exemplares disponíveis", String(disponiveis)],
+          ["Empréstimos ativos", String(emprestimos.filter((item) => item.status === "ATIVO").length)],
+          ["Empréstimos atrasados", String(emprestimos.filter((item) => item.status === "ATRASADO").length)],
+          ["Alertas", String(alertas.length)]
+        ]
+      },
+      cabecalho: contexto.cabecalho,
+      rodape: contexto.rodape
+    };
+
+    const html = this.template.montarHtml(relatorioInput);
+    const pdf = await this.renderer.render(html, contexto.rodape, relatorioInput);
+    return { html, pdf, filename: "painel-biblioteca.pdf" };
   }
 
   async gerarTermoAutorizacao(rawPayload: unknown, authUser?: AuthUser): Promise<RelatorioResultado> {

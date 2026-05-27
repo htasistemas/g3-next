@@ -70,6 +70,48 @@ export class ReportsController {
     return responderRelatorio(response, resultado, formato);
   }
 
+  async relacaoLivrosBiblioteca(request: AuthenticatedRequest, response: Response) {
+    const formato = formatoRelatorioSchema.parse(request.query.formato);
+    const resultado = await service.gerarRelacaoLivrosBiblioteca(request.body, request.authUser);
+    return responderRelatorio(response, resultado, formato);
+  }
+
+  async fichaLivroBiblioteca(request: AuthenticatedRequest, response: Response) {
+    const formato = formatoRelatorioSchema.parse(request.query.formato);
+    const resultado = await service.gerarFichaLivroBiblioteca(request.body, request.authUser);
+    return responderRelatorio(response, resultado, formato);
+  }
+
+  async relacaoEmprestimosBiblioteca(request: AuthenticatedRequest, response: Response) {
+    const formato = formatoRelatorioSchema.parse(request.query.formato);
+    const resultado = await service.gerarRelacaoEmprestimosBiblioteca(request.body, request.authUser);
+    return responderRelatorio(response, resultado, formato);
+  }
+
+  async devolucoesPendentesBiblioteca(request: AuthenticatedRequest, response: Response) {
+    const formato = formatoRelatorioSchema.parse(request.query.formato);
+    const resultado = await service.gerarDevolucoesPendentesBiblioteca(request.body, request.authUser);
+    return responderRelatorio(response, resultado, formato);
+  }
+
+  async livrosDisponiveisBiblioteca(request: AuthenticatedRequest, response: Response) {
+    const formato = formatoRelatorioSchema.parse(request.query.formato);
+    const resultado = await service.gerarLivrosDisponiveisBiblioteca(request.body, request.authUser);
+    return responderRelatorio(response, resultado, formato);
+  }
+
+  async alertasBiblioteca(request: AuthenticatedRequest, response: Response) {
+    const formato = formatoRelatorioSchema.parse(request.query.formato);
+    const resultado = await service.gerarAlertasBiblioteca(request.body, request.authUser);
+    return responderRelatorio(response, resultado, formato);
+  }
+
+  async painelBiblioteca(request: AuthenticatedRequest, response: Response) {
+    const formato = formatoRelatorioSchema.parse(request.query.formato);
+    const resultado = await service.gerarPainelBiblioteca(request.body, request.authUser);
+    return responderRelatorio(response, resultado, formato);
+  }
+
   async relacaoMatriculas(request: AuthenticatedRequest, response: Response) {
     const formato = formatoRelatorioSchema.parse(request.query.formato);
     const resultado = await service.gerarRelacaoMatriculas(request.body, request.authUser);

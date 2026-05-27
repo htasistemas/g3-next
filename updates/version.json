@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.510",
-  "releaseDate": "2026-05-25",
-  "description": "A tela Empréstimo para eventos passou a preservar horários corretamente, revalidar disponibilidade no salvamento e bloquear transições inválidas de status.",
+  "latestVersion": "1.00.514",
+  "releaseDate": "2026-05-27",
+  "description": "A geração semanal do Checklist diário foi estabilizada para suportar disparos simultâneos e lotes completos sem erro interno.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.510",
+  "minCompatibleVersion": "1.00.514",
   "releaseType": "stable",
   "downloadUrl": null
 }

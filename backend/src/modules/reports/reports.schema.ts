@@ -88,6 +88,25 @@ export const voluntarioFichaRequestSchema = z.object({
   usuarioEmissor: optionalString
 });
 
+export const bibliotecaLivroRelacaoRequestSchema = z.object({
+  termo: optionalString,
+  usuarioEmissor: optionalString
+});
+
+export const bibliotecaLivroFichaRequestSchema = z.object({
+  livroId: z.string().trim().min(1, "livroId e obrigatorio."),
+  usuarioEmissor: optionalString
+});
+
+export const bibliotecaEmprestimoRelacaoRequestSchema = z.object({
+  termo: optionalString,
+  usuarioEmissor: optionalString
+});
+
+export const bibliotecaRelatorioRequestSchema = z.object({
+  usuarioEmissor: optionalString
+});
+
 export const matriculasRelacaoRequestSchema = z.object({
   nome: optionalString,
   tipo: optionalString,

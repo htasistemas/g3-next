@@ -13,7 +13,8 @@ import { useAlertasBiblioteca, useConsultarLivroIsbnBiblioteca, useEmprestimosBi
 import { useBeneficiarios } from "@/features/beneficiarios/use-beneficiarios";
 import { useAuth } from "@/hooks/use-auth";
 import { obterUrlArquivoAutenticado } from "@/lib/arquivos";
-import { imprimirConteudoAtual } from "@/lib/report-utils";
+import { reservarJanelaRelatorio } from "@/lib/report-utils";
+import { reportsService } from "@/services/reports.service";
 import type { Beneficiario } from "@/types/beneficiario";
 import type { BibliotecaEmprestimoCadastro, BibliotecaLivro, BibliotecaLivroCadastro } from "@/types/biblioteca";
 
@@ -53,7 +54,7 @@ const formatarNumero = (valor: number) => valor.toLocaleString("pt-BR");
 const formatarDataIso = (data?: string | null) => {
   if (!data) return "Sem data";
   const [ano, mes, dia] = data.split("-");
-  return ano && mes && dia ? `${dia}/${mes}/${ano}` : data;
+  return ano && mes && dia ? `${dia}-${mes}-${ano}` : data;
 };
 
 function localizarBeneficiarioPorNome(beneficiarios: Beneficiario[], nome: string) {
@@ -92,6 +93,12 @@ function localizarLivroPorDescricao(livros: BibliotecaLivro[], valor: string) {
 
 const normalizarIsbn = (valor: string) => valor.replace(/[^0-9Xx]/g, "").toUpperCase();
 
+function formatarStatusRelatorio(status?: string | null) {
+  if (!status) return "---";
+  const texto = status.toLocaleLowerCase("pt-BR").replaceAll("_", " ");
+  return texto.charAt(0).toLocaleUpperCase("pt-BR") + texto.slice(1);
+}
+
 export function BibliotecaPage() {
   const navigate = useNavigate();
   const { usuario } = useAuth();
@@ -107,6 +114,7 @@ export function BibliotecaPage() {
   const [capaLivroPreviewUrl, setCapaLivroPreviewUrl] = useState("");
   const [popup, setPopup] = useState<PopupMensagemState | null>(null);
   const [confirmarExcluir, setConfirmarExcluir] = useState<"livro" | "emprestimo" | null>(null);
+  const [imprimindoRelatorio, setImprimindoRelatorio] = useState(false);
   const livrosQuery = useLivrosBiblioteca();
   const emprestimosQuery = useEmprestimosBiblioteca();
   const alertasQuery = useAlertasBiblioteca();
@@ -147,7 +155,7 @@ export function BibliotecaPage() {
     { titulo: "Disponibilidade", valor: `${taxaDisponibilidade}%`, detalhe1: `${formatarNumero(categoriasAtivas)} categorias`, detalhe2: `${formatarNumero(livrosSemDisponibilidade)} sem estoque`, icon: BookOpen, classe: "from-teal-100 via-white to-emerald-100 text-teal-950 shadow-[0_24px_50px_-28px_rgba(13,148,136,0.55)]" },
     { titulo: "Próxima devolução", valor: proximaDevolucao ? formatarDataIso(proximaDevolucao.dataDevolucaoPrevista) : "--", detalhe1: proximaDevolucao?.livroTitulo ?? "Sem pendências", detalhe2: proximaDevolucao?.beneficiarioNome ?? "Nenhum beneficiário pendente", icon: Undo2, classe: "from-rose-100 via-white to-pink-100 text-rose-950 shadow-[0_24px_50px_-28px_rgba(244,63,94,0.45)]" }
   ] as const;
-  const carregandoAcoes = consultarIsbnMutation.isPending || salvarLivroMutation.isPending || removerLivroMutation.isPending || salvarEmprestimoMutation.isPending || removerEmprestimoMutation.isPending || devolucaoMutation.isPending;
+  const carregandoAcoes = imprimindoRelatorio || consultarIsbnMutation.isPending || salvarLivroMutation.isPending || removerLivroMutation.isPending || salvarEmprestimoMutation.isPending || removerEmprestimoMutation.isPending || devolucaoMutation.isPending;
   const salvandoAtual = abaAtiva === "livros" ? salvarLivroMutation.isPending : abaAtiva === "emprestimos" ? salvarEmprestimoMutation.isPending : false;
   useEffect(() => { if (!livroSelecionadoId && proximoCodigoQuery.data) setLivroForm((atual) => ({ ...atual, codigo: proximoCodigoQuery.data })); }, [livroSelecionadoId, proximoCodigoQuery.data]);
   useEffect(() => { if (emprestimoSelecionadoId || !nomeResponsavelAtual) return; setEmprestimoForm((atual) => ({ ...atual, responsavelId: usuario?.id ?? atual.responsavelId ?? "", responsavelNome: atual.responsavelNome?.trim() || nomeResponsavelAtual })); }, [emprestimoSelecionadoId, nomeResponsavelAtual, usuario?.id]);
@@ -201,14 +209,93 @@ export function BibliotecaPage() {
   async function salvar() { try { if (abaAtiva === "livros") { if (!livroForm.codigo?.trim() || !livroForm.titulo?.trim() || !livroForm.autor?.trim()) { setPopup({ tipo: "aviso", titulo: "Validação", texto: "Preencha código, título e autor do livro." }); return; } await salvarLivroMutation.mutateAsync({ id: livroSelecionadoId, payload: livroForm }); setPopup({ tipo: "sucesso", titulo: "Confirmação", texto: "Livro salvo com sucesso." }); return; } if (abaAtiva === "emprestimos") { const beneficiarioSelecionado = emprestimoForm.beneficiarioId && emprestimoForm.beneficiarioNome ? { id: emprestimoForm.beneficiarioId, nome: emprestimoForm.beneficiarioNome } : (() => { const item = localizarBeneficiarioPorNome(sugestoesBeneficiarios, emprestimoForm.beneficiarioNome ?? ""); return item?.id_beneficiario ? { id: item.id_beneficiario, nome: item.nome_completo } : null; })(); const livroSelecionado = (emprestimoForm.livroId ? livros.find((item) => item.id === emprestimoForm.livroId) ?? null : null) ?? localizarLivroPorDescricao(livros, emprestimoForm.livroNome ?? ""); if (!livroSelecionado || !beneficiarioSelecionado || !emprestimoForm.dataDevolucaoPrevista) { setPopup({ tipo: "aviso", titulo: "Validação", texto: "Selecione um livro cadastrado por nome, código ou ISBN, um beneficiário cadastrado e a data prevista." }); return; } const { livroNome, ...emprestimoPayload } = emprestimoForm; await salvarEmprestimoMutation.mutateAsync({ id: emprestimoSelecionadoId, payload: { ...emprestimoPayload, livroId: livroSelecionado.id, beneficiarioId: beneficiarioSelecionado.id, beneficiarioNome: beneficiarioSelecionado.nome, responsavelId: emprestimoForm.responsavelId || usuario?.id || null, responsavelNome: emprestimoForm.responsavelNome?.trim() || nomeResponsavelAtual } }); setPopup({ tipo: "sucesso", titulo: "Confirmação", texto: "Empréstimo salvo com sucesso." }); return; } setPopup({ tipo: "aviso", titulo: "Atenção", texto: "Selecione a aba de livros ou empréstimos para salvar." }); } catch (error: any) { setPopup({ tipo: "erro", titulo: "Erro", texto: error?.response?.data?.message ?? "Não foi possível salvar." }); } }
   async function registrarDevolucao(id: string) { try { await devolucaoMutation.mutateAsync({ id, dataDevolucaoReal: new Date().toISOString().slice(0, 10) }); setPopup({ tipo: "sucesso", titulo: "Confirmação", texto: "A devolução foi realizada com sucesso e o livro retornou para a biblioteca." }); } catch (error: any) { setPopup({ tipo: "erro", titulo: "Erro", texto: error?.response?.data?.message ?? "Não foi possível registrar a devolução." }); } }
   async function confirmarExclusaoAtual() { try { if (confirmarExcluir === "livro" && livroSelecionadoId) await removerLivroMutation.mutateAsync(livroSelecionadoId); if (confirmarExcluir === "emprestimo" && emprestimoSelecionadoId) await removerEmprestimoMutation.mutateAsync(emprestimoSelecionadoId); setConfirmarExcluir(null); novo(); setPopup({ tipo: "sucesso", titulo: "Confirmação", texto: "Registro excluído com sucesso." }); } catch (error: any) { setPopup({ tipo: "erro", titulo: "Erro", texto: error?.response?.data?.message ?? "Não foi possível excluir." }); } }
-  function imprimir() { try { imprimirConteudoAtual({ titulo: "Biblioteca" }); } catch (error: any) { setPopup({ tipo: "erro", titulo: "Erro", texto: error?.message ?? "Não foi possível preparar a impressão." }); } }
+
+  async function gerarPdfBiblioteca(titulo: string, gerar: () => Promise<Blob>) {
+    let janela: ReturnType<typeof reservarJanelaRelatorio> | undefined;
+    try {
+      setImprimindoRelatorio(true);
+      janela = reservarJanelaRelatorio(`Gerando ${titulo.toLocaleLowerCase("pt-BR")}`);
+      const blob = await gerar();
+      janela.publicar(blob);
+    } catch (error: any) {
+      janela?.fechar();
+      setPopup({ tipo: "erro", titulo: "Erro", texto: error?.response?.data?.message ?? error?.message ?? "Não foi possível gerar o relatório." });
+    } finally {
+      setImprimindoRelatorio(false);
+    }
+  }
+
+  function imprimirListagemLivros() {
+    void gerarPdfBiblioteca("relação do acervo da biblioteca", () =>
+      reportsService.gerarRelacaoLivrosBiblioteca({
+        termo: buscaLivro.trim() || undefined,
+        usuarioEmissor: nomeResponsavelAtual || undefined
+      })
+    );
+  }
+
+  function imprimirCadastroLivro() {
+    if (!livroSelecionadoId) {
+      setPopup({ tipo: "aviso", titulo: "Atenção", texto: "Selecione um livro salvo para imprimir o cadastro." });
+      return;
+    }
+    void gerarPdfBiblioteca("cadastro do livro", () =>
+      reportsService.gerarFichaLivroBiblioteca({
+        livroId: livroSelecionadoId,
+        usuarioEmissor: nomeResponsavelAtual || undefined
+      })
+    );
+  }
+
+  function imprimir() {
+    if (abaAtiva === "emprestimos") {
+      void gerarPdfBiblioteca("relação de empréstimos da biblioteca", () =>
+        reportsService.gerarRelacaoEmprestimosBiblioteca({
+          termo: buscaEmprestimo.trim() || undefined,
+          usuarioEmissor: nomeResponsavelAtual || undefined
+        })
+      );
+      return;
+    }
+    if (abaAtiva === "devolucoes") {
+      void gerarPdfBiblioteca("devoluções pendentes da biblioteca", () =>
+        reportsService.gerarDevolucoesPendentesBiblioteca({ usuarioEmissor: nomeResponsavelAtual || undefined })
+      );
+      return;
+    }
+    if (abaAtiva === "disponiveis") {
+      void gerarPdfBiblioteca("livros disponíveis na biblioteca", () =>
+        reportsService.gerarLivrosDisponiveisBiblioteca({ usuarioEmissor: nomeResponsavelAtual || undefined })
+      );
+      return;
+    }
+    if (abaAtiva === "alertas") {
+      void gerarPdfBiblioteca("alertas de devolução da biblioteca", () =>
+        reportsService.gerarAlertasBiblioteca({ usuarioEmissor: nomeResponsavelAtual || undefined })
+      );
+      return;
+    }
+    void gerarPdfBiblioteca("painel da biblioteca", () =>
+      reportsService.gerarPainelBiblioteca({ usuarioEmissor: nomeResponsavelAtual || undefined })
+    );
+  }
+
+  const acaoImpressao: AdminAction[] =
+    abaAtiva === "livros"
+      ? [
+          { label: "Imprimir listagem", icon: Printer, onClick: imprimirListagemLivros, variant: "outline", disabled: imprimindoRelatorio },
+          { label: "Imprimir cadastro", icon: Printer, onClick: imprimirCadastroLivro, variant: "outline", disabled: !livroSelecionadoId || imprimindoRelatorio }
+        ]
+      : [
+          { label: abaAtiva === "visao" ? "Imprimir painel" : "Imprimir listagem", icon: Printer, onClick: imprimir, variant: "outline", disabled: imprimindoRelatorio }
+        ];
   const acoes: AdminAction[] = [
     { label: "Buscar", icon: Search, onClick: () => setAbaAtiva("livros"), variant: "outline" },
     { label: "Novo", icon: Plus, onClick: novo, variant: "default", disabled: carregandoAcoes },
     { label: salvandoAtual ? "Salvando..." : "Salvar", icon: Save, onClick: () => void salvar(), variant: "default", disabled: carregandoAcoes },
     { label: "Cancelar", icon: Undo2, onClick: cancelar, variant: "outline", disabled: carregandoAcoes },
     { label: "Excluir", icon: Trash2, onClick: () => setConfirmarExcluir(abaAtiva === "emprestimos" ? "emprestimo" : "livro"), variant: "danger", disabled: (abaAtiva === "emprestimos" ? !emprestimoSelecionadoId : !livroSelecionadoId) || carregandoAcoes },
-    { label: "Imprimir", icon: Printer, onClick: imprimir, variant: "outline" },
+    ...acaoImpressao,
     { label: "Fechar", icon: X, onClick: () => navigate("/dashboard/visao-geral"), variant: "outline" }
   ];
 
@@ -476,10 +563,10 @@ export function BibliotecaPage() {
             </div>
           </section>
         ) : null}
-        {abaAtiva === "emprestimos" ? <section className="space-y-3"><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"><div className="space-y-1"><Label>Livro *</Label><Input list="catalogo-livros-biblioteca" value={emprestimoForm.livroNome ?? ""} onChange={(event) => atualizarLivroEmprestimo(event.target.value)} onBlur={(event) => atualizarLivroEmprestimo(event.target.value)} disabled={carregandoAcoes} placeholder="Digite nome, código ou ISBN" /><datalist id="catalogo-livros-biblioteca">{sugestoesLivros.map((item) => <option key={item.id} value={descreverLivro(item)}>{`Código ${item.codigo}${item.isbn ? ` | ISBN ${item.isbn}` : ""}`}</option>)}</datalist><p className="text-xs text-slate-500">Digite o nome do livro, o código ou o ISBN para localizar o acervo.</p></div><div className="space-y-1"><Label>Beneficiário *</Label><Input list="catalogo-beneficiarios-biblioteca" value={emprestimoForm.beneficiarioNome ?? ""} onChange={(event) => atualizarBeneficiarioEmprestimo(event.target.value)} onBlur={(event) => atualizarBeneficiarioEmprestimo(event.target.value)} disabled={carregandoAcoes} placeholder="Digite para localizar um beneficiário" /><datalist id="catalogo-beneficiarios-biblioteca">{sugestoesBeneficiarios.map((item, index) => <option key={item.id_beneficiario ?? `${item.nome_completo}-${index}`} value={item.nome_completo}>{item.codigo ? `Código ${item.codigo}` : "Beneficiário cadastrado"}</option>)}</datalist><p className="text-xs text-slate-500">O empréstimo deve ser vinculado a um beneficiário já cadastrado.</p></div><div className="space-y-1"><Label>Responsável</Label><Input value={emprestimoForm.responsavelNome ?? ""} readOnly disabled={carregandoAcoes} /></div><div className="space-y-1"><Label>Status</Label><Select value={emprestimoForm.status ?? "ATIVO"} onChange={(event) => setEmprestimoForm((atual) => ({ ...atual, status: event.target.value as BibliotecaEmprestimoCadastro["status"] }))} disabled={carregandoAcoes}><option value="ATIVO">Ativo</option><option value="ATRASADO">Atrasado</option><option value="DEVOLVIDO">Devolvido</option><option value="CANCELADO">Cancelado</option></Select></div><div className="space-y-1"><Label>Data empréstimo *</Label><Input type="date" value={emprestimoForm.dataEmprestimo} onChange={(event) => setEmprestimoForm((atual) => ({ ...atual, dataEmprestimo: event.target.value }))} disabled={carregandoAcoes} /></div><div className="space-y-1"><Label>Data prevista *</Label><Input type="date" value={emprestimoForm.dataDevolucaoPrevista} onChange={(event) => setEmprestimoForm((atual) => ({ ...atual, dataDevolucaoPrevista: event.target.value }))} disabled={carregandoAcoes} /></div><div className="space-y-1"><Label>Data real</Label><Input type="date" value={emprestimoForm.dataDevolucaoReal ?? ""} onChange={(event) => setEmprestimoForm((atual) => ({ ...atual, dataDevolucaoReal: event.target.value }))} disabled={carregandoAcoes} /></div><div className="space-y-1 md:col-span-2 xl:col-span-4"><Label>Observações</Label><Textarea rows={2} value={emprestimoForm.observacoes ?? ""} onChange={(event) => setEmprestimoForm((atual) => ({ ...atual, observacoes: event.target.value }))} disabled={carregandoAcoes} /></div></div><div className="space-y-1"><Label>Buscar empréstimo</Label><Input value={buscaEmprestimo} onChange={(event) => setBuscaEmprestimo(event.target.value)} disabled={carregandoAcoes} /></div><div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]"><table className="min-w-full text-sm"><thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"><tr><th className="px-3 py-2 text-left">Livro</th><th className="px-3 py-2 text-left">Beneficiário</th><th className="px-3 py-2 text-left">Prevista</th><th className="px-3 py-2 text-left">Status</th><th className="px-3 py-2 text-right">Ações</th></tr></thead><tbody>{emprestimosFiltrados.length ? emprestimosFiltrados.map((item, index) => <tr key={item.id} className={`border-t border-[var(--g3-border)] ${index % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35"}`}><td className="px-3 py-2">{item.livroTitulo}</td><td className="px-3 py-2">{item.beneficiarioNome ?? "---"}</td><td className="px-3 py-2">{item.dataDevolucaoPrevista}</td><td className="px-3 py-2">{item.status}</td><td className="px-3 py-2 text-right"><Button size="sm" variant="outline" onClick={() => selecionarEmprestimo(item.id)} disabled={carregandoAcoes}>Selecionar</Button></td></tr>) : <tr><td colSpan={5} className="px-3 py-4 text-center">{emprestimosQuery.isLoading ? "Carregando empréstimos..." : "Nenhum empréstimo encontrado."}</td></tr>}</tbody></table></div></section> : null}
-        {abaAtiva === "devolucoes" ? <section className="overflow-x-auto rounded-lg border border-[var(--g3-border)]"><table className="min-w-full text-sm"><thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"><tr><th className="px-3 py-2 text-left">Livro</th><th className="px-3 py-2 text-left">Beneficiário</th><th className="px-3 py-2 text-left">Data prevista</th><th className="px-3 py-2 text-right">Ações</th></tr></thead><tbody>{emprestimosPendentes.length ? emprestimosPendentes.map((item, index) => <tr key={item.id} className={`border-t border-[var(--g3-border)] ${index % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35"}`}><td className="px-3 py-2">{item.livroTitulo}</td><td className="px-3 py-2">{item.beneficiarioNome ?? "---"}</td><td className="px-3 py-2">{item.dataDevolucaoPrevista}</td><td className="px-3 py-2 text-right"><Button size="sm" onClick={() => void registrarDevolucao(item.id)} disabled={devolucaoMutation.isPending}>{devolucaoMutation.isPending ? "Registrando..." : "Registrar devolução"}</Button></td></tr>) : <tr><td colSpan={4} className="px-3 py-4 text-center">Nenhuma devolução pendente.</td></tr>}</tbody></table></section> : null}
+        {abaAtiva === "emprestimos" ? <section className="space-y-3"><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"><div className="space-y-1"><Label>Livro *</Label><Input list="catalogo-livros-biblioteca" value={emprestimoForm.livroNome ?? ""} onChange={(event) => atualizarLivroEmprestimo(event.target.value)} onBlur={(event) => atualizarLivroEmprestimo(event.target.value)} disabled={carregandoAcoes} placeholder="Digite nome, código ou ISBN" /><datalist id="catalogo-livros-biblioteca">{sugestoesLivros.map((item) => <option key={item.id} value={descreverLivro(item)}>{`Código ${item.codigo}${item.isbn ? ` | ISBN ${item.isbn}` : ""}`}</option>)}</datalist><p className="text-xs text-slate-500">Digite o nome do livro, o código ou o ISBN para localizar o acervo.</p></div><div className="space-y-1"><Label>Beneficiário *</Label><Input list="catalogo-beneficiarios-biblioteca" value={emprestimoForm.beneficiarioNome ?? ""} onChange={(event) => atualizarBeneficiarioEmprestimo(event.target.value)} onBlur={(event) => atualizarBeneficiarioEmprestimo(event.target.value)} disabled={carregandoAcoes} placeholder="Digite para localizar um beneficiário" /><datalist id="catalogo-beneficiarios-biblioteca">{sugestoesBeneficiarios.map((item, index) => <option key={item.id_beneficiario ?? `${item.nome_completo}-${index}`} value={item.nome_completo}>{item.codigo ? `Código ${item.codigo}` : "Beneficiário cadastrado"}</option>)}</datalist><p className="text-xs text-slate-500">O empréstimo deve ser vinculado a um beneficiário já cadastrado.</p></div><div className="space-y-1"><Label>Responsável</Label><Input value={emprestimoForm.responsavelNome ?? ""} readOnly disabled={carregandoAcoes} /></div><div className="space-y-1"><Label>Status</Label><Select value={emprestimoForm.status ?? "ATIVO"} onChange={(event) => setEmprestimoForm((atual) => ({ ...atual, status: event.target.value as BibliotecaEmprestimoCadastro["status"] }))} disabled={carregandoAcoes}><option value="ATIVO">Ativo</option><option value="ATRASADO">Atrasado</option><option value="DEVOLVIDO">Devolvido</option><option value="CANCELADO">Cancelado</option></Select></div><div className="space-y-1"><Label>Data empréstimo *</Label><Input type="date" value={emprestimoForm.dataEmprestimo} onChange={(event) => setEmprestimoForm((atual) => ({ ...atual, dataEmprestimo: event.target.value }))} disabled={carregandoAcoes} /></div><div className="space-y-1"><Label>Data prevista *</Label><Input type="date" value={emprestimoForm.dataDevolucaoPrevista} onChange={(event) => setEmprestimoForm((atual) => ({ ...atual, dataDevolucaoPrevista: event.target.value }))} disabled={carregandoAcoes} /></div><div className="space-y-1"><Label>Data real</Label><Input type="date" value={emprestimoForm.dataDevolucaoReal ?? ""} onChange={(event) => setEmprestimoForm((atual) => ({ ...atual, dataDevolucaoReal: event.target.value }))} disabled={carregandoAcoes} /></div><div className="space-y-1 md:col-span-2 xl:col-span-4"><Label>Observações</Label><Textarea rows={2} value={emprestimoForm.observacoes ?? ""} onChange={(event) => setEmprestimoForm((atual) => ({ ...atual, observacoes: event.target.value }))} disabled={carregandoAcoes} /></div></div><div className="space-y-1"><Label>Buscar empréstimo</Label><Input value={buscaEmprestimo} onChange={(event) => setBuscaEmprestimo(event.target.value)} disabled={carregandoAcoes} /></div><div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]"><table className="min-w-full text-sm"><thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"><tr><th className="px-3 py-2 text-left">Livro</th><th className="px-3 py-2 text-left">Beneficiário</th><th className="px-3 py-2 text-left">Prevista</th><th className="px-3 py-2 text-left">Status</th><th className="px-3 py-2 text-right">Ações</th></tr></thead><tbody>{emprestimosFiltrados.length ? emprestimosFiltrados.map((item, index) => <tr key={item.id} className={`border-t border-[var(--g3-border)] ${index % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35"}`}><td className="px-3 py-2">{item.livroTitulo}</td><td className="px-3 py-2">{item.beneficiarioNome ?? "---"}</td><td className="px-3 py-2">{formatarDataIso(item.dataDevolucaoPrevista)}</td><td className="px-3 py-2">{formatarStatusRelatorio(item.status)}</td><td className="px-3 py-2 text-right"><Button size="sm" variant="outline" onClick={() => selecionarEmprestimo(item.id)} disabled={carregandoAcoes}>Selecionar</Button></td></tr>) : <tr><td colSpan={5} className="px-3 py-4 text-center">{emprestimosQuery.isLoading ? "Carregando empréstimos..." : "Nenhum empréstimo encontrado."}</td></tr>}</tbody></table></div></section> : null}
+        {abaAtiva === "devolucoes" ? <section className="overflow-x-auto rounded-lg border border-[var(--g3-border)]"><table className="min-w-full text-sm"><thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"><tr><th className="px-3 py-2 text-left">Livro</th><th className="px-3 py-2 text-left">Beneficiário</th><th className="px-3 py-2 text-left">Data prevista</th><th className="px-3 py-2 text-right">Ações</th></tr></thead><tbody>{emprestimosPendentes.length ? emprestimosPendentes.map((item, index) => <tr key={item.id} className={`border-t border-[var(--g3-border)] ${index % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35"}`}><td className="px-3 py-2">{item.livroTitulo}</td><td className="px-3 py-2">{item.beneficiarioNome ?? "---"}</td><td className="px-3 py-2">{formatarDataIso(item.dataDevolucaoPrevista)}</td><td className="px-3 py-2 text-right"><Button size="sm" onClick={() => void registrarDevolucao(item.id)} disabled={devolucaoMutation.isPending}>{devolucaoMutation.isPending ? "Registrando..." : "Registrar devolução"}</Button></td></tr>) : <tr><td colSpan={4} className="px-3 py-4 text-center">Nenhuma devolução pendente.</td></tr>}</tbody></table></section> : null}
         {abaAtiva === "disponiveis" ? <section className="overflow-x-auto rounded-lg border border-[var(--g3-border)]"><table className="min-w-full text-sm"><thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"><tr><th className="px-3 py-2 text-left">Código</th><th className="px-3 py-2 text-left">Título</th><th className="px-3 py-2 text-left">Autor</th><th className="px-3 py-2 text-left">Disponíveis</th></tr></thead><tbody>{livros.filter((item) => item.status === "ATIVO" && item.quantidadeDisponivel > 0).map((item, index) => <tr key={item.id} className={`border-t border-[var(--g3-border)] ${index % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35"}`}><td className="px-3 py-2">{item.codigo}</td><td className="px-3 py-2">{item.titulo}</td><td className="px-3 py-2">{item.autor}</td><td className="px-3 py-2">{item.quantidadeDisponivel}</td></tr>)}</tbody></table></section> : null}
-        {abaAtiva === "alertas" ? <section className="overflow-x-auto rounded-lg border border-[var(--g3-border)]"><table className="min-w-full text-sm"><thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"><tr><th className="px-3 py-2 text-left">Livro</th><th className="px-3 py-2 text-left">Beneficiário</th><th className="px-3 py-2 text-left">Prevista</th><th className="px-3 py-2 text-left">Dias</th><th className="px-3 py-2 text-left">Status</th></tr></thead><tbody>{alertas.length ? alertas.map((item, index) => <tr key={item.emprestimoId} className={`border-t border-[var(--g3-border)] ${index % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35"}`}><td className="px-3 py-2">{item.livroTitulo}</td><td className="px-3 py-2">{item.beneficiarioNome ?? "---"}</td><td className="px-3 py-2">{item.dataDevolucaoPrevista}</td><td className="px-3 py-2">{item.diasParaVencimento}</td><td className="px-3 py-2">{item.status}</td></tr>) : <tr><td colSpan={5} className="px-3 py-4 text-center">{alertasQuery.isLoading ? "Carregando alertas..." : "Nenhum alerta no momento."}</td></tr>}</tbody></table></section> : null}
+        {abaAtiva === "alertas" ? <section className="overflow-x-auto rounded-lg border border-[var(--g3-border)]"><table className="min-w-full text-sm"><thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"><tr><th className="px-3 py-2 text-left">Livro</th><th className="px-3 py-2 text-left">Beneficiário</th><th className="px-3 py-2 text-left">Prevista</th><th className="px-3 py-2 text-left">Dias</th><th className="px-3 py-2 text-left">Status</th></tr></thead><tbody>{alertas.length ? alertas.map((item, index) => <tr key={item.emprestimoId} className={`border-t border-[var(--g3-border)] ${index % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35"}`}><td className="px-3 py-2">{item.livroTitulo}</td><td className="px-3 py-2">{item.beneficiarioNome ?? "---"}</td><td className="px-3 py-2">{formatarDataIso(item.dataDevolucaoPrevista)}</td><td className="px-3 py-2">{item.diasParaVencimento}</td><td className="px-3 py-2">{formatarStatusRelatorio(item.status)}</td></tr>) : <tr><td colSpan={5} className="px-3 py-4 text-center">{alertasQuery.isLoading ? "Carregando alertas..." : "Nenhum alerta no momento."}</td></tr>}</tbody></table></section> : null}
       </AdminPageLayout>
       {popup ? <PopupMensagem popup={popup} onClose={() => setPopup(null)} /> : null}
       <PopupConfirmacao aberto={!!confirmarExcluir} titulo="Confirmar exclusão" texto="Esta ação é irreversível. Deseja continuar?" processando={removerLivroMutation.isPending || removerEmprestimoMutation.isPending} onCancel={() => setConfirmarExcluir(null)} onConfirm={() => void confirmarExclusaoAtual()} confirmarTexto="Excluir" />

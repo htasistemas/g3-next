@@ -1,6 +1,53 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.514",
+                        "releaseDate":  "2026-05-27",
+                        "title":  "Geração semanal do checklist estabilizada",
+                        "description":  "A ação Gerar semana do Checklist diário deixou de falhar quando a montagem semanal ocorre em paralelo ou processa muitas atividades.",
+                        "changes":  [
+                                        "A criação das execuções semanais agora ignora de forma idempotente colisões de geração já processadas por outra atualização simultânea da tela.",
+                                        "A transação da montagem semanal recebeu limite adequado para gerar lotes completos de atividades por usuário.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ]
+                    },
+                    {
+                        "version":  "1.00.513",
+                        "releaseDate":  "2026-05-27",
+                        "title":  "Biblioteca com relatórios de acervo e cadastro",
+                        "description":  "A tela Biblioteca passou a emitir relatórios próprios para o acervo, o cadastro individual do livro e as operações de empréstimos.",
+                        "changes":  [
+                                        "Na aba Cadastro de livros, as ações Imprimir listagem e Imprimir cadastro emitem diretamente, com um clique, a relação filtrada do acervo e a ficha individual do livro selecionado.",
+                                        "Visão geral, Empréstimos, Devoluções, Livros disponíveis e Alertas de devolução agora geram relatórios limpos correspondentes ao conteúdo da aba.",
+                                        "As impressões passaram a ser geradas em PDF pelo template central de relatórios do G3N, com cabeçalho, logomarca, metadados e rodapé institucionais e datas em dd-mm-aaaa.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ]
+                    },
+                    {
+                        "version":  "1.00.512",
+                        "releaseDate":  "2026-05-27",
+                        "title":  "Impressão de voluntariado por listagem e cadastro",
+                        "description":  "A tela Cadastro de voluntariado passou a emitir corretamente a relação filtrada e a ficha individual no padrão de relatórios do G3N.",
+                        "changes":  [
+                                        "Na aba Listagem de voluntários, o botão Imprimir listagem agora gera a relação conforme os filtros aplicados, mesmo que já exista um cadastro selecionado.",
+                                        "Nas abas do voluntário selecionado, o botão Imprimir cadastro agora abre a ficha individual reservando a janela de relatório no clique para evitar bloqueio do navegador.",
+                                        "Os relatórios de relação e ficha de voluntários passaram a consultar apenas dados do tenant autenticado.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ]
+                    },
+                    {
+                        "version":  "1.00.511",
+                        "releaseDate":  "2026-05-27",
+                        "title":  "Impressão de profissionais por listagem e cadastro",
+                        "description":  "A tela Cadastro de profissionais passou a emitir corretamente a relação filtrada e a ficha individual no padrão de relatórios do G3N.",
+                        "changes":  [
+                                        "Na aba Listagem de profissionais, o botão Imprimir listagem agora gera a relação dos profissionais conforme os filtros aplicados, mesmo que já exista um cadastro selecionado.",
+                                        "Nas abas do profissional selecionado, o botão Imprimir cadastro agora abre a ficha individual reservando a janela de relatório no clique para evitar bloqueio do navegador.",
+                                        "Os relatórios de relação e ficha de profissionais passaram a consultar apenas dados do tenant autenticado.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ]
+                    },
+                    {
                         "version":  "1.00.510",
                         "releaseDate":  "2026-05-25",
                         "title":  "Empréstimo para eventos com datas e reservas corrigidas",

@@ -60,6 +60,48 @@ reportsRoutes.post(
   asyncHandler(controller.fichaVoluntario.bind(controller))
 );
 reportsRoutes.post(
+  "/biblioteca/livros/relacao",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.relacaoLivrosBiblioteca.bind(controller))
+);
+reportsRoutes.post(
+  "/biblioteca/livros/ficha",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.fichaLivroBiblioteca.bind(controller))
+);
+reportsRoutes.post(
+  "/biblioteca/emprestimos/relacao",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.relacaoEmprestimosBiblioteca.bind(controller))
+);
+reportsRoutes.post(
+  "/biblioteca/devolucoes/pendentes",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.devolucoesPendentesBiblioteca.bind(controller))
+);
+reportsRoutes.post(
+  "/biblioteca/livros/disponiveis",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.livrosDisponiveisBiblioteca.bind(controller))
+);
+reportsRoutes.post(
+  "/biblioteca/alertas/devolucao",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.alertasBiblioteca.bind(controller))
+);
+reportsRoutes.post(
+  "/biblioteca/painel",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.painelBiblioteca.bind(controller))
+);
+reportsRoutes.post(
   "/matriculas/relacao",
   ensureAuthenticated,
   ensurePermissions(permissoesLeitura),

@@ -52,7 +52,7 @@ import { reportsService } from "@/services/reports.service";
 import { somenteDigitos } from "@/lib/validators";
 import { formatarTextoPorCampo, normalizarObjetoTexto } from "@/lib/text-formatter";
 import { mapaCamposTextoProfissionalForm } from "@/lib/text-format-config";
-import { abrirRelatorioPdf } from "@/lib/report-utils";
+import { reservarJanelaRelatorio } from "@/lib/report-utils";
 import { resolverUrlArquivo } from "@/lib/arquivos";
 import {
   ajustarParaFotoTresPorQuatro,
@@ -629,17 +629,28 @@ export function CadastroProfissionalPage() {
   }
 
   async function acaoImprimir() {
+    if (abaAtiva !== "listagem" && !idSelecionado) {
+      setMensagem({ tipo: "erro", texto: "Salve ou selecione um profissional para imprimir o cadastro." });
+      return;
+    }
+
+    const imprimindoListagem = abaAtiva === "listagem";
+    let janela: ReturnType<typeof reservarJanelaRelatorio> | undefined;
+
     try {
       setImprimindoRelatorio(true);
       setMensagem(null);
+      janela = reservarJanelaRelatorio(
+        imprimindoListagem ? "Gerando lista de profissionais" : "Gerando cadastro do profissional"
+      );
       const usuarioEmissor = usuario?.nome || usuario?.nomeUsuario || "Sistema G3-Next";
 
-      if (idSelecionado) {
+      if (!imprimindoListagem && idSelecionado) {
         const blob = await reportsService.gerarFichaProfissional({
           profissionalId: idSelecionado,
           usuarioEmissor
         });
-        abrirRelatorioPdf(blob);
+        janela.publicar(blob);
         return;
       }
 
@@ -647,8 +658,9 @@ export function CadastroProfissionalPage() {
         ...filtros,
         usuarioEmissor
       });
-      abrirRelatorioPdf(blob);
+      janela.publicar(blob);
     } catch (error: any) {
+      janela?.fechar();
       setMensagem({
         tipo: "erro",
         texto: error?.response?.data?.message ?? "Não foi possível gerar o relatório."
@@ -688,6 +700,7 @@ export function CadastroProfissionalPage() {
   const acoesNaOrdemPadrao = ordemAcoesCrudPadrao
     .map((label) => acoes.find((acao) => acao.label === label))
     .filter((acao): acao is AcaoCrud => !!acao);
+  const rotuloImpressao = abaAtiva === "listagem" ? "Imprimir listagem" : "Imprimir cadastro";
 
   return (
     <main className={classesTelaPadraoBeneficiario.container}>
@@ -706,7 +719,7 @@ export function CadastroProfissionalPage() {
             {acoesNaOrdemPadrao.map((acao) => (
               <Button key={acao.label} type="button" variant={acao.variant} size="sm" className={classesTelaPadraoBeneficiario.botaoAcao} onClick={acao.onClick} disabled={bloqueadoAcao || (acao.label === "Excluir" && !idSelecionado)}>
                 <acao.icon className="mr-1.5 h-3.5 w-3.5" />
-                {acao.label}
+                {acao.label === "Imprimir" ? rotuloImpressao : acao.label}
               </Button>
             ))}
           </div>

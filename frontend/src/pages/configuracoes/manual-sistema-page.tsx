@@ -423,13 +423,13 @@ const secoesManual: ManualSecao[] = [
           "Na aba Indicadores, acompanhe o painel gerencial com conclusão geral, itens críticos não concluídos, cumprimento por usuário, unidade, setor e tarefas mais recorrentes sem depender apenas da visão do dia.",
           "Na aba Histórico, acompanhe a trilha de auditoria com resumo das ocorrências, data e hora, origem, status anterior, novo status, observações e motivos registrados em cada evento auditável.",
           "Na aba Configurações, apenas perfis autorizados podem ativar sábado e domingo. Enquanto esses dias estiverem desligados, o sistema não gera tarefas automáticas neles.",
-          "Use a geração semanal quando precisar preparar a semana operacional. A geração respeita os modelos ativos, evita duplicidade e mantém o snapshot da atividade gerada."
+          "Use a geração semanal quando precisar preparar a semana operacional. A geração respeita os modelos ativos, evita duplicidade mesmo quando consultas simultâneas atualizam a tela e mantém o snapshot da atividade gerada."
         ],
         atencoes: [
           "Sábado e domingo permanecem desativados por padrão e não geram tarefas automáticas enquanto estiverem desligados.",
           "Pendência, atraso, conclusão, dispensa e não se aplica são status operacionais reais e devem refletir a execução do dia, não apenas controle visual.",
           "Toda conclusão, dispensa, reabertura, alteração de modelo e atualização de configuração gera histórico de auditoria do checklist.",
-          "A geração semanal evita duplicidade por usuário, atividade e data e mantém o snapshot da atividade mesmo após edição posterior do modelo.",
+          "A geração semanal evita duplicidade por usuário, atividade e data, suporta a montagem completa do lote semanal e mantém o snapshot da atividade mesmo após edição posterior do modelo.",
           "Os indicadores do topo e da visão gerencial usam dados reais do banco e devem ser lidos como acompanhamento operacional da rotina.",
           "A tela Checklist diário agora lista execuções, semana, histórico, modelos, indicadores e configurações sempre dentro do tenant autenticado, impedindo mistura de rotinas administrativas entre instituições."
         ]
@@ -700,6 +700,7 @@ const secoesManual: ManualSecao[] = [
         objetivo: "Cadastrar e atualizar profissionais com dados pessoais, endereço, perfil profissional, agenda e foto do colaborador.",
         comoUsar: [
           "Use a foto 3x4 do profissional apenas em formatos aceitos pelo sistema e finalize o salvamento após revisar os dados principais.",
+          "Na aba Listagem de profissionais, use Imprimir listagem para emitir a relação filtrada; nas abas do cadastro selecionado, use Imprimir cadastro para emitir a ficha individual no padrão institucional de relatórios.",
           "Quando houver falha no processamento ou na vinculação da foto, a tela deve exibir o motivo operacional real retornado pelo backend.",
           "Em produção, após trocar a foto do profissional, o sistema mantém o cadastro mesmo se a limpeza do arquivo antigo falhar no storage."
         ],
@@ -715,6 +716,7 @@ const secoesManual: ManualSecao[] = [
         objetivo: "Cadastrar e atualizar voluntários com dados pessoais, disponibilidade, endereço, interesses e foto do cadastro.",
         comoUsar: [
           "Preencha os dados do voluntário e salve normalmente em um clique após revisar nome, CPF, contatos, disponibilidade e área de interesse.",
+          "Na aba Listagem de voluntários, use Imprimir listagem para emitir a relação filtrada; nas abas do cadastro selecionado, use Imprimir cadastro para emitir a ficha individual no padrão institucional de relatórios.",
           "Quando houver foto 3x4, o sistema processa o arquivo antes do salvamento e informa o motivo real caso a imagem não possa ser utilizada.",
           "Em produção, o cadastro foi ajustado para funcionar também em bases legadas que ainda não possuem colunas novas de comunicação na tabela cadastro_voluntario."
         ],
@@ -993,6 +995,7 @@ const secoesManual: ManualSecao[] = [
           "Os cards Biblioteca, Patrimônio e Almoxarifado da Visão geral também passaram a depender das tabelas reais segregadas por tenant, impedindo reaproveitamento de acervo, bens e estoque entre instituições.",
           "A segregação da Biblioteca foi estendida também para a base singular biblioteca_livro e para biblioteca_emprestimo, eliminando o vazamento de acervo legado entre instituições.",
           "A própria tela Biblioteca agora lista, cria, atualiza e remove livros e empréstimos sempre dentro do tenant autenticado, impedindo que a RNP visualize ou manipule exemplares e empréstimos da ADRA.",
+          "Na aba Cadastro de livros da Biblioteca, use as ações de um clique Imprimir listagem e Imprimir cadastro para emitir, respectivamente, a relação do acervo ou a ficha individual do livro selecionado; nas demais abas, a impressão gera painel ou listagens de empréstimos, devoluções, disponibilidade e alertas em PDF pelo template central de relatórios do G3N, com cabeçalho, metadados e rodapé institucionais.",
           "A tela Agendamentos agora lista agenda, indicadores, lista de espera, participantes e notificações sempre dentro do tenant autenticado, impedindo que uma instituição veja pacientes agendados ou histórico operacional de outra.",
           "As telas Chamada de senhas e Painel de senhas agora emitem, chamam, finalizam e exibem filas, chamadas e configurações sempre dentro do tenant autenticado, impedindo reaproveitamento de senhas entre instituições diferentes.",
           "A tela Recebimento de doações agora lista, abre, cadastra, atualiza, exclui e pesquisa doadores sempre dentro do tenant autenticado, inclusive na integração automática com o almoxarifado, impedindo mistura de doações e doadores entre instituições.",
