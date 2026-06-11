@@ -13,7 +13,7 @@ test("monta DATABASE_URL a partir do padrao legado DB_*", () => {
 });
 test("usa DATABASE_URL padrao de desenvolvimento quando nenhuma variavel de banco foi informada", () => {
     const env = normalizeRuntimeEnv({});
-    assert.equal(env.DATABASE_URL, "postgresql://postgres:admin@localhost:5432/g3?schema=public");
+    assert.equal(env.DATABASE_URL, "postgresql://postgres:admin@localhost:5432/g3n?schema=public");
 });
 test("desabilita email no desenvolvimento quando MAIL_PASS nao foi configurada", () => {
     const env = normalizeRuntimeEnv({});

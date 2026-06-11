@@ -5,7 +5,7 @@ import { config } from "dotenv";
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const backendRoot = resolve(currentDir, "../..");
 const workspaceRoot = resolve(backendRoot, "..");
-const DEFAULT_DEV_DATABASE_URL = "postgresql://postgres:admin@localhost:5432/g3?schema=public";
+const DEFAULT_DEV_DATABASE_URL = "postgresql://postgres:admin@localhost:5432/g3n?schema=public";
 const DEFAULT_DEV_AUTH_TOKEN_SECRET = "g3-next-dev-token-secret-2026";
 export function loadBackendEnvFiles() {
     const candidates = [
@@ -46,7 +46,7 @@ export function normalizeRuntimeEnv(rawEnv) {
     if (!normalizedEnv.APP_AUTH_TOKEN_SECRET && isDevelopment) {
         normalizedEnv.APP_AUTH_TOKEN_SECRET = DEFAULT_DEV_AUTH_TOKEN_SECRET;
     }
-    if (!normalizedEnv.MAIL_PASS?.trim() && isDevelopment) {
+    if (!normalizedEnv.MAIL_PASS?.trim() && !normalizedEnv.APP_EMAIL_HABILITADO && isDevelopment) {
         normalizedEnv.APP_EMAIL_HABILITADO = "false";
     }
     return normalizedEnv;
