@@ -1,6 +1,6 @@
 # Deploy G3-Next
 
-Use somente o stack do `g3n` para evitar qualquer mistura com o G3 legado.
+Use somente o stack do `g3n`.
 
 Diretorio do deploy:
 

@@ -17,7 +17,7 @@ export function iniciarDocumentosInstituicaoScheduler(intervaloMs = 60 * 60 * 10
             await service.processarAlertasEmailPendentes();
         }
         catch (error) {
-            console.error("[g3-backend-node] falha no scheduler de documentos institucionais", error);
+            console.error("[g3n-backend-node] falha no scheduler de documentos institucionais", error);
         }
     };
     void executar();

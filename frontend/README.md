@@ -1,4 +1,4 @@
-# Frontend G3-Next
+# Frontend G3N
 
 Frontend ativo do projeto em React + Vite + TypeScript.
 
@@ -8,11 +8,10 @@ Frontend ativo do projeto em React + Vite + TypeScript.
 - Roteamento ativo: `src/routes/router.tsx`
 - Shell principal: `src/app/app-shell.tsx`
 
-O frontend em uso no G3-Next é a base React. O legado Angular foi retirado do fluxo ativo e ficou arquivado apenas como referência em `legacy-angular/src`.
+O frontend em uso no G3N é a base React.
 
 - `tsconfig.json`: base ativa do React
 - `src/app`: somente arquivos React ativos
-- `legacy-angular/src`: árvore preservada do Angular legado
 
 ## Scripts principais
 
@@ -57,12 +56,6 @@ npm run check:ptbr
 ```
 
 Isso evita publicar telas com acentuação quebrada.
-
-## Legado Angular
-
-O diretório `legacy-angular/` é apenas um arquivo histórico da migração. Ele não participa do build, do teste nem da instalação padrão do frontend ativo.
-
-Se algum trecho legado precisar ser reaproveitado, a recomendação é migrar o código necessário para a base React em vez de reativar a stack Angular dentro deste pacote.
 
 ## Manual do sistema
 

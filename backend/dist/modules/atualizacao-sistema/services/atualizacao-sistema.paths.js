@@ -25,6 +25,6 @@ export function obterAtualizacaoSistemaPaths() {
         diretorioLogs: path.join(diretorioUpdates, "logs"),
         arquivoManifesto: path.join(diretorioUpdates, "version.json"),
         arquivoChangelog: path.join(diretorioUpdates, "changelog.json"),
-        arquivoVersaoInstalada: path.join(raizRepositorio, "backend", "src", "main", "resources", "static", "version.txt")
+        arquivoVersaoInstalada: path.join(diretorioUpdates, "version.txt")
     };
 }

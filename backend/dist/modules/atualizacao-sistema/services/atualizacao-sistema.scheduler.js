@@ -11,7 +11,7 @@ export function iniciarAtualizacaoSistemaScheduler(intervaloMs = 5 * 60 * 1000) 
             await service.verificarEAplicarAutomaticamente();
         }
         catch (error) {
-            console.error("[g3-backend-node] falha no scheduler de atualizacao do sistema", error);
+            console.error("[g3n-backend-node] falha no scheduler de atualizacao do sistema", error);
         }
     };
     void executar();

@@ -16,7 +16,7 @@ export function iniciarLicencaUsoScheduler(intervaloMs = 12 * 60 * 60 * 1000) {
     try {
       await service.processarAlertasEmailPendentes();
     } catch (error) {
-      console.error("[g3-backend-node] falha no scheduler de licenca de uso", error);
+      console.error("[g3n-backend-node] falha no scheduler de licenca de uso", error);
     }
   };
 

@@ -1,5 +1,5 @@
 param(
-  [string]$VersionFile = '.\backend\src\main\resources\static\version.txt'
+  [string]$VersionFile = '.\updates\version.txt'
 )
 
 $ErrorActionPreference = 'Stop'

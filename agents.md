@@ -1,7 +1,7 @@
 ﻿# AGENTS.md — G3 Next (Migração)
 
 > Este arquivo foi reiniciado para a fase de migração.
-> As regras antigas foram removidas do padrão ativo e arquivadas em: `docs/agents-legacy-2026-03-07.md`.
+> As regras antigas foram removidas do padrão ativo.
 
 ---
 

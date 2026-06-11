@@ -53,7 +53,7 @@ import { carteiraEventoRoutes } from "../modules/carteira-evento/routes/carteira
 import { agendamentosRoutes } from "../modules/agendamentos/routes/agendamentos.routes.js";
 export const appRoutes = Router();
 appRoutes.get("/health", (_request, response) => {
-    response.json({ status: "ok", service: "g3-backend-node" });
+    response.json({ status: "ok", service: "g3n-backend-node" });
 });
 appRoutes.use("/api/auth", authRoutes);
 appRoutes.use("/api/ai", ensureAuthenticated, aiRoutes);

@@ -11,7 +11,7 @@ function carregarVersaoSistema() {
 
   const arquivosVersao = [
     path.resolve(__dirname, ".g3-version"),
-    path.resolve(__dirname, "../backend/src/main/resources/static/version.txt")
+    path.resolve(__dirname, "../updates/version.txt")
   ];
 
   for (const arquivo of arquivosVersao) {

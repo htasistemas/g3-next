@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION_FILE="${1:-backend/src/main/resources/static/version.txt}"
+VERSION_FILE="${1:-updates/version.txt}"
 STATE_VERSION_FILE="${STATE_VERSION_FILE:-}"
 
 trim_value() {

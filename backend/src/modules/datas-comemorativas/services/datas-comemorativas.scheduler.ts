@@ -49,7 +49,7 @@ export function iniciarDatasComemorativasScheduler(intervaloMs = 60 * 60 * 1000)
 
       await syncService.syncCurrentAndNextYear();
     } catch (error) {
-      console.error("[g3-backend-node] falha no scheduler de datas comemorativas", error);
+      console.error("[g3n-backend-node] falha no scheduler de datas comemorativas", error);
     }
   };
 

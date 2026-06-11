@@ -73,7 +73,7 @@ function obterVersaoSaude() {
 }
 
 appRoutes.get("/health", (_request, response) => {
-  response.json({ status: "ok", service: "g3-backend-node", version: obterVersaoSaude() });
+  response.json({ status: "ok", service: "g3n-backend-node", version: obterVersaoSaude() });
 });
 
 appRoutes.use("/api/auth", authRoutes);

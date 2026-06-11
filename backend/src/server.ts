@@ -64,7 +64,7 @@ async function aquecerEstruturasDeTela() {
   resultados.forEach((resultado, indice) => {
     if (resultado.status === "rejected") {
       console.error(
-        `[g3-backend-node] falha ao aquecer modulo ${aquecimentos[indice]?.nome}`,
+        `[g3n-backend-node] falha ao aquecer modulo ${aquecimentos[indice]?.nome}`,
         resultado.reason
       );
     }
@@ -81,16 +81,16 @@ async function bootstrap() {
 
   app.listen(env.API_PORT, env.API_HOST, () => {
     console.log(
-      `[g3-backend-node] executando em http://${env.API_HOST}:${env.API_PORT}`
+      `[g3n-backend-node] executando em http://${env.API_HOST}:${env.API_PORT}`
     );
     if (env.IA_PROVIDER === "gemini") {
       if (!env.APP_GEMINI_API_KEY) {
         console.warn(
-          "[g3-backend-node] assistente de IA indisponivel: defina GEMINI_API_KEY no ambiente do backend."
+          "[g3n-backend-node] assistente de IA indisponivel: defina GEMINI_API_KEY no ambiente do backend."
         );
       } else {
         console.log(
-          `[g3-backend-node] assistente de IA configurado com provider=${env.IA_PROVIDER} model=${env.IA_MODEL}`
+          `[g3n-backend-node] assistente de IA configurado com provider=${env.IA_PROVIDER} model=${env.IA_MODEL}`
         );
       }
     }
@@ -103,6 +103,6 @@ async function bootstrap() {
 }
 
 bootstrap().catch((error) => {
-  console.error("[g3-backend-node] falha ao inicializar estruturas de runtime", error);
+  console.error("[g3n-backend-node] falha ao inicializar estruturas de runtime", error);
   process.exit(1);
 });

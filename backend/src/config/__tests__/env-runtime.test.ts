@@ -6,12 +6,12 @@ test("monta DATABASE_URL a partir do padrao legado DB_*", () => {
   const env = normalizeRuntimeEnv({
     DB_HOST: "localhost",
     DB_PORT: "5432",
-    DB_NAME: "g3",
+    DB_NAME: "g3n",
     DB_USERNAME: "postgres",
     DB_PASSWORD: "admin"
   });
 
-  assert.equal(env.DATABASE_URL, "postgresql://postgres:admin@localhost:5432/g3?schema=public");
+  assert.equal(env.DATABASE_URL, "postgresql://postgres:admin@localhost:5432/g3n?schema=public");
 });
 
 test("usa DATABASE_URL padrao de desenvolvimento quando nenhuma variavel de banco foi informada", () => {
