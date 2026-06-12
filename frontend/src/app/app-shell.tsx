@@ -6,6 +6,7 @@ import { DatasComemorativasPopup } from "@/components/system/datas-comemorativas
 import { AIChatWidget } from "@/modules/ai/components/AIChatWidget";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
+import { useAutoRefreshOnVersionChange } from "@/hooks/use-auto-refresh-on-version-change";
 import { useSystemVersion } from "@/hooks/use-system-version";
 import { obterUrlArquivoAutenticado, resolverUrlArquivo } from "@/lib/arquivos";
 import { precarregarRota, precarregarRotas } from "@/routes/route-modules";
@@ -670,7 +671,8 @@ export function AppShell() {
   const navigate = useNavigate();
   const titulo = obterTitulo(location.pathname);
   const semTituloNoTopo = ocultarTituloTopo(location.pathname);
-  const { version: versaoSistema } = useSystemVersion();
+  const { version: versaoSistema, runtimeVersion } = useSystemVersion();
+  const { atualizando: atualizandoFrontend } = useAutoRefreshOnVersionChange(runtimeVersion);
   const [sidebarRecolhida, setSidebarRecolhida] = useState(false);
   const [gruposAbertos, setGruposAbertos] = useState<Record<string, boolean>>({});
   const [lembreteAlertaAtivo, setLembreteAlertaAtivo] = useState(false);
@@ -1030,6 +1032,11 @@ export function AppShell() {
 
   return (
     <div className="min-h-screen bg-[var(--g3-bg)]">
+      {atualizandoFrontend && (
+        <div className="fixed inset-x-0 top-0 z-[70] border-b border-emerald-700 bg-emerald-600 px-4 py-2 text-center text-sm font-semibold text-white shadow-lg">
+          Atualizando sistema...
+        </div>
+      )}
       <aside
         className={`fixed inset-y-0 left-0 z-40 hidden isolate flex-col border-r border-[var(--g3-sidebar-border)] bg-[linear-gradient(180deg,var(--g3-sidebar-bg)_0%,var(--g3-sidebar-bg-alt)_100%)] text-[var(--g3-sidebar-text)] shadow-2xl shadow-[color:var(--g3-sidebar-shadow)] transition-[width] duration-300 lg:flex ${
           sidebarRecolhida ? "w-16" : "w-64"

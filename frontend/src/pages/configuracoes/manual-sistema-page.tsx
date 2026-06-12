@@ -1012,17 +1012,19 @@ const secoesManual: ManualSecao[] = [
         ]
       },
       {
-        nome: "Atualizacao e recarregamento da interface",
-        objetivo: "Orientar a operacao quando houver nova publicacao do frontend e o navegador estiver com arquivos antigos em cache.",
+        nome: "Atualização e recarregamento da interface",
+        objetivo: "Orientar a operação quando houver nova publicação do frontend e o navegador estiver com arquivos antigos em cache.",
         comoUsar: [
-          "Se uma tela exibir erro de carregamento apos atualizacao do sistema, use o botao Atualizar pagina exibido na propria mensagem.",
-          "Quando necessario, acesse novamente a Visao geral para recarregar os modulos mais recentes do frontend.",
-          "Em novas publicacoes, aguarde a recarga completa da aplicacao antes de retomar a operacao.",
-          "No celular, use primeiro a secao desejada no topo e depois toque no item da secao aberta para navegar com menos ruido visual."
+          "Quando uma nova versão for publicada, o sistema compara automaticamente a versão carregada no navegador com a versão informada pelo servidor.",
+          "Se houver versão nova, a interface exibe Atualizando sistema e recarrega a aplicação sem exigir limpeza manual de cache do navegador.",
+          "Após a recarga automática, retome a operação normalmente na tela aberta.",
+          "Se uma tela exibir erro de carregamento após atualização do sistema, use o botão Atualizar página exibido na própria mensagem."
         ],
         atencoes: [
-          "O sistema tenta se recuperar automaticamente uma vez quando detecta erro de importacao dinamica de modulo.",
-          "Se o erro persistir apos a recarga, validar se a publicacao dos arquivos do frontend foi concluida no servidor."
+          "A verificação de versão roda em intervalos regulares enquanto o usuário permanece com o sistema aberto.",
+          "O index.html, env-config.js e configurações runtime devem continuar publicados com no-store para evitar reaproveitamento de HTML antigo.",
+          "Os arquivos de assets versionados por hash podem manter cache longo, pois uma nova build gera novos nomes de arquivos.",
+          "Se o erro persistir após a recarga, validar se a publicação dos arquivos do frontend foi concluída no servidor."
         ]
       }
     ]

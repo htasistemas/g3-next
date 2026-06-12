@@ -6,11 +6,14 @@ export function useSystemVersion() {
   const query = useQuery({
     queryKey: ["system-version-runtime"],
     queryFn: () => systemVersionService.obterVersaoRuntime(),
-    staleTime: 60_000
+    refetchInterval: 60_000,
+    staleTime: 30_000
   });
 
   return {
     ...query,
+    runtimeVersion: query.data ?? null,
+    buildVersion: APP_VERSION,
     version: query.data || APP_VERSION || "Não informado"
   };
 }
