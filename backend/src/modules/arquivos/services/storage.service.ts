@@ -37,6 +37,7 @@ type PersistirCampoInput = {
   entidadeId?: bigint | null;
   entidadeTipo?: string;
   usuarioUploadId?: bigint | null;
+  tenantId?: string | null;
   observacao?: string | null;
   metadadosJson?: Record<string, unknown> | null;
 };
@@ -54,6 +55,7 @@ export class StorageService {
   private readonly provider = new LocalStorageProvider();
 
   async listar(rawFilters: {
+    tenantId?: string;
     entidadeTipo?: string;
     entidadeId?: string;
     categoria?: string;
@@ -64,6 +66,7 @@ export class StorageService {
       rawFilters.ativo === undefined ? undefined : ["true", "1", "yes"].includes(rawFilters.ativo);
 
     return this.repository.listar({
+      tenantId: rawFilters.tenantId,
       entidadeTipo: rawFilters.entidadeTipo?.trim() || undefined,
       entidadeId,
       categoria: rawFilters.categoria?.trim() || undefined,
@@ -71,28 +74,31 @@ export class StorageService {
     });
   }
 
-  async obterPorId(rawId: string) {
-    return this.repository.buscarPorIdOuFalhar(this.parseId(rawId));
+  async obterPorId(rawId: string, tenantId?: string) {
+    return this.repository.buscarPorIdOuFalhar(this.parseId(rawId), tenantId);
   }
 
-  async obterConteudoPorId(rawId: string, usuarioId?: bigint) {
-    const arquivo = await this.repository.buscarPorIdOuFalhar(this.parseId(rawId));
+  async obterConteudoPorId(rawId: string, usuarioId?: bigint, tenantId?: string) {
+    const arquivo = await this.repository.buscarPorIdOuFalhar(this.parseId(rawId), tenantId);
     return this.obterConteudoPorCaminhoInterno(arquivo.caminho_arquivo, arquivo, usuarioId, "VIEW");
   }
 
-  async obterConteudoPorCaminho(rawPath: string, usuarioId?: bigint) {
+  async obterConteudoPorCaminho(rawPath: string, usuarioId?: bigint, tenantId?: string) {
     if (!rawPath?.trim()) {
       throw new AppError("Caminho do arquivo nao informado.", 400);
     }
 
     const caminhoArquivo = this.provider.normalizePath(rawPath);
-    const arquivo = await this.repository.buscarAtivoPorCaminho(caminhoArquivo);
-    return this.obterConteudoPorCaminhoInterno(caminhoArquivo, arquivo ?? undefined, usuarioId, "VIEW");
+    const arquivo = await this.repository.buscarAtivoPorCaminho(caminhoArquivo, tenantId);
+    if (!arquivo) {
+      throw new AppError("Arquivo nao encontrado ou sem permissao de acesso.", 404);
+    }
+    return this.obterConteudoPorCaminhoInterno(caminhoArquivo, arquivo, usuarioId, "VIEW");
   }
 
-  async excluirLogico(rawId: string, usuarioId?: bigint) {
+  async excluirLogico(rawId: string, usuarioId?: bigint, tenantId?: string) {
     const id = this.parseId(rawId);
-    const arquivo = await this.repository.buscarPorIdOuFalhar(id);
+    const arquivo = await this.repository.buscarPorIdOuFalhar(id, tenantId);
     await this.repository.desativarPorId(id);
     await this.provider.remover(arquivo.caminho_arquivo);
     if (arquivo.thumbnail_caminho) {
@@ -109,10 +115,11 @@ export class StorageService {
     });
   }
 
-  async vincularEntidade(caminhoArquivo: string, entidadeId: bigint) {
+  async vincularEntidade(caminhoArquivo: string, entidadeId: bigint, tenantId?: string) {
     await this.repository.vincularEntidadePorCaminho(
       this.provider.normalizePath(caminhoArquivo),
-      entidadeId
+      entidadeId,
+      tenantId
     );
   }
 
@@ -283,6 +290,7 @@ export class StorageService {
     try {
       const registro = await this.repository.criar({
         entidadeTipo: input.entidadeTipo ?? policy.entidadeTipo,
+        tenantId: input.tenantId ?? null,
         entidadeId: input.entidadeId ?? null,
         categoria: policy.categoria,
         nomeOriginal: input.nomeOriginal?.trim() || fileName,

@@ -25,6 +25,7 @@ export type ArquivoEntidadeTipo =
 
 export type ArquivoMetadataRow = {
   id: bigint;
+  tenant_id: string | null;
   entidade_tipo: string;
   entidade_id: bigint | null;
   categoria: string;
@@ -46,6 +47,7 @@ export type ArquivoMetadataRow = {
 };
 
 export type ArquivoMetadataCreateInput = {
+  tenantId?: string | null;
   entidadeTipo: string;
   entidadeId?: bigint | null;
   categoria: string;
@@ -62,6 +64,7 @@ export type ArquivoMetadataCreateInput = {
 };
 
 export type ArquivoListFilters = {
+  tenantId?: string;
   entidadeTipo?: string;
   entidadeId?: bigint;
   categoria?: string;

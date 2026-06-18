@@ -864,7 +864,7 @@ export class MensagensPersonalizadasRepository {
           SELECT
             b.id::text AS id,
             b.nome_completo AS nome,
-            b.cpf AS documento,
+            cpf_doc.numero_documento AS documento,
             contato.email AS email,
             COALESCE(
               NULLIF(contato.telefone_principal, ''),
@@ -882,6 +882,15 @@ export class MensagensPersonalizadasRepository {
             contato.preferencia_canal_comunicacao AS preferencia_canal
           FROM cadastro_beneficiario b
           LEFT JOIN contato_beneficiario contato ON contato.beneficiario_id = b.id
+          LEFT JOIN LATERAL (
+            SELECT d.numero_documento
+            FROM documentos d
+            WHERE d.beneficiario_id = b.id
+              AND d.tenant_id::text = ${tenant}
+              AND upper(coalesce(d.tipo_documento, '')) = 'CPF'
+            ORDER BY d.id DESC
+            LIMIT 1
+          ) cpf_doc ON TRUE
           WHERE b.tenant_id::text = ${tenant}
         ) base
         WHERE 1 = 1

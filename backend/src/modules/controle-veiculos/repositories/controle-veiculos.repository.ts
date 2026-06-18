@@ -38,7 +38,10 @@ function tenantSql(alias: string, tenantId: string) {
 }
 
 type FonteMotorista = {
-  nomeTabela: "cadastro_profissional" | "cadastro_profissionais" | "cadastro_voluntario";
+  nomeTabela:
+    | "cadastro_profissional"
+    | "cadastro_profissionais"
+    | "cadastro_voluntario";
   possuiTenant: boolean;
 };
 
@@ -591,44 +594,50 @@ export class ControleVeiculosRepository {
   async listarMotoristasDisponiveis(nome: string | undefined, tenantId: string) {
     await this.ensureEstrutura();
     const termo = trimOrUndefined(nome);
-    const { profissionais, voluntarios } = await this.obterFontesMotoristas();
-    const fontes: string[] = [];
+    const fontes = await this.obterFontesMotoristas();
+    const consultas: string[] = [];
+    const parametros: unknown[] = [tenantId];
+    const filtroTermo = termo ? "AND nome_completo ILIKE $2" : "";
 
-    if (profissionais?.possuiTenant) {
-      fontes.push(
-        `SELECT id, 'PROFISSIONAL'::text AS tipo_origem, nome_completo AS nome FROM ${profissionais.nomeTabela} WHERE tenant_id::text = $1`
-      );
+    if (termo) {
+      parametros.push(`%${termo}%`);
     }
 
-    if (voluntarios?.possuiTenant) {
-      fontes.push(
-        `SELECT id, 'VOLUNTARIO'::text AS tipo_origem, nome_completo AS nome FROM ${voluntarios.nomeTabela} WHERE tenant_id::text = $1`
-      );
+    if (fontes.profissionais?.possuiTenant) {
+      consultas.push(`
+        SELECT id, 'PROFISSIONAL'::text AS tipo_origem, nome_completo AS nome
+        FROM ${fontes.profissionais.nomeTabela}
+        WHERE tenant_id::text = $1
+          ${filtroTermo}
+      `);
     }
 
-    if (!fontes.length) {
+    if (fontes.voluntarios?.possuiTenant) {
+      consultas.push(`
+        SELECT id, 'VOLUNTARIO'::text AS tipo_origem, nome_completo AS nome
+        FROM ${fontes.voluntarios.nomeTabela}
+        WHERE tenant_id::text = $1
+          ${filtroTermo}
+      `);
+    }
+
+    if (!consultas.length) {
       return [];
     }
 
-    const filtroTermo = termo ? "WHERE nome ILIKE $2" : "";
     const sql = `
-      SELECT *
-      FROM (${fontes.join(" UNION ALL ")}) motoristas
-      ${filtroTermo}
+      SELECT id, tipo_origem, nome
+      FROM (
+        ${consultas.join("\nUNION ALL\n")}
+      ) motoristas
       ORDER BY nome ASC
       LIMIT 30
     `;
 
-    return termo
-      ? prisma.$queryRawUnsafe<Array<{ id: bigint; tipo_origem: string; nome: string }>>(
-          sql,
-          tenantId,
-          `%${termo}%`
-        )
-      : prisma.$queryRawUnsafe<Array<{ id: bigint; tipo_origem: string; nome: string }>>(
-          sql,
-          tenantId
-        );
+    return prisma.$queryRawUnsafe<Array<{ id: bigint; tipo_origem: string; nome: string }>>(
+      sql,
+      ...parametros
+    );
   }
 
   async listarMotoristasAutorizados(veiculoId: number | undefined, tenantId: string) {

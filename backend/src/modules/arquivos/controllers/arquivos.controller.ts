@@ -1,5 +1,5 @@
 import multer from "multer";
-import type { Request, Response } from "express";
+import type { Response } from "express";
 import type { AuthenticatedRequest } from "../../auth/middlewares/auth.middleware.js";
 import {
   mapArquivoMetadataToResponse,
@@ -17,39 +17,44 @@ export const arquivosUploadMiddleware = multer({
 }).single("arquivo");
 
 export class ArquivosController {
-  async listar(request: Request, response: Response) {
-    const arquivos = await service.listar(request.query as Record<string, unknown>);
+  async listar(request: AuthenticatedRequest, response: Response) {
+    const arquivos = await service.listar(
+      request.query as Record<string, unknown>,
+      request.authUser?.tenant_id
+    );
     return response.json({ arquivos: arquivos.map(mapArquivoMetadataToResponse) });
   }
 
-  async upload(request: Request, response: Response) {
+  async upload(request: AuthenticatedRequest, response: Response) {
     const arquivo = await service.upload(request as AuthenticatedRequest & { file?: Express.Multer.File });
     return response.status(201).json({ arquivo: mapArquivoUploadToResponse(arquivo) });
   }
 
-  async obterPorId(request: Request, response: Response) {
-    const arquivo = await service.obterPorId(request.params.id);
+  async obterPorId(request: AuthenticatedRequest, response: Response) {
+    const arquivo = await service.obterPorId(request.params.id, request.authUser?.tenant_id);
     return response.json({ arquivo: mapArquivoMetadataToResponse(arquivo) });
   }
 
-  async obterConteudoPorId(request: Request, response: Response) {
+  async obterConteudoPorId(request: AuthenticatedRequest, response: Response) {
     const conteudo = await service.obterConteudoPorId(
       request.params.id,
-      (request as AuthenticatedRequest).authUser?.id
+      request.authUser?.id,
+      request.authUser?.tenant_id
     );
     return this.enviarConteudo(response, conteudo, request.query.download);
   }
 
-  async obterConteudoPorCaminho(request: Request, response: Response) {
+  async obterConteudoPorCaminho(request: AuthenticatedRequest, response: Response) {
     const conteudo = await service.obterConteudoPorCaminho(
       String(request.query.path ?? ""),
-      (request as AuthenticatedRequest).authUser?.id
+      request.authUser?.id,
+      request.authUser?.tenant_id
     );
     return this.enviarConteudo(response, conteudo, request.query.download);
   }
 
-  async excluir(request: Request, response: Response) {
-    await service.excluir(request.params.id, (request as AuthenticatedRequest).authUser?.id);
+  async excluir(request: AuthenticatedRequest, response: Response) {
+    await service.excluir(request.params.id, request.authUser?.id, request.authUser?.tenant_id);
     return response.status(204).send();
   }
 

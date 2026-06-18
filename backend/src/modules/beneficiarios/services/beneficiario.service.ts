@@ -19,10 +19,12 @@ import {
 import { normalizarObjetoTexto } from "../../../utils/text-formatter.js";
 import type { BeneficiarioInput } from "../beneficiario.types.js";
 import { storageService } from "../../arquivos/services/storage-instance.js";
+import { ParametrosSistemaService } from "../../configuracoes-gerais/services/parametros-sistema.service.js";
 
 export class BeneficiarioService {
   private readonly repository = new BeneficiarioRepository();
   private readonly emailService = new EmailService();
+  private readonly parametrosSistemaService = new ParametrosSistemaService();
 
   async listar(rawFilters: unknown, tenantId?: string) {
     const filtersNormalizados =
@@ -51,13 +53,14 @@ export class BeneficiarioService {
     const inputNormalizado = this.normalizarPayload(rawInput);
     const input = beneficiarioInputSchema.parse(inputNormalizado);
     const tenantObrigatorio = this.parseTenantId(tenantId);
+    await this.validarDocumentosObrigatorios(input, tenantObrigatorio);
     await this.validarDuplicidadeCadastro(input, tenantObrigatorio);
     const usuarioId = this.parseUsuarioId(rawUsuarioId);
-    const preparado = await this.prepararArquivosPayload(input, usuarioId);
+    const preparado = await this.prepararArquivosPayload(input, usuarioId, undefined, tenantObrigatorio);
 
     try {
       const beneficiario = await this.repository.criar(preparado.input, tenantObrigatorio);
-      await this.vincularArquivos(preparado.novosCaminhos, beneficiario.id);
+      await this.vincularArquivos(preparado.novosCaminhos, beneficiario.id, tenantObrigatorio);
       return mapBeneficiarioToResponse(beneficiario);
     } catch (error) {
       await storageService.rollbackArquivos(preparado.novosCaminhos);
@@ -71,10 +74,11 @@ export class BeneficiarioService {
     const input = beneficiarioInputSchema.parse(inputNormalizado);
     const tenantObrigatorio = this.parseTenantId(tenantId);
     const usuarioId = this.parseUsuarioId(rawUsuarioId);
+    await this.validarDocumentosObrigatorios(input, tenantObrigatorio);
     await this.validarDuplicidadeCadastro(input, tenantObrigatorio, id);
     const existente = await this.repository.buscarPorIdOuFalhar(id, tenantObrigatorio);
     const snapshotAnterior = mapBeneficiarioToResponse(existente);
-    const preparado = await this.prepararArquivosPayload(input, usuarioId, id);
+    const preparado = await this.prepararArquivosPayload(input, usuarioId, id, tenantObrigatorio);
 
     try {
       let beneficiario;
@@ -94,7 +98,7 @@ export class BeneficiarioService {
       }
 
       try {
-        await this.vincularArquivos(preparado.novosCaminhos, id);
+        await this.vincularArquivos(preparado.novosCaminhos, id, tenantObrigatorio);
       } catch (error) {
         if (error instanceof AppError) {
           throw error;
@@ -199,7 +203,8 @@ export class BeneficiarioService {
   private async prepararArquivosPayload(
     input: BeneficiarioInput,
     usuarioId?: bigint,
-    entidadeId?: bigint
+    entidadeId?: bigint,
+    tenantId?: string
   ) {
     const novosCaminhos: string[] = [];
 
@@ -212,6 +217,7 @@ export class BeneficiarioService {
         mimeType: "image/jpeg",
         entidadeId,
         usuarioUploadId: usuarioId,
+        tenantId,
         observacao: "Foto 3x4 do beneficiario"
       });
     } catch (error) {
@@ -238,6 +244,7 @@ export class BeneficiarioService {
             mimeType: documento.contentType,
             entidadeId,
             usuarioUploadId: usuarioId,
+            tenantId,
             observacao: documento.nome
           });
         } catch (error) {
@@ -299,10 +306,68 @@ export class BeneficiarioService {
     return [...caminhos];
   }
 
-  private async vincularArquivos(caminhos: string[], entidadeId: bigint) {
+  private async vincularArquivos(caminhos: string[], entidadeId: bigint, tenantId: string) {
     for (const caminho of caminhos) {
-      await storageService.vincularEntidade(caminho, entidadeId);
+      await storageService.vincularEntidade(caminho, entidadeId, tenantId);
     }
+  }
+
+  private async validarDocumentosObrigatorios(input: BeneficiarioInput, tenantId: string) {
+    const configuracao =
+      await this.parametrosSistemaService.obterObrigatoriedadeDocumentosBeneficiario(tenantId);
+    const documentos = input.documentos_obrigatorios ?? [];
+    const porChave = new Map<string, (typeof documentos)[number]>();
+
+    for (const documento of documentos) {
+      const chaves = [
+        documento.id ? String(documento.id) : undefined,
+        documento.nome ? this.normalizarNomeDocumento(documento.nome) : undefined
+      ].filter((valor): valor is string => !!valor);
+
+      for (const chave of chaves) {
+        porChave.set(chave, documento);
+      }
+    }
+
+    const pendencias: string[] = [];
+
+    for (const documentoConfig of configuracao.obrigatoriedade.documentos) {
+      if (!documentoConfig.obrigatorio) continue;
+
+      const documento =
+        porChave.get(documentoConfig.id) ??
+        porChave.get(this.normalizarNomeDocumento(documentoConfig.nome));
+
+      const numeroDocumento = documento?.numeroDocumento?.trim();
+      const caminhoArquivo = documento?.caminhoArquivo?.trim() || documento?.conteudo?.trim();
+
+      if (documentoConfig.id === "cpf") {
+        continue;
+      }
+
+      if (documentoConfig.id === "comprovante_endereco") {
+        if (!numeroDocumento || !caminhoArquivo || documento?.ignorado) {
+          pendencias.push(documentoConfig.nome);
+        }
+        continue;
+      }
+
+      if ((!numeroDocumento && !caminhoArquivo) || documento?.ignorado) {
+        pendencias.push(documentoConfig.nome);
+      }
+    }
+
+    if (pendencias.length) {
+      throw new AppError(`Documentos obrigatorios pendentes: ${pendencias.join(", ")}.`, 400);
+    }
+  }
+
+  private normalizarNomeDocumento(nome: string) {
+    return nome
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim()
+      .toLowerCase();
   }
 
   private async limparArquivosSubstituidos(

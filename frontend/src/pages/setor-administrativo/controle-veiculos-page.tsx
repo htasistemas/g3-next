@@ -55,11 +55,19 @@ import { controleVeiculosService } from "@/services/controle-veiculos.service";
 import type {
   LocalDestinoVeiculo,
   MotoristaAutorizado,
+  MotoristaDisponivel,
   RegistroDiarioBordo,
   VeiculoCadastro
 } from "@/types/controle-veiculos";
 
-type AbaId = "dashboard" | "cadastro" | "listagem" | "diario" | "destinos" | "motoristas";
+type AbaId =
+  | "dashboard"
+  | "cadastro"
+  | "listagem"
+  | "diario"
+  | "destinos"
+  | "motoristas";
+type TipoOrigemMotorista = MotoristaAutorizado["tipoOrigem"];
 
 const abas: AdminTab[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -130,7 +138,7 @@ const defaultMotorista: MotoristaAutorizado = {
 type MotoristaAutorizadoAgrupado = {
   chave: string;
   nomeMotorista: string;
-  tipoOrigem: "PROFISSIONAL" | "VOLUNTARIO";
+  tipoOrigem: TipoOrigemMotorista;
   categoriaCarteira?: string | null;
   numeroCarteira?: string | null;
   vencimentoCarteira?: string | null;
@@ -304,6 +312,11 @@ function focarProximoCampoComEnter(event: KeyboardEvent<HTMLDivElement>) {
 
 function arquivoEhPdf(arquivo: File) {
   return arquivo.type === "application/pdf" || arquivo.name.toLowerCase().endsWith(".pdf");
+}
+
+function rotuloTipoOrigemMotorista(tipoOrigem?: string | null) {
+  if (tipoOrigem === "VOLUNTARIO") return "Voluntário";
+  return "Profissional";
 }
 
 function PlacaVeiculoVisual({ placa }: { placa?: string | null }) {
@@ -762,10 +775,10 @@ export function ControleVeiculosPage() {
     setConfirmarExcluir(true);
   }
 
-  function selecionarMotoristaDisponivel(item: { id: number; nome: string; tipoOrigem: string }) {
+  function selecionarMotoristaDisponivel(item: MotoristaDisponivel) {
     setMotoristaForm((atual) => ({
       ...atual,
-      tipoOrigem: item.tipoOrigem === "VOLUNTARIO" ? "VOLUNTARIO" : "PROFISSIONAL",
+      tipoOrigem: item.tipoOrigem,
       motoristaId: item.id,
       nomeMotorista: item.nome
     }));
@@ -1576,7 +1589,25 @@ export function ControleVeiculosPage() {
           <section className="space-y-4">
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <div className="space-y-1"><Label>Veículo *</Label><Select value={String(motoristaForm.veiculoId || "")} onChange={(event) => setMotoristaForm((atual) => ({ ...atual, veiculoId: Number(event.target.value) || 0 }))}><option value="">Selecione</option>{veiculos.map((item) => <option key={item.id} value={item.id}>{item.placa} - {item.modelo}</option>)}</Select></div>
-              <div className="space-y-1"><Label>Tipo de origem</Label><Select value={motoristaForm.tipoOrigem} onChange={(event) => { const tipoOrigem = event.target.value as "PROFISSIONAL" | "VOLUNTARIO"; setMotoristaForm((atual) => ({ ...atual, tipoOrigem, motoristaId: 0, nomeMotorista: "" })); setTermoMotorista(""); }}><option value="PROFISSIONAL">Profissional</option><option value="VOLUNTARIO">Voluntário</option></Select></div>
+              <div className="space-y-1">
+                <Label>Tipo de origem</Label>
+                <Select
+                  value={motoristaForm.tipoOrigem}
+                  onChange={(event) => {
+                    const tipoOrigem = event.target.value as "PROFISSIONAL" | "VOLUNTARIO";
+                    setMotoristaForm((atual) => ({
+                      ...atual,
+                      tipoOrigem,
+                      motoristaId: 0,
+                      nomeMotorista: ""
+                    }));
+                    setTermoMotorista("");
+                  }}
+                >
+                  <option value="PROFISSIONAL">Profissional</option>
+                  <option value="VOLUNTARIO">Voluntário</option>
+                </Select>
+              </div>
               <div className="space-y-1 md:col-span-2 xl:col-span-2">
                 <Label>Motorista autorizado *</Label>
                 <div className="relative">
@@ -1602,7 +1633,7 @@ export function ControleVeiculosPage() {
                           onClick={() => selecionarMotoristaDisponivel(item)}
                         >
                           <span className="font-medium text-[var(--g3-text)]">{item.nome}</span>
-                          <span className="text-xs text-[var(--g3-muted)]">{item.tipoOrigem === "PROFISSIONAL" ? "Profissional" : "Voluntário"}</span>
+                          <span className="text-xs text-[var(--g3-muted)]">{rotuloTipoOrigemMotorista(item.tipoOrigem)}</span>
                         </button>
                       )) : (
                         <div className="px-3 py-2 text-sm text-[var(--g3-muted)]">Nenhum motorista encontrado.</div>
@@ -1618,7 +1649,7 @@ export function ControleVeiculosPage() {
             <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]">
               <table className="min-w-full text-sm">
                 <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"><tr><th className="px-3 py-2 text-left">Motorista</th><th className="px-3 py-2 text-left">Origem</th><th className="px-3 py-2 text-left">Categoria da carteira</th><th className="px-3 py-2 text-left">Número da carteira</th><th className="px-3 py-2 text-left">Veículos autorizados</th></tr></thead>
-                <tbody>{motoristasAutorizadosAgrupados.length ? motoristasAutorizadosAgrupados.map((grupo, index) => <tr key={grupo.chave} className={`cursor-pointer border-t border-[var(--g3-border)] ${index % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35"}`} onClick={() => { const item = grupo.registros[0]; setMotoristaForm({ ...item, vencimentoCarteira: item.vencimentoCarteira ?? "" }); setTermoMotorista(item.nomeMotorista ?? ""); }}><td className="px-3 py-2 font-medium">{grupo.nomeMotorista}</td><td className="px-3 py-2">{grupo.tipoOrigem === "PROFISSIONAL" ? "Profissional" : "Voluntário"}</td><td className="px-3 py-2">{grupo.categoriaCarteira ?? "---"}</td><td className="px-3 py-2">{grupo.numeroCarteira ?? "---"}</td><td className="px-3 py-2"><div className="flex flex-wrap gap-1">{grupo.veiculos.map((veiculo) => <span key={`${grupo.chave}-${veiculo}`} className="rounded-full border border-[var(--g3-border)] bg-[var(--g3-card)] px-2 py-1 text-xs">{veiculo}</span>)}</div></td></tr>) : <tr><td className="px-3 py-4 text-center" colSpan={5}>Nenhum motorista autorizado cadastrado.</td></tr>}</tbody>
+                <tbody>{motoristasAutorizadosAgrupados.length ? motoristasAutorizadosAgrupados.map((grupo, index) => <tr key={grupo.chave} className={`cursor-pointer border-t border-[var(--g3-border)] ${index % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35"}`} onClick={() => { const item = grupo.registros[0]; setMotoristaForm({ ...item, vencimentoCarteira: item.vencimentoCarteira ?? "" }); setTermoMotorista(item.nomeMotorista ?? ""); }}><td className="px-3 py-2 font-medium">{grupo.nomeMotorista}</td><td className="px-3 py-2">{rotuloTipoOrigemMotorista(grupo.tipoOrigem)}</td><td className="px-3 py-2">{grupo.categoriaCarteira ?? "---"}</td><td className="px-3 py-2">{grupo.numeroCarteira ?? "---"}</td><td className="px-3 py-2"><div className="flex flex-wrap gap-1">{grupo.veiculos.map((veiculo) => <span key={`${grupo.chave}-${veiculo}`} className="rounded-full border border-[var(--g3-border)] bg-[var(--g3-card)] px-2 py-1 text-xs">{veiculo}</span>)}</div></td></tr>) : <tr><td className="px-3 py-4 text-center" colSpan={5}>Nenhum motorista autorizado cadastrado.</td></tr>}</tbody>
               </table>
             </div>
           </section>

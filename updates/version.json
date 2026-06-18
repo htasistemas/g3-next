@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.514",
-  "releaseDate": "2026-05-27",
-  "description": "A geração semanal do Checklist diário foi estabilizada para suportar disparos simultâneos e lotes completos sem erro interno.",
+  "latestVersion": "1.00.523",
+  "releaseDate": "2026-06-18",
+  "description": "O Cadastro de beneficiários recebeu reforços de segurança e validação para arquivos, documentos obrigatórios, datas e aceite LGPD.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.514",
+  "minCompatibleVersion": "1.00.523",
   "releaseType": "stable",
   "downloadUrl": null
 }

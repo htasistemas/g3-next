@@ -50,7 +50,7 @@ export type LocalDestinoVeiculo = {
 
 export type MotoristaDisponivel = {
   id: number;
-  tipoOrigem: string;
+  tipoOrigem: "PROFISSIONAL" | "VOLUNTARIO";
   nome: string;
 };
 

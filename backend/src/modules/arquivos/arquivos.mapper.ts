@@ -21,6 +21,7 @@ function toJsonDate(value?: Date | null) {
 export function mapArquivoMetadataToResponse(row: ArquivoMetadataRow) {
   return {
     id: Number(row.id),
+    tenant_id: row.tenant_id,
     entidade_tipo: row.entidade_tipo,
     entidade_id: toJsonNumber(row.entidade_id),
     categoria: row.categoria,

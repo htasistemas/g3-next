@@ -409,7 +409,7 @@ function mapearBeneficiarioParaFormulario(item?: Beneficiario): BeneficiarioForm
     telefone_recado_numero: formatarTelefoneInput(item.telefone_recado_numero),
     email: normalizarEmailDigitado(item.email),
     status: item.status ?? "EM_ANALISE",
-    aceite_lgpd: item.aceite_lgpd ?? true
+    aceite_lgpd: item.aceite_lgpd ?? false
   };
 }
 

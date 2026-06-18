@@ -17,6 +17,18 @@ const emailOpcionalSchema = z.preprocess(
   z.union([z.string().email("E-mail inválido."), z.literal("")]).optional()
 );
 
+function dataIsoReal(value: string) {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return false;
+
+  const ano = Number(match[1]);
+  const mes = Number(match[2]);
+  const dia = Number(match[3]);
+  const data = new Date(ano, mes - 1, dia);
+
+  return data.getFullYear() === ano && data.getMonth() === mes - 1 && data.getDate() === dia;
+}
+
 export const beneficiarioStatusOptions = [
   "ATIVO",
   "INATIVO",
@@ -33,7 +45,14 @@ export const beneficiarioFormSchema = z.object({
   nome_completo: z.string().trim().min(3, "Informe o nome completo."),
   nome_social: z.string().optional(),
   apelido: z.string().optional(),
-  data_nascimento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data de nascimento invalida."),
+  data_nascimento: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Data de nascimento inválida.")
+    .refine(dataIsoReal, "Data de nascimento inválida.")
+    .refine(
+      (value) => new Date(`${value}T00:00:00`).getTime() <= Date.now(),
+      "Data de nascimento não pode ser futura."
+    ),
   foto_3x4: z.string().optional(),
   sexo_biologico: z.string().optional(),
   cor_raca: z.string().optional(),
@@ -187,8 +206,8 @@ export const beneficiarioDefaultValues: BeneficiarioFormValues = {
   usa_medicacao_continua: false,
   descricao_medicacao: "",
   servico_saude_referencia: "",
-  aceite_lgpd: true,
-  data_aceite_lgpd: new Date().toISOString().slice(0, 10),
+  aceite_lgpd: false,
+  data_aceite_lgpd: "",
   observacoes: "",
   documentos_obrigatorios: []
 };

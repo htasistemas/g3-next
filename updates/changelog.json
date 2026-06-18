@@ -1,6 +1,53 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.523",
+                        "releaseDate":  "2026-06-18",
+                        "title":  "Beneficiários com validação e segurança reforçadas",
+                        "description":  "O Cadastro de beneficiários recebeu reforços de segurança e validação para arquivos, documentos obrigatórios, datas e aceite LGPD.",
+                        "changes":  [
+                                        "Fotos e documentos vinculados ao cadastro passam a gravar e validar tenant no módulo de arquivos, reduzindo risco de acesso cruzado entre instituições.",
+                                        "A API de beneficiários passou a validar no backend os documentos obrigatórios configurados em Parâmetros do sistema.",
+                                        "Datas de nascimento inexistentes ou futuras passam a ser rejeitadas no frontend e no backend.",
+                                        "O aceite LGPD deixou de vir marcado por padrão, exigindo confirmação explícita antes do salvamento.",
+                                        "A busca de destinatários de mensagens personalizadas passou a recuperar CPF de beneficiários pela tabela de documentos."
+                                    ]
+                    },
+                    {
+                        "version":  "1.00.522",
+                        "releaseDate":  "2026-06-18",
+                        "title":  "Campos de beneficiários com destaque visual",
+                        "description":  "Os campos do Cadastro de beneficiários receberam fundo e sombra mais evidentes para melhorar a leitura em monitores com muito brilho.",
+                        "changes":  [
+                                        "Campos de texto, seleção e áreas de texto agora usam fundo cinza claro, borda mais visível e sombra interna leve.",
+                                        "O foco dos campos mantém realce visual para facilitar a identificação do campo ativo.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ]
+                    },
+                    {
+                        "version":  "1.00.521",
+                        "releaseDate":  "2026-06-18",
+                        "title":  "Motoristas autorizados sem cadastro duplicado",
+                        "description":  "A aba Motoristas autorizados do Controle de veículos passou a buscar condutores diretamente nos cadastros de profissionais e voluntários.",
+                        "changes":  [
+                                        "A aba Cadastro de motoristas foi removida para evitar duplicidade de cadastro de condutores.",
+                                        "O campo Motorista autorizado agora busca profissionais ou voluntários conforme o Tipo de origem selecionado.",
+                                        "O backend deixou de criar cadastro próprio de motoristas e passou a consultar cadastro_profissionais/cadastro_profissional e cadastro_voluntario dentro do tenant autenticado.",
+                                        "Diagnóstico de impacto de banco, manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ]
+                    },
+                    {
+                        "version":  "1.00.517",
+                        "releaseDate":  "2026-06-18",
+                        "title":  "Campos de formulário com melhor contraste",
+                        "description":  "Os campos de preenchimento do cadastro de beneficiários e dos demais formulários que usam componentes padrão receberam fundo sombreado para evitar que fiquem invisíveis em monitores com alto contraste.",
+                        "changes":  [
+                                        "Campos de texto, seleção e áreas de texto agora usam fundo levemente sombreado, sombra interna discreta e borda de foco mais evidente.",
+                                        "O cadastro de beneficiários passou a exibir campos como Nome completo e Nome social com melhor separação visual em relação ao fundo da tela.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ]
+                    },
+                    {
                         "version":  "1.00.514",
                         "releaseDate":  "2026-05-27",
                         "title":  "Geração semanal do checklist estabilizada",

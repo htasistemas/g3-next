@@ -13,6 +13,22 @@ const optionalBoolean = z.preprocess((value) => {
   return value;
 }, z.boolean().optional());
 
+function isRealIsoDate(value: string) {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return false;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(year, month - 1, day);
+
+  return (
+    date.getFullYear() === year &&
+    date.getMonth() === month - 1 &&
+    date.getDate() === day
+  );
+}
+
 const optionalInteger = z.preprocess((value) => {
   if (value === null || value === undefined || value === "") return undefined;
   if (typeof value === "number") return value;
@@ -24,7 +40,7 @@ const optionalIsoDate = z.preprocess((value) => {
   if (typeof value !== "string") return value;
   const trimmed = value.trim();
   return trimmed.length ? trimmed : undefined;
-}, z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional());
+}, z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(isRealIsoDate, "Data invalida.").optional());
 
 const optionalEmail = z.preprocess((value) => {
   if (typeof value !== "string") return value;
@@ -38,7 +54,11 @@ export const beneficiarioInputSchema = z.object({
   nome_completo: z.string().trim().min(3, "Informe o nome completo."),
   nome_social: optionalTrimmedString,
   apelido: optionalTrimmedString,
-  data_nascimento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data de nascimento invalida."),
+  data_nascimento: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Data de nascimento invalida.")
+    .refine(isRealIsoDate, "Data de nascimento invalida.")
+    .refine((value) => new Date(`${value}T00:00:00`).getTime() <= Date.now(), "Data de nascimento nao pode ser futura."),
   foto_3x4: optionalTrimmedString,
   sexo_biologico: optionalTrimmedString,
   identidade_genero: optionalTrimmedString,

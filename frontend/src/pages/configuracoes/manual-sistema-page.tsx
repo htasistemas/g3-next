@@ -78,6 +78,7 @@ const secoesManual: ManualSecao[] = [
         comoUsar: [
           "Preencha os dados pessoais principais e confira campos obrigatórios destacados.",
           "Na aba Dados pessoais, os campos e o bloco de foto usam layout compacto para reduzir rolagem da tela durante o cadastro.",
+          "Os campos de preenchimento usam fundo sombreado, borda mais visível, sombra interna leve e realce no foco para melhorar a leitura em monitores com alto contraste ou muito brilho.",
           "Revise a aba Documentos e use a regra de obrigatoriedade definida em parâmetros do sistema; quando houver muitos documentos, a rolagem fica dentro do card da lista de documentos.",
           "Ao abrir um beneficiário, leia o aviso de pendências antes de continuar o atendimento.",
           "Na aba Listagem de beneficiários, use os filtros no topo e o botão Limpar para localizar registros. A listagem não exibe mais o resumo do beneficiário selecionado acima dos resultados, mantendo a rolagem apenas na grade de beneficiários."
@@ -337,7 +338,7 @@ const secoesManual: ManualSecao[] = [
           "Na aba Mapa de bordo, registre saídas, chegadas, condutor, destino e quilometragem do deslocamento. O campo Data abre preenchido com a data atual e não permite edição manual.",
           "Ao usar a ação Imprimir mapa de bordo, informe o veículo, a data inicial e a data final do período desejado para gerar o relatório.",
           "Na aba Locais de destino, mantenha os endereços de referência organizados para reaproveitar no mapa de bordo.",
-          "Na aba Motoristas autorizados, vincule motorista e veículo com carteira e vencimento quando aplicável.",
+          "Na aba Motoristas autorizados, selecione se a origem é Profissional ou Voluntário, digite ao menos duas letras e escolha o cadastro correspondente para vincular o condutor ao veículo.",
           "Na listagem de Motoristas autorizados, cada motorista aparece uma única vez, com os veículos autorizados consolidados no mesmo registro e a categoria da carteira visível na tabela.",
           "A barra superior da tela usa nomes específicos por aba, como Salvar veículo, Salvar mapa de bordo, Salvar destino e Salvar motorista autorizado."
         ],
@@ -345,7 +346,7 @@ const secoesManual: ManualSecao[] = [
           "Na aba Dashboard, a barra superior usa ações próprias do painel e o botão Abrir cadastro de veículo leva diretamente ao cadastro.",
           "Na aba Listagem de veículos, a ação principal da barra superior passa a ser Editar veículo, evitando confusão com o salvamento do cadastro.",
           "Os botões da barra superior foram compactados e balanceados em largura para respeitar melhor o espaço do card e não avançar sobre o título da tela.",
-          "O vínculo de motorista autorizado foi ajustado para funcionar tanto em bases que usam cadastro_profissional quanto em bases que usam cadastro_profissionais.",
+          "A busca de Motoristas autorizados usa diretamente os cadastros de profissionais e voluntários, evitando duplicidade de cadastro de condutores.",
           "A impressão do mapa de bordo é gerada no próprio navegador sem abrir aba auxiliar, respeita o período informado no modal de impressão e segue o padrão institucional do G3N com nome da instituição, logomarca de relatório e rodapé oficial da unidade.",
           "A tela Controle de veículos agora lista, cadastra, atualiza e exclui veículos, diário de bordo, locais de destino e motoristas autorizados sempre dentro do tenant autenticado, impedindo mistura de dados entre instituições."
         ]
@@ -687,10 +688,14 @@ const secoesManual: ManualSecao[] = [
         objetivo: "Manter o cadastro social completo do beneficiário com documentos, contatos, endereço e demais informações obrigatórias.",
         comoUsar: [
           "Na aba Documentos, anexe ou capture os arquivos aceitos pelo sistema antes de salvar o cadastro.",
+          "Documentos marcados como obrigatórios em Parâmetros do sistema precisam ser preenchidos também para chamadas diretas da API, não apenas pela validação visual da tela.",
+          "O aceite LGPD deve ser marcado explicitamente pelo usuário responsável antes de salvar o cadastro.",
           "Se houver falha no processamento de um documento, o sistema agora informa qual documento apresentou erro e o motivo real retornado pelo backend.",
           "Revise nome do arquivo, tipo aceito, tamanho e integridade do anexo quando houver mensagem específica na tela."
         ],
         atencoes: [
+          "Fotos e documentos do beneficiário ficam vinculados ao tenant da instituição autenticada e não devem ser acessíveis por outro CNPJ.",
+          "Datas de nascimento futuras ou inexistentes são bloqueadas no cadastro.",
           "A tela não deve mais exibir apenas erro interno do servidor nesse fluxo de documentos quando houver um motivo tratável.",
           "Mensagens de validação e persistência agora priorizam o motivo operacional real do erro."
         ]

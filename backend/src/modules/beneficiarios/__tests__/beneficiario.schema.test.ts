@@ -41,3 +41,24 @@ test("beneficiarioInputSchema rejeita e-mail inválido quando informado", () => 
     })
   );
 });
+
+test("beneficiarioInputSchema rejeita data de nascimento inexistente", () => {
+  assert.throws(() =>
+    beneficiarioInputSchema.parse({
+      ...criarPayloadValido(),
+      data_nascimento: "2026-02-31"
+    })
+  );
+});
+
+test("beneficiarioInputSchema rejeita data de nascimento futura", () => {
+  const dataFutura = new Date();
+  dataFutura.setFullYear(dataFutura.getFullYear() + 1);
+
+  assert.throws(() =>
+    beneficiarioInputSchema.parse({
+      ...criarPayloadValido(),
+      data_nascimento: dataFutura.toISOString().slice(0, 10)
+    })
+  );
+});
