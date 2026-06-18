@@ -16,6 +16,34 @@ type AuditoriaPayload = {
 };
 
 export class ArquivosRepository {
+  private montarClausulaTenantLegado(tenantId: string) {
+    return Prisma.sql`
+      OR (
+        tenant_id IS NULL
+        AND (
+          (
+            entidade_tipo = 'beneficiario'
+            AND EXISTS (
+              SELECT 1
+              FROM cadastro_beneficiario b
+              WHERE b.id = arquivos.entidade_id
+                AND b.tenant_id::text = ${tenantId}
+            )
+          )
+          OR (
+            entidade_tipo IN ('instituicao', 'unidade_assistencial')
+            AND EXISTS (
+              SELECT 1
+              FROM unidade_assistencial u
+              WHERE u.id = arquivos.entidade_id
+                AND u.tenant_id::text = ${tenantId}
+            )
+          )
+        )
+      )
+    `;
+  }
+
   async criar(input: ArquivoMetadataCreateInput) {
     await ensureArquivosEstrutura(prisma);
     const usuarioUploadId = await this.resolverUsuarioUploadId(input.usuarioUploadId ?? undefined);
@@ -118,16 +146,7 @@ export class ArquivosRepository {
       clauses.push(Prisma.sql`
         (
           tenant_id::text = ${filters.tenantId}
-          OR (
-            tenant_id IS NULL
-            AND entidade_tipo = 'beneficiario'
-            AND EXISTS (
-              SELECT 1
-              FROM cadastro_beneficiario b
-              WHERE b.id = arquivos.entidade_id
-                AND b.tenant_id::text = ${filters.tenantId}
-            )
-          )
+          ${this.montarClausulaTenantLegado(filters.tenantId)}
         )
       `);
     }
@@ -183,16 +202,7 @@ export class ArquivosRepository {
       ? Prisma.sql`
         AND (
           tenant_id::text = ${tenantId}
-          OR (
-            tenant_id IS NULL
-            AND entidade_tipo = 'beneficiario'
-            AND EXISTS (
-              SELECT 1
-              FROM cadastro_beneficiario b
-              WHERE b.id = arquivos.entidade_id
-                AND b.tenant_id::text = ${tenantId}
-            )
-          )
+          ${this.montarClausulaTenantLegado(tenantId)}
         )
       `
       : Prisma.empty;
@@ -243,16 +253,7 @@ export class ArquivosRepository {
       ? Prisma.sql`
         AND (
           tenant_id::text = ${tenantId}
-          OR (
-            tenant_id IS NULL
-            AND entidade_tipo = 'beneficiario'
-            AND EXISTS (
-              SELECT 1
-              FROM cadastro_beneficiario b
-              WHERE b.id = arquivos.entidade_id
-                AND b.tenant_id::text = ${tenantId}
-            )
-          )
+          ${this.montarClausulaTenantLegado(tenantId)}
         )
       `
       : Prisma.empty;

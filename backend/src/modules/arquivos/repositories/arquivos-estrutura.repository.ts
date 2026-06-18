@@ -37,6 +37,15 @@ const sqlEstruturaArquivos: string[] = [
     AND a.entidade_id = b.id
     AND b.tenant_id IS NOT NULL
   `,
+  `
+  UPDATE arquivos a
+  SET tenant_id = u.tenant_id
+  FROM unidade_assistencial u
+  WHERE a.tenant_id IS NULL
+    AND a.entidade_tipo IN ('instituicao', 'unidade_assistencial')
+    AND a.entidade_id = u.id
+    AND u.tenant_id IS NOT NULL
+  `,
   "ALTER TABLE arquivos ADD COLUMN IF NOT EXISTS thumbnail_caminho TEXT",
   "ALTER TABLE arquivos ADD COLUMN IF NOT EXISTS usuario_upload_id BIGINT",
   "ALTER TABLE arquivos ADD COLUMN IF NOT EXISTS ativo BOOLEAN NOT NULL DEFAULT TRUE",

@@ -123,13 +123,13 @@ export class StorageService {
     );
   }
 
-  async desativarPorCaminho(caminhoArquivo?: string | null, usuarioId?: bigint) {
+  async desativarPorCaminho(caminhoArquivo?: string | null, usuarioId?: bigint, tenantId?: string) {
     if (!caminhoArquivo?.trim()) {
       return;
     }
 
     const caminhoLogico = this.provider.normalizePath(caminhoArquivo);
-    const arquivo = await this.repository.buscarAtivoPorCaminho(caminhoLogico);
+    const arquivo = await this.repository.buscarAtivoPorCaminho(caminhoLogico, tenantId);
     await this.repository.desativarPorCaminho(caminhoLogico);
     await this.provider.remover(caminhoLogico);
 
@@ -147,10 +147,10 @@ export class StorageService {
     });
   }
 
-  async rollbackArquivos(caminhosArquivos: Array<string | undefined>) {
+  async rollbackArquivos(caminhosArquivos: Array<string | undefined>, tenantId?: string) {
     for (const caminhoArquivo of caminhosArquivos) {
       if (!caminhoArquivo) continue;
-      await this.desativarPorCaminho(caminhoArquivo);
+      await this.desativarPorCaminho(caminhoArquivo, undefined, tenantId);
     }
   }
 
