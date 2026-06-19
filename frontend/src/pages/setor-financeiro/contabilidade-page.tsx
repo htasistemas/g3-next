@@ -2492,7 +2492,7 @@ export function ContabilidadePage() {
         activeTab={abaAtiva}
         onChangeTab={(tabId) => setAbaAtiva(tabId as AbaId)}
         actions={acoes}
-        sectionLabel="Setor financeiro"
+        sectionLabel="Contabilidade e finanças"
         pageTitle="Contabilidade / financeiro"
         activeTitle={abas.find((item) => item.id === abaAtiva)?.label}
         codeBadge={codeBadge}

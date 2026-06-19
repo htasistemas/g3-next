@@ -528,7 +528,7 @@ export function HistoricoGeralPage() {
       responsavel: item.profissionalResponsavel ?? "---",
       observacoes: item.observacoes ?? "",
       status: "Retirado",
-      origem: item.origem === "doacao" ? "Doação realizada" : "Central de Atendimentos"
+      origem: item.origem === "doacao" ? "Doações realizadas" : "Central de atendimentos"
     }));
 
     return aplicarFiltrosData(itens, filtros, (item) => ({
@@ -667,7 +667,7 @@ export function HistoricoGeralPage() {
         activeTab={abaAtiva}
         onChangeTab={(tabId) => setAbaAtiva(tabId as AbaId)}
         actions={actions}
-        sectionLabel="Atendimentos"
+        sectionLabel="Atendimentos diários"
         pageTitle="Histórico geral"
         activeTitle={abas.find((aba) => aba.id === abaAtiva)?.label}
         activeIcon={abas.find((aba) => aba.id === abaAtiva)?.icon}

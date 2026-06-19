@@ -96,7 +96,7 @@ const tiposOcorrenciaOptions: RegistroPontoOcorrenciaTipo[] = [
 ];
 
 const tituloTela = "Registro de ponto";
-const secaoTela = "Setor RH";
+const secaoTela = "Recursos humanos";
 
 function normalizarAbaRegistroPonto(valor: string | null | undefined): AbaRegistroPonto {
   if (abas.some((aba) => aba.id === valor)) {

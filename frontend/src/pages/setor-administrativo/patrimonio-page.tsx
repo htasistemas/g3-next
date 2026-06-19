@@ -1518,7 +1518,7 @@ export function PatrimonioPage() {
         activeTab={abaAtiva}
         onChangeTab={(tabId) => setAbaAtiva(tabId as AbaId)}
         actions={acoes}
-        sectionLabel="Setor administrativo"
+        sectionLabel="Administração e gestão"
         pageTitle={tituloTela}
         activeTitle={abas.find((aba) => aba.id === abaAtiva)?.label}
         codeBadge={form.numeroPatrimonio ? `Patrimônio ${form.numeroPatrimonio}` : "Novo cadastro"}

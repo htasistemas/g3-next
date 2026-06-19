@@ -1,6 +1,45 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.526",
+                        "releaseDate":  "2026-06-19",
+                        "title":  "Menus operacionais com nomes mais claros",
+                        "description":  "Menus, títulos de telas e manual do sistema foram atualizados com nomenclaturas mais fáceis de identificar.",
+                        "changes":  [
+                                        "Dashboard passou a ser exibido como Painel de indicadores.",
+                                        "Departamento jurídico passou a ser exibido como Jurídico e Compliance.",
+                                        "Frente de caixa passou a ser exibido como Vendas e Caixa.",
+                                        "Itens como Central de atendimentos, Inscrições em cursos e oficinas, Receber doações, Doações realizadas, Fotos de eventos, Empréstimos para eventos, Histórico de vendas e Pergunte à IA foram padronizados.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ]
+                    },
+                    {
+                        "version":  "1.00.525",
+                        "releaseDate":  "2026-06-18",
+                        "title":  "Cadastros e atendimentos com nova nomenclatura",
+                        "description":  "Os menus Cadastros e Atendimentos foram renomeados para a nova nomenclatura institucional.",
+                        "changes":  [
+                                        "Cadastros passou a ser exibido como Cadastros em geral.",
+                                        "Atendimentos passou a ser exibido como Atendimentos diários.",
+                                        "Cabeçalhos das telas vinculadas e Manual do sistema foram atualizados na mesma entrega.",
+                                        "Versão oficial atualizada para manter a sequência crescente."
+                                    ]
+                    },
+                    {
+                        "version":  "1.00.524",
+                        "releaseDate":  "2026-06-18",
+                        "title":  "Menus com nova nomenclatura institucional",
+                        "description":  "Os menus principais foram renomeados para a nova nomenclatura institucional da migração.",
+                        "changes":  [
+                                        "Setor administrativo passou a ser exibido como Administração e gestão.",
+                                        "Setor jurídico passou a ser exibido como Departamento jurídico.",
+                                        "Setor financeiro passou a ser exibido como Contabilidade e finanças.",
+                                        "Setor vendas passou a ser exibido como Frente de caixa.",
+                                        "Setor RH passou a ser exibido como Recursos humanos.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ]
+                    },
+                    {
                         "version":  "1.00.523",
                         "releaseDate":  "2026-06-18",
                         "title":  "Beneficiários com validação e segurança reforçadas",

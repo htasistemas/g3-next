@@ -98,8 +98,8 @@ type PopupMensagemState = {
   texto: string;
 };
 
-const secaoTela = "Setor financeiro";
-const tituloTela = "Recebimento de doações";
+const secaoTela = "Contabilidade e finanças";
+const tituloTela = "Receber doações";
 
 const formaRecebimentoOptionsPadrao = [
   "Pix",

@@ -8,7 +8,7 @@ import { vendasService } from "@/services/vendas.service";
 import type { Venda } from "@/types/vendas";
 
 const abas: AdminTab[] = [
-  { id: "historico", label: "Historico de vendas", icon: ShoppingBasket }
+  { id: "historico", label: "Histórico de vendas", icon: ShoppingBasket }
 ];
 
 function formatarMoeda(valor: number) {
@@ -67,7 +67,7 @@ export function HistoricoVendasPage() {
     const linhas = venda.itens
       .map((item) => `<tr><td>${item.descricaoItem}</td><td style="text-align:center">${item.quantidade}</td><td style="text-align:right">${formatarMoeda(item.valorTotal)}</td></tr>`)
       .join("");
-    popup.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Notinha de venda</title><style>body{font-family:monospace;padding:24px;color:#111827}table{width:100%;border-collapse:collapse;margin-top:16px}td,th{padding:6px 0;border-bottom:1px dashed #cbd5e1;font-size:12px}.total{margin-top:16px;padding-top:12px;border-top:2px solid #111827;font-size:18px;font-weight:700;text-align:right}</style></head><body><h1>Instituicao - setor vendas</h1><p>Comprovante simples de venda</p><p>${new Date(venda.criadoEm).toLocaleString("pt-BR")}</p><table><thead><tr><th>Produto</th><th>Qtd</th><th style="text-align:right">Total</th></tr></thead><tbody>${linhas}</tbody></table><p class="total">Total: ${formatarMoeda(venda.valorTotal)}</p><p>Pagamento: ${formatarMetodo(venda.formaPagamento)}</p><p>Cliente: ${venda.clienteNome || "Consumidor final"}</p><p>Documento sem valor fiscal</p><script>window.onload = () => window.print();</script></body></html>`);
+    popup.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Notinha de venda</title><style>body{font-family:monospace;padding:24px;color:#111827}table{width:100%;border-collapse:collapse;margin-top:16px}td,th{padding:6px 0;border-bottom:1px dashed #cbd5e1;font-size:12px}.total{margin-top:16px;padding-top:12px;border-top:2px solid #111827;font-size:18px;font-weight:700;text-align:right}</style></head><body><h1>Instituicao - frente de caixa</h1><p>Comprovante simples de venda</p><p>${new Date(venda.criadoEm).toLocaleString("pt-BR")}</p><table><thead><tr><th>Produto</th><th>Qtd</th><th style="text-align:right">Total</th></tr></thead><tbody>${linhas}</tbody></table><p class="total">Total: ${formatarMoeda(venda.valorTotal)}</p><p>Pagamento: ${formatarMetodo(venda.formaPagamento)}</p><p>Cliente: ${venda.clienteNome || "Consumidor final"}</p><p>Documento sem valor fiscal</p><script>window.onload = () => window.print();</script></body></html>`);
     popup.document.close();
   }
 
@@ -76,9 +76,9 @@ export function HistoricoVendasPage() {
       tabs={abas}
       activeTab={abaAtiva}
       onChangeTab={setAbaAtiva}
-      sectionLabel="Setor vendas"
-      pageTitle="Historico de vendas"
-      activeTitle="Historico de vendas"
+      sectionLabel="Vendas e Caixa"
+      pageTitle="Histórico de vendas"
+      activeTitle="Histórico de vendas"
       actions={[{ label: "Atualizar", icon: RefreshCcw, onClick: () => void carregar(), variant: "outline" }]}
     >
       <section className="space-y-4">

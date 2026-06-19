@@ -813,7 +813,7 @@ export function GestaoDocumentosPage() {
         activeTab={abaAtiva}
         onChangeTab={(tabId) => setAbaAtiva(tabId as AbaId)}
         actions={abaAtiva === "links" ? [] : acoes}
-        sectionLabel="Setor administrativo"
+        sectionLabel="Administração e gestão"
         pageTitle={tituloTela}
         activeTitle={abaAtiva === "lista" ? "Lista de documentos" : abas.find((item) => item.id === abaAtiva)?.label}
         codeBadge={form.id ? `Código: ${form.id}` : "Novo"}

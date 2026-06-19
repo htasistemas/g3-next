@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.523",
-  "releaseDate": "2026-06-18",
-  "description": "O Cadastro de beneficiários recebeu reforços de segurança e validação para arquivos, documentos obrigatórios, datas e aceite LGPD.",
+  "latestVersion": "1.00.526",
+  "releaseDate": "2026-06-19",
+  "description": "Menus e títulos operacionais foram renomeados para identificação mais clara dos setores.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.523",
+  "minCompatibleVersion": "1.00.526",
   "releaseType": "stable",
   "downloadUrl": null
 }

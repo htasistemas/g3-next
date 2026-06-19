@@ -410,7 +410,7 @@ export function CentralAtendimentosPage() {
     { label: "Atualizar cadastro", icon: UserRound, onClick: () => beneficiarioId && navigate(`/beneficiarios/cadastro/${beneficiarioId}`), variant: "outline", disabled: !beneficiarioId },
     { label: "Ver família", icon: UsersRound, onClick: () => setAbaAtiva("grupo-familiar"), variant: "outline", disabled: !beneficiarioId },
     { label: "Ver custos", icon: BadgeDollarSign, onClick: () => setAbaAtiva("custos"), variant: "outline", disabled: !beneficiarioId },
-    { label: "Imprimir resumo", icon: Printer, onClick: () => imprimirConteudoAtual({ titulo: "Central de Atendimentos" }), variant: "outline", disabled: !beneficiarioId },
+    { label: "Imprimir resumo", icon: Printer, onClick: () => imprimirConteudoAtual({ titulo: "Central de atendimentos" }), variant: "outline", disabled: !beneficiarioId },
     { label: "Gerar relatório", icon: History, onClick: () => void baixarRelatorioPdf("individual"), variant: "outline", disabled: !beneficiarioId || gerarRelatorioPdf.isPending },
     { label: "Atualizar", icon: RefreshCcw, onClick: () => void visaoQuery.refetch(), variant: "ghost", disabled: !beneficiarioId }
   ];
@@ -422,8 +422,8 @@ export function CentralAtendimentosPage() {
         activeTab={abaAtiva}
         onChangeTab={(tabId) => setAbaAtiva(tabId as AbaId)}
         actions={acoes}
-        sectionLabel="Atendimentos"
-        pageTitle="Central de Atendimentos"
+        sectionLabel="Atendimentos diários"
+        pageTitle="Central de atendimentos"
         activeTitle={abas.find((item) => item.id === abaAtiva)?.label}
         codeBadge={visao?.beneficiario.codigo ? `Código do beneficiário: ${visao.beneficiario.codigo}` : undefined}
       >
@@ -523,7 +523,7 @@ export function CentralAtendimentosPage() {
                   </div>
                 </CardContent>
               </Card>
-            ) : <div className="rounded-xl border border-dashed border-[var(--g3-border)] bg-[var(--g3-card)] px-5 py-10 text-center text-sm text-[var(--g3-muted)]">Selecione um beneficiário para carregar a visão 360º da Central de Atendimentos.</div>}
+            ) : <div className="rounded-xl border border-dashed border-[var(--g3-border)] bg-[var(--g3-card)] px-5 py-10 text-center text-sm text-[var(--g3-muted)]">Selecione um beneficiário para carregar a visão 360º da Central de atendimentos.</div>}
 
             {abaAtiva === "resumo" && visao ? <section className="space-y-3"><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{cardsResumo}</div><Card><CardHeader><CardTitle className="text-sm">Alertas automáticos</CardTitle></CardHeader><CardContent className="space-y-2">{visao.alertas.length ? visao.alertas.map((item, index) => <div key={`${item.titulo}-${index}`} className={`rounded-xl border px-3 py-3 ${prioridadesAlerta[item.prioridade]}`}><div className="flex items-start gap-2"><AlertTriangle className="mt-0.5 h-4 w-4" /><div><p className="font-semibold">{item.titulo}</p><p className="text-sm">{item.descricao}</p></div></div></div>) : <p className="text-sm text-[var(--g3-muted)]">Nenhum alerta ativo no momento.</p>}</CardContent></Card><Card><CardHeader><CardTitle className="text-sm">Últimas movimentações</CardTitle></CardHeader><CardContent className="space-y-2">{visao.historico.slice(0, 6).map((item) => <div key={item.id} className="rounded-lg border border-[var(--g3-border)] p-3"><p className="text-xs text-[var(--g3-muted)]">{item.categoria} • {formatarDataHora(item.data)}</p><p className="font-semibold">{item.titulo}</p><p className="text-sm text-[var(--g3-muted)]">{item.descricao || "Sem detalhamento adicional."}</p></div>)}</CardContent></Card></section> : null}
 

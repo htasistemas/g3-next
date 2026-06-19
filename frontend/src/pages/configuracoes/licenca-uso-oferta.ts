@@ -71,7 +71,7 @@ export const ofertaPlanos: OfertaPlano[] = [
       "Captação de recursos",
       "Georreferenciamento",
       "Central de atendimentos",
-      "Recebimento de doações"
+      "Receber doações"
     ],
     cta: "Quero este plano"
   },
@@ -153,7 +153,7 @@ export const comparativoLinhas: Array<{
     valores: { essencial: false, profissional: false, premium: true, enterprise: true }
   },
   {
-    nome: "Recebimento de doações",
+    nome: "Receber doações",
     valores: { essencial: false, profissional: false, premium: true, enterprise: true }
   },
   {

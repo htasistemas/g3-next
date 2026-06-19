@@ -45,7 +45,7 @@ const secoesManual: ManualSecao[] = [
         objetivo: "Explica a navegação principal por cadastros, atendimentos, setores e configurações.",
         comoUsar: [
           "Comece pelos cadastros para garantir base confiável de beneficiários, famílias e profissionais.",
-          "Use Atendimentos para registrar movimentações sociais, benefícios, inscrições e acompanhamentos.",
+          "Use Atendimentos diários para registrar movimentações sociais, benefícios, inscrições e acompanhamentos.",
           "Use Configurações gerais para manter parâmetros, usuários, IA e o próprio manual atualizados.",
           "Na tela Visão geral, acompanhe também os cards de Termos vencidos, Documentos vencidos, Documentos a vencer, Motoristas autorizados, Itens no almoxarifado e Itens no patrimônio para leitura operacional rápida logo na entrada do sistema.",
           "Os cards da Visão geral funcionam como atalhos: ao clicar em cada indicador, o sistema abre a tela correspondente para aprofundar a análise ou continuar a operação.",
@@ -123,12 +123,12 @@ const secoesManual: ManualSecao[] = [
   },
   {
     id: "atendimentos",
-    titulo: "Atendimentos",
+    titulo: "Atendimentos diários",
     descricao: "Tela operacional central do relacionamento com beneficiários e famílias.",
     icon: HeartHandshake,
     telas: [
       {
-        nome: "Central de Atendimentos",
+        nome: "Central de atendimentos",
         objetivo: "Consultar visão 360º, registrar atendimentos, benefícios, inscrições, encaminhamentos e custos.",
         comoUsar: [
           "Use a busca inteligente para localizar rapidamente o beneficiário por nome, código, CPF, telefone ou família.",
@@ -138,7 +138,7 @@ const secoesManual: ManualSecao[] = [
         atencoes: [
           "Antes de conceder benefícios críticos, confira alertas automáticos de duplicidade no beneficiário e no grupo familiar.",
           "A aba Custos resume impacto mensal, anual e histórico do beneficiário e da família.",
-          "A Central de Atendimentos agora carrega busca, visão geral, atendimentos, benefícios, encaminhamentos, histórico, custos, alertas e relatórios sempre dentro da instituição autenticada, sem misturar dados de outros CNPJs."
+          "A Central de atendimentos agora carrega busca, visão geral, atendimentos, benefícios, encaminhamentos, histórico, custos, alertas e relatórios sempre dentro da instituição autenticada, sem misturar dados de outros CNPJs."
         ]
       },
       {
@@ -151,13 +151,13 @@ const secoesManual: ManualSecao[] = [
           "O botão Imprimir ou salvar em PDF prepara a visão consolidada da tela atual para impressão ou geração de PDF pelo navegador."
         ],
         atencoes: [
-          "A tela reaproveita dados reais já lançados na Central de Atendimentos, em Doações realizadas, em Doações a realizar e em Agendamentos.",
+          "A tela reaproveita dados reais já lançados na Central de atendimentos, em Doações realizadas, em Doações a realizar e em Agendamentos.",
           "Quando não houver movimentações vinculadas ao beneficiário selecionado, o sistema exibe a mensagem Nenhum histórico encontrado para este beneficiário.",
           "Os agendamentos futuros são filtrados pelo beneficiário real da agenda, incluindo cards coletivos onde ele esteja vinculado como participante."
         ]
       },
       {
-        nome: "Inscrições",
+        nome: "Inscrições em cursos e oficinas",
         objetivo: "Gerenciar inscrições em cursos, oficinas e atividades.",
         comoUsar: [
           "Consulte a listagem de inscrições para localizar cada inscrição individual já incluída, com beneficiário, curso, status, data da inscrição, agendamento e profissional; a tabela voltou a carregar os lançamentos reais já salvos na instituição, respeitando os filtros aplicados na própria listagem.",
@@ -172,7 +172,7 @@ const secoesManual: ManualSecao[] = [
         atencoes: [
           "O botão Excluir da barra superior remove todo o curso configurado e exige confirmação específica antes da exclusão.",
           "Na aba Presença, a data exibida na lista e a data impressa na lista de presença agora seguem exatamente o mesmo dia informado, sem recuo por fuso horário.",
-          "A tela de Inscrições agora carrega catálogo, listagem, detalhe, fila de espera, presença, beneficiários, profissionais e salas sempre dentro da instituição autenticada, sem exibir dados de outro CNPJ.",
+          "A tela de Inscrições em cursos e oficinas agora carrega catálogo, listagem, detalhe, fila de espera, presença, beneficiários, profissionais e salas sempre dentro da instituição autenticada, sem exibir dados de outro CNPJ.",
           "Quando houver inscrições já realizadas e a tabela estiver vazia, revise primeiro os filtros do topo; o botão Limpar filtros restaura a visão completa da listagem."
         ]
       },
@@ -208,7 +208,7 @@ const secoesManual: ManualSecao[] = [
         ]
       },
       {
-        nome: "Recebimento de doações",
+        nome: "Receber doações",
         objetivo: "Registrar dados da doação, itens recebidos, recorrência e comunicação com o doador.",
         comoUsar: [
           "Preencha a aba Dados da doação e depois siga para Itens recebidos para lançar os produtos, quantidades e valores antes de concluir o registro.",
@@ -223,7 +223,7 @@ const secoesManual: ManualSecao[] = [
           "A identificação de item existente considera diferenças de maiúsculas, minúsculas, espaços e acentos para evitar duplicidade como cesta basica e cesta básica.",
           "O salvamento pela aba Itens recebidos não deve mais bloquear o registro por campo opcional numérico vazio no formulário principal.",
           "Quando faltar algum campo obrigatório real, o sistema continuará informando a pendência nominalmente no alerta.",
-          "A tela Recebimento de doações agora lista, abre, salva, exclui e consulta beneficiários, famílias, estoque e carência sempre dentro do tenant autenticado."
+          "A tela Receber doações agora lista, abre, salva, exclui e consulta beneficiários, famílias, estoque e carência sempre dentro do tenant autenticado."
         ]
       },
       {
@@ -308,7 +308,7 @@ const secoesManual: ManualSecao[] = [
   },
   {
     id: "administrativo",
-    titulo: "Setor administrativo",
+    titulo: "Administração e gestão",
     descricao: "Rotinas de apoio operacional e controle interno do G3N.",
     icon: SlidersHorizontal,
     telas: [
@@ -352,7 +352,7 @@ const secoesManual: ManualSecao[] = [
         ]
       },
       {
-        nome: "Empréstimo para eventos",
+        nome: "Empréstimos para eventos",
         objetivo: "Controlar empréstimos de itens para eventos, agenda de reservas, itens vinculados e eventos associados.",
         comoUsar: [
           "Na aba Dados do empréstimo, selecione o evento, informe unidade, período, observações e o responsável pela retirada ou acompanhamento.",
@@ -370,7 +370,7 @@ const secoesManual: ManualSecao[] = [
           "O backend agora revalida disponibilidade de itens no salvamento e bloqueia reserva acima do disponível, inclusive quando o mesmo item for informado mais de uma vez no mesmo empréstimo.",
           "As ações de retirada, devolução e cancelamento passaram a respeitar transições válidas de status para evitar movimentações incoerentes.",
           "O cadastro do empréstimo mantém compatibilidade com bases antigas criando automaticamente as colunas e a tabela novas necessárias quando ainda não existirem.",
-          "A tela Empréstimo para eventos agora lista, cadastra, atualiza e exclui empréstimos, agenda, eventos, responsáveis, itens vinculados e movimentações sempre dentro do tenant autenticado, impedindo mistura de reservas entre instituições."
+          "A tela Empréstimos para eventos agora lista, cadastra, atualiza e exclui empréstimos, agenda, eventos, responsáveis, itens vinculados e movimentações sempre dentro do tenant autenticado, impedindo mistura de reservas entre instituições."
         ]
       },
       {
@@ -409,7 +409,7 @@ const secoesManual: ManualSecao[] = [
         nome: "Checklist diário",
         objetivo: "Organizar a rotina administrativa por usuário com execução diária, visão semanal, recorrência e rastreabilidade operacional.",
         comoUsar: [
-          "Acesse Setor administrativo > Checklist diário para abrir a central operacional da rotina.",
+          "Acesse Administração e gestão > Checklist diário para abrir a central operacional da rotina.",
           "No topo da tela, use os filtros por usuário, unidade, período, status, prioridade, dia da semana, tipo de modelo, somente pendentes e somente atrasados para chegar rapidamente ao recorte desejado.",
           "Use o Modo diário para acompanhar as tarefas do dia, com leitura de pendentes, atrasadas, concluídas, alertas críticos e percentual de conclusão em tempo real.",
           "Quando a atividade estiver pronta, use a ação de concluir no próprio item. O sistema registra data, hora, usuário executor e exige observação quando o modelo pedir esse preenchimento.",
@@ -436,7 +436,7 @@ const secoesManual: ManualSecao[] = [
         ]
       },
       {
-        nome: "Fotos e eventos",
+        nome: "Fotos de eventos",
         objetivo: "Gerenciar eventos institucionais com álbum persistido, capa do evento, galeria organizada e ações claras por contexto.",
         comoUsar: [
           "Na aba Listagem, use busca e status para localizar rapidamente o evento e acompanhe os indicadores de total de eventos, fotos, álbuns sem capa e evento com mais fotos.",
@@ -455,7 +455,7 @@ const secoesManual: ManualSecao[] = [
           "A remoção da foto principal limpa a capa atual do evento e exige nova definição visual quando necessário.",
           "As fotos ficam armazenadas no storage do sistema com persistência real; o banco guarda apenas os metadados e caminhos do arquivo.",
           "As ações mudam conforme a aba para evitar botões genéricos e reduzir clique desnecessário durante a operação.",
-          "A tela Fotos e eventos agora lista, cadastra, atualiza e exclui eventos, fotos, capa, tags e galeria sempre dentro do tenant autenticado, impedindo mistura de álbuns entre instituições."
+          "A tela Fotos de eventos agora lista, cadastra, atualiza e exclui eventos, fotos, capa, tags e galeria sempre dentro do tenant autenticado, impedindo mistura de álbuns entre instituições."
         ]
       },
       {
@@ -509,7 +509,7 @@ const secoesManual: ManualSecao[] = [
   },
   {
     id: "juridico",
-    titulo: "Setor jurídico",
+    titulo: "Jurídico e Compliance",
     descricao: "Formalização, acompanhamento e organização documental de instrumentos e planos institucionais.",
     icon: Link2,
     telas: [
@@ -546,7 +546,7 @@ const secoesManual: ManualSecao[] = [
   },
   {
     id: "financeiro",
-    titulo: "Setor financeiro",
+    titulo: "Contabilidade e finanças",
     descricao: "Controle financeiro simplificado, com foco em lançamentos e contas bancárias.",
     icon: PiggyBank,
     telas: [
@@ -599,7 +599,7 @@ const secoesManual: ManualSecao[] = [
         ]
       },
       {
-        nome: "Recebimento de doações",
+        nome: "Receber doações",
         objetivo: "Registrar doações recebidas com doador vinculado, classificação oficial por tipo e organização separada entre dados do registro e itens recebidos.",
         comoUsar: [
           "Na aba Dados da doação, selecione o doador, informe número do recibo, tipo, status e data de recebimento. Ao escolher o tipo, o sistema mostra ao lado o destino de entrada da doação, como Contabilidade, Almoxarifado ou Patrimônio.",
@@ -735,7 +735,7 @@ const secoesManual: ManualSecao[] = [
   },
   {
     id: "vendas",
-    titulo: "Setor vendas",
+    titulo: "Vendas e Caixa",
     descricao: "Operacao de caixa para vendas de produtos em uma tela exclusiva de atendimento.",
     icon: ShoppingBasket,
     telas: [
@@ -743,7 +743,7 @@ const secoesManual: ManualSecao[] = [
         nome: "Frente de caixa",
         objetivo: "Executar vendas em um modo dedicado, com busca de produtos do almoxarifado, lista de itens, subtotal, baixa de estoque, cliente opcional, historico persistido e impressao de notinha simples.",
         comoUsar: [
-          "Acesse Setor vendas > Frente de caixa para abrir a operacao em tela exclusiva.",
+          "Acesse Vendas e Caixa > Frente de caixa para abrir a operacao em tela exclusiva.",
           "Use a busca principal para localizar produtos por codigo ou nome e informe a quantidade antes de adicionar o item.",
           "Acompanhe a lista de itens, o subtotal e o historico lateral antes de abrir o pagamento e concluir a baixa do estoque.",
           "Use os atalhos do modelo para ajuda, busca, quantidade, pagamento e cancelamento de item.",
@@ -757,10 +757,10 @@ const secoesManual: ManualSecao[] = [
         ]
       },
       {
-        nome: "Historico de vendas",
+        nome: "Histórico de vendas",
         objetivo: "Consultar vendas ja registradas, aplicar filtros e reimprimir a notinha simples de cada atendimento.",
         comoUsar: [
-          "Acesse Setor vendas > Historico de vendas para abrir a tela de consulta dentro do sistema.",
+          "Acesse Vendas e Caixa > Histórico de vendas para abrir a tela de consulta dentro do sistema.",
           "Filtre por cliente, forma de pagamento, data inicial e data final para localizar a venda desejada.",
           "Selecione uma venda da lista para visualizar cliente, pagamento, total e itens vendidos.",
           "Use o botao de impressao para reemitir a notinha simples do atendimento selecionado."
@@ -776,7 +776,7 @@ const secoesManual: ManualSecao[] = [
         nome: "Carteira digital do evento",
         objetivo: "Controlar creditos pre-pagos por participante em eventos da instituicao, com QR Code seguro, recarga, consumo nas barracas, extrato, dashboard e fechamento operacional em desktop e celular.",
         comoUsar: [
-          "Acesse Setor vendas > Carteira digital do evento para abrir o modulo completo dentro do sistema.",
+          "Acesse Vendas e Caixa > Carteira digital do evento para abrir o modulo completo dentro do sistema.",
           "No fluxo administrativo, comece pelo cadastro do evento e defina nome, tipo, periodo, status, regras de recarga, transferencia, estorno, validade do credito, centro de receita e observacoes.",
           "Na aba Cadastros, os blocos de evento, barraca e produto agora ficam organizados um abaixo do outro para melhorar a visualizacao e a conferencia durante o preenchimento.",
           "Na aba Cadastros, use o proprio formulario em modo Novo ou Editar. Quando quiser iniciar um cadastro limpo, use o botao Novo evento, Nova barraca ou Novo item.",
@@ -810,7 +810,7 @@ const secoesManual: ManualSecao[] = [
   },
   {
     id: "rh",
-    titulo: "Setor RH",
+    titulo: "Recursos humanos",
     descricao: "Rotinas de jornada, confirmação operacional e validação de identidade no registro de ponto.",
     icon: UserRound,
     telas: [
@@ -869,7 +869,7 @@ const secoesManual: ManualSecao[] = [
         objetivo: "Definir regras que afetam obrigatoriedade, alertas e comportamento global do G3N.",
         comoUsar: [
           "Use Campos obrigatórios para definir quais documentos e campos devem ser exigidos no cadastro.",
-          "Revise parâmetros da Central de Atendimentos para controlar alertas e critérios operacionais.",
+          "Revise parâmetros da Central de atendimentos para controlar alertas e critérios operacionais.",
           "Salve alterações somente após revisar o impacto nas telas relacionadas."
         ],
         atencoes: [
@@ -913,7 +913,7 @@ const secoesManual: ManualSecao[] = [
         ]
       },
       {
-        nome: "Pesquise na IA",
+        nome: "Pergunte à IA",
         objetivo: "Usar a central completa da IA com o mesmo núcleo do robô exibido nas telas.",
         comoUsar: [
           "Pesquise por texto livre ou use as perguntas frequentes e categorias sugeridas.",
@@ -928,7 +928,7 @@ const secoesManual: ManualSecao[] = [
         ],
         atencoes: [
           "A IA respeita permissões e usa a mesma base inteligente nos dois pontos de acesso.",
-          "Na central Pesquise na IA, a barra de envio foi reorganizada para manter os botões acessíveis sem sobrepor o ícone do robô.",
+          "Na central Pergunte à IA, a barra de envio foi reorganizada para manter os botões acessíveis sem sobrepor o ícone do robô.",
           "Se a chave Gemini não estiver configurada no backend, a central continua em modo local com sugestões e consultas objetivas ao banco, sem expor segredos no frontend.",
           "As respostas estruturadas usam dados reais de beneficiários, agenda, visitas e atendimentos internos, sem depender de conteúdo inventado."
         ]
@@ -1003,7 +1003,7 @@ const secoesManual: ManualSecao[] = [
           "Na aba Cadastro de livros da Biblioteca, use as ações de um clique Imprimir listagem e Imprimir cadastro para emitir, respectivamente, a relação do acervo ou a ficha individual do livro selecionado; nas demais abas, a impressão gera painel ou listagens de empréstimos, devoluções, disponibilidade e alertas em PDF pelo template central de relatórios do G3N, com cabeçalho, metadados e rodapé institucionais.",
           "A tela Agendamentos agora lista agenda, indicadores, lista de espera, participantes e notificações sempre dentro do tenant autenticado, impedindo que uma instituição veja pacientes agendados ou histórico operacional de outra.",
           "As telas Chamada de senhas e Painel de senhas agora emitem, chamam, finalizam e exibem filas, chamadas e configurações sempre dentro do tenant autenticado, impedindo reaproveitamento de senhas entre instituições diferentes.",
-          "A tela Recebimento de doações agora lista, abre, cadastra, atualiza, exclui e pesquisa doadores sempre dentro do tenant autenticado, inclusive na integração automática com o almoxarifado, impedindo mistura de doações e doadores entre instituições.",
+          "A tela Receber doações agora lista, abre, cadastra, atualiza, exclui e pesquisa doadores sempre dentro do tenant autenticado, inclusive na integração automática com o almoxarifado, impedindo mistura de doações e doadores entre instituições.",
           "A tela Cadastro de beneficiários agora lista, abre, cadastra, atualiza, exclui e gera o próximo código sempre dentro do tenant autenticado, impedindo que uma instituição veja os beneficiários de outra.",
           "A tela Usuários e permissões agora lista, abre, cadastra, atualiza, altera status, reseta senha e exclui sempre dentro do tenant autenticado, impedindo acesso cruzado entre instituições mesmo quando alguém tenta operar por ID direto.",
           "A tela Parâmetros do sistema agora salva personalização, carência, obrigatoriedades e alertas por tenant, então mudanças de cor, regras e alertas afetam apenas a instituição logada.",
@@ -1093,7 +1093,7 @@ export function ManualSistemaPage() {
       activeTitle="Manual do sistema"
       actions={[
         {
-          label: "Ir para Pesquise na IA",
+          label: "Ir para Pergunte à IA",
           icon: Brain,
           onClick: () => {
             window.location.href = "/configuracoes/pesquise-na-ia";

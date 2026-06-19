@@ -101,8 +101,8 @@ type PopupMensagemState = {
   texto: string;
 };
 
-const secaoTela = "Atendimentos";
-const tituloTela = "Inscrições";
+const secaoTela = "Atendimentos diários";
+const tituloTela = "Inscrições em cursos e oficinas";
 
 function formatarStatus(status?: string) {
   if (!status) return "Não informado";

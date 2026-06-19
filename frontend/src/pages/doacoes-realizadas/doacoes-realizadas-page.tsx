@@ -97,8 +97,8 @@ type ItemEstoque = {
   estoque_atual: number;
 };
 
-const secaoTela = "Setor financeiro";
-const tituloTela = "Doação realizada";
+const secaoTela = "Contabilidade e finanças";
+const tituloTela = "Doações realizadas";
 
 type PlanoForm = {
   id_doacao_planejada?: string;

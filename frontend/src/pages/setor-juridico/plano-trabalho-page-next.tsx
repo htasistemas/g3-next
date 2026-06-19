@@ -1114,7 +1114,7 @@ export function PlanoTrabalhoPage() {
   return (
     <>
       <AdminPageLayout
-        sectionLabel="Setor jurídico"
+        sectionLabel="Jurídico e Compliance"
         pageTitle="Plano de trabalho"
         tabs={abas}
         activeTab={abaAtiva}

@@ -61,7 +61,7 @@ const abas: AdminTab[] = [
   { id: "detalhe", label: "Álbum do evento", icon: FolderOpen }
 ];
 
-const tituloTela = "Fotos e eventos";
+const tituloTela = "Fotos de eventos";
 
 const defaultForm: FormState = {
   titulo: "",
@@ -592,7 +592,7 @@ export function FotosEventosPage() {
         activeTab={abaAtiva}
         onChangeTab={(tabId) => setAbaAtiva(tabId as AbaId)}
         actions={acoes}
-        sectionLabel="Setor administrativo"
+        sectionLabel="Administração e gestão"
         pageTitle={tituloTela}
         activeTitle={abas.find((item) => item.id === abaAtiva)?.label}
         codeBadge={form.id ? `Código: ${form.id}` : "Novo"}

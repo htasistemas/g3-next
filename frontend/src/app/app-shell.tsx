@@ -157,7 +157,7 @@ const captacaoMenuPermissions = [
 export const menuSections: MenuSection[] = [
   {
     id: "dashboard",
-    secao: "Dashboard",
+    secao: "Painel de indicadores",
     icon: LayoutDashboard,
     itens: [
       { id: "dashboard-visao-geral", to: "/dashboard/visao-geral", label: "Visão geral", icon: ChartPie },
@@ -179,7 +179,7 @@ export const menuSections: MenuSection[] = [
   },
   {
     id: "cadastros",
-    secao: "Cadastros",
+    secao: "Cadastros em geral",
     icon: FolderOpen,
     itens: [
       { id: "cadastros-beneficiarios", to: "/cadastros/beneficiarios", label: "Beneficiários", icon: UserRound },
@@ -211,13 +211,13 @@ export const menuSections: MenuSection[] = [
   },
   {
     id: "atendimentos",
-    secao: "Atendimentos",
+    secao: "Atendimentos diários",
     icon: HeartHandshake,
     itens: [
       {
         id: "atendimentos-central-atendimentos",
         to: "/atendimentos/central-atendimentos",
-        label: "Central de Atendimentos",
+        label: "Central de atendimentos",
         icon: HeartHandshake
       },
       {
@@ -229,7 +229,7 @@ export const menuSections: MenuSection[] = [
       {
         id: "atendimentos-matriculas",
         to: "/atendimentos/matriculas",
-        label: "Inscrições",
+        label: "Inscrições em cursos e oficinas",
         icon: GraduationCap
       },
       {
@@ -279,20 +279,20 @@ export const menuSections: MenuSection[] = [
       {
         id: "atendimentos-registro-doacao",
         to: "/financeiro/registro-doacao",
-        label: "Recebimento de doações",
+        label: "Receber doações",
         icon: CircleDollarSign
       },
       {
         id: "atendimentos-doacoes-realizadas",
         to: "/financeiro/doacoes-realizadas",
-        label: "Doação realizada",
+        label: "Doações realizadas",
         icon: Gift
       }
     ]
   },
   {
     id: "setor-administrativo",
-    secao: "Setor administrativo",
+    secao: "Administração e gestão",
     icon: FolderKanban,
     itens: [
       {
@@ -310,13 +310,13 @@ export const menuSections: MenuSection[] = [
       {
         id: "setor-administrativo-emprestimos-eventos",
         to: "/setor-administrativo/emprestimo-eventos",
-        label: "Empréstimo para eventos",
+        label: "Empréstimos para eventos",
         icon: CalendarRange
       },
       {
         id: "setor-administrativo-fotos-eventos",
         to: "/setor-administrativo/fotos-eventos",
-        label: "Fotos e eventos",
+        label: "Fotos de eventos",
         icon: ImageIcon
       },
       {
@@ -370,7 +370,7 @@ export const menuSections: MenuSection[] = [
   },
   {
     id: "setor-juridico",
-    secao: "Setor jurídico",
+    secao: "Jurídico e Compliance",
     icon: Scale,
     itens: [
       {
@@ -389,7 +389,7 @@ export const menuSections: MenuSection[] = [
   },
   {
     id: "financeiro",
-    secao: "Setor financeiro",
+    secao: "Contabilidade e finanças",
     icon: DollarSign,
     itens: [
       {
@@ -422,13 +422,13 @@ export const menuSections: MenuSection[] = [
   },
   {
     id: "setor-vendas",
-    secao: "Setor vendas",
+    secao: "Vendas e Caixa",
     icon: ShoppingBasket,
     itens: [
       {
         id: "setor-vendas-historico",
         to: "/setor-vendas/historico",
-        label: "Historico de vendas",
+        label: "Histórico de vendas",
         icon: ScrollText
       },
       {
@@ -454,7 +454,7 @@ export const menuSections: MenuSection[] = [
   },
   {
     id: "setor-rh",
-    secao: "Setor RH",
+    secao: "Recursos humanos",
     icon: UserCog,
     itens: [
       {
@@ -510,7 +510,7 @@ export const menuSections: MenuSection[] = [
       {
         id: "configuracoes-pesquise-na-ia",
         to: "/configuracoes/pesquise-na-ia",
-        label: "Pesquise na IA",
+        label: "Pergunte à IA",
         icon: Brain
       },
       {
@@ -570,16 +570,16 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/cadastros/beneficiarios")) return "Cadastro de beneficiários";
   if (pathname.startsWith("/cadastros/profissionais")) return "Cadastro de profissionais";
   if (pathname.startsWith("/cadastros/voluntariado")) return "Cadastro de voluntariado";
-  if (pathname.startsWith("/atendimentos/central-atendimentos")) return "Central de Atendimentos";
-  if (pathname.startsWith("/atendimentos/matriculas")) return "Inscrições";
+  if (pathname.startsWith("/atendimentos/central-atendimentos")) return "Central de atendimentos";
+  if (pathname.startsWith("/atendimentos/matriculas")) return "Inscrições em cursos e oficinas";
   if (pathname.startsWith("/atendimentos/banco-empregos")) return "Banco de empregos";
   if (pathname.startsWith("/atendimentos/biblioteca")) return "Biblioteca";
   if (pathname.startsWith("/atendimentos/registro-visitas")) return "Registro de visitas";
   if (pathname.startsWith("/atendimentos/agendamentos")) return "Agendamentos";
   if (pathname.startsWith("/atendimentos/ocorrencias")) return "Ocorrências";
   if (pathname.startsWith("/atendimentos/chamada-senhas")) return "Chamada de senhas";
-  if (pathname.startsWith("/financeiro/registro-doacao")) return "Recebimento de doações";
-  if (pathname.startsWith("/financeiro/doacoes-realizadas")) return "Doação realizada";
+  if (pathname.startsWith("/financeiro/registro-doacao")) return "Receber doações";
+  if (pathname.startsWith("/financeiro/doacoes-realizadas")) return "Doações realizadas";
   if (pathname.startsWith("/cadastros/unidades-assistenciais")) return "Cadastro de unidade assistencial";
   if (pathname.startsWith("/cadastros/vinculo-familiar")) return "Cadastro de vínculo familiar";
   if (pathname.startsWith("/captacao-recursos/dashboard")) return "Cockpit de captação";
@@ -598,17 +598,17 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/configuracoes/licenca-uso")) return "Licença de uso";
   if (pathname.startsWith("/configuracoes/manual-do-sistema")) return "Manual do sistema";
   if (pathname.startsWith("/configuracoes/master-instituicoes")) return "Instituições SaaS";
-  if (pathname.startsWith("/configuracoes/pesquise-na-ia")) return "Pesquise na IA";
+  if (pathname.startsWith("/configuracoes/pesquise-na-ia")) return "Pergunte à IA";
   if (pathname.startsWith("/configuracoes/sobre-o-sistema")) return "Sobre o sistema";
   if (pathname.startsWith("/configuracoes/mensagens-personalizadas")) return "Mensagens personalizadas";
   if (pathname.startsWith("/configuracoes/usuarios")) return "";
   if (pathname.startsWith("/setor-vendas/carteira-digital-evento")) return "Carteira digital do evento";
-  if (pathname.startsWith("/setor-vendas/historico")) return "Historico de vendas";
+  if (pathname.startsWith("/setor-vendas/historico")) return "Histórico de vendas";
   if (pathname.startsWith("/setor-rh/registro-ponto")) return "Registro de ponto";
   if (pathname.startsWith("/setor-administrativo/almoxarifado")) return "Almoxarifado";
   if (pathname.startsWith("/setor-administrativo/controle-veiculos")) return "Controle de veículos";
-  if (pathname.startsWith("/setor-administrativo/emprestimo-eventos")) return "Empréstimo para eventos";
-  if (pathname.startsWith("/setor-administrativo/fotos-eventos")) return "Fotos e eventos";
+  if (pathname.startsWith("/setor-administrativo/emprestimo-eventos")) return "Empréstimos para eventos";
+  if (pathname.startsWith("/setor-administrativo/fotos-eventos")) return "Fotos de eventos";
   if (pathname.startsWith("/setor-administrativo/projetos")) return "Projetos";
   if (pathname.startsWith("/setor-administrativo/gestao-documentos")) return "Gestão de documentos";
   if (pathname.startsWith("/setor-administrativo/oficios-protocolos")) return "Ofícios e protocolos";

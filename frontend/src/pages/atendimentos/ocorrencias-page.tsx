@@ -874,7 +874,7 @@ export function OcorrenciasPage() {
         activeTab={abaAtiva}
         onChangeTab={(tabId) => setAbaAtiva(tabId as AbaId)}
         actions={acoes}
-        sectionLabel="Atendimentos"
+        sectionLabel="Atendimentos diários"
         pageTitle={tituloTela}
         activeTitle={abas.find((item) => item.id === abaAtiva)?.label}
         codeBadge={form.id ? `Código: ${form.id}` : "Novo"}

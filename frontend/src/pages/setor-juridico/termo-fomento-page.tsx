@@ -262,7 +262,7 @@ export function TermoFomentoPage() {
   return (
     <>
       <AdminPageLayout
-        sectionLabel="Setor jurídico"
+        sectionLabel="Jurídico e Compliance"
         pageTitle="Termo de fomento"
         tabs={abas}
         activeTab={abaAtiva}

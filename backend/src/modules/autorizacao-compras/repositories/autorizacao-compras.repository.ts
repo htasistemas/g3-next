@@ -2134,7 +2134,7 @@ export class AutorizacaoComprasRepository {
             ${item.valor_estimado},
             ${cotacaoVencedora.fornecedor},
             ${ator.nomeUsuario ?? cotacaoVencedora.contato ?? null},
-            ${'Setor financeiro'},
+            ${'Contabilidade e finanças'},
             ${`Gerado automaticamente pela compra ${await this.buscarNumeroSolicitacaoTx(tx, autorizacaoId)}.`},
             NOW(),
             NOW()

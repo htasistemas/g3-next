@@ -26,7 +26,7 @@ function groupByCategory(items: AiSuggestionItem[]) {
 export function AIConversationPanel({
   variant,
   context,
-  title = "Pesquise na IA",
+  title = "Pergunte à IA",
   subtitle = "Use a mesma inteligência do G3N para consultar dados, indicadores e orientações.",
   showSidebar = variant === "page",
   queuedQuestion,

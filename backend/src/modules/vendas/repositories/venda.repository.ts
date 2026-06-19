@@ -213,7 +213,7 @@ export class VendaRepository {
             ${item.quantidade},
             ${estoqueAtual - item.quantidade},
             ${'Venda frente de caixa'},
-            ${'Setor vendas'},
+            ${'Frente de caixa'},
             ${'Baixa automatica pela frente de caixa'},
             NOW()
           )

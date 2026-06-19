@@ -291,7 +291,7 @@ export function AlmoxarifadoPage() {
         activeTab={abaAtiva}
         onChangeTab={(tabId) => setAbaAtiva(tabId as AbaId)}
         actions={acoes}
-        sectionLabel="Setor administrativo"
+        sectionLabel="Administração e gestão"
         pageTitle={tituloTela}
         activeTitle={abas.find((item) => item.id === abaAtiva)?.label}
         codeBadge={itemForm.id_item ? `Código: ${itemForm.codigo}` : "Novo"}

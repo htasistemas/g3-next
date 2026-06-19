@@ -296,7 +296,7 @@ export function LembretesDiariosPage() {
         activeTab={abaAtiva}
         onChangeTab={(tabId) => setAbaAtiva(tabId as AbaId)}
         actions={acoes}
-        sectionLabel="Setor administrativo"
+        sectionLabel="Administração e gestão"
         pageTitle={tituloTela}
         activeIcon={abaAtiva === "cadastro" ? Bell : List}
         activeTitle={abaAtiva === "cadastro" ? "Cadastro De Lembretes" : "Lembretes Criados"}

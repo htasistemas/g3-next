@@ -1398,7 +1398,7 @@ export function BancoEmpregosPage() {
         activeTab={abaAtiva}
         onChangeTab={(tabId) => setAbaAtiva(tabId as AbaId)}
         actions={actions}
-        sectionLabel="Atendimentos"
+        sectionLabel="Atendimentos diários"
         pageTitle="Banco de empregos"
         codeBadge={
           abaAtiva === "candidatos"

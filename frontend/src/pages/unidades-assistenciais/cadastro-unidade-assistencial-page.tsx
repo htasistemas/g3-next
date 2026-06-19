@@ -712,7 +712,7 @@ export function CadastroUnidadeAssistencialPage() {
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--g3-muted)]">
-              Cadastros
+              Cadastros em geral
             </p>
             <h1 className="text-sm font-semibold tracking-tight text-[var(--g3-foreground)] sm:text-base">
               {tituloTela}

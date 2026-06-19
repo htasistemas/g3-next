@@ -1076,7 +1076,7 @@ export function AutorizacaoComprasPage() {
         activeTab={abaAtiva}
         onChangeTab={(tabId) => setAbaAtiva(tabId as AbaId)}
         actions={acoes}
-        sectionLabel="Setor financeiro"
+        sectionLabel="Contabilidade e finanças"
         pageTitle={tituloTela}
         activeTitle={abaAtiva === "listagem" ? "Painel e listagem" : abas.find((item) => item.id === abaAtiva)?.label}
         codeBadge={autorizacaoSelecionadaId ? `Código: ${detalhe?.numeroSolicitacao ?? autorizacaoSelecionadaId}` : "Novo"}

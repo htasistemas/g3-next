@@ -306,7 +306,7 @@ export function ContratacaoPage() {
         activeTab={abaAtiva}
         onChangeTab={(tabId) => setAbaAtiva(tabId as AbaId)}
         actions={acoes}
-        sectionLabel="Setor RH"
+        sectionLabel="Recursos humanos"
         pageTitle="Contratação"
         activeTitle={abas.find((item) => item.id === abaAtiva)?.label}
         codeBadge={candidatoSelecionadoId ? `Candidato: ${candidatoSelecionadoId}` : "Novo"}

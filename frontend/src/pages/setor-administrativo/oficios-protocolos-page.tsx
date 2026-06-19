@@ -1522,7 +1522,7 @@ export function OficiosProtocolosPage() {
         activeTab={abaAtiva}
         onChangeTab={(tabId) => setAbaAtiva(tabId as AbaId)}
         actions={acoes}
-        sectionLabel="Setor administrativo"
+        sectionLabel="Administração e gestão"
         pageTitle={tituloTela}
         activeTitle={abas.find((item) => item.id === abaAtiva)?.label}
         codeBadge={form.identificacao.numero ? `Número ${form.identificacao.numero}` : "Novo ofício"}

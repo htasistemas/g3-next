@@ -223,7 +223,7 @@ export function FrenteCaixaPage() {
       )
       .join("");
 
-    popup.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Notinha de venda</title><style>body{font-family:monospace;padding:24px;color:#111827}h1,p{margin:0}table{width:100%;border-collapse:collapse;margin-top:16px}td,th{padding:6px 0;border-bottom:1px dashed #cbd5e1;font-size:12px}th{text-align:left}.topo,.rodape{text-align:center}.total{margin-top:16px;padding-top:12px;border-top:2px solid #111827;font-size:18px;font-weight:700;text-align:right}</style></head><body><div class="topo"><h1>Instituicao - setor vendas</h1><p>Comprovante simples de venda</p><p>${new Date(venda.criadoEm).toLocaleString("pt-BR")}</p></div><table><thead><tr><th>Produto</th><th>Qtd</th><th style="text-align:right">Total</th></tr></thead><tbody>${linhas}</tbody></table><p class="total">Total: ${formatarMoeda(venda.valorTotal)}</p><p>Pagamento: ${formatarMetodo(venda.formaPagamento)}</p><p>Cliente: ${venda.clienteNome || "Consumidor final"}</p><div class="rodape"><p>Documento sem valor fiscal</p><p>Obrigado pela compra</p></div><script>window.onload = () => window.print();</script></body></html>`);
+    popup.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Notinha de venda</title><style>body{font-family:monospace;padding:24px;color:#111827}h1,p{margin:0}table{width:100%;border-collapse:collapse;margin-top:16px}td,th{padding:6px 0;border-bottom:1px dashed #cbd5e1;font-size:12px}th{text-align:left}.topo,.rodape{text-align:center}.total{margin-top:16px;padding-top:12px;border-top:2px solid #111827;font-size:18px;font-weight:700;text-align:right}</style></head><body><div class="topo"><h1>Instituicao - frente de caixa</h1><p>Comprovante simples de venda</p><p>${new Date(venda.criadoEm).toLocaleString("pt-BR")}</p></div><table><thead><tr><th>Produto</th><th>Qtd</th><th style="text-align:right">Total</th></tr></thead><tbody>${linhas}</tbody></table><p class="total">Total: ${formatarMoeda(venda.valorTotal)}</p><p>Pagamento: ${formatarMetodo(venda.formaPagamento)}</p><p>Cliente: ${venda.clienteNome || "Consumidor final"}</p><div class="rodape"><p>Documento sem valor fiscal</p><p>Obrigado pela compra</p></div><script>window.onload = () => window.print();</script></body></html>`);
     popup.document.close();
   }
 
@@ -266,7 +266,7 @@ export function FrenteCaixaPage() {
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15"><Store className="h-6 w-6" /></div>
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-white/80">Setor vendas</p>
+              <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-white/80">Frente de caixa</p>
               <h1 className="text-2xl font-black tracking-tight sm:text-3xl">Frente de caixa</h1>
               <p className="text-sm text-white/80">{status}</p>
             </div>

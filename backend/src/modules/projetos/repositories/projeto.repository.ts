@@ -116,10 +116,10 @@ const estruturaSql = [
     INSERT INTO manual_sistema_secoes (slug, titulo, conteudo, ordem, tags, atualizado_em, atualizado_por, versao)
     VALUES (
       'setor-administrativo-projetos',
-      'Setor Administrativo > Projetos',
+      'Administração e gestão > Projetos',
       '<p>A tela Projetos concentra o cadastro, acompanhamento, kanban, indicadores e relatórios dos projetos sociais da instituição.</p><ul><li>Use a aba Visão geral para acompanhar totais, atrasos, evolução e vencimentos.</li><li>Use a aba Projetos para filtrar, cadastrar, editar, inativar e abrir os detalhes de cada projeto.</li><li>No detalhe do projeto, mantenha dados principais, tarefas, histórico e observações sempre atualizados.</li><li>Na área Kanban, mova as tarefas entre Não iniciado, Em andamento, Parado e Concluído com um clique e arraste.</li><li>Na aba Relatórios, gere PDFs gerais, por status, prioridade, atrasos, evolução, tarefas por responsável e relatório completo individual.</li></ul>',
       140,
-      'projetos,setor administrativo,kanban,relatorios',
+      'projetos,administração e gestão,kanban,relatorios',
       NOW(),
       'sistema',
       '1.00.487'
@@ -147,7 +147,7 @@ const estruturaSql = [
     SELECT
       NOW(),
       'sistema',
-      'Setor Administrativo',
+      'Administração e gestão',
       'Projetos',
       'CRIACAO',
       'Nova tela Projetos com cards, dashboard, kanban, tarefas e relatórios.',

@@ -877,7 +877,7 @@ export function AgendamentosPage() {
         activeTab={abaAtiva}
         onChangeTab={(tabId) => setAbaAtiva(tabId as AbaId)}
         actions={acoes}
-        sectionLabel="Atendimentos"
+        sectionLabel="Atendimentos diários"
         pageTitle="Agendamentos"
         activeTitle={abas.find((item) => item.id === abaAtiva)?.label}
         codeBadge={cardSelecionado?.id ? `Código: ${cardSelecionado.id}` : "Novo"}

@@ -348,7 +348,7 @@ const AI_SUGGESTION_CATEGORIES: AiSuggestionCategoryMeta[] = [
   { id: "familias", label: "Famílias", descricao: "Consultas sobre núcleo familiar, responsável e atualização cadastral." },
   { id: "beneficiarios", label: "Beneficiários", descricao: "Histórico, situação cadastral, pendências e vínculos." },
   { id: "beneficios", label: "Benefícios", descricao: "Concessões, duplicidades, custos e cestas básicas." },
-  { id: "atendimentos", label: "Atendimentos", descricao: "Histórico, pendências, retornos e movimentações técnicas." },
+  { id: "atendimentos", label: "Atendimentos diários", descricao: "Histórico, pendências, retornos e movimentações técnicas." },
   { id: "cursos-oficinas", label: "Cursos e oficinas", descricao: "Inscrições, vagas, abandono e conclusão." },
   { id: "gestao-indicadores", label: "Gestão e indicadores", descricao: "Resumos executivos, custos e comparação de períodos." },
   { id: "doadores-doacoes", label: "Doadores e doações", descricao: "Arrecadação, inatividade, campanhas e inadimplência." },

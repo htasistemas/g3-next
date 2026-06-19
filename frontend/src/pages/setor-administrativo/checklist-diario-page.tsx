@@ -980,7 +980,7 @@ export function ChecklistDiarioPage() {
       activeTab={abaAtiva}
       onChangeTab={(tab) => setAbaAtiva(tab as AbaId)}
       actions={actions}
-      sectionLabel="Setor administrativo"
+      sectionLabel="Administração e gestão"
       pageTitle="Checklist diário"
       activeTitle={abas.find((item) => item.id === abaAtiva)?.label}
       activeIcon={abaAtiva === "diario" ? ClipboardCheck : abaAtiva === "semanal" ? Layers3 : abaAtiva === "modelos" ? Sparkles : abaAtiva === "indicadores" ? ShieldAlert : abaAtiva === "configuracoes" ? Settings2 : History}

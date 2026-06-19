@@ -581,7 +581,7 @@ export function CarteiraDigitalEventoPage() {
       tabs={abas}
       activeTab={abaAtiva}
       onChangeTab={(tab) => setAbaAtiva(tab as AbaId)}
-      sectionLabel="Setor vendas"
+      sectionLabel="Vendas e Caixa"
       pageTitle="Carteira digital do evento"
       activeTitle="Carteira digital do evento"
       actions={actions}

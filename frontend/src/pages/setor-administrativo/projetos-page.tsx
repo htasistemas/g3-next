@@ -662,7 +662,7 @@ export function ProjetosPage() {
         activeTab={activeTab}
         onChangeTab={(id) => setActiveTab(id as AbaId)}
         actions={tabActions}
-        sectionLabel="Setor administrativo"
+        sectionLabel="Administração e gestão"
         pageTitle="Projetos"
         activeTitle={
           activeTab === "visao-geral"

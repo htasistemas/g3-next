@@ -23,7 +23,7 @@ export function SementePage() {
   const contexto = useMemo(
     () => ({
       pathname: location.pathname,
-      pageTitle: "Pesquise na IA"
+      pageTitle: "Pergunte à IA"
     }),
     [location.pathname]
   );
@@ -63,7 +63,7 @@ export function SementePage() {
       onChangeTab={(tabId) => setAbaAtiva(tabId as AbaId)}
       actions={acoes}
       sectionLabel="Configurações gerais"
-      pageTitle="Pesquise na IA"
+      pageTitle="Pergunte à IA"
       activeTitle={abaAtiva === "conversa" ? "Conversa com a IA" : "Sugestões de perguntas"}
     >
       <section className="space-y-4">
@@ -81,7 +81,7 @@ export function SementePage() {
             showSidebar={false}
             queuedQuestion={perguntaSelecionada}
             onQueuedQuestionHandled={() => setPerguntaSelecionada(null)}
-            title="Pesquise na IA"
+            title="Pergunte à IA"
             subtitle="Central completa de consulta com a mesma base inteligente do robô e opção de reiniciar a conversa quando quiser."
           />
         ) : (

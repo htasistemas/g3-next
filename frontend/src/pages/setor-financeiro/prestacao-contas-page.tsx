@@ -605,7 +605,7 @@ export function PrestacaoContasPage() {
         activeTab={abaAtiva}
         onChangeTab={(tabId) => setAbaAtiva(tabId as AbaId)}
         actions={acoes}
-        sectionLabel="Setor financeiro"
+        sectionLabel="Contabilidade e finanças"
         pageTitle={tituloTela}
         activeTitle={abas.find((item) => item.id === abaAtiva)?.label}
         codeBadge={registroSelecionadoId ? `Código: ${registroSelecionadoId}` : "Novo"}

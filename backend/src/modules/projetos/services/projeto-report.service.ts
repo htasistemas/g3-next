@@ -88,7 +88,7 @@ export class ProjetoReportService {
       const tarefas = lista.flatMap((item) => item.tarefas);
       const tabela: RelatorioHtmlInput = {
         titulo: tituloMap[tipo],
-        subtitulo: "Setor Administrativo > Projetos",
+        subtitulo: "Administração e gestão > Projetos",
         descricao: "Distribuição de tarefas por responsável com filtros aplicados.",
         metadadosTopo: [
           { rotulo: "Emitido por", valor: authUser?.nome ?? authUser?.nomeUsuario ?? "Sistema" }
@@ -121,7 +121,7 @@ export class ProjetoReportService {
 
     const input: RelatorioHtmlInput = {
       titulo: tituloMap[tipo],
-      subtitulo: "Setor Administrativo > Projetos",
+      subtitulo: "Administração e gestão > Projetos",
       descricao: "Relatório gerado a partir dos projetos visíveis para a instituição autenticada.",
       metadadosTopo: [
         { rotulo: "Emitido por", valor: authUser?.nome ?? authUser?.nomeUsuario ?? "Sistema" }
@@ -201,7 +201,7 @@ export class ProjetoReportService {
 
     const input: RelatorioHtmlInput = {
       titulo: "Relatório completo individual do projeto",
-      subtitulo: "Setor Administrativo > Projetos",
+      subtitulo: "Administração e gestão > Projetos",
       descricao: "Visão consolidada do projeto, tarefas e histórico operacional.",
       metadadosTopo: [
         { rotulo: "Emitido por", valor: authUser?.nome ?? authUser?.nomeUsuario ?? "Sistema" }

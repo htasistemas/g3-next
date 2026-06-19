@@ -1344,7 +1344,7 @@ export function ControleVeiculosPage() {
           setAbaAtiva(proximaAba);
         }}
         actions={acoes}
-        sectionLabel="Setor administrativo"
+        sectionLabel="Administração e gestão"
         pageTitle={tituloTela}
         activeTitle={abas.find((item) => item.id === abaAtiva)?.label}
         codeBadge={codeBadge}
