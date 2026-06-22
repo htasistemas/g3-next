@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.532",
+  "latestVersion": "1.00.533",
   "releaseDate": "2026-06-22",
-  "description": "Portais externos passaram a consultar dados reais e o pos-deploy passou a bloquear build antigo de login sem CNPJ.",
+  "description": "Deploy oficial passou a atualizar o checkout, reconstruir o frontend sem cache e validar o login atual tambem no dominio publico.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.532",
+  "minCompatibleVersion": "1.00.533",
   "releaseType": "stable",
   "downloadUrl": null
 }

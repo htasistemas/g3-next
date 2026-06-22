@@ -86,6 +86,12 @@ cd "$APP_DIR"
 mkdir -p "$DEPLOY_STATE_DIR"
 
 log "Deploy g3n stack"
+if [[ "${DEPLOY_SKIP_GIT_PULL:-0}" != "1" ]] && [[ -d ".git" ]]; then
+  log "Atualizando checkout Git antes do build"
+  git fetch origin
+  git pull --ff-only --autostash
+fi
+
 APP_VERSION="$(STATE_VERSION_FILE="$STATE_VERSION_FILE" bash ./scripts/bump-version.sh)"
 log "Version set to $APP_VERSION"
 
@@ -96,7 +102,8 @@ docker compose -f "$APP_COMPOSE" up -d --remove-orphans g3n-db nginx-g3n
 wait_healthy g3n-db 120
 wait_healthy nginx-g3n 120
 
-docker compose -f "$APP_COMPOSE" build g3n-backend g3n-frontend
+docker compose -f "$APP_COMPOSE" build g3n-backend
+docker compose -f "$APP_COMPOSE" build --no-cache g3n-frontend
 docker compose -f "$APP_COMPOSE" up -d --remove-orphans --force-recreate g3n-backend
 
 if ! wait_healthy g3n-backend 180; then

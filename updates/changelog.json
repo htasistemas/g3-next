@@ -1,6 +1,18 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.533",
+                        "releaseDate":  "2026-06-22",
+                        "title":  "Deploy com validação pública do login",
+                        "description":  "O fluxo oficial de produção foi reforçado para evitar publicação ou permanência de tela antiga de login sem CNPJ.",
+                        "changes":  [
+                                        "Deploy oficial agora executa git pull --ff-only --autostash antes do build para garantir que o servidor esteja usando o commit mais recente.",
+                                        "Frontend passou a ser reconstruído sem cache no deploy para evitar reaproveitamento de bundle antigo.",
+                                        "Deploy-check valida o login atual com CNPJ tanto no frontend local quanto no domínio público configurado.",
+                                        "Documentação de deploy atualizada com a nova regra de atualização do checkout e validação pós-deploy."
+                                    ]
+                    },
+                    {
                         "version":  "1.00.532",
                         "releaseDate":  "2026-06-22",
                         "title":  "Portais externos com dados reais",

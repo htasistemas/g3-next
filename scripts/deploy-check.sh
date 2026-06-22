@@ -7,6 +7,7 @@ HOST_API_PORT="${HOST_API_PORT:-3333}"
 HOST_FRONTEND_PORT="${HOST_FRONTEND_PORT:-3200}"
 BACKEND_URL="${BACKEND_URL:-http://127.0.0.1:${HOST_API_PORT}}"
 FRONTEND_URL="${FRONTEND_URL:-http://127.0.0.1:${HOST_FRONTEND_PORT}}"
+PUBLIC_FRONTEND_URL="${PUBLIC_FRONTEND_URL:-${APP_PUBLIC_URL:-https://g3n.htasistemas.com.br}}"
 LOGIN_USER="${LOGIN_USER:-}"
 LOGIN_PASS="${LOGIN_PASS:-}"
 
@@ -20,6 +21,44 @@ require_cmd() {
 require_cmd docker
 require_cmd curl
 require_cmd grep
+require_cmd sed
+
+checar_login_atual() {
+  local base_url="${1%/}"
+  local label="$2"
+  local html_file="/tmp/g3n-frontend-${label}.html"
+  local main_file="/tmp/g3n-frontend-main-${label}.js"
+  local status
+  local main_asset_paths
+  local login_asset_paths
+  local login_bundle_ok
+
+  log "Checando login atual em $base_url/ ($label)"
+  status="$(curl -sS -H 'Cache-Control: no-cache' -H 'Pragma: no-cache' -o "$html_file" -w '%{http_code}' "$base_url/?_g3n_check=$(date +%s)")"
+  if [ "$status" != "200" ]; then
+    fail "Falha ao carregar frontend para validar login ($label, HTTP $status)"
+  fi
+
+  login_bundle_ok=0
+  main_asset_paths="$(grep -Eo 'src="/assets/[^"]+\.js"' "$html_file" | sed -E 's#src="([^"]+)"#\1#' || true)"
+  login_asset_paths=""
+  for asset_path in $main_asset_paths; do
+    curl -sS -H 'Cache-Control: no-cache' "$base_url$asset_path" -o "$main_file"
+    login_asset_paths="$login_asset_paths $(grep -Eo 'assets/login-page-[^"]+\.js' "$main_file" | sort -u || true)"
+  done
+  for asset_path in $main_asset_paths $login_asset_paths; do
+    normalized_asset_path="/${asset_path#/}"
+    if curl -sS -H 'Cache-Control: no-cache' "$base_url$normalized_asset_path" | grep -q "CNPJ da institui"; then
+      login_bundle_ok=1
+      break
+    fi
+  done
+
+  if [ "$login_bundle_ok" != "1" ]; then
+    fail "Build publicado em $base_url nao contem o login atual com CNPJ da instituicao. Verifique checkout, imagem antiga, cache ou rota publica."
+  fi
+  log "Login atual com CNPJ OK ($label)"
+}
 
 log "Verificando containers..."
 docker compose -f "$APP_COMPOSE" ps -a
@@ -37,25 +76,10 @@ if [ "$frontend_status" != "200" ]; then
   fail "Falha no frontend (HTTP $frontend_status)"
 fi
 log "Frontend OK"
-
-login_bundle_ok=0
-main_asset_paths="$(grep -Eo 'src="/assets/[^"]+\.js"' /tmp/g3n-frontend.html | sed -E 's#src="([^"]+)"#\1#' || true)"
-login_asset_paths=""
-for asset_path in $main_asset_paths; do
-  curl -sS "$FRONTEND_URL$asset_path" -o /tmp/g3n-frontend-main.js
-  login_asset_paths="$login_asset_paths $(grep -Eo 'assets/login-page-[^"]+\.js' /tmp/g3n-frontend-main.js | sort -u || true)"
-done
-for asset_path in $main_asset_paths $login_asset_paths; do
-  normalized_asset_path="/${asset_path#/}"
-  if curl -sS "$FRONTEND_URL$normalized_asset_path" | grep -q "CNPJ da institui"; then
-    login_bundle_ok=1
-    break
-  fi
-done
-if [ "$login_bundle_ok" != "1" ]; then
-  fail "Build publicado nao contem o login atual com CNPJ da instituicao. Verifique cache, imagem antiga ou deploy do frontend."
+checar_login_atual "$FRONTEND_URL" "local"
+if [ "$PUBLIC_FRONTEND_URL" != "$FRONTEND_URL" ]; then
+  checar_login_atual "$PUBLIC_FRONTEND_URL" "publico"
 fi
-log "Login atual com CNPJ OK"
 
 portal_routes=(
   "/portal-doador"
