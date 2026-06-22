@@ -1,6 +1,19 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.532",
+                        "releaseDate":  "2026-06-22",
+                        "title":  "Portais externos com dados reais",
+                        "description":  "Os portais externos passaram a consultar dados reais dos módulos internos e o deploy ganhou verificação contra login antigo sem CNPJ.",
+                        "changes":  [
+                                        "Criada a API pública /api/portais-externos para carregar painéis de voluntário, beneficiário e família, transparência e parceiro ou financiador.",
+                                        "Portal da transparência passou a carregar projetos, prestação, campanhas públicas, documentos e unidades reais.",
+                                        "Portais de voluntário, beneficiário e parceiro passaram a exibir resumos reais após identificação do cadastro correspondente.",
+                                        "Deploy-check agora falha se o frontend publicado não contiver a tela de login atual com CNPJ da instituição.",
+                                        "Manual do sistema atualizado com o novo comportamento dos portais conectados a dados reais."
+                                    ]
+                    },
+                    {
                         "version":  "1.00.531",
                         "releaseDate":  "2026-06-22",
                         "title":  "Menu Portais de acesso",

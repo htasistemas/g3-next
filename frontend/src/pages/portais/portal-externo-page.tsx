@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   BarChart3,
   Building2,
@@ -25,6 +25,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  portaisExternosService,
+  type PortalExternoCard,
+  type PortalExternoIndicador,
+  type PortalExternoPainel,
+  type PortalExternoTimeline
+} from "@/services/portais-externos.service";
 
 type PortalTipo = "voluntario" | "beneficiario" | "transparencia" | "parceiro";
 
@@ -45,6 +52,10 @@ type PortalConfig = {
   linhaDoTempo: Array<{ titulo: string; detalhe: string }>;
   acessoRestrito: boolean;
 };
+
+function obterMensagemErro(error: any, fallback: string) {
+  return error?.response?.data?.message ?? error?.response?.data?.mensagem ?? fallback;
+}
 
 const portalConfigs: Record<PortalTipo, PortalConfig> = {
   voluntario: {
@@ -218,6 +229,8 @@ function PortalExternoPage({ tipo }: { tipo: PortalTipo }) {
   const [identificador, setIdentificador] = useState("");
   const [senha, setSenha] = useState("");
   const [acessoLiberado, setAcessoLiberado] = useState(!config.acessoRestrito);
+  const [painel, setPainel] = useState<PortalExternoPainel | null>(null);
+  const [carregando, setCarregando] = useState(false);
   const [popup, setPopup] = useState<PopupMensagemState | null>(null);
 
   const gradiente = useMemo(
@@ -227,7 +240,59 @@ function PortalExternoPage({ tipo }: { tipo: PortalTipo }) {
     [config.cor]
   );
 
-  function acessarPortal() {
+  const indicadores = useMemo(
+    () =>
+      (painel?.indicadores ?? config.indicadores).map((item: PortalExternoIndicador, index) => ({
+        ...item,
+        Icone: config.indicadores[index]?.Icone ?? Target
+      })),
+    [config.indicadores, painel?.indicadores]
+  );
+  const cards = useMemo(
+    () =>
+      (painel?.cards ?? config.cards).map((item: PortalExternoCard, index) => ({
+        ...item,
+        Icone: config.cards[index]?.Icone ?? Target
+      })),
+    [config.cards, painel?.cards]
+  );
+  const linhaDoTempo = (painel?.linhaDoTempo ?? config.linhaDoTempo) as PortalExternoTimeline[];
+
+  useEffect(() => {
+    setIdentificador("");
+    setSenha("");
+    setPainel(null);
+    setAcessoLiberado(!config.acessoRestrito);
+
+    if (tipo !== "transparencia") return;
+
+    let ativo = true;
+    setCarregando(true);
+    portaisExternosService
+      .obterTransparencia()
+      .then((dados) => {
+        if (!ativo) return;
+        setPainel(dados);
+        setAcessoLiberado(true);
+      })
+      .catch((error) => {
+        if (!ativo) return;
+        setPopup({
+          tipo: "erro",
+          titulo: "Falha ao carregar dados",
+          texto: obterMensagemErro(error, "Não foi possível carregar os dados reais do portal.")
+        });
+      })
+      .finally(() => {
+        if (ativo) setCarregando(false);
+      });
+
+    return () => {
+      ativo = false;
+    };
+  }, [config.acessoRestrito, tipo]);
+
+  async function acessarPortal() {
     if (config.acessoRestrito && (!identificador.trim() || !senha.trim())) {
       setPopup({
         tipo: "aviso",
@@ -237,18 +302,39 @@ function PortalExternoPage({ tipo }: { tipo: PortalTipo }) {
       return;
     }
 
-    setAcessoLiberado(true);
-    setPopup({
-      tipo: "sucesso",
-      titulo: config.acessoRestrito ? "Acesso liberado" : "Consulta aberta",
-      texto: config.acessoRestrito
-        ? "O painel externo foi aberto para validação do fluxo do portal."
-        : "A consulta pública foi aberta para navegação."
-    });
+    setCarregando(true);
+    try {
+      if (tipo === "transparencia") {
+        const dados = await portaisExternosService.obterTransparencia();
+        setPainel(dados);
+      } else {
+        const dados = await portaisExternosService.acessar(tipo, identificador, senha);
+        setPainel(dados);
+      }
+
+      setAcessoLiberado(true);
+      setPopup({
+        tipo: "sucesso",
+        titulo: config.acessoRestrito ? "Acesso liberado" : "Consulta aberta",
+        texto: config.acessoRestrito
+          ? "O painel externo foi carregado com dados reais vinculados ao cadastro localizado."
+          : "A consulta pública foi carregada com dados reais da instituição."
+      });
+    } catch (error: any) {
+      setAcessoLiberado(!config.acessoRestrito);
+      setPopup({
+        tipo: "erro",
+        titulo: "Acesso não liberado",
+        texto: obterMensagemErro(error, "Não foi possível validar o acesso ao portal.")
+      });
+    } finally {
+      setCarregando(false);
+    }
   }
 
   function sairPortal() {
     setAcessoLiberado(!config.acessoRestrito);
+    setPainel(null);
     setIdentificador("");
     setSenha("");
     setPopup({
@@ -262,7 +348,9 @@ function PortalExternoPage({ tipo }: { tipo: PortalTipo }) {
     setPopup({
       tipo: "aviso",
       titulo,
-      texto: "A ação está disponível na interface do portal e será conectada aos dados reais do módulo correspondente."
+      texto: acessoLiberado
+        ? "A rotina já está vinculada ao painel real do portal. A abertura detalhada será liberada na próxima etapa."
+        : "Entre no portal para consultar os dados reais vinculados a esta rotina."
     });
   }
 
@@ -285,7 +373,7 @@ function PortalExternoPage({ tipo }: { tipo: PortalTipo }) {
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-3">
-                  {config.indicadores.map((item) => (
+                  {indicadores.map((item) => (
                     <div key={item.label} className="rounded-2xl border border-white/15 bg-white/10 p-4">
                       <item.Icone className="h-5 w-5 text-white/85" />
                       <p className="mt-3 text-2xl font-semibold">{item.valor}</p>
@@ -320,8 +408,8 @@ function PortalExternoPage({ tipo }: { tipo: PortalTipo }) {
                       placeholder={config.senhaPlaceholder}
                     />
                   </div>
-                  <Button className="w-full" onClick={acessarPortal}>
-                    {config.acaoPrimaria}
+                  <Button className="w-full" onClick={acessarPortal} disabled={carregando}>
+                    {carregando ? "Carregando..." : config.acaoPrimaria}
                   </Button>
                   {acessoLiberado && config.acessoRestrito ? (
                     <Button className="w-full" variant="outline" onClick={sairPortal}>
@@ -331,8 +419,8 @@ function PortalExternoPage({ tipo }: { tipo: PortalTipo }) {
                   <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
                     <ShieldCheck className="mr-1.5 inline h-4 w-4 align-[-3px] text-emerald-700" />
                     {acessoLiberado
-                      ? "Painel externo aberto com isolamento visual por público."
-                      : "Acesso preparado para isolamento por instituição, perfil e permissão."}
+                      ? "Painel externo aberto com dados reais filtrados pelo cadastro localizado."
+                      : "Acesso preparado para consulta real por instituição, perfil e permissão."}
                   </div>
                 </CardContent>
               </Card>
@@ -340,7 +428,7 @@ function PortalExternoPage({ tipo }: { tipo: PortalTipo }) {
           </section>
 
           <section className="grid gap-4 lg:grid-cols-3">
-            {config.cards.map((card) => (
+            {cards.map((card) => (
               <Card key={card.titulo} className="border-[var(--g3-border)]">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-base">
@@ -369,7 +457,7 @@ function PortalExternoPage({ tipo }: { tipo: PortalTipo }) {
                   </h2>
                   <p className="mt-1 text-sm text-[var(--g3-muted)]">
                     {config.acessoRestrito
-                      ? `Acesso validado para ${identificador.trim() || "usuário externo"}.`
+                      ? `Acesso validado para ${(painel?.pessoa?.nome ?? identificador.trim()) || "usuário externo"}.`
                       : "Consulta pública liberada para navegação externa."}
                   </p>
                 </div>
@@ -381,7 +469,7 @@ function PortalExternoPage({ tipo }: { tipo: PortalTipo }) {
               </div>
 
               <div className="mt-4 grid gap-3 md:grid-cols-3">
-                {config.cards.map((card) => (
+                {cards.map((card) => (
                   <button
                     key={card.titulo}
                     type="button"
@@ -398,6 +486,33 @@ function PortalExternoPage({ tipo }: { tipo: PortalTipo }) {
                   </button>
                 ))}
               </div>
+
+              {painel?.itens?.length ? (
+                <div className="mt-4 grid gap-3">
+                  {painel.itens.map((item, index) => (
+                    <div
+                      key={item.id ?? `${item.titulo}-${index}`}
+                      className="rounded-xl border border-[var(--g3-border)] bg-white px-4 py-3"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-semibold text-[var(--g3-foreground)]">{item.titulo}</p>
+                          <p className="mt-1 text-xs text-[var(--g3-muted)]">{item.subtitulo}</p>
+                        </div>
+                        <Badge variant="info">{item.status ?? "Ativo"}</Badge>
+                      </div>
+                      {typeof item.percentual === "number" ? (
+                        <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
+                          <div
+                            className="h-full rounded-full bg-[var(--g3-active)]"
+                            style={{ width: `${Math.min(Math.max(item.percentual, 0), 100)}%` }}
+                          />
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </section>
           ) : null}
 
@@ -410,7 +525,7 @@ function PortalExternoPage({ tipo }: { tipo: PortalTipo }) {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                {config.linhaDoTempo.map((item, index) => (
+                {linhaDoTempo.map((item, index) => (
                   <div key={item.titulo} className="flex gap-3 rounded-xl border border-[var(--g3-border)] px-3 py-3">
                     <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--g3-primary-soft)] text-xs font-semibold text-[var(--g3-active)]">
                       {index + 1}
@@ -439,13 +554,13 @@ function PortalExternoPage({ tipo }: { tipo: PortalTipo }) {
                 <div className="flex items-center justify-between rounded-xl border border-[var(--g3-border)] px-3 py-2">
                   <span>Dados reais</span>
                   <Badge variant={acessoLiberado ? "info" : "warning"}>
-                    {acessoLiberado ? "Fluxo ativo" : "Pendente"}
+                    {acessoLiberado ? "Conectados" : "Pendente"}
                   </Badge>
                 </div>
                 <div className="flex items-center justify-between rounded-xl border border-[var(--g3-border)] px-3 py-2">
                   <span>Autenticação dedicada</span>
                   <Badge variant={config.acessoRestrito ? "warning" : "info"}>
-                    {config.acessoRestrito ? "Pendente" : "Não exigida"}
+                    {config.acessoRestrito ? "Identificador e senha" : "Não exigida"}
                   </Badge>
                 </div>
               </CardContent>

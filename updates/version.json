@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.531",
+  "latestVersion": "1.00.532",
   "releaseDate": "2026-06-22",
-  "description": "Menu Portais de acesso foi criado no G3N com atalhos para os portais externos.",
+  "description": "Portais externos passaram a consultar dados reais e o pos-deploy passou a bloquear build antigo de login sem CNPJ.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.531",
+  "minCompatibleVersion": "1.00.532",
   "releaseType": "stable",
   "downloadUrl": null
 }

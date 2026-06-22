@@ -58,6 +58,7 @@ import { carteiraEventoRoutes } from "../modules/carteira-evento/routes/carteira
 import { agendamentosRoutes } from "../modules/agendamentos/routes/agendamentos.routes.js";
 import { instituicoesRoutes } from "../modules/instituicoes/routes/instituicoes.routes.js";
 import { projetoRoutes } from "../modules/projetos/routes/projeto.routes.js";
+import { portaisExternosRoutes } from "../modules/portais-externos/routes/portais-externos.routes.js";
 import { obterAtualizacaoSistemaPaths } from "../modules/atualizacao-sistema/services/atualizacao-sistema.paths.js";
 
 export const appRoutes = Router();
@@ -125,6 +126,7 @@ appRoutes.use("/api/dashboard", dashboardRoutes);
 appRoutes.use("/api/chamados-tecnicos", chamadoTecnicoRoutes);
 appRoutes.use("/api/datas-comemorativas", datasComemorativasRoutes);
 appRoutes.use("/api/captacao-recursos", captacaoRecursosRoutes);
+appRoutes.use("/api/portais-externos", portaisExternosRoutes);
 appRoutes.use("/api/configuracoes/parametros", parametrosSistemaRoutes);
 appRoutes.use("/api/configuracoes/licenca-uso", licencaUsoRoutes);
 appRoutes.use("/api/vendas", vendaRoutes);

@@ -773,11 +773,11 @@ const secoesManual: ManualSecao[] = [
         comoUsar: [
           "Use a rota /portal-voluntario para abrir a interface externa do voluntário.",
           "O voluntário informa e-mail ou CPF e senha para acessar a área restrita.",
-          "Após o acesso, o portal abre uma área operacional com rotinas de oportunidades, escalas, check-in, horas, certificados e termos.",
-          "A estrutura está pronta para receber dados reais de cadastro, escalas, check-in, horas, certificados e termos."
+          "Após o acesso, o portal consulta o cadastro real do voluntário e exibe indicadores, área de interesse, disponibilidade, status e informações resumidas.",
+          "Use o módulo Cadastro de voluntários para manter CPF, e-mail, status, disponibilidade, área de interesse e habilidades atualizados."
         ],
         atencoes: [
-          "Antes de publicar dados reais, implemente autenticação dedicada ou token seguro de acesso.",
+          "A primeira integração usa identificador e senha informados no portal para localizar o cadastro; a etapa seguinte deve evoluir para autenticação dedicada ou token seguro de convite.",
           "Horas, certificados e documentos devem ser exibidos apenas ao próprio voluntário ou a usuários autorizados."
         ]
       },
@@ -787,8 +787,8 @@ const secoesManual: ManualSecao[] = [
         comoUsar: [
           "Use a rota /portal-beneficiario-familia para abrir a interface externa da família acompanhada.",
           "O beneficiário ou responsável informa CPF ou código familiar e senha de acesso.",
-          "Após o acesso, o portal abre uma área operacional com rotinas de agenda familiar, histórico, documentos e avisos.",
-          "A estrutura está pronta para receber dados reais de atendimentos, agendamentos, documentos pendentes e comunicados."
+          "Após o acesso, o portal consulta beneficiário, vínculo familiar, agenda, atendimentos e documentos pendentes em formato resumido.",
+          "Mantenha CPF, código familiar, vínculos, contatos, agendamentos e documentos atualizados nos módulos internos para alimentar o portal."
         ],
         atencoes: [
           "Dados sociais são sensíveis e devem exigir autenticação forte, vínculo familiar validado e regra clara de consentimento.",
@@ -801,8 +801,8 @@ const secoesManual: ManualSecao[] = [
         comoUsar: [
           "Use a rota /portal-transparencia para abrir a consulta pública de transparência.",
           "A busca permite preparar consulta por projeto, campanha, documento ou período.",
-          "A consulta pública já abre com área de navegação para projetos, prestação pública e mapa de atuação.",
-          "A estrutura está pronta para receber projetos, relatórios, documentos públicos, indicadores sociais e mapa de atuação."
+          "A consulta pública já carrega projetos, prestação pública, campanhas visíveis ao público, documentos institucionais e unidades cadastradas.",
+          "Revise os dados de Projetos, Prestação de contas, Documentos da instituição e Captação antes de divulgar a página."
         ],
         atencoes: [
           "O Portal da transparência é público por natureza; publique apenas informações aprovadas para divulgação externa.",
@@ -815,8 +815,8 @@ const secoesManual: ManualSecao[] = [
         comoUsar: [
           "Use a rota /portal-parceiro-financiador para abrir a área externa de parceiros e financiadores.",
           "O parceiro informa e-mail institucional e senha para acessar projetos autorizados.",
-          "Após o acesso, o portal abre uma área operacional com projetos financiados, documentos, relatórios e comunicação.",
-          "A estrutura está pronta para receber execução física, execução financeira, metas, evidências, relatórios e pendências."
+          "Após o acesso, o portal consulta projetos reais relacionados ao parceiro por fonte de recurso, responsável ou nome do projeto.",
+          "Use o módulo Projetos para manter fonte de recurso, responsável, status e tarefas atualizados para alimentar o painel externo."
         ],
         atencoes: [
           "Parceiros devem visualizar apenas os projetos, contratos, relatórios e documentos vinculados ao próprio relacionamento.",
