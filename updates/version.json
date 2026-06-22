@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.526",
-  "releaseDate": "2026-06-19",
-  "description": "Menus e títulos operacionais foram renomeados para identificação mais clara dos setores.",
+  "latestVersion": "1.00.531",
+  "releaseDate": "2026-06-22",
+  "description": "Menu Portais de acesso foi criado no G3N com atalhos para os portais externos.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.526",
+  "minCompatibleVersion": "1.00.531",
   "releaseType": "stable",
   "downloadUrl": null
 }

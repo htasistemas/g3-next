@@ -250,7 +250,7 @@ export function CadastroVinculoFamiliarPage() {
       const response = await salvarFamilia.mutateAsync({ ...familiaForm, id_familia: familiaIdSelecionada, id_referencia_familiar: responsavel.id_beneficiario, membros });
       setFamiliaIdSelecionada(response.familia.id_familia);
       setAbaAtiva("resumo");
-      setPopup({ tipo: "sucesso", titulo: "Vínculo familiar salvo", texto: "A família foi salva com sucesso." });
+      setPopup({ tipo: "sucesso", titulo: "Família e vínculo salvos", texto: "A família foi salva com sucesso." });
     } catch (error) {
       setPopup({ tipo: "erro", titulo: "Erro ao salvar", texto: mensagemErroApi(error) });
     }
@@ -339,7 +339,7 @@ export function CadastroVinculoFamiliarPage() {
 
   return (
     <>
-      <AdminPageLayout tabs={abas} activeTab={abaAtiva} onChangeTab={(id) => setAbaAtiva(id as AbaId)} actions={acoes} sectionLabel="Cadastros em geral" pageTitle="Vínculo familiar" activeTitle={abas.find((item) => item.id === abaAtiva)?.label} codeBadge={familiaIdSelecionada ? `Código da família: ${familiaIdSelecionada}` : "Nova família"}>
+      <AdminPageLayout tabs={abas} activeTab={abaAtiva} onChangeTab={(id) => setAbaAtiva(id as AbaId)} actions={acoes} sectionLabel="Cadastros em geral" pageTitle="Famílias e vínculos" activeTitle={abas.find((item) => item.id === abaAtiva)?.label} codeBadge={familiaIdSelecionada ? `Código da família: ${familiaIdSelecionada}` : "Nova família"}>
         <section className={abaAtiva === "composicao" ? "space-y-3" : "space-y-4"}>
           <Card className={abaAtiva === "composicao" ? "shrink-0 overflow-hidden" : undefined}><CardHeader className={abaAtiva === "composicao" ? "px-3 py-2" : undefined}><CardTitle className="text-base">Cabeçalho da família</CardTitle></CardHeader><CardContent className={abaAtiva === "composicao" ? "grid gap-2 px-3 pb-2 pt-0 md:grid-cols-2 xl:grid-cols-4" : "grid gap-3 md:grid-cols-2 xl:grid-cols-4"}><div className={abaAtiva === "composicao" ? "rounded-xl border border-[var(--g3-border)] p-2" : "rounded-xl border border-[var(--g3-border)] p-3"}><p className="text-xs uppercase tracking-wide text-[var(--g3-muted)]">Nome</p><p className={abaAtiva === "composicao" ? "mt-0.5 truncate text-sm font-semibold" : "mt-1 font-semibold"}>{familiaForm.nome_familia || "Nova família"}</p></div><div className={abaAtiva === "composicao" ? "rounded-xl border border-[var(--g3-border)] p-2" : "rounded-xl border border-[var(--g3-border)] p-3"}><p className="text-xs uppercase tracking-wide text-[var(--g3-muted)]">Responsável</p><p className={abaAtiva === "composicao" ? "mt-0.5 truncate text-sm font-semibold" : "mt-1 font-semibold"}>{nomePessoa(membros.find((item) => item.responsavel_familiar)?.beneficiario)}</p></div><div className={abaAtiva === "composicao" ? "rounded-xl border border-[var(--g3-border)] p-2" : "rounded-xl border border-[var(--g3-border)] p-3"}><p className="text-xs uppercase tracking-wide text-[var(--g3-muted)]">Membros</p><p className={abaAtiva === "composicao" ? "mt-0.5 text-sm font-semibold" : "mt-1 font-semibold"}>{membros.length}</p></div><div className={abaAtiva === "composicao" ? "rounded-xl border border-[var(--g3-border)] p-2" : "rounded-xl border border-[var(--g3-border)] p-3"}><p className="text-xs uppercase tracking-wide text-[var(--g3-muted)]">Alertas</p><p className={abaAtiva === "composicao" ? "mt-0.5 text-sm font-semibold" : "mt-1 font-semibold"}>{alertas.length}</p></div></CardContent></Card>
 

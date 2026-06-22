@@ -204,7 +204,7 @@ export const menuSections: MenuSection[] = [
       {
         id: "cadastros-vinculo-familiar",
         to: "/cadastros/vinculo-familiar",
-        label: "Vínculo familiar",
+        label: "Famílias e vínculos",
         icon: Link2
       }
     ]
@@ -328,7 +328,7 @@ export const menuSections: MenuSection[] = [
       {
         id: "setor-administrativo-gestao-documentos",
         to: "/setor-administrativo/gestao-documentos",
-        label: "Gestão de documentos",
+        label: "Documentos da instituição",
         icon: Files
       },
       {
@@ -401,7 +401,7 @@ export const menuSections: MenuSection[] = [
       {
         id: "setor-financeiro-contabilidade",
         to: "/setor-financeiro/contabilidade",
-        label: "Contabilidade",
+        label: "Lançamentos contábeis",
         icon: DollarSign
       },
       {
@@ -448,6 +448,48 @@ export const menuSections: MenuSection[] = [
         to: "/setor-vendas/frente-caixa",
         label: "Frente de caixa",
         icon: ScanBarcode,
+        abrirEmNovaAba: true
+      }
+    ]
+  },
+  {
+    id: "portais-acesso",
+    secao: "Portais de acesso",
+    icon: Link2,
+    itens: [
+      {
+        id: "portais-acesso-doador",
+        to: "/portal-doador",
+        label: "Portal do doador",
+        icon: HandCoins,
+        abrirEmNovaAba: true
+      },
+      {
+        id: "portais-acesso-voluntario",
+        to: "/portal-voluntario",
+        label: "Portal do voluntário",
+        icon: HandHeart,
+        abrirEmNovaAba: true
+      },
+      {
+        id: "portais-acesso-beneficiario-familia",
+        to: "/portal-beneficiario-familia",
+        label: "Portal do beneficiário e família",
+        icon: HeartHandshake,
+        abrirEmNovaAba: true
+      },
+      {
+        id: "portais-acesso-transparencia",
+        to: "/portal-transparencia",
+        label: "Portal da transparência",
+        icon: ChartPie,
+        abrirEmNovaAba: true
+      },
+      {
+        id: "portais-acesso-parceiro-financiador",
+        to: "/portal-parceiro-financiador",
+        label: "Portal do parceiro e financiador",
+        icon: Building2,
         abrirEmNovaAba: true
       }
     ]
@@ -541,7 +583,7 @@ export const menuSections: MenuSection[] = [
       {
         id: "configuracoes-parametros-sistema",
         to: "/configuracoes/parametros-sistema",
-        label: "Parâmetros do sistema",
+        label: "Configurações do sistema",
         icon: SlidersHorizontal,
         requiredPermissions: ["ADMINISTRADOR"]
       },
@@ -555,7 +597,7 @@ export const menuSections: MenuSection[] = [
       {
         id: "configuracoes-master-instituicoes",
         to: "/configuracoes/master-instituicoes",
-        label: "Instituições SaaS",
+        label: "Instituições do sistema",
         icon: Building2
       }
     ]
@@ -581,23 +623,23 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/financeiro/registro-doacao")) return "Receber doações";
   if (pathname.startsWith("/financeiro/doacoes-realizadas")) return "Doações realizadas";
   if (pathname.startsWith("/cadastros/unidades-assistenciais")) return "Cadastro de unidade assistencial";
-  if (pathname.startsWith("/cadastros/vinculo-familiar")) return "Cadastro de vínculo familiar";
-  if (pathname.startsWith("/captacao-recursos/dashboard")) return "Cockpit de captação";
-  if (pathname.startsWith("/captacao-recursos/doadores")) return "Doadores 360";
-  if (pathname.startsWith("/captacao-recursos/doacoes")) return "Doações";
+  if (pathname.startsWith("/cadastros/vinculo-familiar")) return "Famílias e vínculos";
+  if (pathname.startsWith("/captacao-recursos/dashboard")) return "Painel de captação";
+  if (pathname.startsWith("/captacao-recursos/doadores")) return "Cadastro de doadores";
+  if (pathname.startsWith("/captacao-recursos/doacoes")) return "Doações recebidas";
   if (pathname.startsWith("/captacao-recursos/campanhas")) return "Campanhas";
   if (pathname.startsWith("/captacao-recursos/portal-doador")) return "Portal doador";
   if (pathname.startsWith("/captacao-recursos/comprovantes")) return "Comprovantes";
-  if (pathname.startsWith("/captacao-recursos/configuracoes-pagamento")) return "Configurações de pagamento";
+  if (pathname.startsWith("/captacao-recursos/configuracoes-pagamento")) return "Formas de pagamento";
   if (pathname.startsWith("/captacao-recursos/relatorios")) return "Relatórios";
-  if (pathname.startsWith("/captacao-recursos/permissoes")) return "Permissões do módulo";
-  if (pathname.startsWith("/configuracoes/parametros-sistema")) return "Parâmetros do sistema";
+  if (pathname.startsWith("/captacao-recursos/permissoes")) return "Permissões da captação";
+  if (pathname.startsWith("/configuracoes/parametros-sistema")) return "Configurações do sistema";
   if (pathname.startsWith("/configuracoes/datas-comemorativas")) return "Datas comemorativas";
   if (pathname.startsWith("/configuracoes/atualizar-sistema")) return "Atualizar sistema";
   if (pathname.startsWith("/configuracoes/chamado-tecnico")) return "Chamado técnico";
   if (pathname.startsWith("/configuracoes/licenca-uso")) return "Licença de uso";
   if (pathname.startsWith("/configuracoes/manual-do-sistema")) return "Manual do sistema";
-  if (pathname.startsWith("/configuracoes/master-instituicoes")) return "Instituições SaaS";
+  if (pathname.startsWith("/configuracoes/master-instituicoes")) return "Instituições do sistema";
   if (pathname.startsWith("/configuracoes/pesquise-na-ia")) return "Pergunte à IA";
   if (pathname.startsWith("/configuracoes/sobre-o-sistema")) return "Sobre o sistema";
   if (pathname.startsWith("/configuracoes/mensagens-personalizadas")) return "Mensagens personalizadas";
@@ -610,7 +652,7 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/setor-administrativo/emprestimo-eventos")) return "Empréstimos para eventos";
   if (pathname.startsWith("/setor-administrativo/fotos-eventos")) return "Fotos de eventos";
   if (pathname.startsWith("/setor-administrativo/projetos")) return "Projetos";
-  if (pathname.startsWith("/setor-administrativo/gestao-documentos")) return "Gestão de documentos";
+  if (pathname.startsWith("/setor-administrativo/gestao-documentos")) return "Documentos da instituição";
   if (pathname.startsWith("/setor-administrativo/oficios-protocolos")) return "Ofícios e protocolos";
   if (pathname.startsWith("/setor-administrativo/patrimonio")) return "Patrimônio";
   if (pathname.startsWith("/setor-administrativo/tarefas-pendencias")) return "Tarefas e pendências";
@@ -619,7 +661,7 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/setor-juridico/plano-trabalho")) return "Plano de trabalho";
   if (pathname.startsWith("/setor-juridico/termo-fomento")) return "Termo de fomento";
   if (pathname.startsWith("/setor-financeiro/autorizacao-compras")) return "Autorização de compras";
-  if (pathname.startsWith("/setor-financeiro/contabilidade")) return "Contabilidade";
+  if (pathname.startsWith("/setor-financeiro/contabilidade")) return "Lançamentos contábeis";
   if (pathname.startsWith("/setor-financeiro/prestacao-contas")) return "Prestação de contas";
   if (pathname.startsWith("/setor-rh/contratacao")) return "Contratação";
   return "Painel de migração";

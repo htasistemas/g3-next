@@ -37,6 +37,23 @@ if [ "$frontend_status" != "200" ]; then
 fi
 log "Frontend OK"
 
+portal_routes=(
+  "/portal-doador"
+  "/portal-voluntario"
+  "/portal-beneficiario-familia"
+  "/portal-transparencia"
+  "/portal-parceiro-financiador"
+)
+
+for route in "${portal_routes[@]}"; do
+  log "Checando portal publico em $FRONTEND_URL$route"
+  portal_status="$(curl -sS -o /tmp/g3n-portal.html -w '%{http_code}' "$FRONTEND_URL$route")"
+  if [ "$portal_status" != "200" ]; then
+    fail "Falha no portal $route (HTTP $portal_status)"
+  fi
+done
+log "Portais publicos OK"
+
 if [ -n "$LOGIN_USER" ] && [ -n "$LOGIN_PASS" ]; then
   log "Checando login em $FRONTEND_URL (usuario: $LOGIN_USER)"
   login_status="$(

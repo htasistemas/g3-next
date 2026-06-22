@@ -3,6 +3,7 @@ import {
   BookOpenText,
   Brain,
   CheckCircle2,
+  Globe2,
   HeartHandshake,
   Link2,
   PiggyBank,
@@ -98,12 +99,12 @@ const secoesManual: ManualSecao[] = [
   },
   {
     id: "familias",
-    titulo: "Vínculo familiar",
+    titulo: "Famílias e vínculos",
     descricao: "Gestão da família como núcleo principal de atendimento, moradia e concessão.",
     icon: Link2,
     telas: [
       {
-        nome: "Vínculo familiar",
+        nome: "Famílias e vínculos",
         objetivo: "Montar a composição familiar, definir responsável, consolidar endereço e manter histórico do núcleo.",
         comoUsar: [
           "Use a aba Listagem de famílias para localizar um núcleo já cadastrado ou iniciar uma nova família.",
@@ -116,7 +117,7 @@ const secoesManual: ManualSecao[] = [
           "Não marque outro responsável se já existir um responsável ativo.",
           "Membros configurados para usar o endereço da família herdam o endereço principal do núcleo.",
           "A aba Listagem de famílias segue o mesmo padrão visual e estrutural da aba Listagem de beneficiários, com filtros no topo, limpeza rápida e tabela clicável.",
-          "A tela Vínculo familiar agora lista, abre, cria, atualiza, transfere, desmembra e inativa famílias sempre dentro do tenant autenticado, impedindo que uma instituição veja ou altere núcleos familiares de outra."
+          "A tela Famílias e vínculos agora lista, abre, cria, atualiza, transfere, desmembra e inativa famílias sempre dentro do tenant autenticado, impedindo que uma instituição veja ou altere núcleos familiares de outra."
         ]
       }
     ]
@@ -374,7 +375,7 @@ const secoesManual: ManualSecao[] = [
         ]
       },
       {
-        nome: "Gestão de documentos",
+        nome: "Documentos da instituição",
         objetivo: "Controlar documentos institucionais, anexar arquivos e manter histórico de atualizações do documento.",
         comoUsar: [
           "Cadastre ou selecione um documento na lista para abrir o detalhamento completo.",
@@ -387,7 +388,7 @@ const secoesManual: ManualSecao[] = [
           "A renovação de documento vencido agora respeita corretamente a data de validade informada, inclusive quando a nova validade for o dia atual.",
           "Se o documento já estiver salvo, o anexo é armazenado no storage do sistema e permanece disponível para substituição e exclusão sem duplicar arquivo no banco.",
           "O envio dos anexos na aba Cadastro e edição aceita seleção múltipla e mostra a evolução do upload em barra percentual até a conclusão.",
-          "A tela Gestão de documentos agora lista, cadastra, atualiza e exclui documentos, anexos, arquivos e histórico sempre dentro do tenant autenticado, impedindo mistura de documentos entre instituições."
+          "A tela Documentos da instituição agora lista, cadastra, atualiza e exclui documentos, anexos, arquivos e histórico sempre dentro do tenant autenticado, impedindo mistura de documentos entre instituições."
         ]
       },
       {
@@ -566,7 +567,7 @@ const secoesManual: ManualSecao[] = [
         ]
       },
       {
-        nome: "Contabilidade / financeiro",
+        nome: "Lançamentos contábeis",
         objetivo: "Permitir que qualquer usuário registre receitas e despesas e acompanhe as contas bancárias com o mínimo de complexidade.",
         comoUsar: [
           "A tela foi simplificada para trabalhar somente com três abas principais: Painel financeiro, Lançamentos e Contas bancárias.",
@@ -595,7 +596,7 @@ const secoesManual: ManualSecao[] = [
           "O cadastro de centro de custo deixou de fazer parte do fluxo simplificado dessa tela.",
           "Ao salvar um centro de custo no backend, o sistema agora suporta perfis longos de permissões no histórico sem retornar erro interno do servidor.",
           "Se o valor do lançamento for digitado com vírgula, a tela passa a interpretar corretamente o número antes do salvamento.",
-          "A tela Contabilidade / financeiro agora lista contas, lançamentos, movimentações, transferências, conciliações, histórico, compras integradas e emendas sempre dentro do tenant autenticado."
+          "A tela Lançamentos contábeis agora lista contas, lançamentos, movimentações, transferências, conciliações, histórico, compras integradas e emendas sempre dentro do tenant autenticado."
         ]
       },
       {
@@ -631,16 +632,16 @@ const secoesManual: ManualSecao[] = [
         nome: "Captação de recursos",
         objetivo: "Organizar doadores, campanhas, doações, comprovantes e indicadores da captação sem cruzar dados entre instituições.",
         comoUsar: [
-          "Use o Cockpit de captação para acompanhar arrecadação, recorrência, risco de retenção, campanhas públicas e prioridades comerciais somente da instituição logada.",
-          "Na aba Doadores 360, selecione o cadastro com 1 clique para abrir score de relacionamento, risco, próxima ação recomendada, histórico, comprovantes, campanhas e preferências de contato no mesmo fluxo.",
-          "Na aba Retenção e tarefas do Doadores 360, registre segmento, status de retenção, motivo de risco, score salvo, próxima ação e a fila operacional de follow-up do doador selecionado.",
+          "Use o Painel de captação para acompanhar arrecadação, recorrência, risco de retenção, campanhas públicas e prioridades comerciais somente da instituição logada.",
+          "Na aba Cadastro de doadores, selecione o cadastro com 1 clique para abrir score de relacionamento, risco, próxima ação recomendada, histórico, comprovantes, campanhas e preferências de contato no mesmo fluxo.",
+          "Na aba Retenção e tarefas do Cadastro de doadores, registre segmento, status de retenção, motivo de risco, score salvo, próxima ação e a fila operacional de follow-up do doador selecionado.",
           "Use o bloco Recuperação de recorrência para preparar ações rápidas de retenção, reativação ou upgrade e salvar tarefas com responsável e data prevista em 1 clique.",
           "Na gestão de doadores, campanhas, doações e comprovantes, trabalhe normalmente com listagem, cadastro, edição, cobrança, confirmação e emissão de comprovante em um clique por ação.",
           "Na área de configurações, mantenha mensagens, parâmetros de pagamento e regras operacionais da captação conforme a necessidade da instituição atual.",
           "Os relatórios e comprovantes emitidos pela tela passam a usar também os dados institucionais do tenant autenticado."
         ],
         atencoes: [
-          "O Cockpit continua calculando sinais automáticos a partir da base atual, mas a aba Retenção e tarefas agora também grava segmento, status, score salvo, motivo de risco e próximas ações para uso persistente por instituição.",
+          "O Painel de captação continua calculando sinais automáticos a partir da base atual, mas a aba Retenção e tarefas agora também grava segmento, status, score salvo, motivo de risco e próximas ações para uso persistente por instituição.",
           "As tarefas de relacionamento da captação ficam vinculadas apenas ao doador e ao tenant autenticado, sem mistura entre instituições.",
           "A tela Captação de recursos agora lista, abre, cadastra, atualiza e movimenta doadores, campanhas, doações, comprovantes, configurações e logs sempre dentro do tenant autenticado.",
           "O portal do doador continua vinculado ao tenant do próprio cadastro para impedir acesso ou geração de cobrança em dados de outra instituição.",
@@ -688,7 +689,7 @@ const secoesManual: ManualSecao[] = [
         objetivo: "Manter o cadastro social completo do beneficiário com documentos, contatos, endereço e demais informações obrigatórias.",
         comoUsar: [
           "Na aba Documentos, anexe ou capture os arquivos aceitos pelo sistema antes de salvar o cadastro.",
-          "Documentos marcados como obrigatórios em Parâmetros do sistema precisam ser preenchidos também para chamadas diretas da API, não apenas pela validação visual da tela.",
+          "Documentos marcados como obrigatórios em Configurações do sistema precisam ser preenchidos também para chamadas diretas da API, não apenas pela validação visual da tela.",
           "O aceite LGPD deve ser marcado explicitamente pelo usuário responsável antes de salvar o cadastro.",
           "Se houver falha no processamento de um documento, o sistema agora informa qual documento apresentou erro e o motivo real retornado pelo backend.",
           "Revise nome do arquivo, tipo aceito, tamanho e integridade do anexo quando houver mensagem específica na tela."
@@ -729,6 +730,97 @@ const secoesManual: ManualSecao[] = [
           "Falhas tratáveis do cadastro ou da vinculação da foto agora retornam mensagem operacional em vez de apenas erro interno do servidor.",
           "A limpeza de foto antiga no storage não deve mais derrubar a atualização do voluntário em produção.",
           "A compatibilidade com a base legada foi mantida removendo do ORM os campos de comunicação ainda não existentes em alguns bancos de produção."
+        ]
+      }
+    ]
+  },
+  {
+    id: "portais-externos",
+    titulo: "Portais externos",
+    descricao: "Acessos públicos ou restritos para públicos externos da instituição.",
+    icon: Globe2,
+    telas: [
+      {
+        nome: "Menu Portais de acesso",
+        objetivo: "Centralizar no menu interno os atalhos para todos os portais externos publicados pelo G3N.",
+        comoUsar: [
+          "Acesse Portais de acesso no menu lateral do G3N.",
+          "Clique no portal desejado para abrir a rota pública em nova aba, sem perder a navegação interna do operador.",
+          "Use esse menu para validar rapidamente os links externos antes de divulgar os endereços para doadores, voluntários, famílias, parceiros ou sociedade."
+        ],
+        atencoes: [
+          "Os links usam as mesmas rotas públicas configuradas no frontend e validadas no pós-deploy.",
+          "Em produção, o domínio público da instalação substitui o localhost; o caminho do portal permanece o mesmo."
+        ]
+      },
+      {
+        nome: "Portal do doador",
+        objetivo: "Disponibilizar campanhas, dados do doador, doações, comprovantes e pagamento externo.",
+        comoUsar: [
+          "Use a rota /portal-doador para abrir o portal público do doador.",
+          "Quando não houver token real disponível para teste, use Acessar demonstração para validar painel, doações, comprovantes, recorrências e preferências sem depender de backend.",
+          "Mantenha campanhas, doadores, doações, comprovantes e formas de pagamento atualizados em Captação de recursos antes de divulgar o link.",
+          "Quando o acesso vier de uma campanha ou doador identificado, confira se o vínculo do tenant está correto antes de gerar cobrança ou comprovante."
+        ],
+        atencoes: [
+          "O Portal do doador já possui integração com a captação e deve continuar respeitando o tenant do cadastro vinculado.",
+          "Dados de doadores e cobranças não devem ser expostos entre instituições diferentes."
+        ]
+      },
+      {
+        nome: "Portal do voluntário",
+        objetivo: "Preparar o acesso de voluntários a oportunidades, escalas, horas registradas, certificados e termos.",
+        comoUsar: [
+          "Use a rota /portal-voluntario para abrir a interface externa do voluntário.",
+          "O voluntário informa e-mail ou CPF e senha para acessar a área restrita.",
+          "Após o acesso, o portal abre uma área operacional com rotinas de oportunidades, escalas, check-in, horas, certificados e termos.",
+          "A estrutura está pronta para receber dados reais de cadastro, escalas, check-in, horas, certificados e termos."
+        ],
+        atencoes: [
+          "Antes de publicar dados reais, implemente autenticação dedicada ou token seguro de acesso.",
+          "Horas, certificados e documentos devem ser exibidos apenas ao próprio voluntário ou a usuários autorizados."
+        ]
+      },
+      {
+        nome: "Portal do beneficiário e família",
+        objetivo: "Preparar o acompanhamento externo de atendimentos, agenda familiar, documentos e comunicados.",
+        comoUsar: [
+          "Use a rota /portal-beneficiario-familia para abrir a interface externa da família acompanhada.",
+          "O beneficiário ou responsável informa CPF ou código familiar e senha de acesso.",
+          "Após o acesso, o portal abre uma área operacional com rotinas de agenda familiar, histórico, documentos e avisos.",
+          "A estrutura está pronta para receber dados reais de atendimentos, agendamentos, documentos pendentes e comunicados."
+        ],
+        atencoes: [
+          "Dados sociais são sensíveis e devem exigir autenticação forte, vínculo familiar validado e regra clara de consentimento.",
+          "Não publique histórico social, documentos ou comunicados sem permissão explícita da instituição e do titular responsável."
+        ]
+      },
+      {
+        nome: "Portal da transparência",
+        objetivo: "Publicar projetos, indicadores, documentos públicos, prestação social e evidências autorizadas.",
+        comoUsar: [
+          "Use a rota /portal-transparencia para abrir a consulta pública de transparência.",
+          "A busca permite preparar consulta por projeto, campanha, documento ou período.",
+          "A consulta pública já abre com área de navegação para projetos, prestação pública e mapa de atuação.",
+          "A estrutura está pronta para receber projetos, relatórios, documentos públicos, indicadores sociais e mapa de atuação."
+        ],
+        atencoes: [
+          "O Portal da transparência é público por natureza; publique apenas informações aprovadas para divulgação externa.",
+          "Dados pessoais, listas nominais e documentos internos devem permanecer protegidos."
+        ]
+      },
+      {
+        nome: "Portal do parceiro e financiador",
+        objetivo: "Preparar o acompanhamento de projetos apoiados, metas, documentos, relatórios e comunicação com a equipe.",
+        comoUsar: [
+          "Use a rota /portal-parceiro-financiador para abrir a área externa de parceiros e financiadores.",
+          "O parceiro informa e-mail institucional e senha para acessar projetos autorizados.",
+          "Após o acesso, o portal abre uma área operacional com projetos financiados, documentos, relatórios e comunicação.",
+          "A estrutura está pronta para receber execução física, execução financeira, metas, evidências, relatórios e pendências."
+        ],
+        atencoes: [
+          "Parceiros devem visualizar apenas os projetos, contratos, relatórios e documentos vinculados ao próprio relacionamento.",
+          "Prestação financeira e documentos de parceria exigem trilha de auditoria e permissão por instituição."
         ]
       }
     ]
@@ -865,7 +957,7 @@ const secoesManual: ManualSecao[] = [
     icon: Settings2,
     telas: [
       {
-        nome: "Parâmetros do sistema",
+        nome: "Configurações do sistema",
         objetivo: "Definir regras que afetam obrigatoriedade, alertas e comportamento global do G3N.",
         comoUsar: [
           "Use Campos obrigatórios para definir quais documentos e campos devem ser exigidos no cadastro.",
@@ -873,7 +965,7 @@ const secoesManual: ManualSecao[] = [
           "Salve alterações somente após revisar o impacto nas telas relacionadas."
         ],
         atencoes: [
-          "A tela Parâmetros do sistema agora lê e grava personalização, carência, obrigatoriedade e alertas sempre dentro do tenant autenticado.",
+          "A tela Configurações do sistema agora lê e grava personalização, carência, obrigatoriedade e alertas sempre dentro do tenant autenticado.",
           "Ao trocar de instituição na mesma estação, a página recarrega os parâmetros da organização logada e não deve reaproveitar dados de outro CNPJ."
         ]
       },
@@ -969,10 +1061,10 @@ const secoesManual: ManualSecao[] = [
         ]
       },
       {
-        nome: "Instituições SaaS",
+        nome: "Instituições do sistema",
         objetivo: "Administrar os tenants do G3N em base PostgreSQL compartilhada, com identificação por instituição e operação exclusiva para superadmin.",
         comoUsar: [
-          "Use a tela Instituições SaaS para cadastrar cada cliente do G3N como um tenant separado, com CNPJ, slug, plano, status e contato principal.",
+          "Use a tela Instituições do sistema para cadastrar cada cliente do G3N como um tenant separado, com CNPJ, slug, plano, status e contato principal.",
           "Na listagem, pesquise por razão social, nome fantasia, CNPJ, slug, código da instituição ou e-mail e clique na linha para abrir o tenant.",
           "Na aba Cadastro do tenant, revise os dados da instituição, plano contratado, identidade visual e status operacional antes de salvar.",
           "Ao atualizar o e-mail principal de um tenant já existente na aba Cadastro do tenant, o sistema sincroniza esse endereço com o administrador inicial principal para preservar o acesso ao login da instituição.",
@@ -991,7 +1083,7 @@ const secoesManual: ManualSecao[] = [
           "Os cards de dados da instituição e de apresentação do Sistema G3 na lateral direita também passaram a ficar sem vão entre si, formando um bloco visual contínuo, sem empurrar o card institucional para o rodapé.",
           "A foto lateral do login voltou a usar altura maior para ganhar mais presença visual na composição desktop.",
           "A altura da foto lateral foi ampliada novamente para ocupar mais área vertical no desktop, conforme ajuste visual da tela de acesso.",
-          "O usuário administrativo padrão htasistemas@gmail.com é tratado como superadmin master no acesso SaaS e pode abrir a tela Instituições SaaS mesmo sem depender de configuração manual adicional.",
+          "O usuário administrativo padrão htasistemas@gmail.com é tratado como superadmin master no acesso SaaS e pode abrir a tela Instituições do sistema mesmo sem depender de configuração manual adicional.",
           "No topo principal do sistema, o cabeçalho passou a exibir nome da instituição e nome do usuário, sem mostrar o plano contratado.",
           "Ao entrar com outra instituição, a unidade principal atual, a logomarca do topo e os dados da visão geral passam a ser recarregados por tenant, evitando reaproveitar cache ou identidade visual da instituição anterior.",
           "A API de unidades assistenciais agora exige o tenant autenticado em leitura e escrita, impedindo que um CNPJ carregue a unidade principal, a logomarca ou os dados institucionais de outro cliente.",
@@ -1006,7 +1098,7 @@ const secoesManual: ManualSecao[] = [
           "A tela Receber doações agora lista, abre, cadastra, atualiza, exclui e pesquisa doadores sempre dentro do tenant autenticado, inclusive na integração automática com o almoxarifado, impedindo mistura de doações e doadores entre instituições.",
           "A tela Cadastro de beneficiários agora lista, abre, cadastra, atualiza, exclui e gera o próximo código sempre dentro do tenant autenticado, impedindo que uma instituição veja os beneficiários de outra.",
           "A tela Usuários e permissões agora lista, abre, cadastra, atualiza, altera status, reseta senha e exclui sempre dentro do tenant autenticado, impedindo acesso cruzado entre instituições mesmo quando alguém tenta operar por ID direto.",
-          "A tela Parâmetros do sistema agora salva personalização, carência, obrigatoriedades e alertas por tenant, então mudanças de cor, regras e alertas afetam apenas a instituição logada.",
+          "A tela Configurações do sistema agora salva personalização, carência, obrigatoriedades e alertas por tenant, então mudanças de cor, regras e alertas afetam apenas a instituição logada.",
           "A estrutura da tabela parametros_sistema também foi ajustada para remover o índice global legado por chave, evitando erro interno do servidor ao salvar a mesma configuração em tenants diferentes.",
           "Administradores iniciais de tenants criados antes do ajuste de permissões continuam herdando o acesso administrativo pelo perfil no login, evitando bloqueio indevido da visão geral e de outras telas administrativas."
         ],

@@ -62,7 +62,7 @@ const abas: AdminTab[] = [
   { id: "relatorios", label: "Relatórios e dashboard", icon: Bell }
 ];
 
-const tituloTela = "Gestão de documentos";
+const tituloTela = "Documentos da instituição";
 
 interface LinkExterno {
   id?: number;

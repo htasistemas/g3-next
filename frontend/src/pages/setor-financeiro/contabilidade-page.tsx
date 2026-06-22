@@ -2357,7 +2357,7 @@ export function ContabilidadePage() {
   }
 
   const imprimirAbaAtual = () =>
-    imprimirConteudoAtual({ titulo: `Contabilidade / financeiro - ${abas.find((item) => item.id === abaAtiva)?.label ?? ''}` });
+    imprimirConteudoAtual({ titulo: `Lançamentos contábeis - ${abas.find((item) => item.id === abaAtiva)?.label ?? ''}` });
 
   const acoesPorAba: Record<AbaId, AdminAction[]> = {
     painel: [
@@ -2493,7 +2493,7 @@ export function ContabilidadePage() {
         onChangeTab={(tabId) => setAbaAtiva(tabId as AbaId)}
         actions={acoes}
         sectionLabel="Contabilidade e finanças"
-        pageTitle="Contabilidade / financeiro"
+        pageTitle="Lançamentos contábeis"
         activeTitle={abas.find((item) => item.id === abaAtiva)?.label}
         codeBadge={codeBadge}
       >

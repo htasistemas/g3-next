@@ -15,6 +15,110 @@ import type { CaptacaoPortalPainel } from "@/types/captacao-recursos";
 import { formatarDataHora, formatarMoeda, formaPagamentoOptions, tipoDoacaoOptions } from "./captacao-recursos.shared";
 
 const TOKEN_KEY = "g3n.captacao.portal.token";
+const DEMO_TOKEN = "g3n.portal.doador.demo";
+
+function criarPainelDemonstrativo(): CaptacaoPortalPainel {
+  return {
+    doador: {
+      id: "demo-doador",
+      uuid: "demo-doador",
+      tipoDoador: "pessoa_fisica",
+      nome: "Doador demonstrativo",
+      cpfCnpj: "00000000000",
+      emailPrincipal: "doador@exemplo.org",
+      telefone: "(11) 3000-0000",
+      whatsapp: "(11) 99999-0000",
+      cidade: "São Paulo",
+      uf: "SP",
+      status: "ativo",
+      aceitouLgpd: true,
+      aceitaEmail: true,
+      aceitaWhatsapp: true,
+      aceitaReceberCampanhas: true,
+      portalAtivo: true,
+      totalDoado: 1850,
+      quantidadeDoacoes: 4,
+      ticketMedio: 462.5,
+      maiorDoacao: 750,
+      campanhasApoiadas: 2,
+      recorrenciaAtiva: true
+    },
+    campanhas: [
+      {
+        id: "demo-campanha-1",
+        uuid: "demo-campanha-1",
+        nome: "Apoio institucional",
+        descricaoCurta: "Contribuição livre para manutenção das atividades.",
+        metaFinanceira: 50000,
+        valorArrecadado: 18500,
+        percentualAtingido: 37,
+        valorFaltante: 31500,
+        status: "ativa",
+        corDestaque: "#0f766e",
+        tipo: "institucional",
+        destaqueNoPortal: true,
+        visivelAoPublico: true,
+        totalDoacoes: 42,
+        totalDoadores: 31,
+        metaAtingida: false
+      }
+    ],
+    doacoes: [
+      {
+        id: "demo-doacao-1",
+        uuid: "demo-doacao-1",
+        numeroDoacao: "DOA-DEMO-001",
+        dataHora: new Date().toISOString(),
+        doadorId: "demo-doador",
+        doadorNome: "Doador demonstrativo",
+        campanhaId: "demo-campanha-1",
+        campanhaNome: "Apoio institucional",
+        valor: 250,
+        valorLiquido: 250,
+        valorTaxas: 0,
+        tipoDoacao: "unica",
+        formaPagamento: "pix",
+        situacao: "confirmado",
+        origem: "portal",
+        comprovanteGerado: true
+      }
+    ],
+    comprovantes: [
+      {
+        id: "demo-comprovante-1",
+        uuid: "demo-comprovante-1",
+        doacaoId: "demo-doacao-1",
+        doadorId: "demo-doador",
+        numeroComprovante: "REC-DEMO-001",
+        codigoValidacao: "DEMO-001",
+        enviadoEmail: true,
+        mensagemAgradecimento: "Obrigado por apoiar a instituição.",
+        numeroDoacao: "DOA-DEMO-001",
+        valorLiquido: 250,
+        formaPagamento: "pix",
+        dataHora: new Date().toISOString(),
+        doadorNome: "Doador demonstrativo",
+        campanhaNome: "Apoio institucional"
+      }
+    ],
+    recorrencias: [
+      {
+        id: "demo-recorrencia-1",
+        uuid: "demo-recorrencia-1",
+        doadorId: "demo-doador",
+        campanhaId: "demo-campanha-1",
+        campanhaNome: "Apoio institucional",
+        valorRecorrente: 100,
+        periodicidade: "mensal",
+        formaPagamento: "pix",
+        dataProximaCobranca: new Date().toISOString().slice(0, 10),
+        ciclosPagos: 3,
+        semPrevisaoTermino: true,
+        status: "ativa"
+      }
+    ]
+  };
+}
 
 export function PortalDoadorPage() {
   const [email, setEmail] = useState("");
@@ -88,6 +192,28 @@ export function PortalDoadorPage() {
 
   async function salvarDados() {
     if (!token) return;
+    if (token === DEMO_TOKEN) {
+      setPainel((atual) =>
+        atual
+          ? {
+              ...atual,
+              doador: {
+                ...atual.doador,
+                telefone: meusDados.telefone,
+                whatsapp: meusDados.whatsapp,
+                cidade: meusDados.cidade,
+                uf: meusDados.uf,
+                aceitaEmail: meusDados.aceitaEmail,
+                aceitaWhatsapp: meusDados.aceitaWhatsapp,
+                aceitaReceberCampanhas: meusDados.aceitaReceberCampanhas,
+                observacoes: meusDados.observacoes
+              }
+            }
+          : atual
+      );
+      setPopup({ tipo: "sucesso", titulo: "Dados atualizados", texto: "Suas preferências foram salvas na demonstração." });
+      return;
+    }
     setCarregando(true);
     try {
       const atualizado = await captacaoRecursosService.atualizarDadosPortal(token, meusDados);
@@ -102,6 +228,75 @@ export function PortalDoadorPage() {
 
   async function criarDoacao() {
     if (!token) return;
+    if (token === DEMO_TOKEN) {
+      const valor = Number(formDoacao.valor.replace(",", "."));
+      if (!Number.isFinite(valor) || valor <= 0) {
+        setPopup({ tipo: "aviso", titulo: "Valor obrigatório", texto: "Informe um valor maior que zero para registrar o apoio." });
+        return;
+      }
+      const agora = new Date().toISOString();
+      setPainel((atual) => {
+        if (!atual) return atual;
+        const campanha = atual.campanhas.find((item) => item.id === formDoacao.campanhaId);
+        const novaDoacao = {
+          id: `demo-doacao-${Date.now()}`,
+          uuid: `demo-doacao-${Date.now()}`,
+          numeroDoacao: `DOA-DEMO-${String(atual.doacoes.length + 1).padStart(3, "0")}`,
+          dataHora: agora,
+          doadorId: atual.doador.id,
+          doadorNome: atual.doador.nome,
+          campanhaId: campanha?.id,
+          campanhaNome: campanha?.nome,
+          valor,
+          valorLiquido: valor,
+          valorTaxas: 0,
+          tipoDoacao: formDoacao.tipoDoacao,
+          formaPagamento: formDoacao.formaPagamento as any,
+          situacao: "confirmado" as const,
+          origem: "portal",
+          observacoesInternas: formDoacao.observacoesInternas || undefined,
+          comprovanteGerado: true
+        };
+        return {
+          ...atual,
+          doador: {
+            ...atual.doador,
+            totalDoado: atual.doador.totalDoado + valor,
+            quantidadeDoacoes: atual.doador.quantidadeDoacoes + 1,
+            ticketMedio: (atual.doador.totalDoado + valor) / (atual.doador.quantidadeDoacoes + 1),
+            maiorDoacao: Math.max(atual.doador.maiorDoacao, valor)
+          },
+          doacoes: [novaDoacao, ...atual.doacoes],
+          comprovantes: [
+            {
+              id: `demo-comprovante-${Date.now()}`,
+              uuid: `demo-comprovante-${Date.now()}`,
+              doacaoId: novaDoacao.id,
+              doadorId: atual.doador.id,
+              numeroComprovante: `REC-DEMO-${String(atual.comprovantes.length + 1).padStart(3, "0")}`,
+              codigoValidacao: `DEMO-${Date.now()}`,
+              enviadoEmail: false,
+              numeroDoacao: novaDoacao.numeroDoacao,
+              valorLiquido: valor,
+              formaPagamento: formDoacao.formaPagamento,
+              dataHora: agora,
+              doadorNome: atual.doador.nome,
+              campanhaNome: campanha?.nome
+            },
+            ...atual.comprovantes
+          ]
+        };
+      });
+      setFormDoacao({
+        campanhaId: "",
+        valor: "",
+        formaPagamento: "pix",
+        tipoDoacao: "unica",
+        observacoesInternas: ""
+      });
+      setPopup({ tipo: "sucesso", titulo: "Apoio registrado", texto: "Sua nova doação foi criada na demonstração." });
+      return;
+    }
     setCarregando(true);
     try {
       await captacaoRecursosService.criarDoacaoPortal(token, {
@@ -129,6 +324,19 @@ export function PortalDoadorPage() {
 
   async function cancelarRecorrencia(recorrenciaId: string) {
     if (!token) return;
+    if (token === DEMO_TOKEN) {
+      setPainel((atual) =>
+        atual
+          ? {
+              ...atual,
+              recorrencias: atual.recorrencias.filter((item) => item.id !== recorrenciaId),
+              doador: { ...atual.doador, recorrenciaAtiva: false }
+            }
+          : atual
+      );
+      setPopup({ tipo: "sucesso", titulo: "Recorrência cancelada", texto: "A recorrência foi cancelada na demonstração." });
+      return;
+    }
     setCarregando(true);
     try {
       await captacaoRecursosService.cancelarRecorrenciaPortal(token, recorrenciaId);
@@ -145,6 +353,23 @@ export function PortalDoadorPage() {
     window.localStorage.removeItem(TOKEN_KEY);
     setToken("");
     setPainel(null);
+  }
+
+  function entrarDemonstracao() {
+    const painelDemo = criarPainelDemonstrativo();
+    setToken(DEMO_TOKEN);
+    setPainel(painelDemo);
+    setMeusDados({
+      telefone: painelDemo.doador.telefone ?? "",
+      whatsapp: painelDemo.doador.whatsapp ?? "",
+      cidade: painelDemo.doador.cidade ?? "",
+      uf: painelDemo.doador.uf ?? "",
+      aceitaEmail: painelDemo.doador.aceitaEmail,
+      aceitaWhatsapp: painelDemo.doador.aceitaWhatsapp,
+      aceitaReceberCampanhas: painelDemo.doador.aceitaReceberCampanhas,
+      observacoes: painelDemo.doador.observacoes ?? ""
+    });
+    setPopup({ tipo: "sucesso", titulo: "Demonstração aberta", texto: "O portal do doador foi carregado com dados demonstrativos." });
   }
 
   if (!token || !painel) {
@@ -172,6 +397,9 @@ export function PortalDoadorPage() {
                 </div>
                 <Button className="w-full" disabled={carregando} onClick={() => void entrar()}>
                   {carregando ? "Acessando..." : "Entrar no portal"}
+                </Button>
+                <Button className="w-full" variant="outline" disabled={carregando} onClick={entrarDemonstracao}>
+                  Acessar demonstração
                 </Button>
               </CardContent>
             </Card>

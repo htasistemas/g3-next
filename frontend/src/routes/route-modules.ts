@@ -209,6 +209,22 @@ const routeModules: RouteModuleDefinition[] = [
     path: "/portal-doador",
     loader: () => import("@/pages/captacao-recursos/portal-doador-page")
   },
+  {
+    path: "/portal-voluntario",
+    loader: () => import("@/pages/portais/portal-externo-page")
+  },
+  {
+    path: "/portal-beneficiario-familia",
+    loader: () => import("@/pages/portais/portal-externo-page")
+  },
+  {
+    path: "/portal-transparencia",
+    loader: () => import("@/pages/portais/portal-externo-page")
+  },
+  {
+    path: "/portal-parceiro-financiador",
+    loader: () => import("@/pages/portais/portal-externo-page")
+  },
   { path: "/configuracoes/usuarios", loader: () => import("@/pages/configuracoes/usuarios-page") },
   {
     path: "/configuracoes/master-instituicoes",

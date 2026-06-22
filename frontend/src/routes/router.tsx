@@ -245,6 +245,16 @@ const CaptacaoRecursosPage = carregarPagina(
   "CaptacaoRecursosPage"
 );
 const PortalDoadorPage = carregarPagina("/portal-doador", "PortalDoadorPage");
+const PortalVoluntarioPage = carregarPagina("/portal-voluntario", "PortalVoluntarioPage");
+const PortalBeneficiarioFamiliaPage = carregarPagina(
+  "/portal-beneficiario-familia",
+  "PortalBeneficiarioFamiliaPage"
+);
+const PortalTransparenciaPage = carregarPagina("/portal-transparencia", "PortalTransparenciaPage");
+const PortalParceiroFinanciadorPage = carregarPagina(
+  "/portal-parceiro-financiador",
+  "PortalParceiroFinanciadorPage"
+);
 
 export const router = createBrowserRouter([
   {
@@ -280,6 +290,26 @@ export const router = createBrowserRouter([
   {
     path: "/portal-doador",
     element: PortalDoadorPage,
+    errorElement: <RouteErrorBoundary />
+  },
+  {
+    path: "/portal-voluntario",
+    element: PortalVoluntarioPage,
+    errorElement: <RouteErrorBoundary />
+  },
+  {
+    path: "/portal-beneficiario-familia",
+    element: PortalBeneficiarioFamiliaPage,
+    errorElement: <RouteErrorBoundary />
+  },
+  {
+    path: "/portal-transparencia",
+    element: PortalTransparenciaPage,
+    errorElement: <RouteErrorBoundary />
+  },
+  {
+    path: "/portal-parceiro-financiador",
+    element: PortalParceiroFinanciadorPage,
     errorElement: <RouteErrorBoundary />
   },
   {

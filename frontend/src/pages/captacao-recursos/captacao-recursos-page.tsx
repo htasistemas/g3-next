@@ -241,15 +241,15 @@ type DoadorAbaInterna =
   | "anexos";
 
 const abas: AdminTab[] = [
-  { id: "dashboard", label: "Cockpit de captação", icon: LayoutDashboard },
-  { id: "doadores", label: "Doadores 360", icon: UsersRound },
-  { id: "doacoes", label: "Doações", icon: CircleDollarSign },
+  { id: "dashboard", label: "Painel de captação", icon: LayoutDashboard },
+  { id: "doadores", label: "Cadastro de doadores", icon: UsersRound },
+  { id: "doacoes", label: "Doações recebidas", icon: CircleDollarSign },
   { id: "campanhas", label: "Campanhas", icon: HandCoins },
   { id: "portal", label: "Portal doador", icon: ShieldUser },
   { id: "comprovantes", label: "Comprovantes", icon: FileText },
-  { id: "configuracoes", label: "Configurações de pagamento", icon: Settings2 },
+  { id: "configuracoes", label: "Formas de pagamento", icon: Settings2 },
   { id: "relatorios", label: "Relatórios", icon: FileSpreadsheet },
-  { id: "permissoes", label: "Permissões do módulo", icon: History }
+  { id: "permissoes", label: "Permissões da captação", icon: History }
 ];
 
 const defaultDoadorForm: DoadorFormState = {
@@ -1343,7 +1343,7 @@ export function CaptacaoRecursosPage() {
             <div className="space-y-3">
               <div className="space-y-1">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">
-                  Cockpit de captação
+                  Painel de captação
                 </p>
                 <h2 className="text-3xl font-semibold tracking-tight">
                   Receita social, retenção e relacionamento em uma só visão

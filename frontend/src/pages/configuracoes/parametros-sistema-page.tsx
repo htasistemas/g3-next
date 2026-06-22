@@ -374,7 +374,7 @@ export function ParametrosSistemaPage() {
             <div className={classesTelaPadraoBeneficiario.tituloAba}>
               <IconeAbaAtual className="h-4 w-4" aria-hidden="true" />
               <CardTitle className={classesTelaPadraoBeneficiario.tituloAbaTexto}>
-                {abaAtual?.label ?? "Parâmetros do sistema"}
+                {abaAtual?.label ?? "Configurações do sistema"}
               </CardTitle>
             </div>
             <Badge variant="default">Configurações gerais</Badge>

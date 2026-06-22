@@ -1,6 +1,70 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.531",
+                        "releaseDate":  "2026-06-22",
+                        "title":  "Menu Portais de acesso",
+                        "description":  "Foi criado um menu interno para centralizar os links dos portais externos do G3N.",
+                        "changes":  [
+                                        "Novo menu Portais de acesso adicionado ao shell interno do sistema.",
+                                        "Incluídos atalhos em nova aba para Portal do doador, Portal do voluntário, Portal do beneficiário e família, Portal da transparência e Portal do parceiro e financiador.",
+                                        "Manual do sistema atualizado com orientação de acesso interno e uso dos links publicados.",
+                                        "Versão oficial atualizada para manter a sequência crescente."
+                                    ]
+                    },
+                    {
+                        "version":  "1.00.530",
+                        "releaseDate":  "2026-06-22",
+                        "title":  "Validação web dos portais externos",
+                        "description":  "O pós-deploy passou a validar automaticamente se as rotas públicas dos portais externos estão acessíveis pela web.",
+                        "changes":  [
+                                        "Deploy-check agora testa /portal-doador, /portal-voluntario, /portal-beneficiario-familia, /portal-transparencia e /portal-parceiro-financiador.",
+                                        "A configuração Nginx existente mantém fallback para index.html, permitindo acesso direto às rotas públicas do React em produção.",
+                                        "Versão oficial atualizada para manter a sequência crescente."
+                                    ]
+                    },
+                    {
+                        "version":  "1.00.529",
+                        "releaseDate":  "2026-06-22",
+                        "title":  "Portais externos com fluxo funcional",
+                        "description":  "Os portais externos passaram a abrir uma área operacional de validação, evitando telas apenas preparatórias.",
+                        "changes":  [
+                                        "Portal do doador recebeu acesso de demonstração com painel, doações, comprovantes, recorrência e preferências editáveis localmente.",
+                                        "Portais de voluntário, beneficiário e família, transparência e parceiro ou financiador passaram a liberar uma área do portal após o acesso.",
+                                        "Ações internas dos portais agora exibem feedback visual para confirmar a navegação do fluxo.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ]
+                    },
+                    {
+                        "version":  "1.00.528",
+                        "releaseDate":  "2026-06-22",
+                        "title":  "Portais externos do terceiro setor",
+                        "description":  "Foram criadas rotas externas para públicos estratégicos da instituição, preparando o G3N para relacionamento digital com doadores, voluntários, famílias, parceiros e sociedade.",
+                        "changes":  [
+                                        "Criada a rota pública /portal-voluntario com interface inicial para oportunidades, escalas, horas, certificados e termos.",
+                                        "Criada a rota pública /portal-beneficiario-familia com interface inicial para agenda, atendimentos, documentos e comunicados da família.",
+                                        "Criada a rota pública /portal-transparencia com interface inicial para projetos, indicadores, documentos públicos e prestação social.",
+                                        "Criada a rota pública /portal-parceiro-financiador com interface inicial para projetos apoiados, metas, relatórios e comunicação com parceiros.",
+                                        "Mantida a rota /portal-doador como portal externo integrado à captação de recursos.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ]
+                    },
+                    {
+                        "version":  "1.00.527",
+                        "releaseDate":  "2026-06-22",
+                        "title":  "Submenus com nomenclatura mais didática",
+                        "description":  "Submenus operacionais e abas de captação foram renomeados para facilitar a interpretação pelos usuários.",
+                        "changes":  [
+                                        "Vínculo familiar passou a ser exibido como Famílias e vínculos.",
+                                        "Gestão de documentos passou a ser exibido como Documentos da instituição.",
+                                        "Contabilidade passou a ser exibido como Lançamentos contábeis.",
+                                        "Parâmetros do sistema passou a ser exibido como Configurações do sistema.",
+                                        "Instituições SaaS passou a ser exibido como Instituições do sistema.",
+                                        "Na captação, Cockpit de captação, Doadores 360, Doações, Configurações de pagamento e Permissões do módulo foram renomeados.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ]
+                    },
+                    {
                         "version":  "1.00.526",
                         "releaseDate":  "2026-06-19",
                         "title":  "Menus operacionais com nomes mais claros",

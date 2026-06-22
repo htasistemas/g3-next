@@ -355,7 +355,7 @@ export function MasterInstituicoesPage() {
         onChangeTab={(tabId) => setActiveTab(tabId as TabId)}
         actions={actions}
         sectionLabel="Configurações gerais"
-        pageTitle="Gestão master de instituições"
+        pageTitle="Instituições do sistema"
         activeTitle={
           activeTab === "listagem"
             ? "Listagem de tenants"
