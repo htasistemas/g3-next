@@ -88,12 +88,24 @@ type AcaoCrud = {
 
 const diasOptions = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
 const periodosOptions = ["Manhá", "Tarde", "Noite"];
+const sexoOptions = [
+  { value: "", label: "Selecione" },
+  { value: "FEMININO", label: "Feminino" },
+  { value: "MASCULINO", label: "Masculino" },
+  { value: "NAO_INFORMADO", label: "Não informado" }
+];
 
 function formatarCpf(valor?: string) {
   if (!valor) return "---";
   const digitos = valor.replace(/\D/g, "");
   if (digitos.length !== 11) return valor;
   return `${digitos.slice(0, 3)}.${digitos.slice(3, 6)}.${digitos.slice(6, 9)}-${digitos.slice(9)}`;
+}
+
+function formatarCep(valor?: string) {
+  const digitos = somenteDigitos(valor).slice(0, 8);
+  if (digitos.length <= 5) return digitos;
+  return `${digitos.slice(0, 5)}-${digitos.slice(5)}`;
 }
 
 function mapParaFormulario(voluntario: Voluntario): VoluntarioFormValues {
@@ -106,6 +118,7 @@ function mapParaFormulario(voluntario: Voluntario): VoluntarioFormValues {
     remoto: voluntario.remoto ?? false,
     aceite_voluntariado: voluntario.aceite_voluntariado ?? false,
     aceite_imagem: voluntario.aceite_imagem ?? false,
+    cep: formatarCep(voluntario.cep),
     status: voluntario.status ?? "ATIVO"
   };
 }
@@ -143,7 +156,7 @@ function mapParaPayload(values: VoluntarioFormValues, id?: string): Voluntario {
     aceite_voluntariado: values.aceite_voluntariado,
     aceite_imagem: values.aceite_imagem,
     assinatura_digital: values.assinatura_digital?.trim() || undefined,
-    cep: values.cep?.trim() || undefined,
+    cep: somenteDigitos(values.cep) || undefined,
     logradouro: values.logradouro?.trim() || undefined,
     numero: values.numero?.trim() || undefined,
     complemento: values.complemento?.trim() || undefined,
@@ -174,6 +187,7 @@ export function CadastroVoluntariadoPage() {
   const [mensagem, setMensagem] = useState<{ tipo: "sucesso" | "erro"; texto: string } | null>(null);
   const [popupSalvarAberto, setPopupSalvarAberto] = useState(false);
   const [popupExcluirAberto, setPopupExcluirAberto] = useState(false);
+  const [popupImprimirAberto, setPopupImprimirAberto] = useState(false);
   const [popupBuscarBeneficiarioAberto, setPopupBuscarBeneficiarioAberto] = useState(false);
   const [filtroBeneficiarioDraft, setFiltroBeneficiarioDraft] = useState<BeneficiarioFiltro>({
     nome: "",
@@ -218,6 +232,7 @@ export function CadastroVoluntariadoPage() {
     reset,
     setValue,
     getValues,
+    trigger,
     watch,
     formState: { errors }
   } = useForm({
@@ -237,6 +252,7 @@ export function CadastroVoluntariadoPage() {
   const bairroAtual = watch("bairro") || "";
   const municipioAtual = watch("municipio") || "";
   const ufAtual = watch("uf") || "";
+  const campoCep = register("cep");
 
   useEffect(() => {
     if (!detalhesData?.voluntario) return;
@@ -257,12 +273,24 @@ export function CadastroVoluntariadoPage() {
     void (async () => {
       try {
         const endereco = await buscarEnderecoPorCep(cepNormalizado);
-        if (!ativo || !endereco) return;
+        if (!ativo) return;
+        if (!endereco) {
+          ultimoCepConsultadoRef.current = cepNormalizado;
+          setMensagem({ tipo: "erro", texto: "CEP não encontrado. Confira o número informado." });
+          return;
+        }
         ultimoCepConsultadoRef.current = cepNormalizado;
+        setValue("cep", formatarCep(cepNormalizado), { shouldDirty: true, shouldValidate: true });
         setValue("logradouro", endereco.logradouro, { shouldDirty: true, shouldValidate: true });
         setValue("bairro", endereco.bairro, { shouldDirty: true, shouldValidate: true });
         setValue("municipio", endereco.municipio, { shouldDirty: true, shouldValidate: true });
         setValue("uf", endereco.uf, { shouldDirty: true, shouldValidate: true });
+        if (!getValues("cidade")?.trim()) {
+          setValue("cidade", endereco.municipio, { shouldDirty: true, shouldValidate: true });
+        }
+        if (!getValues("estado")?.trim()) {
+          setValue("estado", endereco.uf, { shouldDirty: true, shouldValidate: true });
+        }
       } finally {
         if (ativo) setCarregandoCep(false);
       }
@@ -271,7 +299,7 @@ export function CadastroVoluntariadoPage() {
     return () => {
       ativo = false;
     };
-  }, [cepAtual, setValue]);
+  }, [cepAtual, getValues, setValue]);
 
   useEffect(() => {
     if (!webcamAberta) return;
@@ -550,32 +578,14 @@ export function CadastroVoluntariadoPage() {
     }
   }
 
-  async function acaoImprimir() {
-    if (abaAtiva !== "listagem" && !idSelecionado) {
-      setMensagem({ tipo: "erro", texto: "Salve ou selecione um voluntário para imprimir o cadastro." });
-      return;
-    }
-
-    const imprimindoListagem = abaAtiva === "listagem";
+  async function imprimirListagemVoluntarios() {
     let janela: ReturnType<typeof reservarJanelaRelatorio> | undefined;
 
     try {
       setImprimindoRelatorio(true);
       setMensagem(null);
-      janela = reservarJanelaRelatorio(
-        imprimindoListagem ? "Gerando lista de voluntários" : "Gerando cadastro do voluntário"
-      );
+      janela = reservarJanelaRelatorio("Gerando lista de voluntários");
       const usuarioEmissor = usuario?.nome || usuario?.nomeUsuario || "Sistema G3-Next";
-
-      if (!imprimindoListagem && idSelecionado) {
-        const blob = await reportsService.gerarFichaVoluntario({
-          voluntarioId: idSelecionado,
-          usuarioEmissor
-        });
-        janela.publicar(blob);
-        return;
-      }
-
       const blob = await reportsService.gerarRelacaoVoluntarios({
         ...filtros,
         usuarioEmissor
@@ -590,6 +600,50 @@ export function CadastroVoluntariadoPage() {
     } finally {
       setImprimindoRelatorio(false);
     }
+  }
+
+  async function imprimirDocumentoVoluntario(tipo: "ficha" | "termo") {
+    if (!idSelecionado) return;
+
+    let janela: ReturnType<typeof reservarJanelaRelatorio> | undefined;
+
+    try {
+      setImprimindoRelatorio(true);
+      setMensagem(null);
+      setPopupImprimirAberto(false);
+      janela = reservarJanelaRelatorio(
+        tipo === "ficha" ? "Gerando ficha cadastral" : "Gerando termo de voluntariado"
+      );
+      const usuarioEmissor = usuario?.nome || usuario?.nomeUsuario || "Sistema G3-Next";
+      const payload = { voluntarioId: idSelecionado, usuarioEmissor };
+      const blob =
+        tipo === "ficha"
+          ? await reportsService.gerarFichaVoluntario(payload)
+          : await reportsService.gerarTermoVoluntariado(payload);
+      janela.publicar(blob);
+    } catch (error: any) {
+      janela?.fechar();
+      setMensagem({
+        tipo: "erro",
+        texto: error?.response?.data?.message ?? "Não foi possível gerar o relatório."
+      });
+    } finally {
+      setImprimindoRelatorio(false);
+    }
+  }
+
+  function acaoImprimir() {
+    if (abaAtiva === "listagem") {
+      void imprimirListagemVoluntarios();
+      return;
+    }
+
+    if (!idSelecionado) {
+      setMensagem({ tipo: "erro", texto: "Salve ou selecione um voluntário para imprimir." });
+      return;
+    }
+
+    setPopupImprimirAberto(true);
   }
   function abrirMapa() {
     const query = encodeURIComponent([logradouroAtual, numeroAtual, bairroAtual, municipioAtual, ufAtual, cepAtual].filter(Boolean).join(", "));
@@ -609,7 +663,7 @@ export function CadastroVoluntariadoPage() {
   const acoesNaOrdemPadrao = ordemAcoesCrudPadrao
     .map((label) => acoes.find((acao) => acao.label === label))
     .filter((acao): acao is AcaoCrud => !!acao);
-  const rotuloImpressao = abaAtiva === "listagem" ? "Imprimir listagem" : "Imprimir cadastro";
+  const rotuloImpressao = "Imprimir";
 
   return (
     <main className={classesTelaPadraoBeneficiario.container}>
@@ -764,8 +818,14 @@ export function CadastroVoluntariadoPage() {
                       </div>
 
                       <div className="xl:col-span-4">
-                        <Label>Gênero</Label>
-                        <Input {...register("genero")} onBlurCapture={() => aplicarFormatacaoCampo("genero")} />
+                        <Label>Sexo</Label>
+                        <Select {...register("genero")}>
+                          {sexoOptions.map((opcao) => (
+                            <option key={opcao.value || "vazio"} value={opcao.value}>
+                              {opcao.label}
+                            </option>
+                          ))}
+                        </Select>
                       </div>
 
                       <div className="xl:col-span-4">
@@ -828,8 +888,41 @@ export function CadastroVoluntariadoPage() {
                     </div>
                   </section>
                 )}
-                {abaAtiva === "endereco" && <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-12"><div className="xl:col-span-3"><Label>CEP</Label><Input {...register("cep")} />{carregandoCep && <p className="mt-1 text-xs text-slate-500">Consultando CEP...</p>}</div><div className="xl:col-span-6"><Label>Endereço</Label><Input {...register("logradouro")} onBlurCapture={() => aplicarFormatacaoCampo("logradouro")} /></div><div className="xl:col-span-3"><Label>Número</Label><Input {...register("numero")} /></div><div className="xl:col-span-4"><Label>Complemento</Label><Input {...register("complemento")} onBlurCapture={() => aplicarFormatacaoCampo("complemento")} /></div><div className="xl:col-span-4"><Label>Bairro</Label><Input {...register("bairro")} onBlurCapture={() => aplicarFormatacaoCampo("bairro")} /></div><div className="xl:col-span-4"><Label>Ponto de referência</Label><Input {...register("ponto_referencia")} onBlurCapture={() => aplicarFormatacaoCampo("ponto_referencia")} /></div><div className="xl:col-span-4"><Label>Município</Label><Input {...register("municipio")} onBlurCapture={() => aplicarFormatacaoCampo("municipio")} /></div><div className="xl:col-span-2"><Label>UF</Label><Input maxLength={2} {...register("uf")} /></div><div className="xl:col-span-3"><Label>Zona</Label><Input {...register("zona")} /></div><div className="xl:col-span-3"><Label>Subzona</Label><Input {...register("subzona")} /></div><div className="sm:col-span-2 xl:col-span-12"><Button type="button" variant="outline" onClick={abrirMapa} disabled={!possuiEnderecoParaMapa}>Ver no Google Maps</Button></div></section>}
-                {abaAtiva === "disponibilidade" && <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-12"><div className="xl:col-span-3"><Label>Status</Label><Select {...register("status")}>{voluntarioStatusOptions.map((status) => <option key={status} value={status}>{status}</option>)}</Select></div><div className="xl:col-span-3"><Label>Carga horária semanal</Label><Input {...register("carga_horaria_semanal")} onBlurCapture={() => aplicarFormatacaoCampo("carga_horaria_semanal")} /></div><div className="xl:col-span-3"><Label>Início previsto</Label><Input type="date" {...register("inicio_previsto")} /></div><label className="xl:col-span-2 flex items-center gap-2 text-sm"><Checkbox {...register("presencial")} checked={!!watch("presencial")} />Presencial</label><label className="xl:col-span-2 flex items-center gap-2 text-sm"><Checkbox {...register("remoto")} checked={!!watch("remoto")} />Remoto</label><div className="sm:col-span-2 xl:col-span-6"><Label>Dias disponíveis</Label><div className="mt-2 flex flex-wrap gap-3">{diasOptions.map((item) => <label key={item} className="inline-flex items-center gap-2 text-sm"><Checkbox checked={watch("disponibilidade_dias")?.includes(item)} onChange={() => alternarLista("disponibilidade_dias", item)} />{item}</label>)}</div></div><div className="sm:col-span-2 xl:col-span-6"><Label>Períodos</Label><div className="mt-2 flex flex-wrap gap-3">{periodosOptions.map((item) => <label key={item} className="inline-flex items-center gap-2 text-sm"><Checkbox checked={watch("disponibilidade_periodos")?.includes(item)} onChange={() => alternarLista("disponibilidade_periodos", item)} />{item}</label>)}</div></div><div className="xl:col-span-12"><Label>Observações</Label><Textarea {...register("observacoes")} rows={2} onBlurCapture={() => aplicarFormatacaoCampo("observacoes")} /></div></section>}
+                {abaAtiva === "endereco" && (
+                  <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-12">
+                    <div className="xl:col-span-3">
+                      <Label>CEP</Label>
+                      <Input
+                        {...campoCep}
+                        value={formatarCep(cepAtual)}
+                        inputMode="numeric"
+                        maxLength={9}
+                        onChange={(event) => {
+                          const proximoCep = formatarCep(event.target.value);
+                          setValue("cep", proximoCep, { shouldDirty: true, shouldValidate: true });
+                          ultimoCepConsultadoRef.current = "";
+                        }}
+                        onBlur={(event) => {
+                          void campoCep.onBlur(event);
+                          void trigger("cep");
+                        }}
+                      />
+                      {carregandoCep && <p className="mt-1 text-xs text-slate-500">Consultando CEP...</p>}
+                      {errors.cep && <p className="mt-1 text-xs text-red-600">{errors.cep.message}</p>}
+                    </div>
+                    <div className="xl:col-span-6"><Label>Endereço</Label><Input {...register("logradouro")} onBlurCapture={() => aplicarFormatacaoCampo("logradouro")} /></div>
+                    <div className="xl:col-span-3"><Label>Número</Label><Input {...register("numero")} /></div>
+                    <div className="xl:col-span-4"><Label>Complemento</Label><Input {...register("complemento")} onBlurCapture={() => aplicarFormatacaoCampo("complemento")} /></div>
+                    <div className="xl:col-span-4"><Label>Bairro</Label><Input {...register("bairro")} onBlurCapture={() => aplicarFormatacaoCampo("bairro")} /></div>
+                    <div className="xl:col-span-4"><Label>Ponto de referência</Label><Input {...register("ponto_referencia")} onBlurCapture={() => aplicarFormatacaoCampo("ponto_referencia")} /></div>
+                    <div className="xl:col-span-4"><Label>Município</Label><Input {...register("municipio")} onBlurCapture={() => aplicarFormatacaoCampo("municipio")} /></div>
+                    <div className="xl:col-span-2"><Label>UF</Label><Input maxLength={2} {...register("uf")} /></div>
+                    <div className="xl:col-span-3"><Label>Zona</Label><Input {...register("zona")} /></div>
+                    <div className="xl:col-span-3"><Label>Subzona</Label><Input {...register("subzona")} /></div>
+                    <div className="sm:col-span-2 xl:col-span-12"><Button type="button" variant="outline" onClick={abrirMapa} disabled={!possuiEnderecoParaMapa}>Ver no Google Maps</Button></div>
+                  </section>
+                )}
+                {abaAtiva === "disponibilidade" && <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-12"><div className="xl:col-span-3"><Label>Status</Label><Select {...register("status")}>{voluntarioStatusOptions.map((status) => <option key={status} value={status}>{status}</option>)}</Select></div><div className="xl:col-span-3"><Label>Carga horária semanal</Label><Input {...register("carga_horaria_semanal")} onBlurCapture={() => aplicarFormatacaoCampo("carga_horaria_semanal")} /></div><div className="xl:col-span-3"><Label>Início previsto</Label><Input type="date" {...register("inicio_previsto")} /></div><div className="xl:col-span-3"><Label>Modalidade</Label><div className="mt-2 flex items-center gap-4"><label className="inline-flex items-center gap-2 text-sm"><Checkbox {...register("presencial")} checked={!!watch("presencial")} />Presencial</label><label className="inline-flex items-center gap-2 text-sm"><Checkbox {...register("remoto")} checked={!!watch("remoto")} />Remoto</label></div></div><div className="sm:col-span-2 xl:col-span-6"><Label>Dias disponíveis</Label><div className="mt-2 flex flex-wrap gap-3">{diasOptions.map((item) => <label key={item} className="inline-flex items-center gap-2 text-sm"><Checkbox checked={watch("disponibilidade_dias")?.includes(item)} onChange={() => alternarLista("disponibilidade_dias", item)} />{item}</label>)}</div></div><div className="sm:col-span-2 xl:col-span-6"><Label>Períodos</Label><div className="mt-2 flex flex-wrap gap-3">{periodosOptions.map((item) => <label key={item} className="inline-flex items-center gap-2 text-sm"><Checkbox checked={watch("disponibilidade_periodos")?.includes(item)} onChange={() => alternarLista("disponibilidade_periodos", item)} />{item}</label>)}</div></div><div className="xl:col-span-12"><Label>Observações</Label><Textarea {...register("observacoes")} rows={2} onBlurCapture={() => aplicarFormatacaoCampo("observacoes")} /></div></section>}
                 {abaAtiva === "termos" && <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-12"><label className="xl:col-span-4 flex items-center gap-2 text-sm"><Checkbox {...register("aceite_voluntariado")} checked={!!watch("aceite_voluntariado")} />Aceite de voluntariado</label><label className="xl:col-span-4 flex items-center gap-2 text-sm"><Checkbox {...register("aceite_imagem")} checked={!!watch("aceite_imagem")} />Aceite de uso de imagem</label><div className="xl:col-span-12"><Label>Documento de identificação</Label><Textarea {...register("documento_identificacao")} rows={2} /></div><div className="xl:col-span-12"><Label>Comprovante de endereço</Label><Textarea {...register("comprovante_endereco")} rows={2} /></div><div className="xl:col-span-12"><Label>Assinatura digital</Label><Input {...register("assinatura_digital")} /></div></section>}
               </form>
             )}
@@ -840,6 +933,7 @@ export function CadastroVoluntariadoPage() {
       {mensagem && <div className="fixed inset-0 z-[58] flex items-center justify-center bg-slate-900/45 px-4" onClick={() => setMensagem(null)}><div className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}><div className="border-b border-slate-100 px-5 py-4"><h3 className={`text-base font-semibold ${mensagem.tipo === "sucesso" ? "text-emerald-800" : "text-red-700"}`}>{mensagem.tipo === "sucesso" ? "Confirmação" : "Atenção"}</h3></div><div className="px-5 py-4"><p className="text-sm text-slate-700">{mensagem.texto}</p></div><div className="flex justify-end border-t border-slate-100 px-5 py-3"><Button type="button" onClick={() => setMensagem(null)}>OK</Button></div></div></div>}
       {popupSalvarAberto && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/45 px-4" onClick={() => setPopupSalvarAberto(false)}><div className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}><div className="border-b border-slate-100 px-5 py-4"><h3 className="text-base font-semibold text-slate-900">Confirmação</h3></div><div className="px-5 py-4"><p className="text-sm text-slate-700">Salvo com sucesso</p></div><div className="flex justify-end border-t border-slate-100 px-5 py-3"><Button type="button" onClick={() => setPopupSalvarAberto(false)}>OK</Button></div></div></div>}
       {popupExcluirAberto && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/45 px-4" onClick={() => !removerMutation.isPending && setPopupExcluirAberto(false)}><div className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}><div className="border-b border-slate-100 px-5 py-4"><h3 className="text-base font-semibold text-slate-900">Confirmar exclusão</h3></div><div className="px-5 py-4"><p className="text-sm text-slate-700">Esta ação é irreversível. Deseja continuar?</p></div><div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3"><Button type="button" variant="outline" onClick={() => setPopupExcluirAberto(false)} disabled={removerMutation.isPending}>Cancelar</Button><Button type="button" variant="danger" onClick={() => void confirmarExclusao()} disabled={removerMutation.isPending}>{removerMutation.isPending ? "Excluindo..." : "Excluir"}</Button></div></div></div>}
+      {popupImprimirAberto && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/45 px-4" onClick={() => !imprimindoRelatorio && setPopupImprimirAberto(false)}><div className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}><div className="border-b border-slate-100 px-5 py-4"><h3 className="text-base font-semibold text-slate-900">Imprimir</h3></div><div className="space-y-3 px-5 py-4"><p className="text-sm text-slate-700">Selecione o documento que deseja emitir.</p><div className="grid gap-2 sm:grid-cols-2"><Button type="button" variant="outline" onClick={() => void imprimirDocumentoVoluntario("ficha")} disabled={imprimindoRelatorio}>Ficha cadastral</Button><Button type="button" variant="outline" onClick={() => void imprimirDocumentoVoluntario("termo")} disabled={imprimindoRelatorio}>Termo de voluntariado</Button></div></div><div className="flex justify-end border-t border-slate-100 px-5 py-3"><Button type="button" variant="outline" onClick={() => setPopupImprimirAberto(false)} disabled={imprimindoRelatorio}>Cancelar</Button></div></div></div>}
       {webcamAberta && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 px-4 py-4"

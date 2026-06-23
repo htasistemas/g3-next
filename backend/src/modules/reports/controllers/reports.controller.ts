@@ -70,6 +70,12 @@ export class ReportsController {
     return responderRelatorio(response, resultado, formato);
   }
 
+  async termoVoluntariado(request: AuthenticatedRequest, response: Response) {
+    const formato = formatoRelatorioSchema.parse(request.query.formato);
+    const resultado = await service.gerarTermoVoluntariado(request.body, request.authUser);
+    return responderRelatorio(response, resultado, formato);
+  }
+
   async relacaoLivrosBiblioteca(request: AuthenticatedRequest, response: Response) {
     const formato = formatoRelatorioSchema.parse(request.query.formato);
     const resultado = await service.gerarRelacaoLivrosBiblioteca(request.body, request.authUser);

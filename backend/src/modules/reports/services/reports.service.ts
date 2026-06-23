@@ -465,7 +465,7 @@ export class ReportsService {
       this.blocoComCampos("Dados pessoais", 3, [
         this.campoPreenchido("RG", voluntario.rg),
         this.campoPreenchido("Data de nascimento", this.formatarDataComHifen(voluntario.data_nascimento)),
-        this.campoPreenchido("Gênero", voluntario.genero),
+        this.campoPreenchido("Sexo", this.formatarValorEnumerado(voluntario.genero)),
         this.campoPreenchido("Profissão", voluntario.profissao),
         this.campoPreenchido("Status", this.formatarStatus(voluntario.status)),
         this.campoPreenchido("Profissional vinculado", voluntario.profissional_nome),
@@ -1213,6 +1213,104 @@ export class ReportsService {
     const html = this.template.montarHtml(relatorioInput);
     const pdf = await this.renderer.render(html, contexto.rodape, relatorioInput);
     return { html, pdf, filename: "ficha-voluntario.pdf" };
+  }
+
+  async gerarTermoVoluntariado(rawPayload: unknown, authUser?: AuthUser): Promise<RelatorioResultado> {
+    const payload = voluntarioFichaRequestSchema.parse(rawPayload);
+    const voluntario = await this.voluntarioService.buscarPorId(payload.voluntarioId, authUser?.tenant_id);
+    const contexto = await this.montarContextoInstitucional(authUser?.tenant_id);
+    const modalidade = [
+      voluntario.presencial ? "Presencial" : undefined,
+      voluntario.remoto ? "Remoto" : undefined
+    ].filter(Boolean).join(" e ");
+    const disponibilidade = [
+      voluntario.disponibilidade_dias?.length ? `Dias: ${voluntario.disponibilidade_dias.join(", ")}` : undefined,
+      voluntario.disponibilidade_periodos?.length
+        ? `Períodos: ${voluntario.disponibilidade_periodos.join(", ")}`
+        : undefined,
+      this.normalizarTexto(voluntario.carga_horaria_semanal)
+        ? `Carga horária semanal: ${voluntario.carga_horaria_semanal}`
+        : undefined
+    ].filter(Boolean).join(" | ");
+
+    const relatorioInput: RelatorioHtmlInput = {
+      titulo: "Termo de voluntariado",
+      metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),
+      descricao:
+        "Termo emitido a partir do cadastro de voluntariado, conforme dados registrados no sistema G3-Next.",
+      blocos: [
+        {
+          titulo: "Identificação do voluntário",
+          colunas: 2,
+          destaque: true,
+          campos: [
+            this.campo("Nome completo", voluntario.nome_completo),
+            this.campo("CPF", voluntario.cpf),
+            this.campo("RG", voluntario.rg),
+            this.campo("Data de nascimento", this.formatarDataComHifen(voluntario.data_nascimento)),
+            this.campo("Sexo", this.formatarValorEnumerado(voluntario.genero)),
+            this.campo("E-mail", voluntario.email),
+            this.campo("Telefone", voluntario.telefone)
+          ]
+        },
+        {
+          titulo: "Atividade voluntária",
+          colunas: 3,
+          campos: [
+            this.campo("Área de interesse", voluntario.area_interesse),
+            this.campo("Profissão", voluntario.profissao),
+            this.campo("Modalidade", modalidade || "---"),
+            this.campo("Início previsto", this.formatarDataComHifen(voluntario.inicio_previsto)),
+            this.campo("Disponibilidade", disponibilidade || "---"),
+            this.campo("Aceite de uso de imagem", this.formatarSimNao(voluntario.aceite_imagem))
+          ]
+        }
+      ],
+      secoes: [
+        {
+          titulo: "Declaração",
+          conteudo: [
+            "Pelo presente termo, o(a) voluntário(a) acima identificado(a) declara sua adesão ao serviço voluntário prestado à instituição, de forma livre, consciente e não remunerada.",
+            "As atividades serão realizadas conforme disponibilidade informada e necessidades institucionais, sem geração de vínculo empregatício, obrigação trabalhista, previdenciária ou afim."
+          ].join("\n")
+        },
+        {
+          titulo: "Responsabilidades",
+          conteudo: [
+            "O(a) voluntário(a) compromete-se a cumprir orientações internas, preservar informações sigilosas, zelar pelos usuários atendidos e comunicar previamente impossibilidades de comparecimento.",
+            "A instituição compromete-se a orientar as atividades, registrar a participação e manter condições adequadas para a execução do serviço voluntário."
+          ].join("\n")
+        },
+        {
+          titulo: "Vigência e desligamento",
+          conteudo:
+            "Este termo permanece vigente enquanto houver atuação voluntária registrada. O desligamento poderá ocorrer a qualquer tempo, por iniciativa do(a) voluntário(a) ou da instituição, mediante comunicação simples entre as partes."
+        },
+        {
+          titulo: "Assinaturas",
+          conteudo: [
+            "Local e data: _______________________________________________",
+            "[[espaco:2.6]]",
+            `Voluntário(a): ${this.normalizarTexto(voluntario.nome_completo) ?? "Não informado"}`,
+            `CPF: ${this.normalizarTexto(voluntario.cpf) ?? "Não informado"}`,
+            "_______________________________________________________________",
+            "[[espaco:2.6]]",
+            "Representante da instituição",
+            "_______________________________________________________________"
+          ].join("\n")
+        }
+      ],
+      cabecalho: contexto.cabecalho,
+      rodape: contexto.rodape
+    };
+
+    const html = this.template.montarHtml(relatorioInput);
+    const pdf = await this.renderer.render(html, contexto.rodape, relatorioInput);
+    return {
+      html,
+      pdf,
+      filename: `termo-voluntariado-${voluntario.id_voluntario ?? payload.voluntarioId}.pdf`
+    };
   }
 
   async gerarRelacaoLivrosBiblioteca(rawPayload: unknown, authUser?: AuthUser): Promise<RelatorioResultado> {

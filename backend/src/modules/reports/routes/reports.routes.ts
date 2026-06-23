@@ -60,6 +60,12 @@ reportsRoutes.post(
   asyncHandler(controller.fichaVoluntario.bind(controller))
 );
 reportsRoutes.post(
+  "/voluntarios/termo",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.termoVoluntariado.bind(controller))
+);
+reportsRoutes.post(
   "/biblioteca/livros/relacao",
   ensureAuthenticated,
   ensurePermissions(permissoesLeitura),

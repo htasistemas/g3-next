@@ -57,6 +57,13 @@ export const reportsService = {
     return data as Blob;
   },
 
+  async gerarTermoVoluntariado(payload: { voluntarioId: string; usuarioEmissor?: string }) {
+    const { data } = await httpClient.post("/api/reports/voluntarios/termo", payload, {
+      responseType: "blob"
+    });
+    return data as Blob;
+  },
+
   async gerarRelacaoLivrosBiblioteca(payload: Record<string, unknown>) {
     const { data } = await httpClient.post("/api/reports/biblioteca/livros/relacao", payload, {
       responseType: "blob"
