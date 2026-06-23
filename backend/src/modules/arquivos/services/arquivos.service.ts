@@ -35,19 +35,21 @@ export class ArquivosService {
     return storageService.obterPorId(rawId, this.requireTenantId(tenantId));
   }
 
-  async obterConteudoPorId(rawId: string, usuarioId?: string, tenantId?: string) {
+  async obterConteudoPorId(rawId: string, usuarioId?: string, tenantId?: string, auditar = true) {
     return storageService.obterConteudoPorId(
       rawId,
       this.toOptionalBigInt(usuarioId),
-      this.requireTenantId(tenantId)
+      this.requireTenantId(tenantId),
+      auditar
     );
   }
 
-  async obterConteudoPorCaminho(rawPath: string, usuarioId?: string, tenantId?: string) {
+  async obterConteudoPorCaminho(rawPath: string, usuarioId?: string, tenantId?: string, auditar = true) {
     return storageService.obterConteudoPorCaminho(
       rawPath,
       this.toOptionalBigInt(usuarioId),
-      this.requireTenantId(tenantId)
+      this.requireTenantId(tenantId),
+      auditar
     );
   }
 

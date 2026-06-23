@@ -6,6 +6,7 @@ export type ArquivoMetadata = {
   nomeOriginal: string;
   nomeArquivo: string;
   caminhoArquivo: string;
+  thumbnailCaminho?: string;
   mimeType: string;
   observacao?: string;
   dataUpload: string;

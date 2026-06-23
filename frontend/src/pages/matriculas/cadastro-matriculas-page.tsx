@@ -211,6 +211,26 @@ function normalizarDataIso(valor?: string) {
   return match ? match[1] : undefined;
 }
 
+function normalizarHora(valor?: string) {
+  if (!valor) return undefined;
+  const texto = valor.trim();
+  if (!texto) return undefined;
+  const match = texto.match(/^(\d{2}:\d{2})/);
+  return match ? match[1] : undefined;
+}
+
+function normalizarEmailOpcional(email?: string) {
+  const valor = email?.trim().toLowerCase();
+  if (!valor) return undefined;
+  return emailValido(valor) ? valor : undefined;
+}
+
+function normalizarIdNumericoOpcional(valor?: string) {
+  const texto = valor?.trim();
+  if (!texto) return undefined;
+  return /^\d+$/.test(texto) ? texto : undefined;
+}
+
 function normalizarNomeComparacaoTexto(valor?: string) {
   return formatarTextoPadrao(valor ?? "").toLocaleLowerCase("pt-BR");
 }
@@ -268,10 +288,11 @@ function mapFormularioParaPayload(
     ...item,
     beneficiario_nome: formatarTextoPadrao(item.beneficiario_nome),
     cpf: somenteDigitos(item.cpf) || undefined,
+    email: normalizarEmailOpcional(item.email),
     status: item.status?.trim() || undefined,
     data_matricula: normalizarDataIso(item.data_matricula),
     data_agendada: normalizarDataIso(item.data_agendada),
-    hora_agendada: item.hora_agendada?.trim() || undefined,
+    hora_agendada: normalizarHora(item.hora_agendada),
     status_agendamento: item.status_agendamento?.trim() || undefined,
     profissional_nome: item.profissional_nome ? formatarTextoPadrao(item.profissional_nome) : undefined
   }));
@@ -307,7 +328,7 @@ function mapFormularioParaPayload(
     restricoes: values.restricoes?.trim() || undefined,
     profissional: values.profissional?.trim() || undefined,
     instituicao_parceira: values.instituicao_parceira?.trim() || undefined,
-    sala_id: values.sala_id?.trim() || undefined,
+    sala_id: normalizarIdNumericoOpcional(values.sala_id),
     status: values.status.trim(),
     data_triagem: values.data_triagem?.trim() || undefined,
     data_encaminhamento: values.data_encaminhamento?.trim() || undefined,
@@ -387,7 +408,7 @@ function ImagemAutenticada({
 
     void (async () => {
       try {
-        const arquivo = await obterUrlArquivoAutenticado(imagem);
+        const arquivo = await obterUrlArquivoAutenticado(imagem, { cache: true, auditar: false });
         if (!ativo) {
           arquivo.revoke?.();
           return;
@@ -412,7 +433,7 @@ function ImagemAutenticada({
     return <span className="px-2 text-center text-[10px] text-[var(--g3-muted)]">{placeholder}</span>;
   }
 
-  return <img src={url} alt={alt} className={className} onError={() => setFalhou(true)} />;
+  return <img src={url} alt={alt} className={className} loading="lazy" decoding="async" onError={() => setFalhou(true)} />;
 }
 
 export function CadastroMatriculasPage() {
@@ -2979,9 +3000,9 @@ export function CadastroMatriculasPage() {
                           >
                             <div className="flex flex-col items-center gap-2 text-center">
                               <div className="relative mb-5 flex aspect-[4/3] w-full max-w-[220px] items-center justify-center overflow-visible rounded-md border border-[var(--g3-border)] bg-[var(--g3-card-soft)] shadow-sm">
-                                {item.imagem ? (
+                                {item.imagem_thumbnail || item.imagem ? (
                                   <ImagemAutenticada
-                                    valor={item.imagem}
+                                    valor={item.imagem_thumbnail ?? item.imagem}
                                     alt={`Foto de ${item.nome}`}
                                     className="h-full w-full rounded-md object-cover"
                                     placeholder="Sem foto"

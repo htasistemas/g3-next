@@ -369,7 +369,7 @@ export class FamiliaRepository {
     }
 
     const rows = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
-      SELECT DISTINCT vf.id
+      SELECT vf.id
       FROM vinculo_familiar vf
       LEFT JOIN cadastro_beneficiario cb ON cb.id = vf.id_referencia_familiar
       WHERE ${Prisma.join(conditions, " AND ")}

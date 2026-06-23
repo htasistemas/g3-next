@@ -2379,7 +2379,7 @@ export function CadastroBeneficiarioPage() {
                         disabled={!possuiEnderecoParaMapa}
                       >
                         <MapPinned className="mr-1.5 h-4 w-4" aria-hidden="true" />
-                        Ver No Google Maps
+                        Ver no Google Maps
                       </Button>
                     </div>
 

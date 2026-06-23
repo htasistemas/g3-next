@@ -29,6 +29,7 @@ export type Matricula = {
   nome: string;
   descricao?: string;
   imagem?: string;
+  imagem_thumbnail?: string;
   vagas_totais: number;
   vagas_disponiveis?: number;
   carga_horaria?: number;

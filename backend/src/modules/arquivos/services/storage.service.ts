@@ -78,12 +78,12 @@ export class StorageService {
     return this.repository.buscarPorIdOuFalhar(this.parseId(rawId), tenantId);
   }
 
-  async obterConteudoPorId(rawId: string, usuarioId?: bigint, tenantId?: string) {
+  async obterConteudoPorId(rawId: string, usuarioId?: bigint, tenantId?: string, auditar = true) {
     const arquivo = await this.repository.buscarPorIdOuFalhar(this.parseId(rawId), tenantId);
-    return this.obterConteudoPorCaminhoInterno(arquivo.caminho_arquivo, arquivo, usuarioId, "VIEW");
+    return this.obterConteudoPorCaminhoInterno(arquivo.caminho_arquivo, arquivo, usuarioId, "VIEW", auditar);
   }
 
-  async obterConteudoPorCaminho(rawPath: string, usuarioId?: bigint, tenantId?: string) {
+  async obterConteudoPorCaminho(rawPath: string, usuarioId?: bigint, tenantId?: string, auditar = true) {
     if (!rawPath?.trim()) {
       throw new AppError("Caminho do arquivo nao informado.", 400);
     }
@@ -93,7 +93,7 @@ export class StorageService {
     if (!arquivo) {
       throw new AppError("Arquivo nao encontrado ou sem permissao de acesso.", 404);
     }
-    return this.obterConteudoPorCaminhoInterno(caminhoArquivo, arquivo, usuarioId, "VIEW");
+    return this.obterConteudoPorCaminhoInterno(caminhoArquivo, arquivo, usuarioId, "VIEW", auditar);
   }
 
   async excluirLogico(rawId: string, usuarioId?: bigint, tenantId?: string) {
@@ -335,7 +335,8 @@ export class StorageService {
     caminhoArquivo: string,
     arquivo?: ArquivoMetadataRow,
     usuarioId?: bigint,
-    acao: "VIEW" | "UPLOAD" | "UPDATE" | "DELETE" = "VIEW"
+    acao: "VIEW" | "UPLOAD" | "UPDATE" | "DELETE" = "VIEW",
+    auditar = true
   ) {
     const normalizedPath = this.provider.normalizePath(caminhoArquivo);
     const exists = await this.provider.existe(normalizedPath);
@@ -343,7 +344,7 @@ export class StorageService {
       throw new AppError("Arquivo fisico nao encontrado.", 404);
     }
 
-    if (arquivo) {
+    if (arquivo && auditar) {
       await this.repository.registrarAuditoria({
         atorId: usuarioId,
         acao,

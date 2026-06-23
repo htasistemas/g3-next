@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../../database/prisma.js";
 import { AppError } from "../../../shared/errors/app-error.js";
 import { normalizeDigits, toOptionalDate, trimOrUndefined } from "../../../utils/string-utils.js";
+import { ensureArquivosEstrutura } from "../../arquivos/repositories/arquivos-estrutura.repository.js";
 import type {
   MatriculaFilaEsperaInput,
   MatriculaFilters,
@@ -297,6 +298,7 @@ export class MatriculaRepository {
   async ensureEstrutura() {
     if (!estruturaPromise) {
       estruturaPromise = (async () => {
+        await ensureArquivosEstrutura(prisma);
         for (const [indice, comando] of estruturaMatriculasSql.entries()) {
           try {
             await prisma.$executeRawUnsafe(comando);
@@ -374,6 +376,7 @@ export class MatriculaRepository {
         c.nome,
         c.descricao,
         c.imagem,
+        img.thumbnail_caminho AS imagem_thumbnail,
         c.vagas_totais,
         c.vagas_disponiveis,
         c.carga_horaria,
@@ -408,6 +411,14 @@ export class MatriculaRepository {
         )::BIGINT AS total_fila_espera
       FROM cursos_atendimentos c
       LEFT JOIN salas_unidade s ON s.id = c.sala_id
+      LEFT JOIN LATERAL (
+        SELECT a.thumbnail_caminho
+        FROM arquivos a
+        WHERE a.caminho_arquivo = c.imagem
+          AND a.ativo = TRUE
+          AND (a.tenant_id::text = ${tenantId} OR a.tenant_id IS NULL)
+        LIMIT 1
+      ) img ON TRUE
       WHERE 1 = 1
       ${tenantClause}
       ${whereClause}
@@ -451,6 +462,7 @@ export class MatriculaRepository {
         c.nome,
         c.descricao,
         c.imagem,
+        img.thumbnail_caminho AS imagem_thumbnail,
         c.vagas_totais,
         c.vagas_disponiveis,
         c.carga_horaria,
@@ -485,6 +497,14 @@ export class MatriculaRepository {
         )::BIGINT AS total_fila_espera
       FROM cursos_atendimentos c
       LEFT JOIN salas_unidade s ON s.id = c.sala_id
+      LEFT JOIN LATERAL (
+        SELECT a.thumbnail_caminho
+        FROM arquivos a
+        WHERE a.caminho_arquivo = c.imagem
+          AND a.ativo = TRUE
+          AND (a.tenant_id::text = ${tenantId} OR a.tenant_id IS NULL)
+        LIMIT 1
+      ) img ON TRUE
       WHERE c.id = ${id}
         AND c.tenant_id::text = ${tenantId}
       LIMIT 1
@@ -1141,6 +1161,7 @@ export class MatriculaRepository {
           curso_id,
           beneficiario_nome,
           cpf,
+          email,
           status,
           data_matricula,
           data_agendada,
@@ -1155,6 +1176,7 @@ export class MatriculaRepository {
           ${cursoId},
           ${matricula.beneficiario_nome},
           ${cpf},
+          ${trimOrUndefined(matricula.email)},
           ${trimOrUndefined(matricula.status) ?? "ATIVO"},
           COALESCE(${dataMatricula}, NOW()),
           ${dataAgendada},

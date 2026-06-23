@@ -1,5 +1,17 @@
 import { httpClient } from "@/services/http-client";
 
+type ArquivoAutenticado = {
+  url: string;
+  revoke?: () => void;
+};
+
+type OpcoesUrlArquivoAutenticado = {
+  cache?: boolean;
+  auditar?: boolean;
+};
+
+const cacheUrlArquivoAutenticado = new Map<string, Promise<ArquivoAutenticado>>();
+
 function normalizarBaseUrl(baseUrl?: string) {
   if (!baseUrl) return "";
   return String(baseUrl).replace(/\/+$/, "");
@@ -36,7 +48,10 @@ export function resolverUrlArquivo(valor?: string | null) {
   return `${apiBaseUrl}/api/arquivos/conteudo?path=${encodeURIComponent(normalized)}`;
 }
 
-export async function obterUrlArquivoAutenticado(valor?: string | null) {
+export async function obterUrlArquivoAutenticado(
+  valor?: string | null,
+  opcoes: OpcoesUrlArquivoAutenticado = {}
+) {
   if (!valor?.trim()) {
     return { url: "", revoke: undefined as (() => void) | undefined };
   }
@@ -50,22 +65,41 @@ export async function obterUrlArquivoAutenticado(valor?: string | null) {
     return { url: normalized, revoke: undefined as (() => void) | undefined };
   }
 
-  const resposta = normalized.startsWith("/api/") || normalized.startsWith("api/")
-    ? await httpClient.get<Blob>(normalized.startsWith("/") ? normalized : `/${normalized}`, {
-        responseType: "blob"
-      })
-    : await httpClient.get<Blob>("/api/arquivos/conteudo", {
-        params: { path: normalized },
-        responseType: "blob"
-      });
+  const usarCache = opcoes.cache ?? true;
+  const auditar = opcoes.auditar ?? true;
+  const cacheKey = `${normalized}|audit:${auditar ? "1" : "0"}`;
+  if (usarCache && cacheUrlArquivoAutenticado.has(cacheKey)) {
+    return cacheUrlArquivoAutenticado.get(cacheKey) as Promise<ArquivoAutenticado>;
+  }
 
-  const blob = resposta.data instanceof Blob ? resposta.data : new Blob([resposta.data]);
-  const url = URL.createObjectURL(blob);
+  const carregar = (async (): Promise<ArquivoAutenticado> => {
+    const resposta = normalized.startsWith("/api/") || normalized.startsWith("api/")
+      ? await httpClient.get<Blob>(normalized.startsWith("/") ? normalized : `/${normalized}`, {
+          params: { audit: auditar ? undefined : "false" },
+          responseType: "blob"
+        })
+      : await httpClient.get<Blob>("/api/arquivos/conteudo", {
+          params: { path: normalized, audit: auditar ? undefined : "false" },
+          responseType: "blob"
+        });
 
-  return {
-    url,
-    revoke: () => URL.revokeObjectURL(url)
-  };
+    const blob = resposta.data instanceof Blob ? resposta.data : new Blob([resposta.data]);
+    const url = URL.createObjectURL(blob);
+
+    return usarCache
+      ? { url }
+      : {
+          url,
+          revoke: () => URL.revokeObjectURL(url)
+        };
+  })();
+
+  if (usarCache) {
+    cacheUrlArquivoAutenticado.set(cacheKey, carregar);
+    carregar.catch(() => cacheUrlArquivoAutenticado.delete(cacheKey));
+  }
+
+  return carregar;
 }
 
 export async function abrirArquivoAutenticado(valor?: string | null, titulo = "Arquivo") {

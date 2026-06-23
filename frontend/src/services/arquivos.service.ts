@@ -9,6 +9,7 @@ type ArquivoApiRow = {
   nome_original: string;
   nome_arquivo: string;
   caminho_arquivo: string;
+  thumbnail_caminho?: string | null;
   mime_type: string;
   observacao?: string | null;
   data_upload: string;
@@ -23,6 +24,7 @@ function mapArquivo(row: ArquivoApiRow): ArquivoMetadata {
     nomeOriginal: row.nome_original,
     nomeArquivo: row.nome_arquivo,
     caminhoArquivo: row.caminho_arquivo,
+    thumbnailCaminho: row.thumbnail_caminho ?? undefined,
     mimeType: row.mime_type,
     observacao: row.observacao ?? undefined,
     dataUpload: row.data_upload

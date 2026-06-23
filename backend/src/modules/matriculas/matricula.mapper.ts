@@ -53,6 +53,7 @@ export type MatriculaCursoRow = {
   nome: string;
   descricao: string | null;
   imagem: string | null;
+  imagem_thumbnail: string | null;
   vagas_totais: number;
   vagas_disponiveis: number;
   carga_horaria: number | null;
@@ -121,6 +122,7 @@ export function mapCursoToResponse(
     nome: curso.nome,
     descricao: curso.descricao ?? undefined,
     imagem: curso.imagem ?? undefined,
+    imagem_thumbnail: curso.imagem_thumbnail ?? undefined,
     vagas_totais: curso.vagas_totais,
     vagas_disponiveis: curso.vagas_disponiveis,
     carga_horaria: curso.carga_horaria ?? undefined,

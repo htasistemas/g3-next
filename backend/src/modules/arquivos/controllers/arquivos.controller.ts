@@ -39,7 +39,8 @@ export class ArquivosController {
     const conteudo = await service.obterConteudoPorId(
       request.params.id,
       request.authUser?.id,
-      request.authUser?.tenant_id
+      request.authUser?.tenant_id,
+      this.deveAuditarVisualizacao(request.query.audit)
     );
     return this.enviarConteudo(response, conteudo, request.query.download);
   }
@@ -48,7 +49,8 @@ export class ArquivosController {
     const conteudo = await service.obterConteudoPorCaminho(
       String(request.query.path ?? ""),
       request.authUser?.id,
-      request.authUser?.tenant_id
+      request.authUser?.tenant_id,
+      this.deveAuditarVisualizacao(request.query.audit)
     );
     return this.enviarConteudo(response, conteudo, request.query.download);
   }
@@ -67,11 +69,17 @@ export class ArquivosController {
       typeof download === "string" && ["1", "true", "sim", "yes"].includes(download.toLowerCase());
 
     response.setHeader("Content-Type", conteudo.mimeType);
+    response.setHeader("Cache-Control", "private, max-age=3600");
     response.setHeader(
       "Content-Disposition",
       `${forcarDownload ? "attachment" : "inline"}; filename="${encodeURIComponent(conteudo.nomeArquivo)}"`
     );
 
     return conteudo.stream.pipe(response);
+  }
+
+  private deveAuditarVisualizacao(valor: unknown) {
+    if (typeof valor !== "string") return true;
+    return !["0", "false", "nao", "não", "no"].includes(valor.trim().toLowerCase());
   }
 }
