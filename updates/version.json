@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.533",
-  "releaseDate": "2026-06-22",
-  "description": "Deploy oficial passou a atualizar o checkout, reconstruir o frontend sem cache e validar o login atual tambem no dominio publico.",
+  "latestVersion": "1.00.534",
+  "releaseDate": "2026-06-23",
+  "description": "Fotos de cursos, oficinas e atendimentos passaram a ser gravadas e exibidas corretamente a partir do storage autenticado.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.533",
+  "minCompatibleVersion": "1.00.534",
   "releaseType": "stable",
   "downloadUrl": null
 }

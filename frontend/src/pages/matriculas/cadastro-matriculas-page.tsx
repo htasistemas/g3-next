@@ -53,7 +53,8 @@ import {
 } from "@/features/matriculas/use-matriculas";
 import { reportsService } from "@/services/reports.service";
 import { matriculasService } from "@/services/matriculas.service";
-import { resolverUrlArquivo } from "@/lib/arquivos";
+import { arquivosService } from "@/services/arquivos.service";
+import { obterUrlArquivoAutenticado, resolverUrlArquivo } from "@/lib/arquivos";
 import { abrirRelatorioPdf } from "@/lib/report-utils";
 import { formatarTextoPadrao, formatarTextoPorCampo } from "@/lib/text-formatter";
 import { mapaCamposTextoMatriculaForm } from "@/lib/text-format-config";
@@ -349,6 +350,71 @@ function PopupMensagem({ popup, onClose }: { popup: PopupMensagemState; onClose:
   );
 }
 
+function ImagemAutenticada({
+  valor,
+  alt,
+  className,
+  placeholder = "Sem foto"
+}: {
+  valor?: string | null;
+  alt: string;
+  className?: string;
+  placeholder?: string;
+}) {
+  const [url, setUrl] = useState("");
+  const [falhou, setFalhou] = useState(false);
+
+  useEffect(() => {
+    let ativo = true;
+    let revokeAtual: (() => void) | undefined;
+    const imagem = valor?.trim() ?? "";
+
+    setFalhou(false);
+
+    if (!imagem) {
+      setUrl("");
+      return () => {
+        revokeAtual?.();
+      };
+    }
+
+    if (imagem.startsWith("data:") || imagem.startsWith("blob:") || /^https?:\/\//i.test(imagem)) {
+      setUrl(imagem);
+      return () => {
+        revokeAtual?.();
+      };
+    }
+
+    void (async () => {
+      try {
+        const arquivo = await obterUrlArquivoAutenticado(imagem);
+        if (!ativo) {
+          arquivo.revoke?.();
+          return;
+        }
+
+        revokeAtual = arquivo.revoke;
+        setUrl(arquivo.url || resolverUrlArquivo(imagem));
+      } catch {
+        if (!ativo) return;
+        setUrl("");
+        setFalhou(true);
+      }
+    })();
+
+    return () => {
+      ativo = false;
+      revokeAtual?.();
+    };
+  }, [valor]);
+
+  if (!url || falhou) {
+    return <span className="px-2 text-center text-[10px] text-[var(--g3-muted)]">{placeholder}</span>;
+  }
+
+  return <img src={url} alt={alt} className={className} onError={() => setFalhou(true)} />;
+}
+
 export function CadastroMatriculasPage() {
   const navigate = useNavigate();
   const { usuario } = useAuth();
@@ -420,6 +486,8 @@ export function CadastroMatriculasPage() {
   const [presencaSalvando, setPresencaSalvando] = useState(false);
   const [presencaExcluindo, setPresencaExcluindo] = useState(false);
   const [presencaPendente, setPresencaPendente] = useState(false);
+  const [imagemCursoArquivo, setImagemCursoArquivo] = useState<File | null>(null);
+  const [salvandoImagemCurso, setSalvandoImagemCurso] = useState(false);
   const inputImagemRef = useRef<HTMLInputElement | null>(null);
 
   const { data: listaData, isLoading: carregandoLista, isFetching: atualizandoLista } = useMatriculas(filtros);
@@ -483,7 +551,7 @@ export function CadastroMatriculasPage() {
   const matriculaIdFormulario = watch("id_matricula");
   const vagasTotaisFormulario = watch("vagas_totais");
   const acaoEmAndamento =
-    salvarMutation.isPending || removerMutation.isPending || carregandoDetalhes || atualizandoLista;
+    salvarMutation.isPending || removerMutation.isPending || carregandoDetalhes || atualizandoLista || salvandoImagemCurso;
 
   const matriculas = catalogoData?.matriculas ?? [];
   const matriculasListagem = listaData?.matriculas ?? [];
@@ -678,6 +746,8 @@ export function CadastroMatriculasPage() {
     const formValues = mapMatriculaParaFormulario(detalhesData.matricula);
     reset(formValues);
     setSnapshot(formValues);
+    setImagemCursoArquivo(null);
+    setSalvandoImagemCurso(false);
     setInscricoes(detalhesData.matricula.matriculas ?? []);
     setFilaEspera(detalhesData.matricula.fila_espera ?? []);
     setTermoCatalogoProfissionalResponsavel("");
@@ -731,6 +801,7 @@ export function CadastroMatriculasPage() {
 
   function selecionarMatricula(matriculaId: string) {
     const cursoSelecionado = matriculas.find((item) => item.id_matricula === matriculaId);
+    setImagemCursoArquivo(null);
     setIdSelecionado(matriculaId);
     setTermoAgendaBeneficiario("");
     setMostrarSugestoesAgendaBeneficiario(false);
@@ -798,6 +869,8 @@ export function CadastroMatriculasPage() {
   function novo() {
     setIdSelecionado(undefined);
     setSnapshot(null);
+    setImagemCursoArquivo(null);
+    setSalvandoImagemCurso(false);
     reset(matriculaDefaultValues);
     setTermoCatalogoProfissionalResponsavel("");
     setMostrarSugestoesProfissionalResponsavel(false);
@@ -845,6 +918,8 @@ export function CadastroMatriculasPage() {
   }
 
   function cancelar() {
+    setImagemCursoArquivo(null);
+    setSalvandoImagemCurso(false);
     if (!snapshot) {
       reset(matriculaDefaultValues);
       setTermoCatalogoProfissionalResponsavel("");
@@ -2071,6 +2146,7 @@ export function CadastroMatriculasPage() {
 
     try {
       const dataUrl = await lerArquivoComoDataUrl(arquivo);
+      setImagemCursoArquivo(arquivo);
       setValue("imagem", dataUrl, { shouldDirty: true, shouldValidate: true });
     } catch (error: any) {
       setPopupMensagem({
@@ -2082,13 +2158,60 @@ export function CadastroMatriculasPage() {
   }
 
   function removerImagemCurso() {
+    setImagemCursoArquivo(null);
     setValue("imagem", "", { shouldDirty: true, shouldValidate: true });
+  }
+
+  async function uploadImagemCurso(arquivo: File, cursoId: string) {
+    const upload = await arquivosService.uploadPorEntidade({
+      scope: "curso_imagem",
+      entidadeTipo: "curso",
+      entidadeId: cursoId,
+      arquivo,
+      observacao: "Foto do curso, oficina ou atendimento"
+    });
+
+    return upload.caminhoArquivo;
   }
 
   async function salvar(values: MatriculaFormValues) {
     try {
-      const payload = mapFormularioParaPayload(values, inscricoes, filaEspera);
-      const response = await salvarMutation.mutateAsync(payload);
+      let payload = mapFormularioParaPayload(
+        {
+          ...values,
+          imagem: imagemCursoArquivo ? snapshot?.imagem ?? "" : values.imagem
+        },
+        inscricoes,
+        filaEspera
+      );
+
+      if (imagemCursoArquivo && payload.id_matricula) {
+        setSalvandoImagemCurso(true);
+        payload = {
+          ...payload,
+          imagem: await uploadImagemCurso(imagemCursoArquivo, payload.id_matricula)
+        };
+      }
+
+      let response = await salvarMutation.mutateAsync(payload);
+
+      if (imagemCursoArquivo && !payload.id_matricula && response.matricula.id_matricula) {
+        setSalvandoImagemCurso(true);
+        const caminhoImagem = await uploadImagemCurso(imagemCursoArquivo, response.matricula.id_matricula);
+        response = await salvarMutation.mutateAsync({
+          ...mapFormularioParaPayload(
+            {
+              ...values,
+              id_matricula: response.matricula.id_matricula,
+              imagem: caminhoImagem
+            },
+            inscricoes,
+            filaEspera
+          )
+        });
+      }
+
+      setImagemCursoArquivo(null);
       const formValues = mapMatriculaParaFormulario(response.matricula);
       reset(formValues);
       setSnapshot(formValues);
@@ -2106,6 +2229,8 @@ export function CadastroMatriculasPage() {
         titulo: "Erro",
         texto: error?.response?.data?.message ?? "Não foi possível salvar a inscrição."
       });
+    } finally {
+      setSalvandoImagemCurso(false);
     }
   }
 
@@ -2556,10 +2681,11 @@ export function CadastroMatriculasPage() {
                       <Label>Foto do curso/atendimento</Label>
                       <div className="mt-2 flex aspect-[4/3] w-full max-w-[260px] items-center justify-center overflow-hidden rounded-md border border-[var(--g3-border)] bg-[var(--g3-card-soft)]">
                         {imagemAtual ? (
-                          <img
-                            src={resolverUrlArquivo(imagemAtual)}
+                          <ImagemAutenticada
+                            valor={imagemAtual}
                             alt="Foto do curso ou atendimento"
                             className="h-full w-full object-cover"
+                            placeholder="Sem foto"
                           />
                         ) : (
                           <span className="px-3 text-center text-xs text-[var(--g3-muted)]">Sem foto</span>
@@ -2854,10 +2980,11 @@ export function CadastroMatriculasPage() {
                             <div className="flex flex-col items-center gap-2 text-center">
                               <div className="relative mb-5 flex aspect-[4/3] w-full max-w-[220px] items-center justify-center overflow-visible rounded-md border border-[var(--g3-border)] bg-[var(--g3-card-soft)] shadow-sm">
                                 {item.imagem ? (
-                                  <img
-                                    src={resolverUrlArquivo(item.imagem)}
+                                  <ImagemAutenticada
+                                    valor={item.imagem}
                                     alt={`Foto de ${item.nome}`}
                                     className="h-full w-full rounded-md object-cover"
+                                    placeholder="Sem foto"
                                   />
                                 ) : (
                                   <span className="px-2 text-center text-[10px] text-[var(--g3-muted)]">Sem foto</span>

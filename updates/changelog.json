@@ -1,6 +1,18 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.534",
+                        "releaseDate":  "2026-06-23",
+                        "title":  "Fotos autenticadas nas inscrições",
+                        "description":  "A tela Inscrições em cursos e oficinas voltou a gravar e exibir fotos de cursos, oficinas e atendimentos no storage autenticado.",
+                        "changes":  [
+                                        "Upload de foto no cadastro passou a enviar o arquivo para o storage com escopo curso_imagem.",
+                                        "Campo imagem do curso passou a salvar apenas o caminho físico/lógico retornado pelo storage.",
+                                        "Cards do catálogo e vagas passaram a exibir imagens protegidas sem depender de acesso público ao arquivo.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ]
+                    },
+                    {
                         "version":  "1.00.533",
                         "releaseDate":  "2026-06-22",
                         "title":  "Deploy com validação pública do login",
