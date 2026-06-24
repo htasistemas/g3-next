@@ -123,6 +123,12 @@ emprestimosEventosRoutes.post(
   ensurePermissions(permissoesEscrita),
   asyncHandler(controller.enviarAlertaDevolucaoEmail.bind(controller))
 );
+emprestimosEventosRoutes.post(
+  "/:id/confirmacao-reserva/email",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.enviarConfirmacaoReservaEmail.bind(controller))
+);
 emprestimosEventosRoutes.get(
   "/:id",
   ensureAuthenticated,

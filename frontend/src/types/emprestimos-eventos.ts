@@ -40,6 +40,8 @@ export type ItemEmprestimoEvento = {
   numeroPatrimonio?: string | null;
 };
 
+export type TipoDiaAgendaEmprestimo = "EVENTO" | "RETIRADA" | "DEVOLUCAO";
+
 export type EmprestimoEvento = {
   id?: number;
   evento: EventoEmprestimo;

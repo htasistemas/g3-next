@@ -1,6 +1,46 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.538",
+                        "releaseDate":  "2026-06-24",
+                        "title":  "Seleção múltipla de patrimônios em empréstimos",
+                        "description":  "A aba Itens vinculados de empréstimos para eventos passou a selecionar patrimônios conforme a quantidade informada e buscar por número de patrimônio.",
+                        "changes":  [
+                                        "Quantidade maior que 1 em patrimônio agora abre a seleção de patrimônios e exige marcar exatamente a quantidade solicitada.",
+                                        "A busca de item passou a aceitar nome do item e número de patrimônio.",
+                                        "O sistema bloqueia patrimônio já vinculado no próprio empréstimo antes de consultar a disponibilidade do período.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.537",
+                        "releaseDate":  "2026-06-24",
+                        "title":  "Confirmação de reserva em empréstimos para eventos",
+                        "description":  "Empréstimos para eventos passam a enviar confirmação de reserva por WhatsApp e e-mail para o responsável.",
+                        "changes":  [
+                                        "A tela ganhou ações para confirmar a reserva por WhatsApp e e-mail após salvar o empréstimo.",
+                                        "As mensagens de confirmação informam o nome da instituição, a data do evento e os itens reservados.",
+                                        "As cobranças de devolução vencida por WhatsApp e e-mail também passam a informar a instituição e listar os itens pendentes.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.536",
+                        "releaseDate":  "2026-06-24",
+                        "title":  "Reservas patrimoniais em empréstimos para eventos",
+                        "description":  "Empréstimos para eventos passam a selecionar patrimônios vindos do almoxarifado item a item e a agenda diferencia dias do evento e dias de apoio.",
+                        "changes":  [
+                                        "A aba Itens vinculados agora permite selecionar os números de patrimônio ao trazer um item do almoxarifado.",
+                                        "Cada patrimônio selecionado é lançado como uma linha própria no empréstimo e no termo impresso.",
+                                        "A agenda marca dias do evento em vermelho e dias de retirada ou devolução em amarelo.",
+                                        "A devolução de apoio usa o próximo dia útil quando cair em sábado, domingo ou feriado cadastrado.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.486",
                         "releaseDate":  "2026-05-07",
                         "title":  "Versão da interface sincronizada em runtime",

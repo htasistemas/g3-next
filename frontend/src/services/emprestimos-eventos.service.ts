@@ -8,6 +8,7 @@ import type {
   ResponsavelEmprestimo,
   ResponsavelEmprestimoPayload,
   StatusEmprestimoEvento,
+  TipoDiaAgendaEmprestimo,
   TipoItemEmprestimo
 } from "@/types/emprestimos-eventos";
 
@@ -80,9 +81,23 @@ export const emprestimosEventosService = {
     return data;
   },
 
+  async enviarConfirmacaoReservaEmail(id: number) {
+    const { data } = await httpClient.post<{ destinatario: string; enviadoEm: string }>(
+      `/api/emprestimos-eventos/${id}/confirmacao-reserva/email`
+    );
+    return data;
+  },
+
   async agendaResumo(inicio: string, fim: string) {
     const { data } = await httpClient.get<
-      Array<{ data: string; temBloqueio: boolean; qtdEmprestimos: number; emprestimoIds: number[] }>
+      Array<{
+        data: string;
+        temBloqueio: boolean;
+        temApoio?: boolean;
+        qtdEmprestimos: number;
+        qtdApoios?: number;
+        emprestimoIds: number[];
+      }>
     >("/api/emprestimos-eventos/agenda/resumo", { params: { inicio, fim } });
     return data;
   },
@@ -92,11 +107,16 @@ export const emprestimosEventosService = {
       Array<{
         emprestimoId: number;
         status: StatusEmprestimoEvento;
+        tipoDia?: TipoDiaAgendaEmprestimo;
         periodo: {
           retiradaPrevista: string;
           devolucaoPrevista: string;
           retiradaReal?: string | null;
           devolucaoReal?: string | null;
+          retiradaApoio?: string | null;
+          eventoInicio?: string | null;
+          eventoFim?: string | null;
+          devolucaoApoio?: string | null;
         };
         responsavel?: { id: number; nome: string } | null;
         evento: EventoEmprestimo;

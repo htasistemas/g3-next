@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.508",
-  "releaseDate": "2026-05-21",
-  "description": "A tela Contabilidade / financeiro foi finalizada com painel simplificado, ações rápidas, bloqueio de saldo negativo, transferências entre contas e fechamento mensal com abertura do mês seguinte.",
+  "latestVersion": "1.00.538",
+  "releaseDate": "2026-06-24",
+  "description": "Itens vinculados em emprestimos para eventos passam a selecionar multiplos patrimonios por quantidade e buscar por numero de patrimonio.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.508",
+  "minCompatibleVersion": "1.00.538",
   "releaseType": "stable"
 }
 

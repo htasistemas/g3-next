@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  calcularDiaDevolucaoApoio,
+  calcularDiaRetiradaApoio,
   formatDateLocal,
   formatDateTimeLocal,
   parseDateOnlyLocal,
@@ -26,4 +28,20 @@ test("formatDateTimeLocal retorna texto compativel com input datetime-local", ()
   const data = new Date(2026, 4, 25, 14, 30, 0, 0);
   assert.equal(formatDateTimeLocal(data), "2026-05-25T14:30");
   assert.equal(formatDateLocal(data), "2026-05-25");
+});
+
+test("calcula dia de retirada como dia anterior ao evento", () => {
+  const data = calcularDiaRetiradaApoio(new Date(2026, 5, 24, 14, 30, 0, 0));
+  assert.equal(formatDateLocal(data), "2026-06-23");
+});
+
+test("calcula devolucao no proximo dia util apos sabado", () => {
+  const data = calcularDiaDevolucaoApoio(new Date(2026, 5, 27, 18, 0, 0, 0));
+  assert.equal(formatDateLocal(data), "2026-06-29");
+});
+
+test("calcula devolucao depois do feriado cadastrado", () => {
+  const feriados = new Set(["2026-06-29"]);
+  const data = calcularDiaDevolucaoApoio(new Date(2026, 5, 27, 18, 0, 0, 0), feriados);
+  assert.equal(formatDateLocal(data), "2026-06-30");
 });

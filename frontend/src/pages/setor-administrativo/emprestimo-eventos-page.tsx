@@ -179,6 +179,14 @@ function compararDataHora(a?: string | null, b?: string | null) {
   return dt(a).localeCompare(dt(b));
 }
 
+function normalizarBuscaTexto(valor?: string | null) {
+  return (valor ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("pt-BR")
+    .trim();
+}
+
 function formatarHora(valor?: string | null) {
   const normalizado = dt(valor);
   return normalizado.length >= 16 ? normalizado.slice(11, 16) : "--:--";
@@ -244,12 +252,14 @@ export function EmprestimoEventosPage() {
   const [itemBusca, setItemBusca] = useState("");
   const [itemQtd, setItemQtd] = useState("1");
   const [itemObs, setItemObs] = useState("");
+  const [patrimoniosAlmoxSelecionados, setPatrimoniosAlmoxSelecionados] = useState<string[]>([]);
 
   const [agendaMes, setAgendaMes] = useState(inicioMesIso());
   const [agendaDia, setAgendaDia] = useState(dataLocalIso());
 
   const [popup, setPopup] = useState<PopupMensagemState | null>(null);
   const [alertaEmailEmEnvio, setAlertaEmailEmEnvio] = useState<number | null>(null);
+  const [confirmacaoEmailEmEnvio, setConfirmacaoEmailEmEnvio] = useState<number | null>(null);
   const [confirmarExcluir, setConfirmarExcluir] = useState(false);
   const [confirmarExcluirEvento, setConfirmarExcluirEvento] = useState(false);
   const [confirmarExcluirResponsavel, setConfirmarExcluirResponsavel] = useState(false);
@@ -288,6 +298,10 @@ export function EmprestimoEventosPage() {
   const unidades = unidadesData?.unidades ?? [];
   const patrimonios = patrimoniosData?.patrimonios ?? [];
   const almox = almoxData?.itens ?? [];
+  const nomeInstituicao =
+    usuario?.instituicao_nome?.trim() ||
+    unidades.find((unidade) => String(unidade.id_unidade) === form.unidadeId)?.nome_fantasia?.trim() ||
+    "Instituição";
   const agendaResumo = agendaResumoData ?? [];
   const agendaDetalhe = agendaDiaData ?? [];
   const agendaResumoPorData = useMemo(
@@ -315,6 +329,8 @@ export function EmprestimoEventosPage() {
         selecionado,
         hoje,
         qtdEmprestimos: resumo?.qtdEmprestimos ?? 0,
+        qtdApoios: resumo?.qtdApoios ?? 0,
+        temApoio: resumo?.temApoio ?? false,
         temBloqueio: resumo?.temBloqueio ?? false
       };
     });
@@ -335,7 +351,8 @@ export function EmprestimoEventosPage() {
   const compromissosAtivos = emprestimosDoMes.filter((item) => !["DEVOLVIDO", "CANCELADO"].includes(item.status));
   const compromissosLiberados = emprestimosDoMes.filter((item) => ["DEVOLVIDO", "CANCELADO"].includes(item.status));
   const diasOcupados = new Set(agendaResumo.filter((item) => item.qtdEmprestimos > 0).map((item) => item.data)).size;
-  const diasLivres = diasAgenda.filter((dia) => dia.dentroDoMes && !dia.qtdEmprestimos).length;
+  const diasApoio = new Set(agendaResumo.filter((item) => (item.qtdApoios ?? 0) > 0).map((item) => item.data)).size;
+  const diasLivres = diasAgenda.filter((dia) => dia.dentroDoMes && !dia.qtdEmprestimos && !dia.qtdApoios).length;
   const tituloMesAgenda = `${nomesMeses[parseDataLocal(agendaMes).getMonth()]} de ${parseDataLocal(agendaMes).getFullYear()}`;
   const emprestimosVencidosSemDevolucao = useMemo(
     () =>
@@ -357,12 +374,59 @@ export function EmprestimoEventosPage() {
   );
 
   const opcoesItemFiltradas = useMemo(() => {
-    const termo = itemBusca.trim().toLocaleLowerCase("pt-BR");
+    const termo = normalizarBuscaTexto(itemBusca);
     if (!termo) return opcoesItem.slice(0, 30);
     return opcoesItem
-      .filter((item) => item.label.toLocaleLowerCase("pt-BR").includes(termo))
+      .filter((item) => normalizarBuscaTexto(item.label).includes(termo))
       .slice(0, 30);
   }, [itemBusca, opcoesItem]);
+
+  const itemAlmoxSelecionado = useMemo(
+    () => almox.find((item) => String(item.id_item) === itemId) ?? null,
+    [almox, itemId]
+  );
+
+  const patrimoniosDoItemAlmox = useMemo(() => {
+    if (itemTipo !== "ALMOXARIFADO" || !itemAlmoxSelecionado) return [];
+    const descricao = normalizarBuscaTexto(itemAlmoxSelecionado.descricao);
+    const categoria = normalizarBuscaTexto(itemAlmoxSelecionado.categoria);
+    const termos = descricao.split(/\s+/).filter((termo) => termo.length >= 3);
+    const encontrados = patrimonios.filter((patrimonio) => {
+      const nome = normalizarBuscaTexto(patrimonio.nome);
+      const patrimonioCategoria = normalizarBuscaTexto(patrimonio.categoria);
+      return (
+        (descricao && (nome.includes(descricao) || descricao.includes(nome))) ||
+        (categoria && patrimonioCategoria === categoria) ||
+        termos.some((termo) => nome.includes(termo))
+      );
+    });
+
+    return (encontrados.length ? encontrados : patrimonios).slice(0, 80);
+  }, [itemAlmoxSelecionado, itemTipo, patrimonios]);
+
+  const patrimoniosFiltradosBusca = useMemo(() => {
+    if (itemTipo !== "PATRIMONIO") return [];
+    const termo = normalizarBuscaTexto(itemBusca);
+    const lista = termo
+      ? patrimonios.filter((patrimonio) => {
+          const texto = normalizarBuscaTexto([
+            patrimonio.numeroPatrimonio,
+            patrimonio.nome,
+            patrimonio.categoria,
+            patrimonio.subcategoria
+          ].filter(Boolean).join(" "));
+          return texto.includes(termo);
+        })
+      : patrimonios;
+    return lista.slice(0, 80);
+  }, [itemBusca, itemTipo, patrimonios]);
+
+  const patrimoniosParaSelecao = itemTipo === "ALMOXARIFADO"
+    ? patrimoniosDoItemAlmox
+    : patrimoniosFiltradosBusca;
+  const exibirSelecaoPatrimonios =
+    (itemTipo === "ALMOXARIFADO" && !!itemAlmoxSelecionado) ||
+    (itemTipo === "PATRIMONIO" && (Number(itemQtd) > 1 || itemBusca.trim().length > 0));
 
   const carregandoAcoes =
     salvarMutation.isPending ||
@@ -371,7 +435,8 @@ export function EmprestimoEventosPage() {
     removerEventoMutation.isPending ||
     salvarResponsavelMutation.isPending ||
     removerResponsavelMutation.isPending ||
-    alertaEmailEmEnvio !== null;
+    alertaEmailEmEnvio !== null ||
+    confirmacaoEmailEmEnvio !== null;
 
   function selecionarEmprestimo(item: EmprestimoEvento) {
     const next: FormState = {
@@ -396,6 +461,8 @@ export function EmprestimoEventosPage() {
     setForm(next);
     setSnapshot(next);
     setItemBusca("");
+    setItemId("");
+    setPatrimoniosAlmoxSelecionados([]);
     setAbaAtiva("cadastro");
   }
 
@@ -479,19 +546,139 @@ export function EmprestimoEventosPage() {
   }
 
   async function adicionarItem() {
-    if (!itemId || Number(itemQtd) <= 0) {
+    if (Number(itemQtd) <= 0 || (itemTipo === "ALMOXARIFADO" && !itemId)) {
       setPopup({ tipo: "aviso", titulo: "Validação", texto: "Informe item e quantidade válidos." });
       return;
     }
+
+    const quantidade = Number(itemQtd);
+
+    if (itemTipo === "ALMOXARIFADO" || quantidade > 1 || patrimoniosAlmoxSelecionados.length > 0) {
+      const idsSelecionados =
+        patrimoniosAlmoxSelecionados.length > 0
+          ? patrimoniosAlmoxSelecionados
+          : itemTipo === "PATRIMONIO" && itemId
+            ? [itemId]
+            : [];
+
+      if (idsSelecionados.length !== quantidade) {
+        setPopup({
+          tipo: "aviso",
+          titulo: "Validação",
+          texto: "Marque exatamente a quantidade solicitada na lista de patrimônios."
+        });
+        return;
+      }
+
+      const selecionados = idsSelecionados
+        .map((id) => patrimonios.find((patrimonio) => String(patrimonio.idPatrimonio) === id))
+        .filter(Boolean);
+
+      const patrimonioJaVinculado = selecionados.find((patrimonio) =>
+        form.itens.some((item) => item.tipoItem === "PATRIMONIO" && String(item.itemId) === String(patrimonio?.idPatrimonio))
+      );
+      if (patrimonioJaVinculado) {
+        setPopup({
+          tipo: "aviso",
+          titulo: "Patrimônio já reservado",
+          texto: `O patrimônio ${patrimonioJaVinculado.numeroPatrimonio} já está reservado neste empréstimo.`
+        });
+        return;
+      }
+
+      try {
+        for (const patrimonio of selecionados) {
+          const disponibilidade = await emprestimosEventosService.disponibilidade({
+            itemId: Number(patrimonio?.idPatrimonio),
+            tipoItem: "PATRIMONIO",
+            quantidade: 1,
+            inicio: form.dataRetiradaPrevista,
+            fim: form.dataDevolucaoPrevista,
+            emprestimoId: form.id
+          });
+          if (!disponibilidade.disponivel) {
+            const conflito = disponibilidade.conflitos?.[0];
+            throw new Error(
+              conflito
+                ? `${patrimonio?.numeroPatrimonio ?? "Patrimônio"} já está reservado para ${conflito.eventoTitulo}.`
+                : `${patrimonio?.numeroPatrimonio ?? "Patrimônio"} já está reservado no período.`
+            );
+          }
+        }
+      } catch (error: any) {
+        setPopup({
+          tipo: "erro",
+          titulo: "Erro",
+          texto: error?.response?.data?.message ?? error?.message ?? "Um dos patrimônios selecionados já está reservado para o período."
+        });
+        return;
+      }
+
+      setForm((atual) => ({
+        ...atual,
+        itens: [
+          ...atual.itens,
+          ...selecionados.map((patrimonio) => ({
+            itemId: Number(patrimonio?.idPatrimonio),
+            tipoItem: "PATRIMONIO" as const,
+            quantidade: 1,
+            statusItem: "RESERVADO",
+            observacaoItem:
+              itemObs ||
+              (itemTipo === "ALMOXARIFADO"
+                ? `Origem: almoxarifado ${itemAlmoxSelecionado?.codigo ?? ""}`.trim()
+                : undefined),
+            nomeItem: patrimonio?.nome,
+            numeroPatrimonio: patrimonio?.numeroPatrimonio
+          }))
+        ]
+      }));
+      setItemId("");
+      setItemBusca("");
+      setItemQtd("1");
+      setItemObs("");
+      setPatrimoniosAlmoxSelecionados([]);
+      return;
+    }
+
+    if (!itemId) {
+      setPopup({ tipo: "aviso", titulo: "Validação", texto: "Selecione um patrimônio válido." });
+      return;
+    }
+
+    if (itemTipo === "PATRIMONIO") {
+      const patrimonio = patrimonios.find((item) => String(item.idPatrimonio) === itemId);
+      const jaVinculado = form.itens.some((item) => item.tipoItem === "PATRIMONIO" && String(item.itemId) === itemId);
+      if (jaVinculado) {
+        setPopup({
+          tipo: "aviso",
+          titulo: "Patrimônio já reservado",
+          texto: `O patrimônio ${patrimonio?.numeroPatrimonio ?? itemId} já está reservado neste empréstimo.`
+        });
+        return;
+      }
+    }
+
     try {
-      await emprestimosEventosService.disponibilidade({
+      const disponibilidade = await emprestimosEventosService.disponibilidade({
         itemId: Number(itemId),
         tipoItem: itemTipo,
-        quantidade: Number(itemQtd),
+        quantidade,
         inicio: form.dataRetiradaPrevista,
         fim: form.dataDevolucaoPrevista,
         emprestimoId: form.id
       });
+      if (!disponibilidade.disponivel) {
+        const conflito = disponibilidade.conflitos?.[0];
+        setPopup({
+          tipo: "aviso",
+          titulo: "Item reservado",
+          texto: conflito
+            ? `Este item já está reservado para ${conflito.eventoTitulo} no período informado.`
+            : "Este item já está reservado no período informado."
+        });
+        return;
+      }
     } catch (error: any) {
       setPopup({ tipo: "erro", titulo: "Erro", texto: error?.response?.data?.message ?? "Falha ao validar disponibilidade." });
       return;
@@ -515,10 +702,11 @@ export function EmprestimoEventosPage() {
             {
               itemId: Number(itemId),
               tipoItem: itemTipo,
-              quantidade: Number(itemQtd),
+              quantidade,
               statusItem: "RESERVADO",
               observacaoItem: itemObs || undefined,
-              nomeItem: nomeItem ?? undefined
+              nomeItem: nomeItem ?? undefined,
+              numeroPatrimonio: patrimonios.find((i) => String(i.idPatrimonio) === itemId)?.numeroPatrimonio
             }
           ];
         }
@@ -527,7 +715,7 @@ export function EmprestimoEventosPage() {
           indice === indiceExistente
             ? {
                 ...item,
-                quantidade: item.quantidade + Number(itemQtd),
+                quantidade: item.quantidade + quantidade,
                 observacaoItem: [item.observacaoItem, itemObs].filter(Boolean).join(" | ") || undefined,
                 nomeItem: item.nomeItem ?? nomeItem ?? undefined
               }
@@ -539,6 +727,7 @@ export function EmprestimoEventosPage() {
     setItemBusca("");
     setItemQtd("1");
     setItemObs("");
+    setPatrimoniosAlmoxSelecionados([]);
   }
 
   function removerItem(indice: number) {
@@ -552,6 +741,7 @@ export function EmprestimoEventosPage() {
 
     setItemBusca(valor);
     setItemId(itemEncontrado?.id ?? "");
+    setPatrimoniosAlmoxSelecionados([]);
   }
 
   function selecionarResponsavel(item: ResponsavelEmprestimo) {
@@ -728,23 +918,112 @@ export function EmprestimoEventosPage() {
     return responsaveis.find((responsavel) => String(responsavel.id) === responsavelId) ?? null;
   }
 
-  function montarMensagemAtraso(item: EmprestimoEvento) {
-    return [
-      `Olá, ${item.responsavel?.nome ?? "responsável"}.`,
-      `Consta em aberto a devolução do empréstimo #${item.id ?? ""} do evento ${item.evento.titulo}.`,
-      `A devolução prevista era ${fmt(item.dataDevolucaoPrevista)}.`,
-      "Solicitamos confirmar a devolução dos itens ou entrar em contato com a instituição."
-    ].join("\n");
+  function montarEmprestimoAtual() {
+    const evento = eventos.find((item) => String(item.id) === form.eventoId);
+    if (!form.id || !evento) return null;
+    return {
+      id: form.id,
+      evento,
+      unidadeId: form.unidadeId ? Number(form.unidadeId) : null,
+      responsavel: form.responsavelId || form.responsavelNome
+        ? {
+            id: form.responsavelId ? Number(form.responsavelId) : null,
+            nome: form.responsavelNome || "Responsável"
+          }
+        : null,
+      dataRetiradaPrevista: form.dataRetiradaPrevista,
+      dataDevolucaoPrevista: form.dataDevolucaoPrevista,
+      status: form.status,
+      observacoes: form.observacoes,
+      itens: form.itens
+    } satisfies EmprestimoEvento;
   }
 
-  function enviarAlertaWhatsApp(item: EmprestimoEvento) {
+  function formatarItensMensagem(item: EmprestimoEvento) {
+    return (item.itens ?? [])
+      .map((vinculo) => {
+        const nome = vinculo.nomeItem || `Item #${vinculo.itemId}`;
+        const patrimonio = vinculo.numeroPatrimonio ? ` - patrimônio ${vinculo.numeroPatrimonio}` : "";
+        return `- ${vinculo.quantidade}x ${nome}${patrimonio}`;
+      })
+      .join("\n");
+  }
+
+  function montarMensagemConfirmacao(item: EmprestimoEvento) {
+    const itens = formatarItensMensagem(item);
+    return [
+      `Olá, ${item.responsavel?.nome ?? "responsável"}.`,
+      "",
+      `${nomeInstituicao} confirma a reserva dos itens para o evento ${item.evento.titulo}.`,
+      `Período do evento: ${fmt(item.dataRetiradaPrevista)} até ${fmt(item.dataDevolucaoPrevista)}.`,
+      `Status da reserva: ${statusOpcoes.find((status) => status.value === item.status)?.label ?? item.status}.`,
+      "",
+      itens ? "Itens reservados:" : undefined,
+      itens || undefined,
+      "",
+      "Os itens ficam reservados para a data informada. Em caso de alteração, entre em contato com a instituição."
+    ]
+      .filter((linha) => linha !== undefined)
+      .join("\n");
+  }
+
+  function montarMensagemAtraso(item: EmprestimoEvento) {
+    const itens = formatarItensMensagem(item);
+    return [
+      `Olá, ${item.responsavel?.nome ?? "responsável"}.`,
+      "",
+      `${nomeInstituicao} informa que consta em aberto a devolução do empréstimo #${item.id ?? ""} do evento ${item.evento.titulo}.`,
+      `A devolução prevista era ${fmt(item.dataDevolucaoPrevista)}.`,
+      "",
+      itens ? "Itens pendentes:" : undefined,
+      itens || undefined,
+      "",
+      "Solicitamos confirmar a devolução dos itens ou entrar em contato com a instituição."
+    ]
+      .filter((linha) => linha !== undefined)
+      .join("\n");
+  }
+
+  function enviarWhatsAppResponsavel(item: EmprestimoEvento, mensagem: string) {
     const responsavel = buscarResponsavelDoEmprestimo(item);
     const telefone = normalizarTelefone(responsavel?.telefone);
     if (telefone.length < 10) {
       setPopup({ tipo: "aviso", titulo: "Atenção", texto: "O responsável não possui telefone válido para WhatsApp." });
       return;
     }
-    window.open(`https://wa.me/55${telefone}?text=${encodeURIComponent(montarMensagemAtraso(item))}`, "_blank", "noopener,noreferrer");
+    window.open(`https://wa.me/55${telefone}?text=${encodeURIComponent(mensagem)}`, "_blank", "noopener,noreferrer");
+  }
+
+  function enviarConfirmacaoWhatsApp(item: EmprestimoEvento) {
+    enviarWhatsAppResponsavel(item, montarMensagemConfirmacao(item));
+  }
+
+  function enviarAlertaWhatsApp(item: EmprestimoEvento) {
+    enviarWhatsAppResponsavel(item, montarMensagemAtraso(item));
+  }
+
+  async function enviarConfirmacaoEmail(item: EmprestimoEvento) {
+    if (!item.id || confirmacaoEmailEmEnvio !== null) {
+      return;
+    }
+
+    try {
+      setConfirmacaoEmailEmEnvio(item.id);
+      const envio = await emprestimosEventosService.enviarConfirmacaoReservaEmail(item.id);
+      setPopup({
+        tipo: "sucesso",
+        titulo: "E-mail enviado",
+        texto: `Confirmação de reserva enviada para ${envio.destinatario}.`
+      });
+    } catch (error: any) {
+      setPopup({
+        tipo: "erro",
+        titulo: "Erro",
+        texto: error?.response?.data?.message ?? "Falha ao enviar e-mail pelo servidor do G3N."
+      });
+    } finally {
+      setConfirmacaoEmailEmEnvio(null);
+    }
   }
 
   async function enviarAlertaEmail(item: EmprestimoEvento) {
@@ -818,6 +1097,7 @@ export function EmprestimoEventosPage() {
   };
 
   const acoes = acoesPorAba[abaAtiva];
+  const emprestimoAtual = montarEmprestimoAtual();
 
   return (
     <>
@@ -868,8 +1148,8 @@ export function EmprestimoEventosPage() {
         {abaAtiva === "listagem" ? (
           <section className="space-y-3">
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-              <div className="space-y-1"><Label>Período Inicial</Label><Input type="date" value={fInicio} onChange={(e) => setFInicio(e.target.value)} /></div>
-              <div className="space-y-1"><Label>Período Final</Label><Input type="date" value={fFim} onChange={(e) => setFFim(e.target.value)} /></div>
+              <div className="space-y-1"><Label>Período inicial</Label><Input type="date" value={fInicio} onChange={(e) => setFInicio(e.target.value)} /></div>
+              <div className="space-y-1"><Label>Período final</Label><Input type="date" value={fFim} onChange={(e) => setFFim(e.target.value)} /></div>
               <div className="space-y-1"><Label>Status</Label><Select value={fStatus} onChange={(e) => setFStatus(e.target.value)}><option value="">Todos</option>{statusOpcoes.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</Select></div>
               <div className="space-y-1 xl:col-span-2"><Label>Evento</Label><Select value={fEvento} onChange={(e) => setFEvento(e.target.value)}><option value="">Todos</option>{eventos.map((e) => <option key={e.id} value={e.id}>{e.titulo}</option>)}</Select></div>
             </div>
@@ -907,26 +1187,83 @@ export function EmprestimoEventosPage() {
                 </Select>
                 <p className="text-xs text-[var(--g3-muted)]">Cadastre ou edite nomes na aba Responsáveis.</p>
               </div>
-              <div className="space-y-1"><Label>Retirada Prevista</Label><Input type="datetime-local" value={form.dataRetiradaPrevista} onChange={(e) => setForm((a) => ({ ...a, dataRetiradaPrevista: e.target.value }))} /></div>
-              <div className="space-y-1"><Label>Devolução Prevista</Label><Input type="datetime-local" value={form.dataDevolucaoPrevista} onChange={(e) => setForm((a) => ({ ...a, dataDevolucaoPrevista: e.target.value }))} /></div>
+              <div className="space-y-1"><Label>Início do evento</Label><Input type="datetime-local" value={form.dataRetiradaPrevista} onChange={(e) => setForm((a) => ({ ...a, dataRetiradaPrevista: e.target.value }))} /></div>
+              <div className="space-y-1"><Label>Fim do evento</Label><Input type="datetime-local" value={form.dataDevolucaoPrevista} onChange={(e) => setForm((a) => ({ ...a, dataDevolucaoPrevista: e.target.value }))} /></div>
               <div className="space-y-1 md:col-span-2 xl:col-span-4"><Label>Observações</Label><Textarea rows={2} value={form.observacoes} onChange={(e) => setForm((a) => ({ ...a, observacoes: e.target.value }))} /></div>
             </div>
-            <Card className="border-[var(--g3-border)]"><CardHeader className="pb-2"><CardTitle className="text-sm">Ações Rápidas</CardTitle></CardHeader><CardContent className="flex flex-wrap gap-2"><Button variant="outline" disabled={!form.id || form.status === "RETIRADO" || form.status === "DEVOLVIDO" || form.status === "CANCELADO"} onClick={() => void confirmarStatus("RETIRADA")}>Confirmar Retirada</Button><Button variant="outline" disabled={!form.id || form.status !== "RETIRADO"} onClick={() => void confirmarStatus("DEVOLUCAO")}>Confirmar Devolução</Button><Button variant="danger" disabled={!form.id || form.status === "DEVOLVIDO" || form.status === "CANCELADO"} onClick={() => void confirmarStatus("CANCELAR")}>Cancelar Empréstimo</Button></CardContent></Card>
+            <Card className="border-[var(--g3-border)]"><CardHeader className="pb-2"><CardTitle className="text-sm">Ações rápidas</CardTitle></CardHeader><CardContent className="flex flex-wrap gap-2"><Button variant="outline" disabled={!form.id || form.status === "RETIRADO" || form.status === "DEVOLVIDO" || form.status === "CANCELADO"} onClick={() => void confirmarStatus("RETIRADA")}>Confirmar retirada</Button><Button variant="outline" disabled={!form.id || form.status !== "RETIRADO"} onClick={() => void confirmarStatus("DEVOLUCAO")}>Confirmar devolução</Button><Button variant="outline" disabled={!emprestimoAtual || confirmacaoEmailEmEnvio !== null} onClick={() => emprestimoAtual && enviarConfirmacaoWhatsApp(emprestimoAtual)}><MessageCircle className="mr-1.5 h-4 w-4" />Confirmar por WhatsApp</Button><Button variant="outline" disabled={!emprestimoAtual || confirmacaoEmailEmEnvio !== null} onClick={() => emprestimoAtual && void enviarConfirmacaoEmail(emprestimoAtual)}>{confirmacaoEmailEmEnvio === form.id ? <LoaderCircle className="mr-1.5 h-4 w-4 animate-spin" /> : <Mail className="mr-1.5 h-4 w-4" />}Confirmar por e-mail</Button><Button variant="danger" disabled={!form.id || form.status === "DEVOLVIDO" || form.status === "CANCELADO"} onClick={() => void confirmarStatus("CANCELAR")}>Cancelar empréstimo</Button></CardContent></Card>
           </section>
         ) : null}
 
         {abaAtiva === "itens" ? (
           <section className="space-y-3">
             <div className="grid gap-3 rounded-lg border border-[var(--g3-border)] p-3 md:grid-cols-2 xl:grid-cols-[0.8fr_2.2fr_0.6fr_1.8fr_auto]">
-              <div className="space-y-1"><Label>Tipo</Label><Select value={itemTipo} onChange={(e) => { setItemTipo(e.target.value as TipoItemEmprestimo); setItemId(""); setItemBusca(""); }}><option value="PATRIMONIO">Patrimônio</option><option value="ALMOXARIFADO">Almoxarifado</option></Select></div>
-              <div className="space-y-1"><Label>Item</Label><Input list="emprestimo-eventos-itens" value={itemBusca} onChange={(e) => atualizarBuscaItem(e.target.value)} placeholder="Digite para buscar o item" /><datalist id="emprestimo-eventos-itens">{opcoesItemFiltradas.map((i) => <option key={i.id} value={i.label} />)}</datalist></div>
+              <div className="space-y-1"><Label>Tipo</Label><Select value={itemTipo} onChange={(e) => { setItemTipo(e.target.value as TipoItemEmprestimo); setItemId(""); setItemBusca(""); setPatrimoniosAlmoxSelecionados([]); }}><option value="PATRIMONIO">Patrimônio</option><option value="ALMOXARIFADO">Almoxarifado</option></Select></div>
+              <div className="space-y-1"><Label>Item ou patrimônio</Label><Input list="emprestimo-eventos-itens" value={itemBusca} onChange={(e) => atualizarBuscaItem(e.target.value)} placeholder="Digite o item ou o número do patrimônio" /><datalist id="emprestimo-eventos-itens">{opcoesItemFiltradas.map((i) => <option key={i.id} value={i.label} />)}</datalist></div>
               <div className="space-y-1"><Label>Quantidade</Label><Input type="number" min={1} value={itemQtd} onChange={(e) => setItemQtd(e.target.value)} className="max-w-[96px]" /></div>
               <div className="space-y-1"><Label>Observação</Label><Input value={itemObs} onChange={(e) => setItemObs(e.target.value)} placeholder="Observação do item" /></div>
-              <div className="flex items-end"><Button className="w-full" onClick={() => void adicionarItem()}>Adicionar Item</Button></div>
+              <div className="flex items-end"><Button className="w-full" onClick={() => void adicionarItem()}>Adicionar item</Button></div>
             </div>
+            {exibirSelecaoPatrimonios ? (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-semibold">
+                      {itemTipo === "ALMOXARIFADO" && itemAlmoxSelecionado
+                        ? `Selecione os patrimônios de ${itemAlmoxSelecionado.descricao}`
+                        : "Selecione os patrimônios"}
+                    </p>
+                    <p className="text-xs text-amber-800">Marcados: {patrimoniosAlmoxSelecionados.length} de {Number(itemQtd) || 0}. Cada patrimônio será lançado como uma linha no termo.</p>
+                  </div>
+                </div>
+                <div className="mt-3 max-h-72 overflow-auto rounded-md border border-amber-200 bg-white">
+                  <table className="min-w-full text-xs">
+                    <thead className="bg-amber-100 text-amber-950">
+                      <tr>
+                        <th className="w-12 px-2 py-2 text-left">Sel.</th>
+                        <th className="px-2 py-2 text-left">Patrimônio</th>
+                        <th className="px-2 py-2 text-left">Item</th>
+                        <th className="px-2 py-2 text-left">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {patrimoniosParaSelecao.length ? patrimoniosParaSelecao.map((patrimonio) => {
+                        const id = String(patrimonio.idPatrimonio);
+                        const jaVinculado = form.itens.some((item) => item.tipoItem === "PATRIMONIO" && String(item.itemId) === id);
+                        const marcado = patrimoniosAlmoxSelecionados.includes(id);
+                        return (
+                          <tr key={id} className="border-t border-amber-100">
+                            <td className="px-2 py-2">
+                              <input
+                                type="checkbox"
+                                checked={marcado}
+                                disabled={jaVinculado}
+                                onChange={(event) => {
+                                  setPatrimoniosAlmoxSelecionados((atual) =>
+                                    event.target.checked
+                                      ? [...atual, id]
+                                      : atual.filter((item) => item !== id)
+                                  );
+                                }}
+                                aria-label={`Selecionar patrimônio ${patrimonio.numeroPatrimonio}`}
+                              />
+                            </td>
+                            <td className="px-2 py-2 font-semibold">{patrimonio.numeroPatrimonio}</td>
+                            <td className="px-2 py-2">{patrimonio.nome}</td>
+                            <td className="px-2 py-2">{jaVinculado ? "Já vinculado neste empréstimo" : "Disponível para validação"}</td>
+                          </tr>
+                        );
+                      }) : (
+                        <tr><td colSpan={4} className="px-3 py-4 text-center">Nenhum patrimônio encontrado para selecionar.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : null}
             <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]">
-              <table className="min-w-full text-sm"><thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"><tr><th className="px-3 py-2 text-left">Tipo</th><th className="px-3 py-2 text-left">Item</th><th className="px-3 py-2 text-left">Quantidade</th><th className="px-3 py-2 text-left">Observação</th><th className="px-3 py-2 text-right">Ações</th></tr></thead>
-                <tbody>{form.itens.length ? form.itens.map((i, idx) => <tr key={`${i.tipoItem}-${i.itemId}-${idx}`} className={`border-t border-[var(--g3-border)] ${idx % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35"}`}><td className="px-3 py-2">{i.tipoItem}</td><td className="px-3 py-2">{i.nomeItem || `#${i.itemId}`}</td><td className="px-3 py-2">{i.quantidade}</td><td className="px-3 py-2">{i.observacaoItem || "---"}</td><td className="px-3 py-2 text-right"><Button variant="danger" size="sm" onClick={() => removerItem(idx)}>Remover</Button></td></tr>) : <tr><td colSpan={5} className="px-3 py-4 text-center">Nenhum item adicionado.</td></tr>}</tbody>
+              <table className="min-w-full text-sm"><thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"><tr><th className="px-3 py-2 text-left">Tipo</th><th className="px-3 py-2 text-left">Item</th><th className="px-3 py-2 text-left">Patrimônio</th><th className="px-3 py-2 text-left">Quantidade</th><th className="px-3 py-2 text-left">Observação</th><th className="px-3 py-2 text-right">Ações</th></tr></thead>
+                <tbody>{form.itens.length ? form.itens.map((i, idx) => <tr key={`${i.tipoItem}-${i.itemId}-${idx}`} className={`border-t border-[var(--g3-border)] ${idx % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35"}`}><td className="px-3 py-2">{i.tipoItem}</td><td className="px-3 py-2">{i.nomeItem || `#${i.itemId}`}</td><td className="px-3 py-2">{i.numeroPatrimonio || "---"}</td><td className="px-3 py-2">{i.quantidade}</td><td className="px-3 py-2">{i.observacaoItem || "---"}</td><td className="px-3 py-2 text-right"><Button variant="danger" size="sm" onClick={() => removerItem(idx)}>Remover</Button></td></tr>) : <tr><td colSpan={6} className="px-3 py-4 text-center">Nenhum item adicionado.</td></tr>}</tbody>
               </table>
             </div>
           </section>
@@ -975,9 +1312,14 @@ export function EmprestimoEventosPage() {
                 <p className="text-xs text-emerald-700">Sem compromisso no mês exibido</p>
               </div>
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-950">
-                <div className="flex items-center gap-2 text-xs font-semibold uppercase text-amber-700"><Clock className="h-4 w-4" />Dias ocupados</div>
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase text-amber-700"><Clock className="h-4 w-4" />Dias de apoio</div>
+                <p className="mt-2 text-2xl font-semibold">{diasApoio}</p>
+                <p className="text-xs text-amber-700">Retirada ou devolução sugerida</p>
+              </div>
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-red-950">
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase text-red-700"><AlertTriangle className="h-4 w-4" />Dias ocupados</div>
                 <p className="mt-2 text-2xl font-semibold">{diasOcupados}</p>
-                <p className="text-xs text-amber-700">Com retirada ou devolução prevista</p>
+                <p className="text-xs text-red-700">Dias do evento com item reservado</p>
               </div>
               <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sky-950">
                 <div className="flex items-center gap-2 text-xs font-semibold uppercase text-sky-700"><PackageCheck className="h-4 w-4" />Compromissos</div>
@@ -1000,6 +1342,8 @@ export function EmprestimoEventosPage() {
                   {diasAgenda.map((dia) => {
                     const classeStatus = dia.qtdEmprestimos
                       ? "border-red-300 bg-red-50 text-red-950"
+                      : dia.qtdApoios
+                        ? "border-amber-300 bg-amber-50 text-amber-950"
                       : "border-emerald-100 bg-emerald-50/55 text-emerald-900";
                     return (
                       <button
@@ -1012,9 +1356,9 @@ export function EmprestimoEventosPage() {
                           <span className={`flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold ${dia.hoje ? "bg-[var(--g3-primary)] text-white" : ""}`}>
                             {dia.dia}
                           </span>
-                          {dia.qtdEmprestimos ? (
+                          {dia.qtdEmprestimos || dia.qtdApoios ? (
                             <span className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-semibold shadow-sm">
-                              {dia.qtdEmprestimos}
+                              {dia.qtdEmprestimos || dia.qtdApoios}
                             </span>
                           ) : null}
                         </div>
@@ -1022,7 +1366,12 @@ export function EmprestimoEventosPage() {
                           {dia.qtdEmprestimos ? (
                             <>
                               <div className="flex items-center gap-1 font-semibold"><Clock className="h-3.5 w-3.5" />(X) ocupado</div>
-                              <div>Agenda com compromisso</div>
+                              <div>Evento com item reservado</div>
+                            </>
+                          ) : dia.qtdApoios ? (
+                            <>
+                              <div className="flex items-center gap-1 font-semibold"><Clock className="h-3.5 w-3.5" />Apoio</div>
+                              <div>Retirada ou devolução</div>
                             </>
                           ) : dia.dentroDoMes ? (
                             <div className="flex items-center gap-1 font-medium"><CheckCircle2 className="h-3.5 w-3.5" />Liberado</div>
@@ -1041,33 +1390,37 @@ export function EmprestimoEventosPage() {
                       <p className="text-xs font-semibold uppercase text-[var(--g3-muted)]">Dia selecionado</p>
                       <h3 className="text-base font-semibold text-[var(--g3-foreground)]">{formatarDataPtBr(agendaDia)}</h3>
                     </div>
-                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${agendaDetalheOrdenada.length ? "bg-red-100 text-red-800" : "bg-emerald-100 text-emerald-800"}`}>
-                      {agendaDetalheOrdenada.length ? "(X) ocupado" : "Liberado"}
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${agendaResumoPorData.get(agendaDia)?.qtdEmprestimos ? "bg-red-100 text-red-800" : agendaResumoPorData.get(agendaDia)?.qtdApoios ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>
+                      {agendaResumoPorData.get(agendaDia)?.qtdEmprestimos ? "(X) ocupado" : agendaResumoPorData.get(agendaDia)?.qtdApoios ? "Apoio" : "Liberado"}
                     </span>
                   </div>
                 </div>
 
                 {agendaDetalheOrdenada.length ? agendaDetalheOrdenada.map((item) => {
                   const bloqueado = !["DEVOLVIDO", "CANCELADO"].includes(item.status);
+                  const tipoDia = item.tipoDia ?? "EVENTO";
+                  const rotuloTipoDia = tipoDia === "RETIRADA" ? "Retirada" : tipoDia === "DEVOLUCAO" ? "Devolução" : "Evento";
                   return (
-                    <div key={item.emprestimoId} className={`rounded-lg border p-3 ${bloqueado ? "border-amber-200 bg-amber-50" : "border-emerald-200 bg-emerald-50"}`}>
+                    <div key={`${item.emprestimoId}-${tipoDia}`} className={`rounded-lg border p-3 ${tipoDia === "EVENTO" && bloqueado ? "border-red-200 bg-red-50" : tipoDia !== "EVENTO" ? "border-amber-200 bg-amber-50" : "border-emerald-200 bg-emerald-50"}`}>
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="text-xs font-semibold uppercase text-slate-600">Empréstimo #{item.emprestimoId}</p>
                           <h4 className="text-sm font-semibold text-slate-950">{item.evento.titulo}</h4>
                           <p className="mt-1 text-xs text-slate-600">{item.evento.local || "Local não informado"}</p>
                         </div>
-                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${bloqueado ? "bg-amber-200 text-amber-900" : "bg-emerald-200 text-emerald-900"}`}>
-                          {statusOpcoes.find((status) => status.value === item.status)?.label ?? item.status}
+                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${tipoDia === "EVENTO" && bloqueado ? "bg-red-200 text-red-900" : tipoDia !== "EVENTO" ? "bg-amber-200 text-amber-900" : "bg-emerald-200 text-emerald-900"}`}>
+                          {rotuloTipoDia}
                         </span>
                       </div>
-                      <div className="mt-3 grid gap-2 text-xs text-slate-700 sm:grid-cols-2">
-                        <div className="rounded-md bg-white/70 p-2"><strong>Retirada:</strong><br />{formatarHora(item.periodo.retiradaPrevista)} - {fmt(item.periodo.retiradaPrevista)}</div>
-                        <div className="rounded-md bg-white/70 p-2"><strong>Devolução:</strong><br />{formatarHora(item.periodo.devolucaoPrevista)} - {fmt(item.periodo.devolucaoPrevista)}</div>
+                      <div className="mt-3 grid gap-2 text-xs text-slate-700 sm:grid-cols-3">
+                        <div className="rounded-md bg-white/70 p-2"><strong>Retirada:</strong><br />{fmt(item.periodo.retiradaApoio || item.periodo.retiradaPrevista)}</div>
+                        <div className="rounded-md bg-white/70 p-2"><strong>Evento:</strong><br />{fmt(item.periodo.eventoInicio || item.periodo.retiradaPrevista)} até {fmt(item.periodo.eventoFim || item.periodo.devolucaoPrevista)}</div>
+                        <div className="rounded-md bg-white/70 p-2"><strong>Devolução:</strong><br />{fmt(item.periodo.devolucaoApoio || item.periodo.devolucaoPrevista)}</div>
                       </div>
                       <div className="mt-3 space-y-1 text-xs text-slate-700">
+                        <p><strong>Status:</strong> {statusOpcoes.find((status) => status.value === item.status)?.label ?? item.status}</p>
                         <p><strong>Responsável:</strong> {item.responsavel?.nome ?? "Não informado"}</p>
-                        <p><strong>Itens:</strong> {item.itens.length ? item.itens.map((vinculo) => `${vinculo.quantidade}x ${vinculo.nomeItem || vinculo.numeroPatrimonio || `#${vinculo.itemId}`}`).join("; ") : "Nenhum item vinculado"}</p>
+                        <p><strong>Itens:</strong> {item.itens.length ? item.itens.map((vinculo) => `${vinculo.quantidade}x ${vinculo.nomeItem || `#${vinculo.itemId}`}${vinculo.numeroPatrimonio ? ` (${vinculo.numeroPatrimonio})` : ""}`).join("; ") : "Nenhum item vinculado"}</p>
                       </div>
                       <div className="mt-3 flex flex-wrap gap-2">
                         <Button type="button" size="sm" variant="outline" onClick={() => adicionarAoGoogleAgenda(item)}>
@@ -1143,7 +1496,7 @@ export function EmprestimoEventosPage() {
               <Card className="border-[var(--g3-border)]"><CardHeader className="pb-2"><CardTitle className="text-sm">Dados do empréstimo</CardTitle></CardHeader><CardContent className="space-y-1 text-sm"><p><strong>Código:</strong> {form.id ?? "---"}</p><p><strong>Evento:</strong> {eventos.find((e) => String(e.id) === form.eventoId)?.titulo || "---"}</p><p><strong>Unidade:</strong> {unidades.find((u) => String(u.id_unidade) === form.unidadeId)?.nome_fantasia || "---"}</p><p><strong>Status:</strong> {statusOpcoes.find((s) => s.value === form.status)?.label || form.status}</p><p><strong>Retirada prevista:</strong> {fmt(form.dataRetiradaPrevista)}</p><p><strong>Devolução prevista:</strong> {fmt(form.dataDevolucaoPrevista)}</p></CardContent></Card>
               <Card className="border-[var(--g3-border)]"><CardHeader className="pb-2"><CardTitle className="text-sm">Responsável pela retirada</CardTitle></CardHeader><CardContent className="space-y-1 text-sm"><p><strong>Nome:</strong> {form.responsavelNome || "---"}</p><p><strong>Documento:</strong> {responsaveis.find((item) => String(item.id) === form.responsavelId)?.documento || "---"}</p><p><strong>Telefone:</strong> {responsaveis.find((item) => String(item.id) === form.responsavelId)?.telefone || "---"}</p><p><strong>E-mail:</strong> {responsaveis.find((item) => String(item.id) === form.responsavelId)?.email || "---"}</p></CardContent></Card>
             </div>
-            <Card className="border-[var(--g3-border)]"><CardHeader className="pb-2"><CardTitle className="text-sm">Itens vinculados</CardTitle></CardHeader><CardContent><table className="min-w-full text-sm"><thead><tr><th className="border-b px-2 py-2 text-left">Tipo</th><th className="border-b px-2 py-2 text-left">Item</th><th className="border-b px-2 py-2 text-left">Quantidade</th><th className="border-b px-2 py-2 text-left">Observação</th></tr></thead><tbody>{form.itens.length ? form.itens.map((item, index) => <tr key={`${item.tipoItem}-${item.itemId}-${index}`}><td className="border-b px-2 py-2">{item.tipoItem}</td><td className="border-b px-2 py-2">{item.nomeItem || `#${item.itemId}`}</td><td className="border-b px-2 py-2">{item.quantidade}</td><td className="border-b px-2 py-2">{item.observacaoItem || "---"}</td></tr>) : <tr><td colSpan={4} className="px-2 py-3 text-center">Nenhum item vinculado.</td></tr>}</tbody></table></CardContent></Card>
+            <Card className="border-[var(--g3-border)]"><CardHeader className="pb-2"><CardTitle className="text-sm">Itens vinculados</CardTitle></CardHeader><CardContent><table className="min-w-full text-sm"><thead><tr><th className="border-b px-2 py-2 text-left">Tipo</th><th className="border-b px-2 py-2 text-left">Item</th><th className="border-b px-2 py-2 text-left">Patrimônio</th><th className="border-b px-2 py-2 text-left">Quantidade</th><th className="border-b px-2 py-2 text-left">Observação</th></tr></thead><tbody>{form.itens.length ? form.itens.map((item, index) => <tr key={`${item.tipoItem}-${item.itemId}-${index}`}><td className="border-b px-2 py-2">{item.tipoItem}</td><td className="border-b px-2 py-2">{item.nomeItem || `#${item.itemId}`}</td><td className="border-b px-2 py-2">{item.numeroPatrimonio || "---"}</td><td className="border-b px-2 py-2">{item.quantidade}</td><td className="border-b px-2 py-2">{item.observacaoItem || "---"}</td></tr>) : <tr><td colSpan={5} className="px-2 py-3 text-center">Nenhum item vinculado.</td></tr>}</tbody></table></CardContent></Card>
             <Card className="border-[var(--g3-border)]"><CardHeader className="pb-2"><CardTitle className="text-sm">Condições</CardTitle></CardHeader><CardContent className="space-y-2 text-sm"><p>Declaro receber os itens acima para uso no evento informado, comprometendo-me a devolvê-los nas mesmas condições de retirada, respeitando a data prevista de devolução.</p><p>Em caso de dano, perda ou não devolução, o registro deverá ser tratado conforme as regras internas da instituição.</p><p><strong>Observações do empréstimo:</strong> {form.observacoes || "---"}</p></CardContent></Card>
             <div className="grid gap-8 pt-10 md:grid-cols-2">
               <div className="border-t border-[var(--g3-border)] pt-2 text-center">Responsável pela retirada</div>
@@ -1154,9 +1507,9 @@ export function EmprestimoEventosPage() {
       </AdminPageLayout>
 
       {popup ? <PopupMensagem popup={popup} onClose={() => setPopup(null)} /> : null}
-      <PopupConfirmacao aberto={confirmarExcluir} titulo="Confirmar Exclusão" texto="Esta ação é irreversível. Deseja continuar?" processando={removerMutation.isPending} onCancel={() => setConfirmarExcluir(false)} onConfirm={() => void confirmarExclusao()} confirmarTexto="Excluir" />
-      <PopupConfirmacao aberto={confirmarExcluirEvento} titulo="Confirmar Exclusão" texto="Deseja realmente excluir o evento selecionado?" processando={removerEventoMutation.isPending} onCancel={() => setConfirmarExcluirEvento(false)} onConfirm={() => void confirmarExclusaoEvento()} confirmarTexto="Excluir" />
-      <PopupConfirmacao aberto={confirmarExcluirResponsavel} titulo="Confirmar Exclusão" texto="Deseja realmente excluir o responsável selecionado?" processando={removerResponsavelMutation.isPending} onCancel={() => setConfirmarExcluirResponsavel(false)} onConfirm={() => void confirmarExclusaoResponsavel()} confirmarTexto="Excluir" />
+      <PopupConfirmacao aberto={confirmarExcluir} titulo="Confirmar exclusão" texto="Esta ação é irreversível. Deseja continuar?" processando={removerMutation.isPending} onCancel={() => setConfirmarExcluir(false)} onConfirm={() => void confirmarExclusao()} confirmarTexto="Excluir" />
+      <PopupConfirmacao aberto={confirmarExcluirEvento} titulo="Confirmar exclusão" texto="Deseja realmente excluir o evento selecionado?" processando={removerEventoMutation.isPending} onCancel={() => setConfirmarExcluirEvento(false)} onConfirm={() => void confirmarExclusaoEvento()} confirmarTexto="Excluir" />
+      <PopupConfirmacao aberto={confirmarExcluirResponsavel} titulo="Confirmar exclusão" texto="Deseja realmente excluir o responsável selecionado?" processando={removerResponsavelMutation.isPending} onCancel={() => setConfirmarExcluirResponsavel(false)} onConfirm={() => void confirmarExclusaoResponsavel()} confirmarTexto="Excluir" />
     </>
   );
 }

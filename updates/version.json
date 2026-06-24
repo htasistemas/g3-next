@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.535",
-  "releaseDate": "2026-06-23",
-  "description": "Alertas de devolucao vencida em emprestimos para eventos passam a enviar e-mail pelo servidor configurado do G3N.",
+  "latestVersion": "1.00.538",
+  "releaseDate": "2026-06-24",
+  "description": "Itens vinculados em emprestimos para eventos passam a selecionar multiplos patrimonios por quantidade e buscar por numero de patrimonio.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.535",
+  "minCompatibleVersion": "1.00.538",
   "releaseType": "stable",
   "downloadUrl": null
 }

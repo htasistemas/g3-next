@@ -15,7 +15,7 @@ import {
   eventoEmprestimoInputSchema,
   responsavelEmprestimoInputSchema
 } from "../emprestimos-eventos.schema.js";
-import { parseDateOnlyLocal } from "../emprestimos-eventos-datetime.js";
+import { formatDateTimeLocal, parseDateOnlyLocal } from "../emprestimos-eventos-datetime.js";
 import { EmprestimosEventosRepository } from "../repositories/emprestimos-eventos.repository.js";
 
 function parseDateOnly(rawValue: unknown, label: string) {
@@ -176,11 +176,16 @@ export class EmprestimosEventosService {
       return {
         emprestimoId: emprestimo.id,
         status: emprestimo.status,
+        tipoDia: item.tipoDia,
         periodo: {
           retiradaPrevista: emprestimo.dataRetiradaPrevista,
           devolucaoPrevista: emprestimo.dataDevolucaoPrevista,
           retiradaReal: emprestimo.dataRetiradaReal,
-          devolucaoReal: emprestimo.dataDevolucaoReal
+          devolucaoReal: emprestimo.dataDevolucaoReal,
+          retiradaApoio: formatDateTimeLocal(item.apoio?.retirada),
+          eventoInicio: formatDateTimeLocal(item.apoio?.eventoInicio),
+          eventoFim: formatDateTimeLocal(item.apoio?.eventoFim),
+          devolucaoApoio: formatDateTimeLocal(item.apoio?.devolucao)
         },
         responsavel: emprestimo.responsavel,
         evento: emprestimo.evento,
@@ -238,8 +243,52 @@ export class EmprestimosEventosService {
       throw new AppError("O responsavel nao possui e-mail valido cadastrado.", 422);
     }
 
+    const nomeInstituicao = await this.repository.obterNomeInstituicao(tenantId);
     const assunto = `Alerta de devolucao vencida - Emprestimo #${emprestimo.id ?? ""}`;
-    const mensagem = this.montarMensagemAlertaDevolucao(emprestimo, responsavel?.nome ?? emprestimo.responsavel?.nome);
+    const mensagem = this.montarMensagemAlertaDevolucao(
+      emprestimo,
+      responsavel?.nome ?? emprestimo.responsavel?.nome,
+      nomeInstituicao
+    );
+    const envio = await this.emailService.enviarEmailSimples({
+      destinatario,
+      assunto,
+      mensagem
+    });
+
+    return {
+      destinatario: envio.destinatario,
+      enviadoEm: envio.enviadoEm
+    };
+  }
+
+  async enviarConfirmacaoReservaEmail(rawId: string, rawTenantId?: string) {
+    const id = this.parseId(rawId);
+    const tenantId = this.parseTenant(rawTenantId);
+    const registro = await this.repository.buscarEmprestimoPorIdOuFalhar(id, tenantId);
+    const emprestimo = mapEmprestimoToResponse(registro.registro, registro.itens);
+
+    if (emprestimo.status === "CANCELADO") {
+      throw new AppError("Nao e possivel confirmar reserva cancelada.", 422);
+    }
+
+    if (!registro.registro.responsavel_id) {
+      throw new AppError("Emprestimo sem responsavel cadastrado para envio de e-mail.", 422);
+    }
+
+    const responsavel = await this.repository.buscarResponsavelPorId(registro.registro.responsavel_id, tenantId);
+    const destinatario = normalizarEmail(responsavel?.email);
+    if (!destinatario || !validarEmail(destinatario)) {
+      throw new AppError("O responsavel nao possui e-mail valido cadastrado.", 422);
+    }
+
+    const nomeInstituicao = await this.repository.obterNomeInstituicao(tenantId);
+    const assunto = `Confirmacao de reserva - ${emprestimo.evento.titulo}`;
+    const mensagem = this.montarMensagemConfirmacaoReserva(
+      emprestimo,
+      responsavel?.nome ?? emprestimo.responsavel?.nome,
+      nomeInstituicao
+    );
     const envio = await this.emailService.enviarEmailSimples({
       destinatario,
       assunto,
@@ -287,19 +336,15 @@ export class EmprestimosEventosService {
 
   private montarMensagemAlertaDevolucao(
     emprestimo: ReturnType<typeof mapEmprestimoToResponse>,
-    nomeResponsavel?: string | null
+    nomeResponsavel?: string | null,
+    nomeInstituicao = "Instituição"
   ) {
-    const itens = (emprestimo.itens ?? [])
-      .map((item) => {
-        const nome = item.nomeItem || item.numeroPatrimonio || `Item #${item.itemId}`;
-        return `- ${item.quantidade}x ${nome}`;
-      })
-      .join("\n");
+    const itens = this.formatarItensMensagem(emprestimo);
 
     return [
       `Ola, ${nomeResponsavel?.trim() || "responsavel"}.`,
       "",
-      `Consta em aberto a devolucao do emprestimo #${emprestimo.id ?? ""} vinculado ao evento ${emprestimo.evento.titulo}.`,
+      `${nomeInstituicao} informa que consta em aberto a devolucao do emprestimo #${emprestimo.id ?? ""} vinculado ao evento ${emprestimo.evento.titulo}.`,
       `A devolucao prevista era ${emprestimo.dataDevolucaoPrevista}.`,
       `Status atual: ${emprestimo.status}.`,
       "",
@@ -308,9 +353,44 @@ export class EmprestimosEventosService {
       "",
       "Solicitamos confirmar a devolucao dos itens ou entrar em contato com a instituicao para regularizacao.",
       "",
-      "Mensagem automatica enviada pelo G3N."
+      `Mensagem automatica enviada por ${nomeInstituicao} pelo G3N.`
     ]
       .filter((linha) => linha !== undefined)
+      .join("\n");
+  }
+
+  private montarMensagemConfirmacaoReserva(
+    emprestimo: ReturnType<typeof mapEmprestimoToResponse>,
+    nomeResponsavel?: string | null,
+    nomeInstituicao = "Instituição"
+  ) {
+    const itens = this.formatarItensMensagem(emprestimo);
+
+    return [
+      `Ola, ${nomeResponsavel?.trim() || "responsavel"}.`,
+      "",
+      `${nomeInstituicao} confirma a reserva dos itens para o evento ${emprestimo.evento.titulo}.`,
+      `Periodo do evento: ${emprestimo.dataRetiradaPrevista} ate ${emprestimo.dataDevolucaoPrevista}.`,
+      `Status da reserva: ${emprestimo.status}.`,
+      "",
+      itens ? "Itens reservados:" : undefined,
+      itens || undefined,
+      "",
+      "Os itens ficam reservados para a data informada. Em caso de alteracao, entre em contato com a instituicao.",
+      "",
+      `Mensagem automatica enviada por ${nomeInstituicao} pelo G3N.`
+    ]
+      .filter((linha) => linha !== undefined)
+      .join("\n");
+  }
+
+  private formatarItensMensagem(emprestimo: ReturnType<typeof mapEmprestimoToResponse>) {
+    return (emprestimo.itens ?? [])
+      .map((item) => {
+        const nome = item.nomeItem || `Item #${item.itemId}`;
+        const patrimonio = item.numeroPatrimonio ? ` - patrimonio ${item.numeroPatrimonio}` : "";
+        return `- ${item.quantidade}x ${nome}${patrimonio}`;
+      })
       .join("\n");
   }
 }

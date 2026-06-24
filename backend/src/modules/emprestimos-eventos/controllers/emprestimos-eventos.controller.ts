@@ -69,6 +69,14 @@ export class EmprestimosEventosController {
     return response.json(envio);
   }
 
+  async enviarConfirmacaoReservaEmail(request: AuthenticatedRequest, response: Response) {
+    const envio = await service.enviarConfirmacaoReservaEmail(
+      request.params.id,
+      request.authUser?.tenant_id
+    );
+    return response.json(envio);
+  }
+
   async listarAgendaResumo(request: AuthenticatedRequest, response: Response) {
     const resumo = await service.listarAgendaResumo(
       request.query.inicio,

@@ -41,3 +41,35 @@ export function formatDateTimeLocal(value?: Date | null) {
   if (!value) return null;
   return `${formatDateLocal(value)}T${pad(value.getHours())}:${pad(value.getMinutes())}`;
 }
+
+export function inicioDoDiaLocal(value: Date) {
+  const data = new Date(value);
+  data.setHours(0, 0, 0, 0);
+  return data;
+}
+
+export function adicionarDiasLocal(value: Date, dias: number) {
+  const data = new Date(value);
+  data.setDate(data.getDate() + dias);
+  return data;
+}
+
+export function isFimDeSemana(value: Date) {
+  const diaSemana = value.getDay();
+  return diaSemana === 0 || diaSemana === 6;
+}
+
+export function calcularDiaRetiradaApoio(inicioEvento: Date) {
+  return adicionarDiasLocal(inicioDoDiaLocal(inicioEvento), -1);
+}
+
+export function calcularDiaDevolucaoApoio(
+  fimEvento: Date,
+  feriados = new Set<string>()
+) {
+  let data = adicionarDiasLocal(inicioDoDiaLocal(fimEvento), 1);
+  while (isFimDeSemana(data) || feriados.has(formatDateLocal(data) ?? "")) {
+    data = adicionarDiasLocal(data, 1);
+  }
+  return data;
+}

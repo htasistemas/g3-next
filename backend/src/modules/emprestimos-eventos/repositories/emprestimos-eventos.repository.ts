@@ -2,7 +2,15 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../../database/prisma.js";
 import { AppError } from "../../../shared/errors/app-error.js";
 import { trimOrUndefined } from "../../../utils/string-utils.js";
-import { formatDateLocal, formatDateTimeLocal, parseDateTimeLocal } from "../emprestimos-eventos-datetime.js";
+import {
+  adicionarDiasLocal,
+  calcularDiaDevolucaoApoio,
+  calcularDiaRetiradaApoio,
+  formatDateLocal,
+  formatDateTimeLocal,
+  inicioDoDiaLocal,
+  parseDateTimeLocal
+} from "../emprestimos-eventos-datetime.js";
 import type {
   EmprestimoEventoFiltros,
   EmprestimoEventoInput,
@@ -32,12 +40,6 @@ function toOptionalDateTime(value?: string | null) {
 
 function toDbNullableText(value?: string | null) {
   return trimOrUndefined(value ?? undefined) ?? null;
-}
-
-function inicioDoDia(value: Date) {
-  const data = new Date(value);
-  data.setHours(0, 0, 0, 0);
-  return data;
 }
 
 function overlapSql(
@@ -740,6 +742,9 @@ export class EmprestimosEventosRepository {
 
   async listarAgendaResumo(inicio: Date, fim: Date, tenantId: string) {
     await this.ensureEstrutura();
+    const inicioConsulta = adicionarDiasLocal(inicio, -1);
+    const fimConsulta = adicionarDiasLocal(fim, 14);
+    const feriados = await this.listarFeriadosPeriodo(inicioConsulta, fimConsulta);
     const emprestimos = await prisma.$queryRaw<
       Array<{ id: bigint; inicio: Date; fim: Date; status: string }>
     >(Prisma.sql`
@@ -750,32 +755,61 @@ export class EmprestimosEventosRepository {
         status
       FROM emprestimos_eventos
       WHERE tenant_id::text = ${tenantId}
-        AND ${overlapSql(inicio, fim, "data_retirada_prevista", "data_devolucao_prevista")}
+        AND status <> 'CANCELADO'
+        AND ${overlapSql(inicioConsulta, fimConsulta, "data_retirada_prevista", "data_devolucao_prevista")}
       ORDER BY data_retirada_prevista ASC
     `);
 
     const resultado = new Map<
       string,
-      { data: string; temBloqueio: boolean; qtdEmprestimos: number; emprestimoIds: number[] }
+      {
+        data: string;
+        temBloqueio: boolean;
+        temApoio: boolean;
+        qtdEmprestimos: number;
+        qtdApoios: number;
+        emprestimoIds: number[];
+      }
     >();
 
+    const registrarDia = (
+      data: Date,
+      tipo: "EVENTO" | "APOIO",
+      registro: { id: bigint; status: string }
+    ) => {
+      const dia = formatDateLocal(data) ?? "";
+      if (!dia || dia < formatDateLocal(inicio)! || dia > formatDateLocal(fim)!) return;
+      const atual = resultado.get(dia) ?? {
+        data: dia,
+        temBloqueio: false,
+        temApoio: false,
+        qtdEmprestimos: 0,
+        qtdApoios: 0,
+        emprestimoIds: []
+      };
+
+      if (tipo === "EVENTO") {
+        atual.qtdEmprestimos += 1;
+        atual.temBloqueio = atual.temBloqueio || registro.status !== "DEVOLVIDO";
+      } else {
+        atual.qtdApoios += 1;
+        atual.temApoio = true;
+      }
+      atual.emprestimoIds.push(Number(registro.id));
+      resultado.set(dia, atual);
+    };
+
     for (const registro of emprestimos) {
-      const primeiroDia = inicioDoDia(registro.inicio > inicio ? registro.inicio : inicio);
-      const ultimoDia = inicioDoDia(registro.fim < fim ? registro.fim : fim);
+      const retiradaApoio = calcularDiaRetiradaApoio(registro.inicio);
+      const devolucaoApoio = calcularDiaDevolucaoApoio(registro.fim, feriados);
+      registrarDia(retiradaApoio, "APOIO", registro);
+      registrarDia(devolucaoApoio, "APOIO", registro);
+
+      const primeiroDia = inicioDoDiaLocal(registro.inicio > inicio ? registro.inicio : inicio);
+      const ultimoDia = inicioDoDiaLocal(registro.fim < fim ? registro.fim : fim);
 
       for (const dataAtual = new Date(primeiroDia); dataAtual <= ultimoDia; dataAtual.setDate(dataAtual.getDate() + 1)) {
-        const dia = formatDateLocal(dataAtual) ?? "";
-        const atual = resultado.get(dia) ?? {
-          data: dia,
-          temBloqueio: false,
-          qtdEmprestimos: 0,
-          emprestimoIds: []
-        };
-
-        atual.qtdEmprestimos += 1;
-        atual.temBloqueio = atual.temBloqueio || registro.status === "RETIRADO";
-        atual.emprestimoIds.push(Number(registro.id));
-        resultado.set(dia, atual);
+        registrarDia(dataAtual, "EVENTO", registro);
       }
     }
 
@@ -788,6 +822,7 @@ export class EmprestimosEventosRepository {
     inicioDia.setHours(0, 0, 0, 0);
     const fimDia = new Date(data);
     fimDia.setHours(23, 59, 59, 999);
+    const feriados = await this.listarFeriadosPeriodo(adicionarDiasLocal(data, -14), adicionarDiasLocal(data, 14));
 
     const registros = await prisma.$queryRaw<EmprestimoEventoRow[]>(Prisma.sql`
       SELECT
@@ -821,16 +856,56 @@ export class EmprestimosEventosRepository {
         ON u.id = e.responsavel_id
        AND u.tenant_id::text = ${tenantId}
       WHERE e.tenant_id::text = ${tenantId}
-        AND ${overlapSql(inicioDia, fimDia, "e.data_retirada_prevista", "e.data_devolucao_prevista")}
+        AND e.status <> 'CANCELADO'
+        AND (
+          ${overlapSql(inicioDia, fimDia, "e.data_retirada_prevista", "e.data_devolucao_prevista")}
+          OR DATE(e.data_retirada_prevista) = CAST(${formatDateLocal(adicionarDiasLocal(data, 1))} AS DATE)
+          OR DATE(e.data_devolucao_prevista) BETWEEN CAST(${formatDateLocal(adicionarDiasLocal(data, -14))} AS DATE) AND CAST(${formatDateLocal(adicionarDiasLocal(data, -1))} AS DATE)
+        )
       ORDER BY e.data_retirada_prevista ASC, e.id ASC
     `);
 
-    if (!registros.length) return [];
-    const itens = await this.listarItensPorEmprestimos(registros.map((item) => item.id), tenantId);
-    return registros.map((registro) => ({
-      registro,
-      itens: itens.filter((item) => item.emprestimo_id === registro.id)
-    }));
+    const registrosDoDia = registros.filter((registro) => {
+      const diaSelecionado = formatDateLocal(inicioDia);
+      const inicioEvento = inicioDoDiaLocal(registro.data_retirada_prevista);
+      const fimEvento = inicioDoDiaLocal(registro.data_devolucao_prevista);
+      const retiradaApoio = calcularDiaRetiradaApoio(inicioEvento);
+      const devolucaoApoio = calcularDiaDevolucaoApoio(fimEvento, feriados);
+      const dia = diaSelecionado ?? "";
+      return (
+        (formatDateLocal(inicioEvento)! <= dia && formatDateLocal(fimEvento)! >= dia) ||
+        formatDateLocal(retiradaApoio) === dia ||
+        formatDateLocal(devolucaoApoio) === dia
+      );
+    });
+
+    if (!registrosDoDia.length) return [];
+    const itens = await this.listarItensPorEmprestimos(registrosDoDia.map((item) => item.id), tenantId);
+    return registrosDoDia.map((registro) => {
+      const diaSelecionado = formatDateLocal(inicioDia);
+      const inicioEvento = inicioDoDiaLocal(registro.data_retirada_prevista);
+      const fimEvento = inicioDoDiaLocal(registro.data_devolucao_prevista);
+      const retiradaApoio = calcularDiaRetiradaApoio(inicioEvento);
+      const devolucaoApoio = calcularDiaDevolucaoApoio(fimEvento, feriados);
+      const dia = diaSelecionado ?? "";
+      const tipoDia =
+        formatDateLocal(retiradaApoio) === dia
+          ? "RETIRADA"
+          : formatDateLocal(devolucaoApoio) === dia
+            ? "DEVOLUCAO"
+            : "EVENTO";
+      return {
+        registro,
+        tipoDia,
+        apoio: {
+          retirada: retiradaApoio,
+          eventoInicio: inicioEvento,
+          eventoFim: fimEvento,
+          devolucao: devolucaoApoio
+        },
+        itens: itens.filter((item) => item.emprestimo_id === registro.id)
+      };
+    });
   }
 
   async consultarDisponibilidade(
@@ -943,6 +1018,18 @@ export class EmprestimosEventosRepository {
     `);
   }
 
+  async obterNomeInstituicao(tenantId: string) {
+    await this.ensureEstrutura();
+    const rows = await prisma.$queryRaw<Array<{ nome: string | null }>>(Prisma.sql`
+      SELECT COALESCE(NULLIF(TRIM(nome_fantasia), ''), NULLIF(TRIM(razao_social), '')) AS nome
+      FROM instituicoes
+      WHERE tenant_id::text = ${tenantId}
+      ORDER BY criado_em ASC
+      LIMIT 1
+    `);
+    return rows[0]?.nome?.trim() || "Instituição";
+  }
+
   private async validarEventoExiste(tx: TransactionClient, eventoId: number, tenantId: string) {
     const rows = await tx.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
       SELECT id
@@ -1036,6 +1123,15 @@ export class EmprestimosEventosRepository {
         )
       `);
     }
+  }
+
+  private async listarFeriadosPeriodo(inicio: Date, fim: Date) {
+    const rows = await prisma.$queryRaw<Array<{ data: Date }>>(Prisma.sql`
+      SELECT data
+      FROM feriados
+      WHERE data BETWEEN ${inicioDoDiaLocal(inicio)} AND ${inicioDoDiaLocal(fim)}
+    `);
+    return new Set(rows.map((item) => formatDateLocal(item.data) ?? "").filter(Boolean));
   }
 
   private async validarItensEmprestimo(
