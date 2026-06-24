@@ -11,8 +11,9 @@ export type EventoEmprestimoInput = {
   titulo: string;
   descricao?: string | null;
   local?: string | null;
-  dataInicio: string;
-  dataFim: string;
+  promovidoPor?: string | null;
+  dataInicio?: string | null;
+  dataFim?: string | null;
   status?: string | null;
 };
 
@@ -60,8 +61,9 @@ export type EventoEmprestimoRow = {
   titulo: string;
   descricao: string | null;
   local: string | null;
-  data_inicio: Date;
-  data_fim: Date;
+  promovido_por: string | null;
+  data_inicio: Date | null;
+  data_fim: Date | null;
   status: string;
 };
 
@@ -91,8 +93,9 @@ export type EmprestimoEventoRow = {
   evento_titulo: string;
   evento_descricao: string | null;
   evento_local: string | null;
-  evento_data_inicio: Date;
-  evento_data_fim: Date;
+  evento_promovido_por: string | null;
+  evento_data_inicio: Date | null;
+  evento_data_fim: Date | null;
   evento_status: string;
   responsavel_nome: string | null;
 };

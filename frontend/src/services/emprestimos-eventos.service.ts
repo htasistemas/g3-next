@@ -73,6 +73,13 @@ export const emprestimosEventosService = {
     return data;
   },
 
+  async enviarAlertaDevolucaoEmail(id: number) {
+    const { data } = await httpClient.post<{ destinatario: string; enviadoEm: string }>(
+      `/api/emprestimos-eventos/${id}/alerta-devolucao/email`
+    );
+    return data;
+  },
+
   async agendaResumo(inicio: string, fim: string) {
     const { data } = await httpClient.get<
       Array<{ data: string; temBloqueio: boolean; qtdEmprestimos: number; emprestimoIds: number[] }>

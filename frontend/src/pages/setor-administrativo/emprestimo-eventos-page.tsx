@@ -1,7 +1,30 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { CalendarDays, ClipboardList, List, Plus, Printer, Save, Search, Trash2, Undo2, X } from "lucide-react";
+import {
+  AlertTriangle,
+  Bell,
+  CalendarDays,
+  CalendarPlus,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardList,
+  Clock,
+  ExternalLink,
+  List,
+  LoaderCircle,
+  Mail,
+  MessageCircle,
+  PackageCheck,
+  Plus,
+  Printer,
+  Save,
+  Search,
+  Trash2,
+  Undo2,
+  X
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -26,7 +49,7 @@ import {
 import { useItensAlmoxarifado } from "@/features/almoxarifado/use-almoxarifado";
 import { usePatrimonios } from "@/features/patrimonios/use-patrimonios";
 import { useUnidadesAssistenciais } from "@/features/unidades-assistenciais/use-unidades-assistenciais";
-import { formatarDataPtBr } from "@/lib/br-utils";
+import { formatarDataPtBr, normalizarTelefone } from "@/lib/br-utils";
 import { imprimirConteudoAtual } from "@/lib/report-utils";
 import {
   agoraLocalInputDateTime,
@@ -64,8 +87,7 @@ type EventoFormState = {
   titulo: string;
   descricao: string;
   local: string;
-  dataInicio: string;
-  dataFim: string;
+  promovidoPor: string;
   status: string;
 };
 
@@ -97,11 +119,82 @@ const statusOpcoes: Array<{ value: StatusEmprestimoEvento; label: string }> = [
   { value: "CANCELADO", label: "Cancelado" }
 ];
 
-const eventoStatusOpcoes = ["PLANEJADO", "EM_ANDAMENTO", "FINALIZADO", "CANCELADO"];
+const eventoCatalogoStatusOpcoes = [
+  { value: "ATIVO", label: "Ativo" },
+  { value: "INATIVO", label: "Inativo" }
+];
 
 const nowLocal = () => agoraLocalInputDateTime();
 const fmt = (v?: string | null) => formatarDateTimeLocalPtBr(v);
 const dt = (v?: string | null) => normalizarDateTimeLocal(v);
+
+const nomesMeses = [
+  "Janeiro",
+  "Fevereiro",
+  "Março",
+  "Abril",
+  "Maio",
+  "Junho",
+  "Julho",
+  "Agosto",
+  "Setembro",
+  "Outubro",
+  "Novembro",
+  "Dezembro"
+];
+const nomesDiasSemana = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+
+function dataLocalIso(data = new Date()) {
+  const ano = data.getFullYear();
+  const mes = String(data.getMonth() + 1).padStart(2, "0");
+  const dia = String(data.getDate()).padStart(2, "0");
+  return `${ano}-${mes}-${dia}`;
+}
+
+function parseDataLocal(dataIso: string) {
+  const [ano, mes, dia] = dataIso.split("-").map(Number);
+  return new Date(ano, (mes || 1) - 1, dia || 1);
+}
+
+function inicioMesIso(dataIso = dataLocalIso()) {
+  const data = parseDataLocal(dataIso);
+  return dataLocalIso(new Date(data.getFullYear(), data.getMonth(), 1));
+}
+
+function fimMesIso(dataIso = dataLocalIso()) {
+  const data = parseDataLocal(dataIso);
+  return dataLocalIso(new Date(data.getFullYear(), data.getMonth() + 1, 0));
+}
+
+function alterarMes(dataIso: string, delta: number) {
+  const data = parseDataLocal(dataIso);
+  return dataLocalIso(new Date(data.getFullYear(), data.getMonth() + delta, 1));
+}
+
+function somenteData(valor?: string | null) {
+  return dt(valor).slice(0, 10);
+}
+
+function compararDataHora(a?: string | null, b?: string | null) {
+  return dt(a).localeCompare(dt(b));
+}
+
+function formatarHora(valor?: string | null) {
+  const normalizado = dt(valor);
+  return normalizado.length >= 16 ? normalizado.slice(11, 16) : "--:--";
+}
+
+function dataHoraVencida(valor?: string | null) {
+  const normalizado = dt(valor);
+  if (!normalizado) return false;
+  return new Date(normalizado).getTime() < Date.now();
+}
+
+function formatarGoogleDateTime(valor?: string | null) {
+  const normalizado = dt(valor);
+  if (!normalizado) return "";
+  return normalizado.replace(/[-:]/g, "").replace("T", "T").slice(0, 15);
+}
 
 const defaultForm = (): FormState => ({
   eventoId: "",
@@ -119,9 +212,8 @@ const defaultEvento: EventoFormState = {
   titulo: "",
   descricao: "",
   local: "",
-  dataInicio: nowLocal(),
-  dataFim: nowLocal(),
-  status: "PLANEJADO"
+  promovidoPor: "",
+  status: "ATIVO"
 };
 
 const defaultResponsavel: ResponsavelFormState = {
@@ -153,11 +245,11 @@ export function EmprestimoEventosPage() {
   const [itemQtd, setItemQtd] = useState("1");
   const [itemObs, setItemObs] = useState("");
 
-  const [agendaInicio, setAgendaInicio] = useState("");
-  const [agendaFim, setAgendaFim] = useState("");
-  const [agendaDia, setAgendaDia] = useState("");
+  const [agendaMes, setAgendaMes] = useState(inicioMesIso());
+  const [agendaDia, setAgendaDia] = useState(dataLocalIso());
 
   const [popup, setPopup] = useState<PopupMensagemState | null>(null);
+  const [alertaEmailEmEnvio, setAlertaEmailEmEnvio] = useState<number | null>(null);
   const [confirmarExcluir, setConfirmarExcluir] = useState(false);
   const [confirmarExcluirEvento, setConfirmarExcluirEvento] = useState(false);
   const [confirmarExcluirResponsavel, setConfirmarExcluirResponsavel] = useState(false);
@@ -175,7 +267,9 @@ export function EmprestimoEventosPage() {
   const { data: emprestimosData, isLoading: carregandoEmprestimos } = useEmprestimosEventos(filtros);
   const { data: eventosData } = useEventosEmprestimo();
   const { data: responsaveisData } = useResponsaveisEmprestimo();
-  const { data: agendaResumoData } = useAgendaResumoEmprestimos(agendaInicio || undefined, agendaFim || undefined);
+  const agendaInicio = useMemo(() => inicioMesIso(agendaMes), [agendaMes]);
+  const agendaFim = useMemo(() => fimMesIso(agendaMes), [agendaMes]);
+  const { data: agendaResumoData } = useAgendaResumoEmprestimos(agendaInicio, agendaFim);
   const { data: agendaDiaData } = useAgendaDiaEmprestimos(agendaDia || undefined);
   const { data: unidadesData } = useUnidadesAssistenciais({});
   const { data: patrimoniosData } = usePatrimonios();
@@ -196,6 +290,63 @@ export function EmprestimoEventosPage() {
   const almox = almoxData?.itens ?? [];
   const agendaResumo = agendaResumoData ?? [];
   const agendaDetalhe = agendaDiaData ?? [];
+  const agendaResumoPorData = useMemo(
+    () => new Map(agendaResumo.map((item) => [item.data, item])),
+    [agendaResumo]
+  );
+  const diasAgenda = useMemo(() => {
+    const inicio = parseDataLocal(agendaInicio);
+    const primeiroDiaGrade = new Date(inicio);
+    primeiroDiaGrade.setDate(inicio.getDate() - inicio.getDay());
+
+    return Array.from({ length: 42 }, (_item, indice) => {
+      const data = new Date(primeiroDiaGrade);
+      data.setDate(primeiroDiaGrade.getDate() + indice);
+      const dataIso = dataLocalIso(data);
+      const resumo = agendaResumoPorData.get(dataIso);
+      const dentroDoMes = dataIso >= agendaInicio && dataIso <= agendaFim;
+      const selecionado = dataIso === agendaDia;
+      const hoje = dataIso === dataLocalIso();
+
+      return {
+        dataIso,
+        dia: data.getDate(),
+        dentroDoMes,
+        selecionado,
+        hoje,
+        qtdEmprestimos: resumo?.qtdEmprestimos ?? 0,
+        temBloqueio: resumo?.temBloqueio ?? false
+      };
+    });
+  }, [agendaDia, agendaFim, agendaInicio, agendaResumoPorData]);
+  const agendaDetalheOrdenada = useMemo(
+    () => [...agendaDetalhe].sort((a, b) => compararDataHora(a.periodo.retiradaPrevista, b.periodo.retiradaPrevista)),
+    [agendaDetalhe]
+  );
+  const emprestimosDoMes = useMemo(
+    () =>
+      emprestimos.filter((item) => {
+        const inicio = somenteData(item.dataRetiradaPrevista);
+        const fim = somenteData(item.dataDevolucaoPrevista);
+        return inicio <= agendaFim && fim >= agendaInicio;
+      }),
+    [agendaFim, agendaInicio, emprestimos]
+  );
+  const compromissosAtivos = emprestimosDoMes.filter((item) => !["DEVOLVIDO", "CANCELADO"].includes(item.status));
+  const compromissosLiberados = emprestimosDoMes.filter((item) => ["DEVOLVIDO", "CANCELADO"].includes(item.status));
+  const diasOcupados = new Set(agendaResumo.filter((item) => item.qtdEmprestimos > 0).map((item) => item.data)).size;
+  const diasLivres = diasAgenda.filter((dia) => dia.dentroDoMes && !dia.qtdEmprestimos).length;
+  const tituloMesAgenda = `${nomesMeses[parseDataLocal(agendaMes).getMonth()]} de ${parseDataLocal(agendaMes).getFullYear()}`;
+  const emprestimosVencidosSemDevolucao = useMemo(
+    () =>
+      emprestimos.filter(
+        (item) =>
+          item.status !== "DEVOLVIDO" &&
+          item.status !== "CANCELADO" &&
+          dataHoraVencida(item.dataDevolucaoPrevista)
+      ),
+    [emprestimos]
+  );
 
   const opcoesItem = useMemo(
     () =>
@@ -219,7 +370,8 @@ export function EmprestimoEventosPage() {
     salvarEventoMutation.isPending ||
     removerEventoMutation.isPending ||
     salvarResponsavelMutation.isPending ||
-    removerResponsavelMutation.isPending;
+    removerResponsavelMutation.isPending ||
+    alertaEmailEmEnvio !== null;
 
   function selecionarEmprestimo(item: EmprestimoEvento) {
     const next: FormState = {
@@ -393,18 +545,6 @@ export function EmprestimoEventosPage() {
     setForm((atual) => ({ ...atual, itens: atual.itens.filter((_i, idx) => idx !== indice) }));
   }
 
-  function atualizarResponsavelNome(valor: string) {
-    const responsavelEncontrado = responsaveis.find((item) => {
-      return item.nome.trim().localeCompare(valor.trim(), "pt-BR", { sensitivity: "base" }) === 0;
-    });
-
-    setForm((atual) => ({
-      ...atual,
-      responsavelNome: valor,
-      responsavelId: responsavelEncontrado ? String(responsavelEncontrado.id) : ""
-    }));
-  }
-
   function atualizarBuscaItem(valor: string) {
     const itemEncontrado = opcoesItem.find((item) => {
       return item.label.trim().localeCompare(valor.trim(), "pt-BR", { sensitivity: "base" }) === 0;
@@ -476,12 +616,8 @@ export function EmprestimoEventosPage() {
   }
 
   async function salvarEvento() {
-    if (!eventoForm.titulo.trim() || !eventoForm.dataInicio || !eventoForm.dataFim) {
-      setPopup({ tipo: "aviso", titulo: "Validação", texto: "Preencha título e período do evento." });
-      return;
-    }
-    if (eventoForm.dataFim < eventoForm.dataInicio) {
-      setPopup({ tipo: "aviso", titulo: "Validação", texto: "O fim do evento não pode ser menor que o início." });
+    if (!eventoForm.titulo.trim()) {
+      setPopup({ tipo: "aviso", titulo: "Validação", texto: "Informe o título do evento." });
       return;
     }
     try {
@@ -490,14 +626,21 @@ export function EmprestimoEventosPage() {
         titulo: eventoForm.titulo.trim(),
         descricao: eventoForm.descricao || undefined,
         local: eventoForm.local || undefined,
-        dataInicio: eventoForm.dataInicio,
-        dataFim: eventoForm.dataFim,
+        promovidoPor: eventoForm.promovidoPor || undefined,
         status: eventoForm.status
       });
       setEventoForm(defaultEvento);
       setPopup({ tipo: "sucesso", titulo: "Confirmação", texto: "Evento salvo com sucesso." });
     } catch (error: any) {
-      setPopup({ tipo: "erro", titulo: "Erro", texto: error?.response?.data?.message ?? "Falha ao salvar evento." });
+      setPopup({
+        tipo: "erro",
+        titulo: "Erro",
+        texto:
+          error?.response?.data?.message ??
+          error?.response?.data?.erro ??
+          error?.response?.data?.error ??
+          "Falha ao salvar evento."
+      });
     }
   }
 
@@ -534,6 +677,97 @@ export function EmprestimoEventosPage() {
       imprimirConteudoAtual({ titulo: "Relatório de empréstimos" });
     } catch {
       window.print();
+    }
+  }
+
+  function selecionarDiaAgenda(dataIso: string) {
+    setAgendaDia(dataIso);
+    if (dataIso < agendaInicio || dataIso > agendaFim) {
+      setAgendaMes(inicioMesIso(dataIso));
+    }
+  }
+
+  function abrirGoogleAgenda() {
+    window.open("https://calendar.google.com/calendar/u/0/r", "_blank", "noopener,noreferrer");
+  }
+
+  function montarGoogleAgendaUrl(item: (typeof agendaDetalheOrdenada)[number]) {
+    const inicio = formatarGoogleDateTime(item.periodo.retiradaPrevista);
+    const fim = formatarGoogleDateTime(item.periodo.devolucaoPrevista || item.periodo.retiradaPrevista);
+    const itens = item.itens
+      .map((vinculo) => `${vinculo.quantidade}x ${vinculo.nomeItem || vinculo.numeroPatrimonio || `Item #${vinculo.itemId}`}`)
+      .join("; ");
+    const detalhes = [
+      `Empréstimo #${item.emprestimoId}`,
+      `Status: ${statusOpcoes.find((status) => status.value === item.status)?.label ?? item.status}`,
+      item.responsavel?.nome ? `Responsável: ${item.responsavel.nome}` : undefined,
+      itens ? `Itens: ${itens}` : undefined,
+      "Registro gerado pelo G3-Next."
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    const params = new URLSearchParams({
+      action: "TEMPLATE",
+      text: `Empréstimo para evento - ${item.evento.titulo}`,
+      dates: `${inicio}/${fim}`,
+      details: detalhes,
+      location: item.evento.local ?? ""
+    });
+
+    return `https://calendar.google.com/calendar/render?${params.toString()}`;
+  }
+
+  function adicionarAoGoogleAgenda(item: (typeof agendaDetalheOrdenada)[number]) {
+    window.open(montarGoogleAgendaUrl(item), "_blank", "noopener,noreferrer");
+  }
+
+  function buscarResponsavelDoEmprestimo(item: EmprestimoEvento) {
+    const responsavelId = item.responsavel?.id ? String(item.responsavel.id) : "";
+    if (!responsavelId) return null;
+    return responsaveis.find((responsavel) => String(responsavel.id) === responsavelId) ?? null;
+  }
+
+  function montarMensagemAtraso(item: EmprestimoEvento) {
+    return [
+      `Olá, ${item.responsavel?.nome ?? "responsável"}.`,
+      `Consta em aberto a devolução do empréstimo #${item.id ?? ""} do evento ${item.evento.titulo}.`,
+      `A devolução prevista era ${fmt(item.dataDevolucaoPrevista)}.`,
+      "Solicitamos confirmar a devolução dos itens ou entrar em contato com a instituição."
+    ].join("\n");
+  }
+
+  function enviarAlertaWhatsApp(item: EmprestimoEvento) {
+    const responsavel = buscarResponsavelDoEmprestimo(item);
+    const telefone = normalizarTelefone(responsavel?.telefone);
+    if (telefone.length < 10) {
+      setPopup({ tipo: "aviso", titulo: "Atenção", texto: "O responsável não possui telefone válido para WhatsApp." });
+      return;
+    }
+    window.open(`https://wa.me/55${telefone}?text=${encodeURIComponent(montarMensagemAtraso(item))}`, "_blank", "noopener,noreferrer");
+  }
+
+  async function enviarAlertaEmail(item: EmprestimoEvento) {
+    if (!item.id || alertaEmailEmEnvio !== null) {
+      return;
+    }
+
+    try {
+      setAlertaEmailEmEnvio(item.id);
+      const envio = await emprestimosEventosService.enviarAlertaDevolucaoEmail(item.id);
+      setPopup({
+        tipo: "sucesso",
+        titulo: "E-mail enviado",
+        texto: `Alerta de devolução enviado para ${envio.destinatario}.`
+      });
+    } catch (error: any) {
+      setPopup({
+        tipo: "erro",
+        titulo: "Erro",
+        texto: error?.response?.data?.message ?? "Falha ao enviar e-mail pelo servidor do G3N."
+      });
+    } finally {
+      setAlertaEmailEmEnvio(null);
     }
   }
 
@@ -588,6 +822,49 @@ export function EmprestimoEventosPage() {
   return (
     <>
       <AdminPageLayout tabs={abas} activeTab={abaAtiva} onChangeTab={(id) => setAbaAtiva(id as AbaId)} actions={acoes} sectionLabel="Administração e gestão" pageTitle={tituloTela} activeTitle={abas.find((a) => a.id === abaAtiva)?.label} codeBadge={form.id ? `Código: ${form.id}` : "Novo"}>
+        {emprestimosVencidosSemDevolucao.length ? (
+          <section className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-red-950">
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <Bell className="h-4 w-4" />
+              Alerta de devolução vencida
+            </div>
+            <div className="mt-3 space-y-2">
+              {emprestimosVencidosSemDevolucao.map((item) => {
+                const responsavel = buscarResponsavelDoEmprestimo(item);
+                return (
+                  <div key={item.id} className="grid gap-2 rounded-md border border-red-200 bg-white/70 p-2 text-xs md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+                    <div>
+                      <p className="font-semibold">Empréstimo #{item.id} - {item.evento.titulo}</p>
+                      <p>Responsável: {item.responsavel?.nome ?? "Não informado"} | Devolução prevista: {fmt(item.dataDevolucaoPrevista)}</p>
+                      <p className="text-red-700">Status: devolução não confirmada{responsavel ? "" : " | responsável sem cadastro vinculado"}</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button" variant="outline" size="sm" onClick={() => enviarAlertaWhatsApp(item)}>
+                        <MessageCircle className="mr-1.5 h-4 w-4" />
+                        WhatsApp
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={alertaEmailEmEnvio !== null}
+                        onClick={() => void enviarAlertaEmail(item)}
+                      >
+                        {alertaEmailEmEnvio === item.id ? (
+                          <LoaderCircle className="mr-1.5 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Mail className="mr-1.5 h-4 w-4" />
+                        )}
+                        {alertaEmailEmEnvio === item.id ? "Enviando..." : "E-mail"}
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        ) : null}
+
         {abaAtiva === "listagem" ? (
           <section className="space-y-3">
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
@@ -612,17 +889,23 @@ export function EmprestimoEventosPage() {
               <div className="space-y-1"><Label>Unidade</Label><Select value={form.unidadeId} onChange={(e) => setForm((a) => ({ ...a, unidadeId: e.target.value }))}><option value="">Selecione</option>{unidades.map((u) => <option key={u.id_unidade} value={u.id_unidade}>{u.nome_fantasia}</option>)}</Select></div>
               <div className="space-y-1 xl:col-span-2">
                 <Label>Responsável</Label>
-                <Input
-                  list="emprestimo-eventos-responsaveis"
-                  value={form.responsavelNome}
-                  onChange={(e) => atualizarResponsavelNome(e.target.value)}
-                  placeholder="Digite o nome do responsável"
-                />
-                <datalist id="emprestimo-eventos-responsaveis">
+                <Select
+                  value={form.responsavelId}
+                  onChange={(e) => {
+                    const responsavel = responsaveis.find((item) => String(item.id) === e.target.value);
+                    setForm((atual) => ({
+                      ...atual,
+                      responsavelId: e.target.value,
+                      responsavelNome: responsavel?.nome ?? ""
+                    }));
+                  }}
+                >
+                  <option value="">Selecione</option>
                   {responsaveis.map((responsavel) => (
-                    <option key={responsavel.id} value={responsavel.nome} />
+                    <option key={responsavel.id} value={responsavel.id}>{responsavel.nome}</option>
                   ))}
-                </datalist>
+                </Select>
+                <p className="text-xs text-[var(--g3-muted)]">Cadastre ou edite nomes na aba Responsáveis.</p>
               </div>
               <div className="space-y-1"><Label>Retirada Prevista</Label><Input type="datetime-local" value={form.dataRetiradaPrevista} onChange={(e) => setForm((a) => ({ ...a, dataRetiradaPrevista: e.target.value }))} /></div>
               <div className="space-y-1"><Label>Devolução Prevista</Label><Input type="datetime-local" value={form.dataDevolucaoPrevista} onChange={(e) => setForm((a) => ({ ...a, dataDevolucaoPrevista: e.target.value }))} /></div>
@@ -650,14 +933,171 @@ export function EmprestimoEventosPage() {
         ) : null}
 
         {abaAtiva === "agenda" ? (
-          <section className="space-y-3">
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-              <div className="space-y-1"><Label>Agenda Inicial</Label><Input type="date" value={agendaInicio} onChange={(e) => setAgendaInicio(e.target.value)} /></div>
-              <div className="space-y-1"><Label>Agenda Final</Label><Input type="date" value={agendaFim} onChange={(e) => setAgendaFim(e.target.value)} /></div>
-              <div className="space-y-1 xl:col-span-2"><Label>Dia</Label><Input type="date" value={agendaDia} onChange={(e) => setAgendaDia(e.target.value)} /></div>
+          <section className="space-y-4">
+            <div className="flex flex-col gap-3 rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card)] p-3 md:flex-row md:items-end md:justify-between">
+              <div className="space-y-1">
+                <Label>Mês da agenda</Label>
+                <div className="flex items-center gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={() => setAgendaMes((atual) => alterarMes(atual, -1))} title="Mês anterior" aria-label="Mês anterior">
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <div className="min-w-[190px] rounded-md border border-[var(--g3-border)] bg-white px-3 py-2 text-center text-sm font-semibold text-[var(--g3-foreground)]">
+                    {tituloMesAgenda}
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setAgendaMes((atual) => alterarMes(atual, 1))} title="Próximo mês" aria-label="Próximo mês">
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto] md:min-w-[520px]">
+                <div className="space-y-1">
+                  <Label>Dia selecionado</Label>
+                  <Input type="date" value={agendaDia} onChange={(e) => selecionarDiaAgenda(e.target.value)} />
+                </div>
+                <div className="flex items-end">
+                  <Button type="button" variant="outline" className="w-full" onClick={() => selecionarDiaAgenda(dataLocalIso())}>
+                    Hoje
+                  </Button>
+                </div>
+                <div className="flex items-end">
+                  <Button type="button" variant="outline" className="w-full" onClick={abrirGoogleAgenda}>
+                    <ExternalLink className="mr-1.5 h-4 w-4" />
+                    Google Agenda
+                  </Button>
+                </div>
+              </div>
             </div>
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{agendaResumo.map((a) => <Card key={a.data} className="border-[var(--g3-border)]"><CardHeader className="pb-2"><CardTitle className="text-sm">{formatarDataPtBr(a.data)}</CardTitle></CardHeader><CardContent className="text-sm">Empréstimos: {a.qtdEmprestimos}</CardContent></Card>)}</div>
-            <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]"><table className="min-w-full text-sm"><thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"><tr><th className="px-3 py-2 text-left">Empréstimo</th><th className="px-3 py-2 text-left">Evento</th><th className="px-3 py-2 text-left">Período</th><th className="px-3 py-2 text-left">Status</th></tr></thead><tbody>{agendaDetalhe.length ? agendaDetalhe.map((a, i) => <tr key={`${a.emprestimoId}-${i}`} className={`border-t border-[var(--g3-border)] ${i % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35"}`}><td className="px-3 py-2">#{a.emprestimoId}</td><td className="px-3 py-2">{a.evento.titulo}</td><td className="px-3 py-2">{fmt(a.periodo.retiradaPrevista)} a {fmt(a.periodo.devolucaoPrevista)}</td><td className="px-3 py-2">{a.status}</td></tr>) : <tr><td colSpan={4} className="px-3 py-4 text-center">Nenhum empréstimo para a data selecionada.</td></tr>}</tbody></table></div>
+
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-emerald-950">
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase text-emerald-700"><CheckCircle2 className="h-4 w-4" />Dias livres</div>
+                <p className="mt-2 text-2xl font-semibold">{diasLivres}</p>
+                <p className="text-xs text-emerald-700">Sem compromisso no mês exibido</p>
+              </div>
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-950">
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase text-amber-700"><Clock className="h-4 w-4" />Dias ocupados</div>
+                <p className="mt-2 text-2xl font-semibold">{diasOcupados}</p>
+                <p className="text-xs text-amber-700">Com retirada ou devolução prevista</p>
+              </div>
+              <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sky-950">
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase text-sky-700"><PackageCheck className="h-4 w-4" />Compromissos</div>
+                <p className="mt-2 text-2xl font-semibold">{compromissosAtivos.length}</p>
+                <p className="text-xs text-sky-700">Rascunhos, agendados ou retirados</p>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-slate-950">
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase text-slate-600"><CalendarPlus className="h-4 w-4" />Liberados</div>
+                <p className="mt-2 text-2xl font-semibold">{compromissosLiberados.length}</p>
+                <p className="text-xs text-slate-600">Devolvidos ou cancelados no mês</p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.85fr)]">
+              <div className="overflow-hidden rounded-lg border border-[var(--g3-border)] bg-white">
+                <div className="grid grid-cols-7 border-b border-[var(--g3-border)] bg-[var(--g3-primary-soft)] text-center text-xs font-semibold text-[var(--g3-active)]">
+                  {nomesDiasSemana.map((dia) => <div key={dia} className="px-2 py-2">{dia}</div>)}
+                </div>
+                <div className="grid grid-cols-7">
+                  {diasAgenda.map((dia) => {
+                    const classeStatus = dia.qtdEmprestimos
+                      ? "border-red-300 bg-red-50 text-red-950"
+                      : "border-emerald-100 bg-emerald-50/55 text-emerald-900";
+                    return (
+                      <button
+                        key={dia.dataIso}
+                        type="button"
+                        onClick={() => selecionarDiaAgenda(dia.dataIso)}
+                        className={`min-h-[108px] border-b border-r p-2 text-left transition hover:bg-[var(--g3-primary-soft)] ${dia.dentroDoMes ? classeStatus : "bg-slate-50 text-slate-400"} ${dia.selecionado ? "ring-2 ring-inset ring-[var(--g3-primary)]" : ""}`}
+                      >
+                        <div className="flex items-center justify-between gap-1">
+                          <span className={`flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold ${dia.hoje ? "bg-[var(--g3-primary)] text-white" : ""}`}>
+                            {dia.dia}
+                          </span>
+                          {dia.qtdEmprestimos ? (
+                            <span className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-semibold shadow-sm">
+                              {dia.qtdEmprestimos}
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="mt-3 space-y-1 text-xs">
+                          {dia.qtdEmprestimos ? (
+                            <>
+                              <div className="flex items-center gap-1 font-semibold"><Clock className="h-3.5 w-3.5" />(X) ocupado</div>
+                              <div>Agenda com compromisso</div>
+                            </>
+                          ) : dia.dentroDoMes ? (
+                            <div className="flex items-center gap-1 font-medium"><CheckCircle2 className="h-3.5 w-3.5" />Liberado</div>
+                          ) : null}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="rounded-lg border border-[var(--g3-border)] bg-white p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase text-[var(--g3-muted)]">Dia selecionado</p>
+                      <h3 className="text-base font-semibold text-[var(--g3-foreground)]">{formatarDataPtBr(agendaDia)}</h3>
+                    </div>
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${agendaDetalheOrdenada.length ? "bg-red-100 text-red-800" : "bg-emerald-100 text-emerald-800"}`}>
+                      {agendaDetalheOrdenada.length ? "(X) ocupado" : "Liberado"}
+                    </span>
+                  </div>
+                </div>
+
+                {agendaDetalheOrdenada.length ? agendaDetalheOrdenada.map((item) => {
+                  const bloqueado = !["DEVOLVIDO", "CANCELADO"].includes(item.status);
+                  return (
+                    <div key={item.emprestimoId} className={`rounded-lg border p-3 ${bloqueado ? "border-amber-200 bg-amber-50" : "border-emerald-200 bg-emerald-50"}`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-semibold uppercase text-slate-600">Empréstimo #{item.emprestimoId}</p>
+                          <h4 className="text-sm font-semibold text-slate-950">{item.evento.titulo}</h4>
+                          <p className="mt-1 text-xs text-slate-600">{item.evento.local || "Local não informado"}</p>
+                        </div>
+                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${bloqueado ? "bg-amber-200 text-amber-900" : "bg-emerald-200 text-emerald-900"}`}>
+                          {statusOpcoes.find((status) => status.value === item.status)?.label ?? item.status}
+                        </span>
+                      </div>
+                      <div className="mt-3 grid gap-2 text-xs text-slate-700 sm:grid-cols-2">
+                        <div className="rounded-md bg-white/70 p-2"><strong>Retirada:</strong><br />{formatarHora(item.periodo.retiradaPrevista)} - {fmt(item.periodo.retiradaPrevista)}</div>
+                        <div className="rounded-md bg-white/70 p-2"><strong>Devolução:</strong><br />{formatarHora(item.periodo.devolucaoPrevista)} - {fmt(item.periodo.devolucaoPrevista)}</div>
+                      </div>
+                      <div className="mt-3 space-y-1 text-xs text-slate-700">
+                        <p><strong>Responsável:</strong> {item.responsavel?.nome ?? "Não informado"}</p>
+                        <p><strong>Itens:</strong> {item.itens.length ? item.itens.map((vinculo) => `${vinculo.quantidade}x ${vinculo.nomeItem || vinculo.numeroPatrimonio || `#${vinculo.itemId}`}`).join("; ") : "Nenhum item vinculado"}</p>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Button type="button" size="sm" variant="outline" onClick={() => adicionarAoGoogleAgenda(item)}>
+                          <CalendarPlus className="mr-1.5 h-4 w-4" />
+                          Adicionar ao Google Agenda
+                        </Button>
+                        <Button type="button" size="sm" variant="outline" onClick={() => {
+                          const emprestimo = emprestimos.find((registro) => registro.id === item.emprestimoId);
+                          if (emprestimo) selecionarEmprestimo(emprestimo);
+                        }}>
+                          Abrir empréstimo
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                }) : (
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+                    <div className="flex items-center gap-2 font-semibold"><CheckCircle2 className="h-4 w-4" />Dia liberado</div>
+                    <p className="mt-1 text-xs">Não há retirada ou devolução prevista para esta data.</p>
+                  </div>
+                )}
+
+                {agendaResumoPorData.get(agendaDia)?.temBloqueio ? (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                    <div className="flex items-center gap-2 font-semibold"><AlertTriangle className="h-4 w-4" />Atenção à disponibilidade</div>
+                    <p className="mt-1">Este dia possui itens comprometidos por empréstimos ativos. Revise os itens antes de criar novo compromisso.</p>
+                  </div>
+                ) : null}
+              </div>
+            </div>
           </section>
         ) : null}
 
@@ -665,14 +1105,14 @@ export function EmprestimoEventosPage() {
           <section className="space-y-3">
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <div className="space-y-1 xl:col-span-2"><Label>Título</Label><Input value={eventoForm.titulo} onChange={(e) => setEventoForm((a) => ({ ...a, titulo: e.target.value }))} /></div>
-              <div className="space-y-1"><Label>Início</Label><Input type="datetime-local" value={eventoForm.dataInicio} onChange={(e) => setEventoForm((a) => ({ ...a, dataInicio: e.target.value }))} /></div>
-              <div className="space-y-1"><Label>Fim</Label><Input type="datetime-local" value={eventoForm.dataFim} onChange={(e) => setEventoForm((a) => ({ ...a, dataFim: e.target.value }))} /></div>
-              <div className="space-y-1 md:col-span-2 xl:col-span-3"><Label>Local</Label><Input value={eventoForm.local} onChange={(e) => setEventoForm((a) => ({ ...a, local: e.target.value }))} /></div>
-              <div className="space-y-1"><Label>Status</Label><Select value={eventoForm.status} onChange={(e) => setEventoForm((a) => ({ ...a, status: e.target.value }))}>{eventoStatusOpcoes.map((s) => <option key={s} value={s}>{s}</option>)}</Select></div>
+              <div className="space-y-1"><Label>Status</Label><Select value={eventoForm.status} onChange={(e) => setEventoForm((a) => ({ ...a, status: e.target.value }))}>{eventoCatalogoStatusOpcoes.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</Select></div>
+              <div className="space-y-1 md:col-span-2 xl:col-span-2"><Label>Local padrão</Label><Input value={eventoForm.local} onChange={(e) => setEventoForm((a) => ({ ...a, local: e.target.value }))} /></div>
+              <div className="space-y-1 md:col-span-2 xl:col-span-2"><Label>Promovido por</Label><Input value={eventoForm.promovidoPor} onChange={(e) => setEventoForm((a) => ({ ...a, promovidoPor: e.target.value }))} /></div>
+              <div className="space-y-1 md:col-span-2 xl:col-span-4"><p className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">Este cadastro é um catálogo fixo de eventos para reutilizar nos empréstimos. Informe as datas somente em Dados do empréstimo.</p></div>
               <div className="space-y-1 md:col-span-2 xl:col-span-4"><Label>Descrição</Label><Textarea rows={2} value={eventoForm.descricao} onChange={(e) => setEventoForm((a) => ({ ...a, descricao: e.target.value }))} /></div>
             </div>
-            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap"><Button onClick={() => void salvarEvento()} disabled={salvarEventoMutation.isPending}>Salvar Evento</Button><Button variant="outline" onClick={() => setEventoForm(defaultEvento)}>Novo Evento</Button><Button variant="danger" onClick={excluirEvento} disabled={!eventoForm.id}>Excluir Evento</Button></div>
-            <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]"><table className="min-w-full text-sm"><thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"><tr><th className="px-3 py-2 text-left">Título</th><th className="px-3 py-2 text-left">Início</th><th className="px-3 py-2 text-left">Fim</th><th className="px-3 py-2 text-left">Status</th><th className="px-3 py-2 text-right">Ações</th></tr></thead><tbody>{eventos.length ? eventos.map((e, i) => <tr key={e.id} className={`border-t border-[var(--g3-border)] ${i % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35"}`}><td className="px-3 py-2">{e.titulo}</td><td className="px-3 py-2">{fmt(e.dataInicio)}</td><td className="px-3 py-2">{fmt(e.dataFim)}</td><td className="px-3 py-2">{e.status}</td><td className="px-3 py-2 text-right"><Button variant="outline" size="sm" onClick={() => setEventoForm({ id: e.id, titulo: e.titulo, descricao: e.descricao ?? "", local: e.local ?? "", dataInicio: dt(e.dataInicio), dataFim: dt(e.dataFim), status: e.status || "PLANEJADO" })}>Selecionar</Button></td></tr>) : <tr><td colSpan={5} className="px-3 py-4 text-center">Nenhum evento cadastrado.</td></tr>}</tbody></table></div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap"><Button onClick={() => void salvarEvento()} disabled={salvarEventoMutation.isPending}>Salvar evento</Button><Button variant="outline" onClick={() => setEventoForm(defaultEvento)}>Novo evento</Button><Button variant="danger" onClick={excluirEvento} disabled={!eventoForm.id}>Excluir evento</Button></div>
+            <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]"><table className="min-w-full text-sm"><thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"><tr><th className="px-3 py-2 text-left">Título</th><th className="px-3 py-2 text-left">Promovido por</th><th className="px-3 py-2 text-left">Local padrão</th><th className="px-3 py-2 text-left">Status</th><th className="px-3 py-2 text-left">Descrição</th><th className="px-3 py-2 text-right">Ações</th></tr></thead><tbody>{eventos.length ? eventos.map((e, i) => { const eventoAtivo = e.status !== "INATIVO"; return <tr key={e.id} className={`border-t border-[var(--g3-border)] ${i % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35"}`}><td className={`px-3 py-2 font-medium ${eventoAtivo ? "bg-emerald-50 text-emerald-950" : "bg-red-50 text-red-950"}`}>{e.titulo}</td><td className="px-3 py-2">{e.promovidoPor || "---"}</td><td className="px-3 py-2">{e.local || "---"}</td><td className="px-3 py-2">{eventoAtivo ? "Ativo" : "Inativo"}</td><td className="px-3 py-2">{e.descricao || "---"}</td><td className="px-3 py-2 text-right"><Button variant="outline" size="sm" onClick={() => setEventoForm({ id: e.id, titulo: e.titulo, descricao: e.descricao ?? "", local: e.local ?? "", promovidoPor: e.promovidoPor ?? "", status: e.status || "ATIVO" })}>Selecionar</Button></td></tr>; }) : <tr><td colSpan={6} className="px-3 py-4 text-center">Nenhum evento cadastrado.</td></tr>}</tbody></table></div>
           </section>
         ) : null}
 

@@ -27,12 +27,13 @@ export const eventoEmprestimoInputSchema = z
     titulo: z.string().trim().min(2, "Informe o titulo."),
     descricao: optionalTrimmedString.nullable().optional(),
     local: optionalTrimmedString.nullable().optional(),
-    dataInicio: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/),
-    dataFim: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/),
+    promovidoPor: optionalTrimmedString.nullable().optional(),
+    dataInicio: optionalIsoDateTime.nullable().optional(),
+    dataFim: optionalIsoDateTime.nullable().optional(),
     status: optionalTrimmedString.nullable().optional()
   })
   .superRefine((input, ctx) => {
-    if (new Date(input.dataFim) < new Date(input.dataInicio)) {
+    if (input.dataInicio && input.dataFim && new Date(input.dataFim) < new Date(input.dataInicio)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Data final do evento nao pode ser menor que a inicial.",

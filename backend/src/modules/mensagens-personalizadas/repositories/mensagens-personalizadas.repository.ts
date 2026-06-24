@@ -250,7 +250,7 @@ export class MensagensPersonalizadasRepository {
           1
         )
       )
-      ON CONFLICT (tenant_id, tipo, nome) DO NOTHING
+      ON CONFLICT DO NOTHING
     `);
   }
 
@@ -588,10 +588,18 @@ export class MensagensPersonalizadasRepository {
         ${input.mensagemSugeridaIa ?? false},
         ${input.chaveSistema}
       )
+      ON CONFLICT DO NOTHING
       RETURNING id
     `);
 
-    return this.obterModeloOuFalhar(rows[0]?.id, tenant);
+    if (rows[0]?.id) {
+      return this.obterModeloOuFalhar(rows[0].id, tenant);
+    }
+
+    const existenteAposConflito = await this.obterModeloPorChaveSistema(input.chaveSistema, tenant);
+    if (existenteAposConflito) return existenteAposConflito;
+
+    throw new AppError("Modelo de mensagem ja existe, mas nao foi localizado apos conflito.", 409);
   }
 
   async atualizarModelo(id: bigint, input: MensagemModeloInput, actor?: MensagemAtor) {

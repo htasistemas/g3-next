@@ -111,6 +111,7 @@ export function useSalvarEventoEmprestimo() {
           titulo: payload.titulo,
           descricao: payload.descricao,
           local: payload.local,
+          promovidoPor: payload.promovidoPor,
           dataInicio: payload.dataInicio,
           dataFim: payload.dataFim,
           status: payload.status
@@ -120,6 +121,7 @@ export function useSalvarEventoEmprestimo() {
         titulo: payload.titulo,
         descricao: payload.descricao,
         local: payload.local,
+        promovidoPor: payload.promovidoPor,
         dataInicio: payload.dataInicio,
         dataFim: payload.dataFim,
         status: payload.status

@@ -357,13 +357,17 @@ const secoesManual: ManualSecao[] = [
         nome: "Empréstimos para eventos",
         objetivo: "Controlar empréstimos de itens para eventos, agenda de reservas, itens vinculados e eventos associados.",
         comoUsar: [
-          "Na aba Dados do empréstimo, selecione o evento, informe unidade, período, observações e o responsável pela retirada ou acompanhamento.",
+          "Na aba Dados do empréstimo, selecione o evento, informe unidade, período, observações e escolha o responsável pela retirada a partir dos nomes cadastrados na aba Responsáveis.",
+          "Na aba Eventos, cadastre eventos fixos de catálogo, sem data de início ou fim; informe título, status Ativo ou Inativo, local padrão e Promovido por. As datas pertencem ao empréstimo criado na aba Dados do empréstimo.",
           "Na aba Responsáveis, cadastre previamente os dados da pessoa que pode retirar os produtos, como nome, documento, telefone, e-mail e observações.",
           "Depois disso, na aba Dados do empréstimo, o campo Responsável passa a sugerir os nomes cadastrados na aba Responsáveis.",
           "Ao abrir um empréstimo já cadastrado, o sistema agora reapresenta retirada, devolução, evento e agenda com a mesma data e hora salvas, sem deslocamento de fuso horário.",
           "Na aba Itens vinculados, digite o nome do item para localizar rapidamente patrimônio ou almoxarifado, depois informe quantidade e observação antes de adicionar.",
           "Ao imprimir a partir da aba Dados do empréstimo ou Itens vinculados, o sistema gera o termo de empréstimo no padrão de relatórios do G3N com dados do evento, responsável, período e itens.",
-          "Na aba Agenda de empréstimos, consulte a ocupação por período e por dia para verificar reservas já programadas.",
+          "Na aba Agenda de empréstimos, acompanhe o calendário mensal interativo com dias livres, dias ocupados, compromissos ativos e liberações de itens devolvidos ou cancelados.",
+          "Clique em um dia da agenda para ver os empréstimos previstos, horários de retirada e devolução, responsável, itens comprometidos e status de liberação.",
+          "Use Adicionar ao Google Agenda no compromisso para abrir o Google Agenda com título, período, local, responsável e itens já preenchidos.",
+          "Quando a data e hora de devolução vencerem sem confirmação de devolução, a tela exibe alerta operacional com ação de WhatsApp e envio de e-mail pelo servidor configurado do G3N para o responsável cadastrado.",
           "A barra superior usa ações específicas por aba, como Buscar empréstimos, Salvar dados do empréstimo, Salvar empréstimo com itens, Salvar responsável e Imprimir termo de empréstimo."
         ],
         atencoes: [

@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.534",
+  "latestVersion": "1.00.535",
   "releaseDate": "2026-06-23",
-  "description": "Fotos de cursos, oficinas e atendimentos passaram a ser gravadas e exibidas corretamente a partir do storage autenticado.",
+  "description": "Alertas de devolucao vencida em emprestimos para eventos passam a enviar e-mail pelo servidor configurado do G3N.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.534",
+  "minCompatibleVersion": "1.00.535",
   "releaseType": "stable",
   "downloadUrl": null
 }

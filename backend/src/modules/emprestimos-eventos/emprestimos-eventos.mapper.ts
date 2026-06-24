@@ -17,6 +17,7 @@ export function mapEventoEmprestimoToResponse(row: EventoEmprestimoRow) {
     titulo: row.titulo,
     descricao: row.descricao ?? null,
     local: row.local ?? null,
+    promovidoPor: row.promovido_por ?? null,
     dataInicio: formatDateTimeLocal(row.data_inicio),
     dataFim: formatDateTimeLocal(row.data_fim),
     status: row.status
@@ -47,6 +48,7 @@ export function mapEmprestimoToResponse(
       titulo: row.evento_titulo,
       descricao: row.evento_descricao ?? null,
       local: row.evento_local ?? null,
+      promovidoPor: row.evento_promovido_por ?? null,
       dataInicio: formatDateTimeLocal(row.evento_data_inicio),
       dataFim: formatDateTimeLocal(row.evento_data_fim),
       status: row.evento_status

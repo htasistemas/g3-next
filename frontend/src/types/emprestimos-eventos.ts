@@ -12,8 +12,9 @@ export type EventoEmprestimo = {
   titulo: string;
   descricao?: string | null;
   local?: string | null;
-  dataInicio: string;
-  dataFim: string;
+  promovidoPor?: string | null;
+  dataInicio?: string | null;
+  dataFim?: string | null;
   status: string;
 };
 

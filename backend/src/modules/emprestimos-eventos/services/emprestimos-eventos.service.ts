@@ -1,6 +1,8 @@
 import { AppError } from "../../../shared/errors/app-error.js";
+import { normalizarEmail, validarEmail } from "../../../utils/br-utils.js";
 import { mapaCamposTextoEmprestimosEventos } from "../../../utils/text-format-config.js";
 import { normalizarObjetoTexto } from "../../../utils/text-formatter.js";
+import { EmailService } from "../../email/services/email.service.js";
 import {
   mapEmprestimoToResponse,
   mapEventoEmprestimoToResponse,
@@ -32,6 +34,7 @@ function parseDateOnly(rawValue: unknown, label: string) {
 
 export class EmprestimosEventosService {
   private readonly repository = new EmprestimosEventosRepository();
+  private readonly emailService = new EmailService();
 
   async listar(rawQuery: unknown, rawTenantId?: string) {
     const tenantId = this.parseTenant(rawTenantId);
@@ -206,6 +209,49 @@ export class EmprestimosEventosService {
     return registros.map(mapMovimentacaoToResponse);
   }
 
+  async enviarAlertaDevolucaoEmail(rawId: string, rawTenantId?: string) {
+    const id = this.parseId(rawId);
+    const tenantId = this.parseTenant(rawTenantId);
+    const registro = await this.repository.buscarEmprestimoPorIdOuFalhar(id, tenantId);
+    const emprestimo = mapEmprestimoToResponse(registro.registro, registro.itens);
+
+    if (emprestimo.status === "DEVOLVIDO" || emprestimo.status === "CANCELADO") {
+      throw new AppError("Este emprestimo nao possui devolucao pendente.", 422);
+    }
+
+    if (!emprestimo.dataDevolucaoPrevista) {
+      throw new AppError("Emprestimo sem data de devolucao prevista.", 422);
+    }
+
+    const devolucaoPrevista = new Date(emprestimo.dataDevolucaoPrevista);
+    if (Number.isNaN(devolucaoPrevista.getTime()) || devolucaoPrevista.getTime() >= Date.now()) {
+      throw new AppError("A devolucao prevista ainda nao esta vencida.", 422);
+    }
+
+    if (!registro.registro.responsavel_id) {
+      throw new AppError("Emprestimo sem responsavel cadastrado para envio de e-mail.", 422);
+    }
+
+    const responsavel = await this.repository.buscarResponsavelPorId(registro.registro.responsavel_id, tenantId);
+    const destinatario = normalizarEmail(responsavel?.email);
+    if (!destinatario || !validarEmail(destinatario)) {
+      throw new AppError("O responsavel nao possui e-mail valido cadastrado.", 422);
+    }
+
+    const assunto = `Alerta de devolucao vencida - Emprestimo #${emprestimo.id ?? ""}`;
+    const mensagem = this.montarMensagemAlertaDevolucao(emprestimo, responsavel?.nome ?? emprestimo.responsavel?.nome);
+    const envio = await this.emailService.enviarEmailSimples({
+      destinatario,
+      assunto,
+      mensagem
+    });
+
+    return {
+      destinatario: envio.destinatario,
+      enviadoEm: envio.enviadoEm
+    };
+  }
+
   private parseId(rawId: string): bigint {
     const parsed = Number(rawId);
     if (!Number.isInteger(parsed) || parsed <= 0) {
@@ -237,5 +283,34 @@ export class EmprestimosEventosService {
       rawInput as Record<string, unknown>,
       mapaCamposTextoEmprestimosEventos
     );
+  }
+
+  private montarMensagemAlertaDevolucao(
+    emprestimo: ReturnType<typeof mapEmprestimoToResponse>,
+    nomeResponsavel?: string | null
+  ) {
+    const itens = (emprestimo.itens ?? [])
+      .map((item) => {
+        const nome = item.nomeItem || item.numeroPatrimonio || `Item #${item.itemId}`;
+        return `- ${item.quantidade}x ${nome}`;
+      })
+      .join("\n");
+
+    return [
+      `Ola, ${nomeResponsavel?.trim() || "responsavel"}.`,
+      "",
+      `Consta em aberto a devolucao do emprestimo #${emprestimo.id ?? ""} vinculado ao evento ${emprestimo.evento.titulo}.`,
+      `A devolucao prevista era ${emprestimo.dataDevolucaoPrevista}.`,
+      `Status atual: ${emprestimo.status}.`,
+      "",
+      itens ? "Itens vinculados:" : undefined,
+      itens || undefined,
+      "",
+      "Solicitamos confirmar a devolucao dos itens ou entrar em contato com a instituicao para regularizacao.",
+      "",
+      "Mensagem automatica enviada pelo G3N."
+    ]
+      .filter((linha) => linha !== undefined)
+      .join("\n");
   }
 }

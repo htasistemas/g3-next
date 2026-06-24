@@ -117,6 +117,12 @@ emprestimosEventosRoutes.post(
   ensurePermissions(permissoesEscrita),
   asyncHandler(controller.cancelar.bind(controller))
 );
+emprestimosEventosRoutes.post(
+  "/:id/alerta-devolucao/email",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.enviarAlertaDevolucaoEmail.bind(controller))
+);
 emprestimosEventosRoutes.get(
   "/:id",
   ensureAuthenticated,

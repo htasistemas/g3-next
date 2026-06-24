@@ -1219,6 +1219,15 @@ export class ReportsService {
     const payload = voluntarioFichaRequestSchema.parse(rawPayload);
     const voluntario = await this.voluntarioService.buscarPorId(payload.voluntarioId, authUser?.tenant_id);
     const contexto = await this.montarContextoInstitucional(authUser?.tenant_id);
+    const nomeVoluntario = this.normalizarTexto(voluntario.nome_completo) ?? "voluntário(a) não informado(a)";
+    const nomeInstituicao = this.normalizarTexto(contexto.cabecalho.razaoSocial) ?? "instituição não informada";
+    const dataRegistro = this.formatarDataComHifen(voluntario.data_cadastro);
+    const instituicao = await this.repository.obterInstituicaoRelatorio(authUser?.tenant_id);
+    const localInstituicao =
+      [this.normalizarTexto(instituicao.cidade), this.normalizarTexto(instituicao.uf)].filter(Boolean).join(" / ") ||
+      this.normalizarTexto(instituicao.enderecoCompleto) ||
+      "Local não informado";
+    const enderecoInstituicao = this.normalizarTexto(instituicao.enderecoCompleto) ?? "Endereço institucional não informado";
     const modalidade = [
       voluntario.presencial ? "Presencial" : undefined,
       voluntario.remoto ? "Remoto" : undefined
@@ -1246,7 +1255,6 @@ export class ReportsService {
           campos: [
             this.campo("Nome completo", voluntario.nome_completo),
             this.campo("CPF", voluntario.cpf),
-            this.campo("RG", voluntario.rg),
             this.campo("Data de nascimento", this.formatarDataComHifen(voluntario.data_nascimento)),
             this.campo("Sexo", this.formatarValorEnumerado(voluntario.genero)),
             this.campo("E-mail", voluntario.email),
@@ -1270,33 +1278,40 @@ export class ReportsService {
         {
           titulo: "Declaração",
           conteudo: [
-            "Pelo presente termo, o(a) voluntário(a) acima identificado(a) declara sua adesão ao serviço voluntário prestado à instituição, de forma livre, consciente e não remunerada.",
-            "As atividades serão realizadas conforme disponibilidade informada e necessidades institucionais, sem geração de vínculo empregatício, obrigação trabalhista, previdenciária ou afim."
+            `Pelo presente termo, o voluntário ${nomeVoluntario} declara, de forma livre, expressa e consciente, sua adesão ao serviço voluntário a ser prestado à ${nomeInstituicao}, nos termos da Lei nº 9.608/1998, reconhecendo que a atividade possui natureza cívica, assistencial, educacional, cultural, recreativa ou de apoio institucional, conforme a finalidade social da entidade.`,
+            "O serviço voluntário será executado sem remuneração, contraprestação econômica, habitualidade laboral subordinada ou expectativa de vínculo empregatício, funcional, previdenciário, estatutário ou de natureza semelhante. A atuação ocorrerá dentro dos limites das atividades previamente ajustadas, observada a disponibilidade cadastrada, as normas internas da instituição, a boa-fé objetiva, a urbanidade e a proteção das pessoas atendidas.",
+            `O voluntário ${nomeVoluntario} declara estar ciente de que eventual ressarcimento de despesas somente poderá ocorrer quando a despesa for necessária à atividade voluntária, previamente autorizada pela instituição e devidamente comprovada, não caracterizando salário, ajuda de custo permanente, vantagem econômica ou remuneração indireta.`
           ].join("\n")
         },
         {
           titulo: "Responsabilidades",
           conteudo: [
-            "O(a) voluntário(a) compromete-se a cumprir orientações internas, preservar informações sigilosas, zelar pelos usuários atendidos e comunicar previamente impossibilidades de comparecimento.",
-            "A instituição compromete-se a orientar as atividades, registrar a participação e manter condições adequadas para a execução do serviço voluntário."
+            `O voluntário ${nomeVoluntario} compromete-se a desempenhar as atividades com zelo, diligência, assiduidade compatível com a disponibilidade informada, respeito à dignidade humana, observância das orientações técnicas e administrativas e cumprimento das políticas internas aplicáveis, inclusive regras de segurança, proteção de dados, sigilo, uso de imagem e conduta ética.`,
+            `O voluntário ${nomeVoluntario} obriga-se a preservar informações pessoais, sociais, familiares, financeiras, de saúde ou quaisquer outros dados sensíveis a que tiver acesso em razão da atividade voluntária, abstendo-se de divulgar, compartilhar, copiar ou utilizar tais informações para finalidade diversa da atuação autorizada pela ${nomeInstituicao}.`,
+            `A ${nomeInstituicao} compromete-se a orientar o voluntário quanto às atividades, registrar sua participação quando aplicável, indicar responsáveis de referência, disponibilizar informações necessárias à execução segura do serviço e comunicar mudanças relevantes de escala, local, atividade ou regra operacional.`
           ].join("\n")
         },
         {
           titulo: "Vigência e desligamento",
-          conteudo:
-            "Este termo permanece vigente enquanto houver atuação voluntária registrada. O desligamento poderá ocorrer a qualquer tempo, por iniciativa do(a) voluntário(a) ou da instituição, mediante comunicação simples entre as partes."
+          conteudo: [
+            `Este termo passa a vigorar a partir da data de registro indicada neste documento e permanecerá válido enquanto houver atividade voluntária ativa ou até manifestação de encerramento por qualquer das partes. A continuidade da atuação dependerá da necessidade institucional, da disponibilidade do voluntário ${nomeVoluntario} e da compatibilidade com as normas internas da ${nomeInstituicao}.`,
+            "O desligamento poderá ocorrer a qualquer tempo, por iniciativa do voluntário ou da instituição, sem ônus, multa ou indenização, mediante comunicação simples. A instituição poderá suspender ou encerrar a participação quando houver descumprimento de normas internas, quebra de sigilo, conduta incompatível com os objetivos institucionais, risco às pessoas atendidas ou inexistência temporária de atividade compatível.",
+            "O encerramento do termo não afasta o dever de confidencialidade sobre informações conhecidas durante a atuação voluntária, nem prejudica a guarda dos registros administrativos necessários à comprovação da atividade, auditoria interna, prestação de contas e cumprimento de obrigações legais."
+          ].join("\n")
         },
         {
           titulo: "Assinaturas",
           conteudo: [
-            "Local e data: _______________________________________________",
-            "[[espaco:2.6]]",
-            `Voluntário(a): ${this.normalizarTexto(voluntario.nome_completo) ?? "Não informado"}`,
-            `CPF: ${this.normalizarTexto(voluntario.cpf) ?? "Não informado"}`,
+            `Local e data: ${localInstituicao}, ${dataRegistro}`,
+            `Endereço da instituição: ${enderecoInstituicao}`,
+            "[[espaco:3.8]]",
             "_______________________________________________________________",
-            "[[espaco:2.6]]",
+            `Voluntário(a): ${nomeVoluntario}`,
+            `CPF: ${this.normalizarTexto(voluntario.cpf) ?? "Não informado"}`,
+            "[[espaco:4.4]]",
+            "_______________________________________________________________",
             "Representante da instituição",
-            "_______________________________________________________________"
+            `Instituição: ${nomeInstituicao}`
           ].join("\n")
         }
       ],

@@ -61,6 +61,14 @@ export class EmprestimosEventosController {
     return response.json(emprestimo);
   }
 
+  async enviarAlertaDevolucaoEmail(request: AuthenticatedRequest, response: Response) {
+    const envio = await service.enviarAlertaDevolucaoEmail(
+      request.params.id,
+      request.authUser?.tenant_id
+    );
+    return response.json(envio);
+  }
+
   async listarAgendaResumo(request: AuthenticatedRequest, response: Response) {
     const resumo = await service.listarAgendaResumo(
       request.query.inicio,

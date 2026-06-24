@@ -30,6 +30,16 @@ function toOptionalDateTime(value?: string | null) {
   return parsed;
 }
 
+function toDbNullableText(value?: string | null) {
+  return trimOrUndefined(value ?? undefined) ?? null;
+}
+
+function inicioDoDia(value: Date) {
+  const data = new Date(value);
+  data.setHours(0, 0, 0, 0);
+  return data;
+}
+
 function overlapSql(
   inicio: Date,
   fim: Date,
@@ -51,6 +61,9 @@ const estruturaSql = [
   "ALTER TABLE IF EXISTS emprestimos_eventos ADD COLUMN IF NOT EXISTS responsavel_cadastro_id BIGINT",
   "ALTER TABLE IF EXISTS emprestimos_eventos ADD COLUMN IF NOT EXISTS tenant_id UUID",
   "ALTER TABLE IF EXISTS eventos_emprestimos ADD COLUMN IF NOT EXISTS tenant_id UUID",
+  "ALTER TABLE IF EXISTS eventos_emprestimos ADD COLUMN IF NOT EXISTS promovido_por VARCHAR(200)",
+  "ALTER TABLE IF EXISTS eventos_emprestimos ALTER COLUMN data_inicio DROP NOT NULL",
+  "ALTER TABLE IF EXISTS eventos_emprestimos ALTER COLUMN data_fim DROP NOT NULL",
   "ALTER TABLE IF EXISTS emprestimos_eventos_itens ADD COLUMN IF NOT EXISTS tenant_id UUID",
   "ALTER TABLE IF EXISTS emprestimos_eventos_movimentacoes ADD COLUMN IF NOT EXISTS tenant_id UUID",
   `CREATE TABLE IF NOT EXISTS emprestimos_eventos_responsaveis (
@@ -94,15 +107,27 @@ const estruturaSql = [
   `,
   `
     UPDATE emprestimos_eventos AS e
-    SET tenant_id = COALESCE(ev.tenant_id, r.tenant_id, ref.tenant_id)
+    SET tenant_id = COALESCE(
+      (
+        SELECT ev.tenant_id
+        FROM eventos_emprestimos ev
+        WHERE ev.id = e.evento_id
+        LIMIT 1
+      ),
+      (
+        SELECT r.tenant_id
+        FROM emprestimos_eventos_responsaveis r
+        WHERE r.id = e.responsavel_cadastro_id
+        LIMIT 1
+      ),
+      ref.tenant_id
+    )
     FROM (
       SELECT tenant_id
       FROM instituicoes
       ORDER BY criado_em ASC
       LIMIT 1
     ) ref
-    LEFT JOIN eventos_emprestimos ev ON ev.id = e.evento_id
-    LEFT JOIN emprestimos_eventos_responsaveis r ON r.id = e.responsavel_cadastro_id
     WHERE e.tenant_id IS NULL
   `,
   `
@@ -201,6 +226,7 @@ export class EmprestimosEventosRepository {
         ev.titulo AS evento_titulo,
         ev.descricao AS evento_descricao,
         ev.local AS evento_local,
+        ev.promovido_por AS evento_promovido_por,
         ev.data_inicio AS evento_data_inicio,
         ev.data_fim AS evento_data_fim,
         ev.status AS evento_status,
@@ -246,6 +272,7 @@ export class EmprestimosEventosRepository {
         ev.titulo AS evento_titulo,
         ev.descricao AS evento_descricao,
         ev.local AS evento_local,
+        ev.promovido_por AS evento_promovido_por,
         ev.data_inicio AS evento_data_inicio,
         ev.data_fim AS evento_data_fim,
         ev.status AS evento_status,
@@ -465,6 +492,7 @@ export class EmprestimosEventosRepository {
         titulo,
         descricao,
         local,
+        promovido_por,
         data_inicio,
         data_fim,
         status
@@ -610,6 +638,7 @@ export class EmprestimosEventosRepository {
         titulo,
         descricao,
         local,
+        promovido_por,
         data_inicio,
         data_fim,
         status
@@ -629,6 +658,7 @@ export class EmprestimosEventosRepository {
         titulo,
         descricao,
         local,
+        promovido_por,
         data_inicio,
         data_fim,
         status,
@@ -637,11 +667,12 @@ export class EmprestimosEventosRepository {
       ) VALUES (
         CAST(${tenantId} AS UUID),
         ${input.titulo},
-        ${trimOrUndefined(input.descricao ?? undefined)},
-        ${trimOrUndefined(input.local ?? undefined)},
+        ${toDbNullableText(input.descricao)},
+        ${toDbNullableText(input.local)},
+        ${toDbNullableText(input.promovidoPor)},
         ${toOptionalDateTime(input.dataInicio)},
         ${toOptionalDateTime(input.dataFim)},
-        ${trimOrUndefined(input.status ?? undefined) ?? "PLANEJADO"},
+        ${toDbNullableText(input.status) ?? "PLANEJADO"},
         NOW(),
         NOW()
       )
@@ -666,11 +697,12 @@ export class EmprestimosEventosRepository {
       UPDATE eventos_emprestimos
       SET
         titulo = ${input.titulo},
-        descricao = ${trimOrUndefined(input.descricao ?? undefined)},
-        local = ${trimOrUndefined(input.local ?? undefined)},
+        descricao = ${toDbNullableText(input.descricao)},
+        local = ${toDbNullableText(input.local)},
+        promovido_por = ${toDbNullableText(input.promovidoPor)},
         data_inicio = ${toOptionalDateTime(input.dataInicio)},
         data_fim = ${toOptionalDateTime(input.dataFim)},
-        status = ${trimOrUndefined(input.status ?? undefined) ?? atual.status},
+        status = ${toDbNullableText(input.status) ?? atual.status},
         atualizado_em = NOW()
       WHERE id = ${id}
         AND tenant_id::text = ${tenantId}
@@ -728,18 +760,23 @@ export class EmprestimosEventosRepository {
     >();
 
     for (const registro of emprestimos) {
-      const dia = formatDateLocal(registro.inicio) ?? "";
-      const atual = resultado.get(dia) ?? {
-        data: dia,
-        temBloqueio: false,
-        qtdEmprestimos: 0,
-        emprestimoIds: []
-      };
+      const primeiroDia = inicioDoDia(registro.inicio > inicio ? registro.inicio : inicio);
+      const ultimoDia = inicioDoDia(registro.fim < fim ? registro.fim : fim);
 
-      atual.qtdEmprestimos += 1;
-      atual.temBloqueio = atual.temBloqueio || registro.status === "RETIRADO";
-      atual.emprestimoIds.push(Number(registro.id));
-      resultado.set(dia, atual);
+      for (const dataAtual = new Date(primeiroDia); dataAtual <= ultimoDia; dataAtual.setDate(dataAtual.getDate() + 1)) {
+        const dia = formatDateLocal(dataAtual) ?? "";
+        const atual = resultado.get(dia) ?? {
+          data: dia,
+          temBloqueio: false,
+          qtdEmprestimos: 0,
+          emprestimoIds: []
+        };
+
+        atual.qtdEmprestimos += 1;
+        atual.temBloqueio = atual.temBloqueio || registro.status === "RETIRADO";
+        atual.emprestimoIds.push(Number(registro.id));
+        resultado.set(dia, atual);
+      }
     }
 
     return [...resultado.values()].sort((a, b) => a.data.localeCompare(b.data));
@@ -768,6 +805,7 @@ export class EmprestimosEventosRepository {
         ev.titulo AS evento_titulo,
         ev.descricao AS evento_descricao,
         ev.local AS evento_local,
+        ev.promovido_por AS evento_promovido_por,
         ev.data_inicio AS evento_data_inicio,
         ev.data_fim AS evento_data_fim,
         ev.status AS evento_status,
