@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.538",
-  "releaseDate": "2026-06-24",
-  "description": "Itens vinculados em emprestimos para eventos passam a selecionar multiplos patrimonios por quantidade e buscar por numero de patrimonio.",
+  "latestVersion": "1.00.542",
+  "releaseDate": "2026-06-25",
+  "description": "Termo de emprestimo para eventos mantem letras legiveis com campos compactos.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.538",
+  "minCompatibleVersion": "1.00.542",
   "releaseType": "stable",
   "downloadUrl": null
 }

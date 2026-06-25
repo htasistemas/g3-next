@@ -48,7 +48,8 @@ const secoesManual: ManualSecao[] = [
           "Comece pelos cadastros para garantir base confiável de beneficiários, famílias e profissionais.",
           "Use Atendimentos diários para registrar movimentações sociais, benefícios, inscrições e acompanhamentos.",
           "Use Configurações gerais para manter parâmetros, usuários, IA e o próprio manual atualizados.",
-          "Na tela Visão geral, acompanhe também os cards de Termos vencidos, Documentos vencidos, Documentos a vencer, Motoristas autorizados, Itens no almoxarifado e Itens no patrimônio para leitura operacional rápida logo na entrada do sistema.",
+          "Na tela Visão geral, acompanhe também os cards de Termos vencidos, Documentos vencidos, Documentos a vencer, Motoristas autorizados, Itens no almoxarifado, Itens no patrimônio e Empréstimos para eventos para leitura operacional rápida logo na entrada do sistema.",
+          "O card Empréstimos para eventos mostra eventos ativos, eventos futuros e eventos em atraso por devolução vencida.",
           "Os cards da Visão geral funcionam como atalhos: ao clicar em cada indicador, o sistema abre a tela correspondente para aprofundar a análise ou continuar a operação.",
           "No acesso local pela tela de login, o botão Entrar com Google depende do client ID configurado no ambiente do frontend e do backend.",
           "Quando o backend estiver em desenvolvimento sem envio de e-mail configurado, a recuperação de senha conclui localmente e grava a senha temporária no log do servidor."
@@ -60,7 +61,7 @@ const secoesManual: ManualSecao[] = [
           "Em produção, o backend não deve operar com o segredo padrão de desenvolvimento para autenticação; configure APP_AUTH_TOKEN_SECRET próprio antes de publicar.",
           "O envio de e-mail deve permanecer desabilitado enquanto MAIL_PASS não estiver configurada no ambiente da instância.",
           "Essa recuperação local sem e-mail é apenas de apoio ao desenvolvimento; em ambientes com envio ativo, a senha temporária continua sendo enviada ao endereço cadastrado.",
-          "O card Famílias em extrema pobreza foi removido da Visão geral para liberar espaço aos indicadores operacionais de termos, documentos, motoristas, almoxarifado e patrimônio.",
+          "O card Famílias em extrema pobreza foi removido da Visão geral para liberar espaço aos indicadores operacionais de termos, documentos, motoristas, almoxarifado, patrimônio e empréstimos para eventos.",
           "Na impressão da ficha cadastral do beneficiário e no recibo de doação entregue, a logomarca do cabeçalho é carregada diretamente do storage local da unidade quando estiver salva como caminho lógico do sistema.",
           "No cadastro da unidade assistencial, a Logomarca da unidade vazado preserva o arquivo original enviado pelo cliente, incluindo SVG e imagens com transparência, enquanto a Logomarca do relatório pode ser normalizada para manter compatibilidade de impressão."
         ]
@@ -366,7 +367,8 @@ const secoesManual: ManualSecao[] = [
           "Quando a quantidade for maior que 1, marque exatamente os patrimônios correspondentes antes de adicionar ao empréstimo.",
           "Ao selecionar almoxarifado, marque os patrimônios correspondentes à quantidade solicitada.",
           "Itens patrimoniais vindos do almoxarifado são lançados individualmente no empréstimo e no termo, com uma linha para cada número de patrimônio.",
-          "Ao imprimir a partir da aba Dados do empréstimo ou Itens vinculados, o sistema gera o termo de empréstimo no padrão de relatórios do G3N com dados do evento, responsável, período, itens e números de patrimônio.",
+          "Na aba Listagem, as linhas são destacadas por status: agendado em amarelo, retirado em vermelho, devolvido em verde e cancelado em cinza.",
+          "Ao imprimir a partir da aba Dados do empréstimo ou Itens vinculados, o sistema gera o termo de empréstimo em layout compacto no padrão de relatórios do G3N, com logomarca da instituição, cabeçalho institucional, corpo com dados do evento, responsável, período, itens e números de patrimônio, assinaturas e rodapé oficial da unidade.",
           "Na aba Agenda de empréstimos, acompanhe o calendário mensal interativo com dias livres, dias ocupados em vermelho e dias de apoio em amarelo para retirada e devolução.",
           "Clique em um dia da agenda para ver retirada sugerida, período do evento, devolução calculada, responsável, itens comprometidos e status de liberação.",
           "Após salvar o empréstimo, use Confirmar por WhatsApp ou Confirmar por e-mail para avisar o responsável que o evento está confirmado, os itens estão reservados e listar os itens vinculados.",

@@ -1,6 +1,54 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.542",
+                        "releaseDate":  "2026-06-25",
+                        "title":  "Fonte legível no termo de empréstimo",
+                        "description":  "O termo de empréstimo para eventos mantém letras legíveis e compacta apenas os campos e espaçamentos.",
+                        "changes":  [
+                                        "As fontes do cabeçalho, dados, tabela, declaração, assinaturas e rodapé foram ampliadas para leitura normal.",
+                                        "A compactação do termo ficou concentrada em margens, padding, bordas e espaçamento dos campos.",
+                                        "Versão oficial atualizada na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.541",
+                        "releaseDate":  "2026-06-25",
+                        "title":  "Termo de empréstimo compacto com logomarca",
+                        "description":  "O termo de empréstimo para eventos passou a carregar a logomarca autenticada e usar layout compacto para impressão.",
+                        "changes":  [
+                                        "A logomarca do relatório agora é carregada como arquivo autenticado antes da impressão do termo.",
+                                        "A rotina de impressão aguarda imagens do relatório antes de acionar a janela de impressão.",
+                                        "O termo teve margens, campos, tabela, declaração, assinaturas e rodapé compactados para aproveitar melhor uma folha A4."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.540",
+                        "releaseDate":  "2026-06-25",
+                        "title":  "Termo institucional em empréstimos para eventos",
+                        "description":  "O termo de empréstimo para eventos foi refeito no padrão institucional de relatórios do G3N.",
+                        "changes":  [
+                                        "A impressão do termo agora usa logomarca da instituição, cabeçalho institucional, corpo estruturado, assinaturas e rodapé oficial da unidade.",
+                                        "O relatório lista dados do evento, responsável, período, itens emprestados e número de patrimônio item a item.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.539",
+                        "releaseDate":  "2026-06-25",
+                        "title":  "Indicadores e cores em empréstimos para eventos",
+                        "description":  "Empréstimos para eventos passaram a destacar a listagem por status e a exibir indicadores operacionais na Visão geral.",
+                        "changes":  [
+                                        "A aba Listagem agora destaca agendado em amarelo, retirado em vermelho, devolvido em verde e cancelado em cinza.",
+                                        "A Visão geral ganhou card de Empréstimos para eventos com eventos ativos, futuros e em atraso por devolução vencida.",
+                                        "Manual do sistema e versão oficial atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.538",
                         "releaseDate":  "2026-06-24",
                         "title":  "Seleção múltipla de patrimônios em empréstimos",

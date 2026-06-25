@@ -322,10 +322,28 @@ export function imprimirHtmlSemJanela(options: ImprimirHtmlOptions) {
   };
 
   frameWindow.addEventListener("afterprint", limpar, { once: true });
-  window.setTimeout(() => {
+  const imprimirQuandoPronto = async () => {
+    const imagens = Array.from(frameDocument.images);
+    await Promise.all(
+      imagens.map((imagem) => {
+        if (imagem.complete) return Promise.resolve();
+        if (typeof imagem.decode === "function") {
+          return imagem.decode().catch(() => undefined);
+        }
+        return new Promise<void>((resolve) => {
+          imagem.addEventListener("load", () => resolve(), { once: true });
+          imagem.addEventListener("error", () => resolve(), { once: true });
+        });
+      })
+    );
+
     frameWindow.focus();
     frameWindow.print();
-  }, 50);
+  };
+
+  window.setTimeout(() => {
+    void imprimirQuandoPronto();
+  }, 100);
 }
 
 function escapeHtml(value: string) {

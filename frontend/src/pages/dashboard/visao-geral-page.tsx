@@ -16,9 +16,11 @@ import {
 import { ResponsiveChart } from "@/components/charts/responsive-chart";
 import {
   Archive,
+  AlertTriangle,
   BanknoteArrowUp,
   BriefcaseBusiness,
   Building2,
+  CalendarDays,
   CarFront,
   FolderHeart,
   HandHeart,
@@ -34,6 +36,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useItensAlmoxarifado } from "@/features/almoxarifado/use-almoxarifado";
 import { useMotoristasAutorizados } from "@/features/controle-veiculos/use-controle-veiculos";
 import { useDashboardAssistencia } from "@/features/dashboard/use-dashboard";
+import { useEmprestimosEventos } from "@/features/emprestimos-eventos/use-emprestimos-eventos";
 import { usePatrimonios } from "@/features/patrimonios/use-patrimonios";
 import { classesTelaPadraoBeneficiario } from "@/lib/tela-padrao-beneficiario";
 import { matriculasService } from "@/services/matriculas.service";
@@ -100,11 +103,13 @@ export function VisaoGeralPage() {
   const { data: patrimoniosData } = usePatrimonios();
   const { data: motoristasAutorizadosData } = useMotoristasAutorizados();
   const { data: documentosInstituicaoData } = useDocumentosInstituicao();
+  const { data: emprestimosEventosData } = useEmprestimosEventos({});
 
   const itensAlmoxarifado = itensAlmoxarifadoData?.itens ?? [];
   const patrimonios = patrimoniosData?.patrimonios ?? [];
   const motoristasAutorizados = motoristasAutorizadosData ?? [];
   const documentosInstituicao = documentosInstituicaoData ?? [];
+  const emprestimosEventos = emprestimosEventosData?.emprestimos ?? [];
 
   const termosVencidos = useMemo(() => {
     const hoje = new Intl.DateTimeFormat("sv-SE", {
@@ -134,6 +139,16 @@ export function VisaoGeralPage() {
     () => documentosInstituicao.filter((item) => item.situacao === "vence_em_breve").length,
     [documentosInstituicao]
   );
+
+  const resumoEventosEmprestimos = useMemo(() => {
+    const agora = Date.now();
+    const abertos = emprestimosEventos.filter((item) => !["DEVOLVIDO", "CANCELADO"].includes(item.status));
+    return {
+      ativos: abertos.length,
+      futuros: abertos.filter((item) => new Date(item.dataRetiradaPrevista).getTime() > agora).length,
+      atraso: abertos.filter((item) => new Date(item.dataDevolucaoPrevista).getTime() < agora).length
+    };
+  }, [emprestimosEventos]);
 
   const dadosCadastros = useMemo(() => {
     if (!data) return [];
@@ -336,6 +351,45 @@ export function VisaoGeralPage() {
                   </button>
                 ))}
               </div>
+
+              <button
+                type="button"
+                className={`${classeCardVerdeInterativo} w-full px-3 py-3 text-left`}
+                onClick={() => navigate("/setor-administrativo/emprestimo-eventos")}
+              >
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex items-start gap-3">
+                    <span className="rounded-md bg-[var(--g3-primary-soft)] p-2 text-[var(--g3-active)]">
+                      <CalendarDays className="h-4 w-4" />
+                    </span>
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
+                        Empréstimos para eventos
+                      </p>
+                      <p className="mt-1 text-sm text-[var(--g3-muted)]">
+                        Reservas ativas, eventos futuros e devoluções vencidas.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid min-w-full grid-cols-1 gap-2 sm:grid-cols-3 lg:min-w-[520px]">
+                    <div className="rounded-lg border border-emerald-100 bg-white/70 px-3 py-2">
+                      <p className="text-xs text-[var(--g3-muted)]">Eventos ativos</p>
+                      <p className="text-xl font-semibold text-emerald-700">{resumoEventosEmprestimos.ativos}</p>
+                    </div>
+                    <div className="rounded-lg border border-sky-100 bg-white/70 px-3 py-2">
+                      <p className="text-xs text-[var(--g3-muted)]">Eventos futuros</p>
+                      <p className="text-xl font-semibold text-sky-700">{resumoEventosEmprestimos.futuros}</p>
+                    </div>
+                    <div className="rounded-lg border border-red-100 bg-white/70 px-3 py-2">
+                      <div className="flex items-center gap-1 text-xs text-[var(--g3-muted)]">
+                        <AlertTriangle className="h-3.5 w-3.5 text-red-600" />
+                        Eventos em atraso
+                      </div>
+                      <p className="text-xl font-semibold text-red-700">{resumoEventosEmprestimos.atraso}</p>
+                    </div>
+                  </div>
+                </div>
+              </button>
 
               <div className={`${classeCardVerde} p-3`}>
                 <div className="mb-3 flex items-center justify-between gap-2">

@@ -49,8 +49,9 @@ import {
 import { useItensAlmoxarifado } from "@/features/almoxarifado/use-almoxarifado";
 import { usePatrimonios } from "@/features/patrimonios/use-patrimonios";
 import { useUnidadesAssistenciais } from "@/features/unidades-assistenciais/use-unidades-assistenciais";
-import { formatarDataPtBr, normalizarTelefone } from "@/lib/br-utils";
-import { imprimirConteudoAtual } from "@/lib/report-utils";
+import { formatarCnpj, formatarDataPtBr, formatarTelefone, normalizarTelefone } from "@/lib/br-utils";
+import { obterUrlArquivoAutenticado, resolverUrlArquivo } from "@/lib/arquivos";
+import { imprimirConteudoAtual, imprimirHtmlSemJanela } from "@/lib/report-utils";
 import {
   agoraLocalInputDateTime,
   formatarDateTimeLocalPtBr,
@@ -124,6 +125,14 @@ const eventoCatalogoStatusOpcoes = [
   { value: "INATIVO", label: "Inativo" }
 ];
 
+const classesLinhaStatusEmprestimo: Record<StatusEmprestimoEvento, string> = {
+  RASCUNHO: "bg-[var(--g3-card)]",
+  AGENDADO: "bg-amber-50 text-amber-950",
+  RETIRADO: "bg-red-50 text-red-950",
+  DEVOLVIDO: "bg-emerald-50 text-emerald-950",
+  CANCELADO: "bg-slate-100 text-slate-700"
+};
+
 const nowLocal = () => agoraLocalInputDateTime();
 const fmt = (v?: string | null) => formatarDateTimeLocalPtBr(v);
 const dt = (v?: string | null) => normalizarDateTimeLocal(v);
@@ -185,6 +194,46 @@ function normalizarBuscaTexto(valor?: string | null) {
     .replace(/[\u0300-\u036f]/g, "")
     .toLocaleLowerCase("pt-BR")
     .trim();
+}
+
+function escaparHtmlRelatorio(valor?: string | number | null) {
+  return String(valor ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function montarRodapeInstitucional(unidade?: {
+  razao_social?: string;
+  nome_fantasia?: string;
+  cnpj?: string;
+  telefone?: string;
+  email?: string;
+  logradouro?: string;
+  numero?: string;
+  complemento?: string;
+  bairro?: string;
+  cidade?: string;
+  estado?: string;
+}) {
+  const linha1 = unidade?.razao_social?.trim() || unidade?.nome_fantasia?.trim() || "Instituição não cadastrada";
+  const detalhes = [formatarCnpj(unidade?.cnpj), formatarTelefone(unidade?.telefone), unidade?.email?.trim()]
+    .filter(Boolean)
+    .join(" • ");
+  const endereco = [
+    unidade?.logradouro?.trim(),
+    unidade?.numero?.trim(),
+    unidade?.complemento?.trim(),
+    unidade?.bairro?.trim(),
+    unidade?.cidade?.trim(),
+    unidade?.estado?.trim()
+  ]
+    .filter(Boolean)
+    .join(" • ");
+
+  return { linha1, linha2: detalhes, linha3: endereco };
 }
 
 function formatarHora(valor?: string | null) {
@@ -298,10 +347,18 @@ export function EmprestimoEventosPage() {
   const unidades = unidadesData?.unidades ?? [];
   const patrimonios = patrimoniosData?.patrimonios ?? [];
   const almox = almoxData?.itens ?? [];
+  const unidadeRelatorio =
+    unidades.find((unidade) => String(unidade.id_unidade) === form.unidadeId) ??
+    unidades.find((unidade) => unidade.unidade_principal) ??
+    unidades[0];
   const nomeInstituicao =
     usuario?.instituicao_nome?.trim() ||
-    unidades.find((unidade) => String(unidade.id_unidade) === form.unidadeId)?.nome_fantasia?.trim() ||
+    unidadeRelatorio?.razao_social?.trim() ||
+    unidadeRelatorio?.nome_fantasia?.trim() ||
     "Instituição";
+  const caminhoLogomarcaRelatorio = unidadeRelatorio?.logomarca_relatorio || unidadeRelatorio?.logomarca;
+  const logomarcaRelatorio = resolverUrlArquivo(caminhoLogomarcaRelatorio);
+  const rodapeInstitucional = montarRodapeInstitucional(unidadeRelatorio);
   const agendaResumo = agendaResumoData ?? [];
   const agendaDetalhe = agendaDiaData ?? [];
   const agendaResumoPorData = useMemo(
@@ -854,13 +911,181 @@ export function EmprestimoEventosPage() {
     }
   }
 
+  function montarHtmlTermoEmprestimo(logomarcaTermo = logomarcaRelatorio) {
+    const evento = eventos.find((item) => String(item.id) === form.eventoId);
+    const responsavel = responsaveis.find((item) => String(item.id) === form.responsavelId);
+    const unidadeNome = unidadeRelatorio?.nome_fantasia || unidadeRelatorio?.razao_social || "---";
+    const emitidoEm = formatarDataPtBr(dataLocalIso());
+    const statusLabel = statusOpcoes.find((status) => status.value === form.status)?.label ?? form.status;
+    const linhasItens = form.itens
+      .map(
+        (item, index) => `
+          <tr>
+            <td>${index + 1}</td>
+            <td>${escaparHtmlRelatorio(item.nomeItem || `Item #${item.itemId}`)}</td>
+            <td>${escaparHtmlRelatorio(item.numeroPatrimonio || "---")}</td>
+            <td>${escaparHtmlRelatorio(item.tipoItem === "PATRIMONIO" ? "Patrimônio" : "Almoxarifado")}</td>
+            <td>${escaparHtmlRelatorio(item.quantidade)}</td>
+            <td>${escaparHtmlRelatorio(item.observacaoItem || "---")}</td>
+          </tr>
+        `
+      )
+      .join("");
+
+    return `
+      <section class="folha">
+        <header class="topo">
+          <div class="g3-topo-faixa">
+            <span class="g3-topo-marca">G3N</span>
+            <span class="g3-topo-selo">Empréstimos para eventos</span>
+          </div>
+          <div class="g3-topo-corpo">
+            ${logomarcaTermo ? `<img src="${escaparHtmlRelatorio(logomarcaTermo)}" alt="Logomarca da instituição" class="g3-topo-logo" />` : ""}
+            <div class="g3-topo-texto">
+              <h1>${escaparHtmlRelatorio(nomeInstituicao)}</h1>
+              <h2>Termo de empréstimo</h2>
+              <p class="subtitulo">Controle institucional de reserva, retirada e devolução de itens para eventos.</p>
+            </div>
+          </div>
+          <div class="meta-grid">
+            <div class="meta-item"><strong>Código</strong><span>${escaparHtmlRelatorio(form.id ?? "---")}</span></div>
+            <div class="meta-item"><strong>Status</strong><span>${escaparHtmlRelatorio(statusLabel)}</span></div>
+            <div class="meta-item"><strong>Emitido em</strong><span>${escaparHtmlRelatorio(emitidoEm)}</span></div>
+            <div class="meta-item"><strong>Unidade</strong><span>${escaparHtmlRelatorio(unidadeNome)}</span></div>
+          </div>
+        </header>
+
+        <main class="corpo">
+          <section class="bloco">
+            <h3>Dados do evento</h3>
+            <div class="info-grid">
+              <div><strong>Evento</strong><span>${escaparHtmlRelatorio(evento?.titulo || "---")}</span></div>
+              <div><strong>Local</strong><span>${escaparHtmlRelatorio(evento?.local || "---")}</span></div>
+              <div><strong>Promovido por</strong><span>${escaparHtmlRelatorio(evento?.promovidoPor || "---")}</span></div>
+              <div><strong>Período do evento</strong><span>${escaparHtmlRelatorio(`${fmt(form.dataRetiradaPrevista)} até ${fmt(form.dataDevolucaoPrevista)}`)}</span></div>
+            </div>
+          </section>
+
+          <section class="bloco">
+            <h3>Responsável pela retirada</h3>
+            <div class="info-grid">
+              <div><strong>Nome</strong><span>${escaparHtmlRelatorio(form.responsavelNome || responsavel?.nome || "---")}</span></div>
+              <div><strong>Documento</strong><span>${escaparHtmlRelatorio(responsavel?.documento || "---")}</span></div>
+              <div><strong>Telefone</strong><span>${escaparHtmlRelatorio(formatarTelefone(responsavel?.telefone) || responsavel?.telefone || "---")}</span></div>
+              <div><strong>E-mail</strong><span>${escaparHtmlRelatorio(responsavel?.email || "---")}</span></div>
+            </div>
+          </section>
+
+          <section class="bloco">
+            <h3>Itens emprestados</h3>
+            <div class="tabela-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Item</th>
+                    <th>Número do patrimônio</th>
+                    <th>Origem</th>
+                    <th>Qtd.</th>
+                    <th>Observação</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${linhasItens || '<tr><td colspan="6" class="vazio">Nenhum item vinculado.</td></tr>'}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="bloco texto">
+            <h3>Declaração e condições</h3>
+            <p>Declaro receber os itens listados para uso exclusivo no evento informado, responsabilizando-me pela guarda, conservação e devolução no prazo combinado.</p>
+            <p><strong>Observações do empréstimo:</strong> ${escaparHtmlRelatorio(form.observacoes || "---")}</p>
+          </section>
+
+          <section class="assinaturas">
+            <div><span></span><strong>Responsável pela retirada</strong></div>
+            <div><span></span><strong>Responsável interno pela entrega</strong></div>
+          </section>
+        </main>
+
+        <footer class="rodape">
+          <div>${escaparHtmlRelatorio(rodapeInstitucional.linha1)}</div>
+          ${rodapeInstitucional.linha2 ? `<div>${escaparHtmlRelatorio(rodapeInstitucional.linha2)}</div>` : ""}
+          ${rodapeInstitucional.linha3 ? `<div>${escaparHtmlRelatorio(rodapeInstitucional.linha3)}</div>` : ""}
+          <div>Emitido em ${escaparHtmlRelatorio(emitidoEm)}</div>
+        </footer>
+      </section>
+    `;
+  }
+
+  async function imprimirTermoEmprestimo() {
+    let arquivoLogomarca: { url: string; revoke?: () => void } | null = null;
+    let logomarcaTermo = logomarcaRelatorio;
+
+    try {
+      if (caminhoLogomarcaRelatorio) {
+        try {
+          arquivoLogomarca = await obterUrlArquivoAutenticado(caminhoLogomarcaRelatorio, { cache: false, auditar: false });
+          logomarcaTermo = arquivoLogomarca.url || logomarcaRelatorio;
+        } catch {
+          logomarcaTermo = logomarcaRelatorio;
+        }
+      }
+
+      imprimirHtmlSemJanela({
+        titulo: `Termo de empréstimo #${form.id ?? ""}`,
+        html: montarHtmlTermoEmprestimo(logomarcaTermo),
+        tamanhoPagina: "A4 portrait",
+        margemPagina: "7mm",
+        paddingRaiz: "4px",
+        estilosExtras: `
+          * { box-sizing: border-box; }
+          body { font-family: Arial, sans-serif; margin: 0; color: #0f172a; background: #fff; }
+          .folha { padding: 0; }
+          .topo { border: 1px solid #bbf7d0; border-radius: 8px; background: #ffffff; margin-bottom: 8px; overflow: hidden; }
+          .g3-topo-faixa { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; background: #0f8a57; color: #ffffff; }
+          .g3-topo-marca { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; }
+          .g3-topo-selo { border: 1px solid rgba(255,255,255,0.35); border-radius: 999px; padding: 2px 7px; font-size: 11px; font-weight: 600; background: rgba(255,255,255,0.12); }
+          .g3-topo-corpo { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 10px; padding: 8px 10px; }
+          .g3-topo-logo { width: 52px; height: 52px; object-fit: contain; border-radius: 8px; background: #ffffff; border: 1px solid #dbe7df; padding: 4px; }
+          .g3-topo-texto { text-align: center; }
+          h1 { margin: 0; font-size: 15px; font-weight: 700; color: #14532d; }
+          h2 { margin: 2px 0 2px; font-size: 19px; line-height: 1; letter-spacing: 0.04em; text-transform: uppercase; color: #1f2937; font-weight: 800; }
+          .subtitulo { margin: 0; font-size: 11px; color: #475569; }
+          .meta-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 0 10px 8px; }
+          .meta-item, .info-grid > div { border: 1px solid #dbe7df; border-radius: 5px; background: #ffffff; padding: 4px 5px; min-height: 0; }
+          .meta-item strong, .info-grid strong { display: block; margin-bottom: 1px; font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.03em; }
+          .meta-item span, .info-grid span { font-size: 12px; color: #0f172a; line-height: 1.2; }
+          .corpo { display: grid; gap: 6px; }
+          .bloco { border: 1px solid #e2e8f0; border-radius: 7px; padding: 7px; background: #ffffff; break-inside: avoid; }
+          h3 { margin: 0 0 5px; font-size: 12px; color: #14532d; text-transform: uppercase; letter-spacing: 0.04em; }
+          .info-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
+          .tabela-wrap { overflow: hidden; border: 1px solid #dbe7df; border-radius: 6px; }
+          table { width: 100%; border-collapse: collapse; font-size: 11px; line-height: 1.2; }
+          th { background: #dcfce7; color: #14532d; text-align: left; padding: 3px 4px; border-bottom: 1px solid #bbf7d0; }
+          td { padding: 2px 4px; border-bottom: 1px solid #e2e8f0; }
+          tr:last-child td { border-bottom: 0; }
+          .vazio { text-align: center; color: #64748b; padding: 8px; }
+          .texto p { margin: 0 0 4px; font-size: 11px; line-height: 1.25; color: #334155; }
+          .assinaturas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; padding: 22px 10px 2px; }
+          .assinaturas span { display: block; border-top: 1px solid #0f172a; margin-bottom: 4px; }
+          .assinaturas strong { display: block; text-align: center; font-size: 11px; color: #334155; }
+          .rodape { margin-top: 7px; border-top: 1px solid #cbd5e1; padding-top: 5px; text-align: center; font-size: 9px; color: #475569; line-height: 1.2; }
+          @media print { .folha { padding: 0; } .topo, .bloco { break-inside: avoid; } }
+        `
+      });
+    } catch {
+      window.print();
+    }
+
+    window.setTimeout(() => arquivoLogomarca?.revoke?.(), 60_000);
+  }
+
   function imprimir() {
     try {
       if ((abaAtiva === "cadastro" || abaAtiva === "itens") && form.id) {
-        imprimirConteudoAtual({
-          titulo: `Termo de empréstimo #${form.id}`,
-          seletor: "#emprestimo-eventos-termo"
-        });
+        void imprimirTermoEmprestimo();
         return;
       }
 
@@ -1155,7 +1380,7 @@ export function EmprestimoEventosPage() {
             </div>
             <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]">
               <table className="min-w-full text-sm"><thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"><tr><th className="px-3 py-2 text-left">Código</th><th className="px-3 py-2 text-left">Evento</th><th className="px-3 py-2 text-left">Retirada</th><th className="px-3 py-2 text-left">Devolução</th><th className="px-3 py-2 text-left">Status</th><th className="px-3 py-2 text-left">Itens</th><th className="px-3 py-2 text-right">Ações</th></tr></thead>
-                <tbody>{carregandoEmprestimos ? <tr><td colSpan={7} className="px-3 py-4 text-center">Carregando empréstimos...</td></tr> : emprestimos.length ? emprestimos.map((item, i) => <tr key={item.id} className={`border-t border-[var(--g3-border)] ${i % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35"}`}><td className="px-3 py-2">{item.id}</td><td className="px-3 py-2 font-medium">{item.evento.titulo}</td><td className="px-3 py-2">{fmt(item.dataRetiradaPrevista)}</td><td className="px-3 py-2">{fmt(item.dataDevolucaoPrevista)}</td><td className="px-3 py-2">{item.status}</td><td className="px-3 py-2">{item.itens?.length ?? 0}</td><td className="px-3 py-2 text-right"><Button variant="outline" size="sm" onClick={() => selecionarEmprestimo(item)}>Selecionar</Button></td></tr>) : <tr><td colSpan={7} className="px-3 py-4 text-center">Nenhum empréstimo encontrado.</td></tr>}</tbody>
+                <tbody>{carregandoEmprestimos ? <tr><td colSpan={7} className="px-3 py-4 text-center">Carregando empréstimos...</td></tr> : emprestimos.length ? emprestimos.map((item) => <tr key={item.id} className={`border-t border-[var(--g3-border)] transition hover:brightness-[0.98] ${classesLinhaStatusEmprestimo[item.status] ?? "bg-[var(--g3-card)]"}`}><td className="px-3 py-2">{item.id}</td><td className="px-3 py-2 font-medium">{item.evento.titulo}</td><td className="px-3 py-2">{fmt(item.dataRetiradaPrevista)}</td><td className="px-3 py-2">{fmt(item.dataDevolucaoPrevista)}</td><td className="px-3 py-2">{item.status}</td><td className="px-3 py-2">{item.itens?.length ?? 0}</td><td className="px-3 py-2 text-right"><Button variant="outline" size="sm" onClick={() => selecionarEmprestimo(item)}>Selecionar</Button></td></tr>) : <tr><td colSpan={7} className="px-3 py-4 text-center">Nenhum empréstimo encontrado.</td></tr>}</tbody>
               </table>
             </div>
           </section>
