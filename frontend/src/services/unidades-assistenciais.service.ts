@@ -46,5 +46,12 @@ export const unidadesAssistenciaisService = {
 
   async remover(id: string): Promise<void> {
     await httpClient.delete(`/api/unidades-assistenciais/${id}`);
+  },
+
+  async verificarVinculosSala(salaId: string): Promise<{ possuiVinculo: boolean; total: number }> {
+    const { data } = await httpClient.get<{ possuiVinculo: boolean; total: number }>(
+      `/api/unidades-assistenciais/salas/${salaId}/vinculos`
+    );
+    return data;
   }
 };

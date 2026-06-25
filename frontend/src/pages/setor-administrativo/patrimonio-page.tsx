@@ -42,7 +42,10 @@ import {
   useRegistrarMovimentoPatrimonio,
   useSalvarPatrimonio
 } from "@/features/patrimonios/use-patrimonios";
-import { useUnidadeAssistencialAtual } from "@/features/unidades-assistenciais/use-unidades-assistenciais";
+import {
+  useUnidadeAssistencialAtual,
+  useUnidadesAssistenciais
+} from "@/features/unidades-assistenciais/use-unidades-assistenciais";
 import { resolverUrlArquivo } from "@/lib/arquivos";
 import { formatarCnpj, formatarTelefone } from "@/lib/br-utils";
 import { imprimirConteudoAtual, imprimirHtmlSemJanela } from "@/lib/report-utils";
@@ -55,7 +58,7 @@ type AbaId =
   | "visual"
   | "movimentacao"
   | "listagem";
-type CampoFormulario = "numeroPatrimonio" | "nome" | "valorAquisicao" | "taxaDepreciacao";
+type CampoFormulario = "numeroPatrimonio" | "nome" | "categoria" | "valorAquisicao" | "taxaDepreciacao";
 type CampoMovimento = "dataMovimento";
 
 type MovimentoAssistido = PatrimonioMovimento & {
@@ -96,17 +99,19 @@ const abas: AdminTab[] = [
 ];
 
 const tituloTela = "Patrimônio";
-const categoriasPadrao = [
-  "Equipamentos de informática",
-  "Mobiliário",
-  "Eletrodomésticos",
-  "Telefonia",
-  "Veículos",
-  "Instrumentos",
-  "Máquinas",
-  "Material permanente",
-  "Outros"
+const categoriasPatrimonio = [
+  { nome: "Equipamentos de informática", taxaDepreciacao: 10 },
+  { nome: "Mobiliário", taxaDepreciacao: 10 },
+  { nome: "Eletrodomésticos", taxaDepreciacao: 10 },
+  { nome: "Telefonia", taxaDepreciacao: 20 },
+  { nome: "Veículos", taxaDepreciacao: 20 },
+  { nome: "Instrumentos", taxaDepreciacao: 10 },
+  { nome: "Máquinas", taxaDepreciacao: 10 },
+  { nome: "Material permanente", taxaDepreciacao: 10 },
+  { nome: "Imóveis e construções", taxaDepreciacao: 4 },
+  { nome: "Outros", taxaDepreciacao: 10 }
 ];
+const categoriasPadrao = categoriasPatrimonio.map((item) => item.nome);
 const conservacaoOptions = ["Novo", "Bom", "Regular", "Ruim", "Inservível"];
 const statusOptions = ["Ativo", "Em manutenção", "Em empréstimo", "Baixado / Inativo"];
 const origemOptions = ["Compra", "Doação", "Transferência", "Comodato", "Produção própria"];
@@ -172,6 +177,26 @@ function formatarMoeda(valor?: number | null) {
   });
 }
 
+function normalizarValorMonetario(valor: string) {
+  const digitos = valor.replace(/\D/g, "");
+  if (!digitos) return 0;
+  return Number(digitos) / 100;
+}
+
+function formatarValorMonetarioInput(valor?: number | null) {
+  return formatarMoeda(Number(valor ?? 0));
+}
+
+function extrairNumeroSequencial(valor?: string | null) {
+  const match = String(valor ?? "").match(/\d+/g);
+  if (!match?.length) return null;
+  return Number(match[match.length - 1]);
+}
+
+function formatarNumeroSequencial(numero: number, tamanho = 3) {
+  return String(numero).padStart(tamanho, "0");
+}
+
 function normalizarBusca(valor?: string | null) {
   return (valor ?? "")
     .normalize("NFD")
@@ -233,9 +258,13 @@ function calcularValorContabilEstimado(item: Patrimonio) {
   if (Number.isNaN(dataAquisicao.getTime())) return valor;
 
   const hoje = new Date();
-  const anos = Math.max(0, (hoje.getTime() - dataAquisicao.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
-  const fator = Math.max(0, 1 - (taxa / 100) * anos);
-  return Math.max(0, valor * fator);
+  const meses =
+    (hoje.getFullYear() - dataAquisicao.getFullYear()) * 12 +
+    (hoje.getMonth() - dataAquisicao.getMonth()) -
+    (hoje.getDate() < dataAquisicao.getDate() ? 1 : 0);
+  const mesesDepreciados = Math.max(0, meses);
+  const depreciacao = valor * (taxa / 100) * (mesesDepreciados / 12);
+  return Math.max(0, valor - depreciacao);
 }
 
 function listarPendencias(item: Partial<Patrimonio>) {
@@ -548,6 +577,7 @@ export function PatrimonioPage() {
   const [edicaoLote, setEdicaoLote] = useState<EdicaoLote>(defaultEdicaoLote);
   const [somenteCamposVaziosLote, setSomenteCamposVaziosLote] = useState(true);
   const [formatoEtiquetaId, setFormatoEtiquetaId] = useState<FormatoEtiquetaId>("80x50");
+  const [mostrarNumerosVagos, setMostrarNumerosVagos] = useState(false);
   const [form, setForm] = useState<Patrimonio>(defaultForm);
   const [snapshot, setSnapshot] = useState<Patrimonio>(defaultForm);
   const [movimento, setMovimento] = useState<MovimentoAssistido>(criarMovimentoPadrao());
@@ -561,11 +591,13 @@ export function PatrimonioPage() {
 
   const { data, isLoading } = usePatrimonios();
   const unidadeAtualQuery = useUnidadeAssistencialAtual();
+  const unidadesAssistenciaisQuery = useUnidadesAssistenciais({});
   const salvarMutation = useSalvarPatrimonio();
   const atualizarLoteMutation = useAtualizarPatrimoniosEmLote();
   const movimentoMutation = useRegistrarMovimentoPatrimonio();
 
   const patrimonios = data?.patrimonios ?? [];
+  const unidadesAssistenciais = unidadesAssistenciaisQuery.data?.unidades ?? [];
   const unidadeAtual = unidadeAtualQuery.data?.unidade;
   const nomeInstituicao =
     unidadeAtual?.razao_social?.trim() ||
@@ -577,29 +609,54 @@ export function PatrimonioPage() {
     salvarMutation.isPending || movimentoMutation.isPending || atualizarLoteMutation.isPending;
   const possuiRegistroSelecionado = Boolean(form.idPatrimonio);
 
-  const categoriasDisponiveis = useMemo(
+  const categoriasDisponiveis = useMemo(() => categoriasPadrao, []);
+  const categoriaSelecionada = useMemo(
+    () => categoriasPatrimonio.find((item) => normalizarBusca(item.nome) === normalizarBusca(form.categoria)),
+    [form.categoria]
+  );
+  const numerosPatrimonio = useMemo(
     () =>
-      Array.from(
-        new Set([...categoriasPadrao, ...patrimonios.map((item) => item.categoria?.trim() || "").filter(Boolean)])
-      ).sort((a, b) => a.localeCompare(b, "pt-BR")),
+      patrimonios
+        .map((item) => extrairNumeroSequencial(item.numeroPatrimonio))
+        .filter((numero): numero is number => typeof numero === "number" && Number.isInteger(numero) && numero > 0)
+        .sort((a, b) => a - b),
     [patrimonios]
   );
+  const ultimoNumeroPatrimonial = numerosPatrimonio[numerosPatrimonio.length - 1] ?? 0;
+  const proximoNumeroPatrimonial = formatarNumeroSequencial(ultimoNumeroPatrimonial + 1);
+  const numerosPatrimoniaisVagos = useMemo(() => {
+    if (!numerosPatrimonio.length) return [];
+    const existentes = new Set(numerosPatrimonio);
+    const vagas: string[] = [];
+    const ultimo = numerosPatrimonio[numerosPatrimonio.length - 1] ?? 0;
+    for (let numero = 1; numero < ultimo; numero += 1) {
+      if (!existentes.has(numero)) vagas.push(formatarNumeroSequencial(numero));
+      if (vagas.length >= 80) break;
+    }
+    return vagas;
+  }, [numerosPatrimonio]);
 
   const unidadesDisponiveis = useMemo(
     () =>
-      Array.from(new Set(patrimonios.map((item) => item.unidade?.trim() || "").filter(Boolean))).sort((a, b) =>
-        a.localeCompare(b, "pt-BR")
-      ),
-    [patrimonios]
+      Array.from(
+        new Set(unidadesAssistenciais.map((item) => item.nome_fantasia?.trim() || "").filter(Boolean))
+      ).sort((a, b) => a.localeCompare(b, "pt-BR")),
+    [unidadesAssistenciais]
   );
 
-  const salasDisponiveis = useMemo(
-    () =>
-      Array.from(new Set(patrimonios.map((item) => item.sala?.trim() || "").filter(Boolean))).sort((a, b) =>
-        a.localeCompare(b, "pt-BR")
-      ),
-    [patrimonios]
-  );
+  const salasDisponiveis = useMemo(() => {
+    const unidadeSelecionada = normalizarBusca(form.unidade);
+    if (!unidadeSelecionada) return [];
+
+    const salasDasUnidades = unidadesAssistenciais
+      .filter((unidade) => normalizarBusca(unidade.nome_fantasia) === unidadeSelecionada)
+      .flatMap((unidade) => unidade.salas ?? [])
+      .filter((sala) => sala.ativo ?? true)
+      .map((sala) => sala.nome?.trim() || "")
+      .filter(Boolean);
+
+    return Array.from(new Set(salasDasUnidades)).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [form.unidade, unidadesAssistenciais]);
 
   const locaisPatrimonioDisponiveis = useMemo(
     () =>
@@ -742,6 +799,13 @@ export function PatrimonioPage() {
     if (campo === "nome") {
       return String(valor ?? "").trim().length >= 2 ? "" : "Informe o nome do bem.";
     }
+    if (campo === "categoria") {
+      const categoria = String(valor ?? "").trim();
+      if (!categoria) return "Selecione a categoria do bem.";
+      return categoriasPatrimonio.some((item) => normalizarBusca(item.nome) === normalizarBusca(categoria))
+        ? ""
+        : "Categoria não cadastrada. Selecione uma categoria existente para evitar duplicidade.";
+    }
     if (campo === "valorAquisicao") {
       return Number(valor ?? 0) >= 0 ? "" : "O valor de aquisição não pode ser negativo.";
     }
@@ -766,7 +830,7 @@ export function PatrimonioPage() {
 
   function validarFormulario() {
     const proximo: Partial<Record<CampoFormulario, string>> = {};
-    (["numeroPatrimonio", "nome", "valorAquisicao", "taxaDepreciacao"] as CampoFormulario[]).forEach(
+    (["numeroPatrimonio", "nome", "categoria", "valorAquisicao", "taxaDepreciacao"] as CampoFormulario[]).forEach(
       (campo) => {
         const mensagem = validarCampoFormulario(campo);
         if (mensagem) proximo[campo] = mensagem;
@@ -806,9 +870,11 @@ export function PatrimonioPage() {
   }
 
   function novo() {
-    setForm(defaultForm);
-    setSnapshot(defaultForm);
-    setMovimento(criarMovimentoPadrao());
+    const proximo = { ...defaultForm, numeroPatrimonio: proximoNumeroPatrimonial };
+    setForm(proximo);
+    setSnapshot(proximo);
+    setMovimento(criarMovimentoPadrao(proximo));
+    setMostrarNumerosVagos(false);
     setSelecionadosIds([]);
     setErros({});
     setErrosMovimento({});
@@ -824,6 +890,7 @@ export function PatrimonioPage() {
     setForm(proximo);
     setSnapshot(proximo);
     setMovimento(criarMovimentoPadrao(proximo));
+    setMostrarNumerosVagos(false);
     setErros({});
     setErrosMovimento({});
     setAbaAtiva("cadastro");
@@ -1914,7 +1981,7 @@ export function PatrimonioPage() {
                   <Input
                     value={form.numeroPatrimonio}
                     className={erros.numeroPatrimonio ? "border-rose-400 focus:ring-rose-400" : undefined}
-                    placeholder="Ex.: 000123"
+                    placeholder={proximoNumeroPatrimonial}
                     onChange={(event) =>
                       setForm((atual) => ({ ...atual, numeroPatrimonio: event.target.value }))
                     }
@@ -1923,9 +1990,52 @@ export function PatrimonioPage() {
                   {erros.numeroPatrimonio ? (
                     <p className="text-xs text-rose-700">{erros.numeroPatrimonio}</p>
                   ) : (
-                    <p className="text-xs text-[var(--g3-muted)]">
-                      Use o identificador oficial que será rastreado na instituição.
-                    </p>
+                    <div className="space-y-1 text-xs text-[var(--g3-muted)]">
+                      <p>Último registrado: {ultimoNumeroPatrimonial ? formatarNumeroSequencial(ultimoNumeroPatrimonial) : "---"} • Próximo sugerido: {proximoNumeroPatrimonial}</p>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            setForm((atual) => ({ ...atual, numeroPatrimonio: proximoNumeroPatrimonial }))
+                          }
+                        >
+                          Usar próximo
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setMostrarNumerosVagos((atual) => !atual)}
+                        >
+                          Ver números vagos
+                        </Button>
+                      </div>
+                      {mostrarNumerosVagos ? (
+                        <div className="rounded-md border border-[var(--g3-border)] bg-[var(--g3-card)] p-2">
+                          {numerosPatrimoniaisVagos.length ? (
+                            <div className="flex max-h-24 flex-wrap gap-1 overflow-auto">
+                              {numerosPatrimoniaisVagos.map((numero) => (
+                                <button
+                                  key={numero}
+                                  type="button"
+                                  className="rounded border border-[var(--g3-border)] px-2 py-1 text-xs text-[var(--g3-foreground)] hover:bg-[var(--g3-primary-soft)]"
+                                  onClick={() => {
+                                    setForm((atual) => ({ ...atual, numeroPatrimonio: numero }));
+                                    setMostrarNumerosVagos(false);
+                                  }}
+                                >
+                                  {numero}
+                                </button>
+                              ))}
+                            </div>
+                          ) : (
+                            <p>Nenhum número vago encontrado na sequência atual.</p>
+                          )}
+                        </div>
+                      ) : null}
+                    </div>
                   )}
                 </div>
 
@@ -1943,12 +2053,33 @@ export function PatrimonioPage() {
 
                 <div className="space-y-1">
                   <Label>Categoria</Label>
-                  <Input
-                    list="patrimonio-categorias"
+                  <Select
                     value={form.categoria ?? ""}
-                    placeholder="Selecione ou digite"
-                    onChange={(event) => setForm((atual) => ({ ...atual, categoria: event.target.value }))}
-                  />
+                    className={erros.categoria ? "border-rose-400 focus:ring-rose-400" : undefined}
+                    onChange={(event) => {
+                      const categoria = categoriasPatrimonio.find((item) => item.nome === event.target.value);
+                      setForm((atual) => ({
+                        ...atual,
+                        categoria: event.target.value,
+                        taxaDepreciacao: categoria?.taxaDepreciacao ?? atual.taxaDepreciacao
+                      }));
+                    }}
+                    onBlur={() => atualizarErroFormulario("categoria")}
+                  >
+                    <option value="">Selecione a categoria</option>
+                    {categoriasPatrimonio.map((item) => (
+                      <option key={item.nome} value={item.nome}>
+                        {item.nome} - {item.taxaDepreciacao}% ao ano
+                      </option>
+                    ))}
+                  </Select>
+                  {erros.categoria ? (
+                    <p className="text-xs text-rose-700">{erros.categoria}</p>
+                  ) : (
+                    <p className="text-xs text-[var(--g3-muted)]">
+                      Use categorias da base para evitar duplicidade de escrita.
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-1">
@@ -2022,15 +2153,13 @@ export function PatrimonioPage() {
                 <div className="space-y-1">
                   <Label>Valor de aquisição</Label>
                   <Input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={Number(form.valorAquisicao ?? 0)}
+                    inputMode="numeric"
+                    value={formatarValorMonetarioInput(form.valorAquisicao)}
                     className={erros.valorAquisicao ? "border-rose-400 focus:ring-rose-400" : undefined}
                     onChange={(event) =>
                       setForm((atual) => ({
                         ...atual,
-                        valorAquisicao: Number(event.target.value) || 0
+                        valorAquisicao: normalizarValorMonetario(event.target.value)
                       }))
                     }
                     onBlur={() => atualizarErroFormulario("valorAquisicao")}
@@ -2065,7 +2194,9 @@ export function PatrimonioPage() {
                     <p className="text-xs text-rose-700">{erros.taxaDepreciacao}</p>
                   ) : (
                     <p className="text-xs text-[var(--g3-muted)]">
-                      Ajuda a estimar o valor atual do bem ao longo do tempo.
+                      {categoriaSelecionada
+                        ? `Sugestão da categoria ${categoriaSelecionada.nome}: ${categoriaSelecionada.taxaDepreciacao}% ao ano.`
+                        : "Ajuda a estimar o valor atual do bem ao longo do tempo."}
                     </p>
                   )}
                 </div>
@@ -2125,22 +2256,42 @@ export function PatrimonioPage() {
                 <CardContent className="grid gap-3 md:grid-cols-2">
                   <div className="space-y-1">
                     <Label>Unidade</Label>
-                    <Input
-                      list="patrimonio-unidades"
+                    <Select
                       value={form.unidade ?? ""}
-                      placeholder="Selecione ou digite"
-                      onChange={(event) => setForm((atual) => ({ ...atual, unidade: event.target.value }))}
-                    />
+                      onChange={(event) =>
+                        setForm((atual) => ({ ...atual, unidade: event.target.value, sala: "" }))
+                      }
+                    >
+                      <option value="">Selecione a unidade</option>
+                      {unidadesDisponiveis.map((item) => (
+                        <option key={item} value={item}>
+                          {item}
+                        </option>
+                      ))}
+                    </Select>
                   </div>
 
                   <div className="space-y-1">
                     <Label>Sala</Label>
-                    <Input
-                      list="patrimonio-salas"
+                    <Select
                       value={form.sala ?? ""}
-                      placeholder="Selecione ou digite"
                       onChange={(event) => setForm((atual) => ({ ...atual, sala: event.target.value }))}
-                    />
+                      disabled={!form.unidade}
+                    >
+                      <option value="">
+                        {form.unidade ? "Selecione a sala" : "Selecione a unidade primeiro"}
+                      </option>
+                      {salasDisponiveis.map((item) => (
+                        <option key={item} value={item}>
+                          {item}
+                        </option>
+                      ))}
+                    </Select>
+                    {form.unidade && salasDisponiveis.length === 0 ? (
+                      <p className="text-xs text-[var(--g3-muted)]">
+                        Nenhuma sala de atendimento cadastrada para esta unidade.
+                      </p>
+                    ) : null}
                   </div>
 
                   <div className="space-y-1 md:col-span-2">

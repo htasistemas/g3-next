@@ -32,6 +32,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { buscarEnderecoPorCep } from "@/services/cep.service";
+import { unidadesAssistenciaisService } from "@/services/unidades-assistenciais.service";
 import { reportsService } from "@/services/reports.service";
 import {
   unidadeAssistencialDefaultValues,
@@ -133,7 +134,8 @@ function mapUnidadeParaFormulario(unidade: UnidadeAssistencial): UnidadeAssisten
     salas:
       unidade.salas?.map((sala) => ({
         id: sala.id,
-        nome: sala.nome ?? ""
+        nome: sala.nome ?? "",
+        ativo: sala.ativo ?? true
       })) ?? []
   };
 }
@@ -154,13 +156,14 @@ function limparDiretoria(payload: Array<Partial<DiretoriaUnidade>>): DiretoriaUn
     .filter((membro) => membro.nome_completo && membro.documento && membro.funcao);
 }
 
-function limparSalas(payload: Array<{ id?: string; nome?: string }>) {
+function limparSalas(payload: Array<{ id?: string; nome?: string; ativo?: boolean }>) {
   const salasNormalizadas = payload
     .map((sala) => {
       const salaNormalizada = normalizarObjetoTexto(sala, mapaSalaUnidadeForm);
       return {
         id: sala.id,
-        nome: salaNormalizada.nome?.trim() ?? ""
+        nome: salaNormalizada.nome?.trim() ?? "",
+        ativo: sala.ativo ?? true
       };
     })
     .filter((sala) => sala.nome.length > 0);
@@ -232,6 +235,7 @@ export function CadastroUnidadeAssistencialPage() {
   const [mensagem, setMensagem] = useState<{ tipo: "sucesso" | "erro"; texto: string } | null>(null);
   const [popupSalvarAberto, setPopupSalvarAberto] = useState(false);
   const [popupExcluirAberto, setPopupExcluirAberto] = useState(false);
+  const [nomeSalaNova, setNomeSalaNova] = useState("");
   const [carregandoCep, setCarregandoCep] = useState(false);
   const [imprimindoRelatorio, setImprimindoRelatorio] = useState(false);
   const [previewLogomarcaUrl, setPreviewLogomarcaUrl] = useState("");
@@ -276,7 +280,8 @@ export function CadastroUnidadeAssistencialPage() {
     replace: replaceSalas
   } = useFieldArray({
     control,
-    name: "salas"
+    name: "salas",
+    keyName: "fieldId"
   });
 
   const cepAtual = watch("cep") || "";
@@ -291,6 +296,7 @@ export function CadastroUnidadeAssistencialPage() {
   const estadoAtual = watch("estado") || "";
   const logomarcaAtual = watch("logomarca") || "";
   const logomarcaRelatorioAtual = watch("logomarca_relatorio") || "";
+  const salasAtendimento = watch("salas") ?? [];
 
   useEffect(() => {
     if (!unidadeData?.unidade) return;
@@ -298,6 +304,7 @@ export function CadastroUnidadeAssistencialPage() {
     reset(values);
     replaceDiretoria(values.diretoria ?? []);
     replaceSalas(values.salas ?? []);
+    setNomeSalaNova("");
     setSnapshot(values);
     setMensagem(null);
     setAbaAtiva("dados");
@@ -513,17 +520,62 @@ export function CadastroUnidadeAssistencialPage() {
     }
   }
 
-  function aplicarFormatacaoSala(indice: number) {
-    const chave = `salas.${indice}.nome` as const;
-    const valorAtual = getValues(chave);
-    const valorFormatado = formatarTextoPorCampo("nome", valorAtual, mapaSalaUnidadeForm);
+  function normalizarNomeSala(valor: string) {
+    const salaNormalizada = normalizarObjetoTexto({ nome: valor }, mapaSalaUnidadeForm);
+    return salaNormalizada.nome?.trim() ?? "";
+  }
 
-    if (typeof valorAtual === "string" && typeof valorFormatado === "string" && valorAtual !== valorFormatado) {
-      setValue(chave, valorFormatado, {
-        shouldDirty: true,
-        shouldValidate: true
-      });
+  function incluirSalaAtendimento() {
+    const nome = normalizarNomeSala(nomeSalaNova);
+    if (!nome) {
+      setMensagem({ tipo: "erro", texto: "Informe o nome da sala antes de incluir." });
+      return;
     }
+
+    const salasAtuais = getValues("salas") ?? [];
+    const existeSala = salasAtuais.some(
+      (sala) => normalizarNomeSala(sala.nome ?? "").toLocaleLowerCase("pt-BR") === nome.toLocaleLowerCase("pt-BR")
+    );
+    if (existeSala) {
+      setMensagem({ tipo: "erro", texto: "Esta sala já está cadastrada nesta unidade." });
+      return;
+    }
+
+    appendSala({ nome, ativo: true });
+    setNomeSalaNova("");
+    setMensagem(null);
+  }
+
+  async function removerSalaAtendimento(indice: number) {
+    const sala = getValues(`salas.${indice}`);
+    if (sala?.id) {
+      try {
+        const vinculos = await unidadesAssistenciaisService.verificarVinculosSala(sala.id);
+        if (vinculos.possuiVinculo) {
+          setMensagem({
+            tipo: "erro",
+            texto:
+              "Não é possível remover esta sala porque ela possui vínculo de uso no sistema. Use a opção Inativar sala."
+          });
+          return;
+        }
+      } catch (error: any) {
+        setMensagem({
+          tipo: "erro",
+          texto: error?.response?.data?.message ?? "Não foi possível verificar os vínculos da sala."
+        });
+        return;
+      }
+    }
+
+    removerSala(indice);
+    setMensagem(null);
+  }
+
+  function alternarSalaAtiva(indice: number) {
+    const ativa = getValues(`salas.${indice}.ativo`) ?? true;
+    setValue(`salas.${indice}.ativo`, !ativa, { shouldDirty: true, shouldValidate: true });
+    setMensagem(null);
   }
 
   async function carregarLogomarca(
@@ -617,6 +669,7 @@ export function CadastroUnidadeAssistencialPage() {
     setMensagem(null);
     setUnidadeSelecionadaId(undefined);
     setSnapshot(null);
+    setNomeSalaNova("");
     reset(unidadeAssistencialDefaultValues);
     replaceDiretoria([]);
     replaceSalas([]);
@@ -631,6 +684,7 @@ export function CadastroUnidadeAssistencialPage() {
     reset(snapshot);
     replaceDiretoria(snapshot.diretoria ?? []);
     replaceSalas(snapshot.salas ?? []);
+    setNomeSalaNova("");
     setMensagem(null);
   }
 
@@ -1388,18 +1442,28 @@ export function CadastroUnidadeAssistencialPage() {
 
                 {abaAtiva === "salas" && (
                   <section className="space-y-3">
-                    <div className="flex justify-end">
+                    <div className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 md:grid-cols-[1fr_auto] md:items-end">
+                      <div>
+                        <Label htmlFor="nome_sala_nova">Nome da sala</Label>
+                        <Input
+                          id="nome_sala_nova"
+                          value={nomeSalaNova}
+                          onChange={(event) => setNomeSalaNova(event.target.value)}
+                          onBlur={() => setNomeSalaNova((valor) => normalizarNomeSala(valor))}
+                          placeholder="Ex.: Sala 01, Auditório principal"
+                        />
+                      </div>
                       <Button
                         type="button"
-                        variant="outline"
-                        onClick={() => appendSala({ nome: "" })}
+                        variant="default"
+                        onClick={incluirSalaAtendimento}
                       >
                         <Plus className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
-                        Adicionar sala
+                        Incluir sala
                       </Button>
                     </div>
 
-                    {salasFields.length === 0 ? (
+                    {salasAtendimento.length === 0 ? (
                       <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
                         Nenhuma sala ou auditório cadastrado.
                       </p>
@@ -1410,30 +1474,47 @@ export function CadastroUnidadeAssistencialPage() {
                             <tr>
                               <th className="w-16 px-3 py-2 font-semibold">#</th>
                               <th className="px-3 py-2 font-semibold">Nome da sala ou auditório</th>
-                              <th className="w-40 px-3 py-2 text-right font-semibold">Ações</th>
+                              <th className="w-28 px-3 py-2 font-semibold">Status</th>
+                              <th className="w-56 px-3 py-2 text-right font-semibold">Ações</th>
                             </tr>
                           </thead>
                           <tbody>
-                            {salasFields.map((field, indice) => (
+                            {salasAtendimento.map((sala, indice) => (
                               <tr
-                                key={field.id}
+                                key={salasFields[indice]?.fieldId ?? `${sala.id ?? "nova"}-${indice}`}
                                 className={indice % 2 === 0 ? "bg-white" : "bg-emerald-50/30"}
                               >
                                 <td className="px-3 py-2 text-slate-600">{indice + 1}</td>
                                 <td className="px-3 py-2">
-                                  <Input
-                                    id={`sala_nome_${indice}`}
-                                    {...register(`salas.${indice}.nome`)}
-                                    onBlurCapture={() => aplicarFormatacaoSala(indice)}
-                                    placeholder="Ex.: Sala 01, Auditório Principal"
+                                  <input type="hidden" {...register(`salas.${indice}.id`)} value={sala.id ?? ""} readOnly />
+                                  <input type="hidden" {...register(`salas.${indice}.nome`)} value={sala.nome ?? ""} readOnly />
+                                  <input
+                                    type="hidden"
+                                    {...register(`salas.${indice}.ativo`, { setValueAs: (value) => value === "true" })}
+                                    value={(sala.ativo ?? true) ? "true" : "false"}
+                                    readOnly
                                   />
+                                  <span className="font-medium text-slate-800">{sala.nome}</span>
                                 </td>
-                                <td className="px-3 py-2 text-right">
+                                <td className="px-3 py-2">
+                                  <Badge variant={(sala.ativo ?? true) ? "success" : "default"}>
+                                    {(sala.ativo ?? true) ? "Ativa" : "Inativa"}
+                                  </Badge>
+                                </td>
+                                <td className="space-x-2 px-3 py-2 text-right">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => alternarSalaAtiva(indice)}
+                                  >
+                                    {(sala.ativo ?? true) ? "Inativar" : "Reativar"}
+                                  </Button>
                                   <Button
                                     type="button"
                                     variant="danger"
                                     size="sm"
-                                    onClick={() => removerSala(indice)}
+                                    onClick={() => void removerSalaAtendimento(indice)}
                                   >
                                     <Trash2 className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
                                     Remover

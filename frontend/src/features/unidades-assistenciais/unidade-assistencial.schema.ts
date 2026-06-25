@@ -19,7 +19,8 @@ export const diretoriaUnidadeSchema = z.object({
 
 export const salaUnidadeSchema = z.object({
   id: z.string().optional(),
-  nome: z.string().trim().optional()
+  nome: z.string().trim().optional(),
+  ativo: z.boolean().default(true)
 });
 
 export const unidadeAssistencialFormSchema = z.object({

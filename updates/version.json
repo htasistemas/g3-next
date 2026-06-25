@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.542",
+  "latestVersion": "1.00.547",
   "releaseDate": "2026-06-25",
-  "description": "Termo de emprestimo para eventos mantem letras legiveis com campos compactos.",
+  "description": "Patrimonio ganhou sequencia de numero patrimonial, categorias padronizadas, mascara monetaria e calculo de depreciacao.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.542",
+  "minCompatibleVersion": "1.00.547",
   "releaseType": "stable",
   "downloadUrl": null
 }

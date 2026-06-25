@@ -61,7 +61,8 @@ export function mapUnidadeAssistencialToResponse(record: UnidadeAssistencialDbRe
     })),
     salas: record.salas.map((sala) => ({
       id: toStringId(sala.id),
-      nome: sala.nome
+      nome: sala.nome,
+      ativo: (sala as any).ativo ?? true
     })),
     data_cadastro: record.criadoEm.toISOString(),
     data_atualizacao: record.atualizadoEm.toISOString()

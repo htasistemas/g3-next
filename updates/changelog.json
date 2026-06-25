@@ -1,6 +1,61 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.547",
+                        "releaseDate":  "2026-06-25",
+                        "title":  "Sequência e depreciação no patrimônio",
+                        "description":  "A aba Cadastro patrimonial ganhou sugestão de número, consulta de números vagos, categorias padronizadas, máscara monetária e cálculo de depreciação.",
+                        "changes":  [
+                                        "O campo Número patrimonial sugere o próximo número registrado, permite informar outro número e mostra números vagos da sequência.",
+                                        "O campo Categoria passou a usar base padronizada e sugere taxa anual de depreciação conforme a categoria selecionada.",
+                                        "O Valor de aquisição passou a usar máscara monetária brasileira e a estimativa contábil considera depreciação anual proporcional por meses."
+                                    ]
+                    },
+                    {
+                        "version":  "1.00.546",
+                        "releaseDate":  "2026-06-25",
+                        "title":  "Cadastro de salas por inclusão",
+                        "description":  "A aba Salas de atendimento do Cadastro de unidade assistencial passou a cadastrar salas por inclusão em lista e controlar inativação.",
+                        "changes":  [
+                                        "A aba agora usa um campo único de nome da sala com botão Incluir sala e lista as salas cadastradas abaixo.",
+                                        "A remoção de sala existente verifica vínculos de uso no sistema e orienta a inativação quando a exclusão não for permitida.",
+                                        "Salas passaram a ter status ativa ou inativa, e o Patrimônio lista somente salas ativas da unidade selecionada."
+                                    ]
+                    },
+                    {
+                        "version":  "1.00.545",
+                        "releaseDate":  "2026-06-25",
+                        "title":  "Correção de unidade e sala no patrimônio",
+                        "description":  "A aba Localização e custódia do Patrimônio passou a separar corretamente unidades assistenciais e salas de atendimento.",
+                        "changes":  [
+                                        "O campo Unidade agora lista somente nomes fantasia cadastrados em Cadastro de unidade assistencial.",
+                                        "O campo Sala agora fica vinculado à unidade selecionada e lista somente as salas de atendimento daquela unidade.",
+                                        "O campo Sala fica desabilitado até que uma unidade seja selecionada."
+                                    ]
+                    },
+                    {
+                        "version":  "1.00.544",
+                        "releaseDate":  "2026-06-25",
+                        "title":  "Listas de unidade e sala no patrimônio",
+                        "description":  "Os campos Unidade e Sala da aba Localização e custódia do Patrimônio passaram a abrir opções selecionáveis ao clicar.",
+                        "changes":  [
+                                        "O campo Unidade deixou de usar datalist e passou a usar lista selecionável com nome fantasia das unidades assistenciais.",
+                                        "O campo Sala deixou de usar datalist e passou a usar lista selecionável com as salas da unidade escolhida.",
+                                        "A lista de salas mantém compatibilidade com salas já usadas em patrimônios da mesma unidade."
+                                    ]
+                    },
+                    {
+                        "version":  "1.00.543",
+                        "releaseDate":  "2026-06-25",
+                        "title":  "Unidades e salas no patrimônio",
+                        "description":  "A aba Localização e custódia do Patrimônio passou a sugerir unidades e salas cadastradas nas unidades assistenciais.",
+                        "changes":  [
+                                        "O campo Unidade agora traz o nome fantasia das unidades cadastradas em Cadastro de unidade assistencial.",
+                                        "O campo Sala agora traz as salas cadastradas na aba Salas de atendimento, priorizando a unidade selecionada.",
+                                        "O manual do sistema e a versão oficial foram atualizados na mesma entrega."
+                                    ]
+                    },
+                    {
                         "version":  "1.00.542",
                         "releaseDate":  "2026-06-25",
                         "title":  "Fonte legível no termo de empréstimo",

@@ -27,6 +27,12 @@ unidadeAssistencialRoutes.get(
   asyncHandler(controller.buscarAtual.bind(controller))
 );
 unidadeAssistencialRoutes.get(
+  "/salas/:salaId/vinculos",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.verificarVinculosSala.bind(controller))
+);
+unidadeAssistencialRoutes.get(
   "/:id",
   ensureAuthenticated,
   ensurePermissions(permissoesLeitura),

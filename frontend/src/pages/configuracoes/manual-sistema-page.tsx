@@ -63,7 +63,8 @@ const secoesManual: ManualSecao[] = [
           "Essa recuperação local sem e-mail é apenas de apoio ao desenvolvimento; em ambientes com envio ativo, a senha temporária continua sendo enviada ao endereço cadastrado.",
           "O card Famílias em extrema pobreza foi removido da Visão geral para liberar espaço aos indicadores operacionais de termos, documentos, motoristas, almoxarifado, patrimônio e empréstimos para eventos.",
           "Na impressão da ficha cadastral do beneficiário e no recibo de doação entregue, a logomarca do cabeçalho é carregada diretamente do storage local da unidade quando estiver salva como caminho lógico do sistema.",
-          "No cadastro da unidade assistencial, a Logomarca da unidade vazado preserva o arquivo original enviado pelo cliente, incluindo SVG e imagens com transparência, enquanto a Logomarca do relatório pode ser normalizada para manter compatibilidade de impressão."
+          "No cadastro da unidade assistencial, a Logomarca da unidade vazado preserva o arquivo original enviado pelo cliente, incluindo SVG e imagens com transparência, enquanto a Logomarca do relatório pode ser normalizada para manter compatibilidade de impressão.",
+          "Na aba Salas de atendimento do Cadastro de unidade assistencial, informe o nome da sala e use Incluir sala para montar a lista abaixo; salas vinculadas a uso no sistema não podem ser removidas e devem ser inativadas quando não forem mais utilizadas."
         ]
       }
     ]
@@ -491,7 +492,12 @@ const secoesManual: ManualSecao[] = [
         objetivo: "Controlar bens patrimoniais com cadastro, atualização de estado e histórico de movimentações por instituição.",
         comoUsar: [
           "Use a listagem para localizar rapidamente o patrimônio e abrir o item para edição ou conferência do cadastro.",
+          "Ao cadastrar um bem, o campo Número patrimonial sugere o próximo número da sequência, permite informar outro número manualmente e oferece consulta aos números vagos da sequência atual.",
+          "Na aba Cadastro patrimonial, selecione a Categoria a partir da base padronizada do sistema; a tela não aceita categoria digitada livremente para evitar duplicidade de nomes.",
+          "Ao selecionar uma categoria, a tela sugere a taxa anual de depreciação correspondente e mantém a taxa editável para ajustes do cadastro.",
+          "O campo Valor de aquisição usa máscara monetária brasileira e a estimativa contábil considera a data de aquisição, a taxa anual e a depreciação proporcional por meses.",
           "Ao cadastrar um bem, informe número do patrimônio, nome, categoria, conservação, status, origem, responsável, unidade e demais dados de identificação.",
+          "Na aba Localização e custódia, o campo Unidade lista somente as unidades cadastradas em Cadastro de unidade assistencial pelo nome fantasia; depois de selecionar a unidade, o campo Sala lista somente as salas cadastradas na aba Salas de atendimento daquela unidade.",
           "Use Registrar movimento para lançar movimentação, manutenção ou baixa, mantendo a trilha operacional do bem ao longo do tempo.",
           "Quando o tipo do movimento for Baixa, o sistema atualiza automaticamente o status do patrimônio para refletir a saída do item.",
           "No botão Imprimir, escolha entre Impressão geral para emitir a relação completa dos bens ou Impressão por local para gerar a lista dos itens vinculados a um ambiente específico, como cozinha, sala ou setor.",
@@ -500,6 +506,7 @@ const secoesManual: ManualSecao[] = [
         ],
         atencoes: [
           "A tela Patrimônio agora lista, cadastra, atualiza e movimenta bens sempre dentro do tenant autenticado, impedindo mistura de patrimônios entre instituições.",
+          "O número patrimonial continua com bloqueio de duplicidade por instituição no backend, mesmo quando o usuário informa manualmente um número diferente da sugestão.",
           "A validação do número do patrimônio passou a ser exclusiva por tenant, permitindo que instituições diferentes mantenham suas próprias sequências sem conflito.",
           "A Impressão por local usa a localização atual do cadastro do bem para montar a relação que pode ser fixada no mural do ambiente.",
           "No relatório por local, o cabeçalho também exibe o local selecionado para evitar impressão sem identificação do ambiente."

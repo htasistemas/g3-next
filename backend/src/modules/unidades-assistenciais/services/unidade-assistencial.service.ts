@@ -112,6 +112,11 @@ export class UnidadeAssistencialService {
     );
   }
 
+  async verificarVinculosSala(rawSalaId: string, tenantId?: string) {
+    const salaId = this.parseId(rawSalaId);
+    return this.repository.verificarVinculosSala(salaId, tenantId?.trim());
+  }
+
   private parseId(rawId: string): bigint {
     const id = Number(rawId);
     if (!Number.isInteger(id) || id <= 0) {

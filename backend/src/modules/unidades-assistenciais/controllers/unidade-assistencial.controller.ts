@@ -20,6 +20,11 @@ export class UnidadeAssistencialController {
     return response.json({ unidade });
   }
 
+  async verificarVinculosSala(request: AuthenticatedRequest, response: Response) {
+    const resultado = await service.verificarVinculosSala(request.params.salaId, request.authUser?.tenant_id);
+    return response.json(resultado);
+  }
+
   async criar(request: AuthenticatedRequest, response: Response) {
     const unidade = await service.criar(
       request.body,

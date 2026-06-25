@@ -18,6 +18,7 @@ const unidadeInclude = {
 
 type TransactionClient = Prisma.TransactionClient;
 type IdRow = { id: bigint };
+type SalaNormalizada = { id?: bigint; nome: string; ativo: boolean };
 
 function hasAnyAddressData(input: UnidadeAssistencialInput): boolean {
   return !!(
@@ -64,19 +65,37 @@ function normalizarDiretoria(diretoria?: DiretoriaUnidadeInput[]) {
   }>;
 }
 
-function normalizarSalas(salas?: SalaUnidadeInput[]) {
+function parseSalaId(id?: string | number) {
+  if (id === undefined || id === null || id === "") return undefined;
+  try {
+    return BigInt(id);
+  } catch {
+    return undefined;
+  }
+}
+
+function normalizarSalas(salas?: SalaUnidadeInput[]): SalaNormalizada[] {
   if (!salas?.length) return [];
   const nomesUnicos = new Set<string>();
+  const idsUnicos = new Set<string>();
+  const resultado: SalaNormalizada[] = [];
   for (const sala of salas) {
     const nome = trimOrUndefined(sala.nome);
     if (!nome) continue;
-    nomesUnicos.add(nome);
+    const id = parseSalaId(sala.id);
+    const chaveId = id?.toString();
+    const chaveNome = nome.toLocaleLowerCase("pt-BR");
+    if ((chaveId && idsUnicos.has(chaveId)) || nomesUnicos.has(chaveNome)) continue;
+    if (chaveId) idsUnicos.add(chaveId);
+    nomesUnicos.add(chaveNome);
+    resultado.push({ id, nome, ativo: sala.ativo ?? true });
   }
-  return Array.from(nomesUnicos);
+  return resultado;
 }
 
 export class UnidadeAssistencialRepository {
   async listar(filters: UnidadeAssistencialFilters, tenantId?: string) {
+    await this.garantirColunaSalaAtivo();
     if (!tenantId) {
       const where: Prisma.UnidadeAssistencialWhereInput = {};
 
@@ -106,11 +125,12 @@ export class UnidadeAssistencialRepository {
         where.unidadePrincipal = filters.unidade_principal;
       }
 
-      return prisma.unidadeAssistencial.findMany({
+      const unidades = await prisma.unidadeAssistencial.findMany({
         where,
         include: unidadeInclude,
         orderBy: [{ nomeFantasia: "asc" }]
       });
+      return this.anexarStatusSalas(unidades);
     }
 
     const ids = await this.listarIdsPorTenant(filters, tenantId);
@@ -123,14 +143,17 @@ export class UnidadeAssistencialRepository {
     });
 
     const ordem = new Map(ids.map((id, indice) => [id.toString(), indice]));
-    return unidades.sort((a, b) => (ordem.get(a.id.toString()) ?? 0) - (ordem.get(b.id.toString()) ?? 0));
+    const ordenadas = unidades.sort((a, b) => (ordem.get(a.id.toString()) ?? 0) - (ordem.get(b.id.toString()) ?? 0));
+    return this.anexarStatusSalas(ordenadas);
   }
 
   async buscarPorId(id: bigint) {
-    return prisma.unidadeAssistencial.findUnique({
+    await this.garantirColunaSalaAtivo();
+    const unidade = await prisma.unidadeAssistencial.findUnique({
       where: { id },
       include: unidadeInclude
     });
+    return unidade ? this.anexarStatusSalas(unidade) : null;
   }
 
   async buscarPorIdDoTenant(id: bigint, tenantId?: string) {
@@ -303,14 +326,10 @@ export class UnidadeAssistencialRepository {
 
       const salas = normalizarSalas(input.salas);
       if (salas.length) {
-        await tx.salaUnidade.createMany({
-          data: salas.map((nome) => ({
-            unidadeId: unidade.id,
-            nome,
-            criadoEm: now,
-            atualizadoEm: now
-          }))
-        });
+        await this.garantirColunaSalaAtivo(tx);
+        for (const sala of salas) {
+          await this.criarSala(tx, unidade.id, sala, now);
+        }
       }
 
       return this.buscarPorIdTransacao(tx, unidade.id, tenantId);
@@ -460,17 +479,31 @@ export class UnidadeAssistencialRepository {
       }
 
       if (input.salas) {
-        await tx.salaUnidade.deleteMany({ where: { unidadeId: id } });
+        await this.garantirColunaSalaAtivo(tx);
         const salas = normalizarSalas(input.salas);
-        if (salas.length) {
-          await tx.salaUnidade.createMany({
-            data: salas.map((nome) => ({
-              unidadeId: id,
-              nome,
-              criadoEm: now,
-              atualizadoEm: now
-            }))
-          });
+        const idsRecebidos = salas.map((sala) => sala.id).filter((salaId): salaId is bigint => !!salaId);
+        const salasExistentes = existing.salas ?? [];
+        const salasRemovidas = salasExistentes.filter(
+          (sala) => !idsRecebidos.some((salaId) => salaId === sala.id)
+        );
+
+        for (const sala of salasRemovidas) {
+          const possuiVinculo = await this.salaPossuiVinculo(sala.id, tx);
+          if (possuiVinculo) {
+            throw new AppError(
+              `A sala "${sala.nome}" possui vínculo de uso no sistema. Não é possível remover; inative a sala.`,
+              409
+            );
+          }
+          await tx.salaUnidade.delete({ where: { id: sala.id } });
+        }
+
+        for (const sala of salas) {
+          if (sala.id) {
+            await this.atualizarSala(tx, id, sala, now);
+          } else {
+            await this.criarSala(tx, id, sala, now);
+          }
         }
       }
 
@@ -483,6 +516,28 @@ export class UnidadeAssistencialRepository {
     await prisma.unidadeAssistencial.delete({ where: { id } });
   }
 
+  async verificarVinculosSala(salaId: bigint, tenantId?: string) {
+    await this.garantirColunaSalaAtivo();
+    const rows = await prisma.$queryRawUnsafe<Array<{ id: bigint }>>(
+      `
+      SELECT s.id
+      FROM salas_unidade s
+      INNER JOIN unidade_assistencial ua ON ua.id = s.unidade_id
+      WHERE s.id = $1
+        ${tenantId ? "AND ua.tenant_id::text = $2" : ""}
+      LIMIT 1
+      `,
+      ...(tenantId ? [salaId, tenantId] : [salaId])
+    );
+
+    if (!rows[0]) {
+      throw new AppError("Sala de atendimento nao encontrada.", 404);
+    }
+
+    const total = await this.contarVinculosSala(salaId);
+    return { total, possuiVinculo: total > 0 };
+  }
+
   private async buscarPorIdTransacao(tx: TransactionClient, id: bigint, tenantId?: string) {
     if (tenantId) {
       const pertenceAoTenant = await this.unidadePertenceAoTenant(id, tenantId, tx);
@@ -491,10 +546,106 @@ export class UnidadeAssistencialRepository {
       }
     }
 
-    return tx.unidadeAssistencial.findUnique({
+    const unidade = await tx.unidadeAssistencial.findUnique({
       where: { id },
       include: unidadeInclude
     });
+    return unidade ? this.anexarStatusSalas(unidade, tx) : null;
+  }
+
+  private async garantirColunaSalaAtivo(db: Pick<TransactionClient, "$executeRawUnsafe"> = prisma) {
+    await db.$executeRawUnsafe(
+      "ALTER TABLE salas_unidade ADD COLUMN IF NOT EXISTS ativo BOOLEAN NOT NULL DEFAULT TRUE"
+    );
+  }
+
+  private async criarSala(tx: TransactionClient, unidadeId: bigint, sala: SalaNormalizada, now: Date) {
+    await tx.$executeRawUnsafe(
+      `
+      INSERT INTO salas_unidade (unidade_id, nome, ativo, criado_em, atualizado_em)
+      VALUES ($1, $2, $3, $4, $5)
+      `,
+      unidadeId,
+      sala.nome,
+      sala.ativo,
+      now,
+      now
+    );
+  }
+
+  private async atualizarSala(tx: TransactionClient, unidadeId: bigint, sala: SalaNormalizada, now: Date) {
+    await tx.$executeRawUnsafe(
+      `
+      UPDATE salas_unidade
+      SET nome = $3,
+          ativo = $4,
+          atualizado_em = $5
+      WHERE id = $1
+        AND unidade_id = $2
+      `,
+      sala.id,
+      unidadeId,
+      sala.nome,
+      sala.ativo,
+      now
+    );
+  }
+
+  private async anexarStatusSalas<T extends { salas?: Array<{ id: bigint }> }>(
+    entrada: T,
+    db?: Pick<TransactionClient, "$queryRawUnsafe">
+  ): Promise<T>;
+  private async anexarStatusSalas<T extends { salas?: Array<{ id: bigint }> }>(
+    entrada: T[],
+    db?: Pick<TransactionClient, "$queryRawUnsafe">
+  ): Promise<T[]>;
+  private async anexarStatusSalas<T extends { salas?: Array<{ id: bigint }> }>(
+    entrada: T | T[],
+    db: Pick<TransactionClient, "$queryRawUnsafe"> = prisma
+  ) {
+    const unidades = Array.isArray(entrada) ? entrada : [entrada];
+    const ids = unidades.flatMap((unidade) => unidade.salas?.map((sala) => sala.id) ?? []);
+    if (!ids.length) return entrada;
+
+    const rows = await db.$queryRawUnsafe<Array<{ id: bigint; ativo: boolean }>>(
+      `
+      SELECT id, COALESCE(ativo, TRUE) AS ativo
+      FROM salas_unidade
+      WHERE id = ANY($1::bigint[])
+      `,
+      ids.map((id) => id.toString())
+    );
+    const statusPorId = new Map(rows.map((row) => [row.id.toString(), row.ativo]));
+
+    for (const unidade of unidades) {
+      for (const sala of unidade.salas ?? []) {
+        (sala as any).ativo = statusPorId.get(sala.id.toString()) ?? true;
+      }
+    }
+
+    return entrada;
+  }
+
+  private async salaPossuiVinculo(salaId: bigint, db: Pick<TransactionClient, "$queryRawUnsafe"> = prisma) {
+    return (await this.contarVinculosSala(salaId, db)) > 0;
+  }
+
+  private async contarVinculosSala(salaId: bigint, db: Pick<TransactionClient, "$queryRawUnsafe"> = prisma) {
+    const tabelaRows = await db.$queryRawUnsafe<Array<{ existe: string | null }>>(
+      "SELECT to_regclass('public.cursos_atendimentos')::text AS existe"
+    );
+    if (!tabelaRows[0]?.existe) return 0;
+
+    const rows = await db.$queryRawUnsafe<Array<{ total: bigint }>>(
+      `
+      SELECT COUNT(*)::bigint AS total
+      FROM cursos_atendimentos
+      WHERE sala_id = $1
+      `,
+      salaId
+    );
+
+    return Number(rows[0]?.total ?? 0);
   }
 
   private async listarIdsPorTenant(filters: UnidadeAssistencialFilters, tenantId: string) {
