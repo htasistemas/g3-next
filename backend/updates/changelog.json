@@ -1,5 +1,65 @@
-﻿{
+{
     "entries":  [
+                    {
+                        "version":  "1.00.555",
+                        "releaseDate":  "2026-06-25",
+                        "title":  "Impressao patrimonial por local ajustada",
+                        "description":  "A impressao patrimonial por local passou a usar locais cadastrados e a carregar a logomarca institucional corretamente.",
+                        "changes":  [
+                                        "O seletor de local da impressao patrimonial agora usa as unidades e salas cadastradas.",
+                                        "A logomarca do relatorio patrimonial passou a ser carregada por acesso autenticado antes da impressao.",
+                                        "A impressao por local manteve os mesmos campos do relatorio geral, removendo conservacao e responsavel."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.554",
+                        "releaseDate":  "2026-06-25",
+                        "title":  "Relatorio patrimonial para mural",
+                        "description":  "Os relatorios patrimoniais receberam totalizacao final e a impressao por local ganhou formato para mural da sala.",
+                        "changes":  [
+                                        "Os totais de patrimonio agora aparecem apenas no final da relacao, evitando repeticao em todas as paginas.",
+                                        "A totalizacao passou a separar total incorporado, total depreciado e total geral.",
+                                        "A impressao por local ganhou destaque da localizacao e colunas de conservacao e responsavel para uso em mural."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.553",
+                        "releaseDate":  "2026-06-25",
+                        "title":  "Relatorios patrimoniais com valores",
+                        "description":  "As impressoes de patrimonio foram ajustadas para exibir valores, totalizar a relacao e usar linhas zebradas.",
+                        "changes":  [
+                                        "A Impressao geral do patrimonio passou a exibir o valor de cada bem e o total geral ao final.",
+                                        "A Impressao patrimonial por local recebeu o mesmo tratamento de valores e totalizacao.",
+                                        "As tabelas impressas deixaram de usar grade nos itens e passaram a usar linhas zebradas."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.552",
+                        "releaseDate":  "2026-06-25",
+                        "title":  "Album de eventos e busca patrimonial ajustados",
+                        "description":  "Fotos de eventos e Patrimonio receberam ajustes para restaurar a exibicao do album e refinar a busca/cadastro de bens.",
+                        "changes":  [
+                                        "A aba Album do evento agora carrega cada foto por acesso autenticado, restaurando a exibicao de galerias protegidas.",
+                                        "A busca numerica da listagem de Patrimonio passou a comparar o numero patrimonial de forma exata.",
+                                        "O cadastro patrimonial passou a sugerir a unidade principal e permitir selecionar unidades cadastradas."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.551",
+                        "releaseDate":  "2026-06-25",
+                        "title":  "Imagens autenticadas no mural de eventos",
+                        "description":  "O Mural de eventos passou a carregar as imagens por URL autenticada para restaurar a exibição das fotos protegidas.",
+                        "changes":  [
+                                        "As capas do mural agora são carregadas como blobs autenticados antes da renderização.",
+                                        "O fallback de URL direta foi mantido para imagens antigas em base64 ou caminhos públicos.",
+                                        "Manual do sistema e versão oficial atualizados."
+                                    ],
+                        "releaseType":  "stable"
+                    },
                     {
                         "version":  "1.00.550",
                         "releaseDate":  "2026-06-25",

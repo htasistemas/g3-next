@@ -51,7 +51,7 @@ import {
   useUnidadeAssistencialAtual,
   useUnidadesAssistenciais
 } from "@/features/unidades-assistenciais/use-unidades-assistenciais";
-import { resolverUrlArquivo } from "@/lib/arquivos";
+import { obterUrlArquivoAutenticado, resolverUrlArquivo } from "@/lib/arquivos";
 import { formatarCnpj, formatarTelefone } from "@/lib/br-utils";
 import { imprimirConteudoAtual, imprimirHtmlSemJanela } from "@/lib/report-utils";
 import type { Patrimonio, PatrimonioCategoria, PatrimonioMovimento } from "@/types/patrimonio";
@@ -623,11 +623,16 @@ export function PatrimonioPage() {
   const categoriasCatalogo = categoriasQuery.data?.categorias ?? [];
   const unidadesAssistenciais = unidadesAssistenciaisQuery.data?.unidades ?? [];
   const unidadeAtual = unidadeAtualQuery.data?.unidade;
+  const nomeUnidadePrincipalPatrimonio =
+    unidadesAssistenciais.find((unidade) => unidade.unidade_principal)?.nome_fantasia?.trim() ||
+    unidadeAtual?.nome_fantasia?.trim() ||
+    unidadesAssistenciais[0]?.nome_fantasia?.trim() ||
+    "";
   const nomeInstituicao =
     unidadeAtual?.razao_social?.trim() ||
     unidadeAtual?.nome_fantasia?.trim() ||
     "Instituição não cadastrada";
-  const logomarcaRelatorio = resolverUrlArquivo(unidadeAtual?.logomarca_relatorio || unidadeAtual?.logomarca);
+  const caminhoLogomarcaRelatorio = unidadeAtual?.logomarca_relatorio || unidadeAtual?.logomarca || "";
   const rodapeInstitucional = montarRodapeInstitucional(unidadeAtual ?? undefined);
   const carregandoAcoes =
     salvarMutation.isPending ||
@@ -701,12 +706,18 @@ export function PatrimonioPage() {
     () =>
       Array.from(
         new Set(
-          patrimonios
-            .map((item) => gerarResumoLocalizacao(item.unidade, item.sala))
+          unidadesAssistenciais
+            .flatMap((unidade) => {
+              const nomeUnidade = unidade.nome_fantasia?.trim() || "";
+              const salasAtivas = (unidade.salas ?? []).filter((sala) => sala.ativo ?? true);
+              if (!nomeUnidade) return [];
+              if (!salasAtivas.length) return [gerarResumoLocalizacao(nomeUnidade, "")];
+              return salasAtivas.map((sala) => gerarResumoLocalizacao(nomeUnidade, sala.nome));
+            })
             .filter((item) => item && item !== "---")
         )
       ).sort((a, b) => a.localeCompare(b, "pt-BR")),
-    [patrimonios]
+    [unidadesAssistenciais]
   );
 
   const responsaveisDisponiveis = useMemo(
@@ -730,8 +741,15 @@ export function PatrimonioPage() {
 
   const patrimoniosFiltrados = useMemo(() => {
     const termo = normalizarBusca(busca);
+    const termoBruto = busca.trim();
+    const termoNumerico = /^\d+$/.test(termoBruto);
 
     return patrimoniosAnaliticos.filter(({ item, pendencias }) => {
+      if (termoNumerico) {
+        const numeroNormalizado = String(item.numeroPatrimonio ?? "").replace(/\D/g, "");
+        if (numeroNormalizado !== termoBruto.replace(/\D/g, "")) return false;
+      }
+
       const alvo = normalizarBusca(
         [
           item.numeroPatrimonio,
@@ -747,7 +765,7 @@ export function PatrimonioPage() {
           .join(" ")
       );
 
-      if (termo && !alvo.includes(termo)) return false;
+      if (termo && !termoNumerico && !alvo.includes(termo)) return false;
       if (filtroStatus !== "todos" && normalizarBusca(item.status) !== normalizarBusca(filtroStatus)) return false;
       if (
         filtroCategoria !== "todas" &&
@@ -911,7 +929,11 @@ export function PatrimonioPage() {
   }
 
   function novo() {
-    const proximo = { ...defaultForm, numeroPatrimonio: proximoNumeroPatrimonial };
+    const proximo = {
+      ...defaultForm,
+      numeroPatrimonio: proximoNumeroPatrimonial,
+      unidade: nomeUnidadePrincipalPatrimonio
+    };
     setForm(proximo);
     setSnapshot(proximo);
     setMovimento(criarMovimentoPadrao(proximo));
@@ -1359,36 +1381,77 @@ export function PatrimonioPage() {
     titulo: string,
     subtitulo: string,
     itens: Patrimonio[],
-    localSelecionado?: string
+    localSelecionado?: string,
+    opcoes: {
+      mostrarValores?: boolean;
+      tituloComplemento?: string;
+      formatoMuralLocal?: boolean;
+      logomarcaUrl?: string;
+    } = {}
   ) {
+    const mostrarValores = opcoes.mostrarValores ?? false;
+    const formatoMuralLocal = opcoes.formatoMuralLocal ?? false;
+    const logomarcaUrl = opcoes.logomarcaUrl?.trim() || "";
+    const totalIncorporado = itens.reduce((acc, item) => acc + Number(item.valorAquisicao ?? 0), 0);
+    const totalGeral = itens.reduce((acc, item) => acc + calcularValorContabilEstimado(item), 0);
+    const totalDepreciado = Math.max(0, totalIncorporado - totalGeral);
     const linhas = itens
       .map(
         (item) => `
           <tr>
-            <td>${escaparHtmlRelatorio(item.nome || "---")}</td>
             <td>${escaparHtmlRelatorio(item.numeroPatrimonio || "---")}</td>
+            <td>${escaparHtmlRelatorio(item.nome || "---")}</td>
             <td>${escaparHtmlRelatorio(item.categoria || "---")}</td>
+            ${mostrarValores ? `<td class="valor">${escaparHtmlRelatorio(formatarMoeda(item.valorAquisicao))}</td>` : ""}
           </tr>
         `
       )
       .join("");
     const emitidoEm = formatarDataInterface(new Date().toISOString().slice(0, 10));
+    const colunasBase = 3;
+    const colspanVazio = colunasBase + (mostrarValores ? 1 : 0);
+    const tituloComplemento = opcoes.tituloComplemento?.trim();
+    const linhasTotais = mostrarValores
+      ? `
+          <tr class="totalizador totalizador-inicio">
+            <td colspan="${colspanVazio - 1}">Total incorporado</td>
+            <td class="valor">${escaparHtmlRelatorio(formatarMoeda(totalIncorporado))}</td>
+          </tr>
+          <tr class="totalizador">
+            <td colspan="${colspanVazio - 1}">Total depreciado</td>
+            <td class="valor">${escaparHtmlRelatorio(formatarMoeda(totalDepreciado))}</td>
+          </tr>
+          <tr class="totalizador totalizador-geral">
+            <td colspan="${colspanVazio - 1}">Total geral</td>
+            <td class="valor">${escaparHtmlRelatorio(formatarMoeda(totalGeral))}</td>
+          </tr>
+        `
+      : "";
 
     return `
       <section class="folha">
-        <header class="topo">
+        <header class="topo ${formatoMuralLocal ? "topo-mural" : ""}">
           <div class="g3-topo-faixa">
             <span class="g3-topo-marca">G3N</span>
             <span class="g3-topo-selo">Patrimônio</span>
           </div>
           <div class="g3-topo-corpo">
-            ${logomarcaRelatorio ? `<img src="${escaparHtmlRelatorio(logomarcaRelatorio)}" alt="Logomarca da instituição" class="g3-topo-logo" />` : ""}
+            ${logomarcaUrl ? `<img src="${escaparHtmlRelatorio(logomarcaUrl)}" alt="Logomarca da instituição" class="g3-topo-logo" />` : ""}
             <div class="g3-topo-texto">
               <h1>${escaparHtmlRelatorio(nomeInstituicao)}</h1>
               <h2>${escaparHtmlRelatorio(titulo)}</h2>
+              ${tituloComplemento ? `<div class="titulo-complemento">${escaparHtmlRelatorio(tituloComplemento)}</div>` : ""}
               <p class="subtitulo">${escaparHtmlRelatorio(subtitulo)}</p>
             </div>
           </div>
+          ${
+            formatoMuralLocal
+              ? `<div class="localizacao-destaque">
+                  <span>Localização</span>
+                  <strong>${escaparHtmlRelatorio(localSelecionado?.trim() || "Local não informado")}</strong>
+                </div>`
+              : ""
+          }
           <div class="meta-resumo">
             <span><strong>Setor:</strong> Patrimônio</span>
             <span><strong>Tipo de impressão:</strong> ${escaparHtmlRelatorio(titulo)}</span>
@@ -1401,16 +1464,18 @@ export function PatrimonioPage() {
           <table>
             <thead>
               <tr>
-                <th>Nome do bem</th>
                 <th>Número do patrimônio</th>
+                <th>Nome do bem</th>
                 <th>Categoria</th>
+                ${mostrarValores ? "<th class=\"valor\">Valor</th>" : ""}
               </tr>
             </thead>
             <tbody>
               ${
                 linhas ||
-                '<tr><td colspan="3" class="g3-relatorio__vazio">Nenhum item encontrado para este relatório.</td></tr>'
+                `<tr><td colspan="${colspanVazio}" class="g3-relatorio__vazio">Nenhum item encontrado para este relatório.</td></tr>`
               }
+              ${linhas ? linhasTotais : ""}
             </tbody>
           </table>
         </div>
@@ -1424,22 +1489,43 @@ export function PatrimonioPage() {
     `;
   }
 
-  function imprimirRelatorioPatrimonio(
+  async function obterLogomarcaRelatorioParaImpressao() {
+    if (!caminhoLogomarcaRelatorio?.trim()) return "";
+
+    try {
+      const arquivo = await obterUrlArquivoAutenticado(caminhoLogomarcaRelatorio, {
+        cache: true,
+        auditar: false
+      });
+      return arquivo.url || resolverUrlArquivo(caminhoLogomarcaRelatorio);
+    } catch {
+      return resolverUrlArquivo(caminhoLogomarcaRelatorio);
+    }
+  }
+
+  async function imprimirRelatorioPatrimonio(
     titulo: string,
     subtitulo: string,
     itens: Patrimonio[],
-    localSelecionado?: string
+    localSelecionado?: string,
+    opcoes: { mostrarValores?: boolean; tituloComplemento?: string; formatoMuralLocal?: boolean } = {}
   ) {
     try {
+      const logomarcaUrl = await obterLogomarcaRelatorioParaImpressao();
       imprimirHtmlSemJanela({
         titulo,
-        html: montarHtmlRelatorioPatrimonio(titulo, subtitulo, itens, localSelecionado),
+        html: montarHtmlRelatorioPatrimonio(titulo, subtitulo, itens, localSelecionado, {
+          ...opcoes,
+          logomarcaUrl
+        }),
         tamanhoPagina: "A4 portrait",
         margemPagina: "10mm",
         paddingRaiz: "18px",
         estilosExtras: `
           * {
             box-sizing: border-box;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
           }
 
           body {
@@ -1459,6 +1545,10 @@ export function PatrimonioPage() {
             background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 100%);
             margin-bottom: 16px;
             overflow: hidden;
+          }
+
+          .topo-mural {
+            border-color: #86efac;
           }
 
           .g3-topo-faixa {
@@ -1525,10 +1615,43 @@ export function PatrimonioPage() {
             font-weight: 800;
           }
 
+          .titulo-complemento {
+            margin: -2px 0 6px;
+            font-size: 16px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #166534;
+          }
+
           .subtitulo {
             margin: 0;
             font-size: 13px;
             color: #475569;
+          }
+
+          .localizacao-destaque {
+            margin: 0 18px 14px;
+            padding: 12px 14px;
+            border-radius: 14px;
+            background: #dcfce7;
+            color: #14532d;
+            text-align: center;
+          }
+
+          .localizacao-destaque span {
+            display: block;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+          }
+
+          .localizacao-destaque strong {
+            display: block;
+            margin-top: 3px;
+            font-size: 22px;
+            line-height: 1.15;
           }
 
           .meta-resumo {
@@ -1550,20 +1673,20 @@ export function PatrimonioPage() {
 
           .tabela-wrap {
             overflow: hidden;
-            border: 1px solid #cbd5e1;
             border-radius: 18px;
           }
 
           table {
             width: 100%;
             border-collapse: collapse;
+            page-break-inside: auto;
           }
 
           th {
             background: #166534;
             color: #fff;
             padding: 10px 8px;
-            border: 1px solid #166534;
+            border: 0;
             font-size: 11px;
             text-align: left;
             text-transform: uppercase;
@@ -1571,13 +1694,42 @@ export function PatrimonioPage() {
           }
 
           td {
-            border: 1px solid #cbd5e1;
+            border: 0;
             padding: 8px;
             font-size: 12px;
           }
 
+          tbody tr {
+            break-inside: avoid;
+            page-break-inside: avoid;
+          }
+
+          tbody tr:nth-child(odd) td {
+            background: #ffffff;
+          }
+
           tbody tr:nth-child(even) td {
-            background: #f8fafc;
+            background: #f1f5f9;
+          }
+
+          .valor {
+            text-align: right;
+            white-space: nowrap;
+          }
+
+          .totalizador td {
+            background: #dcfce7;
+            color: #14532d;
+            font-weight: 800;
+          }
+
+          .totalizador-inicio td {
+            border-top: 2px solid #166534;
+          }
+
+          .totalizador-geral td {
+            background: #bbf7d0;
+            font-size: 13px;
           }
 
           .g3-relatorio__vazio {
@@ -1608,16 +1760,18 @@ export function PatrimonioPage() {
     }
   }
 
-  function imprimirRelacaoGeral() {
-    imprimirRelatorioPatrimonio(
+  async function imprimirRelacaoGeral() {
+    await imprimirRelatorioPatrimonio(
       "Impressão geral do patrimônio",
       "Relação completa dos bens patrimoniais cadastrados.",
-      [...patrimonios].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
+      [...patrimonios].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")),
+      undefined,
+      { mostrarValores: true }
     );
     fecharPopupImpressao();
   }
 
-  function imprimirRelacaoPorLocal() {
+  async function imprimirRelacaoPorLocal() {
     const localSelecionado = popupImpressao.localSelecionado.trim();
 
     if (!localSelecionado) {
@@ -1633,11 +1787,12 @@ export function PatrimonioPage() {
       .filter((item) => gerarResumoLocalizacao(item.unidade, item.sala) === localSelecionado)
       .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
 
-    imprimirRelatorioPatrimonio(
-      "Impressão patrimonial por local",
+    await imprimirRelatorioPatrimonio(
+      "Impressão patrimonial",
       `Itens patrimoniais vinculados ao local ${localSelecionado}.`,
       itensLocal,
-      localSelecionado
+      localSelecionado,
+      { mostrarValores: true, tituloComplemento: "Por local", formatoMuralLocal: true }
     );
     fecharPopupImpressao();
   }
@@ -2284,6 +2439,26 @@ export function PatrimonioPage() {
                     placeholder="Selecione ou digite"
                     onChange={(event) => setForm((atual) => ({ ...atual, origem: event.target.value }))}
                   />
+                </div>
+
+                <div className="space-y-1">
+                  <Label>Unidade</Label>
+                  <Select
+                    value={form.unidade ?? ""}
+                    onChange={(event) =>
+                      setForm((atual) => ({ ...atual, unidade: event.target.value, sala: "" }))
+                    }
+                  >
+                    <option value="">Selecione a unidade</option>
+                    {unidadesDisponiveis.map((item) => (
+                      <option key={item} value={item}>
+                        {item}
+                      </option>
+                    ))}
+                  </Select>
+                  <p className="text-xs text-[var(--g3-muted)]">
+                    Novo cadastro usa a unidade principal como sugestão.
+                  </p>
                 </div>
               </CardContent>
             </Card>

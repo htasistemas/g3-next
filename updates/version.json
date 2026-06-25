@@ -1,10 +1,10 @@
-﻿{
-  "latestVersion": "1.00.550",
+{
+  "latestVersion": "1.00.555",
   "releaseDate": "2026-06-25",
-  "description": "Fotos de eventos voltou a exibir imagens no mural usando capa ou primeira foto do album.",
+  "description": "Impressao patrimonial por local passou a usar locais cadastrados e logomarca autenticada.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.550",
+  "minCompatibleVersion": "1.00.555",
   "releaseType": "stable",
   "downloadUrl": null
 }

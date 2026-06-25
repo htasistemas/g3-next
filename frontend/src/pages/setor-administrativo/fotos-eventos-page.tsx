@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowDown,
@@ -40,7 +40,7 @@ import {
   useReordenarFotosEvento,
   useSalvarFotoEvento
 } from "@/features/fotos-eventos/use-fotos-eventos";
-import { resolverUrlArquivo } from "@/lib/arquivos";
+import { obterUrlArquivoAutenticado, resolverUrlArquivo } from "@/lib/arquivos";
 import { imprimirConteudoAtual } from "@/lib/report-utils";
 import type { FotoEventoFotoPayload, FotoEventoPayload, FotoUploadPayload } from "@/types/fotos-eventos";
 
@@ -114,6 +114,8 @@ export function FotosEventosPage() {
   const [confirmarExcluir, setConfirmarExcluir] = useState(false);
   const [confirmarExcluirFotoId, setConfirmarExcluirFotoId] = useState<number | null>(null);
   const [uploadsPendentes, setUploadsPendentes] = useState<UploadPendente[]>([]);
+  const [capasMural, setCapasMural] = useState<Record<number, string>>({});
+  const [imagensAlbum, setImagensAlbum] = useState<Record<number, string>>({});
 
   const { data, isLoading } = useFotosEventos({
     busca,
@@ -129,10 +131,78 @@ export function FotosEventosPage() {
   const removerFotoMutation = useRemoverFotoItemEvento();
   const reordenarFotosMutation = useReordenarFotosEvento();
 
-  const eventos = data?.eventos ?? [];
+  const eventos = useMemo(() => data?.eventos ?? [], [data?.eventos]);
   const detalhes = detalheQuery.data;
-  const fotos = detalhes?.fotos ?? [];
+  const fotos = useMemo(() => detalhes?.fotos ?? [], [detalhes?.fotos]);
   const fotoPrincipalId = detalhes?.evento?.fotoPrincipalId ?? form.fotoPrincipalId ?? null;
+
+  useEffect(() => {
+    let ativo = true;
+    const revokes: Array<() => void> = [];
+    const eventosComCapa = eventos.filter((item) => item.fotoPrincipalUrl);
+
+    if (!eventosComCapa.length) {
+      setCapasMural({});
+      return () => undefined;
+    }
+
+    void (async () => {
+      const entradas = await Promise.all(
+        eventosComCapa.map(async (item) => {
+          try {
+            const arquivo = await obterUrlArquivoAutenticado(item.fotoPrincipalUrl, { cache: true, auditar: false });
+            if (arquivo.revoke) revokes.push(arquivo.revoke);
+            return [item.id, arquivo.url || resolverUrlArquivo(item.fotoPrincipalUrl)] as const;
+          } catch {
+            return [item.id, resolverUrlArquivo(item.fotoPrincipalUrl)] as const;
+          }
+        })
+      );
+
+      if (ativo) {
+        setCapasMural(Object.fromEntries(entradas));
+      }
+    })();
+
+    return () => {
+      ativo = false;
+      revokes.forEach((revoke) => revoke());
+    };
+  }, [eventos]);
+
+  useEffect(() => {
+    let ativo = true;
+    const revokes: Array<() => void> = [];
+    const fotosComArquivo = fotos.filter((item) => item.arquivoUrl);
+
+    if (!fotosComArquivo.length) {
+      setImagensAlbum({});
+      return () => undefined;
+    }
+
+    void (async () => {
+      const entradas = await Promise.all(
+        fotosComArquivo.map(async (item) => {
+          try {
+            const arquivo = await obterUrlArquivoAutenticado(item.arquivoUrl, { cache: true, auditar: false });
+            if (arquivo.revoke) revokes.push(arquivo.revoke);
+            return [item.id, arquivo.url || resolverUrlArquivo(item.arquivoUrl)] as const;
+          } catch {
+            return [item.id, resolverUrlArquivo(item.arquivoUrl)] as const;
+          }
+        })
+      );
+
+      if (ativo) {
+        setImagensAlbum(Object.fromEntries(entradas));
+      }
+    })();
+
+    return () => {
+      ativo = false;
+      revokes.forEach((revoke) => revoke());
+    };
+  }, [fotos]);
 
   const carregandoAcoes =
     salvarMutation.isPending ||
@@ -736,7 +806,7 @@ export function FotosEventosPage() {
                     <div className="relative aspect-[4/3] overflow-hidden bg-[var(--g3-primary-soft)]">
                       {item.fotoPrincipalUrl ? (
                         <img
-                          src={resolverUrlArquivo(item.fotoPrincipalUrl)}
+                          src={capasMural[item.id] || resolverUrlArquivo(item.fotoPrincipalUrl)}
                           alt={item.titulo}
                           className="h-full w-full object-cover"
                         />
@@ -982,7 +1052,7 @@ export function FotosEventosPage() {
                   <div className="aspect-[16/9] bg-slate-100">
                     {capaAtual?.arquivoUrl ? (
                       <img
-                        src={resolverUrlArquivo(capaAtual.arquivoUrl)}
+                        src={imagensAlbum[capaAtual.id] || resolverUrlArquivo(capaAtual.arquivoUrl)}
                         alt={capaAtual.legenda ?? "Capa do evento"}
                         className="h-full w-full object-cover"
                       />
@@ -1102,7 +1172,7 @@ export function FotosEventosPage() {
                       <div className="relative aspect-video bg-slate-100">
                         {item.arquivoUrl ? (
                           <img
-                            src={resolverUrlArquivo(item.arquivoUrl)}
+                            src={imagensAlbum[item.id] || resolverUrlArquivo(item.arquivoUrl)}
                             alt={item.legenda ?? "Foto do evento"}
                             className="h-full w-full object-cover"
                           />
