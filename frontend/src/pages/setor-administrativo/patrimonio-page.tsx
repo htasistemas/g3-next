@@ -666,19 +666,32 @@ export function PatrimonioPage() {
         .sort((a, b) => a - b),
     [patrimonios]
   );
-  const ultimoNumeroPatrimonial = numerosPatrimonio[numerosPatrimonio.length - 1] ?? 0;
+  const patrimoniosDaUnidadeSelecionada = useMemo(() => {
+    const unidadeSelecionada = normalizarBusca(form.unidade);
+    if (!unidadeSelecionada) return patrimonios;
+    return patrimonios.filter((item) => normalizarBusca(item.unidade) === unidadeSelecionada);
+  }, [form.unidade, patrimonios]);
+  const numerosPatrimonioDaUnidade = useMemo(
+    () =>
+      patrimoniosDaUnidadeSelecionada
+        .map((item) => extrairNumeroSequencial(item.numeroPatrimonio))
+        .filter((numero): numero is number => typeof numero === "number" && Number.isInteger(numero) && numero > 0)
+        .sort((a, b) => a - b),
+    [patrimoniosDaUnidadeSelecionada]
+  );
+  const ultimoNumeroPatrimonial = numerosPatrimonioDaUnidade[numerosPatrimonioDaUnidade.length - 1] ?? 0;
   const proximoNumeroPatrimonial = formatarNumeroSequencial(ultimoNumeroPatrimonial + 1);
   const numerosPatrimoniaisVagos = useMemo(() => {
-    if (!numerosPatrimonio.length) return [];
-    const existentes = new Set(numerosPatrimonio);
+    if (!numerosPatrimonioDaUnidade.length) return [];
+    const existentes = new Set(numerosPatrimonioDaUnidade);
     const vagas: string[] = [];
-    const ultimo = numerosPatrimonio[numerosPatrimonio.length - 1] ?? 0;
+    const ultimo = numerosPatrimonioDaUnidade[numerosPatrimonioDaUnidade.length - 1] ?? 0;
     for (let numero = 1; numero < ultimo; numero += 1) {
       if (!existentes.has(numero)) vagas.push(formatarNumeroSequencial(numero));
       if (vagas.length >= 80) break;
     }
     return vagas;
-  }, [numerosPatrimonio]);
+  }, [numerosPatrimonioDaUnidade]);
 
   const unidadesDisponiveis = useMemo(
     () =>
@@ -2273,12 +2286,33 @@ export function PatrimonioPage() {
               </CardHeader>
               <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
                 <div className="space-y-1">
+                  <Label>Unidade</Label>
+                  <Select
+                    value={form.unidade ?? ""}
+                    onChange={(event) =>
+                      setForm((atual) => ({ ...atual, unidade: event.target.value, sala: "" }))
+                    }
+                  >
+                    <option value="">Selecione a unidade</option>
+                    {unidadesDisponiveis.map((item) => (
+                      <option key={item} value={item}>
+                        {item}
+                      </option>
+                    ))}
+                  </Select>
+                  <p className="text-xs text-[var(--g3-muted)]">
+                    Selecione a unidade antes de informar o número patrimonial.
+                  </p>
+                </div>
+
+                <div className="space-y-1">
                   <Label>Número patrimonial *</Label>
                   <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2">
                     <Input
                       value={form.numeroPatrimonio}
                       className={erros.numeroPatrimonio ? "border-rose-400 focus:ring-rose-400" : undefined}
-                      placeholder={proximoNumeroPatrimonial}
+                      placeholder={form.unidade ? proximoNumeroPatrimonial : "Selecione a unidade primeiro"}
+                      disabled={!form.unidade}
                       onChange={(event) =>
                         setForm((atual) => ({ ...atual, numeroPatrimonio: event.target.value }))
                       }
@@ -2313,10 +2347,10 @@ export function PatrimonioPage() {
                     <p className="text-xs text-rose-700">{erros.numeroPatrimonio}</p>
                   ) : (
                     <div className="space-y-1 text-xs text-[var(--g3-muted)]">
-                      <p>Último registrado: {ultimoNumeroPatrimonial ? formatarNumeroSequencial(ultimoNumeroPatrimonial) : "---"} • Próximo sugerido: {proximoNumeroPatrimonial}</p>
-                      {mostrarNumerosVagos ? (
-                        <div className="rounded-md border border-[var(--g3-border)] bg-[var(--g3-card)] p-2">
-                          {numerosPatrimoniaisVagos.length ? (
+                    <p>Último registrado: {ultimoNumeroPatrimonial ? formatarNumeroSequencial(ultimoNumeroPatrimonial) : "---"} • Próximo sugerido: {proximoNumeroPatrimonial}</p>
+                    {mostrarNumerosVagos ? (
+                      <div className="rounded-md border border-[var(--g3-border)] bg-[var(--g3-card)] p-2">
+                        {numerosPatrimoniaisVagos.length ? (
                             <div className="flex max-h-24 flex-wrap gap-1 overflow-auto">
                               {numerosPatrimoniaisVagos.map((numero) => (
                                 <button
@@ -2336,11 +2370,10 @@ export function PatrimonioPage() {
                             <p>Nenhum número vago encontrado na sequência atual.</p>
                           )}
                         </div>
-                      ) : null}
-                    </div>
-                  )}
+                    ) : null}
+                  </div>
+                )}
                 </div>
-
                 <div className="space-y-1 xl:col-span-3">
                   <Label>Nome do bem *</Label>
                   <Input
@@ -2441,25 +2474,6 @@ export function PatrimonioPage() {
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <Label>Unidade</Label>
-                  <Select
-                    value={form.unidade ?? ""}
-                    onChange={(event) =>
-                      setForm((atual) => ({ ...atual, unidade: event.target.value, sala: "" }))
-                    }
-                  >
-                    <option value="">Selecione a unidade</option>
-                    {unidadesDisponiveis.map((item) => (
-                      <option key={item} value={item}>
-                        {item}
-                      </option>
-                    ))}
-                  </Select>
-                  <p className="text-xs text-[var(--g3-muted)]">
-                    Novo cadastro usa a unidade principal como sugestão.
-                  </p>
-                </div>
               </CardContent>
             </Card>
 
