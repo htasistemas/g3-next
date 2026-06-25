@@ -1,12 +1,13 @@
 import { createReadStream } from "node:fs";
-import { mkdir, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
 import { env } from "../../../config/env.js";
 import { AppError } from "../../../shared/errors/app-error.js";
 import { requiredStorageDirectories } from "./storage-policy.js";
+import type { StorageProvider } from "./storage-provider.js";
 import { normalizarCaminhoLogico } from "./storage-utils.js";
 
-export class LocalStorageProvider {
+export class LocalStorageProvider implements StorageProvider {
   private readonly rootPath = resolve(process.cwd(), env.APP_STORAGE_ROOT);
   private initPromise: Promise<void> | null = null;
 
@@ -44,7 +45,7 @@ export class LocalStorageProvider {
     return normalizarCaminhoLogico(trimmed);
   }
 
-  async salvar(caminhoArquivo: string, conteudo: Buffer) {
+  async salvar(caminhoArquivo: string, conteudo: Buffer, _mimeType?: string) {
     await this.ensureReady();
     const absolutePath = this.resolveAbsolutePath(caminhoArquivo);
     try {
@@ -56,7 +57,6 @@ export class LocalStorageProvider {
         500
       );
     }
-    return absolutePath;
   }
 
   async remover(caminhoArquivo: string) {
@@ -77,5 +77,14 @@ export class LocalStorageProvider {
   criarLeitura(caminhoArquivo: string) {
     const absolutePath = this.resolveAbsolutePath(caminhoArquivo);
     return createReadStream(absolutePath);
+  }
+
+  async lerBuffer(caminhoArquivo: string) {
+    const absolutePath = this.resolveAbsolutePath(caminhoArquivo);
+    try {
+      return await readFile(absolutePath);
+    } catch {
+      return undefined;
+    }
   }
 }

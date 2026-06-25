@@ -25,8 +25,14 @@ const envSchema = z
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
     API_PORT: z.coerce.number().int().positive().default(3333),
     API_HOST: z.string().min(1).default("0.0.0.0"),
-    APP_STORAGE_DRIVER: z.enum(["local"]).default("local"),
+    APP_STORAGE_DRIVER: z.enum(["local", "minio"]).default("local"),
     APP_STORAGE_ROOT: z.string().trim().min(1).default("storage"),
+    APP_STORAGE_ENDPOINT: optionalTrimmedStringFromEnv,
+    APP_STORAGE_BUCKET: z.string().trim().min(1).default("g3n-storage"),
+    APP_STORAGE_ACCESS_KEY_ID: optionalTrimmedStringFromEnv,
+    APP_STORAGE_SECRET_ACCESS_KEY: optionalTrimmedStringFromEnv,
+    APP_STORAGE_REGION: z.string().trim().min(1).default("us-east-1"),
+    APP_STORAGE_FORCE_PATH_STYLE: booleanFromEnv.default(true),
     APP_MAINTENANCE_FLAG_PATH: z.string().trim().min(1).default("/var/run/g3n/maintenance.enable"),
     APP_GEOCODING_USER_AGENT: z.string().trim().min(1).default("G3-Next/1.0"),
     APP_EMAIL_DESTINO_CHAMADOS: z.string().trim().min(1).default("htasistemas@gmail.com"),
@@ -58,6 +64,32 @@ const envSchema = z
     MAIL_PASS: optionalTrimmedStringFromEnv
   })
   .superRefine((env, ctx) => {
+    if (env.APP_STORAGE_DRIVER === "minio") {
+      if (!env.APP_STORAGE_ENDPOINT) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["APP_STORAGE_ENDPOINT"],
+          message: "APP_STORAGE_ENDPOINT nao configurada"
+        });
+      }
+
+      if (!env.APP_STORAGE_ACCESS_KEY_ID) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["APP_STORAGE_ACCESS_KEY_ID"],
+          message: "APP_STORAGE_ACCESS_KEY_ID nao configurada"
+        });
+      }
+
+      if (!env.APP_STORAGE_SECRET_ACCESS_KEY) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["APP_STORAGE_SECRET_ACCESS_KEY"],
+          message: "APP_STORAGE_SECRET_ACCESS_KEY nao configurada"
+        });
+      }
+    }
+
     if (
       env.NODE_ENV === "production" &&
       env.APP_AUTH_TOKEN_SECRET === DEFAULT_DEV_AUTH_TOKEN_SECRET

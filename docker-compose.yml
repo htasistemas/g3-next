@@ -18,6 +18,28 @@ services:
     networks:
       - g3n_net
 
+  g3n-minio:
+    image: minio/minio:latest
+    container_name: g3n-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-g3nminio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-g3nminio123}
+    volumes:
+      - g3n_minio_data:/data
+    ports:
+      - "127.0.0.1:${HOST_MINIO_API_PORT:-9000}:9000"
+      - "127.0.0.1:${HOST_MINIO_CONSOLE_PORT:-9001}:9001"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9000/minio/health/live > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - g3n_net
+
   g3n-backend:
     build:
       context: .
@@ -37,8 +59,14 @@ services:
       APP_AUTH_TOKEN_EXPIRATION_MINUTES: ${APP_AUTH_TOKEN_EXPIRATION_MINUTES:-480}
       APP_AUTH_COOKIE_NAME: ${APP_AUTH_COOKIE_NAME:-g3n_auth_token}
       APP_AUTH_COOKIE_DOMAIN: ${APP_AUTH_COOKIE_DOMAIN:-}
-      APP_STORAGE_DRIVER: ${APP_STORAGE_DRIVER:-local}
+      APP_STORAGE_DRIVER: ${APP_STORAGE_DRIVER:-minio}
       APP_STORAGE_ROOT: ${APP_STORAGE_ROOT:-storage}
+      APP_STORAGE_ENDPOINT: ${APP_STORAGE_ENDPOINT:-http://g3n-minio:9000}
+      APP_STORAGE_BUCKET: ${APP_STORAGE_BUCKET:-g3n-storage}
+      APP_STORAGE_ACCESS_KEY_ID: ${APP_STORAGE_ACCESS_KEY_ID:-g3nminio}
+      APP_STORAGE_SECRET_ACCESS_KEY: ${APP_STORAGE_SECRET_ACCESS_KEY:-g3nminio123}
+      APP_STORAGE_REGION: ${APP_STORAGE_REGION:-us-east-1}
+      APP_STORAGE_FORCE_PATH_STYLE: ${APP_STORAGE_FORCE_PATH_STYLE:-true}
       APP_GOOGLE_CLIENT_ID: ${APP_GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       APP_EMAIL_HABILITADO: ${APP_EMAIL_HABILITADO:-true}
@@ -53,6 +81,8 @@ services:
       - ./docker/runtime:/var/run/g3n
     depends_on:
       g3n-db:
+        condition: service_healthy
+      g3n-minio:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:3333/health || exit 1"]
@@ -135,3 +165,4 @@ networks:
 volumes:
   g3n_db_data:
   g3n_backend_storage:
+  g3n_minio_data:

@@ -18,6 +18,7 @@
     "dev:seed-admin": "tsx scripts/seed-dev-admin.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1075.0",
     "@google/generative-ai": "^0.24.1",
     "@prisma/client": "^6.6.0",
     "@types/multer": "^2.1.0",

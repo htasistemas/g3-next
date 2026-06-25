@@ -62,7 +62,8 @@ const secoesManual: ManualSecao[] = [
           "O envio de e-mail deve permanecer desabilitado enquanto MAIL_PASS não estiver configurada no ambiente da instância.",
           "Essa recuperação local sem e-mail é apenas de apoio ao desenvolvimento; em ambientes com envio ativo, a senha temporária continua sendo enviada ao endereço cadastrado.",
           "O card Famílias em extrema pobreza foi removido da Visão geral para liberar espaço aos indicadores operacionais de termos, documentos, motoristas, almoxarifado, patrimônio e empréstimos para eventos.",
-          "Na impressão da ficha cadastral do beneficiário e no recibo de doação entregue, a logomarca do cabeçalho é carregada diretamente do storage local da unidade quando estiver salva como caminho lógico do sistema.",
+          "Na impressão da ficha cadastral do beneficiário e no recibo de doação entregue, a logomarca do cabeçalho é carregada diretamente do storage persistente da unidade quando estiver salva como caminho lógico do sistema.",
+          "Fotos, documentos e demais binários agora devem ser enviados para o storage persistente do sistema, com o banco guardando apenas metadados e caminhos lógicos para evitar perda em troca de máquina, backup ou atualização de ambiente.",
           "No cadastro da unidade assistencial, a Logomarca da unidade vazado preserva o arquivo original enviado pelo cliente, incluindo SVG e imagens com transparência, enquanto a Logomarca do relatório pode ser normalizada para manter compatibilidade de impressão.",
           "Na aba Salas de atendimento do Cadastro de unidade assistencial, informe o nome da sala e use Incluir sala para montar a lista abaixo; salas vinculadas a uso no sistema não podem ser removidas e devem ser inativadas quando não forem mais utilizadas."
         ]
@@ -470,7 +471,7 @@ const secoesManual: ManualSecao[] = [
           "A capa do evento é persistida por vínculo com a foto cadastrada no álbum e pode ser substituída sem duplicar imagem ou deixar referência órfã.",
           "Ao carregar a listagem, eventos com fotos cadastradas e capa ausente ou inválida são compatibilizados para voltar a exibir imagem no mural.",
           "A remoção da foto principal limpa a capa atual do evento e exige nova definição visual quando necessário.",
-          "As fotos ficam armazenadas no storage do sistema com persistência real; o banco guarda apenas os metadados e caminhos do arquivo.",
+          "As fotos ficam armazenadas no storage persistente do sistema, com garantia de portabilidade entre máquinas e backups; o banco guarda apenas os metadados e caminhos do arquivo.",
           "As ações mudam conforme a aba para evitar botões genéricos e reduzir clique desnecessário durante a operação.",
           "A tela Fotos de eventos agora lista, cadastra, atualiza e exclui eventos, fotos, capa, tags e galeria sempre dentro do tenant autenticado, impedindo mistura de álbuns entre instituições."
         ]

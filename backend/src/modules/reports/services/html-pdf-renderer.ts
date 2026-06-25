@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import PDFDocument from "pdfkit";
-import { LocalStorageProvider } from "../../arquivos/services/local-storage.provider.js";
+import { getStorageProvider } from "../../arquivos/services/storage-factory.js";
+import type { StorageProvider } from "../../arquivos/services/storage-provider.js";
 import type { RelatorioHtmlInput } from "../templates/relatorio-template-padrao.js";
 
 type RodapeRender = {
@@ -73,7 +74,7 @@ function extractSectionSpacerLines(value: string): number | null {
 }
 
 export class HtmlPdfRenderer {
-  private readonly storageProvider = new LocalStorageProvider();
+  private readonly storageProvider: StorageProvider = getStorageProvider();
 
   async render(html: string, rodape: RodapeRender, layout?: RelatorioHtmlInput): Promise<Buffer> {
     if (!layout) {
@@ -688,11 +689,15 @@ export class HtmlPdfRenderer {
     }
 
     const caminhoNormalizado = valor.replace(/^file:\/\//i, "");
+    const bufferStorage = await this.storageProvider.lerBuffer(caminhoNormalizado);
+    if (bufferStorage) {
+      return bufferStorage;
+    }
+
     const candidatos = [
       caminhoNormalizado,
       path.resolve(process.cwd(), caminhoNormalizado),
       path.resolve(process.cwd(), "..", caminhoNormalizado),
-      this.resolverCaminhoStorage(caminhoNormalizado),
       path.resolve(process.cwd(), "..", "frontend", "public", caminhoNormalizado.replace(/^[/\\]/, ""))
     ].filter((candidato): candidato is string => Boolean(candidato));
 
@@ -707,14 +712,6 @@ export class HtmlPdfRenderer {
     }
 
     return undefined;
-  }
-
-  private resolverCaminhoStorage(caminhoArquivo: string): string | undefined {
-    try {
-      return this.storageProvider.resolveAbsolutePath(caminhoArquivo);
-    } catch {
-      return undefined;
-    }
   }
 
   private htmlToText(html: string): string {

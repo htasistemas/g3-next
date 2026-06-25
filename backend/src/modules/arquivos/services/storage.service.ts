@@ -6,7 +6,7 @@ import type { ArquivoMetadataRow } from "../arquivos.types.js";
 import { ArquivosRepository } from "../repositories/arquivos.repository.js";
 import type { StorageScopeKey } from "./storage-policy.js";
 import { getStoragePolicy } from "./storage-policy.js";
-import { LocalStorageProvider } from "./local-storage.provider.js";
+import { getStorageProvider } from "./storage-factory.js";
 import {
   detectarMimeTypePorAssinatura,
   ehUrlExterna,
@@ -52,7 +52,7 @@ type PersistirBufferInput = Omit<PersistirCampoInput, "valor"> & {
 
 export class StorageService {
   private readonly repository = new ArquivosRepository();
-  private readonly provider = new LocalStorageProvider();
+  private readonly provider = getStorageProvider();
 
   async listar(rawFilters: {
     tenantId?: string;
@@ -282,9 +282,9 @@ export class StorageService {
         )
       : undefined;
 
-    await this.provider.salvar(caminhoArquivo, principalBuffer);
+    await this.provider.salvar(caminhoArquivo, principalBuffer, mimeType);
     if (thumbnailBuffer && thumbnailCaminho) {
-      await this.provider.salvar(thumbnailCaminho, thumbnailBuffer);
+      await this.provider.salvar(thumbnailCaminho, thumbnailBuffer, mimeType);
     }
 
     try {
