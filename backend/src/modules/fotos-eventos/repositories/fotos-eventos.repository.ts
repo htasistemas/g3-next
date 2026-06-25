@@ -46,6 +46,14 @@ const estruturaSql = [
   "CREATE INDEX IF NOT EXISTS fotos_eventos_tags_tenant_idx ON fotos_eventos_tags(tenant_id, evento_id, tag)",
   `
     UPDATE fotos_eventos AS e
+    SET tenant_id = ua.tenant_id
+    FROM unidade_assistencial ua
+    WHERE e.unidade_id = ua.id
+      AND ua.tenant_id IS NOT NULL
+      AND (e.tenant_id IS NULL OR e.tenant_id <> ua.tenant_id)
+  `,
+  `
+    UPDATE fotos_eventos AS e
     SET tenant_id = ref.tenant_id
     FROM (
       SELECT tenant_id
@@ -59,9 +67,25 @@ const estruturaSql = [
     UPDATE fotos_eventos_itens AS fi
     SET tenant_id = e.tenant_id
     FROM fotos_eventos e
+    WHERE e.id = fi.evento_id
+      AND e.tenant_id IS NOT NULL
+      AND (fi.tenant_id IS NULL OR fi.tenant_id <> e.tenant_id)
+  `,
+  `
+    UPDATE fotos_eventos_itens AS fi
+    SET tenant_id = e.tenant_id
+    FROM fotos_eventos e
     WHERE fi.tenant_id IS NULL
       AND e.id = fi.evento_id
       AND e.tenant_id IS NOT NULL
+  `,
+  `
+    UPDATE fotos_eventos_tags AS ft
+    SET tenant_id = e.tenant_id
+    FROM fotos_eventos e
+    WHERE e.id = ft.evento_id
+      AND e.tenant_id IS NOT NULL
+      AND (ft.tenant_id IS NULL OR ft.tenant_id <> e.tenant_id)
   `,
   `
     UPDATE fotos_eventos_tags AS ft
@@ -91,8 +115,60 @@ export class FotosEventosRepository {
     await estruturaPromise;
   }
 
+  private async repararFotosPrincipaisAusentes(tenantId: string) {
+    await prisma.$executeRaw(Prisma.sql`
+      UPDATE fotos_eventos e
+      SET foto_principal_id = (
+            SELECT fi.id
+            FROM fotos_eventos_itens fi
+            WHERE fi.evento_id = e.id
+              AND fi.tenant_id::text = ${tenantId}
+            ORDER BY COALESCE(fi.ordem, 9999) ASC, fi.id ASC
+            LIMIT 1
+          ),
+          atualizado_em = NOW()
+      WHERE e.tenant_id::text = ${tenantId}
+        AND e.foto_principal_id IS NULL
+        AND EXISTS (
+          SELECT 1
+          FROM fotos_eventos_itens fi
+          WHERE fi.evento_id = e.id
+            AND fi.tenant_id::text = ${tenantId}
+        )
+    `);
+
+    await prisma.$executeRaw(Prisma.sql`
+      UPDATE fotos_eventos e
+      SET foto_principal_id = (
+            SELECT fi.id
+            FROM fotos_eventos_itens fi
+            WHERE fi.evento_id = e.id
+              AND fi.tenant_id::text = ${tenantId}
+            ORDER BY COALESCE(fi.ordem, 9999) ASC, fi.id ASC
+            LIMIT 1
+          ),
+          atualizado_em = NOW()
+      WHERE e.tenant_id::text = ${tenantId}
+        AND e.foto_principal_id IS NOT NULL
+        AND EXISTS (
+          SELECT 1
+          FROM fotos_eventos_itens fi
+          WHERE fi.evento_id = e.id
+            AND fi.tenant_id::text = ${tenantId}
+        )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM fotos_eventos_itens atual
+          WHERE atual.id = e.foto_principal_id
+            AND atual.evento_id = e.id
+            AND atual.tenant_id::text = ${tenantId}
+        )
+    `);
+  }
+
   async listar(filtros: FotoEventoFiltros, tenantId: string) {
     await this.ensureEstrutura();
+    await this.repararFotosPrincipaisAusentes(tenantId);
     const where: Prisma.Sql[] = [Prisma.sql`e.tenant_id::text = ${tenantId}`];
 
     const busca = trimOrUndefined(filtros.busca);
@@ -182,11 +258,19 @@ export class FotosEventosRepository {
           WHERE fi.evento_id = e.id
             AND fi.tenant_id::text = ${tenantId}
         ), 0) AS total_fotos,
-        principal.arquivo AS foto_principal_url
+        COALESCE(principal.arquivo, primeira_foto.arquivo) AS foto_principal_url
       FROM fotos_eventos e
       LEFT JOIN fotos_eventos_itens principal
         ON principal.id = e.foto_principal_id
        AND principal.tenant_id::text = ${tenantId}
+      LEFT JOIN LATERAL (
+        SELECT fi.arquivo
+        FROM fotos_eventos_itens fi
+        WHERE fi.evento_id = e.id
+          AND fi.tenant_id::text = ${tenantId}
+        ORDER BY COALESCE(fi.ordem, 9999) ASC, fi.id ASC
+        LIMIT 1
+      ) primeira_foto ON TRUE
       WHERE ${whereClause}
       ${orderClause}
       LIMIT ${tamanho}
@@ -198,6 +282,7 @@ export class FotosEventosRepository {
 
   async buscarPorId(id: bigint, tenantId: string) {
     await this.ensureEstrutura();
+    await this.repararFotosPrincipaisAusentes(tenantId);
     const eventos = await prisma.$queryRaw<FotoEventoRow[]>(Prisma.sql`
       SELECT
         id,

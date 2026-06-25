@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.549",
+  "latestVersion": "1.00.550",
   "releaseDate": "2026-06-25",
-  "description": "Patrimonio ganhou aba de categorias e subcategorias para alimentar o cadastro patrimonial.",
+  "description": "Fotos de eventos voltou a exibir imagens no mural usando capa ou primeira foto do album.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.549",
+  "minCompatibleVersion": "1.00.550",
   "releaseType": "stable",
   "downloadUrl": null
 }

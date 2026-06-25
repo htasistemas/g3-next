@@ -455,7 +455,7 @@ const secoesManual: ManualSecao[] = [
         objetivo: "Gerenciar eventos institucionais com álbum persistido, capa do evento, galeria organizada e ações claras por contexto.",
         comoUsar: [
           "Na aba Listagem, use busca e status para localizar rapidamente o evento e acompanhe os indicadores de total de eventos, fotos, álbuns sem capa e evento com mais fotos.",
-          "Na aba Mural de eventos, visualize mini cards com a foto principal de cada evento, status, data, local e total de fotos, usando 1 clique no card para abrir a galeria do evento.",
+          "Na aba Mural de eventos, visualize mini cards com a foto principal de cada evento, status, data, local e total de fotos, usando 1 clique no card para abrir a galeria do evento. Quando a capa não estiver definida, o mural usa automaticamente a primeira foto do álbum.",
           "Na listagem de eventos, clique diretamente sobre a linha do evento para abrir o álbum, sem depender de botão de ação separado.",
           "Na aba Cadastro do evento, preencha os dados principais e use Adicionar fotos para fazer upload múltiplo antes mesmo do primeiro salvamento.",
           "Depois do upload, escolha visualmente a capa do álbum ainda no cadastro. A primeira imagem marcada como destaque será persistida como capa real no banco.",
@@ -467,6 +467,7 @@ const secoesManual: ManualSecao[] = [
         ],
         atencoes: [
           "A capa do evento é persistida por vínculo com a foto cadastrada no álbum e pode ser substituída sem duplicar imagem ou deixar referência órfã.",
+          "Ao carregar a listagem, eventos com fotos cadastradas e capa ausente ou inválida são compatibilizados para voltar a exibir imagem no mural.",
           "A remoção da foto principal limpa a capa atual do evento e exige nova definição visual quando necessário.",
           "As fotos ficam armazenadas no storage do sistema com persistência real; o banco guarda apenas os metadados e caminhos do arquivo.",
           "As ações mudam conforme a aba para evitar botões genéricos e reduzir clique desnecessário durante a operação.",

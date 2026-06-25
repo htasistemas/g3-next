@@ -1,6 +1,18 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.550",
+                        "releaseDate":  "2026-06-25",
+                        "title":  "Fotos restauradas no mural de eventos",
+                        "description":  "A aba Mural de eventos em Fotos de eventos voltou a exibir as imagens cadastradas.",
+                        "changes":  [
+                                        "A listagem agora usa a foto principal ou, quando ela estiver ausente, a primeira foto do álbum como imagem do mural.",
+                                        "Eventos com fotos cadastradas e capa ausente ou inválida são compatibilizados automaticamente ao carregar a listagem.",
+                                        "A compatibilização de tenant das fotos foi reforçada usando a unidade assistencial vinculada ao evento."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.549",
                         "releaseDate":  "2026-06-25",
                         "title":  "Categorias e subcategorias no patrimônio",
