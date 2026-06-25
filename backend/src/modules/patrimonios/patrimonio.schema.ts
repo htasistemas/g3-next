@@ -47,3 +47,15 @@ export const patrimonioMovimentoInputSchema = z.object({
       return trimmed.length ? trimmed : undefined;
     }, z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional())
 });
+
+export const patrimonioCategoriaInputSchema = z.object({
+  nome: z.string().trim().min(2, "Informe o nome da categoria."),
+  taxaDepreciacao: z.preprocess((value) => {
+    if (value === null || value === undefined || value === "") return undefined;
+    if (typeof value === "number") return value;
+    if (typeof value === "string") return Number(value);
+    return value;
+  }, z.number().min(0).max(100).optional()),
+  subcategorias: z.array(z.string().trim().min(1)).optional(),
+  ativo: z.boolean().optional()
+});

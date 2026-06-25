@@ -1,6 +1,28 @@
 ﻿{
     "entries":  [
                     {
+                        "version":  "1.00.549",
+                        "releaseDate":  "2026-06-25",
+                        "title":  "Categorias e subcategorias no patrimônio",
+                        "description":  "A tela Patrimônio ganhou uma aba para cadastrar categorias e subcategorias usadas no cadastro patrimonial.",
+                        "changes":  [
+                                        "A nova aba Categorias permite incluir, editar, excluir, ativar e inativar categorias, além de manter subcategorias.",
+                                        "A aba Cadastro patrimonial passou a carregar categoria e subcategoria a partir do catálogo cadastrado.",
+                                        "O backend passa a persistir o catálogo por instituição e bloqueia exclusão de categoria com bens vinculados."
+                                    ]
+                    },
+                    {
+                        "version":  "1.00.548",
+                        "releaseDate":  "2026-06-25",
+                        "title":  "Ícones no número patrimonial",
+                        "description":  "O campo Número patrimonial do cadastro de Patrimônio foi compactado e ganhou ações por ícone.",
+                        "changes":  [
+                                        "O campo Número patrimonial ficou menor no layout da aba Cadastro patrimonial.",
+                                        "As ações Usar próximo e Ver números vagos passaram a ficar como ícones ao lado do campo.",
+                                        "O manual do sistema e a versão oficial foram atualizados."
+                                    ]
+                    },
+                    {
                         "version":  "1.00.547",
                         "releaseDate":  "2026-06-25",
                         "title":  "Sequência e depreciação no patrimônio",

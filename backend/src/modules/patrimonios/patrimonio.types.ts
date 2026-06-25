@@ -15,6 +15,24 @@ export type PatrimonioInput = {
   observacoes?: string;
 };
 
+export type PatrimonioCategoriaInput = {
+  nome: string;
+  taxaDepreciacao?: number;
+  subcategorias?: string[];
+  ativo?: boolean;
+};
+
+export type PatrimonioCategoriaRow = {
+  id: bigint;
+  tenant_id: string;
+  nome: string;
+  taxa_depreciacao: number | null;
+  subcategorias: unknown;
+  ativo: boolean;
+  criado_em: Date;
+  atualizado_em: Date;
+};
+
 export type PatrimonioMovimentoInput = {
   tipo: "MOVIMENTACAO" | "MANUTENCAO" | "BAIXA";
   destino?: string;

@@ -19,6 +19,30 @@ patrimonioRoutes.get(
   ensurePermissions(permissoesLeitura),
   asyncHandler(controller.listar.bind(controller))
 );
+patrimonioRoutes.get(
+  "/categorias",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.listarCategorias.bind(controller))
+);
+patrimonioRoutes.post(
+  "/categorias",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.criarCategoria.bind(controller))
+);
+patrimonioRoutes.put(
+  "/categorias/:id",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.atualizarCategoria.bind(controller))
+);
+patrimonioRoutes.delete(
+  "/categorias/:id",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.removerCategoria.bind(controller))
+);
 patrimonioRoutes.post(
   "/",
   ensureAuthenticated,

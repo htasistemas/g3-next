@@ -3,6 +3,8 @@ import { prisma } from "../../../database/prisma.js";
 import { AppError } from "../../../shared/errors/app-error.js";
 import { toOptionalDate, trimOrUndefined } from "../../../utils/string-utils.js";
 import type {
+  PatrimonioCategoriaInput,
+  PatrimonioCategoriaRow,
   PatrimonioInput,
   PatrimonioMovimentoInput,
   PatrimonioMovimentoRow,
@@ -17,6 +19,17 @@ const estruturaSql = [
   "CREATE INDEX IF NOT EXISTS patrimonio_item_tenant_idx ON patrimonio_item(tenant_id, nome, id DESC)",
   "CREATE INDEX IF NOT EXISTS patrimonio_item_numero_tenant_idx ON patrimonio_item(tenant_id, numero_patrimonio)",
   "CREATE INDEX IF NOT EXISTS patrimonio_movimentacao_tenant_idx ON patrimonio_movimentacao(tenant_id, patrimonio_id, data_movimento DESC)",
+  `CREATE TABLE IF NOT EXISTS patrimonio_categoria (
+    id BIGSERIAL PRIMARY KEY,
+    tenant_id UUID NOT NULL,
+    nome VARCHAR(160) NOT NULL,
+    taxa_depreciacao NUMERIC(5,2),
+    subcategorias JSONB NOT NULL DEFAULT '[]'::jsonb,
+    ativo BOOLEAN NOT NULL DEFAULT TRUE,
+    criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+    atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
+  )`,
+  "CREATE UNIQUE INDEX IF NOT EXISTS patrimonio_categoria_nome_tenant_idx ON patrimonio_categoria(tenant_id, lower(trim(nome)))",
   `
     UPDATE patrimonio_item AS p
     SET tenant_id = ref.tenant_id
@@ -100,6 +113,112 @@ export class PatrimonioRepository {
       patrimonio,
       movimentos: movimentos.filter((movimento) => movimento.patrimonio_id === patrimonio.id)
     }));
+  }
+
+  async listarCategorias(tenantId: string) {
+    await this.garantirEstrutura();
+    await this.semearCategoriasPadrao(tenantId);
+
+    return prisma.$queryRaw<PatrimonioCategoriaRow[]>(Prisma.sql`
+      SELECT
+        id,
+        tenant_id::text AS tenant_id,
+        nome,
+        taxa_depreciacao::float8 AS taxa_depreciacao,
+        subcategorias,
+        ativo,
+        criado_em,
+        atualizado_em
+      FROM patrimonio_categoria
+      WHERE tenant_id::text = ${tenantId}
+      ORDER BY nome ASC
+    `);
+  }
+
+  async criarCategoria(input: PatrimonioCategoriaInput, tenantId: string) {
+    await this.garantirEstrutura();
+    await this.validarCategoriaUnica(input.nome, tenantId);
+
+    const rows = await prisma.$queryRaw<PatrimonioCategoriaRow[]>(Prisma.sql`
+      INSERT INTO patrimonio_categoria (
+        tenant_id,
+        nome,
+        taxa_depreciacao,
+        subcategorias,
+        ativo,
+        criado_em,
+        atualizado_em
+      ) VALUES (
+        CAST(${tenantId} AS UUID),
+        ${input.nome.trim()},
+        ${input.taxaDepreciacao ?? null},
+        ${JSON.stringify(this.normalizarSubcategorias(input.subcategorias))}::jsonb,
+        ${input.ativo ?? true},
+        NOW(),
+        NOW()
+      )
+      RETURNING
+        id,
+        tenant_id::text AS tenant_id,
+        nome,
+        taxa_depreciacao::float8 AS taxa_depreciacao,
+        subcategorias,
+        ativo,
+        criado_em,
+        atualizado_em
+    `);
+
+    return rows[0];
+  }
+
+  async atualizarCategoria(id: bigint, input: PatrimonioCategoriaInput, tenantId: string) {
+    await this.garantirEstrutura();
+    await this.buscarCategoriaOuFalhar(id, tenantId);
+    await this.validarCategoriaUnica(input.nome, tenantId, id);
+
+    const rows = await prisma.$queryRaw<PatrimonioCategoriaRow[]>(Prisma.sql`
+      UPDATE patrimonio_categoria
+      SET
+        nome = ${input.nome.trim()},
+        taxa_depreciacao = ${input.taxaDepreciacao ?? null},
+        subcategorias = ${JSON.stringify(this.normalizarSubcategorias(input.subcategorias))}::jsonb,
+        ativo = ${input.ativo ?? true},
+        atualizado_em = NOW()
+      WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
+      RETURNING
+        id,
+        tenant_id::text AS tenant_id,
+        nome,
+        taxa_depreciacao::float8 AS taxa_depreciacao,
+        subcategorias,
+        ativo,
+        criado_em,
+        atualizado_em
+    `);
+
+    return rows[0];
+  }
+
+  async removerCategoria(id: bigint, tenantId: string) {
+    await this.garantirEstrutura();
+    const categoria = await this.buscarCategoriaOuFalhar(id, tenantId);
+    const usos = await prisma.$queryRaw<Array<{ total: bigint }>>(Prisma.sql`
+      SELECT COUNT(*)::bigint AS total
+      FROM patrimonio_item
+      WHERE tenant_id::text = ${tenantId}
+        AND lower(trim(coalesce(categoria, ''))) = lower(trim(${categoria.nome}))
+    `);
+
+    if (Number(usos[0]?.total ?? 0) > 0) {
+      throw new AppError("Categoria possui bens vinculados. Inative ou edite a categoria em vez de excluir.", 409);
+    }
+
+    await prisma.$executeRaw(Prisma.sql`
+      DELETE FROM patrimonio_categoria
+      WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
+    `);
   }
 
   async buscarPorId(id: bigint, tenantId: string) {
@@ -304,6 +423,104 @@ export class PatrimonioRepository {
 
     if (rows.length) {
       throw new AppError("Ja existe patrimonio com este numero.", 409);
+    }
+  }
+
+  private normalizarSubcategorias(subcategorias?: string[]) {
+    const nomes = new Set<string>();
+    const resultado: string[] = [];
+    for (const subcategoria of subcategorias ?? []) {
+      const nome = trimOrUndefined(subcategoria);
+      if (!nome) continue;
+      const chave = nome.toLocaleLowerCase("pt-BR");
+      if (nomes.has(chave)) continue;
+      nomes.add(chave);
+      resultado.push(nome);
+    }
+    return resultado;
+  }
+
+  private async buscarCategoriaOuFalhar(id: bigint, tenantId: string) {
+    const rows = await prisma.$queryRaw<PatrimonioCategoriaRow[]>(Prisma.sql`
+      SELECT
+        id,
+        tenant_id::text AS tenant_id,
+        nome,
+        taxa_depreciacao::float8 AS taxa_depreciacao,
+        subcategorias,
+        ativo,
+        criado_em,
+        atualizado_em
+      FROM patrimonio_categoria
+      WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
+      LIMIT 1
+    `);
+
+    if (!rows[0]) {
+      throw new AppError("Categoria patrimonial nao encontrada.", 404);
+    }
+    return rows[0];
+  }
+
+  private async validarCategoriaUnica(nome: string, tenantId: string, idAtual?: bigint) {
+    const rows = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+      SELECT id
+      FROM patrimonio_categoria
+      WHERE tenant_id::text = ${tenantId}
+        AND lower(trim(nome)) = lower(trim(${nome}))
+        ${idAtual ? Prisma.sql`AND id <> ${idAtual}` : Prisma.empty}
+      LIMIT 1
+    `);
+
+    if (rows[0]) {
+      throw new AppError("Categoria ja cadastrada. Edite a categoria existente para evitar duplicidade.", 409);
+    }
+  }
+
+  private async semearCategoriasPadrao(tenantId: string) {
+    const rows = await prisma.$queryRaw<Array<{ total: bigint }>>(Prisma.sql`
+      SELECT COUNT(*)::bigint AS total
+      FROM patrimonio_categoria
+      WHERE tenant_id::text = ${tenantId}
+    `);
+
+    if (Number(rows[0]?.total ?? 0) > 0) return;
+
+    const categorias = [
+      { nome: "Equipamentos de informática", taxa: 10, subcategorias: ["Computadores", "Notebooks", "Impressoras", "Periféricos"] },
+      { nome: "Mobiliário", taxa: 10, subcategorias: ["Mesas", "Cadeiras", "Armários", "Estantes"] },
+      { nome: "Eletrodomésticos", taxa: 10, subcategorias: ["Refrigeradores", "Fogões", "Bebedouros", "Micro-ondas"] },
+      { nome: "Telefonia", taxa: 20, subcategorias: ["Celulares", "Telefones fixos", "Centrais telefônicas"] },
+      { nome: "Veículos", taxa: 20, subcategorias: ["Carros", "Motos", "Utilitários"] },
+      { nome: "Instrumentos", taxa: 10, subcategorias: ["Musicais", "Técnicos", "Medição"] },
+      { nome: "Máquinas", taxa: 10, subcategorias: ["Máquinas operacionais", "Equipamentos elétricos"] },
+      { nome: "Material permanente", taxa: 10, subcategorias: ["Utensílios", "Equipamentos permanentes"] },
+      { nome: "Imóveis e construções", taxa: 4, subcategorias: ["Edificações", "Benfeitorias"] },
+      { nome: "Outros", taxa: 10, subcategorias: ["Diversos"] }
+    ];
+
+    for (const categoria of categorias) {
+      await prisma.$executeRaw(Prisma.sql`
+        INSERT INTO patrimonio_categoria (
+          tenant_id,
+          nome,
+          taxa_depreciacao,
+          subcategorias,
+          ativo,
+          criado_em,
+          atualizado_em
+        ) VALUES (
+          CAST(${tenantId} AS UUID),
+          ${categoria.nome},
+          ${categoria.taxa},
+          ${JSON.stringify(categoria.subcategorias)}::jsonb,
+          TRUE,
+          NOW(),
+          NOW()
+        )
+        ON CONFLICT DO NOTHING
+      `);
     }
   }
 }

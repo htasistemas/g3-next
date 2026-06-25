@@ -1,5 +1,5 @@
 import { toIsoDate, toStringId } from "../../utils/string-utils.js";
-import type { PatrimonioMovimentoRow, PatrimonioRow } from "./patrimonio.types.js";
+import type { PatrimonioCategoriaRow, PatrimonioMovimentoRow, PatrimonioRow } from "./patrimonio.types.js";
 
 export function mapPatrimonioToResponse(
   patrimonio: PatrimonioRow,
@@ -33,5 +33,21 @@ export function mapPatrimonioToResponse(
         observacao: movimento.observacao ?? undefined,
         dataMovimento: toIsoDate(movimento.data_movimento) ?? ""
       }))
+  };
+}
+
+export function mapPatrimonioCategoriaToResponse(categoria: PatrimonioCategoriaRow) {
+  const subcategorias = Array.isArray(categoria.subcategorias)
+    ? categoria.subcategorias.map((item) => String(item)).filter(Boolean)
+    : [];
+
+  return {
+    id: toStringId(categoria.id),
+    nome: categoria.nome,
+    taxaDepreciacao: categoria.taxa_depreciacao ?? undefined,
+    subcategorias,
+    ativo: categoria.ativo,
+    dataCadastro: categoria.criado_em.toISOString(),
+    dataAtualizacao: categoria.atualizado_em.toISOString()
   };
 }

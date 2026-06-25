@@ -1,8 +1,9 @@
 import { AppError } from "../../../shared/errors/app-error.js";
 import { mapaCamposTextoPatrimonio } from "../../../utils/text-format-config.js";
 import { normalizarObjetoTexto } from "../../../utils/text-formatter.js";
-import { mapPatrimonioToResponse } from "../patrimonio.mapper.js";
+import { mapPatrimonioCategoriaToResponse, mapPatrimonioToResponse } from "../patrimonio.mapper.js";
 import {
+  patrimonioCategoriaInputSchema,
   patrimonioInputSchema,
   patrimonioMovimentoInputSchema
 } from "../patrimonio.schema.js";
@@ -15,6 +16,33 @@ export class PatrimonioService {
     const tenantId = this.parseTenant(rawTenantId);
     const registros = await this.repository.listar(tenantId);
     return registros.map((item) => mapPatrimonioToResponse(item.patrimonio, item.movimentos));
+  }
+
+  async listarCategorias(rawTenantId?: string) {
+    const tenantId = this.parseTenant(rawTenantId);
+    const categorias = await this.repository.listarCategorias(tenantId);
+    return categorias.map(mapPatrimonioCategoriaToResponse);
+  }
+
+  async criarCategoria(rawInput: unknown, rawTenantId?: string) {
+    const input = patrimonioCategoriaInputSchema.parse(this.normalizarPayload(rawInput));
+    const tenantId = this.parseTenant(rawTenantId);
+    const categoria = await this.repository.criarCategoria(input, tenantId);
+    return mapPatrimonioCategoriaToResponse(categoria);
+  }
+
+  async atualizarCategoria(rawId: string, rawInput: unknown, rawTenantId?: string) {
+    const id = this.parseId(rawId);
+    const input = patrimonioCategoriaInputSchema.parse(this.normalizarPayload(rawInput));
+    const tenantId = this.parseTenant(rawTenantId);
+    const categoria = await this.repository.atualizarCategoria(id, input, tenantId);
+    return mapPatrimonioCategoriaToResponse(categoria);
+  }
+
+  async removerCategoria(rawId: string, rawTenantId?: string) {
+    const id = this.parseId(rawId);
+    const tenantId = this.parseTenant(rawTenantId);
+    await this.repository.removerCategoria(id, tenantId);
   }
 
   async criar(rawInput: unknown, rawTenantId?: string) {

@@ -1,13 +1,47 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { patrimoniosService } from "@/services/patrimonios.service";
-import type { Patrimonio, PatrimonioMovimento } from "@/types/patrimonio";
+import type { Patrimonio, PatrimonioCategoria, PatrimonioMovimento } from "@/types/patrimonio";
 
 export function usePatrimonios() {
   const { usuario } = useAuth();
   return useQuery({
     queryKey: ["patrimonios", usuario?.tenant_id ?? "sem-tenant"],
     queryFn: () => patrimoniosService.listar()
+  });
+}
+
+export function usePatrimonioCategorias() {
+  const { usuario } = useAuth();
+  return useQuery({
+    queryKey: ["patrimonio-categorias", usuario?.tenant_id ?? "sem-tenant"],
+    queryFn: () => patrimoniosService.listarCategorias(),
+    enabled: !!usuario
+  });
+}
+
+export function useSalvarPatrimonioCategoria() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: PatrimonioCategoria) => {
+      if (payload.id) {
+        return patrimoniosService.atualizarCategoria(payload.id, payload);
+      }
+      return patrimoniosService.criarCategoria(payload);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["patrimonio-categorias"] });
+    }
+  });
+}
+
+export function useRemoverPatrimonioCategoria() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => patrimoniosService.removerCategoria(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["patrimonio-categorias"] });
+    }
   });
 }
 

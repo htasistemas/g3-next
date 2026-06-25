@@ -1,10 +1,10 @@
 ﻿{
-  "latestVersion": "1.00.547",
+  "latestVersion": "1.00.549",
   "releaseDate": "2026-06-25",
-  "description": "Patrimonio ganhou sequencia de numero patrimonial, categorias padronizadas, mascara monetaria e calculo de depreciacao.",
+  "description": "Patrimonio ganhou aba de categorias e subcategorias para alimentar o cadastro patrimonial.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.547",
+  "minCompatibleVersion": "1.00.549",
   "releaseType": "stable"
 }
 

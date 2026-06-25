@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   ClipboardList,
   ListChecks,
+  ListRestart,
   MapPin,
   Package,
   Pencil,
@@ -21,6 +22,7 @@ import {
   Search,
   Trash2,
   Undo2,
+  Wand2,
   Wallet,
   Wrench,
   X
@@ -39,7 +41,10 @@ import { PopupMensagem, type PopupMensagemState } from "@/components/admin/admin
 import {
   usePatrimonios,
   useAtualizarPatrimoniosEmLote,
+  usePatrimonioCategorias,
+  useRemoverPatrimonioCategoria,
   useRegistrarMovimentoPatrimonio,
+  useSalvarPatrimonioCategoria,
   useSalvarPatrimonio
 } from "@/features/patrimonios/use-patrimonios";
 import {
@@ -49,7 +54,7 @@ import {
 import { resolverUrlArquivo } from "@/lib/arquivos";
 import { formatarCnpj, formatarTelefone } from "@/lib/br-utils";
 import { imprimirConteudoAtual, imprimirHtmlSemJanela } from "@/lib/report-utils";
-import type { Patrimonio, PatrimonioMovimento } from "@/types/patrimonio";
+import type { Patrimonio, PatrimonioCategoria, PatrimonioMovimento } from "@/types/patrimonio";
 
 type AbaId =
   | "dashboard"
@@ -57,6 +62,7 @@ type AbaId =
   | "localizacao"
   | "visual"
   | "movimentacao"
+  | "categorias"
   | "listagem";
 type CampoFormulario = "numeroPatrimonio" | "nome" | "categoria" | "valorAquisicao" | "taxaDepreciacao";
 type CampoMovimento = "dataMovimento";
@@ -95,6 +101,7 @@ const abas: AdminTab[] = [
   { id: "localizacao", label: "Localização e custódia", icon: MapPin },
   { id: "visual", label: "Identificação visual", icon: Camera },
   { id: "movimentacao", label: "Movimentação", icon: Archive },
+  { id: "categorias", label: "Categorias", icon: ClipboardList },
   { id: "listagem", label: "Listagem e busca", icon: ListChecks }
 ];
 
@@ -141,6 +148,13 @@ const defaultEdicaoLote: EdicaoLote = {
   responsavel: "",
   status: "",
   conservacao: ""
+};
+
+const defaultCategoriaForm: PatrimonioCategoria = {
+  nome: "",
+  taxaDepreciacao: 10,
+  subcategorias: [],
+  ativo: true
 };
 
 function obterHojeIso() {
@@ -195,6 +209,10 @@ function extrairNumeroSequencial(valor?: string | null) {
 
 function formatarNumeroSequencial(numero: number, tamanho = 3) {
   return String(numero).padStart(tamanho, "0");
+}
+
+function normalizarNomeCatalogo(valor?: string | null) {
+  return String(valor ?? "").trim().replace(/\s+/g, " ");
 }
 
 function normalizarBusca(valor?: string | null) {
@@ -579,6 +597,8 @@ export function PatrimonioPage() {
   const [formatoEtiquetaId, setFormatoEtiquetaId] = useState<FormatoEtiquetaId>("80x50");
   const [mostrarNumerosVagos, setMostrarNumerosVagos] = useState(false);
   const [form, setForm] = useState<Patrimonio>(defaultForm);
+  const [categoriaForm, setCategoriaForm] = useState<PatrimonioCategoria>(defaultCategoriaForm);
+  const [subcategoriaDraft, setSubcategoriaDraft] = useState("");
   const [snapshot, setSnapshot] = useState<Patrimonio>(defaultForm);
   const [movimento, setMovimento] = useState<MovimentoAssistido>(criarMovimentoPadrao());
   const [erros, setErros] = useState<Partial<Record<CampoFormulario, string>>>({});
@@ -590,13 +610,17 @@ export function PatrimonioPage() {
   });
 
   const { data, isLoading } = usePatrimonios();
+  const categoriasQuery = usePatrimonioCategorias();
   const unidadeAtualQuery = useUnidadeAssistencialAtual();
   const unidadesAssistenciaisQuery = useUnidadesAssistenciais({});
   const salvarMutation = useSalvarPatrimonio();
+  const salvarCategoriaMutation = useSalvarPatrimonioCategoria();
+  const removerCategoriaMutation = useRemoverPatrimonioCategoria();
   const atualizarLoteMutation = useAtualizarPatrimoniosEmLote();
   const movimentoMutation = useRegistrarMovimentoPatrimonio();
 
   const patrimonios = data?.patrimonios ?? [];
+  const categoriasCatalogo = categoriasQuery.data?.categorias ?? [];
   const unidadesAssistenciais = unidadesAssistenciaisQuery.data?.unidades ?? [];
   const unidadeAtual = unidadeAtualQuery.data?.unidade;
   const nomeInstituicao =
@@ -606,13 +630,28 @@ export function PatrimonioPage() {
   const logomarcaRelatorio = resolverUrlArquivo(unidadeAtual?.logomarca_relatorio || unidadeAtual?.logomarca);
   const rodapeInstitucional = montarRodapeInstitucional(unidadeAtual ?? undefined);
   const carregandoAcoes =
-    salvarMutation.isPending || movimentoMutation.isPending || atualizarLoteMutation.isPending;
+    salvarMutation.isPending ||
+    movimentoMutation.isPending ||
+    atualizarLoteMutation.isPending ||
+    salvarCategoriaMutation.isPending ||
+    removerCategoriaMutation.isPending;
   const possuiRegistroSelecionado = Boolean(form.idPatrimonio);
 
-  const categoriasDisponiveis = useMemo(() => categoriasPadrao, []);
+  const categoriasDisponiveis = useMemo(
+    () =>
+      categoriasCatalogo
+        .filter((item) => item.ativo ?? true)
+        .map((item) => item.nome)
+        .sort((a, b) => a.localeCompare(b, "pt-BR")),
+    [categoriasCatalogo]
+  );
   const categoriaSelecionada = useMemo(
-    () => categoriasPatrimonio.find((item) => normalizarBusca(item.nome) === normalizarBusca(form.categoria)),
-    [form.categoria]
+    () => categoriasCatalogo.find((item) => normalizarBusca(item.nome) === normalizarBusca(form.categoria)),
+    [categoriasCatalogo, form.categoria]
+  );
+  const subcategoriasDisponiveis = useMemo(
+    () => (categoriaSelecionada?.subcategorias ?? []).slice().sort((a, b) => a.localeCompare(b, "pt-BR")),
+    [categoriaSelecionada]
   );
   const numerosPatrimonio = useMemo(
     () =>
@@ -802,7 +841,9 @@ export function PatrimonioPage() {
     if (campo === "categoria") {
       const categoria = String(valor ?? "").trim();
       if (!categoria) return "Selecione a categoria do bem.";
-      return categoriasPatrimonio.some((item) => normalizarBusca(item.nome) === normalizarBusca(categoria))
+      return categoriasCatalogo.some(
+        (item) => (item.ativo ?? true) && normalizarBusca(item.nome) === normalizarBusca(categoria)
+      )
         ? ""
         : "Categoria não cadastrada. Selecione uma categoria existente para evitar duplicidade.";
     }
@@ -1098,6 +1139,106 @@ export function PatrimonioPage() {
         tipo: "erro",
         titulo: "Erro",
         texto: error?.response?.data?.message ?? "Não foi possível salvar o patrimônio."
+      });
+    }
+  }
+
+  function novaCategoria() {
+    setCategoriaForm(defaultCategoriaForm);
+    setSubcategoriaDraft("");
+    setAbaAtiva("categorias");
+  }
+
+  function editarCategoria(categoria: PatrimonioCategoria) {
+    setCategoriaForm({
+      id: categoria.id,
+      nome: categoria.nome,
+      taxaDepreciacao: categoria.taxaDepreciacao ?? 0,
+      subcategorias: categoria.subcategorias ?? [],
+      ativo: categoria.ativo ?? true
+    });
+    setSubcategoriaDraft("");
+  }
+
+  function incluirSubcategoria() {
+    const nome = normalizarNomeCatalogo(subcategoriaDraft);
+    if (!nome) {
+      setPopupMensagem({ tipo: "aviso", titulo: "Validação", texto: "Informe a subcategoria antes de incluir." });
+      return;
+    }
+
+    const existentes = categoriaForm.subcategorias ?? [];
+    if (existentes.some((item) => normalizarBusca(item) === normalizarBusca(nome))) {
+      setPopupMensagem({ tipo: "aviso", titulo: "Validação", texto: "Esta subcategoria já está cadastrada." });
+      return;
+    }
+
+    setCategoriaForm((atual) => ({
+      ...atual,
+      subcategorias: [...(atual.subcategorias ?? []), nome]
+    }));
+    setSubcategoriaDraft("");
+  }
+
+  function removerSubcategoria(nome: string) {
+    setCategoriaForm((atual) => ({
+      ...atual,
+      subcategorias: (atual.subcategorias ?? []).filter((item) => item !== nome)
+    }));
+  }
+
+  async function salvarCategoria() {
+    const nome = normalizarNomeCatalogo(categoriaForm.nome);
+    if (!nome) {
+      setPopupMensagem({ tipo: "aviso", titulo: "Validação", texto: "Informe o nome da categoria." });
+      return;
+    }
+
+    const duplicada = categoriasCatalogo.some(
+      (item) => item.id !== categoriaForm.id && normalizarBusca(item.nome) === normalizarBusca(nome)
+    );
+    if (duplicada) {
+      setPopupMensagem({
+        tipo: "aviso",
+        titulo: "Categoria já existe",
+        texto: "Edite a categoria existente para evitar duplicidade de nomes."
+      });
+      return;
+    }
+
+    try {
+      await salvarCategoriaMutation.mutateAsync({
+        ...categoriaForm,
+        nome,
+        taxaDepreciacao: Number(categoriaForm.taxaDepreciacao ?? 0),
+        subcategorias: categoriaForm.subcategorias ?? [],
+        ativo: categoriaForm.ativo ?? true
+      });
+      setCategoriaForm(defaultCategoriaForm);
+      setSubcategoriaDraft("");
+      setPopupMensagem({ tipo: "sucesso", titulo: "Confirmação", texto: "Categoria salva com sucesso." });
+    } catch (error: any) {
+      setPopupMensagem({
+        tipo: "erro",
+        titulo: "Erro",
+        texto: error?.response?.data?.message ?? "Não foi possível salvar a categoria."
+      });
+    }
+  }
+
+  async function removerCategoria(categoria: PatrimonioCategoria) {
+    if (!categoria.id) return;
+    try {
+      await removerCategoriaMutation.mutateAsync(categoria.id);
+      if (categoriaForm.id === categoria.id) {
+        setCategoriaForm(defaultCategoriaForm);
+      }
+      setPopupMensagem({ tipo: "sucesso", titulo: "Confirmação", texto: "Categoria excluída com sucesso." });
+    } catch (error: any) {
+      setPopupMensagem({
+        tipo: "erro",
+        titulo: "Erro",
+        texto: error?.response?.data?.message ?? "Não foi possível excluir a categoria."
       });
     }
   }
@@ -1975,43 +2116,49 @@ export function PatrimonioPage() {
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm">Identificação patrimonial</CardTitle>
               </CardHeader>
-              <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
                 <div className="space-y-1">
                   <Label>Número patrimonial *</Label>
-                  <Input
-                    value={form.numeroPatrimonio}
-                    className={erros.numeroPatrimonio ? "border-rose-400 focus:ring-rose-400" : undefined}
-                    placeholder={proximoNumeroPatrimonial}
-                    onChange={(event) =>
-                      setForm((atual) => ({ ...atual, numeroPatrimonio: event.target.value }))
-                    }
-                    onBlur={() => atualizarErroFormulario("numeroPatrimonio")}
-                  />
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2">
+                    <Input
+                      value={form.numeroPatrimonio}
+                      className={erros.numeroPatrimonio ? "border-rose-400 focus:ring-rose-400" : undefined}
+                      placeholder={proximoNumeroPatrimonial}
+                      onChange={(event) =>
+                        setForm((atual) => ({ ...atual, numeroPatrimonio: event.target.value }))
+                      }
+                      onBlur={() => atualizarErroFormulario("numeroPatrimonio")}
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-9 w-9 px-0"
+                      title="Usar próximo número"
+                      aria-label="Usar próximo número"
+                      onClick={() =>
+                        setForm((atual) => ({ ...atual, numeroPatrimonio: proximoNumeroPatrimonial }))
+                      }
+                    >
+                      <Wand2 className="h-4 w-4" aria-hidden="true" />
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-9 w-9 px-0"
+                      title="Ver números vagos"
+                      aria-label="Ver números vagos"
+                      onClick={() => setMostrarNumerosVagos((atual) => !atual)}
+                    >
+                      <ListRestart className="h-4 w-4" aria-hidden="true" />
+                    </Button>
+                  </div>
                   {erros.numeroPatrimonio ? (
                     <p className="text-xs text-rose-700">{erros.numeroPatrimonio}</p>
                   ) : (
                     <div className="space-y-1 text-xs text-[var(--g3-muted)]">
                       <p>Último registrado: {ultimoNumeroPatrimonial ? formatarNumeroSequencial(ultimoNumeroPatrimonial) : "---"} • Próximo sugerido: {proximoNumeroPatrimonial}</p>
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() =>
-                            setForm((atual) => ({ ...atual, numeroPatrimonio: proximoNumeroPatrimonial }))
-                          }
-                        >
-                          Usar próximo
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setMostrarNumerosVagos((atual) => !atual)}
-                        >
-                          Ver números vagos
-                        </Button>
-                      </div>
                       {mostrarNumerosVagos ? (
                         <div className="rounded-md border border-[var(--g3-border)] bg-[var(--g3-card)] p-2">
                           {numerosPatrimoniaisVagos.length ? (
@@ -2039,7 +2186,7 @@ export function PatrimonioPage() {
                   )}
                 </div>
 
-                <div className="space-y-1 xl:col-span-2">
+                <div className="space-y-1 xl:col-span-3">
                   <Label>Nome do bem *</Label>
                   <Input
                     value={form.nome}
@@ -2057,19 +2204,20 @@ export function PatrimonioPage() {
                     value={form.categoria ?? ""}
                     className={erros.categoria ? "border-rose-400 focus:ring-rose-400" : undefined}
                     onChange={(event) => {
-                      const categoria = categoriasPatrimonio.find((item) => item.nome === event.target.value);
+                      const categoria = categoriasCatalogo.find((item) => item.nome === event.target.value);
                       setForm((atual) => ({
                         ...atual,
                         categoria: event.target.value,
+                        subcategoria: "",
                         taxaDepreciacao: categoria?.taxaDepreciacao ?? atual.taxaDepreciacao
                       }));
                     }}
                     onBlur={() => atualizarErroFormulario("categoria")}
                   >
                     <option value="">Selecione a categoria</option>
-                    {categoriasPatrimonio.map((item) => (
+                    {categoriasCatalogo.filter((item) => item.ativo ?? true).map((item) => (
                       <option key={item.nome} value={item.nome}>
-                        {item.nome} - {item.taxaDepreciacao}% ao ano
+                        {item.nome} - {Number(item.taxaDepreciacao ?? 0).toFixed(2)}% ao ano
                       </option>
                     ))}
                   </Select>
@@ -2084,11 +2232,20 @@ export function PatrimonioPage() {
 
                 <div className="space-y-1">
                   <Label>Subcategoria</Label>
-                  <Input
+                  <Select
                     value={form.subcategoria ?? ""}
-                    placeholder="Detalhe a classificação"
                     onChange={(event) => setForm((atual) => ({ ...atual, subcategoria: event.target.value }))}
-                  />
+                    disabled={!form.categoria || !subcategoriasDisponiveis.length}
+                  >
+                    <option value="">
+                      {form.categoria ? "Selecione a subcategoria" : "Selecione a categoria primeiro"}
+                    </option>
+                    {subcategoriasDisponiveis.map((item) => (
+                      <option key={item} value={item}>
+                        {item}
+                      </option>
+                    ))}
+                  </Select>
                 </div>
 
                 <div className="space-y-1">
@@ -2851,6 +3008,175 @@ export function PatrimonioPage() {
                 </table>
               </CardContent>
             </Card>
+          </section>
+        ) : null}
+
+        {abaAtiva === "categorias" ? (
+          <section className="space-y-3">
+            <div className="grid gap-3 xl:grid-cols-[0.9fr,1.1fr]">
+              <Card className="border-[var(--g3-border)]">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">
+                    {categoriaForm.id ? "Editar categoria" : "Cadastrar categoria"}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="space-y-1">
+                    <Label>Categoria</Label>
+                    <Input
+                      value={categoriaForm.nome}
+                      placeholder="Ex.: Equipamentos odontológicos"
+                      onChange={(event) =>
+                        setCategoriaForm((atual) => ({ ...atual, nome: event.target.value }))
+                      }
+                      onBlur={() =>
+                        setCategoriaForm((atual) => ({ ...atual, nome: normalizarNomeCatalogo(atual.nome) }))
+                      }
+                    />
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="space-y-1">
+                      <Label>Taxa de depreciação anual (%)</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        step="0.01"
+                        value={Number(categoriaForm.taxaDepreciacao ?? 0)}
+                        onChange={(event) =>
+                          setCategoriaForm((atual) => ({
+                            ...atual,
+                            taxaDepreciacao: Number(event.target.value) || 0
+                          }))
+                        }
+                      />
+                    </div>
+
+                    <label className="flex items-center gap-2 pt-6 text-sm text-[var(--g3-foreground)]">
+                      <Checkbox
+                        checked={categoriaForm.ativo ?? true}
+                        onChange={(event) =>
+                          setCategoriaForm((atual) => ({ ...atual, ativo: event.target.checked }))
+                        }
+                      />
+                      Categoria ativa
+                    </label>
+                  </div>
+
+                  <div className="space-y-2 rounded-lg border border-[var(--g3-border)] p-3">
+                    <Label>Subcategorias</Label>
+                    <div className="grid gap-2 md:grid-cols-[1fr_auto]">
+                      <Input
+                        value={subcategoriaDraft}
+                        placeholder="Ex.: Cadeiras de rodas"
+                        onChange={(event) => setSubcategoriaDraft(event.target.value)}
+                        onBlur={() => setSubcategoriaDraft((valor) => normalizarNomeCatalogo(valor))}
+                      />
+                      <Button type="button" variant="outline" onClick={incluirSubcategoria}>
+                        <Plus className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                        Incluir
+                      </Button>
+                    </div>
+                    {(categoriaForm.subcategorias ?? []).length ? (
+                      <div className="flex flex-wrap gap-2">
+                        {(categoriaForm.subcategorias ?? []).map((item) => (
+                          <span
+                            key={item}
+                            className="inline-flex items-center gap-2 rounded-full border border-[var(--g3-border)] px-3 py-1 text-xs text-[var(--g3-foreground)]"
+                          >
+                            {item}
+                            <button
+                              type="button"
+                              className="text-[var(--g3-danger)]"
+                              onClick={() => removerSubcategoria(item)}
+                              aria-label={`Remover ${item}`}
+                            >
+                              <X className="h-3.5 w-3.5" aria-hidden="true" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-[var(--g3-muted)]">Nenhuma subcategoria incluída.</p>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" onClick={() => void salvarCategoria()} disabled={carregandoAcoes}>
+                      <Save className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                      Salvar categoria
+                    </Button>
+                    <Button type="button" variant="outline" onClick={novaCategoria} disabled={carregandoAcoes}>
+                      <Plus className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                      Nova categoria
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-[var(--g3-border)]">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Categorias cadastradas</CardTitle>
+                </CardHeader>
+                <CardContent className="overflow-auto p-0">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-[var(--g3-card-soft)] text-[var(--g3-muted)]">
+                      <tr>
+                        <th className="px-3 py-2 text-left">Categoria</th>
+                        <th className="px-3 py-2 text-left">Subcategorias</th>
+                        <th className="px-3 py-2 text-left">Taxa</th>
+                        <th className="px-3 py-2 text-left">Status</th>
+                        <th className="px-3 py-2 text-right">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {categoriasCatalogo.length ? (
+                        categoriasCatalogo.map((item, index) => (
+                          <tr
+                            key={item.id ?? item.nome}
+                            className={`border-t border-[var(--g3-border)] ${
+                              index % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/20"
+                            }`}
+                          >
+                            <td className="px-3 py-2 font-medium">{item.nome}</td>
+                            <td className="px-3 py-2 text-[var(--g3-muted)]">
+                              {(item.subcategorias ?? []).join(", ") || "---"}
+                            </td>
+                            <td className="px-3 py-2">{Number(item.taxaDepreciacao ?? 0).toFixed(2)}%</td>
+                            <td className="px-3 py-2">
+                              <Badge variant={(item.ativo ?? true) ? "success" : "default"}>
+                                {(item.ativo ?? true) ? "Ativa" : "Inativa"}
+                              </Badge>
+                            </td>
+                            <td className="space-x-2 px-3 py-2 text-right">
+                              <Button type="button" size="sm" variant="outline" onClick={() => editarCategoria(item)}>
+                                Editar
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="danger"
+                                onClick={() => void removerCategoria(item)}
+                                disabled={carregandoAcoes}
+                              >
+                                Excluir
+                              </Button>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={5} className="px-3 py-4 text-center text-[var(--g3-muted)]">
+                            Nenhuma categoria cadastrada.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </CardContent>
+              </Card>
+            </div>
           </section>
         ) : null}
 

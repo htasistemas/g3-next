@@ -492,8 +492,10 @@ const secoesManual: ManualSecao[] = [
         objetivo: "Controlar bens patrimoniais com cadastro, atualização de estado e histórico de movimentações por instituição.",
         comoUsar: [
           "Use a listagem para localizar rapidamente o patrimônio e abrir o item para edição ou conferência do cadastro.",
-          "Ao cadastrar um bem, o campo Número patrimonial sugere o próximo número da sequência, permite informar outro número manualmente e oferece consulta aos números vagos da sequência atual.",
-          "Na aba Cadastro patrimonial, selecione a Categoria a partir da base padronizada do sistema; a tela não aceita categoria digitada livremente para evitar duplicidade de nomes.",
+          "Ao cadastrar um bem, o campo Número patrimonial sugere o próximo número da sequência, permite informar outro número manualmente e traz ícones ao lado do campo para usar o próximo número ou consultar os números vagos da sequência atual.",
+          "Use a aba Categorias para cadastrar, editar ou excluir categorias e suas subcategorias de patrimônio, definindo também a taxa anual de depreciação e o status ativo ou inativo.",
+          "Na aba Cadastro patrimonial, selecione a Categoria a partir da base cadastrada na aba Categorias; a tela não aceita categoria digitada livremente para evitar duplicidade de nomes.",
+          "Depois de selecionar a categoria, o campo Subcategoria passa a listar as subcategorias vinculadas à categoria escolhida.",
           "Ao selecionar uma categoria, a tela sugere a taxa anual de depreciação correspondente e mantém a taxa editável para ajustes do cadastro.",
           "O campo Valor de aquisição usa máscara monetária brasileira e a estimativa contábil considera a data de aquisição, a taxa anual e a depreciação proporcional por meses.",
           "Ao cadastrar um bem, informe número do patrimônio, nome, categoria, conservação, status, origem, responsável, unidade e demais dados de identificação.",
@@ -507,6 +509,7 @@ const secoesManual: ManualSecao[] = [
         atencoes: [
           "A tela Patrimônio agora lista, cadastra, atualiza e movimenta bens sempre dentro do tenant autenticado, impedindo mistura de patrimônios entre instituições.",
           "O número patrimonial continua com bloqueio de duplicidade por instituição no backend, mesmo quando o usuário informa manualmente um número diferente da sugestão.",
+          "Categorias com bens vinculados não podem ser excluídas; nesses casos, mantenha o histórico e use a edição ou inativação da categoria.",
           "A validação do número do patrimônio passou a ser exclusiva por tenant, permitindo que instituições diferentes mantenham suas próprias sequências sem conflito.",
           "A Impressão por local usa a localização atual do cadastro do bem para montar a relação que pode ser fixada no mural do ambiente.",
           "No relatório por local, o cabeçalho também exibe o local selecionado para evitar impressão sem identificação do ambiente."

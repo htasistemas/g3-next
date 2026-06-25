@@ -25,3 +25,11 @@ export type Patrimonio = {
   observacoes?: string;
   movimentos?: PatrimonioMovimento[];
 };
+
+export type PatrimonioCategoria = {
+  id?: string;
+  nome: string;
+  taxaDepreciacao?: number;
+  subcategorias?: string[];
+  ativo?: boolean;
+};

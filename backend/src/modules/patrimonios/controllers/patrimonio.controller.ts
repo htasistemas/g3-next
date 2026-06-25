@@ -10,6 +10,30 @@ export class PatrimonioController {
     return response.json({ patrimonios });
   }
 
+  async listarCategorias(request: AuthenticatedRequest, response: Response) {
+    const categorias = await service.listarCategorias(request.authUser?.tenant_id);
+    return response.json({ categorias });
+  }
+
+  async criarCategoria(request: AuthenticatedRequest, response: Response) {
+    const categoria = await service.criarCategoria(request.body, request.authUser?.tenant_id);
+    return response.status(201).json({ categoria });
+  }
+
+  async atualizarCategoria(request: AuthenticatedRequest, response: Response) {
+    const categoria = await service.atualizarCategoria(
+      request.params.id,
+      request.body,
+      request.authUser?.tenant_id
+    );
+    return response.json({ categoria });
+  }
+
+  async removerCategoria(request: AuthenticatedRequest, response: Response) {
+    await service.removerCategoria(request.params.id, request.authUser?.tenant_id);
+    return response.status(204).send();
+  }
+
   async criar(request: AuthenticatedRequest, response: Response) {
     const patrimonio = await service.criar(request.body, request.authUser?.tenant_id);
     return response.status(201).json({ patrimonio });
