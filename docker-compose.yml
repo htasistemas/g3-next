@@ -31,12 +31,6 @@ services:
     ports:
       - "127.0.0.1:${HOST_MINIO_API_PORT:-9000}:9000"
       - "127.0.0.1:${HOST_MINIO_CONSOLE_PORT:-9001}:9001"
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:9000/minio/health/live > /dev/null || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
     networks:
       - g3n_net
 
@@ -81,8 +75,6 @@ services:
       - ./docker/runtime:/var/run/g3n
     depends_on:
       g3n-db:
-        condition: service_healthy
-      g3n-minio:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:3333/health || exit 1"]
