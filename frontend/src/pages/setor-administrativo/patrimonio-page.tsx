@@ -597,6 +597,7 @@ export function PatrimonioPage() {
   const [formatoEtiquetaId, setFormatoEtiquetaId] = useState<FormatoEtiquetaId>("80x50");
   const [mostrarNumerosVagos, setMostrarNumerosVagos] = useState(false);
   const [form, setForm] = useState<Patrimonio>(defaultForm);
+  const [unidadeLocalizacaoSelecionadaId, setUnidadeLocalizacaoSelecionadaId] = useState("");
   const [categoriaForm, setCategoriaForm] = useState<PatrimonioCategoria>(defaultCategoriaForm);
   const [subcategoriaDraft, setSubcategoriaDraft] = useState("");
   const [snapshot, setSnapshot] = useState<Patrimonio>(defaultForm);
@@ -701,19 +702,39 @@ export function PatrimonioPage() {
     [unidadesAssistenciais]
   );
 
-  const salasDisponiveis = useMemo(() => {
-    const unidadeSelecionada = normalizarBusca(form.unidade);
-    if (!unidadeSelecionada) return [];
+  const unidadeLocalizacaoSelecionada = useMemo(
+    () =>
+      unidadesAssistenciais.find(
+        (unidade) =>
+          unidade.id_unidade === unidadeLocalizacaoSelecionadaId ||
+          normalizarBusca(unidade.nome_fantasia) === normalizarBusca(form.unidade)
+      ) ?? null,
+    [form.unidade, unidadeLocalizacaoSelecionadaId, unidadesAssistenciais]
+  );
 
-    const salasDasUnidades = unidadesAssistenciais
-      .filter((unidade) => normalizarBusca(unidade.nome_fantasia) === unidadeSelecionada)
-      .flatMap((unidade) => unidade.salas ?? [])
+  useEffect(() => {
+    if (!form.unidade?.trim()) {
+      setUnidadeLocalizacaoSelecionadaId("");
+      return;
+    }
+
+    const unidadeEncontrada = unidadesAssistenciais.find(
+      (unidade) =>
+        unidade.id_unidade === form.unidade ||
+        normalizarBusca(unidade.nome_fantasia) === normalizarBusca(form.unidade)
+    );
+    setUnidadeLocalizacaoSelecionadaId(unidadeEncontrada?.id_unidade ?? unidadeEncontrada?.nome_fantasia ?? "");
+  }, [form.unidade, unidadesAssistenciais]);
+
+  const salasDisponiveis = useMemo(() => {
+    const salaSource = unidadeLocalizacaoSelecionada?.salas ?? [];
+    const salasDasUnidades = salaSource
       .filter((sala) => sala.ativo ?? true)
       .map((sala) => sala.nome?.trim() || "")
       .filter(Boolean);
 
     return Array.from(new Set(salasDasUnidades)).sort((a, b) => a.localeCompare(b, "pt-BR"));
-  }, [form.unidade, unidadesAssistenciais]);
+  }, [unidadeLocalizacaoSelecionada]);
 
   const locaisPatrimonioDisponiveis = useMemo(
     () =>
@@ -942,6 +963,10 @@ export function PatrimonioPage() {
   }
 
   function novo() {
+    const unidadePadrao =
+      unidadesAssistenciais.find((unidade) => unidade.unidade_principal)?.id_unidade ??
+      unidadesAssistenciais[0]?.id_unidade ??
+      "";
     const proximo = {
       ...defaultForm,
       numeroPatrimonio: proximoNumeroPatrimonial,
@@ -950,6 +975,7 @@ export function PatrimonioPage() {
     setForm(proximo);
     setSnapshot(proximo);
     setMovimento(criarMovimentoPadrao(proximo));
+    setUnidadeLocalizacaoSelecionadaId(unidadePadrao);
     setMostrarNumerosVagos(false);
     setSelecionadosIds([]);
     setErros({});
@@ -966,6 +992,11 @@ export function PatrimonioPage() {
     setForm(proximo);
     setSnapshot(proximo);
     setMovimento(criarMovimentoPadrao(proximo));
+    setUnidadeLocalizacaoSelecionadaId(
+      unidadesAssistenciais.find(
+        (unidade) => normalizarBusca(unidade.nome_fantasia) === normalizarBusca(item.unidade)
+      )?.id_unidade ?? ""
+    );
     setMostrarNumerosVagos(false);
     setErros({});
     setErrosMovimento({});
@@ -979,6 +1010,11 @@ export function PatrimonioPage() {
   function cancelar() {
     setForm(snapshot);
     setMovimento(criarMovimentoPadrao(snapshot));
+    setUnidadeLocalizacaoSelecionadaId(
+      unidadesAssistenciais.find(
+        (unidade) => normalizarBusca(unidade.nome_fantasia) === normalizarBusca(snapshot.unidade)
+      )?.id_unidade ?? ""
+    );
     setErros({});
     setErrosMovimento({});
   }
@@ -2603,15 +2639,25 @@ export function PatrimonioPage() {
                   <div className="space-y-1">
                     <Label>Unidade</Label>
                     <Select
-                      value={form.unidade ?? ""}
+                      value={unidadeLocalizacaoSelecionadaId}
                       onChange={(event) =>
-                        setForm((atual) => ({ ...atual, unidade: event.target.value, sala: "" }))
+                        setForm((atual) => ({
+                          ...atual,
+                          unidade:
+                            unidadesAssistenciais.find(
+                              (unidade) =>
+                                unidade.id_unidade === event.target.value ||
+                                unidade.nome_fantasia === event.target.value
+                            )
+                              ?.nome_fantasia ?? atual.unidade,
+                          sala: ""
+                        }))
                       }
                     >
                       <option value="">Selecione a unidade</option>
-                      {unidadesDisponiveis.map((item) => (
-                        <option key={item} value={item}>
-                          {item}
+                      {unidadesAssistenciais.map((item) => (
+                        <option key={item.id_unidade ?? item.nome_fantasia} value={item.id_unidade ?? item.nome_fantasia}>
+                          {item.nome_fantasia}
                         </option>
                       ))}
                     </Select>
@@ -2622,10 +2668,10 @@ export function PatrimonioPage() {
                     <Select
                       value={form.sala ?? ""}
                       onChange={(event) => setForm((atual) => ({ ...atual, sala: event.target.value }))}
-                      disabled={!form.unidade}
+                      disabled={!unidadeLocalizacaoSelecionadaId}
                     >
                       <option value="">
-                        {form.unidade ? "Selecione a sala" : "Selecione a unidade primeiro"}
+                        {unidadeLocalizacaoSelecionadaId ? "Selecione a sala" : "Selecione a unidade primeiro"}
                       </option>
                       {salasDisponiveis.map((item) => (
                         <option key={item} value={item}>
@@ -2633,7 +2679,7 @@ export function PatrimonioPage() {
                         </option>
                       ))}
                     </Select>
-                    {form.unidade && salasDisponiveis.length === 0 ? (
+                    {unidadeLocalizacaoSelecionadaId && salasDisponiveis.length === 0 ? (
                       <p className="text-xs text-[var(--g3-muted)]">
                         Nenhuma sala de atendimento cadastrada para esta unidade.
                       </p>
