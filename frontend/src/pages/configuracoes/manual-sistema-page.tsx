@@ -501,6 +501,7 @@ const secoesManual: ManualSecao[] = [
           "Depois de selecionar a categoria, o campo Subcategoria passa a listar as subcategorias vinculadas à categoria escolhida.",
           "Ao selecionar uma categoria, a tela sugere a taxa anual de depreciação correspondente e mantém a taxa editável para ajustes do cadastro.",
           "O campo Valor de aquisição usa máscara monetária brasileira e a estimativa contábil considera a data de aquisição, a taxa anual e a depreciação proporcional por meses.",
+          "Na aba Localização e custódia, o card de conferência exibe Valor informado em verde quando o bem já tem valor de aquisição lançado, substituindo a referência ao histórico iniciado.",
           "Ao cadastrar um bem, informe unidade antes do número do patrimônio, depois nome, categoria, conservação, status, origem, responsável e demais dados de identificação. Novo cadastro sugere a unidade principal e permite selecionar qualquer unidade cadastrada.",
           "Na aba Localização e custódia, o campo Unidade lista somente as unidades cadastradas em Cadastro de unidade assistencial pelo nome fantasia; depois de selecionar a unidade, o campo Sala lista somente as salas cadastradas na aba Salas de atendimento daquela unidade.",
           "Use Registrar movimento para lançar movimentação, manutenção ou baixa, mantendo a trilha operacional do bem ao longo do tempo.",

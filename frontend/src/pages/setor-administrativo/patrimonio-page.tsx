@@ -2722,11 +2722,9 @@ export function PatrimonioPage() {
                     detalhe: formatarDataInterface(form.dataAquisicao)
                   },
                   {
-                    ok: Boolean((form.movimentos ?? []).length),
-                    titulo: "Histórico iniciado",
-                    detalhe: (form.movimentos ?? []).length
-                      ? `${(form.movimentos ?? []).length} movimentação(ões)`
-                      : "Sem histórico"
+                    ok: Number(form.valorAquisicao ?? 0) > 0,
+                    titulo: "Valor informado",
+                    detalhe: Number(form.valorAquisicao ?? 0) > 0 ? formatarMoeda(form.valorAquisicao) : "Sem valor informado"
                   }
                 ].map((item) => (
                   <div
