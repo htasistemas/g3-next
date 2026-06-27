@@ -1,6 +1,66 @@
 {
     "entries":  [
                     {
+                        "version":  "1.00.560",
+                        "releaseDate":  "2026-06-27",
+                        "title":  "Fotos de eventos com tenant corrigido",
+                        "description":  "As fotos de eventos passaram a gravar e reencontrar o tenant corretamente, evitando que a galeria fique vazia após reabrir a tela.",
+                        "changes":  [
+                                        "O upload de fotos de evento agora grava o tenant no metadado do arquivo no momento do salvamento.",
+                                        "O vínculo do arquivo com o evento passou a receber o tenant junto, alinhando a leitura autenticada por caminho.",
+                                        "Foi aplicado backfill para corrigir registros antigos de fotos de evento que ficaram sem tenant_id."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.559",
+                        "releaseDate":  "2026-06-27",
+                        "title":  "Fotos de eventos com carregamento autenticado",
+                        "description":  "A exibição das fotos do evento passou a usar um preview autenticado por imagem, evitando tela em branco ao reabrir o cadastro ou a galeria.",
+                        "changes":  [
+                                        "A listagem, o mural e o álbum agora carregam cada foto por URL autenticada em um componente dedicado.",
+                                        "A galeria deixou de depender de um carregamento em lote que podia atrasar ou impedir a visualização das imagens.",
+                                        "A tela continua mostrando evento, capa e fotos mesmo após fechar e reabrir a página."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.558",
+                        "releaseDate":  "2026-06-27",
+                        "title":  "Saneamento de patrimônio recolhível",
+                        "description":  "A listagem de patrimônio ganhou uma auditoria visual de vínculos legados e o painel de saneamento em lote passou a poder ser recolhido e reaberto sem perder o contexto.",
+                        "changes":  [
+                                        "A tela passou a mostrar a quantidade de patrimônios ainda sem unidade resolvida, destacando os registros legados que precisam de revisão manual.",
+                                        "O saneamento em lote assistido agora pode ser recolhido por um botão no cabeçalho e reaberto quando necessário.",
+                                        "A listagem mantém o estado da seleção e dos filtros mesmo quando o painel é recolhido."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.557",
+                        "releaseDate":  "2026-06-27",
+                        "title":  "Patrimônio vinculado por unidade",
+                        "description":  "O patrimônio passou a persistir o vínculo da unidade por ID, mantendo o nome apenas como apoio visual e compatibilidade legada.",
+                        "changes":  [
+                                        "A tabela de patrimônio recebeu a coluna unidade_id com backfill automático quando o nome da unidade pôde ser resolvido.",
+                                        "O cadastro e a atualização agora gravam o vínculo por unidade assistencial autenticada, não apenas por texto.",
+                                        "A listagem continua exibindo o nome da unidade, mas o vínculo interno passa a usar o ID da unidade para evitar inconsistências futuras."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.556",
+                        "releaseDate":  "2026-06-27",
+                        "title":  "Patrimônio por unidade corrigido",
+                        "description":  "O número patrimonial passou a ser validado por unidade e a busca passou a mostrar a unidade de cada registro com mais clareza.",
+                        "changes":  [
+                                        "A duplicidade do número patrimonial deixou de ser global no tenant e passou a considerar a unidade informada no cadastro.",
+                                        "A busca numérica da listagem continua exata e agora exibe a unidade de cada patrimônio para diferenciar números repetidos entre unidades.",
+                                        "A tela de cadastro passou a exigir unidade antes de salvar o patrimônio e exibe aviso explícito de validação por unidade."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.555",
                         "releaseDate":  "2026-06-25",
                         "title":  "Impressao patrimonial por local ajustada",

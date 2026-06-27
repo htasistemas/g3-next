@@ -48,6 +48,7 @@ export class PatrimonioService {
   async criar(rawInput: unknown, rawTenantId?: string) {
     const input = patrimonioInputSchema.parse(this.normalizarPayload(rawInput));
     const tenantId = this.parseTenant(rawTenantId);
+    this.validarUnidadeObrigatoria(input.unidadeId, input.unidade);
     const registro = await this.repository.criar(input, tenantId);
     return mapPatrimonioToResponse(registro.patrimonio, registro.movimentos);
   }
@@ -56,6 +57,7 @@ export class PatrimonioService {
     const id = this.parseId(rawId);
     const input = patrimonioInputSchema.parse(this.normalizarPayload(rawInput));
     const tenantId = this.parseTenant(rawTenantId);
+    this.validarUnidadeObrigatoria(input.unidadeId, input.unidade);
     const registro = await this.repository.atualizar(id, input, tenantId);
     return mapPatrimonioToResponse(registro.patrimonio, registro.movimentos);
   }
@@ -87,5 +89,11 @@ export class PatrimonioService {
   private normalizarPayload(rawInput: unknown) {
     if (!rawInput || typeof rawInput !== "object") return rawInput;
     return normalizarObjetoTexto(rawInput as Record<string, unknown>, mapaCamposTextoPatrimonio);
+  }
+
+  private validarUnidadeObrigatoria(unidadeId?: string, unidade?: string) {
+    if (!unidadeId?.trim() && !unidade?.trim()) {
+      throw new AppError("Selecione a unidade do patrimônio.", 400);
+    }
   }
 }

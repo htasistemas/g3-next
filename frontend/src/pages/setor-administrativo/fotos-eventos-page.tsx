@@ -40,7 +40,7 @@ import {
   useReordenarFotosEvento,
   useSalvarFotoEvento
 } from "@/features/fotos-eventos/use-fotos-eventos";
-import { obterUrlArquivoAutenticado, resolverUrlArquivo } from "@/lib/arquivos";
+import { obterUrlArquivoAutenticado } from "@/lib/arquivos";
 import { lerArquivoComoDataUrl } from "@/lib/foto-3x4";
 import { imprimirConteudoAtual } from "@/lib/report-utils";
 import type { FotoEventoFotoPayload, FotoEventoPayload, FotoUploadPayload } from "@/types/fotos-eventos";
@@ -109,6 +109,75 @@ function cardIndicador(titulo: string, valor: string | number, apoio: string) {
   );
 }
 
+function ImagemArquivoAutenticado({
+  valor,
+  alt,
+  className,
+  placeholder
+}: {
+  valor?: string | null;
+  alt: string;
+  className?: string;
+  placeholder: string;
+}) {
+  const [url, setUrl] = useState("");
+  const [falhou, setFalhou] = useState(false);
+
+  useEffect(() => {
+    let ativo = true;
+    let revokeAtual: (() => void) | undefined;
+    const caminho = valor?.trim() ?? "";
+
+    setFalhou(false);
+
+    if (!caminho) {
+      setUrl("");
+      return () => {
+        revokeAtual?.();
+      };
+    }
+
+    if (caminho.startsWith("data:") || caminho.startsWith("blob:") || /^https?:\/\//i.test(caminho)) {
+      setUrl(caminho);
+      return () => {
+        revokeAtual?.();
+      };
+    }
+
+    void (async () => {
+      try {
+        const arquivo = await obterUrlArquivoAutenticado(caminho, { cache: true, auditar: false });
+        if (!ativo) {
+          arquivo.revoke?.();
+          return;
+        }
+
+        revokeAtual = arquivo.revoke;
+        setUrl(arquivo.url);
+      } catch {
+        if (!ativo) return;
+        setUrl("");
+        setFalhou(true);
+      }
+    })();
+
+    return () => {
+      ativo = false;
+      revokeAtual?.();
+    };
+  }, [valor]);
+
+  if (!url || falhou) {
+    return (
+      <div className="flex h-full items-center justify-center bg-[var(--g3-primary-soft)]/30 text-xs text-[var(--g3-muted)]">
+        {placeholder}
+      </div>
+    );
+  }
+
+  return <img src={url} alt={alt} className={className} loading="lazy" decoding="async" onError={() => setFalhou(true)} />;
+}
+
 export function FotosEventosPage() {
   const navigate = useNavigate();
   const [abaAtiva, setAbaAtiva] = useState<AbaId>("lista");
@@ -120,8 +189,6 @@ export function FotosEventosPage() {
   const [confirmarExcluir, setConfirmarExcluir] = useState(false);
   const [confirmarExcluirFotoId, setConfirmarExcluirFotoId] = useState<number | null>(null);
   const [uploadsPendentes, setUploadsPendentes] = useState<UploadPendente[]>([]);
-  const [capasMural, setCapasMural] = useState<Record<number, string>>({});
-  const [imagensAlbum, setImagensAlbum] = useState<Record<number, string>>({});
 
   const { data, isLoading } = useFotosEventos({
     busca,
@@ -141,74 +208,6 @@ export function FotosEventosPage() {
   const detalhes = detalheQuery.data;
   const fotos = useMemo(() => detalhes?.fotos ?? [], [detalhes?.fotos]);
   const fotoPrincipalId = detalhes?.evento?.fotoPrincipalId ?? form.fotoPrincipalId ?? null;
-
-  useEffect(() => {
-    let ativo = true;
-    const revokes: Array<() => void> = [];
-    const eventosComCapa = eventos.filter((item) => item.fotoPrincipalUrl);
-
-    if (!eventosComCapa.length) {
-      setCapasMural({});
-      return () => undefined;
-    }
-
-    void (async () => {
-      const entradas = await Promise.all(
-        eventosComCapa.map(async (item) => {
-          try {
-            const arquivo = await obterUrlArquivoAutenticado(item.fotoPrincipalUrl, { cache: true, auditar: false });
-            if (arquivo.revoke) revokes.push(arquivo.revoke);
-            return [item.id, arquivo.url || resolverUrlArquivo(item.fotoPrincipalUrl)] as const;
-          } catch {
-            return [item.id, resolverUrlArquivo(item.fotoPrincipalUrl)] as const;
-          }
-        })
-      );
-
-      if (ativo) {
-        setCapasMural(Object.fromEntries(entradas));
-      }
-    })();
-
-    return () => {
-      ativo = false;
-      revokes.forEach((revoke) => revoke());
-    };
-  }, [eventos]);
-
-  useEffect(() => {
-    let ativo = true;
-    const revokes: Array<() => void> = [];
-    const fotosComArquivo = fotos.filter((item) => item.arquivoUrl);
-
-    if (!fotosComArquivo.length) {
-      setImagensAlbum({});
-      return () => undefined;
-    }
-
-    void (async () => {
-      const entradas = await Promise.all(
-        fotosComArquivo.map(async (item) => {
-          try {
-            const arquivo = await obterUrlArquivoAutenticado(item.arquivoUrl, { cache: true, auditar: false });
-            if (arquivo.revoke) revokes.push(arquivo.revoke);
-            return [item.id, arquivo.url || resolverUrlArquivo(item.arquivoUrl)] as const;
-          } catch {
-            return [item.id, resolverUrlArquivo(item.arquivoUrl)] as const;
-          }
-        })
-      );
-
-      if (ativo) {
-        setImagensAlbum(Object.fromEntries(entradas));
-      }
-    })();
-
-    return () => {
-      ativo = false;
-      revokes.forEach((revoke) => revoke());
-    };
-  }, [fotos]);
 
   const carregandoAcoes =
     salvarMutation.isPending ||
@@ -829,10 +828,11 @@ export function FotosEventosPage() {
                   >
                     <div className="relative aspect-[4/3] overflow-hidden bg-[var(--g3-primary-soft)]">
                       {item.fotoPrincipalUrl ? (
-                        <img
-                          src={capasMural[item.id] || resolverUrlArquivo(item.fotoPrincipalUrl)}
+                        <ImagemArquivoAutenticado
+                          valor={item.fotoPrincipalUrl}
                           alt={item.titulo}
                           className="h-full w-full object-cover"
+                          placeholder="Sem foto principal"
                         />
                       ) : (
                         <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-[var(--g3-muted)]">
@@ -1090,17 +1090,18 @@ export function FotosEventosPage() {
             <div className="grid gap-3 xl:grid-cols-[1.1fr_0.9fr]">
               <Card className="overflow-hidden border-[var(--g3-border)] bg-[var(--g3-card)] shadow-sm">
                 <div className="grid gap-0">
-                  <div className="aspect-[16/9] bg-slate-100">
-                    {capaAtual?.arquivoUrl ? (
-                      <img
-                        src={imagensAlbum[capaAtual.id] || resolverUrlArquivo(capaAtual.arquivoUrl)}
-                        alt={capaAtual.legenda ?? "Capa do evento"}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-full items-center justify-center bg-[var(--g3-primary-soft)]/30">
-                        <div className="space-y-2 text-center">
-                          <Images className="mx-auto h-10 w-10 text-[var(--g3-muted)]" />
+                <div className="aspect-[16/9] bg-slate-100">
+                  {capaAtual?.arquivoUrl ? (
+                    <ImagemArquivoAutenticado
+                      valor={capaAtual.arquivoUrl}
+                      alt={capaAtual.legenda ?? "Capa do evento"}
+                      className="h-full w-full object-cover"
+                      placeholder="Capa indisponível"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center bg-[var(--g3-primary-soft)]/30">
+                      <div className="space-y-2 text-center">
+                        <Images className="mx-auto h-10 w-10 text-[var(--g3-muted)]" />
                           <p className="text-sm text-[var(--g3-muted)]">Este evento ainda não possui capa definida.</p>
                         </div>
                       </div>
@@ -1235,10 +1236,11 @@ export function FotosEventosPage() {
                     >
                       <div className="relative aspect-video bg-slate-100">
                         {item.arquivoUrl ? (
-                          <img
-                            src={imagensAlbum[item.id] || resolverUrlArquivo(item.arquivoUrl)}
+                          <ImagemArquivoAutenticado
+                            valor={item.arquivoUrl}
                             alt={item.legenda ?? "Foto do evento"}
                             className="h-full w-full object-cover"
+                            placeholder="Sem visualização"
                           />
                         ) : (
                           <div className="flex h-full items-center justify-center text-sm text-[var(--g3-muted)]">

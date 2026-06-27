@@ -11,6 +11,8 @@ import {
   Camera,
   CheckCircle2,
   ClipboardList,
+  ChevronDown,
+  ChevronUp,
   ListChecks,
   ListRestart,
   MapPin,
@@ -64,7 +66,7 @@ type AbaId =
   | "movimentacao"
   | "categorias"
   | "listagem";
-type CampoFormulario = "numeroPatrimonio" | "nome" | "categoria" | "valorAquisicao" | "taxaDepreciacao";
+type CampoFormulario = "numeroPatrimonio" | "nome" | "categoria" | "unidade" | "valorAquisicao" | "taxaDepreciacao";
 type CampoMovimento = "dataMovimento";
 
 type MovimentoAssistido = PatrimonioMovimento & {
@@ -134,6 +136,7 @@ const defaultForm: Patrimonio = {
   valorAquisicao: 0,
   origem: "Compra",
   responsavel: "",
+  unidadeId: "",
   unidade: "",
   sala: "",
   taxaDepreciacao: 0,
@@ -292,7 +295,8 @@ function listarPendencias(item: Partial<Patrimonio>) {
   if (!item.nome?.trim()) pendencias.push("Informar nome do bem");
   if (!item.categoria?.trim()) pendencias.push("Classificar a categoria");
   if (!item.responsavel?.trim()) pendencias.push("Definir responsável");
-  if (!item.unidade?.trim() || !item.sala?.trim()) pendencias.push("Completar localização");
+  if (!item.unidade?.trim()) pendencias.push("Definir unidade");
+  if (!item.sala?.trim()) pendencias.push("Definir sala");
   if (Number(item.valorAquisicao ?? 0) > 0 && !item.dataAquisicao?.trim()) {
     pendencias.push("Registrar data de aquisição");
   }
@@ -594,6 +598,7 @@ export function PatrimonioPage() {
   const [selecionadosIds, setSelecionadosIds] = useState<string[]>([]);
   const [edicaoLote, setEdicaoLote] = useState<EdicaoLote>(defaultEdicaoLote);
   const [somenteCamposVaziosLote, setSomenteCamposVaziosLote] = useState(true);
+  const [mostrarSaneamentoLote, setMostrarSaneamentoLote] = useState(true);
   const [formatoEtiquetaId, setFormatoEtiquetaId] = useState<FormatoEtiquetaId>("80x50");
   const [mostrarNumerosVagos, setMostrarNumerosVagos] = useState(false);
   const [form, setForm] = useState<Patrimonio>(defaultForm);
@@ -624,11 +629,13 @@ export function PatrimonioPage() {
   const categoriasCatalogo = categoriasQuery.data?.categorias ?? [];
   const unidadesAssistenciais = unidadesAssistenciaisQuery.data?.unidades ?? [];
   const unidadeAtual = unidadeAtualQuery.data?.unidade;
-  const nomeUnidadePrincipalPatrimonio =
-    unidadesAssistenciais.find((unidade) => unidade.unidade_principal)?.nome_fantasia?.trim() ||
-    unidadeAtual?.nome_fantasia?.trim() ||
-    unidadesAssistenciais[0]?.nome_fantasia?.trim() ||
-    "";
+  const unidadePadraoPatrimonio =
+    unidadesAssistenciais.find((unidade) => unidade.unidade_principal) ??
+    unidadeAtual ??
+    unidadesAssistenciais[0] ??
+    null;
+  const nomeUnidadePrincipalPatrimonio = unidadePadraoPatrimonio?.nome_fantasia?.trim() || "";
+  const idUnidadePrincipalPatrimonio = unidadePadraoPatrimonio?.id_unidade ?? "";
   const nomeInstituicao =
     unidadeAtual?.razao_social?.trim() ||
     unidadeAtual?.nome_fantasia?.trim() ||
@@ -707,24 +714,26 @@ export function PatrimonioPage() {
       unidadesAssistenciais.find(
         (unidade) =>
           unidade.id_unidade === unidadeLocalizacaoSelecionadaId ||
+          unidade.id_unidade === form.unidadeId ||
           normalizarBusca(unidade.nome_fantasia) === normalizarBusca(form.unidade)
       ) ?? null,
-    [form.unidade, unidadeLocalizacaoSelecionadaId, unidadesAssistenciais]
+    [form.unidade, form.unidadeId, unidadeLocalizacaoSelecionadaId, unidadesAssistenciais]
   );
 
   useEffect(() => {
-    if (!form.unidade?.trim()) {
+    if (!form.unidadeId?.trim() && !form.unidade?.trim()) {
       setUnidadeLocalizacaoSelecionadaId("");
       return;
     }
 
     const unidadeEncontrada = unidadesAssistenciais.find(
       (unidade) =>
+        unidade.id_unidade === form.unidadeId ||
         unidade.id_unidade === form.unidade ||
         normalizarBusca(unidade.nome_fantasia) === normalizarBusca(form.unidade)
     );
     setUnidadeLocalizacaoSelecionadaId(unidadeEncontrada?.id_unidade ?? unidadeEncontrada?.nome_fantasia ?? "");
-  }, [form.unidade, unidadesAssistenciais]);
+  }, [form.unidade, form.unidadeId, unidadesAssistenciais]);
 
   const salasDisponiveis = useMemo(() => {
     const salaSource = unidadeLocalizacaoSelecionada?.salas ?? [];
@@ -773,12 +782,18 @@ export function PatrimonioPage() {
     [patrimonios]
   );
 
+  const patrimoniosSemVinculo = useMemo(
+    () => patrimoniosAnaliticos.filter(({ item }) => !item.unidadeId?.trim()),
+    [patrimoniosAnaliticos]
+  );
+
   const patrimoniosFiltrados = useMemo(() => {
     const termo = normalizarBusca(busca);
     const termoBruto = busca.trim();
     const termoNumerico = /^\d+$/.test(termoBruto);
 
-    return patrimoniosAnaliticos.filter(({ item, pendencias }) => {
+    return patrimoniosAnaliticos
+      .filter(({ item, pendencias }) => {
       if (termoNumerico) {
         const numeroNormalizado = String(item.numeroPatrimonio ?? "").replace(/\D/g, "");
         if (numeroNormalizado !== termoBruto.replace(/\D/g, "")) return false;
@@ -813,7 +828,15 @@ export function PatrimonioPage() {
       if (somentePendencias && !pendencias.length) return false;
 
       return true;
-    });
+    })
+      .sort((a, b) => {
+        if (!termoNumerico) return 0;
+        const unidadeA = String(a.item.unidade ?? "");
+        const unidadeB = String(b.item.unidade ?? "");
+        const porUnidade = unidadeA.localeCompare(unidadeB, "pt-BR");
+        if (porUnidade !== 0) return porUnidade;
+        return String(a.item.nome ?? "").localeCompare(String(b.item.nome ?? ""), "pt-BR");
+      });
   }, [busca, filtroCategoria, filtroStatus, filtroUnidade, patrimoniosAnaliticos, somentePendencias]);
 
   const patrimoniosSelecionados = useMemo(
@@ -899,6 +922,9 @@ export function PatrimonioPage() {
         ? ""
         : "Categoria não cadastrada. Selecione uma categoria existente para evitar duplicidade.";
     }
+    if (campo === "unidade") {
+      return String(valor ?? "").trim() ? "" : "Selecione a unidade do patrimônio.";
+    }
     if (campo === "valorAquisicao") {
       return Number(valor ?? 0) >= 0 ? "" : "O valor de aquisição não pode ser negativo.";
     }
@@ -923,7 +949,7 @@ export function PatrimonioPage() {
 
   function validarFormulario() {
     const proximo: Partial<Record<CampoFormulario, string>> = {};
-    (["numeroPatrimonio", "nome", "categoria", "valorAquisicao", "taxaDepreciacao"] as CampoFormulario[]).forEach(
+    (["numeroPatrimonio", "nome", "categoria", "unidade", "valorAquisicao", "taxaDepreciacao"] as CampoFormulario[]).forEach(
       (campo) => {
         const mensagem = validarCampoFormulario(campo);
         if (mensagem) proximo[campo] = mensagem;
@@ -963,19 +989,16 @@ export function PatrimonioPage() {
   }
 
   function novo() {
-    const unidadePadrao =
-      unidadesAssistenciais.find((unidade) => unidade.unidade_principal)?.id_unidade ??
-      unidadesAssistenciais[0]?.id_unidade ??
-      "";
     const proximo = {
       ...defaultForm,
       numeroPatrimonio: proximoNumeroPatrimonial,
+      unidadeId: idUnidadePrincipalPatrimonio,
       unidade: nomeUnidadePrincipalPatrimonio
     };
     setForm(proximo);
     setSnapshot(proximo);
     setMovimento(criarMovimentoPadrao(proximo));
-    setUnidadeLocalizacaoSelecionadaId(unidadePadrao);
+    setUnidadeLocalizacaoSelecionadaId(idUnidadePrincipalPatrimonio);
     setMostrarNumerosVagos(false);
     setSelecionadosIds([]);
     setErros({});
@@ -984,19 +1007,23 @@ export function PatrimonioPage() {
   }
 
   function selecionar(item: Patrimonio) {
+    const unidadeSelecionada =
+      unidadesAssistenciais.find((unidade) => unidade.id_unidade === item.unidadeId) ??
+      unidadesAssistenciais.find(
+        (unidade) => normalizarBusca(unidade.nome_fantasia) === normalizarBusca(item.unidade)
+      ) ??
+      null;
     const proximo = {
       ...defaultForm,
       ...item,
+      unidadeId: item.unidadeId ?? unidadeSelecionada?.id_unidade ?? "",
+      unidade: unidadeSelecionada?.nome_fantasia ?? item.unidade ?? "",
       movimentos: item.movimentos ?? []
     };
     setForm(proximo);
     setSnapshot(proximo);
     setMovimento(criarMovimentoPadrao(proximo));
-    setUnidadeLocalizacaoSelecionadaId(
-      unidadesAssistenciais.find(
-        (unidade) => normalizarBusca(unidade.nome_fantasia) === normalizarBusca(item.unidade)
-      )?.id_unidade ?? ""
-    );
+    setUnidadeLocalizacaoSelecionadaId(unidadeSelecionada?.id_unidade ?? "");
     setMostrarNumerosVagos(false);
     setErros({});
     setErrosMovimento({});
@@ -1011,9 +1038,11 @@ export function PatrimonioPage() {
     setForm(snapshot);
     setMovimento(criarMovimentoPadrao(snapshot));
     setUnidadeLocalizacaoSelecionadaId(
-      unidadesAssistenciais.find(
-        (unidade) => normalizarBusca(unidade.nome_fantasia) === normalizarBusca(snapshot.unidade)
-      )?.id_unidade ?? ""
+      unidadesAssistenciais.find((unidade) => unidade.id_unidade === snapshot.unidadeId)?.id_unidade ??
+        unidadesAssistenciais.find(
+          (unidade) => normalizarBusca(unidade.nome_fantasia) === normalizarBusca(snapshot.unidade)
+        )?.id_unidade ??
+        ""
     );
     setErros({});
     setErrosMovimento({});
@@ -1188,6 +1217,7 @@ export function PatrimonioPage() {
         valorAquisicao: Number(form.valorAquisicao ?? 0),
         origem: form.origem?.trim() || undefined,
         responsavel: form.responsavel?.trim() || undefined,
+        unidadeId: form.unidadeId?.trim() || undefined,
         unidade: form.unidade?.trim() || undefined,
         sala: form.sala?.trim() || undefined,
         taxaDepreciacao: Number(form.taxaDepreciacao ?? 0),
@@ -1361,6 +1391,13 @@ export function PatrimonioPage() {
             unidade: movimento.atualizarCadastro
               ? movimento.novaUnidade.trim() || patrimonioAtualizado.unidade
               : patrimonioAtualizado.unidade,
+            unidadeId: movimento.atualizarCadastro
+              ? unidadesAssistenciais.find(
+                  (unidade) =>
+                    unidade.id_unidade === unidadeLocalizacaoSelecionadaId ||
+                    normalizarBusca(unidade.nome_fantasia) === normalizarBusca(movimento.novaUnidade)
+                )?.id_unidade ?? patrimonioAtualizado.unidadeId
+              : patrimonioAtualizado.unidadeId,
             sala: movimento.atualizarCadastro
               ? movimento.novaSala.trim() || patrimonioAtualizado.sala
               : patrimonioAtualizado.sala,
@@ -2324,21 +2361,41 @@ export function PatrimonioPage() {
                 <div className="space-y-1">
                   <Label>Unidade</Label>
                   <Select
-                    value={form.unidade ?? ""}
-                    onChange={(event) =>
-                      setForm((atual) => ({ ...atual, unidade: event.target.value, sala: "" }))
-                    }
+                    value={form.unidadeId ?? ""}
+                    className={erros.unidade ? "border-rose-400 focus:ring-rose-400" : undefined}
+                    onChange={(event) => {
+                      const unidadeId = event.target.value;
+                      const unidadeSelecionada =
+                        unidadesAssistenciais.find((item) => item.id_unidade === unidadeId) ??
+                        unidadesAssistenciais.find(
+                          (item) => normalizarBusca(item.nome_fantasia) === normalizarBusca(unidadeId)
+                        ) ??
+                        null;
+                      setForm((atual) => ({
+                        ...atual,
+                        unidadeId: unidadeSelecionada?.id_unidade ?? "",
+                        unidade: unidadeSelecionada?.nome_fantasia ?? "",
+                        sala: ""
+                      }));
+                      setUnidadeLocalizacaoSelecionadaId(unidadeSelecionada?.id_unidade ?? "");
+                      atualizarErroFormulario("unidade", unidadeSelecionada?.nome_fantasia ?? "");
+                    }}
+                    onBlur={() => atualizarErroFormulario("unidade")}
                   >
                     <option value="">Selecione a unidade</option>
                     {unidadesDisponiveis.map((item) => (
-                      <option key={item} value={item}>
+                      <option key={item} value={unidadesAssistenciais.find((unidade) => unidade.nome_fantasia?.trim() === item)?.id_unidade ?? item}>
                         {item}
                       </option>
                     ))}
                   </Select>
-                  <p className="text-xs text-[var(--g3-muted)]">
-                    Selecione a unidade antes de informar o número patrimonial.
-                  </p>
+                  {erros.unidade ? (
+                    <p className="text-xs text-rose-700">{erros.unidade}</p>
+                  ) : (
+                    <p className="text-xs text-[var(--g3-muted)]">
+                      O número patrimonial é validado por unidade.
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-1">
@@ -3427,6 +3484,9 @@ export function PatrimonioPage() {
                     value={busca}
                     onChange={(event) => setBusca(event.target.value)}
                   />
+                  <p className="text-xs text-[var(--g3-muted)]">
+                    A busca numérica é exata e a unidade aparece na coluna Unidade.
+                  </p>
                 </div>
 
                 <div className="space-y-1">
@@ -3477,135 +3537,177 @@ export function PatrimonioPage() {
               </CardContent>
             </Card>
 
+            {patrimoniosSemVinculo.length ? (
+              <Card className="border-amber-300 bg-amber-50/60">
+                <CardContent className="flex flex-col gap-2 p-3 text-sm text-amber-950 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <p className="font-semibold">Auditoria de legado</p>
+                    <p>
+                      {patrimoniosSemVinculo.length} patrimônio(s) ainda estão sem `unidadeId` resolvido e podem
+                      precisar de revisão manual.
+                    </p>
+                  </div>
+                  <Badge variant="warning">Revisar vínculo de unidade</Badge>
+                </CardContent>
+              </Card>
+            ) : null}
+
             <Card className="border-[var(--g3-border)]">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Saneamento em lote assistido</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between gap-3 pb-2">
+                <div className="space-y-1">
+                  <CardTitle className="text-sm">Saneamento em lote assistido</CardTitle>
+                  <p className="text-xs text-[var(--g3-muted)]">
+                    {mostrarSaneamentoLote
+                      ? "Recolha a seção quando quiser focar apenas na listagem."
+                      : "Seção recolhida. Abra novamente para continuar o saneamento."}
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setMostrarSaneamentoLote((atual) => !atual)}
+                  aria-expanded={mostrarSaneamentoLote}
+                >
+                  {mostrarSaneamentoLote ? (
+                    <>
+                      <ChevronUp className="mr-1.5 h-3.5 w-3.5" />
+                      Recolher
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="mr-1.5 h-3.5 w-3.5" />
+                      Abrir saneamento
+                    </>
+                  )}
+                </Button>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant={patrimoniosSelecionados.length ? "info" : "default"}>
-                    {patrimoniosSelecionados.length} selecionado(s)
-                  </Badge>
-                  <Button variant="outline" size="sm" onClick={alternarSelecaoTodosFiltrados}>
-                    <CheckSquare className="mr-1.5 h-3.5 w-3.5" />
-                    {todosFiltradosSelecionados ? "Remover filtro da seleção" : "Selecionar filtro atual"}
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={selecionarFiltradosComPendencias}>
-                    Selecionar pendências
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={limparSelecaoLote}>
-                    Limpar seleção
-                  </Button>
-                </div>
-
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
-                  <div className="space-y-1">
-                    <Label>Categoria</Label>
-                    <Input
-                      list="patrimonio-categorias"
-                      value={edicaoLote.categoria}
-                      placeholder="Aplicar categoria"
-                      onChange={(event) =>
-                        setEdicaoLote((atual) => ({ ...atual, categoria: event.target.value }))
-                      }
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label>Unidade</Label>
-                    <Input
-                      list="patrimonio-unidades"
-                      value={edicaoLote.unidade}
-                      placeholder="Aplicar unidade"
-                      onChange={(event) =>
-                        setEdicaoLote((atual) => ({ ...atual, unidade: event.target.value }))
-                      }
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label>Sala</Label>
-                    <Input
-                      list="patrimonio-salas"
-                      value={edicaoLote.sala}
-                      placeholder="Aplicar sala"
-                      onChange={(event) =>
-                        setEdicaoLote((atual) => ({ ...atual, sala: event.target.value }))
-                      }
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label>Responsável</Label>
-                    <Input
-                      list="patrimonio-responsaveis"
-                      value={edicaoLote.responsavel}
-                      placeholder="Aplicar responsável"
-                      onChange={(event) =>
-                        setEdicaoLote((atual) => ({ ...atual, responsavel: event.target.value }))
-                      }
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label>Status</Label>
-                    <Select
-                      value={edicaoLote.status}
-                      onChange={(event) =>
-                        setEdicaoLote((atual) => ({ ...atual, status: event.target.value }))
-                      }
-                    >
-                      <option value="">Não alterar</option>
-                      {statusOptions.map((item) => (
-                        <option key={item} value={item}>
-                          {item}
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label>Conservação</Label>
-                    <Select
-                      value={edicaoLote.conservacao}
-                      onChange={(event) =>
-                        setEdicaoLote((atual) => ({ ...atual, conservacao: event.target.value }))
-                      }
-                    >
-                      <option value="">Não alterar</option>
-                      {conservacaoOptions.map((item) => (
-                        <option key={item} value={item}>
-                          {item}
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                  <label className="flex items-center gap-2 text-sm text-[var(--g3-foreground)]">
-                    <Checkbox
-                      checked={somenteCamposVaziosLote}
-                      onChange={(event) => setSomenteCamposVaziosLote(event.target.checked)}
-                    />
-                    Aplicar somente onde o campo estiver vazio
-                  </label>
-
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="ghost" size="sm" onClick={limparEdicaoLote}>
-                      Limpar campos
+              {mostrarSaneamentoLote ? (
+                <CardContent className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant={patrimoniosSelecionados.length ? "info" : "default"}>
+                      {patrimoniosSelecionados.length} selecionado(s)
+                    </Badge>
+                    <Button variant="outline" size="sm" onClick={alternarSelecaoTodosFiltrados}>
+                      <CheckSquare className="mr-1.5 h-3.5 w-3.5" />
+                      {todosFiltradosSelecionados ? "Remover filtro da seleção" : "Selecionar filtro atual"}
                     </Button>
-                    <Button size="sm" disabled={atualizarLoteMutation.isPending} onClick={() => void aplicarEdicaoLote()}>
-                      {atualizarLoteMutation.isPending ? "Aplicando..." : "Aplicar saneamento"}
+                    <Button variant="outline" size="sm" onClick={selecionarFiltradosComPendencias}>
+                      Selecionar pendências
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={limparSelecaoLote}>
+                      Limpar seleção
                     </Button>
                   </div>
-                </div>
 
-                <div className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/20 p-3 text-sm text-[var(--g3-foreground)]">
-                  Preencha apenas os dados que deseja propagar. O modo seguro mantém os valores já existentes e só
-                  completa lacunas no acervo selecionado.
-                </div>
-              </CardContent>
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+                    <div className="space-y-1">
+                      <Label>Categoria</Label>
+                      <Input
+                        list="patrimonio-categorias"
+                        value={edicaoLote.categoria}
+                        placeholder="Aplicar categoria"
+                        onChange={(event) =>
+                          setEdicaoLote((atual) => ({ ...atual, categoria: event.target.value }))
+                        }
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label>Unidade</Label>
+                      <Input
+                        list="patrimonio-unidades"
+                        value={edicaoLote.unidade}
+                        placeholder="Aplicar unidade"
+                        onChange={(event) =>
+                          setEdicaoLote((atual) => ({ ...atual, unidade: event.target.value }))
+                        }
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label>Sala</Label>
+                      <Input
+                        list="patrimonio-salas"
+                        value={edicaoLote.sala}
+                        placeholder="Aplicar sala"
+                        onChange={(event) =>
+                          setEdicaoLote((atual) => ({ ...atual, sala: event.target.value }))
+                        }
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label>Responsável</Label>
+                      <Input
+                        list="patrimonio-responsaveis"
+                        value={edicaoLote.responsavel}
+                        placeholder="Aplicar responsável"
+                        onChange={(event) =>
+                          setEdicaoLote((atual) => ({ ...atual, responsavel: event.target.value }))
+                        }
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label>Status</Label>
+                      <Select
+                        value={edicaoLote.status}
+                        onChange={(event) =>
+                          setEdicaoLote((atual) => ({ ...atual, status: event.target.value }))
+                        }
+                      >
+                        <option value="">Não alterar</option>
+                        {statusOptions.map((item) => (
+                          <option key={item} value={item}>
+                            {item}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label>Conservação</Label>
+                      <Select
+                        value={edicaoLote.conservacao}
+                        onChange={(event) =>
+                          setEdicaoLote((atual) => ({ ...atual, conservacao: event.target.value }))
+                        }
+                      >
+                        <option value="">Não alterar</option>
+                        {conservacaoOptions.map((item) => (
+                          <option key={item} value={item}>
+                            {item}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <label className="flex items-center gap-2 text-sm text-[var(--g3-foreground)]">
+                      <Checkbox
+                        checked={somenteCamposVaziosLote}
+                        onChange={(event) => setSomenteCamposVaziosLote(event.target.checked)}
+                      />
+                      Aplicar somente onde o campo estiver vazio
+                    </label>
+
+                    <div className="flex flex-wrap gap-2">
+                      <Button variant="ghost" size="sm" onClick={limparEdicaoLote}>
+                        Limpar campos
+                      </Button>
+                      <Button size="sm" disabled={atualizarLoteMutation.isPending} onClick={() => void aplicarEdicaoLote()}>
+                        {atualizarLoteMutation.isPending ? "Aplicando..." : "Aplicar saneamento"}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/20 p-3 text-sm text-[var(--g3-foreground)]">
+                    Preencha apenas os dados que deseja propagar. O modo seguro mantém os valores já existentes e só
+                    completa lacunas no acervo selecionado.
+                  </div>
+                </CardContent>
+              ) : null}
             </Card>
 
             <div className="grid gap-3 md:grid-cols-3">

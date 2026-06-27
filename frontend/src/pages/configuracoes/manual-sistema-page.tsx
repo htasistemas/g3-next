@@ -496,7 +496,7 @@ const secoesManual: ManualSecao[] = [
         nome: "Patrimônio",
         objetivo: "Controlar bens patrimoniais com cadastro, atualização de estado e histórico de movimentações por instituição.",
         comoUsar: [
-          "Use a listagem para localizar rapidamente o patrimônio e abrir o item para edição ou conferência do cadastro. Quando a busca for apenas numérica, o número patrimonial é comparado de forma exata para evitar retorno de itens como 190, 198 ou 199 ao buscar 19.",
+          "Use a listagem para localizar rapidamente o patrimônio e abrir o item para edição ou conferência do cadastro. Quando a busca for apenas numérica, o número patrimonial é comparado de forma exata e a coluna Unidade mostra a qual local cada registro pertence.",
           "Ao cadastrar um bem, selecione primeiro a unidade e depois informe o Número patrimonial; o campo sugere o próximo número da sequência da unidade selecionada, permite informar outro número manualmente e traz ícones ao lado do campo para usar o próximo número ou consultar os números vagos da sequência atual.",
           "Use a aba Categorias para cadastrar, editar ou excluir categorias e suas subcategorias de patrimônio, definindo também a taxa anual de depreciação e o status ativo ou inativo.",
           "Na aba Cadastro patrimonial, selecione a Categoria a partir da base cadastrada na aba Categorias; a tela não aceita categoria digitada livremente para evitar duplicidade de nomes.",
@@ -504,7 +504,7 @@ const secoesManual: ManualSecao[] = [
           "Ao selecionar uma categoria, a tela sugere a taxa anual de depreciação correspondente e mantém a taxa editável para ajustes do cadastro.",
           "O campo Valor de aquisição usa máscara monetária brasileira e a estimativa contábil considera a data de aquisição, a taxa anual e a depreciação proporcional por meses.",
           "Na aba Localização e custódia, o card de conferência exibe Valor informado em verde quando o bem já tem valor de aquisição lançado, substituindo a referência ao histórico iniciado.",
-          "Ao cadastrar um bem, informe unidade antes do número do patrimônio, depois nome, categoria, conservação, status, origem, responsável e demais dados de identificação. Novo cadastro sugere a unidade principal e permite selecionar qualquer unidade cadastrada.",
+          "Ao cadastrar um bem, informe unidade antes do número do patrimônio, depois nome, categoria, conservação, status, origem, responsável e demais dados de identificação. Novo cadastro sugere a unidade principal e permite selecionar qualquer unidade cadastrada. O número patrimonial é validado por unidade, então o mesmo código pode existir em unidades diferentes sem gerar conflito.",
           "Na aba Localização e custódia, o campo Unidade lista as unidades cadastradas em Cadastro de unidade assistencial e, ao selecionar uma delas, o campo Sala passa a listar apenas as salas de atendimento vinculadas àquela unidade.",
           "Use Registrar movimento para lançar movimentação, manutenção ou baixa, mantendo a trilha operacional do bem ao longo do tempo.",
           "Quando o tipo do movimento for Baixa, o sistema atualiza automaticamente o status do patrimônio para refletir a saída do item.",
@@ -517,9 +517,10 @@ const secoesManual: ManualSecao[] = [
         ],
         atencoes: [
           "A tela Patrimônio agora lista, cadastra, atualiza e movimenta bens sempre dentro do tenant autenticado, impedindo mistura de patrimônios entre instituições.",
-          "O número patrimonial continua com bloqueio de duplicidade por instituição no backend, mesmo quando o usuário informa manualmente um número diferente da sugestão.",
+          "O número patrimonial agora bloqueia duplicidade somente dentro da mesma unidade, permitindo o mesmo número em unidades diferentes quando o cadastro estiver corretamente vinculado.",
+          "Internamente, o patrimônio passa a guardar o vínculo da unidade por ID, enquanto a tela continua exibindo o nome fantasia para leitura operacional.",
           "Categorias com bens vinculados não podem ser excluídas; nesses casos, mantenha o histórico e use a edição ou inativação da categoria.",
-          "A validação do número do patrimônio passou a ser exclusiva por tenant, permitindo que instituições diferentes mantenham suas próprias sequências sem conflito.",
+          "A validação do número do patrimônio passou a ser exclusiva por unidade, permitindo o mesmo número em unidades diferentes sem conflito.",
           "A Impressão por local usa a localização atual do cadastro do bem para montar a relação que pode ser fixada no mural do ambiente.",
           "No relatório por local, o cabeçalho também exibe o local selecionado para evitar impressão sem identificação do ambiente."
         ]

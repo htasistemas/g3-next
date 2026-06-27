@@ -16,8 +16,11 @@ type TransactionClient = Prisma.TransactionClient;
 const estruturaSql = [
   "ALTER TABLE patrimonio_item ADD COLUMN IF NOT EXISTS tenant_id UUID",
   "ALTER TABLE IF EXISTS patrimonio_movimentacao ADD COLUMN IF NOT EXISTS tenant_id UUID",
+  "ALTER TABLE patrimonio_item ADD COLUMN IF NOT EXISTS unidade_id BIGINT",
   "CREATE INDEX IF NOT EXISTS patrimonio_item_tenant_idx ON patrimonio_item(tenant_id, nome, id DESC)",
   "CREATE INDEX IF NOT EXISTS patrimonio_item_numero_tenant_idx ON patrimonio_item(tenant_id, numero_patrimonio)",
+  "CREATE INDEX IF NOT EXISTS patrimonio_item_unidade_tenant_idx ON patrimonio_item(tenant_id, unidade_id, numero_patrimonio)",
+  "CREATE UNIQUE INDEX IF NOT EXISTS patrimonio_item_numero_unidade_uidx ON patrimonio_item(tenant_id, unidade_id, numero_patrimonio) WHERE unidade_id IS NOT NULL",
   "CREATE INDEX IF NOT EXISTS patrimonio_movimentacao_tenant_idx ON patrimonio_movimentacao(tenant_id, patrimonio_id, data_movimento DESC)",
   `CREATE TABLE IF NOT EXISTS patrimonio_categoria (
     id BIGSERIAL PRIMARY KEY,
@@ -40,6 +43,17 @@ const estruturaSql = [
       LIMIT 1
     ) ref
     WHERE p.tenant_id IS NULL
+  `,
+  `
+    UPDATE patrimonio_item AS p
+    SET unidade_id = u.id
+    FROM unidade_assistencial u
+    WHERE p.unidade_id IS NULL
+      AND p.tenant_id::text = u.tenant_id::text
+      AND (
+        LOWER(TRIM(COALESCE(p.unidade, ''))) = LOWER(TRIM(COALESCE(u.nome_fantasia, '')))
+        OR LOWER(TRIM(COALESCE(p.unidade, ''))) = LOWER(TRIM(COALESCE(u.razao_social, '')))
+      )
   `,
   `
     UPDATE patrimonio_movimentacao AS m
@@ -73,26 +87,30 @@ export class PatrimonioRepository {
     await this.garantirEstrutura();
     const patrimonios = await prisma.$queryRaw<PatrimonioRow[]>(Prisma.sql`
       SELECT
-        id,
-        numero_patrimonio,
-        nome,
-        categoria,
-        subcategoria,
-        conservacao,
-        status,
-        data_aquisicao,
-        valor_aquisicao::float8 AS valor_aquisicao,
-        origem,
-        responsavel,
-        unidade,
-        sala,
-        taxa_depreciacao::float8 AS taxa_depreciacao,
-        observacoes,
-        criado_em,
-        atualizado_em
-      FROM patrimonio_item
-      WHERE tenant_id::text = ${tenantId}
-      ORDER BY nome ASC, id DESC
+        p.id,
+        p.numero_patrimonio,
+        p.nome,
+        p.categoria,
+        p.subcategoria,
+        p.conservacao,
+        p.status,
+        p.data_aquisicao,
+        p.valor_aquisicao::float8 AS valor_aquisicao,
+        p.origem,
+        p.responsavel,
+        p.unidade_id,
+        COALESCE(u.nome_fantasia, p.unidade) AS unidade,
+        p.sala,
+        p.taxa_depreciacao::float8 AS taxa_depreciacao,
+        p.observacoes,
+        p.criado_em,
+        p.atualizado_em
+      FROM patrimonio_item p
+      LEFT JOIN unidade_assistencial u
+        ON u.id = p.unidade_id
+       AND u.tenant_id::text = p.tenant_id
+      WHERE p.tenant_id::text = ${tenantId}
+      ORDER BY p.nome ASC, p.id DESC
     `);
 
     const movimentos = await prisma.$queryRaw<PatrimonioMovimentoRow[]>(Prisma.sql`
@@ -225,26 +243,30 @@ export class PatrimonioRepository {
     await this.garantirEstrutura();
     const rows = await prisma.$queryRaw<PatrimonioRow[]>(Prisma.sql`
       SELECT
-        id,
-        numero_patrimonio,
-        nome,
-        categoria,
-        subcategoria,
-        conservacao,
-        status,
-        data_aquisicao,
-        valor_aquisicao::float8 AS valor_aquisicao,
-        origem,
-        responsavel,
-        unidade,
-        sala,
-        taxa_depreciacao::float8 AS taxa_depreciacao,
-        observacoes,
-        criado_em,
-        atualizado_em
-      FROM patrimonio_item
-      WHERE id = ${id}
-        AND tenant_id::text = ${tenantId}
+        p.id,
+        p.numero_patrimonio,
+        p.nome,
+        p.categoria,
+        p.subcategoria,
+        p.conservacao,
+        p.status,
+        p.data_aquisicao,
+        p.valor_aquisicao::float8 AS valor_aquisicao,
+        p.origem,
+        p.responsavel,
+        p.unidade_id,
+        COALESCE(u.nome_fantasia, p.unidade) AS unidade,
+        p.sala,
+        p.taxa_depreciacao::float8 AS taxa_depreciacao,
+        p.observacoes,
+        p.criado_em,
+        p.atualizado_em
+      FROM patrimonio_item p
+      LEFT JOIN unidade_assistencial u
+        ON u.id = p.unidade_id
+       AND u.tenant_id::text = p.tenant_id
+      WHERE p.id = ${id}
+        AND p.tenant_id::text = ${tenantId}
       LIMIT 1
     `);
 
@@ -280,10 +302,12 @@ export class PatrimonioRepository {
   async criar(input: PatrimonioInput, tenantId: string) {
     await this.garantirEstrutura();
     const id = await prisma.$transaction(async (tx) => {
-      await this.validarNumeroUnico(tx, input.numeroPatrimonio, tenantId);
+      const unidade = await this.resolverUnidade(tx, input, tenantId);
+      await this.validarNumeroUnico(tx, input.numeroPatrimonio, unidade.id, tenantId);
       const inserted = await tx.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
         INSERT INTO patrimonio_item (
           tenant_id,
+          unidade_id,
           numero_patrimonio,
           nome,
           categoria,
@@ -302,6 +326,7 @@ export class PatrimonioRepository {
           atualizado_em
         ) VALUES (
           CAST(${tenantId} AS UUID),
+          ${unidade.id},
           ${input.numeroPatrimonio},
           ${input.nome},
           ${trimOrUndefined(input.categoria)},
@@ -312,7 +337,7 @@ export class PatrimonioRepository {
           ${input.valorAquisicao ?? null},
           ${trimOrUndefined(input.origem)},
           ${trimOrUndefined(input.responsavel)},
-          ${trimOrUndefined(input.unidade)},
+          ${unidade.nome},
           ${trimOrUndefined(input.sala)},
           ${input.taxaDepreciacao ?? null},
           ${trimOrUndefined(input.observacoes)},
@@ -338,10 +363,12 @@ export class PatrimonioRepository {
     await this.buscarPorIdOuFalhar(id, tenantId);
 
     await prisma.$transaction(async (tx) => {
-      await this.validarNumeroUnico(tx, input.numeroPatrimonio, tenantId, id);
+      const unidade = await this.resolverUnidade(tx, input, tenantId);
+      await this.validarNumeroUnico(tx, input.numeroPatrimonio, unidade.id, tenantId, id);
       await tx.$executeRaw(Prisma.sql`
         UPDATE patrimonio_item
         SET
+          unidade_id = ${unidade.id},
           numero_patrimonio = ${input.numeroPatrimonio},
           nome = ${input.nome},
           categoria = ${trimOrUndefined(input.categoria)},
@@ -352,7 +379,7 @@ export class PatrimonioRepository {
           valor_aquisicao = ${input.valorAquisicao ?? null},
           origem = ${trimOrUndefined(input.origem)},
           responsavel = ${trimOrUndefined(input.responsavel)},
-          unidade = ${trimOrUndefined(input.unidade)},
+          unidade = ${unidade.nome},
           sala = ${trimOrUndefined(input.sala)},
           taxa_depreciacao = ${input.taxaDepreciacao ?? null},
           observacoes = ${trimOrUndefined(input.observacoes)},
@@ -409,6 +436,7 @@ export class PatrimonioRepository {
   private async validarNumeroUnico(
     tx: TransactionClient,
     numeroPatrimonio: string,
+    unidadeId: bigint,
     tenantId: string,
     idAtual?: bigint
   ) {
@@ -416,13 +444,79 @@ export class PatrimonioRepository {
       SELECT id
       FROM patrimonio_item
       WHERE numero_patrimonio = ${numeroPatrimonio}
+        AND unidade_id = ${unidadeId}
         AND tenant_id::text = ${tenantId}
       ${idAtual ? Prisma.sql`AND id <> ${idAtual}` : Prisma.empty}
       LIMIT 1
     `);
 
     if (rows.length) {
-      throw new AppError("Ja existe patrimonio com este numero.", 409);
+      throw new AppError("Ja existe patrimonio com este numero nesta unidade.", 409);
+    }
+  }
+
+  private async resolverUnidade(
+    tx: TransactionClient,
+    input: PatrimonioInput,
+    tenantId: string
+  ): Promise<{ id: bigint; nome: string }> {
+    const unidadeId = this.parseOptionalBigInt(input.unidadeId);
+
+    if (unidadeId) {
+      const rows = await tx.$queryRaw<Array<{ id: bigint; nome_fantasia: string | null; razao_social: string | null }>>(Prisma.sql`
+        SELECT id, nome_fantasia, razao_social
+        FROM unidade_assistencial
+        WHERE id = ${unidadeId}
+          AND tenant_id::text = ${tenantId}
+        LIMIT 1
+      `);
+
+      const unidade = rows[0];
+      if (!unidade) {
+        throw new AppError("A unidade informada não pertence à instituição autenticada.", 400);
+      }
+
+      return {
+        id: unidade.id,
+        nome: unidade.nome_fantasia ?? unidade.razao_social ?? trimOrUndefined(input.unidade) ?? ""
+      };
+    }
+
+    const nome = trimOrUndefined(input.unidade);
+    if (!nome) {
+      throw new AppError("Selecione a unidade do patrimônio.", 400);
+    }
+
+    const rows = await tx.$queryRaw<Array<{ id: bigint; nome_fantasia: string | null; razao_social: string | null }>>(Prisma.sql`
+      SELECT id, nome_fantasia, razao_social
+      FROM unidade_assistencial
+      WHERE tenant_id::text = ${tenantId}
+        AND (
+          lower(trim(coalesce(nome_fantasia, ''))) = lower(trim(${nome}))
+          OR lower(trim(coalesce(razao_social, ''))) = lower(trim(${nome}))
+        )
+      ORDER BY unidade_principal DESC, atualizado_em DESC, criado_em ASC
+      LIMIT 1
+    `);
+
+    const unidade = rows[0];
+    if (!unidade) {
+      throw new AppError("Selecione uma unidade válida para o patrimônio.", 400);
+    }
+
+    return {
+      id: unidade.id,
+      nome: unidade.nome_fantasia ?? unidade.razao_social ?? nome
+    };
+  }
+
+  private parseOptionalBigInt(value?: string) {
+    const texto = trimOrUndefined(value);
+    if (!texto) return undefined;
+    try {
+      return BigInt(texto);
+    } catch {
+      return undefined;
     }
   }
 

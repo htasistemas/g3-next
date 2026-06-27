@@ -66,11 +66,11 @@ export class FotosEventosService {
     const input = fotoEventoInputSchema.parse(this.normalizarPayload(rawInput));
     const usuarioId = this.parseUsuarioId(rawUsuarioId);
     const tenantId = this.parseTenant(rawTenantId);
-    const preparado = await this.prepararFotoPrincipal(input, usuarioId);
+    const preparado = await this.prepararFotoPrincipal(input, usuarioId, undefined, tenantId);
 
     try {
       const registro = await this.repository.criar(preparado.input, tenantId);
-      await this.vincularFotos(registro.evento.id, preparado.novosCaminhos);
+      await this.vincularFotos(registro.evento.id, preparado.novosCaminhos, tenantId);
       const fotoPrincipal = registro.fotos.find(
         (item) => registro.evento.foto_principal_id && item.id === registro.evento.foto_principal_id
       );
@@ -86,11 +86,11 @@ export class FotosEventosService {
     const input = fotoEventoInputSchema.parse(this.normalizarPayload(rawInput));
     const usuarioId = this.parseUsuarioId(rawUsuarioId);
     const tenantId = this.parseTenant(rawTenantId);
-    const preparado = await this.prepararFotoPrincipal(input, usuarioId, id);
+    const preparado = await this.prepararFotoPrincipal(input, usuarioId, id, tenantId);
 
     try {
       const registro = await this.repository.atualizar(id, preparado.input, tenantId);
-      await this.vincularFotos(id, preparado.novosCaminhos);
+      await this.vincularFotos(id, preparado.novosCaminhos, tenantId);
       const fotoPrincipal = registro.fotos.find(
         (item) => registro.evento.foto_principal_id && item.id === registro.evento.foto_principal_id
       );
@@ -123,11 +123,11 @@ export class FotosEventosService {
     const input = fotoEventoFotoInputSchema.parse(this.normalizarPayload(rawInput));
     const usuarioId = this.parseUsuarioId(rawUsuarioId);
     const tenantId = this.parseTenant(rawTenantId);
-    const preparado = await this.prepararFotoItem(input, usuarioId, eventoId);
+    const preparado = await this.prepararFotoItem(input, usuarioId, eventoId, tenantId);
 
     try {
       const foto = await this.repository.adicionarFoto(eventoId, preparado.input, tenantId);
-      await this.vincularFotos(eventoId, preparado.novosCaminhos);
+      await this.vincularFotos(eventoId, preparado.novosCaminhos, tenantId);
       return mapFotoEventoItemToResponse(foto);
     } catch (error) {
       await storageService.rollbackArquivos(preparado.novosCaminhos);
@@ -149,7 +149,7 @@ export class FotosEventosService {
     const novosCaminhos: string[] = [];
 
     for (const fotoInput of input.fotos) {
-      const preparado = await this.prepararFotoItem(fotoInput, usuarioId, eventoId);
+      const preparado = await this.prepararFotoItem(fotoInput, usuarioId, eventoId, tenantId);
       preparados.push(preparado.input);
       novosCaminhos.push(...preparado.novosCaminhos);
     }
@@ -160,7 +160,7 @@ export class FotosEventosService {
         fotoPrincipalIndex:
           typeof input.fotoPrincipalIndex === "number" ? input.fotoPrincipalIndex : null
       }, tenantId);
-      await this.vincularFotos(eventoId, novosCaminhos);
+      await this.vincularFotos(eventoId, novosCaminhos, tenantId);
       return fotos.map(mapFotoEventoItemToResponse);
     } catch (error) {
       await storageService.rollbackArquivos(novosCaminhos);
@@ -264,7 +264,8 @@ export class FotosEventosService {
   private async prepararFotoPrincipal(
     input: ReturnType<typeof fotoEventoInputSchema.parse>,
     usuarioId?: bigint,
-    entidadeId?: bigint
+    entidadeId?: bigint,
+    tenantId?: string
   ) {
     if (!input.fotoPrincipalUpload) {
       return { input, novosCaminhos: [] as string[] };
@@ -276,6 +277,7 @@ export class FotosEventosService {
       nomeOriginal: input.fotoPrincipalUpload.nomeArquivo,
       mimeType: input.fotoPrincipalUpload.contentType,
       entidadeId,
+      tenantId,
       usuarioUploadId: usuarioId,
       observacao: "Foto principal do evento"
     });
@@ -297,7 +299,8 @@ export class FotosEventosService {
   private async prepararFotoItem(
     input: ReturnType<typeof fotoEventoFotoInputSchema.parse>,
     usuarioId?: bigint,
-    entidadeId?: bigint
+    entidadeId?: bigint,
+    tenantId?: string
   ) {
     const arquivo = await storageService.salvarArquivo({
       scope: "evento_foto",
@@ -305,6 +308,7 @@ export class FotosEventosService {
       nomeOriginal: input.arquivo.nomeArquivo,
       mimeType: input.arquivo.contentType,
       entidadeId,
+      tenantId,
       usuarioUploadId: usuarioId,
       observacao: input.legenda ?? "Foto do evento"
     });
@@ -323,9 +327,9 @@ export class FotosEventosService {
     };
   }
 
-  private async vincularFotos(eventoId: bigint, caminhos: string[]) {
+  private async vincularFotos(eventoId: bigint, caminhos: string[], tenantId?: string) {
     for (const caminho of caminhos) {
-      await storageService.vincularEntidade(caminho, eventoId);
+      await storageService.vincularEntidade(caminho, eventoId, tenantId);
     }
   }
 

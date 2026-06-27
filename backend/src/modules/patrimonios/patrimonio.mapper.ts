@@ -17,6 +17,7 @@ export function mapPatrimonioToResponse(
     valorAquisicao: patrimonio.valor_aquisicao ?? undefined,
     origem: patrimonio.origem ?? undefined,
     responsavel: patrimonio.responsavel ?? undefined,
+    unidadeId: patrimonio.unidade_id ? toStringId(patrimonio.unidade_id) : undefined,
     unidade: patrimonio.unidade ?? undefined,
     sala: patrimonio.sala ?? undefined,
     taxaDepreciacao: patrimonio.taxa_depreciacao ?? undefined,

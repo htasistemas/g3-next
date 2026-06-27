@@ -64,6 +64,15 @@ const estruturaSql = [
     WHERE e.tenant_id IS NULL
   `,
   `
+    UPDATE arquivos AS a
+    SET tenant_id = e.tenant_id
+    FROM fotos_eventos e
+    WHERE a.entidade_tipo = 'evento'
+      AND a.entidade_id = e.id
+      AND e.tenant_id IS NOT NULL
+      AND (a.tenant_id IS NULL OR a.tenant_id <> e.tenant_id)
+  `,
+  `
     UPDATE fotos_eventos_itens AS fi
     SET tenant_id = e.tenant_id
     FROM fotos_eventos e

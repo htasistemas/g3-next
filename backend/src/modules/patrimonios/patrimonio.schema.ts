@@ -29,10 +29,19 @@ export const patrimonioInputSchema = z.object({
   valorAquisicao: optionalNumber,
   origem: optionalTrimmedString,
   responsavel: optionalTrimmedString,
+  unidadeId: optionalTrimmedString,
   unidade: optionalTrimmedString,
   sala: optionalTrimmedString,
   taxaDepreciacao: optionalNumber,
   observacoes: optionalTrimmedString
+}).superRefine((value, ctx) => {
+  if (!value.unidadeId && !value.unidade) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["unidade"],
+      message: "Selecione a unidade do patrimônio."
+    });
+  }
 });
 
 export const patrimonioMovimentoInputSchema = z.object({

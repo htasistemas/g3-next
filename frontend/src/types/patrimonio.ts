@@ -9,6 +9,7 @@ export type PatrimonioMovimento = {
 
 export type Patrimonio = {
   idPatrimonio?: string;
+  unidadeId?: string;
   numeroPatrimonio: string;
   nome: string;
   categoria?: string;

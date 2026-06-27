@@ -9,6 +9,7 @@ export type PatrimonioInput = {
   valorAquisicao?: number;
   origem?: string;
   responsavel?: string;
+  unidadeId?: string;
   unidade?: string;
   sala?: string;
   taxaDepreciacao?: number;
@@ -53,6 +54,7 @@ export type PatrimonioRow = {
   valor_aquisicao: number | null;
   origem: string | null;
   responsavel: string | null;
+  unidade_id: bigint | null;
   unidade: string | null;
   sala: string | null;
   taxa_depreciacao: number | null;

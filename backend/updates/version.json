@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.555",
-  "releaseDate": "2026-06-25",
-  "description": "Impressao patrimonial por local passou a usar locais cadastrados e logomarca autenticada.",
+  "latestVersion": "1.00.560",
+  "releaseDate": "2026-06-27",
+  "description": "Patrimonio passou a vincular a unidade por ID e manter a validacao por unidade.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.555",
+  "minCompatibleVersion": "1.00.560",
   "releaseType": "stable"
 }
 
