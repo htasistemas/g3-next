@@ -459,6 +459,7 @@ const secoesManual: ManualSecao[] = [
           "Na aba Mural de eventos, visualize mini cards com a foto principal de cada evento, status, data, local e total de fotos, usando 1 clique no card para abrir a galeria do evento. Quando a capa não estiver definida, o mural usa automaticamente a primeira foto do álbum e carrega a imagem por acesso autenticado.",
           "Na listagem de eventos, clique diretamente sobre a linha do evento para abrir o álbum, sem depender de botão de ação separado.",
           "Na aba Cadastro do evento, preencha os dados principais e use Adicionar fotos para fazer upload múltiplo antes mesmo do primeiro salvamento.",
+          "Se as imagens estiverem organizadas em uma pasta, use Importar pasta para enviar todas de uma vez; o sistema lê os arquivos da pasta, filtra apenas imagens e preserva a ordem pela estrutura e pelo nome do arquivo.",
           "Depois do upload, escolha visualmente a capa do álbum ainda no cadastro. A primeira imagem marcada como destaque será persistida como capa real no banco.",
           "Ao salvar, o sistema grava o evento, envia as fotos pendentes, define a capa e mantém o fluxo completo sincronizado entre cadastro, listagem e galeria.",
           "Quando o evento for salvo com sucesso, a tela passa a confirmar corretamente o cadastro sem exibir mensagem indevida de erro, mesmo quando houver fotos pendentes no mesmo fluxo.",
@@ -473,7 +474,8 @@ const secoesManual: ManualSecao[] = [
           "A remoção da foto principal limpa a capa atual do evento e exige nova definição visual quando necessário.",
           "As fotos ficam armazenadas no storage persistente do sistema, com garantia de portabilidade entre máquinas e backups; o banco guarda apenas os metadados e caminhos do arquivo.",
           "As ações mudam conforme a aba para evitar botões genéricos e reduzir clique desnecessário durante a operação.",
-          "A tela Fotos de eventos agora lista, cadastra, atualiza e exclui eventos, fotos, capa, tags e galeria sempre dentro do tenant autenticado, impedindo mistura de álbuns entre instituições."
+          "A tela Fotos de eventos agora lista, cadastra, atualiza e exclui eventos, fotos, capa, tags e galeria sempre dentro do tenant autenticado, impedindo mistura de álbuns entre instituições.",
+          "A importação por pasta permite organizar imagens no computador antes do envio e lançar várias fotos de uma só vez no álbum do evento."
         ]
       },
       {

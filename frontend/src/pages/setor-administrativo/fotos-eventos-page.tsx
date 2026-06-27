@@ -41,6 +41,7 @@ import {
   useSalvarFotoEvento
 } from "@/features/fotos-eventos/use-fotos-eventos";
 import { obterUrlArquivoAutenticado, resolverUrlArquivo } from "@/lib/arquivos";
+import { lerArquivoComoDataUrl } from "@/lib/foto-3x4";
 import { imprimirConteudoAtual } from "@/lib/report-utils";
 import type { FotoEventoFotoPayload, FotoEventoPayload, FotoUploadPayload } from "@/types/fotos-eventos";
 
@@ -53,6 +54,11 @@ type UploadPendente = {
   arquivo: File;
   previewUrl: string;
 };
+
+const collatorArquivos = new Intl.Collator("pt-BR", {
+  numeric: true,
+  sensitivity: "base"
+});
 
 const abas: AdminTab[] = [
   { id: "lista", label: "Listagem", icon: List },
@@ -251,7 +257,20 @@ export function FotosEventosPage() {
   }, [detalhes?.evento?.atualizadoEm, fotoPrincipalId, fotos]);
 
   function limparUploadsPendentes() {
-    setUploadsPendentes([]);
+    setUploadsPendentes((atual) => {
+      atual.forEach((item) => URL.revokeObjectURL(item.previewUrl));
+      return [];
+    });
+  }
+
+  function removerUploadPendente(chave: string) {
+    setUploadsPendentes((atual) => {
+      const removido = atual.find((item) => item.chave === chave);
+      if (removido) {
+        URL.revokeObjectURL(removido.previewUrl);
+      }
+      return atual.filter((item) => item.chave !== chave);
+    });
   }
 
   function novo() {
@@ -298,24 +317,29 @@ export function FotosEventosPage() {
   }
 
   async function arquivoParaUpload(file: File): Promise<FotoUploadPayload> {
-    const conteudo = await file.arrayBuffer().then((buffer) => {
-      const bytes = new Uint8Array(buffer);
-      let binary = "";
-      bytes.forEach((byte) => {
-        binary += String.fromCharCode(byte);
-      });
-      return btoa(binary);
-    });
+    const dataUrl = await lerArquivoComoDataUrl(file);
+    const [cabecalho, conteudo = ""] = dataUrl.split(",", 2);
+    const contentType = cabecalho?.match(/^data:([^;]+);base64$/)?.[1] ?? file.type ?? "image/jpeg";
 
     return {
       nomeArquivo: file.name,
-      contentType: file.type || "image/jpeg",
+      contentType,
       conteudo
     };
   }
 
+  function ordenarArquivosImportacao(files: FileList | File[]) {
+    return Array.from(files)
+      .filter((arquivo) => arquivo.type.startsWith("image/") || /\.(png|jpe?g|webp|gif|bmp|tiff|heic|heif)$/i.test(arquivo.name))
+      .sort((a, b) => {
+        const caminhoA = a.webkitRelativePath || a.name;
+        const caminhoB = b.webkitRelativePath || b.name;
+        return collatorArquivos.compare(caminhoA, caminhoB);
+      });
+  }
+
   function adicionarUploadsPendentes(files: FileList | File[]) {
-    const lista = Array.from(files);
+    const lista = ordenarArquivosImportacao(files);
     if (!lista.length) return;
 
     setUploadsPendentes((atual) => [
@@ -486,7 +510,7 @@ export function FotosEventosPage() {
       return;
     }
 
-    const lista = Array.from(files);
+    const lista = ordenarArquivosImportacao(files);
     if (!lista.length) return;
 
     try {
@@ -916,18 +940,18 @@ export function FotosEventosPage() {
             </div>
 
             <div className="grid gap-3 xl:grid-cols-[1.2fr_0.8fr]">
-              <Card className="border-[var(--g3-border)] bg-[var(--g3-card)] shadow-sm">
-                <CardHeader className="flex flex-row items-center justify-between gap-3">
-                  <div>
-                    <CardTitle className="text-sm">Upload de fotos</CardTitle>
-                    <p className="text-xs text-[var(--g3-muted)]">
-                      Adicione várias imagens do evento e escolha visualmente a capa antes de salvar.
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      id="fotosEventoCadastro"
-                      type="file"
+                <Card className="border-[var(--g3-border)] bg-[var(--g3-card)] shadow-sm">
+                  <CardHeader className="flex flex-row items-center justify-between gap-3">
+                    <div>
+                      <CardTitle className="text-sm">Upload de fotos</CardTitle>
+                      <p className="text-xs text-[var(--g3-muted)]">
+                      Adicione várias imagens do evento ou importe uma pasta inteira e escolha visualmente a capa antes de salvar.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        id="fotosEventoCadastro"
+                        type="file"
                       accept="image/*"
                       multiple
                       className="hidden"
@@ -936,18 +960,39 @@ export function FotosEventosPage() {
                           adicionarUploadsPendentes(event.target.files);
                         }
                         event.target.value = "";
-                      }}
-                    />
-                    <Button
-                      variant="outline"
-                      disabled={carregandoAcoes}
-                      onClick={() => document.getElementById("fotosEventoCadastro")?.click()}
-                    >
-                      <Upload className="mr-2 h-4 w-4" />
-                      Adicionar fotos
-                    </Button>
-                  </div>
-                </CardHeader>
+                        }}
+                      />
+                      <input
+                        id="fotosEventoCadastroPasta"
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        // @ts-expect-error atributo não padronizado, suportado pelos navegadores para seleção de pasta
+                        webkitdirectory=""
+                        onChange={(event) => {
+                          if (event.target.files?.length) {
+                            adicionarUploadsPendentes(event.target.files);
+                          }
+                          event.target.value = "";
+                        }}
+                      />
+                      <Button
+                        variant="outline"
+                        onClick={() => document.getElementById("fotosEventoCadastro")?.click()}
+                      >
+                        <Upload className="mr-2 h-4 w-4" />
+                        Adicionar fotos
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => document.getElementById("fotosEventoCadastroPasta")?.click()}
+                      >
+                        <FolderOpen className="mr-2 h-4 w-4" />
+                        Importar pasta
+                      </Button>
+                    </div>
+                  </CardHeader>
                 <CardContent>
                   {uploadsPendentes.length ? (
                     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -1004,11 +1049,7 @@ export function FotosEventosPage() {
                                 <Button
                                   size="sm"
                                   variant="ghost"
-                                  onClick={() =>
-                                    setUploadsPendentes((atual) =>
-                                      atual.filter((foto) => foto.chave !== item.chave)
-                                    )
-                                  }
+                                  onClick={() => removerUploadPendente(item.chave)}
                                 >
                                   <Trash2 className="mr-1 h-3.5 w-3.5" />
                                   Remover
@@ -1125,13 +1166,36 @@ export function FotosEventosPage() {
                           event.target.value = "";
                         }}
                       />
+                      <input
+                        id="galeriaEventoPasta"
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        // @ts-expect-error atributo não padronizado, suportado pelos navegadores para seleção de pasta
+                        webkitdirectory=""
+                        onChange={(event) => {
+                          if (event.target.files?.length) {
+                            void adicionarFotosNaGaleria(event.target.files);
+                          }
+                          event.target.value = "";
+                        }}
+                      />
                       <Button
                         variant="default"
-                        disabled={!form.id || carregandoAcoes}
+                        disabled={!form.id}
                         onClick={() => document.getElementById("galeriaEvento")?.click()}
                       >
                         <Upload className="mr-2 h-4 w-4" />
                         Adicionar fotos
+                      </Button>
+                      <Button
+                        variant="outline"
+                        disabled={!form.id}
+                        onClick={() => document.getElementById("galeriaEventoPasta")?.click()}
+                      >
+                        <FolderOpen className="mr-2 h-4 w-4" />
+                        Importar pasta
                       </Button>
                       <Button variant="outline" disabled={!form.id || carregandoAcoes} onClick={() => setAbaAtiva("cadastro")}>
                         <Edit3 className="mr-2 h-4 w-4" />
