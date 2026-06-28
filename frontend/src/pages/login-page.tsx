@@ -195,15 +195,13 @@ export function LoginPage() {
     try {
       const from = (location.state as { from?: string } | null)?.from;
       const destino = from || "/cadastros/beneficiarios";
-      await Promise.all([
-        login({
-          cnpj: slugSubdominio || dispensarInstituicao ? undefined : cnpjNormalizado,
-          slug: slugSubdominio,
-          email: emailNormalizado,
-          senha
-        }),
-        precarregarRota(destino)
-      ]);
+      await login({
+        cnpj: slugSubdominio || dispensarInstituicao ? undefined : cnpjNormalizado,
+        slug: slugSubdominio,
+        email: emailNormalizado,
+        senha
+      });
+      void precarregarRota(destino).catch(() => {});
 
       if (typeof window !== "undefined") {
         if (lembrarAcesso && cnpjNormalizado) {
@@ -232,14 +230,12 @@ export function LoginPage() {
       const destino = from || "/cadastros/beneficiarios";
       const cnpjNormalizado = normalizarCnpj(cnpj);
 
-      await Promise.all([
-        loginGoogle({
-          idToken,
-          cnpj: slugSubdominio ? undefined : cnpjNormalizado || undefined,
-          slug: slugSubdominio
-        }),
-        precarregarRota(destino)
-      ]);
+      await loginGoogle({
+        idToken,
+        cnpj: slugSubdominio ? undefined : cnpjNormalizado || undefined,
+        slug: slugSubdominio
+      });
+      void precarregarRota(destino).catch(() => {});
       navigate(destino, { replace: true });
     } catch (error: any) {
       setErro(obterMensagemErro(error, "Não foi possível autenticar com Google."));

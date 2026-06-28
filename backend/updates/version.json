@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.572",
+  "latestVersion": "1.00.573",
   "releaseDate": "2026-06-28",
-  "description": "A visão geral passou a mostrar o card de empréstimos para eventos ao lado dos cartões patrimoniais.",
+  "description": "O login passou a autenticar antes do pré-carregamento da rota de destino, evitando bloqueio por chunk.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.572",
+  "minCompatibleVersion": "1.00.573",
   "releaseType": "stable"
 }
 

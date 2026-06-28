@@ -1,6 +1,18 @@
 {
     "entries":  [
                     {
+                        "version":  "1.00.573",
+                        "releaseDate":  "2026-06-28",
+                        "title":  "Login sem dependência de preload",
+                        "description":  "A tela de login passou a autenticar antes de pré-carregar a rota de destino, evitando bloqueio por chunk ou cache.",
+                        "changes":  [
+                                        "O login agora conclui a autenticação antes de tentar pré-carregar a rota seguinte.",
+                                        "Falhas no pré-carregamento da página deixam de bloquear o acesso do usuário.",
+                                        "O login com Google recebeu o mesmo tratamento para manter o fluxo resiliente."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.572",
                         "releaseDate":  "2026-06-28",
                         "title":  "Visão geral com empréstimos lado a lado",

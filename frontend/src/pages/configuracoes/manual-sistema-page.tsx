@@ -1123,6 +1123,7 @@ const secoesManual: ManualSecao[] = [
           "A tela de login do sistema agora aceita CNPJ da instituição e e-mail do usuário; quando houver subdomínio configurado, o sistema identifica automaticamente a instituição pelo endereço.",
           "O e-mail master htasistemas@gmail.com pode entrar na tela de login mesmo sem informar CNPJ, código ou slug; se houver um CNPJ digitado, o sistema desconsidera esse filtro para preservar o acesso administrativo global.",
           "O campo Senha da tela de login agora possui botão de visualizar ou ocultar a senha digitada no mesmo clique, facilitando a conferência antes de entrar.",
+          "A autenticação da tela de login ocorre primeiro e o carregamento da rota seguinte acontece em segundo plano, sem bloquear o acesso caso o pré-carregamento da página falhe.",
           "Na recuperação de senha da tela de login, o sistema passou a considerar também a instituição informada no acesso, evitando redefinir senha em tenant incorreto quando houver e-mails iguais em bases diferentes.",
           "No desktop, ao informar o CNPJ, o resumo da instituição aparece abaixo da foto lateral direita para liberar mais espaço útil no formulário de acesso.",
           "Na lateral direita do login, o espaço entre a foto e o card com os dados da instituição foi reduzido para deixar a composição mais próxima e melhor aproveitada.",
