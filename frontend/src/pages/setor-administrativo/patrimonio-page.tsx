@@ -226,6 +226,29 @@ function normalizarBusca(valor?: string | null) {
     .trim();
 }
 
+function resolverUnidadeAssistencial(
+  unidades: Array<{
+    id_unidade?: string | null;
+    nome_fantasia?: string | null;
+    razao_social?: string | null;
+    salas?: Array<{
+      nome?: string | null;
+      ativo?: boolean | null;
+    }>;
+  }>,
+  valor?: string | null
+) {
+  const chave = normalizarBusca(valor);
+  if (!chave) return null;
+
+  return (
+    unidades.find((unidade) => unidade.id_unidade === valor) ??
+    unidades.find((unidade) => normalizarBusca(unidade.nome_fantasia) === chave) ??
+    unidades.find((unidade) => normalizarBusca(unidade.razao_social) === chave) ??
+    null
+  );
+}
+
 function gerarResumoLocalizacao(unidade?: string, sala?: string) {
   return [unidade?.trim(), sala?.trim()].filter(Boolean).join(" / ") || "---";
 }
@@ -711,12 +734,9 @@ export function PatrimonioPage() {
 
   const unidadeLocalizacaoSelecionada = useMemo(
     () =>
-      unidadesAssistenciais.find(
-        (unidade) =>
-          unidade.id_unidade === unidadeLocalizacaoSelecionadaId ||
-          unidade.id_unidade === form.unidadeId ||
-          normalizarBusca(unidade.nome_fantasia) === normalizarBusca(form.unidade)
-      ) ?? null,
+      resolverUnidadeAssistencial(unidadesAssistenciais, unidadeLocalizacaoSelecionadaId) ??
+      resolverUnidadeAssistencial(unidadesAssistenciais, form.unidadeId) ??
+      resolverUnidadeAssistencial(unidadesAssistenciais, form.unidade),
     [form.unidade, form.unidadeId, unidadeLocalizacaoSelecionadaId, unidadesAssistenciais]
   );
 
@@ -726,12 +746,9 @@ export function PatrimonioPage() {
       return;
     }
 
-    const unidadeEncontrada = unidadesAssistenciais.find(
-      (unidade) =>
-        unidade.id_unidade === form.unidadeId ||
-        unidade.id_unidade === form.unidade ||
-        normalizarBusca(unidade.nome_fantasia) === normalizarBusca(form.unidade)
-    );
+    const unidadeEncontrada =
+      resolverUnidadeAssistencial(unidadesAssistenciais, form.unidadeId) ??
+      resolverUnidadeAssistencial(unidadesAssistenciais, form.unidade);
     setUnidadeLocalizacaoSelecionadaId(unidadeEncontrada?.id_unidade ?? unidadeEncontrada?.nome_fantasia ?? "");
   }, [form.unidade, form.unidadeId, unidadesAssistenciais]);
 
@@ -2364,13 +2381,10 @@ export function PatrimonioPage() {
                     value={form.unidadeId ?? ""}
                     className={erros.unidade ? "border-rose-400 focus:ring-rose-400" : undefined}
                     onChange={(event) => {
-                      const unidadeId = event.target.value;
-                      const unidadeSelecionada =
-                        unidadesAssistenciais.find((item) => item.id_unidade === unidadeId) ??
-                        unidadesAssistenciais.find(
-                          (item) => normalizarBusca(item.nome_fantasia) === normalizarBusca(unidadeId)
-                        ) ??
-                        null;
+                      const unidadeSelecionada = resolverUnidadeAssistencial(
+                        unidadesAssistenciais,
+                        event.target.value
+                      );
                       setForm((atual) => ({
                         ...atual,
                         unidadeId: unidadeSelecionada?.id_unidade ?? "",
@@ -2383,9 +2397,12 @@ export function PatrimonioPage() {
                     onBlur={() => atualizarErroFormulario("unidade")}
                   >
                     <option value="">Selecione a unidade</option>
-                    {unidadesDisponiveis.map((item) => (
-                      <option key={item} value={unidadesAssistenciais.find((unidade) => unidade.nome_fantasia?.trim() === item)?.id_unidade ?? item}>
-                        {item}
+                    {unidadesAssistenciais.map((item) => (
+                      <option
+                        key={item.id_unidade ?? item.nome_fantasia}
+                        value={item.id_unidade ?? item.nome_fantasia ?? ""}
+                      >
+                        {item.nome_fantasia?.trim() || item.razao_social?.trim() || item.id_unidade}
                       </option>
                     ))}
                   </Select>
@@ -2700,12 +2717,10 @@ export function PatrimonioPage() {
                       onChange={(event) =>
                         {
                           const valorSelecionado = event.target.value;
-                          const unidadeSelecionada =
-                            unidadesAssistenciais.find((unidade) => unidade.id_unidade === valorSelecionado) ??
-                            unidadesAssistenciais.find(
-                              (unidade) => unidade.nome_fantasia === valorSelecionado
-                            ) ??
-                            null;
+                          const unidadeSelecionada = resolverUnidadeAssistencial(
+                            unidadesAssistenciais,
+                            valorSelecionado
+                          );
 
                           setForm((atual) => ({
                             ...atual,

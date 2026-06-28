@@ -1,6 +1,18 @@
 {
     "entries":  [
                     {
+                        "version":  "1.00.569",
+                        "releaseDate":  "2026-06-28",
+                        "title":  "Patrimônio com unidade consistente",
+                        "description":  "Cadastro e localização de patrimônio passaram a usar a mesma regra de resolução de unidade.",
+                        "changes":  [
+                                        "Os selects de unidade da aba Cadastro patrimonial e da aba Localização e custódia agora resolvem a unidade pelo mesmo helper.",
+                                        "A seleção de unidade passou a atualizar `unidadeId`, nome exibido e sala de forma consistente.",
+                                        "A listagem de salas continua sendo filtrada pela unidade escolhida, sem travar a troca de unidade."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.568",
                         "releaseDate":  "2026-06-28",
                         "title":  "Localização patrimonial com troca de unidade",

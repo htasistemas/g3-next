@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.568",
+  "latestVersion": "1.00.569",
   "releaseDate": "2026-06-28",
-  "description": "A aba Localização e custódia de patrimônio passou a permitir a troca correta de unidade.",
+  "description": "Cadastro e localização de patrimônio passaram a usar o mesmo resolvedor de unidade.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.568",
+  "minCompatibleVersion": "1.00.569",
   "releaseType": "stable"
 }
 
