@@ -3437,7 +3437,6 @@ export function CadastroMatriculasPage() {
                               <th className="px-3 py-2 text-left font-semibold">CPF</th>
                               <th className="px-3 py-2 text-left font-semibold">Telefone</th>
                               <th className="px-3 py-2 text-left font-semibold">Inscrição</th>
-                              <th className="px-3 py-2 text-left font-semibold">Status</th>
                               <th className="px-3 py-2 text-left font-semibold">Agendamento</th>
                               <th className="px-3 py-2 text-left font-semibold">Profissional</th>
                               <th className="px-3 py-2 text-right font-semibold">Ações</th>
@@ -3456,13 +3455,12 @@ export function CadastroMatriculasPage() {
                                   <td className="px-3 py-2">{formatarCpf(inscricao.cpf)}</td>
                                   <td className="px-3 py-2">{formatarTelefone(inscricao.telefone)}</td>
                                   <td className="px-3 py-2">{formatarData(inscricao.data_matricula)}</td>
-                                  <td className="px-3 py-2">{formatarStatus(inscricao.status)}</td>
                                   <td className="px-3 py-2">
                                     {inscricao.data_agendada
                                       ? `${formatarData(inscricao.data_agendada)} ${inscricao.hora_agendada ?? ""}`.trim()
                                       : "---"}
                                   </td>
-                                  <td className="px-3 py-2">{inscricao.profissional_nome ?? "---"}</td>
+                                  <td className="px-3 py-2">{obterPrimeiroNome(inscricao.profissional_nome)}</td>
                                   <td className="px-3 py-2 text-right">
                                     <Button
                                       type="button"
@@ -3477,7 +3475,7 @@ export function CadastroMatriculasPage() {
                               ))
                             ) : (
                               <tr>
-                                <td colSpan={8} className="px-3 py-4 text-center text-[var(--g3-muted)]">
+                                <td colSpan={7} className="px-3 py-4 text-center text-[var(--g3-muted)]">
                                   Nenhum inscrito listado para o curso ou atendimento selecionado.
                                 </td>
                               </tr>
