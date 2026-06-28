@@ -143,6 +143,12 @@ function formatarTelefone(telefone?: string) {
   return telefone;
 }
 
+function obterPrimeiroNome(nome?: string) {
+  const texto = formatarTextoPadrao(nome ?? "");
+  if (!texto) return "---";
+  return texto.split(/\s+/)[0] ?? texto;
+}
+
 function formatarPeriodoCurso(dataInicial?: string, dataFinal?: string) {
   if (!dataInicial && !dataFinal) return "---";
   return `${formatarData(dataInicial)} a ${formatarData(dataFinal)}`;
@@ -2540,44 +2546,26 @@ export function CadastroMatriculasPage() {
                     <table className="min-w-full table-fixed text-xs">
                       <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]">
                         <tr>
-                          <th className="w-[18%] px-2 py-2 text-left font-semibold">Beneficiário</th>
-                          <th className="w-[10%] px-2 py-2 text-left font-semibold">CPF</th>
-                          <th className="w-[22%] px-2 py-2 text-left font-semibold">Curso / atendimento</th>
-                          <th className="w-[9%] px-2 py-2 text-left font-semibold">Tipo</th>
-                          <th className="w-[9%] px-2 py-2 text-left font-semibold">Status</th>
-                          <th className="w-[12%] px-2 py-2 text-left font-semibold">Data da inscrição</th>
-                          <th className="w-[12%] px-2 py-2 text-left font-semibold">Agendamento</th>
-                          <th className="w-[8%] px-2 py-2 text-left font-semibold">Profissional</th>
+                          <th className="w-[24%] px-2 py-2 text-left font-semibold">Beneficiário</th>
+                          <th className="w-[14%] px-2 py-2 text-left font-semibold">CPF</th>
+                          <th className="w-[30%] px-2 py-2 text-left font-semibold">Curso / atendimento</th>
+                          <th className="w-[16%] px-2 py-2 text-left font-semibold">Data da inscrição</th>
+                          <th className="w-[16%] px-2 py-2 text-left font-semibold">Agendamento</th>
                         </tr>
                       </thead>
                       <tbody>
                         {carregandoLista ? (
                           <tr>
-                            <td className="px-2 py-4 text-center text-[var(--g3-muted)]" colSpan={8}>
+                            <td className="px-2 py-4 text-center text-[var(--g3-muted)]" colSpan={5}>
                               Carregando inscrições...
                             </td>
                           </tr>
                         ) : inscricoesListagem.length ? (
                           inscricoesListagem.map((item, index) => {
                             const possuiAgendamento = Boolean(normalizarDataIso(item.data_agendada) || String(item.hora_agendada ?? "").trim());
-                            const statusInscricaoNormalizado = String(item.status ?? "").trim().toUpperCase();
-                            const statusAgendamentoTexto =
-                              statusInscricaoNormalizado === "CANCELADO"
-                                ? "Cancelada"
-                                : statusInscricaoNormalizado === "FINALIZADO"
-                                  ? "Finalizada"
-                                  : item.status_agendamento?.trim() || (possuiAgendamento ? "Agendado" : "Pendente");
                             const agendamento = item.data_agendada
                               ? `${formatarData(item.data_agendada)}${item.hora_agendada ? ` às ${item.hora_agendada}` : ""}`
                               : "---";
-                            const classeStatusAgendamento =
-                              statusInscricaoNormalizado === "CANCELADO"
-                                ? "bg-rose-100 text-rose-700"
-                                : statusInscricaoNormalizado === "FINALIZADO"
-                                  ? "bg-slate-200 text-slate-700"
-                                  : possuiAgendamento
-                                    ? "bg-emerald-100 text-emerald-700"
-                                    : "bg-amber-100 text-amber-700";
                               return (
                               <tr
                                 key={`${item.curso_id ?? "sem-curso"}-${item.id_matricula_item ?? index}`}
@@ -2592,7 +2580,7 @@ export function CadastroMatriculasPage() {
                               >
                                 <td className="px-2 py-2 align-top">
                                   <div className="space-y-0.5 break-words">
-                                    <p className="font-medium text-[var(--g3-foreground)]">{item.beneficiario_nome}</p>
+                                    <p className="font-medium text-[var(--g3-foreground)]">{obterPrimeiroNome(item.beneficiario_nome)}</p>
                                     <p className="text-[11px] text-[var(--g3-muted)]">
                                       {item.telefone ? `Tel.: ${formatarTelefone(item.telefone)}` : "Tel.: ---"}
                                     </p>
@@ -2600,26 +2588,18 @@ export function CadastroMatriculasPage() {
                                 </td>
                                 <td className="px-2 py-2 align-top whitespace-nowrap">{formatarCpf(item.cpf)}</td>
                                 <td className="px-2 py-2 align-top break-words">{item.curso_nome}</td>
-                                <td className="px-2 py-2 align-top whitespace-nowrap">{item.curso_tipo}</td>
-                                <td className="px-2 py-2 align-top whitespace-nowrap">{formatarStatus(item.status)}</td>
                                 <td className="px-2 py-2 align-top whitespace-nowrap">{formatarData(item.data_matricula)}</td>
                                 <td className="px-2 py-2 align-top">
                                   <div className="flex flex-col gap-1">
-                                    <span
-                                      className={`inline-flex w-fit rounded-full px-2 py-0.5 text-[11px] font-semibold ${classeStatusAgendamento}`}
-                                    >
-                                      {statusAgendamentoTexto}
-                                    </span>
                                     <span className="text-[11px] text-[var(--g3-muted)]">{agendamento}</span>
                                   </div>
                                 </td>
-                                <td className="px-2 py-2 align-top break-words">{item.profissional_nome ?? "---"}</td>
                               </tr>
                             );
                           })
                         ) : (
                           <tr>
-                            <td className="px-2 py-4 text-center text-[var(--g3-muted)]" colSpan={8}>
+                            <td className="px-2 py-4 text-center text-[var(--g3-muted)]" colSpan={5}>
                               Nenhuma inscrição encontrada.
                             </td>
                           </tr>
