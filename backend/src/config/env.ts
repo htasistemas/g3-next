@@ -39,6 +39,10 @@ const envSchema = z
     APP_BACKUP_IMAGES_GOOGLE_CLIENT_ID: optionalTrimmedStringFromEnv,
     APP_BACKUP_IMAGES_GOOGLE_CLIENT_SECRET: optionalTrimmedStringFromEnv,
     APP_BACKUP_IMAGES_REFRESH_TOKEN: optionalTrimmedStringFromEnv,
+    APP_GOOGLE_CLIENT_SECRET: optionalTrimmedStringFromEnv,
+    GOOGLE_CLIENT_SECRET: optionalTrimmedStringFromEnv,
+    APP_GOOGLE_REFRESH_TOKEN: optionalTrimmedStringFromEnv,
+    GOOGLE_REFRESH_TOKEN: optionalTrimmedStringFromEnv,
     APP_MAINTENANCE_FLAG_PATH: z.string().trim().min(1).default("/var/run/g3n/maintenance.enable"),
     APP_GEOCODING_USER_AGENT: z.string().trim().min(1).default("G3-Next/1.0"),
     APP_EMAIL_DESTINO_CHAMADOS: z.string().trim().min(1).default("htasistemas@gmail.com"),
@@ -96,18 +100,24 @@ const envSchema = z
       }
     }
 
+    const backupCredenciaisEspecificas =
+      !!env.APP_BACKUP_IMAGES_GOOGLE_CLIENT_ID &&
+      !!env.APP_BACKUP_IMAGES_GOOGLE_CLIENT_SECRET &&
+      !!env.APP_BACKUP_IMAGES_REFRESH_TOKEN;
+    const backupCredenciaisGenericas =
+      !!env.APP_GOOGLE_CLIENT_ID &&
+      !!env.APP_GOOGLE_CLIENT_SECRET &&
+      !!env.APP_GOOGLE_REFRESH_TOKEN;
+
     if (
       env.APP_BACKUP_IMAGES_HABILITADO &&
-      (!env.APP_BACKUP_IMAGES_GOOGLE_DRIVE_FOLDER_ID ||
-        !env.APP_BACKUP_IMAGES_GOOGLE_CLIENT_ID ||
-        !env.APP_BACKUP_IMAGES_GOOGLE_CLIENT_SECRET ||
-        !env.APP_BACKUP_IMAGES_REFRESH_TOKEN)
+      (!env.APP_BACKUP_IMAGES_GOOGLE_DRIVE_FOLDER_ID || (!backupCredenciaisEspecificas && !backupCredenciaisGenericas))
     ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["APP_BACKUP_IMAGES_GOOGLE_DRIVE_FOLDER_ID"],
         message:
-          "APP_BACKUP_IMAGES_GOOGLE_DRIVE_FOLDER_ID, APP_BACKUP_IMAGES_GOOGLE_CLIENT_ID, APP_BACKUP_IMAGES_GOOGLE_CLIENT_SECRET e APP_BACKUP_IMAGES_REFRESH_TOKEN sao obrigatorios quando o backup de imagens estiver habilitado"
+          "APP_BACKUP_IMAGES_GOOGLE_DRIVE_FOLDER_ID e as credenciais OAuth do backup sao obrigatorios quando o backup de imagens estiver habilitado"
       });
     }
 

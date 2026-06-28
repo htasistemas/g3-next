@@ -7,6 +7,11 @@ import type {
 } from "@/types/fotos-eventos";
 
 export const fotosEventosService = {
+  async resumo() {
+    const { data } = await httpClient.get<{ totalAlbuns: number; totalFotos: number }>("/api/fotos-eventos/resumo");
+    return data;
+  },
+
   async listar(params?: {
     busca?: string;
     dataInicio?: string;

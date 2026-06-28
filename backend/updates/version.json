@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.564",
+  "latestVersion": "1.00.565",
   "releaseDate": "2026-06-28",
-  "description": "O backup diário das imagens foi trocado para OAuth com refresh token e passou a executar às 23:30.",
+  "description": "A agenda passou a mostrar o telefone cadastrado do beneficiário e a visão geral ganhou o card de álbuns e fotos.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.564",
+  "minCompatibleVersion": "1.00.565",
   "releaseType": "stable"
 }
 

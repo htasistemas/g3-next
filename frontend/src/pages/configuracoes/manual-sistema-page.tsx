@@ -48,7 +48,7 @@ const secoesManual: ManualSecao[] = [
           "Comece pelos cadastros para garantir base confiável de beneficiários, famílias e profissionais.",
           "Use Atendimentos diários para registrar movimentações sociais, benefícios, inscrições e acompanhamentos.",
           "Use Configurações gerais para manter parâmetros, usuários, IA e o próprio manual atualizados.",
-          "Na tela Visão geral, acompanhe também os cards de Termos vencidos, Documentos vencidos, Documentos a vencer, Motoristas autorizados, Itens no almoxarifado, Itens no patrimônio e Empréstimos para eventos para leitura operacional rápida logo na entrada do sistema.",
+          "Na tela Visão geral, acompanhe também os cards de Termos vencidos, Documentos vencidos, Documentos a vencer, Motoristas autorizados, Itens no almoxarifado, Itens no patrimônio, Álbuns e fotos e Empréstimos para eventos para leitura operacional rápida logo na entrada do sistema.",
           "O card Empréstimos para eventos mostra eventos ativos, eventos futuros e eventos em atraso por devolução vencida.",
           "Os cards da Visão geral funcionam como atalhos: ao clicar em cada indicador, o sistema abre a tela correspondente para aprofundar a análise ou continuar a operação.",
           "No acesso local pela tela de login, o botão Entrar com Google depende do client ID configurado no ambiente do frontend e do backend.",
@@ -189,7 +189,7 @@ const secoesManual: ManualSecao[] = [
           "Na aba Agendamento, escolha o tipo entre curso, atendimento ou oficina para carregar apenas os itens já cadastrados nas inscrições.",
           "Os filtros rápidos foram removidos dessa aba para deixar a operação mais direta; o foco agora é montar o card sem distrações.",
           "Depois selecione o item desejado em cards operacionais exibidos lado a lado, em grade com dois cards por linha, para o sistema preencher automaticamente o resumo com profissional, dias, horário e local na mesma linha, sem redigitação manual.",
-          "Use a lista de beneficiários vinculados ao item para marcar quem participará naquela data; a agenda operacional agora usa a própria matrícula da inscrição, os identificadores legados salvos no card e, quando necessário, a lista atual de matriculados do item para localizar o cadastro do beneficiário, exibindo no card o telefone principal da aba Contato e reaproveitando o mesmo dado nos envios.",
+          "Use a lista de beneficiários vinculados ao item para marcar quem participará naquela data; a agenda operacional agora usa a própria matrícula da inscrição, os identificadores legados salvos no card e, quando necessário, a lista atual de matriculados do item para localizar o cadastro do beneficiário, exibindo no card o telefone cadastrado da aba Contato e reaproveitando o mesmo dado nos envios.",
           "No topo da aba operacional, acompanhe primeiro o resumo do card com tipo, item, data e quantidade de beneficiários antes de montar a agenda.",
           "Na área principal, o campo Tipo fica ao lado da grade de itens do tipo selecionado, sem campo adicional de curso, atendimento ou oficina, e os beneficiários vinculados passam a aparecer em grade, lado a lado, para agilizar a marcação.",
           "Informe a data do agendamento e use Gerar Agenda para salvar a agenda do dia com os participantes agrupados no mesmo card. Não há um segundo botão de salvar: o clique em Gerar Agenda já persiste o card imediatamente.",
@@ -479,7 +479,8 @@ const secoesManual: ManualSecao[] = [
           "A tela Fotos de eventos agora lista, cadastra, atualiza e exclui eventos, fotos, capa, tags e galeria sempre dentro do tenant autenticado, impedindo mistura de álbuns entre instituições.",
           "A importação por pasta agora interpreta cada pasta como um evento separado, facilitando organizar o backup e o cadastro em lote sem misturar álbuns diferentes.",
           "As imagens do sistema passam por backup diário em pacote compactado às 23:30 quando o agendamento e as credenciais OAuth do Google Drive estiverem configurados.",
-          "Para habilitar o envio ao Drive, configure o id da pasta, o client id, o client secret e o refresh token de uma conta Google dedicada ao backup.",
+          "O backup envia as imagens para a mesma pasta base do Drive usada no restante da rotina e cria automaticamente a estrutura backup servidores/g3n/data do dia para manter banco, arquivos e fotos juntos no mesmo destino.",
+          "Para habilitar o envio ao Drive, configure o id da pasta base, o client id, o client secret e o refresh token de uma conta Google dedicada ao backup, ou reutilize as credenciais OAuth já autorizadas se elas estiverem disponíveis no ambiente.",
           "A conta usada no OAuth precisa ter a pasta do Drive compartilhada com permissão de edição para receber os pacotes compactados."
         ]
       },

@@ -1,6 +1,17 @@
 {
     "entries":  [
                     {
+                        "version":  "1.00.565",
+                        "releaseDate":  "2026-06-28",
+                        "title":  "Agenda com telefone e visão geral com fotos",
+                        "description":  "A agenda passou a exibir o telefone cadastrado do beneficiário e a visão geral ganhou um card com álbuns e fotos.",
+                        "changes":  [
+                                        "A busca e a geração da agenda passaram a localizar o telefone cadastrado do beneficiário com comparação de nome mais robusta e uso de todas as formas de telefone do cadastro.",
+                                        "A visão geral recebeu um card com a quantidade de álbuns e fotos registradas no sistema.",
+                                        "O backup de imagens passou a organizar o envio no mesmo destino do Drive com a estrutura backup servidores/g3n/data do dia."
+                                    ]
+                    },
+                    {
                         "version":  "1.00.564",
                         "releaseDate":  "2026-06-28",
                         "title":  "Backup de imagens via OAuth",

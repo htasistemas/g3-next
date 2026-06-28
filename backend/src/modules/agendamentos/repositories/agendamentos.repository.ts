@@ -211,6 +211,18 @@ function normalizarTextoComparacao(valor?: string | null) {
     .toLowerCase();
 }
 
+function normalizarTextoSql(campo: Prisma.Sql) {
+  return Prisma.sql`
+    LOWER(
+      TRANSLATE(
+        REGEXP_REPLACE(TRIM(COALESCE(${campo}, '')), '\s+', ' ', 'g'),
+        'ÁÀÃÂÄáàãâäÉÈÊËéèêëÍÌÎÏíìîïÓÒÕÔÖóòõôöÚÙÛÜúùûüÇçÑñ',
+        'AAAAAaaaaaEEEEeeeeIIIIiiiiOOOOOoooooUUUUuuuuCcNn'
+      )
+    )
+  `;
+}
+
 function formatarDataMensagem(value?: Date | string | null) {
   if (!value) return "";
   if (value instanceof Date) {
@@ -428,19 +440,7 @@ export class AgendamentosRepository {
             (ab.beneficiario_id IS NOT NULL AND b.id = ab.beneficiario_id)
             OR (
               ab.beneficiario_id IS NULL
-              AND LOWER(
-                TRANSLATE(
-                  REGEXP_REPLACE(TRIM(COALESCE(b.nome_completo, '')), '\s+', ' ', 'g'),
-                  'ÁÀÃÂÄáàãâäÉÈÊËéèêëÍÌÎÏíìîïÓÒÕÔÖóòõôöÚÙÛÜúùûüÇçÑñ',
-                  'AAAAAaaaaaEEEEeeeeIIIIiiiiOOOOOoooooUUUUuuuuCcNn'
-                )
-              ) = LOWER(
-                TRANSLATE(
-                  REGEXP_REPLACE(TRIM(COALESCE(ab.beneficiario_nome, '')), '\s+', ' ', 'g'),
-                  'ÁÀÃÂÄáàãâäÉÈÊËéèêëÍÌÎÏíìîïÓÒÕÔÖóòõôöÚÙÛÜúùûüÇçÑñ',
-                  'AAAAAaaaaaEEEEeeeeIIIIiiiiOOOOOoooooUUUUuuuuCcNn'
-                )
-              )
+              AND ${normalizarTextoSql(Prisma.sql`b.nome_completo`)} = ${normalizarTextoSql(Prisma.sql`ab.beneficiario_nome`)}
             )
           )
         ORDER BY c.id DESC NULLS LAST, b.id DESC
@@ -481,13 +481,7 @@ export class AgendamentosRepository {
     }
     if (nomes.length) {
       filtros.push(Prisma.sql`
-        LOWER(
-          TRANSLATE(
-            REGEXP_REPLACE(TRIM(COALESCE(b.nome_completo, '')), '\s+', ' ', 'g'),
-            'ÁÀÃÂÄáàãâäÉÈÊËéèêëÍÌÎÏíìîïÓÒÕÔÖóòõôöÚÙÛÜúùûüÇçÑñ',
-            'AAAAAaaaaaEEEEeeeeIIIIiiiiOOOOOoooooUUUUuuuuCcNn'
-          )
-        ) IN (${Prisma.join(nomes)})
+        ${normalizarTextoSql(Prisma.sql`b.nome_completo`)} IN (${Prisma.join(nomes)})
       `);
     }
 
@@ -537,7 +531,11 @@ export class AgendamentosRepository {
       LEFT JOIN LATERAL (
         SELECT
           b.id AS beneficiario_id,
-          NULLIF(TRIM(c2.telefone_principal), '') AS telefone_principal,
+          COALESCE(
+            NULLIF(TRIM(c2.telefone_principal), ''),
+            NULLIF(TRIM(c2.telefone_secundario), ''),
+            NULLIF(TRIM(c2.telefone_recado_numero), '')
+          ) AS telefone_principal,
           NULLIF(TRIM(c2.email), '') AS email
         FROM cadastro_beneficiario b
         LEFT JOIN contato_beneficiario c2 ON c2.beneficiario_id = b.id AND c2.tenant_id::text = ${tenantId}
@@ -562,19 +560,7 @@ export class AgendamentosRepository {
             )
             OR (
               REGEXP_REPLACE(COALESCE(m.cpf, ''), '\D', '', 'g') = ''
-              AND LOWER(
-                TRANSLATE(
-                  REGEXP_REPLACE(TRIM(COALESCE(b.nome_completo, '')), '\s+', ' ', 'g'),
-                  'ÁÀÃÂÄáàãâäÉÈÊËéèêëÍÌÎÏíìîïÓÒÕÔÖóòõôöÚÙÛÜúùûüÇçÑñ',
-                  'AAAAAaaaaaEEEEeeeeIIIIiiiiOOOOOoooooUUUUuuuuCcNn'
-                )
-              ) = LOWER(
-                TRANSLATE(
-                  REGEXP_REPLACE(TRIM(COALESCE(m.beneficiario_nome, '')), '\s+', ' ', 'g'),
-                  'ÁÀÃÂÄáàãâäÉÈÊËéèêëÍÌÎÏíìîïÓÒÕÔÖóòõôöÚÙÛÜúùûüÇçÑñ',
-                  'AAAAAaaaaaEEEEeeeeIIIIiiiiOOOOOoooooUUUUuuuuCcNn'
-                )
-              )
+              AND ${normalizarTextoSql(Prisma.sql`b.nome_completo`)} = ${normalizarTextoSql(Prisma.sql`m.beneficiario_nome`)}
             )
           )
         ORDER BY c2.id DESC NULLS LAST, b.id DESC
@@ -642,19 +628,7 @@ export class AgendamentosRepository {
             )
             OR (
               REGEXP_REPLACE(COALESCE(m.cpf, ''), '\D', '', 'g') = ''
-              AND LOWER(
-                TRANSLATE(
-                  REGEXP_REPLACE(TRIM(COALESCE(b.nome_completo, '')), '\s+', ' ', 'g'),
-                  'ÁÀÃÂÄáàãâäÉÈÊËéèêëÍÌÎÏíìîïÓÒÕÔÖóòõôöÚÙÛÜúùûüÇçÑñ',
-                  'AAAAAaaaaaEEEEeeeeIIIIiiiiOOOOOoooooUUUUuuuuCcNn'
-                )
-              ) = LOWER(
-                TRANSLATE(
-                  REGEXP_REPLACE(TRIM(COALESCE(m.beneficiario_nome, '')), '\s+', ' ', 'g'),
-                  'ÁÀÃÂÄáàãâäÉÈÊËéèêëÍÌÎÏíìîïÓÒÕÔÖóòõôöÚÙÛÜúùûüÇçÑñ',
-                  'AAAAAaaaaaEEEEeeeeIIIIiiiiOOOOOoooooUUUUuuuuCcNn'
-                )
-              )
+              AND ${normalizarTextoSql(Prisma.sql`b.nome_completo`)} = ${normalizarTextoSql(Prisma.sql`m.beneficiario_nome`)}
             )
           )
         ORDER BY c2.id DESC NULLS LAST, b.id DESC
@@ -937,19 +911,7 @@ export class AgendamentosRepository {
             )
             OR (
               REGEXP_REPLACE(COALESCE(m.cpf, ''), '\D', '', 'g') = ''
-              AND LOWER(
-                TRANSLATE(
-                  REGEXP_REPLACE(TRIM(COALESCE(b.nome_completo, '')), '\s+', ' ', 'g'),
-                  'ÁÀÃÂÄáàãâäÉÈÊËéèêëÍÌÎÏíìîïÓÒÕÔÖóòõôöÚÙÛÜúùûüÇçÑñ',
-                  'AAAAAaaaaaEEEEeeeeIIIIiiiiOOOOOoooooUUUUuuuuCcNn'
-                )
-              ) = LOWER(
-                TRANSLATE(
-                  REGEXP_REPLACE(TRIM(COALESCE(m.beneficiario_nome, '')), '\s+', ' ', 'g'),
-                  'ÁÀÃÂÄáàãâäÉÈÊËéèêëÍÌÎÏíìîïÓÒÕÔÖóòõôöÚÙÛÜúùûüÇçÑñ',
-                  'AAAAAaaaaaEEEEeeeeIIIIiiiiOOOOOoooooUUUUuuuuCcNn'
-                )
-              )
+              AND ${normalizarTextoSql(Prisma.sql`b.nome_completo`)} = ${normalizarTextoSql(Prisma.sql`m.beneficiario_nome`)}
             )
           )
         ORDER BY c2.id DESC NULLS LAST, b.id DESC

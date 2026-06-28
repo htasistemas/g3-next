@@ -35,15 +35,33 @@ async function gravarStreamEmArquivo(
   await pipeline(stream, createWriteStream(destino));
 }
 
+type DriveFolder = { id: string; name: string };
+
+function nomePastaData(data: Date) {
+  const ano = data.getFullYear();
+  const mes = String(data.getMonth() + 1).padStart(2, "0");
+  const dia = String(data.getDate()).padStart(2, "0");
+  return `${ano}-${mes}-${dia}`;
+}
+
 export class BackupImagensService {
   private readonly raizStorage = resolve(process.cwd(), env.APP_STORAGE_ROOT);
   private readonly diretorioImagens = resolve(process.cwd(), env.APP_STORAGE_ROOT, "imagens");
   private readonly diretorioBackups = resolve(process.cwd(), env.APP_STORAGE_ROOT, "backups", "imagens");
 
   private criarClienteOAuth() {
-    const clientId = env.APP_BACKUP_IMAGES_GOOGLE_CLIENT_ID?.trim();
-    const clientSecret = env.APP_BACKUP_IMAGES_GOOGLE_CLIENT_SECRET?.trim();
-    const refreshToken = env.APP_BACKUP_IMAGES_REFRESH_TOKEN?.trim();
+    const clientId =
+      env.APP_BACKUP_IMAGES_GOOGLE_CLIENT_ID?.trim() ||
+      env.APP_GOOGLE_CLIENT_ID?.trim() ||
+      env.GOOGLE_CLIENT_ID?.trim();
+    const clientSecret =
+      env.APP_BACKUP_IMAGES_GOOGLE_CLIENT_SECRET?.trim() ||
+      env.APP_GOOGLE_CLIENT_SECRET?.trim() ||
+      env.GOOGLE_CLIENT_SECRET?.trim();
+    const refreshToken =
+      env.APP_BACKUP_IMAGES_REFRESH_TOKEN?.trim() ||
+      env.APP_GOOGLE_REFRESH_TOKEN?.trim() ||
+      env.GOOGLE_REFRESH_TOKEN?.trim();
 
     if (!clientId || !clientSecret || !refreshToken) {
       return null;
@@ -54,6 +72,92 @@ export class BackupImagensService {
     return client;
   }
 
+  private async autenticarDrive() {
+    const client = this.criarClienteOAuth();
+    if (!client) {
+      throw new AppError("Credenciais OAuth do Google Drive nao configuradas.", 500);
+    }
+
+    const { token } = await client.getAccessToken();
+    if (!token) {
+      throw new AppError("Nao foi possivel obter token de acesso do Google Drive.", 500);
+    }
+
+    return token;
+  }
+
+  private async driveFetchJson<T>(token: string, url: string, init?: RequestInit) {
+    const resposta = await fetch(url, {
+      ...init,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(init?.headers ?? {})
+      }
+    });
+
+    if (!resposta.ok) {
+      const texto = await resposta.text().catch(() => "");
+      throw new AppError(`Falha na comunicacao com o Google Drive. ${texto}`.trim(), 500);
+    }
+
+    return (await resposta.json()) as T;
+  }
+
+  private async listarPastasDrive(token: string, parentId: string, nome: string) {
+    const url = new URL("https://www.googleapis.com/drive/v3/files");
+    url.searchParams.set(
+      "q",
+      `mimeType='application/vnd.google-apps.folder' and name='${nome.replace(/'/g, "\\'")}' and '${parentId}' in parents and trashed=false`
+    );
+    url.searchParams.set("supportsAllDrives", "true");
+    url.searchParams.set("includeItemsFromAllDrives", "true");
+    url.searchParams.set("fields", "files(id,name)");
+    url.searchParams.set("pageSize", "10");
+    return this.driveFetchJson<{ files?: DriveFolder[] }>(token, url.toString());
+  }
+
+  private async criarPastaDrive(token: string, parentId: string, nome: string) {
+    const resposta = await fetch("https://www.googleapis.com/drive/v3/files?supportsAllDrives=true&fields=id,name", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        name: nome,
+        mimeType: "application/vnd.google-apps.folder",
+        parents: [parentId]
+      })
+    });
+
+    if (!resposta.ok) {
+      const texto = await resposta.text().catch(() => "");
+      throw new AppError(`Falha ao criar pasta no Google Drive. ${texto}`.trim(), 500);
+    }
+
+    return (await resposta.json()) as DriveFolder;
+  }
+
+  private async obterOuCriarPastaDrive(token: string, parentId: string, nome: string) {
+    const existentes = await this.listarPastasDrive(token, parentId, nome);
+    const pasta = existentes.files?.[0];
+    if (pasta?.id) {
+      return pasta;
+    }
+    return this.criarPastaDrive(token, parentId, nome);
+  }
+
+  private async resolverDestinoDrive(token: string) {
+    const pastaRaiz = env.APP_BACKUP_IMAGES_GOOGLE_DRIVE_FOLDER_ID?.trim();
+    if (!pastaRaiz) {
+      throw new AppError("Pasta do Google Drive nao configurada.", 500);
+    }
+
+    const pastaServidor = await this.obterOuCriarPastaDrive(token, pastaRaiz, "g3n");
+    const pastaData = await this.obterOuCriarPastaDrive(token, pastaServidor.id, nomePastaData(new Date()));
+    return { pastaRaiz, pastaServidor, pastaData };
+  }
+
   private async criarPacoteLocal() {
     await mkdir(this.diretorioBackups, { recursive: true });
 
@@ -62,7 +166,7 @@ export class BackupImagensService {
     const pastaEspelho = resolve(pastaTemporaria, "storage");
     const arquivoCompactado = resolve(
       this.diretorioBackups,
-      `backup-imagens-${timestamp}-${randomUUID().slice(0, 8)}.tar.gz`
+      `g3n_imagens-${timestamp}-${randomUUID().slice(0, 8)}.tar.gz`
     );
 
     const arquivos = await storageService.listar({ ativo: "true" });
@@ -102,27 +206,15 @@ export class BackupImagensService {
   }
 
   private async enviarParaDrive(arquivoCompactado: string) {
-    const folderId = env.APP_BACKUP_IMAGES_GOOGLE_DRIVE_FOLDER_ID?.trim();
-    if (!folderId) {
-      return { uploaded: false, reason: "Pasta do Google Drive nao configurada." };
-    }
-
-    const client = this.criarClienteOAuth();
-    if (!client) {
-      return { uploaded: false, reason: "Credenciais OAuth do Google Drive nao configuradas." };
-    }
-
-    const { token } = await client.getAccessToken();
-    if (!token) {
-      throw new AppError("Nao foi possivel obter token de acesso do Google Drive.", 500);
-    }
+    const token = await this.autenticarDrive();
+    const destino = await this.resolverDestinoDrive(token);
 
     const arquivoBuffer = await readFile(arquivoCompactado);
-    const nomeArquivo = arquivoCompactado.split(/[\\/]/).pop() ?? "backup-imagens.tar.gz";
+    const nomeArquivo = arquivoCompactado.split(/[\\/]/).pop() ?? "g3n_imagens.tar.gz";
     const boundary = `g3n-${randomUUID()}`;
     const metadata = JSON.stringify({
       name: nomeArquivo,
-      parents: [folderId]
+      parents: [destino.pastaData.id]
     });
 
     const corpo = Buffer.concat([

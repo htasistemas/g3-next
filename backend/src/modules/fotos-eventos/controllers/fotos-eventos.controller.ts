@@ -10,6 +10,11 @@ export class FotosEventosController {
     return response.json(resultado);
   }
 
+  async resumo(request: AuthenticatedRequest, response: Response) {
+    const resultado = await service.resumo(request.authUser?.tenant_id);
+    return response.json(resultado);
+  }
+
   async obter(request: AuthenticatedRequest, response: Response) {
     const resultado = await service.obter(request.params.id, request.authUser?.tenant_id);
     return response.json(resultado);

@@ -289,6 +289,30 @@ export class FotosEventosRepository {
     return { eventos, total, pagina, tamanho };
   }
 
+  async resumo(tenantId: string) {
+    await this.ensureEstrutura();
+    await this.repararFotosPrincipaisAusentes(tenantId);
+    const rows = await prisma.$queryRaw<Array<{ total_albuns: bigint; total_fotos: bigint }>>(Prisma.sql`
+      SELECT
+        COUNT(*)::bigint AS total_albuns,
+        COALESCE((
+          SELECT COUNT(*)::bigint
+          FROM fotos_eventos_itens fi
+          INNER JOIN fotos_eventos e ON e.id = fi.evento_id
+          WHERE e.tenant_id::text = ${tenantId}
+            AND fi.tenant_id::text = ${tenantId}
+        ), 0::bigint) AS total_fotos
+      FROM fotos_eventos e
+      WHERE e.tenant_id::text = ${tenantId}
+    `);
+
+    const row = rows[0];
+    return {
+      totalAlbuns: Number(row?.total_albuns ?? 0n),
+      totalFotos: Number(row?.total_fotos ?? 0n)
+    };
+  }
+
   async buscarPorId(id: bigint, tenantId: string) {
     await this.ensureEstrutura();
     await this.repararFotosPrincipaisAusentes(tenantId);

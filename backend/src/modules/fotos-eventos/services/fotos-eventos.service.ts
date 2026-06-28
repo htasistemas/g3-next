@@ -44,6 +44,11 @@ export class FotosEventosService {
     };
   }
 
+  async resumo(rawTenantId?: string) {
+    const tenantId = this.parseTenant(rawTenantId);
+    return this.repository.resumo(tenantId);
+  }
+
   async obter(rawId: string, rawTenantId?: string) {
     const id = this.parseId(rawId);
     const tenantId = this.parseTenant(rawTenantId);

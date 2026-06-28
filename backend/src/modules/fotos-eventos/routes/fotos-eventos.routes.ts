@@ -20,6 +20,12 @@ fotosEventosRoutes.get(
   ensurePermissions(permissoesLeitura),
   asyncHandler(controller.listar.bind(controller))
 );
+fotosEventosRoutes.get(
+  "/resumo",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.resumo.bind(controller))
+);
 fotosEventosRoutes.post(
   "/",
   ensureAuthenticated,

@@ -24,6 +24,7 @@ import {
   CarFront,
   FolderHeart,
   HandHeart,
+  Images,
   LayoutDashboard,
   Package,
   RefreshCw,
@@ -37,6 +38,7 @@ import { useItensAlmoxarifado } from "@/features/almoxarifado/use-almoxarifado";
 import { useMotoristasAutorizados } from "@/features/controle-veiculos/use-controle-veiculos";
 import { useDashboardAssistencia } from "@/features/dashboard/use-dashboard";
 import { useEmprestimosEventos } from "@/features/emprestimos-eventos/use-emprestimos-eventos";
+import { fotosEventosService } from "@/services/fotos-eventos.service";
 import { usePatrimonios } from "@/features/patrimonios/use-patrimonios";
 import { classesTelaPadraoBeneficiario } from "@/lib/tela-padrao-beneficiario";
 import { matriculasService } from "@/services/matriculas.service";
@@ -96,6 +98,12 @@ export function VisaoGeralPage() {
   const { data: matriculasResumoData, isFetching: atualizandoResumoMatriculas } = useQuery({
     queryKey: ["dashboard", "visao-geral", "matriculas-resumo", usuario?.tenant_id ?? "sem-tenant"],
     queryFn: () => matriculasService.obterResumoCatalogo(),
+    enabled: !!usuario,
+    staleTime: 60_000
+  });
+  const { data: fotosEventosResumoData } = useQuery({
+    queryKey: ["dashboard", "visao-geral", "fotos-eventos-resumo", usuario?.tenant_id ?? "sem-tenant"],
+    queryFn: () => fotosEventosService.resumo(),
     enabled: !!usuario,
     staleTime: 60_000
   });
@@ -197,9 +205,23 @@ export function VisaoGeralPage() {
     [dadosFinanceiro]
   );
 
+  const resumoFotosEventos = useMemo(() => {
+    return {
+      totalAlbuns: fotosEventosResumoData?.totalAlbuns ?? 0,
+      totalFotos: fotosEventosResumoData?.totalFotos ?? 0
+    };
+  }, [fotosEventosResumoData]);
+
   const cardsResumo = useMemo(() => {
     if (!data) return [];
     return [
+      {
+        label: "Álbuns e fotos",
+        valor: `${resumoFotosEventos.totalAlbuns} / ${resumoFotosEventos.totalFotos}`,
+        hint: "Álbuns cadastrados / fotos registradas",
+        icone: Images,
+        rota: "/setor-administrativo/fotos-eventos"
+      },
       {
         label: "Beneficiários no período",
         valor: String(data.top12.beneficiariosAtendidosPeriodo),
@@ -277,6 +299,8 @@ export function VisaoGeralPage() {
     documentosVencidos,
     itensAlmoxarifado.length,
     patrimonios.length,
+    resumoFotosEventos.totalAlbuns,
+    resumoFotosEventos.totalFotos,
     termosVencidos,
     totalMotoristasAutorizados
   ]);

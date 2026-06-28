@@ -53,6 +53,11 @@ export type FotoEventoFiltros = {
   tamanho?: string;
 };
 
+export type FotoEventoResumo = {
+  totalAlbuns: number;
+  totalFotos: number;
+};
+
 export type FotoEventoRow = {
   id: bigint;
   unidade_id: bigint | null;
