@@ -55,6 +55,14 @@ type UploadPendente = {
   previewUrl: string;
 };
 
+type GrupoImportacaoPasta = {
+  caminhoPasta: string;
+  titulo: string;
+  local: string;
+  dataEvento: string;
+  arquivos: File[];
+};
+
 const collatorArquivos = new Intl.Collator("pt-BR", {
   numeric: true,
   sensitivity: "base"
@@ -107,6 +115,76 @@ function cardIndicador(titulo: string, valor: string | number, apoio: string) {
       </CardContent>
     </Card>
   );
+}
+
+function normalizarCaminhoImportado(valor?: string | null) {
+  return (valor ?? "").replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+}
+
+function formatarDataIsoLocal(data: Date) {
+  const ano = data.getFullYear();
+  const mes = String(data.getMonth() + 1).padStart(2, "0");
+  const dia = String(data.getDate()).padStart(2, "0");
+  return `${ano}-${mes}-${dia}`;
+}
+
+function obterNomePasta(caminhoPasta: string) {
+  const partes = normalizarCaminhoImportado(caminhoPasta).split("/").filter(Boolean);
+  return (partes[partes.length - 1] || caminhoPasta.trim() || "Evento").replace(/\.[^.]+$/, "");
+}
+
+function obterCaminhoPastaArquivo(arquivo: File) {
+  const caminhoRelativo = normalizarCaminhoImportado(arquivo.webkitRelativePath || arquivo.name);
+  const partes = caminhoRelativo.split("/").filter(Boolean);
+  if (partes.length <= 1) return "";
+  return partes.slice(0, -1).join("/");
+}
+
+function agruparArquivosPorPasta(files: FileList | File[]) {
+  const grupos = new Map<string, { caminhoPasta: string; arquivos: File[]; menorData: number }>();
+
+  Array.from(files)
+    .filter(
+      (arquivo) =>
+        arquivo.type.startsWith("image/") || /\.(png|jpe?g|webp|gif|bmp|tiff|heic|heif)$/i.test(arquivo.name)
+    )
+    .sort((a, b) =>
+      collatorArquivos.compare(
+        normalizarCaminhoImportado(a.webkitRelativePath || a.name),
+        normalizarCaminhoImportado(b.webkitRelativePath || b.name)
+      )
+    )
+    .forEach((arquivo) => {
+    const caminhoPasta = obterCaminhoPastaArquivo(arquivo);
+    const chave = caminhoPasta || "__sem-pasta__";
+    const grupoAtual = grupos.get(chave) ?? {
+      caminhoPasta,
+      arquivos: [],
+      menorData: arquivo.lastModified || Date.now()
+    };
+
+    grupoAtual.arquivos.push(arquivo);
+    grupoAtual.menorData = Math.min(grupoAtual.menorData, arquivo.lastModified || grupoAtual.menorData);
+    grupos.set(chave, grupoAtual);
+    });
+
+  return Array.from(grupos.values())
+    .sort((a, b) => collatorArquivos.compare(a.caminhoPasta || "__sem-pasta__", b.caminhoPasta || "__sem-pasta__"))
+    .map<GrupoImportacaoPasta>((grupo) => {
+      const caminhoPasta = grupo.caminhoPasta || obterNomePasta(grupo.arquivos[0]?.name ?? "Evento");
+      return {
+        caminhoPasta,
+        titulo: obterNomePasta(caminhoPasta),
+        local: caminhoPasta,
+        dataEvento: formatarDataIsoLocal(new Date(grupo.menorData)),
+        arquivos: grupo.arquivos.sort((a, b) =>
+          collatorArquivos.compare(
+            normalizarCaminhoImportado(a.webkitRelativePath || a.name),
+            normalizarCaminhoImportado(b.webkitRelativePath || b.name)
+          )
+        )
+      };
+    });
 }
 
 function ImagemArquivoAutenticado({
@@ -189,6 +267,7 @@ export function FotosEventosPage() {
   const [confirmarExcluir, setConfirmarExcluir] = useState(false);
   const [confirmarExcluirFotoId, setConfirmarExcluirFotoId] = useState<number | null>(null);
   const [uploadsPendentes, setUploadsPendentes] = useState<UploadPendente[]>([]);
+  const [importandoPastas, setImportandoPastas] = useState(false);
 
   const { data, isLoading } = useFotosEventos({
     busca,
@@ -215,7 +294,8 @@ export function FotosEventosPage() {
     adicionarFotosLoteMutation.isPending ||
     definirCapaMutation.isPending ||
     removerFotoMutation.isPending ||
-    reordenarFotosMutation.isPending;
+    reordenarFotosMutation.isPending ||
+    importandoPastas;
 
   const totalFotos = useMemo(
     () => eventos.reduce((acc, item) => acc + Number(item.totalFotos ?? 0), 0),
@@ -349,6 +429,107 @@ export function FotosEventosPage() {
         previewUrl: URL.createObjectURL(arquivo)
       }))
     ]);
+  }
+
+  async function importarPastasComoEventos(files: FileList | File[]) {
+    const grupos = agruparArquivosPorPasta(files);
+    if (!grupos.length) {
+      setPopupMensagem({
+        tipo: "aviso",
+        titulo: "Atenção",
+        texto: "Selecione uma pasta com imagens válidas."
+      });
+      return;
+    }
+
+    setImportandoPastas(true);
+
+    let eventosCriados = 0;
+    let eventosComFalha = 0;
+    const erros: string[] = [];
+
+    try {
+      for (const grupo of grupos) {
+        const fotosPayload: FotoEventoFotoPayload[] = [];
+
+        for (let index = 0; index < grupo.arquivos.length; index += 1) {
+          const upload = await arquivoParaUpload(grupo.arquivos[index]);
+          fotosPayload.push({
+            arquivo: upload,
+            legenda: index === 0 ? "Foto do evento" : undefined,
+            ordem: index + 1
+          });
+        }
+
+        try {
+          const eventoCriado = await salvarMutation.mutateAsync({
+            titulo: grupo.titulo,
+            descricao: "",
+            dataEvento: grupo.dataEvento,
+            local: grupo.local,
+            status: "REALIZADO",
+            tags: [],
+            unidadeId: null,
+            fotoPrincipalUpload: null,
+            fotoPrincipalId: null
+          });
+
+          try {
+            await adicionarFotosLoteMutation.mutateAsync({
+              id: eventoCriado.id,
+              payload: {
+                fotos: fotosPayload,
+                fotoPrincipalIndex: 0
+              }
+            });
+            eventosCriados += 1;
+          } catch (erroFotos: any) {
+            eventosComFalha += 1;
+
+            try {
+              await removerMutation.mutateAsync(eventoCriado.id);
+            } catch {
+              // Se a exclusão falhar, o evento permanece para não perder a importação já concluída.
+            }
+
+            erros.push(
+              erroFotos?.response?.data?.message ??
+                `Não foi possível concluir a importação da pasta ${grupo.caminhoPasta}.`
+            );
+          }
+        } catch (erroEvento: any) {
+          eventosComFalha += 1;
+          erros.push(
+            erroEvento?.response?.data?.message ??
+              erroEvento?.message ??
+              `Não foi possível importar a pasta ${grupo.caminhoPasta}.`
+          );
+        }
+      }
+
+      setAbaAtiva("lista");
+      const textoConclusao =
+        eventosComFalha > 0
+          ? `${eventosCriados} evento(s) criado(s) com sucesso. Houve falha em ${eventosComFalha} pasta(s).${
+              erros.length ? ` Primeiro erro: ${erros[0]}` : ""
+            }`
+          : `${eventosCriados} evento(s) criado(s) com sucesso.`;
+
+      setPopupMensagem({
+        tipo: eventosComFalha > 0 ? "aviso" : "sucesso",
+        titulo: eventosComFalha > 0 ? "Importação parcial" : "Confirmação",
+        texto: textoConclusao
+      });
+    } catch (error: any) {
+      setPopupMensagem({
+        tipo: "erro",
+        titulo: "Erro",
+        texto: error?.message ?? error?.response?.data?.message ?? "Não foi possível importar as pastas."
+      });
+    } finally {
+      setImportandoPastas(false);
+      limparUploadsPendentes();
+    }
   }
 
   async function persistirUploadsPendentes(eventoId: number) {
@@ -972,7 +1153,7 @@ export function FotosEventosPage() {
                         webkitdirectory=""
                         onChange={(event) => {
                           if (event.target.files?.length) {
-                            adicionarUploadsPendentes(event.target.files);
+                            void importarPastasComoEventos(event.target.files);
                           }
                           event.target.value = "";
                         }}
@@ -986,10 +1167,11 @@ export function FotosEventosPage() {
                       </Button>
                       <Button
                         variant="outline"
+                        disabled={importandoPastas}
                         onClick={() => document.getElementById("fotosEventoCadastroPasta")?.click()}
                       >
                         <FolderOpen className="mr-2 h-4 w-4" />
-                        Importar pasta
+                        {importandoPastas ? "Importando..." : "Importar pasta"}
                       </Button>
                     </div>
                   </CardHeader>

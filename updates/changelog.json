@@ -1,6 +1,17 @@
 {
     "entries":  [
                     {
+                        "version":  "1.00.562",
+                        "releaseDate":  "2026-06-28",
+                        "title":  "Importação de fotos por pasta gera eventos separados",
+                        "description":  "A importação de pastas na tela Fotos de eventos agora cria um evento novo por pasta, com título, data, local e status padronizados.",
+                        "changes":  [
+                                        "Cada pasta selecionada no importador agora gera um evento novo, em vez de apenas empilhar fotos no cadastro atual.",
+                                        "O título do evento vem do nome da pasta, a data vem da data do arquivo de imagem e o status é gravado como Realizado.",
+                                        "O campo local passa a registrar o caminho da pasta usada na importação para facilitar conferência e backup."
+                                    ]
+                    },
+                    {
                         "version":  "1.00.561",
                         "releaseDate":  "2026-06-28",
                         "title":  "Imagens centralizadas em storage unico",

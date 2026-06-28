@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.561",
+  "latestVersion": "1.00.562",
   "releaseDate": "2026-06-28",
-  "description": "As imagens do sistema passaram a usar uma arvore unica de storage por tipo e entidade.",
+  "description": "A importação por pasta em fotos de eventos agora cria um evento por pasta com título, data e status padronizados.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.561",
+  "minCompatibleVersion": "1.00.562",
   "releaseType": "stable"
 }
 
