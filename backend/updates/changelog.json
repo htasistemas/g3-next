@@ -1,6 +1,18 @@
 {
     "entries":  [
                     {
+                        "version":  "1.00.563",
+                        "releaseDate":  "2026-06-28",
+                        "title":  "Importação em lote e backup diário de imagens",
+                        "description":  "A tela Fotos de eventos passou a aceitar arrastar varias pastas de uma vez e o sistema ganhou backup diario das imagens para o Google Drive.",
+                        "changes":  [
+                                        "A importação de fotos de eventos passou a aceitar múltiplas pastas por arrastar e soltar, mantendo a criação de um evento por pasta.",
+                                        "O backup diário agora compacta o storage de imagens do sistema e envia o pacote ao Google Drive quando as credenciais estiverem configuradas.",
+                                        "O manual do sistema e a versão oficial foram atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.562",
                         "releaseDate":  "2026-06-28",
                         "title":  "Importação de fotos por pasta gera eventos separados",

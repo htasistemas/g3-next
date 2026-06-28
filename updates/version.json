@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.562",
+  "latestVersion": "1.00.563",
   "releaseDate": "2026-06-28",
-  "description": "A importação por pasta em fotos de eventos agora cria um evento por pasta com título, data e status padronizados.",
+  "description": "A importação por pasta em fotos de eventos aceita pastas arrastadas em lote e o sistema passou a gerar backup diário das imagens.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.562",
+  "minCompatibleVersion": "1.00.563",
   "releaseType": "stable",
   "downloadUrl": null
 }

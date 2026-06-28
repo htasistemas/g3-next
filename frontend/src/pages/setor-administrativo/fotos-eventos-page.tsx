@@ -140,6 +140,62 @@ function obterCaminhoPastaArquivo(arquivo: File) {
   return partes.slice(0, -1).join("/");
 }
 
+async function lerEntradaArquivo(entrada: FileSystemFileEntry): Promise<File[]> {
+  return new Promise((resolve) => {
+    entrada.file(
+      (arquivo) => resolve([arquivo]),
+      () => resolve([])
+    );
+  });
+}
+
+async function lerEntradaDiretorio(entrada: FileSystemDirectoryEntry): Promise<File[]> {
+  const leitor = entrada.createReader();
+  const arquivos: File[] = [];
+
+  while (true) {
+    const entradas = await new Promise<FileSystemEntry[]>((resolve) => {
+      leitor.readEntries((resultado) => resolve(resultado), () => resolve([]));
+    });
+
+    if (!entradas.length) break;
+
+    for (const subEntrada of entradas) {
+      if (subEntrada.isFile) {
+        arquivos.push(...(await lerEntradaArquivo(subEntrada as FileSystemFileEntry)));
+      } else if (subEntrada.isDirectory) {
+        arquivos.push(...(await lerEntradaDiretorio(subEntrada as FileSystemDirectoryEntry)));
+      }
+    }
+  }
+
+  return arquivos;
+}
+
+async function coletarArquivosDoDrop(items: DataTransferItemList) {
+  const arquivos: File[] = [];
+
+  for (const item of Array.from(items)) {
+    const entrada = (item as DataTransferItem & { webkitGetAsEntry?: () => FileSystemEntry | null })
+      .webkitGetAsEntry?.();
+
+    if (entrada?.isDirectory) {
+      arquivos.push(...(await lerEntradaDiretorio(entrada as FileSystemDirectoryEntry)));
+      continue;
+    }
+
+    if (entrada?.isFile) {
+      arquivos.push(...(await lerEntradaArquivo(entrada as FileSystemFileEntry)));
+      continue;
+    }
+
+    const arquivo = item.getAsFile?.();
+    if (arquivo) arquivos.push(arquivo);
+  }
+
+  return arquivos;
+}
+
 function agruparArquivosPorPasta(files: FileList | File[]) {
   const grupos = new Map<string, { caminhoPasta: string; arquivos: File[]; menorData: number }>();
 
@@ -1121,12 +1177,33 @@ export function FotosEventosPage() {
             </div>
 
             <div className="grid gap-3 xl:grid-cols-[1.2fr_0.8fr]">
-                <Card className="border-[var(--g3-border)] bg-[var(--g3-card)] shadow-sm">
+                <Card
+                  className="border-[var(--g3-border)] bg-[var(--g3-card)] shadow-sm"
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={async (event) => {
+                    event.preventDefault();
+                    try {
+                      const itens = event.dataTransfer?.items;
+                      if (!itens?.length) return;
+
+                      const arquivosArrastados = await coletarArquivosDoDrop(itens);
+                      if (arquivosArrastados.length) {
+                        void importarPastasComoEventos(arquivosArrastados);
+                      }
+                    } catch {
+                      setPopupMensagem({
+                        tipo: "erro",
+                        titulo: "Erro",
+                        texto: "Não foi possível ler as pastas arrastadas."
+                      });
+                    }
+                  }}
+                >
                   <CardHeader className="flex flex-row items-center justify-between gap-3">
                     <div>
                       <CardTitle className="text-sm">Upload de fotos</CardTitle>
                       <p className="text-xs text-[var(--g3-muted)]">
-                      Adicione várias imagens do evento ou importe uma pasta inteira e escolha visualmente a capa antes de salvar.
+                      Adicione várias imagens do evento ou importe uma ou mais pastas inteiras. Você também pode arrastar pastas do Windows para criar vários eventos de uma vez.
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -1171,7 +1248,7 @@ export function FotosEventosPage() {
                         onClick={() => document.getElementById("fotosEventoCadastroPasta")?.click()}
                       >
                         <FolderOpen className="mr-2 h-4 w-4" />
-                        {importandoPastas ? "Importando..." : "Importar pasta"}
+                        {importandoPastas ? "Importando..." : "Importar pastas"}
                       </Button>
                     </div>
                   </CardHeader>
