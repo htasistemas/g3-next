@@ -755,7 +755,6 @@ export function PatrimonioPage() {
   const salasDisponiveis = useMemo(() => {
     const salaSource = unidadeLocalizacaoSelecionada?.salas ?? [];
     const salasDasUnidades = salaSource
-      .filter((sala) => sala.ativo ?? true)
       .map((sala) => sala.nome?.trim() || "")
       .filter(Boolean);
 

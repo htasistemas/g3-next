@@ -1,6 +1,18 @@
 {
     "entries":  [
                     {
+                        "version":  "1.00.570",
+                        "releaseDate":  "2026-06-28",
+                        "title":  "Salas da unidade visíveis no patrimônio",
+                        "description":  "A aba Localização e custódia passou a listar todas as salas cadastradas da unidade selecionada.",
+                        "changes":  [
+                                        "A lista de salas da aba Localização e custódia deixou de esconder salas com status diferente de ativo.",
+                                        "A unidade agora pode exibir as salas cadastradas no próprio cadastro de unidade assistencial, mesmo quando a listagem anterior vinha vazia.",
+                                        "A seleção da sala continua sendo limpa ao trocar de unidade."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.569",
                         "releaseDate":  "2026-06-28",
                         "title":  "Patrimônio com unidade consistente",
