@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.573",
+  "latestVersion": "1.00.574",
   "releaseDate": "2026-06-28",
-  "description": "O login passou a autenticar antes do pré-carregamento da rota de destino, evitando bloqueio por chunk.",
+  "description": "A visão geral passou a exibir Catálogo e vagas de matrículas ao lado de Empréstimos para eventos.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.573",
+  "minCompatibleVersion": "1.00.574",
   "releaseType": "stable",
   "downloadUrl": null
 }

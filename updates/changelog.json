@@ -1,6 +1,18 @@
 {
     "entries":  [
                     {
+                        "version":  "1.00.574",
+                        "releaseDate":  "2026-06-28",
+                        "title":  "Cards lado a lado na visão geral",
+                        "description":  "A visão geral passou a mostrar Catálogo e vagas de matrículas ao lado de Empréstimos para eventos.",
+                        "changes":  [
+                                        "O bloco de catálogo foi reposicionado para ficar ao lado do card de empréstimos para eventos.",
+                                        "A tela mantém os atalhos operacionais principais alinhados na mesma faixa.",
+                                        "Os indicadores internos do catálogo continuam clicáveis para abrir a tela de matrículas."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.573",
                         "releaseDate":  "2026-06-28",
                         "title":  "Login sem dependência de preload",

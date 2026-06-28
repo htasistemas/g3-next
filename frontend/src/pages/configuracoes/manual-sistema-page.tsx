@@ -516,6 +516,7 @@ const secoesManual: ManualSecao[] = [
           "Na aba Localização e custódia, o campo Unidade lista as unidades cadastradas em Cadastro de unidade assistencial e, ao selecionar uma delas, o campo Sala passa a listar as salas cadastradas naquela unidade.",
           "Na aba Cadastro patrimonial, os campos Unidade, Número patrimonial e Nome do bem foram ajustados para manter melhor alinhamento visual no desktop.",
           "Na Visão geral, o card Empréstimos para eventos aparece ao lado de Itens no patrimônio na grade principal, facilitando a leitura operacional.",
+          "Na Visão geral, o card Catálogo e vagas de matrículas aparece ao lado de Empréstimos para eventos, mantendo os atalhos principais juntos na mesma faixa.",
           "Use Registrar movimento para lançar movimentação, manutenção ou baixa, mantendo a trilha operacional do bem ao longo do tempo.",
           "Quando o tipo do movimento for Baixa, o sistema atualiza automaticamente o status do patrimônio para refletir a saída do item.",
           "No botão Imprimir, escolha entre Impressão geral para emitir a relação completa dos bens ou Impressão por local para gerar a lista dos itens vinculados a um ambiente específico, como cozinha, sala ou setor.",
