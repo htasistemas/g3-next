@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.566",
+  "latestVersion": "1.00.567",
   "releaseDate": "2026-06-28",
-  "description": "A listagem de patrimônio voltou a carregar os registros e a validar duplicidade por unidade com suporte ao legado.",
+  "description": "A listagem de patrimônio passou a considerar também o legado com unidade textual e tenant ausente.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.566",
+  "minCompatibleVersion": "1.00.567",
   "releaseType": "stable",
   "downloadUrl": null
 }

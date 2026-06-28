@@ -1,6 +1,18 @@
 {
     "entries":  [
                     {
+                        "version":  "1.00.567",
+                        "releaseDate":  "2026-06-28",
+                        "title":  "Patrimônio legado voltado à listagem",
+                        "description":  "A listagem de patrimônio passou a considerar registros antigos com unidade textual e tenant ausente, evitando tela vazia em bases migradas.",
+                        "changes":  [
+                                        "A consulta de listagem passou a procurar patrimônio por tenant e também por unidade textual vinculada à instituição atual quando o tenant ainda não foi gravado no legado.",
+                                        "A busca por ID recebeu o mesmo tratamento para impedir que registros legados fiquem invisíveis ao abrir o cadastro.",
+                                        "A validação de duplicidade do número patrimonial passou a considerar o legado com tenant ausente quando a unidade puder ser resolvida."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.566",
                         "releaseDate":  "2026-06-28",
                         "title":  "Patrimônio com listagem e busca restauradas",

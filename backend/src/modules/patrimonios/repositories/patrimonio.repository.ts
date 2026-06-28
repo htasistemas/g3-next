@@ -107,9 +107,19 @@ export class PatrimonioRepository {
         p.atualizado_em
       FROM patrimonio_item p
       LEFT JOIN unidade_assistencial u
-        ON u.id = p.unidade_id
-       AND (p.tenant_id IS NULL OR u.tenant_id::text = p.tenant_id)
-      WHERE COALESCE(p.tenant_id::text, u.tenant_id::text) = ${tenantId}
+        ON (
+          (p.unidade_id IS NOT NULL AND u.id = p.unidade_id)
+          OR (
+            p.unidade_id IS NULL
+            AND u.tenant_id::text = ${tenantId}
+            AND lower(trim(coalesce(p.unidade, ''))) IN (
+              lower(trim(coalesce(u.nome_fantasia, ''))),
+              lower(trim(coalesce(u.razao_social, '')))
+            )
+          )
+        )
+      WHERE p.tenant_id::text = ${tenantId}
+         OR (p.tenant_id IS NULL AND u.id IS NOT NULL)
       ORDER BY p.nome ASC, p.id DESC
     `);
 
@@ -263,10 +273,19 @@ export class PatrimonioRepository {
         p.atualizado_em
       FROM patrimonio_item p
       LEFT JOIN unidade_assistencial u
-        ON u.id = p.unidade_id
-       AND (p.tenant_id IS NULL OR u.tenant_id::text = p.tenant_id)
+        ON (
+          (p.unidade_id IS NOT NULL AND u.id = p.unidade_id)
+          OR (
+            p.unidade_id IS NULL
+            AND u.tenant_id::text = ${tenantId}
+            AND lower(trim(coalesce(p.unidade, ''))) IN (
+              lower(trim(coalesce(u.nome_fantasia, ''))),
+              lower(trim(coalesce(u.razao_social, '')))
+            )
+          )
+        )
       WHERE p.id = ${id}
-        AND COALESCE(p.tenant_id::text, u.tenant_id::text) = ${tenantId}
+        AND (p.tenant_id::text = ${tenantId} OR (p.tenant_id IS NULL AND u.id IS NOT NULL))
       LIMIT 1
     `);
 
@@ -443,8 +462,20 @@ export class PatrimonioRepository {
     const rows = await tx.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
       SELECT id
       FROM patrimonio_item
-      WHERE tenant_id::text = ${tenantId}
-        AND numero_patrimonio = ${numeroPatrimonio}
+      WHERE numero_patrimonio = ${numeroPatrimonio}
+        AND (
+          tenant_id::text = ${tenantId}
+          OR (
+            tenant_id IS NULL
+            AND (
+              unidade_id = ${unidade.id}
+              OR (
+                unidade_id IS NULL
+                AND lower(trim(coalesce(unidade, ''))) = lower(trim(${unidade.nome}))
+              )
+            )
+          )
+        )
         AND (
           unidade_id = ${unidade.id}
           OR (
