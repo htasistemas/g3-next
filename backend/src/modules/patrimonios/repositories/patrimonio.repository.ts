@@ -108,8 +108,8 @@ export class PatrimonioRepository {
       FROM patrimonio_item p
       LEFT JOIN unidade_assistencial u
         ON u.id = p.unidade_id
-       AND u.tenant_id::text = p.tenant_id
-      WHERE p.tenant_id::text = ${tenantId}
+       AND (p.tenant_id IS NULL OR u.tenant_id::text = p.tenant_id)
+      WHERE COALESCE(p.tenant_id::text, u.tenant_id::text) = ${tenantId}
       ORDER BY p.nome ASC, p.id DESC
     `);
 
@@ -264,9 +264,9 @@ export class PatrimonioRepository {
       FROM patrimonio_item p
       LEFT JOIN unidade_assistencial u
         ON u.id = p.unidade_id
-       AND u.tenant_id::text = p.tenant_id
+       AND (p.tenant_id IS NULL OR u.tenant_id::text = p.tenant_id)
       WHERE p.id = ${id}
-        AND p.tenant_id::text = ${tenantId}
+        AND COALESCE(p.tenant_id::text, u.tenant_id::text) = ${tenantId}
       LIMIT 1
     `);
 
@@ -303,7 +303,7 @@ export class PatrimonioRepository {
     await this.garantirEstrutura();
     const id = await prisma.$transaction(async (tx) => {
       const unidade = await this.resolverUnidade(tx, input, tenantId);
-      await this.validarNumeroUnico(tx, input.numeroPatrimonio, unidade.id, tenantId);
+      await this.validarNumeroUnico(tx, input.numeroPatrimonio, unidade, tenantId);
       const inserted = await tx.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
         INSERT INTO patrimonio_item (
           tenant_id,
@@ -364,7 +364,7 @@ export class PatrimonioRepository {
 
     await prisma.$transaction(async (tx) => {
       const unidade = await this.resolverUnidade(tx, input, tenantId);
-      await this.validarNumeroUnico(tx, input.numeroPatrimonio, unidade.id, tenantId, id);
+      await this.validarNumeroUnico(tx, input.numeroPatrimonio, unidade, tenantId, id);
       await tx.$executeRaw(Prisma.sql`
         UPDATE patrimonio_item
         SET
@@ -436,16 +436,22 @@ export class PatrimonioRepository {
   private async validarNumeroUnico(
     tx: TransactionClient,
     numeroPatrimonio: string,
-    unidadeId: bigint,
+    unidade: { id: bigint; nome: string },
     tenantId: string,
     idAtual?: bigint
   ) {
     const rows = await tx.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
       SELECT id
       FROM patrimonio_item
-      WHERE numero_patrimonio = ${numeroPatrimonio}
-        AND unidade_id = ${unidadeId}
-        AND tenant_id::text = ${tenantId}
+      WHERE tenant_id::text = ${tenantId}
+        AND numero_patrimonio = ${numeroPatrimonio}
+        AND (
+          unidade_id = ${unidade.id}
+          OR (
+            unidade_id IS NULL
+            AND lower(trim(coalesce(unidade, ''))) = lower(trim(${unidade.nome}))
+          )
+        )
       ${idAtual ? Prisma.sql`AND id <> ${idAtual}` : Prisma.empty}
       LIMIT 1
     `);

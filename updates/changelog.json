@@ -1,6 +1,18 @@
 {
     "entries":  [
                     {
+                        "version":  "1.00.566",
+                        "releaseDate":  "2026-06-28",
+                        "title":  "Patrimônio com listagem e busca restauradas",
+                        "description":  "A listagem de patrimônio voltou a carregar os registros cadastrados e a validação de número passou a respeitar a unidade com suporte ao legado.",
+                        "changes":  [
+                                        "A tela Patrimônio voltou a esperar a autenticação antes de carregar a listagem, evitando consulta prematura sem usuário.",
+                                        "A listagem agora considera patrimônios com tenant e unidade resolvidos no legado, em vez de esconder registros válidos por inconsistência antiga.",
+                                        "A validação de duplicidade do número patrimonial passou a considerar também o nome da unidade quando o vínculo por ID ainda não existe no legado."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.565",
                         "releaseDate":  "2026-06-28",
                         "title":  "Agenda com telefone e visão geral com fotos",

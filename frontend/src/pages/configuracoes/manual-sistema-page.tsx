@@ -525,6 +525,7 @@ const secoesManual: ManualSecao[] = [
           "A tela Patrimônio agora lista, cadastra, atualiza e movimenta bens sempre dentro do tenant autenticado, impedindo mistura de patrimônios entre instituições.",
           "O número patrimonial agora bloqueia duplicidade somente dentro da mesma unidade, permitindo o mesmo número em unidades diferentes quando o cadastro estiver corretamente vinculado.",
           "Internamente, o patrimônio passa a guardar o vínculo da unidade por ID, enquanto a tela continua exibindo o nome fantasia para leitura operacional.",
+          "Registros antigos sem tenant ou sem unidadeId continuam sendo considerados quando a unidade puder ser resolvida pelo nome, para não ocultar bens já cadastrados no sistema.",
           "Categorias com bens vinculados não podem ser excluídas; nesses casos, mantenha o histórico e use a edição ou inativação da categoria.",
           "A validação do número do patrimônio passou a ser exclusiva por unidade, permitindo o mesmo número em unidades diferentes sem conflito.",
           "A Impressão por local usa a localização atual do cadastro do bem para montar a relação que pode ser fixada no mural do ambiente.",

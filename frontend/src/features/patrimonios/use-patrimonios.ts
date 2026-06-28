@@ -7,7 +7,9 @@ export function usePatrimonios() {
   const { usuario } = useAuth();
   return useQuery({
     queryKey: ["patrimonios", usuario?.tenant_id ?? "sem-tenant"],
-    queryFn: () => patrimoniosService.listar()
+    queryFn: () => patrimoniosService.listar(),
+    enabled: !!usuario,
+    staleTime: 60_000
   });
 }
 

@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.565",
+  "latestVersion": "1.00.566",
   "releaseDate": "2026-06-28",
-  "description": "A agenda passou a mostrar o telefone cadastrado do beneficiário e a visão geral ganhou o card de álbuns e fotos.",
+  "description": "A listagem de patrimônio voltou a carregar os registros e a validar duplicidade por unidade com suporte ao legado.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.565",
+  "minCompatibleVersion": "1.00.566",
   "releaseType": "stable",
   "downloadUrl": null
 }
