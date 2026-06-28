@@ -4161,6 +4161,7 @@ export function CadastroMatriculasPage() {
                             <tr>
                               <th className="px-3 py-2 text-left font-semibold">Beneficiário</th>
                               {presencaExibirCpf && <th className="px-3 py-2 text-left font-semibold">CPF</th>}
+                              <th className="px-3 py-2 text-left font-semibold">Telefone</th>
                               <th className="px-3 py-2 text-left font-semibold">Presente</th>
                               <th className="px-3 py-2 text-left font-semibold">Ausente</th>
                             </tr>
@@ -4179,6 +4180,7 @@ export function CadastroMatriculasPage() {
                                   >
                                     <td className="px-3 py-2">{inscricao.beneficiario_nome}</td>
                                     {presencaExibirCpf && <td className="px-3 py-2">{formatarCpf(inscricao.cpf)}</td>}
+                                    <td className="px-3 py-2">{formatarTelefone(inscricao.telefone)}</td>
                                     <td className="px-3 py-2">
                                       <Checkbox
                                         checked={statusAtual === "PRESENTE"}
@@ -4200,7 +4202,7 @@ export function CadastroMatriculasPage() {
                               <tr>
                                 <td
                                   className="px-3 py-4 text-center text-[var(--g3-muted)]"
-                                  colSpan={presencaExibirCpf ? 4 : 3}
+                                  colSpan={presencaExibirCpf ? 5 : 4}
                                 >
                                   Nenhuma inscrição ativa para registrar presença.
                                 </td>
