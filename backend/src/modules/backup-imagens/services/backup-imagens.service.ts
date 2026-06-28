@@ -6,17 +6,12 @@ import os from "node:os";
 import { promisify } from "node:util";
 import { execFile } from "node:child_process";
 import { pipeline } from "node:stream/promises";
-import { JWT } from "google-auth-library";
+import { OAuth2Client } from "google-auth-library";
 import { env } from "../../../config/env.js";
 import { AppError } from "../../../shared/errors/app-error.js";
 import { storageService } from "../../arquivos/services/storage-instance.js";
 
 const execFileAsync = promisify(execFile);
-
-type ServiceAccountJson = {
-  client_email: string;
-  private_key: string;
-};
 
 function normalizarDataHorario(data: Date) {
   const ano = data.getFullYear();
@@ -45,27 +40,18 @@ export class BackupImagensService {
   private readonly diretorioImagens = resolve(process.cwd(), env.APP_STORAGE_ROOT, "imagens");
   private readonly diretorioBackups = resolve(process.cwd(), env.APP_STORAGE_ROOT, "backups", "imagens");
 
-  private obterCredenciaisDrive() {
-    const json = env.APP_BACKUP_IMAGES_SERVICE_ACCOUNT_JSON?.trim();
-    if (!json) return null;
+  private criarClienteOAuth() {
+    const clientId = env.APP_BACKUP_IMAGES_GOOGLE_CLIENT_ID?.trim();
+    const clientSecret = env.APP_BACKUP_IMAGES_GOOGLE_CLIENT_SECRET?.trim();
+    const refreshToken = env.APP_BACKUP_IMAGES_REFRESH_TOKEN?.trim();
 
-    try {
-      const parsed = JSON.parse(json) as ServiceAccountJson;
-      if (!parsed.client_email || !parsed.private_key) {
-        throw new Error("Credenciais do Google Drive incompletas.");
-      }
-      return {
-        clientEmail: parsed.client_email,
-        privateKey: parsed.private_key.replace(/\\n/g, "\n")
-      };
-    } catch (error) {
-      throw new AppError(
-        error instanceof Error
-          ? `Nao foi possivel ler APP_BACKUP_IMAGES_SERVICE_ACCOUNT_JSON: ${error.message}`
-          : "Nao foi possivel ler as credenciais do Google Drive.",
-        500
-      );
+    if (!clientId || !clientSecret || !refreshToken) {
+      return null;
     }
+
+    const client = new OAuth2Client(clientId, clientSecret);
+    client.setCredentials({ refresh_token: refreshToken });
+    return client;
   }
 
   private async criarPacoteLocal() {
@@ -121,16 +107,10 @@ export class BackupImagensService {
       return { uploaded: false, reason: "Pasta do Google Drive nao configurada." };
     }
 
-    const credenciais = this.obterCredenciaisDrive();
-    if (!credenciais) {
-      return { uploaded: false, reason: "Credenciais do Google Drive nao configuradas." };
+    const client = this.criarClienteOAuth();
+    if (!client) {
+      return { uploaded: false, reason: "Credenciais OAuth do Google Drive nao configuradas." };
     }
-
-    const client = new JWT({
-      email: credenciais.clientEmail,
-      key: credenciais.privateKey,
-      scopes: ["https://www.googleapis.com/auth/drive.file"]
-    });
 
     const { token } = await client.getAccessToken();
     if (!token) {
@@ -156,7 +136,7 @@ export class BackupImagensService {
     ]);
 
     const resposta = await fetch(
-      "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name",
+      "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,name",
       {
         method: "POST",
         headers: {

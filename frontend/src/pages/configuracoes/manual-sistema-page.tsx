@@ -478,7 +478,9 @@ const secoesManual: ManualSecao[] = [
           "As ações mudam conforme a aba para evitar botões genéricos e reduzir clique desnecessário durante a operação.",
           "A tela Fotos de eventos agora lista, cadastra, atualiza e exclui eventos, fotos, capa, tags e galeria sempre dentro do tenant autenticado, impedindo mistura de álbuns entre instituições.",
           "A importação por pasta agora interpreta cada pasta como um evento separado, facilitando organizar o backup e o cadastro em lote sem misturar álbuns diferentes.",
-          "As imagens do sistema passam por backup diário em pacote compactado quando o agendamento e as credenciais do Google Drive estiverem configurados."
+          "As imagens do sistema passam por backup diário em pacote compactado às 23:30 quando o agendamento e as credenciais OAuth do Google Drive estiverem configurados.",
+          "Para habilitar o envio ao Drive, configure o id da pasta, o client id, o client secret e o refresh token de uma conta Google dedicada ao backup.",
+          "A conta usada no OAuth precisa ter a pasta do Drive compartilhada com permissão de edição para receber os pacotes compactados."
         ]
       },
       {

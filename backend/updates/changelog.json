@@ -1,6 +1,18 @@
 {
     "entries":  [
                     {
+                        "version":  "1.00.564",
+                        "releaseDate":  "2026-06-28",
+                        "title":  "Backup de imagens via OAuth",
+                        "description":  "O backup diário das imagens foi ajustado para usar OAuth com refresh token e executar sempre às 23:30.",
+                        "changes":  [
+                                        "O envio para o Google Drive passou a usar OAuth com client id, client secret e refresh token, sem depender de chave JSON de service account.",
+                                        "O horário diário foi padronizado para 23:30 no scheduler do backend.",
+                                        "A documentação do sistema foi atualizada com a nova forma de configuração."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.563",
                         "releaseDate":  "2026-06-28",
                         "title":  "Importação em lote e backup diário de imagens",
