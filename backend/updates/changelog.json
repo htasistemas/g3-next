@@ -1,6 +1,18 @@
 {
     "entries":  [
                     {
+                        "version":  "1.00.575",
+                        "releaseDate":  "2026-06-28",
+                        "title":  "Cards de resumo na visão geral",
+                        "description":  "Empréstimos para eventos e Catálogo e vagas de matrículas voltaram ao formato padrão dos cards de resumo.",
+                        "changes":  [
+                                        "Os dois indicadores passaram a aparecer como cards simples na grade principal da Visão geral.",
+                                        "O layout especial em duas colunas foi removido para manter o mesmo padrão visual de Itens no patrimônio.",
+                                        "A leitura operacional continua com navegação por clique para as telas correspondentes."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.574",
                         "releaseDate":  "2026-06-28",
                         "title":  "Cards lado a lado na visão geral",

@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.574",
+  "latestVersion": "1.00.575",
   "releaseDate": "2026-06-28",
-  "description": "A visão geral passou a exibir Catálogo e vagas de matrículas ao lado de Empréstimos para eventos.",
+  "description": "A visão geral passou a exibir Empréstimos para eventos e Catálogo e vagas de matrículas no formato dos cards de resumo.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.574",
+  "minCompatibleVersion": "1.00.575",
   "releaseType": "stable"
 }
 

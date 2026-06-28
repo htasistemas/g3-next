@@ -16,7 +16,6 @@ import {
 import { ResponsiveChart } from "@/components/charts/responsive-chart";
 import {
   Archive,
-  AlertTriangle,
   BanknoteArrowUp,
   BriefcaseBusiness,
   Building2,
@@ -95,7 +94,7 @@ export function VisaoGeralPage() {
     {},
     { autoRefresh: true }
   );
-  const { data: matriculasResumoData, isFetching: atualizandoResumoMatriculas } = useQuery({
+  const { data: matriculasResumoData } = useQuery({
     queryKey: ["dashboard", "visao-geral", "matriculas-resumo", usuario?.tenant_id ?? "sem-tenant"],
     queryFn: () => matriculasService.obterResumoCatalogo(),
     enabled: !!usuario,
@@ -212,6 +211,15 @@ export function VisaoGeralPage() {
     };
   }, [fotosEventosResumoData]);
 
+  const resumoCatalogoVagas = useMemo(() => {
+    return {
+      cursosNoCatalogo: matriculasResumoData?.cursosNoCatalogo ?? 0,
+      totalVagas: matriculasResumoData?.totalVagas ?? 0,
+      vagasDisponiveis: matriculasResumoData?.vagasDisponiveis ?? 0,
+      inscricoesAtivas: matriculasResumoData?.inscricoesAtivas ?? 0
+    };
+  }, [matriculasResumoData]);
+
   const cardsResumo = useMemo(() => {
     if (!data) return [];
     return [
@@ -291,6 +299,20 @@ export function VisaoGeralPage() {
         hint: "Bens patrimoniais cadastrados",
         icone: Archive,
         rota: "/setor-administrativo/patrimonio"
+      },
+      {
+        label: "Empréstimos para eventos",
+        valor: String(resumoEventosEmprestimos.ativos),
+        hint: "Eventos ativos no momento",
+        icone: CalendarDays,
+        rota: "/setor-administrativo/emprestimo-eventos"
+      },
+      {
+        label: "Catálogo e vagas de matrículas",
+        valor: `${resumoCatalogoVagas.cursosNoCatalogo} / ${resumoCatalogoVagas.vagasDisponiveis}`,
+        hint: "Cursos no catálogo / vagas disponíveis",
+        icone: BriefcaseBusiness,
+        rota: "/atendimentos/matriculas"
       }
     ];
   }, [
@@ -302,17 +324,11 @@ export function VisaoGeralPage() {
     resumoFotosEventos.totalAlbuns,
     resumoFotosEventos.totalFotos,
     termosVencidos,
-    totalMotoristasAutorizados
+    totalMotoristasAutorizados,
+    resumoEventosEmprestimos.ativos,
+    resumoCatalogoVagas.cursosNoCatalogo,
+    resumoCatalogoVagas.vagasDisponiveis
   ]);
-
-  const resumoCatalogoVagas = useMemo(() => {
-    return {
-      cursosNoCatalogo: matriculasResumoData?.cursosNoCatalogo ?? 0,
-      totalVagas: matriculasResumoData?.totalVagas ?? 0,
-      vagasDisponiveis: matriculasResumoData?.vagasDisponiveis ?? 0,
-      inscricoesAtivas: matriculasResumoData?.inscricoesAtivas ?? 0
-    };
-  }, [matriculasResumoData]);
 
   return (
     <main className={classesTelaPadraoBeneficiario.container}>
@@ -374,100 +390,6 @@ export function VisaoGeralPage() {
                     </div>
                   </button>
                 ))}
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-                <button
-                  type="button"
-                  className={`${classeCardVerdeInterativo} w-full px-3 py-3 text-left`}
-                  onClick={() => navigate("/setor-administrativo/emprestimo-eventos")}
-                >
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                    <div className="flex items-start gap-3">
-                      <span className="rounded-md bg-[var(--g3-primary-soft)] p-2 text-[var(--g3-active)]">
-                        <CalendarDays className="h-4 w-4" />
-                      </span>
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
-                          Empréstimos para eventos
-                        </p>
-                        <p className="mt-1 text-sm text-[var(--g3-muted)]">
-                          Reservas ativas, eventos futuros e devoluções vencidas.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="grid min-w-full grid-cols-1 gap-2 sm:grid-cols-3 lg:min-w-[520px]">
-                      <div className="rounded-lg border border-emerald-100 bg-white/70 px-3 py-2">
-                        <p className="text-xs text-[var(--g3-muted)]">Eventos ativos</p>
-                        <p className="text-xl font-semibold text-emerald-700">{resumoEventosEmprestimos.ativos}</p>
-                      </div>
-                      <div className="rounded-lg border border-sky-100 bg-white/70 px-3 py-2">
-                        <p className="text-xs text-[var(--g3-muted)]">Eventos futuros</p>
-                        <p className="text-xl font-semibold text-sky-700">{resumoEventosEmprestimos.futuros}</p>
-                      </div>
-                      <div className="rounded-lg border border-red-100 bg-white/70 px-3 py-2">
-                        <div className="flex items-center gap-1 text-xs text-[var(--g3-muted)]">
-                          <AlertTriangle className="h-3.5 w-3.5 text-red-600" />
-                          Eventos em atraso
-                        </div>
-                        <p className="text-xl font-semibold text-red-700">{resumoEventosEmprestimos.atraso}</p>
-                      </div>
-                    </div>
-                  </div>
-                </button>
-
-                <div className={`${classeCardVerde} p-3`}>
-                  <div className="mb-3 flex items-center justify-between gap-2">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
-                      Catálogo e vagas de matrículas
-                    </p>
-                    {atualizandoResumoMatriculas && (
-                      <span className="text-[11px] text-[var(--g3-muted)]">Atualizando...</span>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    <button
-                      type="button"
-                      className={`${classeCardVerdeInterativo} rounded-lg p-3 text-left`}
-                      onClick={() => navigate("/atendimentos/matriculas")}
-                    >
-                      <p className="text-xs text-[var(--g3-muted)]">Cursos no catálogo</p>
-                      <p className="text-lg font-semibold text-[var(--g3-foreground)]">
-                        {resumoCatalogoVagas.cursosNoCatalogo}
-                      </p>
-                    </button>
-                    <button
-                      type="button"
-                      className={`${classeCardVerdeInterativo} rounded-lg p-3 text-left`}
-                      onClick={() => navigate("/atendimentos/matriculas")}
-                    >
-                      <p className="text-xs text-[var(--g3-muted)]">Total de vagas</p>
-                      <p className="text-lg font-semibold text-[var(--g3-foreground)]">
-                        {resumoCatalogoVagas.totalVagas}
-                      </p>
-                    </button>
-                    <button
-                      type="button"
-                      className={`${classeCardVerdeInterativo} rounded-lg p-3 text-left`}
-                      onClick={() => navigate("/atendimentos/matriculas")}
-                    >
-                      <p className="text-xs text-[var(--g3-muted)]">Vagas disponíveis</p>
-                      <p className="text-lg font-semibold text-emerald-700">
-                        {resumoCatalogoVagas.vagasDisponiveis}
-                      </p>
-                    </button>
-                    <button
-                      type="button"
-                      className={`${classeCardVerdeInterativo} rounded-lg p-3 text-left`}
-                      onClick={() => navigate("/atendimentos/matriculas")}
-                    >
-                      <p className="text-xs text-[var(--g3-muted)]">Inscrições ativas</p>
-                      <p className="text-lg font-semibold text-[var(--g3-foreground)]">
-                        {resumoCatalogoVagas.inscricoesAtivas}
-                      </p>
-                    </button>
-                  </div>
-                </div>
               </div>
 
               <div className="space-y-4">
