@@ -2373,8 +2373,8 @@ export function PatrimonioPage() {
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm">Identificação patrimonial</CardTitle>
               </CardHeader>
-              <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-                <div className="space-y-1">
+              <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-5 xl:items-start">
+                <div className="space-y-1 xl:col-span-1">
                   <Label>Unidade</Label>
                   <Select
                     value={form.unidadeId ?? ""}
@@ -2414,7 +2414,7 @@ export function PatrimonioPage() {
                   )}
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1 xl:col-span-1">
                   <Label>Número patrimonial *</Label>
                   <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2">
                     <Input
@@ -2456,10 +2456,14 @@ export function PatrimonioPage() {
                     <p className="text-xs text-rose-700">{erros.numeroPatrimonio}</p>
                   ) : (
                     <div className="space-y-1 text-xs text-[var(--g3-muted)]">
-                    <p>Último registrado: {ultimoNumeroPatrimonial ? formatarNumeroSequencial(ultimoNumeroPatrimonial) : "---"} • Próximo sugerido: {proximoNumeroPatrimonial}</p>
-                    {mostrarNumerosVagos ? (
-                      <div className="rounded-md border border-[var(--g3-border)] bg-[var(--g3-card)] p-2">
-                        {numerosPatrimoniaisVagos.length ? (
+                      <p>
+                        Último registrado:{" "}
+                        {ultimoNumeroPatrimonial ? formatarNumeroSequencial(ultimoNumeroPatrimonial) : "---"} •
+                        Próximo sugerido: {proximoNumeroPatrimonial}
+                      </p>
+                      {mostrarNumerosVagos ? (
+                        <div className="rounded-md border border-[var(--g3-border)] bg-[var(--g3-card)] p-2">
+                          {numerosPatrimoniaisVagos.length ? (
                             <div className="flex max-h-24 flex-wrap gap-1 overflow-auto">
                               {numerosPatrimoniaisVagos.map((numero) => (
                                 <button
@@ -2479,9 +2483,9 @@ export function PatrimonioPage() {
                             <p>Nenhum número vago encontrado na sequência atual.</p>
                           )}
                         </div>
-                    ) : null}
-                  </div>
-                )}
+                      ) : null}
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-1 xl:col-span-3">
                   <Label>Nome do bem *</Label>

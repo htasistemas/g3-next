@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.570",
+  "latestVersion": "1.00.571",
   "releaseDate": "2026-06-28",
-  "description": "A aba Localização e custódia de patrimônio passou a listar todas as salas cadastradas da unidade.",
+  "description": "A aba Cadastro patrimonial teve o alinhamento visual dos campos principais ajustado.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.570",
+  "minCompatibleVersion": "1.00.571",
   "releaseType": "stable"
 }
 

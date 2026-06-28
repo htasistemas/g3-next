@@ -1,6 +1,18 @@
 {
     "entries":  [
                     {
+                        "version":  "1.00.571",
+                        "releaseDate":  "2026-06-28",
+                        "title":  "Alinhamento da identificação patrimonial",
+                        "description":  "A aba Cadastro patrimonial passou a exibir os campos principais com alinhamento visual mais consistente.",
+                        "changes":  [
+                                        "Os campos Unidade, Número patrimonial e Nome do bem receberam ajuste de grade para manter alinhamento visual no desktop.",
+                                        "A área de apoio do número patrimonial foi mantida abaixo do campo, sem desalinhamento do restante da linha.",
+                                        "A tela continua responsiva em telas menores."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.570",
                         "releaseDate":  "2026-06-28",
                         "title":  "Salas da unidade visíveis no patrimônio",
