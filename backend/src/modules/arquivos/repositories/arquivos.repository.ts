@@ -290,13 +290,21 @@ export class ArquivosRepository {
     return rows[0] ?? null;
   }
 
-  async vincularEntidadePorCaminho(caminhoArquivo: string, entidadeId: bigint, tenantId?: string) {
+  async vincularEntidadePorCaminho(
+    caminhoArquivo: string,
+    entidadeId: bigint,
+    tenantId?: string,
+    novoCaminhoArquivo?: string,
+    novoThumbnailCaminho?: string
+  ) {
     await ensureArquivosEstrutura(prisma);
 
     await prisma.$executeRaw(Prisma.sql`
       UPDATE arquivos
       SET entidade_id = ${entidadeId},
           tenant_id = COALESCE(tenant_id, ${tenantId ? Prisma.sql`${tenantId}::uuid` : Prisma.sql`NULL`}),
+          ${novoCaminhoArquivo ? Prisma.sql`caminho_arquivo = ${novoCaminhoArquivo},` : Prisma.empty}
+          ${novoThumbnailCaminho !== undefined ? Prisma.sql`thumbnail_caminho = ${novoThumbnailCaminho},` : Prisma.empty}
           atualizado_em = NOW()
       WHERE caminho_arquivo = ${caminhoArquivo}
     `);

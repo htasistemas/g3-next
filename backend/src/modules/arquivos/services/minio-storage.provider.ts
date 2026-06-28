@@ -1,6 +1,7 @@
 import { PassThrough, Readable } from "node:stream";
 import {
   CreateBucketCommand,
+  CopyObjectCommand,
   type BucketLocationConstraint,
   DeleteObjectCommand,
   GetObjectCommand,
@@ -110,6 +111,29 @@ export class MinioStorageProvider implements StorageProvider {
       );
     } catch {
       throw new AppError("Nao foi possivel gravar o arquivo no storage persistente.", 500);
+    }
+  }
+
+  async mover(caminhoOrigem: string, caminhoDestino: string) {
+    await this.ensureReady();
+    const sourceKey = this.normalizePath(caminhoOrigem);
+    const targetKey = this.normalizePath(caminhoDestino);
+    try {
+      await this.client.send(
+        new CopyObjectCommand({
+          Bucket: this.bucket,
+          CopySource: `${this.bucket}/${encodeURIComponent(sourceKey).replace(/%2F/g, "/")}`,
+          Key: targetKey
+        })
+      );
+      await this.client.send(
+        new DeleteObjectCommand({
+          Bucket: this.bucket,
+          Key: sourceKey
+        })
+      );
+    } catch {
+      throw new AppError("Nao foi possivel mover o arquivo no storage persistente.", 500);
     }
   }
 

@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.560",
-  "releaseDate": "2026-06-27",
-  "description": "Patrimonio passou a vincular a unidade por ID e manter a validacao por unidade.",
+  "latestVersion": "1.00.561",
+  "releaseDate": "2026-06-28",
+  "description": "As imagens do sistema passaram a usar uma arvore unica de storage por tipo e entidade.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.560",
+  "minCompatibleVersion": "1.00.561",
   "releaseType": "stable",
   "downloadUrl": null
 }

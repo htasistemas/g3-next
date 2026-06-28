@@ -1,6 +1,18 @@
 {
     "entries":  [
                     {
+                        "version":  "1.00.561",
+                        "releaseDate":  "2026-06-28",
+                        "title":  "Imagens centralizadas em storage unico",
+                        "description":  "As imagens do sistema passaram a seguir uma unica arvore de storage, separada por tipo e entidade, facilitando backup e organizacao.",
+                        "changes":  [
+                                        "As fotos do sistema agora sao gravadas em /storage/imagens, com subpastas por tipo de imagem e identificador da entidade.",
+                                        "O storage passou a reposicionar imagens pendentes para a pasta definitiva quando a entidade recebe identificador.",
+                                        "O manual do sistema e a versao oficial foram atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.560",
                         "releaseDate":  "2026-06-27",
                         "title":  "Fotos de eventos com tenant corrigido",

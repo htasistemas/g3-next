@@ -62,22 +62,15 @@ const attachmentExtensions = [...documentExtensions, "mp4", "webm", "mov"];
 const attachmentMimeTypes = [...documentMimeTypes, "video/mp4", "video/webm", "video/quicktime"];
 
 export const requiredStorageDirectories = [
-  "beneficiarios/fotos",
   "beneficiarios/documentos",
   "banco-empregos/candidatos/documentos",
-  "biblioteca/capas",
-  "colaboradores/fotos",
   "colaboradores/documentos",
   "instituicoes/documentos",
   "doacoes/comprovantes",
   "cursos/comprovantes",
   "almoxarifado/anexos",
-  "veiculos/fotos",
   "veiculos/documentos",
   "geral/outros",
-  "instituicoes/imagens",
-  "cursos/imagens",
-  "eventos/fotos",
   "chamados-tecnicos/anexos",
   "ocorrencias/anexos",
   "oficios/documentos",
@@ -85,14 +78,30 @@ export const requiredStorageDirectories = [
   "compras/anexos",
   "contabilidade/anexos",
   "captacao/doadores/anexos",
-  "captacao/campanhas/banners"
+  "captacao/campanhas/banners",
+  "imagens/beneficiarios",
+  "imagens/beneficiarios/thumbs",
+  "imagens/biblioteca",
+  "imagens/biblioteca/thumbs",
+  "imagens/colaboradores",
+  "imagens/colaboradores/thumbs",
+  "imagens/instituicoes",
+  "imagens/instituicoes/thumbs",
+  "imagens/cursos",
+  "imagens/cursos/thumbs",
+  "imagens/veiculos",
+  "imagens/veiculos/thumbs",
+  "imagens/eventos",
+  "imagens/eventos/thumbs",
+  "imagens/captacao/campanhas",
+  "imagens/captacao/campanhas/thumbs"
 ] as const;
 
 export const storagePolicies: Record<StorageScopeKey, StoragePolicy> = {
   beneficiario_foto: {
     entidadeTipo: "beneficiario",
     categoria: "foto",
-    subdirectory: "beneficiarios/fotos",
+    subdirectory: "imagens/beneficiarios",
     allowedExtensions: imageExtensions,
     allowedMimeTypes: imageMimeTypes,
     maxSizeBytes: 5 * 1024 * 1024,
@@ -120,7 +129,7 @@ export const storagePolicies: Record<StorageScopeKey, StoragePolicy> = {
   biblioteca_capa: {
     entidadeTipo: "biblioteca_livro",
     categoria: "capa",
-    subdirectory: "biblioteca/capas",
+    subdirectory: "imagens/biblioteca",
     allowedExtensions: imageExtensions,
     allowedMimeTypes: imageMimeTypes,
     maxSizeBytes: 8 * 1024 * 1024,
@@ -130,7 +139,7 @@ export const storagePolicies: Record<StorageScopeKey, StoragePolicy> = {
   colaborador_foto: {
     entidadeTipo: "colaborador",
     categoria: "foto",
-    subdirectory: "colaboradores/fotos",
+    subdirectory: "imagens/colaboradores",
     allowedExtensions: imageExtensions,
     allowedMimeTypes: imageMimeTypes,
     maxSizeBytes: 5 * 1024 * 1024,
@@ -140,7 +149,7 @@ export const storagePolicies: Record<StorageScopeKey, StoragePolicy> = {
   colaborador_face: {
     entidadeTipo: "colaborador",
     categoria: "face",
-    subdirectory: "colaboradores/fotos",
+    subdirectory: "imagens/colaboradores",
     allowedExtensions: imageExtensions,
     allowedMimeTypes: imageMimeTypes,
     maxSizeBytes: 5 * 1024 * 1024,
@@ -168,7 +177,7 @@ export const storagePolicies: Record<StorageScopeKey, StoragePolicy> = {
   instituicao_imagem: {
     entidadeTipo: "instituicao",
     categoria: "imagem",
-    subdirectory: "instituicoes/imagens",
+    subdirectory: "imagens/instituicoes",
     allowedExtensions: imageExtensions,
     allowedMimeTypes: imageMimeTypes,
     maxSizeBytes: 8 * 1024 * 1024,
@@ -196,7 +205,7 @@ export const storagePolicies: Record<StorageScopeKey, StoragePolicy> = {
   curso_imagem: {
     entidadeTipo: "curso",
     categoria: "imagem",
-    subdirectory: "cursos/imagens",
+    subdirectory: "imagens/cursos",
     allowedExtensions: imageExtensions,
     allowedMimeTypes: imageMimeTypes,
     maxSizeBytes: 8 * 1024 * 1024,
@@ -215,7 +224,7 @@ export const storagePolicies: Record<StorageScopeKey, StoragePolicy> = {
   veiculo_foto: {
     entidadeTipo: "controle_veiculo",
     categoria: "foto",
-    subdirectory: "veiculos/fotos",
+    subdirectory: "imagens/veiculos",
     allowedExtensions: imageExtensions,
     allowedMimeTypes: imageMimeTypes,
     maxSizeBytes: 8 * 1024 * 1024,
@@ -234,7 +243,7 @@ export const storagePolicies: Record<StorageScopeKey, StoragePolicy> = {
   evento_foto: {
     entidadeTipo: "evento",
     categoria: "foto",
-    subdirectory: "eventos/fotos",
+    subdirectory: "imagens/eventos",
     allowedExtensions: imageExtensions,
     allowedMimeTypes: imageMimeTypes,
     maxSizeBytes: 8 * 1024 * 1024,
@@ -307,7 +316,7 @@ export const storagePolicies: Record<StorageScopeKey, StoragePolicy> = {
   captacao_campanha_banner: {
     entidadeTipo: "captacao_campanha",
     categoria: "banner",
-    subdirectory: "captacao/campanhas/banners",
+    subdirectory: "imagens/captacao/campanhas",
     allowedExtensions: imageExtensions,
     allowedMimeTypes: imageMimeTypes,
     maxSizeBytes: 10 * 1024 * 1024,

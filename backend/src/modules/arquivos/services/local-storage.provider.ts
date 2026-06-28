@@ -1,5 +1,5 @@
 import { createReadStream } from "node:fs";
-import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
 import { env } from "../../../config/env.js";
 import { AppError } from "../../../shared/errors/app-error.js";
@@ -57,6 +57,15 @@ export class LocalStorageProvider implements StorageProvider {
         500
       );
     }
+  }
+
+  async mover(caminhoOrigem: string, caminhoDestino: string) {
+    await this.ensureReady();
+    const origem = this.resolveAbsolutePath(caminhoOrigem);
+    const destino = this.resolveAbsolutePath(caminhoDestino);
+    await mkdir(dirname(destino), { recursive: true });
+    await rm(destino, { force: true });
+    await rename(origem, destino);
   }
 
   async remover(caminhoArquivo: string) {

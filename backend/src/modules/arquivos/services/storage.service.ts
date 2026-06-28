@@ -5,7 +5,7 @@ import { toStringId } from "../../../utils/string-utils.js";
 import type { ArquivoMetadataRow } from "../arquivos.types.js";
 import { ArquivosRepository } from "../repositories/arquivos.repository.js";
 import type { StorageScopeKey } from "./storage-policy.js";
-import { getStoragePolicy } from "./storage-policy.js";
+import { getStoragePolicy, storagePolicies } from "./storage-policy.js";
 import { getStorageProvider } from "./storage-factory.js";
 import {
   detectarMimeTypePorAssinatura,
@@ -116,10 +116,39 @@ export class StorageService {
   }
 
   async vincularEntidade(caminhoArquivo: string, entidadeId: bigint, tenantId?: string) {
-    await this.repository.vincularEntidadePorCaminho(
-      this.provider.normalizePath(caminhoArquivo),
+    const caminhoNormalizado = this.provider.normalizePath(caminhoArquivo);
+    const arquivo = await this.repository.buscarAtivoPorCaminho(caminhoNormalizado, tenantId);
+    if (!arquivo) {
+      await this.repository.vincularEntidadePorCaminho(caminhoNormalizado, entidadeId, tenantId);
+      return;
+    }
+
+    const policy = this.obterPolicyDoArquivo(arquivo);
+    const novoCaminhoArquivo = this.reescreverCaminhoImagem(
+      caminhoNormalizado,
+      policy,
       entidadeId,
-      tenantId
+      false
+    );
+    const novoThumbnailCaminho = arquivo.thumbnail_caminho
+      ? this.reescreverCaminhoImagem(arquivo.thumbnail_caminho, policy, entidadeId, true)
+      : undefined;
+
+    if (novoCaminhoArquivo !== caminhoNormalizado) {
+      await this.provider.mover(caminhoNormalizado, novoCaminhoArquivo);
+      if (arquivo.thumbnail_caminho && novoThumbnailCaminho && novoThumbnailCaminho !== arquivo.thumbnail_caminho) {
+        await this.provider.mover(arquivo.thumbnail_caminho, novoThumbnailCaminho);
+      }
+    }
+
+    await this.repository.vincularEntidadePorCaminho(
+      caminhoNormalizado,
+      entidadeId,
+      tenantId,
+      novoCaminhoArquivo !== caminhoNormalizado ? novoCaminhoArquivo : undefined,
+      novoThumbnailCaminho && arquivo.thumbnail_caminho !== novoThumbnailCaminho
+        ? novoThumbnailCaminho
+        : undefined
     );
   }
 
@@ -274,11 +303,16 @@ export class StorageService {
       120
     );
     const fileName = `${uniqueName}.${extensaoInferida}`;
-    const relativeDir = `${policy.subdirectory}/${data.getFullYear()}/${String(data.getMonth() + 1).padStart(2, "0")}`;
+    const entitySegment = policy.imageOnly ? (input.entidadeId ? toStringId(input.entidadeId) : "pendente") : undefined;
+    const relativeDir = policy.imageOnly
+      ? `${policy.subdirectory}/${entitySegment}/${data.getFullYear()}/${String(data.getMonth() + 1).padStart(2, "0")}`
+      : `${policy.subdirectory}/${data.getFullYear()}/${String(data.getMonth() + 1).padStart(2, "0")}`;
     const caminhoArquivo = normalizarCaminhoLogico(`${relativeDir}/${fileName}`);
     const thumbnailCaminho = thumbnailBuffer
       ? normalizarCaminhoLogico(
-          `${policy.subdirectory}/thumbs/${data.getFullYear()}/${String(data.getMonth() + 1).padStart(2, "0")}/${fileName}`
+          policy.imageOnly
+            ? `${policy.subdirectory}/thumbs/${entitySegment}/${data.getFullYear()}/${String(data.getMonth() + 1).padStart(2, "0")}/${fileName}`
+            : `${policy.subdirectory}/thumbs/${data.getFullYear()}/${String(data.getMonth() + 1).padStart(2, "0")}/${fileName}`
         )
       : undefined;
 
@@ -371,5 +405,35 @@ export class StorageService {
       throw new AppError("Identificador de arquivo invalido.", 400);
     }
     return BigInt(parsed);
+  }
+
+  private obterPolicyDoArquivo(arquivo: ArquivoMetadataRow) {
+    const policy = Object.values(storagePolicies).find(
+      (item) => item.entidadeTipo === arquivo.entidade_tipo && item.categoria === arquivo.categoria
+    );
+    if (!policy) {
+      throw new AppError("Politica de storage do arquivo nao encontrada.", 400);
+    }
+    return policy;
+  }
+
+  private reescreverCaminhoImagem(
+    caminhoArquivo: string,
+    policy: { subdirectory: string; imageOnly?: boolean },
+    entidadeId: bigint,
+    thumb = false
+  ) {
+    if (!policy.imageOnly) return caminhoArquivo;
+
+    const entitySegment = toStringId(entidadeId);
+    const prefix = thumb ? `${policy.subdirectory}/thumbs/pendente/` : `${policy.subdirectory}/pendente/`;
+    if (!caminhoArquivo.startsWith(prefix)) {
+      return caminhoArquivo;
+    }
+
+    return caminhoArquivo.replace(
+      prefix,
+      thumb ? `${policy.subdirectory}/thumbs/${entitySegment}/` : `${policy.subdirectory}/${entitySegment}/`
+    );
   }
 }

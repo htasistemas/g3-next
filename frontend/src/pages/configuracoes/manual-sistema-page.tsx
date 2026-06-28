@@ -472,7 +472,8 @@ const secoesManual: ManualSecao[] = [
           "A capa do evento é persistida por vínculo com a foto cadastrada no álbum e pode ser substituída sem duplicar imagem ou deixar referência órfã.",
           "Ao carregar a listagem, eventos com fotos cadastradas e capa ausente ou inválida são compatibilizados para voltar a exibir imagem no mural.",
           "A remoção da foto principal limpa a capa atual do evento e exige nova definição visual quando necessário.",
-          "As fotos ficam armazenadas no storage persistente do sistema, com garantia de portabilidade entre máquinas e backups; o banco guarda apenas os metadados e caminhos do arquivo.",
+          "As imagens ficam armazenadas em uma arvore unica do storage persistente, organizada em /storage/imagens por tipo e por entidade; o banco guarda apenas os metadados e caminhos do arquivo.",
+          "As fotos de evento usam a pasta /storage/imagens/eventos e sao movidas para a pasta definitiva da entidade quando o cadastro recebe identificador valido, mantendo backups e organizacao consistentes.",
           "As ações mudam conforme a aba para evitar botões genéricos e reduzir clique desnecessário durante a operação.",
           "A tela Fotos de eventos agora lista, cadastra, atualiza e exclui eventos, fotos, capa, tags e galeria sempre dentro do tenant autenticado, impedindo mistura de álbuns entre instituições.",
           "A importação por pasta permite organizar imagens no computador antes do envio e lançar várias fotos de uma só vez no álbum do evento."
