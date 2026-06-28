@@ -1,6 +1,18 @@
 {
     "entries":  [
                     {
+                        "version":  "1.00.572",
+                        "releaseDate":  "2026-06-28",
+                        "title":  "Visão geral com empréstimos lado a lado",
+                        "description":  "A visão geral passou a exibir o card de empréstimos para eventos ao lado dos cartões patrimoniais.",
+                        "changes":  [
+                                        "O card de empréstimos para eventos saiu do bloco largo e passou a integrar a grade principal da visão geral.",
+                                        "O cartão ficou ao lado de Itens no patrimônio na disposição do dashboard.",
+                                        "A navegação para a tela de empréstimos para eventos permanece disponível ao clicar no card."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.571",
                         "releaseDate":  "2026-06-28",
                         "title":  "Alinhamento da identificação patrimonial",

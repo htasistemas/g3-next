@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.571",
+  "latestVersion": "1.00.572",
   "releaseDate": "2026-06-28",
-  "description": "A aba Cadastro patrimonial teve o alinhamento visual dos campos principais ajustado.",
+  "description": "A visão geral passou a mostrar o card de empréstimos para eventos ao lado dos cartões patrimoniais.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.571",
+  "minCompatibleVersion": "1.00.572",
   "releaseType": "stable",
   "downloadUrl": null
 }
