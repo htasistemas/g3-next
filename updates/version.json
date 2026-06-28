@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.567",
+  "latestVersion": "1.00.568",
   "releaseDate": "2026-06-28",
-  "description": "A listagem de patrimônio passou a considerar também o legado com unidade textual e tenant ausente.",
+  "description": "A aba Localização e custódia de patrimônio passou a permitir a troca correta de unidade.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.567",
+  "minCompatibleVersion": "1.00.568",
   "releaseType": "stable",
   "downloadUrl": null
 }

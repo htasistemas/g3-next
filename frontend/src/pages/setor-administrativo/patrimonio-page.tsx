@@ -2698,17 +2698,23 @@ export function PatrimonioPage() {
                     <Select
                       value={unidadeLocalizacaoSelecionadaId}
                       onChange={(event) =>
-                        setForm((atual) => ({
-                          ...atual,
-                          unidade:
+                        {
+                          const valorSelecionado = event.target.value;
+                          const unidadeSelecionada =
+                            unidadesAssistenciais.find((unidade) => unidade.id_unidade === valorSelecionado) ??
                             unidadesAssistenciais.find(
-                              (unidade) =>
-                                unidade.id_unidade === event.target.value ||
-                                unidade.nome_fantasia === event.target.value
-                            )
-                              ?.nome_fantasia ?? atual.unidade,
-                          sala: ""
-                        }))
+                              (unidade) => unidade.nome_fantasia === valorSelecionado
+                            ) ??
+                            null;
+
+                          setForm((atual) => ({
+                            ...atual,
+                            unidadeId: unidadeSelecionada?.id_unidade ?? "",
+                            unidade: unidadeSelecionada?.nome_fantasia ?? atual.unidade,
+                            sala: ""
+                          }));
+                          setUnidadeLocalizacaoSelecionadaId(unidadeSelecionada?.id_unidade ?? valorSelecionado);
+                        }
                       }
                     >
                       <option value="">Selecione a unidade</option>

@@ -1,6 +1,18 @@
 {
     "entries":  [
                     {
+                        "version":  "1.00.568",
+                        "releaseDate":  "2026-06-28",
+                        "title":  "Localização patrimonial com troca de unidade",
+                        "description":  "A aba Localização e custódia passou a permitir a troca correta de unidade no cadastro do patrimônio.",
+                        "changes":  [
+                                        "O select de unidade da aba Localização e custódia passou a atualizar unidade e unidadeId ao mesmo tempo.",
+                                        "A sincronização automática deixou de reverter a unidade selecionada para o valor anterior.",
+                                        "A tela continua limpando a sala ao trocar de unidade para evitar vínculo incorreto."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.567",
                         "releaseDate":  "2026-06-28",
                         "title":  "Patrimônio legado voltado à listagem",

@@ -511,6 +511,7 @@ const secoesManual: ManualSecao[] = [
           "O campo Valor de aquisição usa máscara monetária brasileira e a estimativa contábil considera a data de aquisição, a taxa anual e a depreciação proporcional por meses.",
           "Na aba Localização e custódia, o card de conferência exibe Valor informado em verde quando o bem já tem valor de aquisição lançado, substituindo a referência ao histórico iniciado.",
           "Ao cadastrar um bem, informe unidade antes do número do patrimônio, depois nome, categoria, conservação, status, origem, responsável e demais dados de identificação. Novo cadastro sugere a unidade principal e permite selecionar qualquer unidade cadastrada. O número patrimonial é validado por unidade, então o mesmo código pode existir em unidades diferentes sem gerar conflito.",
+          "Na aba Localização e custódia, o campo Unidade pode ser trocado a qualquer momento; ao alterar a unidade, a sala é limpa e a seleção passa a seguir a unidade escolhida sem voltar para o valor anterior.",
           "Na aba Localização e custódia, o campo Unidade lista as unidades cadastradas em Cadastro de unidade assistencial e, ao selecionar uma delas, o campo Sala passa a listar apenas as salas de atendimento vinculadas àquela unidade.",
           "Use Registrar movimento para lançar movimentação, manutenção ou baixa, mantendo a trilha operacional do bem ao longo do tempo.",
           "Quando o tipo do movimento for Baixa, o sistema atualiza automaticamente o status do patrimônio para refletir a saída do item.",
