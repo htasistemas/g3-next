@@ -2546,17 +2546,18 @@ export function CadastroMatriculasPage() {
                     <table className="min-w-full table-fixed text-xs">
                       <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]">
                         <tr>
-                          <th className="w-[24%] px-2 py-2 text-left font-semibold">Beneficiário</th>
+                          <th className="w-[22%] px-2 py-2 text-left font-semibold">Beneficiário</th>
                           <th className="w-[14%] px-2 py-2 text-left font-semibold">CPF</th>
-                          <th className="w-[30%] px-2 py-2 text-left font-semibold">Curso / atendimento</th>
-                          <th className="w-[16%] px-2 py-2 text-left font-semibold">Data da inscrição</th>
-                          <th className="w-[16%] px-2 py-2 text-left font-semibold">Agendamento</th>
+                          <th className="w-[27%] px-2 py-2 text-left font-semibold">Curso / atendimento</th>
+                          <th className="w-[14%] px-2 py-2 text-left font-semibold">Data da inscrição</th>
+                          <th className="w-[14%] px-2 py-2 text-left font-semibold">Agendamento</th>
+                          <th className="w-[9%] px-2 py-2 text-left font-semibold">Profissional</th>
                         </tr>
                       </thead>
                       <tbody>
                         {carregandoLista ? (
                           <tr>
-                            <td className="px-2 py-4 text-center text-[var(--g3-muted)]" colSpan={5}>
+                            <td className="px-2 py-4 text-center text-[var(--g3-muted)]" colSpan={6}>
                               Carregando inscrições...
                             </td>
                           </tr>
@@ -2580,7 +2581,7 @@ export function CadastroMatriculasPage() {
                               >
                                 <td className="px-2 py-2 align-top">
                                   <div className="space-y-0.5 break-words">
-                                    <p className="font-medium text-[var(--g3-foreground)]">{obterPrimeiroNome(item.beneficiario_nome)}</p>
+                                    <p className="font-medium text-[var(--g3-foreground)]">{item.beneficiario_nome}</p>
                                     <p className="text-[11px] text-[var(--g3-muted)]">
                                       {item.telefone ? `Tel.: ${formatarTelefone(item.telefone)}` : "Tel.: ---"}
                                     </p>
@@ -2594,12 +2595,15 @@ export function CadastroMatriculasPage() {
                                     <span className="text-[11px] text-[var(--g3-muted)]">{agendamento}</span>
                                   </div>
                                 </td>
+                                <td className="px-2 py-2 align-top break-words">
+                                  {obterPrimeiroNome(item.profissional_nome)}
+                                </td>
                               </tr>
                             );
                           })
                         ) : (
                           <tr>
-                            <td className="px-2 py-4 text-center text-[var(--g3-muted)]" colSpan={5}>
+                            <td className="px-2 py-4 text-center text-[var(--g3-muted)]" colSpan={6}>
                               Nenhuma inscrição encontrada.
                             </td>
                           </tr>
