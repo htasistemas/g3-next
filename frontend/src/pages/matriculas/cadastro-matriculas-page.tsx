@@ -3439,6 +3439,7 @@ export function CadastroMatriculasPage() {
                             <tr>
                               <th className="px-3 py-2 text-left font-semibold">Beneficiário</th>
                               <th className="px-3 py-2 text-left font-semibold">CPF</th>
+                              <th className="px-3 py-2 text-left font-semibold">Telefone</th>
                               <th className="px-3 py-2 text-left font-semibold">Inscrição</th>
                               <th className="px-3 py-2 text-left font-semibold">Status</th>
                               <th className="px-3 py-2 text-left font-semibold">Agendamento</th>
@@ -3457,6 +3458,7 @@ export function CadastroMatriculasPage() {
                                 >
                                   <td className="px-3 py-2">{inscricao.beneficiario_nome}</td>
                                   <td className="px-3 py-2">{formatarCpf(inscricao.cpf)}</td>
+                                  <td className="px-3 py-2">{formatarTelefone(inscricao.telefone)}</td>
                                   <td className="px-3 py-2">{formatarData(inscricao.data_matricula)}</td>
                                   <td className="px-3 py-2">{formatarStatus(inscricao.status)}</td>
                                   <td className="px-3 py-2">
@@ -3479,7 +3481,7 @@ export function CadastroMatriculasPage() {
                               ))
                             ) : (
                               <tr>
-                                <td colSpan={7} className="px-3 py-4 text-center text-[var(--g3-muted)]">
+                                <td colSpan={8} className="px-3 py-4 text-center text-[var(--g3-muted)]">
                                   Nenhum inscrito listado para o curso ou atendimento selecionado.
                                 </td>
                               </tr>
