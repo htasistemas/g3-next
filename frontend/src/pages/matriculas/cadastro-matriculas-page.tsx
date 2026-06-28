@@ -745,8 +745,13 @@ export function CadastroMatriculasPage() {
 
         const nome = normalizarNomeComparacaoTexto(item.beneficiario_nome);
         const cpf = somenteDigitos(item.cpf);
+        const telefone = somenteDigitos(item.telefone);
 
-        return (termoNome && nome.includes(termoNome)) || (termoCpf && !!cpf && cpf.includes(termoCpf));
+        return (
+          (termoNome && nome.includes(termoNome)) ||
+          (termoCpf && !!cpf && cpf.includes(termoCpf)) ||
+          (termoCpf && !!telefone && telefone.includes(termoCpf))
+        );
       })
       .sort((a, b) => a.item.beneficiario_nome.localeCompare(b.item.beneficiario_nome, "pt-BR"))
       .slice(0, 20);
@@ -3715,6 +3720,7 @@ export function CadastroMatriculasPage() {
                                   <span className="font-medium text-[var(--g3-foreground)]">{item.beneficiario_nome}</span>
                                   <span className="block text-[11px] text-[var(--g3-muted)]">
                                     {formatarCpf(item.cpf)}
+                                    {item.telefone ? ` • Tel.: ${formatarTelefone(item.telefone)}` : " • Tel.: ---"}
                                     {item.data_agendada
                                       ? ` • Agendado em ${formatarData(item.data_agendada)} ${item.hora_agendada ?? ""}`.trim()
                                       : " • Sem agendamento"}
@@ -3734,6 +3740,9 @@ export function CadastroMatriculasPage() {
                             {inscricaoAgendaSelecionada.item.cpf
                               ? ` • CPF ${formatarCpf(inscricaoAgendaSelecionada.item.cpf)}`
                               : ""}
+                            {inscricaoAgendaSelecionada.item.telefone
+                              ? ` • Tel. ${formatarTelefone(inscricaoAgendaSelecionada.item.telefone)}`
+                              : " • Tel. ---"}
                           </p>
                         )}
                       </div>
