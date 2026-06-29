@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../../../database/prisma.js";
 import { AppError } from "../../../shared/errors/app-error.js";
 import { ensureMultiTenantStructure } from "../../multi-tenant/tenant-estrutura.service.js";
@@ -47,6 +48,40 @@ function mapRow(row: InstituicaoRow): InstituicaoResumo {
     criado_em: new Date(row.criado_em).toISOString(),
     atualizado_em: new Date(row.atualizado_em).toISOString()
   };
+}
+
+function identificarViolacaoUnicidadeInstituicao(error: unknown) {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError)) {
+    return null;
+  }
+
+  const rawCode = typeof error.meta?.code === "string" ? error.meta.code : undefined;
+  const rawMessage =
+    typeof error.meta?.message === "string" ? error.meta.message : error.message;
+
+  if (error.code !== "P2002" && !(error.code === "P2010" && rawCode === "23505")) {
+    return null;
+  }
+
+  const contexto = `${error.message} ${rawMessage}`.toLowerCase();
+
+  if (contexto.includes("cnpj")) {
+    return "Já existe uma instituição cadastrada com este CNPJ.";
+  }
+
+  if (contexto.includes("slug")) {
+    return "Já existe uma instituição cadastrada com este slug.";
+  }
+
+  if (contexto.includes("codigo") || contexto.includes("código")) {
+    return "Já existe uma instituição cadastrada com este código.";
+  }
+
+  if (contexto.includes("email")) {
+    return "Já existe uma instituição cadastrada com este e-mail.";
+  }
+
+  return "Já existe uma instituição cadastrada com os dados informados.";
 }
 
 export class InstituicoesRepository {
@@ -110,105 +145,114 @@ export class InstituicoesRepository {
     await this.ensureEstrutura();
     const senhaHash = input.admin_inicial?.senha ? await bcrypt.hash(input.admin_inicial.senha, 10) : null;
 
-    const rows = await prisma.$transaction(async (tx): Promise<InstituicaoRow[]> => {
-      const created = await tx.$queryRawUnsafe<InstituicaoRow[]>(
-        `
-        INSERT INTO instituicoes (
-          cnpj, razao_social, nome_fantasia, slug, codigo, email, telefone, endereco, plano, status, logo_url, cor_tema
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-        RETURNING
-          id::text AS id,
-          tenant_id::text AS tenant_id,
-          codigo,
-          cnpj,
-          razao_social,
-          nome_fantasia,
-          slug,
-          email,
-          telefone,
-          endereco,
-          plano,
-          status,
-          logo_url,
-          cor_tema,
-          0::bigint AS quantidade_usuarios,
-          NULL::timestamp AS ultimo_acesso_em,
-          criado_em,
-          atualizado_em
-        `,
-        input.cnpj,
-        input.razao_social,
-        input.nome_fantasia ?? null,
-        input.slug,
-        input.codigo ?? null,
-        input.email ?? null,
-        input.telefone ?? null,
-        input.endereco ?? null,
-        input.plano,
-        input.status,
-        input.logo_url ?? null,
-        input.cor_tema ?? null
-      );
-
-      const instituicao = created[0];
-      if (!instituicao) {
-        throw new AppError("Não foi possível criar a instituição.", 500);
-      }
-
-      if (input.admin_inicial && senhaHash) {
-        const usuarioRows = await tx.$queryRawUnsafe<{ id: bigint }[]>(
+    let rows: InstituicaoRow[];
+    try {
+      rows = await prisma.$transaction(async (tx): Promise<InstituicaoRow[]> => {
+        const created = await tx.$queryRawUnsafe<InstituicaoRow[]>(
           `
-          INSERT INTO usuarios (
-            tenant_id,
-            instituicao_id,
-            nome_usuario,
-            nome,
+          INSERT INTO instituicoes (
+            cnpj, razao_social, nome_fantasia, slug, codigo, email, telefone, endereco, plano, status, logo_url, cor_tema
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+          RETURNING
+            id::text AS id,
+            tenant_id::text AS tenant_id,
+            codigo,
+            cnpj,
+            razao_social,
+            nome_fantasia,
+            slug,
             email,
-            senha_hash,
-            perfil_acesso,
+            telefone,
+            endereco,
+            plano,
             status,
+            logo_url,
+            cor_tema,
+            0::bigint AS quantidade_usuarios,
+            NULL::timestamp AS ultimo_acesso_em,
             criado_em,
             atualizado_em
-          )
-          VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, 'ADMINISTRADOR', 'ATIVO', NOW(), NOW())
-          RETURNING id
           `,
-          instituicao.tenant_id,
-          instituicao.id,
-          input.admin_inicial.nome_usuario.trim(),
-          input.admin_inicial.nome.trim(),
-          input.admin_inicial.email.trim().toLowerCase(),
-          senhaHash
+          input.cnpj,
+          input.razao_social,
+          input.nome_fantasia ?? null,
+          input.slug,
+          input.codigo ?? null,
+          input.email ?? null,
+          input.telefone ?? null,
+          input.endereco ?? null,
+          input.plano,
+          input.status,
+          input.logo_url ?? null,
+          input.cor_tema ?? null
         );
 
-        const usuarioId = usuarioRows[0]?.id;
-        if (!usuarioId) {
-          throw new AppError("Nao foi possivel criar o administrador inicial da instituicao.", 500);
+        const instituicao = created[0];
+        if (!instituicao) {
+          throw new AppError("Não foi possível criar a instituição.", 500);
         }
 
-        await tx.$executeRawUnsafe(
-          `
-          INSERT INTO permissao (nome)
-          VALUES ('ADMINISTRADOR')
-          ON CONFLICT (nome) DO NOTHING
-          `
-        );
+        if (input.admin_inicial && senhaHash) {
+          const usuarioRows = await tx.$queryRawUnsafe<{ id: bigint }[]>(
+            `
+            INSERT INTO usuarios (
+              tenant_id,
+              instituicao_id,
+              nome_usuario,
+              nome,
+              email,
+              senha_hash,
+              perfil_acesso,
+              status,
+              criado_em,
+              atualizado_em
+            )
+            VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, 'ADMINISTRADOR', 'ATIVO', NOW(), NOW())
+            RETURNING id
+            `,
+            instituicao.tenant_id,
+            instituicao.id,
+            input.admin_inicial.nome_usuario.trim(),
+            input.admin_inicial.nome.trim(),
+            input.admin_inicial.email.trim().toLowerCase(),
+            senhaHash
+          );
 
-        await tx.$executeRawUnsafe(
-          `
-          INSERT INTO usuario_permissao (usuario_id, permissao_id)
-          SELECT $1, p.id
-          FROM permissao p
-          WHERE p.nome = 'ADMINISTRADOR'
-          ON CONFLICT (usuario_id, permissao_id) DO NOTHING
-          `,
-          usuarioId
-        );
+          const usuarioId = usuarioRows[0]?.id;
+          if (!usuarioId) {
+            throw new AppError("Nao foi possivel criar o administrador inicial da instituicao.", 500);
+          }
+
+          await tx.$executeRawUnsafe(
+            `
+            INSERT INTO permissao (nome)
+            VALUES ('ADMINISTRADOR')
+            ON CONFLICT (nome) DO NOTHING
+            `
+          );
+
+          await tx.$executeRawUnsafe(
+            `
+            INSERT INTO usuario_permissao (usuario_id, permissao_id)
+            SELECT $1, p.id
+            FROM permissao p
+            WHERE p.nome = 'ADMINISTRADOR'
+            ON CONFLICT (usuario_id, permissao_id) DO NOTHING
+            `,
+            usuarioId
+          );
+        }
+
+        return created;
+      });
+    } catch (error) {
+      const mensagem = identificarViolacaoUnicidadeInstituicao(error);
+      if (mensagem) {
+        throw new AppError(mensagem, 409);
       }
-
-      return created;
-    });
+      throw error;
+    }
 
     return mapRow(rows[0]);
   }
@@ -218,79 +262,97 @@ export class InstituicoesRepository {
 
     await this.buscarPorId(id);
 
-    await prisma.$transaction(async (tx) => {
-      await tx.$executeRawUnsafe(
-        `
-        UPDATE instituicoes
-        SET
-          cnpj = COALESCE($2, cnpj),
-          razao_social = COALESCE($3, razao_social),
-          nome_fantasia = COALESCE($4, nome_fantasia),
-          slug = COALESCE($5, slug),
-          codigo = COALESCE($6, codigo),
-          email = COALESCE($7, email),
-          telefone = COALESCE($8, telefone),
-          endereco = COALESCE($9, endereco),
-          plano = COALESCE($10, plano),
-          status = COALESCE($11, status),
-          logo_url = COALESCE($12, logo_url),
-          cor_tema = COALESCE($13, cor_tema),
-          atualizado_em = NOW()
-        WHERE id::text = $1
-        `,
-        id,
-        input.cnpj ?? null,
-        input.razao_social ?? null,
-        input.nome_fantasia ?? null,
-        input.slug ?? null,
-        input.codigo ?? null,
-        input.email ?? null,
-        input.telefone ?? null,
-        input.endereco ?? null,
-        input.plano ?? null,
-        input.status ?? null,
-        input.logo_url ?? null,
-        input.cor_tema ?? null
-      );
-
-      if (typeof input.email === "string" && input.email.trim()) {
-        const adminRows = await tx.$queryRawUnsafe<{ id: bigint }[]>(
+    try {
+      await prisma.$transaction(async (tx) => {
+        await tx.$executeRawUnsafe(
           `
-          SELECT u.id
-          FROM usuarios u
-          WHERE u.instituicao_id::text = $1
-            AND u.deletado_em IS NULL
-            AND (
-              COALESCE(u.perfil_acesso, '') = 'ADMINISTRADOR'
-              OR EXISTS (
-                SELECT 1
-                FROM usuario_permissao up
-                JOIN permissao p ON p.id = up.permissao_id
-                WHERE up.usuario_id = u.id
-                  AND p.nome = 'ADMINISTRADOR'
-              )
-            )
-          ORDER BY u.id ASC
-          LIMIT 1
+          UPDATE instituicoes
+          SET
+            cnpj = COALESCE($2, cnpj),
+            razao_social = COALESCE($3, razao_social),
+            nome_fantasia = COALESCE($4, nome_fantasia),
+            slug = COALESCE($5, slug),
+            codigo = COALESCE($6, codigo),
+            email = COALESCE($7, email),
+            telefone = COALESCE($8, telefone),
+            endereco = COALESCE($9, endereco),
+            plano = COALESCE($10, plano),
+            status = COALESCE($11, status),
+            logo_url = COALESCE($12, logo_url),
+            cor_tema = COALESCE($13, cor_tema),
+            atualizado_em = NOW()
+          WHERE id::text = $1
           `,
-          id
+          id,
+          input.cnpj ?? null,
+          input.razao_social ?? null,
+          input.nome_fantasia ?? null,
+          input.slug ?? null,
+          input.codigo ?? null,
+          input.email ?? null,
+          input.telefone ?? null,
+          input.endereco ?? null,
+          input.plano ?? null,
+          input.status ?? null,
+          input.logo_url ?? null,
+          input.cor_tema ?? null
         );
+      });
+    } catch (error) {
+      const mensagem = identificarViolacaoUnicidadeInstituicao(error);
+      if (mensagem) {
+        throw new AppError(mensagem, 409);
+      }
+      throw error;
+    }
 
-        const adminPrincipalId = adminRows[0]?.id;
-        if (adminPrincipalId) {
-          await tx.$executeRawUnsafe(
+    if (typeof input.email === "string" && input.email.trim()) {
+      const emailInstituicao = input.email.trim().toLowerCase();
+
+      try {
+        await prisma.$transaction(async (tx) => {
+          const adminRows = await tx.$queryRawUnsafe<{ id: bigint }[]>(
             `
-            UPDATE usuarios
-            SET email = $2,
-                atualizado_em = NOW()
-            WHERE id = $1
+            SELECT u.id
+            FROM usuarios u
+            WHERE u.instituicao_id::text = $1
+              AND u.deletado_em IS NULL
+              AND (
+                COALESCE(u.perfil_acesso, '') = 'ADMINISTRADOR'
+                OR EXISTS (
+                  SELECT 1
+                  FROM usuario_permissao up
+                  JOIN permissao p ON p.id = up.permissao_id
+                  WHERE up.usuario_id = u.id
+                    AND p.nome = 'ADMINISTRADOR'
+                )
+              )
+            ORDER BY u.id ASC
+            LIMIT 1
             `,
-            adminPrincipalId,
-            input.email.trim().toLowerCase()
+            id
           );
+
+          const adminPrincipalId = adminRows[0]?.id;
+          if (adminPrincipalId) {
+            await tx.$executeRawUnsafe(
+              `
+              UPDATE usuarios
+              SET email = $2,
+                  atualizado_em = NOW()
+              WHERE id = $1
+              `,
+              adminPrincipalId,
+              emailInstituicao
+            );
+          }
+        });
+      } catch (error) {
+        if (!identificarViolacaoUnicidadeInstituicao(error)) {
+          throw error;
         }
       }
-    });
+    }
 
     return this.buscarPorId(id);
   }
