@@ -190,7 +190,7 @@ const secoesManual: ManualSecao[] = [
           "Na aba Agendamento, escolha o tipo entre curso, atendimento ou oficina para carregar apenas os itens já cadastrados nas inscrições.",
           "Os filtros rápidos foram removidos dessa aba para deixar a operação mais direta; o foco agora é montar o card sem distrações.",
           "Depois selecione o item desejado em cards operacionais exibidos lado a lado, em grade com dois cards por linha, para o sistema preencher automaticamente o resumo com profissional, dias, horário e local na mesma linha, sem redigitação manual.",
-          "Use a lista de beneficiários vinculados ao item para marcar quem participará naquela data; a agenda operacional agora usa a própria matrícula da inscrição, os identificadores legados salvos no card e, quando necessário, a lista atual de matriculados do item para localizar o cadastro do beneficiário, exibindo no card o telefone cadastrado da aba Contato e reaproveitando o mesmo dado nos envios.",
+          "Use a lista de beneficiários vinculados ao item para marcar quem participará naquela data; a agenda operacional agora usa a própria matrícula da inscrição, os identificadores legados salvos no card e, quando necessário, a lista atual de matriculados do item para localizar o cadastro do beneficiário, exibindo no card e na seleção o telefone cadastrado da aba Contato e reaproveitando o mesmo dado nos envios.",
           "No topo da aba operacional, acompanhe primeiro o resumo do card com tipo, item, data e quantidade de beneficiários antes de montar a agenda.",
           "Na área principal, o campo Tipo fica ao lado da grade de itens do tipo selecionado, sem campo adicional de curso, atendimento ou oficina, e os beneficiários vinculados passam a aparecer em grade, lado a lado, para agilizar a marcação.",
           "Informe a data do agendamento e use Gerar Agenda para salvar a agenda do dia com os participantes agrupados no mesmo card. Não há um segundo botão de salvar: o clique em Gerar Agenda já persiste o card imediatamente.",
@@ -209,6 +209,7 @@ const secoesManual: ManualSecao[] = [
         ],
         atencoes: [
           "O agendamento operacional reaproveita dados reais das inscrições; se um beneficiário não estiver vinculado ao item, ele não poderá ser selecionado no card.",
+          "Quando o telefone já existir no cadastro do beneficiário, a aba Agendamento e os cards vinculados devem mostrar esse número em vez de exibir Sem telefone cadastrado.",
           "O sistema impede duplicidade do mesmo beneficiário dentro do mesmo card e registra auditoria de criação, edição, cancelamento e envios.",
           "O envio por WhatsApp prepara links diretos para contato e o envio por e-mail depende de endereço válido cadastrado no participante."
         ]
@@ -981,11 +982,14 @@ const secoesManual: ManualSecao[] = [
           "Na aba Espelho de ponto, use o botão Gerar espelho de ponto PDF para emitir o relatório individual em um clique; administradores podem selecionar o funcionário antes da emissão, enquanto usuários comuns emitem apenas o próprio espelho.",
           "Somente após o cadastro da face o botão Registrar ponto agora fica liberado para a confirmação da batida.",
           "Ao clicar em Registrar ponto agora, informe o usuário e a senha. Se o modo escolhido for Somente senha, a marcação é concluída sem captura facial. Se o modo escolhido for Senha + captura facial, faça também a validação da face atual com prova de vida por duas piscadas ou leve virada do rosto antes do envio.",
-          "Na aba Ajuste administrativo, escolha entre Somente senha ou Senha + captura facial antes de salvar a correção do registro."
+          "Na aba Ajuste administrativo, escolha entre Somente senha ou Senha + captura facial antes de salvar a correção do registro.",
+          "Na aba Aprovação de horas extras, o RH e os gestores aprovam, negam ou aprovam parcialmente entradas antecipadas sem alterar a marcação original.",
+          "Quando a entrada ocorrer antes do horário previsto além da tolerância configurada, o sistema abre o modal de ciência com justificativa obrigatória e mantém a ocorrência pendente até decisão formal."
         ],
         atencoes: [
           "A geração do espelho em PDF usa o endpoint autenticado do registro de ponto e respeita a regra de acesso por usuário: administrador pode emitir para funcionários, demais perfis somente para si mesmos.",
           "A tela Registro de ponto agora lista usuários, carrega configuração, registra batidas, salva face, aplica ajustes, grava ocorrências, abre histórico e gera espelho sempre dentro do tenant autenticado, sem cruzar dados de outra instituição.",
+          "A extra antecipada deixou de ser somada automaticamente como hora extra aprovada. O sistema agora separa pendentes, autorizadas, negadas e saldo de banco de horas aprovado.",
           "No espelho de ponto individual em PDF, o nome do colaborador aparece em destaque e a tabela mantém data e horários em linha única, deixando a ocorrência em fonte reduzida com quebra de linha quando necessário.",
           "A marcação pode ser configurada para Somente senha ou para Senha + captura facial, conforme a necessidade operacional.",
           "Na confirmação da marcação, o sistema exige duas piscadas ou uma leve virada do rosto para reduzir o risco de uso de foto estática no lugar de uma pessoa real.",

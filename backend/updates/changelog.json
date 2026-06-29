@@ -1,6 +1,30 @@
 {
     "entries":  [
                     {
+                        "version":  "1.00.577",
+                        "releaseDate":  "2026-06-29",
+                        "title":  "Controle de hora extra antecipada no ponto",
+                        "description":  "O registro de ponto passou a preservar a batida original e separar entradas antecipadas pendentes, autorizadas e negadas por tenant.",
+                        "changes":  [
+                                        "A marcação antecipada agora grava ciência e justificativa sem transformar automaticamente a batida em hora extra aprovada.",
+                                        "Foi criada a tela de aprovação de horas extras para RH e gestores, com decisão parcial e auditoria.",
+                                        "O manual do sistema foi atualizado com o novo fluxo de ponto e a versão oficial foi incrementada."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.576",
+                        "releaseDate":  "2026-06-28",
+                        "title":  "Telefone dos beneficiários em agendamentos",
+                        "description":  "A aba Agendamento passou a exibir o telefone cadastrado dos beneficiários vinculados na seleção e nos cards.",
+                        "changes":  [
+                                        "A busca de beneficiários vinculados prioriza contatos com telefone cadastrado antes de contatos vazios mais recentes.",
+                                        "Os cards já salvos passam a tentar reaproveitar telefone principal, secundário ou de recado na hidratação da agenda.",
+                                        "A interface formata o telefone exibido na seleção e na lista de participantes vinculados."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.575",
                         "releaseDate":  "2026-06-28",
                         "title":  "Cards de resumo na visão geral",

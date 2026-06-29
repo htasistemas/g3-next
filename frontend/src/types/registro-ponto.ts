@@ -23,6 +23,11 @@ export type RegistroPontoItem = {
   entrada_2?: string;
   saida_2?: string;
   horas_extras_minutos: number;
+  horas_extras_pendentes_minutos: number;
+  horas_extras_autorizadas_minutos: number;
+  horas_extras_negadas_minutos: number;
+  horas_extras_compensadas_minutos: number;
+  horas_extras_pagas_minutos: number;
   banco_horas_minutos: number;
   faltas_minutos: number;
   atrasos_minutos: number;
@@ -44,12 +49,22 @@ export type RegistroPontoEspelhoResponse = {
   registros: RegistroPontoItem[];
   totais: {
     horas_extras_minutos: number;
+    horas_extras_pendentes_minutos: number;
+    horas_extras_autorizadas_minutos: number;
+    horas_extras_negadas_minutos: number;
+    horas_extras_compensadas_minutos: number;
+    horas_extras_pagas_minutos: number;
     banco_horas_minutos: number;
     faltas_minutos: number;
     atrasos_minutos: number;
     total_trabalhado_minutos: number;
     total_dias: number;
     total_ajustes: number;
+  };
+  periodo: {
+    data_inicial?: string | null;
+    data_final?: string | null;
+    fechado: boolean;
   };
 };
 
@@ -90,6 +105,75 @@ export type RegistroPontoMarcarResponse = {
   registro: RegistroPontoItem;
   mensagem: string;
   bloqueado?: boolean;
+  pendencia_hora_extra?: RegistroPontoHoraExtraPendencia;
+};
+
+export type RegistroPontoHoraExtraStatus =
+  | "SEM_EXTRA"
+  | "EXTRA_PENDENTE_AUTORIZACAO"
+  | "EXTRA_AUTORIZADA"
+  | "EXTRA_NEGADA"
+  | "EXTRA_COMPENSADA_BANCO"
+  | "EXTRA_PAGA_FOLHA";
+
+export type RegistroPontoHoraExtraPendencia = {
+  id: string;
+  status: RegistroPontoHoraExtraStatus;
+  campo_batida: "entrada_1" | "saida_1" | "entrada_2" | "saida_2";
+  horario_previsto: string;
+  horario_real: string;
+  minutos_excedentes: number;
+  tolerancia_minutos: number;
+  limite_diario_minutos: number;
+  ciencia_obrigatoria: boolean;
+  justificativa_obrigatoria: boolean;
+  mensagem: string;
+  mensagem_ciencia?: string;
+};
+
+export type RegistroPontoHoraExtraConfiguracao = {
+  tolerancia_entrada_antecipada_minutos: number;
+  exigir_autorizacao_hora_extra_antecipada: boolean;
+  limite_hora_extra_diaria_minutos: number;
+  permitir_solicitacao_hora_extra_pelo_funcionario: boolean;
+  mensagem_ciencia_hora_extra: string;
+};
+
+export type RegistroPontoHoraExtraItem = {
+  id: string;
+  registro_ponto_id: string;
+  registro_ponto_batida_id: string;
+  usuario_id: string;
+  usuario_nome?: string;
+  usuario_login?: string;
+  unidade?: string;
+  setor?: string;
+  data_referencia: string;
+  campo_batida: "entrada_1" | "saida_1" | "entrada_2" | "saida_2";
+  horario_previsto: string;
+  horario_real: string;
+  minutos_excedentes: number;
+  status: RegistroPontoHoraExtraStatus;
+  justificativa_funcionario?: string;
+  ciencia_registrada: boolean;
+  ciencia_em?: string;
+  ciencia_usuario_nome?: string;
+  gestor_id?: string;
+  gestor_nome?: string;
+  gestor_justificativa?: string;
+  minutos_aprovados: number;
+  minutos_negados: number;
+  criado_em: string;
+  atualizado_em: string;
+};
+
+export type RegistroPontoHoraExtraResumo = {
+  total_pendentes_minutos: number;
+  total_autorizadas_minutos: number;
+  total_negadas_minutos: number;
+  total_compensadas_minutos: number;
+  total_pagas_minutos: number;
+  saldo_banco_horas_aprovado_minutos: number;
 };
 
 export type RegistroPontoAjustePayload = {

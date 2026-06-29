@@ -1776,7 +1776,13 @@ export class ReportsService {
 
     const registros = espelhoData.registros ?? [];
     const totais = espelhoData.totais;
+    const periodoEspelho = espelhoData.periodo;
     const nomeColaborador = registros[0]?.usuario_nome || "Colaborador não informado";
+    const descricaoPeriodo = this.formatarPeriodoCurso(
+      periodoEspelho?.data_inicial ?? payload.data_inicial,
+      periodoEspelho?.data_final ?? payload.data_final
+    );
+    const statusPeriodo = periodoEspelho?.fechado ? "Período fechado" : "Período em aberto";
     const colunaSemQuebra = {
       classe: "coluna-compacta",
       semQuebra: true,
@@ -1792,7 +1798,15 @@ export class ReportsService {
     const contexto = await this.montarContextoInstitucional(tenantId);
     const relatorioInput: RelatorioHtmlInput = {
       titulo: "Espelho de ponto individual",
-      metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),
+      metadadosTopo: [
+        ...this.montarMetadadosTopo(payload.usuarioEmissor),
+        ...(descricaoPeriodo
+          ? [
+              { rotulo: "Período", valor: descricaoPeriodo },
+              { rotulo: "Status do período", valor: statusPeriodo }
+            ]
+          : [])
+      ],
       descricao: "Relatório detalhado de marcações de ponto e apuração de horas.",
       blocos: [
         {

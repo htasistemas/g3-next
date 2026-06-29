@@ -13,6 +13,7 @@ export const registroPontoRoutes = Router();
 const permissoesLeitura = ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS", "PROFISSIONAL", "VOLUNTARIO"];
 const permissoesMarcacao = ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS", "PROFISSIONAL", "VOLUNTARIO"];
 const permissoesAjuste = ["ADMINISTRADOR"];
+const permissoesRhAprovacao = ["ADMINISTRADOR", "SETOR_RH_REGISTRO_PONTO_APROVAR"];
 
 registroPontoRoutes.get(
   "/alerta-pendente",
@@ -36,6 +37,13 @@ registroPontoRoutes.get(
 );
 
 registroPontoRoutes.get(
+  "/configuracao/hora-extra",
+  ensureAuthenticated,
+  ensurePermissions(permissoesMarcacao),
+  asyncHandler(controller.buscarConfiguracaoHoraExtra.bind(controller))
+);
+
+registroPontoRoutes.get(
   "/face",
   ensureAuthenticated,
   ensurePermissions(permissoesMarcacao),
@@ -56,11 +64,39 @@ registroPontoRoutes.put(
   asyncHandler(controller.salvarHorarioUsuario.bind(controller))
 );
 
+registroPontoRoutes.put(
+  "/configuracao/hora-extra",
+  ensureAuthenticated,
+  ensurePermissions(permissoesAjuste),
+  asyncHandler(controller.salvarConfiguracaoHoraExtra.bind(controller))
+);
+
 registroPontoRoutes.get(
   "/espelho",
   ensureAuthenticated,
   ensurePermissions(permissoesLeitura),
   asyncHandler(controller.listarEspelho.bind(controller))
+);
+
+registroPontoRoutes.get(
+  "/hora-extra",
+  ensureAuthenticated,
+  ensurePermissions(permissoesRhAprovacao),
+  asyncHandler(controller.listarHorasExtras.bind(controller))
+);
+
+registroPontoRoutes.get(
+  "/relatorio-mensal",
+  ensureAuthenticated,
+  ensurePermissions(permissoesRhAprovacao),
+  asyncHandler(controller.listarRelatorioMensal.bind(controller))
+);
+
+registroPontoRoutes.get(
+  "/relatorio-mensal/export",
+  ensureAuthenticated,
+  ensurePermissions(permissoesRhAprovacao),
+  asyncHandler(controller.exportarRelatorioMensal.bind(controller))
 );
 
 registroPontoRoutes.get(
@@ -75,6 +111,20 @@ registroPontoRoutes.post(
   ensureAuthenticated,
   ensurePermissions(permissoesMarcacao),
   asyncHandler(controller.marcarPonto.bind(controller))
+);
+
+registroPontoRoutes.post(
+  "/hora-extra/:id/ciencia",
+  ensureAuthenticated,
+  ensurePermissions(permissoesMarcacao),
+  asyncHandler(controller.registrarCienciaHoraExtra.bind(controller))
+);
+
+registroPontoRoutes.patch(
+  "/hora-extra/:id/decisao",
+  ensureAuthenticated,
+  ensurePermissions(permissoesRhAprovacao),
+  asyncHandler(controller.decidirHoraExtra.bind(controller))
 );
 
 registroPontoRoutes.get(

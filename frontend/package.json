@@ -1,6 +1,6 @@
 {
   "name": "frontend",
-  "version": "1.00.13",
+  "version": "1.00.14",
   "scripts": {
     "start": "npm run dev",
     "check:ptbr": "node ./scripts/check-ptbr-encoding.cjs",

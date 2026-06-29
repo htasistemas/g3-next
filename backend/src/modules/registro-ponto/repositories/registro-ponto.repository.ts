@@ -2,7 +2,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../../database/prisma.js";
 import { AppError } from "../../../shared/errors/app-error.js";
-import { toIsoDate } from "../../../utils/string-utils.js";
+import { toIsoDate, toStringId } from "../../../utils/string-utils.js";
 import {
   mapHistoricoRowToResponse,
   mapOcorrenciaRowToResponse,
@@ -14,10 +14,21 @@ import {
   type UsuarioCatalogoRow
 } from "../registro-ponto.mapper.js";
 import type {
+  RegistroPontoHoraExtraCienciaInput,
+  RegistroPontoHoraExtraConfiguracao,
+  RegistroPontoHoraExtraDecisaoInput,
+  RegistroPontoHoraExtraFiltro,
+  RegistroPontoHoraExtraItem,
+  RegistroPontoHoraExtraPendencia,
+  RegistroPontoHoraExtraResumo,
+  RegistroPontoHoraExtraStatus,
   RegistroPontoAjusteInput,
   RegistroPontoAlertaPendencia,
   RegistroPontoAtor,
   RegistroPontoFilters,
+  RegistroPontoRelatorioMensalFiltro,
+  RegistroPontoRelatorioMensalItem,
+  RegistroPontoRelatorioMensalResponse,
   RegistroPontoHorarioUsuario,
   RegistroPontoHorarioUsuarioInput,
   RegistroPontoMarcarInput,
@@ -38,6 +49,15 @@ type RegistroLinha = {
   entrada_2: string | null;
   saida_2: string | null;
   observacoes: string | null;
+  horas_extras_minutos: number | null;
+  horas_extras_pendentes_minutos: number | null;
+  horas_extras_autorizadas_minutos: number | null;
+  horas_extras_negadas_minutos: number | null;
+  horas_extras_compensadas_minutos: number | null;
+  horas_extras_pagas_minutos: number | null;
+  banco_horas_minutos: number | null;
+  faltas_minutos: number | null;
+  atrasos_minutos: number | null;
 };
 
 type BatidaLinha = {
@@ -65,6 +85,11 @@ type UsuarioContexto = {
   ips_publicos_ponto: string | null;
   redes_locais_ponto: string | null;
   horario_funcionamento: string | null;
+  tolerancia_entrada_antecipada_minutos: number | null;
+  exigir_autorizacao_hora_extra_antecipada: boolean | null;
+  limite_hora_extra_diaria_minutos: number | null;
+  permitir_solicitacao_hora_extra_pelo_funcionario: boolean | null;
+  mensagem_ciencia_hora_extra: string | null;
   latitude: string | number | null;
   longitude: string | number | null;
 };
@@ -81,6 +106,34 @@ type ValidacaoOrigemResultado = {
   motivo?: string;
   origem_validada: boolean;
   detalhes: Record<string, unknown>;
+};
+
+type HoraExtraLinha = {
+  id: bigint;
+  registro_ponto_id: bigint;
+  registro_ponto_batida_id: bigint;
+  usuario_id: bigint;
+  usuario_nome: string | null;
+  usuario_login: string | null;
+  unidade: string | null;
+  setor: string | null;
+  data_referencia: Date;
+  campo_batida: string;
+  horario_previsto: string;
+  horario_real: string;
+  minutos_excedentes: number;
+  status: RegistroPontoHoraExtraStatus;
+  justificativa_funcionario: string | null;
+  ciencia_registrada: boolean;
+  ciencia_em: Date | null;
+  ciencia_usuario_nome: string | null;
+  gestor_id: bigint | null;
+  gestor_nome: string | null;
+  gestor_justificativa: string | null;
+  minutos_aprovados: number;
+  minutos_negados: number;
+  criado_em: Date;
+  atualizado_em: Date;
 };
 
 const SEQUENCIA_BATIDAS = ["ENTRADA_1", "SAIDA_1", "ENTRADA_2", "SAIDA_2"] as const;
@@ -289,11 +342,11 @@ export class RegistroPontoRepository {
     where.push(Prisma.sql`AND u.tenant_id::text = ${ator.tenant_id}`);
 
     if (filters.data_inicial) {
-      where.push(Prisma.sql`AND r.data_referencia >= ${new Date(`${filters.data_inicial}T00:00:00.000Z`)}`);
+      where.push(Prisma.sql`AND r.data_referencia >= CAST(${filters.data_inicial} AS DATE)`);
     }
 
     if (filters.data_final) {
-      where.push(Prisma.sql`AND r.data_referencia <= ${new Date(`${filters.data_final}T00:00:00.000Z`)}`);
+      where.push(Prisma.sql`AND r.data_referencia <= CAST(${filters.data_final} AS DATE)`);
     }
 
 
@@ -357,6 +410,11 @@ export class RegistroPontoRepository {
         r.entrada_2::text,
         r.saida_2::text,
         r.horas_extras_minutos,
+        r.horas_extras_pendentes_minutos,
+        r.horas_extras_autorizadas_minutos,
+        r.horas_extras_negadas_minutos,
+        r.horas_extras_compensadas_minutos,
+        r.horas_extras_pagas_minutos,
         r.banco_horas_minutos,
         r.faltas_minutos,
         r.atrasos_minutos,
@@ -394,6 +452,11 @@ export class RegistroPontoRepository {
         r.entrada_2,
         r.saida_2,
         r.horas_extras_minutos,
+        r.horas_extras_pendentes_minutos,
+        r.horas_extras_autorizadas_minutos,
+        r.horas_extras_negadas_minutos,
+        r.horas_extras_compensadas_minutos,
+        r.horas_extras_pagas_minutos,
         r.banco_horas_minutos,
         r.faltas_minutos,
         r.atrasos_minutos,
@@ -410,10 +473,17 @@ export class RegistroPontoRepository {
 
   async listarEspelho(filters: RegistroPontoFilters, ator: RegistroPontoAtor) {
     const registros = await this.listar(filters, ator);
+    const hojeIso = obterCarimboBrasilia().data;
+    const periodoFechado = !!filters.data_final && filters.data_final < hojeIso;
 
     const totais = registros.reduce(
       (acc, item) => {
         acc.horas_extras_minutos += item.horas_extras_minutos;
+        acc.horas_extras_pendentes_minutos += item.horas_extras_pendentes_minutos;
+        acc.horas_extras_autorizadas_minutos += item.horas_extras_autorizadas_minutos;
+        acc.horas_extras_negadas_minutos += item.horas_extras_negadas_minutos;
+        acc.horas_extras_compensadas_minutos += item.horas_extras_compensadas_minutos;
+        acc.horas_extras_pagas_minutos += item.horas_extras_pagas_minutos;
         acc.banco_horas_minutos += item.banco_horas_minutos;
         acc.faltas_minutos += item.faltas_minutos;
         acc.atrasos_minutos += item.atrasos_minutos;
@@ -425,6 +495,11 @@ export class RegistroPontoRepository {
       },
       {
         horas_extras_minutos: 0,
+        horas_extras_pendentes_minutos: 0,
+        horas_extras_autorizadas_minutos: 0,
+        horas_extras_negadas_minutos: 0,
+        horas_extras_compensadas_minutos: 0,
+        horas_extras_pagas_minutos: 0,
         banco_horas_minutos: 0,
         faltas_minutos: 0,
         atrasos_minutos: 0,
@@ -434,7 +509,15 @@ export class RegistroPontoRepository {
       }
     );
 
-    return { registros, totais };
+    return {
+      registros,
+      totais,
+      periodo: {
+        data_inicial: filters.data_inicial ?? null,
+        data_final: filters.data_final ?? null,
+        fechado: periodoFechado
+      }
+    };
   }
 
   async listarUsuarios(termo: string | undefined, tenantId: string) {
@@ -577,7 +660,7 @@ export class RegistroPontoRepository {
       return { exibir_alerta: false };
     }
 
-      const [registroHoje] = await prisma.$queryRaw<RegistroLinha[]>(Prisma.sql`
+    const [registroHoje] = await prisma.$queryRaw<RegistroLinha[]>(Prisma.sql`
       SELECT
         id,
         usuario_id,
@@ -613,12 +696,506 @@ export class RegistroPontoRepository {
           campo: item.campo,
           rotulo_batida: item.rotulo,
           horario_previsto: item.horario,
-          mensagem: `O ponto de ${item.rotulo.toLowerCase()} previsto para ${item.horario} ainda não foi registrado. Deseja registrar agora?`
+          mensagem: `O ponto de ${item.rotulo.toLowerCase()} previsto para ${item.horario} ainda nao foi registrado. Deseja registrar agora?`
         };
       }
     }
 
     return { exibir_alerta: false };
+  }
+
+  async buscarConfiguracaoHoraExtra(ator: RegistroPontoAtor): Promise<RegistroPontoHoraExtraConfiguracao> {
+    await ensureRegistroPontoEstrutura(prisma);
+
+    return this.buscarConfiguracaoHoraExtraTx(prisma, ator.tenant_id);
+  }
+
+  async salvarConfiguracaoHoraExtra(
+    input: RegistroPontoHoraExtraConfiguracao,
+    ator: RegistroPontoAtor,
+    origem: RegistroPontoOrigem
+  ) {
+    await ensureRegistroPontoEstrutura(prisma);
+
+    if (!this.isAdmin(ator)) {
+      throw new AppError("Somente administradores podem alterar a configuracao de hora extra.", 403);
+    }
+
+    if (!ator.id) {
+      throw new AppError("Usuario autenticado invalido.", 401);
+    }
+
+    return prisma.$transaction(async (tx) => {
+      const antes = await this.buscarConfiguracaoHoraExtraTx(tx, ator.tenant_id);
+
+      await tx.$executeRaw(Prisma.sql`
+        INSERT INTO registro_ponto_configuracao (
+          tenant_id,
+          tolerancia_entrada_antecipada_minutos,
+          exigir_autorizacao_hora_extra_antecipada,
+          limite_hora_extra_diaria_minutos,
+          permitir_solicitacao_hora_extra_pelo_funcionario,
+          mensagem_ciencia_hora_extra,
+          criado_em,
+          atualizado_em
+        ) VALUES (
+          CAST(${ator.tenant_id} AS UUID),
+          ${input.tolerancia_entrada_antecipada_minutos},
+          ${input.exigir_autorizacao_hora_extra_antecipada},
+          ${input.limite_hora_extra_diaria_minutos},
+          ${input.permitir_solicitacao_hora_extra_pelo_funcionario},
+          ${input.mensagem_ciencia_hora_extra},
+          NOW(),
+          NOW()
+        )
+        ON CONFLICT (tenant_id)
+        DO UPDATE SET
+          tolerancia_entrada_antecipada_minutos = EXCLUDED.tolerancia_entrada_antecipada_minutos,
+          exigir_autorizacao_hora_extra_antecipada = EXCLUDED.exigir_autorizacao_hora_extra_antecipada,
+          limite_hora_extra_diaria_minutos = EXCLUDED.limite_hora_extra_diaria_minutos,
+          permitir_solicitacao_hora_extra_pelo_funcionario = EXCLUDED.permitir_solicitacao_hora_extra_pelo_funcionario,
+          mensagem_ciencia_hora_extra = EXCLUDED.mensagem_ciencia_hora_extra,
+          atualizado_em = NOW()
+      `);
+
+      const depois = await this.buscarConfiguracaoHoraExtraTx(tx, ator.tenant_id);
+
+      await this.registrarAuditoriaTx(tx, {
+        registro_ponto_id: null,
+        registro_ponto_batida_id: null,
+        acao: "CONFIGURACAO_HORA_EXTRA",
+        ator,
+        origem,
+        justificativa: undefined,
+        observacao: "Atualizacao da configuracao de hora extra antecipada.",
+        dados_antes: antes,
+        dados_depois: depois
+      });
+
+      return depois;
+    });
+  }
+
+  async listarHorasExtras(
+    filters: RegistroPontoHoraExtraFiltro,
+    ator: RegistroPontoAtor
+  ): Promise<{ registros: RegistroPontoHoraExtraItem[]; totais: RegistroPontoHoraExtraResumo }> {
+    await ensureRegistroPontoEstrutura(prisma);
+
+    const where: Prisma.Sql[] = [Prisma.sql`h.tenant_id::text = ${ator.tenant_id}`];
+
+    if (filters.data_inicial) {
+      where.push(Prisma.sql`h.data_referencia >= CAST(${filters.data_inicial} AS DATE)`);
+    }
+
+    if (filters.data_final) {
+      where.push(Prisma.sql`h.data_referencia <= CAST(${filters.data_final} AS DATE)`);
+    }
+
+    if (filters.funcionario) {
+      where.push(
+        Prisma.sql`(u.nome ILIKE ${`%${filters.funcionario}%`} OR u.nome_usuario ILIKE ${`%${filters.funcionario}%`})`
+      );
+    }
+
+    if (filters.setor) {
+      where.push(Prisma.sql`u.setor ILIKE ${`%${filters.setor}%`}`);
+    }
+
+    if (filters.status && filters.status !== "TODOS") {
+      where.push(Prisma.sql`h.status = ${filters.status}`);
+    }
+
+    const rows = await prisma.$queryRaw<HoraExtraLinha[]>(Prisma.sql`
+      SELECT
+        h.id,
+        h.registro_ponto_id,
+        h.registro_ponto_batida_id,
+        h.usuario_id,
+        u.nome AS usuario_nome,
+        u.nome_usuario AS usuario_login,
+        u.unidade,
+        u.setor,
+        h.data_referencia,
+        h.campo_batida,
+        h.horario_previsto::text,
+        h.horario_real::text,
+        h.minutos_excedentes,
+        h.status::text AS status,
+        h.justificativa_funcionario,
+        h.ciencia_registrada,
+        h.ciencia_em,
+        h.ciencia_usuario_nome,
+        h.gestor_id,
+        h.gestor_nome,
+        h.gestor_justificativa,
+        h.minutos_aprovados,
+        h.minutos_negados,
+        h.criado_em,
+        h.atualizado_em
+      FROM registro_ponto_hora_extra h
+      INNER JOIN usuarios u ON u.id = h.usuario_id
+      WHERE ${Prisma.join(where, " AND ")}
+      ORDER BY h.data_referencia DESC, h.id DESC
+      LIMIT 500
+    `);
+
+    const registros = rows.map((row) => this.mapHoraExtraRowToResponse(row));
+    const totais = registros.reduce(
+      (acc, item) => {
+        switch (item.status) {
+          case "EXTRA_PENDENTE_AUTORIZACAO":
+            acc.total_pendentes_minutos += item.minutos_excedentes;
+            break;
+          case "EXTRA_AUTORIZADA":
+            acc.total_autorizadas_minutos += item.minutos_aprovados;
+            acc.saldo_banco_horas_aprovado_minutos += item.minutos_aprovados;
+            break;
+          case "EXTRA_NEGADA":
+            acc.total_negadas_minutos += item.minutos_negados;
+            break;
+          case "EXTRA_COMPENSADA_BANCO":
+            acc.total_compensadas_minutos += item.minutos_aprovados;
+            acc.saldo_banco_horas_aprovado_minutos += item.minutos_aprovados;
+            break;
+          case "EXTRA_PAGA_FOLHA":
+            acc.total_pagas_minutos += item.minutos_aprovados;
+            break;
+          default:
+            break;
+        }
+        return acc;
+      },
+      {
+        total_pendentes_minutos: 0,
+        total_autorizadas_minutos: 0,
+        total_negadas_minutos: 0,
+        total_compensadas_minutos: 0,
+        total_pagas_minutos: 0,
+        saldo_banco_horas_aprovado_minutos: 0
+      }
+    );
+
+    return { registros, totais };
+  }
+
+  async registrarCienciaHoraExtra(
+    horaExtraIdRaw: string,
+    input: RegistroPontoHoraExtraCienciaInput,
+    ator: RegistroPontoAtor,
+    origem: RegistroPontoOrigem
+  ) {
+    await ensureRegistroPontoEstrutura(prisma);
+
+    if (!ator.id) {
+      throw new AppError("Usuario autenticado invalido.", 401);
+    }
+
+    const horaExtraId = this.parseId(horaExtraIdRaw, "Hora extra");
+
+    return prisma.$transaction(async (tx) => {
+      const registro = await tx.$queryRaw<HoraExtraLinha[]>(Prisma.sql`
+        SELECT
+          h.id,
+          h.registro_ponto_id,
+          h.registro_ponto_batida_id,
+          h.usuario_id,
+          u.nome AS usuario_nome,
+          u.nome_usuario AS usuario_login,
+          u.unidade,
+          u.setor,
+          h.data_referencia,
+          h.campo_batida,
+          h.horario_previsto::text,
+          h.horario_real::text,
+          h.minutos_excedentes,
+          h.status::text AS status,
+          h.justificativa_funcionario,
+          h.ciencia_registrada,
+          h.ciencia_em,
+          h.ciencia_usuario_nome,
+          h.gestor_id,
+          h.gestor_nome,
+          h.gestor_justificativa,
+          h.minutos_aprovados,
+          h.minutos_negados,
+          h.criado_em,
+          h.atualizado_em
+        FROM registro_ponto_hora_extra h
+        INNER JOIN usuarios u ON u.id = h.usuario_id
+        WHERE h.id = ${horaExtraId}
+          AND h.tenant_id::text = ${ator.tenant_id}
+          AND h.usuario_id = ${ator.id}
+        LIMIT 1
+      `);
+
+      const atual = registro[0];
+      if (!atual) {
+        throw new AppError("Registro de hora extra nao encontrado.", 404);
+      }
+
+      if (atual.status !== "EXTRA_PENDENTE_AUTORIZACAO") {
+        throw new AppError("Esta ocorrencia nao esta pendente de ciencia.", 409);
+      }
+
+      await tx.$executeRaw(Prisma.sql`
+        UPDATE registro_ponto_hora_extra
+        SET
+          justificativa_funcionario = ${input.justificativa_funcionario},
+          ciencia_registrada = TRUE,
+          ciencia_em = NOW(),
+          ciencia_usuario_id = ${ator.id},
+          ciencia_usuario_nome = ${ator.nome_usuario},
+          atualizado_em = NOW()
+        WHERE id = ${horaExtraId}
+          AND tenant_id::text = ${ator.tenant_id}
+          AND usuario_id = ${ator.id}
+      `);
+
+      await this.registrarAuditoriaTx(tx, {
+        registro_ponto_id: atual.registro_ponto_id,
+        registro_ponto_batida_id: atual.registro_ponto_batida_id,
+        acao: "CIENCIA_HORA_EXTRA",
+        ator,
+        origem,
+        justificativa: input.justificativa_funcionario,
+        observacao: "Ciencia do funcionario sobre hora extra antecipada.",
+        dados_antes: atual,
+        dados_depois: {
+          ...atual,
+          justificativa_funcionario: input.justificativa_funcionario,
+          ciencia_registrada: true
+        }
+      });
+
+      await this.recalcularTotaisTx(tx, atual.registro_ponto_id, ator.tenant_id, null);
+      const atualizada = await this.buscarHoraExtraPendenciaTx(tx, horaExtraId, ator.tenant_id);
+      return atualizada ? this.mapHoraExtraRowToResponse(atualizada as unknown as HoraExtraLinha) : null;
+    });
+  }
+
+  async decidirHoraExtra(
+    horaExtraIdRaw: string,
+    input: RegistroPontoHoraExtraDecisaoInput,
+    ator: RegistroPontoAtor,
+    origem: RegistroPontoOrigem
+  ) {
+    await ensureRegistroPontoEstrutura(prisma);
+
+    if (!this.isAdmin(ator)) {
+      throw new AppError("Somente gestores e RH podem decidir horas extras.", 403);
+    }
+
+    if (!ator.id) {
+      throw new AppError("Usuario autenticado invalido.", 401);
+    }
+
+    const horaExtraId = this.parseId(horaExtraIdRaw, "Hora extra");
+
+    return prisma.$transaction(async (tx) => {
+      const atual = await tx.$queryRaw<HoraExtraLinha[]>(Prisma.sql`
+        SELECT
+          h.id,
+          h.registro_ponto_id,
+          h.registro_ponto_batida_id,
+          h.usuario_id,
+          u.nome AS usuario_nome,
+          u.nome_usuario AS usuario_login,
+          u.unidade,
+          u.setor,
+          h.data_referencia,
+          h.campo_batida,
+          h.horario_previsto::text,
+          h.horario_real::text,
+          h.minutos_excedentes,
+          h.status::text AS status,
+          h.justificativa_funcionario,
+          h.ciencia_registrada,
+          h.ciencia_em,
+          h.ciencia_usuario_nome,
+          h.gestor_id,
+          h.gestor_nome,
+          h.gestor_justificativa,
+          h.minutos_aprovados,
+          h.minutos_negados,
+          h.criado_em,
+          h.atualizado_em
+        FROM registro_ponto_hora_extra h
+        INNER JOIN usuarios u ON u.id = h.usuario_id
+        WHERE h.id = ${horaExtraId}
+          AND h.tenant_id::text = ${ator.tenant_id}
+        LIMIT 1
+      `);
+
+      const registro = atual[0];
+      if (!registro) {
+        throw new AppError("Registro de hora extra nao encontrado.", 404);
+      }
+
+      const minutosAprovados = Math.min(
+        input.minutos_aprovados ?? registro.minutos_excedentes,
+        registro.minutos_excedentes
+      );
+      const minutosNegados = Math.min(
+        input.minutos_negados ?? Math.max(0, registro.minutos_excedentes - minutosAprovados),
+        registro.minutos_excedentes
+      );
+
+      let novoStatus: RegistroPontoHoraExtraStatus = "EXTRA_PENDENTE_AUTORIZACAO";
+      if (minutosAprovados > 0) {
+        novoStatus = "EXTRA_AUTORIZADA";
+      } else {
+        novoStatus = "EXTRA_NEGADA";
+      }
+
+      if (input.justificativa.length < 5) {
+        throw new AppError("Informe a justificativa da decisao.", 422);
+      }
+
+      await tx.$executeRaw(Prisma.sql`
+        UPDATE registro_ponto_hora_extra
+        SET
+          status = ${novoStatus},
+          gestor_id = ${ator.id},
+          gestor_nome = ${ator.nome_usuario},
+          gestor_justificativa = ${input.justificativa},
+          minutos_aprovados = ${minutosAprovados},
+          minutos_negados = ${minutosNegados},
+          atualizado_em = NOW()
+        WHERE id = ${horaExtraId}
+          AND tenant_id::text = ${ator.tenant_id}
+      `);
+
+      await this.registrarAuditoriaTx(tx, {
+        registro_ponto_id: registro.registro_ponto_id,
+        registro_ponto_batida_id: registro.registro_ponto_batida_id,
+        acao: "DECISAO_HORA_EXTRA",
+        ator,
+        origem,
+        justificativa: input.justificativa,
+        observacao: `Decisao de hora extra: ${novoStatus}.`,
+        dados_antes: registro,
+        dados_depois: {
+          ...registro,
+          status: novoStatus,
+          gestor_id: ator.id?.toString(),
+          gestor_nome: ator.nome_usuario,
+          gestor_justificativa: input.justificativa,
+          minutos_aprovados: minutosAprovados,
+          minutos_negados: minutosNegados
+        }
+      });
+
+      await this.recalcularTotaisTx(tx, registro.registro_ponto_id, ator.tenant_id, null);
+      const atualizada = await this.buscarHoraExtraPendenciaTx(tx, horaExtraId, ator.tenant_id);
+      return atualizada ? this.mapHoraExtraRowToResponse(atualizada as unknown as HoraExtraLinha) : null;
+    });
+  }
+
+  async listarRelatorioMensal(
+    filters: RegistroPontoRelatorioMensalFiltro,
+    ator: RegistroPontoAtor
+  ): Promise<RegistroPontoRelatorioMensalResponse> {
+    await ensureRegistroPontoEstrutura(prisma);
+
+    const where: Prisma.Sql[] = [Prisma.sql`r.tenant_id::text = ${ator.tenant_id}`];
+    if (filters.data_inicial) where.push(Prisma.sql`r.data_referencia >= CAST(${filters.data_inicial} AS DATE)`);
+    if (filters.data_final) where.push(Prisma.sql`r.data_referencia <= CAST(${filters.data_final} AS DATE)`);
+    if (filters.usuario_id) where.push(Prisma.sql`r.usuario_id = ${this.parseId(filters.usuario_id, "Usuario")}`);
+    if (filters.funcionario) {
+      where.push(Prisma.sql`(u.nome ILIKE ${`%${filters.funcionario}%`} OR u.nome_usuario ILIKE ${`%${filters.funcionario}%`})`);
+    }
+    if (filters.setor) where.push(Prisma.sql`u.setor ILIKE ${`%${filters.setor}%`}`);
+
+    const rows = await prisma.$queryRaw<
+      Array<{
+        id: bigint;
+        usuario_id: bigint;
+        usuario_nome: string | null;
+        usuario_login: string;
+        unidade: string | null;
+        setor: string | null;
+        data_referencia: Date;
+        entrada_1: string | null;
+        saida_1: string | null;
+        entrada_2: string | null;
+        saida_2: string | null;
+        horas_extras_pendentes_minutos: number | null;
+        horas_extras_autorizadas_minutos: number | null;
+        horas_extras_negadas_minutos: number | null;
+        horas_extras_compensadas_minutos: number | null;
+        horas_extras_pagas_minutos: number | null;
+      }>
+    >(Prisma.sql`
+      SELECT
+        r.id,
+        r.usuario_id,
+        u.nome AS usuario_nome,
+        u.nome_usuario AS usuario_login,
+        u.unidade,
+        u.setor,
+        r.data_referencia,
+        r.entrada_1::text,
+        r.saida_1::text,
+        r.entrada_2::text,
+        r.saida_2::text,
+        r.horas_extras_pendentes_minutos,
+        r.horas_extras_autorizadas_minutos,
+        r.horas_extras_negadas_minutos,
+        r.horas_extras_compensadas_minutos,
+        r.horas_extras_pagas_minutos
+      FROM registro_ponto r
+      INNER JOIN usuarios u ON u.id = r.usuario_id
+      WHERE ${Prisma.join(where, " AND ")}
+      ORDER BY r.data_referencia DESC, r.id DESC
+      LIMIT 1000
+    `);
+
+    const registros = rows.map((row) => ({
+      id: toStringId(row.id),
+      usuario_id: toStringId(row.usuario_id),
+      usuario_nome: row.usuario_nome?.trim() || row.usuario_login,
+      usuario_login: row.usuario_login,
+      unidade: row.unidade ?? undefined,
+      setor: row.setor ?? undefined,
+      data_referencia: toIsoDate(row.data_referencia) ?? "",
+      jornada_prevista: undefined,
+      batidas_reais: [row.entrada_1, row.saida_1, row.entrada_2, row.saida_2].filter(
+        (item): item is string => !!item
+      ).map((item) => item.slice(0, 5)),
+      entradas_antecipadas: [],
+      horas_extras_pendentes_minutos: row.horas_extras_pendentes_minutos ?? 0,
+      horas_extras_aprovadas_minutos:
+        (row.horas_extras_autorizadas_minutos ?? 0) +
+        (row.horas_extras_compensadas_minutos ?? 0) +
+        (row.horas_extras_pagas_minutos ?? 0),
+      horas_extras_negadas_minutos: row.horas_extras_negadas_minutos ?? 0,
+      saldo_banco_horas_aprovado_minutos:
+        (row.horas_extras_autorizadas_minutos ?? 0) + (row.horas_extras_compensadas_minutos ?? 0),
+      justificativas: [],
+      ciencia_funcionario: false,
+      aprovacao_gestor_rh: false
+    }));
+
+    const totais = registros.reduce(
+      (acc, item) => {
+        acc.funcionarios += 1;
+        acc.horas_extras_pendentes_minutos += item.horas_extras_pendentes_minutos;
+        acc.horas_extras_aprovadas_minutos += item.horas_extras_aprovadas_minutos;
+        acc.horas_extras_negadas_minutos += item.horas_extras_negadas_minutos;
+        acc.saldo_banco_horas_aprovado_minutos += item.saldo_banco_horas_aprovado_minutos;
+        return acc;
+      },
+      {
+        funcionarios: 0,
+        horas_extras_pendentes_minutos: 0,
+        horas_extras_aprovadas_minutos: 0,
+        horas_extras_negadas_minutos: 0,
+        saldo_banco_horas_aprovado_minutos: 0
+      }
+    );
+
+    return { registros, totais };
   }
 
   async marcarPonto(
@@ -732,6 +1309,50 @@ export class RegistroPontoRepository {
       `);
 
       const batidaId = insertedBatida[0]?.id ?? null;
+      if (!batidaId) {
+        throw new AppError("Nao foi possivel registrar a batida de ponto.", 500);
+      }
+
+      let pendenciaHoraExtra: RegistroPontoHoraExtraPendencia | undefined;
+      let alertaCritico = false;
+
+      const configuracaoHoraExtra = await this.buscarConfiguracaoHoraExtraTx(tx, ator.tenant_id);
+      const campoAntecipado =
+        tipo === "ENTRADA_1" || tipo === "ENTRADA_2" ? (campo as "entrada_1" | "entrada_2") : null;
+      const horarioPrevisto =
+        campoAntecipado === "entrada_1"
+          ? usuario.horario_entrada_1
+          : campoAntecipado === "entrada_2"
+            ? usuario.horario_entrada_2
+            : null;
+
+      if (campoAntecipado && horarioPrevisto) {
+        const minutoPrevisto = toMinutes(horarioPrevisto);
+        const minutoReal = toMinutes(horaBatida);
+
+        if (minutoPrevisto !== null && minutoReal !== null && minutoReal < minutoPrevisto) {
+          const minutosAntecipados = minutoPrevisto - minutoReal;
+          if (minutosAntecipados > configuracaoHoraExtra.tolerancia_entrada_antecipada_minutos) {
+            const resultadoHoraExtra = await this.registrarHoraExtraAntecipadaTx(tx, {
+              registroId,
+              batidaId,
+              usuarioId: usuario.id,
+              tenantId: ator.tenant_id,
+              dataReferencia: agoraBrasilia.timestamp ? new Date(`${agoraBrasilia.data}T00:00:00-03:00`) : new Date(),
+              campoBatida: campoAntecipado,
+              horarioPrevisto,
+              horarioReal: horaBatida,
+              minutosExcedentes: minutosAntecipados,
+              configuracao: configuracaoHoraExtra,
+              ator,
+              origem
+            });
+
+            pendenciaHoraExtra = resultadoHoraExtra.pendencia;
+            alertaCritico = resultadoHoraExtra.critico;
+          }
+        }
+      }
 
       await this.recalcularTotaisTx(tx, registroId, ator.tenant_id, usuario.horario_funcionamento);
 
@@ -774,7 +1395,10 @@ export class RegistroPontoRepository {
 
       return {
         registro: registroResponse,
-        mensagem
+        mensagem: pendenciaHoraExtra
+          ? `${mensagem} ${alertaCritico ? "A ocorrência excede o limite diário parametrizado e seguirá para análise prioritária do RH." : "A antecipação ficou pendente de análise do RH/gestor."}`
+          : mensagem,
+        pendencia_hora_extra: pendenciaHoraExtra
       };
     });
   }
@@ -1071,6 +1695,11 @@ export class RegistroPontoRepository {
         r.entrada_2::text,
         r.saida_2::text,
         r.horas_extras_minutos,
+        r.horas_extras_pendentes_minutos,
+        r.horas_extras_autorizadas_minutos,
+        r.horas_extras_negadas_minutos,
+        r.horas_extras_compensadas_minutos,
+        r.horas_extras_pagas_minutos,
         r.banco_horas_minutos,
         r.faltas_minutos,
         r.atrasos_minutos,
@@ -1109,6 +1738,11 @@ export class RegistroPontoRepository {
         r.entrada_2,
         r.saida_2,
         r.horas_extras_minutos,
+        r.horas_extras_pendentes_minutos,
+        r.horas_extras_autorizadas_minutos,
+        r.horas_extras_negadas_minutos,
+        r.horas_extras_compensadas_minutos,
+        r.horas_extras_pagas_minutos,
         r.banco_horas_minutos,
         r.faltas_minutos,
         r.atrasos_minutos,
@@ -1140,6 +1774,271 @@ export class RegistroPontoRepository {
     `);
 
     return rows[0] ?? null;
+  }
+
+  private async buscarConfiguracaoHoraExtraTx(
+    tx: DatabaseTx | typeof prisma,
+    tenantId: string
+  ): Promise<RegistroPontoHoraExtraConfiguracao> {
+    const rows = await tx.$queryRaw<RegistroPontoHoraExtraConfiguracao[]>(Prisma.sql`
+      SELECT
+        COALESCE(tolerancia_entrada_antecipada_minutos, 10) AS tolerancia_entrada_antecipada_minutos,
+        COALESCE(exigir_autorizacao_hora_extra_antecipada, TRUE) AS exigir_autorizacao_hora_extra_antecipada,
+        COALESCE(limite_hora_extra_diaria_minutos, 120) AS limite_hora_extra_diaria_minutos,
+        COALESCE(permitir_solicitacao_hora_extra_pelo_funcionario, FALSE) AS permitir_solicitacao_hora_extra_pelo_funcionario,
+        COALESCE(
+          mensagem_ciencia_hora_extra,
+          'Declaro ciência de que a realização de hora extra depende de autorização da empresa.'
+        ) AS mensagem_ciencia_hora_extra
+      FROM registro_ponto_configuracao
+      WHERE tenant_id::text = ${tenantId}
+      ORDER BY id DESC
+      LIMIT 1
+    `);
+
+    return (
+      rows[0] ?? {
+        tolerancia_entrada_antecipada_minutos: 10,
+        exigir_autorizacao_hora_extra_antecipada: true,
+        limite_hora_extra_diaria_minutos: 120,
+        permitir_solicitacao_hora_extra_pelo_funcionario: false,
+        mensagem_ciencia_hora_extra:
+          "Declaro ciência de que a realização de hora extra depende de autorização da empresa."
+      }
+    );
+  }
+
+  private async buscarResumoHoraExtraTx(
+    tx: DatabaseTx | typeof prisma,
+    registroId: bigint,
+    tenantId: string
+  ) {
+    const rows = await tx.$queryRaw<
+      Array<{
+        horas_extras_pendentes_minutos: number | null;
+        horas_extras_autorizadas_minutos: number | null;
+        horas_extras_negadas_minutos: number | null;
+        horas_extras_compensadas_minutos: number | null;
+        horas_extras_pagas_minutos: number | null;
+      }>
+    >(Prisma.sql`
+      SELECT
+        COALESCE(SUM(CASE WHEN status = 'EXTRA_PENDENTE_AUTORIZACAO' THEN minutos_excedentes ELSE 0 END), 0)::integer AS horas_extras_pendentes_minutos,
+        COALESCE(SUM(CASE WHEN status = 'EXTRA_AUTORIZADA' THEN minutos_aprovados ELSE 0 END), 0)::integer AS horas_extras_autorizadas_minutos,
+        COALESCE(SUM(CASE WHEN status = 'EXTRA_NEGADA' THEN minutos_negados ELSE 0 END), 0)::integer AS horas_extras_negadas_minutos,
+        COALESCE(SUM(CASE WHEN status = 'EXTRA_COMPENSADA_BANCO' THEN minutos_aprovados ELSE 0 END), 0)::integer AS horas_extras_compensadas_minutos,
+        COALESCE(SUM(CASE WHEN status = 'EXTRA_PAGA_FOLHA' THEN minutos_aprovados ELSE 0 END), 0)::integer AS horas_extras_pagas_minutos
+      FROM registro_ponto_hora_extra
+      WHERE registro_ponto_id = ${registroId}
+        AND tenant_id::text = ${tenantId}
+    `);
+
+    const resumo = rows[0] ?? {
+      horas_extras_pendentes_minutos: 0,
+      horas_extras_autorizadas_minutos: 0,
+      horas_extras_negadas_minutos: 0,
+      horas_extras_compensadas_minutos: 0,
+      horas_extras_pagas_minutos: 0
+    };
+
+    const horasExtrasAutorizadas = Number(resumo.horas_extras_autorizadas_minutos ?? 0);
+    const horasExtrasCompensadas = Number(resumo.horas_extras_compensadas_minutos ?? 0);
+    const horasExtrasPagas = Number(resumo.horas_extras_pagas_minutos ?? 0);
+    const horasExtrasPendentes = Number(resumo.horas_extras_pendentes_minutos ?? 0);
+    const horasExtrasNegadas = Number(resumo.horas_extras_negadas_minutos ?? 0);
+    const horasExtrasMinutos =
+      horasExtrasAutorizadas + horasExtrasCompensadas + horasExtrasPagas;
+
+    const bancoHorasMinutos = horasExtrasAutorizadas + horasExtrasCompensadas;
+
+    return {
+      horas_extras_pendentes_minutos: horasExtrasPendentes,
+      horas_extras_autorizadas_minutos: horasExtrasAutorizadas,
+      horas_extras_negadas_minutos: horasExtrasNegadas,
+      horas_extras_compensadas_minutos: horasExtrasCompensadas,
+      horas_extras_pagas_minutos: horasExtrasPagas,
+      horas_extras_minutos: horasExtrasMinutos,
+      banco_horas_minutos: bancoHorasMinutos
+    };
+  }
+
+  private async buscarHoraExtraPendenciaTx(
+    tx: DatabaseTx | typeof prisma,
+    registroBatidaId: bigint,
+    tenantId: string
+  ) {
+    const rows = await tx.$queryRaw<HoraExtraLinha[]>(Prisma.sql`
+      SELECT
+        id,
+        registro_ponto_id,
+        registro_ponto_batida_id,
+        usuario_id,
+        u.nome AS usuario_nome,
+        u.nome_usuario AS usuario_login,
+        u.unidade,
+        u.setor,
+        h.data_referencia,
+        h.campo_batida,
+        h.horario_previsto::text,
+        h.horario_real::text,
+        h.minutos_excedentes,
+        h.status::text AS status,
+        justificativa_funcionario,
+        ciencia_registrada,
+        ciencia_em,
+        ciencia_usuario_nome,
+        gestor_id,
+        gestor_nome,
+        gestor_justificativa,
+        minutos_aprovados,
+        minutos_negados,
+        h.criado_em,
+        h.atualizado_em
+      FROM registro_ponto_hora_extra h
+      INNER JOIN usuarios u ON u.id = h.usuario_id
+      WHERE h.registro_ponto_batida_id = ${registroBatidaId}
+        AND h.tenant_id::text = ${tenantId}
+      LIMIT 1
+    `);
+
+    return rows[0] ?? null;
+  }
+
+  private montarPendenciaHoraExtraResponse(args: {
+    id: bigint;
+    status: RegistroPontoHoraExtraStatus;
+    campo_batida: "entrada_1" | "saida_1" | "entrada_2" | "saida_2";
+    horario_previsto: string;
+    horario_real: string;
+    minutos_excedentes: number;
+    tolerancia_minutos: number;
+    limite_diario_minutos: number;
+    mensagem_ciencia: string;
+    ciencia_obrigatoria: boolean;
+    justificativa_obrigatoria: boolean;
+  }): RegistroPontoHoraExtraPendencia {
+    return {
+      id: args.id.toString(),
+      status: args.status,
+      campo_batida: args.campo_batida,
+      horario_previsto: args.horario_previsto,
+      horario_real: args.horario_real,
+      minutos_excedentes: args.minutos_excedentes,
+      tolerancia_minutos: args.tolerancia_minutos,
+      limite_diario_minutos: args.limite_diario_minutos,
+      ciencia_obrigatoria: args.ciencia_obrigatoria,
+      justificativa_obrigatoria: args.justificativa_obrigatoria,
+      mensagem:
+        "Você está registrando entrada antes do horário previsto. Horas extras somente são válidas mediante autorização da empresa. Caso não exista autorização, este período ficará pendente de análise do RH/gestor e poderá não ser aprovado como hora extra.",
+      mensagem_ciencia: args.mensagem_ciencia
+    };
+  }
+
+  private async registrarHoraExtraAntecipadaTx(
+    tx: DatabaseTx,
+    args: {
+      registroId: bigint;
+      batidaId: bigint;
+      usuarioId: bigint;
+      tenantId: string;
+      dataReferencia: Date;
+      campoBatida: "entrada_1" | "entrada_2";
+      horarioPrevisto: string;
+      horarioReal: string;
+      minutosExcedentes: number;
+      configuracao: RegistroPontoHoraExtraConfiguracao;
+      ator: RegistroPontoAtor;
+      origem: RegistroPontoOrigem;
+      justificativaFuncionario?: string;
+    }
+  ) {
+    const resumoAtual = await this.buscarResumoHoraExtraTx(tx, args.registroId, args.tenantId);
+    const totalDiarioAteAqui =
+      resumoAtual.horas_extras_pendentes_minutos +
+      resumoAtual.horas_extras_autorizadas_minutos +
+      resumoAtual.horas_extras_compensadas_minutos +
+      resumoAtual.horas_extras_pagas_minutos +
+      args.minutosExcedentes;
+
+    const critico = totalDiarioAteAqui > args.configuracao.limite_hora_extra_diaria_minutos;
+    const status: RegistroPontoHoraExtraStatus = args.configuracao.exigir_autorizacao_hora_extra_antecipada
+      ? "EXTRA_PENDENTE_AUTORIZACAO"
+      : "EXTRA_AUTORIZADA";
+
+    const inserted = await tx.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+      INSERT INTO registro_ponto_hora_extra (
+        tenant_id,
+        registro_ponto_id,
+        registro_ponto_batida_id,
+        usuario_id,
+        data_referencia,
+        campo_batida,
+        horario_previsto,
+        horario_real,
+        minutos_excedentes,
+        status,
+        justificativa_funcionario,
+        ciencia_registrada,
+        minutos_aprovados,
+        minutos_negados,
+        criado_em,
+        atualizado_em
+      ) VALUES (
+        CAST(${args.tenantId} AS UUID),
+        ${args.registroId},
+        ${args.batidaId},
+        ${args.usuarioId},
+        CAST(${toIsoDate(args.dataReferencia) ?? ""} AS DATE),
+        ${args.campoBatida},
+        CAST(${args.horarioPrevisto} AS TIME),
+        CAST(${args.horarioReal} AS TIME),
+        ${args.minutosExcedentes},
+        ${status},
+        ${args.justificativaFuncionario ?? null},
+        ${false},
+        ${status === "EXTRA_AUTORIZADA" ? args.minutosExcedentes : 0},
+        ${0},
+        NOW(),
+        NOW()
+      )
+      ON CONFLICT (registro_ponto_batida_id)
+      DO UPDATE SET
+        horario_previsto = EXCLUDED.horario_previsto,
+        horario_real = EXCLUDED.horario_real,
+        minutos_excedentes = EXCLUDED.minutos_excedentes,
+        status = EXCLUDED.status,
+        atualizado_em = NOW()
+      RETURNING id
+    `);
+
+    const pendencia = this.montarPendenciaHoraExtraResponse({
+      id: inserted[0]?.id ?? args.batidaId,
+      status,
+      campo_batida: args.campoBatida,
+      horario_previsto: args.horarioPrevisto,
+      horario_real: args.horarioReal,
+      minutos_excedentes: args.minutosExcedentes,
+      tolerancia_minutos: args.configuracao.tolerancia_entrada_antecipada_minutos,
+      limite_diario_minutos: args.configuracao.limite_hora_extra_diaria_minutos,
+      mensagem_ciencia: args.configuracao.mensagem_ciencia_hora_extra,
+      ciencia_obrigatoria: true,
+      justificativa_obrigatoria: true
+    });
+
+    if (critico) {
+      await this.registrarOcorrenciaTx(tx, {
+        registro_ponto_id: args.registroId,
+        tenant_id: args.tenantId,
+        tipo: "OBSERVACAO_OPERACIONAL",
+        descricao: `Antecipacao critica de ${args.minutosExcedentes} minuto(s) antes do horario previsto.`,
+        origem: "SISTEMA"
+      });
+    }
+
+    return {
+      pendencia,
+      critico
+    };
   }
 
   private async buscarContextoUsuarioTx(tx: DatabaseTx, usuarioId: bigint, tenantId: string) {
@@ -1177,6 +2076,14 @@ export class RegistroPontoRepository {
         uni.ips_publicos_ponto,
         uni.redes_locais_ponto,
         uni.horario_funcionamento,
+        COALESCE(cfg.tolerancia_entrada_antecipada_minutos, 10) AS tolerancia_entrada_antecipada_minutos,
+        COALESCE(cfg.exigir_autorizacao_hora_extra_antecipada, TRUE) AS exigir_autorizacao_hora_extra_antecipada,
+        COALESCE(cfg.limite_hora_extra_diaria_minutos, 120) AS limite_hora_extra_diaria_minutos,
+        COALESCE(cfg.permitir_solicitacao_hora_extra_pelo_funcionario, FALSE) AS permitir_solicitacao_hora_extra_pelo_funcionario,
+        COALESCE(
+          cfg.mensagem_ciencia_hora_extra,
+          'Declaro ciência de que a realização de hora extra depende de autorização da empresa.'
+        ) AS mensagem_ciencia_hora_extra,
         e.latitude::text AS latitude,
         e.longitude::text AS longitude
       FROM usuario_atual ua
@@ -1206,6 +2113,8 @@ export class RegistroPontoRepository {
           ux.id
         LIMIT 1
       ) uni ON TRUE
+      LEFT JOIN registro_ponto_configuracao cfg
+        ON cfg.tenant_id::text = ${tenantId}
       LEFT JOIN endereco e ON e.id = uni.endereco_id
     `);
 
@@ -1392,6 +2301,7 @@ export class RegistroPontoRepository {
     horarioFuncionamento?: string | null
   ) {
     const registro = await this.buscarRegistroParaAtualizacaoTx(tx, registroId, tenantId);
+    const resumoHoraExtra = await this.buscarResumoHoraExtraTx(tx, registroId, tenantId);
 
     const totalTrabalhado =
       diferencaMinutos(registro.entrada_1, registro.saida_1) +
@@ -1402,8 +2312,8 @@ export class RegistroPontoRepository {
     const atrasos =
       entrada1Minutos === null ? 0 : Math.max(0, entrada1Minutos - atrasoReferencia);
 
-    const bancoHoras = totalTrabalhado - JORNADA_PADRAO_MINUTOS;
-    const horasExtras = Math.max(0, bancoHoras);
+    const bancoHoras = resumoHoraExtra.banco_horas_minutos;
+    const horasExtras = resumoHoraExtra.horas_extras_minutos;
 
     const hojeIso = obterCarimboBrasilia().data;
     const registroIso = toIsoDate(registro.data_referencia) ?? "";
@@ -1416,6 +2326,11 @@ export class RegistroPontoRepository {
       UPDATE registro_ponto
       SET
         horas_extras_minutos = ${horasExtras},
+        horas_extras_pendentes_minutos = ${resumoHoraExtra.horas_extras_pendentes_minutos},
+        horas_extras_autorizadas_minutos = ${resumoHoraExtra.horas_extras_autorizadas_minutos},
+        horas_extras_negadas_minutos = ${resumoHoraExtra.horas_extras_negadas_minutos},
+        horas_extras_compensadas_minutos = ${resumoHoraExtra.horas_extras_compensadas_minutos},
+        horas_extras_pagas_minutos = ${resumoHoraExtra.horas_extras_pagas_minutos},
         banco_horas_minutos = ${bancoHoras},
         faltas_minutos = ${faltas},
         atrasos_minutos = ${atrasos},
@@ -1428,6 +2343,7 @@ export class RegistroPontoRepository {
       faltasMinutos: faltas,
       horasExtrasMinutos: horasExtras,
       bancoHorasMinutos: bancoHoras,
+      resumoHoraExtra,
       registro
     });
   }
@@ -1441,6 +2357,15 @@ export class RegistroPontoRepository {
       faltasMinutos: number;
       horasExtrasMinutos: number;
       bancoHorasMinutos: number;
+      resumoHoraExtra: {
+        horas_extras_minutos: number;
+        horas_extras_pendentes_minutos: number;
+        horas_extras_autorizadas_minutos: number;
+        horas_extras_negadas_minutos: number;
+        horas_extras_compensadas_minutos: number;
+        horas_extras_pagas_minutos: number;
+        banco_horas_minutos: number;
+      };
       registro: RegistroLinha;
     }
   ) {
@@ -1471,7 +2396,7 @@ export class RegistroPontoRepository {
       });
     }
 
-    if (contexto.horasExtrasMinutos > 0) {
+    if (contexto.resumoHoraExtra.horas_extras_autorizadas_minutos > 0) {
       await this.registrarOcorrenciaTx(tx, {
         registro_ponto_id: registroId,
         tenant_id: tenantId,
@@ -1481,12 +2406,22 @@ export class RegistroPontoRepository {
       });
     }
 
-    if (contexto.bancoHorasMinutos !== 0) {
+    if (contexto.resumoHoraExtra.banco_horas_minutos !== 0) {
       await this.registrarOcorrenciaTx(tx, {
         registro_ponto_id: registroId,
         tenant_id: tenantId,
         tipo: "BANCO_HORAS",
         descricao: `Banco de horas com saldo de ${contexto.bancoHorasMinutos} minuto(s).`,
+        origem: "SISTEMA"
+      });
+    }
+
+    if (contexto.resumoHoraExtra.horas_extras_pendentes_minutos > 0) {
+      await this.registrarOcorrenciaTx(tx, {
+        registro_ponto_id: registroId,
+        tenant_id: tenantId,
+        tipo: "OBSERVACAO_OPERACIONAL",
+        descricao: `Horas extras pendentes de autorizacao: ${contexto.resumoHoraExtra.horas_extras_pendentes_minutos} minuto(s).`,
         origem: "SISTEMA"
       });
     }
@@ -1642,6 +2577,36 @@ export class RegistroPontoRepository {
     } catch (error) {
       console.warn("[registro-ponto] nao foi possivel registrar auditoria_evento:", error);
     }
+  }
+
+  private mapHoraExtraRowToResponse(row: HoraExtraLinha): RegistroPontoHoraExtraItem {
+    return {
+      id: toStringId(row.id),
+      registro_ponto_id: toStringId(row.registro_ponto_id),
+      registro_ponto_batida_id: toStringId(row.registro_ponto_batida_id),
+      usuario_id: toStringId(row.usuario_id),
+      usuario_nome: row.usuario_nome?.trim() || undefined,
+      usuario_login: row.usuario_login?.trim() || undefined,
+      unidade: row.unidade?.trim() || undefined,
+      setor: row.setor?.trim() || undefined,
+      data_referencia: toIsoDate(row.data_referencia) ?? "",
+      campo_batida: row.campo_batida as "entrada_1" | "saida_1" | "entrada_2" | "saida_2",
+      horario_previsto: row.horario_previsto.slice(0, 5),
+      horario_real: row.horario_real.slice(0, 5),
+      minutos_excedentes: row.minutos_excedentes ?? 0,
+      status: row.status,
+      justificativa_funcionario: row.justificativa_funcionario?.trim() || undefined,
+      ciencia_registrada: !!row.ciencia_registrada,
+      ciencia_em: row.ciencia_em ? row.ciencia_em.toISOString() : undefined,
+      ciencia_usuario_nome: row.ciencia_usuario_nome?.trim() || undefined,
+      gestor_id: row.gestor_id ? toStringId(row.gestor_id) : undefined,
+      gestor_nome: row.gestor_nome?.trim() || undefined,
+      gestor_justificativa: row.gestor_justificativa?.trim() || undefined,
+      minutos_aprovados: row.minutos_aprovados ?? 0,
+      minutos_negados: row.minutos_negados ?? 0,
+      criado_em: row.criado_em.toISOString(),
+      atualizado_em: row.atualizado_em.toISOString()
+    };
   }
 
   private sequenciaHorariosValida(input: {

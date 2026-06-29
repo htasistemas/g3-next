@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.575",
+  "latestVersion": "1.00.577",
   "releaseDate": "2026-06-28",
-  "description": "A visão geral passou a exibir Empréstimos para eventos e Catálogo e vagas de matrículas no formato dos cards de resumo.",
+  "description": "A aba Agendamento passou a exibir o telefone cadastrado dos beneficiários vinculados na seleção e nos cards.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.575",
+  "minCompatibleVersion": "1.00.577",
   "releaseType": "stable"
 }
 

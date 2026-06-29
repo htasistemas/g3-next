@@ -429,12 +429,32 @@ export class AgendamentosRepository {
       LEFT JOIN LATERAL (
         SELECT
           b.id AS beneficiario_id,
-          c.telefone_principal,
-          c.telefone_secundario,
-          c.telefone_recado_numero,
-          c.email
+          contato_beneficio.telefone_principal,
+          contato_beneficio.telefone_secundario,
+          contato_beneficio.telefone_recado_numero,
+          contato_beneficio.email
         FROM cadastro_beneficiario b
-        LEFT JOIN contato_beneficiario c ON c.beneficiario_id = b.id AND c.tenant_id::text = ${tenantId}
+        LEFT JOIN LATERAL (
+          SELECT
+            c.telefone_principal,
+            c.telefone_secundario,
+            c.telefone_recado_numero,
+            c.email
+          FROM contato_beneficiario c
+          WHERE c.beneficiario_id = b.id
+            AND c.tenant_id::text = ${tenantId}
+          ORDER BY
+            CASE
+              WHEN COALESCE(
+                NULLIF(TRIM(c.telefone_principal), ''),
+                NULLIF(TRIM(c.telefone_secundario), ''),
+                NULLIF(TRIM(c.telefone_recado_numero), '')
+              ) IS NULL THEN 1
+              ELSE 0
+            END,
+            c.id DESC
+          LIMIT 1
+        ) contato_beneficio ON TRUE
         WHERE b.tenant_id::text = ${tenantId}
           AND (
             (ab.beneficiario_id IS NOT NULL AND b.id = ab.beneficiario_id)
@@ -443,7 +463,7 @@ export class AgendamentosRepository {
               AND ${normalizarTextoSql(Prisma.sql`b.nome_completo`)} = ${normalizarTextoSql(Prisma.sql`ab.beneficiario_nome`)}
             )
           )
-        ORDER BY c.id DESC NULLS LAST, b.id DESC
+        ORDER BY b.id DESC
         LIMIT 1
       ) contato ON TRUE
       WHERE ab.agendamento_id IN (${Prisma.join(agendamentoIds)})
@@ -490,16 +510,45 @@ export class AgendamentosRepository {
         b.id AS beneficiario_id,
         b.nome_completo AS beneficiario_nome,
         COALESCE(
-          NULLIF(TRIM(c.telefone_principal), ''),
-          NULLIF(TRIM(c.telefone_secundario), ''),
-          NULLIF(TRIM(c.telefone_recado_numero), '')
+          NULLIF(TRIM(contato_beneficio.telefone_principal), ''),
+          NULLIF(TRIM(contato_beneficio.telefone_secundario), ''),
+          NULLIF(TRIM(contato_beneficio.telefone_recado_numero), '')
         ) AS telefone,
-        NULLIF(TRIM(c.email), '') AS email
+        NULLIF(TRIM(contato_beneficio.email), '') AS email
       FROM cadastro_beneficiario b
-      LEFT JOIN contato_beneficiario c ON c.beneficiario_id = b.id AND c.tenant_id::text = ${tenantId}
+      LEFT JOIN LATERAL (
+        SELECT
+          c.telefone_principal,
+          c.telefone_secundario,
+          c.telefone_recado_numero,
+          c.email
+        FROM contato_beneficiario c
+        WHERE c.beneficiario_id = b.id
+          AND c.tenant_id::text = ${tenantId}
+        ORDER BY
+          CASE
+            WHEN COALESCE(
+              NULLIF(TRIM(c.telefone_principal), ''),
+              NULLIF(TRIM(c.telefone_secundario), ''),
+              NULLIF(TRIM(c.telefone_recado_numero), '')
+            ) IS NULL THEN 1
+            ELSE 0
+          END,
+          c.id DESC
+        LIMIT 1
+      ) contato_beneficio ON TRUE
       WHERE b.tenant_id::text = ${tenantId}
         AND (${Prisma.join(filtros, " OR ")})
-      ORDER BY b.id DESC
+      ORDER BY
+        CASE
+          WHEN COALESCE(
+            NULLIF(TRIM(c.telefone_principal), ''),
+            NULLIF(TRIM(c.telefone_secundario), ''),
+            NULLIF(TRIM(c.telefone_recado_numero), '')
+          ) IS NULL THEN 1
+          ELSE 0
+        END,
+        b.id DESC
     `);
   }
 
@@ -532,13 +581,33 @@ export class AgendamentosRepository {
         SELECT
           b.id AS beneficiario_id,
           COALESCE(
-            NULLIF(TRIM(c2.telefone_principal), ''),
-            NULLIF(TRIM(c2.telefone_secundario), ''),
-            NULLIF(TRIM(c2.telefone_recado_numero), '')
+            NULLIF(TRIM(contato_beneficio.telefone_principal), ''),
+            NULLIF(TRIM(contato_beneficio.telefone_secundario), ''),
+            NULLIF(TRIM(contato_beneficio.telefone_recado_numero), '')
           ) AS telefone_principal,
-          NULLIF(TRIM(c2.email), '') AS email
+          NULLIF(TRIM(contato_beneficio.email), '') AS email
         FROM cadastro_beneficiario b
-        LEFT JOIN contato_beneficiario c2 ON c2.beneficiario_id = b.id AND c2.tenant_id::text = ${tenantId}
+        LEFT JOIN LATERAL (
+          SELECT
+            c2.telefone_principal,
+            c2.telefone_secundario,
+            c2.telefone_recado_numero,
+            c2.email
+          FROM contato_beneficiario c2
+          WHERE c2.beneficiario_id = b.id
+            AND c2.tenant_id::text = ${tenantId}
+          ORDER BY
+            CASE
+              WHEN COALESCE(
+                NULLIF(TRIM(c2.telefone_principal), ''),
+                NULLIF(TRIM(c2.telefone_secundario), ''),
+                NULLIF(TRIM(c2.telefone_recado_numero), '')
+              ) IS NULL THEN 1
+              ELSE 0
+            END,
+            c2.id DESC
+          LIMIT 1
+        ) contato_beneficio ON TRUE
         LEFT JOIN LATERAL (
           SELECT numero_documento
           FROM documentos d
@@ -563,7 +632,7 @@ export class AgendamentosRepository {
               AND ${normalizarTextoSql(Prisma.sql`b.nome_completo`)} = ${normalizarTextoSql(Prisma.sql`m.beneficiario_nome`)}
             )
           )
-        ORDER BY c2.id DESC NULLS LAST, b.id DESC
+        ORDER BY b.id DESC
         LIMIT 1
       ) contato ON TRUE
       WHERE m.tenant_id::text = ${tenantId}
@@ -600,13 +669,33 @@ export class AgendamentosRepository {
         SELECT
           b.id AS beneficiario_id,
           COALESCE(
-            NULLIF(TRIM(c2.telefone_principal), ''),
-            NULLIF(TRIM(c2.telefone_secundario), ''),
-            NULLIF(TRIM(c2.telefone_recado_numero), '')
+            NULLIF(TRIM(contato_beneficio.telefone_principal), ''),
+            NULLIF(TRIM(contato_beneficio.telefone_secundario), ''),
+            NULLIF(TRIM(contato_beneficio.telefone_recado_numero), '')
           ) AS telefone,
-          NULLIF(TRIM(c2.email), '') AS email
+          NULLIF(TRIM(contato_beneficio.email), '') AS email
         FROM cadastro_beneficiario b
-        LEFT JOIN contato_beneficiario c2 ON c2.beneficiario_id = b.id AND c2.tenant_id::text = ${tenantId}
+        LEFT JOIN LATERAL (
+          SELECT
+            c2.telefone_principal,
+            c2.telefone_secundario,
+            c2.telefone_recado_numero,
+            c2.email
+          FROM contato_beneficiario c2
+          WHERE c2.beneficiario_id = b.id
+            AND c2.tenant_id::text = ${tenantId}
+          ORDER BY
+            CASE
+              WHEN COALESCE(
+                NULLIF(TRIM(c2.telefone_principal), ''),
+                NULLIF(TRIM(c2.telefone_secundario), ''),
+                NULLIF(TRIM(c2.telefone_recado_numero), '')
+              ) IS NULL THEN 1
+              ELSE 0
+            END,
+            c2.id DESC
+          LIMIT 1
+        ) contato_beneficio ON TRUE
         LEFT JOIN LATERAL (
           SELECT numero_documento
           FROM documentos d
@@ -631,7 +720,7 @@ export class AgendamentosRepository {
               AND ${normalizarTextoSql(Prisma.sql`b.nome_completo`)} = ${normalizarTextoSql(Prisma.sql`m.beneficiario_nome`)}
             )
           )
-        ORDER BY c2.id DESC NULLS LAST, b.id DESC
+        ORDER BY b.id DESC
         LIMIT 1
       ) contato ON TRUE
       WHERE m.curso_id IN (${Prisma.join(ids.map((id) => BigInt(id)))})
@@ -883,13 +972,33 @@ export class AgendamentosRepository {
         SELECT
           b.id AS beneficiario_id,
           COALESCE(
-            NULLIF(TRIM(c2.telefone_principal), ''),
-            NULLIF(TRIM(c2.telefone_secundario), ''),
-            NULLIF(TRIM(c2.telefone_recado_numero), '')
+            NULLIF(TRIM(contato_beneficio.telefone_principal), ''),
+            NULLIF(TRIM(contato_beneficio.telefone_secundario), ''),
+            NULLIF(TRIM(contato_beneficio.telefone_recado_numero), '')
           ) AS telefone,
-          c2.email
+          contato_beneficio.email
         FROM cadastro_beneficiario b
-        LEFT JOIN contato_beneficiario c2 ON c2.beneficiario_id = b.id AND c2.tenant_id::text = ${tenantId}
+        LEFT JOIN LATERAL (
+          SELECT
+            c2.telefone_principal,
+            c2.telefone_secundario,
+            c2.telefone_recado_numero,
+            c2.email
+          FROM contato_beneficiario c2
+          WHERE c2.beneficiario_id = b.id
+            AND c2.tenant_id::text = ${tenantId}
+          ORDER BY
+            CASE
+              WHEN COALESCE(
+                NULLIF(TRIM(c2.telefone_principal), ''),
+                NULLIF(TRIM(c2.telefone_secundario), ''),
+                NULLIF(TRIM(c2.telefone_recado_numero), '')
+              ) IS NULL THEN 1
+              ELSE 0
+            END,
+            c2.id DESC
+          LIMIT 1
+        ) contato_beneficio ON TRUE
         LEFT JOIN LATERAL (
           SELECT numero_documento
           FROM documentos d
@@ -909,12 +1018,12 @@ export class AgendamentosRepository {
               AND REGEXP_REPLACE(COALESCE(doc.numero_documento, ''), '\D', '', 'g') =
                 REGEXP_REPLACE(COALESCE(m.cpf, ''), '\D', '', 'g')
             )
-            OR (
+          OR (
               REGEXP_REPLACE(COALESCE(m.cpf, ''), '\D', '', 'g') = ''
               AND ${normalizarTextoSql(Prisma.sql`b.nome_completo`)} = ${normalizarTextoSql(Prisma.sql`m.beneficiario_nome`)}
             )
           )
-        ORDER BY c2.id DESC NULLS LAST, b.id DESC
+        ORDER BY b.id DESC
         LIMIT 1
       ) contato ON TRUE
       WHERE m.curso_id = ${itemId}

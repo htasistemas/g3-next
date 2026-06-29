@@ -18,6 +18,11 @@ type ListaRow = {
   entrada_2: string | null;
   saida_2: string | null;
   horas_extras_minutos: number | bigint | null;
+  horas_extras_pendentes_minutos: number | bigint | null;
+  horas_extras_autorizadas_minutos: number | bigint | null;
+  horas_extras_negadas_minutos: number | bigint | null;
+  horas_extras_compensadas_minutos: number | bigint | null;
+  horas_extras_pagas_minutos: number | bigint | null;
   banco_horas_minutos: number | bigint | null;
   faltas_minutos: number | bigint | null;
   atrasos_minutos: number | bigint | null;
@@ -116,6 +121,11 @@ export function mapRegistroPontoRowToResponse(row: ListaRow): RegistroPontoLista
     entrada_2,
     saida_2,
     horas_extras_minutos: toNumber(row.horas_extras_minutos),
+    horas_extras_pendentes_minutos: toNumber(row.horas_extras_pendentes_minutos),
+    horas_extras_autorizadas_minutos: toNumber(row.horas_extras_autorizadas_minutos),
+    horas_extras_negadas_minutos: toNumber(row.horas_extras_negadas_minutos),
+    horas_extras_compensadas_minutos: toNumber(row.horas_extras_compensadas_minutos),
+    horas_extras_pagas_minutos: toNumber(row.horas_extras_pagas_minutos),
     banco_horas_minutos: toNumber(row.banco_horas_minutos),
     faltas_minutos: toNumber(row.faltas_minutos),
     atrasos_minutos: toNumber(row.atrasos_minutos),

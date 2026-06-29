@@ -21,6 +21,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { formatarTelefone } from "@/lib/br-utils";
 import type {
   Agendamento,
   AgendamentoOperacionalBeneficiario,
@@ -233,7 +234,7 @@ export function BeneficiarioSelector(props: {
                       {!item.selecionavel ? <Badge variant="warning">Cadastro não vinculado</Badge> : null}
                     </div>
                     <p className="mt-1 text-xs text-[var(--g3-muted)]">
-                      {item.telefone || "Sem telefone"}
+                      {formatarTelefone(item.telefone) || item.telefone || "Sem telefone"}
                       {item.email ? ` - ${item.email}` : ""}
                     </p>
                   </div>
@@ -455,7 +456,7 @@ export function AgendaCard(props: {
                       {participante.beneficiarioNome}
                     </td>
                     <td className="border-b border-[var(--g3-border)] px-3 py-2 text-[var(--g3-muted)] whitespace-nowrap">
-                      {participante.telefone || "Sem telefone cadastrado"}
+                      {formatarTelefone(participante.telefone) || participante.telefone || "Sem telefone cadastrado"}
                     </td>
                     <td className="border-b border-[var(--g3-border)] px-3 py-2">
                       <div className="flex items-center justify-center gap-2">

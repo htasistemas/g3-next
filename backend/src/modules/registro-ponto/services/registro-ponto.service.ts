@@ -1,3 +1,4 @@
+import PDFDocument from "pdfkit";
 import bcrypt from "bcryptjs";
 import { prisma } from "../../../database/prisma.js";
 import { AppError } from "../../../shared/errors/app-error.js";
@@ -5,11 +6,16 @@ import { storageService } from "../../arquivos/services/storage-instance.js";
 import { parseBase64Payload } from "../../arquivos/services/storage-utils.js";
 import {
   registroPontoAjusteSchema,
+  registroPontoHoraExtraCienciaSchema,
+  registroPontoHoraExtraConfiguracaoSchema,
+  registroPontoHoraExtraDecisaoSchema,
+  registroPontoHoraExtraFiltroSchema,
   registroPontoFaceSchema,
   registroPontoFiltersSchema,
   registroPontoHorarioUsuarioSchema,
   registroPontoMarcarSchema,
-  registroPontoOcorrenciaSchema
+  registroPontoOcorrenciaSchema,
+  registroPontoRelatorioMensalSchema
 } from "../registro-ponto.schema.js";
 import { ensureRegistroPontoEstrutura } from "../repositories/registro-ponto-estrutura.repository.js";
 import { RegistroPontoRepository } from "../repositories/registro-ponto.repository.js";
@@ -72,6 +78,17 @@ export class RegistroPontoService {
   async buscarAlertaPendencia(atorRaw: AtorRaw) {
     const ator = this.parseAtor(atorRaw);
     return this.repository.buscarAlertaPendencia(ator);
+  }
+
+  async buscarConfiguracaoHoraExtra(atorRaw: AtorRaw) {
+    const ator = this.parseAtor(atorRaw);
+    return this.repository.buscarConfiguracaoHoraExtra(ator);
+  }
+
+  async salvarConfiguracaoHoraExtra(rawInput: unknown, atorRaw: AtorRaw, origem: RegistroPontoOrigem) {
+    const input = registroPontoHoraExtraConfiguracaoSchema.parse(rawInput ?? {});
+    const ator = this.parseAtor(atorRaw);
+    return this.repository.salvarConfiguracaoHoraExtra(input, ator, origem);
   }
 
   async buscarFaceUsuario(atorRaw: AtorRaw) {
@@ -176,6 +193,60 @@ export class RegistroPontoService {
     const input = registroPontoOcorrenciaSchema.parse(rawInput);
     const ator = this.parseAtor(atorRaw);
     return this.repository.adicionarOcorrencia(rawRegistroId, input, ator, origem);
+  }
+
+  async listarHorasExtras(rawFilters: unknown, atorRaw: AtorRaw) {
+    const filters = registroPontoHoraExtraFiltroSchema.parse(rawFilters ?? {});
+    const ator = this.parseAtor(atorRaw);
+    return this.repository.listarHorasExtras(filters, ator);
+  }
+
+  async registrarCienciaHoraExtra(
+    rawId: string,
+    rawInput: unknown,
+    atorRaw: AtorRaw,
+    origem: RegistroPontoOrigem
+  ) {
+    const input = registroPontoHoraExtraCienciaSchema.parse(rawInput ?? {});
+    const ator = this.parseAtor(atorRaw);
+    return this.repository.registrarCienciaHoraExtra(rawId, input, ator, origem);
+  }
+
+  async decidirHoraExtra(
+    rawId: string,
+    rawInput: unknown,
+    atorRaw: AtorRaw,
+    origem: RegistroPontoOrigem
+  ) {
+    const input = registroPontoHoraExtraDecisaoSchema.parse(rawInput ?? {});
+    const ator = this.parseAtor(atorRaw);
+    return this.repository.decidirHoraExtra(rawId, input, ator, origem);
+  }
+
+  async listarRelatorioMensal(rawFilters: unknown, atorRaw: AtorRaw) {
+    const filters = registroPontoRelatorioMensalSchema.parse(rawFilters ?? {});
+    const ator = this.parseAtor(atorRaw);
+    return this.repository.listarRelatorioMensal(filters, ator);
+  }
+
+  async exportarRelatorioMensal(rawFilters: unknown, formato: "pdf" | "excel", atorRaw: AtorRaw) {
+    const relatorio = await this.listarRelatorioMensal(rawFilters, atorRaw);
+
+    if (formato === "excel") {
+      const html = this.montarHtmlRelatorioMensal(relatorio);
+      return {
+        filename: `relatorio-horas-extras-${new Date().toISOString().slice(0, 10)}.xls`,
+        contentType: "application/vnd.ms-excel",
+        buffer: Buffer.from(html, "utf8")
+      };
+    }
+
+    const pdf = await this.montarPdfRelatorioMensal(relatorio);
+    return {
+      filename: `relatorio-horas-extras-${new Date().toISOString().slice(0, 10)}.pdf`,
+      contentType: "application/pdf",
+      buffer: pdf
+    };
   }
 
   async buscarHistorico(rawRegistroId: string, atorRaw: AtorRaw) {
@@ -295,5 +366,100 @@ export class RegistroPontoService {
     if (!valor?.trim()) return false;
     const normalized = valor.trim();
     return !normalized.startsWith("data:") && !/^https?:\/\//i.test(normalized);
+  }
+
+  private montarHtmlRelatorioMensal(relatorio: Awaited<ReturnType<RegistroPontoService["listarRelatorioMensal"]>>) {
+    const linhas = relatorio.registros
+      .map((item) => {
+        const justificativas = item.justificativas.join(" | ");
+        const batidas = item.batidas_reais.join(" | ");
+        return `
+          <tr>
+            <td>${item.usuario_nome}</td>
+            <td>${item.data_referencia}</td>
+            <td>${item.jornada_prevista ?? ""}</td>
+            <td>${batidas}</td>
+            <td>${item.horas_extras_pendentes_minutos}</td>
+            <td>${item.horas_extras_aprovadas_minutos}</td>
+            <td>${item.horas_extras_negadas_minutos}</td>
+            <td>${item.saldo_banco_horas_aprovado_minutos}</td>
+            <td>${justificativas}</td>
+            <td>${item.ciencia_funcionario ? "Sim" : "Não"}</td>
+            <td>${item.aprovacao_gestor_rh ? "Sim" : "Não"}</td>
+          </tr>`;
+      })
+      .join("");
+
+    return `<!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>Relatorio mensal de horas extras</title>
+          <style>
+            body { font-family: Arial, sans-serif; font-size: 12px; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { border: 1px solid #ccc; padding: 6px; vertical-align: top; }
+            th { background: #f1f5f9; }
+          </style>
+        </head>
+        <body>
+          <h1>Relatorio mensal de horas extras</h1>
+          <p>Total de funcionarios: ${relatorio.totais.funcionarios}</p>
+          <table>
+            <thead>
+              <tr>
+                <th>Funcionario</th>
+                <th>Data</th>
+                <th>Jornada prevista</th>
+                <th>Batidas reais</th>
+                <th>Pendentes</th>
+                <th>Aprovadas</th>
+                <th>Negadas</th>
+                <th>Banco aprovado</th>
+                <th>Justificativas</th>
+                <th>Ciencia</th>
+                <th>Aprovacao gestor/RH</th>
+              </tr>
+            </thead>
+            <tbody>${linhas}</tbody>
+          </table>
+        </body>
+      </html>`;
+  }
+
+  private async montarPdfRelatorioMensal(
+    relatorio: Awaited<ReturnType<RegistroPontoService["listarRelatorioMensal"]>>
+  ) {
+    return await new Promise<Buffer>((resolve, reject) => {
+      const doc = new PDFDocument({ margin: 30, size: "A4", compress: true });
+      const chunks: Buffer[] = [];
+
+      doc.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+      doc.on("end", () => resolve(Buffer.concat(chunks)));
+      doc.on("error", reject);
+
+      doc.fontSize(16).text("Relatorio mensal de horas extras", { align: "center" });
+      doc.moveDown(0.5);
+      doc.fontSize(10).text(`Funcionarios: ${relatorio.totais.funcionarios}`);
+      doc.text(`Pendentes: ${relatorio.totais.horas_extras_pendentes_minutos} min`);
+      doc.text(`Aprovadas: ${relatorio.totais.horas_extras_aprovadas_minutos} min`);
+      doc.text(`Negadas: ${relatorio.totais.horas_extras_negadas_minutos} min`);
+      doc.text(`Banco aprovado: ${relatorio.totais.saldo_banco_horas_aprovado_minutos} min`);
+      doc.moveDown(0.75);
+
+      for (const item of relatorio.registros.slice(0, 120)) {
+        doc.fontSize(11).text(`${item.usuario_nome} - ${item.data_referencia}`, { continued: false });
+        doc.fontSize(9).text(`Batidas: ${item.batidas_reais.join(" | ") || "---"}`);
+        doc.text(
+          `Pendentes: ${item.horas_extras_pendentes_minutos} | Aprovadas: ${item.horas_extras_aprovadas_minutos} | Negadas: ${item.horas_extras_negadas_minutos} | Banco: ${item.saldo_banco_horas_aprovado_minutos}`
+        );
+        if (item.justificativas.length) {
+          doc.text(`Justificativas: ${item.justificativas.join(" | ")}`);
+        }
+        doc.moveDown(0.4);
+      }
+
+      doc.end();
+    });
   }
 }

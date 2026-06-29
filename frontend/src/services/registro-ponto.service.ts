@@ -3,6 +3,10 @@ import type {
   RegistroPontoAlertaPendente,
   RegistroPontoAjustePayload,
   RegistroPontoEspelhoResponse,
+  RegistroPontoHoraExtraConfiguracao,
+  RegistroPontoHoraExtraItem,
+  RegistroPontoHoraExtraPendencia,
+  RegistroPontoHoraExtraResumo,
   RegistroPontoFacePayload,
   RegistroPontoFaceStatus,
   RegistroPontoFiltro,
@@ -13,6 +17,7 @@ import type {
   RegistroPontoMarcarPayload,
   RegistroPontoMarcarResponse,
   RegistroPontoOcorrenciaPayload,
+  RegistroPontoRelatorioMensalResponse,
   RegistroPontoUsuarioCatalogoItem
 } from "@/types/registro-ponto";
 
@@ -46,6 +51,13 @@ export const registroPontoService = {
     return data;
   },
 
+  async buscarConfiguracaoHoraExtra(): Promise<RegistroPontoHoraExtraConfiguracao> {
+    const { data } = await httpClient.get<RegistroPontoHoraExtraConfiguracao>(
+      "/api/registro-ponto/configuracao/hora-extra"
+    );
+    return data;
+  },
+
   async buscarFace(): Promise<RegistroPontoFaceStatus> {
     const { data } = await httpClient.get<RegistroPontoFaceStatus>("/api/registro-ponto/face");
     return data;
@@ -64,6 +76,16 @@ export const registroPontoService = {
     return data;
   },
 
+  async salvarConfiguracaoHoraExtra(
+    payload: RegistroPontoHoraExtraConfiguracao
+  ): Promise<RegistroPontoHoraExtraConfiguracao> {
+    const { data } = await httpClient.put<RegistroPontoHoraExtraConfiguracao>(
+      "/api/registro-ponto/configuracao/hora-extra",
+      payload
+    );
+    return data;
+  },
+
   async buscarAlertaPendente(): Promise<RegistroPontoAlertaPendente> {
     const { data } = await httpClient.get<RegistroPontoAlertaPendente>("/api/registro-ponto/alerta-pendente");
     return data;
@@ -72,6 +94,54 @@ export const registroPontoService = {
   async marcarPonto(payload: RegistroPontoMarcarPayload): Promise<RegistroPontoMarcarResponse> {
     const { data } = await httpClient.post<RegistroPontoMarcarResponse>("/api/registro-ponto/marcar", payload);
     return data;
+  },
+
+  async listarHorasExtras(params?: Record<string, unknown>): Promise<{
+    registros: RegistroPontoHoraExtraItem[];
+    totais: RegistroPontoHoraExtraResumo;
+  }> {
+    const { data } = await httpClient.get<{
+      registros: RegistroPontoHoraExtraItem[];
+      totais: RegistroPontoHoraExtraResumo;
+    }>("/api/registro-ponto/hora-extra", { params });
+    return data;
+  },
+
+  async registrarCienciaHoraExtra(id: string, payload: { justificativa_funcionario: string; ciencia_registrada: boolean }) {
+    const { data } = await httpClient.post<{ registro: RegistroPontoHoraExtraItem }>(
+      `/api/registro-ponto/hora-extra/${id}/ciencia`,
+      payload
+    );
+    return data;
+  },
+
+  async decidirHoraExtra(
+    id: string,
+    payload: { justificativa: string; minutos_aprovados?: number; minutos_negados?: number }
+  ) {
+    const { data } = await httpClient.patch<{ registro: RegistroPontoHoraExtraItem }>(
+      `/api/registro-ponto/hora-extra/${id}/decisao`,
+      payload
+    );
+    return data;
+  },
+
+  async listarRelatorioMensal(params?: Record<string, unknown>): Promise<RegistroPontoRelatorioMensalResponse> {
+    const { data } = await httpClient.get<RegistroPontoRelatorioMensalResponse>(
+      "/api/registro-ponto/relatorio-mensal",
+      { params }
+    );
+    return data;
+  },
+
+  async exportarRelatorioMensal(
+    params?: Record<string, unknown> & { formato?: "pdf" | "excel" }
+  ): Promise<Blob> {
+    const { data } = await httpClient.get("/api/registro-ponto/relatorio-mensal/export", {
+      params,
+      responseType: "blob"
+    });
+    return data as Blob;
   },
 
   async ajustarRegistro(id: string, payload: RegistroPontoAjustePayload) {

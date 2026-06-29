@@ -65,6 +65,21 @@ export class RegistroPontoController {
     return response.json(alerta);
   }
 
+  async buscarConfiguracaoHoraExtra(request: AuthenticatedRequest, response: Response) {
+    const configuracao = await service.buscarConfiguracaoHoraExtra(request.authUser ?? {});
+    return response.json(configuracao);
+  }
+
+  async salvarConfiguracaoHoraExtra(request: AuthenticatedRequest, response: Response) {
+    const origem = obterOrigem(request);
+    const configuracao = await service.salvarConfiguracaoHoraExtra(
+      request.body,
+      request.authUser ?? {},
+      origem
+    );
+    return response.json(configuracao);
+  }
+
   async buscarFace(request: AuthenticatedRequest, response: Response) {
     const face = await service.buscarFaceUsuario(request.authUser ?? {});
     return response.json(face);
@@ -106,6 +121,53 @@ export class RegistroPontoController {
   async buscarHistorico(request: AuthenticatedRequest, response: Response) {
     const historico = await service.buscarHistorico(request.params.id, request.authUser ?? {});
     return response.json(historico);
+  }
+
+  async listarHorasExtras(request: AuthenticatedRequest, response: Response) {
+    const resultado = await service.listarHorasExtras(request.query, request.authUser ?? {});
+    return response.json(resultado);
+  }
+
+  async registrarCienciaHoraExtra(request: AuthenticatedRequest, response: Response) {
+    const origem = obterOrigem(request);
+    const resultado = await service.registrarCienciaHoraExtra(
+      request.params.id,
+      request.body,
+      request.authUser ?? {},
+      origem
+    );
+    return response.json({ registro: resultado });
+  }
+
+  async decidirHoraExtra(request: AuthenticatedRequest, response: Response) {
+    const origem = obterOrigem(request);
+    const resultado = await service.decidirHoraExtra(
+      request.params.id,
+      request.body,
+      request.authUser ?? {},
+      origem
+    );
+    return response.json({ registro: resultado });
+  }
+
+  async listarRelatorioMensal(request: AuthenticatedRequest, response: Response) {
+    const relatorio = await service.listarRelatorioMensal(request.query, request.authUser ?? {});
+    return response.json(relatorio);
+  }
+
+  async exportarRelatorioMensal(request: AuthenticatedRequest, response: Response) {
+    const formato = request.query.formato === "excel" ? "excel" : "pdf";
+    const payload = {
+      ...(request.query as Record<string, unknown>),
+      ...(request.body as Record<string, unknown>)
+    };
+    const resultado = await service.exportarRelatorioMensal(payload, formato, request.authUser ?? {});
+
+    return response
+      .status(200)
+      .type(resultado.contentType)
+      .setHeader("Content-Disposition", `inline; filename="${resultado.filename}"`)
+      .send(resultado.buffer);
   }
 
   async gerarEspelhoPontoPdf(request: AuthenticatedRequest, response: Response) {

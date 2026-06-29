@@ -18,7 +18,8 @@ import {
   History,
   ShieldCheck,
   AlertCircle,
-  MapPinned
+  MapPinned,
+  ListChecks
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -55,18 +56,28 @@ import {
   useAdicionarOcorrenciaPonto,
   useAjustarRegistroPonto,
   useCatalogoUsuariosRegistroPonto,
+  useConfiguracaoHoraExtraRegistroPonto,
   useConfiguracaoRegistroPonto,
+  useDecidirHoraExtraRegistroPonto,
   useEspelhoPonto,
   useFaceRegistroPonto,
   useHistoricoRegistroPonto,
+  useHorasExtrasRegistroPonto,
   useMarcarPonto,
   useRegistrosPonto,
+  useRegistrarCienciaHoraExtraRegistroPonto,
+  useRelatorioMensalHoraExtraRegistroPonto,
   useSalvarFaceRegistroPonto,
+  useSalvarConfiguracaoHoraExtraRegistroPonto,
   useSalvarConfiguracaoRegistroPonto
 } from "@/features/registro-ponto/use-registro-ponto";
 import type {
   RegistroPontoFiltro,
   RegistroPontoItem,
+  RegistroPontoHoraExtraConfiguracao,
+  RegistroPontoHoraExtraItem,
+  RegistroPontoHoraExtraPendencia,
+  RegistroPontoHoraExtraResumo,
   RegistroPontoOcorrenciaTipo,
   RegistroPontoStatus
 } from "@/types/registro-ponto";
@@ -78,7 +89,8 @@ const abas = [
   { id: "espelho", label: "Espelho de ponto", icon: CalendarDays },
   { id: "ocorrencias", label: "Ocorrências", icon: AlertCircle },
   { id: "historico", label: "Histórico", icon: History },
-  { id: "ajuste", label: "Ajuste administrativo", icon: ShieldCheck }
+  { id: "ajuste", label: "Ajuste administrativo", icon: ShieldCheck },
+  { id: "hora-extra", label: "Aprovação de horas extras", icon: ListChecks }
 ] as const;
 
 type AbaRegistroPonto = (typeof abas)[number]["id"];
@@ -386,15 +398,29 @@ export function RegistroPontoPage() {
   const [abaAtiva, setAbaAtiva] = useState<AbaRegistroPonto>(() => normalizarAbaRegistroPonto(searchParams.get("aba")));
   const [filtroDraft, setFiltroDraft] = useState<RegistroPontoFiltro>({ ...filtroRegistroPontoPadrao });
   const [filtros, setFiltros] = useState<RegistroPontoFiltro>({ ...filtroRegistroPontoPadrao });
+  const [filtroHoraExtraDraft, setFiltroHoraExtraDraft] = useState<Record<string, string>>({});
+  const [filtrosHoraExtra, setFiltrosHoraExtra] = useState<Record<string, string>>({});
   const [registroSelecionadoId, setRegistroSelecionadoId] = useState<string | undefined>();
   const [mensagem, setMensagem] = useState<{ tipo: "sucesso" | "erro"; texto: string } | null>(null);
   const [popupMarcarAberto, setPopupMarcarAberto] = useState(false);
+  const [popupCienciaHoraExtraAberto, setPopupCienciaHoraExtraAberto] = useState(false);
   const [popupAjusteAberto, setPopupAjusteAberto] = useState(false);
   const [popupFaceAberto, setPopupFaceAberto] = useState(false);
   const [modoFace, setModoFace] = useState<"cadastro" | "confirmacao">("cadastro");
   const [modoConfirmacaoMarcacao, setModoConfirmacaoMarcacao] = useState<"senha" | "face">("senha");
   const [modoConfirmacaoAjuste, setModoConfirmacaoAjuste] = useState<"senha" | "face">("senha");
   const [localizacaoHistoricoSelecionada, setLocalizacaoHistoricoSelecionada] = useState<LocalizacaoHistoricoMapa | null>(null);
+  const [pendenciaHoraExtra, setPendenciaHoraExtra] = useState<RegistroPontoHoraExtraPendencia | null>(null);
+  const [cienciaHoraExtraConfirmada, setCienciaHoraExtraConfirmada] = useState(false);
+  const [justificativaHoraExtra, setJustificativaHoraExtra] = useState("");
+  const [configHoraExtraDraft, setConfigHoraExtraDraft] = useState<RegistroPontoHoraExtraConfiguracao>({
+    tolerancia_entrada_antecipada_minutos: 10,
+    exigir_autorizacao_hora_extra_antecipada: true,
+    limite_hora_extra_diaria_minutos: 120,
+    permitir_solicitacao_hora_extra_pelo_funcionario: false,
+    mensagem_ciencia_hora_extra:
+      "Declaro ciência de que a realização de hora extra depende de autorização da empresa."
+  });
   const [confirmacaoLogin, setConfirmacaoLogin] = useState("");
   const [confirmacaoSenha, setConfirmacaoSenha] = useState("");
   const [confirmacaoFaceImagem, setConfirmacaoFaceImagem] = useState("");
@@ -412,13 +438,23 @@ export function RegistroPontoPage() {
   const { data: espelhoData, isLoading: carregandoEspelho } = useEspelhoPonto(filtros);
   const { data: historicoData, isLoading: carregandoHistorico } = useHistoricoRegistroPonto(registroSelecionadoId);
   const { data: configuracaoHorarioData, isLoading: carregandoConfiguracaoHorario } = useConfiguracaoRegistroPonto();
+  const { data: configuracaoHoraExtraData } = useConfiguracaoHoraExtraRegistroPonto();
   const { data: faceData, isLoading: carregandoFace } = useFaceRegistroPonto();
   const { data: usuariosCatalogoData } = useCatalogoUsuariosRegistroPonto(isAdmin ? "" : undefined);
+  const { data: horaExtrasData } = useHorasExtrasRegistroPonto(
+    abaAtiva === "hora-extra" ? filtrosHoraExtra : undefined
+  );
+  const { data: relatorioHoraExtraData } = useRelatorioMensalHoraExtraRegistroPonto(
+    abaAtiva === "hora-extra" ? filtrosHoraExtra : undefined
+  );
 
   const marcarMutation = useMarcarPonto();
   const ajusteMutation = useAjustarRegistroPonto();
   const ocorrenciaMutation = useAdicionarOcorrenciaPonto();
   const salvarConfiguracaoHorarioMutation = useSalvarConfiguracaoRegistroPonto();
+  const salvarConfiguracaoHoraExtraMutation = useSalvarConfiguracaoHoraExtraRegistroPonto();
+  const decidirHoraExtraMutation = useDecidirHoraExtraRegistroPonto();
+  const registrarCienciaHoraExtraMutation = useRegistrarCienciaHoraExtraRegistroPonto();
   const salvarFaceMutation = useSalvarFaceRegistroPonto();
 
   const ajusteForm = useForm<
@@ -451,6 +487,8 @@ export function RegistroPontoPage() {
   const espelho = espelhoData?.registros ?? [];
   const totaisEspelho = espelhoData?.totais;
   const usuariosCatalogo = usuariosCatalogoData?.usuarios ?? [];
+  const horaExtras = horaExtrasData?.registros ?? [];
+  const totaisHoraExtra = horaExtrasData?.totais;
 
   const registroSelecionado = useMemo(
     () => registros.find((item) => item.id === registroSelecionadoId),
@@ -712,9 +750,24 @@ export function RegistroPontoPage() {
     });
   }, [configuracaoHorarioData, configuracaoHorarioForm]);
 
+  useEffect(() => {
+    if (configuracaoHoraExtraData) {
+      setConfigHoraExtraDraft(configuracaoHoraExtraData);
+    }
+  }, [configuracaoHoraExtraData]);
+
   function aplicarBusca() {
     if (filtrosTravados) return;
     setFiltros({ ...filtroDraft });
+  }
+
+  function aplicarFiltrosHoraExtra() {
+    setFiltrosHoraExtra({ ...filtroHoraExtraDraft });
+  }
+
+  function limparFiltrosHoraExtra() {
+    setFiltroHoraExtraDraft({});
+    setFiltrosHoraExtra({});
   }
 
   function limparParaNovo() {
@@ -768,6 +821,10 @@ export function RegistroPontoPage() {
       proximosParams.set("aba", aba);
     }
     setSearchParams(proximosParams, { replace: true });
+
+    if (aba === "espelho") {
+      setFiltros({ ...filtroDraft });
+    }
   }
 
   const submitConfiguracaoHorario = configuracaoHorarioForm.handleSubmit(async (values) => {
@@ -782,6 +839,43 @@ export function RegistroPontoPage() {
       });
     }
   });
+
+  async function salvarConfiguracaoHoraExtra() {
+    try {
+      await salvarConfiguracaoHoraExtraMutation.mutateAsync(configHoraExtraDraft);
+      setMensagem({ tipo: "sucesso", texto: "Configuração de hora extra salva com sucesso." });
+    } catch (error: unknown) {
+      const apiError = error as { response?: { data?: { message?: string } } };
+      setMensagem({
+        tipo: "erro",
+        texto: apiError.response?.data?.message ?? "Não foi possível salvar a configuração de hora extra."
+      });
+    }
+  }
+
+  async function exportarRelatorioMensalHoraExtra(formato: "pdf" | "excel") {
+    try {
+      const blob = await registroPontoService.exportarRelatorioMensal({
+        ...filtrosHoraExtra,
+        formato
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `relatorio-horas-extras.${formato === "pdf" ? "pdf" : "xls"}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      setMensagem({ tipo: "sucesso", texto: `Relatório mensal exportado em ${formato.toUpperCase()}.` });
+    } catch (error: unknown) {
+      const apiError = error as { response?: { data?: { message?: string } } };
+      setMensagem({
+        tipo: "erro",
+        texto: apiError.response?.data?.message ?? "Não foi possível exportar o relatório mensal."
+      });
+    }
+  }
 
   async function capturarFaceDaCamera() {
     const video = videoFaceRef.current;
@@ -952,12 +1046,19 @@ export function RegistroPontoPage() {
         validar_localizacao: false
       });
 
-      setMensagem({
-        tipo: "sucesso",
-        texto: marcouSemLocalizacao
-          ? `${response.mensagem} A marcação foi registrada sem localização.`
-          : response.mensagem
-      });
+      if (response.pendencia_hora_extra) {
+        setPendenciaHoraExtra(response.pendencia_hora_extra);
+        setJustificativaHoraExtra("");
+        setCienciaHoraExtraConfirmada(false);
+        setPopupCienciaHoraExtraAberto(true);
+      } else {
+        setMensagem({
+          tipo: "sucesso",
+          texto: marcouSemLocalizacao
+            ? `${response.mensagem} A marcação foi registrada sem localização.`
+            : response.mensagem
+        });
+      }
       setConfirmacaoSenha("");
       setConfirmacaoFaceImagem("");
     } catch (error: unknown) {
@@ -969,6 +1070,54 @@ export function RegistroPontoPage() {
     } finally {
       marcacaoEmExecucaoRef.current = false;
       setEtapaMarcacao("idle");
+    }
+  }
+
+  async function confirmarCienciaHoraExtra() {
+    if (!pendenciaHoraExtra) {
+      setPopupCienciaHoraExtraAberto(false);
+      return;
+    }
+
+    if (!cienciaHoraExtraConfirmada) {
+      setMensagem({
+        tipo: "erro",
+        texto: "Confirme a ciência antes de finalizar a ocorrência de hora extra."
+      });
+      return;
+    }
+
+    if (!justificativaHoraExtra.trim()) {
+      setMensagem({
+        tipo: "erro",
+        texto: "Informe a justificativa da antecipação."
+      });
+      return;
+    }
+
+    try {
+      await registrarCienciaHoraExtraMutation.mutateAsync({
+        id: pendenciaHoraExtra.id,
+        payload: {
+          justificativa_funcionario: justificativaHoraExtra.trim(),
+          ciencia_registrada: true
+        }
+      });
+
+      setMensagem({
+        tipo: "sucesso",
+        texto: "Batida registrada e ciência de hora extra confirmada com sucesso."
+      });
+      setPendenciaHoraExtra(null);
+      setPopupCienciaHoraExtraAberto(false);
+      setJustificativaHoraExtra("");
+      setCienciaHoraExtraConfirmada(false);
+    } catch (error: unknown) {
+      const apiError = error as { response?: { data?: { message?: string } } };
+      setMensagem({
+        tipo: "erro",
+        texto: apiError.response?.data?.message ?? "Não foi possível registrar a ciência da hora extra."
+      });
     }
   }
 
@@ -1410,6 +1559,322 @@ export function RegistroPontoPage() {
       );
     }
 
+    if (abaAtiva === "hora-extra") {
+      return (
+        <section className="space-y-3">
+          <Card>
+            <CardHeader>
+              <CardTitle>Aprovação de horas extras</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+                <div className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-3">
+                  <p className="text-xs text-[var(--g3-muted)]">Pendentes</p>
+                  <p className="text-lg font-semibold">{formatarMinutos(totaisHoraExtra?.total_pendentes_minutos)}</p>
+                </div>
+                <div className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-3">
+                  <p className="text-xs text-[var(--g3-muted)]">Autorizadas</p>
+                  <p className="text-lg font-semibold">{formatarMinutos(totaisHoraExtra?.total_autorizadas_minutos)}</p>
+                </div>
+                <div className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-3">
+                  <p className="text-xs text-[var(--g3-muted)]">Negadas</p>
+                  <p className="text-lg font-semibold">{formatarMinutos(totaisHoraExtra?.total_negadas_minutos)}</p>
+                </div>
+                <div className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-3">
+                  <p className="text-xs text-[var(--g3-muted)]">Banco aprovado</p>
+                  <p className="text-lg font-semibold">{formatarMinutos(totaisHoraExtra?.saldo_banco_horas_aprovado_minutos)}</p>
+                </div>
+                <div className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-3">
+                  <p className="text-xs text-[var(--g3-muted)]">Limiar diário</p>
+                  <p className="text-lg font-semibold">
+                    {configuracaoHoraExtraData
+                      ? `${configuracaoHoraExtraData.limite_hora_extra_diaria_minutos} min`
+                      : "120 min"}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-3">
+                  <p className="text-xs text-[var(--g3-muted)]">Funcionários no relatório</p>
+                  <p className="text-lg font-semibold">{relatorioHoraExtraData?.totais.funcionarios ?? 0}</p>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-4 space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-semibold">Configuração da empresa</h3>
+                    <p className="text-xs text-[var(--g3-muted)]">
+                      Ajuste a tolerância, o limite diário e a ciência obrigatória para entradas antecipadas.
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => void exportarRelatorioMensalHoraExtra("pdf")}
+                    >
+                      Exportar PDF
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => void exportarRelatorioMensalHoraExtra("excel")}
+                    >
+                      Exportar Excel
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => void salvarConfiguracaoHoraExtra()}
+                      disabled={salvarConfiguracaoHoraExtraMutation.isPending}
+                    >
+                      {salvarConfiguracaoHoraExtraMutation.isPending ? "Salvando..." : "Salvar configuração"}
+                    </Button>
+                  </div>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                  <div>
+                    <Label>Tolerância antecipada (min)</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={configHoraExtraDraft.tolerancia_entrada_antecipada_minutos}
+                      onChange={(event) =>
+                        setConfigHoraExtraDraft((atual) => ({
+                          ...atual,
+                          tolerancia_entrada_antecipada_minutos: Number(event.target.value || 0)
+                        }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>Limite diário (min)</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={configHoraExtraDraft.limite_hora_extra_diaria_minutos}
+                      onChange={(event) =>
+                        setConfigHoraExtraDraft((atual) => ({
+                          ...atual,
+                          limite_hora_extra_diaria_minutos: Number(event.target.value || 0)
+                        }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Cobrança de ciência</Label>
+                    <label className="flex items-center gap-2 rounded-lg border border-[var(--g3-border)] bg-white px-3 py-2 text-sm">
+                      <Checkbox
+                        checked={configHoraExtraDraft.exigir_autorizacao_hora_extra_antecipada}
+                        onCheckedChange={(checked) =>
+                          setConfigHoraExtraDraft((atual) => ({
+                            ...atual,
+                            exigir_autorizacao_hora_extra_antecipada: checked === true
+                          }))
+                        }
+                      />
+                      Exigir ciência para extra antecipada
+                    </label>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Solicitação do funcionário</Label>
+                    <label className="flex items-center gap-2 rounded-lg border border-[var(--g3-border)] bg-white px-3 py-2 text-sm">
+                      <Checkbox
+                        checked={configHoraExtraDraft.permitir_solicitacao_hora_extra_pelo_funcionario}
+                        onCheckedChange={(checked) =>
+                          setConfigHoraExtraDraft((atual) => ({
+                            ...atual,
+                            permitir_solicitacao_hora_extra_pelo_funcionario: checked === true
+                          }))
+                        }
+                      />
+                      Permitir solicitação
+                    </label>
+                  </div>
+                  <div className="sm:col-span-2 xl:col-span-5">
+                    <Label>Mensagem de ciência</Label>
+                    <Textarea
+                      value={configHoraExtraDraft.mensagem_ciencia_hora_extra}
+                      onChange={(event) =>
+                        setConfigHoraExtraDraft((atual) => ({
+                          ...atual,
+                          mensagem_ciencia_hora_extra: event.target.value
+                        }))
+                      }
+                      rows={3}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div>
+                  <Label>Funcionário</Label>
+                  <Input
+                    value={filtroHoraExtraDraft.funcionario ?? ""}
+                    onChange={(event) =>
+                      setFiltroHoraExtraDraft((atual) => ({ ...atual, funcionario: event.target.value }))
+                    }
+                  />
+                </div>
+                <div>
+                  <Label>Data inicial</Label>
+                  <Input
+                    type="date"
+                    value={filtroHoraExtraDraft.data_inicial ?? ""}
+                    onChange={(event) =>
+                      setFiltroHoraExtraDraft((atual) => ({ ...atual, data_inicial: event.target.value }))
+                    }
+                  />
+                </div>
+                <div>
+                  <Label>Data final</Label>
+                  <Input
+                    type="date"
+                    value={filtroHoraExtraDraft.data_final ?? ""}
+                    onChange={(event) =>
+                      setFiltroHoraExtraDraft((atual) => ({ ...atual, data_final: event.target.value }))
+                    }
+                  />
+                </div>
+                <div>
+                  <Label>Setor</Label>
+                  <Input
+                    value={filtroHoraExtraDraft.setor ?? ""}
+                    onChange={(event) =>
+                      setFiltroHoraExtraDraft((atual) => ({ ...atual, setor: event.target.value }))
+                    }
+                  />
+                </div>
+                <div>
+                  <Label>Status</Label>
+                  <Select
+                    value={filtroHoraExtraDraft.status ?? ""}
+                    onChange={(event) =>
+                      setFiltroHoraExtraDraft((atual) => ({ ...atual, status: event.target.value }))
+                    }
+                  >
+                    <option value="">Todos</option>
+                    <option value="EXTRA_PENDENTE_AUTORIZACAO">Pendente</option>
+                    <option value="EXTRA_AUTORIZADA">Autorizada</option>
+                    <option value="EXTRA_NEGADA">Negada</option>
+                    <option value="EXTRA_COMPENSADA_BANCO">Compensada no banco</option>
+                    <option value="EXTRA_PAGA_FOLHA">Paga em folha</option>
+                  </Select>
+                </div>
+                <div className="flex items-end gap-2 sm:col-span-2 xl:col-span-2">
+                  <Button type="button" onClick={aplicarFiltrosHoraExtra}>Aplicar filtros</Button>
+                  <Button type="button" variant="outline" onClick={limparFiltrosHoraExtra}>Limpar filtros</Button>
+                </div>
+              </div>
+
+              <div className="overflow-auto rounded-xl border border-[var(--g3-border)]">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]">
+                    <tr>
+                      <th className="px-3 py-2 text-left">Funcionário</th>
+                      <th className="px-3 py-2 text-left">Data</th>
+                      <th className="px-3 py-2 text-left">Previsto</th>
+                      <th className="px-3 py-2 text-left">Real</th>
+                      <th className="px-3 py-2 text-left">Minutos</th>
+                      <th className="px-3 py-2 text-left">Status</th>
+                      <th className="px-3 py-2 text-left">Ciência</th>
+                      <th className="px-3 py-2 text-left">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {horaExtras.length ? horaExtras.map((item) => (
+                      <tr key={item.id} className="border-t border-[var(--g3-border)] bg-[var(--g3-card)]">
+                        <td className="px-3 py-2">
+                          <div className="font-medium">{item.usuario_nome || item.usuario_login}</div>
+                          <div className="text-xs text-[var(--g3-muted)]">{item.setor || item.unidade || "—"}</div>
+                        </td>
+                        <td className="px-3 py-2">{formatarData(item.data_referencia)}</td>
+                        <td className="px-3 py-2">{item.horario_previsto}</td>
+                        <td className="px-3 py-2">{item.horario_real}</td>
+                        <td className="px-3 py-2">{formatarMinutos(item.minutos_excedentes)}</td>
+                        <td className="px-3 py-2">{item.status}</td>
+                        <td className="px-3 py-2">{item.ciencia_registrada ? "Sim" : "Não"}</td>
+                        <td className="px-3 py-2">
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={async () => {
+                                const justificativa = window.prompt("Justificativa da aprovação:")?.trim();
+                                if (!justificativa) return;
+                                await decidirHoraExtraMutation.mutateAsync({
+                                  id: item.id,
+                                  payload: { justificativa, minutos_aprovados: item.minutos_excedentes, minutos_negados: 0 }
+                                });
+                                setMensagem({ tipo: "sucesso", texto: "Hora extra aprovada com sucesso." });
+                              }}
+                              disabled={decidirHoraExtraMutation.isPending}
+                            >
+                              Aprovar
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={async () => {
+                                const justificativa = window.prompt("Justificativa da negativa:")?.trim();
+                                if (!justificativa) return;
+                                await decidirHoraExtraMutation.mutateAsync({
+                                  id: item.id,
+                                  payload: { justificativa, minutos_aprovados: 0, minutos_negados: item.minutos_excedentes }
+                                });
+                                setMensagem({ tipo: "sucesso", texto: "Hora extra negada com sucesso." });
+                              }}
+                              disabled={decidirHoraExtraMutation.isPending}
+                            >
+                              Negar
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={async () => {
+                                const aprovadosTexto = window.prompt(
+                                  `Quantidade aprovada em minutos (até ${item.minutos_excedentes}):`
+                                )?.trim();
+                                const aprovados = Number(aprovadosTexto);
+                                if (!Number.isFinite(aprovados) || aprovados < 0 || aprovados > item.minutos_excedentes) {
+                                  return;
+                                }
+                                const justificativa = window.prompt("Justificativa da decisão parcial:")?.trim();
+                                if (!justificativa) return;
+                                await decidirHoraExtraMutation.mutateAsync({
+                                  id: item.id,
+                                  payload: {
+                                    justificativa,
+                                    minutos_aprovados: aprovados,
+                                    minutos_negados: item.minutos_excedentes - aprovados
+                                  }
+                                });
+                                setMensagem({ tipo: "sucesso", texto: "Hora extra aprovada parcialmente com sucesso." });
+                              }}
+                              disabled={decidirHoraExtraMutation.isPending}
+                            >
+                              Aprovar parcialmente
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    )) : (
+                      <tr>
+                        <td className="px-3 py-4 text-center text-sm text-[var(--g3-muted)]" colSpan={8}>
+                          Nenhuma hora extra encontrada.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+      );
+    }
+
     if (abaAtiva === "marcacao") {
       return (
         <section className="space-y-3">
@@ -1720,9 +2185,33 @@ export function RegistroPontoPage() {
     }
 
     if (abaAtiva === "espelho") {
+      const periodoEspelho = espelhoData?.periodo;
       return (
         <section className="space-y-3">
           {renderFiltros()}
+          <div className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold">Período do espelho</h3>
+                <p className="text-xs text-[var(--g3-muted)]">
+                  {periodoEspelho?.data_inicial ? formatarData(periodoEspelho.data_inicial) : "Início não informado"} até{" "}
+                  {periodoEspelho?.data_final ? formatarData(periodoEspelho.data_final) : "Fim não informado"}
+                </p>
+                <p className="mt-1 text-xs text-[var(--g3-muted)]">
+                  Este relatório considera o período selecionado e apresenta o fechamento para conferência do mês.
+                </p>
+              </div>
+              <span
+                className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                  periodoEspelho?.fechado
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : "border-amber-200 bg-amber-50 text-amber-700"
+                }`}
+              >
+                {periodoEspelho?.fechado ? "Período fechado" : "Período em aberto"}
+              </span>
+            </div>
+          </div>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
             <Card><CardContent className="p-3"><p className="text-xs text-[var(--g3-muted)]">Dias</p><p className="text-lg font-semibold">{totaisEspelho?.total_dias ?? 0}</p></CardContent></Card>
             <Card><CardContent className="p-3"><p className="text-xs text-[var(--g3-muted)]">Horas extras</p><p className="text-lg font-semibold">{formatarMinutos(totaisEspelho?.horas_extras_minutos ?? 0)}</p></CardContent></Card>
@@ -1942,7 +2431,7 @@ export function RegistroPontoPage() {
           <Card className={classesTelaPadraoBeneficiario.cardAbas} data-print="tabs">
             <CardContent className={classesTelaPadraoBeneficiario.conteudoAbas}>
               {abas
-                .filter((aba) => (aba.id === "ajuste" ? isAdmin : true))
+                .filter((aba) => (aba.id === "ajuste" || aba.id === "hora-extra" ? isAdmin : true))
                 .map((aba, index) => (
                   <button
                     key={aba.id}
@@ -2115,6 +2604,72 @@ export function RegistroPontoPage() {
             <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3">
               <Button type="button" variant="outline" onClick={() => setPopupMarcarAberto(false)} disabled={marcacaoEmAndamento}>Cancelar</Button>
               <Button type="button" onClick={() => void executarMarcacao()} disabled={marcacaoEmAndamento}>{obterTextoBotaoMarcacao()}</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {popupCienciaHoraExtraAberto && pendenciaHoraExtra && (
+        <div
+          className="fixed inset-0 z-[72] flex items-center justify-center bg-slate-900/55 px-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => !registrarCienciaHoraExtraMutation.isPending && setPopupCienciaHoraExtraAberto(false)}
+        >
+          <div
+            className="w-full max-w-lg rounded-xl border border-slate-200 bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="border-b border-slate-100 px-5 py-4">
+              <h3 className="text-base font-semibold text-slate-900">Ciência de hora extra</h3>
+            </div>
+            <div className="space-y-4 px-5 py-4">
+              <p className="text-sm text-slate-700">{pendenciaHoraExtra.mensagem}</p>
+              {pendenciaHoraExtra.mensagem_ciencia ? (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                  {pendenciaHoraExtra.mensagem_ciencia}
+                </div>
+              ) : null}
+              {pendenciaHoraExtra.status === "EXTRA_PENDENTE_AUTORIZACAO" ? (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                  Esta entrada ficará pendente de análise do RH/gestor até decisão formal.
+                </div>
+              ) : null}
+              <label className="flex items-start gap-2 rounded-lg border border-[var(--g3-border)] bg-slate-50 p-3">
+                <Checkbox
+                  checked={cienciaHoraExtraConfirmada}
+                  onCheckedChange={(checked) => setCienciaHoraExtraConfirmada(checked === true)}
+                />
+                <span className="text-sm text-slate-700">
+                  Declaro ciência de que a realização de hora extra depende de autorização da empresa.
+                </span>
+              </label>
+              <div>
+                <Label>Justificativa</Label>
+                <Textarea
+                  value={justificativaHoraExtra}
+                  onChange={(event) => setJustificativaHoraExtra(event.target.value)}
+                  rows={4}
+                  placeholder="Informe o motivo da entrada antecipada."
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setPopupCienciaHoraExtraAberto(false)}
+                disabled={registrarCienciaHoraExtraMutation.isPending}
+              >
+                Fechar
+              </Button>
+              <Button
+                type="button"
+                onClick={() => void confirmarCienciaHoraExtra()}
+                disabled={registrarCienciaHoraExtraMutation.isPending}
+              >
+                {registrarCienciaHoraExtraMutation.isPending ? "Registrando..." : "Confirmar ciência"}
+              </Button>
             </div>
           </div>
         </div>
