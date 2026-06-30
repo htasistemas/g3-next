@@ -27,6 +27,12 @@ voluntarioRoutes.get(
   asyncHandler(controller.buscarPorId.bind(controller))
 );
 voluntarioRoutes.post(
+  "/escalas",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.criarEscala.bind(controller))
+);
+voluntarioRoutes.post(
   "/",
   ensureAuthenticated,
   ensurePermissions(permissoesEscrita),
@@ -43,4 +49,22 @@ voluntarioRoutes.delete(
   ensureAuthenticated,
   ensurePermissions(permissaoExclusao),
   asyncHandler(controller.remover.bind(controller))
+);
+voluntarioRoutes.get(
+  "/:id/escalas",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.listarEscalas.bind(controller))
+);
+voluntarioRoutes.put(
+  "/escalas/:escalaId",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.atualizarEscala.bind(controller))
+);
+voluntarioRoutes.delete(
+  "/escalas/:escalaId",
+  ensureAuthenticated,
+  ensurePermissions(permissaoExclusao),
+  asyncHandler(controller.removerEscala.bind(controller))
 );

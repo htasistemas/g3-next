@@ -40,6 +40,7 @@ import {
   useRemoverVoluntario,
   useSalvarVoluntario
 } from "@/features/voluntarios/use-voluntarios";
+import { VoluntarioEscalasPanel } from "@/pages/voluntarios/voluntario-escalas-panel";
 import { useBeneficiarios } from "@/features/beneficiarios/use-beneficiarios";
 import { useProfissionais } from "@/features/profissionais/use-profissionais";
 import type { Voluntario, VoluntarioFiltro } from "@/types/voluntario";
@@ -74,6 +75,7 @@ const abas = [
   { id: "contato", label: "Contato e competências", icon: HandHeart },
   { id: "endereco", label: "Endereço", icon: MapPinned },
   { id: "disponibilidade", label: "Disponibilidade", icon: CalendarClock },
+  { id: "escalas", label: "Escalas", icon: CalendarClock },
   { id: "termos", label: "Termos e documentos", icon: FileText }
 ] as const;
 
@@ -923,6 +925,16 @@ export function CadastroVoluntariadoPage() {
                   </section>
                 )}
                 {abaAtiva === "disponibilidade" && <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-12"><div className="xl:col-span-3"><Label>Status</Label><Select {...register("status")}>{voluntarioStatusOptions.map((status) => <option key={status} value={status}>{status}</option>)}</Select></div><div className="xl:col-span-3"><Label>Carga horária semanal</Label><Input {...register("carga_horaria_semanal")} onBlurCapture={() => aplicarFormatacaoCampo("carga_horaria_semanal")} /></div><div className="xl:col-span-3"><Label>Início previsto</Label><Input type="date" {...register("inicio_previsto")} /></div><div className="xl:col-span-3"><Label>Modalidade</Label><div className="mt-2 flex items-center gap-4"><label className="inline-flex items-center gap-2 text-sm"><Checkbox {...register("presencial")} checked={!!watch("presencial")} />Presencial</label><label className="inline-flex items-center gap-2 text-sm"><Checkbox {...register("remoto")} checked={!!watch("remoto")} />Remoto</label></div></div><div className="sm:col-span-2 xl:col-span-6"><Label>Dias disponíveis</Label><div className="mt-2 flex flex-wrap gap-3">{diasOptions.map((item) => <label key={item} className="inline-flex items-center gap-2 text-sm"><Checkbox checked={watch("disponibilidade_dias")?.includes(item)} onChange={() => alternarLista("disponibilidade_dias", item)} />{item}</label>)}</div></div><div className="sm:col-span-2 xl:col-span-6"><Label>Períodos</Label><div className="mt-2 flex flex-wrap gap-3">{periodosOptions.map((item) => <label key={item} className="inline-flex items-center gap-2 text-sm"><Checkbox checked={watch("disponibilidade_periodos")?.includes(item)} onChange={() => alternarLista("disponibilidade_periodos", item)} />{item}</label>)}</div></div><div className="xl:col-span-12"><Label>Observações</Label><Textarea {...register("observacoes")} rows={2} onBlurCapture={() => aplicarFormatacaoCampo("observacoes")} /></div></section>}
+                {abaAtiva === "escalas" && (
+                  <VoluntarioEscalasPanel
+                    voluntarioId={idSelecionado}
+                    voluntarios={voluntarios}
+                    onSelecionarVoluntario={(voluntarioId) => {
+                      setIdSelecionado(voluntarioId);
+                      setAbaAtiva("dados");
+                    }}
+                  />
+                )}
                 {abaAtiva === "termos" && <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-12"><label className="xl:col-span-4 flex items-center gap-2 text-sm"><Checkbox {...register("aceite_voluntariado")} checked={!!watch("aceite_voluntariado")} />Aceite de voluntariado</label><label className="xl:col-span-4 flex items-center gap-2 text-sm"><Checkbox {...register("aceite_imagem")} checked={!!watch("aceite_imagem")} />Aceite de uso de imagem</label><div className="xl:col-span-12"><Label>Documento de identificação</Label><Textarea {...register("documento_identificacao")} rows={2} /></div><div className="xl:col-span-12"><Label>Comprovante de endereço</Label><Textarea {...register("comprovante_endereco")} rows={2} /></div><div className="xl:col-span-12"><Label>Assinatura digital</Label><Input {...register("assinatura_digital")} /></div></section>}
               </form>
             )}

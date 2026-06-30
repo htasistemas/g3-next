@@ -770,6 +770,7 @@ const secoesManual: ManualSecao[] = [
           "Preencha os dados do voluntário e salve normalmente em um clique após revisar nome, CPF, contatos, disponibilidade e área de interesse.",
           "Na aba Dados pessoais, selecione o campo Sexo entre as opções disponíveis no cadastro.",
           "Na aba Endereço, informe o CEP com máscara; ao completar um CEP válido, o sistema consulta o endereço e preenche logradouro, bairro, município e UF quando encontrados.",
+          "Na aba Escalas, monte a agenda do voluntário escolhendo sala, tipo de atividade, dias da semana, hora inicial e hora final; o sistema calcula a carga semanal estimada e mantém a escala vinculada ao tenant.",
           "Na aba Listagem de voluntários, use Imprimir para emitir a relação filtrada; nas abas do cadastro selecionado, use Imprimir e escolha entre ficha cadastral ou termo de voluntariado no padrão institucional de relatórios.",
           "Quando houver foto 3x4, o sistema processa o arquivo antes do salvamento e informa o motivo real caso a imagem não possa ser utilizada.",
           "Em produção, o cadastro foi ajustado para funcionar também em bases legadas que ainda não possuem colunas novas de comunicação na tabela cadastro_voluntario."

@@ -76,6 +76,7 @@ const tabelasOperacionaisMultiTenant = [
   "cursos_atendimentos_presenca_datas",
   "cursos_atendimentos_presenca_anexos",
   "cursos_atendimentos_status",
+  "voluntario_escala",
   "banco_empregos_candidatos",
   "banco_empregos_vagas",
   "contas_bancarias",

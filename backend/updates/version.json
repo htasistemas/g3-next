@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.577",
-  "releaseDate": "2026-06-28",
-  "description": "A aba Agendamento passou a exibir o telefone cadastrado dos beneficiários vinculados na seleção e nos cards.",
+  "latestVersion": "1.00.578",
+  "releaseDate": "2026-06-29",
+  "description": "A tela de voluntariado passou a contar com a nova aba de escalas com sala, dias, horários, atividade e carga horaria calculada.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.577",
+  "minCompatibleVersion": "1.00.578",
   "releaseType": "stable"
 }
 

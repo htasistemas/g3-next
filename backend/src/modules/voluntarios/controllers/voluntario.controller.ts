@@ -38,4 +38,28 @@ export class VoluntarioController {
     await service.remover(request.params.id, request.authUser?.id, request.authUser?.tenant_id);
     return response.status(204).send();
   }
+
+  async listarEscalas(request: AuthenticatedRequest, response: Response) {
+    const escalas = await service.listarEscalas(request.params.id, request.authUser?.tenant_id);
+    return response.json({ escalas });
+  }
+
+  async criarEscala(request: AuthenticatedRequest, response: Response) {
+    const escala = await service.criarEscala(request.body, request.authUser?.tenant_id);
+    return response.status(201).json({ escala });
+  }
+
+  async atualizarEscala(request: AuthenticatedRequest, response: Response) {
+    const escala = await service.atualizarEscala(
+      request.params.escalaId,
+      request.body,
+      request.authUser?.tenant_id
+    );
+    return response.json({ escala });
+  }
+
+  async removerEscala(request: AuthenticatedRequest, response: Response) {
+    await service.removerEscala(request.params.escalaId, request.authUser?.tenant_id);
+    return response.status(204).send();
+  }
 }

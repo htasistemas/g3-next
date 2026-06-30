@@ -1,4 +1,13 @@
 export type VoluntarioStatus = "ATIVO" | "INATIVO" | "BLOQUEADO";
+export type VoluntarioEscalaStatus = "ATIVA" | "PAUSADA" | "INATIVA";
+export type VoluntarioEscalaDia =
+  | "SEGUNDA"
+  | "TERCA"
+  | "QUARTA"
+  | "QUINTA"
+  | "SEXTA"
+  | "SABADO"
+  | "DOMINGO";
 
 export type Voluntario = {
   id_voluntario?: string;
@@ -46,6 +55,39 @@ export type Voluntario = {
   uf?: string;
   data_cadastro?: string;
   data_atualizacao?: string;
+  escalas?: VoluntarioEscala[];
+};
+
+export type VoluntarioEscala = {
+  id_escala?: string;
+  voluntario_id: string;
+  sala_id: string;
+  sala_nome: string;
+  unidade_nome?: string;
+  atividade_tipo: string;
+  titulo?: string;
+  dias_semana: VoluntarioEscalaDia[];
+  hora_inicio: string;
+  hora_fim: string;
+  carga_horaria_semanal: number;
+  status: VoluntarioEscalaStatus;
+  observacoes?: string;
+  criado_em?: string;
+  atualizado_em?: string;
+};
+
+export type VoluntarioEscalaPayload = {
+  id_escala?: string;
+  voluntario_id: string;
+  sala_id: string;
+  atividade_tipo: string;
+  titulo?: string;
+  dias_semana: VoluntarioEscalaDia[];
+  hora_inicio: string;
+  hora_fim: string;
+  carga_horaria_semanal?: number;
+  status: VoluntarioEscalaStatus;
+  observacoes?: string;
 };
 
 export type VoluntarioListaResponse = {
@@ -54,6 +96,14 @@ export type VoluntarioListaResponse = {
 
 export type VoluntarioItemResponse = {
   voluntario: Voluntario;
+};
+
+export type VoluntarioEscalaListaResponse = {
+  escalas: VoluntarioEscala[];
+};
+
+export type VoluntarioEscalaItemResponse = {
+  escala: VoluntarioEscala;
 };
 
 export type VoluntarioFiltro = {

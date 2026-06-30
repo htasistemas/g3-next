@@ -1,5 +1,17 @@
 {
-    "entries":  [
+                "entries":  [
+                    {
+                        "version":  "1.00.578",
+                        "releaseDate":  "2026-06-29",
+                        "title":  "Escalas de voluntariado com sala e carga horaria",
+                        "description":  "A tela de voluntariado passou a contar com uma aba de escalas para montar atendimentos por sala, dias da semana, horários e tipo de atividade.",
+                        "changes":  [
+                                        "A nova aba Escalas permite cadastrar, editar e remover escalas vinculadas ao voluntário e ao tenant autenticado.",
+                                        "A carga horaria semanal passou a ser calculada a partir dos dias selecionados e do intervalo de horário informado.",
+                                        "O manual do sistema e a versão oficial foram atualizados para refletir a nova funcionalidade."
+                                    ],
+                        "releaseType":  "stable"
+                    },
                     {
                         "version":  "1.00.577",
                         "releaseDate":  "2026-06-29",

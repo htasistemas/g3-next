@@ -8,6 +8,7 @@ import { VoluntarioRepository } from "../repositories/voluntario.repository.js";
 import { mapaCamposTextoVoluntario } from "../../../utils/text-format-config.js";
 import { normalizarObjetoTexto } from "../../../utils/text-formatter.js";
 import { storageService } from "../../arquivos/services/storage-instance.js";
+import { voluntarioEscalaInputSchema } from "../voluntario-escala.schema.js";
 
 export class VoluntarioService {
   private readonly repository = new VoluntarioRepository();
@@ -34,7 +35,10 @@ export class VoluntarioService {
     const id = this.parseId(rawId);
     const tenantId = this.parseTenant(rawTenantId);
     const voluntario = await this.repository.buscarPorIdOuFalhar(id, tenantId);
-    return mapVoluntarioToResponse(voluntario);
+    return {
+      ...mapVoluntarioToResponse(voluntario),
+      escalas: []
+    };
   }
 
   async criar(rawInput: unknown, rawUsuarioId?: string, rawTenantId?: string) {
@@ -80,7 +84,7 @@ export class VoluntarioService {
           throw new AppError(`Nao foi possivel vincular a foto do voluntario. ${motivo}.`, 500);
         }
       }
-      return mapVoluntarioToResponse(voluntario);
+      return this.buscarPorId(voluntario.id.toString(), tenantId);
     } catch (error) {
       await storageService.rollbackArquivos([foto.novoCaminho]);
       throw error;
@@ -143,11 +147,53 @@ export class VoluntarioService {
           console.warn("[voluntario] falha ao limpar foto antiga apos atualizar cadastro:", error);
         }
       }
-      return mapVoluntarioToResponse(voluntario);
+      return this.buscarPorId(id.toString(), tenantId);
     } catch (error) {
       await storageService.rollbackArquivos([foto.novoCaminho]);
       throw error;
     }
+  }
+
+  async listarEscalas(rawVoluntarioId: string, rawTenantId?: string) {
+    const voluntarioId = this.parseId(rawVoluntarioId);
+    const tenantId = this.parseTenant(rawTenantId);
+    return this.repository.listarEscalas(voluntarioId, tenantId);
+  }
+
+  async criarEscala(rawInput: unknown, rawTenantId?: string) {
+    const tenantId = this.parseTenant(rawTenantId);
+    const input = voluntarioEscalaInputSchema.parse(this.normalizarPayload(rawInput));
+    return this.repository.criarEscala(
+      {
+        ...input,
+        voluntario_id: this.parseId(input.voluntario_id),
+        sala_id: this.parseId(input.sala_id),
+        dias_semana: input.dias_semana
+      },
+      tenantId
+    );
+  }
+
+  async atualizarEscala(rawEscalaId: string, rawInput: unknown, rawTenantId?: string) {
+    const tenantId = this.parseTenant(rawTenantId);
+    const escalaId = this.parseId(rawEscalaId);
+    const input = voluntarioEscalaInputSchema.parse(this.normalizarPayload(rawInput));
+    return this.repository.atualizarEscala(
+      escalaId,
+      {
+        ...input,
+        voluntario_id: this.parseId(input.voluntario_id),
+        sala_id: this.parseId(input.sala_id),
+        dias_semana: input.dias_semana
+      },
+      tenantId
+    );
+  }
+
+  async removerEscala(rawEscalaId: string, rawTenantId?: string) {
+    const tenantId = this.parseTenant(rawTenantId);
+    const escalaId = this.parseId(rawEscalaId);
+    await this.repository.removerEscala(escalaId, tenantId);
   }
 
   async remover(rawId: string, rawUsuarioId?: string, rawTenantId?: string) {
