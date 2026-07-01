@@ -183,8 +183,15 @@ function formatarHora(value?: string | null) {
   return texto.length === 5 ? `${texto}:00` : texto;
 }
 
-function formatarHoraExibicao(value?: string | null) {
-  const texto = String(value ?? "").trim();
+function formatarHoraExibicao(value?: Date | string | null) {
+  if (!value) return "---";
+  if (value instanceof Date) {
+    const horas = String(value.getUTCHours()).padStart(2, "0");
+    const minutos = String(value.getUTCMinutes()).padStart(2, "0");
+    return `${horas}:${minutos}`;
+  }
+
+  const texto = String(value).trim();
   if (!texto) return "---";
   const match = texto.match(/^(\d{2}:\d{2})/);
   return match ? match[1] : texto;
@@ -1107,7 +1114,7 @@ export class AgendamentosRepository {
     sala: string | null;
     recurso: string | null;
     hora_inicial: string;
-    hora_final: string | null;
+    hora_final: Date | string | null;
     status: string | null;
   }>) {
     const resumo = conflitos.slice(0, 3).map((item) => {
