@@ -76,6 +76,11 @@ export class AgendamentosController {
     return response.json({ agendamento: item ? mapAgendamentoRow(item) : null });
   }
 
+  async excluir(request: AuthenticatedRequest, response: Response) {
+    const item = await service.excluir(request.params.id, request.authUser, request.authUser?.tenant_id);
+    return response.json({ agendamento: item ? mapAgendamentoRow(item) : null });
+  }
+
   async remarcar(request: AuthenticatedRequest, response: Response) {
     const item = await service.remarcar(
       request.params.id,

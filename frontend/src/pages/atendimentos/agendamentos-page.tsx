@@ -41,6 +41,7 @@ import {
   useIndicadoresAgendamentos,
   useItensOperacionaisAgendamento,
   useListaEsperaAgendamentos,
+  useExcluirAgendamento,
   useNotificarAgendamento,
   useRemarcarAgendamento,
   useSalvarAgendamento,
@@ -405,6 +406,7 @@ export function AgendamentosPage() {
   const salvarAgendamentoMutation = useSalvarAgendamento();
   const salvarMutation = useSalvarAgendamentoOperacional();
   const cancelarMutation = useCancelarAgendamento();
+  const excluirMutation = useExcluirAgendamento();
   const notificarMutation = useNotificarAgendamento();
   const remarcarMutation = useRemarcarAgendamento();
   const preferenciaSalvando = useRef<number | null>(null);
@@ -1127,12 +1129,12 @@ export function AgendamentosPage() {
         aberto={Boolean(agendaParaExcluir)}
         titulo="Excluir agenda"
         texto="Deseja realmente excluir esta agenda da listagem?"
-        processando={cancelarMutation.isPending}
+        processando={excluirMutation.isPending}
         onCancel={() => setAgendaParaExcluir(null)}
         onConfirm={() => {
           if (!agendaParaExcluir?.id) return;
-          void cancelarMutation
-            .mutateAsync({ id: agendaParaExcluir.id, motivo: "Excluído pela agenda operacional." })
+          void excluirMutation
+            .mutateAsync(agendaParaExcluir.id)
             .then(() => {
               setPopup({ tipo: "sucesso", titulo: "Confirmação", texto: "Agenda removida com sucesso." });
               if (selecionadoId === agendaParaExcluir.id) {

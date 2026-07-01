@@ -113,6 +113,16 @@ export function useCancelarAgendamento() {
   });
 }
 
+export function useExcluirAgendamento() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string | number) => agendamentosService.excluir(id),
+    onSuccess: async () => {
+      await invalidarAgendamentos(queryClient);
+    }
+  });
+}
+
 export function useRemarcarAgendamento() {
   const queryClient = useQueryClient();
   return useMutation({

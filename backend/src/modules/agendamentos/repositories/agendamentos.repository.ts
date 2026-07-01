@@ -389,13 +389,19 @@ export class AgendamentosRepository {
     `);
   }
 
-  private async registrarHistoricoFamilia(familiaId?: bigint | null, descricao?: string, dadosNovos?: unknown) {
+  private async registrarHistoricoFamilia(
+    familiaId?: bigint | null,
+    descricao?: string,
+    dadosNovos?: unknown,
+    tenantId?: string
+  ) {
     if (!familiaId) return;
 
     await prisma.$executeRaw(Prisma.sql`
       INSERT INTO familia_historico (
-        familia_id, tipo_evento, descricao, dados_novos, data_evento
+        tenant_id, familia_id, tipo_evento, descricao, dados_novos, data_evento
       ) VALUES (
+        ${tenantId ? Prisma.sql`${tenantId}::uuid` : Prisma.sql`NULL`},
         ${familiaId},
         'agendamento',
         ${descricao ?? 'Agendamento vinculado à família.'},
@@ -1294,7 +1300,7 @@ export class AgendamentosRepository {
     await this.sincronizarBeneficiariosAgendamento(id, tenantId, input.participantes ?? []);
     const criado = await this.obter(id, tenantId);
     await this.registrarLog(id, "criar", usuario, tenantId, null, criado);
-    await this.registrarHistoricoFamilia(criado?.familia_id, "Agendamento criado para a família.", criado);
+    await this.registrarHistoricoFamilia(criado?.familia_id, "Agendamento criado para a família.", criado, tenantId);
     return criado;
   }
 
@@ -1396,6 +1402,21 @@ export class AgendamentosRepository {
     const atual = await this.obter(id, tenantId);
     await this.registrarLog(id, "cancelar", usuario, tenantId, anterior, atual);
     return atual;
+  }
+
+  async excluir(id: bigint, usuario: UsuarioActor | undefined, tenantId: string) {
+    const anterior = await this.obter(id, tenantId);
+    if (!anterior) throw new AppError("Agendamento nao encontrado.", 404);
+
+    await prisma.$executeRaw(Prisma.sql`
+      DELETE FROM agendamento
+      WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
+    `);
+
+    await this.registrarLog(id, "excluir", usuario, tenantId, anterior, null);
+    await this.registrarHistoricoFamilia(anterior.familia_id, "Agendamento excluido da agenda.", anterior, tenantId);
+    return anterior;
   }
 
   async remarcar(id: bigint, input: AgendamentoRemarcacaoInput, usuario: UsuarioActor | undefined, tenantId: string) {
@@ -1574,7 +1595,7 @@ export class AgendamentosRepository {
 
     const atual = await this.obter(id, tenantId);
     await this.registrarLog(id, "concluir", usuario, tenantId, anterior, atual);
-    await this.registrarHistoricoFamilia(atual?.familia_id, "Atendimento concluído para a família.", atual);
+    await this.registrarHistoricoFamilia(atual?.familia_id, "Atendimento concluído para a família.", atual, tenantId);
     return atual;
   }
 

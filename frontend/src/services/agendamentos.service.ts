@@ -42,6 +42,11 @@ export const agendamentosService = {
     return data.agendamento;
   },
 
+  async excluir(id: string | number) {
+    const { data } = await httpClient.delete<{ agendamento: Agendamento | null }>(`/api/agendamentos/${id}`);
+    return data.agendamento;
+  },
+
   async remarcar(id: string | number, payload: Partial<Agendamento>) {
     const { data } = await httpClient.post<{ agendamento: Agendamento | null }>(`/api/agendamentos/${id}/remarcar`, payload);
     return data.agendamento;

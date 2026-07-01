@@ -48,6 +48,10 @@ export class AgendamentosService {
     return this.repository.cancelar(this.parseId(rawId), body.motivo, usuario, this.parseTenantId(tenantId));
   }
 
+  async excluir(rawId: string, usuario?: UsuarioActor, tenantId?: string) {
+    return this.repository.excluir(this.parseId(rawId), usuario, this.parseTenantId(tenantId));
+  }
+
   async remarcar(rawId: string, rawInput: unknown, usuario?: UsuarioActor, tenantId?: string) {
     const input = agendamentoRemarcacaoInputSchema.parse(rawInput);
     return this.repository.remarcar(this.parseId(rawId), input, usuario, this.parseTenantId(tenantId));

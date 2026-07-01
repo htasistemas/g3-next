@@ -41,6 +41,11 @@ agendamentosRoutes.post(
   ensurePermissions(["ADMINISTRADOR", "OPERADOR", "AGENDAMENTOS_CANCELAR"]),
   asyncHandler(controller.cancelar.bind(controller))
 );
+agendamentosRoutes.delete(
+  "/:id",
+  ensurePermissions(["ADMINISTRADOR", "OPERADOR", "AGENDAMENTOS_CANCELAR"]),
+  asyncHandler(controller.excluir.bind(controller))
+);
 agendamentosRoutes.post(
   "/:id/remarcar",
   ensurePermissions(["ADMINISTRADOR", "OPERADOR", "AGENDAMENTOS_REMARCAR"]),
