@@ -379,27 +379,35 @@ function PopupMensagem({ popup, onClose }: { popup: PopupMensagemState; onClose:
 
 function ImagemAutenticada({
   valor,
+  fallbackValor,
   alt,
   className,
   placeholder = "Sem foto"
 }: {
   valor?: string | null;
+  fallbackValor?: string | null;
   alt: string;
   className?: string;
   placeholder?: string;
 }) {
   const [url, setUrl] = useState("");
   const [falhou, setFalhou] = useState(false);
+  const [fonteAtual, setFonteAtual] = useState("");
+
+  useEffect(() => {
+    setFalhou(false);
+    setFonteAtual(valor?.trim() ?? fallbackValor?.trim() ?? "");
+  }, [valor, fallbackValor]);
 
   useEffect(() => {
     let ativo = true;
     let revokeAtual: (() => void) | undefined;
-    const imagem = valor?.trim() ?? "";
+    const imagem = fonteAtual.trim();
+    const fallback = fallbackValor?.trim() ?? "";
 
-    setFalhou(false);
+    setUrl("");
 
     if (!imagem) {
-      setUrl("");
       return () => {
         revokeAtual?.();
       };
@@ -424,6 +432,10 @@ function ImagemAutenticada({
         setUrl(arquivo.url || resolverUrlArquivo(imagem));
       } catch {
         if (!ativo) return;
+        if (fallback && imagem !== fallback) {
+          setFonteAtual(fallback);
+          return;
+        }
         setUrl("");
         setFalhou(true);
       }
@@ -433,13 +445,31 @@ function ImagemAutenticada({
       ativo = false;
       revokeAtual?.();
     };
-  }, [valor]);
+  }, [fonteAtual, fallbackValor]);
 
   if (!url || falhou) {
     return <span className="px-2 text-center text-[10px] text-[var(--g3-muted)]">{placeholder}</span>;
   }
 
-  return <img src={url} alt={alt} className={className} loading="lazy" decoding="async" onError={() => setFalhou(true)} />;
+  return (
+    <img
+      src={url}
+      alt={alt}
+      className={className}
+      loading="lazy"
+      decoding="async"
+      onError={() => {
+        const fallback = fallbackValor?.trim() ?? "";
+        if (fallback && fonteAtual !== fallback) {
+          setFalhou(false);
+          setFonteAtual(fallback);
+          return;
+        }
+
+        setFalhou(true);
+      }}
+    />
+  );
 }
 
 export function CadastroMatriculasPage() {
@@ -2998,7 +3028,8 @@ export function CadastroMatriculasPage() {
                               <div className="relative mb-5 flex aspect-[4/3] w-full max-w-[220px] items-center justify-center overflow-visible rounded-md border border-[var(--g3-border)] bg-[var(--g3-card-soft)] shadow-sm">
                                 {item.imagem_thumbnail || item.imagem ? (
                                   <ImagemAutenticada
-                                    valor={item.imagem_thumbnail ?? item.imagem}
+                                    valor={item.imagem_thumbnail}
+                                    fallbackValor={item.imagem}
                                     alt={`Foto de ${item.nome}`}
                                     className="h-full w-full rounded-md object-cover"
                                     placeholder="Sem foto"

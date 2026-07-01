@@ -168,7 +168,7 @@ const secoesManual: ManualSecao[] = [
           "Consulte a listagem de inscrições para localizar cada inscrição individual já incluída, com beneficiário, curso, status, data da inscrição, agendamento e profissional; a tabela voltou a carregar os lançamentos reais já salvos na instituição, respeitando os filtros aplicados na própria listagem.",
           "O agendamento da inscrição fica destacado visualmente como agendado, pendente, cancelado ou finalizado, com filtros rápidos por status acima da tabela.",
           "A aba Catálogo e vagas voltou a usar uma fonte própria de dados, então os cards cadastrados continuam visíveis mesmo quando a listagem estiver filtrada.",
-          "As fotos dos cursos, oficinas e atendimentos são enviadas para o storage autenticado do sistema; o cadastro grava apenas o caminho do arquivo e exibe a imagem na prévia e nos cards do catálogo.",
+          "As fotos dos cursos, oficinas e atendimentos são enviadas para o storage autenticado do sistema; o cadastro grava apenas o caminho do arquivo e exibe a imagem na prévia e nos cards do catálogo, com fallback automático para a imagem original quando a miniatura não estiver disponível.",
           "Use os dados da inscrição para registrar turma, responsável, datas e observações.",
           "Revise a fila de espera e a situação de vagas para apoiar decisões de encaminhamento.",
           "Os atendimentos agendados não ficam mais dentro da tela de inscrições; quando precisar operar agenda, use o botão Abrir em Agendamentos.",
