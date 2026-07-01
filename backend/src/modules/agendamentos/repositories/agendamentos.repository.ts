@@ -562,9 +562,9 @@ export class AgendamentosRepository {
       ORDER BY
         CASE
           WHEN COALESCE(
-            NULLIF(TRIM(c.telefone_principal), ''),
-            NULLIF(TRIM(c.telefone_secundario), ''),
-            NULLIF(TRIM(c.telefone_recado_numero), '')
+            NULLIF(TRIM(contato_beneficio.telefone_principal), ''),
+            NULLIF(TRIM(contato_beneficio.telefone_secundario), ''),
+            NULLIF(TRIM(contato_beneficio.telefone_recado_numero), '')
           ) IS NULL THEN 1
           ELSE 0
         END,
