@@ -460,7 +460,7 @@ const secoesManual: ManualSecao[] = [
         objetivo: "Gerenciar eventos institucionais com álbum persistido, capa do evento, galeria organizada e ações claras por contexto.",
         comoUsar: [
           "Na aba Listagem, use busca e status para localizar rapidamente o evento e acompanhe os indicadores de total de eventos, fotos, álbuns sem capa e evento com mais fotos.",
-          "Na aba Mural de eventos, visualize mini cards com a foto principal de cada evento, status, data, local e total de fotos, usando 1 clique no card para abrir a galeria do evento. Quando a capa não estiver definida, o mural usa automaticamente a primeira foto do álbum e carrega a imagem por acesso autenticado.",
+          "Na aba Mural de eventos, visualize mini cards com a foto principal de cada evento, status, data, local e total de fotos, usando 1 clique no card para abrir a galeria do evento. Quando a capa não estiver definida, o mural usa automaticamente a primeira foto do álbum e carrega a imagem por acesso autenticado, com fallback para o caminho original se a URL autenticada não responder.",
           "Na listagem de eventos, clique diretamente sobre a linha do evento para abrir o álbum, sem depender de botão de ação separado.",
           "Na aba Cadastro do evento, preencha os dados principais e use Adicionar fotos para fazer upload múltiplo antes mesmo do primeiro salvamento.",
           "Se as imagens estiverem organizadas em várias pastas, use Importar pastas para criar um evento novo por pasta; o título vem do nome da pasta, a data vem da data da foto, o status é gravado como Realizado e o campo local recebe o caminho da pasta importada.",
@@ -746,6 +746,7 @@ const secoesManual: ManualSecao[] = [
         ],
         atencoes: [
           "Fotos e documentos do beneficiário ficam vinculados ao tenant da instituição autenticada e não devem ser acessíveis por outro CNPJ.",
+          "Quando a foto 3x4 estiver salva, a prévia tenta primeiro a URL autenticada e, se houver falha de leitura, usa o caminho original para evitar sumiço visual da imagem já cadastrada.",
           "Datas de nascimento futuras ou inexistentes são bloqueadas no cadastro.",
           "A tela não deve mais exibir apenas erro interno do servidor nesse fluxo de documentos quando houver um motivo tratável.",
           "Mensagens de validação e persistência agora priorizam o motivo operacional real do erro."

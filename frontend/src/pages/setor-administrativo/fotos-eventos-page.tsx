@@ -40,7 +40,7 @@ import {
   useReordenarFotosEvento,
   useSalvarFotoEvento
 } from "@/features/fotos-eventos/use-fotos-eventos";
-import { obterUrlArquivoAutenticado } from "@/lib/arquivos";
+import { obterUrlArquivoAutenticado, resolverUrlArquivo } from "@/lib/arquivos";
 import { lerArquivoComoDataUrl } from "@/lib/foto-3x4";
 import { imprimirConteudoAtual } from "@/lib/report-utils";
 import type { FotoEventoFotoPayload, FotoEventoPayload, FotoUploadPayload } from "@/types/fotos-eventos";
@@ -261,6 +261,7 @@ function ImagemArquivoAutenticado({
     let ativo = true;
     let revokeAtual: (() => void) | undefined;
     const caminho = valor?.trim() ?? "";
+    const urlFallback = resolverUrlArquivo(caminho);
 
     setFalhou(false);
 
@@ -290,8 +291,7 @@ function ImagemArquivoAutenticado({
         setUrl(arquivo.url);
       } catch {
         if (!ativo) return;
-        setUrl("");
-        setFalhou(true);
+        setUrl(urlFallback);
       }
     })();
 
@@ -309,7 +309,25 @@ function ImagemArquivoAutenticado({
     );
   }
 
-  return <img src={url} alt={alt} className={className} loading="lazy" decoding="async" onError={() => setFalhou(true)} />;
+  return (
+    <img
+      src={url}
+      alt={alt}
+      className={className}
+      loading="lazy"
+      decoding="async"
+      onError={() => {
+        const fallback = resolverUrlArquivo(valor?.trim() ?? "");
+        if (fallback && url !== fallback) {
+          setFalhou(false);
+          setUrl(fallback);
+          return;
+        }
+
+        setFalhou(true);
+      }}
+    />
+  );
 }
 
 export function FotosEventosPage() {

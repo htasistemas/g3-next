@@ -63,7 +63,7 @@ import {
 } from "@/lib/text-format-config";
 import { formatarTextoPorCampo, normalizarObjetoTexto } from "@/lib/text-formatter";
 import { reservarJanelaRelatorio } from "@/lib/report-utils";
-import { obterUrlArquivoAutenticado } from "@/lib/arquivos";
+import { obterUrlArquivoAutenticado, resolverUrlArquivo } from "@/lib/arquivos";
 import {
   classeBotaoAbaLateral,
   classeNumeroAbaLateral,
@@ -901,7 +901,7 @@ export function CadastroBeneficiarioPage() {
         setFoto3x4PreviewUrl(arquivo.url);
       } catch {
         if (!ativo) return;
-        setFoto3x4PreviewUrl("");
+        setFoto3x4PreviewUrl(resolverUrlArquivo(foto3x4Atual));
       }
     })();
 
