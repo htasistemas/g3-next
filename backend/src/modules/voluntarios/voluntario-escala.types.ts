@@ -28,6 +28,7 @@ export type VoluntarioEscalaInput = {
 export type VoluntarioEscalaResumo = {
   id_escala: string;
   voluntario_id: string;
+  voluntario_nome?: string;
   sala_id: string;
   sala_nome: string;
   unidade_nome?: string;

@@ -1,6 +1,18 @@
 {
                 "entries":  [
                     {
+                        "version":  "1.00.579",
+                        "releaseDate":  "2026-06-30",
+                        "title":  "Reserva de empréstimo com pré-visualização de e-mail",
+                        "description":  "Empréstimos para eventos passaram a confirmar a reserva, mostrar o conteúdo do e-mail antes do envio e incluir observações nas mensagens de WhatsApp e e-mail.",
+                        "changes":  [
+                                        "A aba Dados do empréstimo ganhou a ação Confirmar reserva e os botões Itens retirados e Itens devolvidos.",
+                                        "A confirmação por e-mail agora abre uma pré-visualização com destinatário, assunto e corpo antes do envio.",
+                                        "As mensagens de WhatsApp e e-mail passaram a carregar também as observações do empréstimo."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.578",
                         "releaseDate":  "2026-06-29",
                         "title":  "Escalas de voluntariado com sala e carga horaria",

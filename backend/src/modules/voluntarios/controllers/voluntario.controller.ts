@@ -44,6 +44,11 @@ export class VoluntarioController {
     return response.json({ escalas });
   }
 
+  async listarEscalasGeral(request: AuthenticatedRequest, response: Response) {
+    const escalas = await service.listarEscalasGeral(request.authUser?.tenant_id);
+    return response.json({ escalas });
+  }
+
   async criarEscala(request: AuthenticatedRequest, response: Response) {
     const escala = await service.criarEscala(request.body, request.authUser?.tenant_id);
     return response.status(201).json({ escala });

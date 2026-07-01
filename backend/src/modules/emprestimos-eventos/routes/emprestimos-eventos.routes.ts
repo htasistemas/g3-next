@@ -106,6 +106,12 @@ emprestimosEventosRoutes.post(
   asyncHandler(controller.confirmarRetirada.bind(controller))
 );
 emprestimosEventosRoutes.post(
+  "/:id/confirmar-reserva",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.confirmarReserva.bind(controller))
+);
+emprestimosEventosRoutes.post(
   "/:id/confirmar-devolucao",
   ensureAuthenticated,
   ensurePermissions(permissoesEscrita),
@@ -128,6 +134,12 @@ emprestimosEventosRoutes.post(
   ensureAuthenticated,
   ensurePermissions(permissoesEscrita),
   asyncHandler(controller.enviarConfirmacaoReservaEmail.bind(controller))
+);
+emprestimosEventosRoutes.get(
+  "/:id/confirmacao-reserva/email/preview",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.obterPreviewConfirmacaoReservaEmail.bind(controller))
 );
 emprestimosEventosRoutes.get(
   "/:id",

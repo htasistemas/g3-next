@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Edit3, Save, Trash2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -12,7 +13,8 @@ import { matriculasService } from "@/services/matriculas.service";
 import {
   useRemoverVoluntarioEscala,
   useSalvarVoluntarioEscala,
-  useVoluntarioEscalas
+  useVoluntarioEscalas,
+  useVoluntarioEscalasGeral
 } from "@/features/voluntarios/use-voluntarios";
 import type {
   VoluntarioEscala,
@@ -50,6 +52,26 @@ const statusOptions: Array<{ value: VoluntarioEscalaStatus; label: string }> = [
   { value: "PAUSADA", label: "Pausada" },
   { value: "INATIVA", label: "Inativa" }
 ];
+
+const diasOrdenados: VoluntarioEscalaDia[] = [
+  "SEGUNDA",
+  "TERCA",
+  "QUARTA",
+  "QUINTA",
+  "SEXTA",
+  "SABADO",
+  "DOMINGO"
+];
+
+const diasMapeados: Record<VoluntarioEscalaDia, string> = {
+  SEGUNDA: "Segunda",
+  TERCA: "Terça",
+  QUARTA: "Quarta",
+  QUINTA: "Quinta",
+  SEXTA: "Sexta",
+  SABADO: "Sábado",
+  DOMINGO: "Domingo"
+};
 
 const formInicial: FormState = {
   sala_id: "",
@@ -102,23 +124,67 @@ function validarHorarioEscala(horaInicio: string, horaFim: string) {
   return "";
 }
 
+function varianteBadgeStatusEscala(status: VoluntarioEscalaStatus) {
+  switch (status) {
+    case "ATIVA":
+      return "success";
+    case "PAUSADA":
+      return "warning";
+    case "INATIVA":
+      return "default";
+    default:
+      return "default";
+  }
+}
+
+function agruparEscalasPorDia(escalas: VoluntarioEscala[]) {
+  return diasOrdenados.reduce<Record<VoluntarioEscalaDia, VoluntarioEscala[]>>((acc, dia) => {
+    acc[dia] = escalas.filter((escala) => escala.dias_semana.includes(dia));
+    return acc;
+  }, {} as Record<VoluntarioEscalaDia, VoluntarioEscala[]>);
+}
+
+function distribuirEmFaixas(escalas: VoluntarioEscala[]) {
+  const ordenadas = [...escalas].sort((a, b) => horaParaMinutos(a.hora_inicio) - horaParaMinutos(b.hora_inicio));
+  const faixasFim: number[] = [];
+
+  const itens = ordenadas.map((escala) => {
+    const inicio = horaParaMinutos(escala.hora_inicio);
+    const fim = horaParaMinutos(escala.hora_fim);
+    let indice = faixasFim.findIndex((faixaFim) => inicio >= faixaFim);
+    if (indice === -1) {
+      indice = faixasFim.length;
+      faixasFim.push(fim);
+    } else {
+      faixasFim[indice] = fim;
+    }
+
+    return { escala, indice, inicio, fim };
+  });
+
+  const totalFaixas = Math.max(faixasFim.length, 1);
+  return itens.map((item) => ({ ...item, totalFaixas }));
+}
+
+function resumirSala(escala: VoluntarioEscala) {
+  return `${escala.sala_nome}${escala.unidade_nome ? ` • ${escala.unidade_nome}` : ""}`;
+}
+
 export function VoluntarioEscalasPanel({
   voluntarioId,
-  voluntarios,
-  onSelecionarVoluntario
+  voluntarios
 }: {
   voluntarioId?: string;
   voluntarios: VoluntarioResumo[];
-  onSelecionarVoluntario: (voluntarioId: string) => void;
 }) {
   const { usuario } = useAuth();
   const tenantKey = usuario?.tenant_id ?? "sem-tenant";
   const [form, setForm] = useState<FormState>(formInicial);
   const [tituloManual, setTituloManual] = useState(false);
   const [mensagem, setMensagem] = useState<{ tipo: "sucesso" | "erro"; texto: string } | null>(null);
-  const [voluntarioEscolhidoId, setVoluntarioEscolhidoId] = useState("");
 
   const { data: escalasData, isLoading: carregandoEscalas } = useVoluntarioEscalas(voluntarioId);
+  const { data: escalasSistemaData, isLoading: carregandoEscalasSistema } = useVoluntarioEscalasGeral();
   const { data: salasData } = useQuery({
     queryKey: ["voluntario-escalas", tenantKey, "salas-catalogo"],
     queryFn: () => matriculasService.listarSalas(),
@@ -130,6 +196,7 @@ export function VoluntarioEscalasPanel({
 
   const salas = salasData?.salas ?? [];
   const escalas = escalasData?.escalas ?? [];
+  const escalasSistema = escalasSistemaData?.escalas ?? [];
   const salaSelecionada = salas.find((item) => item.id_sala === form.sala_id);
   const cargaSemanal = useMemo(() => formatarHorasSemana(form), [form]);
   const erroHorario = validarHorarioEscala(form.hora_inicio, form.hora_fim);
@@ -140,12 +207,28 @@ export function VoluntarioEscalasPanel({
     !!form.atividade_tipo.trim() &&
     !erroHorario &&
     !erroDias;
+  const voluntarioSelecionado = useMemo(
+    () => voluntarios.find((item) => item.id_voluntario === voluntarioId),
+    [voluntarioId, voluntarios]
+  );
+  const escalasDoVoluntarioOrdenadas = useMemo(
+    () => [...escalas].sort((a, b) => horaParaMinutos(a.hora_inicio) - horaParaMinutos(b.hora_inicio)),
+    [escalas]
+  );
+  const mapaEscalas = voluntarioId ? escalasDoVoluntarioOrdenadas : escalasSistema;
+  const carregandoMapa = voluntarioId ? carregandoEscalas : carregandoEscalasSistema;
+  const tituloMapa = voluntarioId
+    ? `Mapa do voluntário${voluntarioSelecionado?.nome_completo ? `: ${voluntarioSelecionado.nome_completo}` : ""}`
+    : "Mapa geral das escalas";
+  const subtituloMapa = voluntarioId
+    ? "Visualização focada no voluntário selecionado para leitura e edição."
+    : "Visualização geral com todas as escalas cadastradas no sistema.";
+  const escalasPorDiaMapa = useMemo(() => agruparEscalasPorDia(mapaEscalas), [mapaEscalas]);
 
   useEffect(() => {
     setForm(formInicial);
     setTituloManual(false);
     setMensagem(null);
-    setVoluntarioEscolhidoId(voluntarioId ?? "");
   }, [voluntarioId]);
 
   useEffect(() => {
@@ -239,59 +322,28 @@ export function VoluntarioEscalasPanel({
     }
   }
 
-  if (!voluntarioId) {
-    return (
-      <div className="space-y-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Selecionar voluntário</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm text-[var(--g3-muted)]">
-              Para montar a escala, escolha um voluntário já cadastrado. Se preferir, volte para a aba Listagem
-              e abra o registro desejado.
-            </p>
-            <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto]">
-              <div>
-                <Label>Voluntário</Label>
-                <Select value={voluntarioEscolhidoId} onChange={(event) => setVoluntarioEscolhidoId(event.target.value)}>
-                  <option value="">Selecione</option>
-                  {voluntarios.map((voluntario) => (
-                    <option key={voluntario.id_voluntario} value={voluntario.id_voluntario ?? ""}>
-                      {voluntario.nome_completo} {voluntario.cpf ? `- ${voluntario.cpf}` : ""}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <div className="flex items-end">
-                <Button
-                  type="button"
-                  onClick={() => voluntarioEscolhidoId && onSelecionarVoluntario(voluntarioEscolhidoId)}
-                  disabled={!voluntarioEscolhidoId}
-                >
-                  Abrir voluntário
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Como a escala funciona</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm text-[var(--g3-muted)]">
-            <p>A escala fica vinculada ao voluntário, à sala e ao tenant da instituição.</p>
-            <p>Você pode definir dias da semana, horário, atividade, título e observações operacionais.</p>
-            <p>Depois de selecionar o voluntário, o formulário completo de escala é liberado nesta mesma aba.</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-3">
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">{tituloMapa}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm text-[var(--g3-muted)]">{subtituloMapa}</p>
+              <p className="text-xs text-[var(--g3-muted)]">
+                Quando nenhuma pessoa estiver selecionada, a tela mostra a ocupação total por dia, sala e horário.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="info">{mapaEscalas.length} escalas</Badge>
+              <Badge variant={voluntarioId ? "success" : "default"}>{voluntarioId ? "Filtro ativo" : "Visão geral"}</Badge>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
         <Card>
           <CardHeader className="pb-2">
@@ -452,67 +504,211 @@ export function VoluntarioEscalasPanel({
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Escalas cadastradas</CardTitle>
+          <CardTitle className="text-sm">Mapa de usabilidade das escalas</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {carregandoEscalas ? (
+          {carregandoMapa ? (
             <p className="text-sm text-[var(--g3-muted)]">Carregando escalas...</p>
-          ) : escalas.length ? (
-            <div className="overflow-hidden rounded-lg border border-[var(--g3-border)]">
-              <div className="max-h-[380px] overflow-auto">
-                <table className="min-w-full text-sm">
-                  <thead className="sticky top-0 bg-[var(--g3-card-soft)] text-left text-xs uppercase tracking-wide text-[var(--g3-muted)]">
-                    <tr>
-                      <th className="px-3 py-2">Título</th>
-                      <th className="px-3 py-2">Sala</th>
-                      <th className="px-3 py-2">Dias</th>
-                      <th className="px-3 py-2">Horário</th>
-                      <th className="px-3 py-2">Horas</th>
-                      <th className="px-3 py-2">Status</th>
-                      <th className="px-3 py-2">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {escalas.map((escala) => (
-                      <tr key={escala.id_escala} className="border-t border-[var(--g3-border)]">
-                        <td className="px-3 py-2">
-                          <div className="font-medium text-[var(--g3-foreground)]">{escala.titulo || escala.atividade_tipo}</div>
-                          <div className="text-xs text-[var(--g3-muted)]">{escala.atividade_tipo}</div>
-                        </td>
-                        <td className="px-3 py-2">
-                          <div>{escala.sala_nome}</div>
-                          <div className="text-xs text-[var(--g3-muted)]">{escala.unidade_nome || "Unidade não informada"}</div>
-                        </td>
-                        <td className="px-3 py-2 text-xs text-[var(--g3-muted)]">{formatarDias(escala.dias_semana)}</td>
-                        <td className="px-3 py-2">{escala.hora_inicio} às {escala.hora_fim}</td>
-                        <td className="px-3 py-2">{escala.carga_horaria_semanal.toFixed(2).replace(".", ",")} h</td>
-                        <td className="px-3 py-2">{escala.status}</td>
-                        <td className="px-3 py-2">
-                          <div className="flex flex-wrap gap-2">
-                            <Button type="button" variant="outline" size="sm" onClick={() => editarEscala(escala)}>
-                              <Edit3 className="mr-1.5 h-3.5 w-3.5" />
-                              Editar
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => void removerEscala(escala.id_escala)}
-                              disabled={removerMutation.isPending}
-                            >
-                              <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-                              Excluir
-                            </Button>
+          ) : mapaEscalas.length ? (
+            <div className="grid gap-3 xl:grid-cols-2 2xl:grid-cols-3">
+              {diasOrdenados.map((dia) => {
+                const escalasDia = escalasPorDiaMapa[dia];
+                const escalasDiaFaixas = distribuirEmFaixas(escalasDia);
+                const ocupacaoTotal = escalasDia.length;
+
+                return (
+                  <div key={dia} className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="text-sm font-semibold text-[var(--g3-foreground)]">{diasMapeados[dia]}</h3>
+                        <p className="text-xs text-[var(--g3-muted)]">
+                          {ocupacaoTotal} escala{ocupacaoTotal === 1 ? "" : "s"} neste dia
+                        </p>
+                      </div>
+                      <Badge variant={ocupacaoTotal ? "info" : "default"}>{ocupacaoTotal}</Badge>
+                    </div>
+
+                    <div className="relative mt-3 h-[20rem] overflow-hidden rounded-lg border border-[var(--g3-border)] bg-[linear-gradient(to_bottom,rgba(15,118,110,0.04)_1px,transparent_1px)] bg-[length:100%_10%]">
+                      <div className="absolute inset-0">
+                        {[0, 6, 12, 18, 24].map((hora) => (
+                          <div
+                            key={hora}
+                            className="absolute left-0 right-0 border-t border-dashed border-[var(--g3-border)]/70 text-[10px] text-[var(--g3-muted)]"
+                            style={{ top: `${(hora / 24) * 100}%` }}
+                          >
+                            <span className="absolute left-1 -top-2 bg-[var(--g3-card)] px-1">
+                              {hora.toString().padStart(2, "0")}:00
+                            </span>
                           </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                        ))}
+                      </div>
+
+                      {escalasDiaFaixas.length ? (
+                        escalasDiaFaixas.map(({ escala, indice, totalFaixas, inicio, fim }) => {
+                          const duracao = Math.max(fim - inicio, 20);
+                          const top = (inicio / 1440) * 100;
+                          const height = Math.max((duracao / 1440) * 100, 4);
+                          const largura = Math.max(100 / totalFaixas - 1.5, 20);
+                          const deslocamento = indice * (100 / totalFaixas);
+
+                          return (
+                            <div
+                              key={escala.id_escala}
+                              className={`absolute rounded-lg border px-2 py-1 text-[11px] shadow-sm ${
+                                escala.status === "ATIVA"
+                                  ? "border-emerald-300 bg-emerald-50 text-emerald-900"
+                                  : escala.status === "PAUSADA"
+                                    ? "border-amber-300 bg-amber-50 text-amber-900"
+                                    : "border-slate-300 bg-slate-50 text-slate-700"
+                              }`}
+                              style={{
+                                top: `${top}%`,
+                                height: `${height}%`,
+                                left: `calc(${deslocamento}% + 0.25rem)`,
+                                width: `calc(${largura}% - 0.25rem)`
+                              }}
+                            >
+                              <div className="flex h-full flex-col justify-between gap-1 overflow-hidden">
+                                <div className="space-y-0.5">
+                                  <p className="truncate font-semibold">{escala.titulo || escala.atividade_tipo}</p>
+                                  <p className="truncate text-[10px] opacity-80">{resumirSala(escala)}</p>
+                                </div>
+                                <div className="space-y-0.5">
+                                  <p className="truncate text-[10px]">
+                                    {escala.voluntario_nome || "Voluntário não informado"}
+                                  </p>
+                                  <p className="text-[10px] font-medium">
+                                    {escala.hora_inicio} - {escala.hora_fim}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div className="flex h-full items-center justify-center px-4 text-center text-sm text-[var(--g3-muted)]">
+                          Nenhuma escala cadastrada neste dia.
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-3 space-y-2">
+                      {escalasDia.length ? (
+                        escalasDiaFaixas.map(({ escala }) => (
+                          <div
+                            key={`${dia}-${escala.id_escala}-resumo`}
+                            className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card-soft)] px-3 py-2 text-xs"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="truncate font-semibold text-[var(--g3-foreground)]">
+                                  {escala.titulo || escala.atividade_tipo}
+                                </p>
+                                <p className="truncate text-[var(--g3-muted)]">{resumirSala(escala)}</p>
+                              </div>
+                              <Badge variant={varianteBadgeStatusEscala(escala.status)}>{escala.status}</Badge>
+                            </div>
+                            <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-[var(--g3-muted)]">
+                              <span>{escala.voluntario_nome || "Voluntário não informado"}</span>
+                              <span>•</span>
+                              <span>
+                                {escala.hora_inicio} - {escala.hora_fim}
+                              </span>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-xs text-[var(--g3-muted)]">Sem ocupação neste dia.</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           ) : (
-            <p className="text-sm text-[var(--g3-muted)]">Nenhuma escala cadastrada para este voluntário.</p>
+            <p className="text-sm text-[var(--g3-muted)]">Nenhuma escala cadastrada no sistema.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">Escalas deste voluntário</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {voluntarioId ? (
+            escalasDoVoluntarioOrdenadas.length ? (
+              <div className="overflow-hidden rounded-lg border border-[var(--g3-border)]">
+                <div className="max-h-[380px] overflow-auto">
+                  <table className="min-w-full text-sm">
+                    <thead className="sticky top-0 bg-[var(--g3-card-soft)] text-left text-xs uppercase tracking-wide text-[var(--g3-muted)]">
+                      <tr>
+                        <th className="px-3 py-2">Título</th>
+                        <th className="px-3 py-2">Sala</th>
+                        <th className="px-3 py-2">Dias</th>
+                        <th className="px-3 py-2">Horário</th>
+                        <th className="px-3 py-2">Horas</th>
+                        <th className="px-3 py-2">Status</th>
+                        <th className="px-3 py-2">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {escalasDoVoluntarioOrdenadas.map((escala) => (
+                        <tr key={escala.id_escala} className="border-t border-[var(--g3-border)]">
+                          <td className="px-3 py-2">
+                            <div className="font-medium text-[var(--g3-foreground)]">
+                              {escala.titulo || escala.atividade_tipo}
+                            </div>
+                            <div className="text-xs text-[var(--g3-muted)]">{escala.atividade_tipo}</div>
+                          </td>
+                          <td className="px-3 py-2">
+                            <div>{escala.sala_nome}</div>
+                            <div className="text-xs text-[var(--g3-muted)]">
+                              {escala.unidade_nome || "Unidade não informada"}
+                            </div>
+                          </td>
+                          <td className="px-3 py-2 text-xs text-[var(--g3-muted)]">{formatarDias(escala.dias_semana)}</td>
+                          <td className="px-3 py-2">
+                            {escala.hora_inicio} às {escala.hora_fim}
+                          </td>
+                          <td className="px-3 py-2">
+                            {escala.carga_horaria_semanal.toFixed(2).replace(".", ",")} h
+                          </td>
+                          <td className="px-3 py-2">{escala.status}</td>
+                          <td className="px-3 py-2">
+                            <div className="flex flex-wrap gap-2">
+                              <Button type="button" variant="outline" size="sm" onClick={() => editarEscala(escala)}>
+                                <Edit3 className="mr-1.5 h-3.5 w-3.5" />
+                                Editar
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => void removerEscala(escala.id_escala)}
+                                disabled={removerMutation.isPending}
+                              >
+                                <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                                Excluir
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-[var(--g3-muted)]">Nenhuma escala cadastrada para este voluntário.</p>
+            )
+          ) : (
+            <Card className="border-dashed">
+              <CardContent className="p-4 text-sm text-[var(--g3-muted)]">
+                Nenhum voluntário foi selecionado. A visualização acima está mostrando todas as escalas do sistema.
+                Clique em um voluntário na listagem para focar o mapa nesse cadastro específico.
+              </CardContent>
+            </Card>
           )}
         </CardContent>
       </Card>

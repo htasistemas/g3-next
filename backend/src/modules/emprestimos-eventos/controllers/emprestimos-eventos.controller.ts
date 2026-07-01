@@ -43,6 +43,15 @@ export class EmprestimosEventosController {
     return response.json(emprestimo);
   }
 
+  async confirmarReserva(request: AuthenticatedRequest, response: Response) {
+    const emprestimo = await service.confirmarReserva(
+      request.params.id,
+      request.query.usuarioId,
+      request.authUser?.tenant_id
+    );
+    return response.json(emprestimo);
+  }
+
   async confirmarDevolucao(request: AuthenticatedRequest, response: Response) {
     const emprestimo = await service.confirmarDevolucao(
       request.params.id,
@@ -75,6 +84,14 @@ export class EmprestimosEventosController {
       request.authUser?.tenant_id
     );
     return response.json(envio);
+  }
+
+  async obterPreviewConfirmacaoReservaEmail(request: AuthenticatedRequest, response: Response) {
+    const preview = await service.obterPreviewConfirmacaoReservaEmail(
+      request.params.id,
+      request.authUser?.tenant_id
+    );
+    return response.json(preview);
   }
 
   async listarAgendaResumo(request: AuthenticatedRequest, response: Response) {

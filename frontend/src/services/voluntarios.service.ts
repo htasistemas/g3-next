@@ -41,6 +41,11 @@ export const voluntariosService = {
     return data;
   },
 
+  async listarEscalasGeral(): Promise<VoluntarioEscalaListaResponse> {
+    const { data } = await httpClient.get<VoluntarioEscalaListaResponse>("/api/voluntarios/escalas");
+    return data;
+  },
+
   async criarEscala(payload: VoluntarioEscalaPayload): Promise<VoluntarioEscalaItemResponse> {
     const { data } = await httpClient.post<VoluntarioEscalaItemResponse>("/api/voluntarios/escalas", payload);
     return data;

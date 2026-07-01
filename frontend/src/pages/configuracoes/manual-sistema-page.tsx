@@ -366,8 +366,10 @@ const secoesManual: ManualSecao[] = [
           "Na aba Eventos, cadastre eventos fixos de catálogo, sem data de início ou fim; informe título, status Ativo ou Inativo, local padrão e Promovido por. As datas pertencem ao empréstimo criado na aba Dados do empréstimo.",
           "Na aba Responsáveis, cadastre previamente os dados da pessoa que pode retirar os produtos, como nome, documento, telefone, e-mail e observações.",
           "Depois disso, na aba Dados do empréstimo, o campo Responsável passa a sugerir os nomes cadastrados na aba Responsáveis.",
+          "Use a ação Confirmar reserva para marcar o empréstimo como agendado; depois disso, o fluxo operacional segue para Itens retirados e, por fim, Itens devolvidos.",
           "Ao abrir um empréstimo já cadastrado, o sistema agora reapresenta retirada, devolução, evento e agenda com a mesma data e hora salvas, sem deslocamento de fuso horário.",
           "Na aba Itens vinculados, digite o nome do item ou o número do patrimônio para localizar rapidamente patrimônio ou almoxarifado.",
+          "Na aba Itens vinculados, escolha a unidade para listar apenas os patrimônios daquela localidade antes de adicionar os itens ao empréstimo.",
           "Quando a quantidade for maior que 1, marque exatamente os patrimônios correspondentes antes de adicionar ao empréstimo.",
           "Ao selecionar almoxarifado, marque os patrimônios correspondentes à quantidade solicitada.",
           "Itens patrimoniais vindos do almoxarifado são lançados individualmente no empréstimo e no termo, com uma linha para cada número de patrimônio.",
@@ -375,10 +377,10 @@ const secoesManual: ManualSecao[] = [
           "Ao imprimir a partir da aba Dados do empréstimo ou Itens vinculados, o sistema gera o termo de empréstimo em layout compacto no padrão de relatórios do G3N, com logomarca da instituição, cabeçalho institucional, corpo com dados do evento, responsável, período, itens e números de patrimônio, assinaturas e rodapé oficial da unidade.",
           "Na aba Agenda de empréstimos, acompanhe o calendário mensal interativo com dias livres, dias ocupados em vermelho e dias de apoio em amarelo para retirada e devolução.",
           "Clique em um dia da agenda para ver retirada sugerida, período do evento, devolução calculada, responsável, itens comprometidos e status de liberação.",
-          "Após salvar o empréstimo, use Confirmar por WhatsApp ou Confirmar por e-mail para avisar o responsável que o evento está confirmado, os itens estão reservados e listar os itens vinculados.",
+          "Após confirmar a reserva, use Confirmar por WhatsApp ou Confirmar por e-mail para avisar o responsável. O e-mail abre uma pré-visualização antes do envio e inclui as observações do empréstimo na mensagem.",
           "Use Adicionar ao Google Agenda no compromisso para abrir o Google Agenda com título, período, local, responsável e itens já preenchidos.",
           "Quando a data e hora de devolução vencerem sem confirmação de devolução, a tela exibe alerta operacional com ação de WhatsApp e envio de e-mail pelo servidor configurado do G3N para o responsável cadastrado.",
-          "As mensagens de confirmação e cobrança informam o nome da instituição e listam os itens, incluindo número de patrimônio quando houver.",
+          "As mensagens de confirmação e cobrança informam o nome da instituição, listam os itens, incluem número de patrimônio quando houver e também exibem as observações do empréstimo.",
           "A barra superior usa ações específicas por aba, como Buscar empréstimos, Salvar dados do empréstimo, Salvar empréstimo com itens, Salvar responsável e Imprimir termo de empréstimo."
         ],
         atencoes: [
@@ -386,7 +388,7 @@ const secoesManual: ManualSecao[] = [
           "O módulo passou a manter cadastro próprio de responsáveis para retirada, sem depender apenas da lista de usuários internos.",
           "O backend agora revalida disponibilidade de itens no salvamento e bloqueia reserva acima do disponível, inclusive quando o mesmo item for informado mais de uma vez no mesmo empréstimo.",
           "A devolução de apoio é calculada no próximo dia útil quando o dia posterior ao evento cair em sábado, domingo ou feriado cadastrado.",
-          "As ações de retirada, devolução e cancelamento passaram a respeitar transições válidas de status para evitar movimentações incoerentes.",
+          "As ações de confirmação de reserva, retirada, devolução e cancelamento passaram a respeitar transições válidas de status para evitar movimentações incoerentes.",
           "O cadastro do empréstimo mantém compatibilidade com bases antigas criando automaticamente as colunas e a tabela novas necessárias quando ainda não existirem.",
           "A tela Empréstimos para eventos agora lista, cadastra, atualiza e exclui empréstimos, agenda, eventos, responsáveis, itens vinculados e movimentações sempre dentro do tenant autenticado, impedindo mistura de reservas entre instituições."
         ]
@@ -506,6 +508,7 @@ const secoesManual: ManualSecao[] = [
         comoUsar: [
           "Use a listagem para localizar rapidamente o patrimônio e abrir o item para edição ou conferência do cadastro. Quando a busca for apenas numérica, o número patrimonial é comparado de forma exata e a coluna Unidade mostra a qual local cada registro pertence.",
           "Ao cadastrar um bem, selecione primeiro a unidade e depois informe o Número patrimonial; o campo sugere o próximo número da sequência da unidade selecionada, permite informar outro número manualmente e traz ícones ao lado do campo para usar o próximo número ou consultar os números vagos da sequência atual.",
+          "Na listagem do patrimônio, use o botão Copiar do item desejado para abrir o cadastro com os dados já preenchidos e alterar apenas o que for necessário antes de salvar.",
           "Use a aba Categorias para cadastrar, editar ou excluir categorias e suas subcategorias de patrimônio, definindo também a taxa anual de depreciação e o status ativo ou inativo.",
           "Na aba Cadastro patrimonial, selecione a Categoria a partir da base cadastrada na aba Categorias; a tela não aceita categoria digitada livremente para evitar duplicidade de nomes.",
           "Depois de selecionar a categoria, o campo Subcategoria passa a listar as subcategorias vinculadas à categoria escolhida.",
@@ -530,6 +533,7 @@ const secoesManual: ManualSecao[] = [
         atencoes: [
           "A tela Patrimônio agora lista, cadastra, atualiza e movimenta bens sempre dentro do tenant autenticado, impedindo mistura de patrimônios entre instituições.",
           "O número patrimonial agora bloqueia duplicidade somente dentro da mesma unidade, permitindo o mesmo número em unidades diferentes quando o cadastro estiver corretamente vinculado.",
+          "Ao copiar um patrimônio, o sistema mantém os dados do item original como base, mas abre o cadastro sem identificador para evitar sobrescrever o registro existente.",
           "Internamente, o patrimônio passa a guardar o vínculo da unidade por ID, enquanto a tela continua exibindo o nome fantasia para leitura operacional.",
           "Registros antigos sem tenant ou sem unidadeId continuam sendo considerados quando a unidade puder ser resolvida pelo nome, para não ocultar bens já cadastrados no sistema.",
           "Categorias com bens vinculados não podem ser excluídas; nesses casos, mantenha o histórico e use a edição ou inativação da categoria.",
@@ -771,6 +775,8 @@ const secoesManual: ManualSecao[] = [
           "Na aba Dados pessoais, selecione o campo Sexo entre as opções disponíveis no cadastro.",
           "Na aba Endereço, informe o CEP com máscara; ao completar um CEP válido, o sistema consulta o endereço e preenche logradouro, bairro, município e UF quando encontrados.",
           "Na aba Escalas, monte a agenda do voluntário escolhendo sala, tipo de atividade, dias da semana, hora inicial e hora final; o sistema calcula a carga semanal estimada e mantém a escala vinculada ao tenant.",
+          "A mesma aba agora exibe um mapa semanal com todas as escalas cadastradas no sistema, organizado por dia, sala, unidade e horário para facilitar a leitura da ocupação.",
+          "A listagem detalhada do voluntário continua disponível abaixo do mapa para editar ou excluir apenas as escalas do cadastro aberto.",
           "Na aba Listagem de voluntários, use Imprimir para emitir a relação filtrada; nas abas do cadastro selecionado, use Imprimir e escolha entre ficha cadastral ou termo de voluntariado no padrão institucional de relatórios.",
           "Quando houver foto 3x4, o sistema processa o arquivo antes do salvamento e informa o motivo real caso a imagem não possa ser utilizada.",
           "Em produção, o cadastro foi ajustado para funcionar também em bases legadas que ainda não possuem colunas novas de comunicação na tabela cadastro_voluntario."
@@ -778,7 +784,8 @@ const secoesManual: ManualSecao[] = [
         atencoes: [
           "Falhas tratáveis do cadastro ou da vinculação da foto agora retornam mensagem operacional em vez de apenas erro interno do servidor.",
           "A limpeza de foto antiga no storage não deve mais derrubar a atualização do voluntário em produção.",
-          "A compatibilidade com a base legada foi mantida removendo do ORM os campos de comunicação ainda não existentes em alguns bancos de produção."
+          "A compatibilidade com a base legada foi mantida removendo do ORM os campos de comunicação ainda não existentes em alguns bancos de produção.",
+          "O mapa semanal da aba Escalas é somente visual na visão geral do sistema; as ações de editar e excluir continuam restritas às escalas do voluntário aberto."
         ]
       }
     ]

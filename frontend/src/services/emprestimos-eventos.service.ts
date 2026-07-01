@@ -74,6 +74,15 @@ export const emprestimosEventosService = {
     return data;
   },
 
+  async confirmarReserva(id: number, usuarioId?: number) {
+    const { data } = await httpClient.post<EmprestimoEvento>(
+      `/api/emprestimos-eventos/${id}/confirmar-reserva`,
+      null,
+      { params: usuarioId ? { usuarioId } : undefined }
+    );
+    return data;
+  },
+
   async enviarAlertaDevolucaoEmail(id: number) {
     const { data } = await httpClient.post<{ destinatario: string; enviadoEm: string }>(
       `/api/emprestimos-eventos/${id}/alerta-devolucao/email`
@@ -85,6 +94,15 @@ export const emprestimosEventosService = {
     const { data } = await httpClient.post<{ destinatario: string; enviadoEm: string }>(
       `/api/emprestimos-eventos/${id}/confirmacao-reserva/email`
     );
+    return data;
+  },
+
+  async obterPreviewConfirmacaoReservaEmail(id: number) {
+    const { data } = await httpClient.get<{
+      destinatario: string;
+      assunto: string;
+      mensagem: string;
+    }>(`/api/emprestimos-eventos/${id}/confirmacao-reserva/email/preview`);
     return data;
   },
 

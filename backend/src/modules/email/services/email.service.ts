@@ -88,17 +88,22 @@ export class EmailService {
       throw new AppError("Envio de email desabilitado no servidor.", 503);
     }
 
-    const info = await this.transporter.sendMail({
-      from: `${env.APP_EMAIL_NOME} <${env.APP_EMAIL_REMETENTE}>`,
-      to: input.destinatario,
-      subject: input.assunto,
-      text: input.mensagem
-    });
+    try {
+      const info = await this.transporter.sendMail({
+        from: `${env.APP_EMAIL_NOME} <${env.APP_EMAIL_REMETENTE}>`,
+        to: input.destinatario,
+        subject: input.assunto,
+        text: input.mensagem
+      });
 
-    return {
-      destinatario: input.destinatario,
-      messageId: info.messageId,
-      enviadoEm: new Date().toISOString()
-    };
+      return {
+        destinatario: input.destinatario,
+        messageId: info.messageId,
+        enviadoEm: new Date().toISOString()
+      };
+    } catch (error) {
+      console.error("[email] falha ao enviar mensagem", error);
+      throw new AppError("Falha ao enviar e-mail. Verifique a configuração do servidor SMTP.", 503);
+    }
   }
 }

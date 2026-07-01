@@ -32,6 +32,7 @@ type VoluntarioEscalaRow = {
   id: bigint;
   tenant_id: string;
   voluntario_id: bigint;
+  voluntario_nome: string | null;
   sala_id: bigint;
   sala_nome: string;
   unidade_nome: string | null;
@@ -88,6 +89,7 @@ function mapEscalaRow(row: VoluntarioEscalaRow): VoluntarioEscalaResumo {
   return {
     id_escala: row.id.toString(),
     voluntario_id: row.voluntario_id.toString(),
+    voluntario_nome: row.voluntario_nome ?? undefined,
     sala_id: row.sala_id.toString(),
     sala_nome: row.sala_nome,
     unidade_nome: row.unidade_nome ?? undefined,
@@ -453,6 +455,7 @@ export class VoluntarioRepository {
         e.id,
         e.tenant_id::text AS tenant_id,
         e.voluntario_id,
+        v.nome_completo AS voluntario_nome,
         e.sala_id,
         s.nome AS sala_nome,
         u.nome_fantasia AS unidade_nome,
@@ -477,13 +480,14 @@ export class VoluntarioRepository {
     `);
   }
 
-  async buscarEscalaPorId(id: bigint, tenantId: string) {
+  async listarEscalasGeral(tenantId: string) {
     await ensureVoluntarioEscalaEstrutura();
-    const rows = await prisma.$queryRaw<VoluntarioEscalaRow[]>(Prisma.sql`
+    return prisma.$queryRaw<VoluntarioEscalaRow[]>(Prisma.sql`
       SELECT
         e.id,
         e.tenant_id::text AS tenant_id,
         e.voluntario_id,
+        v.nome_completo AS voluntario_nome,
         e.sala_id,
         s.nome AS sala_nome,
         u.nome_fantasia AS unidade_nome,
@@ -498,6 +502,37 @@ export class VoluntarioRepository {
         e.criado_em,
         e.atualizado_em
       FROM voluntario_escala e
+      INNER JOIN cadastro_voluntario v ON v.id = e.voluntario_id
+      INNER JOIN salas_unidade s ON s.id = e.sala_id
+      LEFT JOIN unidade_assistencial u ON u.id = s.unidade_id
+      WHERE e.tenant_id::text = ${tenantId}
+      ORDER BY e.criado_em DESC
+    `);
+  }
+
+  async buscarEscalaPorId(id: bigint, tenantId: string) {
+    await ensureVoluntarioEscalaEstrutura();
+    const rows = await prisma.$queryRaw<VoluntarioEscalaRow[]>(Prisma.sql`
+      SELECT
+        e.id,
+        e.tenant_id::text AS tenant_id,
+        e.voluntario_id,
+        v.nome_completo AS voluntario_nome,
+        e.sala_id,
+        s.nome AS sala_nome,
+        u.nome_fantasia AS unidade_nome,
+        e.atividade_tipo,
+        e.titulo,
+        e.dias_semana,
+        to_char(e.hora_inicio, 'HH24:MI') AS hora_inicio,
+        to_char(e.hora_fim, 'HH24:MI') AS hora_fim,
+        e.carga_horaria_semanal,
+        e.status,
+        e.observacoes,
+        e.criado_em,
+        e.atualizado_em
+      FROM voluntario_escala e
+      INNER JOIN cadastro_voluntario v ON v.id = e.voluntario_id
       INNER JOIN salas_unidade s ON s.id = e.sala_id
       LEFT JOIN unidade_assistencial u ON u.id = s.unidade_id
       WHERE e.id = ${id}

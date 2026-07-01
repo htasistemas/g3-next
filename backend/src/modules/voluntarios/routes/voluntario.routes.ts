@@ -32,6 +32,12 @@ voluntarioRoutes.post(
   ensurePermissions(permissoesEscrita),
   asyncHandler(controller.criarEscala.bind(controller))
 );
+voluntarioRoutes.get(
+  "/escalas",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.listarEscalasGeral.bind(controller))
+);
 voluntarioRoutes.post(
   "/",
   ensureAuthenticated,

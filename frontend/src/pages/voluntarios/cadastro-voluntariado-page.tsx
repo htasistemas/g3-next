@@ -725,7 +725,7 @@ export function CadastroVoluntariadoPage() {
                 {carregandoLista ? <p className="text-sm text-slate-500">Carregando voluntários...</p> : (
                   <div className="overflow-hidden rounded-lg border border-[var(--g3-border)]">
                     {voluntarios.map((item, indice) => (
-                      <button key={item.id_voluntario} type="button" onClick={() => { if (item.id_voluntario) { setIdSelecionado(item.id_voluntario); setAbaAtiva("dados"); } }} className={`grid w-full gap-2 border-b border-[var(--g3-border)] px-3 py-2 text-left xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,0.9fr)] ${indice % 2 === 0 ? "bg-white" : "bg-[var(--g3-primary-soft)]/30"}`}>
+                      <button key={item.id_voluntario} type="button" onClick={() => { if (item.id_voluntario) { setIdSelecionado(item.id_voluntario); setAbaAtiva("escalas"); } }} className={`grid w-full gap-2 border-b border-[var(--g3-border)] px-3 py-2 text-left xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,0.9fr)] ${indice % 2 === 0 ? "bg-white" : "bg-[var(--g3-primary-soft)]/30"}`}>
                         <span className="text-sm font-semibold">{item.nome_completo}</span>
                         <span className="text-xs text-[var(--g3-muted)]">{formatarCpf(item.cpf)}</span>
                         <span className="text-xs text-[var(--g3-muted)]">{item.email}</span>
@@ -929,10 +929,6 @@ export function CadastroVoluntariadoPage() {
                   <VoluntarioEscalasPanel
                     voluntarioId={idSelecionado}
                     voluntarios={voluntarios}
-                    onSelecionarVoluntario={(voluntarioId) => {
-                      setIdSelecionado(voluntarioId);
-                      setAbaAtiva("dados");
-                    }}
                   />
                 )}
                 {abaAtiva === "termos" && <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-12"><label className="xl:col-span-4 flex items-center gap-2 text-sm"><Checkbox {...register("aceite_voluntariado")} checked={!!watch("aceite_voluntariado")} />Aceite de voluntariado</label><label className="xl:col-span-4 flex items-center gap-2 text-sm"><Checkbox {...register("aceite_imagem")} checked={!!watch("aceite_imagem")} />Aceite de uso de imagem</label><div className="xl:col-span-12"><Label>Documento de identificação</Label><Textarea {...register("documento_identificacao")} rows={2} /></div><div className="xl:col-span-12"><Label>Comprovante de endereço</Label><Textarea {...register("comprovante_endereco")} rows={2} /></div><div className="xl:col-span-12"><Label>Assinatura digital</Label><Input {...register("assinatura_digital")} /></div></section>}

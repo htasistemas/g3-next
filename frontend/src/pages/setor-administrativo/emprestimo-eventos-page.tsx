@@ -101,6 +101,13 @@ type ResponsavelFormState = {
   observacoes: string;
 };
 
+type PreviewConfirmacaoEmailState = {
+  emprestimoId: number;
+  destinatario: string;
+  assunto: string;
+  mensagem: string;
+};
+
 const abas: AdminTab[] = [
   { id: "listagem", label: "Listagem", icon: List },
   { id: "cadastro", label: "Dados do empréstimo", icon: ClipboardList },
@@ -301,6 +308,7 @@ export function EmprestimoEventosPage() {
   const [itemBusca, setItemBusca] = useState("");
   const [itemQtd, setItemQtd] = useState("1");
   const [itemObs, setItemObs] = useState("");
+  const [itemUnidadeFiltro, setItemUnidadeFiltro] = useState("");
   const [patrimoniosAlmoxSelecionados, setPatrimoniosAlmoxSelecionados] = useState<string[]>([]);
 
   const [agendaMes, setAgendaMes] = useState(inicioMesIso());
@@ -309,6 +317,7 @@ export function EmprestimoEventosPage() {
   const [popup, setPopup] = useState<PopupMensagemState | null>(null);
   const [alertaEmailEmEnvio, setAlertaEmailEmEnvio] = useState<number | null>(null);
   const [confirmacaoEmailEmEnvio, setConfirmacaoEmailEmEnvio] = useState<number | null>(null);
+  const [previewConfirmacaoEmail, setPreviewConfirmacaoEmail] = useState<PreviewConfirmacaoEmailState | null>(null);
   const [confirmarExcluir, setConfirmarExcluir] = useState(false);
   const [confirmarExcluirEvento, setConfirmarExcluirEvento] = useState(false);
   const [confirmarExcluirResponsavel, setConfirmarExcluirResponsavel] = useState(false);
@@ -422,12 +431,34 @@ export function EmprestimoEventosPage() {
     [emprestimos]
   );
 
+  const patrimoniosFiltradosPorUnidade = useMemo(() => {
+    if (itemTipo !== "PATRIMONIO" || !itemUnidadeFiltro) {
+      return patrimonios;
+    }
+
+    const unidadeSelecionada = unidades.find((unidade) => String(unidade.id_unidade) === itemUnidadeFiltro);
+    const nomeUnidadeSelecionada = normalizarBuscaTexto(
+      unidadeSelecionada?.nome_fantasia ?? unidadeSelecionada?.razao_social ?? ""
+    );
+
+    return patrimonios.filter((patrimonio) => {
+      const unidadePatrimonio = normalizarBuscaTexto(patrimonio.unidade);
+      return (
+        String(patrimonio.unidadeId ?? "") === itemUnidadeFiltro ||
+        (!!nomeUnidadeSelecionada && unidadePatrimonio === nomeUnidadeSelecionada)
+      );
+    });
+  }, [itemTipo, itemUnidadeFiltro, patrimonios, unidades]);
+
   const opcoesItem = useMemo(
     () =>
       itemTipo === "PATRIMONIO"
-        ? patrimonios.map((p) => ({ id: String(p.idPatrimonio), label: `${p.numeroPatrimonio} - ${p.nome}` }))
+        ? patrimoniosFiltradosPorUnidade.map((p) => ({
+            id: String(p.idPatrimonio),
+            label: `${p.numeroPatrimonio} - ${p.nome}${p.unidade ? ` (${p.unidade})` : ""}`
+          }))
         : almox.map((a) => ({ id: String(a.id_item), label: `${a.codigo} - ${a.descricao}` })),
-    [itemTipo, patrimonios, almox]
+    [itemTipo, patrimoniosFiltradosPorUnidade, almox]
   );
 
   const opcoesItemFiltradas = useMemo(() => {
@@ -465,7 +496,7 @@ export function EmprestimoEventosPage() {
     if (itemTipo !== "PATRIMONIO") return [];
     const termo = normalizarBuscaTexto(itemBusca);
     const lista = termo
-      ? patrimonios.filter((patrimonio) => {
+      ? patrimoniosFiltradosPorUnidade.filter((patrimonio) => {
           const texto = normalizarBuscaTexto([
             patrimonio.numeroPatrimonio,
             patrimonio.nome,
@@ -474,9 +505,9 @@ export function EmprestimoEventosPage() {
           ].filter(Boolean).join(" "));
           return texto.includes(termo);
         })
-      : patrimonios;
+      : patrimoniosFiltradosPorUnidade;
     return lista.slice(0, 80);
-  }, [itemBusca, itemTipo, patrimonios]);
+  }, [itemBusca, itemTipo, patrimoniosFiltradosPorUnidade]);
 
   const patrimoniosParaSelecao = itemTipo === "ALMOXARIFADO"
     ? patrimoniosDoItemAlmox
@@ -511,6 +542,7 @@ export function EmprestimoEventosPage() {
     setForm(next);
     setSnapshot(next);
     setAbaAtiva("cadastro");
+    setItemUnidadeFiltro(item.unidadeId ? String(item.unidadeId) : "");
   }
 
   function novo() {
@@ -519,6 +551,7 @@ export function EmprestimoEventosPage() {
     setSnapshot(next);
     setItemBusca("");
     setItemId("");
+    setItemUnidadeFiltro("");
     setPatrimoniosAlmoxSelecionados([]);
     setAbaAtiva("cadastro");
   }
@@ -584,12 +617,14 @@ export function EmprestimoEventosPage() {
     }
   }
 
-  async function confirmarStatus(tipo: "RETIRADA" | "DEVOLUCAO" | "CANCELAR") {
+  async function confirmarStatus(tipo: "RESERVA" | "RETIRADA" | "DEVOLUCAO" | "CANCELAR") {
     if (!form.id) return;
     try {
       const usuarioId = usuario?.id ? Number(usuario.id) : undefined;
       const resp =
-        tipo === "RETIRADA"
+        tipo === "RESERVA"
+          ? await emprestimosEventosService.confirmarReserva(form.id, usuarioId)
+          : tipo === "RETIRADA"
           ? await emprestimosEventosService.confirmarRetirada(form.id, usuarioId)
           : tipo === "DEVOLUCAO"
             ? await emprestimosEventosService.confirmarDevolucao(form.id, usuarioId)
@@ -891,6 +926,31 @@ export function EmprestimoEventosPage() {
     }
   }
 
+  async function abrirPreviewConfirmacaoEmail(item: EmprestimoEvento) {
+    if (!item.id || confirmacaoEmailEmEnvio !== null) {
+      return;
+    }
+
+    try {
+      setConfirmacaoEmailEmEnvio(item.id);
+      const preview = await emprestimosEventosService.obterPreviewConfirmacaoReservaEmail(item.id);
+      setPreviewConfirmacaoEmail({
+        emprestimoId: item.id,
+        destinatario: preview.destinatario,
+        assunto: preview.assunto,
+        mensagem: preview.mensagem
+      });
+    } catch (error: any) {
+      setPopup({
+        tipo: "erro",
+        titulo: "Erro",
+        texto: error?.response?.data?.message ?? "Falha ao preparar a pré-visualização do e-mail."
+      });
+    } finally {
+      setConfirmacaoEmailEmEnvio(null);
+    }
+  }
+
   function excluirEvento() {
     if (!eventoForm.id) {
       setPopup({ tipo: "aviso", titulo: "Atenção", texto: "Selecione um evento para excluir." });
@@ -1176,6 +1236,7 @@ export function EmprestimoEventosPage() {
 
   function montarMensagemConfirmacao(item: EmprestimoEvento) {
     const itens = formatarItensMensagem(item);
+    const observacoes = item.observacoes?.trim();
     return [
       `Olá, ${item.responsavel?.nome ?? "responsável"}.`,
       "",
@@ -1185,6 +1246,8 @@ export function EmprestimoEventosPage() {
       "",
       itens ? "Itens reservados:" : undefined,
       itens || undefined,
+      observacoes ? "" : undefined,
+      observacoes ? `Observações do empréstimo:\n${observacoes}` : undefined,
       "",
       "Os itens ficam reservados para a data informada. Em caso de alteração, entre em contato com a instituição."
     ]
@@ -1194,6 +1257,7 @@ export function EmprestimoEventosPage() {
 
   function montarMensagemAtraso(item: EmprestimoEvento) {
     const itens = formatarItensMensagem(item);
+    const observacoes = item.observacoes?.trim();
     return [
       `Olá, ${item.responsavel?.nome ?? "responsável"}.`,
       "",
@@ -1202,6 +1266,8 @@ export function EmprestimoEventosPage() {
       "",
       itens ? "Itens pendentes:" : undefined,
       itens || undefined,
+      observacoes ? "" : undefined,
+      observacoes ? `Observações do empréstimo:\n${observacoes}` : undefined,
       "",
       "Solicitamos confirmar a devolução dos itens ou entrar em contato com a instituição."
     ]
@@ -1249,6 +1315,22 @@ export function EmprestimoEventosPage() {
     } finally {
       setConfirmacaoEmailEmEnvio(null);
     }
+  }
+
+  async function confirmarEnvioConfirmacaoEmail() {
+    if (!previewConfirmacaoEmail) return;
+    const item = emprestimos.find((emprestimo) => emprestimo.id === previewConfirmacaoEmail.emprestimoId);
+    if (!item) {
+      setPopup({
+        tipo: "erro",
+        titulo: "Erro",
+        texto: "Não foi possível localizar o empréstimo para envio."
+      });
+      return;
+    }
+
+    await enviarConfirmacaoEmail(item);
+    setPreviewConfirmacaoEmail(null);
   }
 
   async function enviarAlertaEmail(item: EmprestimoEvento) {
@@ -1323,6 +1405,8 @@ export function EmprestimoEventosPage() {
 
   const acoes = acoesPorAba[abaAtiva];
   const emprestimoAtual = montarEmprestimoAtual();
+  const enviandoPreviewConfirmacaoEmail =
+    previewConfirmacaoEmail ? confirmacaoEmailEmEnvio === previewConfirmacaoEmail.emprestimoId : false;
 
   return (
     <>
@@ -1416,14 +1500,87 @@ export function EmprestimoEventosPage() {
               <div className="space-y-1"><Label>Fim do evento</Label><Input type="datetime-local" value={form.dataDevolucaoPrevista} onChange={(e) => setForm((a) => ({ ...a, dataDevolucaoPrevista: e.target.value }))} /></div>
               <div className="space-y-1 md:col-span-2 xl:col-span-4"><Label>Observações</Label><Textarea rows={2} value={form.observacoes} onChange={(e) => setForm((a) => ({ ...a, observacoes: e.target.value }))} /></div>
             </div>
-            <Card className="border-[var(--g3-border)]"><CardHeader className="pb-2"><CardTitle className="text-sm">Ações rápidas</CardTitle></CardHeader><CardContent className="flex flex-wrap gap-2"><Button variant="outline" disabled={!form.id || form.status === "RETIRADO" || form.status === "DEVOLVIDO" || form.status === "CANCELADO"} onClick={() => void confirmarStatus("RETIRADA")}>Confirmar retirada</Button><Button variant="outline" disabled={!form.id || form.status !== "RETIRADO"} onClick={() => void confirmarStatus("DEVOLUCAO")}>Confirmar devolução</Button><Button variant="outline" disabled={!emprestimoAtual || confirmacaoEmailEmEnvio !== null} onClick={() => emprestimoAtual && enviarConfirmacaoWhatsApp(emprestimoAtual)}><MessageCircle className="mr-1.5 h-4 w-4" />Confirmar por WhatsApp</Button><Button variant="outline" disabled={!emprestimoAtual || confirmacaoEmailEmEnvio !== null} onClick={() => emprestimoAtual && void enviarConfirmacaoEmail(emprestimoAtual)}>{confirmacaoEmailEmEnvio === form.id ? <LoaderCircle className="mr-1.5 h-4 w-4 animate-spin" /> : <Mail className="mr-1.5 h-4 w-4" />}Confirmar por e-mail</Button><Button variant="danger" disabled={!form.id || form.status === "DEVOLVIDO" || form.status === "CANCELADO"} onClick={() => void confirmarStatus("CANCELAR")}>Cancelar empréstimo</Button></CardContent></Card>
+            <Card className="border-[var(--g3-border)]">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Ações rápidas</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  disabled={!form.id || form.status !== "RASCUNHO"}
+                  onClick={() => void confirmarStatus("RESERVA")}
+                >
+                  Confirmar reserva
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={!form.id || form.status !== "AGENDADO"}
+                  onClick={() => void confirmarStatus("RETIRADA")}
+                >
+                  Itens retirados
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={!form.id || form.status !== "RETIRADO"}
+                  onClick={() => void confirmarStatus("DEVOLUCAO")}
+                >
+                  Itens devolvidos
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={!emprestimoAtual || form.status !== "AGENDADO" || confirmacaoEmailEmEnvio !== null}
+                  onClick={() => emprestimoAtual && enviarConfirmacaoWhatsApp(emprestimoAtual)}
+                >
+                  <MessageCircle className="mr-1.5 h-4 w-4" />
+                  Confirmar por WhatsApp
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={!emprestimoAtual || form.status !== "AGENDADO" || confirmacaoEmailEmEnvio !== null}
+                  onClick={() => emprestimoAtual && void abrirPreviewConfirmacaoEmail(emprestimoAtual)}
+                >
+                  {confirmacaoEmailEmEnvio === form.id ? (
+                    <LoaderCircle className="mr-1.5 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Mail className="mr-1.5 h-4 w-4" />
+                  )}
+                  Confirmar por e-mail
+                </Button>
+                <Button
+                  variant="danger"
+                  disabled={!form.id || form.status === "DEVOLVIDO" || form.status === "CANCELADO"}
+                  onClick={() => void confirmarStatus("CANCELAR")}
+                >
+                  Cancelar empréstimo
+                </Button>
+              </CardContent>
+            </Card>
           </section>
         ) : null}
 
         {abaAtiva === "itens" ? (
           <section className="space-y-3">
-            <div className="grid gap-3 rounded-lg border border-[var(--g3-border)] p-3 md:grid-cols-2 xl:grid-cols-[0.8fr_2.2fr_0.6fr_1.8fr_auto]">
+            <div className="grid gap-3 rounded-lg border border-[var(--g3-border)] p-3 md:grid-cols-2 xl:grid-cols-[0.8fr_1.2fr_2.2fr_0.6fr_1.8fr_auto]">
               <div className="space-y-1"><Label>Tipo</Label><Select value={itemTipo} onChange={(e) => { setItemTipo(e.target.value as TipoItemEmprestimo); setItemId(""); setItemBusca(""); setPatrimoniosAlmoxSelecionados([]); }}><option value="PATRIMONIO">Patrimônio</option><option value="ALMOXARIFADO">Almoxarifado</option></Select></div>
+              <div className="space-y-1">
+                <Label>Unidade</Label>
+                <Select
+                  value={itemUnidadeFiltro}
+                  onChange={(e) => {
+                    setItemUnidadeFiltro(e.target.value);
+                    setItemId("");
+                    setItemBusca("");
+                  }}
+                  disabled={itemTipo !== "PATRIMONIO"}
+                >
+                  <option value="">Todas as unidades</option>
+                  {unidades.map((unidade) => (
+                    <option key={unidade.id_unidade} value={String(unidade.id_unidade)}>
+                      {unidade.nome_fantasia ?? unidade.razao_social ?? String(unidade.id_unidade)}
+                    </option>
+                  ))}
+                </Select>
+              </div>
               <div className="space-y-1"><Label>Item ou patrimônio</Label><Input list="emprestimo-eventos-itens" value={itemBusca} onChange={(e) => atualizarBuscaItem(e.target.value)} placeholder="Digite o item ou o número do patrimônio" /><datalist id="emprestimo-eventos-itens">{opcoesItemFiltradas.map((i) => <option key={i.id} value={i.label} />)}</datalist></div>
               <div className="space-y-1"><Label>Quantidade</Label><Input type="number" min={1} value={itemQtd} onChange={(e) => setItemQtd(e.target.value)} className="max-w-[96px]" /></div>
               <div className="space-y-1"><Label>Observação</Label><Input value={itemObs} onChange={(e) => setItemObs(e.target.value)} placeholder="Observação do item" /></div>
@@ -1447,6 +1604,7 @@ export function EmprestimoEventosPage() {
                       <tr>
                         <th className="w-12 px-2 py-2 text-left">Sel.</th>
                         <th className="px-2 py-2 text-left">Patrimônio</th>
+                        <th className="px-2 py-2 text-left">Unidade</th>
                         <th className="px-2 py-2 text-left">Item</th>
                         <th className="px-2 py-2 text-left">Status</th>
                       </tr>
@@ -1455,6 +1613,7 @@ export function EmprestimoEventosPage() {
                       {patrimoniosParaSelecao.length ? patrimoniosParaSelecao.map((patrimonio) => {
                         const id = String(patrimonio.idPatrimonio);
                         const jaVinculado = form.itens.some((item) => item.tipoItem === "PATRIMONIO" && String(item.itemId) === id);
+                        const indisponivel = jaVinculado || normalizarBuscaTexto(patrimonio.status).includes("emprest");
                         const marcado = patrimoniosAlmoxSelecionados.includes(id);
                         return (
                           <tr key={id} className="border-t border-amber-100">
@@ -1462,7 +1621,7 @@ export function EmprestimoEventosPage() {
                               <input
                                 type="checkbox"
                                 checked={marcado}
-                                disabled={jaVinculado}
+                                disabled={indisponivel}
                                 onChange={(event) => {
                                   setPatrimoniosAlmoxSelecionados((atual) =>
                                     event.target.checked
@@ -1474,12 +1633,23 @@ export function EmprestimoEventosPage() {
                               />
                             </td>
                             <td className="px-2 py-2 font-semibold">{patrimonio.numeroPatrimonio}</td>
+                            <td className="px-2 py-2">{patrimonio.unidade || "---"}</td>
                             <td className="px-2 py-2">{patrimonio.nome}</td>
-                            <td className="px-2 py-2">{jaVinculado ? "Já vinculado neste empréstimo" : "Disponível para validação"}</td>
+                            <td className="px-2 py-2">
+                              <span
+                                className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                                  indisponivel
+                                    ? "bg-slate-100 text-slate-700"
+                                    : "bg-emerald-100 text-emerald-800"
+                                }`}
+                              >
+                                {indisponivel ? "Indisponível para empréstimo" : "Disponível para empréstimo"}
+                              </span>
+                            </td>
                           </tr>
                         );
                       }) : (
-                        <tr><td colSpan={4} className="px-3 py-4 text-center">Nenhum patrimônio encontrado para selecionar.</td></tr>
+                        <tr><td colSpan={5} className="px-3 py-4 text-center">Nenhum patrimônio encontrado para selecionar.</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -1728,8 +1898,65 @@ export function EmprestimoEventosPage() {
               <div className="border-t border-[var(--g3-border)] pt-2 text-center">Responsável interno pela entrega</div>
             </div>
           </div>
-        </section>
-      </AdminPageLayout>
+      </section>
+    </AdminPageLayout>
+
+      {previewConfirmacaoEmail ? (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/45 px-4"
+          onClick={() => {
+            if (!enviandoPreviewConfirmacaoEmail) setPreviewConfirmacaoEmail(null);
+          }}
+        >
+          <div
+            className="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="border-b border-slate-100 px-5 py-4">
+              <h3 className="text-base font-semibold text-slate-900">Pré-visualização do e-mail</h3>
+              <p className="mt-1 text-sm text-slate-600">
+                Revise a mensagem antes de enviar para o responsável.
+              </p>
+            </div>
+            <div className="space-y-4 px-5 py-4">
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-xs font-semibold uppercase text-slate-500">Destinatário</p>
+                  <p className="mt-1 text-sm font-medium text-slate-900">{previewConfirmacaoEmail.destinatario}</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-xs font-semibold uppercase text-slate-500">Assunto</p>
+                  <p className="mt-1 text-sm font-medium text-slate-900">{previewConfirmacaoEmail.assunto}</p>
+                </div>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white">
+                <div className="border-b border-slate-100 px-4 py-2 text-xs font-semibold uppercase text-slate-500">
+                  Mensagem
+                </div>
+                <pre className="max-h-[50vh] overflow-auto whitespace-pre-wrap px-4 py-3 text-sm leading-6 text-slate-800">{previewConfirmacaoEmail.mensagem}</pre>
+              </div>
+            </div>
+            <div className="flex flex-col gap-2 border-t border-slate-100 px-5 py-3 sm:flex-row sm:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setPreviewConfirmacaoEmail(null)}
+                disabled={enviandoPreviewConfirmacaoEmail}
+              >
+                Cancelar
+              </Button>
+              <Button type="button" onClick={() => void confirmarEnvioConfirmacaoEmail()} disabled={enviandoPreviewConfirmacaoEmail}>
+                {enviandoPreviewConfirmacaoEmail ? (
+                  <LoaderCircle className="mr-1.5 h-4 w-4 animate-spin" />
+                ) : (
+                  <Mail className="mr-1.5 h-4 w-4" />
+                )}
+                {enviandoPreviewConfirmacaoEmail ? "Enviando..." : "Enviar e-mail"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {popup ? <PopupMensagem popup={popup} onClose={() => setPopup(null)} /> : null}
       <PopupConfirmacao aberto={confirmarExcluir} titulo="Confirmar exclusão" texto="Esta ação é irreversível. Deseja continuar?" processando={removerMutation.isPending} onCancel={() => setConfirmarExcluir(false)} onConfirm={() => void confirmarExclusao()} confirmarTexto="Excluir" />

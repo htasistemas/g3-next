@@ -87,6 +87,14 @@ export class EmprestimosEventosService {
     return mapEmprestimoToResponse(registro.registro, registro.itens);
   }
 
+  async confirmarReserva(rawId: string, rawUsuarioId?: unknown, rawTenantId?: string) {
+    const id = this.parseId(rawId);
+    const usuarioId = this.parseOptionalId(rawUsuarioId);
+    const tenantId = this.parseTenant(rawTenantId);
+    const registro = await this.repository.alterarStatus(id, "AGENDADO", tenantId, usuarioId);
+    return mapEmprestimoToResponse(registro.registro, registro.itens);
+  }
+
   async confirmarDevolucao(rawId: string, rawUsuarioId?: unknown, rawTenantId?: string) {
     const id = this.parseId(rawId);
     const usuarioId = this.parseOptionalId(rawUsuarioId);
@@ -263,42 +271,16 @@ export class EmprestimosEventosService {
   }
 
   async enviarConfirmacaoReservaEmail(rawId: string, rawTenantId?: string) {
-    const id = this.parseId(rawId);
-    const tenantId = this.parseTenant(rawTenantId);
-    const registro = await this.repository.buscarEmprestimoPorIdOuFalhar(id, tenantId);
-    const emprestimo = mapEmprestimoToResponse(registro.registro, registro.itens);
-
-    if (emprestimo.status === "CANCELADO") {
-      throw new AppError("Nao e possivel confirmar reserva cancelada.", 422);
-    }
-
-    if (!registro.registro.responsavel_id) {
-      throw new AppError("Emprestimo sem responsavel cadastrado para envio de e-mail.", 422);
-    }
-
-    const responsavel = await this.repository.buscarResponsavelPorId(registro.registro.responsavel_id, tenantId);
-    const destinatario = normalizarEmail(responsavel?.email);
-    if (!destinatario || !validarEmail(destinatario)) {
-      throw new AppError("O responsavel nao possui e-mail valido cadastrado.", 422);
-    }
-
-    const nomeInstituicao = await this.repository.obterNomeInstituicao(tenantId);
-    const assunto = `Confirmacao de reserva - ${emprestimo.evento.titulo}`;
-    const mensagem = this.montarMensagemConfirmacaoReserva(
-      emprestimo,
-      responsavel?.nome ?? emprestimo.responsavel?.nome,
-      nomeInstituicao
-    );
-    const envio = await this.emailService.enviarEmailSimples({
-      destinatario,
-      assunto,
-      mensagem
-    });
-
+    const preview = await this.montarPreviewConfirmacaoReservaEmail(rawId, rawTenantId);
+    const envio = await this.emailService.enviarEmailSimples(preview);
     return {
       destinatario: envio.destinatario,
       enviadoEm: envio.enviadoEm
     };
+  }
+
+  async obterPreviewConfirmacaoReservaEmail(rawId: string, rawTenantId?: string) {
+    return this.montarPreviewConfirmacaoReservaEmail(rawId, rawTenantId);
   }
 
   private parseId(rawId: string): bigint {
@@ -350,6 +332,8 @@ export class EmprestimosEventosService {
       "",
       itens ? "Itens vinculados:" : undefined,
       itens || undefined,
+      emprestimo.observacoes?.trim() ? "" : undefined,
+      emprestimo.observacoes?.trim() ? `Observações do empréstimo:\n${emprestimo.observacoes.trim()}` : undefined,
       "",
       "Solicitamos confirmar a devolucao dos itens ou entrar em contato com a instituicao para regularizacao.",
       "",
@@ -375,6 +359,8 @@ export class EmprestimosEventosService {
       "",
       itens ? "Itens reservados:" : undefined,
       itens || undefined,
+      emprestimo.observacoes?.trim() ? "" : undefined,
+      emprestimo.observacoes?.trim() ? `Observações do empréstimo:\n${emprestimo.observacoes.trim()}` : undefined,
       "",
       "Os itens ficam reservados para a data informada. Em caso de alteracao, entre em contato com a instituicao.",
       "",
@@ -392,5 +378,37 @@ export class EmprestimosEventosService {
         return `- ${item.quantidade}x ${nome}${patrimonio}`;
       })
       .join("\n");
+  }
+
+  private async montarPreviewConfirmacaoReservaEmail(rawId: string, rawTenantId?: string) {
+    const id = this.parseId(rawId);
+    const tenantId = this.parseTenant(rawTenantId);
+    const registro = await this.repository.buscarEmprestimoPorIdOuFalhar(id, tenantId);
+    const emprestimo = mapEmprestimoToResponse(registro.registro, registro.itens);
+
+    if (emprestimo.status === "CANCELADO") {
+      throw new AppError("Nao e possivel confirmar reserva cancelada.", 422);
+    }
+
+    if (!registro.registro.responsavel_id) {
+      throw new AppError("Emprestimo sem responsavel cadastrado para envio de e-mail.", 422);
+    }
+
+    const responsavel = await this.repository.buscarResponsavelPorId(registro.registro.responsavel_id, tenantId);
+    const destinatario = normalizarEmail(responsavel?.email);
+    if (!destinatario || !validarEmail(destinatario)) {
+      throw new AppError("O responsavel nao possui e-mail valido cadastrado.", 422);
+    }
+
+    const nomeInstituicao = await this.repository.obterNomeInstituicao(tenantId);
+    return {
+      destinatario,
+      assunto: `Confirmacao de reserva - ${emprestimo.evento.titulo}`,
+      mensagem: this.montarMensagemConfirmacaoReserva(
+        emprestimo,
+        responsavel?.nome ?? emprestimo.responsavel?.nome,
+        nomeInstituicao
+      )
+    };
   }
 }

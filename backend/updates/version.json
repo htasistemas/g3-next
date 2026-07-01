@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.578",
-  "releaseDate": "2026-06-29",
-  "description": "A tela de voluntariado passou a contar com a nova aba de escalas com sala, dias, horários, atividade e carga horaria calculada.",
+  "latestVersion": "1.00.579",
+  "releaseDate": "2026-06-30",
+  "description": "Empréstimos para eventos receberam confirmação de reserva, pré-visualização de e-mail e inclusão das observações no envio. A tela de patrimônio ganhou cópia de itens e a seleção de itens vinculados passou a filtrar por unidade.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.578",
+  "minCompatibleVersion": "1.00.579",
   "releaseType": "stable"
 }
 

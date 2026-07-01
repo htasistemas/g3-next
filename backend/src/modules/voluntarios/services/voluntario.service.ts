@@ -160,6 +160,11 @@ export class VoluntarioService {
     return this.repository.listarEscalas(voluntarioId, tenantId);
   }
 
+  async listarEscalasGeral(rawTenantId?: string) {
+    const tenantId = this.parseTenant(rawTenantId);
+    return this.repository.listarEscalasGeral(tenantId);
+  }
+
   async criarEscala(rawInput: unknown, rawTenantId?: string) {
     const tenantId = this.parseTenant(rawTenantId);
     const input = voluntarioEscalaInputSchema.parse(this.normalizarPayload(rawInput));

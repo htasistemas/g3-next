@@ -1253,6 +1253,10 @@ export class EmprestimosEventosRepository {
       throw new AppError("O emprestimo ja esta com este status.", 409);
     }
 
+    if (proximoStatus === "AGENDADO" && statusAtual !== "RASCUNHO") {
+      throw new AppError("A reserva so pode ser confirmada a partir do status rascunho.", 409);
+    }
+
     if (proximoStatus === "RETIRADO" && ["DEVOLVIDO", "CANCELADO"].includes(statusAtual)) {
       throw new AppError("Nao e possivel confirmar retirada para emprestimo devolvido ou cancelado.", 409);
     }

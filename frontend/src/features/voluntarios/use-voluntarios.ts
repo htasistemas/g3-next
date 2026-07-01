@@ -72,6 +72,16 @@ export function useVoluntarioEscalas(voluntarioId?: string) {
   });
 }
 
+export function useVoluntarioEscalasGeral() {
+  const { usuario } = useAuth();
+  const tenantKey = usuario?.tenant_id ?? "sem-tenant";
+  return useQuery({
+    queryKey: ["voluntario-escalas", tenantKey, "geral"],
+    queryFn: () => voluntariosService.listarEscalasGeral(),
+    enabled: !!usuario
+  });
+}
+
 export function useSalvarVoluntarioEscala(voluntarioId?: string) {
   const queryClient = useQueryClient();
   const { usuario } = useAuth();
@@ -85,6 +95,7 @@ export function useSalvarVoluntarioEscala(voluntarioId?: string) {
     },
     onSuccess: async (response) => {
       const escala = response.escala;
+      await queryClient.invalidateQueries({ queryKey: ["voluntario-escalas", tenantKey, "geral"] });
       await queryClient.invalidateQueries({ queryKey: ["voluntario-escalas", tenantKey, voluntarioId ?? ""] });
       if (voluntarioId) {
         await queryClient.invalidateQueries({ queryKey: ["voluntario", tenantKey, voluntarioId] });
@@ -105,6 +116,7 @@ export function useRemoverVoluntarioEscala(voluntarioId?: string) {
   return useMutation({
     mutationFn: (id: string) => voluntariosService.removerEscala(id),
     onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["voluntario-escalas", tenantKey, "geral"] });
       await queryClient.invalidateQueries({ queryKey: ["voluntario-escalas", tenantKey, voluntarioId ?? ""] });
       if (voluntarioId) {
         await queryClient.invalidateQueries({ queryKey: ["voluntario", tenantKey, voluntarioId] });

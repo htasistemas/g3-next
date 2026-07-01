@@ -13,6 +13,7 @@ import {
   ClipboardList,
   ChevronDown,
   ChevronUp,
+  Copy,
   ListChecks,
   ListRestart,
   MapPin,
@@ -1044,6 +1045,36 @@ export function PatrimonioPage() {
     setErros({});
     setErrosMovimento({});
     setAbaAtiva("cadastro");
+  }
+
+  function copiar(item: Patrimonio) {
+    const unidadeSelecionada =
+      unidadesAssistenciais.find((unidade) => unidade.id_unidade === item.unidadeId) ??
+      unidadesAssistenciais.find(
+        (unidade) => normalizarBusca(unidade.nome_fantasia) === normalizarBusca(item.unidade)
+      ) ??
+      null;
+    const proximo = {
+      ...defaultForm,
+      ...item,
+      idPatrimonio: undefined,
+      unidadeId: item.unidadeId ?? unidadeSelecionada?.id_unidade ?? "",
+      unidade: unidadeSelecionada?.nome_fantasia ?? item.unidade ?? "",
+      movimentos: []
+    };
+    setForm(proximo);
+    setSnapshot(proximo);
+    setMovimento(criarMovimentoPadrao(proximo));
+    setUnidadeLocalizacaoSelecionadaId(unidadeSelecionada?.id_unidade ?? "");
+    setMostrarNumerosVagos(false);
+    setErros({});
+    setErrosMovimento({});
+    setAbaAtiva("cadastro");
+    setPopupMensagem({
+      tipo: "sucesso",
+      titulo: "Item copiado",
+      texto: "Revise os dados e ajuste o número patrimonial antes de salvar."
+    });
   }
 
   function buscar() {
@@ -3831,6 +3862,10 @@ export function PatrimonioPage() {
                               <div className="flex justify-end gap-2">
                                 <Button variant="outline" size="sm" onClick={() => selecionar(item)}>
                                   Selecionar
+                                </Button>
+                                <Button variant="outline" size="sm" onClick={() => copiar(item)}>
+                                  <Copy className="mr-1.5 h-3.5 w-3.5" />
+                                  Copiar
                                 </Button>
                                 <Button
                                   variant="ghost"
