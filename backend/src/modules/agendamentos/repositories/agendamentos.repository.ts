@@ -183,6 +183,13 @@ function formatarHora(value?: string | null) {
   return texto.length === 5 ? `${texto}:00` : texto;
 }
 
+function formatarHoraExibicao(value?: string | null) {
+  const texto = String(value ?? "").trim();
+  if (!texto) return "---";
+  const match = texto.match(/^(\d{2}:\d{2})/);
+  return match ? match[1] : texto;
+}
+
 function formatarData(value?: string | null) {
   return toOptionalDate(value);
 }
@@ -1072,7 +1079,18 @@ export class AgendamentosRepository {
 
     if (!escopos.length) return [];
 
-    return prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+    return prisma.$queryRaw<
+      Array<{
+        id: bigint;
+        beneficiario_nome: string;
+        profissional_nome: string | null;
+        sala: string | null;
+        recurso: string | null;
+        hora_inicial: string;
+        hora_final: string | null;
+        status: string | null;
+      }>
+    >(Prisma.sql`
       SELECT a.id, a.beneficiario_nome, a.profissional_nome, a.sala, a.recurso, a.hora_inicial, a.hora_final, a.status
       FROM agendamento a
       WHERE a.tenant_id::text = ${payload.tenantId}
@@ -1080,6 +1098,32 @@ export class AgendamentosRepository {
         AND (${Prisma.join(escopos, " OR ")})
       ORDER BY a.hora_inicial ASC
     `);
+  }
+
+  private formatarMensagemConflito(conflitos: Array<{
+    id: bigint;
+    beneficiario_nome: string;
+    profissional_nome: string | null;
+    sala: string | null;
+    recurso: string | null;
+    hora_inicial: string;
+    hora_final: string | null;
+    status: string | null;
+  }>) {
+    const resumo = conflitos.slice(0, 3).map((item) => {
+      const partes = [
+        `ID ${item.id.toString()}`,
+        item.beneficiario_nome,
+        `Hora ${formatarHoraExibicao(item.hora_inicial)}${item.hora_final ? `-${formatarHoraExibicao(item.hora_final)}` : ""}`,
+        item.profissional_nome ? `Profissional ${item.profissional_nome}` : null,
+        item.sala ? `Sala ${item.sala}` : null,
+        item.recurso ? `Recurso ${item.recurso}` : null,
+        item.status ? `Status ${item.status}` : null
+      ].filter(Boolean);
+      return partes.join(" | ");
+    });
+
+    return `Conflito de agenda identificado. Registro(s) encontrado(s): ${resumo.join("; ")}.`;
   }
 
   async listar(filtros: AgendamentoFiltros, tenantId: string) {
@@ -1162,7 +1206,7 @@ export class AgendamentosRepository {
     });
 
     if (conflitos.length && !input.permitirConflito) {
-      throw new AppError("Conflito de agenda identificado.", 409);
+      throw new AppError(this.formatarMensagemConflito(conflitos), 409);
     }
 
     const inserted = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
@@ -1258,7 +1302,7 @@ export class AgendamentosRepository {
       tenantId
     });
     if (conflitos.length && !input.permitirConflito) {
-      throw new AppError("Conflito de agenda identificado.", 409);
+      throw new AppError(this.formatarMensagemConflito(conflitos), 409);
     }
 
     await prisma.$executeRaw(Prisma.sql`
@@ -1359,7 +1403,7 @@ export class AgendamentosRepository {
     });
 
     if (conflitos.length && !input.permitirConflito) {
-      throw new AppError("Conflito de agenda identificado.", 409);
+      throw new AppError(this.formatarMensagemConflito(conflitos), 409);
     }
 
     await prisma.$executeRaw(Prisma.sql`
