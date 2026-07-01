@@ -65,6 +65,8 @@ const alertasCentralAtendimentosPadrao: AlertasCentralAtendimentosSistema = {
   alertar_inscricao_ativa: true
 };
 
+const CHAVE_PREFERENCIA_AGENDAMENTOS_VISUALIZACAO = "AGENDAMENTOS_VISUALIZACAO";
+
 export class ParametrosSistemaService {
   private readonly repository = new ParametrosSistemaRepository();
 
@@ -286,5 +288,38 @@ export class ParametrosSistemaService {
 
   getAlertasCentralAtendimentosPadrao() {
     return alertasCentralAtendimentosPadrao;
+  }
+
+  async obterPreferenciaAgendamentosVisualizacao(usuarioId: string, tenantId: string) {
+    const chave = this.montarChavePreferenciaUsuario(
+      CHAVE_PREFERENCIA_AGENDAMENTOS_VISUALIZACAO,
+      usuarioId
+    );
+    const registro = await this.repository.buscarPorChaveGenerica<{ data_visualizacao?: string }>(chave, tenantId);
+    return registro?.valor?.data_visualizacao?.trim() || null;
+  }
+
+  async salvarPreferenciaAgendamentosVisualizacao(
+    dataVisualizacao: string,
+    usuarioId: string,
+    usuarioAtualizacao: string,
+    tenantId: string
+  ) {
+    const chave = this.montarChavePreferenciaUsuario(
+      CHAVE_PREFERENCIA_AGENDAMENTOS_VISUALIZACAO,
+      usuarioId
+    );
+    await this.repository.salvarPorChaveGenerica(
+      chave,
+      { data_visualizacao: dataVisualizacao },
+      usuarioAtualizacao,
+      tenantId
+    );
+
+    return { data_visualizacao: dataVisualizacao };
+  }
+
+  private montarChavePreferenciaUsuario(chaveBase: string, usuarioId: string) {
+    return `${chaveBase}:${String(usuarioId).trim()}`;
   }
 }

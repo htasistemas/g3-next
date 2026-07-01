@@ -14,6 +14,10 @@ type TenantContextResponse = {
   instituicao: TenantContextoLogin | null;
 };
 
+type PreferenciaAgendamentosResponse = {
+  dataVisualizacao: string | null;
+};
+
 const STORAGE_KEY = "g3_session";
 
 function persistirSessao(token: string, usuario: UsuarioAutenticado) {
@@ -113,5 +117,20 @@ export const authService = {
       params
     });
     return data.instituicao;
+  },
+
+  async obterPreferenciaAgendamentos(): Promise<string | null> {
+    const { data } = await httpClient.get<PreferenciaAgendamentosResponse>(
+      "/api/auth/me/preferencias/agendamentos"
+    );
+    return data.dataVisualizacao?.trim() || null;
+  },
+
+  async salvarPreferenciaAgendamentos(dataVisualizacao: string): Promise<string | null> {
+    const { data } = await httpClient.put<{ data_visualizacao: string }>(
+      "/api/auth/me/preferencias/agendamentos",
+      { dataVisualizacao }
+    );
+    return data.data_visualizacao?.trim() || null;
   }
 };

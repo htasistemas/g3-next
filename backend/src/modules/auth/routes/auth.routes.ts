@@ -12,4 +12,14 @@ authRoutes.post("/google", asyncHandler(controller.loginGoogle.bind(controller))
 authRoutes.post("/esqueci-senha", asyncHandler(controller.esqueciSenha.bind(controller)));
 authRoutes.get("/tenant-context", asyncHandler(controller.tenantContext.bind(controller)));
 authRoutes.get("/me", hydrateAuthenticatedUser, asyncHandler(controller.me.bind(controller)));
+authRoutes.get(
+  "/me/preferencias/agendamentos",
+  ensureAuthenticated,
+  asyncHandler(controller.obterPreferenciaAgendamentos.bind(controller))
+);
+authRoutes.put(
+  "/me/preferencias/agendamentos",
+  ensureAuthenticated,
+  asyncHandler(controller.salvarPreferenciaAgendamentos.bind(controller))
+);
 authRoutes.post("/logout", asyncHandler(controller.logout.bind(controller)));

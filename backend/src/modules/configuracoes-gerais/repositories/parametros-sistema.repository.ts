@@ -52,6 +52,14 @@ const estruturaSql = [
 let estruturaPromise: Promise<void> | null = null;
 
 export class ParametrosSistemaRepository {
+  async buscarPorChaveGenerica<T>(chave: string, tenantId?: string) {
+    return this.buscarPorChave<T>(chave, tenantId);
+  }
+
+  async salvarPorChaveGenerica<T>(chave: string, valor: T, usuarioAtualizacao: string, tenantId: string) {
+    return this.salvarPorChave(chave, valor, usuarioAtualizacao, tenantId);
+  }
+
   async buscarPersonalizacao(tenantId?: string) {
     return this.buscarPorChave<PersonalizacaoSistema>(CHAVE_PERSONALIZACAO, tenantId);
   }

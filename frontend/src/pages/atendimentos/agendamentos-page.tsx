@@ -1,4 +1,4 @@
-import { useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   BadgeCheck,
@@ -20,6 +20,8 @@ import { AdminPageLayout, type AdminAction, type AdminTab } from "@/components/a
 import { PopupConfirmacao, PopupMensagem, type PopupMensagemState } from "@/components/admin/admin-popups";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAuth } from "@/hooks/use-auth";
+import { authService } from "@/services/auth.service";
 import { useUnidadeAssistencialAtual } from "@/features/unidades-assistenciais/use-unidades-assistenciais";
 import { resolverUrlArquivo } from "@/lib/arquivos";
 import { formatarCnpj, formatarTelefone } from "@/lib/br-utils";
@@ -85,7 +87,6 @@ const abas: AdminTab[] = [
 ];
 
 const hoje = new Date().toISOString().slice(0, 10);
-
 function obterInicioSemana(dataBase: Date) {
   const data = new Date(dataBase);
   const dia = data.getDay();
@@ -374,6 +375,7 @@ function imprimirFichaHtml(options: {
 
 export function AgendamentosPage() {
   const navigate = useNavigate();
+  const { usuario } = useAuth();
   const [abaAtiva, setAbaAtiva] = useState<AbaId>("dashboard");
   const [tipo, setTipo] = useState<AgendamentoOperacionalTipo | undefined>();
   const [buscaItem, setBuscaItem] = useState("");
@@ -381,6 +383,7 @@ export function AgendamentosPage() {
   const [itemSelecionado, setItemSelecionado] = useState<AgendamentoOperacionalItem | null>(null);
   const [dataAgendamento, setDataAgendamento] = useState(hoje);
   const [dataVisualizacao, setDataVisualizacao] = useState(hoje);
+  const [preferenciaCarregada, setPreferenciaCarregada] = useState(false);
   const [buscaBeneficiario, setBuscaBeneficiario] = useState("");
   const [beneficiariosSelecionados, setBeneficiariosSelecionados] = useState<number[]>([]);
   const [selecionadoId, setSelecionadoId] = useState<number | null>(null);
@@ -404,6 +407,57 @@ export function AgendamentosPage() {
   const cancelarMutation = useCancelarAgendamento();
   const notificarMutation = useNotificarAgendamento();
   const remarcarMutation = useRemarcarAgendamento();
+  const preferenciaSalvando = useRef<number | null>(null);
+
+  useEffect(() => {
+    let ativo = true;
+
+    if (!usuario?.id) {
+      setPreferenciaCarregada(true);
+      return () => {
+        ativo = false;
+      };
+    }
+
+    setPreferenciaCarregada(false);
+    void (async () => {
+      try {
+        const dataPreferencia = await authService.obterPreferenciaAgendamentos();
+        if (!ativo) return;
+        if (dataPreferencia) {
+          setDataVisualizacao(dataPreferencia);
+        }
+      } catch {
+        if (!ativo) return;
+      } finally {
+        if (ativo) setPreferenciaCarregada(true);
+      }
+    })();
+
+    return () => {
+      ativo = false;
+    };
+  }, [usuario?.id]);
+
+  useEffect(() => {
+    if (!preferenciaCarregada || !usuario?.id) return;
+
+    if (preferenciaSalvando.current) {
+      window.clearTimeout(preferenciaSalvando.current);
+    }
+
+    preferenciaSalvando.current = window.setTimeout(() => {
+      void authService.salvarPreferenciaAgendamentos(dataVisualizacao).catch(() => undefined);
+      preferenciaSalvando.current = null;
+    }, 350);
+
+    return () => {
+      if (preferenciaSalvando.current) {
+        window.clearTimeout(preferenciaSalvando.current);
+        preferenciaSalvando.current = null;
+      }
+    };
+  }, [dataVisualizacao, preferenciaCarregada, usuario?.id]);
 
   const cards = useMemo(
     () =>

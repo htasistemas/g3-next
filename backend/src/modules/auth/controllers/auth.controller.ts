@@ -2,8 +2,10 @@ import type { CookieOptions, Request, Response } from "express";
 import { env } from "../../../config/env.js";
 import { AUTH_COOKIE_NAME, type AuthenticatedRequest } from "../middlewares/auth.middleware.js";
 import { AuthService } from "../services/auth.service.js";
+import { ParametrosSistemaService } from "../../configuracoes-gerais/services/parametros-sistema.service.js";
 
 const authService = new AuthService();
+const parametrosSistemaService = new ParametrosSistemaService();
 
 function authCookieOptions(): CookieOptions {
   const cookieOptions: CookieOptions = {
@@ -40,6 +42,40 @@ export class AuthController {
     }
     const usuario = await authService.obterPerfilUsuario(request.authUser.id);
     return response.json({ usuario });
+  }
+
+  async obterPreferenciaAgendamentos(request: AuthenticatedRequest, response: Response) {
+    if (!request.authUser?.id || !request.authUser?.tenant_id) {
+      return response.status(401).json({ dataVisualizacao: null });
+    }
+
+    const dataVisualizacao = await parametrosSistemaService.obterPreferenciaAgendamentosVisualizacao(
+      request.authUser.id,
+      request.authUser.tenant_id
+    );
+
+    return response.json({ dataVisualizacao });
+  }
+
+  async salvarPreferenciaAgendamentos(request: AuthenticatedRequest, response: Response) {
+    if (!request.authUser?.id || !request.authUser?.tenant_id) {
+      return response.status(401).json({ dataVisualizacao: null });
+    }
+
+    const dataVisualizacao =
+      typeof request.body?.dataVisualizacao === "string" ? request.body.dataVisualizacao.trim() : "";
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dataVisualizacao)) {
+      return response.status(400).json({ message: "Data de visualizacao invalida." });
+    }
+
+    const salvo = await parametrosSistemaService.salvarPreferenciaAgendamentosVisualizacao(
+      dataVisualizacao,
+      request.authUser.id,
+      request.authUser.nomeUsuario,
+      request.authUser.tenant_id
+    );
+
+    return response.json(salvo);
   }
 
   async logout(_request: Request, response: Response) {
