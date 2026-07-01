@@ -1121,16 +1121,20 @@ export class AgendamentosRepository {
       const partes = [
         `ID ${item.id.toString()}`,
         item.beneficiario_nome,
-        `Hora ${formatarHoraExibicao(item.hora_inicial)}${item.hora_final ? `-${formatarHoraExibicao(item.hora_final)}` : ""}`,
+        `Horário ${formatarHoraExibicao(item.hora_inicial)}${item.hora_final ? ` até ${formatarHoraExibicao(item.hora_final)}` : ""}`,
         item.profissional_nome ? `Profissional ${item.profissional_nome}` : null,
         item.sala ? `Sala ${item.sala}` : null,
         item.recurso ? `Recurso ${item.recurso}` : null,
         item.status ? `Status ${item.status}` : null
       ].filter(Boolean);
-      return partes.join(" | ");
+      return `- ${partes.join("\n- ")}`;
     });
 
-    return `Conflito de agenda identificado. Registro(s) encontrado(s): ${resumo.join("; ")}.`;
+    return [
+      "Conflito de agenda identificado.",
+      "Agendamento(s) bloqueador(es):",
+      ...resumo
+    ].join("\n");
   }
 
   async listar(filtros: AgendamentoFiltros, tenantId: string) {

@@ -558,7 +558,12 @@ export function AgendamentosPage() {
         texto: cardSelecionado?.id ? "Agenda atualizada com sucesso." : "Agenda gerada com sucesso."
       });
     } catch (error: any) {
-      setPopup({ tipo: "erro", titulo: "Erro", texto: error?.response?.data?.message ?? "Não foi possível gerar a agenda." });
+      const mensagem = error?.response?.data?.message ?? "Não foi possível gerar a agenda.";
+      setPopup({
+        tipo: "erro",
+        titulo: mensagem.startsWith("Conflito de agenda identificado.") ? "Agendamento bloqueador" : "Erro",
+        texto: mensagem
+      });
     }
   }
 

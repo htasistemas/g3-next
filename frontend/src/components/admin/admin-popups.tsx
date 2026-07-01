@@ -38,7 +38,7 @@ export function PopupMensagem({
           </h3>
         </div>
         <div className="px-5 py-4">
-          <p className="text-sm text-slate-700">{popup.texto}</p>
+          <p className="text-sm text-slate-700 whitespace-pre-line">{popup.texto}</p>
         </div>
         <div className="flex justify-end border-t border-slate-100 px-5 py-3">
           <Button type="button" onClick={onClose}>
