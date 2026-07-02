@@ -29,5 +29,14 @@ export const instituicoesService = {
       payload
     );
     return data;
+  },
+
+  async desbloquearAcesso(id: string) {
+    const { data } = await httpClient.post<{
+      sucesso: boolean;
+      instituicoes_desbloqueadas: number;
+      usuarios_desbloqueados: number;
+    }>(`/api/master/instituicoes/${id}/desbloquear-acesso`);
+    return data;
   }
 };

@@ -43,4 +43,8 @@ export class InstituicoesService {
     const input = instituicaoResetAdminSchema.parse(rawInput);
     return this.repository.resetarSenhaAdmin(id, input.email, input.nova_senha);
   }
+
+  async desbloquearAcesso(id: string) {
+    return this.repository.desbloquearAcesso(id);
+  }
 }

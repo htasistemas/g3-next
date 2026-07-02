@@ -1,10 +1,9 @@
 {
-  "latestVersion": "1.00.579",
-  "releaseDate": "2026-06-30",
-  "description": "Empréstimos para eventos receberam confirmação de reserva, pré-visualização de e-mail e inclusão das observações no envio. A tela de patrimônio ganhou cópia de itens e a seleção de itens vinculados passou a filtrar por unidade.",
+  "latestVersion": "1.00.581",
+  "releaseDate": "2026-07-02",
+  "description": "A gestao master de instituicoes passou a permitir desbloquear acesso de tenants e usuarios bloqueados por tentativas invalidas, alem de reativar o administrador ao redefinir senha.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.579",
+  "minCompatibleVersion": "1.00.581",
   "releaseType": "stable"
 }
-

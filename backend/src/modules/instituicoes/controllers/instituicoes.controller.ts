@@ -23,4 +23,9 @@ export class InstituicoesController {
     const resultado = await service.resetarAdmin(request.params.id, request.body);
     return response.json(resultado);
   }
+
+  async desbloquearAcesso(request: Request, response: Response) {
+    const resultado = await service.desbloquearAcesso(request.params.id);
+    return response.json(resultado);
+  }
 }

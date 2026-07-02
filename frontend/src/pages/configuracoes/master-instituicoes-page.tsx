@@ -8,7 +8,8 @@ import {
   Plus,
   RefreshCcw,
   Save,
-  ShieldCheck
+  ShieldCheck,
+  Unlock
 } from "lucide-react";
 import { AdminPageLayout, type AdminAction, type AdminTab } from "@/components/admin/admin-page-layout";
 import { PopupMensagem, type PopupMensagemState } from "@/components/admin/admin-popups";
@@ -244,6 +245,40 @@ export function MasterInstituicoesPage() {
     }
   });
 
+  const desbloquearAcessoMutation = useMutation({
+    mutationFn: async () => {
+      if (!selecionada?.id) {
+        throw new Error("Selecione uma instituiÃ§Ã£o primeiro.");
+      }
+      return instituicoesService.desbloquearAcesso(selecionada.id);
+    },
+    onSuccess: async (resultado) => {
+      await queryClient.invalidateQueries({ queryKey: ["master-instituicoes"] });
+      setForm((current) => ({
+        ...current,
+        status: current.status === "bloqueado" ? "ativo" : current.status
+      }));
+      setSelecionada((current) =>
+        current ? { ...current, status: current.status === "bloqueado" ? "ativo" : current.status } : current
+      );
+      setPopup({
+        tipo: "sucesso",
+        titulo: "Acesso desbloqueado",
+        texto: `InstituiÃ§Ã£o desbloqueada: ${resultado.instituicoes_desbloqueadas}. UsuÃ¡rios desbloqueados: ${resultado.usuarios_desbloqueados}.`
+      });
+    },
+    onError: (error: any) => {
+      setPopup({
+        tipo: "erro",
+        titulo: "Falha ao desbloquear",
+        texto:
+          error?.response?.data?.message ??
+          error?.response?.data?.mensagem ??
+          "NÃ£o foi possÃ­vel desbloquear o acesso."
+      });
+    }
+  });
+
   const instituicoesFiltradas = useMemo(() => {
     const termo = filtro.trim().toLowerCase();
     const dados = instituicoesQuery.data ?? [];
@@ -343,6 +378,24 @@ export function MasterInstituicoesPage() {
           return;
         }
         resetarAdminMutation.mutate();
+      }
+    },
+    {
+      id: "desbloquear-acesso",
+      label: "Desbloquear acesso",
+      icon: Unlock,
+      variant: "outline",
+      disabled: !selecionada?.id || desbloquearAcessoMutation.isPending,
+      onClick: () => {
+        if (!selecionada?.id) {
+          setPopup({
+            tipo: "aviso",
+            titulo: "SeleÃ§Ã£o obrigatÃ³ria",
+            texto: "Selecione uma instituiÃ§Ã£o antes de desbloquear o acesso."
+          });
+          return;
+        }
+        desbloquearAcessoMutation.mutate();
       }
     }
   ];
@@ -678,6 +731,9 @@ export function MasterInstituicoesPage() {
                     </div>
                     <p className="text-xs text-[var(--g3-muted)]">
                       Ao redefinir a senha, o sistema marca o usuário para troca obrigatória no próximo acesso.
+                    </p>
+                    <p className="text-xs text-[var(--g3-muted)]">
+                      Use Desbloquear acesso para reativar o tenant bloqueado e zerar as tentativas inválidas dos usuários bloqueados.
                     </p>
                   </>
                 )}

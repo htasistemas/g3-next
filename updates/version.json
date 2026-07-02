@@ -1,11 +1,10 @@
 {
-  "latestVersion": "1.00.580",
-  "releaseDate": "2026-06-30",
-  "description": "A aba de escalas do voluntário agora exibe um mapa semanal com todas as escalas cadastradas no sistema, organizado por dia, sala, unidade e horário.",
+  "latestVersion": "1.00.581",
+  "releaseDate": "2026-07-02",
+  "description": "A gestao master de instituicoes passou a permitir desbloquear acesso de tenants e usuarios bloqueados por tentativas invalidas, alem de reativar o administrador ao redefinir senha.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.580",
+  "minCompatibleVersion": "1.00.581",
   "releaseType": "stable",
   "downloadUrl": null
 }
-

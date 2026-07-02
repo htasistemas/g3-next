@@ -1134,6 +1134,8 @@ const secoesManual: ManualSecao[] = [
           "O salvamento de um tenant novo com Administração inicial agora prepara antes a estrutura de usuários e permissões necessária no backend, evitando falha interna do servidor ao concluir o cadastro.",
           "O login e o e-mail do administrador inicial passaram a respeitar unicidade por tenant, sem bloquear o cadastro apenas porque o mesmo endereço já existe em outra instituição.",
           "Quando o tenant já existir, use a aba Administração inicial para redefinir a senha provisória do administrador e forçar troca no próximo login.",
+          "Ao redefinir a senha do administrador pela tela master, o sistema também reativa esse usuário e zera as tentativas inválidas de login.",
+          "Use a ação Desbloquear acesso para reativar uma instituição bloqueada e liberar, em um clique, todos os usuários bloqueados daquele tenant por tentativas inválidas.",
           "A tela de login do sistema agora aceita CNPJ da instituição e e-mail do usuário; quando houver subdomínio configurado, o sistema identifica automaticamente a instituição pelo endereço.",
           "O e-mail master htasistemas@gmail.com pode entrar na tela de login mesmo sem informar CNPJ, código ou slug; se houver um CNPJ digitado, o sistema desconsidera esse filtro para preservar o acesso administrativo global.",
           "O campo Senha da tela de login agora possui botão de visualizar ou ocultar a senha digitada no mesmo clique, facilitando a conferência antes de entrar.",

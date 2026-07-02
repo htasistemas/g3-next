@@ -394,6 +394,9 @@ export class InstituicoesRepository {
       UPDATE usuarios
       SET senha_hash = $2,
           exigir_troca_senha = TRUE,
+          status = 'ATIVO',
+          tentativas_login_invalidas = 0,
+          ultimo_login_invalido_em = NULL,
           atualizado_em = NOW()
       WHERE id = $1
       `,
@@ -402,6 +405,54 @@ export class InstituicoesRepository {
     );
 
     return { sucesso: true };
+  }
+
+  async desbloquearAcesso(id: string) {
+    await this.ensureEstrutura();
+    await this.buscarPorId(id);
+
+    const resultado = await prisma.$transaction(async (tx) => {
+      const instituicoesRows = await tx.$queryRawUnsafe<{ total: bigint }[]>(
+        `
+        UPDATE instituicoes
+        SET status = 'ativo',
+            atualizado_em = NOW()
+        WHERE id::text = $1
+          AND upper(coalesce(status, '')) = 'BLOQUEADO'
+        RETURNING 1 AS total
+        `,
+        id
+      );
+
+      const usuariosRows = await tx.$queryRawUnsafe<{ total: bigint }[]>(
+        `
+        WITH atualizados AS (
+          UPDATE usuarios
+          SET status = 'ATIVO',
+              tentativas_login_invalidas = 0,
+              ultimo_login_invalido_em = NULL,
+              atualizado_em = NOW()
+          WHERE instituicao_id::text = $1
+            AND deletado_em IS NULL
+            AND upper(coalesce(status, '')) = 'BLOQUEADO'
+          RETURNING id
+        )
+        SELECT COUNT(*)::bigint AS total
+        FROM atualizados
+        `,
+        id
+      );
+
+      return {
+        instituicoes_desbloqueadas: instituicoesRows.length,
+        usuarios_desbloqueados: Number(usuariosRows[0]?.total ?? 0)
+      };
+    });
+
+    return {
+      sucesso: true,
+      ...resultado
+    };
   }
 
   async buscarPorId(id: string) {

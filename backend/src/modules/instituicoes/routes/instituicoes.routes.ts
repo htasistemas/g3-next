@@ -10,3 +10,4 @@ instituicoesRoutes.get("/", asyncHandler(controller.listar.bind(controller)));
 instituicoesRoutes.post("/", asyncHandler(controller.criar.bind(controller)));
 instituicoesRoutes.put("/:id", asyncHandler(controller.atualizar.bind(controller)));
 instituicoesRoutes.post("/:id/resetar-admin", asyncHandler(controller.resetarAdmin.bind(controller)));
+instituicoesRoutes.post("/:id/desbloquear-acesso", asyncHandler(controller.desbloquearAcesso.bind(controller)));
