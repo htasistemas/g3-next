@@ -22,6 +22,7 @@ export type AgendamentoParticipante = {
   matriculaId?: number;
   beneficiarioId?: number;
   beneficiarioNome: string;
+  dataNascimento?: string;
   telefone?: string;
   comparecimento?: "Pendente" | "Presente" | "Faltou" | "Justificado";
   observacao?: string;

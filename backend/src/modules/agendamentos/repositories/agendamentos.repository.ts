@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../../database/prisma.js";
 import { EmailService } from "../../email/services/email.service.js";
 import { AppError } from "../../../shared/errors/app-error.js";
-import { toOptionalDate, trimOrUndefined } from "../../../utils/string-utils.js";
+import { toIsoDate, toOptionalDate, trimOrUndefined } from "../../../utils/string-utils.js";
 import type {
   AgendamentoBeneficiarioRow,
   AgendamentoCheckInInput,
@@ -435,6 +435,7 @@ export class AgendamentosRepository {
         ab.agendamento_id,
         COALESCE(ab.beneficiario_id, contato.beneficiario_id) AS beneficiario_id,
         ab.beneficiario_nome,
+        contato.data_nascimento AS data_nascimento,
         COALESCE(
           NULLIF(TRIM(ab.telefone), ''),
           NULLIF(TRIM(contato.telefone_principal), ''),
@@ -449,6 +450,7 @@ export class AgendamentosRepository {
       LEFT JOIN LATERAL (
         SELECT
           b.id AS beneficiario_id,
+          b.data_nascimento,
           contato_beneficio.telefone_principal,
           contato_beneficio.telefone_secundario,
           contato_beneficio.telefone_recado_numero,
@@ -525,10 +527,11 @@ export class AgendamentosRepository {
       `);
     }
 
-    return prisma.$queryRaw<Array<{ beneficiario_id: bigint; beneficiario_nome: string; telefone: string | null; email: string | null }>>(Prisma.sql`
+    return prisma.$queryRaw<Array<{ beneficiario_id: bigint; beneficiario_nome: string; data_nascimento: Date | null; telefone: string | null; email: string | null }>>(Prisma.sql`
       SELECT
         b.id AS beneficiario_id,
         b.nome_completo AS beneficiario_nome,
+        b.data_nascimento,
         COALESCE(
           NULLIF(TRIM(contato_beneficio.telefone_principal), ''),
           NULLIF(TRIM(contato_beneficio.telefone_secundario), ''),
@@ -586,6 +589,7 @@ export class AgendamentosRepository {
         matricula_id: bigint;
         beneficiario_id: bigint | null;
         beneficiario_nome: string;
+        data_nascimento: Date | null;
         telefone_principal: string | null;
         email: string | null;
       }>
@@ -594,12 +598,14 @@ export class AgendamentosRepository {
         m.id AS matricula_id,
         contato.beneficiario_id,
         m.beneficiario_nome,
+        contato.data_nascimento,
         contato.telefone_principal,
         contato.email
       FROM cursos_atendimentos_matriculas m
       LEFT JOIN LATERAL (
         SELECT
           b.id AS beneficiario_id,
+          b.data_nascimento,
           COALESCE(
             NULLIF(TRIM(contato_beneficio.telefone_principal), ''),
             NULLIF(TRIM(contato_beneficio.telefone_secundario), ''),
@@ -673,6 +679,7 @@ export class AgendamentosRepository {
         matricula_id: bigint;
         beneficiario_id: bigint | null;
         beneficiario_nome: string;
+        data_nascimento: Date | null;
         telefone: string | null;
         email: string | null;
       }>
@@ -682,12 +689,14 @@ export class AgendamentosRepository {
         m.id AS matricula_id,
         contato.beneficiario_id,
         m.beneficiario_nome,
+        contato.data_nascimento,
         contato.telefone AS telefone,
         COALESCE(NULLIF(TRIM(m.email), ''), contato.email) AS email
       FROM cursos_atendimentos_matriculas m
       LEFT JOIN LATERAL (
         SELECT
           b.id AS beneficiario_id,
+          b.data_nascimento,
           COALESCE(
             NULLIF(TRIM(contato_beneficio.telefone_principal), ''),
             NULLIF(TRIM(contato_beneficio.telefone_secundario), ''),
@@ -805,27 +814,28 @@ export class AgendamentosRepository {
     );
     const contatosPorMatriculaMap = new Map<
       number,
-      { beneficiario_id: bigint | null; beneficiario_nome: string; telefone_principal: string | null; email: string | null }
+      { beneficiario_id: bigint | null; beneficiario_nome: string; data_nascimento: Date | null; telefone_principal: string | null; email: string | null }
     >();
     for (const contato of contatosPorMatricula) {
       contatosPorMatriculaMap.set(Number(contato.matricula_id), contato);
     }
-    const contatosItensPorChave = new Map<string, { telefone: string | null; email: string | null }>();
+    const contatosItensPorChave = new Map<string, { data_nascimento: Date | null; telefone: string | null; email: string | null }>();
     for (const contato of contatosItensOperacionais) {
       const itemOrigemId = Number(contato.item_origem_id);
       const matriculaId = Number(contato.matricula_id);
       contatosItensPorChave.set(`item:${itemOrigemId}:matricula:${matriculaId}`, {
+        data_nascimento: contato.data_nascimento,
         telefone: contato.telefone,
         email: contato.email
       });
       contatosItensPorChave.set(
         `item:${itemOrigemId}:participante:${this.chaveParticipante(contato.beneficiario_nome, contato.beneficiario_id)}`,
-        { telefone: contato.telefone, email: contato.email }
+        { data_nascimento: contato.data_nascimento, telefone: contato.telefone, email: contato.email }
       );
     }
     const contatosFallbackPorChave = new Map<
       string,
-      { beneficiario_id: bigint; beneficiario_nome: string; telefone: string | null; email: string | null }
+      { beneficiario_id: bigint; beneficiario_nome: string; data_nascimento: Date | null; telefone: string | null; email: string | null }
     >();
     for (const contato of contatosFallback) {
       contatosFallbackPorChave.set(
@@ -882,9 +892,19 @@ export class AgendamentosRepository {
                 typeof participante.email === "string" && participante.email.trim().length
                   ? participante.email
                   : undefined;
+              const dataNascimentoParticipante =
+                typeof participante.dataNascimento === "string" && participante.dataNascimento.trim().length
+                  ? participante.dataNascimento
+                  : typeof participante.data_nascimento === "string" && participante.data_nascimento.trim().length
+                    ? participante.data_nascimento
+                    : undefined;
 
               return {
                 ...participante,
+                dataNascimento:
+                  toIsoDate(contatoMatricula?.data_nascimento) ??
+                  toIsoDate(contato?.data_nascimento ?? null) ??
+                  dataNascimentoParticipante,
                 telefone:
                   typeof contatoMatricula?.telefone_principal === "string" && contatoMatricula.telefone_principal.trim().length
                     ? contatoMatricula.telefone_principal
@@ -898,6 +918,7 @@ export class AgendamentosRepository {
           : contatosDoAgendamento.map((contato) => ({
               beneficiarioId: contato.beneficiario_id ? Number(contato.beneficiario_id) : undefined,
               beneficiarioNome: contato.beneficiario_nome,
+              dataNascimento: toIsoDate(contato.data_nascimento ?? null),
               telefone: contato.telefone ?? undefined,
               email: contato.email ?? undefined,
               comparecimento: "Pendente"
