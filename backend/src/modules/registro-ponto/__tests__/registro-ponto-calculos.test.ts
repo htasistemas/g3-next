@@ -56,7 +56,7 @@ test("calcula atrasos e saldo negativo quando a batida ocorre fora do horario", 
   ]);
 });
 
-test("ignora campos sem horario previsto ou sem batida registrada", () => {
+test("usa jornada padrao quando alguns horarios nao estiverem configurados", () => {
   const resultado = calcularDesviosRegistroPonto(
     {
       entrada_1: "08:00",
@@ -72,8 +72,27 @@ test("ignora campos sem horario previsto ou sem batida registrada", () => {
     }
   );
 
-  assert.equal(resultado.horas_extras_minutos, 10);
+  assert.equal(resultado.horas_extras_minutos, 20);
   assert.equal(resultado.atrasos_minutos, 0);
-  assert.equal(resultado.banco_horas_minutos, 10);
-  assert.deepEqual(resultado.detalhes, [{ campo: "entrada_1", minutos: 10, tipo: "HORA_EXTRA" }]);
+  assert.equal(resultado.banco_horas_minutos, 20);
+  assert.deepEqual(resultado.detalhes, [
+    { campo: "entrada_1", minutos: 10, tipo: "HORA_EXTRA" },
+    { campo: "saida_1", minutos: 10, tipo: "HORA_EXTRA" }
+  ]);
+});
+
+test("usa jornada padrao quando o horario previsto nao estiver configurado", () => {
+  const resultado = calcularDesviosRegistroPonto(
+    {},
+    {
+      entrada_1: "07:46",
+      saida_1: "12:00",
+      entrada_2: "13:01",
+      saida_2: "17:07"
+    }
+  );
+
+  assert.equal(resultado.horas_extras_minutos, 21);
+  assert.equal(resultado.atrasos_minutos, 1);
+  assert.equal(resultado.banco_horas_minutos, 20);
 });

@@ -1,6 +1,18 @@
 {
   "entries":  [
                     {
+                        "version":  "1.00.583",
+                        "releaseDate":  "2026-07-03",
+                        "title":  "Espelho de ponto com cálculo em leitura",
+                        "description":  "O espelho de ponto passou a recalcular horas extras, banco de horas, atrasos e faltas na leitura, inclusive quando a jornada do colaborador não estiver preenchida.",
+                        "changes":  [
+                                        "A consulta do espelho agora usa a jornada prevista do colaborador e, na ausência dela, assume a jornada padrão para evitar totais zerados.",
+                                        "Os valores de extras, banco de horas, atrasos e faltas passaram a ser mostrados a partir da leitura do ponto, e não apenas do valor persistido anteriormente.",
+                                        "O PDF individual e o manual do sistema foram mantidos alinhados a esse comportamento."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.582",
                         "releaseDate":  "2026-07-03",
                         "title":  "Espelho de ponto com legenda e período consolidado",

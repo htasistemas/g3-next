@@ -1,9 +1,9 @@
 {
-  "latestVersion": "1.00.582",
+  "latestVersion": "1.00.583",
   "releaseDate": "2026-07-03",
   "description": "O registro de ponto passou a calcular horas extras, banco de horas e atrasos a partir do horario previsto e do horario real, sem exigir confirmacao adicional na marcacao.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.582",
+  "minCompatibleVersion": "1.00.583",
   "releaseType": "stable"
 }
