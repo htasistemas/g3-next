@@ -49,6 +49,25 @@ const formatarHorario = (horario?: string) => {
   return match ? `${match[1]}:${match[2]}` : horario;
 };
 
+const formatarIdade = (dataNascimento?: string) => {
+  if (!dataNascimento) return "";
+  const nascimento = new Date(`${dataNascimento.slice(0, 10)}T12:00:00`);
+  if (Number.isNaN(nascimento.getTime())) return "";
+
+  const hoje = new Date();
+  let idade = hoje.getFullYear() - nascimento.getFullYear();
+  const mesAtual = hoje.getMonth();
+  const mesNascimento = nascimento.getMonth();
+  const diaAtual = hoje.getDate();
+  const diaNascimento = nascimento.getDate();
+
+  if (mesAtual < mesNascimento || (mesAtual === mesNascimento && diaAtual < diaNascimento)) {
+    idade -= 1;
+  }
+
+  return idade >= 0 ? `${idade} ano${idade === 1 ? "" : "s"}` : "";
+};
+
 export function TipoSelector(props: {
   value?: AgendamentoOperacionalTipo;
   onChange: (value: AgendamentoOperacionalTipo) => void;
@@ -444,16 +463,19 @@ export function AgendaCard(props: {
             </thead>
             <tbody>
               {participantes.length ? (
-                participantes.map((participante, index) => (
-                  (() => {
-                    const confirmado = participante.observacao === "Confirmado";
-                    return (
+                participantes.map((participante, index) => {
+                  const confirmado = participante.comparecimento === "Presente";
+                  const idade = formatarIdade(participante.dataNascimento);
+                  return (
                   <tr
                     key={`${participante.matriculaId ?? participante.beneficiarioId ?? participante.beneficiarioNome}-${index}`}
                     className="bg-white"
                   >
                     <td className="border-b border-[var(--g3-border)] px-3 py-2 text-[var(--g3-foreground)]">
-                      {participante.beneficiarioNome}
+                      <div className="space-y-0.5">
+                        <p className="font-medium">{participante.beneficiarioNome}</p>
+                        {idade ? <p className="text-xs text-[var(--g3-muted)]">{idade}</p> : null}
+                      </div>
                     </td>
                     <td className="border-b border-[var(--g3-border)] px-3 py-2 text-[var(--g3-muted)] whitespace-nowrap">
                       {formatarTelefone(participante.telefone) || participante.telefone || "Sem telefone cadastrado"}
@@ -494,9 +516,8 @@ export function AgendaCard(props: {
                       </div>
                     </td>
                   </tr>
-                    );
-                  })()
-                ))
+                  );
+                })
               ) : (
                 <tr className="bg-white">
                   <td colSpan={3} className="px-3 py-4 text-center text-[var(--g3-muted)]">

@@ -50,6 +50,7 @@ import {
 import type { Agendamento, AgendamentoOperacionalItem, AgendamentoOperacionalTipo } from "@/types/agendamento";
 
 type AbaId = "agenda" | "dashboard" | "espera";
+type AgendamentoParticipante = NonNullable<Agendamento["participantes"]>[number];
 
 type DashboardCard = {
   label: string;
@@ -763,14 +764,11 @@ export function AgendamentosPage() {
   }
 
   async function copiarAgenda(item: Agendamento) {
-    const itemId = item.itemOrigemId;
-    const tipoItem = item.itemTipo;
-    const matriculasIds = (item.participantes ?? []).map((participante) => participante.matriculaId).filter(Boolean) as number[];
-
-    if (!tipoItem || !itemId || !matriculasIds.length) {
+    if (!item.id) {
       setPopup({ tipo: "erro", titulo: "Atenção", texto: "Não foi possível copiar esta agenda porque faltam dados obrigatórios." });
       return;
     }
+
     setAgendaParaData({ acao: "copiar", item });
     setNovaDataAgenda(item.data?.slice(0, 10) || hoje);
   }
@@ -795,23 +793,31 @@ export function AgendamentosPage() {
 
     try {
       if (agendaParaData.acao === "copiar") {
-        const itemId = agendaParaData.item.itemOrigemId;
-        const tipoItem = agendaParaData.item.itemTipo;
-        const matriculasIds = (agendaParaData.item.participantes ?? [])
-          .map((participante) => participante.matriculaId)
-          .filter(Boolean) as number[];
+        const agendaOriginal = agendaParaData.item;
+        const participantes = (agendaOriginal.participantes ?? []).map<AgendamentoParticipante>((participante) => ({
+          ...participante,
+          comparecimento: "Pendente" as const
+        }));
 
-        if (!tipoItem || !itemId || !matriculasIds.length) {
-          setPopup({ tipo: "erro", titulo: "Atenção", texto: "Não foi possível copiar esta agenda porque faltam dados obrigatórios." });
+        const novaAgenda: Agendamento = {
+          ...agendaOriginal,
+          id: undefined,
+          data: novaDataAgenda,
+          status: "Agendado",
+          confirmadoEm: undefined,
+          confirmadoPorNome: undefined,
+          confirmacaoCanal: undefined,
+          observacaoConfirmacao: undefined,
+          participantes
+        };
+
+        const salvo = await salvarAgendamentoMutation.mutateAsync(novaAgenda);
+
+        if (!salvo?.id) {
+          setPopup({ tipo: "erro", titulo: "Erro", texto: "Não foi possível copiar a agenda." });
           return;
         }
 
-        await salvarMutation.mutateAsync({
-          tipo: tipoItem,
-          itemId,
-          data: novaDataAgenda,
-          matriculasIds
-        });
         setPopup({ tipo: "sucesso", titulo: "Confirmação", texto: "Agenda copiada com sucesso para a nova data." });
       } else {
         if (!agendaParaData.item.id) return;
@@ -837,11 +843,11 @@ export function AgendamentosPage() {
 
   async function alternarConfirmacaoParticipante(item: Agendamento, index: number) {
     if (!item.id) return;
-    const participantes = (item.participantes ?? []).map((participante, participanteIndex) =>
+    const participantes = (item.participantes ?? []).map<AgendamentoParticipante>((participante, participanteIndex) =>
       participanteIndex === index
         ? {
             ...participante,
-            observacao: participante.observacao === "Confirmado" ? "A confirmar" : "Confirmado"
+            comparecimento: participante.comparecimento === "Presente" ? "Pendente" : "Presente"
           }
         : participante
     );

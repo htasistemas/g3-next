@@ -123,6 +123,7 @@ export type AgendamentoBeneficiarioRow = {
   agendamento_id: bigint;
   beneficiario_id: bigint | null;
   beneficiario_nome: string;
+  data_nascimento: Date | null;
   telefone: string | null;
   email: string | null;
   status: string | null;
