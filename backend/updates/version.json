@@ -1,9 +1,9 @@
 {
-  "latestVersion": "1.00.581",
-  "releaseDate": "2026-07-02",
-  "description": "A gestao master de instituicoes passou a permitir desbloquear acesso de tenants e usuarios bloqueados por tentativas invalidas, alem de reativar o administrador ao redefinir senha.",
+  "latestVersion": "1.00.582",
+  "releaseDate": "2026-07-03",
+  "description": "O registro de ponto passou a calcular horas extras, banco de horas e atrasos a partir do horario previsto e do horario real, sem exigir confirmacao adicional na marcacao.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.581",
+  "minCompatibleVersion": "1.00.582",
   "releaseType": "stable"
 }
