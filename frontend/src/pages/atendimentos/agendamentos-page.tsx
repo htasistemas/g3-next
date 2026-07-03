@@ -803,6 +803,7 @@ export function AgendamentosPage() {
           ...agendaOriginal,
           id: undefined,
           data: novaDataAgenda,
+          diaSemana: undefined,
           status: "Agendado",
           confirmadoEm: undefined,
           confirmadoPorNome: undefined,
