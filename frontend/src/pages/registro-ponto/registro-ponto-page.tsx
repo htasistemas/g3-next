@@ -1047,18 +1047,18 @@ export function RegistroPontoPage() {
       });
 
       if (response.pendencia_hora_extra) {
-        setPendenciaHoraExtra(response.pendencia_hora_extra);
         setJustificativaHoraExtra("");
         setCienciaHoraExtraConfirmada(false);
-        setPopupCienciaHoraExtraAberto(true);
-      } else {
-        setMensagem({
-          tipo: "sucesso",
-          texto: marcouSemLocalizacao
-            ? `${response.mensagem} A marcação foi registrada sem localização.`
-            : response.mensagem
-        });
+        setPendenciaHoraExtra(null);
       }
+
+      setPopupCienciaHoraExtraAberto(false);
+      setMensagem({
+        tipo: "sucesso",
+        texto: marcouSemLocalizacao
+          ? `${response.mensagem} A marcação foi registrada sem localização.`
+          : response.mensagem
+      });
       setConfirmacaoSenha("");
       setConfirmacaoFaceImagem("");
     } catch (error: unknown) {

@@ -1783,6 +1783,14 @@ export class ReportsService {
       periodoEspelho?.data_final ?? payload.data_final
     );
     const statusPeriodo = periodoEspelho?.fechado ? "Período fechado" : "Período em aberto";
+    const legendaEspelho = [
+      "Falta: Ausência do colaborador sem justificativa.",
+      "Atraso ou Saída Antecipada: Marcações fora do horário contratual.",
+      "Hora Extra: Horas trabalhadas que excedem a jornada diária.",
+      "Abono ou Justificativa: Dias em que a ausência foi respaldada (Ex: atestado médico).",
+      "Afastamento: Suspensão temporária do contrato (Ex: licença-maternidade ou auxílio-doença).",
+      "Esquecimento: Marcações inseridas manualmente após aprovação do gestor."
+    ].join("\n");
     const colunaSemQuebra = {
       classe: "coluna-compacta",
       semQuebra: true,
@@ -1802,12 +1810,17 @@ export class ReportsService {
         ...this.montarMetadadosTopo(payload.usuarioEmissor),
         ...(descricaoPeriodo
           ? [
-              { rotulo: "Período", valor: descricaoPeriodo },
-              { rotulo: "Status do período", valor: statusPeriodo }
+              { rotulo: "Período", valor: `${descricaoPeriodo} - ${statusPeriodo}` }
             ]
           : [])
       ],
       descricao: "Relatório detalhado de marcações de ponto e apuração de horas.",
+      secoes: [
+        {
+          titulo: "Legenda de ocorrências",
+          conteudo: legendaEspelho
+        }
+      ],
       blocos: [
         {
           titulo: "Colaborador",

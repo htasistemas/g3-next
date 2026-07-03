@@ -1,6 +1,18 @@
 {
                 "entries":  [
                     {
+                        "version":  "1.00.582",
+                        "releaseDate":  "2026-07-03",
+                        "title":  "Espelho de ponto com legenda e período consolidado",
+                        "description":  "O espelho de ponto individual passou a exibir a legenda operacional fixa e a consolidar período e status na mesma linha do cabeçalho.",
+                        "changes":  [
+                                        "O PDF do espelho de ponto individual passou a incluir a legenda de ocorrências com Falta, Atraso ou Saída Antecipada, Hora Extra, Abono ou Justificativa, Afastamento e Esquecimento.",
+                                        "O cabeçalho do espelho agora mostra período e status do período na mesma linha para leitura mais direta.",
+                                        "O manual do sistema e a versão oficial foram atualizados para refletir o novo formato."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.579",
                         "releaseDate":  "2026-06-30",
                         "title":  "Reserva de empréstimo com pré-visualização de e-mail",

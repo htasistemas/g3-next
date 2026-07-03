@@ -4,6 +4,10 @@ import { prisma } from "../../../database/prisma.js";
 import { AppError } from "../../../shared/errors/app-error.js";
 import { toIsoDate, toStringId } from "../../../utils/string-utils.js";
 import {
+  calcularDesviosRegistroPonto,
+  type RegistroPontoHorarioPrevisto
+} from "../registro-ponto-calculos.js";
+import {
   mapHistoricoRowToResponse,
   mapOcorrenciaRowToResponse,
   mapRegistroPontoRowToResponse,
@@ -1354,7 +1358,7 @@ export class RegistroPontoRepository {
         }
       }
 
-      await this.recalcularTotaisTx(tx, registroId, ator.tenant_id, usuario.horario_funcionamento);
+      await this.recalcularTotaisTx(tx, registroId, ator.tenant_id, usuario);
 
       await this.registrarAuditoriaTx(tx, {
         registro_ponto_id: registroId,
@@ -1456,7 +1460,13 @@ export class RegistroPontoRepository {
         criado_por_nome: ator.nome_usuario
       });
 
-      await this.recalcularTotaisTx(tx, registroId, ator.tenant_id, null);
+      const usuarioDoRegistro = await this.buscarContextoUsuarioTx(
+        tx,
+        registroAtual.usuario_id,
+        ator.tenant_id
+      );
+
+      await this.recalcularTotaisTx(tx, registroId, ator.tenant_id, usuarioDoRegistro);
 
       const registroDepois = await this.buscarRegistroParaAtualizacaoTx(tx, registroId, ator.tenant_id);
 
@@ -2298,22 +2308,35 @@ export class RegistroPontoRepository {
     tx: DatabaseTx,
     registroId: bigint,
     tenantId: string,
-    horarioFuncionamento?: string | null
+    contextoUsuario: Pick<
+      UsuarioContexto,
+      "horario_entrada_1" | "horario_saida_1" | "horario_entrada_2" | "horario_saida_2" | "horario_funcionamento"
+    > | null
   ) {
     const registro = await this.buscarRegistroParaAtualizacaoTx(tx, registroId, tenantId);
     const resumoHoraExtra = await this.buscarResumoHoraExtraTx(tx, registroId, tenantId);
+    const desvios = calcularDesviosRegistroPonto(
+      {
+        entrada_1: contextoUsuario?.horario_entrada_1 ?? null,
+        saida_1: contextoUsuario?.horario_saida_1 ?? null,
+        entrada_2: contextoUsuario?.horario_entrada_2 ?? null,
+        saida_2: contextoUsuario?.horario_saida_2 ?? null
+      } satisfies RegistroPontoHorarioPrevisto,
+      {
+        entrada_1: registro.entrada_1 ?? null,
+        saida_1: registro.saida_1 ?? null,
+        entrada_2: registro.entrada_2 ?? null,
+        saida_2: registro.saida_2 ?? null
+      }
+    );
 
     const totalTrabalhado =
       diferencaMinutos(registro.entrada_1, registro.saida_1) +
       diferencaMinutos(registro.entrada_2, registro.saida_2);
 
-    const atrasoReferencia = extrairHorarioEntradaReferencia(horarioFuncionamento);
-    const entrada1Minutos = toMinutes(registro.entrada_1);
-    const atrasos =
-      entrada1Minutos === null ? 0 : Math.max(0, entrada1Minutos - atrasoReferencia);
-
-    const bancoHoras = resumoHoraExtra.banco_horas_minutos;
-    const horasExtras = resumoHoraExtra.horas_extras_minutos;
+    const atrasos = desvios.atrasos_minutos;
+    const horasExtras = desvios.horas_extras_minutos;
+    const bancoHoras = desvios.banco_horas_minutos;
 
     const hojeIso = obterCarimboBrasilia().data;
     const registroIso = toIsoDate(registro.data_referencia) ?? "";
@@ -2343,6 +2366,7 @@ export class RegistroPontoRepository {
       faltasMinutos: faltas,
       horasExtrasMinutos: horasExtras,
       bancoHorasMinutos: bancoHoras,
+      desvios,
       resumoHoraExtra,
       registro
     });
@@ -2357,6 +2381,16 @@ export class RegistroPontoRepository {
       faltasMinutos: number;
       horasExtrasMinutos: number;
       bancoHorasMinutos: number;
+      desvios: {
+        horas_extras_minutos: number;
+        atrasos_minutos: number;
+        banco_horas_minutos: number;
+        detalhes: Array<{
+          campo: "entrada_1" | "saida_1" | "entrada_2" | "saida_2";
+          minutos: number;
+          tipo: "ATRASO" | "HORA_EXTRA";
+        }>;
+      };
       resumoHoraExtra: {
         horas_extras_minutos: number;
         horas_extras_pendentes_minutos: number;
@@ -2396,7 +2430,7 @@ export class RegistroPontoRepository {
       });
     }
 
-    if (contexto.resumoHoraExtra.horas_extras_autorizadas_minutos > 0) {
+    if (contexto.horasExtrasMinutos > 0) {
       await this.registrarOcorrenciaTx(tx, {
         registro_ponto_id: registroId,
         tenant_id: tenantId,
@@ -2406,7 +2440,7 @@ export class RegistroPontoRepository {
       });
     }
 
-    if (contexto.resumoHoraExtra.banco_horas_minutos !== 0) {
+    if (contexto.bancoHorasMinutos !== 0) {
       await this.registrarOcorrenciaTx(tx, {
         registro_ponto_id: registroId,
         tenant_id: tenantId,
