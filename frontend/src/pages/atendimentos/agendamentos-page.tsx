@@ -38,6 +38,7 @@ import {
   useAgendamentos,
   useBeneficiariosOperacionaisAgendamento,
   useCancelarAgendamento,
+  useConfirmarAgendamento,
   useIndicadoresAgendamentos,
   useItensOperacionaisAgendamento,
   useListaEsperaAgendamentos,
@@ -407,6 +408,7 @@ export function AgendamentosPage() {
   const salvarAgendamentoMutation = useSalvarAgendamento();
   const salvarMutation = useSalvarAgendamentoOperacional();
   const cancelarMutation = useCancelarAgendamento();
+  const confirmarMutation = useConfirmarAgendamento();
   const excluirMutation = useExcluirAgendamento();
   const notificarMutation = useNotificarAgendamento();
   const remarcarMutation = useRemarcarAgendamento();
@@ -844,18 +846,25 @@ export function AgendamentosPage() {
 
   async function alternarConfirmacaoParticipante(item: Agendamento, index: number) {
     if (!item.id) return;
+    if (item.status === "Confirmado") return;
+
     const participantes = (item.participantes ?? []).map<AgendamentoParticipante>((participante, participanteIndex) =>
       participanteIndex === index
         ? {
             ...participante,
-            comparecimento: participante.comparecimento === "Presente" ? "Pendente" : "Presente"
+            comparecimento: "Presente"
           }
         : participante
     );
 
     try {
+      await confirmarMutation.mutateAsync({
+        id: item.id,
+        payload: { observacao: "Confirmado pelo card." }
+      });
       await salvarAgendamentoMutation.mutateAsync({
         ...item,
+        status: "Confirmado",
         participantes
       });
     } catch (error: any) {

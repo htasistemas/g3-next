@@ -464,7 +464,7 @@ export function AgendaCard(props: {
             <tbody>
               {participantes.length ? (
                 participantes.map((participante, index) => {
-                  const confirmado = participante.comparecimento === "Presente";
+                  const confirmado = props.item.status === "Confirmado" || participante.comparecimento === "Presente";
                   const idade = formatarIdade(participante.dataNascimento);
                   return (
                   <tr
@@ -484,16 +484,18 @@ export function AgendaCard(props: {
                       <div className="flex items-center justify-center gap-2">
                         <button
                           type="button"
+                          disabled={confirmado}
                           onClick={() => props.onAlternarConfirmacao(index)}
-                          className={`inline-flex h-9 w-9 items-center justify-center rounded-full border transition-colors ${
+                          className={`inline-flex h-9 min-w-28 items-center justify-center gap-1.5 rounded-full border px-3 transition-colors ${
                             confirmado
-                              ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                               : "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
                           }`}
                           title={confirmado ? "Confirmado" : "A confirmar"}
                           aria-label={confirmado ? "Confirmado" : "A confirmar"}
                         >
                           {confirmado ? <BadgeCheck className="h-4 w-4" /> : <CircleHelp className="h-4 w-4" />}
+                          <span className="text-xs font-semibold">{confirmado ? "Confirmado" : "A confirmar"}</span>
                         </button>
                         <button
                           type="button"
