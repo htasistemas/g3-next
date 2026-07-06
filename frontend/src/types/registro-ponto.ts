@@ -253,3 +253,52 @@ export type RegistroPontoAlertaPendente = {
   horario_previsto?: string;
   mensagem?: string;
 };
+
+export type RegistroPontoRelatorioMensalFiltro = {
+  data_inicial?: string;
+  data_final?: string;
+  usuario_id?: string;
+  funcionario?: string;
+  setor?: string;
+};
+
+export type RegistroPontoRelatorioMensalItem = {
+  id: string;
+  usuario_id: string;
+  usuario_nome: string;
+  usuario_login: string;
+  unidade?: string;
+  setor?: string;
+  data_referencia: string;
+  jornada_prevista?: string;
+  batidas_reais: string[];
+  entradas_antecipadas: Array<{
+    campo_batida: "entrada_1" | "saida_1" | "entrada_2" | "saida_2";
+    horario_previsto: string;
+    horario_real: string;
+    minutos_excedentes: number;
+    status: string;
+    justificativa_funcionario?: string;
+    ciencia_registrada: boolean;
+    gestor_nome?: string;
+    gestor_justificativa?: string;
+  }>;
+  horas_extras_pendentes_minutos: number;
+  horas_extras_aprovadas_minutos: number;
+  horas_extras_negadas_minutos: number;
+  saldo_banco_horas_aprovado_minutos: number;
+  justificativas: string[];
+  ciencia_funcionario: boolean;
+  aprovacao_gestor_rh: boolean;
+};
+
+export type RegistroPontoRelatorioMensalResponse = {
+  registros: RegistroPontoRelatorioMensalItem[];
+  totais: {
+    funcionarios: number;
+    horas_extras_pendentes_minutos: number;
+    horas_extras_aprovadas_minutos: number;
+    horas_extras_negadas_minutos: number;
+    saldo_banco_horas_aprovado_minutos: number;
+  };
+};

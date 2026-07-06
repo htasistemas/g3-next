@@ -21,6 +21,7 @@ export type AgendamentoStatus =
 export type AgendamentoParticipante = {
   matriculaId?: number;
   beneficiarioId?: number;
+  codigo?: string;
   beneficiarioNome: string;
   dataNascimento?: string;
   telefone?: string;
@@ -159,6 +160,7 @@ export type AgendamentoOperacionalBeneficiario = {
   matriculaId: number;
   beneficiarioId?: number;
   nomeCompleto: string;
+  dataNascimento?: string;
   telefone?: string;
   email?: string;
   status?: string;

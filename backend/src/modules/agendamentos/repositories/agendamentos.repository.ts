@@ -434,6 +434,7 @@ export class AgendamentosRepository {
         ab.id,
         ab.agendamento_id,
         COALESCE(ab.beneficiario_id, contato.beneficiario_id) AS beneficiario_id,
+        contato.codigo AS codigo,
         ab.beneficiario_nome,
         contato.data_nascimento AS data_nascimento,
         COALESCE(
@@ -450,6 +451,7 @@ export class AgendamentosRepository {
       LEFT JOIN LATERAL (
         SELECT
           b.id AS beneficiario_id,
+          b.codigo,
           b.data_nascimento,
           contato_beneficio.telefone_principal,
           contato_beneficio.telefone_secundario,
@@ -485,7 +487,18 @@ export class AgendamentosRepository {
               AND ${normalizarTextoSql(Prisma.sql`b.nome_completo`)} = ${normalizarTextoSql(Prisma.sql`ab.beneficiario_nome`)}
             )
           )
-        ORDER BY b.id DESC
+        ORDER BY
+          CASE
+            WHEN COALESCE(
+              NULLIF(TRIM(contato_beneficio.telefone_principal), ''),
+              NULLIF(TRIM(contato_beneficio.telefone_secundario), ''),
+              NULLIF(TRIM(contato_beneficio.telefone_recado_numero), '')
+            ) IS NOT NULL
+              OR b.data_nascimento IS NOT NULL
+            THEN 0
+            ELSE 1
+          END,
+          b.id DESC
         LIMIT 1
       ) contato ON TRUE
       WHERE ab.agendamento_id IN (${Prisma.join(agendamentoIds)})
@@ -527,9 +540,10 @@ export class AgendamentosRepository {
       `);
     }
 
-    return prisma.$queryRaw<Array<{ beneficiario_id: bigint; beneficiario_nome: string; data_nascimento: Date | null; telefone: string | null; email: string | null }>>(Prisma.sql`
+      return prisma.$queryRaw<Array<{ beneficiario_id: bigint; codigo: string | null; beneficiario_nome: string; data_nascimento: Date | null; telefone: string | null; email: string | null }>>(Prisma.sql`
       SELECT
         b.id AS beneficiario_id,
+        b.codigo,
         b.nome_completo AS beneficiario_nome,
         b.data_nascimento,
         COALESCE(
@@ -568,8 +582,10 @@ export class AgendamentosRepository {
             NULLIF(TRIM(contato_beneficio.telefone_principal), ''),
             NULLIF(TRIM(contato_beneficio.telefone_secundario), ''),
             NULLIF(TRIM(contato_beneficio.telefone_recado_numero), '')
-          ) IS NULL THEN 1
-          ELSE 0
+          ) IS NOT NULL
+            OR b.data_nascimento IS NOT NULL
+          THEN 0
+          ELSE 1
         END,
         b.id DESC
     `);
@@ -589,6 +605,7 @@ export class AgendamentosRepository {
         matricula_id: bigint;
         beneficiario_id: bigint | null;
         beneficiario_nome: string;
+        codigo: string | null;
         data_nascimento: Date | null;
         telefone_principal: string | null;
         email: string | null;
@@ -597,6 +614,7 @@ export class AgendamentosRepository {
       SELECT
         m.id AS matricula_id,
         contato.beneficiario_id,
+        contato.codigo,
         m.beneficiario_nome,
         contato.data_nascimento,
         contato.telefone_principal,
@@ -605,6 +623,7 @@ export class AgendamentosRepository {
       LEFT JOIN LATERAL (
         SELECT
           b.id AS beneficiario_id,
+          b.codigo,
           b.data_nascimento,
           COALESCE(
             NULLIF(TRIM(contato_beneficio.telefone_principal), ''),
@@ -653,12 +672,29 @@ export class AgendamentosRepository {
               AND REGEXP_REPLACE(COALESCE(doc.numero_documento, ''), '\D', '', 'g') =
                 REGEXP_REPLACE(COALESCE(m.cpf, ''), '\D', '', 'g')
             )
-            OR (
-              REGEXP_REPLACE(COALESCE(m.cpf, ''), '\D', '', 'g') = ''
-              AND ${normalizarTextoSql(Prisma.sql`b.nome_completo`)} = ${normalizarTextoSql(Prisma.sql`m.beneficiario_nome`)}
-            )
+            OR ${normalizarTextoSql(Prisma.sql`b.nome_completo`)} = ${normalizarTextoSql(Prisma.sql`m.beneficiario_nome`)}
           )
-        ORDER BY b.id DESC
+        ORDER BY
+          CASE
+            WHEN COALESCE(
+              NULLIF(TRIM(contato_beneficio.telefone_principal), ''),
+              NULLIF(TRIM(contato_beneficio.telefone_secundario), ''),
+              NULLIF(TRIM(contato_beneficio.telefone_recado_numero), '')
+            ) IS NOT NULL
+              OR b.data_nascimento IS NOT NULL
+            THEN 0
+            ELSE 1
+          END,
+          CASE
+            WHEN REGEXP_REPLACE(COALESCE(m.cpf, ''), '\D', '', 'g') <> ''
+              AND REGEXP_REPLACE(COALESCE(doc.numero_documento, ''), '\D', '', 'g') =
+                REGEXP_REPLACE(COALESCE(m.cpf, ''), '\D', '', 'g')
+            THEN 0
+            WHEN ${normalizarTextoSql(Prisma.sql`b.nome_completo`)} = ${normalizarTextoSql(Prisma.sql`m.beneficiario_nome`)}
+            THEN 1
+            ELSE 2
+          END,
+          b.id DESC
         LIMIT 1
       ) contato ON TRUE
       WHERE m.tenant_id::text = ${tenantId}
@@ -679,6 +715,7 @@ export class AgendamentosRepository {
         matricula_id: bigint;
         beneficiario_id: bigint | null;
         beneficiario_nome: string;
+        codigo: string | null;
         data_nascimento: Date | null;
         telefone: string | null;
         email: string | null;
@@ -688,6 +725,7 @@ export class AgendamentosRepository {
         m.curso_id AS item_origem_id,
         m.id AS matricula_id,
         contato.beneficiario_id,
+        contato.codigo,
         m.beneficiario_nome,
         contato.data_nascimento,
         contato.telefone AS telefone,
@@ -696,6 +734,7 @@ export class AgendamentosRepository {
       LEFT JOIN LATERAL (
         SELECT
           b.id AS beneficiario_id,
+          b.codigo,
           b.data_nascimento,
           COALESCE(
             NULLIF(TRIM(contato_beneficio.telefone_principal), ''),
@@ -744,12 +783,29 @@ export class AgendamentosRepository {
               AND REGEXP_REPLACE(COALESCE(doc.numero_documento, ''), '\D', '', 'g') =
                 REGEXP_REPLACE(COALESCE(m.cpf, ''), '\D', '', 'g')
             )
-            OR (
-              REGEXP_REPLACE(COALESCE(m.cpf, ''), '\D', '', 'g') = ''
-              AND ${normalizarTextoSql(Prisma.sql`b.nome_completo`)} = ${normalizarTextoSql(Prisma.sql`m.beneficiario_nome`)}
-            )
+            OR ${normalizarTextoSql(Prisma.sql`b.nome_completo`)} = ${normalizarTextoSql(Prisma.sql`m.beneficiario_nome`)}
           )
-        ORDER BY b.id DESC
+        ORDER BY
+          CASE
+            WHEN COALESCE(
+              NULLIF(TRIM(contato_beneficio.telefone_principal), ''),
+              NULLIF(TRIM(contato_beneficio.telefone_secundario), ''),
+              NULLIF(TRIM(contato_beneficio.telefone_recado_numero), '')
+            ) IS NOT NULL
+              OR b.data_nascimento IS NOT NULL
+            THEN 0
+            ELSE 1
+          END,
+          CASE
+            WHEN REGEXP_REPLACE(COALESCE(m.cpf, ''), '\D', '', 'g') <> ''
+              AND REGEXP_REPLACE(COALESCE(doc.numero_documento, ''), '\D', '', 'g') =
+                REGEXP_REPLACE(COALESCE(m.cpf, ''), '\D', '', 'g')
+            THEN 0
+            WHEN ${normalizarTextoSql(Prisma.sql`b.nome_completo`)} = ${normalizarTextoSql(Prisma.sql`m.beneficiario_nome`)}
+            THEN 1
+            ELSE 2
+          END,
+          b.id DESC
         LIMIT 1
       ) contato ON TRUE
       WHERE m.curso_id IN (${Prisma.join(ids.map((id) => BigInt(id)))})
@@ -814,28 +870,39 @@ export class AgendamentosRepository {
     );
     const contatosPorMatriculaMap = new Map<
       number,
-      { beneficiario_id: bigint | null; beneficiario_nome: string; data_nascimento: Date | null; telefone_principal: string | null; email: string | null }
+      {
+        beneficiario_id: bigint | null;
+        codigo: string | null;
+        beneficiario_nome: string;
+        data_nascimento: Date | null;
+        telefone_principal: string | null;
+        email: string | null;
+      }
     >();
     for (const contato of contatosPorMatricula) {
       contatosPorMatriculaMap.set(Number(contato.matricula_id), contato);
     }
-    const contatosItensPorChave = new Map<string, { data_nascimento: Date | null; telefone: string | null; email: string | null }>();
+    const contatosItensPorChave = new Map<
+      string,
+      { codigo: string | null; data_nascimento: Date | null; telefone: string | null; email: string | null }
+    >();
     for (const contato of contatosItensOperacionais) {
       const itemOrigemId = Number(contato.item_origem_id);
       const matriculaId = Number(contato.matricula_id);
       contatosItensPorChave.set(`item:${itemOrigemId}:matricula:${matriculaId}`, {
+        codigo: contato.codigo,
         data_nascimento: contato.data_nascimento,
         telefone: contato.telefone,
         email: contato.email
       });
       contatosItensPorChave.set(
         `item:${itemOrigemId}:participante:${this.chaveParticipante(contato.beneficiario_nome, contato.beneficiario_id)}`,
-        { data_nascimento: contato.data_nascimento, telefone: contato.telefone, email: contato.email }
+        { codigo: contato.codigo, data_nascimento: contato.data_nascimento, telefone: contato.telefone, email: contato.email }
       );
     }
     const contatosFallbackPorChave = new Map<
       string,
-      { beneficiario_id: bigint; beneficiario_nome: string; data_nascimento: Date | null; telefone: string | null; email: string | null }
+      { beneficiario_id: bigint; codigo: string | null; beneficiario_nome: string; data_nascimento: Date | null; telefone: string | null; email: string | null }
     >();
     for (const contato of contatosFallback) {
       contatosFallbackPorChave.set(
@@ -909,6 +976,12 @@ export class AgendamentosRepository {
                   typeof contatoMatricula?.telefone_principal === "string" && contatoMatricula.telefone_principal.trim().length
                     ? contatoMatricula.telefone_principal
                     : telefoneContato ?? telefoneParticipante,
+                codigo:
+                  (typeof contatoMatricula?.codigo === "string" && contatoMatricula.codigo.trim().length
+                    ? contatoMatricula.codigo
+                    : typeof contato?.codigo === "string" && contato.codigo.trim().length
+                      ? contato.codigo
+                      : undefined) ?? undefined,
                 email:
                   typeof contatoMatricula?.email === "string" && contatoMatricula.email.trim().length
                     ? contatoMatricula.email
@@ -916,11 +989,12 @@ export class AgendamentosRepository {
               };
             })
           : contatosDoAgendamento.map((contato) => ({
-              beneficiarioId: contato.beneficiario_id ? Number(contato.beneficiario_id) : undefined,
-              beneficiarioNome: contato.beneficiario_nome,
-              dataNascimento: toIsoDate(contato.data_nascimento ?? null),
-              telefone: contato.telefone ?? undefined,
-              email: contato.email ?? undefined,
+            beneficiarioId: contato.beneficiario_id ? Number(contato.beneficiario_id) : undefined,
+            codigo: contato.codigo ?? undefined,
+            beneficiarioNome: contato.beneficiario_nome,
+            dataNascimento: toIsoDate(contato.data_nascimento ?? null),
+            telefone: contato.telefone ?? undefined,
+            email: contato.email ?? undefined,
               comparecimento: "Pendente"
             }));
 
@@ -1002,6 +1076,7 @@ export class AgendamentosRepository {
         m.id AS matricula_id,
         contato.beneficiario_id,
         m.beneficiario_nome,
+        contato.data_nascimento,
         contato.telefone AS telefone,
         COALESCE(NULLIF(TRIM(m.email), ''), contato.email) AS email,
         m.status,
@@ -1012,6 +1087,7 @@ export class AgendamentosRepository {
       LEFT JOIN LATERAL (
         SELECT
           b.id AS beneficiario_id,
+          b.data_nascimento,
           COALESCE(
             NULLIF(TRIM(contato_beneficio.telefone_principal), ''),
             NULLIF(TRIM(contato_beneficio.telefone_secundario), ''),
@@ -1059,12 +1135,19 @@ export class AgendamentosRepository {
               AND REGEXP_REPLACE(COALESCE(doc.numero_documento, ''), '\D', '', 'g') =
                 REGEXP_REPLACE(COALESCE(m.cpf, ''), '\D', '', 'g')
             )
-          OR (
-              REGEXP_REPLACE(COALESCE(m.cpf, ''), '\D', '', 'g') = ''
-              AND ${normalizarTextoSql(Prisma.sql`b.nome_completo`)} = ${normalizarTextoSql(Prisma.sql`m.beneficiario_nome`)}
-            )
+            OR ${normalizarTextoSql(Prisma.sql`b.nome_completo`)} = ${normalizarTextoSql(Prisma.sql`m.beneficiario_nome`)}
           )
-        ORDER BY b.id DESC
+        ORDER BY
+          CASE
+            WHEN REGEXP_REPLACE(COALESCE(m.cpf, ''), '\D', '', 'g') <> ''
+              AND REGEXP_REPLACE(COALESCE(doc.numero_documento, ''), '\D', '', 'g') =
+                REGEXP_REPLACE(COALESCE(m.cpf, ''), '\D', '', 'g')
+            THEN 0
+            WHEN ${normalizarTextoSql(Prisma.sql`b.nome_completo`)} = ${normalizarTextoSql(Prisma.sql`m.beneficiario_nome`)}
+            THEN 1
+            ELSE 2
+          END,
+          b.id DESC
         LIMIT 1
       ) contato ON TRUE
       WHERE m.curso_id = ${itemId}
@@ -1710,7 +1793,9 @@ export class AgendamentosRepository {
     const participantes = selecionados.map((entry) => ({
       matriculaId: Number(entry.matricula_id),
       beneficiarioId: entry.beneficiario_id ? Number(entry.beneficiario_id) : undefined,
+      codigo: entry.codigo ?? undefined,
       beneficiarioNome: entry.beneficiario_nome,
+      dataNascimento: entry.data_nascimento ? entry.data_nascimento.toISOString().slice(0, 10) : undefined,
       telefone: entry.telefone ?? undefined,
       email: entry.email ?? undefined,
       comparecimento: "Pendente" as const
@@ -1750,6 +1835,28 @@ export class AgendamentosRepository {
 
   async criarOperacional(input: AgendamentoOperacionalInput, usuario: UsuarioActor | undefined, tenantId: string) {
     const payload = await this.montarPayloadOperacional(input, tenantId);
+    const itemOrigemId = payload.itemOrigemId;
+    const itemTipo = trimOrUndefined(payload.itemTipo);
+
+    if (itemOrigemId && itemTipo) {
+      const existente = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+        SELECT id
+        FROM agendamento
+        WHERE tenant_id::text = ${tenantId}
+          AND item_tipo = ${itemTipo}
+          AND item_origem_id = ${BigInt(itemOrigemId)}
+          AND data_agendamento = ${formatarData(payload.data)}
+          AND COALESCE(status, '') <> 'Cancelado'
+        ORDER BY atualizado_em DESC, id DESC
+        LIMIT 1
+      `);
+
+      const idExistente = existente[0]?.id;
+      if (idExistente) {
+        return this.atualizar(idExistente, payload, usuario, tenantId);
+      }
+    }
+
     return this.criar(payload, usuario, tenantId);
   }
 

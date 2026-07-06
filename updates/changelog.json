@@ -1,6 +1,18 @@
 {
   "entries":  [
                     {
+                        "version":  "1.00.584",
+                        "releaseDate":  "2026-07-06",
+                        "title":  "Composição financeira com valores normalizados",
+                        "description":  "O card Composição financeira da Visão geral passou a ler saldos e lançamentos financeiros já convertidos para número no backend.",
+                        "changes":  [
+                                        "As queries financeiras da visão geral agora retornam saldo e valor como float8, evitando que campos monetários sejam lidos como zero.",
+                                        "Os cards de Valores a receber, Em caixa e Em banco passaram a refletir corretamente os valores armazenados nas contas e lançamentos.",
+                                        "O manual do sistema e a versão oficial foram atualizados para registrar o ajuste."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.583",
                         "releaseDate":  "2026-07-03",
                         "title":  "Espelho de ponto com cálculo em leitura",

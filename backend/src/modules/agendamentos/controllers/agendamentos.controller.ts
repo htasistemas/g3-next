@@ -37,6 +37,7 @@ export class AgendamentosController {
         matriculaId: Number(item.matricula_id),
         beneficiarioId: item.beneficiario_id ? Number(item.beneficiario_id) : undefined,
         nomeCompleto: item.beneficiario_nome,
+        dataNascimento: item.data_nascimento ? item.data_nascimento.toISOString().slice(0, 10) : undefined,
         telefone: item.telefone ?? undefined,
         email: item.email ?? undefined,
         status: item.status ?? undefined,

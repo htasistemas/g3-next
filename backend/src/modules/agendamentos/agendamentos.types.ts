@@ -110,7 +110,9 @@ export type AgendamentoOperacionalItemRow = {
 export type AgendamentoOperacionalBeneficiarioRow = {
   matricula_id: bigint;
   beneficiario_id: bigint | null;
+  codigo: string | null;
   beneficiario_nome: string;
+  data_nascimento: Date | null;
   telefone: string | null;
   email: string | null;
   status: string | null;
@@ -122,6 +124,7 @@ export type AgendamentoBeneficiarioRow = {
   id: bigint;
   agendamento_id: bigint;
   beneficiario_id: bigint | null;
+  codigo: string | null;
   beneficiario_nome: string;
   data_nascimento: Date | null;
   telefone: string | null;
@@ -136,7 +139,9 @@ export type AgendamentoEnvioCanal = "WHATSAPP" | "EMAIL";
 export type AgendamentoParticipanteInput = {
   matriculaId?: number | null;
   beneficiarioId?: number | null;
+  codigo?: string | null;
   beneficiarioNome: string;
+  dataNascimento?: string | null;
   telefone?: string | null;
   comparecimento?: "Pendente" | "Presente" | "Faltou" | "Justificado";
   observacao?: string | null;

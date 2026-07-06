@@ -167,6 +167,26 @@ export class ReportsService {
     return this.dateTimeFormatter.format(data);
   }
 
+  private formatarIdade(valor?: string | Date | null): string {
+    if (!valor) return "---";
+
+    const data = valor instanceof Date ? valor : new Date(valor);
+    if (Number.isNaN(data.getTime())) return "---";
+
+    const hoje = new Date();
+    let idade = hoje.getFullYear() - data.getFullYear();
+    const mesAtual = hoje.getMonth();
+    const mesNascimento = data.getMonth();
+    const diaAtual = hoje.getDate();
+    const diaNascimento = data.getDate();
+
+    if (mesAtual < mesNascimento || (mesAtual === mesNascimento && diaAtual < diaNascimento)) {
+      idade -= 1;
+    }
+
+    return idade >= 0 ? `${idade} ano${idade === 1 ? "" : "s"}` : "---";
+  }
+
   private formatarPeriodoCurso(dataInicial?: string, dataFinal?: string): string | undefined {
     const inicio = this.normalizarTexto(dataInicial);
     const fim = this.normalizarTexto(dataFinal);
@@ -800,27 +820,38 @@ export class ReportsService {
       colunas: exibirCpf
         ? [
             { titulo: "Nº", largura: "8%" },
-            { titulo: "Participante", largura: "54%" },
+            { titulo: "Participante", largura: "46%" },
             { titulo: "CPF", largura: "22%" },
-            { titulo: "P", largura: "8%" },
-            { titulo: "A", largura: "8%" }
+            { titulo: "Idade", largura: "12%" },
+            { titulo: "Assinatura", largura: "12%" }
           ]
         : [
             { titulo: "Nº", largura: "8%" },
-            { titulo: "Participante", largura: "72%" },
-            { titulo: "P", largura: "10%" },
-            { titulo: "A", largura: "10%" }
+            { titulo: "Participante", largura: "58%" },
+            { titulo: "Idade", largura: "16%" },
+            { titulo: "Assinatura", largura: "18%" }
           ],
       linhas: participantes.length
         ? participantes.map((item, index) =>
             exibirCpf
-              ? [String(index + 1), item.beneficiario_nome || "---", item.cpf || "---", " ", " "]
-              : [String(index + 1), item.beneficiario_nome || "---", " ", " "]
+              ? [
+                  String(index + 1),
+                  item.beneficiario_nome || "---",
+                  item.cpf || "---",
+                  this.formatarIdade(item.data_nascimento),
+                  "____________________"
+                ]
+              : [
+                  String(index + 1),
+                  item.beneficiario_nome || "---",
+                  this.formatarIdade(item.data_nascimento),
+                  "____________________"
+                ]
           )
         : [
             exibirCpf
-              ? ["1", "Nenhum participante inscrito.", "---", " ", " "]
-              : ["1", "Nenhum participante inscrito.", " ", " "]
+              ? ["1", "Nenhum participante inscrito.", "---", "---", "____________________"]
+              : ["1", "Nenhum participante inscrito.", "---", "____________________"]
           ]
     };
 
@@ -884,7 +915,7 @@ export class ReportsService {
         {
           titulo: "Orientação de preenchimento",
           conteudo:
-            "Utilize a coluna P para presente e a coluna A para ausente. A marcação deve ser feita manualmente no momento da aula ou atendimento."
+            "Utilize a coluna Assinatura para colher a confirmação manual de presença no momento da aula ou atendimento. A idade exibida ao lado do participante ajuda na conferência rápida dos dados."
         },
         {
           titulo: "Assinatura do profissional responsável",

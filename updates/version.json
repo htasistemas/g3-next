@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.581",
-  "releaseDate": "2026-07-02",
-  "description": "A gestao master de instituicoes passou a permitir desbloquear acesso de tenants e usuarios bloqueados por tentativas invalidas, alem de reativar o administrador ao redefinir senha.",
+  "latestVersion": "1.00.584",
+  "releaseDate": "2026-07-06",
+  "description": "O card Composição financeira da Visão geral passou a ler saldos e lançamentos financeiros normalizados, corrigindo valores zerados em conta.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.581",
+  "minCompatibleVersion": "1.00.584",
   "releaseType": "stable",
   "downloadUrl": null
 }

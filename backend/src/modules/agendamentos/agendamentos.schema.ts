@@ -25,7 +25,9 @@ const tipoOperacionalSchema = z.enum(["curso", "atendimento", "oficina"]);
 export const agendamentoParticipanteSchema = z.object({
   matriculaId: z.coerce.number().int().positive().optional().nullable(),
   beneficiarioId: z.coerce.number().int().positive().optional().nullable(),
+  codigo: optionalTrimmedString.nullable().optional(),
   beneficiarioNome: z.string().trim().min(2, "Informe o participante."),
+  dataNascimento: optionalIsoDate.nullable().optional(),
   telefone: optionalTrimmedString.nullable().optional(),
   comparecimento: z.enum(["Pendente", "Presente", "Faltou", "Justificado"]).optional(),
   observacao: optionalTrimmedString.nullable().optional()

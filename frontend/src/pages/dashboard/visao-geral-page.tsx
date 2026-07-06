@@ -21,6 +21,7 @@ import {
   Building2,
   CalendarDays,
   CarFront,
+  BookOpen,
   FolderHeart,
   HandHeart,
   Images,
@@ -54,7 +55,7 @@ function formatarPercentual(valor: number) {
   return `${Number.isFinite(valor) ? valor.toFixed(1) : "0.0"}%`;
 }
 
-function encurtarRotuloGrafico(texto: string, limite = 20) {
+function encurtarRotuloGrafico(texto: string, limite = 32) {
   if (texto.length <= limite) return texto;
   return `${texto.slice(0, limite - 1)}…`;
 }
@@ -161,8 +162,6 @@ export function VisaoGeralPage() {
     if (!data) return [];
     return [
       { nome: "Almoxarifado", valor: itensAlmoxarifado.length || data.cadastros.itensAlmoxarifado },
-      { nome: "Biblioteca", valor: data.cadastros.livrosDisponiveis },
-      { nome: "Veículos", valor: data.cadastros.veiculos },
       { nome: "Profissionais", valor: data.cadastros.profissionais },
       { nome: "Voluntários", valor: data.cadastros.voluntarios },
       { nome: "Famílias", valor: data.cadastros.familias },
@@ -294,6 +293,20 @@ export function VisaoGeralPage() {
         rota: "/setor-administrativo/almoxarifado"
       },
       {
+        label: "Livros da biblioteca",
+        valor: String(data.cadastros.livrosDisponiveis),
+        hint: "Acervo disponível para empréstimo",
+        icone: BookOpen,
+        rota: "/atendimentos/biblioteca"
+      },
+      {
+        label: "Quantidade de veículos",
+        valor: String(data.cadastros.veiculos),
+        hint: "Veículos cadastrados no sistema",
+        icone: CarFront,
+        rota: "/setor-administrativo/controle-veiculos"
+      },
+      {
         label: "Itens no patrimônio",
         valor: String(patrimonios.length || data.cadastros.bensPatrimonio),
         hint: "Bens patrimoniais cadastrados",
@@ -326,6 +339,8 @@ export function VisaoGeralPage() {
     termosVencidos,
     totalMotoristasAutorizados,
     resumoEventosEmprestimos.ativos,
+    data?.cadastros.livrosDisponiveis,
+    data?.cadastros.veiculos,
     resumoCatalogoVagas.cursosNoCatalogo,
     resumoCatalogoVagas.vagasDisponiveis
   ]);
@@ -513,18 +528,20 @@ export function VisaoGeralPage() {
                   <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
                     Composição financeira
                   </p>
-                  <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3">
+                  <div className="mt-3 grid grid-cols-1 gap-2 xl:grid-cols-3">
                     {dadosFinanceiro.map((item) => (
                       <button
                         key={item.nome}
                         type="button"
-                        className={`${classeCardVerdeSuave} px-3 py-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-[0_22px_48px_-22px_rgba(22,101,52,0.32)]`}
+                        className={`${classeCardVerdeSuave} min-h-[110px] px-4 py-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-[0_22px_48px_-22px_rgba(22,101,52,0.32)]`}
                         onClick={() => navigate("/setor-financeiro/contabilidade")}
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="text-xs font-semibold text-[var(--g3-muted)]">{item.nome}</p>
-                            <p className="mt-1 text-2xl font-bold leading-tight text-[var(--g3-foreground)]">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="min-w-0 flex-1">
+                            <p className="break-words text-sm font-semibold leading-5 text-[var(--g3-muted)]">
+                              {item.nome}
+                            </p>
+                            <p className="mt-2 text-2xl font-bold leading-none tracking-tight text-[var(--g3-foreground)]">
                               {formatarMoeda(item.valor)}
                             </p>
                           </div>
@@ -570,23 +587,24 @@ export function VisaoGeralPage() {
                     {dadosFinanceiroContas.length ? (
                       <div
                         className="mt-3"
-                        style={{ height: `${Math.max(260, dadosFinanceiroContas.length * 52)}px` }}
+                        style={{ height: `${Math.max(280, dadosFinanceiroContas.length * 60)}px` }}
                       >
                         <ResponsiveChart minWidth={0} minHeight={240}>
                           <BarChart
                             data={dadosFinanceiroContas}
                             layout="vertical"
-                            margin={{ top: 4, right: 36, bottom: 4, left: 8 }}
+                            margin={{ top: 4, right: 84, bottom: 4, left: 12 }}
                           >
                             <CartesianGrid horizontal={false} stroke="var(--g3-border)" opacity={0.35} />
                             <XAxis type="number" hide />
                             <YAxis
                               type="category"
                               dataKey="nomeCurto"
-                              width={118}
+                              width={220}
                               tick={{ fill: "var(--g3-muted)", fontSize: 12 }}
                               axisLine={false}
                               tickLine={false}
+                              tickMargin={10}
                             />
                             <Tooltip
                               formatter={(value, _name, payload) => [
@@ -606,6 +624,7 @@ export function VisaoGeralPage() {
                               <LabelList
                                 dataKey="saldoFormatado"
                                 position="right"
+                                offset={12}
                                 style={{ fill: "var(--g3-foreground)", fontSize: 12, fontWeight: 600 }}
                               />
                             </Bar>

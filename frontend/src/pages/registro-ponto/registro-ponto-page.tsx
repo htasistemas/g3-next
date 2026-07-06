@@ -1664,10 +1664,10 @@ export function RegistroPontoPage() {
                     <label className="flex items-center gap-2 rounded-lg border border-[var(--g3-border)] bg-white px-3 py-2 text-sm">
                       <Checkbox
                         checked={configHoraExtraDraft.exigir_autorizacao_hora_extra_antecipada}
-                        onCheckedChange={(checked) =>
+                        onChange={(event) =>
                           setConfigHoraExtraDraft((atual) => ({
                             ...atual,
-                            exigir_autorizacao_hora_extra_antecipada: checked === true
+                            exigir_autorizacao_hora_extra_antecipada: event.target.checked
                           }))
                         }
                       />
@@ -1679,10 +1679,10 @@ export function RegistroPontoPage() {
                     <label className="flex items-center gap-2 rounded-lg border border-[var(--g3-border)] bg-white px-3 py-2 text-sm">
                       <Checkbox
                         checked={configHoraExtraDraft.permitir_solicitacao_hora_extra_pelo_funcionario}
-                        onCheckedChange={(checked) =>
+                        onChange={(event) =>
                           setConfigHoraExtraDraft((atual) => ({
                             ...atual,
-                            permitir_solicitacao_hora_extra_pelo_funcionario: checked === true
+                            permitir_solicitacao_hora_extra_pelo_funcionario: event.target.checked
                           }))
                         }
                       />
@@ -2638,7 +2638,7 @@ export function RegistroPontoPage() {
               <label className="flex items-start gap-2 rounded-lg border border-[var(--g3-border)] bg-slate-50 p-3">
                 <Checkbox
                   checked={cienciaHoraExtraConfirmada}
-                  onCheckedChange={(checked) => setCienciaHoraExtraConfirmada(checked === true)}
+                  onChange={(event) => setCienciaHoraExtraConfirmada(event.target.checked)}
                 />
                 <span className="text-sm text-slate-700">
                   Declaro ciência de que a realização de hora extra depende de autorização da empresa.

@@ -9,6 +9,7 @@ import {
   Clock3,
   FileDown,
   LayoutGrid,
+  LoaderCircle,
   TriangleAlert,
   TrendingUp,
   Users,
@@ -23,7 +24,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/use-auth";
 import { authService } from "@/services/auth.service";
 import { useUnidadeAssistencialAtual } from "@/features/unidades-assistenciais/use-unidades-assistenciais";
-import { resolverUrlArquivo } from "@/lib/arquivos";
+import { obterUrlArquivoAutenticado } from "@/lib/arquivos";
 import { formatarCnpj, formatarTelefone } from "@/lib/br-utils";
 import {
   AgendaCardList,
@@ -38,7 +39,6 @@ import {
   useAgendamentos,
   useBeneficiariosOperacionaisAgendamento,
   useCancelarAgendamento,
-  useConfirmarAgendamento,
   useIndicadoresAgendamentos,
   useItensOperacionaisAgendamento,
   useListaEsperaAgendamentos,
@@ -78,6 +78,12 @@ const ETAPAS_ENVIO: Array<Record<"WHATSAPP" | "EMAIL", string>> = [
     WHATSAPP: "Finalizando os links para abertura do WhatsApp...",
     EMAIL: "Finalizando o disparo dos e-mails da agenda..."
   }
+];
+
+const ETAPAS_GERACAO_AGS = [
+  "Validando os beneficiários selecionados...",
+  "Salvando a agenda operacional...",
+  "Atualizando a visualização do dia..."
 ];
 
 let janelaFichaAgendamentoAtual: Window | null = null;
@@ -129,6 +135,38 @@ function formatarDataExtensa(data?: string) {
     year: "numeric"
   }).format(parsed);
   return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
+
+function formatarIdade(dataNascimento?: string) {
+  if (!dataNascimento) return "---";
+
+  const nascimento = new Date(`${dataNascimento.slice(0, 10)}T12:00:00`);
+  if (Number.isNaN(nascimento.getTime())) return "---";
+
+  const hojeAtual = new Date();
+  let idade = hojeAtual.getFullYear() - nascimento.getFullYear();
+  const mesAtual = hojeAtual.getMonth();
+  const mesNascimento = nascimento.getMonth();
+  const diaAtual = hojeAtual.getDate();
+  const diaNascimento = nascimento.getDate();
+
+  if (mesAtual < mesNascimento || (mesAtual === mesNascimento && diaAtual < diaNascimento)) {
+    idade -= 1;
+  }
+
+  return idade >= 0 ? `${idade} ano${idade === 1 ? "" : "s"}` : "---";
+}
+
+function formatarTelefoneRelatorio(telefone?: string | null) {
+  if (!telefone?.trim()) return "";
+  const digitos = telefone.replace(/\D/g, "");
+  if (digitos.length === 11) {
+    return `${digitos.slice(0, 2)} ${digitos.slice(2, 7)}-${digitos.slice(7)}`;
+  }
+  if (digitos.length === 10) {
+    return `${digitos.slice(0, 2)} ${digitos.slice(2, 6)}-${digitos.slice(6)}`;
+  }
+  return telefone.trim();
 }
 
 function escapeHtml(value?: string | number | null) {
@@ -408,11 +446,26 @@ export function AgendamentosPage() {
   const salvarAgendamentoMutation = useSalvarAgendamento();
   const salvarMutation = useSalvarAgendamentoOperacional();
   const cancelarMutation = useCancelarAgendamento();
-  const confirmarMutation = useConfirmarAgendamento();
   const excluirMutation = useExcluirAgendamento();
   const notificarMutation = useNotificarAgendamento();
   const remarcarMutation = useRemarcarAgendamento();
   const preferenciaSalvando = useRef<number | null>(null);
+  const [agendaCopiando, setAgendaCopiando] = useState(false);
+  const [geracaoEmAndamento, setGeracaoEmAndamento] = useState(false);
+  const [geracaoEtapa, setGeracaoEtapa] = useState(0);
+  const [ultimaAgendaDestacadaId, setUltimaAgendaDestacadaId] = useState<number | null>(null);
+  const [confirmacaoParticipanteEmAndamento, setConfirmacaoParticipanteEmAndamento] = useState<{
+    agendamentoId: number;
+    index: number;
+  } | null>(null);
+  const geracaoIntervalo = useRef<number | null>(null);
+  const destaqueAgendaTimeout = useRef<number | null>(null);
+  const dataVisualizacaoInteragida = useRef(false);
+
+  function definirDataVisualizacao(novaData: string) {
+    dataVisualizacaoInteragida.current = true;
+    setDataVisualizacao(novaData);
+  }
 
   useEffect(() => {
     let ativo = true;
@@ -429,7 +482,7 @@ export function AgendamentosPage() {
       try {
         const dataPreferencia = await authService.obterPreferenciaAgendamentos();
         if (!ativo) return;
-        if (dataPreferencia) {
+        if (dataPreferencia && !dataVisualizacaoInteragida.current) {
           setDataVisualizacao(dataPreferencia);
         }
       } catch {
@@ -468,7 +521,17 @@ export function AgendamentosPage() {
     () =>
       (agendamentosQuery.data ?? [])
         .filter((item) => (item.status ?? "").trim().toUpperCase() !== "CANCELADO")
-        .filter((item) => item.itemOrigemId || item.itemNome || item.coletivo)
+        .filter((item) => {
+          const participantes = item.participantes ?? [];
+          return (
+            item.itemOrigemId ||
+            item.itemNome ||
+            item.itemTipo ||
+            item.tituloColetivo ||
+            item.coletivo ||
+            participantes.length > 0
+          );
+        })
         .sort((a, b) => `${a.data ?? ""}${a.horaInicial ?? ""}`.localeCompare(`${b.data ?? ""}${b.horaInicial ?? ""}`)),
     [agendamentosQuery.data]
   );
@@ -510,7 +573,7 @@ export function AgendamentosPage() {
     }).length;
 
     return [
-      { label: "Pacientes agendados", value: participantesAgendados, icon: Users },
+      { label: "Beneficiários atendidos", value: participantesAgendados, icon: Users },
       { label: "Frequência média", value: frequenciaMedia.toLocaleString("pt-BR"), icon: TrendingUp },
       { label: "Faltas da semana", value: faltasSemana, icon: TriangleAlert },
       { label: "Sessões do mês", value: sessoesMes, icon: CalendarDays },
@@ -532,7 +595,7 @@ export function AgendamentosPage() {
         setBuscaBeneficiario("");
         setBeneficiariosSelecionados([]);
         setDataAgendamento(hoje);
-        setDataVisualizacao(hoje);
+        definirDataVisualizacao(hoje);
         setAbaAtiva("agenda");
       },
       variant: "default"
@@ -547,6 +610,29 @@ export function AgendamentosPage() {
       return;
     }
 
+    if (geracaoIntervalo.current) {
+      window.clearInterval(geracaoIntervalo.current);
+      geracaoIntervalo.current = null;
+    }
+    if (destaqueAgendaTimeout.current) {
+      window.clearTimeout(destaqueAgendaTimeout.current);
+      destaqueAgendaTimeout.current = null;
+    }
+
+    setGeracaoEmAndamento(true);
+    setGeracaoEtapa(0);
+    geracaoIntervalo.current = window.setInterval(() => {
+      setGeracaoEtapa((atual) => Math.min(atual + 1, ETAPAS_GERACAO_AGS.length - 1));
+    }, 850);
+
+    const cardExistente = cards.find(
+      (item) =>
+        item.itemOrigemId === itemSelecionado.id &&
+        item.itemTipo === tipo &&
+        (item.data ?? "").slice(0, 10) === dataAgendamento &&
+        (item.status ?? "").trim().toUpperCase() !== "CANCELADO"
+    );
+
     try {
       const salvo = await salvarMutation.mutateAsync({
         id: cardSelecionado?.id ? String(cardSelecionado.id) : undefined,
@@ -555,20 +641,37 @@ export function AgendamentosPage() {
         data: dataAgendamento,
         matriculasIds: beneficiariosSelecionados
       });
+      await agendamentosQuery.refetch();
+      const dataExibicao = String(salvo?.data ?? dataAgendamento).slice(0, 10);
       setSelecionadoId(salvo?.id ?? null);
-      setDataVisualizacao(dataAgendamento);
+      setUltimaAgendaDestacadaId(salvo?.id ?? null);
+      definirDataVisualizacao(dataExibicao);
       setPopup({
         tipo: "sucesso",
         titulo: "Confirmação",
-        texto: cardSelecionado?.id ? "Agenda atualizada com sucesso." : "Agenda gerada com sucesso."
+        texto: cardExistente
+          ? "Agenda já existente atualizada com sucesso. O card foi reaproveitado e deve aparecer na data selecionada."
+          : "Agenda gerada com sucesso."
       });
+      destaqueAgendaTimeout.current = window.setTimeout(() => {
+        setUltimaAgendaDestacadaId((atual) => (atual === salvo?.id ? null : atual));
+      }, 4500);
     } catch (error: any) {
+      definirDataVisualizacao(dataAgendamento);
       const mensagem = error?.response?.data?.message ?? "Não foi possível gerar a agenda.";
       setPopup({
         tipo: "erro",
         titulo: mensagem.startsWith("Conflito de agenda identificado.") ? "Agendamento bloqueador" : "Erro",
         texto: mensagem
       });
+    }
+    finally {
+      if (geracaoIntervalo.current) {
+        window.clearInterval(geracaoIntervalo.current);
+        geracaoIntervalo.current = null;
+      }
+      setGeracaoEmAndamento(false);
+      setGeracaoEtapa(0);
     }
   }
 
@@ -620,7 +723,7 @@ export function AgendamentosPage() {
     }
   }
 
-  function imprimirFichaPresenca(item: Agendamento) {
+  async function imprimirFichaPresenca(item: Agendamento) {
     const unidadeAtual = unidadeAtualQuery.data?.unidade;
     const participantes = item.participantes ?? [];
     const atividade = item.itemNome || item.tipoAtendimento;
@@ -630,7 +733,17 @@ export function AgendamentosPage() {
     const horario = item.horaInicial || "-";
     const local = item.itemLocal || item.sala || item.unidade || "-";
     const nomeInstituicao = unidadeAtual?.razao_social?.trim() || unidadeAtual?.nome_fantasia?.trim() || "Instituição não cadastrada";
-    const logomarcaRelatorio = resolverUrlArquivo(unidadeAtual?.logomarca_relatorio || unidadeAtual?.logomarca);
+    let logomarcaRelatorio = "";
+    try {
+      const logo = await obterUrlArquivoAutenticado(unidadeAtual?.logomarca_relatorio || unidadeAtual?.logomarca, {
+        cache: false,
+        auditar: false
+      });
+      logomarcaRelatorio = logo.url;
+      window.setTimeout(() => logo.revoke?.(), 60_000);
+    } catch {
+      logomarcaRelatorio = "";
+    }
     const rodapeInstitucional = montarRodapeInstitucional(unidadeAtual ?? undefined);
     const linhas = participantes.length
       ? participantes
@@ -638,17 +751,18 @@ export function AgendamentosPage() {
             (participante, index) => `
               <tr>
                 <td>${index + 1}</td>
+                <td>${escapeHtml(participante.codigo || participante.beneficiarioId?.toString() || participante.matriculaId?.toString() || "-")}</td>
                 <td>${escapeHtml(participante.beneficiarioNome)}</td>
-                <td>${escapeHtml(participante.telefone || "-")}</td>
-                <td>${escapeHtml(participante.comparecimento || "Pendente")}</td>
-                <td></td>
+                <td>${escapeHtml(formatarTelefoneRelatorio(participante.telefone) || "-")}</td>
+                <td>${escapeHtml(formatarIdade(participante.dataNascimento))}</td>
+                <td><span class="g3-assinatura-campo" aria-hidden="true"></span></td>
               </tr>`
           )
           .join("")
       : `
         <tr>
           <td>1</td>
-          <td colspan="4">Sem beneficiários vinculados ao card.</td>
+          <td colspan="5">Sem beneficiários vinculados ao card.</td>
         </tr>`;
 
     const emitidoEm = new Date().toLocaleString("pt-BR");
@@ -669,11 +783,11 @@ export function AgendamentosPage() {
         .g3-topo h1 { margin: 0; font-size: 18px; font-weight: 700; color: #14532d; }
         .g3-topo h2 { margin: 4px 0 0; font-size: 24px; font-weight: 800; color: #1f2937; font-family: Arial, sans-serif; }
         .g3-bloco { margin-bottom: 16px; border: 1px solid #dbe7df; border-radius: 16px; background: #ffffff; overflow: hidden; }
-        .g3-bloco-titulo { margin: 0; padding: 12px 16px; background: #eef8f2; border-bottom: 1px solid #dbe7df; font-size: 14px; font-weight: 700; color: #166534; }
-        .g3-meta { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; padding: 14px 16px 16px; }
-        .g3-meta-item { border: 1px solid #dbe7df; border-radius: 12px; padding: 10px 12px; background: #f9fcfa; text-align: center; }
-        .g3-meta-item strong { display: block; margin-bottom: 4px; font-size: 11px; font-weight: 600; color: #5d7467; }
-        .g3-meta-item span { display: block; font-size: 14px; font-weight: 700; color: #163027; }
+        .g3-bloco-titulo { margin: 0; padding: 10px 14px; background: #eef8f2; border-bottom: 1px solid #dbe7df; font-size: 13px; font-weight: 700; color: #166534; }
+        .g3-meta { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 10px 12px 12px; }
+        .g3-meta-item { border: 1px solid #dbe7df; border-radius: 12px; padding: 8px 10px; background: #f9fcfa; text-align: center; }
+        .g3-meta-item strong { display: block; margin-bottom: 3px; font-size: 10px; font-weight: 600; color: #5d7467; }
+        .g3-meta-item span { display: block; font-size: 13px; font-weight: 700; color: #163027; line-height: 1.15; }
         .g3-orientacao { margin: 0 0 16px; border-left: 4px solid #0f8a57; border-radius: 10px; padding: 10px 12px; background: #f4fbf7; font-size: 12px; color: #4b6356; }
         .g3-tabela { width: 100%; table-layout: fixed; border: 1px solid #dbe7df; border-radius: 16px; overflow: hidden; }
         .g3-tabela thead th { padding: 11px 12px; background: #0f8a57; color: #ffffff; font-size: 12px; font-weight: 700; text-align: left; }
@@ -681,9 +795,21 @@ export function AgendamentosPage() {
         .g3-tabela tbody tr:nth-child(even) td { background: #f8fbf9; }
         .g3-tabela td { font-size: 13px; color: #233a31; min-height: 36px; }
         .g3-tabela td:first-child,
-        .g3-tabela td:nth-child(3),
+        .g3-tabela td:nth-child(2),
         .g3-tabela td:nth-child(4),
-        .g3-tabela td:nth-child(5) { white-space: nowrap; }
+        .g3-tabela td:nth-child(5),
+        .g3-tabela td:nth-child(6) { white-space: nowrap; }
+        .g3-tabela th:nth-child(2),
+        .g3-tabela td:nth-child(2) { width: 76px; }
+        .g3-tabela th:nth-child(3),
+        .g3-tabela td:nth-child(3) { width: 29%; }
+        .g3-tabela th:nth-child(4),
+        .g3-tabela td:nth-child(4) { width: 118px; }
+        .g3-tabela th:nth-child(5),
+        .g3-tabela td:nth-child(5) { width: 62px; }
+        .g3-tabela th:nth-child(6),
+        .g3-tabela td:nth-child(6) { width: 170px; }
+        .g3-assinatura-campo { display: block; min-height: 20px; border-bottom: 1px solid #96b3a2; }
         .g3-rodape { margin-top: 18px; padding-top: 12px; border-top: 1px solid #dbe7df; font-size: 11px; color: #6b7f75; text-align: center; }
         .g3-rodape div + div { margin-top: 2px; }
       `,
@@ -723,10 +849,11 @@ export function AgendamentosPage() {
             <thead>
               <tr>
                 <th style="width: 42px;">Nº</th>
+                <th style="width: 76px;">Código</th>
                 <th>Beneficiário</th>
-                <th style="width: 132px;">Telefone</th>
-                <th style="width: 108px;">Status</th>
-                <th style="width: 120px;">Presença</th>
+                <th style="width: 118px;">Telefone</th>
+                <th style="width: 62px;">Idade</th>
+                <th style="width: 170px;">Assinatura</th>
               </tr>
             </thead>
             <tbody>${linhas}</tbody>
@@ -757,7 +884,7 @@ export function AgendamentosPage() {
     };
     setItemSelecionado(itemResumo.id ? itemResumo : null);
     setDataAgendamento(item.data ?? hoje);
-    setDataVisualizacao(item.data ?? hoje);
+    definirDataVisualizacao(item.data ?? hoje);
     setBeneficiariosSelecionados(
       (item.participantes ?? [])
         .map((participante) => participante.matriculaId ?? participante.beneficiarioId)
@@ -793,6 +920,7 @@ export function AgendamentosPage() {
       return;
     }
 
+    setAgendaCopiando(true);
     try {
       if (agendaParaData.acao === "copiar") {
         const agendaOriginal = agendaParaData.item;
@@ -831,44 +959,53 @@ export function AgendamentosPage() {
         setPopup({ tipo: "sucesso", titulo: "Confirmação", texto: "Agenda remarcada com sucesso." });
       }
 
-      setDataVisualizacao(novaDataAgenda);
+      definirDataVisualizacao(novaDataAgenda);
       setAgendaParaData(null);
     } catch (error: any) {
       setPopup({
         tipo: "erro",
         titulo: "Erro",
         texto:
-          error?.response?.data?.message ??
+          error?.response?.data?.message ?? 
           (agendaParaData.acao === "copiar" ? "Não foi possível copiar a agenda." : "Não foi possível remarcar a agenda.")
       });
+    } finally {
+      setAgendaCopiando(false);
     }
   }
 
   async function alternarConfirmacaoParticipante(item: Agendamento, index: number) {
     if (!item.id) return;
-    if (item.status === "Confirmado") return;
+    const participanteAtual = item.participantes?.[index];
+    if (!participanteAtual || participanteAtual.comparecimento === "Presente") return;
 
     const participantes = (item.participantes ?? []).map<AgendamentoParticipante>((participante, participanteIndex) =>
       participanteIndex === index
         ? {
             ...participante,
             comparecimento: "Presente"
-          }
+        }
         : participante
     );
+    const statusAtualizado = participantes.every((participante) => participante.comparecimento === "Presente")
+      ? "Confirmado"
+      : item.status;
 
+    setConfirmacaoParticipanteEmAndamento({ agendamentoId: item.id, index });
     try {
-      await confirmarMutation.mutateAsync({
-        id: item.id,
-        payload: { observacao: "Confirmado pelo card." }
-      });
       await salvarAgendamentoMutation.mutateAsync({
         ...item,
-        status: "Confirmado",
+        status: statusAtualizado,
         participantes
       });
+      await agendamentosQuery.refetch();
+      setPopup({ tipo: "sucesso", titulo: "Confirmação", texto: "Participante confirmado com sucesso." });
     } catch (error: any) {
       setPopup({ tipo: "erro", titulo: "Erro", texto: error?.response?.data?.message ?? "Não foi possível atualizar a confirmação." });
+    } finally {
+      setConfirmacaoParticipanteEmAndamento((atual) =>
+        atual && atual.agendamentoId === item.id && atual.index === index ? null : atual
+      );
     }
   }
 
@@ -926,7 +1063,7 @@ export function AgendamentosPage() {
       const participantesRestantes = (participanteParaMover.item.participantes ?? []).filter((_, index) => index !== participanteParaMover.index);
       await salvarParticipantesAtualizados(participanteParaMover.item, participantesRestantes);
 
-      setDataVisualizacao(novaDataAgenda);
+      definirDataVisualizacao(novaDataAgenda);
       setParticipanteParaMover(null);
       setPopup({ tipo: "sucesso", titulo: "Confirmação", texto: "Beneficiário movido para a nova data com sucesso." });
     } catch (error: any) {
@@ -1017,10 +1154,24 @@ export function AgendamentosPage() {
                   <DataSelector value={dataAgendamento} onChange={setDataAgendamento} />
                   <GenerateCardButton
                     disabled={!tipo || !itemSelecionado?.id || !beneficiariosSelecionados.length || !dataAgendamento}
-                    loading={salvarMutation.isPending}
+                    loading={salvarMutation.isPending || geracaoEmAndamento}
                     onClick={salvarCard}
                     texto={cardSelecionado?.id ? "Atualizar agenda" : "Gerar agenda"}
                   />
+                  {geracaoEmAndamento ? (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <LoaderCircle className="h-4 w-4 animate-spin text-emerald-700" />
+                        <p className="text-sm font-medium text-emerald-900">{ETAPAS_GERACAO_AGS[geracaoEtapa]}</p>
+                      </div>
+                      <div className="mt-3 h-2 overflow-hidden rounded-full bg-emerald-100">
+                        <div
+                          className="h-full rounded-full bg-emerald-600 transition-all duration-300"
+                          style={{ width: `${((geracaoEtapa + 1) / ETAPAS_GERACAO_AGS.length) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  ) : null}
                 </CardContent>
               </Card>
 
@@ -1038,16 +1189,16 @@ export function AgendamentosPage() {
                       <p className="mt-1 text-base font-semibold text-emerald-950">{formatarDataExtensa(dataVisualizacao)}</p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <Button type="button" variant="outline" className="shadow-sm" onClick={() => setDataVisualizacao((atual) => somarDias(atual, -1))}>
+                      <Button type="button" variant="outline" className="shadow-sm" onClick={() => definirDataVisualizacao(somarDias(dataVisualizacao, -1))}>
                         <ChevronLeft className="h-4 w-4" />
                       </Button>
                       <input
                         type="date"
                         value={dataVisualizacao}
-                        onChange={(event) => setDataVisualizacao(event.target.value)}
+                        onChange={(event) => definirDataVisualizacao(event.target.value)}
                         className="h-10 rounded-xl border border-[var(--g3-border)] bg-white px-3 text-sm text-[var(--g3-foreground)] shadow-sm outline-none focus:border-emerald-400"
                       />
-                      <Button type="button" variant="outline" className="shadow-sm" onClick={() => setDataVisualizacao((atual) => somarDias(atual, 1))}>
+                      <Button type="button" variant="outline" className="shadow-sm" onClick={() => definirDataVisualizacao(somarDias(dataVisualizacao, 1))}>
                         <ChevronRight className="h-4 w-4" />
                       </Button>
                     </div>
@@ -1055,7 +1206,9 @@ export function AgendamentosPage() {
                   <AgendaCardList
                     cards={cardsDoDia}
                     selecionadoId={selecionadoId}
+                    destaqueRecenteId={ultimaAgendaDestacadaId}
                     envioEmAndamento={envioEmAndamento}
+                    confirmacaoEmAndamento={confirmacaoParticipanteEmAndamento}
                     onAlternarConfirmacao={(item, index) => void alternarConfirmacaoParticipante(item, index)}
                     onMoverParticipante={(item, index) => solicitarMoverParticipante(item, index)}
                     onExcluirParticipante={(item, index) => solicitarExcluirParticipante(item, index)}
@@ -1176,8 +1329,19 @@ export function AgendamentosPage() {
       />
 
       {agendaParaData ? (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/45 px-4" onClick={() => setAgendaParaData(null)}>
-          <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <div
+          className={`fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/45 px-4 ${agendaCopiando ? "cursor-wait" : "cursor-default"}`}
+          onClick={() => !agendaCopiando && setAgendaParaData(null)}
+        >
+          <div className="relative w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            {agendaCopiando ? (
+              <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-white/65 backdrop-blur-[1px]">
+                <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-800 shadow-sm">
+                  <LoaderCircle className="h-4 w-4 animate-spin" />
+                  Copiando agenda...
+                </div>
+              </div>
+            ) : null}
             <div className="border-b border-slate-100 px-5 py-4">
               <h3 className="text-base font-semibold text-emerald-800">
                 {agendaParaData.acao === "copiar" ? "Copiar agenda" : "Mover agenda"}
@@ -1197,11 +1361,18 @@ export function AgendamentosPage() {
               />
             </div>
             <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3">
-              <Button type="button" variant="outline" onClick={() => setAgendaParaData(null)}>
+              <Button type="button" variant="outline" onClick={() => setAgendaParaData(null)} disabled={agendaCopiando}>
                 Cancelar
               </Button>
-              <Button type="button" onClick={() => void confirmarAcaoComData()}>
-                Salvar data
+              <Button type="button" onClick={() => void confirmarAcaoComData()} disabled={agendaCopiando}>
+                {agendaCopiando ? (
+                  <>
+                    <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+                    Copiando...
+                  </>
+                ) : (
+                  "Salvar data"
+                )}
               </Button>
             </div>
           </div>

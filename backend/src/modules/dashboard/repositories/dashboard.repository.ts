@@ -325,7 +325,7 @@ export class DashboardRepository {
     }
     return this.consultarTotal(
       `
-      SELECT COALESCE(SUM(valor), 0) AS total
+      SELECT COALESCE(SUM(valor::float8), 0) AS total
       FROM lancamento_financeiro
       WHERE ${condicoes.join(" AND ")}
       `,
@@ -352,7 +352,7 @@ export class DashboardRepository {
         ${possuiNumero ? "numero" : "NULL::text"} AS numero,
         ${possuiTipo ? "tipo" : "NULL::text"} AS tipo,
         ${possuiRecebimentoLocal ? "recebimento_local" : "NULL::boolean"} AS recebimento_local,
-        saldo
+        saldo::float8 AS saldo
       FROM conta_bancaria
       ${tenant.sql ? `WHERE ${tenant.sql}` : ""}
       ORDER BY COALESCE(NULLIF(TRIM(${possuiBanco ? "banco" : "''"}), ''), 'Conta') ASC,
@@ -391,7 +391,7 @@ export class DashboardRepository {
       : condicoes.map((condicao) => `(${condicao})`).join(" OR ");
     return this.consultarTotal(
       `
-      SELECT COALESCE(SUM(saldo), 0) AS total
+      SELECT COALESCE(SUM(saldo::float8), 0) AS total
       FROM conta_bancaria
       WHERE ${where}
       `,
@@ -429,7 +429,7 @@ export class DashboardRepository {
     const where = tenant.sql ? `${tenant.sql} AND ${filtroBanco}` : filtroBanco;
     return this.consultarTotal(
       `
-      SELECT COALESCE(SUM(saldo), 0) AS total
+      SELECT COALESCE(SUM(saldo::float8), 0) AS total
       FROM conta_bancaria
       WHERE ${where}
       `,
@@ -445,7 +445,7 @@ export class DashboardRepository {
     const tenant = await this.montarFiltroTenant("lancamento_financeiro");
     return this.consultarRows<DashboardLancamentoFinanceiroRow>(
       `
-      SELECT tipo, situacao, valor
+      SELECT tipo, situacao, valor::float8 AS valor
       FROM lancamento_financeiro
       ${tenant.sql ? `WHERE ${tenant.sql}` : ""}
       `,

@@ -18,11 +18,6 @@ type DashboardFinanceiroContaRow = {
   recebimento_local: boolean | null;
   saldo: unknown;
 };
-type DashboardLancamentoFinanceiroRow = {
-  tipo: string | null;
-  situacao: string | null;
-  valor: unknown;
-};
 
 function arredondarUmaCasa(valor: number): number {
   return Math.round(valor * 10) / 10;
@@ -96,8 +91,10 @@ export class DashboardService {
       termosAtivos,
       termosValorTotal,
       termosAlertas,
+      valoresAReceber,
+      valoresEmCaixa,
+      valoresEmBanco,
       contasFinanceirasRows,
-      lancamentosFinanceirosRows,
       cursosAtivos,
       taxaMediaOcupacaoCursos,
       certificadosEmitidos,
@@ -129,8 +126,10 @@ export class DashboardService {
       repository.contarTermosAtivos(),
       repository.somarValorTotalTermosAtivos(),
       repository.listarAlertasTermos(),
+      repository.somarValoresAReceber(),
+      repository.somarValoresEmCaixa(),
+      repository.somarValoresEmBanco(),
       repository.listarContasFinanceiras(),
-      repository.listarLancamentosFinanceiros(),
       repository.contarCursosAtivos(),
       repository.calcularTaxaMediaOcupacaoCursos(),
       repository.contarCertificadosEmitidos(),
@@ -163,13 +162,6 @@ export class DashboardService {
     const rendaPerCapitaMedia = mediaPessoas > 0 ? rendaMediaFamiliar / mediaPessoas : 0;
     const faixaRenda = this.calcularFaixaRenda(rendas);
     const contasFinanceiras = this.mapearContasFinanceiras(contasFinanceirasRows);
-    const valoresEmCaixa = contasFinanceiras
-      .filter((item) => item.categoria === "Caixa")
-      .reduce((total, item) => total + item.saldo, 0);
-    const valoresEmBanco = contasFinanceiras
-      .filter((item) => item.categoria === "Banco")
-      .reduce((total, item) => total + item.saldo, 0);
-    const valoresAReceber = this.calcularValoresAReceber(lancamentosFinanceirosRows);
 
     const familiasExtremaPobreza = faixaRenda["Ate 200"] ?? 0;
 
@@ -316,12 +308,6 @@ export class DashboardService {
       .sort((a, b) => b.saldo - a.saldo || a.nome.localeCompare(b.nome, "pt-BR"));
   }
 
-  private calcularValoresAReceber(rows: DashboardLancamentoFinanceiroRow[]) {
-    return rows
-      .filter((row) => this.ehLancamentoAReceber(row.tipo) && !this.ehSituacaoLiquidada(row.situacao))
-      .reduce((total, row) => total + this.toNumber(row.valor), 0);
-  }
-
   private classificarContaFinanceira(tipo?: string | null, recebimentoLocal?: boolean | null) {
     if (recebimentoLocal) {
       return "Caixa" as const;
@@ -329,35 +315,6 @@ export class DashboardService {
 
     const tipoNormalizado = this.normalizarTexto(tipo);
     return tipoNormalizado.includes("caixa") ? ("Caixa" as const) : ("Banco" as const);
-  }
-
-  private ehLancamentoAReceber(tipo?: string | null) {
-    const tipoNormalizado = this.normalizarTexto(tipo);
-    return (
-      tipoNormalizado === "receber" ||
-      tipoNormalizado === "a receber" ||
-      tipoNormalizado === "receita" ||
-      tipoNormalizado === "entrada" ||
-      tipoNormalizado === "credito" ||
-      tipoNormalizado.includes("receber") ||
-      tipoNormalizado.startsWith("receita") ||
-      tipoNormalizado.includes("entrada") ||
-      tipoNormalizado.includes("credito")
-    );
-  }
-
-  private ehSituacaoLiquidada(situacao?: string | null) {
-    const situacaoNormalizada = this.normalizarTexto(situacao);
-    return [
-      "pago",
-      "paga",
-      "recebido",
-      "recebida",
-      "liquidado",
-      "liquidada",
-      "concluido",
-      "concluida"
-    ].includes(situacaoNormalizada);
   }
 
   private normalizarTexto(valor?: string | null) {

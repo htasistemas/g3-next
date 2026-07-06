@@ -48,7 +48,8 @@ const secoesManual: ManualSecao[] = [
           "Comece pelos cadastros para garantir base confiável de beneficiários, famílias e profissionais.",
           "Use Atendimentos diários para registrar movimentações sociais, benefícios, inscrições e acompanhamentos.",
           "Use Configurações gerais para manter parâmetros, usuários, IA e o próprio manual atualizados.",
-          "Na tela Visão geral, acompanhe também os cards de Termos vencidos, Documentos vencidos, Documentos a vencer, Motoristas autorizados, Itens no almoxarifado, Itens no patrimônio, Álbuns e fotos, Empréstimos para eventos e Catálogo e vagas de matrículas para leitura operacional rápida logo na entrada do sistema.",
+          "Na tela Visão geral, acompanhe também os cards de Termos vencidos, Documentos vencidos, Documentos a vencer, Motoristas autorizados, Itens no almoxarifado, Livros da biblioteca, Quantidade de veículos, Itens no patrimônio, Álbuns e fotos, Empréstimos para eventos e Catálogo e vagas de matrículas para leitura operacional rápida logo na entrada do sistema.",
+          "O card Composição financeira da Visão geral exibe valores a receber, em caixa e em banco com base nos saldos e lançamentos financeiros normalizados pelo backend.",
           "O card Empréstimos para eventos mostra a quantidade de eventos ativos em andamento.",
           "O card Catálogo e vagas de matrículas mostra o resumo de cursos no catálogo e vagas disponíveis na grade principal.",
           "Os cards da Visão geral funcionam como atalhos: ao clicar em cada indicador, o sistema abre a tela correspondente para aprofundar a análise ou continuar a operação.",
@@ -173,7 +174,8 @@ const secoesManual: ManualSecao[] = [
           "Revise a fila de espera e a situação de vagas para apoiar decisões de encaminhamento.",
           "Os atendimentos agendados não ficam mais dentro da tela de inscrições; quando precisar operar agenda, use o botão Abrir em Agendamentos.",
           "Na aba Presença, gere a data da aula, salve as presenças e use Excluir data de presença quando precisar remover apenas a data gerada sem apagar o curso.",
-          "A barra superior da tela usa ações realmente contextuais por aba: a listagem fica com Buscar, Nova, Imprimir e Fechar; as abas de edição mostram apenas as ações que fazem sentido para aquele conteúdo, como Salvar dados da inscrição, Salvar catálogo e vagas, Salvar inscrições e fila ou Imprimir lista de presença."
+          "A barra superior da tela usa ações realmente contextuais por aba: a listagem fica com Buscar, Nova, Imprimir e Fechar; as abas de edição mostram apenas as ações que fazem sentido para aquele conteúdo, como Salvar dados da inscrição, Salvar catálogo e vagas, Salvar inscrições e fila ou Imprimir lista de presença.",
+          "Na impressão da lista de presença, o relatório agora prioriza a leitura com idade do participante e espaço de assinatura no lugar da marcação antiga de presença, mantendo o CPF apenas quando a tela pedir a exibição desse dado."
         ],
         atencoes: [
           "O botão Excluir da barra superior remove todo o curso configurado e exige confirmação específica antes da exclusão.",
@@ -193,8 +195,11 @@ const secoesManual: ManualSecao[] = [
           "Use a lista de beneficiários vinculados ao item para marcar quem participará naquela data; a agenda operacional agora usa a própria matrícula da inscrição, os identificadores legados salvos no card e, quando necessário, a lista atual de matriculados do item para localizar o cadastro do beneficiário, exibindo no card e na seleção o telefone cadastrado da aba Contato e reaproveitando o mesmo dado nos envios.",
           "No topo da aba operacional, acompanhe primeiro o resumo do card com tipo, item, data e quantidade de beneficiários antes de montar a agenda.",
           "Na área principal, o campo Tipo fica ao lado da grade de itens do tipo selecionado, sem campo adicional de curso, atendimento ou oficina, e os beneficiários vinculados passam a aparecer em grade, lado a lado, para agilizar a marcação.",
+          "Ao carregar os beneficiários para a agenda operacional, o sistema prioriza automaticamente os registros de cadastro que já tenham telefone e data de nascimento preenchidos, para evitar que nomes com vínculos incompletos apareçam sem contato ou idade no card.",
           "Informe a data do agendamento e use Gerar Agenda para salvar a agenda do dia com os participantes agrupados no mesmo card. Não há um segundo botão de salvar: o clique em Gerar Agenda já persiste o card imediatamente.",
-          "Na listagem da agenda gerada, use a data em exibição com os botões de avançar e voltar para navegar pelos dias e ver somente os cards agendados naquela data, evitando uma tela extensa com todos os cards misturados.",
+          "Enquanto a agenda está sendo salva, a tela mostra um indicador de progresso com etapas de validação, gravação e atualização da lista, para deixar explícito que a ação está em andamento.",
+          "Depois de salvar, o card recém-criado ou reaproveitado fica destacado por alguns segundos na listagem para facilitar a conferência visual do resultado.",
+          "Na listagem da agenda gerada, use a data em exibição com os botões de avançar e voltar para navegar pelos dias e ver somente os cards agendados naquela data, incluindo também os cards legados que carregam a marcação de agenda coletiva mesmo quando o cadastro original não trouxe todos os metadados operacionais.",
           "Os cards ficam organizados por data e horário, em grade com duas colunas na agenda gerada, com cabeçalho verde, sombreamento visual, uma tarja verde clara para profissional, data, horário e local, lista de beneficiários em formato de tabela e botões compactos em linha única.",
           "Abaixo do nome de cada beneficiário, o card exibe a idade calculada a partir da data de nascimento quando esse dado estiver disponível no cadastro.",
           "O botão de confirmação do beneficiário agora mostra o estado atual e, ao clicar em A confirmar, confirma a agenda e muda o indicador para Confirmado.",
@@ -203,7 +208,7 @@ const secoesManual: ManualSecao[] = [
           "Os ícones de WhatsApp e e-mail dos cards da aba Agendamento agora recarregam os contatos atuais do beneficiário antes do envio, inclusive em agendas antigas que ainda não tenham os vínculos auxiliares completos, tratam contatos inválidos individualmente e continuam processando os demais destinatários sem derrubar a ação com erro interno do servidor.",
           "Durante o envio por WhatsApp ou e-mail no card da agenda operacional, a própria tela agora mostra andamento visual do processamento, bloqueia cliques repetidos e informa quando o envio ainda está em curso.",
           "A versão exibida na interface passa a ser lida em runtime a partir da instância do backend, evitando manter número antigo em produção quando apenas o frontend não tiver recompilado com a constante embutida.",
-          "Ao usar o botão de impressão do card, o sistema abre a ficha de presença em nova janela de visualização como folha A4 do G3N, com logomarca do relatório, nome da instituição em tamanho mais discreto, título do relatório ampliado, resumo do agendamento em oito blocos organizados em 4 por linha, tabela de presença com mais espaço para o nome do beneficiário, rodapé institucional e um botão de impressora no topo para disparar a impressão manualmente.",
+          "Ao usar o botão de impressão do card, o sistema abre a ficha de presença em nova janela de visualização como folha A4 do G3N, com logomarca autenticada do relatório, nome da instituição em tamanho mais discreto, título do relatório ampliado, resumo do agendamento em blocos mais compactos para liberar espaço, tabela de presença com código do beneficiário, telefone formatado, idade em coluna reduzida e campo de assinatura no lugar da presença, além do rodapé institucional e do botão de impressora no topo para disparar a impressão manualmente.",
           "Na lista de beneficiários agendados dentro do card, use o ícone de verificado ou de interrogação dentro da própria coluna de ações, ao lado de mover e excluir, para alternar o status do participante entre confirmado e a confirmar.",
           "Cada beneficiário da agenda também pode ser movido individualmente para outra data ou removido apenas daquele dia, sem precisar alterar todos os participantes do card.",
           "As mensagens preparadas para WhatsApp passaram a exibir a data do agendamento em português do Brasil.",
@@ -212,7 +217,7 @@ const secoesManual: ManualSecao[] = [
         ],
         atencoes: [
           "O agendamento operacional reaproveita dados reais das inscrições; se um beneficiário não estiver vinculado ao item, ele não poderá ser selecionado no card.",
-          "Quando o telefone já existir no cadastro do beneficiário, a aba Agendamento e os cards vinculados devem mostrar esse número em vez de exibir Sem telefone cadastrado.",
+          "Quando o telefone já existir no cadastro do beneficiário, a aba Agendamento e os cards vinculados devem mostrar esse número em vez de exibir Sem telefone cadastrado, e o relatório impresso deve usar o mesmo telefone formatado em padrão enxuto.",
           "O sistema impede duplicidade do mesmo beneficiário dentro do mesmo card e registra auditoria de criação, edição, cancelamento, exclusão e envios.",
           "O envio por WhatsApp prepara links diretos para contato e o envio por e-mail depende de endereço válido cadastrado no participante."
         ]

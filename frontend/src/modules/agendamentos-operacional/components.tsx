@@ -1,7 +1,5 @@
 import {
-  BadgeCheck,
   CalendarDays,
-  CircleHelp,
   Clock3,
   Copy,
   LoaderCircle,
@@ -252,6 +250,9 @@ export function BeneficiarioSelector(props: {
                       <Badge variant="info">{item.status || "Ativo"}</Badge>
                       {!item.selecionavel ? <Badge variant="warning">Cadastro não vinculado</Badge> : null}
                     </div>
+                    {item.dataNascimento ? (
+                      <p className="mt-0.5 text-xs text-[var(--g3-muted)]">{formatarIdade(item.dataNascimento)}</p>
+                    ) : null}
                     <p className="mt-1 text-xs text-[var(--g3-muted)]">
                       {formatarTelefone(item.telefone) || item.telefone || "Sem telefone"}
                       {item.email ? ` - ${item.email}` : ""}
@@ -303,6 +304,7 @@ export function GenerateCardButton(props: { disabled?: boolean; loading?: boolea
 export function AgendaCardList(props: {
   cards: Agendamento[];
   selecionadoId?: number | null;
+  destaqueRecenteId?: number | null;
   envioEmAndamento?: {
     agendamentoId: number;
     canal: "WHATSAPP" | "EMAIL";
@@ -319,6 +321,10 @@ export function AgendaCardList(props: {
   onWhatsApp: (item: Agendamento) => void;
   onEmail: (item: Agendamento) => void;
   onImprimir: (item: Agendamento) => void;
+  confirmacaoEmAndamento?: {
+    agendamentoId: number;
+    index: number;
+  } | null;
 }) {
   if (!props.cards.length) {
     return (
@@ -337,6 +343,7 @@ export function AgendaCardList(props: {
           key={item.id ?? `${item.itemOrigemId}-${item.data}`}
           item={item}
           ativo={props.selecionadoId === item.id}
+          destaqueRecente={props.destaqueRecenteId === item.id}
           envioEmAndamento={
             props.envioEmAndamento && Number(item.id) === props.envioEmAndamento.agendamentoId
               ? props.envioEmAndamento
@@ -353,6 +360,11 @@ export function AgendaCardList(props: {
           onWhatsApp={() => props.onWhatsApp(item)}
           onEmail={() => props.onEmail(item)}
           onImprimir={() => props.onImprimir(item)}
+          confirmacaoEmAndamento={
+            props.confirmacaoEmAndamento && Number(item.id) === props.confirmacaoEmAndamento.agendamentoId
+              ? props.confirmacaoEmAndamento
+              : null
+          }
         />
       ))}
     </div>
@@ -362,6 +374,7 @@ export function AgendaCardList(props: {
 export function AgendaCard(props: {
   item: Agendamento;
   ativo?: boolean;
+  destaqueRecente?: boolean;
   envioEmAndamento?: {
     agendamentoId: number;
     canal: "WHATSAPP" | "EMAIL";
@@ -378,6 +391,10 @@ export function AgendaCard(props: {
   onImprimir: () => void;
   onEditar: () => void;
   onCancelar: () => void;
+  confirmacaoEmAndamento?: {
+    agendamentoId: number;
+    index: number;
+  } | null;
 }) {
   const participantes = props.item.participantes ?? [];
   const canalEmEnvio = props.envioEmAndamento?.canal;
@@ -402,14 +419,17 @@ export function AgendaCard(props: {
       className={`overflow-hidden border-[var(--g3-border)] bg-white shadow-[0_14px_34px_rgba(15,23,42,0.10)] transition-all ${
         props.ativo
           ? "border-emerald-300 bg-[linear-gradient(180deg,#ffffff_0%,#f4fbf6_100%)] ring-2 ring-emerald-500 ring-offset-2 shadow-[0_18px_40px_rgba(5,150,105,0.18)]"
+          : props.destaqueRecente
+            ? "border-amber-300 bg-[linear-gradient(180deg,#fffdf5_0%,#fef7e8_100%)] ring-2 ring-amber-500 ring-offset-2 shadow-[0_18px_40px_rgba(180,83,9,0.14)]"
           : "hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(15,23,42,0.16)]"
       }`}
     >
-      <div className={`px-4 py-3 ${props.ativo ? "bg-emerald-700" : "bg-emerald-600"}`}>
+      <div className={`px-4 py-3 ${props.ativo ? "bg-emerald-700" : props.destaqueRecente ? "bg-amber-600" : "bg-emerald-600"}`}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-base font-semibold text-white">{props.item.itemNome || props.item.tipoAtendimento}</p>
           <div className="flex flex-wrap items-center gap-2">
             {props.ativo ? <Badge variant="warning">Em edição</Badge> : null}
+            {props.destaqueRecente ? <Badge variant="default" className="border-white/35 bg-white/15 text-white">Recém salvo</Badge> : null}
             <Badge variant="default" className="border-white/35 bg-white/15 text-white">
               {participantes.length} participante(s)
             </Badge>
@@ -464,7 +484,6 @@ export function AgendaCard(props: {
             <tbody>
               {participantes.length ? (
                 participantes.map((participante, index) => {
-                  const confirmado = props.item.status === "Confirmado" || participante.comparecimento === "Presente";
                   const idade = formatarIdade(participante.dataNascimento);
                   return (
                   <tr
@@ -482,21 +501,6 @@ export function AgendaCard(props: {
                     </td>
                     <td className="border-b border-[var(--g3-border)] px-3 py-2">
                       <div className="flex items-center justify-center gap-2">
-                        <button
-                          type="button"
-                          disabled={confirmado}
-                          onClick={() => props.onAlternarConfirmacao(index)}
-                          className={`inline-flex h-9 min-w-28 items-center justify-center gap-1.5 rounded-full border px-3 transition-colors ${
-                            confirmado
-                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                              : "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
-                          }`}
-                          title={confirmado ? "Confirmado" : "A confirmar"}
-                          aria-label={confirmado ? "Confirmado" : "A confirmar"}
-                        >
-                          {confirmado ? <BadgeCheck className="h-4 w-4" /> : <CircleHelp className="h-4 w-4" />}
-                          <span className="text-xs font-semibold">{confirmado ? "Confirmado" : "A confirmar"}</span>
-                        </button>
                         <button
                           type="button"
                           onClick={() => props.onMoverParticipante(index)}

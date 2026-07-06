@@ -83,6 +83,7 @@ export type MatriculaInscricaoRow = {
   curso_id: bigint;
   beneficiario_nome: string;
   cpf: string | null;
+  data_nascimento: Date | null;
   telefone: string | null;
   email: string | null;
   status: string;
@@ -147,6 +148,7 @@ export function mapCursoToResponse(
       id_matricula_item: toStringId(item.id),
       beneficiario_nome: item.beneficiario_nome,
       cpf: item.cpf ?? undefined,
+      data_nascimento: item.data_nascimento ? toIsoDate(item.data_nascimento) ?? undefined : undefined,
       telefone: item.telefone ?? undefined,
       email: item.email ?? undefined,
       status: item.status,

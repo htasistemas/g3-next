@@ -55,6 +55,7 @@ type MatriculaPresencaItemRow = {
   matricula_id: bigint;
   beneficiario_nome: string;
   cpf: string | null;
+  data_nascimento: Date | null;
   status: string;
 };
 
@@ -519,6 +520,7 @@ export class MatriculaRepository {
         m.curso_id,
         m.beneficiario_nome,
         m.cpf,
+        contato.data_nascimento AS data_nascimento,
         contato.telefone_principal AS telefone,
         contato.email AS email,
         m.status,
@@ -532,7 +534,7 @@ export class MatriculaRepository {
         m.confirmacao_presenca
       FROM cursos_atendimentos_matriculas m
       LEFT JOIN LATERAL (
-        SELECT c.telefone_principal, c.email
+        SELECT c.telefone_principal, c.email, b.data_nascimento
         FROM cadastro_beneficiario b
         LEFT JOIN contato_beneficiario c ON c.beneficiario_id = b.id AND c.tenant_id::text = ${tenantId}
         LEFT JOIN LATERAL (
@@ -1040,6 +1042,7 @@ export class MatriculaRepository {
         m.id AS matricula_id,
         m.beneficiario_nome,
         m.cpf,
+        b.data_nascimento,
         COALESCE(p.status, 'AUSENTE') AS status
       FROM cursos_atendimentos_matriculas m
       LEFT JOIN cursos_atendimentos_presencas p
@@ -1047,6 +1050,29 @@ export class MatriculaRepository {
        AND p.matricula_id = m.id
        AND p.tenant_id::text = ${tenantId}
        AND p.data_aula = ${presencaData.data_aula}
+      LEFT JOIN cadastro_beneficiario b
+        ON b.tenant_id::text = ${tenantId}
+       AND (
+         (
+           regexp_replace(COALESCE(m.cpf, ''), '\\D', '', 'g') <> ''
+           AND EXISTS (
+             SELECT 1
+             FROM documentos d
+             WHERE d.beneficiario_id = b.id
+               AND d.tenant_id::text = ${tenantId}
+               AND (
+                 UPPER(COALESCE(d.tipo_documento, '')) = 'CPF'
+                 OR UPPER(COALESCE(d.nome_documento, '')) LIKE '%CPF%'
+               )
+               AND regexp_replace(COALESCE(d.numero_documento, ''), '\\D', '', 'g') =
+                 regexp_replace(COALESCE(m.cpf, ''), '\\D', '', 'g')
+           )
+         )
+         OR (
+           regexp_replace(COALESCE(m.cpf, ''), '\\D', '', 'g') = ''
+           AND LOWER(TRIM(COALESCE(b.nome_completo, ''))) = LOWER(TRIM(COALESCE(m.beneficiario_nome, '')))
+         )
+       )
       WHERE m.curso_id = ${cursoId}
         AND m.tenant_id::text = ${tenantId}
         AND UPPER(COALESCE(m.status, 'ATIVO')) <> 'CANCELADO'
