@@ -27,6 +27,7 @@ import {
   CalendarRange,
   Bell,
   CarFront,
+  DatabaseZap,
   ChartColumn,
   ChartPie,
   CheckSquare2,
@@ -588,6 +589,13 @@ export const menuSections: MenuSection[] = [
         requiredPermissions: ["ADMINISTRADOR"]
       },
       {
+        id: "configuracoes-backup-restauracao",
+        to: "/configuracoes/backup-restauracao",
+        label: "Backup e restauração",
+        icon: DatabaseZap,
+        requiredPermissions: ["ADMINISTRADOR"]
+      },
+      {
         id: "configuracoes-usuarios",
         to: "/configuracoes/usuarios",
         label: "Usuários",
@@ -634,6 +642,7 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/captacao-recursos/relatorios")) return "Relatórios";
   if (pathname.startsWith("/captacao-recursos/permissoes")) return "Permissões da captação";
   if (pathname.startsWith("/configuracoes/parametros-sistema")) return "Configurações do sistema";
+  if (pathname.startsWith("/configuracoes/backup-restauracao")) return "Backup e restauração";
   if (pathname.startsWith("/configuracoes/datas-comemorativas")) return "Datas comemorativas";
   if (pathname.startsWith("/configuracoes/atualizar-sistema")) return "Atualizar sistema";
   if (pathname.startsWith("/configuracoes/chamado-tecnico")) return "Chamado técnico";
@@ -719,7 +728,10 @@ export function AppShell() {
   const [gruposAbertos, setGruposAbertos] = useState<Record<string, boolean>>({});
   const [lembreteAlertaAtivo, setLembreteAlertaAtivo] = useState(false);
   const [logomarcaTopoUrl, setLogomarcaTopoUrl] = useState("");
-  const logomarcaInstituicao = unidadeAtualData?.unidade?.logomarca;
+  const baseApresentacao = usuario?.instituicao_slug?.trim().toLowerCase() === "g3n-apresentacao";
+  const logomarcaInstituicao = baseApresentacao
+    ? usuario?.instituicao_logo_url?.trim()
+    : unidadeAtualData?.unidade?.logomarca;
   const nomeInstituicao =
     usuario?.instituicao_nome ??
     unidadeAtualData?.unidade?.nome_fantasia ??
@@ -1075,7 +1087,7 @@ export function AppShell() {
   return (
     <div className="min-h-screen bg-[var(--g3-bg)]">
       {atualizandoFrontend && (
-        <div className="fixed inset-x-0 top-0 z-[70] border-b border-emerald-700 bg-emerald-600 px-4 py-2 text-center text-sm font-semibold text-white shadow-lg">
+        <div className="fixed inset-x-0 top-0 z-[70] border-b border-blue-700 bg-blue-600 px-4 py-2 text-center text-sm font-semibold text-white shadow-lg">
           Atualizando sistema...
         </div>
       )}
@@ -1093,13 +1105,22 @@ export function AppShell() {
             ) : (
               <div className="w-full text-center">
                 {logomarcaInstituicao ? (
-                  <img
-                    src={logomarcaTopoUrl || resolverUrlArquivo(logomarcaInstituicao)}
-                    alt={`Logomarca da instituição ${nomeInstituicao}`}
-                    className="mx-auto h-10 w-auto max-w-[170px] object-contain"
-                  />
+                  <div className="space-y-1">
+                    <img
+                      src={logomarcaTopoUrl || resolverUrlArquivo(logomarcaInstituicao)}
+                      alt={`Logomarca da instituição ${nomeInstituicao}`}
+                      className="mx-auto h-12 w-auto max-w-[210px] object-contain"
+                    />
+                    {baseApresentacao ? (
+                      <p className="text-center text-[17px] font-black uppercase tracking-[0.22em] text-white lg:text-[20px]">
+                        Sistema G3
+                      </p>
+                    ) : null}
+                  </div>
                 ) : (
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/85">Sistema G3</p>
+                  <p className="text-[18px] font-black uppercase tracking-[0.22em] text-white lg:text-[21px]">
+                    Sistema G3
+                  </p>
                 )}
               </div>
             )}

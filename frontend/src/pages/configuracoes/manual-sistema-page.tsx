@@ -47,7 +47,7 @@ const secoesManual: ManualSecao[] = [
         comoUsar: [
           "Comece pelos cadastros para garantir base confiável de beneficiários, famílias e profissionais.",
           "Use Atendimentos diários para registrar movimentações sociais, benefícios, inscrições e acompanhamentos.",
-          "Use Configurações gerais para manter parâmetros, usuários, IA e o próprio manual atualizados.",
+          "Use Configurações gerais para manter parâmetros, usuários, backup, IA e o próprio manual atualizados.",
           "Na tela Visão geral, acompanhe também os cards de Termos vencidos, Documentos vencidos, Documentos a vencer, Motoristas autorizados, Itens no almoxarifado, Livros da biblioteca, Quantidade de veículos, Itens no patrimônio, Álbuns e fotos, Empréstimos para eventos e Catálogo e vagas de matrículas para leitura operacional rápida logo na entrada do sistema.",
           "O card Composição financeira da Visão geral exibe valores a receber, em caixa e em banco com base nos saldos e lançamentos financeiros normalizados pelo backend.",
           "O card Empréstimos para eventos mostra a quantidade de eventos ativos em andamento.",
@@ -68,6 +68,32 @@ const secoesManual: ManualSecao[] = [
           "Fotos, documentos e demais binários agora devem ser enviados para o storage persistente do sistema, com o banco guardando apenas metadados e caminhos lógicos para evitar perda em troca de máquina, backup ou atualização de ambiente.",
           "No cadastro da unidade assistencial, a Logomarca da unidade vazado preserva o arquivo original enviado pelo cliente, incluindo SVG e imagens com transparência, enquanto a Logomarca do relatório pode ser normalizada para manter compatibilidade de impressão.",
           "Na aba Salas de atendimento do Cadastro de unidade assistencial, informe o nome da sala e use Incluir sala para montar a lista abaixo; salas vinculadas a uso no sistema não podem ser removidas e devem ser inativadas quando não forem mais utilizadas."
+        ]
+      }
+    ]
+  },
+  {
+    id: "base-g3n-apresentacao",
+    titulo: "Base G3N de apresentação",
+    descricao: "Clone a base atual no mesmo banco, em um schema isolado, para demonstrações, treinamentos e testes sem expor a identidade da ADRA.",
+    icon: Settings2,
+    telas: [
+      {
+        nome: "Preparação da base de apresentação",
+        objetivo: "Criar um clone íntegro do tenant ADRA em um schema isolado com branding G3N, logo própria e usuário de acesso dedicado.",
+        comoUsar: [
+          "Execute `npm run g3n:base` dentro da pasta `backend` para clonar o schema `public` do PostgreSQL atual para `g3n_apresentacao`.",
+          "A rotina sempre reconstrói a base de apresentação a partir da ADRA original e não altera os dados do schema `public`.",
+          "O processo grava a logomarca G3N em storage, filtra os dados do tenant ADRA para o schema de apresentação e preserva a integridade dos vínculos.",
+          "Ao final, o script cria ou atualiza o usuário `g3n@apresentacao.com` e gera o arquivo `.env.g3n-apresentacao` com a `DATABASE_URL` do ambiente de apresentação.",
+          "A identidade visual da apresentação usa tons de azul e a logomarca institucional G3N no topo; as demais bases continuam usando a logomarca definida no cadastro da unidade assistencial.",
+          "Use a nova base quando quiser demonstrar o sistema sem depender da marca ADRA ou do banco de produção."
+        ],
+        atencoes: [
+          "Se o schema de apresentação já existir, recrie apenas quando necessário usando `G3N_PRESENTATION_REFRESH=true` junto do comando.",
+          "O clone depende de `pg_dump`, `pg_restore` e `psql` disponíveis no ambiente local.",
+          "A base da ADRA original continua preservada no schema `public`; a versão de apresentação vive apenas em `g3n_apresentacao`.",
+          "Para usar a base no backend, aponte `DATABASE_URL` para o mesmo banco `g3n` com `?schema=g3n_apresentacao` ou copie o conteúdo de `.env.g3n-apresentacao` para o ambiente ativo."
         ]
       }
     ]
@@ -1041,6 +1067,22 @@ const secoesManual: ManualSecao[] = [
         atencoes: [
           "A tela Configurações do sistema agora lê e grava personalização, carência, obrigatoriedade e alertas sempre dentro do tenant autenticado.",
           "Ao trocar de instituição na mesma estação, a página recarrega os parâmetros da organização logada e não deve reaproveitar dados de outro CNPJ."
+        ]
+      },
+      {
+        nome: "Backup e restauração",
+        objetivo: "Gerenciar cópias do banco de dados e das imagens geradas pelo sistema com geração, download e restauração guiada.",
+        comoUsar: [
+          "Use Gerar backup do banco para criar uma cópia completa do PostgreSQL antes de qualquer manutenção crítica.",
+          "Use Gerar backup das imagens para preservar a árvore de imagens do storage do sistema em arquivo compactado.",
+          "Selecione um item do histórico para baixar o arquivo gerado ou iniciar a restauração correspondente.",
+          "Na restauração, digite RESTAURAR para liberar a ação e garanta que o ambiente esteja pronto para a intervenção.",
+          "Os backups ficam organizados em /storage/backups/sistema, separados por banco e imagens, com metadados de auditoria."
+        ],
+        atencoes: [
+          "A restauração exige perfil de administrador e pode indisponibilizar temporariamente o banco ou as imagens enquanto o processo ocorre.",
+          "O sistema cria um backup preventivo do banco antes de restaurar e preserva a árvore atual das imagens para rollback em caso de falha.",
+          "Use a tela apenas quando houver janela operacional adequada e confirme com a equipe antes de substituir o estado atual."
         ]
       },
       {

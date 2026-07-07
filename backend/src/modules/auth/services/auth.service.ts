@@ -249,6 +249,7 @@ export class AuthService {
       instituicao_id: usuario.instituicaoId ?? undefined,
       instituicao_nome: usuario.instituicaoNome ?? undefined,
       instituicao_slug: usuario.instituicaoSlug ?? undefined,
+      instituicao_logo_url: usuario.instituicaoLogoUrl ?? undefined,
       cnpj: usuario.instituicaoCnpj ?? undefined,
       plano: usuario.instituicaoPlano ?? undefined,
       perfil: usuario.perfilAcesso ?? (usuario.isSuperadmin ? "MASTER" : undefined),

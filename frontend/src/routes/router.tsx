@@ -218,6 +218,10 @@ const ParametrosSistemaPage = carregarPagina(
   "/configuracoes/parametros-sistema",
   "ParametrosSistemaPage"
 );
+const BackupRestauracaoPage = carregarPagina(
+  "/configuracoes/backup-restauracao",
+  "BackupRestauracaoPage"
+);
 const DatasComemorativasPage = carregarPagina(
   "/configuracoes/datas-comemorativas",
   "DatasComemorativasPage"
@@ -552,6 +556,14 @@ export const router = createBrowserRouter([
         element: (
           <RequirePermission permissions={["ADMINISTRADOR"]}>
             {ParametrosSistemaPage}
+          </RequirePermission>
+        )
+      },
+      {
+        path: "/configuracoes/backup-restauracao",
+        element: (
+          <RequirePermission permissions={["ADMINISTRADOR"]}>
+            {BackupRestauracaoPage}
           </RequirePermission>
         )
       },

@@ -7,6 +7,7 @@ export type UsuarioAutenticado = {
   instituicao_id?: string;
   instituicao_nome?: string;
   instituicao_slug?: string;
+  instituicao_logo_url?: string;
   cnpj?: string;
   plano?: string;
   perfil?: string;

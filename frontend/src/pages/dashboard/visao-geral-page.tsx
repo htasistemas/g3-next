@@ -60,12 +60,12 @@ function encurtarRotuloGrafico(texto: string, limite = 32) {
   return `${texto.slice(0, limite - 1)}…`;
 }
 
-const coresCadastros = ["#0f766e", "#14b8a6", "#38bdf8", "#3b82f6", "#6366f1", "#f59e0b", "#ef4444"];
+const coresCadastros = ["#1e40af", "#2563eb", "#38bdf8", "#60a5fa", "#0ea5e9", "#818cf8", "#94a3b8"];
 const classeCardVerde =
-  "rounded-xl border border-emerald-200/80 bg-[linear-gradient(180deg,rgba(247,252,249,0.98)_0%,rgba(229,245,234,0.98)_100%)] shadow-[0_18px_40px_-26px_rgba(22,101,52,0.35)]";
-const classeCardVerdeInterativo = `${classeCardVerde} transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-[0_22px_48px_-22px_rgba(22,101,52,0.42)]`;
+  "rounded-xl border border-blue-200/80 bg-[linear-gradient(180deg,rgba(247,250,255,0.98)_0%,rgba(226,236,255,0.98)_100%)] shadow-[0_18px_40px_-26px_rgba(37,99,235,0.35)]";
+const classeCardVerdeInterativo = `${classeCardVerde} transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-[0_22px_48px_-22px_rgba(37,99,235,0.42)]`;
 const classeCardVerdeSuave =
-  "rounded-xl border border-emerald-100/90 bg-[rgba(255,255,255,0.72)] shadow-[0_14px_32px_-26px_rgba(22,101,52,0.28)] backdrop-blur-[2px]";
+  "rounded-xl border border-blue-100/90 bg-[rgba(255,255,255,0.78)] shadow-[0_14px_32px_-26px_rgba(37,99,235,0.24)] backdrop-blur-[2px]";
 
 function obterRotaCadastro(nome: string) {
   switch (nome) {
@@ -467,7 +467,7 @@ export function VisaoGeralPage() {
                           />
                         </PieChart>
                       </ResponsiveChart>
-                      <div className="pointer-events-none absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/92 shadow-[0_18px_34px_-24px_rgba(22,101,52,0.35)] ring-1 ring-emerald-100">
+                      <div className="pointer-events-none absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/92 shadow-[0_18px_34px_-24px_rgba(37,99,235,0.28)] ring-1 ring-blue-100">
                         <div className="flex h-full w-full flex-col items-center justify-center text-center">
                           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--g3-muted)]">
                             Tipos
@@ -490,7 +490,7 @@ export function VisaoGeralPage() {
                           <button
                             key={item.nome}
                             type="button"
-                            className={`${classeCardVerdeSuave} p-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-[0_22px_48px_-22px_rgba(22,101,52,0.32)]`}
+                            className={`${classeCardVerdeSuave} p-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-[0_22px_48px_-22px_rgba(37,99,235,0.28)]`}
                             onClick={() => navigate(obterRotaCadastro(item.nome))}
                           >
                             <div className="flex items-start justify-between gap-3">
@@ -508,7 +508,7 @@ export function VisaoGeralPage() {
                                   </p>
                                 </div>
                               </div>
-                              <div className="min-w-[72px] rounded-xl bg-white/90 px-3 py-2 text-right shadow-[0_16px_28px_-24px_rgba(22,101,52,0.35)]">
+                              <div className="min-w-[72px] rounded-xl bg-white/90 px-3 py-2 text-right shadow-[0_16px_28px_-24px_rgba(37,99,235,0.28)]">
                                 <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
                                   Total
                                 </p>
@@ -533,7 +533,7 @@ export function VisaoGeralPage() {
                       <button
                         key={item.nome}
                         type="button"
-                        className={`${classeCardVerdeSuave} min-h-[110px] px-4 py-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-[0_22px_48px_-22px_rgba(22,101,52,0.32)]`}
+                        className={`${classeCardVerdeSuave} min-h-[110px] px-4 py-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-[0_22px_48px_-22px_rgba(37,99,235,0.28)]`}
                         onClick={() => navigate("/setor-financeiro/contabilidade")}
                       >
                         <div className="flex items-start justify-between gap-4">
@@ -561,7 +561,7 @@ export function VisaoGeralPage() {
                   </div>
                   <button
                     type="button"
-                    className={`${classeCardVerdeSuave} mt-3 w-full p-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-[0_22px_48px_-22px_rgba(22,101,52,0.32)]`}
+                    className={`${classeCardVerdeSuave} mt-3 w-full p-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-[0_22px_48px_-22px_rgba(37,99,235,0.28)]`}
                     onClick={() => navigate("/setor-financeiro/contabilidade")}
                   >
                     <div className="flex items-center justify-between gap-2">
@@ -573,7 +573,7 @@ export function VisaoGeralPage() {
                           Distribuição atual dos recursos em caixa e banco.
                         </p>
                       </div>
-                      <div className="rounded-lg border border-emerald-100/90 bg-white/88 px-3 py-2 text-right shadow-[0_16px_28px_-24px_rgba(22,101,52,0.35)]">
+                      <div className="rounded-lg border border-blue-100/90 bg-white/88 px-3 py-2 text-right shadow-[0_16px_28px_-24px_rgba(37,99,235,0.28)]">
                         <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
                           Total em contas
                         </p>
@@ -632,7 +632,7 @@ export function VisaoGeralPage() {
                         </ResponsiveChart>
                       </div>
                     ) : (
-                      <div className="mt-3 rounded-lg border border-dashed border-emerald-200 bg-white/80 px-3 py-4 text-sm text-[var(--g3-muted)]">
+                      <div className="mt-3 rounded-lg border border-dashed border-blue-200 bg-white/80 px-3 py-4 text-sm text-[var(--g3-muted)]">
                         Nenhuma conta com saldo disponível foi encontrada para montar o gráfico financeiro.
                       </div>
                     )}

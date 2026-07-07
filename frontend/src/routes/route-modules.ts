@@ -162,6 +162,10 @@ const routeModules: RouteModuleDefinition[] = [
     loader: () => import("@/pages/configuracoes/parametros-sistema-page")
   },
   {
+    path: "/configuracoes/backup-restauracao",
+    loader: () => import("@/pages/configuracoes/backup-restauracao-page")
+  },
+  {
     path: "/configuracoes/atualizar-sistema",
     loader: () => import("@/pages/configuracoes/atualizar-sistema-page")
   },

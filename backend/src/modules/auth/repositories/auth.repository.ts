@@ -30,6 +30,7 @@ type AuthUsuarioRow = {
   instituicao_cnpj: string | null;
   instituicao_plano: string | null;
   instituicao_status: string | null;
+  instituicao_logo_url: string | null;
   is_superadmin: boolean | null;
   perfil_acesso: string | null;
   permissoes: string[] | null;
@@ -83,6 +84,7 @@ function mapAuthUsuarioRow(row: AuthUsuarioRow | null) {
     instituicaoCnpj: row.instituicao_cnpj,
     instituicaoPlano: row.instituicao_plano,
     instituicaoStatus: row.instituicao_status,
+    instituicaoLogoUrl: row.instituicao_logo_url,
     isSuperadmin: Boolean(row.is_superadmin) || emailAdminPadrao,
     perfilAcesso: row.perfil_acesso,
     permissoes: permissoesNormalizadas.map((item) => ({
@@ -144,6 +146,7 @@ export class AuthRepository {
         i.cnpj AS instituicao_cnpj,
         i.plano AS instituicao_plano,
         i.status AS instituicao_status,
+        i.logo_url AS instituicao_logo_url,
         u.is_superadmin,
         u.perfil_acesso,
         COALESCE(
@@ -184,6 +187,7 @@ export class AuthRepository {
         i.cnpj,
         i.plano,
         i.status,
+        i.logo_url,
         u.is_superadmin,
         u.perfil_acesso
       ORDER BY u.is_superadmin DESC, u.id ASC
@@ -219,6 +223,7 @@ export class AuthRepository {
         i.cnpj AS instituicao_cnpj,
         i.plano AS instituicao_plano,
         i.status AS instituicao_status,
+        i.logo_url AS instituicao_logo_url,
         u.is_superadmin,
         u.perfil_acesso,
         COALESCE(
@@ -250,6 +255,7 @@ export class AuthRepository {
         i.cnpj,
         i.plano,
         i.status,
+        i.logo_url,
         u.is_superadmin,
         u.perfil_acesso
       ORDER BY u.is_superadmin DESC, u.id ASC
@@ -282,6 +288,7 @@ export class AuthRepository {
         i.cnpj AS instituicao_cnpj,
         i.plano AS instituicao_plano,
         i.status AS instituicao_status,
+        i.logo_url AS instituicao_logo_url,
         u.is_superadmin,
         u.perfil_acesso,
         COALESCE(
@@ -313,6 +320,7 @@ export class AuthRepository {
         i.cnpj,
         i.plano,
         i.status,
+        i.logo_url,
         u.is_superadmin,
         u.perfil_acesso
       ORDER BY u.is_superadmin DESC, u.id ASC

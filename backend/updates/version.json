@@ -1,9 +1,9 @@
 {
-  "latestVersion": "1.00.583",
-  "releaseDate": "2026-07-03",
-  "description": "O registro de ponto passou a calcular horas extras, banco de horas e atrasos a partir do horario previsto e do horario real, sem exigir confirmacao adicional na marcacao.",
+  "latestVersion": "1.00.589",
+  "releaseDate": "2026-07-07",
+  "description": "A base de apresentação G3N passou a usar identidade visual azul com logomarca G3N no topo e tema forçado no tenant de apresentação.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.583",
+  "minCompatibleVersion": "1.00.589",
   "releaseType": "stable"
 }

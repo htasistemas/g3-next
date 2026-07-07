@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.584",
-  "releaseDate": "2026-07-06",
-  "description": "O card Composição financeira da Visão geral passou a ler saldos e lançamentos financeiros normalizados, corrigindo valores zerados em conta.",
+  "latestVersion": "1.00.589",
+  "releaseDate": "2026-07-07",
+  "description": "A base de apresentação G3N passou a usar identidade visual azul com logomarca G3N no topo e tema forçado no tenant de apresentação.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.584",
+  "minCompatibleVersion": "1.00.589",
   "releaseType": "stable",
   "downloadUrl": null
 }

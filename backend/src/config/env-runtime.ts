@@ -20,6 +20,11 @@ export function loadBackendEnvFiles() {
       config({ path });
     }
   }
+
+  const presentationEnv = resolve(backendRoot, ".env.g3n-apresentacao");
+  if (existsSync(presentationEnv)) {
+    config({ path: presentationEnv, override: true });
+  }
 }
 
 function buildDatabaseUrlFromLegacyEnv(rawEnv: NodeJS.ProcessEnv) {

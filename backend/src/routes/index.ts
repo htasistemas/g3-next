@@ -47,6 +47,7 @@ import { mensagensPersonalizadasRoutes } from "../modules/mensagens-personalizad
 import { arquivosRoutes } from "../modules/arquivos/routes/arquivos.routes.js";
 import { chamadoTecnicoRoutes } from "../modules/chamados-tecnicos/routes/chamado-tecnico.routes.js";
 import { atualizacaoSistemaRoutes } from "../modules/atualizacao-sistema/routes/atualizacao-sistema.routes.js";
+import { backupSistemaRoutes } from "../modules/backup-sistema/routes/backup-sistema.routes.js";
 import { datasComemorativasRoutes } from "../modules/datas-comemorativas/routes/datas-comemorativas.routes.js";
 import { captacaoRecursosRoutes } from "../modules/captacao-recursos/routes/captacao-recursos.routes.js";
 import { aiRoutes } from "../modules/ai/routes/ai.routes.js";
@@ -128,6 +129,7 @@ appRoutes.use("/api/datas-comemorativas", datasComemorativasRoutes);
 appRoutes.use("/api/captacao-recursos", captacaoRecursosRoutes);
 appRoutes.use("/api/portais-externos", portaisExternosRoutes);
 appRoutes.use("/api/configuracoes/parametros", parametrosSistemaRoutes);
+appRoutes.use("/api/configuracoes/backup", backupSistemaRoutes);
 appRoutes.use("/api/configuracoes/licenca-uso", licencaUsoRoutes);
 appRoutes.use("/api/vendas", vendaRoutes);
 appRoutes.use("/api/carteira-evento", carteiraEventoRoutes);

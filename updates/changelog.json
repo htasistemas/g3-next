@@ -1,6 +1,67 @@
 {
   "entries":  [
                     {
+                        "version":  "1.00.589",
+                        "releaseDate":  "2026-07-07",
+                        "title":  "Tema e logo da apresentação",
+                        "description":  "A base de apresentação passou a forçar tema azul e a exibir a logomarca institucional G3N no topo apenas nesse tenant.",
+                        "changes":  [
+                                        "O tenant de apresentação passou a carregar a identidade visual azul a partir da personalização própria do schema g3n_apresentacao.",
+                                        "O topo passou a usar a logo institucional G3N da apresentação, enquanto as demais bases continuam lendo a logomarca da unidade assistencial.",
+                                        "A regra foi aplicada apenas ao tenant de apresentação, sem alterar o comportamento das outras instituições."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.588",
+                        "releaseDate":  "2026-07-07",
+                        "title":  "Apresentação em azul",
+                        "description":  "A base G3N de apresentação passou a usar identidade visual azul com logomarca G3N em destaque, sem alterar as demais bases.",
+                        "changes":  [
+                                        "O script de preparação da base de apresentação agora gera uma logomarca G3N em letras grandes e negrito com paleta azul.",
+                                        "A cor tema da instituição de apresentação passou a usar azul, enquanto as outras bases continuam herdando a logomarca configurada na unidade assistencial.",
+                                        "O ambiente de apresentação permanece isolado no schema g3n_apresentacao do mesmo banco e segue reconstruível a partir do schema public."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.587",
+                        "releaseDate":  "2026-07-06",
+                        "title":  "Tenant G3N no mesmo banco",
+                        "description":  "A base de apresentação passou a ser criada dentro do mesmo PostgreSQL em um schema isolado, com cópia do tenant ADRA, sem alterar a base original, e acesso próprio.",
+                        "changes":  [
+                                        "O comando de preparação agora clona o schema public para g3n_apresentacao e filtra os dados do tenant ADRA para uma base exclusiva de demonstração.",
+                                        "A instituição, a unidade principal, a logomarca e o usuário de acesso passam a ser ajustados dentro do schema de apresentação sem depender de um banco separado.",
+                                        "O schema public da ADRA permanece intacto e serve como origem sempre que a base de apresentação for recriada.",
+                                        "O arquivo .env.g3n-apresentacao passou a apontar para a mesma DATABASE_URL com schema dedicado, facilitando o uso da base de demonstração."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.586",
+                        "releaseDate":  "2026-07-06",
+                        "title":  "Base G3N de apresentação",
+                        "description":  "Foi criado o processo para clonar a base atual no mesmo banco, em um schema isolado, com identidade G3N, logo própria e usuário de acesso dedicado.",
+                        "changes":  [
+                                        "O backend ganhou um script para clonar o schema public para g3n_apresentacao, preservando os dados e a integridade das tabelas.",
+                                        "A instituição principal e a unidade principal do clone passam a exibir a marca G3N, com logomarca gravada em storage e caminho lógico atualizado no schema de apresentação.",
+                                        "O processo também cria o usuário g3n@apresentacao.com e grava o arquivo .env.g3n-apresentacao com a DATABASE_URL do ambiente de demonstração."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.585",
+                        "releaseDate":  "2026-07-06",
+                        "title":  "Backup e restauração unificados",
+                        "description":  "A nova tela de Configurações gerais passou a centralizar backup e restauração do banco de dados e das imagens do sistema.",
+                        "changes":  [
+                                        "Foi criada a tela Backup e restauração com ações para gerar, listar, baixar e restaurar backups do banco e das imagens.",
+                                        "O backend passou a gerar backups reais com pg_dump e arquivos compactados das imagens, além de restaurar com backup preventivo.",
+                                        "O manual do sistema e a numeração oficial da versão foram atualizados para registrar a nova área administrativa."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.584",
                         "releaseDate":  "2026-07-06",
                         "title":  "Composição financeira com valores normalizados",
