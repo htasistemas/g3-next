@@ -542,7 +542,13 @@ export function AgendamentosPage() {
       return cards;
     }
 
-    const existeNaLista = cards.some((item) => item.id === agendaGeradaLocal.id);
+    const existeNaLista = cards.some(
+      (item) =>
+        item.id === agendaGeradaLocal.id ||
+        (item.itemOrigemId === agendaGeradaLocal.itemOrigemId &&
+          item.itemTipo === agendaGeradaLocal.itemTipo &&
+          (item.data ?? "").slice(0, 10) === (agendaGeradaLocal.data ?? "").slice(0, 10))
+    );
     if (existeNaLista) {
       return cards;
     }
@@ -662,9 +668,45 @@ export function AgendamentosPage() {
       });
       await agendamentosQuery.refetch();
       const dataExibicao = String(salvo?.data ?? dataAgendamento).slice(0, 10);
-      if (salvo) {
-        setAgendaGeradaLocal(salvo);
-      }
+      const participantesPreview = (beneficiariosQuery.data ?? [])
+        .filter((item) => beneficiariosSelecionados.includes(item.matriculaId))
+        .map((item) => ({
+          matriculaId: item.matriculaId,
+          beneficiarioId: item.beneficiarioId,
+          beneficiarioNome: item.nomeCompleto,
+          dataNascimento: item.dataNascimento,
+          telefone: item.telefone,
+          comparecimento: "Pendente" as const
+        }));
+      setAgendaGeradaLocal(
+        salvo ?? {
+          id: -Date.now(),
+          beneficiarioId: participantesPreview[0]?.beneficiarioId,
+          beneficiarioNome: itemSelecionado.nome,
+          unidade: itemSelecionado.local ?? "Local a definir",
+          setor: tipo === "curso" ? "Curso" : tipo === "oficina" ? "Oficina" : "Atendimento",
+          tipoAtendimento: itemSelecionado.nome,
+          profissionalNome: itemSelecionado.profissionalNome,
+          data: dataExibicao,
+          horaInicial: itemSelecionado.horario ?? "08:00",
+          modalidade: "Coletivo",
+          prioridade: "Normal",
+          status: "Agendado",
+          coletivo: true,
+          tituloColetivo: itemSelecionado.nome,
+          capacidadeMaxima: participantesPreview.length,
+          participantes: participantesPreview,
+          itemTipo: tipo,
+          itemOrigemId: itemSelecionado.id,
+          itemNome: itemSelecionado.nome,
+          itemDiasSemana: itemSelecionado.diasSemana,
+          itemLocal: itemSelecionado.local,
+          diaSemana: new Intl.DateTimeFormat("pt-BR", { weekday: "long" }).format(
+            new Date(`${dataExibicao}T12:00:00`)
+          ),
+          observacaoCurta: `${participantesPreview.length} participante(s) vinculado(s) pela inscricao.`
+        }
+      );
       setSelecionadoId(salvo?.id ?? null);
       setUltimaAgendaDestacadaId(salvo?.id ?? null);
       definirDataVisualizacao(dataExibicao);
