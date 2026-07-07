@@ -454,6 +454,7 @@ export function AgendamentosPage() {
   const [geracaoEmAndamento, setGeracaoEmAndamento] = useState(false);
   const [geracaoEtapa, setGeracaoEtapa] = useState(0);
   const [ultimaAgendaDestacadaId, setUltimaAgendaDestacadaId] = useState<number | null>(null);
+  const [agendaGeradaLocal, setAgendaGeradaLocal] = useState<Agendamento | null>(null);
   const [confirmacaoParticipanteEmAndamento, setConfirmacaoParticipanteEmAndamento] = useState<{
     agendamentoId: number;
     index: number;
@@ -536,8 +537,26 @@ export function AgendamentosPage() {
     [agendamentosQuery.data]
   );
 
-  const cardSelecionado = cards.find((item) => item.id === selecionadoId) ?? null;
-  const cardsDoDia = useMemo(() => cards.filter((item) => (item.data ?? "").slice(0, 10) === dataVisualizacao), [cards, dataVisualizacao]);
+  const cardsVisiveis = useMemo(() => {
+    if (!agendaGeradaLocal) {
+      return cards;
+    }
+
+    const existeNaLista = cards.some((item) => item.id === agendaGeradaLocal.id);
+    if (existeNaLista) {
+      return cards;
+    }
+
+    return [...cards, agendaGeradaLocal].sort((a, b) =>
+      `${a.data ?? ""}${a.horaInicial ?? ""}`.localeCompare(`${b.data ?? ""}${b.horaInicial ?? ""}`)
+    );
+  }, [agendaGeradaLocal, cards]);
+
+  const cardSelecionado = cardsVisiveis.find((item) => item.id === selecionadoId) ?? null;
+  const cardsDoDia = useMemo(
+    () => cardsVisiveis.filter((item) => (item.data ?? "").slice(0, 10) === dataVisualizacao),
+    [cardsVisiveis, dataVisualizacao]
+  );
 
   const beneficiariosFiltrados = useMemo(() => {
     const termo = buscaBeneficiario.trim().toLowerCase();
@@ -643,6 +662,9 @@ export function AgendamentosPage() {
       });
       await agendamentosQuery.refetch();
       const dataExibicao = String(salvo?.data ?? dataAgendamento).slice(0, 10);
+      if (salvo) {
+        setAgendaGeradaLocal(salvo);
+      }
       setSelecionadoId(salvo?.id ?? null);
       setUltimaAgendaDestacadaId(salvo?.id ?? null);
       definirDataVisualizacao(dataExibicao);

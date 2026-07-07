@@ -1060,7 +1060,7 @@ export class AgendamentosRepository {
         c.status
       FROM cursos_atendimentos c
       LEFT JOIN salas_unidade s ON s.id = c.sala_id
-      WHERE LOWER(COALESCE(c.tipo, '')) = ${tipo}
+      WHERE LOWER(TRIM(COALESCE(c.tipo, ''))) = ${tipo}
         AND c.tenant_id::text = ${tenantId}
         AND COALESCE(c.status, 'Ativo') <> 'Inativo'
         ${termo ? Prisma.sql`AND (c.nome ILIKE ${`%${termo}%`} OR COALESCE(c.profissional, '') ILIKE ${`%${termo}%`})` : Prisma.empty}

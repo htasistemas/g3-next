@@ -7,7 +7,11 @@ const service = new AgendamentosService();
 
 export class AgendamentosController {
   async listar(request: AuthenticatedRequest, response: Response) {
-    const itens = await service.listar(request.query, request.authUser?.tenant_id);
+    const itens = await service.listar(
+      request.query,
+      request.authUser?.tenant_id,
+      request.authUser?.instituicao_slug
+    );
     return response.json({ agendamentos: itens.map(mapAgendamentoRow) });
   }
 
@@ -15,7 +19,8 @@ export class AgendamentosController {
     const itens = await service.listarItens(
       request.query.tipo,
       request.query.busca,
-      request.authUser?.tenant_id
+      request.authUser?.tenant_id,
+      request.authUser?.instituicao_slug
     );
     return response.json({
       itens: itens.map((item) => ({
@@ -31,7 +36,11 @@ export class AgendamentosController {
   }
 
   async listarBeneficiarios(request: AuthenticatedRequest, response: Response) {
-    const itens = await service.listarBeneficiarios(request.query.itemId, request.authUser?.tenant_id);
+    const itens = await service.listarBeneficiarios(
+      request.query.itemId,
+      request.authUser?.tenant_id,
+      request.authUser?.instituicao_slug
+    );
     return response.json({
       beneficiarios: itens.map((item) => ({
         matriculaId: Number(item.matricula_id),
@@ -48,12 +57,21 @@ export class AgendamentosController {
   }
 
   async obter(request: AuthenticatedRequest, response: Response) {
-    const item = await service.obter(request.params.id, request.authUser?.tenant_id);
+    const item = await service.obter(
+      request.params.id,
+      request.authUser?.tenant_id,
+      request.authUser?.instituicao_slug
+    );
     return response.json({ agendamento: item ? mapAgendamentoRow(item) : null });
   }
 
   async criar(request: AuthenticatedRequest, response: Response) {
-    const item = await service.criar(request.body, request.authUser, request.authUser?.tenant_id);
+    const item = await service.criar(
+      request.body,
+      request.authUser,
+      request.authUser?.tenant_id,
+      request.authUser?.instituicao_slug
+    );
     return response.status(201).json({ agendamento: item ? mapAgendamentoRow(item) : null });
   }
 
@@ -62,7 +80,8 @@ export class AgendamentosController {
       request.params.id,
       request.body,
       request.authUser,
-      request.authUser?.tenant_id
+      request.authUser?.tenant_id,
+      request.authUser?.instituicao_slug
     );
     return response.json({ agendamento: item ? mapAgendamentoRow(item) : null });
   }
@@ -72,13 +91,19 @@ export class AgendamentosController {
       request.params.id,
       request.body,
       request.authUser,
-      request.authUser?.tenant_id
+      request.authUser?.tenant_id,
+      request.authUser?.instituicao_slug
     );
     return response.json({ agendamento: item ? mapAgendamentoRow(item) : null });
   }
 
   async excluir(request: AuthenticatedRequest, response: Response) {
-    const item = await service.excluir(request.params.id, request.authUser, request.authUser?.tenant_id);
+    const item = await service.excluir(
+      request.params.id,
+      request.authUser,
+      request.authUser?.tenant_id,
+      request.authUser?.instituicao_slug
+    );
     return response.json({ agendamento: item ? mapAgendamentoRow(item) : null });
   }
 
@@ -87,7 +112,8 @@ export class AgendamentosController {
       request.params.id,
       request.body,
       request.authUser,
-      request.authUser?.tenant_id
+      request.authUser?.tenant_id,
+      request.authUser?.instituicao_slug
     );
     return response.json({ agendamento: item ? mapAgendamentoRow(item) : null });
   }
@@ -97,7 +123,8 @@ export class AgendamentosController {
       request.params.id,
       request.body,
       request.authUser,
-      request.authUser?.tenant_id
+      request.authUser?.tenant_id,
+      request.authUser?.instituicao_slug
     );
     return response.json({ agendamento: item ? mapAgendamentoRow(item) : null });
   }
@@ -107,7 +134,8 @@ export class AgendamentosController {
       request.params.id,
       request.body,
       request.authUser,
-      request.authUser?.tenant_id
+      request.authUser?.tenant_id,
+      request.authUser?.instituicao_slug
     );
     return response.json({ agendamento: item ? mapAgendamentoRow(item) : null });
   }
@@ -117,18 +145,26 @@ export class AgendamentosController {
       request.params.id,
       request.body,
       request.authUser,
-      request.authUser?.tenant_id
+      request.authUser?.tenant_id,
+      request.authUser?.instituicao_slug
     );
     return response.json({ agendamento: item ? mapAgendamentoRow(item) : null });
   }
 
   async listarListaEspera(_request: AuthenticatedRequest, response: Response) {
-    const itens = await service.listarListaEspera(_request.authUser?.tenant_id);
+    const itens = await service.listarListaEspera(
+      _request.authUser?.tenant_id,
+      _request.authUser?.instituicao_slug
+    );
     return response.json({ itens: itens.map(mapListaEsperaRow) });
   }
 
   async criarListaEspera(request: AuthenticatedRequest, response: Response) {
-    const item = await service.criarListaEspera(request.body, request.authUser?.tenant_id);
+    const item = await service.criarListaEspera(
+      request.body,
+      request.authUser?.tenant_id,
+      request.authUser?.instituicao_slug
+    );
     return response.status(201).json({ item: item ? mapListaEsperaRow(item) : null });
   }
 
@@ -137,18 +173,26 @@ export class AgendamentosController {
       request.params.id,
       request.body,
       request.authUser,
-      request.authUser?.tenant_id
+      request.authUser?.tenant_id,
+      request.authUser?.instituicao_slug
     );
     return response.json({ agendamento: item ? mapAgendamentoRow(item) : null });
   }
 
   async indicadores(request: AuthenticatedRequest, response: Response) {
-    const indicadores = await service.indicadores(request.query, request.authUser?.tenant_id);
+    const indicadores = await service.indicadores(
+      request.query,
+      request.authUser?.tenant_id,
+      request.authUser?.instituicao_slug
+    );
     return response.json({ indicadores });
   }
 
   async catalogos(_request: AuthenticatedRequest, response: Response) {
-    const catalogos = await service.catalogos(_request.authUser?.tenant_id);
+    const catalogos = await service.catalogos(
+      _request.authUser?.tenant_id,
+      _request.authUser?.instituicao_slug
+    );
     return response.json(catalogos);
   }
 
@@ -157,7 +201,8 @@ export class AgendamentosController {
       request.params.id,
       request.body,
       request.authUser,
-      request.authUser?.tenant_id
+      request.authUser?.tenant_id,
+      request.authUser?.instituicao_slug
     );
     return response.json(payload);
   }

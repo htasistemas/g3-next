@@ -22,7 +22,11 @@ export function loadBackendEnvFiles() {
   }
 
   const presentationEnv = resolve(backendRoot, ".env.g3n-apresentacao");
-  if (existsSync(presentationEnv)) {
+  const presentationAtiva =
+    process.env.G3N_PRESENTATION_ATIVA?.trim().toLowerCase() === "true" ||
+    process.env.G3N_PRESENTATION_ATIVA?.trim() === "1";
+
+  if (presentationAtiva && existsSync(presentationEnv)) {
     config({ path: presentationEnv, override: true });
   }
 }
