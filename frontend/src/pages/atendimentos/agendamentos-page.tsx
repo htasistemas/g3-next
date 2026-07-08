@@ -34,7 +34,6 @@ import {
   GenerateCardButton,
   ItemResumoCard,
   ItemSelector,
-  SalaSelector,
   TipoSelector
 } from "@/modules/agendamentos-operacional/components";
 import {
@@ -444,7 +443,6 @@ export function AgendamentosPage() {
   const [preferenciaCarregada, setPreferenciaCarregada] = useState(false);
   const [buscaBeneficiario, setBuscaBeneficiario] = useState("");
   const [beneficiariosSelecionados, setBeneficiariosSelecionados] = useState<number[]>([]);
-  const [salasSelecionadas, setSalasSelecionadas] = useState<number[]>([]);
   const [selecionadoId, setSelecionadoId] = useState<number | null>(null);
   const [popup, setPopup] = useState<PopupMensagemState | null>(null);
   const [envioEmAndamento, setEnvioEmAndamento] = useState<EnvioAgendamentoEmAndamento | null>(null);
@@ -606,19 +604,14 @@ export function AgendamentosPage() {
     return mapa;
   }, [ocupacoesMapa]);
 
-  const salasSelecionadasDetalhes = useMemo(
-    () => salasDisponiveis.filter((sala) => salasSelecionadas.includes(sala.id)),
-    [salasDisponiveis, salasSelecionadas]
-  );
-
-  const salasSelecionadasTexto = salasSelecionadasDetalhes.map((sala) => sala.nome).join(", ");
+  const salaAutomaticaTexto = itemSelecionado?.local || itemSelecionado?.nome || "Sala definida automaticamente";
 
   const resumoOperacional = [
     { label: "Tipo", value: tipo ? tipo.charAt(0).toUpperCase() + tipo.slice(1) : "Não selecionado" },
     { label: "Item", value: itemSelecionado?.nome || "Não selecionado" },
     { label: "Data", value: dataAgendamento ? new Date(`${dataAgendamento}T12:00:00`).toLocaleDateString("pt-BR") : "Não selecionada" },
     { label: "Beneficiários", value: `${beneficiariosSelecionados.length} selecionado(s)` },
-    { label: "Salas", value: salasSelecionadasTexto || "Nenhuma selecionada" }
+    { label: "Sala", value: salaAutomaticaTexto }
   ];
 
   const dashboardResumo = useMemo<DashboardCard[]>(() => {
@@ -662,7 +655,6 @@ export function AgendamentosPage() {
         setItemSelecionado(null);
         setBuscaBeneficiario("");
         setBeneficiariosSelecionados([]);
-        setSalasSelecionadas([]);
         setDataAgendamento(hoje);
         definirDataVisualizacao(hoje);
         setAbaAtiva("agenda");
@@ -709,7 +701,6 @@ export function AgendamentosPage() {
         itemId: itemSelecionado.id,
         data: dataAgendamento,
         matriculasIds: beneficiariosSelecionados,
-        salasIds: salasSelecionadas
       });
       setSelecionadoId(salvo?.id ?? null);
       setUltimaAgendaDestacadaId(salvo?.id ?? null);
@@ -960,24 +951,6 @@ export function AgendamentosPage() {
     setItemSelecionado(itemResumo.id ? itemResumo : null);
     setDataAgendamento(item.data ?? hoje);
     definirDataVisualizacao(item.data ?? hoje);
-    const salasDoItem = (item.salas ?? [])
-      .map((sala) => Number(sala.sala_id))
-      .filter((valor) => Number.isInteger(valor) && Number(valor) > 0);
-    if (salasDoItem.length) {
-      setSalasSelecionadas(salasDoItem);
-    } else if (item.sala) {
-      const nomesSalas = item.sala
-        .split(",")
-        .map((nome) => nome.trim().toLowerCase())
-        .filter(Boolean);
-      setSalasSelecionadas(
-        salasDisponiveis
-          .filter((sala) => nomesSalas.includes(sala.nome.trim().toLowerCase()))
-          .map((sala) => sala.id)
-      );
-    } else {
-      setSalasSelecionadas([]);
-    }
     setBeneficiariosSelecionados(
       (item.participantes ?? [])
         .map((participante) => participante.matriculaId ?? participante.beneficiarioId)
@@ -1213,7 +1186,6 @@ export function AgendamentosPage() {
                       onSelect={(item) => {
                         setItemSelecionado(item);
                         setBeneficiariosSelecionados([]);
-                        setSalasSelecionadas([]);
                       }}
                       carregando={itensQuery.isLoading}
                     />
@@ -1236,17 +1208,13 @@ export function AgendamentosPage() {
                     carregando={beneficiariosQuery.isLoading}
                   />
                   <DataSelector value={dataAgendamento} onChange={setDataAgendamento} />
-                  <SalaSelector
-                    salas={salasDisponiveis}
-                    selecionadas={salasSelecionadas}
-                    onToggle={(salaId) =>
-                      setSalasSelecionadas((atual) =>
-                        atual.includes(salaId) ? atual.filter((item) => item !== salaId) : [...atual, salaId]
-                      )
-                    }
-                    onLimpar={() => setSalasSelecionadas([])}
-                    carregando={salasQuery.isLoading}
-                  />
+                  <div className="rounded-2xl border border-[var(--g3-border)] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbf8_100%)] p-4 shadow-sm">
+                    <p className="text-sm font-semibold text-[var(--g3-foreground)]">Sala definida automaticamente</p>
+                    <p className="mt-1 text-xs text-[var(--g3-muted)]">
+                      O sistema usa a sala vinculada ao item selecionado. Se o cadastro do item tiver sala configurada, ela será bloqueada automaticamente.
+                    </p>
+                    <p className="mt-3 text-sm text-[var(--g3-foreground)]">{salaAutomaticaTexto}</p>
+                  </div>
                   <GenerateCardButton
                     disabled={!tipo || !itemSelecionado?.id || !beneficiariosSelecionados.length || !dataAgendamento}
                     loading={salvarMutation.isPending || geracaoEmAndamento}

@@ -1704,8 +1704,8 @@ export class AgendamentosRepository {
     }
 
     if (input.itemOrigemId) {
-      const itemRows = await db.$queryRaw<Array<{ sala_id: bigint | null }>>(Prisma.sql`
-        SELECT c.sala_id
+      const itemRows = await db.$queryRaw<Array<{ sala_id: bigint | null; sala_nome: string | null }>>(Prisma.sql`
+        SELECT c.sala_id, c.sala_nome
         FROM cursos_atendimentos c
         INNER JOIN unidade_assistencial ua ON ua.id = c.unidade_id
         WHERE c.id = ${BigInt(input.itemOrigemId)}
@@ -1722,6 +1722,23 @@ export class AgendamentosRepository {
           INNER JOIN unidade_assistencial ua ON ua.id = s.unidade_id
           WHERE s.id = ${salaId}
             AND ua.tenant_id::text = ${tenantId}
+          LIMIT 1
+        `);
+        if (salaRows.length) {
+          return salaRows;
+        }
+      }
+
+      const salaNome = trimOrUndefined(itemRows[0]?.sala_nome);
+      if (salaNome) {
+        const salaRows = await db.$queryRaw<
+          Array<{ sala_id: bigint; sala_nome: string; unidade_id: bigint }>
+        >(Prisma.sql`
+          SELECT s.id AS sala_id, s.nome AS sala_nome, s.unidade_id
+          FROM salas_unidade s
+          INNER JOIN unidade_assistencial ua ON ua.id = s.unidade_id
+          WHERE ua.tenant_id::text = ${tenantId}
+            AND LOWER(s.nome) = LOWER(${salaNome})
           LIMIT 1
         `);
         if (salaRows.length) {
