@@ -59,6 +59,7 @@ export const agendamentoInputSchema = z.object({
   horaFinal: optionalTime.nullable().optional(),
   duracaoMinutos: z.coerce.number().int().positive().max(1440).optional().nullable(),
   sala: optionalTrimmedString.nullable().optional(),
+  salasIds: z.array(z.coerce.number().int().positive()).optional().nullable(),
   recurso: optionalTrimmedString.nullable().optional(),
   modalidade: modalidadeSchema,
   origemAtendimento: optionalTrimmedString.nullable().optional(),
@@ -123,7 +124,8 @@ export const agendamentoOperacionalInputSchema = z.object({
     .optional(),
   matriculasIds: z
     .array(z.coerce.number().int().positive())
-    .optional()
+    .optional(),
+  salasIds: z.array(z.coerce.number().int().positive()).optional()
 }).superRefine((input, ctx) => {
   const totalBeneficiarios = input.beneficiariosIds?.length ?? 0;
   const totalMatriculas = input.matriculasIds?.length ?? 0;
@@ -187,6 +189,7 @@ export const agendamentoRemarcacaoInputSchema = z.object({
   horaFinal: optionalTime.nullable().optional(),
   profissionalNome: optionalTrimmedString.nullable().optional(),
   sala: optionalTrimmedString.nullable().optional(),
+  salasIds: z.array(z.coerce.number().int().positive()).optional().nullable(),
   recurso: optionalTrimmedString.nullable().optional(),
   permitirConflito: z.coerce.boolean().optional(),
   motivo: optionalTrimmedString.nullable().optional()

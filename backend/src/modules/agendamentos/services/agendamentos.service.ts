@@ -119,6 +119,23 @@ export class AgendamentosService {
     return this.repository.catalogos(this.resolverTenantId(tenantId, instituicaoSlug));
   }
 
+  async listarSalas(rawFilters: unknown, tenantId?: string, instituicaoSlug?: string) {
+    const filtros = rawFilters as { unidadeId?: string; sala?: string; semanaInicio?: string } | undefined;
+    return this.repository.listarSalasAgendamento(this.resolverTenantId(tenantId, instituicaoSlug), {
+      unidadeId: filtros?.unidadeId,
+      sala: filtros?.sala
+    });
+  }
+
+  async mapaSalas(rawFilters: unknown, tenantId?: string, instituicaoSlug?: string) {
+    const filtros = rawFilters as { semanaInicio?: string; unidadeId?: string; salaId?: string } | undefined;
+    return this.repository.mapaSalas(this.resolverTenantId(tenantId, instituicaoSlug), {
+      semanaInicio: filtros?.semanaInicio,
+      unidadeId: filtros?.unidadeId,
+      salaId: filtros?.salaId
+    });
+  }
+
   async listarItens(rawTipo: unknown, rawBusca: unknown, tenantId?: string, instituicaoSlug?: string) {
     const tipo = String(rawTipo ?? "").trim().toLowerCase();
     if (!["curso", "atendimento", "oficina"].includes(tipo)) {

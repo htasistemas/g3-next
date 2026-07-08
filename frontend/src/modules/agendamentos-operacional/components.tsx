@@ -371,6 +371,81 @@ export function AgendaCardList(props: {
   );
 }
 
+export function SalaSelector(props: {
+  salas: Array<{
+    id: number;
+    nome: string;
+    ativo: boolean;
+    unidadeNome?: string;
+  }>;
+  selecionadas: number[];
+  onToggle: (salaId: number) => void;
+  onLimpar: () => void;
+  carregando?: boolean;
+}) {
+  const salasAtivas = props.salas.filter((sala) => sala.ativo);
+  const selecionadas = props.salas.filter((sala) => props.selecionadas.includes(sala.id));
+
+  return (
+    <div className="space-y-3 rounded-2xl border border-[var(--g3-border)] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbf8_100%)] p-4 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-sm font-semibold text-[var(--g3-foreground)]">Salas do agendamento</p>
+          <p className="text-xs text-[var(--g3-muted)]">Selecione uma ou mais salas que ficarão bloqueadas no período.</p>
+        </div>
+        <Button type="button" variant="outline" onClick={props.onLimpar} disabled={!props.selecionadas.length}>
+          Limpar salas
+        </Button>
+      </div>
+
+      {selecionadas.length ? (
+        <div className="flex flex-wrap gap-2">
+          {selecionadas.map((sala) => (
+            <Badge key={sala.id} variant="info" className="max-w-full">
+              <span className="truncate">{sala.nome}</span>
+            </Badge>
+          ))}
+        </div>
+      ) : (
+        <p className="text-xs text-[var(--g3-muted)]">Nenhuma sala selecionada.</p>
+      )}
+
+      <div className="max-h-60 overflow-auto rounded-xl border border-[var(--g3-border)] bg-white p-2">
+        {props.carregando ? (
+          <p className="px-2 py-6 text-sm text-[var(--g3-muted)]">Carregando salas...</p>
+        ) : props.salas.length ? (
+          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+            {props.salas.map((sala) => {
+              const ativo = props.selecionadas.includes(sala.id);
+              return (
+                <label
+                  key={sala.id}
+                  className={`flex items-start gap-3 rounded-xl border px-3 py-3 ${
+                    ativo ? "border-emerald-300 bg-emerald-50" : "border-[var(--g3-border)] bg-white"
+                  } ${(sala.ativo || ativo) ? "cursor-pointer" : "opacity-60"}`}
+                >
+                  <Checkbox checked={ativo} disabled={!sala.ativo && !ativo} onChange={() => props.onToggle(sala.id)} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-[var(--g3-foreground)]">{sala.nome}</p>
+                    <p className="mt-0.5 text-xs text-[var(--g3-muted)]">{sala.unidadeNome || "Unidade não informada"}</p>
+                    {!sala.ativo ? <p className="mt-1 text-xs font-medium text-amber-700">Sala inativa</p> : null}
+                  </div>
+                </label>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="px-2 py-6 text-sm text-[var(--g3-muted)]">Nenhuma sala cadastrada para esta instituição.</p>
+        )}
+      </div>
+
+      <p className="text-xs text-[var(--g3-muted)]">
+        {salasAtivas.length} sala(s) ativa(s) disponíveis para bloqueio neste cadastro.
+      </p>
+    </div>
+  );
+}
+
 export function AgendaCard(props: {
   item: Agendamento;
   ativo?: boolean;

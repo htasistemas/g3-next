@@ -30,6 +30,8 @@ agendamentosRoutes.get("/itens", ensurePermissions(permissoesVisualizacao), asyn
 agendamentosRoutes.get("/beneficiarios", ensurePermissions(permissoesVisualizacao), asyncHandler(controller.listarBeneficiarios.bind(controller)));
 agendamentosRoutes.get("/indicadores", ensurePermissions(permissoesVisualizacao), asyncHandler(controller.indicadores.bind(controller)));
 agendamentosRoutes.get("/catalogos", ensurePermissions(permissoesVisualizacao), asyncHandler(controller.catalogos.bind(controller)));
+agendamentosRoutes.get("/salas", ensurePermissions(permissoesVisualizacao), asyncHandler(controller.listarSalas.bind(controller)));
+agendamentosRoutes.get("/mapa-salas", ensurePermissions(permissoesVisualizacao), asyncHandler(controller.mapaSalas.bind(controller)));
 agendamentosRoutes.get("/lista-espera", ensurePermissions(permissoesVisualizacao), asyncHandler(controller.listarListaEspera.bind(controller)));
 agendamentosRoutes.post("/lista-espera", ensurePermissions(permissoesEdicao), asyncHandler(controller.criarListaEspera.bind(controller)));
 agendamentosRoutes.post("/lista-espera/:id/converter", ensurePermissions(permissoesEdicao), asyncHandler(controller.converterListaEspera.bind(controller)));

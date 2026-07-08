@@ -113,6 +113,24 @@ export function useCancelarAgendamento() {
   });
 }
 
+export function useSalasAgendamentos(filtros?: { unidadeId?: string; sala?: string; semanaInicio?: string }) {
+  const { usuario } = useAuth();
+  return useQuery({
+    queryKey: ["agendamentos", "salas", usuario?.tenant_id ?? "sem-tenant", filtros],
+    queryFn: () => agendamentosService.listarSalas(filtros),
+    enabled: !!usuario
+  });
+}
+
+export function useMapaSalasAgendamentos(filtros?: { semanaInicio?: string; unidadeId?: string; salaId?: string }) {
+  const { usuario } = useAuth();
+  return useQuery({
+    queryKey: ["agendamentos", "mapa-salas", usuario?.tenant_id ?? "sem-tenant", filtros],
+    queryFn: () => agendamentosService.mapaSalas(filtros),
+    enabled: !!usuario
+  });
+}
+
 export function useExcluirAgendamento() {
   const queryClient = useQueryClient();
   return useMutation({

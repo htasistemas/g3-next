@@ -2,11 +2,13 @@ import { httpClient } from "./http-client";
 import type {
   Agendamento,
   AgendamentoFiltros,
+  AgendamentoMapaSalas,
   AgendamentoListaEspera,
   AgendamentoOperacionalBeneficiario,
   AgendamentoOperacionalItem,
   AgendamentoOperacionalPayload,
-  AgendamentoOperacionalTipo
+  AgendamentoOperacionalTipo,
+  AgendamentoSalaCatalogo
 } from "@/types/agendamento";
 
 export const agendamentosService = {
@@ -103,6 +105,20 @@ export const agendamentosService = {
       salas: string[];
       recursos: string[];
     }>("/api/agendamentos/catalogos");
+    return data;
+  },
+
+  async listarSalas(params?: { unidadeId?: string; sala?: string; semanaInicio?: string }) {
+    const { data } = await httpClient.get<AgendamentoSalaCatalogo[]>("/api/agendamentos/salas", {
+      params
+    });
+    return data ?? [];
+  },
+
+  async mapaSalas(params?: { semanaInicio?: string; unidadeId?: string; salaId?: string }) {
+    const { data } = await httpClient.get<AgendamentoMapaSalas>("/api/agendamentos/mapa-salas", {
+      params
+    });
     return data;
   },
 

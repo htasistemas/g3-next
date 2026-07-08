@@ -161,6 +161,26 @@ const estruturaSql = [
   "CREATE INDEX IF NOT EXISTS agendamento_beneficiario_tenant_idx ON agendamento_beneficiario(tenant_id, agendamento_id)",
   "CREATE INDEX IF NOT EXISTS agendamento_beneficiario_beneficiario_idx ON agendamento_beneficiario(beneficiario_id)",
   `
+    CREATE TABLE IF NOT EXISTS agendamento_sala (
+      id BIGSERIAL PRIMARY KEY,
+      tenant_id UUID,
+      agendamento_id BIGINT NOT NULL REFERENCES agendamento(id) ON DELETE CASCADE,
+      sala_unidade_id BIGINT NOT NULL REFERENCES salas_unidade(id) ON DELETE RESTRICT,
+      sala_nome VARCHAR(120) NOT NULL,
+      data_agendamento DATE NOT NULL,
+      hora_inicial TIME NOT NULL,
+      hora_final TIME,
+      status VARCHAR(80) NOT NULL DEFAULT 'Agendado',
+      criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+      atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+  `,
+  "ALTER TABLE agendamento_sala ADD COLUMN IF NOT EXISTS tenant_id UUID",
+  "CREATE UNIQUE INDEX IF NOT EXISTS agendamento_sala_unique_idx ON agendamento_sala(agendamento_id, sala_unidade_id)",
+  "CREATE INDEX IF NOT EXISTS agendamento_sala_tenant_idx ON agendamento_sala(tenant_id, data_agendamento, hora_inicial)",
+  "CREATE INDEX IF NOT EXISTS agendamento_sala_sala_idx ON agendamento_sala(tenant_id, sala_unidade_id, data_agendamento, hora_inicial)",
+  "CREATE INDEX IF NOT EXISTS agendamento_sala_agendamento_idx ON agendamento_sala(agendamento_id)",
+  `
     CREATE TABLE IF NOT EXISTS agendamento_envio (
       id BIGSERIAL PRIMARY KEY,
       tenant_id UUID,
@@ -174,7 +194,39 @@ const estruturaSql = [
     )
   `,
   "ALTER TABLE agendamento_envio ADD COLUMN IF NOT EXISTS tenant_id UUID",
-  "CREATE INDEX IF NOT EXISTS agendamento_envio_tenant_idx ON agendamento_envio(tenant_id, agendamento_id)"
+  "CREATE INDEX IF NOT EXISTS agendamento_envio_tenant_idx ON agendamento_envio(tenant_id, agendamento_id)",
+  `
+    INSERT INTO agendamento_sala (
+      tenant_id,
+      agendamento_id,
+      sala_unidade_id,
+      sala_nome,
+      data_agendamento,
+      hora_inicial,
+      hora_final,
+      status,
+      criado_em,
+      atualizado_em
+    )
+    SELECT
+      a.tenant_id,
+      a.id,
+      su.id,
+      su.nome,
+      a.data_agendamento,
+      a.hora_inicial,
+      a.hora_final,
+      COALESCE(a.status, 'Agendado'),
+      NOW(),
+      NOW()
+    FROM agendamento a
+    INNER JOIN unidade_assistencial ua ON ua.tenant_id = a.tenant_id
+    INNER JOIN salas_unidade su ON su.unidade_id = ua.id
+    WHERE a.sala IS NOT NULL
+      AND TRIM(a.sala) <> ''
+      AND LOWER(TRIM(su.nome)) = LOWER(TRIM(a.sala))
+    ON CONFLICT (agendamento_id, sala_unidade_id) DO NOTHING
+  `
 ];
 
 let estruturaPromise: Promise<void> | null = null;
@@ -1250,6 +1302,34 @@ export class AgendamentosRepository {
     });
   }
 
+  private async hidratarSalasAgendamentos(rows: AgendamentoRow[], tenantId: string) {
+    if (!rows.length) {
+      return rows;
+    }
+
+    const salas = await this.listarSalasPorAgendamento(
+      rows.map((row) => row.id),
+      tenantId
+    );
+    const salasPorAgendamento = new Map<string, Array<{ sala_id: bigint; sala_nome: string }>>();
+
+    for (const sala of salas) {
+      const chave = sala.agendamento_id.toString();
+      const lista = salasPorAgendamento.get(chave);
+      const item = { sala_id: sala.sala_id, sala_nome: sala.sala_nome };
+      if (lista) {
+        lista.push(item);
+      } else {
+        salasPorAgendamento.set(chave, [item]);
+      }
+    }
+
+    return rows.map((row) => ({
+      ...row,
+      salas: salasPorAgendamento.get(row.id.toString()) ?? []
+    }));
+  }
+
   private async sincronizarBeneficiariosAgendamento(
     agendamentoId: bigint,
     tenantId: string,
@@ -1432,6 +1512,7 @@ export class AgendamentosRepository {
     horaFinal?: string | null;
     profissionalNome?: string | null;
     sala?: string | null;
+    salasIds?: number[] | null;
     recurso?: string | null;
     idIgnorar?: bigint | null;
     tenantId: string;
@@ -1456,8 +1537,32 @@ export class AgendamentosRepository {
         Prisma.sql`LOWER(COALESCE(a.profissional_nome, '')) = LOWER(${trimOrUndefined(payload.profissionalNome)})`
       );
     }
+    const salasIds = Array.from(
+      new Set((payload.salasIds ?? []).filter((id): id is number => Number.isInteger(id) && Number(id) > 0))
+    );
+    if (salasIds.length) {
+      escopos.push(Prisma.sql`
+        EXISTS (
+          SELECT 1
+          FROM agendamento_sala ass
+          WHERE ass.agendamento_id = a.id
+            AND ass.tenant_id::text = ${payload.tenantId}
+            AND ass.sala_unidade_id IN (${Prisma.join(salasIds.map((id) => BigInt(id)))})
+        )
+      `);
+    }
     if (trimOrUndefined(payload.sala)) {
-      escopos.push(Prisma.sql`LOWER(COALESCE(a.sala, '')) = LOWER(${trimOrUndefined(payload.sala)})`);
+      const sala = trimOrUndefined(payload.sala);
+      escopos.push(Prisma.sql`
+        EXISTS (
+          SELECT 1
+          FROM agendamento_sala ass
+          WHERE ass.agendamento_id = a.id
+            AND ass.tenant_id::text = ${payload.tenantId}
+            AND LOWER(ass.sala_nome) = LOWER(${sala})
+        )
+        OR LOWER(COALESCE(a.sala, '')) = LOWER(${sala})
+      `);
     }
     if (trimOrUndefined(payload.recurso)) {
       escopos.push(Prisma.sql`LOWER(COALESCE(a.recurso, '')) = LOWER(${trimOrUndefined(payload.recurso)})`);
@@ -1477,7 +1582,23 @@ export class AgendamentosRepository {
         status: string | null;
       }>
     >(Prisma.sql`
-      SELECT a.id, a.beneficiario_nome, a.profissional_nome, a.sala, a.recurso, a.hora_inicial, a.hora_final, a.status
+      SELECT
+        a.id,
+        a.beneficiario_nome,
+        a.profissional_nome,
+        COALESCE(
+          (
+            SELECT STRING_AGG(ass.sala_nome, ', ' ORDER BY ass.sala_nome)
+            FROM agendamento_sala ass
+            WHERE ass.agendamento_id = a.id
+              AND ass.tenant_id::text = ${payload.tenantId}
+          ),
+          a.sala
+        ) AS sala,
+        a.recurso,
+        a.hora_inicial,
+        a.hora_final,
+        a.status
       FROM agendamento a
       WHERE a.tenant_id::text = ${payload.tenantId}
         AND ${Prisma.join(condicoes, " AND ")}
@@ -1514,6 +1635,256 @@ export class AgendamentosRepository {
       "Agendamento(s) bloqueador(es):",
       ...resumo
     ].join("\n");
+  }
+
+  async listarSalasAgendamento(tenantId: string, filtros?: { unidadeId?: string; sala?: string }) {
+    await this.ensureEstrutura();
+    const unidadeId = trimOrUndefined(filtros?.unidadeId);
+    const sala = trimOrUndefined(filtros?.sala);
+
+    const rows = await prisma.$queryRaw<
+      Array<{
+        sala_id: bigint;
+        sala_nome: string;
+        sala_ativo: boolean;
+        unidade_id: bigint;
+        unidade_nome: string | null;
+      }>
+    >(Prisma.sql`
+      SELECT
+        s.id AS sala_id,
+        s.nome AS sala_nome,
+        s.ativo AS sala_ativo,
+        ua.id AS unidade_id,
+        COALESCE(ua.nome_fantasia, ua.razao_social) AS unidade_nome
+      FROM salas_unidade s
+      INNER JOIN unidade_assistencial ua ON ua.id = s.unidade_id
+      WHERE ua.tenant_id::text = ${tenantId}
+        ${unidadeId ? Prisma.sql`AND ua.id = ${BigInt(unidadeId)}` : Prisma.empty}
+        ${sala ? Prisma.sql`AND s.nome ILIKE ${`%${sala}%`}` : Prisma.empty}
+      ORDER BY COALESCE(ua.nome_fantasia, ua.razao_social) ASC, s.nome ASC
+    `);
+
+    return rows.map((row) => ({
+      id: Number(row.sala_id),
+      nome: row.sala_nome,
+      ativo: row.sala_ativo,
+      unidadeId: Number(row.unidade_id),
+      unidadeNome: row.unidade_nome ?? undefined
+    }));
+  }
+
+  private async resolverSalasSelecionadas(
+    input: { sala?: string | null; salasIds?: number[] | null; itemOrigemId?: number | null },
+    tenantId: string,
+    db: PrismaExecutor = prisma
+  ) {
+    const idsInformados = Array.from(
+      new Set((input.salasIds ?? []).filter((id): id is number => Number.isInteger(id) && Number(id) > 0))
+    );
+
+    const rowsSalas = await db.$queryRaw<
+      Array<{
+        sala_id: bigint;
+        sala_nome: string;
+        unidade_id: bigint;
+      }>
+    >(Prisma.sql`
+      SELECT s.id AS sala_id, s.nome AS sala_nome, s.unidade_id
+      FROM salas_unidade s
+      INNER JOIN unidade_assistencial ua ON ua.id = s.unidade_id
+      WHERE ua.tenant_id::text = ${tenantId}
+        ${idsInformados.length ? Prisma.sql`AND s.id IN (${Prisma.join(idsInformados.map((id) => BigInt(id)))})` : Prisma.empty}
+        ${trimOrUndefined(input.sala) ? Prisma.sql`AND LOWER(s.nome) = LOWER(${trimOrUndefined(input.sala)})` : Prisma.empty}
+      ORDER BY s.nome ASC
+    `);
+
+    if (rowsSalas.length) {
+      return rowsSalas;
+    }
+
+    if (input.itemOrigemId) {
+      const itemRows = await db.$queryRaw<Array<{ sala_id: bigint | null }>>(Prisma.sql`
+        SELECT c.sala_id
+        FROM cursos_atendimentos c
+        INNER JOIN unidade_assistencial ua ON ua.id = c.unidade_id
+        WHERE c.id = ${BigInt(input.itemOrigemId)}
+          AND ua.tenant_id::text = ${tenantId}
+        LIMIT 1
+      `);
+      const salaId = itemRows[0]?.sala_id;
+      if (salaId) {
+        const salaRows = await db.$queryRaw<
+          Array<{ sala_id: bigint; sala_nome: string; unidade_id: bigint }>
+        >(Prisma.sql`
+          SELECT s.id AS sala_id, s.nome AS sala_nome, s.unidade_id
+          FROM salas_unidade s
+          INNER JOIN unidade_assistencial ua ON ua.id = s.unidade_id
+          WHERE s.id = ${salaId}
+            AND ua.tenant_id::text = ${tenantId}
+          LIMIT 1
+        `);
+        if (salaRows.length) {
+          return salaRows;
+        }
+      }
+    }
+
+    return [];
+  }
+
+  private async sincronizarSalasAgendamento(
+    agendamentoId: bigint,
+    tenantId: string,
+    salas: Array<{ sala_id: bigint; sala_nome: string }>,
+    db: PrismaExecutor = prisma,
+    base?: { data: string; horaInicial: string; horaFinal?: string | null; status?: string | null }
+  ) {
+    await db.$executeRaw(Prisma.sql`
+      DELETE FROM agendamento_sala
+      WHERE agendamento_id = ${agendamentoId}
+        AND tenant_id::text = ${tenantId}
+    `);
+
+    if (!salas.length) {
+      return;
+    }
+
+    const valores = salas.map((sala) =>
+      Prisma.sql`(
+        ${tenantId}::uuid,
+        ${agendamentoId},
+        ${sala.sala_id},
+        ${sala.sala_nome},
+        ${formatarData(base?.data ?? "")},
+        ${sqlTime(base?.horaInicial ?? "00:00")},
+        ${sqlTime(base?.horaFinal ?? null)},
+        ${base?.status ?? "Agendado"},
+        NOW(),
+        NOW()
+      )`
+    );
+
+    await db.$executeRaw(Prisma.sql`
+      INSERT INTO agendamento_sala (
+        tenant_id, agendamento_id, sala_unidade_id, sala_nome, data_agendamento, hora_inicial, hora_final, status, criado_em, atualizado_em
+      ) VALUES ${Prisma.join(valores)}
+      ON CONFLICT (agendamento_id, sala_unidade_id) DO UPDATE
+      SET
+        sala_nome = EXCLUDED.sala_nome,
+        data_agendamento = EXCLUDED.data_agendamento,
+        hora_inicial = EXCLUDED.hora_inicial,
+        hora_final = EXCLUDED.hora_final,
+        status = EXCLUDED.status,
+        atualizado_em = NOW()
+    `);
+  }
+
+  private async listarSalasPorAgendamento(agendamentoIds: bigint[], tenantId: string) {
+    if (!agendamentoIds.length) {
+      return [];
+    }
+
+    return prisma.$queryRaw<
+      Array<{
+        agendamento_id: bigint;
+        sala_id: bigint;
+        sala_nome: string;
+      }>
+    >(Prisma.sql`
+      SELECT
+        ass.agendamento_id,
+        ass.sala_unidade_id AS sala_id,
+        ass.sala_nome
+      FROM agendamento_sala ass
+      WHERE ass.tenant_id::text = ${tenantId}
+        AND ass.agendamento_id IN (${Prisma.join(agendamentoIds)})
+      ORDER BY ass.sala_nome ASC
+    `);
+  }
+
+  async mapaSalas(tenantId: string, filtros?: { semanaInicio?: string; unidadeId?: string; salaId?: string }) {
+    await this.ensureEstrutura();
+    const inicio = filtros?.semanaInicio && /^\d{4}-\d{2}-\d{2}$/.test(filtros.semanaInicio)
+      ? new Date(`${filtros.semanaInicio}T12:00:00`)
+      : (() => {
+          const base = new Date();
+          const dia = base.getDay();
+          const deslocamento = dia === 0 ? -6 : 1 - dia;
+          base.setDate(base.getDate() + deslocamento);
+          base.setHours(12, 0, 0, 0);
+          return base;
+        })();
+    const fim = new Date(inicio);
+    fim.setDate(inicio.getDate() + 6);
+
+    const salas = await this.listarSalasAgendamento(tenantId, {
+      unidadeId: filtros?.unidadeId,
+      sala: filtros?.salaId
+    });
+
+    const salaId = trimOrUndefined(filtros?.salaId);
+    const ocupacoes = await prisma.$queryRaw<
+      Array<{
+        agendamento_id: bigint;
+        sala_id: bigint;
+        sala_nome: string;
+        data_agendamento: Date;
+        hora_inicial: string;
+        hora_final: string | null;
+        status: string | null;
+        beneficiario_nome: string;
+        profissional_nome: string | null;
+        item_nome: string | null;
+        participantes: unknown;
+      }>
+    >(Prisma.sql`
+      SELECT
+        ass.agendamento_id,
+        ass.sala_unidade_id AS sala_id,
+        ass.sala_nome,
+        ass.data_agendamento,
+        ass.hora_inicial,
+        ass.hora_final,
+        ass.status,
+        a.beneficiario_nome,
+        a.profissional_nome,
+        a.item_nome,
+        a.participantes
+      FROM agendamento_sala ass
+      INNER JOIN agendamento a ON a.id = ass.agendamento_id
+      WHERE ass.tenant_id::text = ${tenantId}
+        AND ass.data_agendamento BETWEEN ${formatarDataEntrada(inicio)} AND ${formatarDataEntrada(fim)}
+        AND COALESCE(a.status, '') <> 'Cancelado'
+        ${salaId ? Prisma.sql`AND ass.sala_unidade_id = ${BigInt(salaId)}` : Prisma.empty}
+      ORDER BY ass.data_agendamento ASC, ass.hora_inicial ASC, ass.sala_nome ASC
+    `);
+
+    const dias = Array.from({ length: 7 }, (_, indice) => {
+      const data = new Date(inicio);
+      data.setDate(inicio.getDate() + indice);
+      return data.toISOString().slice(0, 10);
+    });
+
+    return {
+      semanaInicio: formatarDataEntrada(inicio) ?? formatarDataMensagem(inicio),
+      semanaFim: formatarDataEntrada(fim) ?? formatarDataMensagem(fim),
+      dias,
+      salas,
+      ocupacoes: ocupacoes.map((item) => ({
+        agendamentoId: Number(item.agendamento_id),
+        salaId: Number(item.sala_id),
+        salaNome: item.sala_nome,
+        data: item.data_agendamento.toISOString().slice(0, 10),
+        horaInicial: formatarHoraExibicao(item.hora_inicial),
+        horaFinal: formatarHoraExibicao(item.hora_final),
+        status: item.status ?? undefined,
+        beneficiarioNome: item.beneficiario_nome,
+        profissionalNome: item.profissional_nome ?? undefined,
+        itemNome: item.item_nome ?? undefined,
+        participantes: Array.isArray(item.participantes) ? item.participantes : []
+      }))
+    };
   }
 
   async listar(filtros: AgendamentoFiltros, tenantId: string) {
@@ -1570,7 +1941,8 @@ export class AgendamentosRepository {
       ${where.length ? Prisma.sql`AND ${Prisma.join(where, " AND ")}` : Prisma.empty}
       ORDER BY a.data_agendamento ASC, a.hora_inicial ASC, a.id ASC
     `);
-    return this.hidratarParticipantesAgendamentos(rows, tenantId);
+    const hidratados = await this.hidratarParticipantesAgendamentos(rows, tenantId);
+    return this.hidratarSalasAgendamentos(hidratados, tenantId);
   }
 
   async obter(id: bigint, tenantId: string) {
@@ -1579,19 +1951,31 @@ export class AgendamentosRepository {
       SELECT * FROM agendamento WHERE id = ${id} AND tenant_id::text = ${tenantId} LIMIT 1
     `);
     const hidratados = await this.hidratarParticipantesAgendamentos(rows, tenantId);
-    return hidratados[0] ?? null;
+    const comSalas = await this.hidratarSalasAgendamentos(hidratados, tenantId);
+    return comSalas[0] ?? null;
   }
 
   async criar(input: AgendamentoInput, usuario: UsuarioActor | undefined, tenantId: string) {
     await this.ensureEstrutura();
     const familiaResolvida = await this.resolverFamiliaDoBeneficiario(input.beneficiarioId);
     const id = await prisma.$transaction(async (tx) => {
+      const salasSelecionadas = await this.resolverSalasSelecionadas(
+        {
+          sala: input.sala,
+          salasIds: input.salasIds,
+          itemOrigemId: input.itemOrigemId
+        },
+        tenantId,
+        tx
+      );
+      const salasTexto = salasSelecionadas.map((sala) => sala.sala_nome).join(", ") || trimOrUndefined(input.sala);
       const conflitos = await this.listarConflitos({
         data: input.data,
         horaInicial: input.horaInicial,
         horaFinal: input.horaFinal,
         profissionalNome: input.profissionalNome,
         sala: input.sala,
+        salasIds: salasSelecionadas.map((sala) => Number(sala.sala_id)).filter((valor) => Number.isInteger(valor) && Number(valor) > 0),
         recurso: input.recurso,
         tenantId
       }, tx);
@@ -1653,7 +2037,7 @@ export class AgendamentosRepository {
           ${sqlTime(input.horaInicial)},
           ${sqlTime(input.horaFinal)},
           ${input.duracaoMinutos ?? null},
-          ${trimOrUndefined(input.sala)},
+          ${salasTexto},
           ${trimOrUndefined(input.recurso)},
           ${input.modalidade},
           ${trimOrUndefined(input.origemAtendimento)},
@@ -1689,10 +2073,24 @@ export class AgendamentosRepository {
       const idInserido = inserted[0]?.id;
       if (!idInserido) throw new AppError("Nao foi possivel criar o agendamento.", 500);
       await this.sincronizarBeneficiariosAgendamento(idInserido, tenantId, input.participantes ?? [], tx);
+      await this.sincronizarSalasAgendamento(idInserido, tenantId, salasSelecionadas, tx, {
+        data: input.data,
+        horaInicial: input.horaInicial,
+        horaFinal: input.horaFinal,
+        status: input.status ?? (input.coletivo ? "Atendimento coletivo" : input.permitirConflito ? "Encaixe" : "Agendado")
+      });
       return idInserido;
     });
 
     const criado = await this.obter(id, tenantId);
+    console.info("[agendamentos][criar]", {
+      tenantId,
+      agendamentoId: criado?.id?.toString() ?? id.toString(),
+      data: criado?.data_agendamento ? formatarDataMensagem(criado.data_agendamento) : input.data,
+      salas: Array.isArray((criado as { salas?: Array<{ sala_id?: bigint; sala_nome?: string }> }).salas)
+        ? ((criado as { salas?: Array<{ sala_id?: bigint; sala_nome?: string }> }).salas ?? []).map((sala) => sala.sala_nome)
+        : []
+    });
     await this.registrarLog(id, "criar", usuario, tenantId, null, criado);
     await this.registrarHistoricoFamilia(criado?.familia_id, "Agendamento criado para a família.", criado, tenantId);
     return criado;
@@ -1703,12 +2101,26 @@ export class AgendamentosRepository {
     const anterior = await this.obter(id, tenantId);
     if (!anterior) throw new AppError("Agendamento nao encontrado.", 404);
     await prisma.$transaction(async (tx) => {
+      const salasExistentes = Array.isArray((anterior as { salas?: Array<{ sala_id?: bigint; sala_nome?: string }> }).salas)
+        ? ((anterior as { salas?: Array<{ sala_id?: bigint; sala_nome?: string }> }).salas ?? [])
+        : [];
+      const salasSelecionadas = await this.resolverSalasSelecionadas(
+        {
+          sala: input.sala ?? salasExistentes.map((sala) => sala.sala_nome).join(", "),
+          salasIds: input.salasIds ?? salasExistentes.map((sala) => Number(sala.sala_id)).filter((valor) => Number.isInteger(valor) && Number(valor) > 0),
+          itemOrigemId: input.itemOrigemId ?? (anterior.item_origem_id ? Number(anterior.item_origem_id) : undefined)
+        },
+        tenantId,
+        tx
+      );
+      const salasTexto = salasSelecionadas.map((sala) => sala.sala_nome).join(", ") || trimOrUndefined(input.sala);
       const conflitos = await this.listarConflitos({
         data: input.data,
         horaInicial: input.horaInicial,
         horaFinal: input.horaFinal,
         profissionalNome: input.profissionalNome,
         sala: input.sala,
+        salasIds: salasSelecionadas.map((sala) => Number(sala.sala_id)).filter((valor) => Number.isInteger(valor) && Number(valor) > 0),
         recurso: input.recurso,
         idIgnorar: id,
         tenantId
@@ -1761,7 +2173,7 @@ export class AgendamentosRepository {
           hora_inicial = ${sqlTime(input.horaInicial)},
           hora_final = ${sqlTime(input.horaFinal)},
           duracao_minutos = ${input.duracaoMinutos ?? null},
-          sala = ${trimOrUndefined(input.sala)},
+          sala = ${salasTexto},
           recurso = ${trimOrUndefined(input.recurso)},
           modalidade = ${input.modalidade},
           origem_atendimento = ${trimOrUndefined(input.origemAtendimento)},
@@ -1795,6 +2207,12 @@ export class AgendamentosRepository {
       `);
 
       await this.sincronizarBeneficiariosAgendamento(id, tenantId, input.participantes ?? [], tx);
+      await this.sincronizarSalasAgendamento(id, tenantId, salasSelecionadas, tx, {
+        data: input.data,
+        horaInicial: input.horaInicial,
+        horaFinal: input.horaFinal,
+        status: input.status ?? anterior.status
+      });
     });
 
     const atual = await this.obter(id, tenantId);
@@ -1822,6 +2240,9 @@ export class AgendamentosRepository {
       telefone: participante.telefone ?? undefined,
       email: participante.email ?? undefined
     }));
+    const salasOrigem = Array.isArray((origem as { salas?: Array<{ sala_id?: bigint; sala_nome?: string }> }).salas)
+      ? ((origem as { salas?: Array<{ sala_id?: bigint; sala_nome?: string }> }).salas ?? [])
+      : [];
 
     const payload: AgendamentoInput = {
       beneficiarioId: origem.beneficiario_id ? Number(origem.beneficiario_id) : undefined,
@@ -1849,6 +2270,7 @@ export class AgendamentosRepository {
       horaFinal: formatarHoraEntrada(origem.hora_final)?.slice(0, 5),
       duracaoMinutos: origem.duracao_minutos ?? undefined,
       sala: origem.sala ?? undefined,
+      salasIds: salasOrigem.map((sala) => Number(sala.sala_id)).filter((valor) => Number.isInteger(valor) && Number(valor) > 0),
       recurso: origem.recurso ?? undefined,
       modalidade: origem.modalidade as AgendamentoInput["modalidade"],
       origemAtendimento: origem.origem_atendimento ?? undefined,
@@ -1886,12 +2308,23 @@ export class AgendamentosRepository {
     };
 
     const novoId = await prisma.$transaction(async (tx) => {
+      const salasSelecionadas = await this.resolverSalasSelecionadas(
+        {
+          sala: payload.sala,
+          salasIds: payload.salasIds,
+          itemOrigemId: payload.itemOrigemId
+        },
+        tenantId,
+        tx
+      );
+      const salasTexto = salasSelecionadas.map((sala) => sala.sala_nome).join(", ") || trimOrUndefined(payload.sala);
       const conflitos = await this.listarConflitos({
         data: payload.data,
         horaInicial: payload.horaInicial,
         horaFinal: payload.horaFinal,
         profissionalNome: payload.profissionalNome,
         sala: payload.sala,
+        salasIds: salasSelecionadas.map((sala) => Number(sala.sala_id)).filter((valor) => Number.isInteger(valor) && Number(valor) > 0),
         recurso: payload.recurso,
         tenantId
       }, tx);
@@ -1952,7 +2385,7 @@ export class AgendamentosRepository {
           ${sqlTime(payload.horaInicial)},
           ${sqlTime(payload.horaFinal)},
           ${payload.duracaoMinutos ?? null},
-          ${trimOrUndefined(payload.sala)},
+          ${salasTexto},
           ${trimOrUndefined(payload.recurso)},
           ${payload.modalidade},
           ${trimOrUndefined(payload.origemAtendimento)},
@@ -1988,10 +2421,25 @@ export class AgendamentosRepository {
       const idNovo = inserted[0]?.id;
       if (!idNovo) throw new AppError("Nao foi possivel copiar a agenda.", 500);
       await this.sincronizarBeneficiariosAgendamento(idNovo, tenantId, payload.participantes ?? [], tx);
+      await this.sincronizarSalasAgendamento(idNovo, tenantId, salasSelecionadas, tx, {
+        data: payload.data,
+        horaInicial: payload.horaInicial,
+        horaFinal: payload.horaFinal,
+        status: payload.status ?? "Agendado"
+      });
       return idNovo;
     });
 
     const criado = await this.obter(novoId, tenantId);
+    console.info("[agendamentos][copiar]", {
+      tenantId,
+      origemId: id.toString(),
+      novoId: novoId.toString(),
+      dataDestino: novaData,
+      salas: Array.isArray((criado as { salas?: Array<{ sala_id?: bigint; sala_nome?: string }> }).salas)
+        ? ((criado as { salas?: Array<{ sala_id?: bigint; sala_nome?: string }> }).salas ?? []).map((sala) => sala.sala_nome)
+        : []
+    });
     await this.registrarLog(novoId, "copiar", usuario, tenantId, origem, criado);
     return criado;
   }
@@ -2004,6 +2452,12 @@ export class AgendamentosRepository {
       UPDATE agendamento
       SET status = 'Cancelado', observacao_interna = ${trimOrUndefined(motivo) ?? anterior.observacao_interna}, atualizado_em = NOW()
       WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
+    `);
+    await prisma.$executeRaw(Prisma.sql`
+      UPDATE agendamento_sala
+      SET status = 'Cancelado', atualizado_em = NOW()
+      WHERE agendamento_id = ${id}
         AND tenant_id::text = ${tenantId}
     `);
 
@@ -2030,6 +2484,17 @@ export class AgendamentosRepository {
   async remarcar(id: bigint, input: AgendamentoRemarcacaoInput, usuario: UsuarioActor | undefined, tenantId: string) {
     const anterior = await this.obter(id, tenantId);
     if (!anterior) throw new AppError("Agendamento nao encontrado.", 404);
+    const salasExistentes = Array.isArray((anterior as { salas?: Array<{ sala_id?: bigint; sala_nome?: string }> }).salas)
+      ? ((anterior as { salas?: Array<{ sala_id?: bigint; sala_nome?: string }> }).salas ?? [])
+      : [];
+    const salasSelecionadas = await this.resolverSalasSelecionadas(
+      {
+        sala: input.sala ?? anterior.sala,
+        salasIds: input.salasIds ?? salasExistentes.map((sala) => Number(sala.sala_id)).filter((valor) => Number.isInteger(valor) && Number(valor) > 0),
+        itemOrigemId: anterior.item_origem_id ? Number(anterior.item_origem_id) : undefined
+      },
+      tenantId
+    );
 
     const conflitos = await this.listarConflitos({
       data: input.data,
@@ -2037,6 +2502,7 @@ export class AgendamentosRepository {
       horaFinal: input.horaFinal,
       profissionalNome: input.profissionalNome ?? anterior.profissional_nome,
       sala: input.sala ?? anterior.sala,
+      salasIds: salasSelecionadas.map((sala) => Number(sala.sala_id)).filter((valor) => Number.isInteger(valor) && Number(valor) > 0),
       recurso: input.recurso ?? anterior.recurso,
       idIgnorar: id,
       tenantId
@@ -2053,7 +2519,12 @@ export class AgendamentosRepository {
         hora_inicial = ${sqlTime(input.horaInicial)},
         hora_final = ${sqlTime(input.horaFinal)},
         profissional_nome = ${trimOrUndefined(input.profissionalNome) ?? anterior.profissional_nome},
-        sala = ${trimOrUndefined(input.sala) ?? anterior.sala},
+        sala = ${(
+          salasSelecionadas.map((sala) => sala.sala_nome).join(", ") ||
+          trimOrUndefined(input.sala) ||
+          anterior.sala ||
+          ""
+        )},
         recurso = ${trimOrUndefined(input.recurso) ?? anterior.recurso},
         status = 'Remarcado',
         observacao_interna = ${trimOrUndefined(input.motivo) ?? anterior.observacao_interna},
@@ -2061,8 +2532,20 @@ export class AgendamentosRepository {
       WHERE id = ${id}
         AND tenant_id::text = ${tenantId}
     `);
+    await this.sincronizarSalasAgendamento(id, tenantId, salasSelecionadas, prisma, {
+      data: input.data,
+      horaInicial: input.horaInicial,
+      horaFinal: input.horaFinal,
+      status: "Remarcado"
+    });
 
     const atual = await this.obter(id, tenantId);
+    console.info("[agendamentos][remarcar]", {
+      tenantId,
+      agendamentoId: id.toString(),
+      data: input.data,
+      salas: salasSelecionadas.map((sala) => sala.sala_nome)
+    });
     await this.registrarLog(id, "remarcar", usuario, tenantId, anterior, atual);
     return atual;
   }
@@ -2309,6 +2792,14 @@ export class AgendamentosRepository {
     const horarioBase = formatarHoraEntrada(item.horario_inicial) ?? "08:00:00";
     const profissionalNome = trimOrUndefined(item.profissional) ?? trimOrUndefined(selecionados[0]?.profissional_nome) ?? "Equipe institucional";
     const local = trimOrUndefined(item.sala_nome) ?? trimOrUndefined(item.instituicao_parceira) ?? "Local a definir";
+    const salasSelecionadas = await this.resolverSalasSelecionadas(
+      {
+        salasIds: input.salasIds,
+        itemOrigemId: input.itemId
+      },
+      tenantId
+    );
+    const salaTexto = salasSelecionadas.map((sala) => sala.sala_nome).join(", ") || local;
 
     return {
       beneficiarioId: participantes[0]?.beneficiarioId ?? undefined,
@@ -2333,7 +2824,8 @@ export class AgendamentosRepository {
       itemDiasSemana: trimOrUndefined(item.dias_semana),
       itemLocal: local,
       diaSemana: this.formatarDiaSemana(input.data),
-      sala: local,
+      sala: salaTexto,
+      salasIds: salasSelecionadas.map((sala) => Number(sala.sala_id)),
       observacaoCurta: `${participantes.length} participante(s) vinculado(s) pela inscricao.`
     };
   }
