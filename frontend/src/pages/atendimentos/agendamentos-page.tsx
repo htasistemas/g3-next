@@ -1,4 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
   BadgeCheck,
@@ -417,6 +418,7 @@ function imprimirFichaHtml(options: {
 export function AgendamentosPage() {
   const navigate = useNavigate();
   const { usuario } = useAuth();
+  const queryClient = useQueryClient();
   const [abaAtiva, setAbaAtiva] = useState<AbaId>("dashboard");
   const [tipo, setTipo] = useState<AgendamentoOperacionalTipo | undefined>();
   const [buscaItem, setBuscaItem] = useState("");
@@ -678,7 +680,7 @@ export function AgendamentosPage() {
           telefone: item.telefone,
           comparecimento: "Pendente" as const
         }));
-      setAgendaGeradaLocal(
+      const agendaVisivel: Agendamento =
         salvo ?? {
           id: -Date.now(),
           beneficiarioId: participantesPreview[0]?.beneficiarioId,
@@ -705,10 +707,30 @@ export function AgendamentosPage() {
             new Date(`${dataExibicao}T12:00:00`)
           ),
           observacaoCurta: `${participantesPreview.length} participante(s) vinculado(s) pela inscricao.`
+        };
+
+      queryClient.setQueriesData<Agendamento[]>(
+        { queryKey: ["agendamentos", usuario?.tenant_id ?? "sem-tenant"] },
+        (atual) => {
+          const base = Array.isArray(atual) ? atual : [];
+          const semDuplicado = base.filter(
+            (item) =>
+              !(
+                item.id === agendaVisivel.id ||
+                (item.itemOrigemId === agendaVisivel.itemOrigemId &&
+                  item.itemTipo === agendaVisivel.itemTipo &&
+                  (item.data ?? "").slice(0, 10) === (agendaVisivel.data ?? "").slice(0, 10))
+              )
+          );
+          return [...semDuplicado, agendaVisivel].sort((a, b) =>
+            `${a.data ?? ""}${a.horaInicial ?? ""}`.localeCompare(`${b.data ?? ""}${b.horaInicial ?? ""}`)
+          );
         }
       );
-      setSelecionadoId(salvo?.id ?? null);
-      setUltimaAgendaDestacadaId(salvo?.id ?? null);
+
+      setAgendaGeradaLocal(agendaVisivel);
+      setSelecionadoId(agendaVisivel.id ?? null);
+      setUltimaAgendaDestacadaId(agendaVisivel.id ?? null);
       definirDataVisualizacao(dataExibicao);
       setPopup({
         tipo: "sucesso",
