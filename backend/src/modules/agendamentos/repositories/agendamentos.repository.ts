@@ -1750,6 +1750,25 @@ export class AgendamentosRepository {
     return [];
   }
 
+  private async resolverSalasSelecionadasSeguras(
+    input: { sala?: string | null; salasIds?: number[] | null; itemOrigemId?: number | null },
+    tenantId: string,
+    db: PrismaExecutor = prisma
+  ) {
+    try {
+      return await this.resolverSalasSelecionadas(input, tenantId, db);
+    } catch (error) {
+      console.warn("[agendamentos][salas][fallback]", {
+        tenantId,
+        sala: input.sala,
+        salasIds: input.salasIds,
+        itemOrigemId: input.itemOrigemId,
+        erro: error instanceof Error ? error.message : String(error)
+      });
+      return [];
+    }
+  }
+
   private async sincronizarSalasAgendamento(
     agendamentoId: bigint,
     tenantId: string,
@@ -1972,11 +1991,19 @@ export class AgendamentosRepository {
     return comSalas[0] ?? null;
   }
 
+  private async obterBasico(id: bigint, tenantId: string) {
+    await this.ensureEstrutura();
+    const rows = await prisma.$queryRaw<AgendamentoRow[]>(Prisma.sql`
+      SELECT * FROM agendamento WHERE id = ${id} AND tenant_id::text = ${tenantId} LIMIT 1
+    `);
+    return rows[0] ?? null;
+  }
+
   async criar(input: AgendamentoInput, usuario: UsuarioActor | undefined, tenantId: string) {
     await this.ensureEstrutura();
     const familiaResolvida = await this.resolverFamiliaDoBeneficiario(input.beneficiarioId);
     const id = await prisma.$transaction(async (tx) => {
-      const salasSelecionadas = await this.resolverSalasSelecionadas(
+      const salasSelecionadas = await this.resolverSalasSelecionadasSeguras(
         {
           sala: input.sala,
           salasIds: input.salasIds,
@@ -2099,7 +2126,17 @@ export class AgendamentosRepository {
       return idInserido;
     });
 
-    const criado = await this.obter(id, tenantId);
+    let criado: AgendamentoRow | null = null;
+    try {
+      criado = await this.obter(id, tenantId);
+    } catch (error) {
+      console.warn("[agendamentos][criar][obter-fallback]", {
+        tenantId,
+        agendamentoId: id.toString(),
+        erro: error instanceof Error ? error.message : String(error)
+      });
+      criado = await this.obterBasico(id, tenantId);
+    }
     console.info("[agendamentos][criar]", {
       tenantId,
       agendamentoId: criado?.id?.toString() ?? id.toString(),
@@ -2108,8 +2145,24 @@ export class AgendamentosRepository {
         ? ((criado as { salas?: Array<{ sala_id?: bigint; sala_nome?: string }> }).salas ?? []).map((sala) => sala.sala_nome)
         : []
     });
-    await this.registrarLog(id, "criar", usuario, tenantId, null, criado);
-    await this.registrarHistoricoFamilia(criado?.familia_id, "Agendamento criado para a família.", criado, tenantId);
+    try {
+      await this.registrarLog(id, "criar", usuario, tenantId, null, criado);
+    } catch (error) {
+      console.warn("[agendamentos][criar][log-falhou]", {
+        tenantId,
+        agendamentoId: id.toString(),
+        erro: error instanceof Error ? error.message : String(error)
+      });
+    }
+    try {
+      await this.registrarHistoricoFamilia(criado?.familia_id, "Agendamento criado para a família.", criado, tenantId);
+    } catch (error) {
+      console.warn("[agendamentos][criar][historico-falhou]", {
+        tenantId,
+        agendamentoId: id.toString(),
+        erro: error instanceof Error ? error.message : String(error)
+      });
+    }
     return criado;
   }
 
@@ -2121,7 +2174,7 @@ export class AgendamentosRepository {
       const salasExistentes = Array.isArray((anterior as { salas?: Array<{ sala_id?: bigint; sala_nome?: string }> }).salas)
         ? ((anterior as { salas?: Array<{ sala_id?: bigint; sala_nome?: string }> }).salas ?? [])
         : [];
-      const salasSelecionadas = await this.resolverSalasSelecionadas(
+      const salasSelecionadas = await this.resolverSalasSelecionadasSeguras(
         {
           sala: input.sala ?? salasExistentes.map((sala) => sala.sala_nome).join(", "),
           salasIds: input.salasIds ?? salasExistentes.map((sala) => Number(sala.sala_id)).filter((valor) => Number.isInteger(valor) && Number(valor) > 0),
@@ -2325,7 +2378,7 @@ export class AgendamentosRepository {
     };
 
     const novoId = await prisma.$transaction(async (tx) => {
-      const salasSelecionadas = await this.resolverSalasSelecionadas(
+      const salasSelecionadas = await this.resolverSalasSelecionadasSeguras(
         {
           sala: payload.sala,
           salasIds: payload.salasIds,
@@ -2447,7 +2500,17 @@ export class AgendamentosRepository {
       return idNovo;
     });
 
-    const criado = await this.obter(novoId, tenantId);
+    let criado: AgendamentoRow | null = null;
+    try {
+      criado = await this.obter(novoId, tenantId);
+    } catch (error) {
+      console.warn("[agendamentos][copiar][obter-fallback]", {
+        tenantId,
+        agendamentoId: novoId.toString(),
+        erro: error instanceof Error ? error.message : String(error)
+      });
+      criado = await this.obterBasico(novoId, tenantId);
+    }
     console.info("[agendamentos][copiar]", {
       tenantId,
       origemId: id.toString(),
@@ -2457,7 +2520,15 @@ export class AgendamentosRepository {
         ? ((criado as { salas?: Array<{ sala_id?: bigint; sala_nome?: string }> }).salas ?? []).map((sala) => sala.sala_nome)
         : []
     });
-    await this.registrarLog(novoId, "copiar", usuario, tenantId, origem, criado);
+    try {
+      await this.registrarLog(novoId, "copiar", usuario, tenantId, origem, criado);
+    } catch (error) {
+      console.warn("[agendamentos][copiar][log-falhou]", {
+        tenantId,
+        agendamentoId: novoId.toString(),
+        erro: error instanceof Error ? error.message : String(error)
+      });
+    }
     return criado;
   }
 
@@ -2504,7 +2575,7 @@ export class AgendamentosRepository {
     const salasExistentes = Array.isArray((anterior as { salas?: Array<{ sala_id?: bigint; sala_nome?: string }> }).salas)
       ? ((anterior as { salas?: Array<{ sala_id?: bigint; sala_nome?: string }> }).salas ?? [])
       : [];
-    const salasSelecionadas = await this.resolverSalasSelecionadas(
+    const salasSelecionadas = await this.resolverSalasSelecionadasSeguras(
       {
         sala: input.sala ?? anterior.sala,
         salasIds: input.salasIds ?? salasExistentes.map((sala) => Number(sala.sala_id)).filter((valor) => Number.isInteger(valor) && Number(valor) > 0),
@@ -2809,7 +2880,7 @@ export class AgendamentosRepository {
     const horarioBase = formatarHoraEntrada(item.horario_inicial) ?? "08:00:00";
     const profissionalNome = trimOrUndefined(item.profissional) ?? trimOrUndefined(selecionados[0]?.profissional_nome) ?? "Equipe institucional";
     const local = trimOrUndefined(item.sala_nome) ?? trimOrUndefined(item.instituicao_parceira) ?? "Local a definir";
-    const salasSelecionadas = await this.resolverSalasSelecionadas(
+    const salasSelecionadas = await this.resolverSalasSelecionadasSeguras(
       {
         salasIds: input.salasIds,
         itemOrigemId: input.itemId
