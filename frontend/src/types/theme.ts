@@ -12,6 +12,8 @@ export type ThemePalette = {
   border: string;
   muted: string;
   card: string;
+  dashboardCard: string;
+  dashboardCardSoft: string;
   danger: string;
   warning: string;
   success: string;

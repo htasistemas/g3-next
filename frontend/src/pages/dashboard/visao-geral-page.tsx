@@ -60,12 +60,20 @@ function encurtarRotuloGrafico(texto: string, limite = 32) {
   return `${texto.slice(0, limite - 1)}…`;
 }
 
-const coresCadastros = ["#1e40af", "#2563eb", "#38bdf8", "#60a5fa", "#0ea5e9", "#818cf8", "#94a3b8"];
-const classeCardVerde =
-  "rounded-xl border border-blue-200/80 bg-[linear-gradient(180deg,rgba(247,250,255,0.98)_0%,rgba(226,236,255,0.98)_100%)] shadow-[0_18px_40px_-26px_rgba(37,99,235,0.35)]";
-const classeCardVerdeInterativo = `${classeCardVerde} transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-[0_22px_48px_-22px_rgba(37,99,235,0.42)]`;
-const classeCardVerdeSuave =
-  "rounded-xl border border-blue-100/90 bg-[rgba(255,255,255,0.78)] shadow-[0_14px_32px_-26px_rgba(37,99,235,0.24)] backdrop-blur-[2px]";
+const coresCadastros = [
+  "var(--g3-primary)",
+  "var(--g3-secondary)",
+  "var(--g3-accent)",
+  "var(--g3-warning)",
+  "var(--g3-success)",
+  "var(--g3-info)",
+  "var(--g3-muted)"
+];
+const classeCardVisaoGeral =
+  "rounded-xl border border-[var(--g3-border)] bg-[linear-gradient(180deg,var(--g3-dashboard-card)_0%,var(--g3-dashboard-card-soft)_100%)] shadow-[0_18px_40px_-26px_rgba(15,23,42,0.22)]";
+const classeCardVisaoGeralInterativo = `${classeCardVisaoGeral} transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--g3-primary)] hover:shadow-[0_22px_48px_-22px_rgba(15,23,42,0.26)]`;
+const classeCardVisaoGeralSuave =
+  "rounded-xl border border-[var(--g3-border)] bg-[var(--g3-dashboard-card-soft)] shadow-[0_14px_32px_-26px_rgba(15,23,42,0.16)] backdrop-blur-[2px]";
 
 function obterRotaCadastro(nome: string) {
   switch (nome) {
@@ -386,7 +394,7 @@ export function VisaoGeralPage() {
                   <button
                     key={card.label}
                     type="button"
-                    className={`${classeCardVerdeInterativo} px-3 py-3 text-left`}
+                    className={`${classeCardVisaoGeralInterativo} px-3 py-3 text-left`}
                     onClick={() => navigate(card.rota)}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -408,7 +416,7 @@ export function VisaoGeralPage() {
               </div>
 
               <div className="space-y-4">
-                <div className={`${classeCardVerde} min-w-0 p-3`}>
+                <div className={`${classeCardVisaoGeral} min-w-0 p-3`}>
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
@@ -418,7 +426,7 @@ export function VisaoGeralPage() {
                         Distribuição dos cadastros monitorados na operação atual.
                       </p>
                     </div>
-                    <div className={`${classeCardVerdeSuave} rounded-lg px-3 py-2 text-right`}>
+                    <div className={`${classeCardVisaoGeralSuave} rounded-lg px-3 py-2 text-right`}>
                       <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
                         Total
                       </p>
@@ -429,7 +437,7 @@ export function VisaoGeralPage() {
                   </div>
 
                   <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
-                    <div className={`${classeCardVerdeSuave} relative h-72 p-3`}>
+                    <div className={`${classeCardVisaoGeralSuave} relative h-72 p-3`}>
                       <ResponsiveChart minWidth={0} minHeight={220}>
                         <PieChart>
                           <Pie
@@ -467,7 +475,7 @@ export function VisaoGeralPage() {
                           />
                         </PieChart>
                       </ResponsiveChart>
-                      <div className="pointer-events-none absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/92 shadow-[0_18px_34px_-24px_rgba(37,99,235,0.28)] ring-1 ring-blue-100">
+                      <div className="pointer-events-none absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border border-[var(--g3-border)] bg-[var(--g3-dashboard-card)] shadow-[0_18px_34px_-24px_rgba(15,23,42,0.18)]">
                         <div className="flex h-full w-full flex-col items-center justify-center text-center">
                           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--g3-muted)]">
                             Tipos
@@ -490,7 +498,7 @@ export function VisaoGeralPage() {
                           <button
                             key={item.nome}
                             type="button"
-                            className={`${classeCardVerdeSuave} p-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-[0_22px_48px_-22px_rgba(37,99,235,0.28)]`}
+                            className={`${classeCardVisaoGeralSuave} p-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--g3-primary)] hover:shadow-[0_22px_48px_-22px_rgba(15,23,42,0.22)]`}
                             onClick={() => navigate(obterRotaCadastro(item.nome))}
                           >
                             <div className="flex items-start justify-between gap-3">
@@ -508,7 +516,7 @@ export function VisaoGeralPage() {
                                   </p>
                                 </div>
                               </div>
-                              <div className="min-w-[72px] rounded-xl bg-white/90 px-3 py-2 text-right shadow-[0_16px_28px_-24px_rgba(37,99,235,0.28)]">
+                              <div className="min-w-[72px] rounded-xl bg-[var(--g3-dashboard-card)] px-3 py-2 text-right shadow-[0_16px_28px_-24px_rgba(15,23,42,0.18)]">
                                 <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
                                   Total
                                 </p>
@@ -524,7 +532,7 @@ export function VisaoGeralPage() {
                   </div>
                 </div>
 
-                <div className={`${classeCardVerde} min-w-0 p-3`}>
+                <div className={`${classeCardVisaoGeral} min-w-0 p-3`}>
                   <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
                     Composição financeira
                   </p>
@@ -533,7 +541,7 @@ export function VisaoGeralPage() {
                       <button
                         key={item.nome}
                         type="button"
-                        className={`${classeCardVerdeSuave} min-h-[110px] px-4 py-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-[0_22px_48px_-22px_rgba(37,99,235,0.28)]`}
+                        className={`${classeCardVisaoGeralSuave} min-h-[110px] px-4 py-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--g3-primary)] hover:shadow-[0_22px_48px_-22px_rgba(15,23,42,0.22)]`}
                         onClick={() => navigate("/setor-financeiro/contabilidade")}
                       >
                         <div className="flex items-start justify-between gap-4">
@@ -561,7 +569,7 @@ export function VisaoGeralPage() {
                   </div>
                   <button
                     type="button"
-                    className={`${classeCardVerdeSuave} mt-3 w-full p-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-[0_22px_48px_-22px_rgba(37,99,235,0.28)]`}
+                    className={`${classeCardVisaoGeralSuave} mt-3 w-full p-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--g3-primary)] hover:shadow-[0_22px_48px_-22px_rgba(15,23,42,0.22)]`}
                     onClick={() => navigate("/setor-financeiro/contabilidade")}
                   >
                     <div className="flex items-center justify-between gap-2">
@@ -573,7 +581,7 @@ export function VisaoGeralPage() {
                           Distribuição atual dos recursos em caixa e banco.
                         </p>
                       </div>
-                      <div className="rounded-lg border border-blue-100/90 bg-white/88 px-3 py-2 text-right shadow-[0_16px_28px_-24px_rgba(37,99,235,0.28)]">
+                      <div className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-dashboard-card)] px-3 py-2 text-right shadow-[0_16px_28px_-24px_rgba(15,23,42,0.18)]">
                         <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
                           Total em contas
                         </p>
@@ -632,7 +640,7 @@ export function VisaoGeralPage() {
                         </ResponsiveChart>
                       </div>
                     ) : (
-                      <div className="mt-3 rounded-lg border border-dashed border-blue-200 bg-white/80 px-3 py-4 text-sm text-[var(--g3-muted)]">
+                      <div className="mt-3 rounded-lg border border-dashed border-[var(--g3-border)] bg-[var(--g3-dashboard-card-soft)] px-3 py-4 text-sm text-[var(--g3-muted)]">
                         Nenhuma conta com saldo disponível foi encontrada para montar o gráfico financeiro.
                       </div>
                     )}
@@ -643,7 +651,7 @@ export function VisaoGeralPage() {
               <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 <button
                   type="button"
-                  className={`${classeCardVerdeInterativo} px-3 py-3 text-left`}
+                  className={`${classeCardVisaoGeralInterativo} px-3 py-3 text-left`}
                   onClick={() => navigate("/setor-financeiro/prestacao-contas")}
                 >
                   <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
@@ -655,7 +663,7 @@ export function VisaoGeralPage() {
                 </button>
                 <button
                   type="button"
-                  className={`${classeCardVerdeInterativo} px-3 py-3 text-left`}
+                  className={`${classeCardVisaoGeralInterativo} px-3 py-3 text-left`}
                   onClick={() => navigate("/setor-rh/registro-ponto")}
                 >
                   <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
@@ -667,7 +675,7 @@ export function VisaoGeralPage() {
                 </button>
                 <button
                   type="button"
-                  className={`${classeCardVerdeInterativo} px-3 py-3 text-left`}
+                  className={`${classeCardVisaoGeralInterativo} px-3 py-3 text-left`}
                   onClick={() => navigate("/setor-financeiro/contabilidade")}
                 >
                   <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">

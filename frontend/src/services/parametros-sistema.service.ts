@@ -17,6 +17,8 @@ type PersonalizacaoResponse = {
       border: string;
       muted: string;
       card: string;
+      dashboard_card: string;
+      dashboard_card_soft: string;
       danger: string;
       warning: string;
       success: string;
@@ -131,6 +133,8 @@ function fromApi(response: PersonalizacaoResponse): ThemeSettings {
       border: response.personalizacao.paleta.border,
       muted: response.personalizacao.paleta.muted,
       card: response.personalizacao.paleta.card,
+      dashboardCard: response.personalizacao.paleta.dashboard_card,
+      dashboardCardSoft: response.personalizacao.paleta.dashboard_card_soft,
       danger: response.personalizacao.paleta.danger,
       warning: response.personalizacao.paleta.warning,
       success: response.personalizacao.paleta.success,
@@ -156,6 +160,8 @@ function toApi(settings: ThemeSettings) {
         border: settings.paleta.border,
         muted: settings.paleta.muted,
         card: settings.paleta.card,
+        dashboard_card: settings.paleta.dashboardCard,
+        dashboard_card_soft: settings.paleta.dashboardCardSoft,
         danger: settings.paleta.danger,
         warning: settings.paleta.warning,
         success: settings.paleta.success,

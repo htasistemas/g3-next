@@ -12,6 +12,8 @@ export const defaultThemePalette: ThemePalette = {
   border: "#DBE7E0",
   muted: "#64748B",
   card: "#FFFFFF",
+  dashboardCard: "#F3F4F6",
+  dashboardCardSoft: "#E5E7EB",
   danger: "#DC2626",
   warning: "#D97706",
   success: "#16A34A",
@@ -113,7 +115,9 @@ export const themePresets: ThemePreset[] = [
         foreground: "#E2E8F0",
         border: "#23314B",
         muted: "#94A3B8",
-        card: "#111827"
+        card: "#111827",
+        dashboardCard: "#D1D5DB",
+        dashboardCardSoft: "#9CA3AF"
       }
     }
   }

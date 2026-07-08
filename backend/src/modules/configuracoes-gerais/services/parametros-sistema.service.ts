@@ -31,6 +31,8 @@ const personalizacaoPadrao: PersonalizacaoSistema = {
     border: "#dbe7e0",
     muted: "#64748b",
     card: "#ffffff",
+    dashboard_card: "#f3f4f6",
+    dashboard_card_soft: "#e5e7eb",
     danger: "#dc2626",
     warning: "#d97706",
     success: "#16a34a",

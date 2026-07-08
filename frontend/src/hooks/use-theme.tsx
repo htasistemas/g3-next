@@ -62,6 +62,14 @@ function normalizarSettings(input: ThemeSettings): ThemeSettings {
       border: sanitizeHex(input.paleta.border, defaultThemeSettings.paleta.border),
       muted: sanitizeHex(input.paleta.muted, defaultThemeSettings.paleta.muted),
       card: sanitizeHex(input.paleta.card, defaultThemeSettings.paleta.card),
+      dashboardCard: sanitizeHex(
+        input.paleta.dashboardCard,
+        defaultThemeSettings.paleta.dashboardCard
+      ),
+      dashboardCardSoft: sanitizeHex(
+        input.paleta.dashboardCardSoft,
+        defaultThemeSettings.paleta.dashboardCardSoft
+      ),
       danger: sanitizeHex(input.paleta.danger, defaultThemeSettings.paleta.danger),
       warning: sanitizeHex(input.paleta.warning, defaultThemeSettings.paleta.warning),
       success: sanitizeHex(input.paleta.success, defaultThemeSettings.paleta.success),
@@ -99,6 +107,8 @@ function aplicarVariaveisCss(settings: ThemeSettings) {
   root.style.setProperty("--g3-page-gradient-end", lighten(background, temaEscuro ? 0.02 : 0.04));
   root.style.setProperty("--g3-card", card);
   root.style.setProperty("--g3-card-soft", temaEscuro ? "#0F172A" : lighten(card, 0.02));
+  root.style.setProperty("--g3-dashboard-card", paleta.dashboardCard);
+  root.style.setProperty("--g3-dashboard-card-soft", paleta.dashboardCardSoft);
   root.style.setProperty("--g3-foreground", foreground);
   root.style.setProperty("--g3-muted", muted);
   root.style.setProperty("--g3-border", border);

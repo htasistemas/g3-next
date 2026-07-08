@@ -21,6 +21,8 @@ export const paletaTemaSchema = z.object({
   border: corHex,
   muted: corHex,
   card: corHex,
+  dashboard_card: corHex,
+  dashboard_card_soft: corHex,
   danger: corHex,
   warning: corHex,
   success: corHex,
