@@ -1068,6 +1068,32 @@ export class AgendamentosRepository {
     `);
   }
 
+  async obterItemOperacional(itemId: bigint, tenantId: string) {
+    await this.ensureEstrutura();
+
+    const rows = await prisma.$queryRaw<AgendamentoOperacionalItemRow[]>(Prisma.sql`
+      SELECT
+        c.id,
+        c.tipo,
+        c.nome,
+        c.profissional,
+        TO_CHAR(c.horario_inicial, 'HH24:MI') AS horario_inicial,
+        c.duracao_horas,
+        c.dias_semana,
+        s.nome AS sala_nome,
+        c.instituicao_parceira,
+        c.status
+      FROM cursos_atendimentos c
+      LEFT JOIN salas_unidade s ON s.id = c.sala_id
+      WHERE c.id = ${itemId}
+        AND c.tenant_id::text = ${tenantId}
+        AND COALESCE(c.status, 'Ativo') <> 'Inativo'
+      LIMIT 1
+    `);
+
+    return rows[0] ?? null;
+  }
+
   async listarBeneficiariosOperacionais(itemId: bigint, tenantId: string) {
     await this.ensureEstrutura();
 
@@ -1768,13 +1794,14 @@ export class AgendamentosRepository {
   }
 
   private async montarPayloadOperacional(input: AgendamentoOperacionalInput, tenantId: string): Promise<AgendamentoInput> {
-    const itens = await this.listarItensOperacionais(input.tipo, undefined, tenantId);
-    const item = itens.find((entry) => Number(entry.id) === input.itemId);
+    const [item, beneficiarios] = await Promise.all([
+      this.obterItemOperacional(BigInt(input.itemId), tenantId),
+      this.listarBeneficiariosOperacionais(BigInt(input.itemId), tenantId)
+    ]);
     if (!item) {
       throw new AppError("Item de inscricao nao encontrado para agendamento.", 404);
     }
 
-    const beneficiarios = await this.listarBeneficiariosOperacionais(BigInt(input.itemId), tenantId);
     const idsMatriculas = new Set(input.matriculasIds ?? []);
     const idsBeneficiarios = new Set(input.beneficiariosIds ?? []);
     const usarMatriculas = idsMatriculas.size > 0;
