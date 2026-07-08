@@ -169,6 +169,32 @@ function formatarHoraCurta(valor?: string) {
   return match ? match[1] : valor;
 }
 
+function horaParaMinutos(valor?: string) {
+  if (!valor) return null;
+  const match = valor.match(/^(\d{2}):(\d{2})/);
+  if (!match) return null;
+  const horas = Number(match[1]);
+  const minutos = Number(match[2]);
+  if (!Number.isInteger(horas) || !Number.isInteger(minutos)) return null;
+  return horas * 60 + minutos;
+}
+
+function formatarPeriodoMapa(inicio?: string, fim?: string) {
+  const inicioTexto = formatarHoraCurta(inicio);
+  const fimTexto = formatarHoraCurta(fim);
+  return `${inicioTexto}${fimTexto && fimTexto !== "---" ? ` até ${fimTexto}` : ""}`;
+}
+
+function calcularFaixaHorario(inicio?: string, fim?: string) {
+  const inicioMin = horaParaMinutos(inicio) ?? 0;
+  const fimMin = horaParaMinutos(fim) ?? Math.min(inicioMin + 60, 24 * 60);
+  const larguraMin = Math.max(15, fimMin - inicioMin);
+  return {
+    left: `${Math.max(0, Math.min(100, (inicioMin / 1440) * 100))}%`,
+    width: `${Math.max(1, Math.min(100, (larguraMin / 1440) * 100))}%`
+  };
+}
+
 function chaveSalaDia(salaId: number, data: string) {
   return `${salaId}:${data}`;
 }
@@ -1316,14 +1342,14 @@ export function AgendamentosPage() {
 
           {abaAtiva === "mapa-salas" ? (
             <Card className="border-[var(--g3-border)] bg-[linear-gradient(180deg,#ffffff_0%,#fbfdfb_100%)] shadow-sm">
-              <CardHeader className="space-y-2">
-                <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
-                    <CardTitle className="text-sm">Mapa de salas</CardTitle>
-                    <p className="text-xs text-[var(--g3-muted)]">
-                      Visão semanal com ocupações persistidas no PostgreSQL e bloqueio automático por sala, data e horário.
-                    </p>
-                  </div>
+                  <CardHeader className="space-y-2">
+                    <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                      <div>
+                        <CardTitle className="text-sm">Mapa de salas</CardTitle>
+                        <p className="text-xs text-[var(--g3-muted)]">
+                      Visão semanal com ocupações por intervalo de horas. A sala fica livre fora do período reservado.
+                        </p>
+                      </div>
                   <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--g3-muted)]">
                     <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-medium text-emerald-800">
                       {mapaSalasQuery.data?.salas.length ?? salasDisponiveis.length} sala(s)
@@ -1408,7 +1434,7 @@ export function AgendamentosPage() {
                               return (
                                 <td key={`${sala.id}-${dia}`} className="border-b border-[var(--g3-border)] px-3 py-3">
                                   {ocupada ? (
-                                    <div className="space-y-2">
+                                    <div className="space-y-3">
                                       {ocupacoes.map((ocupacao) => (
                                         <div
                                           key={`${ocupacao.agendamentoId}-${ocupacao.salaId}-${ocupacao.data}`}
@@ -1421,19 +1447,24 @@ export function AgendamentosPage() {
                                             </span>
                                           </div>
                                           <p className="mt-1 text-xs text-rose-800">
-                                            {formatarHoraCurta(ocupacao.horaInicial)}
-                                            {ocupacao.horaFinal ? ` até ${formatarHoraCurta(ocupacao.horaFinal)}` : ""}
+                                            {formatarPeriodoMapa(ocupacao.horaInicial, ocupacao.horaFinal)}
                                           </p>
                                           <p className="text-xs text-rose-700">{ocupacao.profissionalNome || "Sem profissional informado"}</p>
                                           <p className="text-xs text-rose-700">
                                             {ocupacao.participantes?.length ?? 0} participante(s)
                                           </p>
+                                          <div className="relative mt-2 h-2 overflow-hidden rounded-full bg-white/80">
+                                            <div
+                                              className="absolute inset-y-0 rounded-full bg-rose-500"
+                                              style={calcularFaixaHorario(ocupacao.horaInicial, ocupacao.horaFinal)}
+                                            />
+                                          </div>
                                         </div>
                                       ))}
                                     </div>
                                   ) : (
                                     <div className="flex min-h-24 items-center justify-center rounded-xl border border-dashed border-emerald-200 bg-emerald-50 px-3 py-3 text-xs font-medium text-emerald-800">
-                                      Disponível
+                                      Disponível o dia todo
                                     </div>
                                   )}
                                 </td>
