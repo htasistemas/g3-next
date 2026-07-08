@@ -757,21 +757,28 @@ export function AgendamentosPage() {
     const linhas = participantes.length
       ? participantes
           .map(
-            (participante, index) => `
+            (participante, index) => {
+              const idade = formatarIdade(participante.dataNascimento);
+              return `
               <tr>
                 <td>${index + 1}</td>
                 <td>${escapeHtml(participante.codigo || participante.beneficiarioId?.toString() || participante.matriculaId?.toString() || "-")}</td>
-                <td>${escapeHtml(participante.beneficiarioNome)}</td>
+                <td>
+                  <div class="g3-beneficiario">
+                    <span class="g3-beneficiario-nome">${escapeHtml(participante.beneficiarioNome)}</span>
+                    <span class="g3-beneficiario-idade">Idade: ${escapeHtml(idade)}</span>
+                  </div>
+                </td>
                 <td>${escapeHtml(formatarTelefoneRelatorio(participante.telefone) || "-")}</td>
-                <td>${escapeHtml(formatarIdade(participante.dataNascimento))}</td>
                 <td><span class="g3-assinatura-campo" aria-hidden="true"></span></td>
-              </tr>`
+              </tr>`;
+            }
           )
           .join("")
       : `
         <tr>
           <td>1</td>
-          <td colspan="5">Sem beneficiários vinculados ao card.</td>
+          <td colspan="4">Sem beneficiários vinculados ao card.</td>
         </tr>`;
 
     const emitidoEm = new Date().toLocaleString("pt-BR");
@@ -806,18 +813,19 @@ export function AgendamentosPage() {
         .g3-tabela td:first-child,
         .g3-tabela td:nth-child(2),
         .g3-tabela td:nth-child(4),
-        .g3-tabela td:nth-child(5),
-        .g3-tabela td:nth-child(6) { white-space: nowrap; }
+        .g3-tabela td:nth-child(5) { white-space: nowrap; }
+        .g3-tabela td:nth-child(3) { white-space: normal; }
         .g3-tabela th:nth-child(2),
-        .g3-tabela td:nth-child(2) { width: 76px; }
+        .g3-tabela td:nth-child(2) { width: 54px; }
         .g3-tabela th:nth-child(3),
-        .g3-tabela td:nth-child(3) { width: 29%; }
+        .g3-tabela td:nth-child(3) { width: 40%; }
         .g3-tabela th:nth-child(4),
-        .g3-tabela td:nth-child(4) { width: 118px; }
+        .g3-tabela td:nth-child(4) { width: 132px; }
         .g3-tabela th:nth-child(5),
-        .g3-tabela td:nth-child(5) { width: 62px; }
-        .g3-tabela th:nth-child(6),
-        .g3-tabela td:nth-child(6) { width: 170px; }
+        .g3-tabela td:nth-child(5) { width: 158px; }
+        .g3-beneficiario { display: flex; flex-direction: column; gap: 2px; }
+        .g3-beneficiario-nome { display: block; line-height: 1.2; white-space: normal; word-break: normal; overflow-wrap: anywhere; }
+        .g3-beneficiario-idade { display: block; font-size: 11px; color: #6b7f75; line-height: 1.15; }
         .g3-assinatura-campo { display: block; min-height: 20px; border-bottom: 1px solid #96b3a2; }
         .g3-rodape { margin-top: 18px; padding-top: 12px; border-top: 1px solid #dbe7df; font-size: 11px; color: #6b7f75; text-align: center; }
         .g3-rodape div + div { margin-top: 2px; }
@@ -857,12 +865,11 @@ export function AgendamentosPage() {
           <table class="g3-tabela">
             <thead>
               <tr>
-                <th style="width: 42px;">Nº</th>
-                <th style="width: 76px;">Código</th>
+                <th style="width: 42px;">Número</th>
+                <th style="width: 54px;">Código</th>
                 <th>Beneficiário</th>
-                <th style="width: 118px;">Telefone</th>
-                <th style="width: 62px;">Idade</th>
-                <th style="width: 170px;">Assinatura</th>
+                <th style="width: 132px;">Telefone</th>
+                <th style="width: 158px;">Assinatura</th>
               </tr>
             </thead>
             <tbody>${linhas}</tbody>

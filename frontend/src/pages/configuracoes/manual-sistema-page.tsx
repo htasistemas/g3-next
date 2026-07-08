@@ -245,7 +245,7 @@ const secoesManual: ManualSecao[] = [
         ],
         atencoes: [
           "O agendamento operacional reaproveita dados reais das inscrições; se um beneficiário não estiver vinculado ao item, ele não poderá ser selecionado no card.",
-          "Quando o telefone já existir no cadastro do beneficiário, a aba Agendamento e os cards vinculados devem mostrar esse número em vez de exibir Telefone não informado, e o relatório impresso deve usar o mesmo telefone formatado em padrão enxuto.",
+          "Quando o telefone já existir no cadastro do beneficiário, a aba Agendamento e os cards vinculados devem mostrar esse número em vez de exibir Telefone não informado, e o relatório impresso deve usar o mesmo telefone formatado em padrão enxuto. Na ficha de agendamento e lista de presença, a idade sai da coluna separada e passa a aparecer abaixo do nome do beneficiário.",
           "O sistema impede duplicidade do mesmo beneficiário dentro do mesmo card, valida duplicidade por data, horário, profissional e atendimento, e registra auditoria de criação, edição, cancelamento, exclusão, cópia e envios.",
           "O envio por WhatsApp prepara links diretos para contato e o envio por e-mail depende de endereço válido cadastrado no participante."
         ]
