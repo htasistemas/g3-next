@@ -680,34 +680,42 @@ export function AgendamentosPage() {
           telefone: item.telefone,
           comparecimento: "Pendente" as const
         }));
+      const agendaPreview: Agendamento = {
+        id: -Date.now(),
+        beneficiarioId: participantesPreview[0]?.beneficiarioId,
+        beneficiarioNome: itemSelecionado.nome,
+        unidade: itemSelecionado.local ?? "Local a definir",
+        setor: tipo === "curso" ? "Curso" : tipo === "oficina" ? "Oficina" : "Atendimento",
+        tipoAtendimento: itemSelecionado.nome,
+        profissionalNome: itemSelecionado.profissionalNome,
+        data: dataExibicao,
+        horaInicial: itemSelecionado.horario ?? "08:00",
+        modalidade: "Coletivo",
+        prioridade: "Normal",
+        status: "Agendado",
+        coletivo: true,
+        tituloColetivo: itemSelecionado.nome,
+        capacidadeMaxima: participantesPreview.length,
+        participantes: participantesPreview,
+        itemTipo: tipo,
+        itemOrigemId: itemSelecionado.id,
+        itemNome: itemSelecionado.nome,
+        itemDiasSemana: itemSelecionado.diasSemana,
+        itemLocal: itemSelecionado.local,
+        diaSemana: new Intl.DateTimeFormat("pt-BR", { weekday: "long" }).format(
+          new Date(`${dataExibicao}T12:00:00`)
+        ),
+        observacaoCurta: `${participantesPreview.length} participante(s) vinculado(s) pela inscricao.`
+      };
       const agendaVisivel: Agendamento =
-        salvo ?? {
-          id: -Date.now(),
-          beneficiarioId: participantesPreview[0]?.beneficiarioId,
-          beneficiarioNome: itemSelecionado.nome,
-          unidade: itemSelecionado.local ?? "Local a definir",
-          setor: tipo === "curso" ? "Curso" : tipo === "oficina" ? "Oficina" : "Atendimento",
-          tipoAtendimento: itemSelecionado.nome,
-          profissionalNome: itemSelecionado.profissionalNome,
-          data: dataExibicao,
-          horaInicial: itemSelecionado.horario ?? "08:00",
-          modalidade: "Coletivo",
-          prioridade: "Normal",
-          status: "Agendado",
-          coletivo: true,
-          tituloColetivo: itemSelecionado.nome,
-          capacidadeMaxima: participantesPreview.length,
-          participantes: participantesPreview,
-          itemTipo: tipo,
-          itemOrigemId: itemSelecionado.id,
-          itemNome: itemSelecionado.nome,
-          itemDiasSemana: itemSelecionado.diasSemana,
-          itemLocal: itemSelecionado.local,
-          diaSemana: new Intl.DateTimeFormat("pt-BR", { weekday: "long" }).format(
-            new Date(`${dataExibicao}T12:00:00`)
-          ),
-          observacaoCurta: `${participantesPreview.length} participante(s) vinculado(s) pela inscricao.`
-        };
+        salvo &&
+        Boolean(salvo.data) &&
+        Boolean(salvo.horaInicial) &&
+        Boolean(salvo.itemTipo) &&
+        Boolean(salvo.itemOrigemId) &&
+        String(salvo.data ?? "").slice(0, 10) === dataExibicao
+          ? salvo
+          : agendaPreview;
 
       queryClient.setQueriesData<Agendamento[]>(
         { queryKey: ["agendamentos", usuario?.tenant_id ?? "sem-tenant"] },
