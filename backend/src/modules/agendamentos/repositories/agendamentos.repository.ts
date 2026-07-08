@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../../database/prisma.js";
 import { EmailService } from "../../email/services/email.service.js";
 import { AppError } from "../../../shared/errors/app-error.js";
-import { toIsoDate, toOptionalDate, trimOrUndefined } from "../../../utils/string-utils.js";
+import { normalizeDigits, toIsoDate, toOptionalDate, trimOrUndefined } from "../../../utils/string-utils.js";
 import type {
   AgendamentoBeneficiarioRow,
   AgendamentoCheckInInput,
@@ -260,6 +260,10 @@ function normalizarTextoComparacao(valor?: string | null) {
     .toLowerCase();
 }
 
+function chaveParticipantePorNome(nome?: string | null) {
+  return `nome:${normalizarTextoComparacao(nome)}`;
+}
+
 function normalizarTextoSql(campo: Prisma.Sql) {
   return Prisma.sql`
     LOWER(
@@ -319,13 +323,22 @@ function extrairTelefoneContato(contato?: {
   telefone_principal?: string | null;
 } | null) {
   if (!contato) return undefined;
-  if (typeof contato.telefone_principal === "string" && contato.telefone_principal.trim().length) {
+  if (typeof contato.telefone_principal === "string" && normalizeDigits(contato.telefone_principal)) {
     return contato.telefone_principal;
   }
-  if (typeof contato.telefone === "string" && contato.telefone.trim().length) {
+  if (typeof contato.telefone === "string" && normalizeDigits(contato.telefone)) {
     return contato.telefone;
   }
   return undefined;
+}
+
+function sqlTelefoneLimpo(campo: Prisma.Sql) {
+  return Prisma.sql`
+    NULLIF(
+      REGEXP_REPLACE(COALESCE(${campo}, ''), '\D', '', 'g'),
+      ''
+    )
+  `;
 }
 
 function extrairEmailContato(contato?: { email?: string | null } | null) {
@@ -509,7 +522,7 @@ export class AgendamentosRepository {
     if (beneficiarioId) {
       return `id:${beneficiarioId.toString()}`;
     }
-    return `nome:${normalizarTextoComparacao(nome)}`;
+    return chaveParticipantePorNome(nome);
   }
 
   private async listarBeneficiariosAgendamentoComContato(agendamentoIds: bigint[], tenantId: string) {
@@ -526,10 +539,10 @@ export class AgendamentosRepository {
         ab.beneficiario_nome,
         contato.data_nascimento AS data_nascimento,
         COALESCE(
-          NULLIF(TRIM(ab.telefone), ''),
-          NULLIF(TRIM(contato.telefone_principal), ''),
-          NULLIF(TRIM(contato.telefone_secundario), ''),
-          NULLIF(TRIM(contato.telefone_recado_numero), '')
+          ${sqlTelefoneLimpo(Prisma.sql`ab.telefone`)},
+          ${sqlTelefoneLimpo(Prisma.sql`contato.telefone_principal`)},
+          ${sqlTelefoneLimpo(Prisma.sql`contato.telefone_secundario`)},
+          ${sqlTelefoneLimpo(Prisma.sql`contato.telefone_recado_numero`)}
         ) AS telefone,
         COALESCE(NULLIF(TRIM(ab.email), ''), NULLIF(TRIM(contato.email), '')) AS email,
         ab.status,
@@ -570,17 +583,21 @@ export class AgendamentosRepository {
         WHERE b.tenant_id::text = ${tenantId}
           AND (
             (ab.beneficiario_id IS NOT NULL AND b.id = ab.beneficiario_id)
-            OR (
-              ab.beneficiario_id IS NULL
-              AND ${normalizarTextoSql(Prisma.sql`b.nome_completo`)} = ${normalizarTextoSql(Prisma.sql`ab.beneficiario_nome`)}
-            )
+            OR ${normalizarTextoSql(Prisma.sql`b.nome_completo`)} = ${normalizarTextoSql(Prisma.sql`ab.beneficiario_nome`)}
           )
         ORDER BY
           CASE
+            WHEN ab.beneficiario_id IS NOT NULL AND b.id = ab.beneficiario_id
+            THEN 0
+            WHEN ${normalizarTextoSql(Prisma.sql`b.nome_completo`)} = ${normalizarTextoSql(Prisma.sql`ab.beneficiario_nome`)}
+            THEN 1
+            ELSE 2
+          END,
+          CASE
             WHEN COALESCE(
-              NULLIF(TRIM(contato_beneficio.telefone_principal), ''),
-              NULLIF(TRIM(contato_beneficio.telefone_secundario), ''),
-              NULLIF(TRIM(contato_beneficio.telefone_recado_numero), '')
+              ${sqlTelefoneLimpo(Prisma.sql`contato_beneficio.telefone_principal`)},
+              ${sqlTelefoneLimpo(Prisma.sql`contato_beneficio.telefone_secundario`)},
+              ${sqlTelefoneLimpo(Prisma.sql`contato_beneficio.telefone_recado_numero`)}
             ) IS NOT NULL
               OR b.data_nascimento IS NOT NULL
             THEN 0
@@ -635,9 +652,9 @@ export class AgendamentosRepository {
         b.nome_completo AS beneficiario_nome,
         b.data_nascimento,
         COALESCE(
-          NULLIF(TRIM(contato_beneficio.telefone_principal), ''),
-          NULLIF(TRIM(contato_beneficio.telefone_secundario), ''),
-          NULLIF(TRIM(contato_beneficio.telefone_recado_numero), '')
+          ${sqlTelefoneLimpo(Prisma.sql`contato_beneficio.telefone_principal`)},
+          ${sqlTelefoneLimpo(Prisma.sql`contato_beneficio.telefone_secundario`)},
+          ${sqlTelefoneLimpo(Prisma.sql`contato_beneficio.telefone_recado_numero`)}
         ) AS telefone,
         NULLIF(TRIM(contato_beneficio.email), '') AS email
       FROM cadastro_beneficiario b
@@ -666,10 +683,80 @@ export class AgendamentosRepository {
         AND (${Prisma.join(filtros, " OR ")})
       ORDER BY
         CASE
+          WHEN ${normalizarTextoSql(Prisma.sql`b.nome_completo`)} IN (${Prisma.join(nomes)})
+          THEN 0
+          WHEN b.id IN (${Prisma.join(ids.map((id) => BigInt(id)))})
+          THEN 1
+          ELSE 2
+        END,
+        b.id DESC
+    `);
+  }
+
+  private async listarContatosPorNomes(nomesEntrada: Array<string | null | undefined>, tenantId: string) {
+    const nomes = Array.from(
+      new Set(
+        nomesEntrada
+          .map((nome) => normalizarTextoComparacao(nome))
+          .filter(Boolean)
+      )
+    );
+
+    if (!nomes.length) {
+      return [];
+    }
+
+    return prisma.$queryRaw<
+      Array<{
+        beneficiario_id: bigint;
+        codigo: string | null;
+        beneficiario_nome: string;
+        data_nascimento: Date | null;
+        telefone: string | null;
+        email: string | null;
+      }>
+    >(Prisma.sql`
+      SELECT
+        b.id AS beneficiario_id,
+        b.codigo,
+        b.nome_completo AS beneficiario_nome,
+        b.data_nascimento,
+        COALESCE(
+          ${sqlTelefoneLimpo(Prisma.sql`contato_beneficio.telefone_principal`)},
+          ${sqlTelefoneLimpo(Prisma.sql`contato_beneficio.telefone_secundario`)},
+          ${sqlTelefoneLimpo(Prisma.sql`contato_beneficio.telefone_recado_numero`)}
+        ) AS telefone,
+        NULLIF(TRIM(contato_beneficio.email), '') AS email
+      FROM cadastro_beneficiario b
+      LEFT JOIN LATERAL (
+        SELECT
+          c.telefone_principal,
+          c.telefone_secundario,
+          c.telefone_recado_numero,
+          c.email
+        FROM contato_beneficiario c
+        WHERE c.beneficiario_id = b.id
+          AND c.tenant_id::text = ${tenantId}
+        ORDER BY
+          CASE
+            WHEN COALESCE(
+              NULLIF(TRIM(c.telefone_principal), ''),
+              NULLIF(TRIM(c.telefone_secundario), ''),
+              NULLIF(TRIM(c.telefone_recado_numero), '')
+            ) IS NULL THEN 1
+            ELSE 0
+          END,
+          c.id DESC
+        LIMIT 1
+      ) contato_beneficio ON TRUE
+      WHERE b.tenant_id::text = ${tenantId}
+        AND LOWER(unaccent(TRIM(COALESCE(b.nome_completo, '')))) IN (${Prisma.join(nomes)})
+      ORDER BY
+        CASE
           WHEN COALESCE(
-            NULLIF(TRIM(contato_beneficio.telefone_principal), ''),
-            NULLIF(TRIM(contato_beneficio.telefone_secundario), ''),
-            NULLIF(TRIM(contato_beneficio.telefone_recado_numero), '')
+            ${sqlTelefoneLimpo(Prisma.sql`contato_beneficio.telefone_principal`)},
+            ${sqlTelefoneLimpo(Prisma.sql`contato_beneficio.telefone_secundario`)},
+            ${sqlTelefoneLimpo(Prisma.sql`contato_beneficio.telefone_recado_numero`)}
           ) IS NOT NULL
             OR b.data_nascimento IS NOT NULL
           THEN 0
@@ -714,9 +801,9 @@ export class AgendamentosRepository {
           b.codigo,
           b.data_nascimento,
           COALESCE(
-            NULLIF(TRIM(contato_beneficio.telefone_principal), ''),
-            NULLIF(TRIM(contato_beneficio.telefone_secundario), ''),
-            NULLIF(TRIM(contato_beneficio.telefone_recado_numero), '')
+            ${sqlTelefoneLimpo(Prisma.sql`contato_beneficio.telefone_principal`)},
+            ${sqlTelefoneLimpo(Prisma.sql`contato_beneficio.telefone_secundario`)},
+            ${sqlTelefoneLimpo(Prisma.sql`contato_beneficio.telefone_recado_numero`)}
           ) AS telefone_principal,
           NULLIF(TRIM(contato_beneficio.email), '') AS email
         FROM cadastro_beneficiario b
@@ -765,9 +852,9 @@ export class AgendamentosRepository {
         ORDER BY
           CASE
             WHEN COALESCE(
-              NULLIF(TRIM(contato_beneficio.telefone_principal), ''),
-              NULLIF(TRIM(contato_beneficio.telefone_secundario), ''),
-              NULLIF(TRIM(contato_beneficio.telefone_recado_numero), '')
+              ${sqlTelefoneLimpo(Prisma.sql`contato_beneficio.telefone_principal`)},
+              ${sqlTelefoneLimpo(Prisma.sql`contato_beneficio.telefone_secundario`)},
+              ${sqlTelefoneLimpo(Prisma.sql`contato_beneficio.telefone_recado_numero`)}
             ) IS NOT NULL
               OR b.data_nascimento IS NOT NULL
             THEN 0
@@ -825,9 +912,9 @@ export class AgendamentosRepository {
           b.codigo,
           b.data_nascimento,
           COALESCE(
-            NULLIF(TRIM(contato_beneficio.telefone_principal), ''),
-            NULLIF(TRIM(contato_beneficio.telefone_secundario), ''),
-            NULLIF(TRIM(contato_beneficio.telefone_recado_numero), '')
+            ${sqlTelefoneLimpo(Prisma.sql`contato_beneficio.telefone_principal`)},
+            ${sqlTelefoneLimpo(Prisma.sql`contato_beneficio.telefone_secundario`)},
+            ${sqlTelefoneLimpo(Prisma.sql`contato_beneficio.telefone_recado_numero`)}
           ) AS telefone,
           NULLIF(TRIM(contato_beneficio.email), '') AS email
         FROM cadastro_beneficiario b
@@ -876,9 +963,9 @@ export class AgendamentosRepository {
         ORDER BY
           CASE
             WHEN COALESCE(
-              NULLIF(TRIM(contato_beneficio.telefone_principal), ''),
-              NULLIF(TRIM(contato_beneficio.telefone_secundario), ''),
-              NULLIF(TRIM(contato_beneficio.telefone_recado_numero), '')
+              ${sqlTelefoneLimpo(Prisma.sql`contato_beneficio.telefone_principal`)},
+              ${sqlTelefoneLimpo(Prisma.sql`contato_beneficio.telefone_secundario`)},
+              ${sqlTelefoneLimpo(Prisma.sql`contato_beneficio.telefone_recado_numero`)}
             ) IS NOT NULL
               OR b.data_nascimento IS NOT NULL
             THEN 0
@@ -938,6 +1025,18 @@ export class AgendamentosRepository {
       ),
       tenantId
     );
+    const contatosPorNomeExato = await this.listarContatosPorNomes(
+      rows.flatMap((row) =>
+        Array.isArray(row.participantes)
+          ? (row.participantes as Array<Record<string, unknown>>)
+              .map((participante) =>
+                lerTextoParticipante(participante.beneficiarioNome ?? participante.beneficiario_nome)
+              )
+              .filter((valor): valor is string => typeof valor === "string" && valor.trim().length > 0)
+          : []
+      ),
+      tenantId
+    );
     const contatosPorMatricula = await this.listarContatosPorMatriculas(
       rows.flatMap((row) =>
         Array.isArray(row.participantes)
@@ -972,12 +1071,13 @@ export class AgendamentosRepository {
     }
     const contatosItensPorChave = new Map<
       string,
-      { codigo: string | null; data_nascimento: Date | null; telefone: string | null; email: string | null }
+      { beneficiario_nome: string; codigo: string | null; data_nascimento: Date | null; telefone: string | null; email: string | null }
     >();
     for (const contato of contatosItensOperacionais) {
       const itemOrigemId = Number(contato.item_origem_id);
       const matriculaId = Number(contato.matricula_id);
       contatosItensPorChave.set(`item:${itemOrigemId}:matricula:${matriculaId}`, {
+        beneficiario_nome: contato.beneficiario_nome,
         codigo: contato.codigo,
         data_nascimento: contato.data_nascimento,
         telefone: contato.telefone,
@@ -985,10 +1085,20 @@ export class AgendamentosRepository {
       });
       contatosItensPorChave.set(
         `item:${itemOrigemId}:participante:${this.chaveParticipante(contato.beneficiario_nome, contato.beneficiario_id)}`,
-        { codigo: contato.codigo, data_nascimento: contato.data_nascimento, telefone: contato.telefone, email: contato.email }
+        {
+          beneficiario_nome: contato.beneficiario_nome,
+          codigo: contato.codigo,
+          data_nascimento: contato.data_nascimento,
+          telefone: contato.telefone,
+          email: contato.email
+        }
       );
     }
     const contatosFallbackPorChave = new Map<
+      string,
+      { beneficiario_id: bigint; codigo: string | null; beneficiario_nome: string; data_nascimento: Date | null; telefone: string | null; email: string | null }
+    >();
+    const contatosFallbackPorNome = new Map<
       string,
       { beneficiario_id: bigint; codigo: string | null; beneficiario_nome: string; data_nascimento: Date | null; telefone: string | null; email: string | null }
     >();
@@ -997,6 +1107,14 @@ export class AgendamentosRepository {
         this.chaveParticipante(contato.beneficiario_nome, contato.beneficiario_id),
         contato
       );
+      contatosFallbackPorNome.set(chaveParticipantePorNome(contato.beneficiario_nome), contato);
+    }
+    const contatosNomeExatoPorNome = new Map<
+      string,
+      { beneficiario_id: bigint; codigo: string | null; beneficiario_nome: string; data_nascimento: Date | null; telefone: string | null; email: string | null }
+    >();
+    for (const contato of contatosPorNomeExato) {
+      contatosNomeExatoPorNome.set(chaveParticipantePorNome(contato.beneficiario_nome), contato);
     }
 
     return rows.map((row) => {
@@ -1025,22 +1143,45 @@ export class AgendamentosRepository {
               const beneficiarioId = beneficiarioIdNumero ? BigInt(beneficiarioIdNumero) : null;
               const nome = lerTextoParticipante(participante.beneficiarioNome ?? participante.beneficiario_nome) ?? "";
               const chaveParticipante = this.chaveParticipante(nome, beneficiarioId);
-              const contatoMatricula = matriculaId ? contatosPorMatriculaMap.get(matriculaId) : undefined;
-              const contatoItem =
+              const chaveNome = chaveParticipantePorNome(nome);
+              const contatoMatriculaBruto = matriculaId ? contatosPorMatriculaMap.get(matriculaId) : undefined;
+              const contatoMatricula =
+                contatoMatriculaBruto &&
+                normalizarTextoComparacao(contatoMatriculaBruto.beneficiario_nome) === normalizarTextoComparacao(nome)
+                  ? contatoMatriculaBruto
+                  : undefined;
+              const contatoItemBruto =
                 itemOrigemId && matriculaId
                   ? contatosItensPorChave.get(`item:${itemOrigemId}:matricula:${matriculaId}`)
                   : itemOrigemId
                     ? contatosItensPorChave.get(`item:${itemOrigemId}:participante:${chaveParticipante}`)
                     : undefined;
-              const contato =
-                contatoMatricula ??
-                contatoItem ??
-                contatosPorChave.get(chaveParticipante) ??
-                contatosFallbackPorChave.get(chaveParticipante);
-              const telefoneContato = extrairTelefoneContato(contato);
-              const emailContato = extrairEmailContato(contato);
+              const contatoItem =
+                contatoItemBruto &&
+                normalizarTextoComparacao(contatoItemBruto.beneficiario_nome) === normalizarTextoComparacao(nome)
+                  ? contatoItemBruto
+                  : undefined;
+              const contatosCandidatos = [
+                contatoMatricula,
+                contatoItem,
+                contatosNomeExatoPorNome.get(chaveNome),
+                contatosPorChave.get(chaveParticipante),
+                contatosFallbackPorChave.get(chaveParticipante),
+                contatosFallbackPorNome.get(chaveNome)
+              ].filter(Boolean) as Array<{
+                data_nascimento?: Date | string | null;
+                telefone?: string | null;
+                telefone_principal?: string | null;
+                codigo?: string | null;
+                email?: string | null;
+              }>;
+              const contatoTelefone = contatosCandidatos.find((item) => extrairTelefoneContato(item));
+              const contatoDataNascimento = contatosCandidatos.find((item) => item?.data_nascimento);
+              const contatoCodigo = contatosCandidatos.find((item) => typeof item?.codigo === "string" && item.codigo.trim().length);
+              const contatoEmail = contatosCandidatos.find((item) => extrairEmailContato(item));
+              const contatoNomeExato = contatosNomeExatoPorNome.get(chaveNome);
               const telefoneParticipante =
-                typeof participante.telefone === "string" && participante.telefone.trim().length
+                typeof participante.telefone === "string" && normalizeDigits(participante.telefone)
                   ? participante.telefone
                   : undefined;
               const emailParticipante =
@@ -1057,23 +1198,30 @@ export class AgendamentosRepository {
               return {
                 ...participante,
                 dataNascimento:
-                  toIsoDate(contatoMatricula?.data_nascimento) ??
-                  toIsoDate(contato?.data_nascimento ?? null) ??
+                  formatarDataEntrada(contatoNomeExato?.data_nascimento) ??
+                  formatarDataEntrada(contatoMatricula?.data_nascimento) ??
+                  formatarDataEntrada(contatoDataNascimento?.data_nascimento ?? null) ??
                   dataNascimentoParticipante,
                 telefone:
-                  typeof contatoMatricula?.telefone_principal === "string" && contatoMatricula.telefone_principal.trim().length
+                  extrairTelefoneContato(contatoTelefone) ??
+                  (typeof contatoMatricula?.telefone_principal === "string" && normalizeDigits(contatoMatricula.telefone_principal)
                     ? contatoMatricula.telefone_principal
-                    : telefoneContato ?? telefoneParticipante,
+                    : telefoneParticipante),
                 codigo:
+                  (typeof contatoNomeExato?.codigo === "string" && contatoNomeExato.codigo.trim().length
+                    ? contatoNomeExato.codigo
+                    : undefined) ??
                   (typeof contatoMatricula?.codigo === "string" && contatoMatricula.codigo.trim().length
                     ? contatoMatricula.codigo
-                    : typeof contato?.codigo === "string" && contato.codigo.trim().length
-                      ? contato.codigo
+                    : typeof contatoCodigo?.codigo === "string" && contatoCodigo.codigo.trim().length
+                      ? contatoCodigo.codigo
                       : undefined) ?? undefined,
                 email:
-                  typeof contatoMatricula?.email === "string" && contatoMatricula.email.trim().length
-                    ? contatoMatricula.email
-                    : emailContato ?? emailParticipante
+                  typeof contatoNomeExato?.email === "string" && contatoNomeExato.email.trim().length
+                    ? contatoNomeExato.email
+                    : typeof contatoMatricula?.email === "string" && contatoMatricula.email.trim().length
+                      ? contatoMatricula.email
+                    : extrairEmailContato(contatoEmail) ?? emailParticipante
               };
             })
           : contatosDoAgendamento.map((contato) => ({
@@ -1210,9 +1358,9 @@ export class AgendamentosRepository {
           b.id AS beneficiario_id,
           b.data_nascimento,
           COALESCE(
-            NULLIF(TRIM(contato_beneficio.telefone_principal), ''),
-            NULLIF(TRIM(contato_beneficio.telefone_secundario), ''),
-            NULLIF(TRIM(contato_beneficio.telefone_recado_numero), '')
+            ${sqlTelefoneLimpo(Prisma.sql`contato_beneficio.telefone_principal`)},
+            ${sqlTelefoneLimpo(Prisma.sql`contato_beneficio.telefone_secundario`)},
+            ${sqlTelefoneLimpo(Prisma.sql`contato_beneficio.telefone_recado_numero`)}
           ) AS telefone,
           contato_beneficio.email
         FROM cadastro_beneficiario b
@@ -2317,11 +2465,11 @@ export class AgendamentosRepository {
             beneficiario_id: contatoMatricula?.beneficiario_id ?? beneficiarioId,
             beneficiario_nome: beneficiarioNome,
             telefone:
-              (typeof contatoMatricula?.telefone_principal === "string" && contatoMatricula.telefone_principal.trim().length
+              (typeof contatoMatricula?.telefone_principal === "string" && normalizeDigits(contatoMatricula.telefone_principal)
                 ? contatoMatricula.telefone_principal
-                : typeof fallback?.telefone === "string" && fallback.telefone.trim().length
+                : typeof fallback?.telefone === "string" && normalizeDigits(fallback.telefone)
                   ? fallback.telefone
-                  : typeof participante.telefone === "string" && participante.telefone.trim().length
+                  : typeof participante.telefone === "string" && normalizeDigits(participante.telefone)
                     ? participante.telefone
                     : null),
             email:
