@@ -254,7 +254,7 @@ export function BeneficiarioSelector(props: {
                       <p className="mt-0.5 text-xs text-[var(--g3-muted)]">{formatarIdade(item.dataNascimento)}</p>
                     ) : null}
                     <p className="mt-1 text-xs text-[var(--g3-muted)]">
-                      {formatarTelefone(item.telefone) || item.telefone || "Sem telefone"}
+                      {formatarTelefone(item.telefone) || item.telefone || "Telefone não informado"}
                       {item.email ? ` - ${item.email}` : ""}
                     </p>
                   </div>
@@ -497,7 +497,7 @@ export function AgendaCard(props: {
                       </div>
                     </td>
                     <td className="border-b border-[var(--g3-border)] px-3 py-2 text-[var(--g3-muted)] whitespace-nowrap">
-                      {formatarTelefone(participante.telefone) || participante.telefone || "Sem telefone cadastrado"}
+                      {formatarTelefone(participante.telefone) || participante.telefone || "Telefone não informado"}
                     </td>
                     <td className="border-b border-[var(--g3-border)] px-3 py-2">
                       <div className="flex items-center justify-center gap-2">
