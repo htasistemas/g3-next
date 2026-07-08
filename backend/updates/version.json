@@ -1,9 +1,9 @@
 {
-  "latestVersion": "1.00.589",
-  "releaseDate": "2026-07-07",
-  "description": "A base de apresentação G3N passou a usar identidade visual azul com logomarca G3N no topo e tema forçado no tenant de apresentação.",
+  "latestVersion": "1.00.594",
+  "releaseDate": "2026-07-08",
+  "description": "A aba Agendamento passou a gravar, consultar e copiar agendas com persistência transacional no PostgreSQL.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.589",
+  "minCompatibleVersion": "1.00.594",
   "releaseType": "stable"
 }

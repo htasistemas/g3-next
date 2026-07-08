@@ -52,6 +52,11 @@ export const agendamentosService = {
     return data.agendamento;
   },
 
+  async copiar(id: string | number, payload: { data: string }) {
+    const { data } = await httpClient.post<{ agendamento: Agendamento | null }>(`/api/agendamentos/${id}/copiar`, payload);
+    return data.agendamento;
+  },
+
   async confirmar(id: string | number, payload: { canal?: string; observacao?: string }) {
     const { data } = await httpClient.post<{ agendamento: Agendamento | null }>(`/api/agendamentos/${id}/confirmar`, payload);
     return data.agendamento;

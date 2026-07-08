@@ -118,6 +118,17 @@ export class AgendamentosController {
     return response.json({ agendamento: item ? mapAgendamentoRow(item) : null });
   }
 
+  async copiar(request: AuthenticatedRequest, response: Response) {
+    const item = await service.copiar(
+      request.params.id,
+      request.body,
+      request.authUser,
+      request.authUser?.tenant_id,
+      request.authUser?.instituicao_slug
+    );
+    return response.status(201).json({ agendamento: item ? mapAgendamentoRow(item) : null });
+  }
+
   async confirmar(request: AuthenticatedRequest, response: Response) {
     const item = await service.confirmar(
       request.params.id,

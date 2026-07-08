@@ -1,5 +1,4 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
   BadgeCheck,
@@ -38,6 +37,7 @@ import {
 } from "@/modules/agendamentos-operacional/components";
 import {
   useAgendamentos,
+  useCopiarAgendamento,
   useBeneficiariosOperacionaisAgendamento,
   useCancelarAgendamento,
   useIndicadoresAgendamentos,
@@ -414,7 +414,6 @@ function imprimirFichaHtml(options: {
 export function AgendamentosPage() {
   const navigate = useNavigate();
   const { usuario } = useAuth();
-  const queryClient = useQueryClient();
   const [abaAtiva, setAbaAtiva] = useState<AbaId>("dashboard");
   const [tipo, setTipo] = useState<AgendamentoOperacionalTipo | undefined>();
   const [buscaItem, setBuscaItem] = useState("");
@@ -435,7 +434,15 @@ export function AgendamentosPage() {
   const [participanteParaMover, setParticipanteParaMover] = useState<{ item: Agendamento; index: number } | null>(null);
   const [participanteParaExcluir, setParticipanteParaExcluir] = useState<{ item: Agendamento; index: number } | null>(null);
 
-  const agendamentosQuery = useAgendamentos({});
+  const filtrosAgendamentos = useMemo(
+    () => ({
+      periodoInicio: dataVisualizacao,
+      periodoFim: dataVisualizacao
+    }),
+    [dataVisualizacao]
+  );
+
+  const agendamentosQuery = useAgendamentos(filtrosAgendamentos);
   const indicadoresQuery = useIndicadoresAgendamentos({});
   const listaEsperaQuery = useListaEsperaAgendamentos();
   const itensQuery = useItensOperacionaisAgendamento(tipo, buscaItemAdiada);
@@ -443,6 +450,7 @@ export function AgendamentosPage() {
   const unidadeAtualQuery = useUnidadeAssistencialAtual();
   const salvarAgendamentoMutation = useSalvarAgendamento();
   const salvarMutation = useSalvarAgendamentoOperacional();
+  const copiarAgendamentoMutation = useCopiarAgendamento();
   const cancelarMutation = useCancelarAgendamento();
   const excluirMutation = useExcluirAgendamento();
   const notificarMutation = useNotificarAgendamento();
@@ -452,7 +460,6 @@ export function AgendamentosPage() {
   const [geracaoEmAndamento, setGeracaoEmAndamento] = useState(false);
   const [geracaoEtapa, setGeracaoEtapa] = useState(0);
   const [ultimaAgendaDestacadaId, setUltimaAgendaDestacadaId] = useState<number | null>(null);
-  const [agendaGeradaLocal, setAgendaGeradaLocal] = useState<Agendamento | null>(null);
   const [confirmacaoParticipanteEmAndamento, setConfirmacaoParticipanteEmAndamento] = useState<{
     agendamentoId: number;
     index: number;
@@ -535,26 +542,7 @@ export function AgendamentosPage() {
     [agendamentosQuery.data]
   );
 
-  const cardsVisiveis = useMemo(() => {
-    if (!agendaGeradaLocal) {
-      return cards;
-    }
-
-    const existeNaLista = cards.some(
-      (item) =>
-        item.id === agendaGeradaLocal.id ||
-        (item.itemOrigemId === agendaGeradaLocal.itemOrigemId &&
-          item.itemTipo === agendaGeradaLocal.itemTipo &&
-          (item.data ?? "").slice(0, 10) === (agendaGeradaLocal.data ?? "").slice(0, 10))
-    );
-    if (existeNaLista) {
-      return cards;
-    }
-
-    return [...cards, agendaGeradaLocal].sort((a, b) =>
-      `${a.data ?? ""}${a.horaInicial ?? ""}`.localeCompare(`${b.data ?? ""}${b.horaInicial ?? ""}`)
-    );
-  }, [agendaGeradaLocal, cards]);
+  const cardsVisiveis = cards;
 
   const cardSelecionado = cardsVisiveis.find((item) => item.id === selecionadoId) ?? null;
   const cardsDoDia = useMemo(
@@ -656,47 +644,6 @@ export function AgendamentosPage() {
         (item.status ?? "").trim().toUpperCase() !== "CANCELADO"
     );
     const dataExibicao = dataAgendamento;
-    const participantesPreview = (beneficiariosQuery.data ?? [])
-      .filter((item) => beneficiariosSelecionados.includes(item.matriculaId))
-      .map((item) => ({
-        matriculaId: item.matriculaId,
-        beneficiarioId: item.beneficiarioId,
-        beneficiarioNome: item.nomeCompleto,
-        dataNascimento: item.dataNascimento,
-        telefone: item.telefone,
-        comparecimento: "Pendente" as const
-      }));
-    const agendaPreview: Agendamento = {
-      id: -Date.now(),
-      beneficiarioId: participantesPreview[0]?.beneficiarioId,
-      beneficiarioNome: itemSelecionado.nome,
-      unidade: itemSelecionado.local ?? "Local a definir",
-      setor: tipo === "curso" ? "Curso" : tipo === "oficina" ? "Oficina" : "Atendimento",
-      tipoAtendimento: itemSelecionado.nome,
-      profissionalNome: itemSelecionado.profissionalNome,
-      data: dataExibicao,
-      horaInicial: itemSelecionado.horario ?? "08:00",
-      modalidade: "Coletivo",
-      prioridade: "Normal",
-      status: "Agendado",
-      coletivo: true,
-      tituloColetivo: itemSelecionado.nome,
-      capacidadeMaxima: participantesPreview.length,
-      participantes: participantesPreview,
-      itemTipo: tipo,
-      itemOrigemId: itemSelecionado.id,
-      itemNome: itemSelecionado.nome,
-      itemDiasSemana: itemSelecionado.diasSemana,
-      itemLocal: itemSelecionado.local,
-      diaSemana: new Intl.DateTimeFormat("pt-BR", { weekday: "long" }).format(new Date(`${dataExibicao}T12:00:00`)),
-      observacaoCurta: `${participantesPreview.length} participante(s) vinculado(s) pela inscricao.`
-    };
-
-    setAgendaGeradaLocal(agendaPreview);
-    setSelecionadoId(agendaPreview.id ?? null);
-    setUltimaAgendaDestacadaId(agendaPreview.id ?? null);
-    definirDataVisualizacao(dataExibicao);
-
     try {
       const salvo = await salvarMutation.mutateAsync({
         id: cardSelecionado?.id ? String(cardSelecionado.id) : undefined,
@@ -705,38 +652,9 @@ export function AgendamentosPage() {
         data: dataAgendamento,
         matriculasIds: beneficiariosSelecionados
       });
-      const agendaVisivel: Agendamento =
-        salvo &&
-        Boolean(salvo.data) &&
-        Boolean(salvo.horaInicial) &&
-        Boolean(salvo.itemTipo) &&
-        Boolean(salvo.itemOrigemId) &&
-        String(salvo.data ?? "").slice(0, 10) === dataExibicao
-          ? salvo
-          : agendaPreview;
-
-      queryClient.setQueriesData<Agendamento[]>(
-        { queryKey: ["agendamentos", usuario?.tenant_id ?? "sem-tenant"] },
-        (atual) => {
-          const base = Array.isArray(atual) ? atual : [];
-          const semDuplicado = base.filter(
-            (item) =>
-              !(
-                item.id === agendaVisivel.id ||
-                (item.itemOrigemId === agendaVisivel.itemOrigemId &&
-                  item.itemTipo === agendaVisivel.itemTipo &&
-                  (item.data ?? "").slice(0, 10) === (agendaVisivel.data ?? "").slice(0, 10))
-              )
-          );
-          return [...semDuplicado, agendaVisivel].sort((a, b) =>
-            `${a.data ?? ""}${a.horaInicial ?? ""}`.localeCompare(`${b.data ?? ""}${b.horaInicial ?? ""}`)
-          );
-        }
-      );
-
-      setAgendaGeradaLocal(agendaVisivel);
-      setSelecionadoId(agendaVisivel.id ?? null);
-      setUltimaAgendaDestacadaId(agendaVisivel.id ?? null);
+      setSelecionadoId(salvo?.id ?? null);
+      setUltimaAgendaDestacadaId(salvo?.id ?? null);
+      definirDataVisualizacao(dataExibicao);
       setPopup({
         tipo: "sucesso",
         titulo: "Confirmação",
@@ -748,7 +666,6 @@ export function AgendamentosPage() {
         setUltimaAgendaDestacadaId((atual) => (atual === salvo?.id ? null : atual));
       }, 4500);
     } catch (error: any) {
-      setAgendaGeradaLocal(null);
       definirDataVisualizacao(dataAgendamento);
       const mensagem = error?.response?.data?.message ?? "Não foi possível gerar a agenda.";
       setPopup({
@@ -1015,32 +932,22 @@ export function AgendamentosPage() {
     setAgendaCopiando(true);
     try {
       if (agendaParaData.acao === "copiar") {
-        const agendaOriginal = agendaParaData.item;
-        const participantes = (agendaOriginal.participantes ?? []).map<AgendamentoParticipante>((participante) => ({
-          ...participante,
-          comparecimento: "Pendente" as const
-        }));
-
-        const novaAgenda: Agendamento = {
-          ...agendaOriginal,
-          id: undefined,
-          data: novaDataAgenda,
-          diaSemana: undefined,
-          status: "Agendado",
-          confirmadoEm: undefined,
-          confirmadoPorNome: undefined,
-          confirmacaoCanal: undefined,
-          observacaoConfirmacao: undefined,
-          participantes
-        };
-
-        const salvo = await salvarAgendamentoMutation.mutateAsync(novaAgenda);
+        if (!agendaParaData.item.id) {
+          setPopup({ tipo: "erro", titulo: "Atenção", texto: "Não foi possível copiar esta agenda porque faltam dados obrigatórios." });
+          return;
+        }
+        const salvo = await copiarAgendamentoMutation.mutateAsync({
+          id: agendaParaData.item.id,
+          payload: { data: novaDataAgenda }
+        });
 
         if (!salvo?.id) {
           setPopup({ tipo: "erro", titulo: "Erro", texto: "Não foi possível copiar a agenda." });
           return;
         }
 
+        setSelecionadoId(salvo.id ?? null);
+        setUltimaAgendaDestacadaId(salvo.id ?? null);
         setPopup({ tipo: "sucesso", titulo: "Confirmação", texto: "Agenda copiada com sucesso para a nova data." });
       } else {
         if (!agendaParaData.item.id) return;

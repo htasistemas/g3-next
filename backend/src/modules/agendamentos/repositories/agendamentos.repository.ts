@@ -19,6 +19,8 @@ import type {
   AgendamentoRow
 } from "../agendamentos.types.js";
 
+type PrismaExecutor = Pick<typeof prisma, "$queryRaw" | "$executeRaw">;
+
 const estruturaSql = [
   `
     CREATE TABLE IF NOT EXISTS agendamento (
@@ -197,6 +199,39 @@ function formatarHoraExibicao(value?: Date | string | null) {
   return match ? match[1] : texto;
 }
 
+function formatarDataEntrada(value?: Date | string | null) {
+  if (!value) return undefined;
+  if (value instanceof Date) {
+    return value.toISOString().slice(0, 10);
+  }
+
+  const texto = String(value).trim();
+  if (!texto) return undefined;
+  if (/^\d{4}-\d{2}-\d{2}/.test(texto)) {
+    return texto.slice(0, 10);
+  }
+
+  const data = new Date(texto);
+  if (Number.isNaN(data.getTime())) return undefined;
+  return data.toISOString().slice(0, 10);
+}
+
+function formatarHoraEntrada(value?: Date | string | null) {
+  if (!value) return undefined;
+  if (value instanceof Date) {
+    const horas = String(value.getUTCHours()).padStart(2, "0");
+    const minutos = String(value.getUTCMinutes()).padStart(2, "0");
+    const segundos = String(value.getUTCSeconds()).padStart(2, "0");
+    return `${horas}:${minutos}:${segundos}`;
+  }
+
+  const texto = String(value).trim();
+  if (!texto) return undefined;
+  const match = texto.match(/^(\d{2}:\d{2})(?::(\d{2}))?$/);
+  if (!match) return undefined;
+  return `${match[1]}:${match[2] ?? "00"}`;
+}
+
 function formatarData(value?: string | null) {
   return toOptionalDate(value);
 }
@@ -372,9 +407,10 @@ export class AgendamentosRepository {
     usuario: UsuarioActor | undefined,
     tenantId: string,
     anterior?: unknown,
-    novo?: unknown
+    novo?: unknown,
+    db: PrismaExecutor = prisma
   ) {
-    await prisma.$executeRaw(Prisma.sql`
+    await db.$executeRaw(Prisma.sql`
       INSERT INTO agendamento_log (
         tenant_id, agendamento_id, acao, usuario_id, usuario_nome, valor_anterior, valor_novo
       ) VALUES (
@@ -393,11 +429,12 @@ export class AgendamentosRepository {
     familiaId?: bigint | null,
     descricao?: string,
     dadosNovos?: unknown,
-    tenantId?: string
+    tenantId?: string,
+    db: PrismaExecutor = prisma
   ) {
     if (!familiaId) return;
 
-    await prisma.$executeRaw(Prisma.sql`
+    await db.$executeRaw(Prisma.sql`
       INSERT INTO familia_historico (
         tenant_id, familia_id, tipo_evento, descricao, dados_novos, data_evento
       ) VALUES (
@@ -415,6 +452,57 @@ export class AgendamentosRepository {
     const data = new Date(`${value}T12:00:00`);
     if (Number.isNaN(data.getTime())) return null;
     return new Intl.DateTimeFormat("pt-BR", { weekday: "long" }).format(data);
+  }
+
+  private async verificarDuplicidadeAgenda(
+    payload: {
+      data: string;
+      horaInicial: string;
+      profissionalNome?: string | null;
+      tipoAtendimento?: string | null;
+      itemTipo?: string | null;
+      itemOrigemId?: number | null;
+    },
+    tenantId: string,
+    idIgnorar?: bigint | null,
+    db: PrismaExecutor = prisma
+  ) {
+    const criterios: Prisma.Sql[] = [
+      Prisma.sql`a.data_agendamento = ${formatarData(payload.data)}`,
+      Prisma.sql`a.hora_inicial = ${sqlTime(payload.horaInicial)}`
+    ];
+
+    if (trimOrUndefined(payload.profissionalNome)) {
+      criterios.push(Prisma.sql`LOWER(COALESCE(a.profissional_nome, '')) = LOWER(${trimOrUndefined(payload.profissionalNome)})`);
+    }
+
+    if (trimOrUndefined(payload.tipoAtendimento)) {
+      criterios.push(Prisma.sql`LOWER(COALESCE(a.tipo_atendimento, '')) = LOWER(${trimOrUndefined(payload.tipoAtendimento)})`);
+    }
+
+    if (trimOrUndefined(payload.itemTipo)) {
+      criterios.push(Prisma.sql`LOWER(COALESCE(a.item_tipo, '')) = LOWER(${trimOrUndefined(payload.itemTipo)})`);
+    }
+
+    if (payload.itemOrigemId) {
+      criterios.push(Prisma.sql`a.item_origem_id = ${BigInt(payload.itemOrigemId)}`);
+    }
+
+    if (idIgnorar) {
+      criterios.push(Prisma.sql`a.id <> ${idIgnorar}`);
+    }
+
+    const rows = await db.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+      SELECT a.id
+      FROM agendamento a
+      WHERE a.tenant_id::text = ${tenantId}
+        AND COALESCE(a.status, '') <> 'Cancelado'
+        AND ${Prisma.join(criterios, " AND ")}
+      ORDER BY a.id DESC
+      LIMIT 1
+    `);
+
+    return rows[0]?.id ?? null;
   }
 
   private chaveParticipante(nome?: string | null, beneficiarioId?: bigint | null) {
@@ -1017,29 +1105,36 @@ export class AgendamentosRepository {
   private async sincronizarBeneficiariosAgendamento(
     agendamentoId: bigint,
     tenantId: string,
-    participantes: Array<{ beneficiarioId?: number | null; beneficiarioNome: string; telefone?: string | null; email?: string | null }>
+    participantes: Array<{ beneficiarioId?: number | null; beneficiarioNome: string; telefone?: string | null; email?: string | null }>,
+    db: PrismaExecutor = prisma
   ) {
-    await prisma.$executeRaw(Prisma.sql`
+    await db.$executeRaw(Prisma.sql`
       DELETE FROM agendamento_beneficiario
       WHERE agendamento_id = ${agendamentoId}
         AND tenant_id::text = ${tenantId}
     `);
 
-    for (const participante of participantes) {
-      await prisma.$executeRaw(Prisma.sql`
-        INSERT INTO agendamento_beneficiario (
-          tenant_id, agendamento_id, beneficiario_id, beneficiario_nome, telefone, email, status
-        ) VALUES (
-          ${tenantId}::uuid,
-          ${agendamentoId},
-          ${participante.beneficiarioId ? BigInt(participante.beneficiarioId) : null},
-          ${participante.beneficiarioNome},
-          ${trimOrUndefined(participante.telefone)},
-          ${trimOrUndefined(participante.email)},
-          'Agendado'
-        )
-      `);
+    if (!participantes.length) {
+      return;
     }
+
+    const valores = participantes.map((participante) =>
+      Prisma.sql`(
+        ${tenantId}::uuid,
+        ${agendamentoId},
+        ${participante.beneficiarioId ? BigInt(participante.beneficiarioId) : null},
+        ${participante.beneficiarioNome},
+        ${trimOrUndefined(participante.telefone)},
+        ${trimOrUndefined(participante.email)},
+        'Agendado'
+      )`
+    );
+
+    await db.$executeRaw(Prisma.sql`
+      INSERT INTO agendamento_beneficiario (
+        tenant_id, agendamento_id, beneficiario_id, beneficiario_nome, telefone, email, status
+      ) VALUES ${Prisma.join(valores)}
+    `);
   }
 
   async listarItensOperacionais(tipo: "curso" | "atendimento" | "oficina", busca: string | undefined, tenantId: string) {
@@ -1192,7 +1287,7 @@ export class AgendamentosRepository {
     recurso?: string | null;
     idIgnorar?: bigint | null;
     tenantId: string;
-  }) {
+  }, db: PrismaExecutor = prisma) {
     const horaInicial = formatarHora(payload.horaInicial);
     const horaFinal = formatarHora(payload.horaFinal) ?? formatarHora(payload.horaInicial);
     if (!horaInicial || !horaFinal) return [];
@@ -1222,7 +1317,7 @@ export class AgendamentosRepository {
 
     if (!escopos.length) return [];
 
-    return prisma.$queryRaw<
+    return db.$queryRaw<
       Array<{
         id: bigint;
         beneficiario_nome: string;
@@ -1342,92 +1437,113 @@ export class AgendamentosRepository {
   async criar(input: AgendamentoInput, usuario: UsuarioActor | undefined, tenantId: string) {
     await this.ensureEstrutura();
     const familiaResolvida = await this.resolverFamiliaDoBeneficiario(input.beneficiarioId);
-    const conflitos = await this.listarConflitos({
-      data: input.data,
-      horaInicial: input.horaInicial,
-      horaFinal: input.horaFinal,
-      profissionalNome: input.profissionalNome,
-      sala: input.sala,
-      recurso: input.recurso,
-      tenantId
+    const id = await prisma.$transaction(async (tx) => {
+      const conflitos = await this.listarConflitos({
+        data: input.data,
+        horaInicial: input.horaInicial,
+        horaFinal: input.horaFinal,
+        profissionalNome: input.profissionalNome,
+        sala: input.sala,
+        recurso: input.recurso,
+        tenantId
+      }, tx);
+
+      if (conflitos.length && !input.permitirConflito) {
+        throw new AppError(this.formatarMensagemConflito(conflitos), 409);
+      }
+
+      const duplicado = await this.verificarDuplicidadeAgenda(
+        {
+          data: input.data,
+          horaInicial: input.horaInicial,
+          profissionalNome: input.profissionalNome,
+          tipoAtendimento: input.tipoAtendimento,
+          itemTipo: input.itemTipo,
+          itemOrigemId: input.itemOrigemId
+        },
+        tenantId,
+        null,
+        tx
+      );
+      if (duplicado) {
+        throw new AppError("Ja existe um card com a mesma data, horario, profissional e atendimento.", 409);
+      }
+
+      const inserted = await tx.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+        INSERT INTO agendamento (
+          tenant_id, beneficiario_id, familia_id, inscricao_origem_id, beneficiario_nome, familia_nome, responsavel_nome,
+          telefone, email, forma_contato_preferencial, observacoes_importantes, restricoes_alerta, necessidade_especial,
+          transporte_apoio, unidade, setor, tipo_atendimento, subcategoria, profissional_id, profissional_nome,
+          equipe_apoio, data_agendamento, hora_inicial, hora_final, duracao_minutos, sala, recurso, modalidade,
+          origem_atendimento, prioridade, status, motivo, objetivo, observacao_interna, observacao_curta, coletivo,
+          titulo_coletivo, capacidade_maxima, participantes, recorrencia, retorno_programado_para, encaminhamento_origem,
+          primeira_vez, retorno, urgencia, documentos_pendentes, autorizacao_pendente, item_tipo, item_origem_id,
+          item_nome, item_dias_semana, item_local, dia_semana, criado_por_usuario_id, criado_por_nome
+        ) VALUES (
+          ${tenantId}::uuid,
+          ${input.beneficiarioId ? BigInt(input.beneficiarioId) : null},
+          ${input.familiaId ? BigInt(input.familiaId) : familiaResolvida.familiaId},
+          ${trimOrUndefined(input.inscricaoOrigemId) ? BigInt(trimOrUndefined(input.inscricaoOrigemId) as string) : null},
+          ${input.beneficiarioNome},
+          ${trimOrUndefined(input.familiaNome) ?? familiaResolvida.familiaNome},
+          ${trimOrUndefined(input.responsavelNome) ?? familiaResolvida.responsavelNome},
+          ${trimOrUndefined(input.telefone)},
+          ${trimOrUndefined(input.email)},
+          ${trimOrUndefined(input.formaContatoPreferencial)},
+          ${trimOrUndefined(input.observacoesImportantes)},
+          ${trimOrUndefined(input.restricoesAlerta)},
+          ${trimOrUndefined(input.necessidadeEspecial)},
+          ${trimOrUndefined(input.transporteApoio)},
+          ${input.unidade},
+          ${input.setor},
+          ${input.tipoAtendimento},
+          ${trimOrUndefined(input.subcategoria)},
+          ${trimOrUndefined(input.profissionalId)},
+          ${trimOrUndefined(input.profissionalNome)},
+          ${Prisma.sql`${serializarJson(input.equipeApoio ?? [])}::jsonb`},
+          ${formatarData(input.data)},
+          ${sqlTime(input.horaInicial)},
+          ${sqlTime(input.horaFinal)},
+          ${input.duracaoMinutos ?? null},
+          ${trimOrUndefined(input.sala)},
+          ${trimOrUndefined(input.recurso)},
+          ${input.modalidade},
+          ${trimOrUndefined(input.origemAtendimento)},
+          ${input.prioridade},
+          ${input.status ?? (input.coletivo ? "Atendimento coletivo" : input.permitirConflito ? "Encaixe" : "Agendado")},
+          ${trimOrUndefined(input.motivo)},
+          ${trimOrUndefined(input.objetivo)},
+          ${trimOrUndefined(input.observacaoInterna)},
+          ${trimOrUndefined(input.observacaoCurta)},
+          ${input.coletivo ?? false},
+          ${trimOrUndefined(input.tituloColetivo)},
+          ${input.capacidadeMaxima ?? null},
+          ${Prisma.sql`${serializarJson(input.participantes ?? [])}::jsonb`},
+          ${input.recorrencia ? Prisma.sql`${serializarJson(input.recorrencia)}::jsonb` : Prisma.sql`NULL`},
+          ${formatarData(input.retornoProgramadoPara)},
+          ${trimOrUndefined(input.encaminhamentoOrigem)},
+          ${input.primeiraVez ?? false},
+          ${input.retorno ?? false},
+          ${input.urgencia ?? false},
+          ${input.documentosPendentes ?? false},
+          ${input.autorizacaoPendente ?? false},
+          ${trimOrUndefined(input.itemTipo ?? undefined)},
+          ${input.itemOrigemId ? BigInt(input.itemOrigemId) : null},
+          ${trimOrUndefined(input.itemNome)},
+          ${trimOrUndefined(input.itemDiasSemana)},
+          ${trimOrUndefined(input.itemLocal)},
+          ${trimOrUndefined(input.diaSemana) ?? this.formatarDiaSemana(input.data)},
+          ${usuario?.id ? BigInt(usuario.id) : null},
+          ${trimOrUndefined(usuario?.nome ?? usuario?.nomeUsuario)}
+        ) RETURNING id
+      `);
+
+      const idInserido = inserted[0]?.id;
+      if (!idInserido) throw new AppError("Nao foi possivel criar o agendamento.", 500);
+      await this.sincronizarBeneficiariosAgendamento(idInserido, tenantId, input.participantes ?? [], tx);
+      return idInserido;
     });
 
-    if (conflitos.length && !input.permitirConflito) {
-      throw new AppError(this.formatarMensagemConflito(conflitos), 409);
-    }
-
-    const inserted = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
-      INSERT INTO agendamento (
-        tenant_id, beneficiario_id, familia_id, inscricao_origem_id, beneficiario_nome, familia_nome, responsavel_nome,
-        telefone, email, forma_contato_preferencial, observacoes_importantes, restricoes_alerta, necessidade_especial,
-        transporte_apoio, unidade, setor, tipo_atendimento, subcategoria, profissional_id, profissional_nome,
-        equipe_apoio, data_agendamento, hora_inicial, hora_final, duracao_minutos, sala, recurso, modalidade,
-        origem_atendimento, prioridade, status, motivo, objetivo, observacao_interna, observacao_curta, coletivo,
-        titulo_coletivo, capacidade_maxima, participantes, recorrencia, retorno_programado_para, encaminhamento_origem,
-        primeira_vez, retorno, urgencia, documentos_pendentes, autorizacao_pendente, item_tipo, item_origem_id,
-        item_nome, item_dias_semana, item_local, dia_semana, criado_por_usuario_id, criado_por_nome
-      ) VALUES (
-        ${tenantId}::uuid,
-        ${input.beneficiarioId ? BigInt(input.beneficiarioId) : null},
-        ${input.familiaId ? BigInt(input.familiaId) : familiaResolvida.familiaId},
-        ${trimOrUndefined(input.inscricaoOrigemId) ? BigInt(trimOrUndefined(input.inscricaoOrigemId) as string) : null},
-        ${input.beneficiarioNome},
-        ${trimOrUndefined(input.familiaNome) ?? familiaResolvida.familiaNome},
-        ${trimOrUndefined(input.responsavelNome) ?? familiaResolvida.responsavelNome},
-        ${trimOrUndefined(input.telefone)},
-        ${trimOrUndefined(input.email)},
-        ${trimOrUndefined(input.formaContatoPreferencial)},
-        ${trimOrUndefined(input.observacoesImportantes)},
-        ${trimOrUndefined(input.restricoesAlerta)},
-        ${trimOrUndefined(input.necessidadeEspecial)},
-        ${trimOrUndefined(input.transporteApoio)},
-        ${input.unidade},
-        ${input.setor},
-        ${input.tipoAtendimento},
-        ${trimOrUndefined(input.subcategoria)},
-        ${trimOrUndefined(input.profissionalId)},
-        ${trimOrUndefined(input.profissionalNome)},
-        ${Prisma.sql`${serializarJson(input.equipeApoio ?? [])}::jsonb`},
-        ${formatarData(input.data)},
-        ${sqlTime(input.horaInicial)},
-        ${sqlTime(input.horaFinal)},
-        ${input.duracaoMinutos ?? null},
-        ${trimOrUndefined(input.sala)},
-        ${trimOrUndefined(input.recurso)},
-        ${input.modalidade},
-        ${trimOrUndefined(input.origemAtendimento)},
-        ${input.prioridade},
-        ${input.status ?? (input.coletivo ? "Atendimento coletivo" : input.permitirConflito ? "Encaixe" : "Agendado")},
-        ${trimOrUndefined(input.motivo)},
-        ${trimOrUndefined(input.objetivo)},
-        ${trimOrUndefined(input.observacaoInterna)},
-        ${trimOrUndefined(input.observacaoCurta)},
-        ${input.coletivo ?? false},
-        ${trimOrUndefined(input.tituloColetivo)},
-        ${input.capacidadeMaxima ?? null},
-        ${Prisma.sql`${serializarJson(input.participantes ?? [])}::jsonb`},
-        ${input.recorrencia ? Prisma.sql`${serializarJson(input.recorrencia)}::jsonb` : Prisma.sql`NULL`},
-        ${formatarData(input.retornoProgramadoPara)},
-        ${trimOrUndefined(input.encaminhamentoOrigem)},
-        ${input.primeiraVez ?? false},
-        ${input.retorno ?? false},
-        ${input.urgencia ?? false},
-        ${input.documentosPendentes ?? false},
-        ${input.autorizacaoPendente ?? false},
-        ${trimOrUndefined(input.itemTipo ?? undefined)},
-        ${input.itemOrigemId ? BigInt(input.itemOrigemId) : null},
-        ${trimOrUndefined(input.itemNome)},
-        ${trimOrUndefined(input.itemDiasSemana)},
-        ${trimOrUndefined(input.itemLocal)},
-        ${trimOrUndefined(input.diaSemana) ?? this.formatarDiaSemana(input.data)},
-        ${usuario?.id ? BigInt(usuario.id) : null},
-        ${trimOrUndefined(usuario?.nome ?? usuario?.nomeUsuario)}
-      ) RETURNING id
-    `);
-
-    const id = inserted[0]?.id;
-    if (!id) throw new AppError("Nao foi possivel criar o agendamento.", 500);
-    await this.sincronizarBeneficiariosAgendamento(id, tenantId, input.participantes ?? []);
     const criado = await this.obter(id, tenantId);
     await this.registrarLog(id, "criar", usuario, tenantId, null, criado);
     await this.registrarHistoricoFamilia(criado?.familia_id, "Agendamento criado para a família.", criado, tenantId);
@@ -1438,84 +1554,298 @@ export class AgendamentosRepository {
     await this.ensureEstrutura();
     const anterior = await this.obter(id, tenantId);
     if (!anterior) throw new AppError("Agendamento nao encontrado.", 404);
-    const conflitos = await this.listarConflitos({
-      data: input.data,
-      horaInicial: input.horaInicial,
-      horaFinal: input.horaFinal,
-      profissionalNome: input.profissionalNome,
-      sala: input.sala,
-      recurso: input.recurso,
-      idIgnorar: id,
-      tenantId
+    await prisma.$transaction(async (tx) => {
+      const conflitos = await this.listarConflitos({
+        data: input.data,
+        horaInicial: input.horaInicial,
+        horaFinal: input.horaFinal,
+        profissionalNome: input.profissionalNome,
+        sala: input.sala,
+        recurso: input.recurso,
+        idIgnorar: id,
+        tenantId
+      }, tx);
+      if (conflitos.length && !input.permitirConflito) {
+        throw new AppError(this.formatarMensagemConflito(conflitos), 409);
+      }
+
+      const duplicado = await this.verificarDuplicidadeAgenda(
+        {
+          data: input.data,
+          horaInicial: input.horaInicial,
+          profissionalNome: input.profissionalNome,
+          tipoAtendimento: input.tipoAtendimento,
+          itemTipo: input.itemTipo,
+          itemOrigemId: input.itemOrigemId
+        },
+        tenantId,
+        id,
+        tx
+      );
+      if (duplicado) {
+        throw new AppError("Ja existe um card com a mesma data, horario, profissional e atendimento.", 409);
+      }
+
+      await tx.$executeRaw(Prisma.sql`
+        UPDATE agendamento
+        SET
+          beneficiario_id = ${input.beneficiarioId ? BigInt(input.beneficiarioId) : null},
+          familia_id = ${input.familiaId ? BigInt(input.familiaId) : anterior.familia_id},
+          inscricao_origem_id = ${trimOrUndefined(input.inscricaoOrigemId) ? BigInt(trimOrUndefined(input.inscricaoOrigemId) as string) : null},
+          beneficiario_nome = ${input.beneficiarioNome},
+          familia_nome = ${trimOrUndefined(input.familiaNome) ?? anterior.familia_nome},
+          responsavel_nome = ${trimOrUndefined(input.responsavelNome) ?? anterior.responsavel_nome},
+          telefone = ${trimOrUndefined(input.telefone)},
+          email = ${trimOrUndefined(input.email)},
+          forma_contato_preferencial = ${trimOrUndefined(input.formaContatoPreferencial)},
+          observacoes_importantes = ${trimOrUndefined(input.observacoesImportantes)},
+          restricoes_alerta = ${trimOrUndefined(input.restricoesAlerta)},
+          necessidade_especial = ${trimOrUndefined(input.necessidadeEspecial)},
+          transporte_apoio = ${trimOrUndefined(input.transporteApoio)},
+          unidade = ${input.unidade},
+          setor = ${input.setor},
+          tipo_atendimento = ${input.tipoAtendimento},
+          subcategoria = ${trimOrUndefined(input.subcategoria)},
+          profissional_id = ${trimOrUndefined(input.profissionalId)},
+          profissional_nome = ${trimOrUndefined(input.profissionalNome)},
+          equipe_apoio = ${Prisma.sql`${serializarJson(input.equipeApoio ?? [])}::jsonb`},
+          data_agendamento = ${formatarData(input.data)},
+          hora_inicial = ${sqlTime(input.horaInicial)},
+          hora_final = ${sqlTime(input.horaFinal)},
+          duracao_minutos = ${input.duracaoMinutos ?? null},
+          sala = ${trimOrUndefined(input.sala)},
+          recurso = ${trimOrUndefined(input.recurso)},
+          modalidade = ${input.modalidade},
+          origem_atendimento = ${trimOrUndefined(input.origemAtendimento)},
+          prioridade = ${input.prioridade},
+          status = ${input.status ?? anterior.status},
+          motivo = ${trimOrUndefined(input.motivo)},
+          objetivo = ${trimOrUndefined(input.objetivo)},
+          observacao_interna = ${trimOrUndefined(input.observacaoInterna)},
+          observacao_curta = ${trimOrUndefined(input.observacaoCurta)},
+          coletivo = ${input.coletivo ?? false},
+          titulo_coletivo = ${trimOrUndefined(input.tituloColetivo)},
+          capacidade_maxima = ${input.capacidadeMaxima ?? null},
+          participantes = ${Prisma.sql`${serializarJson(input.participantes ?? [])}::jsonb`},
+          recorrencia = ${input.recorrencia ? Prisma.sql`${serializarJson(input.recorrencia)}::jsonb` : Prisma.sql`NULL`},
+          retorno_programado_para = ${formatarData(input.retornoProgramadoPara)},
+          encaminhamento_origem = ${trimOrUndefined(input.encaminhamentoOrigem)},
+          primeira_vez = ${input.primeiraVez ?? false},
+          retorno = ${input.retorno ?? false},
+          urgencia = ${input.urgencia ?? false},
+          documentos_pendentes = ${input.documentosPendentes ?? false},
+          autorizacao_pendente = ${input.autorizacaoPendente ?? false},
+          item_tipo = ${trimOrUndefined(input.itemTipo ?? undefined)},
+          item_origem_id = ${input.itemOrigemId ? BigInt(input.itemOrigemId) : null},
+          item_nome = ${trimOrUndefined(input.itemNome)},
+          item_dias_semana = ${trimOrUndefined(input.itemDiasSemana)},
+          item_local = ${trimOrUndefined(input.itemLocal)},
+          dia_semana = ${trimOrUndefined(input.diaSemana) ?? this.formatarDiaSemana(input.data)},
+          atualizado_em = NOW()
+        WHERE id = ${id}
+          AND tenant_id::text = ${tenantId}
+      `);
+
+      await this.sincronizarBeneficiariosAgendamento(id, tenantId, input.participantes ?? [], tx);
     });
-    if (conflitos.length && !input.permitirConflito) {
-      throw new AppError(this.formatarMensagemConflito(conflitos), 409);
-    }
 
-    await prisma.$executeRaw(Prisma.sql`
-      UPDATE agendamento
-      SET
-        beneficiario_id = ${input.beneficiarioId ? BigInt(input.beneficiarioId) : null},
-        familia_id = ${input.familiaId ? BigInt(input.familiaId) : anterior.familia_id},
-        inscricao_origem_id = ${trimOrUndefined(input.inscricaoOrigemId) ? BigInt(trimOrUndefined(input.inscricaoOrigemId) as string) : null},
-        beneficiario_nome = ${input.beneficiarioNome},
-        familia_nome = ${trimOrUndefined(input.familiaNome) ?? anterior.familia_nome},
-        responsavel_nome = ${trimOrUndefined(input.responsavelNome) ?? anterior.responsavel_nome},
-        telefone = ${trimOrUndefined(input.telefone)},
-        email = ${trimOrUndefined(input.email)},
-        forma_contato_preferencial = ${trimOrUndefined(input.formaContatoPreferencial)},
-        observacoes_importantes = ${trimOrUndefined(input.observacoesImportantes)},
-        restricoes_alerta = ${trimOrUndefined(input.restricoesAlerta)},
-        necessidade_especial = ${trimOrUndefined(input.necessidadeEspecial)},
-        transporte_apoio = ${trimOrUndefined(input.transporteApoio)},
-        unidade = ${input.unidade},
-        setor = ${input.setor},
-        tipo_atendimento = ${input.tipoAtendimento},
-        subcategoria = ${trimOrUndefined(input.subcategoria)},
-        profissional_id = ${trimOrUndefined(input.profissionalId)},
-        profissional_nome = ${trimOrUndefined(input.profissionalNome)},
-        equipe_apoio = ${Prisma.sql`${serializarJson(input.equipeApoio ?? [])}::jsonb`},
-        data_agendamento = ${formatarData(input.data)},
-        hora_inicial = ${sqlTime(input.horaInicial)},
-        hora_final = ${sqlTime(input.horaFinal)},
-        duracao_minutos = ${input.duracaoMinutos ?? null},
-        sala = ${trimOrUndefined(input.sala)},
-        recurso = ${trimOrUndefined(input.recurso)},
-        modalidade = ${input.modalidade},
-        origem_atendimento = ${trimOrUndefined(input.origemAtendimento)},
-        prioridade = ${input.prioridade},
-        status = ${input.status ?? anterior.status},
-        motivo = ${trimOrUndefined(input.motivo)},
-        objetivo = ${trimOrUndefined(input.objetivo)},
-        observacao_interna = ${trimOrUndefined(input.observacaoInterna)},
-        observacao_curta = ${trimOrUndefined(input.observacaoCurta)},
-        coletivo = ${input.coletivo ?? false},
-        titulo_coletivo = ${trimOrUndefined(input.tituloColetivo)},
-        capacidade_maxima = ${input.capacidadeMaxima ?? null},
-        participantes = ${Prisma.sql`${serializarJson(input.participantes ?? [])}::jsonb`},
-        recorrencia = ${input.recorrencia ? Prisma.sql`${serializarJson(input.recorrencia)}::jsonb` : Prisma.sql`NULL`},
-        retorno_programado_para = ${formatarData(input.retornoProgramadoPara)},
-        encaminhamento_origem = ${trimOrUndefined(input.encaminhamentoOrigem)},
-        primeira_vez = ${input.primeiraVez ?? false},
-        retorno = ${input.retorno ?? false},
-        urgencia = ${input.urgencia ?? false},
-        documentos_pendentes = ${input.documentosPendentes ?? false},
-        autorizacao_pendente = ${input.autorizacaoPendente ?? false},
-        item_tipo = ${trimOrUndefined(input.itemTipo ?? undefined)},
-        item_origem_id = ${input.itemOrigemId ? BigInt(input.itemOrigemId) : null},
-        item_nome = ${trimOrUndefined(input.itemNome)},
-        item_dias_semana = ${trimOrUndefined(input.itemDiasSemana)},
-        item_local = ${trimOrUndefined(input.itemLocal)},
-        dia_semana = ${trimOrUndefined(input.diaSemana) ?? this.formatarDiaSemana(input.data)},
-        atualizado_em = NOW()
-      WHERE id = ${id}
-        AND tenant_id::text = ${tenantId}
-    `);
-
-    await this.sincronizarBeneficiariosAgendamento(id, tenantId, input.participantes ?? []);
     const atual = await this.obter(id, tenantId);
     await this.registrarLog(id, "editar", usuario, tenantId, anterior, atual);
     return atual;
+  }
+
+  async copiar(id: bigint, dataDestino: string, usuario: UsuarioActor | undefined, tenantId: string) {
+    await this.ensureEstrutura();
+    const origem = await this.obter(id, tenantId);
+    if (!origem) throw new AppError("Agendamento nao encontrado.", 404);
+    if ((origem.status ?? "").trim().toUpperCase() === "CANCELADO") {
+      throw new AppError("Nao e possivel copiar uma agenda cancelada.", 400);
+    }
+
+    const novaData = dataDestino.trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(novaData)) {
+      throw new AppError("Data de destino invalida.", 400);
+    }
+
+    const participantesOriginais = Array.isArray(origem.participantes) ? origem.participantes : [];
+    const participantes = participantesOriginais.map((participante) => ({
+      beneficiarioId: participante.beneficiarioId ?? participante.beneficiario_id,
+      beneficiarioNome: participante.beneficiarioNome ?? participante.beneficiario_nome ?? "",
+      telefone: participante.telefone ?? undefined,
+      email: participante.email ?? undefined
+    }));
+
+    const payload: AgendamentoInput = {
+      beneficiarioId: origem.beneficiario_id ? Number(origem.beneficiario_id) : undefined,
+      familiaId: origem.familia_id ? Number(origem.familia_id) : undefined,
+      inscricaoOrigemId: origem.inscricao_origem_id ? String(origem.inscricao_origem_id) : undefined,
+      beneficiarioNome: origem.beneficiario_nome,
+      familiaNome: origem.familia_nome ?? undefined,
+      responsavelNome: origem.responsavel_nome ?? undefined,
+      telefone: origem.telefone ?? undefined,
+      email: origem.email ?? undefined,
+      formaContatoPreferencial: origem.forma_contato_preferencial ?? undefined,
+      observacoesImportantes: origem.observacoes_importantes ?? undefined,
+      restricoesAlerta: origem.restricoes_alerta ?? undefined,
+      necessidadeEspecial: origem.necessidade_especial ?? undefined,
+      transporteApoio: origem.transporte_apoio ?? undefined,
+      unidade: origem.unidade,
+      setor: origem.setor,
+      tipoAtendimento: origem.tipo_atendimento,
+      subcategoria: origem.subcategoria ?? undefined,
+      profissionalId: origem.profissional_id ?? undefined,
+      profissionalNome: origem.profissional_nome ?? undefined,
+      equipeApoio: Array.isArray(origem.equipe_apoio) ? (origem.equipe_apoio as string[]) : undefined,
+      data: novaData,
+      horaInicial: formatarHoraEntrada(origem.hora_inicial)?.slice(0, 5) ?? "08:00",
+      horaFinal: formatarHoraEntrada(origem.hora_final)?.slice(0, 5),
+      duracaoMinutos: origem.duracao_minutos ?? undefined,
+      sala: origem.sala ?? undefined,
+      recurso: origem.recurso ?? undefined,
+      modalidade: origem.modalidade as AgendamentoInput["modalidade"],
+      origemAtendimento: origem.origem_atendimento ?? undefined,
+      prioridade: origem.prioridade as AgendamentoInput["prioridade"],
+      status: origem.status as AgendamentoInput["status"],
+      motivo: origem.motivo ?? undefined,
+      objetivo: origem.objetivo ?? undefined,
+      observacaoInterna: origem.observacao_interna ?? undefined,
+      observacaoCurta: origem.observacao_curta ?? undefined,
+      coletivo: origem.coletivo ?? undefined,
+      tituloColetivo: origem.titulo_coletivo ?? undefined,
+      capacidadeMaxima: origem.capacidade_maxima ?? undefined,
+      participantes: participantes.map((participante) => ({
+        beneficiarioId: participante.beneficiarioId ?? null,
+        beneficiarioNome: participante.beneficiarioNome,
+        telefone: participante.telefone ?? undefined,
+        email: participante.email ?? undefined,
+        comparecimento: "Pendente" as const
+      })),
+      recorrencia: origem.recorrencia ? (origem.recorrencia as AgendamentoInput["recorrencia"]) : undefined,
+      retornoProgramadoPara: origem.retorno_programado_para ? String(origem.retorno_programado_para).slice(0, 10) : undefined,
+      encaminhamentoOrigem: origem.encaminhamento_origem ?? undefined,
+      primeiraVez: origem.primeira_vez ?? undefined,
+      retorno: origem.retorno ?? undefined,
+      urgencia: origem.urgencia ?? undefined,
+      documentosPendentes: origem.documentos_pendentes ?? undefined,
+      autorizacaoPendente: origem.autorizacao_pendente ?? undefined,
+      permitirConflito: false,
+      itemTipo: (origem.item_tipo ?? undefined) as AgendamentoInput["itemTipo"],
+      itemOrigemId: origem.item_origem_id ? Number(origem.item_origem_id) : undefined,
+      itemNome: origem.item_nome ?? undefined,
+      itemDiasSemana: origem.item_dias_semana ?? undefined,
+      itemLocal: origem.item_local ?? undefined,
+      diaSemana: this.formatarDiaSemana(novaData) ?? undefined
+    };
+
+    const novoId = await prisma.$transaction(async (tx) => {
+      const conflitos = await this.listarConflitos({
+        data: payload.data,
+        horaInicial: payload.horaInicial,
+        horaFinal: payload.horaFinal,
+        profissionalNome: payload.profissionalNome,
+        sala: payload.sala,
+        recurso: payload.recurso,
+        tenantId
+      }, tx);
+      if (conflitos.length) {
+        throw new AppError(this.formatarMensagemConflito(conflitos), 409);
+      }
+
+      const duplicado = await this.verificarDuplicidadeAgenda(
+        {
+          data: payload.data,
+          horaInicial: payload.horaInicial,
+          profissionalNome: payload.profissionalNome,
+          tipoAtendimento: payload.tipoAtendimento,
+          itemTipo: payload.itemTipo,
+          itemOrigemId: payload.itemOrigemId
+        },
+        tenantId,
+        null,
+        tx
+      );
+      if (duplicado) {
+        throw new AppError("Ja existe um card com a mesma data, horario, profissional e atendimento.", 409);
+      }
+
+      const inserted = await tx.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+        INSERT INTO agendamento (
+          tenant_id, beneficiario_id, familia_id, inscricao_origem_id, beneficiario_nome, familia_nome, responsavel_nome,
+          telefone, email, forma_contato_preferencial, observacoes_importantes, restricoes_alerta, necessidade_especial,
+          transporte_apoio, unidade, setor, tipo_atendimento, subcategoria, profissional_id, profissional_nome,
+          equipe_apoio, data_agendamento, hora_inicial, hora_final, duracao_minutos, sala, recurso, modalidade,
+          origem_atendimento, prioridade, status, motivo, objetivo, observacao_interna, observacao_curta, coletivo,
+          titulo_coletivo, capacidade_maxima, participantes, recorrencia, retorno_programado_para, encaminhamento_origem,
+          primeira_vez, retorno, urgencia, documentos_pendentes, autorizacao_pendente, item_tipo, item_origem_id,
+          item_nome, item_dias_semana, item_local, dia_semana, criado_por_usuario_id, criado_por_nome
+        ) VALUES (
+          ${tenantId}::uuid,
+          ${payload.beneficiarioId ? BigInt(payload.beneficiarioId) : null},
+          ${payload.familiaId ? BigInt(payload.familiaId) : origem.familia_id},
+          ${trimOrUndefined(payload.inscricaoOrigemId) ? BigInt(trimOrUndefined(payload.inscricaoOrigemId) as string) : null},
+          ${payload.beneficiarioNome},
+          ${trimOrUndefined(payload.familiaNome) ?? origem.familia_nome},
+          ${trimOrUndefined(payload.responsavelNome) ?? origem.responsavel_nome},
+          ${trimOrUndefined(payload.telefone)},
+          ${trimOrUndefined(payload.email)},
+          ${trimOrUndefined(payload.formaContatoPreferencial)},
+          ${trimOrUndefined(payload.observacoesImportantes)},
+          ${trimOrUndefined(payload.restricoesAlerta)},
+          ${trimOrUndefined(payload.necessidadeEspecial)},
+          ${trimOrUndefined(payload.transporteApoio)},
+          ${payload.unidade},
+          ${payload.setor},
+          ${payload.tipoAtendimento},
+          ${trimOrUndefined(payload.subcategoria)},
+          ${trimOrUndefined(payload.profissionalId)},
+          ${trimOrUndefined(payload.profissionalNome)},
+          ${Prisma.sql`${serializarJson(payload.equipeApoio ?? [])}::jsonb`},
+          ${formatarData(payload.data)},
+          ${sqlTime(payload.horaInicial)},
+          ${sqlTime(payload.horaFinal)},
+          ${payload.duracaoMinutos ?? null},
+          ${trimOrUndefined(payload.sala)},
+          ${trimOrUndefined(payload.recurso)},
+          ${payload.modalidade},
+          ${trimOrUndefined(payload.origemAtendimento)},
+          ${payload.prioridade},
+          ${payload.status ?? "Agendado"},
+          ${trimOrUndefined(payload.motivo)},
+          ${trimOrUndefined(payload.objetivo)},
+          ${trimOrUndefined(payload.observacaoInterna)},
+          ${trimOrUndefined(payload.observacaoCurta)},
+          ${payload.coletivo ?? origem.coletivo ?? false},
+          ${trimOrUndefined(payload.tituloColetivo)},
+          ${payload.capacidadeMaxima && payload.capacidadeMaxima > 0 ? payload.capacidadeMaxima : (participantes.length > 0 ? participantes.length : null)},
+          ${Prisma.sql`${serializarJson(payload.participantes ?? [])}::jsonb`},
+          ${payload.recorrencia ? Prisma.sql`${serializarJson(payload.recorrencia)}::jsonb` : Prisma.sql`NULL`},
+          ${formatarData(payload.retornoProgramadoPara)},
+          ${trimOrUndefined(payload.encaminhamentoOrigem)},
+          ${payload.primeiraVez ?? false},
+          ${payload.retorno ?? false},
+          ${payload.urgencia ?? false},
+          ${payload.documentosPendentes ?? false},
+          ${payload.autorizacaoPendente ?? false},
+          ${trimOrUndefined(payload.itemTipo ?? undefined)},
+          ${payload.itemOrigemId ? BigInt(payload.itemOrigemId) : null},
+          ${trimOrUndefined(payload.itemNome)},
+          ${trimOrUndefined(payload.itemDiasSemana)},
+          ${trimOrUndefined(payload.itemLocal)},
+          ${trimOrUndefined(payload.diaSemana) ?? this.formatarDiaSemana(payload.data)},
+          ${usuario?.id ? BigInt(usuario.id) : null},
+          ${trimOrUndefined(usuario?.nome ?? usuario?.nomeUsuario)}
+        ) RETURNING id
+      `);
+
+      const idNovo = inserted[0]?.id;
+      if (!idNovo) throw new AppError("Nao foi possivel copiar a agenda.", 500);
+      await this.sincronizarBeneficiariosAgendamento(idNovo, tenantId, payload.participantes ?? [], tx);
+      return idNovo;
+    });
+
+    const criado = await this.obter(novoId, tenantId);
+    await this.registrarLog(novoId, "copiar", usuario, tenantId, origem, criado);
+    return criado;
   }
 
   async cancelar(id: bigint, motivo: string | null | undefined, usuario: UsuarioActor | undefined, tenantId: string) {
@@ -1669,7 +1999,7 @@ export class AgendamentosRepository {
       ) VALUES (
         ${atual.beneficiario_id},
         ${atual.familia_id},
-        ${new Date(`${String(atual.data_agendamento).slice(0, 10)}T${String(atual.hora_inicial).slice(0, 8)}`)},
+        ${new Date(`${formatarDataEntrada(atual.data_agendamento)}T${formatarHoraEntrada(atual.hora_inicial)}`)},
         ${atual.tipo_atendimento},
         ${atual.setor},
         ${atual.profissional_nome ?? atual.responsavel_nome ?? "Equipe institucional"},
@@ -1828,7 +2158,7 @@ export class AgendamentosRepository {
       comparecimento: "Pendente" as const
     }));
 
-    const horarioBase = String(item.horario_inicial ?? "08:00:00").slice(0, 8);
+    const horarioBase = formatarHoraEntrada(item.horario_inicial) ?? "08:00:00";
     const profissionalNome = trimOrUndefined(item.profissional) ?? trimOrUndefined(selecionados[0]?.profissional_nome) ?? "Equipe institucional";
     const local = trimOrUndefined(item.sala_nome) ?? trimOrUndefined(item.instituicao_parceira) ?? "Local a definir";
 
@@ -2122,14 +2452,14 @@ export class AgendamentosRepository {
       `),
       prisma.$queryRaw<Array<{ setor: string | null }>>(Prisma.sql`
         SELECT DISTINCT NULLIF(TRIM(setor), '') AS setor
-        FROM usuario
+        FROM usuarios
         WHERE tenant_id::text = ${tenantId}
           AND NULLIF(TRIM(setor), '') IS NOT NULL
         ORDER BY setor ASC
       `),
       prisma.$queryRaw<Array<{ nome_completo: string | null }>>(Prisma.sql`
         SELECT nome_completo
-        FROM cadastro_profissional
+        FROM cadastro_profissionais
         WHERE tenant_id::text = ${tenantId}
         ORDER BY nome_completo ASC
       `),
@@ -2141,14 +2471,15 @@ export class AgendamentosRepository {
         ORDER BY tipo_atendimento ASC
       `),
       prisma.$queryRaw<Array<{ nome: string | null }>>(Prisma.sql`
-        SELECT nome
-        FROM salas
-        WHERE tenant_id::text = ${tenantId}
+        SELECT s.nome
+        FROM salas_unidade s
+        INNER JOIN unidade_assistencial ua ON ua.id = s.unidade_id
+        WHERE ua.tenant_id::text = ${tenantId}
         ORDER BY nome ASC
       `),
       prisma.$queryRaw<Array<{ descricao: string | null }>>(Prisma.sql`
         SELECT DISTINCT NULLIF(TRIM(descricao), '') AS descricao
-        FROM item_almoxarifado
+        FROM almoxarifado_item
         WHERE tenant_id::text = ${tenantId}
           AND NULLIF(TRIM(descricao), '') IS NOT NULL
         ORDER BY descricao ASC

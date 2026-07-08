@@ -2,6 +2,7 @@ import { AppError } from "../../../shared/errors/app-error.js";
 import {
   agendamentoCheckInInputSchema,
   agendamentoConclusaoInputSchema,
+  agendamentoCopiaInputSchema,
   agendamentoFiltrosSchema,
   agendamentoInputSchema,
   agendamentoListaEsperaInputSchema,
@@ -67,6 +68,11 @@ export class AgendamentosService {
   async remarcar(rawId: string, rawInput: unknown, usuario?: UsuarioActor, tenantId?: string, instituicaoSlug?: string) {
     const input = agendamentoRemarcacaoInputSchema.parse(rawInput);
     return this.repository.remarcar(this.parseId(rawId), input, usuario, this.resolverTenantId(tenantId, instituicaoSlug));
+  }
+
+  async copiar(rawId: string, rawInput: unknown, usuario?: UsuarioActor, tenantId?: string, instituicaoSlug?: string) {
+    const input = agendamentoCopiaInputSchema.parse(rawInput);
+    return this.repository.copiar(this.parseId(rawId), input.data, usuario, this.resolverTenantId(tenantId, instituicaoSlug));
   }
 
   async confirmar(rawId: string, rawInput: unknown, usuario?: UsuarioActor, tenantId?: string, instituicaoSlug?: string) {

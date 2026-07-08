@@ -1,6 +1,66 @@
 {
   "entries":  [
                     {
+                        "version":  "1.00.594",
+                        "releaseDate":  "2026-07-08",
+                        "title":  "Agendamentos com persistência transacional",
+                        "description":  "A aba Agendamento passou a gravar, consultar, editar, remover e copiar cards com confirmação real do PostgreSQL e sem dependência de estado local.",
+                        "changes":  [
+                                        "A gravação da agenda operacional passou a ocorrer em transação e com batch insert dos participantes.",
+                                        "A cópia de agenda ganhou endpoint próprio e só confirma sucesso depois da persistência no banco.",
+                                        "A tela passou a consultar os cards pela data selecionada diretamente do backend, sem usar cache, memória ou localStorage como fonte de verdade."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.593",
+                        "releaseDate":  "2026-07-08",
+                        "title":  "Cadastros por tipo com cores do sistema",
+                        "description":  "O bloco Cadastros por tipo da Visão geral passou a usar a paleta padrão do sistema, sem azul fixo.",
+                        "changes":  [
+                                        "Os segmentos e marcadores do bloco Cadastros por tipo passaram a usar as cores padrão do sistema.",
+                                        "A leitura visual do painel ficou coerente com o restante da interface e sem tonalidade azul travada.",
+                                        "O manual do sistema foi atualizado para registrar a mudança de paleta do bloco."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.592",
+                        "releaseDate":  "2026-07-08",
+                        "title":  "Visão geral em cinza claro",
+                        "description":  "Os cards da Visão geral passaram a iniciar com fundo cinza claro nos controles dedicados da personalização.",
+                        "changes":  [
+                                        "Os defaults dos campos Card da visão geral e Card suave da visão geral passaram a usar tons de cinza claro.",
+                                        "A experiência de abertura da personalização passou a mostrar o dashboard já com fundo neutro e mais discreto.",
+                                        "O manual do sistema foi atualizado para registrar o novo padrão inicial."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.591",
+                        "releaseDate":  "2026-07-08",
+                        "title":  "Cards da visão geral com cores próprias",
+                        "description":  "Os cards da Visão geral passaram a ter cores separadas da paleta global e a aba Personalização ganhou controles específicos para esse dashboard.",
+                        "changes":  [
+                                        "A Visão geral passou a usar variáveis próprias para o card principal e para os cards suaves, sem depender só da cor global do tema.",
+                                        "A aba Personalização ganhou os campos Card da visão geral e Card suave da visão geral para alterar apenas esse dashboard.",
+                                        "O manual do sistema foi atualizado para explicar o novo controle dedicado aos cards da Visão geral."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.590",
+                        "releaseDate":  "2026-07-08",
+                        "title":  "Visão geral com cores personalizáveis",
+                        "description":  "A visão geral passou a seguir a paleta definida em Configurações gerais > Personalização e ganhou preview específico dos cards de dashboard.",
+                        "changes":  [
+                                        "Os cards da Visão geral deixaram de usar azuis fixos e passaram a responder às cores do tema definido na personalização.",
+                                        "A aba Personalização de Configurações gerais passou a exibir um aviso e um preview dos cards da Visão geral para facilitar o ajuste antes de salvar.",
+                                        "O manual do sistema foi atualizado para registrar o novo comportamento visual e o vínculo com a personalização."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.589",
                         "releaseDate":  "2026-07-07",
                         "title":  "Tema e logo da apresentação",

@@ -192,6 +192,10 @@ export const agendamentoRemarcacaoInputSchema = z.object({
   motivo: optionalTrimmedString.nullable().optional()
 });
 
+export const agendamentoCopiaInputSchema = z.object({
+  data: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/)
+});
+
 export const agendamentoFiltrosSchema = z.object({
   busca: optionalTrimmedString.optional(),
   unidade: optionalTrimmedString.optional(),

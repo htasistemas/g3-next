@@ -134,6 +134,17 @@ export function useRemarcarAgendamento() {
   });
 }
 
+export function useCopiarAgendamento() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: string | number; payload: { data: string } }) =>
+      agendamentosService.copiar(id, payload),
+    onSuccess: async () => {
+      await invalidarAgendamentos(queryClient);
+    }
+  });
+}
+
 export function useConfirmarAgendamento() {
   const queryClient = useQueryClient();
   return useMutation({
