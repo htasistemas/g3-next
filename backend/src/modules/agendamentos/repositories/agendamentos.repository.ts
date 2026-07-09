@@ -1925,7 +1925,7 @@ export class AgendamentosRepository {
       FROM agendamento_sala ass
       INNER JOIN agendamento a ON a.id = ass.agendamento_id
       WHERE ass.tenant_id::text = ${tenantId}
-        AND ass.data_agendamento BETWEEN ${formatarDataEntrada(inicio)} AND ${formatarDataEntrada(fim)}
+        AND ass.data_agendamento BETWEEN ${inicio}::date AND ${fim}::date
         AND COALESCE(a.status, '') <> 'Cancelado'
         ${salaId ? Prisma.sql`AND ass.sala_unidade_id = ${BigInt(salaId)}` : Prisma.empty}
       ORDER BY ass.data_agendamento ASC, ass.hora_inicial ASC, ass.sala_nome ASC
