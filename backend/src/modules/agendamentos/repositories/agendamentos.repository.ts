@@ -1707,6 +1707,7 @@ export class AgendamentosRepository {
     const idsInformados = Array.from(
       new Set((input.salasIds ?? []).filter((id): id is number => Number.isInteger(id) && Number(id) > 0))
     );
+    const possuiFiltroSalaExplicito = idsInformados.length > 0 || Boolean(trimOrUndefined(input.sala));
 
     const rowsSalas = await db.$queryRaw<
       Array<{
@@ -1724,7 +1725,7 @@ export class AgendamentosRepository {
       ORDER BY s.nome ASC
     `);
 
-    if (rowsSalas.length) {
+    if (rowsSalas.length && possuiFiltroSalaExplicito) {
       return rowsSalas;
     }
 
