@@ -2321,7 +2321,15 @@ export class AgendamentosRepository {
     });
 
     const atual = await this.obter(id, tenantId);
-    await this.registrarLog(id, "editar", usuario, tenantId, anterior, atual);
+    try {
+      await this.registrarLog(id, "editar", usuario, tenantId, anterior, atual);
+    } catch (error) {
+      console.warn("[agendamentos][atualizar][log-falhou]", {
+        tenantId,
+        agendamentoId: id.toString(),
+        erro: error instanceof Error ? error.message : String(error)
+      });
+    }
     return atual;
   }
 
@@ -2585,7 +2593,15 @@ export class AgendamentosRepository {
     `);
 
     const atual = await this.obter(id, tenantId);
-    await this.registrarLog(id, "cancelar", usuario, tenantId, anterior, atual);
+    try {
+      await this.registrarLog(id, "cancelar", usuario, tenantId, anterior, atual);
+    } catch (error) {
+      console.warn("[agendamentos][cancelar][log-falhou]", {
+        tenantId,
+        agendamentoId: id.toString(),
+        erro: error instanceof Error ? error.message : String(error)
+      });
+    }
     return atual;
   }
 
@@ -2599,8 +2615,24 @@ export class AgendamentosRepository {
         AND tenant_id::text = ${tenantId}
     `);
 
-    await this.registrarLog(id, "excluir", usuario, tenantId, anterior, null);
-    await this.registrarHistoricoFamilia(anterior.familia_id, "Agendamento excluido da agenda.", anterior, tenantId);
+    try {
+      await this.registrarLog(id, "excluir", usuario, tenantId, anterior, null);
+    } catch (error) {
+      console.warn("[agendamentos][excluir][log-falhou]", {
+        tenantId,
+        agendamentoId: id.toString(),
+        erro: error instanceof Error ? error.message : String(error)
+      });
+    }
+    try {
+      await this.registrarHistoricoFamilia(anterior.familia_id, "Agendamento excluido da agenda.", anterior, tenantId);
+    } catch (error) {
+      console.warn("[agendamentos][excluir][historico-falhou]", {
+        tenantId,
+        agendamentoId: id.toString(),
+        erro: error instanceof Error ? error.message : String(error)
+      });
+    }
     return anterior;
   }
 
@@ -2669,7 +2701,15 @@ export class AgendamentosRepository {
       data: input.data,
       salas: salasSelecionadas.map((sala) => sala.sala_nome)
     });
-    await this.registrarLog(id, "remarcar", usuario, tenantId, anterior, atual);
+    try {
+      await this.registrarLog(id, "remarcar", usuario, tenantId, anterior, atual);
+    } catch (error) {
+      console.warn("[agendamentos][remarcar][log-falhou]", {
+        tenantId,
+        agendamentoId: id.toString(),
+        erro: error instanceof Error ? error.message : String(error)
+      });
+    }
     return atual;
   }
 
@@ -2697,7 +2737,15 @@ export class AgendamentosRepository {
     `);
 
     const atual = await this.obter(id, tenantId);
-    await this.registrarLog(id, "confirmar", usuario, tenantId, anterior, atual);
+    try {
+      await this.registrarLog(id, "confirmar", usuario, tenantId, anterior, atual);
+    } catch (error) {
+      console.warn("[agendamentos][confirmar][log-falhou]", {
+        tenantId,
+        agendamentoId: id.toString(),
+        erro: error instanceof Error ? error.message : String(error)
+      });
+    }
     return atual;
   }
 
@@ -2731,7 +2779,15 @@ export class AgendamentosRepository {
     `);
 
     const atual = await this.obter(id, tenantId);
-    await this.registrarLog(id, "check_in", usuario, tenantId, anterior, atual);
+    try {
+      await this.registrarLog(id, "check_in", usuario, tenantId, anterior, atual);
+    } catch (error) {
+      console.warn("[agendamentos][check-in][log-falhou]", {
+        tenantId,
+        agendamentoId: id.toString(),
+        erro: error instanceof Error ? error.message : String(error)
+      });
+    }
     return atual;
   }
 
@@ -2808,8 +2864,24 @@ export class AgendamentosRepository {
     `);
 
     const atual = await this.obter(id, tenantId);
-    await this.registrarLog(id, "concluir", usuario, tenantId, anterior, atual);
-    await this.registrarHistoricoFamilia(atual?.familia_id, "Atendimento concluído para a família.", atual, tenantId);
+    try {
+      await this.registrarLog(id, "concluir", usuario, tenantId, anterior, atual);
+    } catch (error) {
+      console.warn("[agendamentos][concluir][log-falhou]", {
+        tenantId,
+        agendamentoId: id.toString(),
+        erro: error instanceof Error ? error.message : String(error)
+      });
+    }
+    try {
+      await this.registrarHistoricoFamilia(atual?.familia_id, "Atendimento concluído para a família.", atual, tenantId);
+    } catch (error) {
+      console.warn("[agendamentos][concluir][historico-falhou]", {
+        tenantId,
+        agendamentoId: id.toString(),
+        erro: error instanceof Error ? error.message : String(error)
+      });
+    }
     return atual;
   }
 
