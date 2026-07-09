@@ -599,6 +599,13 @@ export function AgendamentosPage() {
   const cardsVisiveis = cards;
 
   const cardSelecionado = cardsVisiveis.find((item) => item.id === selecionadoId) ?? null;
+  const cardSelecionadoParaEdicao =
+    cardSelecionado &&
+    cardSelecionado.itemOrigemId === itemSelecionado?.id &&
+    cardSelecionado.itemTipo === tipo &&
+    (cardSelecionado.data ?? "").slice(0, 10) === dataAgendamento
+      ? cardSelecionado
+      : null;
   const cardsDoDia = useMemo(
     () => cardsVisiveis.filter((item) => (item.data ?? "").slice(0, 10) === dataVisualizacao),
     [cardsVisiveis, dataVisualizacao]
@@ -722,7 +729,7 @@ export function AgendamentosPage() {
     const dataExibicao = dataAgendamento;
     try {
       const salvo = await salvarMutation.mutateAsync({
-        id: cardSelecionado?.id ? String(cardSelecionado.id) : undefined,
+        id: cardSelecionadoParaEdicao?.id ? String(cardSelecionadoParaEdicao.id) : undefined,
         tipo,
         itemId: itemSelecionado.id,
         data: dataAgendamento,
@@ -1245,7 +1252,7 @@ export function AgendamentosPage() {
                     disabled={!tipo || !itemSelecionado?.id || !beneficiariosSelecionados.length || !dataAgendamento}
                     loading={salvarMutation.isPending || geracaoEmAndamento}
                     onClick={salvarCard}
-                    texto={cardSelecionado?.id ? "Atualizar agenda" : "Gerar agenda"}
+                    texto={cardSelecionadoParaEdicao ? "Atualizar agenda" : "Gerar agenda"}
                   />
                   {geracaoEmAndamento ? (
                     <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-sm">

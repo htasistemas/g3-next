@@ -1851,6 +1851,25 @@ export class AgendamentosRepository {
     `);
   }
 
+  private async sincronizarSalasAgendamentoComTolerancia(
+    agendamentoId: bigint,
+    tenantId: string,
+    salas: Array<{ sala_id: bigint; sala_nome: string }>,
+    db: PrismaExecutor = prisma,
+    base?: { data: string; horaInicial: string; horaFinal?: string | null; status?: string | null }
+  ) {
+    try {
+      await this.sincronizarSalasAgendamento(agendamentoId, tenantId, salas, db, base);
+    } catch (error) {
+      console.warn("[agendamentos][salas][sincronizacao-falhou]", {
+        tenantId,
+        agendamentoId: agendamentoId.toString(),
+        salas: salas.map((sala) => sala.sala_nome),
+        erro: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
   private async listarSalasPorAgendamento(agendamentoIds: bigint[], tenantId: string) {
     if (!agendamentoIds.length) {
       return [];
@@ -2152,7 +2171,7 @@ export class AgendamentosRepository {
       const idInserido = inserted[0]?.id;
       if (!idInserido) throw new AppError("Nao foi possivel criar o agendamento.", 500);
       await this.sincronizarBeneficiariosAgendamento(idInserido, tenantId, input.participantes ?? [], tx);
-      await this.sincronizarSalasAgendamento(idInserido, tenantId, salasSelecionadas, tx, {
+      await this.sincronizarSalasAgendamentoComTolerancia(idInserido, tenantId, salasSelecionadas, tx, {
         data: input.data,
         horaInicial: input.horaInicial,
         horaFinal: input.horaFinal,
@@ -2312,7 +2331,7 @@ export class AgendamentosRepository {
       `);
 
       await this.sincronizarBeneficiariosAgendamento(id, tenantId, input.participantes ?? [], tx);
-      await this.sincronizarSalasAgendamento(id, tenantId, salasSelecionadas, tx, {
+      await this.sincronizarSalasAgendamentoComTolerancia(id, tenantId, salasSelecionadas, tx, {
         data: input.data,
         horaInicial: input.horaInicial,
         horaFinal: input.horaFinal,
@@ -2534,7 +2553,7 @@ export class AgendamentosRepository {
       const idNovo = inserted[0]?.id;
       if (!idNovo) throw new AppError("Nao foi possivel copiar a agenda.", 500);
       await this.sincronizarBeneficiariosAgendamento(idNovo, tenantId, payload.participantes ?? [], tx);
-      await this.sincronizarSalasAgendamento(idNovo, tenantId, salasSelecionadas, tx, {
+      await this.sincronizarSalasAgendamentoComTolerancia(idNovo, tenantId, salasSelecionadas, tx, {
         data: payload.data,
         horaInicial: payload.horaInicial,
         horaFinal: payload.horaFinal,
@@ -2687,7 +2706,7 @@ export class AgendamentosRepository {
       WHERE id = ${id}
         AND tenant_id::text = ${tenantId}
     `);
-    await this.sincronizarSalasAgendamento(id, tenantId, salasSelecionadas, prisma, {
+    await this.sincronizarSalasAgendamentoComTolerancia(id, tenantId, salasSelecionadas, prisma, {
       data: input.data,
       horaInicial: input.horaInicial,
       horaFinal: input.horaFinal,
