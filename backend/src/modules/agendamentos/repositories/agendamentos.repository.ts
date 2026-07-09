@@ -1705,11 +1705,11 @@ export class AgendamentosRepository {
 
     if (input.itemOrigemId) {
       const itemRows = await db.$queryRaw<Array<{ sala_id: bigint | null; sala_nome: string | null }>>(Prisma.sql`
-        SELECT c.sala_id, c.sala_nome
+        SELECT c.sala_id, s.nome AS sala_nome
         FROM cursos_atendimentos c
-        INNER JOIN unidade_assistencial ua ON ua.id = c.unidade_id
+        LEFT JOIN salas_unidade s ON s.id = c.sala_id
         WHERE c.id = ${BigInt(input.itemOrigemId)}
-          AND ua.tenant_id::text = ${tenantId}
+          AND c.tenant_id::text = ${tenantId}
         LIMIT 1
       `);
       const salaId = itemRows[0]?.sala_id;
