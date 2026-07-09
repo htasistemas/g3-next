@@ -1294,6 +1294,7 @@ export function AgendamentosPage() {
                   </div>
                   <AgendaCardList
                     cards={cardsDoDia}
+                    carregando={agendamentosQuery.isLoading || agendamentosQuery.isFetching}
                     selecionadoId={selecionadoId}
                     destaqueRecenteId={ultimaAgendaDestacadaId}
                     envioEmAndamento={envioEmAndamento}

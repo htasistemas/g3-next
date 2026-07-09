@@ -303,6 +303,7 @@ export function GenerateCardButton(props: { disabled?: boolean; loading?: boolea
 
 export function AgendaCardList(props: {
   cards: Agendamento[];
+  carregando?: boolean;
   selecionadoId?: number | null;
   destaqueRecenteId?: number | null;
   envioEmAndamento?: {
@@ -326,6 +327,17 @@ export function AgendaCardList(props: {
     index: number;
   } | null;
 }) {
+  if (props.carregando) {
+    return (
+      <Card className="border-[var(--g3-border)]">
+        <CardContent className="flex items-center gap-3 px-4 py-8 text-sm text-[var(--g3-muted)]">
+          <LoaderCircle className="h-4 w-4 animate-spin text-emerald-600" />
+          Carregando cards operacionais...
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (!props.cards.length) {
     return (
       <Card className="border-[var(--g3-border)]">

@@ -15,6 +15,7 @@ import type {
   ObrigatoriedadeDocumentosBeneficiarioSistema,
   PersonalizacaoSistema
 } from "../parametros-sistema.types.js";
+import { prisma } from "../../../database/prisma.js";
 
 const personalizacaoPadrao: PersonalizacaoSistema = {
   modo: "CLARO",
@@ -298,7 +299,17 @@ export class ParametrosSistemaService {
       usuarioId
     );
     const registro = await this.repository.buscarPorChaveGenerica<{ data_visualizacao?: string }>(chave, tenantId);
-    return registro?.valor?.data_visualizacao?.trim() || null;
+    const dataPreferida = registro?.valor?.data_visualizacao?.trim() || null;
+    if (dataPreferida && (await this.existeAgendaOperacionalNaData(tenantId, dataPreferida))) {
+      return dataPreferida;
+    }
+
+    const ultimaDataOperacional = await this.obterUltimaDataAgendaOperacional(tenantId);
+    if (ultimaDataOperacional) {
+      return ultimaDataOperacional;
+    }
+
+    return dataPreferida;
   }
 
   async salvarPreferenciaAgendamentosVisualizacao(
@@ -323,5 +334,59 @@ export class ParametrosSistemaService {
 
   private montarChavePreferenciaUsuario(chaveBase: string, usuarioId: string) {
     return `${chaveBase}:${String(usuarioId).trim()}`;
+  }
+
+  private async existeAgendaOperacionalNaData(tenantId: string, dataIso: string) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dataIso)) {
+      return false;
+    }
+
+    const rows = await prisma.$queryRawUnsafe<Array<{ total: bigint }>>(
+      `
+        SELECT COUNT(*)::bigint AS total
+        FROM agendamento
+        WHERE tenant_id::text = $1
+          AND data_agendamento = $2::date
+          AND COALESCE(status, '') <> 'Cancelado'
+          AND (
+            COALESCE(item_tipo, '') <> ''
+            OR COALESCE(jsonb_array_length(COALESCE(participantes, '[]'::jsonb)), 0) > 0
+          )
+      `,
+      tenantId,
+      dataIso
+    );
+
+    return Number(rows[0]?.total ?? 0n) > 0;
+  }
+
+  private async obterUltimaDataAgendaOperacional(tenantId: string) {
+    const rows = await prisma.$queryRawUnsafe<Array<{ data_agendamento: Date | string | null }>>(
+      `
+        SELECT data_agendamento
+        FROM agendamento
+        WHERE tenant_id::text = $1
+          AND COALESCE(status, '') <> 'Cancelado'
+          AND (
+            COALESCE(item_tipo, '') <> ''
+            OR COALESCE(jsonb_array_length(COALESCE(participantes, '[]'::jsonb)), 0) > 0
+          )
+        ORDER BY data_agendamento DESC, atualizado_em DESC, id DESC
+        LIMIT 1
+      `,
+      tenantId
+    );
+
+    const data = rows[0]?.data_agendamento;
+    if (!data) {
+      return null;
+    }
+
+    if (data instanceof Date) {
+      return data.toISOString().slice(0, 10);
+    }
+
+    const texto = String(data).trim();
+    return /^\d{4}-\d{2}-\d{2}/.test(texto) ? texto.slice(0, 10) : null;
   }
 }
