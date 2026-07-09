@@ -180,6 +180,8 @@ const estruturaSql = [
   "CREATE INDEX IF NOT EXISTS agendamento_sala_tenant_idx ON agendamento_sala(tenant_id, data_agendamento, hora_inicial)",
   "CREATE INDEX IF NOT EXISTS agendamento_sala_sala_idx ON agendamento_sala(tenant_id, sala_unidade_id, data_agendamento, hora_inicial)",
   "CREATE INDEX IF NOT EXISTS agendamento_sala_agendamento_idx ON agendamento_sala(agendamento_id)",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS sala_id BIGINT",
+  "CREATE INDEX IF NOT EXISTS cursos_atendimentos_sala_idx ON cursos_atendimentos(sala_id)",
   `
     CREATE TABLE IF NOT EXISTS agendamento_envio (
       id BIGSERIAL PRIMARY KEY,
