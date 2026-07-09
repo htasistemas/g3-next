@@ -207,24 +207,6 @@ export class AgendamentosController {
     return response.json(catalogos);
   }
 
-  async listarSalas(request: AuthenticatedRequest, response: Response) {
-    const salas = await service.listarSalas(
-      request.query,
-      request.authUser?.tenant_id,
-      request.authUser?.instituicao_slug
-    );
-    return response.json(salas);
-  }
-
-  async mapaSalas(request: AuthenticatedRequest, response: Response) {
-    const mapa = await service.mapaSalas(
-      request.query,
-      request.authUser?.tenant_id,
-      request.authUser?.instituicao_slug
-    );
-    return response.json(mapa);
-  }
-
   async notificar(request: AuthenticatedRequest, response: Response) {
     const payload = await service.notificar(
       request.params.id,

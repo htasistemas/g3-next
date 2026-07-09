@@ -51,7 +51,6 @@ export function mapAgendamentoRow(row: AgendamentoRow) {
     duracaoMinutos: row.duracao_minutos ?? undefined,
     sala: row.sala ?? undefined,
     recurso: row.recurso ?? undefined,
-    salas: asArray(row.salas),
     modalidade: row.modalidade,
     origemAtendimento: row.origem_atendimento ?? undefined,
     prioridade: row.prioridade,

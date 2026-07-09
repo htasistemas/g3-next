@@ -56,11 +56,6 @@ export type Agendamento = {
   horaFinal?: string;
   duracaoMinutos?: number;
   sala?: string;
-  salasIds?: number[];
-  salas?: Array<{
-    sala_id?: number;
-    sala_nome?: string;
-  }>;
   recurso?: string;
   modalidade: AgendamentoModalidade;
   origemAtendimento?: string;
@@ -151,36 +146,6 @@ export type AgendamentoFiltros = {
   visualizacao?: string;
 };
 
-export type AgendamentoSalaCatalogo = {
-  id: number;
-  nome: string;
-  ativo: boolean;
-  unidadeId: number;
-  unidadeNome?: string;
-};
-
-export type AgendamentoMapaSalaOcupacao = {
-  agendamentoId: number;
-  salaId: number;
-  salaNome: string;
-  data: string;
-  horaInicial: string;
-  horaFinal?: string;
-  status?: string;
-  beneficiarioNome: string;
-  profissionalNome?: string;
-  itemNome?: string;
-  participantes?: unknown[];
-};
-
-export type AgendamentoMapaSalas = {
-  semanaInicio: string;
-  semanaFim: string;
-  dias: string[];
-  salas: AgendamentoSalaCatalogo[];
-  ocupacoes: AgendamentoMapaSalaOcupacao[];
-};
-
 export type AgendamentoOperacionalItem = {
   id: number;
   tipo?: string;
@@ -210,5 +175,4 @@ export type AgendamentoOperacionalPayload = {
   data: string;
   beneficiariosIds?: number[];
   matriculasIds?: number[];
-  salasIds?: number[];
 };

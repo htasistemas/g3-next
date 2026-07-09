@@ -51,7 +51,6 @@ export type AgendamentoInput = {
   horaFinal?: string | null;
   duracaoMinutos?: number | null;
   sala?: string | null;
-  salasIds?: number[] | null;
   recurso?: string | null;
   modalidade: AgendamentoModalidade;
   origemAtendimento?: string | null;
@@ -93,7 +92,6 @@ export type AgendamentoOperacionalInput = {
   data: string;
   beneficiariosIds?: number[];
   matriculasIds?: number[];
-  salasIds?: number[];
 };
 
 export type AgendamentoOperacionalItemRow = {
@@ -191,7 +189,6 @@ export type AgendamentoRemarcacaoInput = {
   horaFinal?: string | null;
   profissionalNome?: string | null;
   sala?: string | null;
-  salasIds?: number[] | null;
   recurso?: string | null;
   permitirConflito?: boolean;
   motivo?: string | null;
@@ -244,7 +241,6 @@ export type AgendamentoRow = {
   duracao_minutos: number | null;
   sala: string | null;
   recurso: string | null;
-  salas: unknown;
   modalidade: string;
   origem_atendimento: string | null;
   prioridade: string;

@@ -10,7 +10,6 @@ import {
   FileDown,
   LayoutGrid,
   LoaderCircle,
-  MapPinned,
   TriangleAlert,
   TrendingUp,
   Users,
@@ -45,21 +44,14 @@ import {
   useItensOperacionaisAgendamento,
   useListaEsperaAgendamentos,
   useExcluirAgendamento,
-  useMapaSalasAgendamentos,
   useNotificarAgendamento,
   useRemarcarAgendamento,
-  useSalasAgendamentos,
   useSalvarAgendamento,
   useSalvarAgendamentoOperacional
 } from "@/features/agendamentos/use-agendamentos";
-import type {
-  Agendamento,
-  AgendamentoMapaSalaOcupacao,
-  AgendamentoOperacionalItem,
-  AgendamentoOperacionalTipo
-} from "@/types/agendamento";
+import type { Agendamento, AgendamentoOperacionalItem, AgendamentoOperacionalTipo } from "@/types/agendamento";
 
-type AbaId = "agenda" | "dashboard" | "espera" | "mapa-salas";
+type AbaId = "agenda" | "dashboard" | "espera";
 type AgendamentoParticipante = NonNullable<Agendamento["participantes"]>[number];
 
 type DashboardCard = {
@@ -97,7 +89,6 @@ let urlFichaAgendamentoAtual: string | null = null;
 const abas: AdminTab[] = [
   { id: "dashboard", label: "Dashboard", icon: Activity },
   { id: "agenda", label: "Agendamento", icon: CalendarRange },
-  { id: "mapa-salas", label: "Mapa de salas", icon: MapPinned },
   { id: "espera", label: "Lista de espera", icon: Users }
 ];
 
@@ -161,42 +152,6 @@ function formatarIdade(dataNascimento?: string) {
   }
 
   return idade >= 0 ? `${idade} ano${idade === 1 ? "" : "s"}` : "---";
-}
-
-function formatarHoraCurta(valor?: string) {
-  if (!valor) return "---";
-  const match = valor.match(/(\d{2}:\d{2})/);
-  return match ? match[1] : valor;
-}
-
-function horaParaMinutos(valor?: string) {
-  if (!valor) return null;
-  const match = valor.match(/^(\d{2}):(\d{2})/);
-  if (!match) return null;
-  const horas = Number(match[1]);
-  const minutos = Number(match[2]);
-  if (!Number.isInteger(horas) || !Number.isInteger(minutos)) return null;
-  return horas * 60 + minutos;
-}
-
-function formatarPeriodoMapa(inicio?: string, fim?: string) {
-  const inicioTexto = formatarHoraCurta(inicio);
-  const fimTexto = formatarHoraCurta(fim);
-  return `${inicioTexto}${fimTexto && fimTexto !== "---" ? ` até ${fimTexto}` : ""}`;
-}
-
-function calcularFaixaHorario(inicio?: string, fim?: string) {
-  const inicioMin = horaParaMinutos(inicio) ?? 0;
-  const fimMin = horaParaMinutos(fim) ?? Math.min(inicioMin + 60, 24 * 60);
-  const larguraMin = Math.max(15, fimMin - inicioMin);
-  return {
-    left: `${Math.max(0, Math.min(100, (inicioMin / 1440) * 100))}%`,
-    width: `${Math.max(1, Math.min(100, (larguraMin / 1440) * 100))}%`
-  };
-}
-
-function chaveSalaDia(salaId: number, data: string) {
-  return `${salaId}:${data}`;
 }
 
 function formatarTelefoneRelatorio(telefone?: string | null) {
@@ -478,8 +433,6 @@ export function AgendamentosPage() {
   const [novaDataAgenda, setNovaDataAgenda] = useState(hoje);
   const [participanteParaMover, setParticipanteParaMover] = useState<{ item: Agendamento; index: number } | null>(null);
   const [participanteParaExcluir, setParticipanteParaExcluir] = useState<{ item: Agendamento; index: number } | null>(null);
-  const [semanaMapaBase, setSemanaMapaBase] = useState(hoje);
-  const [filtroSalaMapaId, setFiltroSalaMapaId] = useState<number | undefined>();
 
   const filtrosAgendamentos = useMemo(
     () => ({
@@ -495,13 +448,6 @@ export function AgendamentosPage() {
   const itensQuery = useItensOperacionaisAgendamento(tipo, buscaItemAdiada);
   const beneficiariosQuery = useBeneficiariosOperacionaisAgendamento(itemSelecionado?.id ?? null);
   const unidadeAtualQuery = useUnidadeAssistencialAtual();
-  const salasQuery = useSalasAgendamentos();
-  const semanaMapaInicio = useMemo(() => obterInicioSemana(normalizarData(semanaMapaBase) ?? new Date(`${hoje}T12:00:00`)), [semanaMapaBase]);
-  const semanaMapaInicioStr = semanaMapaInicio.toISOString().slice(0, 10);
-  const mapaSalasQuery = useMapaSalasAgendamentos({
-    semanaInicio: semanaMapaInicioStr,
-    salaId: filtroSalaMapaId ? String(filtroSalaMapaId) : undefined
-  });
   const salvarAgendamentoMutation = useSalvarAgendamento();
   const salvarMutation = useSalvarAgendamentoOperacional();
   const copiarAgendamentoMutation = useCopiarAgendamento();
@@ -599,13 +545,6 @@ export function AgendamentosPage() {
   const cardsVisiveis = cards;
 
   const cardSelecionado = cardsVisiveis.find((item) => item.id === selecionadoId) ?? null;
-  const cardSelecionadoParaEdicao =
-    cardSelecionado &&
-    cardSelecionado.itemOrigemId === itemSelecionado?.id &&
-    cardSelecionado.itemTipo === tipo &&
-    (cardSelecionado.data ?? "").slice(0, 10) === dataAgendamento
-      ? cardSelecionado
-      : null;
   const cardsDoDia = useMemo(
     () => cardsVisiveis.filter((item) => (item.data ?? "").slice(0, 10) === dataVisualizacao),
     [cardsVisiveis, dataVisualizacao]
@@ -618,33 +557,11 @@ export function AgendamentosPage() {
     return base.filter((item) => item.nomeCompleto.toLowerCase().includes(termo));
   }, [beneficiariosQuery.data, buscaBeneficiario]);
 
-  const salasDisponiveis = salasQuery.data ?? [];
-  const salasMapa = mapaSalasQuery.data?.salas ?? salasDisponiveis;
-  const ocupacoesMapa = mapaSalasQuery.data?.ocupacoes ?? [];
-  const diasMapa = mapaSalasQuery.data?.dias ?? Array.from({ length: 7 }, (_, indice) => somarDias(semanaMapaInicioStr, indice));
-
-  const ocupacoesPorSalaDia = useMemo(() => {
-    const mapa = new Map<string, AgendamentoMapaSalaOcupacao[]>();
-    for (const ocupacao of ocupacoesMapa) {
-      const chave = chaveSalaDia(ocupacao.salaId, ocupacao.data);
-      const lista = mapa.get(chave) ?? [];
-      lista.push(ocupacao);
-      mapa.set(chave, lista);
-    }
-    for (const lista of mapa.values()) {
-      lista.sort((a, b) => a.horaInicial.localeCompare(b.horaInicial));
-    }
-    return mapa;
-  }, [ocupacoesMapa]);
-
-  const salaAutomaticaTexto = itemSelecionado?.local || itemSelecionado?.nome || "Sala definida automaticamente";
-
   const resumoOperacional = [
     { label: "Tipo", value: tipo ? tipo.charAt(0).toUpperCase() + tipo.slice(1) : "Não selecionado" },
     { label: "Item", value: itemSelecionado?.nome || "Não selecionado" },
     { label: "Data", value: dataAgendamento ? new Date(`${dataAgendamento}T12:00:00`).toLocaleDateString("pt-BR") : "Não selecionada" },
-    { label: "Beneficiários", value: `${beneficiariosSelecionados.length} selecionado(s)` },
-    { label: "Sala", value: salaAutomaticaTexto }
+    { label: "Beneficiários", value: `${beneficiariosSelecionados.length} selecionado(s)` }
   ];
 
   const dashboardResumo = useMemo<DashboardCard[]>(() => {
@@ -729,11 +646,11 @@ export function AgendamentosPage() {
     const dataExibicao = dataAgendamento;
     try {
       const salvo = await salvarMutation.mutateAsync({
-        id: cardSelecionadoParaEdicao?.id ? String(cardSelecionadoParaEdicao.id) : undefined,
+        id: cardSelecionado?.id ? String(cardSelecionado.id) : undefined,
         tipo,
         itemId: itemSelecionado.id,
         data: dataAgendamento,
-        matriculasIds: beneficiariosSelecionados,
+        matriculasIds: beneficiariosSelecionados
       });
       setSelecionadoId(salvo?.id ?? null);
       setUltimaAgendaDestacadaId(salvo?.id ?? null);
@@ -1241,18 +1158,11 @@ export function AgendamentosPage() {
                     carregando={beneficiariosQuery.isLoading}
                   />
                   <DataSelector value={dataAgendamento} onChange={setDataAgendamento} />
-                  <div className="rounded-2xl border border-[var(--g3-border)] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbf8_100%)] p-4 shadow-sm">
-                    <p className="text-sm font-semibold text-[var(--g3-foreground)]">Sala definida automaticamente</p>
-                    <p className="mt-1 text-xs text-[var(--g3-muted)]">
-                      O sistema usa a sala vinculada ao item selecionado. Se o cadastro do item tiver sala configurada, ela será bloqueada automaticamente.
-                    </p>
-                    <p className="mt-3 text-sm text-[var(--g3-foreground)]">{salaAutomaticaTexto}</p>
-                  </div>
                   <GenerateCardButton
                     disabled={!tipo || !itemSelecionado?.id || !beneficiariosSelecionados.length || !dataAgendamento}
                     loading={salvarMutation.isPending || geracaoEmAndamento}
                     onClick={salvarCard}
-                    texto={cardSelecionadoParaEdicao ? "Atualizar agenda" : "Gerar agenda"}
+                    texto={cardSelecionado?.id ? "Atualizar agenda" : "Gerar agenda"}
                   />
                   {geracaoEmAndamento ? (
                     <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-sm">
@@ -1301,7 +1211,6 @@ export function AgendamentosPage() {
                   </div>
                   <AgendaCardList
                     cards={cardsDoDia}
-                    carregando={agendamentosQuery.isLoading || agendamentosQuery.isFetching}
                     selecionadoId={selecionadoId}
                     destaqueRecenteId={ultimaAgendaDestacadaId}
                     envioEmAndamento={envioEmAndamento}
@@ -1344,148 +1253,6 @@ export function AgendamentosPage() {
                     <p className="mt-2 text-2xl font-bold text-emerald-950">{card.value}</p>
                   </div>
                 ))}
-              </CardContent>
-            </Card>
-          ) : null}
-
-          {abaAtiva === "mapa-salas" ? (
-            <Card className="border-[var(--g3-border)] bg-[linear-gradient(180deg,#ffffff_0%,#fbfdfb_100%)] shadow-sm">
-                  <CardHeader className="space-y-2">
-                    <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
-                      <div>
-                        <CardTitle className="text-sm">Mapa de salas</CardTitle>
-                        <p className="text-xs text-[var(--g3-muted)]">
-                      Visão semanal com ocupações por intervalo de horas. A sala fica livre fora do período reservado.
-                        </p>
-                      </div>
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--g3-muted)]">
-                    <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-medium text-emerald-800">
-                      {mapaSalasQuery.data?.salas.length ?? salasDisponiveis.length} sala(s)
-                    </span>
-                    <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-medium text-slate-700">
-                      {mapaSalasQuery.data?.ocupacoes.length ?? 0} ocupação(ões)
-                    </span>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex flex-col gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 shadow-sm xl:flex-row xl:items-center xl:justify-between">
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-800">Semana em exibição</p>
-                    <p className="mt-1 text-sm font-semibold text-emerald-950">
-                      {formatarDataExtensa(mapaSalasQuery.data?.semanaInicio ?? semanaMapaInicioStr)} até{" "}
-                      {formatarDataExtensa(mapaSalasQuery.data?.semanaFim ?? somarDias(semanaMapaInicioStr, 6))}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button type="button" variant="outline" className="shadow-sm" onClick={() => setSemanaMapaBase(somarDias(semanaMapaInicioStr, -7))}>
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <input
-                      type="date"
-                      value={semanaMapaBase}
-                      onChange={(event) => setSemanaMapaBase(event.target.value)}
-                      className="h-10 rounded-xl border border-[var(--g3-border)] bg-white px-3 text-sm text-[var(--g3-foreground)] shadow-sm outline-none focus:border-emerald-400"
-                    />
-                    <Button type="button" variant="outline" className="shadow-sm" onClick={() => setSemanaMapaBase(somarDias(semanaMapaInicioStr, 7))}>
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                    <Button type="button" variant="outline" className="shadow-sm" onClick={() => setSemanaMapaBase(hoje)}>
-                      Hoje
-                    </Button>
-                    <select
-                      value={filtroSalaMapaId ?? ""}
-                      onChange={(event) => setFiltroSalaMapaId(event.target.value ? Number(event.target.value) : undefined)}
-                      className="h-10 rounded-xl border border-[var(--g3-border)] bg-white px-3 text-sm text-[var(--g3-foreground)] shadow-sm outline-none focus:border-emerald-400"
-                    >
-                      <option value="">Todas as salas</option>
-                      {salasDisponiveis.map((sala) => (
-                        <option key={sala.id} value={sala.id}>
-                          {sala.nome}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="overflow-x-auto rounded-2xl border border-[var(--g3-border)] bg-white shadow-sm">
-                  {mapaSalasQuery.isLoading ? (
-                    <div className="flex items-center gap-3 px-4 py-8 text-sm text-[var(--g3-muted)]">
-                      <LoaderCircle className="h-4 w-4 animate-spin text-emerald-600" />
-                      Carregando mapa semanal de salas...
-                    </div>
-                  ) : salasMapa.length ? (
-                    <table className="min-w-[1280px] w-full border-collapse text-sm">
-                      <thead className="sticky top-0 bg-emerald-50 text-left">
-                        <tr>
-                          <th className="border-b border-[var(--g3-border)] px-4 py-3 font-semibold text-emerald-900">Sala</th>
-                          {diasMapa.map((dia) => (
-                            <th key={dia} className="border-b border-[var(--g3-border)] px-4 py-3 font-semibold text-emerald-900">
-                              {formatarDataExtensa(dia)}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {salasMapa.map((sala) => (
-                          <tr key={sala.id} className="align-top even:bg-[var(--g3-primary-soft)]/15">
-                            <td className="border-b border-[var(--g3-border)] px-4 py-4">
-                              <div className="space-y-1">
-                                <p className="font-semibold text-[var(--g3-foreground)]">{sala.nome}</p>
-                                <p className="text-xs text-[var(--g3-muted)]">{sala.unidadeNome || "Unidade não informada"}</p>
-                                {!sala.ativo ? <p className="text-xs font-medium text-amber-700">Sala inativa</p> : null}
-                              </div>
-                            </td>
-                            {diasMapa.map((dia) => {
-                              const ocupacoes = ocupacoesPorSalaDia.get(chaveSalaDia(sala.id, dia)) ?? [];
-                              const ocupada = ocupacoes.length > 0;
-                              return (
-                                <td key={`${sala.id}-${dia}`} className="border-b border-[var(--g3-border)] px-3 py-3">
-                                  {ocupada ? (
-                                    <div className="space-y-3">
-                                      {ocupacoes.map((ocupacao) => (
-                                        <div
-                                          key={`${ocupacao.agendamentoId}-${ocupacao.salaId}-${ocupacao.data}`}
-                                          className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 shadow-sm"
-                                        >
-                                          <div className="flex items-start justify-between gap-2">
-                                            <p className="font-semibold text-rose-900">{ocupacao.itemNome || ocupacao.beneficiarioNome}</p>
-                                            <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-rose-700">
-                                              Ocupada
-                                            </span>
-                                          </div>
-                                          <p className="mt-1 text-xs text-rose-800">
-                                            {formatarPeriodoMapa(ocupacao.horaInicial, ocupacao.horaFinal)}
-                                          </p>
-                                          <p className="text-xs text-rose-700">{ocupacao.profissionalNome || "Sem profissional informado"}</p>
-                                          <p className="text-xs text-rose-700">
-                                            {ocupacao.participantes?.length ?? 0} participante(s)
-                                          </p>
-                                          <div className="relative mt-2 h-2 overflow-hidden rounded-full bg-white/80">
-                                            <div
-                                              className="absolute inset-y-0 rounded-full bg-rose-500"
-                                              style={calcularFaixaHorario(ocupacao.horaInicial, ocupacao.horaFinal)}
-                                            />
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  ) : (
-                                    <div className="flex min-h-24 items-center justify-center rounded-xl border border-dashed border-emerald-200 bg-emerald-50 px-3 py-3 text-xs font-medium text-emerald-800">
-                                      Disponível o dia todo
-                                    </div>
-                                  )}
-                                </td>
-                              );
-                            })}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  ) : (
-                    <div className="px-4 py-8 text-sm text-[var(--g3-muted)]">Nenhuma sala encontrada para a instituição selecionada.</div>
-                  )}
-                </div>
               </CardContent>
             </Card>
           ) : null}
