@@ -439,9 +439,30 @@ export async function ensureAgendamentosEstrutura() {
 
 export class AgendamentosRepository {
   private readonly emailService = new EmailService();
+  private readonly colunaExisteCache = new Map<string, boolean>();
 
   async ensureEstrutura() {
     await ensureAgendamentosEstrutura();
+  }
+
+  private async colunaExiste(tabela: string, coluna: string, db: PrismaExecutor = prisma) {
+    const chave = `${tabela}.${coluna}`;
+    if (this.colunaExisteCache.has(chave)) {
+      return this.colunaExisteCache.get(chave) ?? false;
+    }
+
+    const rows = await db.$queryRaw<Array<{ existe: boolean }>>(Prisma.sql`
+      SELECT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = ${tabela}
+          AND column_name = ${coluna}
+      ) AS existe
+    `);
+    const existe = Boolean(rows[0]?.existe);
+    this.colunaExisteCache.set(chave, existe);
+    return existe;
   }
 
   private async resolverFamiliaDoBeneficiario(beneficiarioId?: number | null) {
@@ -1368,6 +1389,7 @@ export class AgendamentosRepository {
   async listarItensOperacionais(tipo: "curso" | "atendimento" | "oficina", busca: string | undefined, tenantId: string) {
     await this.ensureEstrutura();
     const termo = trimOrUndefined(busca);
+    const possuiSalaId = await this.colunaExiste("cursos_atendimentos", "sala_id");
 
     return prisma.$queryRaw<AgendamentoOperacionalItemRow[]>(Prisma.sql`
       SELECT
@@ -1378,11 +1400,11 @@ export class AgendamentosRepository {
         TO_CHAR(c.horario_inicial, 'HH24:MI') AS horario_inicial,
         c.duracao_horas,
         c.dias_semana,
-        s.nome AS sala_nome,
+        ${possuiSalaId ? Prisma.sql` s.nome AS sala_nome, ` : Prisma.sql` NULL::text AS sala_nome, `}
         c.instituicao_parceira,
         c.status
       FROM cursos_atendimentos c
-      LEFT JOIN salas_unidade s ON s.id = c.sala_id
+      ${possuiSalaId ? Prisma.sql`LEFT JOIN salas_unidade s ON s.id = c.sala_id` : Prisma.empty}
       WHERE LOWER(TRIM(COALESCE(c.tipo, ''))) = ${tipo}
         AND c.tenant_id::text = ${tenantId}
         AND COALESCE(c.status, 'Ativo') <> 'Inativo'
@@ -1393,6 +1415,7 @@ export class AgendamentosRepository {
 
   async obterItemOperacional(itemId: bigint, tenantId: string) {
     await this.ensureEstrutura();
+    const possuiSalaId = await this.colunaExiste("cursos_atendimentos", "sala_id");
 
     const rows = await prisma.$queryRaw<AgendamentoOperacionalItemRow[]>(Prisma.sql`
       SELECT
@@ -1403,11 +1426,11 @@ export class AgendamentosRepository {
         TO_CHAR(c.horario_inicial, 'HH24:MI') AS horario_inicial,
         c.duracao_horas,
         c.dias_semana,
-        s.nome AS sala_nome,
+        ${possuiSalaId ? Prisma.sql` s.nome AS sala_nome, ` : Prisma.sql` NULL::text AS sala_nome, `}
         c.instituicao_parceira,
         c.status
       FROM cursos_atendimentos c
-      LEFT JOIN salas_unidade s ON s.id = c.sala_id
+      ${possuiSalaId ? Prisma.sql`LEFT JOIN salas_unidade s ON s.id = c.sala_id` : Prisma.empty}
       WHERE c.id = ${itemId}
         AND c.tenant_id::text = ${tenantId}
         AND COALESCE(c.status, 'Ativo') <> 'Inativo'
@@ -1704,14 +1727,23 @@ export class AgendamentosRepository {
     }
 
     if (input.itemOrigemId) {
-      const itemRows = await db.$queryRaw<Array<{ sala_id: bigint | null; sala_nome: string | null }>>(Prisma.sql`
-        SELECT c.sala_id, s.nome AS sala_nome
-        FROM cursos_atendimentos c
-        LEFT JOIN salas_unidade s ON s.id = c.sala_id
-        WHERE c.id = ${BigInt(input.itemOrigemId)}
-          AND c.tenant_id::text = ${tenantId}
-        LIMIT 1
-      `);
+      const possuiSalaId = await this.colunaExiste("cursos_atendimentos", "sala_id", db);
+      const itemRows = possuiSalaId
+        ? await db.$queryRaw<Array<{ sala_id: bigint | null; sala_nome: string | null }>>(Prisma.sql`
+            SELECT c.sala_id, s.nome AS sala_nome
+            FROM cursos_atendimentos c
+            LEFT JOIN salas_unidade s ON s.id = c.sala_id
+            WHERE c.id = ${BigInt(input.itemOrigemId)}
+              AND c.tenant_id::text = ${tenantId}
+            LIMIT 1
+          `)
+        : await db.$queryRaw<Array<{ sala_id: bigint | null; sala_nome: string | null }>>(Prisma.sql`
+            SELECT NULL::bigint AS sala_id, NULL::text AS sala_nome
+            FROM cursos_atendimentos c
+            WHERE c.id = ${BigInt(input.itemOrigemId)}
+              AND c.tenant_id::text = ${tenantId}
+            LIMIT 1
+          `);
       const salaId = itemRows[0]?.sala_id;
       if (salaId) {
         const salaRows = await db.$queryRaw<
