@@ -1,6 +1,18 @@
 {
   "entries":  [
                     {
+                        "version":  "1.00.605",
+                        "releaseDate":  "2026-07-10",
+                        "title":  "Autorização fora da carência corrigida",
+                        "description":  "A validação da senha administrativa em doações fora da carência passou a usar a tabela e o hash corretos do módulo de autenticação.",
+                        "changes":  [
+                                        "O lookup do usuário autenticado deixou de consultar a estrutura incorreta e passou a reutilizar o repositório de autenticação do sistema.",
+                                        "A autorização fora da carência agora respeita tenant e hash de senha corretos antes de liberar a entrega.",
+                                        "Foi adicionada regressão automatizada para cobrir a confirmação administrativa."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.604",
                         "releaseDate":  "2026-07-10",
                         "title":  "Doações realizadas com entrega transacional",

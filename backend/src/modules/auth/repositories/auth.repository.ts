@@ -351,7 +351,7 @@ export class AuthRepository {
     return this.buscarUsuarioPorId(usuarioId);
   }
 
-  async buscarUsuarioPorId(id: bigint) {
+  async buscarUsuarioPorId(id: bigint, tenantId?: string) {
     await this.ensureEstrutura();
     const rows = await prisma.$queryRawUnsafe<AuthUsuarioRow[]>(
       `
@@ -381,6 +381,7 @@ export class AuthRepository {
       LEFT JOIN permissao p ON p.id = up.permissao_id
       WHERE u.id = $1
         AND u.deletado_em IS NULL
+        AND ($2::text IS NULL OR u.tenant_id::text = $2::text)
       GROUP BY
         u.id,
         u.nome_usuario,
@@ -400,7 +401,8 @@ export class AuthRepository {
         u.perfil_acesso
       LIMIT 1
       `,
-      id
+      id,
+      tenantId ?? null
     );
 
     return mapAuthUsuarioRow(rows[0] ?? null);

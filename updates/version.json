@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.604",
+  "latestVersion": "1.00.605",
   "releaseDate": "2026-07-10",
-  "description": "A tela Doações realizadas passou a confirmar entregas com persistência transacional, tratamento explícito de conflitos e bloqueio de reenvio duplicado.",
+  "description": "A tela Doações realizadas passou a confirmar entregas fora da carência usando o repositório de autenticação correto para validar a senha administrativa.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.604",
+  "minCompatibleVersion": "1.00.605",
   "releaseType": "stable",
   "downloadUrl": null
 }

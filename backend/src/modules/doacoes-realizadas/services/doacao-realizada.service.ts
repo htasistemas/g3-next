@@ -1,10 +1,9 @@
 import bcrypt from "bcryptjs";
-import { Prisma } from "@prisma/client";
-import { prisma } from "../../../database/prisma.js";
 import { AppError } from "../../../shared/errors/app-error.js";
 import { mapaCamposTextoDoacaoRealizada } from "../../../utils/text-format-config.js";
 import { normalizarObjetoTexto } from "../../../utils/text-formatter.js";
 import { toStringId } from "../../../utils/string-utils.js";
+import { AuthRepository } from "../../auth/repositories/auth.repository.js";
 import { ParametrosSistemaService } from "../../configuracoes-gerais/services/parametros-sistema.service.js";
 import {
   doacaoRealizadaFiltersSchema,
@@ -83,6 +82,8 @@ export function entregaEstaDentroDaCarencia(
 }
 
 export class DoacaoRealizadaService {
+  private readonly authRepository = new AuthRepository();
+
   constructor(
     private readonly repository: Pick<
       DoacaoRealizadaRepository,
@@ -368,7 +369,7 @@ export class DoacaoRealizadaService {
       throw new AppError("Informe a senha administrativa para liberar a entrega.", 422);
     }
 
-    const usuario = await this.buscarUsuarioAutenticadoPorId(ator.id, ator.tenant_id);
+    const usuario = await this.authRepository.buscarUsuarioPorId(ator.id, ator.tenant_id);
     if (!usuario) {
       throw new AppError("Usuario autenticado nao encontrado.", 404);
     }
@@ -383,21 +384,5 @@ export class DoacaoRealizadaService {
       nome_exibicao: usuario.nome?.trim() || usuario.nomeUsuario,
       autorizado_em: new Date().toISOString()
     };
-  }
-
-  private async buscarUsuarioAutenticadoPorId(id: bigint, tenantId: string) {
-    const rows = await prisma.$queryRaw<Array<{
-      nomeUsuario: string;
-      nome: string | null;
-      senhaHash: string;
-    }>>(Prisma.sql`
-      SELECT "nomeUsuario", nome, "senhaHash"
-      FROM usuario
-      WHERE id = ${id}
-        AND tenant_id::text = ${tenantId}
-      LIMIT 1
-    `);
-
-    return rows[0] ?? null;
   }
 }
