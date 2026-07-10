@@ -36,6 +36,7 @@ export type Beneficiario = {
   naturalidade_cidade?: string;
   naturalidade_uf?: string;
   cpf: string;
+  senha_portal?: string;
   rg_numero?: string;
   rg_orgao_emissor?: string;
   rg_uf?: string;
@@ -115,6 +116,7 @@ export type BeneficiarioListaResponse = {
 
 export type BeneficiarioItemResponse = {
   beneficiario: Beneficiario;
+  senha_portal_gerada?: string;
 };
 
 export type BeneficiarioFiltro = {

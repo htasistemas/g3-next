@@ -113,6 +113,7 @@ const secoesManual: ManualSecao[] = [
           "Preencha os dados pessoais principais e confira campos obrigatórios destacados.",
           "Na aba Dados pessoais, os campos e o bloco de foto usam layout compacto para reduzir rolagem da tela durante o cadastro.",
           "Os campos de preenchimento usam fundo sombreado, borda mais visível, sombra interna leve e realce no foco para melhorar a leitura em monitores com alto contraste ou muito brilho.",
+          "A senha do portal do beneficiário é criada no próprio cadastro com 4 dígitos e será usada no acesso do portal do beneficiário e da família junto com o CPF.",
           "Revise a aba Documentos e use a regra de obrigatoriedade definida em parâmetros do sistema; quando houver muitos documentos, a rolagem fica dentro do card da lista de documentos.",
           "Ao abrir um beneficiário, leia o aviso de pendências antes de continuar o atendimento.",
           "Na aba Listagem de beneficiários, use os filtros no topo e o botão Limpar para localizar registros. A listagem não exibe mais o resumo do beneficiário selecionado acima dos resultados, mantendo a rolagem apenas na grade de beneficiários."
@@ -879,7 +880,8 @@ const secoesManual: ManualSecao[] = [
         objetivo: "Preparar o acompanhamento externo de atendimentos, agenda familiar, documentos e comunicados.",
         comoUsar: [
           "Use a rota /portal-beneficiario-familia para abrir a interface externa da família acompanhada.",
-          "O beneficiário ou responsável informa CPF ou código familiar e senha de acesso.",
+          "O beneficiário informa CPF e a senha de 4 dígitos criada no cadastro para acessar o portal.",
+          "O portal carrega automaticamente as cores padrão da instituição após a autenticação para manter a identidade visual do tenant.",
           "Após o acesso, o portal consulta beneficiário, vínculo familiar, agenda, atendimentos e documentos pendentes em formato resumido.",
           "Mantenha CPF, código familiar, vínculos, contatos, agendamentos e documentos atualizados nos módulos internos para alimentar o portal."
         ],

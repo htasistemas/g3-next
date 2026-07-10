@@ -16,22 +16,22 @@ export class BeneficiarioController {
   }
 
   async criar(request: AuthenticatedRequest, response: Response) {
-    const beneficiario = await service.criar(
+    const resultado = await service.criar(
       request.body,
       request.authUser?.id,
       request.authUser?.tenant_id
     );
-    return response.status(201).json({ beneficiario });
+    return response.status(201).json(resultado);
   }
 
   async atualizar(request: AuthenticatedRequest, response: Response) {
-    const beneficiario = await service.atualizar(
+    const resultado = await service.atualizar(
       request.params.id,
       request.body,
       request.authUser?.id,
       request.authUser?.tenant_id
     );
-    return response.json({ beneficiario });
+    return response.json(resultado);
   }
 
   async remover(request: AuthenticatedRequest, response: Response) {

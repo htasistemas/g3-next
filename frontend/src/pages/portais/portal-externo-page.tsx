@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import {
   BarChart3,
   Building2,
@@ -9,6 +9,7 @@ import {
   FileCheck2,
   FileText,
   HandHeart,
+  HandCoins,
   HeartHandshake,
   LockKeyhole,
   Mail,
@@ -25,6 +26,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { darken, lighten } from "@/lib/color-utils";
+import { formatarCpf, somenteDigitos } from "@/lib/br-utils";
 import {
   portaisExternosService,
   type PortalExternoCard,
@@ -56,6 +59,69 @@ type PortalConfig = {
 function obterMensagemErro(error: any, fallback: string) {
   return error?.response?.data?.message ?? error?.response?.data?.mensagem ?? fallback;
 }
+
+function aplicarTemaPortal(tema?: PortalExternoPainel["tema"]): CSSProperties | undefined {
+  if (!tema?.paleta) return undefined;
+
+  const { paleta } = tema;
+  return {
+    "--g3-primary": paleta.cor_primaria,
+    "--g3-primary-hover": darken(paleta.cor_primaria, 0.15),
+    "--g3-primary-soft": lighten(paleta.cor_primaria, 0.82),
+    "--g3-primary-soft-hover": lighten(paleta.cor_primaria, 0.7),
+    "--g3-secondary": paleta.cor_secundaria,
+    "--g3-accent": paleta.cor_destaque,
+    "--g3-primary-button": paleta.cor_botao_primario,
+    "--g3-primary-button-hover": darken(paleta.cor_botao_primario, 0.16),
+    "--g3-link": paleta.cor_link,
+    "--g3-active": paleta.cor_elemento_ativo,
+    "--g3-bg": paleta.background,
+    "--g3-page-gradient-start": lighten(paleta.background, 0.12),
+    "--g3-page-gradient-end": lighten(paleta.background, 0.04),
+    "--g3-card": paleta.card,
+    "--g3-card-soft": lighten(paleta.card, 0.02),
+    "--g3-foreground": paleta.foreground,
+    "--g3-muted": paleta.muted,
+    "--g3-border": paleta.border,
+    "--g3-danger": paleta.danger,
+    "--g3-warning": paleta.warning,
+    "--g3-success": paleta.success,
+    "--g3-info": paleta.info
+  } as CSSProperties;
+}
+
+function formatarDataPortal(valor?: string) {
+  if (!valor) return "---";
+  const data = new Date(valor);
+  if (Number.isNaN(data.getTime())) return valor;
+  return new Intl.DateTimeFormat("pt-BR").format(data);
+}
+
+function formatarDataHoraPortal(valor?: string) {
+  if (!valor) return "---";
+  const data = new Date(valor);
+  if (Number.isNaN(data.getTime())) return valor;
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short"
+  }).format(data);
+}
+
+function formatarMoedaPortal(valor?: number) {
+  if (typeof valor !== "number" || Number.isNaN(valor)) return "R$ 0,00";
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL"
+  }).format(valor);
+}
+
+const limitesIniciaisPortal = {
+  atendimentos: 5,
+  beneficios: 5,
+  agendamentos: 5,
+  documentosPendentes: 5,
+  movimentacoes: 5
+} as const;
 
 const portalConfigs: Record<PortalTipo, PortalConfig> = {
   voluntario: {
@@ -107,10 +173,10 @@ const portalConfigs: Record<PortalTipo, PortalConfig> = {
     acaoPrimaria: "Acessar acompanhamento",
     cor: "#2563eb",
     Icone: HeartHandshake,
-    identificadorLabel: "CPF ou código familiar",
-    identificadorPlaceholder: "Digite CPF ou código familiar",
+    identificadorLabel: "CPF",
+    identificadorPlaceholder: "Digite o CPF do beneficiário",
     senhaLabel: "Senha de acesso",
-    senhaPlaceholder: "Digite sua senha",
+    senhaPlaceholder: "Digite a senha de 4 dígitos",
     acessoRestrito: true,
     indicadores: [
       { label: "Atendimentos", valor: "0", Icone: HeartHandshake },
@@ -232,13 +298,8 @@ function PortalExternoPage({ tipo }: { tipo: PortalTipo }) {
   const [painel, setPainel] = useState<PortalExternoPainel | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [popup, setPopup] = useState<PopupMensagemState | null>(null);
-
-  const gradiente = useMemo(
-    () => ({
-      background: `linear-gradient(135deg, ${config.cor} 0%, #0f172a 100%)`
-    }),
-    [config.cor]
-  );
+  const [limitesPortal, setLimitesPortal] = useState(limitesIniciaisPortal);
+  const portalThemeStyle = useMemo(() => aplicarTemaPortal(painel?.tema), [painel?.tema]);
 
   const indicadores = useMemo(
     () =>
@@ -257,6 +318,15 @@ function PortalExternoPage({ tipo }: { tipo: PortalTipo }) {
     [config.cards, painel?.cards]
   );
   const linhaDoTempo = (painel?.linhaDoTempo ?? config.linhaDoTempo) as PortalExternoTimeline[];
+  const atendimentosPortal = painel?.atendimentos ?? [];
+  const beneficiosPortal = painel?.beneficios ?? [];
+  const agendamentosPortal = painel?.agendamentos ?? [];
+  const documentosPendentesPortal = painel?.documentosPendentes ?? [];
+  const movimentacoesPortal = painel?.movimentacoes ?? [];
+
+  useEffect(() => {
+    setLimitesPortal(limitesIniciaisPortal);
+  }, [painel?.token, tipo]);
 
   useEffect(() => {
     setIdentificador("");
@@ -292,7 +362,16 @@ function PortalExternoPage({ tipo }: { tipo: PortalTipo }) {
     };
   }, [config.acessoRestrito, tipo]);
 
+  useEffect(() => {
+    if (tipo !== "beneficiario") return;
+    setIdentificador((valorAtual) => formatarCpf(somenteDigitos(valorAtual).slice(0, 11)));
+    setSenha((valorAtual) => somenteDigitos(valorAtual).slice(0, 4));
+  }, [tipo]);
+
   async function acessarPortal() {
+    const cpfNormalizado = somenteDigitos(identificador).slice(0, 11);
+    const senhaNormalizada = somenteDigitos(senha).slice(0, 4);
+
     if (config.acessoRestrito && (!identificador.trim() || !senha.trim())) {
       setPopup({
         tipo: "aviso",
@@ -302,13 +381,37 @@ function PortalExternoPage({ tipo }: { tipo: PortalTipo }) {
       return;
     }
 
+    if (tipo === "beneficiario") {
+      if (cpfNormalizado.length !== 11) {
+        setPopup({
+          tipo: "aviso",
+          titulo: "CPF inválido",
+          texto: "Informe o CPF do beneficiário com 11 dígitos."
+        });
+        return;
+      }
+
+      if (senhaNormalizada.length !== 4) {
+        setPopup({
+          tipo: "aviso",
+          titulo: "Senha inválida",
+          texto: "Informe a senha de 4 dígitos criada no cadastro do beneficiário."
+        });
+        return;
+      }
+    }
+
     setCarregando(true);
     try {
       if (tipo === "transparencia") {
         const dados = await portaisExternosService.obterTransparencia();
         setPainel(dados);
       } else {
-        const dados = await portaisExternosService.acessar(tipo, identificador, senha);
+        const dados = await portaisExternosService.acessar(
+          tipo,
+          tipo === "beneficiario" ? cpfNormalizado : identificador,
+          tipo === "beneficiario" ? senhaNormalizada : senha
+        );
         setPainel(dados);
       }
 
@@ -354,11 +457,24 @@ function PortalExternoPage({ tipo }: { tipo: PortalTipo }) {
     });
   }
 
+  function ampliarListaPortal(chave: keyof typeof limitesIniciaisPortal) {
+    setLimitesPortal((atual) => ({
+      ...atual,
+      [chave]: atual[chave] + 5
+    }));
+  }
+
   return (
-    <>
-      <main className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#edf4f8_100%)] px-4 py-8">
+    <div style={portalThemeStyle}>
+      <main className="min-h-screen bg-[linear-gradient(180deg,var(--g3-page-gradient-start,#f8fafc)_0%,var(--g3-page-gradient-end,#edf4f8)_100%)] px-4 py-8">
         <div className="mx-auto max-w-7xl space-y-5">
-          <section className="overflow-hidden rounded-3xl text-white shadow-[0_30px_100px_-55px_rgba(15,23,42,0.85)]" style={gradiente}>
+          <section
+            className="overflow-hidden rounded-3xl text-white shadow-[0_30px_100px_-55px_rgba(15,23,42,0.85)]"
+            style={{
+              background:
+                "linear-gradient(135deg, var(--g3-primary, #2563eb) 0%, var(--g3-secondary, #0f172a) 100%)"
+            }}
+          >
             <div className="grid gap-6 px-5 py-7 lg:grid-cols-[minmax(0,1fr)_390px] lg:px-8">
               <div className="flex min-h-[280px] flex-col justify-between">
                 <div className="space-y-4">
@@ -381,11 +497,11 @@ function PortalExternoPage({ tipo }: { tipo: PortalTipo }) {
                     </div>
                   ))}
                 </div>
-              </div>
+                </div>
 
-              <Card className="border-white/20 bg-white/95 text-slate-900 shadow-xl">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
+                <Card className="border-white/20 bg-white/95 text-slate-900 shadow-xl">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
                     {config.acessoRestrito ? <LockKeyhole className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     {config.acessoRestrito ? "Acesso seguro" : "Consulta pública"}
                   </CardTitle>
@@ -395,8 +511,24 @@ function PortalExternoPage({ tipo }: { tipo: PortalTipo }) {
                     <Label>{config.identificadorLabel}</Label>
                     <Input
                       value={identificador}
-                      onChange={(event) => setIdentificador(event.target.value)}
+                      onChange={(event) => {
+                        const valor = event.target.value;
+                        if (tipo === "beneficiario") {
+                          setIdentificador(formatarCpf(somenteDigitos(valor).slice(0, 11)));
+                          return;
+                        }
+                        setIdentificador(valor);
+                      }}
+                      onBlur={() => {
+                        if (tipo === "beneficiario") {
+                          setIdentificador((valorAtual) =>
+                            formatarCpf(somenteDigitos(valorAtual).slice(0, 11))
+                          );
+                        }
+                      }}
                       placeholder={config.identificadorPlaceholder}
+                      inputMode={tipo === "beneficiario" ? "numeric" : "text"}
+                      maxLength={tipo === "beneficiario" ? 14 : undefined}
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -404,8 +536,22 @@ function PortalExternoPage({ tipo }: { tipo: PortalTipo }) {
                     <Input
                       type={config.acessoRestrito ? "password" : "text"}
                       value={senha}
-                      onChange={(event) => setSenha(event.target.value)}
+                      onChange={(event) => {
+                        const valor = event.target.value;
+                        if (tipo === "beneficiario") {
+                          setSenha(somenteDigitos(valor).slice(0, 4));
+                          return;
+                        }
+                        setSenha(valor);
+                      }}
+                      onBlur={() => {
+                        if (tipo === "beneficiario") {
+                          setSenha((valorAtual) => somenteDigitos(valorAtual).slice(0, 4));
+                        }
+                      }}
                       placeholder={config.senhaPlaceholder}
+                      inputMode={tipo === "beneficiario" ? "numeric" : "text"}
+                      maxLength={tipo === "beneficiario" ? 4 : undefined}
                     />
                   </div>
                   <Button className="w-full" onClick={acessarPortal} disabled={carregando}>
@@ -445,7 +591,7 @@ function PortalExternoPage({ tipo }: { tipo: PortalTipo }) {
             ))}
           </section>
 
-          {acessoLiberado ? (
+              {acessoLiberado ? (
             <section className="rounded-2xl border border-[var(--g3-border)] bg-white p-4 shadow-sm">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
@@ -455,6 +601,11 @@ function PortalExternoPage({ tipo }: { tipo: PortalTipo }) {
                   <h2 className="mt-1 text-xl font-semibold text-[var(--g3-foreground)]">
                     {config.destaque}
                   </h2>
+                  {config.tipo === "beneficiario" && painel?.pessoa?.nome ? (
+                    <p className="mt-1 text-sm font-medium text-[var(--g3-primary)]">
+                      Beneficiário logado: {painel.pessoa.nome}
+                    </p>
+                  ) : null}
                   <p className="mt-1 text-sm text-[var(--g3-muted)]">
                     {config.acessoRestrito
                       ? `Acesso validado para ${(painel?.pessoa?.nome ?? identificador.trim()) || "usuário externo"}.`
@@ -516,6 +667,272 @@ function PortalExternoPage({ tipo }: { tipo: PortalTipo }) {
             </section>
           ) : null}
 
+          {acessoLiberado && (
+            <section className="grid gap-4 xl:grid-cols-2">
+              <Card className="border-[var(--g3-border)]">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <HeartHandshake className="h-5 w-5 text-[var(--g3-active)]" />
+                    Atendimentos
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {atendimentosPortal.length ? (
+                    <>
+                    <div className="max-h-[420px] space-y-3 overflow-y-auto pr-1">
+                      {atendimentosPortal.slice(0, limitesPortal.atendimentos).map((item) => (
+                        <article key={item.id} className="rounded-xl border border-[var(--g3-border)] px-4 py-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                              <p className="text-sm font-semibold text-[var(--g3-foreground)]">
+                                {item.tipoAtendimento}
+                              </p>
+                              <p className="mt-1 text-xs text-[var(--g3-muted)]">
+                                {formatarDataHoraPortal(item.dataHora)} • {item.setor}
+                              </p>
+                            </div>
+                            {item.status ? <Badge variant="info">{item.status}</Badge> : null}
+                          </div>
+                          <p className="mt-3 text-sm leading-6 text-[var(--g3-muted)]">{item.resumo}</p>
+                          <div className="mt-3 grid gap-2 text-xs text-[var(--g3-muted)] sm:grid-cols-2">
+                            <p>Profissional: {item.profissionalResponsavel}</p>
+                            <p>Retorno previsto: {formatarDataPortal(item.retornoPrevisto)}</p>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                    {atendimentosPortal.length > limitesPortal.atendimentos ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => ampliarListaPortal("atendimentos")}
+                      >
+                        Ver mais atendimentos
+                      </Button>
+                    ) : null}
+                    </>
+                  ) : (
+                    <p className="text-sm text-[var(--g3-muted)]">Nenhum atendimento foi encontrado.</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="border-[var(--g3-border)]">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <HandCoins className="h-5 w-5 text-[var(--g3-active)]" />
+                    Benefícios e movimentações
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--g3-muted)]">
+                      Benefícios
+                    </p>
+                    {beneficiosPortal.length ? (
+                      <>
+                      <div className="mt-3 max-h-[260px] space-y-3 overflow-y-auto pr-1">
+                        {beneficiosPortal.slice(0, limitesPortal.beneficios).map((item) => (
+                          <article key={item.id} className="rounded-xl border border-[var(--g3-border)] px-4 py-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div>
+                                <p className="text-sm font-semibold text-[var(--g3-foreground)]">
+                                  {item.tipo} - {item.item}
+                                </p>
+                                <p className="mt-1 text-xs text-[var(--g3-muted)]">{formatarDataPortal(item.data)}</p>
+                              </div>
+                              <Badge variant="success">{formatarMoedaPortal(item.valorTotal)}</Badge>
+                            </div>
+                            <div className="mt-3 grid gap-2 text-xs text-[var(--g3-muted)] sm:grid-cols-2">
+                              <p>Quantidade: {item.quantidade}</p>
+                              <p>Valor unitário: {formatarMoedaPortal(item.valorUnitario)}</p>
+                              {item.profissionalResponsavel ? (
+                                <p className="sm:col-span-2">Responsável: {item.profissionalResponsavel}</p>
+                              ) : null}
+                              {item.observacoes ? (
+                                <p className="sm:col-span-2">Observações: {item.observacoes}</p>
+                              ) : null}
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+                      {beneficiosPortal.length > limitesPortal.beneficios ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="mt-3 w-full"
+                          onClick={() => ampliarListaPortal("beneficios")}
+                        >
+                          Ver mais benefícios
+                        </Button>
+                      ) : null}
+                      </>
+                    ) : (
+                      <p className="mt-3 text-sm text-[var(--g3-muted)]">Nenhum benefício encontrado.</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--g3-muted)]">
+                      Movimentações
+                    </p>
+                    {movimentacoesPortal.length ? (
+                      <>
+                      <div className="mt-3 max-h-[220px] space-y-3 overflow-y-auto pr-1">
+                        {movimentacoesPortal.slice(0, limitesPortal.movimentacoes).map((item, index) => {
+                          const categoria = String(item.categoria ?? "Movimentação");
+                          const titulo = String(item.titulo ?? "Registro");
+                          const data = String(item.data ?? "");
+                          const descricao = String(item.descricao ?? "");
+                          return (
+                            <article
+                              key={`${categoria}-${titulo}-${index}`}
+                              className="rounded-xl border border-[var(--g3-border)] px-4 py-3"
+                            >
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div>
+                                  <p className="text-sm font-semibold text-[var(--g3-foreground)]">{titulo}</p>
+                                  <p className="mt-1 text-xs text-[var(--g3-muted)]">
+                                    {categoria} • {formatarDataHoraPortal(data)}
+                                  </p>
+                                </div>
+                                <Badge variant="info">{categoria}</Badge>
+                              </div>
+                              {descricao ? (
+                                <p className="mt-3 text-sm leading-6 text-[var(--g3-muted)]">{descricao}</p>
+                              ) : null}
+                            </article>
+                          );
+                        })}
+                      </div>
+                      {movimentacoesPortal.length > limitesPortal.movimentacoes ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="mt-3 w-full"
+                          onClick={() => ampliarListaPortal("movimentacoes")}
+                        >
+                          Ver mais movimentações
+                        </Button>
+                      ) : null}
+                      </>
+                    ) : (
+                      <p className="mt-3 text-sm text-[var(--g3-muted)]">Nenhuma movimentação encontrada.</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </section>
+          )}
+
+          {acessoLiberado && (
+            <section className="grid gap-4 xl:grid-cols-2">
+              <Card className="border-[var(--g3-border)]">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <CalendarCheck className="h-5 w-5 text-[var(--g3-active)]" />
+                    Agendamentos
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {agendamentosPortal.length ? (
+                    <>
+                    <div className="max-h-[420px] space-y-3 overflow-y-auto pr-1">
+                      {agendamentosPortal.slice(0, limitesPortal.agendamentos).map((item) => (
+                        <article key={item.id} className="rounded-xl border border-[var(--g3-border)] px-4 py-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                              <p className="text-sm font-semibold text-[var(--g3-foreground)]">
+                                {item.tipoAtendimento ?? "Agendamento"}
+                              </p>
+                              <p className="mt-1 text-xs text-[var(--g3-muted)]">
+                                {formatarDataPortal(item.data)} • {item.horaInicial}
+                                {item.horaFinal ? ` até ${item.horaFinal}` : ""}
+                              </p>
+                            </div>
+                            {item.status ? <Badge variant="warning">{item.status}</Badge> : null}
+                          </div>
+                          <div className="mt-3 grid gap-2 text-xs text-[var(--g3-muted)] sm:grid-cols-2">
+                            {item.setor ? <p>Setor: {item.setor}</p> : null}
+                            {item.modalidade ? <p>Modalidade: {item.modalidade}</p> : null}
+                            {item.profissionalNome ? <p>Profissional: {item.profissionalNome}</p> : null}
+                            {item.sala ? <p>Sala: {item.sala}</p> : null}
+                            {item.prioridade ? <p>Prioridade: {item.prioridade}</p> : null}
+                            {item.documentosPendentes ? <p>Documentos: pendentes</p> : null}
+                            {item.observacaoCurta ? (
+                              <p className="sm:col-span-2">Observação: {item.observacaoCurta}</p>
+                            ) : null}
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                    {agendamentosPortal.length > limitesPortal.agendamentos ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => ampliarListaPortal("agendamentos")}
+                      >
+                        Ver mais agendamentos
+                      </Button>
+                    ) : null}
+                    </>
+                  ) : (
+                    <p className="text-sm text-[var(--g3-muted)]">Nenhum agendamento foi encontrado.</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="border-[var(--g3-border)]">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <FileText className="h-5 w-5 text-[var(--g3-active)]" />
+                    Documentos pendentes
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {documentosPendentesPortal.length ? (
+                    <>
+                    <div className="max-h-[420px] space-y-3 overflow-y-auto pr-1">
+                      {documentosPendentesPortal.slice(0, limitesPortal.documentosPendentes).map((item) => (
+                        <article key={item.id} className="rounded-xl border border-[var(--g3-border)] px-4 py-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                              <p className="text-sm font-semibold text-[var(--g3-foreground)]">{item.nome}</p>
+                              <p className="mt-1 text-xs text-[var(--g3-muted)]">
+                                {item.tipo ?? "Documento"} • {item.obrigatorio ? "Obrigatório" : "Opcional"}
+                              </p>
+                            </div>
+                            <Badge variant="danger">Pendente</Badge>
+                          </div>
+                          <div className="mt-3 grid gap-2 text-xs text-[var(--g3-muted)] sm:grid-cols-2">
+                            {item.numeroDocumento ? <p>Número: {item.numeroDocumento}</p> : null}
+                            {item.contentType ? <p>Tipo de arquivo: {item.contentType}</p> : null}
+                            <p className="sm:col-span-2">Envio aguardando anexação no cadastro interno.</p>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                    {documentosPendentesPortal.length > limitesPortal.documentosPendentes ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => ampliarListaPortal("documentosPendentes")}
+                      >
+                        Ver mais documentos
+                      </Button>
+                    ) : null}
+                    </>
+                  ) : (
+                    <p className="text-sm text-[var(--g3-muted)]">Nenhum documento pendente foi encontrado.</p>
+                  )}
+                </CardContent>
+              </Card>
+            </section>
+          )}
+
           <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
             <Card className="border-[var(--g3-border)]">
               <CardHeader>
@@ -569,7 +986,7 @@ function PortalExternoPage({ tipo }: { tipo: PortalTipo }) {
         </div>
       </main>
       {popup ? <PopupMensagem popup={popup} onClose={() => setPopup(null)} /> : null}
-    </>
+    </div>
   );
 }
 

@@ -64,6 +64,7 @@ export type BeneficiarioInput = {
   permite_contato_email?: boolean;
   horario_preferencial_contato?: string;
   cpf: string;
+  senha_portal?: string;
   rg_numero?: string;
   rg_orgao_emissor?: string;
   rg_uf?: string;

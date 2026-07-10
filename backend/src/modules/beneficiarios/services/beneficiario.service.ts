@@ -1,3 +1,4 @@
+import { randomInt } from "node:crypto";
 import { AppError } from "../../../shared/errors/app-error.js";
 import { EmailService } from "../../email/services/email.service.js";
 import {
@@ -6,7 +7,10 @@ import {
   beneficiarioInputSchema
 } from "../beneficiario.schema.js";
 import { mapBeneficiarioToResponse } from "../beneficiario.mapper.js";
-import { BeneficiarioRepository } from "../repositories/beneficiario.repository.js";
+import {
+  BeneficiarioRepository,
+  possuiBeneficiarioPortalAcesso
+} from "../repositories/beneficiario.repository.js";
 import {
   montarMensagemAlteracoesBeneficiario,
   montarResumoAlteracoesBeneficiario,
@@ -56,12 +60,22 @@ export class BeneficiarioService {
     await this.validarDocumentosObrigatorios(input, tenantObrigatorio);
     await this.validarDuplicidadeCadastro(input, tenantObrigatorio);
     const usuarioId = this.parseUsuarioId(rawUsuarioId);
+    const senhaPortalGerada = this.resolverSenhaPortal(input.senha_portal, false);
     const preparado = await this.prepararArquivosPayload(input, usuarioId, undefined, tenantObrigatorio);
 
     try {
-      const beneficiario = await this.repository.criar(preparado.input, tenantObrigatorio);
+      const beneficiario = await this.repository.criar(
+        {
+          ...preparado.input,
+          senha_portal: senhaPortalGerada
+        },
+        tenantObrigatorio
+      );
       await this.vincularArquivos(preparado.novosCaminhos, beneficiario.id, tenantObrigatorio);
-      return mapBeneficiarioToResponse(beneficiario);
+      return {
+        beneficiario: mapBeneficiarioToResponse(beneficiario),
+        senha_portal_gerada: senhaPortalGerada
+      };
     } catch (error) {
       await storageService.rollbackArquivos(preparado.novosCaminhos);
       throw error;
@@ -76,6 +90,8 @@ export class BeneficiarioService {
     const usuarioId = this.parseUsuarioId(rawUsuarioId);
     await this.validarDocumentosObrigatorios(input, tenantObrigatorio);
     await this.validarDuplicidadeCadastro(input, tenantObrigatorio, id);
+    const senhaPortalExistente = await possuiBeneficiarioPortalAcesso(id, tenantObrigatorio);
+    const senhaPortalGerada = this.resolverSenhaPortal(input.senha_portal, senhaPortalExistente);
     const existente = await this.repository.buscarPorIdOuFalhar(id, tenantObrigatorio);
     const snapshotAnterior = mapBeneficiarioToResponse(existente);
     const preparado = await this.prepararArquivosPayload(input, usuarioId, id, tenantObrigatorio);
@@ -83,7 +99,14 @@ export class BeneficiarioService {
     try {
       let beneficiario;
       try {
-        beneficiario = await this.repository.atualizar(id, preparado.input, tenantObrigatorio);
+        beneficiario = await this.repository.atualizar(
+          id,
+          {
+            ...preparado.input,
+            senha_portal: senhaPortalGerada
+          },
+          tenantObrigatorio
+        );
       } catch (error) {
         if (error instanceof AppError) {
           throw error;
@@ -124,7 +147,10 @@ export class BeneficiarioService {
 
       const response = mapBeneficiarioToResponse(beneficiario);
       await this.enviarEmailAtualizacaoCadastro(snapshotAnterior, response);
-      return response;
+      return {
+        beneficiario: response,
+        senha_portal_gerada: senhaPortalGerada
+      };
     } catch (error) {
       await storageService.rollbackArquivos(preparado.novosCaminhos);
       throw error;
@@ -404,6 +430,22 @@ export class BeneficiarioService {
       throw new AppError("Tenant da sessao nao identificado.", 401);
     }
     return tenantId;
+  }
+
+  private resolverSenhaPortal(senhaPortal?: string, senhaExistente = false) {
+    const senhaNormalizada = senhaPortal?.replace(/\D/g, "").trim();
+    if (senhaNormalizada) {
+      if (senhaNormalizada.length !== 4) {
+        throw new AppError("A senha do portal deve ter 4 digitos.", 422);
+      }
+      return senhaNormalizada;
+    }
+
+    if (senhaExistente) {
+      return undefined;
+    }
+
+    return String(randomInt(1000, 10000));
   }
 
   private async enviarEmailAtualizacaoCadastro(

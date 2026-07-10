@@ -252,6 +252,24 @@ function normalizarEmailDigitado(email?: string) {
   return (email ?? "").replace(/\s+/g, "").toLowerCase();
 }
 
+function gerarSenhaPortalAcesso() {
+  return String(Math.floor(1000 + Math.random() * 9000));
+}
+
+function chaveSenhaPortalBeneficiario(id?: string) {
+  return id ? `g3n:beneficiario:senha-portal:${id}` : "";
+}
+
+function salvarSenhaPortalNaSessao(id?: string, senha?: string) {
+  if (!id || !senha || typeof window === "undefined") return;
+  window.sessionStorage.setItem(chaveSenhaPortalBeneficiario(id), senha);
+}
+
+function lerSenhaPortalDaSessao(id?: string) {
+  if (!id || typeof window === "undefined") return "";
+  return window.sessionStorage.getItem(chaveSenhaPortalBeneficiario(id)) ?? "";
+}
+
 function emailValido(email?: string) {
   const valor = normalizarEmailDigitado(email);
   if (!valor) return false;
@@ -408,6 +426,7 @@ function mapearBeneficiarioParaFormulario(item?: Beneficiario): BeneficiarioForm
     telefone_secundario: formatarTelefoneInput(item.telefone_secundario),
     telefone_recado_numero: formatarTelefoneInput(item.telefone_recado_numero),
     email: normalizarEmailDigitado(item.email),
+    senha_portal: "",
     status: item.status ?? "EM_ANALISE",
     aceite_lgpd: item.aceite_lgpd ?? false
   };
@@ -636,6 +655,7 @@ export function CadastroBeneficiarioPage() {
   >(documentosObrigatoriedadeBeneficiarioPadrao);
   const [documentos, setDocumentos] = useState<DocumentoCadastro[]>(() => criarDocumentosPadrao());
   const [popupSalvarAberto, setPopupSalvarAberto] = useState(false);
+  const [senhaPortalGerada, setSenhaPortalGerada] = useState("");
   const [popupExcluirAberto, setPopupExcluirAberto] = useState(false);
   const [popupImprimirAberto, setPopupImprimirAberto] = useState(false);
   const [popupDeclaracaoResidenciaAberto, setPopupDeclaracaoResidenciaAberto] = useState(false);
@@ -737,6 +757,7 @@ export function CadastroBeneficiarioPage() {
     const item = detalhesData.beneficiario;
 
     reset(mapearBeneficiarioParaFormulario(item));
+    setSenhaPortalGerada(lerSenhaPortalDaSessao(item.id_beneficiario));
     setDocumentos(mapearDocumentosDoBeneficiario(item, configuracaoDocumentos));
     if (exibirAvisoPendenciasAoCarregarRef.current) {
       setAvisoPendenciasSelecao(obterPendenciasAvisoBeneficiario(item));
@@ -750,14 +771,17 @@ export function CadastroBeneficiarioPage() {
   useEffect(() => {
     if (beneficiarioSelecionadoId) return;
     const codigo = proximoCodigoData?.codigo;
+    const senhaPortal = gerarSenhaPortalAcesso();
     reset({
       ...beneficiarioDefaultValues,
-      codigo: codigo ?? beneficiarioDefaultValues.codigo
+      codigo: codigo ?? beneficiarioDefaultValues.codigo,
+      senha_portal: senhaPortal
     });
     setDocumentos(criarDocumentosPadrao(configuracaoDocumentos));
     setAvisoPendenciasSelecao([]);
     exibirAvisoPendenciasAoCarregarRef.current = false;
     setPopupExcluirDocumentoId(null);
+    setSenhaPortalGerada(senhaPortal);
     ultimoCepConsultadoRef.current = "";
   }, [beneficiarioSelecionadoId, configuracaoDocumentos, proximoCodigoData, reset]);
 
@@ -1050,6 +1074,7 @@ export function CadastroBeneficiarioPage() {
         ...valoresNormalizados,
         id_beneficiario: beneficiarioSelecionadoId,
         codigo: valoresNormalizados.codigo || beneficiarioPersistido?.codigo || proximoCodigoData?.codigo,
+        senha_portal: valoresNormalizados.senha_portal || beneficiarioPersistido?.senha_portal || undefined,
         cpf: documentoCpf.numeroDocumento,
         rg_numero: beneficiarioPersistido?.rg_numero || undefined,
         rg_orgao_emissor: beneficiarioPersistido?.rg_orgao_emissor || undefined,
@@ -1078,6 +1103,11 @@ export function CadastroBeneficiarioPage() {
         reset(mapearBeneficiarioParaFormulario(beneficiarioAtualizado));
         setDocumentos(mapearDocumentosDoBeneficiario(beneficiarioAtualizado, configuracaoDocumentos));
         setPopupExcluirDocumentoId(null);
+        setSenhaPortalGerada(response.senha_portal_gerada || valoresNormalizados.senha_portal || "");
+        salvarSenhaPortalNaSessao(
+          beneficiarioAtualizado.id_beneficiario,
+          response.senha_portal_gerada || valoresNormalizados.senha_portal || ""
+        );
         setMensagem(null);
         setPopupSalvarAberto(true);
         setFiltros((prev) => ({ ...prev }));
@@ -1508,11 +1538,15 @@ export function CadastroBeneficiarioPage() {
     encerrarWebcamDocumento();
     setBeneficiarioSelecionadoId(undefined);
     setAbaAtiva("dados");
+    const novaSenhaPortal = gerarSenhaPortalAcesso();
     await refetchProximoCodigo();
     reset({
       ...beneficiarioDefaultValues,
-      codigo: proximoCodigoData?.codigo
+      codigo: proximoCodigoData?.codigo,
+      senha_portal: novaSenhaPortal
     });
+    setSenhaPortalGerada(novaSenhaPortal);
+    salvarSenhaPortalNaSessao(undefined, novaSenhaPortal);
     setDocumentos(criarDocumentosPadrao(configuracaoDocumentos));
     setPopupExcluirDocumentoId(null);
     setMensagem(null);
@@ -1523,6 +1557,7 @@ export function CadastroBeneficiarioPage() {
     encerrarWebcamDocumento();
     if (detalhesData?.beneficiario) {
       reset(mapearBeneficiarioParaFormulario(detalhesData.beneficiario));
+      setSenhaPortalGerada(lerSenhaPortalDaSessao(detalhesData.beneficiario.id_beneficiario));
       setDocumentos(mapearDocumentosDoBeneficiario(detalhesData.beneficiario, configuracaoDocumentos));
       setPopupExcluirDocumentoId(null);
       setMensagem(null);
@@ -2322,6 +2357,54 @@ export function CadastroBeneficiarioPage() {
                       <Label>Nome do pai</Label>
                       <Input {...register("nome_pai")} onBlurCapture={() => aplicarFormatacaoCampo("nome_pai")} />
                     </div>
+                    <div className="xl:col-span-4">
+                      <Label>Senha do portal*</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          {...register("senha_portal")}
+                          inputMode="numeric"
+                          maxLength={4}
+                          placeholder="0000"
+                          onChange={(event) => {
+                            event.target.value = event.target.value.replace(/\D/g, "").slice(0, 4);
+                            setValue("senha_portal", event.target.value, {
+                              shouldDirty: true,
+                              shouldValidate: true
+                            });
+                          }}
+                          onBlurCapture={() => aplicarFormatacaoCampo("senha_portal")}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            const novaSenha = gerarSenhaPortalAcesso();
+                            setValue("senha_portal", novaSenha, {
+                              shouldDirty: true,
+                              shouldValidate: true
+                            });
+                            setSenhaPortalGerada(novaSenha);
+                          }}
+                        >
+                          Gerar
+                        </Button>
+                      </div>
+                      {errors.senha_portal && (
+                        <p className="mt-1 text-xs text-red-600">{errors.senha_portal.message}</p>
+                      )}
+                      <p className="mt-1 text-[11px] text-slate-600">
+                        Usada no acesso ao portal do beneficiário e da família.
+                      </p>
+                      {senhaPortalGerada ? (
+                        <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+                          <p className="font-semibold">Senha do portal ativa</p>
+                          <p className="mt-1 text-lg font-bold tracking-[0.18em]">{senhaPortalGerada}</p>
+                          <p className="mt-1 text-xs text-emerald-800">
+                            Esta senha fica disponível durante a sessão atual do cadastro.
+                          </p>
+                        </div>
+                      ) : null}
+                    </div>
                   </section>
                 )}
 
@@ -3056,6 +3139,15 @@ export function CadastroBeneficiarioPage() {
             </div>
             <div className="px-5 py-4">
               <p className="text-sm text-slate-700">Salvo com sucesso</p>
+              {senhaPortalGerada ? (
+                <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+                  <p className="font-semibold">Senha do portal</p>
+                  <p className="mt-1 text-lg font-bold tracking-[0.18em]">{senhaPortalGerada}</p>
+                  <p className="mt-1 text-xs text-emerald-800">
+                    Informe essa senha junto com o CPF no portal do beneficiário e da família.
+                  </p>
+                </div>
+              ) : null}
             </div>
             <div className="flex justify-end border-t border-slate-100 px-5 py-3">
               <Button type="button" onClick={() => setPopupSalvarAberto(false)}>
