@@ -536,6 +536,7 @@ export function CadastroMatriculasPage() {
   const [presencaDatas, setPresencaDatas] = useState<MatriculaPresencaData[]>([]);
   const [presencaDataSelecionada, setPresencaDataSelecionada] = useState<MatriculaPresencaData | null>(null);
   const [presencasPorMatricula, setPresencasPorMatricula] = useState<Record<string, MatriculaPresencaStatus>>({});
+  const [presencasObservacoesPorMatricula, setPresencasObservacoesPorMatricula] = useState<Record<string, string>>({});
   const [dataPresencaSelecionada, setDataPresencaSelecionada] = useState(obterDataAtualIso);
   const [presencaObservacoes, setPresencaObservacoes] = useState("");
   const [presencaExibirCpf, setPresencaExibirCpf] = useState(true);
@@ -608,7 +609,14 @@ export function CadastroMatriculasPage() {
   const matriculaIdFormulario = watch("id_matricula");
   const vagasTotaisFormulario = watch("vagas_totais");
   const acaoEmAndamento =
-    salvarMutation.isPending || removerMutation.isPending || carregandoDetalhes || atualizandoLista || salvandoImagemCurso;
+    salvarMutation.isPending ||
+    removerMutation.isPending ||
+    carregandoDetalhes ||
+    atualizandoLista ||
+    salvandoImagemCurso ||
+    presencaSalvando ||
+    presencaExcluindo ||
+    presencaCarregando;
 
   const matriculas = catalogoData?.matriculas ?? [];
   const matriculasListagem = listaData?.matriculas ?? [];
@@ -625,6 +633,11 @@ export function CadastroMatriculasPage() {
   const abaAtual = abas.find((aba) => aba.id === abaAtiva);
   const possuiMatriculaSelecionada = Boolean(getValues("id_matricula"));
   const inscricoesAtivas = inscricoes.filter((item) => (item.status ?? "ATIVO") !== "CANCELADO");
+  const presencaDatasOrdenadas = [...presencaDatas].sort((a, b) => a.data_aula.localeCompare(b.data_aula));
+  const dataPresencaTitulo = presencaDataSelecionada?.data_aula ?? dataPresencaSelecionada ?? "";
+  const presencaTitulo = cursoSelecionadoInscricao
+    ? `Frequência — ${cursoSelecionadoInscricao.nome} — ${formatarData(dataPresencaTitulo)}`
+    : "Frequência";
   const horaPadraoAgenda = useMemo(
     () => String(cursoSelecionadoInscricao?.horario_inicial ?? getValues("horario_inicial") ?? "").trim(),
     [cursoSelecionadoInscricao?.horario_inicial, getValues]
@@ -828,7 +841,7 @@ export function CadastroMatriculasPage() {
     if (abaAtiva !== "presenca") return;
     if (!idSelecionado && !getValues("id_matricula")) return;
     void carregarPresencaDatas();
-  }, [abaAtiva, idSelecionado]);
+  }, [abaAtiva, idSelecionado, getValues]);
 
   useEffect(() => {
     if (!horaPadraoAgenda) return;
@@ -1095,9 +1108,12 @@ export function CadastroMatriculasPage() {
     }
 
     try {
+      const datasOrdenadas = [...presencaDatas].sort((a, b) => a.data_aula.localeCompare(b.data_aula));
       const blob = await reportsService.gerarListaPresencaMatricula({
         matriculaId: cursoId,
         dataAula: (presencaDataSelecionada?.data_aula ?? dataPresencaSelecionada) || undefined,
+        periodoInicio: datasOrdenadas[0]?.data_aula,
+        periodoFim: datasOrdenadas[datasOrdenadas.length - 1]?.data_aula,
         exibirCpf: presencaExibirCpf,
         usuarioEmissor: usuario?.nomeUsuario
       });
@@ -1663,6 +1679,7 @@ export function CadastroMatriculasPage() {
       setPresencaDatas([]);
       setPresencaDataSelecionada(null);
       setPresencasPorMatricula({});
+      setPresencasObservacoesPorMatricula({});
       return;
     }
 
@@ -1672,12 +1689,22 @@ export function CadastroMatriculasPage() {
       const datas = response.datas ?? [];
       setPresencaDatas(datas);
 
-      if (presencaDataSelecionada) {
-        const atualizada = datas.find((item) => item.id === presencaDataSelecionada.id);
-        if (atualizada) {
-          setPresencaDataSelecionada(atualizada);
-          setPresencaObservacoes(atualizada.observacoes ?? "");
-        }
+      if (!datas.length) {
+        setPresencaDataSelecionada(null);
+        setDataPresencaSelecionada("");
+        setPresencasPorMatricula({});
+        setPresencasObservacoesPorMatricula({});
+        setPresencaObservacoes("");
+        setPresencaPendente(false);
+        return;
+      }
+
+      const selecionadaAtual = presencaDataSelecionada
+        ? datas.find((item) => item.id === presencaDataSelecionada.id) ?? null
+        : null;
+
+      if (selecionadaAtual ?? datas[0]) {
+        await selecionarPresencaData(selecionadaAtual ?? datas[0]);
       }
     } catch (error: any) {
       setPopupMensagem({
@@ -1686,6 +1713,10 @@ export function CadastroMatriculasPage() {
         texto: error?.response?.data?.message ?? "Não foi possível carregar as datas de presença."
       });
       setPresencaDatas([]);
+      setPresencaDataSelecionada(null);
+      setDataPresencaSelecionada("");
+      setPresencasPorMatricula({});
+      setPresencasObservacoesPorMatricula({});
     } finally {
       setPresencaCarregando(false);
     }
@@ -1703,10 +1734,15 @@ export function CadastroMatriculasPage() {
     try {
       const response = await matriculasService.listarPresencasPorData(cursoId, data.id);
       const mapa: Record<string, MatriculaPresencaStatus> = {};
+      const mapaObservacoes: Record<string, string> = {};
       response.presencas.forEach((item) => {
         mapa[item.matricula_id] = item.status;
+        if (item.observacao?.trim()) {
+          mapaObservacoes[item.matricula_id] = item.observacao.trim();
+        }
       });
       setPresencasPorMatricula(mapa);
+      setPresencasObservacoesPorMatricula(mapaObservacoes);
       setPresencaPendente(false);
     } catch (error: any) {
       setPopupMensagem({
@@ -1723,79 +1759,17 @@ export function CadastroMatriculasPage() {
   function atualizarPresenca(matriculaId: string, status: MatriculaPresencaStatus) {
     setPresencasPorMatricula((atual) => ({
       ...atual,
-      [matriculaId]: atual[matriculaId] === status ? "AUSENTE" : status
+      [matriculaId]: status
     }));
     setPresencaPendente(true);
   }
 
-  async function gerarDataPresenca() {
-    const cursoId = idSelecionado ?? getValues("id_matricula");
-    if (!cursoId) {
-      setPopupMensagem({
-        tipo: "aviso",
-        titulo: "Atenção",
-        texto: "Selecione e salve uma inscrição antes de gerar presença."
-      });
-      return;
-    }
-    if (!dataPresencaSelecionada) {
-      setPopupMensagem({
-        tipo: "aviso",
-        titulo: "Validação",
-        texto: "Informe a data da aula."
-      });
-      return;
-    }
-
-    setPresencaSalvando(true);
-    try {
-      const data = await matriculasService.criarPresencaData(cursoId, {
-        data_aula: dataPresencaSelecionada,
-        observacoes: presencaObservacoes || undefined
-      });
-      await carregarPresencaDatas();
-      await selecionarPresencaData(data);
-      setPopupMensagem({
-        tipo: "sucesso",
-        titulo: "Confirmação",
-        texto: "Data de presença preparada com sucesso."
-      });
-    } catch (error: any) {
-      setPopupMensagem({
-        tipo: "erro",
-        titulo: "Erro",
-        texto: error?.response?.data?.message ?? "Não foi possível gerar a data de presença."
-      });
-    } finally {
-      setPresencaSalvando(false);
-    }
-  }
-
-  async function salvarObservacoesPresenca() {
-    const cursoId = idSelecionado ?? getValues("id_matricula");
-    if (!cursoId || !presencaDataSelecionada) return;
-
-    setPresencaSalvando(true);
-    try {
-      const atualizado = await matriculasService.atualizarPresencaData(cursoId, presencaDataSelecionada.id, {
-        observacoes: presencaObservacoes
-      });
-      setPresencaDataSelecionada(atualizado);
-      await carregarPresencaDatas();
-      setPopupMensagem({
-        tipo: "sucesso",
-        titulo: "Confirmação",
-        texto: "Observações da presença salvas com sucesso."
-      });
-    } catch (error: any) {
-      setPopupMensagem({
-        tipo: "erro",
-        titulo: "Erro",
-        texto: error?.response?.data?.message ?? "Não foi possível salvar as observações."
-      });
-    } finally {
-      setPresencaSalvando(false);
-    }
+  function atualizarObservacaoPresenca(matriculaId: string, observacao: string) {
+    setPresencasObservacoesPorMatricula((atual) => ({
+      ...atual,
+      [matriculaId]: observacao
+    }));
+    setPresencaPendente(true);
   }
 
   function excluirDataPresenca() {
@@ -1821,7 +1795,9 @@ export function CadastroMatriculasPage() {
       setPopupExcluirPresencaAberto(false);
       setPresencaDataSelecionada(null);
       setPresencasPorMatricula({});
+      setPresencasObservacoesPorMatricula({});
       setPresencaObservacoes("");
+      setDataPresencaSelecionada("");
       setPresencaPendente(false);
       await carregarPresencaDatas();
       setPopupMensagem({
@@ -1855,20 +1831,27 @@ export function CadastroMatriculasPage() {
       .filter((item): item is MatriculaInscricao & { id_matricula_item: string } => !!item.id_matricula_item)
       .map((item) => ({
         matricula_id: item.id_matricula_item,
-        status: (presencasPorMatricula[item.id_matricula_item] ?? "AUSENTE") as MatriculaPresencaStatus
+        status: (presencasPorMatricula[item.id_matricula_item] ?? "NAO_INFORMADO") as MatriculaPresencaStatus,
+        observacao: presencasObservacoesPorMatricula[item.id_matricula_item]?.trim() || undefined
       }));
 
     setPresencaSalvando(true);
     try {
       const response = await matriculasService.salvarPresencasPorData(cursoId, presencaDataSelecionada.id, {
         data_aula: presencaDataSelecionada.data_aula,
+        observacoes: presencaObservacoes || undefined,
         presencas
       });
       const mapa: Record<string, MatriculaPresencaStatus> = {};
+      const mapaObservacoes: Record<string, string> = {};
       response.presencas.forEach((item) => {
         mapa[item.matricula_id] = item.status;
+        if (item.observacao?.trim()) {
+          mapaObservacoes[item.matricula_id] = item.observacao.trim();
+        }
       });
       setPresencasPorMatricula(mapa);
+      setPresencasObservacoesPorMatricula(mapaObservacoes);
       setPresencaPendente(false);
       await carregarPresencaDatas();
       setPopupMensagem({
@@ -2333,9 +2316,22 @@ export function CadastroMatriculasPage() {
     ],
     presenca: [
       { label: "Nova inscrição", icon: Plus, onClick: novo, variant: "default", disabled: acaoEmAndamento },
-      { label: "Salvar presença", icon: Save, onClick: () => void handleSubmit(salvar)(), variant: "default", disabled: acaoEmAndamento },
+      {
+        label: "Salvar presenças",
+        icon: Save,
+        onClick: () => void handleSubmit(salvar)(),
+        variant: "default",
+        disabled: acaoEmAndamento || !presencaDataSelecionada || !presencaPendente
+      },
+      {
+        label: "Excluir data de presença",
+        icon: Trash2,
+        onClick: excluirDataPresenca,
+        variant: "danger",
+        disabled: acaoEmAndamento || !presencaDataSelecionada || !usuario?.permissoes?.includes("ADMINISTRADOR")
+      },
+      { label: "Imprimir Frequência", icon: Printer, onClick: () => void imprimirListaPresenca(), variant: "outline", disabled: acaoEmAndamento },
       { label: "Cancelar edição", icon: Undo2, onClick: cancelar, variant: "outline", disabled: acaoEmAndamento },
-      { label: "Imprimir lista de presença", icon: Printer, onClick: () => void imprimir(), variant: "outline", disabled: acaoEmAndamento },
       { label: "Fechar", icon: X, onClick: fechar, variant: "outline" }
     ]
   };
@@ -4077,40 +4073,37 @@ export function CadastroMatriculasPage() {
                 <div className="space-y-3">
                   <div className="rounded-lg border border-[var(--g3-border)] p-3">
                     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-12">
-                      <div className="space-y-1 xl:col-span-3">
+                      <div className="space-y-1 xl:col-span-5">
                         <Label htmlFor="presenca-data-aula">Data da aula</Label>
-                        <Input
+                        <Select
                           id="presenca-data-aula"
-                          type="date"
-                          value={dataPresencaSelecionada}
-                          onChange={(event) => setDataPresencaSelecionada(event.target.value)}
-                        />
+                          value={presencaDataSelecionada?.id ?? ""}
+                          onChange={(event) => {
+                            const selecionada = presencaDatasOrdenadas.find((item) => item.id === event.target.value);
+                            if (selecionada) {
+                              void selecionarPresencaData(selecionada);
+                            }
+                          }}
+                          disabled={presencaCarregando || !presencaDatasOrdenadas.length}
+                        >
+                          <option value="">Selecione uma data real</option>
+                          {presencaDatasOrdenadas.map((data) => (
+                            <option key={data.id} value={data.id}>
+                              {formatarData(data.data_aula)} - {data.status}
+                            </option>
+                          ))}
+                        </Select>
+                      </div>
+                      <div className="space-y-1 xl:col-span-3">
+                        <Label>Título</Label>
+                        <div className="rounded-md border border-[var(--g3-border)] bg-[var(--g3-primary-soft)] px-3 py-2 text-sm font-semibold text-[var(--g3-active)]">
+                          {presencaTitulo}
+                        </div>
                       </div>
                       <label className="xl:col-span-2 flex items-end gap-2 pb-2 text-sm">
                         <Checkbox checked={presencaExibirCpf} onChange={() => setPresencaExibirCpf((atual) => !atual)} />
                         Exibir CPF na lista
                       </label>
-                      <div className="flex items-end xl:col-span-3">
-                        <Button type="button" variant="outline" className="w-full" onClick={() => void gerarDataPresenca()} disabled={presencaSalvando}>
-                          {presencaSalvando ? "Processando..." : "Gerar data de presença"}
-                        </Button>
-                      </div>
-                      <div className="flex items-end xl:col-span-2">
-                        <Button
-                          type="button"
-                          className="w-full"
-                          onClick={() => void salvarPresencas()}
-                          disabled={presencaSalvando || !presencaDataSelecionada || !presencaPendente}
-                        >
-                          {presencaSalvando ? "Salvando..." : "Salvar presenças"}
-                        </Button>
-                      </div>
-                      <div className="flex items-end xl:col-span-2">
-                        <Button type="button" variant="outline" className="w-full" onClick={() => void imprimirListaPresenca()}>
-                          <Printer className="h-4 w-4" />
-                          Imprimir lista
-                        </Button>
-                      </div>
                     </div>
                   </div>
 
@@ -4118,63 +4111,35 @@ export function CadastroMatriculasPage() {
                     <div className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card)] px-4 py-4 text-sm text-[var(--g3-muted)]">
                       Carregando presença...
                     </div>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {presencaDatas.map((data) => (
-                        <button
-                          key={data.id}
-                          type="button"
-                          onClick={() => void selecionarPresencaData(data)}
-                          className={`rounded-md border px-3 py-2 text-left text-xs ${
-                            presencaDataSelecionada?.id === data.id
-                              ? "border-[var(--g3-active)] bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"
-                              : "border-[var(--g3-border)] bg-[var(--g3-card)] text-[var(--g3-foreground)]"
-                          }`}
-                        >
-                          <p className="font-semibold">{formatarData(data.data_aula)}</p>
-                          <p>{data.status}</p>
-                        </button>
-                      ))}
-                      {!presencaDatas.length && (
-                        <div className="rounded-md border border-[var(--g3-border)] bg-[var(--g3-card)] px-3 py-2 text-xs text-[var(--g3-muted)]">
-                          Nenhuma data de presença cadastrada.
-                        </div>
-                      )}
+                  ) : !presencaDatasOrdenadas.length ? (
+                    <div className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card)] px-4 py-4 text-sm text-[var(--g3-muted)]">
+                      Nenhuma data real de atividade foi encontrada para esta inscrição.
                     </div>
-                  )}
+                  ) : null}
 
                   {presencaDataSelecionada && (
                     <div className="space-y-3 rounded-lg border border-[var(--g3-border)] p-3">
+                      <div className="rounded-md border border-[var(--g3-border)] bg-[var(--g3-card)] px-3 py-2">
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--g3-muted)]">
+                          {cursoSelecionadoInscricao?.tipo ?? "Atividade"}
+                        </p>
+                        <p className="text-sm font-semibold text-[var(--g3-foreground)]">{cursoSelecionadoInscricao?.nome ?? "Atividade"}</p>
+                        <p className="text-xs text-[var(--g3-muted)]">
+                          {formatarData(presencaDataSelecionada.data_aula)} • {presencaDataSelecionada.status}
+                        </p>
+                      </div>
                       <div className="space-y-1">
                         <Label htmlFor="presenca-observacoes">Observações da data</Label>
                         <Textarea
                           id="presenca-observacoes"
                           rows={3}
                           value={presencaObservacoes}
-                          onChange={(event) => setPresencaObservacoes(event.target.value)}
+                          onChange={(event) => {
+                            setPresencaObservacoes(event.target.value);
+                            setPresencaPendente(true);
+                          }}
                         />
                       </div>
-                      <div className="flex justify-end">
-                        <div className="flex flex-wrap justify-end gap-2">
-                          <Button
-                            type="button"
-                            variant="danger"
-                            onClick={excluirDataPresenca}
-                            disabled={presencaSalvando || presencaExcluindo}
-                          >
-                            {presencaExcluindo ? "Excluindo..." : "Excluir data de presença"}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => void salvarObservacoesPresenca()}
-                            disabled={presencaSalvando || presencaExcluindo}
-                          >
-                            Salvar observações
-                          </Button>
-                        </div>
-                      </div>
-
                       <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]">
                         <table className="min-w-full text-sm">
                           <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]">
@@ -4182,15 +4147,16 @@ export function CadastroMatriculasPage() {
                               <th className="px-3 py-2 text-left font-semibold">Beneficiário</th>
                               {presencaExibirCpf && <th className="px-3 py-2 text-left font-semibold">CPF</th>}
                               <th className="px-3 py-2 text-left font-semibold">Telefone</th>
-                              <th className="px-3 py-2 text-left font-semibold">Presente</th>
-                              <th className="px-3 py-2 text-left font-semibold">Ausente</th>
+                              <th className="px-3 py-2 text-left font-semibold">Status</th>
+                              <th className="px-3 py-2 text-left font-semibold">Observação</th>
                             </tr>
                           </thead>
                           <tbody>
                             {inscricoesAtivas.length ? (
                               inscricoesAtivas.map((inscricao, index) => {
                                 const matriculaId = inscricao.id_matricula_item;
-                                const statusAtual = matriculaId ? presencasPorMatricula[matriculaId] ?? "AUSENTE" : "AUSENTE";
+                                const statusAtual = matriculaId ? presencasPorMatricula[matriculaId] ?? "NAO_INFORMADO" : "NAO_INFORMADO";
+                                const observacaoAtual = matriculaId ? presencasObservacoesPorMatricula[matriculaId] ?? "" : "";
                                 return (
                                   <tr
                                     key={obterChaveInscricao(inscricao, index)}
@@ -4202,17 +4168,27 @@ export function CadastroMatriculasPage() {
                                     {presencaExibirCpf && <td className="px-3 py-2">{formatarCpf(inscricao.cpf)}</td>}
                                     <td className="px-3 py-2">{formatarTelefone(inscricao.telefone)}</td>
                                     <td className="px-3 py-2">
-                                      <Checkbox
-                                        checked={statusAtual === "PRESENTE"}
-                                        onChange={() => matriculaId && atualizarPresenca(matriculaId, "PRESENTE")}
+                                      <Select
+                                        value={statusAtual}
+                                        onChange={(event) =>
+                                          matriculaId && atualizarPresenca(matriculaId, event.target.value as MatriculaPresencaStatus)
+                                        }
                                         disabled={!matriculaId || presencaDataSelecionada.status === "CANCELADA"}
-                                      />
+                                      >
+                                        <option value="NAO_INFORMADO">Não informado</option>
+                                        <option value="PRESENTE">Presente</option>
+                                        <option value="AUSENTE">Ausente</option>
+                                        <option value="JUSTIFICADO">Justificado</option>
+                                      </Select>
                                     </td>
                                     <td className="px-3 py-2">
-                                      <Checkbox
-                                        checked={statusAtual === "AUSENTE"}
-                                        onChange={() => matriculaId && atualizarPresenca(matriculaId, "AUSENTE")}
+                                      <Input
+                                        value={observacaoAtual}
+                                        onChange={(event) =>
+                                          matriculaId && atualizarObservacaoPresenca(matriculaId, event.target.value)
+                                        }
                                         disabled={!matriculaId || presencaDataSelecionada.status === "CANCELADA"}
+                                        placeholder="Observação opcional"
                                       />
                                     </td>
                                   </tr>
@@ -4255,11 +4231,11 @@ export function CadastroMatriculasPage() {
       <PopupConfirmacao
         aberto={popupExcluirPresencaAberto}
         titulo="Excluir data de presença"
-        texto="Esta ação exclui apenas a data de presença selecionada. Deseja continuar? Essa ação é irreversível."
+        texto="Se você continuar, todos os registros de presença e ausência desta data serão excluídos. Essa ação afetará todos os beneficiários vinculados a esta aula."
         processando={presencaExcluindo}
         onCancel={() => setPopupExcluirPresencaAberto(false)}
         onConfirm={() => void confirmarExclusaoDataPresenca()}
-        confirmarTexto="Excluir"
+        confirmarTexto="Sim, excluir presenças"
       />
     </section>
   );

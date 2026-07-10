@@ -66,7 +66,7 @@ matriculaRoutes.patch(
 matriculaRoutes.delete(
   "/:id/presencas/datas/:presencaDataId",
   ensureAuthenticated,
-  ensurePermissions(permissoesEscrita),
+  ensurePermissions(permissaoExclusao),
   asyncHandler(controller.removerPresencaData.bind(controller))
 );
 matriculaRoutes.get(

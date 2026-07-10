@@ -53,7 +53,7 @@ export type MatriculaFilters = {
   beneficiario?: string;
 };
 
-export type MatriculaPresencaStatus = "PRESENTE" | "AUSENTE";
+export type MatriculaPresencaStatus = "PRESENTE" | "AUSENTE" | "JUSTIFICADO" | "NAO_INFORMADO";
 export type MatriculaPresencaDataStatus = "GERADA" | "PREENCHIDA" | "CANCELADA";
 
 export type MatriculaPresencaDataInput = {
@@ -69,9 +69,11 @@ export type MatriculaPresencaDataUpdateInput = {
 export type MatriculaPresencaItemInput = {
   matricula_id: string;
   status: MatriculaPresencaStatus;
+  observacao?: string;
 };
 
 export type MatriculaPresencaSalvarInput = {
   data_aula: string;
+  observacoes?: string;
   presencas: MatriculaPresencaItemInput[];
 };

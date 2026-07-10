@@ -46,7 +46,7 @@ const optionalStringArray = z.preprocess((value) => {
 }, z.array(z.string().trim().min(1)).optional());
 
 const matriculaStatusValues = ["ATIVO", "FINALIZADO", "CANCELADO"] as const;
-const presencaStatusValues = ["PRESENTE", "AUSENTE"] as const;
+const presencaStatusValues = ["PRESENTE", "AUSENTE", "JUSTIFICADO", "NAO_INFORMADO"] as const;
 const presencaDataStatusValues = ["GERADA", "PREENCHIDA", "CANCELADA"] as const;
 
 export const matriculaInscricaoInputSchema = z.object({
@@ -127,11 +127,13 @@ export const matriculaPresencaDataUpdateSchema = z.object({
 
 export const matriculaPresencaSalvarSchema = z.object({
   data_aula: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Informe a data da aula."),
+  observacoes: optionalTrimmedString,
   presencas: z
     .array(
       z.object({
         matricula_id: z.string().trim().min(1, "Informe a matricula."),
-        status: z.enum(presencaStatusValues)
+        status: z.enum(presencaStatusValues),
+        observacao: optionalTrimmedString
       })
     )
     .default([])

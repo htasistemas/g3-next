@@ -112,6 +112,8 @@ const secoesManual: ManualSecao[] = [
         comoUsar: [
           "Preencha os dados pessoais principais e confira campos obrigatórios destacados.",
           "Na aba Dados pessoais, os campos e o bloco de foto usam layout compacto para reduzir rolagem da tela durante o cadastro.",
+          "No cabeçalho do cadastro de beneficiário, use o botão Gerar para criar a senha do portal e exibi-la ao lado do status e do código do beneficiário.",
+          "O rótulo Senha do portal usa o mesmo estilo visual de Código do beneficiário para manter a leitura padronizada no cabeçalho.",
           "Os campos de preenchimento usam fundo sombreado, borda mais visível, sombra interna leve e realce no foco para melhorar a leitura em monitores com alto contraste ou muito brilho.",
           "A senha do portal do beneficiário é criada no próprio cadastro com 4 dígitos e será usada no acesso do portal do beneficiário e da família junto com o CPF.",
           "Revise a aba Documentos e use a regra de obrigatoriedade definida em parâmetros do sistema; quando houver muitos documentos, a rolagem fica dentro do card da lista de documentos.",
@@ -202,9 +204,10 @@ const secoesManual: ManualSecao[] = [
           "Use os dados da inscrição para registrar turma, responsável, datas e observações.",
           "Revise a fila de espera e a situação de vagas para apoiar decisões de encaminhamento.",
           "Os atendimentos agendados não ficam mais dentro da tela de inscrições; quando precisar operar agenda, use o botão Abrir em Agendamentos.",
-          "Na aba Presença, gere a data da aula, salve as presenças e use Excluir data de presença quando precisar remover apenas a data gerada sem apagar o curso.",
-          "A barra superior da tela usa ações realmente contextuais por aba: a listagem fica com Buscar, Nova, Imprimir e Fechar; as abas de edição mostram apenas as ações que fazem sentido para aquele conteúdo, como Salvar dados da inscrição, Salvar catálogo e vagas, Salvar inscrições e fila ou Imprimir lista de presença.",
-          "Na impressão da lista de presença, o relatório agora prioriza a leitura com idade do participante e espaço de assinatura no lugar da marcação antiga de presença, mantendo o CPF apenas quando a tela pedir a exibição desse dado."
+          "Na aba Presença, a data da aula exibe somente datas reais da agenda e da frequência já registrada, sem botão para geração manual.",
+          "Ao salvar as presenças, o sistema grava status, observações e auditoria no PostgreSQL e recarrega a mesma lista a partir do backend, sem depender de estado local do navegador.",
+          "A barra superior da tela usa ações realmente contextuais por aba: a listagem fica com Buscar, Nova, Imprimir e Fechar; as abas de edição mostram apenas as ações que fazem sentido para aquele conteúdo, como Salvar dados da inscrição, Salvar catálogo e vagas, Salvar inscrições e fila ou Imprimir Frequência.",
+          "Na impressão de frequência, o relatório agora consolida o acompanhamento por período, mostra presentes, ausentes, justificados e não informados, e não exibe campo de assinatura do beneficiário."
         ],
         atencoes: [
           "O botão Excluir da barra superior remove todo o curso configurado e exige confirmação específica antes da exclusão.",
@@ -233,11 +236,11 @@ const secoesManual: ManualSecao[] = [
           "Abaixo do nome de cada beneficiário, o card exibe a idade calculada a partir da data de nascimento quando esse dado estiver disponível no cadastro.",
           "O botão de confirmação do beneficiário agora mostra o estado atual e, ao clicar em A confirmar, confirma a agenda e muda o indicador para Confirmado.",
           "O botão Copiar agenda recria o card em outra data mantendo os dados do agendamento já persistidos no banco e gravando a nova data apenas após a confirmação do PostgreSQL.",
-          "Dentro de cada card, os botões por ícone permitem copiar a agenda para outra data, remarcar a agenda, imprimir o agendamento com a lista de presença, acionar WhatsApp, enviar e-mail e excluir de vez a agenda da base quando necessário, sempre com popup visual do próprio sistema.",
+          "Dentro de cada card, os botões por ícone permitem copiar a agenda para outra data, remarcar a agenda, imprimir o agendamento com o relatório de frequência consolidado, acionar WhatsApp, enviar e-mail e excluir de vez a agenda da base quando necessário, sempre com popup visual do próprio sistema.",
           "Os ícones de WhatsApp e e-mail dos cards da aba Agendamento agora recarregam os contatos atuais do beneficiário antes do envio, inclusive em agendas antigas que ainda não tenham os vínculos auxiliares completos, tratam contatos inválidos individualmente e continuam processando os demais destinatários sem derrubar a ação com erro interno do servidor.",
           "Durante o envio por WhatsApp ou e-mail no card da agenda operacional, a própria tela agora mostra andamento visual do processamento, bloqueia cliques repetidos e informa quando o envio ainda está em curso.",
           "A versão exibida na interface passa a ser lida em runtime a partir da instância do backend, evitando manter número antigo em produção quando apenas o frontend não tiver recompilado com a constante embutida.",
-          "Ao usar o botão de impressão do card, o sistema abre a ficha de presença em nova janela de visualização como folha A4 do G3N, com logomarca autenticada do relatório, nome da instituição em tamanho mais discreto, título do relatório ampliado, resumo do agendamento em blocos mais compactos para liberar espaço, tabela de presença com código do beneficiário, telefone formatado, idade em coluna reduzida e campo de assinatura no lugar da presença, além do rodapé institucional e do botão de impressora no topo para disparar a impressão manualmente.",
+          "Ao usar o botão de impressão do card, o sistema abre o relatório de acompanhamento de frequência em nova janela de visualização como folha A4 do G3N, com logomarca autenticada do relatório, nome da instituição em tamanho mais discreto, título do relatório ampliado, resumo do período em blocos compactos, tabela com presentes, ausentes, justificados e não informados por data e rodapé institucional, sem campo de assinatura do beneficiário.",
           "Na lista de beneficiários agendados dentro do card, use o ícone de verificado ou de interrogação dentro da própria coluna de ações, ao lado de mover e excluir, para alternar o status do participante entre confirmado e a confirmar.",
           "Cada beneficiário da agenda também pode ser movido individualmente para outra data ou removido apenas daquele dia, sem precisar alterar todos os participantes do card.",
           "As mensagens preparadas para WhatsApp passaram a exibir a data do agendamento em português do Brasil.",
@@ -246,7 +249,7 @@ const secoesManual: ManualSecao[] = [
         ],
         atencoes: [
           "O agendamento operacional reaproveita dados reais das inscrições; se um beneficiário não estiver vinculado ao item, ele não poderá ser selecionado no card.",
-          "Quando o telefone já existir no cadastro do beneficiário, a aba Agendamento e os cards vinculados devem mostrar esse número em vez de exibir Telefone não informado, e o relatório impresso deve usar o mesmo telefone formatado em padrão enxuto. Na ficha de agendamento e lista de presença, a idade sai da coluna separada e passa a aparecer abaixo do nome do beneficiário.",
+          "Quando o telefone já existir no cadastro do beneficiário, a aba Agendamento e os cards vinculados devem mostrar esse número em vez de exibir Telefone não informado, e o relatório impresso deve usar o mesmo telefone formatado em padrão enxuto. Na ficha de agendamento e no relatório de frequência, a idade sai da coluna separada e passa a aparecer abaixo do nome do beneficiário.",
           "O sistema impede duplicidade do mesmo beneficiário dentro do mesmo card, valida duplicidade por data, horário, profissional e atendimento, e registra auditoria de criação, edição, cancelamento, exclusão, cópia e envios.",
           "O envio por WhatsApp prepara links diretos para contato e o envio por e-mail depende de endereço válido cadastrado no participante."
         ]
@@ -757,15 +760,18 @@ const secoesManual: ManualSecao[] = [
       },
       {
         nome: "Doações realizadas",
-        objetivo: "Consultar o histórico de entregas e imprimir relatórios e recibos das doações realizadas a beneficiários e famílias.",
+        objetivo: "Registrar, consultar e imprimir o histórico de entregas realizadas a beneficiários e famílias com persistência no PostgreSQL.",
         comoUsar: [
+          "Registre a entrega pela tela principal e aguarde a confirmação visual apenas depois do backend concluir a persistência da movimentação e do estoque.",
+          "Se a entrega estiver fora da carência configurada, o sistema solicita autorização administrativa antes de concluir o salvamento.",
           "Use a aba Histórico de doações para localizar as entregas já registradas e imprimir a relação completa pelo ícone da impressora da tela.",
           "Quando precisar do comprovante individual, use o ícone da impressora na própria linha da doação para abrir e imprimir o recibo da entrega em um clique, com a logomarca institucional carregada na própria visualização.",
           "A impressão reaproveita a mesma sessão autenticada do operador para gerar o PDF sem exigir novo login durante a consulta.",
-          "A impressão da relação segue o padrão visual do G3N, com colunas ajustadas para leitura e melhor aproveitamento da página.",
-          "No recibo individual da entrega, o cabeçalho usa a logomarca institucional configurada na unidade, a tabela de itens mantém o rótulo Quant para a quantidade e a seção de assinaturas exibe apenas o campo do recebedor."
+          "A impressão da relação segue o padrão visual do G3N, com colunas ajustadas para leitura e melhor aproveitamento da página."
         ],
         atencoes: [
+          "O salvamento da entrega é transacional: registro principal, itens, baixa de estoque e retorno da tela precisam concluir juntos para a operação ser considerada realizada.",
+          "Em caso de erro, o sistema mantém o formulário e exibe a mensagem operacional real retornada pelo backend.",
           "No relatório da relação, a coluna Quantidade foi ajustada para caber corretamente sem quebrar o conteúdo na impressão.",
           "Os títulos e descrições do PDF seguem o padrão pt-BR e a apresentação visual oficial do sistema.",
           "Se o recibo individual ficar sem logomarca, revise o cadastro da unidade atual e confirme se a logomarca ou a logomarca de relatório está salva no storage do sistema."

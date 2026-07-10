@@ -1,6 +1,42 @@
 {
   "entries":  [
                     {
+                        "version":  "1.00.604",
+                        "releaseDate":  "2026-07-10",
+                        "title":  "Doações realizadas com entrega transacional",
+                        "description":  "A tela Doações realizadas passou a confirmar entregas com persistência transacional, tratamento explícito de conflitos e bloqueio de reenvio duplicado.",
+                        "changes":  [
+                                        "O backend passou a retornar a doação persistida sem depender de uma leitura pós-commit suscetível a falhas transitórias.",
+                                        "Erros conhecidos do Prisma passaram a ser traduzidos para respostas específicas de conflito, validação e ausência de registro.",
+                                        "O frontend passou a bloquear submissões duplicadas durante o processamento da entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.603",
+                        "releaseDate":  "2026-07-10",
+                        "title":  "Frequência por agenda e relatório consolidado",
+                        "description":  "A aba Presença passou a carregar datas reais da agenda, salvar observações junto com as presenças e gerar relatório de acompanhamento sem assinatura manual.",
+                        "changes":  [
+                                        "O campo Data da aula passou a listar somente datas reais derivadas da agenda e das frequências já persistidas.",
+                                        "O salvamento de presenças agora grava status, observações gerais e observações individuais na mesma transação.",
+                                        "O relatório de frequência foi remodelado para consolidar status por período e remover o campo de assinatura do beneficiário."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.602",
+                        "releaseDate":  "2026-07-10",
+                        "title":  "Presença persistida em inscrições",
+                        "description":  "A presença das inscrições passou a ser gravada e recarregada pelo PostgreSQL, com auditoria e isolamento por tenant.",
+                        "changes":  [
+                                        "O salvamento de presença agora usa tenant_id, curso_id, matricula_id e data_aula como chave lógica.",
+                                        "A gravação passou a registrar usuário responsável, data/hora de registro e data/hora de atualização.",
+                                        "A alteração de presença passou a registrar auditoria com status anterior, novo status e dados institucionais."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.594",
                         "releaseDate":  "2026-07-08",
                         "title":  "Agendamentos com persistência transacional",

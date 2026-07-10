@@ -1,9 +1,9 @@
 {
-  "latestVersion": "1.00.594",
-  "releaseDate": "2026-07-08",
-  "description": "A aba Agendamento passou a gravar, consultar e copiar agendas com persistência transacional no PostgreSQL.",
+  "latestVersion": "1.00.604",
+  "releaseDate": "2026-07-10",
+  "description": "A tela Doações realizadas passou a confirmar entregas com persistência transacional, tratamento explícito de conflitos e bloqueio de reenvio duplicado.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.594",
+  "minCompatibleVersion": "1.00.604",
   "releaseType": "stable"
 }

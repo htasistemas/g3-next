@@ -207,10 +207,15 @@ export class MatriculaService {
     };
   }
 
-  async removerPresencaData(rawCursoId: string, rawPresencaDataId: string, rawTenantId?: string) {
+  async removerPresencaData(
+    rawCursoId: string,
+    rawPresencaDataId: string,
+    rawTenantId?: string,
+    rawUsuario?: { id?: string; nome?: string }
+  ) {
     const cursoId = this.parseId(rawCursoId);
     const presencaDataId = this.parseId(rawPresencaDataId);
-    await this.repository.removerPresencaData(cursoId, presencaDataId, this.parseTenant(rawTenantId));
+    await this.repository.removerPresencaData(cursoId, presencaDataId, this.parseTenant(rawTenantId), this.parseUsuario(rawUsuario));
   }
 
   async listarPresencasPorData(rawCursoId: string, rawPresencaDataId: string, rawTenantId?: string) {
@@ -224,16 +229,29 @@ export class MatriculaService {
         matricula_id: toStringId(item.matricula_id),
         beneficiario_nome: item.beneficiario_nome,
         cpf: item.cpf ?? undefined,
-        status: item.status === "PRESENTE" ? "PRESENTE" : "AUSENTE"
+        status: this.normalizarStatusPresenca(item.status),
+        observacao: item.observacao ?? undefined
       }))
     };
   }
 
-  async salvarPresencasPorData(rawCursoId: string, rawPresencaDataId: string, rawInput: unknown, rawTenantId?: string) {
+  async salvarPresencasPorData(
+    rawCursoId: string,
+    rawPresencaDataId: string,
+    rawInput: unknown,
+    rawTenantId?: string,
+    rawUsuario?: { id?: string; nome?: string }
+  ) {
     const cursoId = this.parseId(rawCursoId);
     const presencaDataId = this.parseId(rawPresencaDataId);
     const input = matriculaPresencaSalvarSchema.parse(rawInput);
-    const resultado = await this.repository.salvarPresencasPorData(cursoId, presencaDataId, input, this.parseTenant(rawTenantId));
+    const resultado = await this.repository.salvarPresencasPorData(
+      cursoId,
+      presencaDataId,
+      input,
+      this.parseTenant(rawTenantId),
+      this.parseUsuario(rawUsuario)
+    );
 
     return {
       data_aula: toIsoDate(resultado.data_aula) ?? "",
@@ -241,7 +259,8 @@ export class MatriculaService {
         matricula_id: toStringId(item.matricula_id),
         beneficiario_nome: item.beneficiario_nome,
         cpf: item.cpf ?? undefined,
-        status: item.status === "PRESENTE" ? "PRESENTE" : "AUSENTE"
+        status: this.normalizarStatusPresenca(item.status),
+        observacao: item.observacao ?? undefined
       }))
     };
   }
@@ -308,5 +327,26 @@ export class MatriculaService {
       throw new AppError("Tenant da sessao nao identificado.", 401);
     }
     return tenantId;
+  }
+
+  private parseUsuario(rawUsuario?: { id?: string; nome?: string }) {
+    if (!rawUsuario?.id) return undefined;
+    const id = Number(rawUsuario.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      return undefined;
+    }
+
+    return {
+      id: BigInt(id),
+      nome: rawUsuario.nome?.trim() || undefined
+    };
+  }
+
+  private normalizarStatusPresenca(status?: string | null) {
+    const valor = String(status ?? "").trim().toUpperCase();
+    if (valor === "PRESENTE" || valor === "AUSENTE" || valor === "JUSTIFICADO" || valor === "NAO_INFORMADO") {
+      return valor;
+    }
+    return "NAO_INFORMADO";
   }
 }

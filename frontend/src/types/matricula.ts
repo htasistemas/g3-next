@@ -100,7 +100,7 @@ export type MatriculaResumoCatalogo = {
   inscricoesAtivas: number;
 };
 
-export type MatriculaPresencaStatus = "PRESENTE" | "AUSENTE";
+export type MatriculaPresencaStatus = "PRESENTE" | "AUSENTE" | "JUSTIFICADO" | "NAO_INFORMADO";
 export type MatriculaPresencaDataStatus = "GERADA" | "PREENCHIDA" | "CANCELADA";
 
 export type MatriculaPresencaItem = {
@@ -108,6 +108,7 @@ export type MatriculaPresencaItem = {
   beneficiario_nome?: string;
   cpf?: string;
   status: MatriculaPresencaStatus;
+  observacao?: string;
 };
 
 export type MatriculaPresencaResponse = {

@@ -2033,6 +2033,32 @@ export function CadastroBeneficiarioPage() {
                   {formatarStatus(detalhesData.beneficiario.status)}
                 </Badge>
               )}
+              <div className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-2 py-1">
+                <span className="text-xs font-bold text-emerald-900">Senha do portal</span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-8 px-3 text-xs"
+                  onClick={() => {
+                    const novaSenha = gerarSenhaPortalAcesso();
+                    setValue("senha_portal", novaSenha, {
+                      shouldDirty: true,
+                      shouldValidate: true
+                    });
+                    setSenhaPortalGerada(novaSenha);
+                  }}
+                >
+                  Gerar
+                </Button>
+                {senhaPortalGerada ? (
+                  <Badge
+                    variant="default"
+                    className="h-8 rounded-md border-emerald-200 bg-emerald-50 px-3 text-xs font-semibold tracking-[0.16em] text-emerald-900"
+                  >
+                    {senhaPortalGerada}
+                  </Badge>
+                ) : null}
+              </div>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-emerald-900">Código do beneficiário</span>
                 <Badge
@@ -2253,11 +2279,15 @@ export function CadastroBeneficiarioPage() {
                           </p>
                         </div>
 
-                        <div className="w-28 self-end rounded-md border border-emerald-200 bg-white px-2 py-1 text-center md:ml-auto md:self-center">
-                          <p className="text-[10px] font-medium text-emerald-700">Idade</p>
-                          <p className="text-xs font-semibold text-slate-900">
-                            {idadeAtual === "---" ? "Informe a data" : idadeAtual}
-                          </p>
+                        <div className="flex flex-col gap-3 md:ml-auto md:flex-row md:items-end">
+                          <div className="w-28 rounded-md border border-emerald-200 bg-white px-2 py-1 text-center md:self-center">
+                            <p className="text-[10px] font-medium text-emerald-700">Idade</p>
+                            <p className="text-xs font-semibold text-slate-900">
+                              {idadeAtual === "---" ? "Informe a data" : idadeAtual}
+                            </p>
+                          </div>
+
+                          <input type="hidden" {...register("senha_portal")} />
                         </div>
                       </div>
                     </div>
@@ -2356,54 +2386,6 @@ export function CadastroBeneficiarioPage() {
                     <div className="xl:col-span-6">
                       <Label>Nome do pai</Label>
                       <Input {...register("nome_pai")} onBlurCapture={() => aplicarFormatacaoCampo("nome_pai")} />
-                    </div>
-                    <div className="xl:col-span-4">
-                      <Label>Senha do portal*</Label>
-                      <div className="flex gap-2">
-                        <Input
-                          {...register("senha_portal")}
-                          inputMode="numeric"
-                          maxLength={4}
-                          placeholder="0000"
-                          onChange={(event) => {
-                            event.target.value = event.target.value.replace(/\D/g, "").slice(0, 4);
-                            setValue("senha_portal", event.target.value, {
-                              shouldDirty: true,
-                              shouldValidate: true
-                            });
-                          }}
-                          onBlurCapture={() => aplicarFormatacaoCampo("senha_portal")}
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => {
-                            const novaSenha = gerarSenhaPortalAcesso();
-                            setValue("senha_portal", novaSenha, {
-                              shouldDirty: true,
-                              shouldValidate: true
-                            });
-                            setSenhaPortalGerada(novaSenha);
-                          }}
-                        >
-                          Gerar
-                        </Button>
-                      </div>
-                      {errors.senha_portal && (
-                        <p className="mt-1 text-xs text-red-600">{errors.senha_portal.message}</p>
-                      )}
-                      <p className="mt-1 text-[11px] text-slate-600">
-                        Usada no acesso ao portal do beneficiário e da família.
-                      </p>
-                      {senhaPortalGerada ? (
-                        <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
-                          <p className="font-semibold">Senha do portal ativa</p>
-                          <p className="mt-1 text-lg font-bold tracking-[0.18em]">{senhaPortalGerada}</p>
-                          <p className="mt-1 text-xs text-emerald-800">
-                            Esta senha fica disponível durante a sessão atual do cadastro.
-                          </p>
-                        </div>
-                      ) : null}
                     </div>
                   </section>
                 )}
@@ -3139,15 +3121,6 @@ export function CadastroBeneficiarioPage() {
             </div>
             <div className="px-5 py-4">
               <p className="text-sm text-slate-700">Salvo com sucesso</p>
-              {senhaPortalGerada ? (
-                <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
-                  <p className="font-semibold">Senha do portal</p>
-                  <p className="mt-1 text-lg font-bold tracking-[0.18em]">{senhaPortalGerada}</p>
-                  <p className="mt-1 text-xs text-emerald-800">
-                    Informe essa senha junto com o CPF no portal do beneficiário e da família.
-                  </p>
-                </div>
-              ) : null}
             </div>
             <div className="flex justify-end border-t border-slate-100 px-5 py-3">
               <Button type="button" onClick={() => setPopupSalvarAberto(false)}>
