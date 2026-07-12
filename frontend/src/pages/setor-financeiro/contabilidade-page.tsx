@@ -676,6 +676,24 @@ function toMovimentacaoForm(item: MovimentacaoFinanceira): MovimentacaoFinanceir
   };
 }
 
+function classeValorResumo(valor: string) {
+  const tamanho = valor.trim().length;
+
+  if (tamanho <= 11) {
+    return 'text-[clamp(1rem,1vw+0.85rem,1.55rem)] whitespace-nowrap';
+  }
+
+  if (tamanho <= 15) {
+    return 'text-[clamp(0.92rem,0.85vw+0.72rem,1.35rem)] whitespace-nowrap';
+  }
+
+  if (tamanho <= 19) {
+    return 'text-[clamp(0.86rem,0.7vw+0.65rem,1.1rem)] whitespace-nowrap';
+  }
+
+  return 'text-[clamp(0.8rem,0.6vw+0.6rem,1rem)] whitespace-normal break-words';
+}
+
 function ResumoCard({
   titulo,
   valor,
@@ -692,15 +710,17 @@ function ResumoCard({
   centralizado?: boolean;
 }) {
   return (
-    <div className={`min-w-0 rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] p-3 shadow-sm ${className ?? ''}`}>
+    <div
+      className={`flex h-full min-h-[104px] min-w-0 flex-col justify-between rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] p-4 shadow-sm sm:min-h-[112px] ${className ?? ''}`}
+    >
       <p className={`text-xs font-semibold text-[var(--g3-muted)] ${centralizado ? 'text-center' : ''}`}>{titulo}</p>
       <p
-        className={`mt-1 overflow-hidden text-[clamp(0.85rem,0.7vw+0.75rem,1.5rem)] font-bold leading-tight tracking-tight whitespace-nowrap ${centralizado ? 'text-center' : ''}`}
-        style={{ color: destaque }}
+        className={`mt-2 font-bold leading-none tracking-tight [overflow-wrap:anywhere] ${classeValorResumo(valor)} ${centralizado ? 'text-center' : ''}`}
+        style={{ color: destaque, fontVariantNumeric: 'tabular-nums' }}
       >
         {valor}
       </p>
-      {subtitulo ? <p className={`mt-1 text-xs text-[var(--g3-muted)] ${centralizado ? 'text-center' : ''}`}>{subtitulo}</p> : null}
+      {subtitulo ? <p className={`mt-2 text-xs text-[var(--g3-muted)] ${centralizado ? 'text-center' : ''}`}>{subtitulo}</p> : null}
     </div>
   );
 }
@@ -1507,7 +1527,7 @@ export function ContabilidadePage() {
           descricao="Tela simplificada para acompanhar o essencial: saldo atual, contas em aberto e últimos lançamentos."
           className="border-emerald-200 bg-[linear-gradient(180deg,#f6fff9_0%,#eefbf3_100%)] shadow-[0_18px_48px_-30px_rgba(22,163,74,0.28)]"
         >
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+          <div className="grid items-stretch gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
             <ResumoCard titulo="Saldo geral" valor={formatarMoeda(saldoGeral)} />
             <ResumoCard titulo="Saldo em bancos" valor={formatarMoeda(saldoBancos)} destaque="#0f766e" />
             <ResumoCard titulo="Saldo em caixa" valor={formatarMoeda(saldoCaixa)} destaque="#2563eb" />
