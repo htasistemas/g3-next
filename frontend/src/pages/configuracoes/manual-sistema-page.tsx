@@ -684,6 +684,7 @@ const secoesManual: ManualSecao[] = [
           "As abas Fluxo de caixa, Centro de custo, Conciliação bancária, Integração com compras, Histórico, Anexos, Relatórios, Impressões e Emendas foram retiradas dessa tela para reduzir complexidade operacional.",
           "O estorno continua disponível somente para lançamentos já pagos, recebidos ou conciliados.",
           "O cadastro de centro de custo deixou de fazer parte do fluxo simplificado dessa tela.",
+          "Quando o salvamento de um lançamento falhar, o popup passa a mostrar o motivo operacional retornado pelo backend, como referência inválida, campo fora do limite ou vínculo já existente, em vez de erro interno genérico.",
           "Ao salvar um centro de custo no backend, o sistema agora suporta perfis longos de permissões no histórico sem retornar erro interno do servidor.",
           "Se o valor do lançamento for digitado com vírgula, a tela passa a interpretar corretamente o número antes do salvamento.",
           "A tela Lançamentos contábeis agora lista contas, lançamentos, movimentações, transferências, conciliações, histórico, compras integradas e emendas sempre dentro do tenant autenticado."
