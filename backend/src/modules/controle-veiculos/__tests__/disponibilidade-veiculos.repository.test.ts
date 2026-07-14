@@ -3,29 +3,23 @@ import assert from "node:assert/strict";
 import { prisma } from "../../../database/prisma.js";
 import { ControleVeiculosDisponibilidadeRepository } from "../disponibilidade-veiculos.repository.js";
 
+type PrismaStub = typeof prisma & {
+  $queryRawUnsafe: any;
+  $executeRawUnsafe: any;
+};
+
 function criarStubPrisma(respostas: unknown[]) {
-  const originalQuery = prisma.$queryRawUnsafe;
-  const originalExecute = prisma.$executeRawUnsafe;
+  const prismaStub = prisma as PrismaStub;
+  const originalQuery = prismaStub.$queryRawUnsafe;
+  const originalExecute = prismaStub.$executeRawUnsafe;
   let indice = 0;
 
-  (prisma as unknown as {
-    $queryRawUnsafe: (...args: unknown[]) => Promise<unknown>;
-    $executeRawUnsafe: (...args: unknown[]) => Promise<unknown>;
-  }).$queryRawUnsafe = async () => respostas[indice++] ?? [];
-  (prisma as unknown as {
-    $queryRawUnsafe: (...args: unknown[]) => Promise<unknown>;
-    $executeRawUnsafe: (...args: unknown[]) => Promise<unknown>;
-  }).$executeRawUnsafe = async () => undefined;
+  prismaStub.$queryRawUnsafe = async () => respostas[indice++] ?? [];
+  prismaStub.$executeRawUnsafe = async () => undefined;
 
   return () => {
-    (prisma as unknown as {
-      $queryRawUnsafe: (...args: unknown[]) => Promise<unknown>;
-      $executeRawUnsafe: (...args: unknown[]) => Promise<unknown>;
-    }).$queryRawUnsafe = originalQuery;
-    (prisma as unknown as {
-      $queryRawUnsafe: (...args: unknown[]) => Promise<unknown>;
-      $executeRawUnsafe: (...args: unknown[]) => Promise<unknown>;
-    }).$executeRawUnsafe = originalExecute;
+    prismaStub.$queryRawUnsafe = originalQuery;
+    prismaStub.$executeRawUnsafe = originalExecute;
   };
 }
 
