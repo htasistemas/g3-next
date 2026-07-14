@@ -72,6 +72,8 @@ const coresCadastros = [
 const classeCardVisaoGeral =
   "rounded-xl border border-[var(--g3-border)] bg-[linear-gradient(180deg,var(--g3-dashboard-card)_0%,var(--g3-dashboard-card-soft)_100%)] shadow-[0_18px_40px_-26px_rgba(15,23,42,0.22)]";
 const classeCardVisaoGeralInterativo = `${classeCardVisaoGeral} transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--g3-primary)] hover:shadow-[0_22px_48px_-22px_rgba(15,23,42,0.26)]`;
+const classeCardVisaoGeralResumo =
+  "rounded-xl border border-[var(--g3-primary-soft)] bg-[linear-gradient(180deg,var(--g3-primary-soft)_0%,var(--g3-card)_100%)] shadow-[0_18px_40px_-26px_rgba(15,23,42,0.22)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--g3-primary)] hover:shadow-[0_22px_48px_-22px_rgba(15,23,42,0.26)]";
 const classeCardVisaoGeralSuave =
   "rounded-xl border border-[var(--g3-border)] bg-[var(--g3-dashboard-card-soft)] shadow-[0_14px_32px_-26px_rgba(15,23,42,0.16)] backdrop-blur-[2px]";
 
@@ -394,7 +396,7 @@ export function VisaoGeralPage() {
                   <button
                     key={card.label}
                     type="button"
-                    className={`${classeCardVisaoGeralInterativo} px-3 py-3 text-left`}
+                    className={`${classeCardVisaoGeralResumo} px-3 py-3 text-left`}
                     onClick={() => navigate(card.rota)}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -426,7 +428,7 @@ export function VisaoGeralPage() {
                         Distribuição dos cadastros monitorados na operação atual.
                       </p>
                     </div>
-                    <div className={`${classeCardVisaoGeralSuave} rounded-lg px-3 py-2 text-right`}>
+                    <div className={`${classeCardVisaoGeralResumo} rounded-lg px-3 py-2 text-right`}>
                       <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
                         Total
                       </p>
@@ -581,7 +583,7 @@ export function VisaoGeralPage() {
                           Distribuição atual dos recursos em caixa e banco.
                         </p>
                       </div>
-                      <div className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-dashboard-card)] px-3 py-2 text-right shadow-[0_16px_28px_-24px_rgba(15,23,42,0.18)]">
+                      <div className="rounded-lg border border-[var(--g3-primary-soft)] bg-[var(--g3-primary-soft)] px-3 py-2 text-right shadow-[0_16px_28px_-24px_rgba(15,23,42,0.18)]">
                         <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
                           Total em contas
                         </p>

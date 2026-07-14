@@ -176,7 +176,7 @@ export function LoginPage() {
     const cnpjNormalizado = normalizarCnpj(cnpj);
     const emailNormalizado = email.trim().toLowerCase();
     const dispensarInstituicao = !slugSubdominio && ehEmailMasterSemTenant(emailNormalizado);
-    if (!dispensarInstituicao && !slugSubdominio && cnpjNormalizado.length !== 14) {
+    if (!dispensarInstituicao && !slugSubdominio && !emailNormalizado && cnpjNormalizado.length !== 14) {
       setErro("Informe o CNPJ da instituição para continuar.");
       return;
     }

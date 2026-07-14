@@ -50,6 +50,74 @@ export type MotoristaAutorizadoInput = {
   arquivoCarteiraPdf?: string | null;
 };
 
+export type DisponibilidadeVeiculoTipoSituacao = "RESERVADO" | "INDISPONIVEL";
+export type DisponibilidadeVeiculoStatusRegistro =
+  | "ATIVO"
+  | "CANCELADO"
+  | "ENCERRADO"
+  | "EXCLUIDO_LOGICAMENTE";
+
+export type DisponibilidadeVeiculoInput = {
+  veiculoId: number;
+  dataHoraInicio: string;
+  dataHoraFim: string;
+  tipoSituacao: DisponibilidadeVeiculoTipoSituacao;
+  motivo?: string | null;
+  motivoDetalhado?: string | null;
+  destino?: string | null;
+  responsavelNome?: string | null;
+  observacoes?: string | null;
+  statusRegistro?: DisponibilidadeVeiculoStatusRegistro;
+};
+
+export type DisponibilidadeVeiculoConsultaInput = {
+  dataHoraInicio: string;
+  dataHoraFim: string;
+  veiculoId?: number | null;
+  situacao?: DisponibilidadeVeiculoTipoSituacao | "DISPONIVEL" | null;
+  unidade?: string | null;
+  responsavel?: string | null;
+  motivo?: string | null;
+};
+
+export type DisponibilidadeVeiculoRow = {
+  id: bigint;
+  tenant_id: string;
+  veiculo_id: bigint;
+  tipo_situacao: DisponibilidadeVeiculoTipoSituacao;
+  data_hora_inicio: Date;
+  data_hora_fim: Date;
+  motivo: string | null;
+  motivo_detalhado: string | null;
+  destino: string | null;
+  responsavel_id: bigint | null;
+  responsavel_nome: string | null;
+  observacoes: string | null;
+  status_registro: DisponibilidadeVeiculoStatusRegistro;
+  criado_por_usuario_id: bigint | null;
+  criado_por_nome: string | null;
+  criado_em: Date;
+  alterado_por_usuario_id: bigint | null;
+  alterado_por_nome: string | null;
+  alterado_em: Date;
+  cancelado_por_usuario_id: bigint | null;
+  cancelado_por_nome: string | null;
+  cancelado_em: Date | null;
+  motivo_cancelamento: string | null;
+  version: number | bigint;
+};
+
+export type DisponibilidadeVeiculoHistoricoRow = {
+  id: bigint;
+  disponibilidade_veiculo_id: bigint;
+  acao: string;
+  antes_json: unknown;
+  depois_json: unknown;
+  usuario_id: bigint | null;
+  usuario_nome: string | null;
+  criado_em: Date;
+};
+
 export type VeiculoRow = {
   id: bigint;
   placa: string | null;

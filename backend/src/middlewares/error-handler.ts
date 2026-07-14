@@ -3,6 +3,44 @@ import type { NextFunction, Request, Response } from "express";
 import { ZodError } from "zod";
 import { AppError } from "../shared/errors/app-error.js";
 
+function obterMensagemPrisma(error: unknown): { statusCode: number; message: string } | null {
+  if (!error || typeof error !== "object") return null;
+
+  const prismaError = error as {
+    code?: string;
+    meta?: { message?: string };
+    message?: string;
+  };
+
+  if (!prismaError.code) return null;
+
+  if (prismaError.code === "P2002") {
+    return {
+      statusCode: 409,
+      message: "Já existe um registro com esses dados."
+    };
+  }
+
+  if (prismaError.code === "P2025") {
+    return {
+      statusCode: 404,
+      message: "O registro solicitado não foi encontrado."
+    };
+  }
+
+  if (prismaError.code === "P2010") {
+    return {
+      statusCode: 500,
+      message: prismaError.meta?.message ?? prismaError.message ?? "Falha ao executar a operação no banco de dados."
+    };
+  }
+
+  return {
+    statusCode: 500,
+    message: prismaError.meta?.message ?? prismaError.message ?? "Falha ao executar a operação no banco de dados."
+  };
+}
+
 export function errorHandler(
   error: unknown,
   _request: Request,
@@ -53,6 +91,11 @@ export function errorHandler(
 
   if (error instanceof Error && /multipart|boundary/i.test(error.message)) {
     return response.status(400).json({ message: "Nao foi possivel processar o upload do arquivo." });
+  }
+
+  const prismaTratado = obterMensagemPrisma(error);
+  if (prismaTratado) {
+    return response.status(prismaTratado.statusCode).json({ message: prismaTratado.message });
   }
 
   console.error(error);

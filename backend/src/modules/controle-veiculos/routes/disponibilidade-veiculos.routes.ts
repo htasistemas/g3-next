@@ -1,0 +1,96 @@
+import { Router } from "express";
+import { asyncHandler } from "../../../shared/http/async-handler.js";
+import { ensureAuthenticated, ensurePermissions } from "../../auth/middlewares/auth.middleware.js";
+import { ControleVeiculosDisponibilidadeController } from "../disponibilidade-veiculos.controller.js";
+
+const controller = new ControleVeiculosDisponibilidadeController();
+
+export const disponibilidadeVeiculosRoutes = Router();
+
+const permissoesLeitura = ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"];
+const permissoesEscrita = ["ADMINISTRADOR", "OPERADOR"];
+const permissaoExclusao = ["ADMINISTRADOR"];
+
+disponibilidadeVeiculosRoutes.get(
+  "/",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.listar.bind(controller))
+);
+
+disponibilidadeVeiculosRoutes.get(
+  "/consulta",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.consultar.bind(controller))
+);
+
+disponibilidadeVeiculosRoutes.get(
+  "/resumo",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.resumo.bind(controller))
+);
+
+disponibilidadeVeiculosRoutes.get(
+  "/veiculos/ativos",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.listarVeiculosAtivos.bind(controller))
+);
+
+disponibilidadeVeiculosRoutes.get(
+  "/veiculos/:veiculoId/agenda",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.agendaVeiculo.bind(controller))
+);
+
+disponibilidadeVeiculosRoutes.get(
+  "/veiculos/:veiculoId/proxima-disponibilidade",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.proximaDisponibilidade.bind(controller))
+);
+
+disponibilidadeVeiculosRoutes.get(
+  "/:id",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.detalhes.bind(controller))
+);
+
+disponibilidadeVeiculosRoutes.post(
+  "/",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.criar.bind(controller))
+);
+
+disponibilidadeVeiculosRoutes.put(
+  "/:id",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.atualizar.bind(controller))
+);
+
+disponibilidadeVeiculosRoutes.patch(
+  "/:id/cancelar",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.cancelar.bind(controller))
+);
+
+disponibilidadeVeiculosRoutes.patch(
+  "/:id/encerrar",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.encerrar.bind(controller))
+);
+
+disponibilidadeVeiculosRoutes.delete(
+  "/:id",
+  ensureAuthenticated,
+  ensurePermissions(permissaoExclusao),
+  asyncHandler(controller.excluir.bind(controller))
+);

@@ -24,9 +24,9 @@ export type AdminAction = {
 };
 
 type AdminPageLayoutProps = {
-  tabs: AdminTab[];
-  activeTab: string;
-  onChangeTab: (tabId: string) => void;
+  tabs?: AdminTab[];
+  activeTab?: string;
+  onChangeTab?: (tabId: string) => void;
   actions: AdminAction[];
   sectionLabel?: string;
   pageTitle?: string;
@@ -52,9 +52,11 @@ export function AdminPageLayout({
   actionButtonClassName,
   children
 }: AdminPageLayoutProps) {
-  const tab = tabs.find((item) => item.id === activeTab);
+  const tabsVisiveis = tabs ?? [];
+  const tab = tabsVisiveis.find((item) => item.id === activeTab);
   const title = activeTitle ?? tab?.label ?? "";
   const Icon = ActiveIcon ?? tab?.icon;
+  const possuiAbas = tabsVisiveis.length > 0 && Boolean(onChangeTab);
 
   return (
     <main className={classesTelaPadraoBeneficiario.container}>
@@ -100,22 +102,28 @@ export function AdminPageLayout({
         </div>
       </section>
 
-      <div className={classesTelaPadraoBeneficiario.gradePrincipal} data-print="layout-grid">
-        <Card className={classesTelaPadraoBeneficiario.cardAbas} data-print="tabs">
-          <CardContent className={classesTelaPadraoBeneficiario.conteudoAbas}>
-            {tabs.map((item, index) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => onChangeTab(item.id)}
-                className={classeBotaoAbaLateral(activeTab === item.id)}
-              >
-                <span className={classeNumeroAbaLateral(activeTab === item.id)}>{index + 1}</span>
-                <span className="min-w-0 break-words">{item.label}</span>
-              </button>
-            ))}
-          </CardContent>
-        </Card>
+      <div
+        className={classesTelaPadraoBeneficiario.gradePrincipal}
+        data-print="layout-grid"
+        style={possuiAbas ? undefined : { gridTemplateColumns: "minmax(0, 1fr)" }}
+      >
+        {possuiAbas ? (
+          <Card className={classesTelaPadraoBeneficiario.cardAbas} data-print="tabs">
+            <CardContent className={classesTelaPadraoBeneficiario.conteudoAbas}>
+              {tabsVisiveis.map((item, index) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => onChangeTab?.(item.id)}
+                  className={classeBotaoAbaLateral(activeTab === item.id)}
+                >
+                  <span className={classeNumeroAbaLateral(activeTab === item.id)}>{index + 1}</span>
+                  <span className="min-w-0 break-words">{item.label}</span>
+                </button>
+              ))}
+            </CardContent>
+          </Card>
+        ) : null}
 
         <Card className={classesTelaPadraoBeneficiario.cardConteudo}>
           <CardHeader className={classesTelaPadraoBeneficiario.cabecalhoConteudo}>

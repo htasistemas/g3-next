@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.605",
-  "releaseDate": "2026-07-10",
-  "description": "A tela Doações realizadas passou a confirmar entregas fora da carência usando o repositório de autenticação correto para validar a senha administrativa.",
+  "latestVersion": "1.00.630",
+  "releaseDate": "2026-07-14",
+  "description": "A disponibilidade de veículos entrou no Controle de Frotas e o login passou a identificar o tenant por e-mail quando possível.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.605",
+  "minCompatibleVersion": "1.00.630",
   "releaseType": "stable",
   "downloadUrl": null
 }

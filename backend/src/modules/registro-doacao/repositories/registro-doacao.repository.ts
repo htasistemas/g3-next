@@ -60,7 +60,7 @@ function tenantSql(alias: string, tenantId: string) {
 
 async function ensureRegistroDoacaoEstrutura() {
   if (!estruturaPromise) {
-    estruturaPromise = (async () => {
+    const promise = (async () => {
       const comandos = [
         `
         ALTER TABLE recebimento_doacao
@@ -103,14 +103,16 @@ async function ensureRegistroDoacaoEstrutura() {
         `,
         `
         UPDATE recebimento_doacao AS r
-        SET tenant_id = COALESCE(d.tenant_id, ref.tenant_id)
+        SET tenant_id = COALESCE(
+          (SELECT d.tenant_id FROM doador d WHERE d.id = r.doador_id LIMIT 1),
+          ref.tenant_id
+        )
         FROM (
           SELECT tenant_id
           FROM instituicoes
           ORDER BY criado_em ASC
           LIMIT 1
         ) ref
-        LEFT JOIN doador d ON d.id = r.doador_id
         WHERE r.tenant_id IS NULL
         `,
         `
@@ -127,6 +129,15 @@ async function ensureRegistroDoacaoEstrutura() {
         await prisma.$executeRawUnsafe(comando);
       }
     })();
+
+    estruturaPromise = promise;
+    try {
+      await promise;
+      return;
+    } catch (error) {
+      estruturaPromise = null;
+      throw error;
+    }
   }
 
   await estruturaPromise;

@@ -16,6 +16,15 @@ type TenantLookupInput = {
   codigoInstituicao?: string;
 };
 
+type TenantContextoPorEmail = {
+  tenant_id: string;
+  cnpj: string;
+  slug: string;
+  codigo: string | null;
+  usuario_id: bigint;
+  email: string | null;
+};
+
 type AuthUsuarioRow = {
   id: bigint;
   nome_usuario: string;
@@ -202,6 +211,29 @@ export class AuthRepository {
     );
 
     return mapAuthUsuarioRow(rows[0] ?? null);
+  }
+
+  async buscarTenantsPorEmail(email: string) {
+    await this.ensureEstrutura();
+    const rows = await prisma.$queryRawUnsafe<TenantContextoPorEmail[]>(
+      `
+      SELECT DISTINCT ON (u.tenant_id)
+        u.tenant_id::text AS tenant_id,
+        i.cnpj AS cnpj,
+        i.slug AS slug,
+        i.codigo AS codigo,
+        u.id AS usuario_id,
+        u.email AS email
+      FROM usuarios u
+      INNER JOIN instituicoes i ON i.id = u.instituicao_id
+      WHERE lower(coalesce(u.email, '')) = lower($1)
+        AND u.deletado_em IS NULL
+      ORDER BY u.tenant_id, u.is_superadmin DESC, u.id ASC
+      `,
+      email.trim().toLowerCase()
+    );
+
+    return rows;
   }
 
   async buscarUsuarioPorGoogleId(googleId: string, lookup?: TenantLookupInput) {

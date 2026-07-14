@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { AppShell } from "@/app/app-shell";
 import { RequireAuth } from "@/app/require-auth";
 import { RequirePermission } from "@/app/require-permission";
-import { RequireSuperadmin } from "@/app/require-superadmin";
 import { carregarModuloRota, obterLoaderRota } from "@/routes/route-modules";
 
 const CHUNK_RELOAD_KEY = "g3:chunk-reload";
@@ -592,7 +591,11 @@ export const router = createBrowserRouter([
       },
       {
         path: "/configuracoes/master-instituicoes",
-        element: <RequireSuperadmin>{MasterInstituicoesPage}</RequireSuperadmin>
+        element: (
+          <RequirePermission permissions={["MASTER_ADMIN"]}>
+            {MasterInstituicoesPage}
+          </RequirePermission>
+        )
       },
       {
         path: "/configuracoes/chamado-tecnico",

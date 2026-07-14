@@ -1,6 +1,306 @@
 {
   "entries":  [
                     {
+                        "version":  "1.00.630",
+                        "releaseDate":  "2026-07-14",
+                        "title":  "Disponibilidade de veículos e login por e-mail",
+                        "description":  "O Controle de Frotas passou a contar com a nova aba de disponibilidade de veículos e o login passou a identificar a instituição automaticamente quando o e-mail for exclusivo de um tenant.",
+                        "changes":  [
+                                        "A tela Controle de frotas ganhou a aba Disponibilidade de veículos com consulta por data e hora, cards por situação e formulário de reserva ou indisponibilidade.",
+                                        "A agenda passou a considerar veículos ativos do tenant autenticado, com ações de editar, cancelar, encerrar e excluir logicamente com validação de conflito no backend.",
+                                        "A autenticação agora tenta localizar a instituição pelo e-mail quando o tenant não for informado e o endereço for exclusivo de um único cliente."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.629",
+                        "releaseDate":  "2026-07-14",
+                        "title":  "Painel master e login com erro mais claro",
+                        "description":  "O menu Painel master foi criado para reunir os acessos exclusivos do superadmin e o login passou a explicar melhor se a falha está na instituição ou na senha.",
+                        "changes":  [
+                                        "A tela Clientes registrados foi movida para o novo menu Painel master, visível somente para master administrativo.",
+                                        "A rota de clientes registrados passou a seguir a mesma regra de acesso master do menu lateral.",
+                                        "O login agora diferencia erro de instituição localizada e erro de senha para reduzir a mensagem genérica de credenciais inválidas."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.628",
+                        "releaseDate":  "2026-07-14",
+                        "title":  "Termo de fomento validado em simulação completa",
+                        "description":  "A tela Termo de fomento passou por simulação automática com preenchimento total, duplicação de registro e validação da impressão.",
+                        "changes":  [
+                                        "A tela passou a validar os campos obrigatórios antes de salvar e antes de liberar a impressão do termo.",
+                                        "Foi adicionada a ação Duplicar termo para criar um novo registro a partir de um termo existente.",
+                                        "A geração do relatório de termo de fomento foi extraída para um utilitário testável e coberta por teste automatizado."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.627",
+                        "releaseDate":  "2026-07-14",
+                        "title":  "Plano de trabalho validado em simulação completa",
+                        "description":  "A tela Plano de trabalho passou por simulação automática com preenchimento total, clone profundo e validação da estrutura de impressão.",
+                        "changes":  [
+                                        "A validação de impressão agora exige também os dados bancários essenciais antes de liberar a ação no topo.",
+                                        "A geração do HTML de impressão foi extraída para um utilitário testável e passou a ser coberta por teste automatizado.",
+                                        "O clone do plano foi verificado para não compartilhar referências internas entre metas e objetivos específicos."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.626",
+                        "releaseDate":  "2026-07-14",
+                        "title":  "Plano de trabalho com preenchimento automático e impressão guiada",
+                        "description":  "A tela Plano de trabalho passou a preencher dados da instituição pela unidade assistencial e dados bancários pelo cadastro de contas, além de liberar a impressão apenas quando o termo estiver completo.",
+                        "changes":  [
+                                        "Na aba Dados da instituição, o usuário pode carregar os dados de uma unidade assistencial cadastrada e preencher o bloco inteiro de forma automática.",
+                                        "No card de dados bancários, o usuário pode carregar uma conta bancária cadastrada e reaproveitar os dados disponíveis no plano.",
+                                        "A opção de imprimir o plano de trabalho agora aparece somente quando o formulário atende aos campos críticos de envio."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.625",
+                        "releaseDate":  "2026-07-14",
+                        "title":  "Controle de frotas",
+                        "description":  "O submenu Controle de veículos passou a ser exibido como Controle de frotas.",
+                        "changes":  [
+                                        "O item do menu lateral foi renomeado para Controle de frotas.",
+                                        "O título da rota de controle de veículos também passou a exibir Controle de frotas.",
+                                        "O manual do sistema foi atualizado com a nova nomenclatura."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.624",
+                        "releaseDate":  "2026-07-14",
+                        "title":  "Cards iniciais da visão geral com cor da unidade",
+                        "description":  "Os cards iniciais da Visão geral passaram a seguir a cor clara do padrão da unidade.",
+                        "changes":  [
+                                        "Os cards-resumo da Visão geral agora usam a variação clara da cor principal da unidade autenticada.",
+                                        "O destaque acompanha o tema ativo, ficando verde claro, azul claro ou outro tom equivalente conforme a personalização.",
+                                        "O manual do sistema foi atualizado com a nova regra visual."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.623",
+                        "releaseDate":  "2026-07-13",
+                        "title":  "Instituições padrão em verde claro",
+                        "description":  "As instituições padrão do cadastro do doador passaram a aparecer em cards com fundo verde claro.",
+                        "changes":  [
+                                        "Os cards das 4 instituições padrão receberam fundo verde claro para destacá-los na aba Cadastro do doador.",
+                                        "O destaque visual foi aplicado sem alterar o comportamento de expandir e preencher o modelo.",
+                                        "O manual do sistema foi atualizado com a orientação visual."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.622",
+                        "releaseDate":  "2026-07-13",
+                        "title":  "Salvamento do doador corrigido",
+                        "description":  "O cadastro do doador passou a tratar erros do banco com mensagem útil e corrigiu a rotina de estrutura que impedia o salvamento.",
+                        "changes":  [
+                                        "A rotina que preparava a estrutura da tabela de doadores foi corrigida para não derrubar o salvamento com SQL inválido.",
+                                        "Erros conhecidos do Prisma agora retornam mensagens mais claras, como conflito, registro não encontrado ou falha de banco.",
+                                        "O manual do sistema foi atualizado com a nova tratativa."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.621",
+                        "releaseDate":  "2026-07-13",
+                        "title":  "Instituições padrão recolhíveis",
+                        "description":  "A lista de instituições padrão no cadastro do doador passou a mostrar apenas o nome por padrão e expandir os detalhes ao clicar.",
+                        "changes":  [
+                                        "A aba Cadastro do doador agora exibe somente o nome da instituição até o usuário expandir o card.",
+                                        "Os detalhes ficam ocultos por padrão e aparecem sob clique, mantendo a tela mais limpa.",
+                                        "O atalho de preencher o cadastro continua disponível dentro de cada card expandido."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.620",
+                        "releaseDate":  "2026-07-13",
+                        "title":  "Modelos padrão no cadastro do doador",
+                        "description":  "A tela Receber doações ganhou modelos padrão para preencher o cadastro do doador com instituições conhecidas.",
+                        "changes":  [
+                                        "A aba Cadastro do doador passou a exibir 4 instituições padrão com preenchimento em um clique.",
+                                        "Os modelos incluem nome, telefone, cidade, endereço e observações quando os dados estão confirmados em canais oficiais.",
+                                        "O manual do sistema foi atualizado para refletir o novo atalho."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.619",
+                        "releaseDate":  "2026-07-13",
+                        "title":  "Bloqueio cross-origin removido",
+                        "description":  "A API passou a liberar consumo cross-origin para evitar o bloqueio NotSameOrigin no frontend.",
+                        "changes":  [
+                                        "O Helmet deixou de impor crossOriginResourcePolicy same-origin na API.",
+                                        "Chamadas do frontend para o backend em portas diferentes deixam de ser bloqueadas pelo navegador.",
+                                        "O comportamento continua protegido por CORS e autenticação."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.618",
+                        "releaseDate":  "2026-07-13",
+                        "title":  "Checkout da InfinitePay corrigido",
+                        "description":  "A geração de cobrança da licença de uso passou a usar o endpoint público correto da InfinitePay e a devolver mensagens tratáveis em caso de erro.",
+                        "changes":  [
+                                        "O adaptador passou a usar o host público atual da InfinitePay para criação e validação de checkout.",
+                                        "Falhas da integração agora retornam AppError com a mensagem da própria API ou da comunicação.",
+                                        "O manual do sistema foi atualizado com a orientação sobre a mensagem exibida."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.617",
+                        "releaseDate":  "2026-07-13",
+                        "title":  "Resumo comercial mais discreto",
+                        "description":  "O card de resumo comercial da licença de uso foi reduzido para dar mais protagonismo à chave de cobrança.",
+                        "changes":  [
+                                        "O card lateral ganhou largura menor e padding reduzido.",
+                                        "A tipografia e os blocos internos ficaram mais compactos.",
+                                        "A hierarquia visual favorece agora o seletor de cobrança no topo."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.616",
+                        "releaseDate":  "2026-07-13",
+                        "title":  "Chave de cobrança em primeiro lugar",
+                        "description":  "A tela de licença de uso passou a mostrar o card de chave de cobrança como primeiro bloco da página.",
+                        "changes":  [
+                                        "O card Chave de cobrança foi movido para o topo do conteúdo.",
+                                        "O banner comercial passou a aparecer logo abaixo do seletor de ciclo.",
+                                        "A ordem visual da página foi ajustada sem alterar a rota."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.615",
+                        "releaseDate":  "2026-07-13",
+                        "title":  "Licença de uso reconfigurada",
+                        "description":  "A tela de licença de uso foi ajustada para manter o conteúdo em coluna única e evitar desconfiguração visual.",
+                        "changes":  [
+                                        "O layout sem abas passou a usar coluna única real no grid.",
+                                        "A página de licença deixou de herdar o espaço lateral vazio do layout de abas.",
+                                        "A estrutura visual foi redimensionada para voltar a ocupar a largura correta."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.614",
+                        "releaseDate":  "2026-07-13",
+                        "title":  "Licença de uso sem aba intermediária",
+                        "description":  "A tela de licença de uso passou a abrir diretamente no conteúdo comercial ao clicar no menu.",
+                        "changes":  [
+                                        "A aba interna da licença foi removida da navegação da página.",
+                                        "Ao clicar em Licença de uso no menu, o sistema abre a tela diretamente no conteúdo.",
+                                        "O manual do sistema foi atualizado com o novo fluxo."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.613",
+                        "releaseDate":  "2026-07-13",
+                        "title":  "Clientes registrados",
+                        "description":  "A tela master de instituições passou a aparecer com o novo nome Clientes registrados no menu e no cabeçalho.",
+                        "changes":  [
+                                        "O item do menu lateral foi renomeado para Clientes registrados.",
+                                        "O título da página master foi alterado para Clientes registrados.",
+                                        "O manual do sistema foi atualizado com o novo nome da tela."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.612",
+                        "releaseDate":  "2026-07-13",
+                        "title":  "Bairros consolidados por normalização",
+                        "description":  "O ranking de bairros passou a somar nomes repetidos independentemente de caixa e padronizar a exibição do rótulo.",
+                        "changes":  [
+                                        "Bairros com o mesmo nome, mas escritos em caixa alta, caixa baixa ou capitalização inicial, agora são consolidados em uma única soma.",
+                                        "O rótulo exibido no ranking passa por formatação padronizada antes de aparecer na tela.",
+                                        "O manual do sistema foi atualizado com a orientação do novo comportamento."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.611",
+                        "releaseDate":  "2026-07-13",
+                        "title":  "Velocímetro sem ponteiro central",
+                        "description":  "A tela de indicadores passou a exibir os KPI em estilo velocímetro sem ponteiro central, preservando o valor no meio do gráfico.",
+                        "changes":  [
+                                        "O ponteiro central foi removido para não competir com o valor principal do KPI.",
+                                        "Os cards continuam no estilo velocímetro e mantêm a leitura de desempenho.",
+                                        "O ranking de bairros segue com rolagem interna e lista completa."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.610",
+                        "releaseDate":  "2026-07-13",
+                        "title":  "Indicadores com velocímetro e ponteiro",
+                        "description":  "A tela de indicadores passou a exibir os KPI principais em estilo velocímetro de carro, com ponteiro visual e ranking de bairros completo.",
+                        "changes":  [
+                                        "Os cards Beneficiários ativos, Cadastro completo e Renda média familiar receberam ponteiro visual para reforçar a leitura de desempenho.",
+                                        "O estilo passou a lembrar um velocímetro automotivo, mantendo a leitura por contagem, percentual e valor.",
+                                        "O ranking de bairros continua com rolagem interna e lista completa de bairros cadastrados."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.609",
+                        "releaseDate":  "2026-07-13",
+                        "title":  "Indicadores com medidores KPI",
+                        "description":  "A tela de indicadores passou a exibir medidores KPI nos principais cards e um ranking de bairros com rolagem completa.",
+                        "changes":  [
+                                        "Os cards Beneficiários ativos, Cadastro completo e Renda média familiar passaram a usar medidor KPI de desempenho.",
+                                        "A leitura do ranking de bairros segue com rolagem interna e mantém os 12 primeiros no topo da tela.",
+                                        "O backend continua entregando todos os bairros cadastrados para a listagem completa."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.608",
+                        "releaseDate":  "2026-07-13",
+                        "title":  "Indicadores com velocímetros e ranking completo",
+                        "description":  "A tela de indicadores ganhou velocímetros nos principais cards e um ranking de bairros com rolagem completa.",
+                        "changes":  [
+                                        "Os cards Beneficiários ativos, Cadastro completo e Renda média familiar passaram a usar velocímetro para leitura visual rápida.",
+                                        "O ranking de bairros mantém os 12 primeiros como referência e permite rolagem para consultar todos os demais bairros cadastrados.",
+                                        "O backend continua devolvendo todos os bairros para a listagem completa do card."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.607",
+                        "releaseDate":  "2026-07-13",
+                        "title":  "Ranking de bairros com rolagem completa",
+                        "description":  "A tela de indicadores passou a exibir o ranking de bairros com rolagem interna, mantendo os 12 primeiros no topo e permitindo consultar todos os bairros cadastrados.",
+                        "changes":  [
+                                        "O backend passou a devolver todos os bairros com beneficiários cadastrados, em vez de limitar o ranking a 12 itens.",
+                                        "O card Ranking de bairros agora usa rolagem interna para mostrar os bairros restantes sem perder a leitura dos primeiros colocados.",
+                                        "O gráfico de bairros continua exibindo apenas os 12 primeiros, preservando a visão resumida."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.606",
+                        "releaseDate":  "2026-07-13",
+                        "title":  "Login master preservado contra status da instituição",
+                        "description":  "O e-mail master htasistemas@gmail.com passou a acessar o sistema mesmo quando a instituição vinculada estiver bloqueada ou inativa.",
+                        "changes":  [
+                                        "A validação de acesso do backend passou a ignorar status inativo ou bloqueado para o usuário master.",
+                                        "A tela de login continua dispensando CNPJ, código ou slug para o e-mail master e agora também preserva o acesso administrativo global quando a instituição vinculada estiver indisponível.",
+                                        "Foi adicionada regressão automatizada para cobrir o login master com instituição bloqueada."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.605",
                         "releaseDate":  "2026-07-10",
                         "title":  "Autorização fora da carência corrigida",

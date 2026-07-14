@@ -297,3 +297,13 @@ export function validarPlano(plano: PlanoTrabalhoPayload, modo: "rascunho" | "en
 
   return erros;
 }
+
+export function validarPlanoParaImpressao(plano: PlanoTrabalhoPayload): PlanoErros {
+  const erros = validarPlano(plano, "envio");
+
+  if (!plano.bancoNome?.trim()) erros.bancoNome = "Informe o banco.";
+  if (!plano.bancoAgencia?.trim()) erros.bancoAgencia = "Informe a agência.";
+  if (!plano.bancoConta?.trim()) erros.bancoConta = "Informe a conta.";
+
+  return erros;
+}

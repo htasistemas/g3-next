@@ -120,7 +120,7 @@ export class DashboardService {
       repository.contarSituacaoSocialTotal(),
       repository.calcularMediaPessoas(),
       repository.listarRendasFamiliares(),
-      repository.contarBeneficiariosPorBairro(),
+      repository.contarBeneficiariosPorBairro(0),
       repository.contarVulnerabilidades(),
       repository.contarInsegurancaAlimentar(),
       repository.contarTermosAtivos(),

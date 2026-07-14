@@ -50,6 +50,7 @@ const secoesManual: ManualSecao[] = [
           "Use Configurações gerais para manter parâmetros, usuários, backup, IA e o próprio manual atualizados.",
           "Na aba Personalização, use os campos Card da visão geral e Card suave da visão geral para ajustar apenas o dashboard sem alterar o restante do tema.",
           "Na aba Personalização de Configurações gerais, ajuste a paleta para alterar as cores dos cards da tela Visão geral antes de salvar as mudanças.",
+          "Os cards iniciais da Visão geral acompanham a cor clara do padrão da unidade, como verde claro ou azul claro, de acordo com a personalização ativa.",
           "Na tela Visão geral, acompanhe também os cards de Termos vencidos, Documentos vencidos, Documentos a vencer, Motoristas autorizados, Itens no almoxarifado, Livros da biblioteca, Quantidade de veículos, Itens no patrimônio, Álbuns e fotos, Empréstimos para eventos e Catálogo e vagas de matrículas para leitura operacional rápida logo na entrada do sistema.",
           "O card Composição financeira da Visão geral exibe valores a receber, em caixa e em banco com base nos saldos e lançamentos financeiros normalizados pelo backend.",
           "O card Empréstimos para eventos mostra a quantidade de eventos ativos em andamento.",
@@ -259,6 +260,8 @@ const secoesManual: ManualSecao[] = [
         objetivo: "Registrar dados da doação, itens recebidos, recorrência e comunicação com o doador.",
         comoUsar: [
           "Preencha a aba Dados da doação e depois siga para Itens recebidos para lançar os produtos, quantidades e valores antes de concluir o registro.",
+          "Na aba Cadastro do doador, os 4 modelos padrão aparecem primeiro com o nome da instituição e expandem ao clicar para mostrar os dados institucionais já conhecidos.",
+          "Os cards das instituições padrão agora usam fundo verde claro para destacar visualmente os atalhos de preenchimento rápido.",
           "Na aba Itens recebidos, use Incluir doação e registrar entrada para salvar o registro completo com os itens já lançados e gerar a entrada no almoxarifado quando a doação for de bens de consumo.",
           "No campo Descrição dos itens recebidos, você pode reaproveitar a descrição de um produto já existente no almoxarifado; quando houver correspondência, a nova entrada soma a quantidade no mesmo item.",
           "A descrição lançada também passa por padronização visual antes de criar item novo no almoxarifado, mantendo capitalização mais limpa e consistente.",
@@ -268,6 +271,8 @@ const secoesManual: ManualSecao[] = [
           "O botão Incluir doação e registrar entrada finaliza o registro quando ele ainda estiver em rascunho para permitir a integração automática com o almoxarifado.",
           "Ao concluir a doação, o sistema agora também invalida o cache do almoxarifado para que a listagem e as movimentações reflitam os novos itens ao abrir a tela.",
           "A identificação de item existente considera diferenças de maiúsculas, minúsculas, espaços e acentos para evitar duplicidade como cesta basica e cesta básica.",
+          "Os modelos padrão do cadastro do doador já trazem nome, telefone, cidade, endereço e observações institucionais quando esses dados foram confirmados em canal oficial.",
+          "Se o cadastro do doador falhar por estrutura do banco ou regra de validação, a tela agora exibe a mensagem técnica útil retornada pelo backend em vez de mostrar apenas erro interno do servidor.",
           "O salvamento pela aba Itens recebidos não deve mais bloquear o registro por campo opcional numérico vazio no formulário principal.",
           "Quando faltar algum campo obrigatório real, o sistema continuará informando a pendência nominalmente no alerta.",
           "A tela Receber doações agora lista, abre, salva, exclui e consulta beneficiários, famílias, estoque e carência sempre dentro do tenant autenticado."
@@ -324,6 +329,9 @@ const secoesManual: ManualSecao[] = [
           "Use os filtros de data inicial e data final no topo da tela e depois clique em Visualizar para atualizar os indicadores do período.",
           "O card Faixa etária agora organiza os beneficiários por fases da vida em leitura direta: 0-12 crianças, 13-17 adolescentes, 18-29 jovens, 30-59 adultos e 60+ idosos.",
           "O gráfico Distribuição por idade continua disponível para análise detalhada por idade exata quando você precisar de leitura mais fina.",
+          "Os cards Beneficiários ativos, Cadastro completo e Renda média familiar agora usam medidor KPI em estilo velocímetro de carro, sem ponteiro central para não esconder o valor exibido no meio do gráfico.",
+          "O card Ranking de bairros exibe os 12 primeiros bairros no topo e permite rolagem para consultar os demais bairros cadastrados com a respectiva quantidade de beneficiários.",
+          "Nomes de bairro iguais com formatação diferente, como caixa alta, caixa baixa ou capitalização inicial, são consolidados em uma única soma antes da exibição.",
           "Use Atualizar para recarregar os dados sem sair da tela quando houver novos cadastros ou mudanças recentes no período."
         ],
         atencoes: [
@@ -378,12 +386,15 @@ const secoesManual: ManualSecao[] = [
       },
       {
         nome: "Controle de veículos",
-        objetivo: "Gerenciar cadastro de veículos, mapa de bordo, locais de destino e motoristas autorizados.",
+        objetivo: "Gerenciar cadastro de veículos, mapa de bordo, locais de destino, motoristas autorizados e disponibilidade da frota.",
         comoUsar: [
           "Use a aba Cadastro de veículo para registrar placa, modelo, marca, dados do veículo, foto e documento em PDF.",
           "Na aba Listagem de veículos, selecione um item da lista para visualizar o resumo completo e usar a ação Editar veículo.",
           "Na aba Mapa de bordo, registre saídas, chegadas, condutor, destino e quilometragem do deslocamento. O campo Data abre preenchido com a data atual e não permite edição manual.",
           "Ao usar a ação Imprimir mapa de bordo, informe o veículo, a data inicial e a data final do período desejado para gerar o relatório.",
+          "Na aba Disponibilidade de veículos, consulte a frota por data e hora, cadastre reservas ou indisponibilidades e abra a agenda filtrada do veículo selecionado.",
+          "A consulta de disponibilidade identifica automaticamente veículos disponíveis, reservados ou indisponíveis e mostra a próxima liberação quando houver bloqueio contínuo.",
+          "Ao cadastrar uma reserva ou indisponibilidade, use somente os veículos ativos do tenant autenticado e selecione sempre Reserva ou Indisponível; a opção Disponível é calculada pelo sistema.",
           "Na aba Locais de destino, mantenha os endereços de referência organizados para reaproveitar no mapa de bordo.",
           "Na aba Motoristas autorizados, selecione se a origem é Profissional ou Voluntário, digite ao menos duas letras e escolha o cadastro correspondente para vincular o condutor ao veículo.",
           "Na listagem de Motoristas autorizados, cada motorista aparece uma única vez, com os veículos autorizados consolidados no mesmo registro e a categoria da carteira visível na tabela.",
@@ -391,11 +402,12 @@ const secoesManual: ManualSecao[] = [
         ],
         atencoes: [
           "Na aba Dashboard, a barra superior usa ações próprias do painel e o botão Abrir cadastro de veículo leva diretamente ao cadastro.",
+          "No painel da visão geral da frota, o botão Abrir agenda de disponibilidade leva para a nova aba Disponibilidade de veículos com a consulta semanal como referência inicial.",
           "Na aba Listagem de veículos, a ação principal da barra superior passa a ser Editar veículo, evitando confusão com o salvamento do cadastro.",
           "Os botões da barra superior foram compactados e balanceados em largura para respeitar melhor o espaço do card e não avançar sobre o título da tela.",
           "A busca de Motoristas autorizados usa diretamente os cadastros de profissionais e voluntários, evitando duplicidade de cadastro de condutores.",
           "A impressão do mapa de bordo é gerada no próprio navegador sem abrir aba auxiliar, respeita o período informado no modal de impressão e segue o padrão institucional do G3N com nome da instituição, logomarca de relatório e rodapé oficial da unidade.",
-          "A tela Controle de veículos agora lista, cadastra, atualiza e exclui veículos, diário de bordo, locais de destino e motoristas autorizados sempre dentro do tenant autenticado, impedindo mistura de dados entre instituições."
+          "A tela Controle de frotas agora lista, cadastra, atualiza e exclui veículos, diário de bordo, locais de destino e motoristas autorizados sempre dentro do tenant autenticado, impedindo mistura de dados entre instituições."
         ]
       },
       {
@@ -611,11 +623,14 @@ const secoesManual: ManualSecao[] = [
           "Use a listagem para localizar rapidamente os termos já cadastrados e abrir o registro completo para edição ou consulta.",
           "Ao cadastrar um termo, informe número, tipo, órgão concedente, vigência, situação, objeto, valor global e responsável interno.",
           "Use os aditivos para registrar alterações de prazo, valor ou condição do instrumento sem perder o histórico do termo principal.",
-          "Os documentos relacionados e anexos de aditivos ficam vinculados ao termo para manter a organização documental do processo."
+          "Os documentos relacionados e anexos de aditivos ficam vinculados ao termo para manter a organização documental do processo.",
+          "Use Duplicar termo para criar uma nova cópia a partir de um termo existente, preservando os dados base e reiniciando o número e os aditivos.",
+          "Quando o termo estiver completo, a ação Imprimir libera o relatório em layout oficial com dados gerais, documento principal, documentos relacionados e aditivos."
         ],
         atencoes: [
           "A tela Termo de fomento agora lista, abre, cadastra, atualiza, exclui termos, aditivos e documentos sempre dentro do tenant autenticado, impedindo mistura de instrumentos entre instituições.",
-          "Aditivos e documentos permanecem vinculados apenas ao termo da instituição logada e não podem ser acessados por outro tenant."
+          "Aditivos e documentos permanecem vinculados apenas ao termo da instituição logada e não podem ser acessados por outro tenant.",
+          "A impressão bloqueia a saída quando faltam dados obrigatórios ou o documento principal não está preenchido."
         ]
       },
       {
@@ -624,11 +639,15 @@ const secoesManual: ManualSecao[] = [
         comoUsar: [
           "Use a barra superior da tela conforme a aba atual: cada etapa mostra apenas os botões de ação que fazem sentido para aquele conteúdo.",
           "Na aba Anexos, por exemplo, aparecem ações de documento, PDF, impressão e exportação; nas abas sem anexo esse botão não é exibido.",
+          "Na aba Dados da instituição, selecione uma unidade assistencial cadastrada para preencher automaticamente razão social, endereço, contato e representante quando houver dados disponíveis.",
+          "No card Dados bancários, selecione uma conta bancária cadastrada para reaproveitar banco, agência, conta, Pix e observações estruturadas no próprio plano.",
+          "Quando o plano estiver completo para envio e os dados bancários essenciais estiverem preenchidos, a barra superior libera a ação de gerar PDF e imprimir no layout oficial do sistema.",
           "Os botões do topo continuam organizados em grade responsiva para não invadir o título da tela e facilitar a leitura em resoluções menores e maiores."
         ],
         atencoes: [
           "Os botões continuam executando em um clique e respeitam bloqueio temporário durante processamentos para evitar acionamento duplo.",
           "A tela Plano de trabalho agora lista, abre, cadastra, atualiza e exclui planos sempre dentro do tenant autenticado, impedindo mistura de dados entre instituições.",
+          "O preenchimento automático usa os dados já cadastrados na unidade assistencial e na conta bancária; campos sem origem equivalente permanecem editáveis manualmente.",
           "Metas, etapas, aplicação de recursos, desembolso e checklist de prestação seguem vinculados apenas aos planos da instituição logada.",
           "Se uma ação estiver desabilitada, revise o status do plano e os campos mínimos obrigatórios antes de tentar novamente."
         ]
@@ -1104,12 +1123,14 @@ const secoesManual: ManualSecao[] = [
         nome: "Licença de uso",
         objetivo: "Apresentar os planos comerciais do G3N em formato de página de vendas e permitir contratação com simulação, vigência e histórico financeiro no mesmo fluxo.",
         comoUsar: [
+          "Ao clicar em Licença de uso no menu, a página abre direto no conteúdo comercial, sem etapa intermediária de escolha de aba.",
           "Use o topo comercial da página para comparar os planos, entender o posicionamento de cada faixa e acionar demonstração ou WhatsApp.",
           "Os valores mensais vigentes exibidos nos cards são: Essencial R$ 397,00, Profissional R$ 697,00, Premium R$ 997,00 e Enterprise R$ 1.497,00.",
           "Alterne entre mensal e anual para visualizar economia e custo-benefício antes de definir o plano.",
           "Consulte os cards comerciais, o comparativo entre planos, a seção Para quem é, os benefícios e o FAQ para apoiar a decisão.",
           "Ao escolher o plano e a data inicial do contrato, o sistema calcula automaticamente a vigência e prepara a contratação.",
           "Use Gerar cobrança para criar o checkout e acompanhar os quadros de pagamentos pendentes e realizados.",
+          "Se a InfinitePay recusar a requisição ou houver falha de comunicação, o sistema mostra a mensagem técnica retornada pela integração em vez de erro interno genérico.",
           "Os alertas de vencimento usam automaticamente o e-mail cadastrado na unidade assistencial principal."
         ],
         atencoes: [
@@ -1192,10 +1213,10 @@ const secoesManual: ManualSecao[] = [
         ]
       },
       {
-        nome: "Instituições do sistema",
+        nome: "Painel master",
         objetivo: "Administrar os tenants do G3N em base PostgreSQL compartilhada, com identificação por instituição e operação exclusiva para superadmin.",
         comoUsar: [
-          "Use a tela Instituições do sistema para cadastrar cada cliente do G3N como um tenant separado, com CNPJ, slug, plano, status e contato principal.",
+          "Use o menu Painel master > Clientes registrados para cadastrar cada cliente do G3N como um tenant separado, com CNPJ, slug, plano, status e contato principal.",
           "Na listagem, pesquise por razão social, nome fantasia, CNPJ, slug, código da instituição ou e-mail e clique na linha para abrir o tenant.",
           "Na aba Cadastro do tenant, revise os dados da instituição, plano contratado, identidade visual e status operacional antes de salvar.",
           "Ao atualizar o e-mail principal de um tenant já existente na aba Cadastro do tenant, o sistema sincroniza esse endereço com o administrador inicial principal para preservar o acesso ao login da instituição.",
@@ -1204,11 +1225,14 @@ const secoesManual: ManualSecao[] = [
           "O administrador inicial criado nessa etapa já nasce com acesso administrativo efetivo no tenant, inclusive à tela de usuários e às permissões compatíveis com o perfil administrativo.",
           "O salvamento de um tenant novo com Administração inicial agora prepara antes a estrutura de usuários e permissões necessária no backend, evitando falha interna do servidor ao concluir o cadastro.",
           "O login e o e-mail do administrador inicial passaram a respeitar unicidade por tenant, sem bloquear o cadastro apenas porque o mesmo endereço já existe em outra instituição.",
+          "Na tela de login, quando o usuário informar apenas o e-mail e a senha, o sistema tenta identificar automaticamente a instituição do acesso se esse e-mail for exclusivo de um único tenant.",
+          "Se o mesmo e-mail existir em mais de um cliente, o sistema pede CNPJ, código ou slug para evitar autenticação no tenant errado.",
           "Quando o tenant já existir, use a aba Administração inicial para redefinir a senha provisória do administrador e forçar troca no próximo login.",
           "Ao redefinir a senha do administrador pela tela master, o sistema também reativa esse usuário e zera as tentativas inválidas de login.",
           "Use a ação Desbloquear acesso para reativar uma instituição bloqueada e liberar, em um clique, todos os usuários bloqueados daquele tenant por tentativas inválidas.",
           "A tela de login do sistema agora aceita CNPJ da instituição e e-mail do usuário; quando houver subdomínio configurado, o sistema identifica automaticamente a instituição pelo endereço.",
-          "O e-mail master htasistemas@gmail.com pode entrar na tela de login mesmo sem informar CNPJ, código ou slug; se houver um CNPJ digitado, o sistema desconsidera esse filtro para preservar o acesso administrativo global.",
+          "Quando o usuário informa CNPJ, slug ou código incorreto na autenticação, o sistema agora diferencia se o problema está na instituição localizada ou apenas na senha digitada.",
+          "O e-mail master htasistemas@gmail.com pode entrar na tela de login mesmo sem informar CNPJ, código ou slug; se houver um CNPJ digitado, o sistema desconsidera esse filtro e também ignora status bloqueado ou inativo da instituição vinculada para preservar o acesso administrativo global.",
           "O campo Senha da tela de login agora possui botão de visualizar ou ocultar a senha digitada no mesmo clique, facilitando a conferência antes de entrar.",
           "A autenticação da tela de login ocorre primeiro e o carregamento da rota seguinte acontece em segundo plano, sem bloquear o acesso caso o pré-carregamento da página falhe.",
           "Na recuperação de senha da tela de login, o sistema passou a considerar também a instituição informada no acesso, evitando redefinir senha em tenant incorreto quando houver e-mails iguais em bases diferentes.",
@@ -1217,7 +1241,7 @@ const secoesManual: ManualSecao[] = [
           "Os cards de dados da instituição e de apresentação do Sistema G3 na lateral direita também passaram a ficar sem vão entre si, formando um bloco visual contínuo, sem empurrar o card institucional para o rodapé.",
           "A foto lateral do login voltou a usar altura maior para ganhar mais presença visual na composição desktop.",
           "A altura da foto lateral foi ampliada novamente para ocupar mais área vertical no desktop, conforme ajuste visual da tela de acesso.",
-          "O usuário administrativo padrão htasistemas@gmail.com é tratado como superadmin master no acesso SaaS e pode abrir a tela Instituições do sistema mesmo sem depender de configuração manual adicional.",
+          "O usuário administrativo padrão htasistemas@gmail.com é tratado como superadmin master no acesso SaaS e pode abrir a tela Clientes registrados mesmo sem depender de configuração manual adicional.",
           "No topo principal do sistema, o cabeçalho passou a exibir nome da instituição e nome do usuário, sem mostrar o plano contratado.",
           "Ao entrar com outra instituição, a unidade principal atual, a logomarca do topo e os dados da visão geral passam a ser recarregados por tenant, evitando reaproveitar cache ou identidade visual da instituição anterior.",
           "A API de unidades assistenciais agora exige o tenant autenticado em leitura e escrita, impedindo que um CNPJ carregue a unidade principal, a logomarca ou os dados institucionais de outro cliente.",

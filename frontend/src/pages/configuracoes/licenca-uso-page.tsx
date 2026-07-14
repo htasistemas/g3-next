@@ -13,7 +13,7 @@ import {
   ShieldCheck,
   Sparkles
 } from "lucide-react";
-import { AdminPageLayout, type AdminTab } from "@/components/admin/admin-page-layout";
+import { AdminPageLayout } from "@/components/admin/admin-page-layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,8 +40,6 @@ import type {
   LicencaUsoPlanoId,
   LicencaUsoResponse
 } from "@/types/licenca-uso";
-
-const abas: AdminTab[] = [{ id: "licenca", label: "Licença de uso", icon: ShieldCheck }];
 
 const configuracaoInicial: LicencaUsoConfiguracao = {
   planoId: "profissional",
@@ -232,7 +230,6 @@ function SectionHeader({
 
 export function LicencaUsoPage() {
   const { usuario } = useAuth();
-  const [abaAtiva, setAbaAtiva] = useState("licenca");
   const [config, setConfig] = useState<LicencaUsoConfiguracao>(configuracaoInicial);
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
@@ -394,9 +391,6 @@ export function LicencaUsoPage() {
 
   return (
     <AdminPageLayout
-      tabs={abas}
-      activeTab={abaAtiva}
-      onChangeTab={(tabId) => setAbaAtiva(tabId)}
       sectionLabel="Configurações gerais"
       pageTitle="Licença de uso"
       activeTitle="Licença de uso"
@@ -418,8 +412,53 @@ export function LicencaUsoPage() {
       ]}
     >
       <div className="space-y-6 pb-6" style={{ fontFamily: "Arial, Helvetica, sans-serif" }}>
+        <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+          <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+            <SectionHeader
+              eyebrow="Chave de cobrança"
+              titulo="Defina como a instituição prefere contratar"
+              descricao="Escolha entre mensal e anual para visualizar o investimento da forma mais estratégica para a sua instituição."
+            />
+
+            <div className="space-y-3 rounded-[28px] border border-slate-200 bg-slate-50 p-4 xl:w-[420px]">
+              <div className="grid grid-cols-2 gap-2">
+                {(["mensal", "anual"] as const).map((ciclo) => {
+                  const ativo = cicloComercial === ciclo;
+                  return (
+                    <button
+                      key={ciclo}
+                      type="button"
+                      onClick={() => atualizarCiclo(ciclo)}
+                      className={`rounded-2xl px-4 py-3 text-left transition ${
+                        ativo
+                          ? "bg-slate-950 text-white shadow-lg"
+                          : "border border-slate-200 bg-white text-slate-700"
+                      }`}
+                    >
+                      <p className="font-semibold">{ciclo === "anual" ? "Anual" : "Mensal"}</p>
+                      <p className={`text-xs ${ativo ? "text-slate-300" : "text-slate-500"}`}>
+                        {ciclo === "anual" ? "Mais previsibilidade" : "Mais flexibilidade"}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                <p className="font-semibold">
+                  {cicloComercial === "anual"
+                    ? economiaAnualTexto
+                    : "Melhor custo-benefício para instituições que desejam previsibilidade"}
+                </p>
+                <p className="mt-1">
+                  No anual, a implantação fica grátis e o custo mensal equivalente se torna mais competitivo.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section className="overflow-hidden rounded-[36px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,#f5f0de_0,#ffffff_38%,#ecf7f2_100%)]">
-          <div className="grid gap-8 p-6 md:p-8 xl:grid-cols-[minmax(0,1.25fr)_380px]">
+          <div className="grid gap-8 p-6 md:p-8 xl:grid-cols-[minmax(0,1.5fr)_300px]">
             <div className="space-y-6">
               <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/85 px-4 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">
                 <Sparkles className="h-4 w-4 text-[var(--g3-active)]" />
@@ -479,104 +518,59 @@ export function LicencaUsoPage() {
               </div>
             </div>
 
-            <div className="rounded-[32px] border border-emerald-900/20 bg-[linear-gradient(180deg,#0f766e_0%,#0b5d56_100%)] p-6 text-white shadow-2xl shadow-emerald-200/70">
+            <div className="rounded-[28px] border border-emerald-900/20 bg-[linear-gradient(180deg,#0f766e_0%,#0b5d56_100%)] p-4 text-white shadow-lg shadow-emerald-200/70">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-100/80">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-emerald-100/80">
                     Resumo comercial
                   </p>
-                  <p className="mt-2 text-2xl font-semibold">{planoAtivo.nome}</p>
+                  <p className="mt-1.5 text-xl font-semibold">{planoAtivo.nome}</p>
                 </div>
-                <ShieldCheck className="h-9 w-9 text-emerald-300" />
+                <ShieldCheck className="h-8 w-8 text-emerald-300" />
               </div>
 
-              <div className="mt-6 space-y-4">
-                <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                  <p className="text-sm text-emerald-100/85">Instituição vinculada</p>
-                  <p className="mt-2 text-lg font-semibold text-white">
+              <div className="mt-4 space-y-3">
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                  <p className="text-xs text-emerald-100/85">Instituição vinculada</p>
+                  <p className="mt-1.5 text-base font-semibold text-white">
                     {unidadeAtualData?.unidade?.nome_fantasia || config.instituicaoNome || "Não informada"}
                   </p>
-                  <p className="mt-1 text-sm text-emerald-50/80">{cnpjAtual || "CNPJ não localizado no registro"}</p>
+                  <p className="mt-1 text-xs text-emerald-50/80">{cnpjAtual || "CNPJ não localizado no registro"}</p>
                 </div>
 
-                <div className="grid gap-3 rounded-3xl border border-white/10 bg-white/5 p-4 text-sm">
+                <div className="grid gap-2 rounded-2xl border border-white/10 bg-white/5 p-3 text-sm">
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-emerald-100/85">Status da licença</span>
+                    <span className="text-xs text-emerald-100/85">Status da licença</span>
                     <Badge variant={config.statusLicenca === "vencida" ? "danger" : "default"}>
                       {statusTexto(config.statusLicenca)}
                     </Badge>
                   </div>
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-emerald-100/85">Ciclo contratado</span>
-                    <span>{cicloComercial === "anual" ? "Anual" : "Mensal"}</span>
+                    <span className="text-xs text-emerald-100/85">Ciclo contratado</span>
+                    <span className="text-xs">{cicloComercial === "anual" ? "Anual" : "Mensal"}</span>
                   </div>
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-emerald-100/85">Cobrança do ciclo</span>
-                    <span>{moeda(config.valorCobranca)}</span>
+                    <span className="text-xs text-emerald-100/85">Cobrança do ciclo</span>
+                    <span className="text-xs">{moeda(config.valorCobranca)}</span>
                   </div>
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-emerald-100/85">Vigência calculada</span>
-                    <span>{vigenciaCalculadaDias} dias</span>
+                    <span className="text-xs text-emerald-100/85">Vigência calculada</span>
+                    <span className="text-xs">{vigenciaCalculadaDias} dias</span>
                   </div>
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-emerald-100/85">Data final prevista</span>
-                    <span>{formatarData(dataFimPrevista)}</span>
+                    <span className="text-xs text-emerald-100/85">Data final prevista</span>
+                    <span className="text-xs">{formatarData(dataFimPrevista)}</span>
                   </div>
                   <div className="h-px bg-white/10" />
-                  <div className="flex items-center justify-between gap-3 text-base font-semibold">
+                  <div className="flex items-center justify-between gap-3 text-sm font-semibold">
                     <span>Total desta contratação</span>
                     <span>{moeda(totalHoje)}</span>
                   </div>
                 </div>
 
-                <div className="rounded-3xl border border-emerald-400/20 bg-emerald-400/10 p-4 text-sm leading-6 text-emerald-100">
+                <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-3 text-xs leading-5 text-emerald-100">
                   O G3N transmite mais organização, melhora a gestão diária e fortalece a apresentação de resultados para direção, equipe e parceiros.
                 </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm md:p-8">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-            <SectionHeader
-              eyebrow="Chave de cobrança"
-              titulo="Defina como a instituição prefere contratar"
-              descricao="Escolha entre mensal e anual para visualizar o investimento da forma mais estratégica para a sua instituição."
-            />
-
-            <div className="space-y-3 rounded-[28px] border border-slate-200 bg-slate-50 p-4 xl:w-[420px]">
-              <div className="grid grid-cols-2 gap-2">
-                {(["mensal", "anual"] as const).map((ciclo) => {
-                  const ativo = cicloComercial === ciclo;
-                  return (
-                    <button
-                      key={ciclo}
-                      type="button"
-                      onClick={() => atualizarCiclo(ciclo)}
-                      className={`rounded-2xl px-4 py-3 text-left transition ${
-                        ativo
-                          ? "bg-slate-950 text-white shadow-lg"
-                          : "border border-slate-200 bg-white text-slate-700"
-                      }`}
-                    >
-                      <p className="font-semibold">{ciclo === "anual" ? "Anual" : "Mensal"}</p>
-                      <p className={`text-xs ${ativo ? "text-slate-300" : "text-slate-500"}`}>
-                        {ciclo === "anual" ? "Mais previsibilidade" : "Mais flexibilidade"}
-                      </p>
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-                <p className="font-semibold">
-                  {cicloComercial === "anual"
-                    ? economiaAnualTexto
-                    : "Melhor custo-benefício para instituições que desejam previsibilidade"}
-                </p>
-                <p className="mt-1">
-                  No anual, a implantação fica grátis e o custo mensal equivalente se torna mais competitivo.
-                </p>
               </div>
             </div>
           </div>

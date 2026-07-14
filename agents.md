@@ -20,6 +20,12 @@
 - Frontend (UI): Português Brasil (pt-BR) com acentuação correta.
 - Backend (código e banco): identificadores sem acentos.
 
+### Versionamento e Git
+
+- MUST NOT fazer `commit` ou `push` automaticamente.
+- MUST only executar `commit` ou `push` mediante ordem explícita do usuário.
+- MUST manter alterações locais preparadas e aguardando confirmação quando houver necessidade de versionamento remoto.
+
 ### UX e Interação
 
 - Toda ação deve funcionar com 1 clique.

@@ -407,8 +407,8 @@ export function MasterInstituicoesPage() {
         activeTab={activeTab}
         onChangeTab={(tabId) => setActiveTab(tabId as TabId)}
         actions={actions}
-        sectionLabel="Configurações gerais"
-        pageTitle="Instituições do sistema"
+        sectionLabel="Painel master"
+        pageTitle="Clientes registrados"
         activeTitle={
           activeTab === "listagem"
             ? "Listagem de tenants"

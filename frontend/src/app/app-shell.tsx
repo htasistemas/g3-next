@@ -106,10 +106,23 @@ const comparadorItensMenu = new Intl.Collator("pt-BR", {
   numeric: true
 });
 
-function ordenarItensMenu<T extends { label: string }>(itens: T[]) {
-  return [...itens].sort((itemA, itemB) =>
-    comparadorItensMenu.compare(itemA.label.trim(), itemB.label.trim())
-  );
+function ordenarItensMenu<T extends { label: string; id?: string }>(itens: T[]) {
+  const prioridadesDashboard = new Map([
+    ["dashboard-visao-geral", 0],
+    ["dashboard-indicadores", 1],
+    ["dashboard-vulnerabilidade", 2],
+    ["dashboard-power-bi", 3]
+  ]);
+
+  return [...itens].sort((itemA, itemB) => {
+    const prioridadeA = prioridadesDashboard.get(itemA.id ?? "") ?? Number.POSITIVE_INFINITY;
+    const prioridadeB = prioridadesDashboard.get(itemB.id ?? "") ?? Number.POSITIVE_INFINITY;
+    if (prioridadeA !== prioridadeB) {
+      return prioridadeA - prioridadeB;
+    }
+
+    return comparadorItensMenu.compare(itemA.label.trim(), itemB.label.trim());
+  });
 }
 
 function listarRotasMenuParaPrecarregar(secoes: MenuSection[], rotaAtual: string) {
@@ -305,7 +318,7 @@ export const menuSections: MenuSection[] = [
       {
         id: "setor-administrativo-controle-veiculos",
         to: "/setor-administrativo/controle-veiculos",
-        label: "Controle de veículos",
+        label: "Controle de frotas",
         icon: CarFront
       },
       {
@@ -601,12 +614,21 @@ export const menuSections: MenuSection[] = [
         label: "Usuários",
         icon: UsersRound,
         requiredPermissions: ["ADMINISTRADOR"]
-      },
+      }
+    ]
+  },
+  {
+    id: "painel-master",
+    secao: "Painel master",
+    icon: ShieldCheck,
+    requiredPermissions: ["MASTER_ADMIN"],
+    itens: [
       {
-        id: "configuracoes-master-instituicoes",
+        id: "painel-master-clientes-registrados",
         to: "/configuracoes/master-instituicoes",
-        label: "Instituições do sistema",
-        icon: Building2
+        label: "Clientes registrados",
+        icon: Building2,
+        requiredPermissions: ["MASTER_ADMIN"]
       }
     ]
   }
@@ -648,7 +670,7 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/configuracoes/chamado-tecnico")) return "Chamado técnico";
   if (pathname.startsWith("/configuracoes/licenca-uso")) return "Licença de uso";
   if (pathname.startsWith("/configuracoes/manual-do-sistema")) return "Manual do sistema";
-  if (pathname.startsWith("/configuracoes/master-instituicoes")) return "Instituições do sistema";
+  if (pathname.startsWith("/configuracoes/master-instituicoes")) return "Clientes registrados";
   if (pathname.startsWith("/configuracoes/pesquise-na-ia")) return "Pergunte à IA";
   if (pathname.startsWith("/configuracoes/sobre-o-sistema")) return "Sobre o sistema";
   if (pathname.startsWith("/configuracoes/mensagens-personalizadas")) return "Mensagens personalizadas";
@@ -657,7 +679,7 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/setor-vendas/historico")) return "Histórico de vendas";
   if (pathname.startsWith("/setor-rh/registro-ponto")) return "Registro de ponto";
   if (pathname.startsWith("/setor-administrativo/almoxarifado")) return "Almoxarifado";
-  if (pathname.startsWith("/setor-administrativo/controle-veiculos")) return "Controle de veículos";
+  if (pathname.startsWith("/setor-administrativo/controle-veiculos")) return "Controle de frotas";
   if (pathname.startsWith("/setor-administrativo/emprestimo-eventos")) return "Empréstimos para eventos";
   if (pathname.startsWith("/setor-administrativo/fotos-eventos")) return "Fotos de eventos";
   if (pathname.startsWith("/setor-administrativo/projetos")) return "Projetos";
@@ -764,16 +786,12 @@ export function AppShell() {
         ...secao,
         itens: ordenarItensMenu(
           secao.itens.filter((item) => {
-            const emailAdminPadrao = usuario?.nomeUsuario?.trim().toLowerCase() === "htasistemas@gmail.com";
-            if (item.id === "configuracoes-master-instituicoes" && !usuario?.is_superadmin && !emailAdminPadrao) {
-              return false;
-            }
             return possuiPermissao(item.requiredPermissions);
           })
         )
       }))
       .filter((secao) => secao.itens.length > 0);
-  }, [possuiPermissao, usuario?.is_superadmin, usuario?.nomeUsuario]);
+  }, [possuiPermissao]);
 
   const secaoAtivaId = useMemo(() => {
     for (const secao of menuSectionsVisiveis) {

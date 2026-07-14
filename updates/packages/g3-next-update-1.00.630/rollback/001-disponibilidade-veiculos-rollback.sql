@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS controle_veiculos_disponibilidade_historico;
+DROP TABLE IF EXISTS controle_veiculos_disponibilidade;

@@ -20,7 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { AdminPageLayout, type AdminAction, type AdminTab } from "@/components/admin/admin-page-layout";
 import { PopupConfirmacao, PopupMensagem, type PopupMensagemState } from "@/components/admin/admin-popups";
-import { imprimirConteudoAtual } from "@/lib/report-utils";
+import { gerarHtmlTermoFomento } from "@/features/termos-fomento/termo-fomento-report";
 import {
   useAdicionarAditivoTermoFomento,
   useExcluirTermoFomento,
@@ -28,12 +28,22 @@ import {
   useTermosFomento
 } from "@/features/termos-fomento/use-termos-fomento";
 import type { AditivoTermoFomento, TermoDocumento, TermoFomentoPayload } from "@/types/termo-fomento";
+import {
+  clonarTermoFomento,
+  validarTermoFomento,
+  validarTermoFomentoParaImpressao
+} from "@/features/termos-fomento/termo-fomento-utils";
+
+function CampoErro({ texto }: { texto?: string }) {
+  if (!texto) return null;
+  return <p className="text-xs text-red-600">{texto}</p>;
+}
 
 type AbaId = "listagem" | "dadosGerais" | "documentos" | "aditivos";
 
 const abas: AdminTab[] = [
-  { id: "listagem", label: "Listagem De Termos", icon: List },
-  { id: "dadosGerais", label: "Dados Gerais", icon: FileSignature },
+  { id: "listagem", label: "Listagem de termos", icon: List },
+  { id: "dadosGerais", label: "Dados gerais", icon: FileSignature },
   { id: "documentos", label: "Documentos", icon: Files },
   { id: "aditivos", label: "Aditivos", icon: FilePlus2 }
 ];
@@ -67,6 +77,7 @@ export function TermoFomentoPage() {
   const [novoDocumento, setNovoDocumento] = useState<TermoDocumento>(documentoVazio);
   const [popup, setPopup] = useState<PopupMensagemState | null>(null);
   const [confirmarExclusao, setConfirmarExclusao] = useState(false);
+  const [erros, setErros] = useState<Record<string, string>>({});
 
   const termosQuery = useTermosFomento();
   const salvarMutation = useSalvarTermoFomento();
@@ -85,11 +96,13 @@ export function TermoFomentoPage() {
 
   const processando =
     salvarMutation.isPending || excluirMutation.isPending || adicionarAditivoMutation.isPending;
+  const termoCompletoParaImpressao = Object.keys(validarTermoFomentoParaImpressao(form)).length === 0;
 
   function novo() {
     setTermoIdSelecionado(undefined);
     setForm(termoVazio);
     setSnapshot(termoVazio);
+    setErros({});
     setNovoAditivo(aditivoVazio);
     setNovoDocumento(documentoVazio);
     setAbaAtiva("dadosGerais");
@@ -99,26 +112,30 @@ export function TermoFomentoPage() {
     const termo = termos.find((item) => item.id === id);
     if (!termo) return;
     const normalizado: TermoFomentoPayload = {
-      ...termo,
+      ...clonarTermoFomento(termo),
       documentosRelacionados: termo.documentosRelacionados ?? [],
       aditivos: termo.aditivos ?? []
     };
     setTermoIdSelecionado(termo.id);
     setForm(normalizado);
     setSnapshot(normalizado);
+    setErros({});
     setAbaAtiva("dadosGerais");
   }
 
   function cancelar() {
-    setForm(snapshot);
+    setForm(clonarTermoFomento(snapshot));
+    setErros({});
   }
 
   async function salvar() {
-    if (!form.numeroTermo?.trim() || !form.tipoTermo || !form.situacao) {
+    const novosErros = validarTermoFomento(form, "rascunho");
+    setErros(novosErros);
+    if (Object.keys(novosErros).length) {
       setPopup({
         tipo: "aviso",
         titulo: "Validação",
-        texto: "Preencha número do termo, tipo e situação."
+        texto: "Revise os campos obrigatórios antes de salvar."
       });
       return;
     }
@@ -134,6 +151,7 @@ export function TermoFomentoPage() {
       setTermoIdSelecionado(response.id);
       setForm(response);
       setSnapshot(response);
+      setErros({});
       setPopup({ tipo: "sucesso", titulo: "Confirmação", texto: "Termo salvo com sucesso." });
     } catch (error: any) {
       setPopup({
@@ -228,11 +246,60 @@ export function TermoFomentoPage() {
     }));
   }
 
+  function duplicarTermo() {
+    const duplicado = clonarTermoFomento(form);
+    duplicado.id = undefined;
+    duplicado.numeroTermo = "";
+    duplicado.situacao = "Ativo";
+    duplicado.aditivos = [];
+    setTermoIdSelecionado(undefined);
+    setForm(duplicado);
+    setSnapshot(clonarTermoFomento(duplicado));
+    setErros({});
+    setAbaAtiva("dadosGerais");
+    setPopup({
+      tipo: "sucesso",
+      titulo: "Termo duplicado",
+      texto: "A cópia foi preparada para salvar como novo termo."
+    });
+  }
+
+  function imprimirTermo() {
+    const faltantes = validarTermoFomentoParaImpressao(form);
+    setErros(faltantes);
+    if (Object.keys(faltantes).length) {
+      setPopup({
+        tipo: "aviso",
+        titulo: "Termo incompleto",
+        texto: "Complete os dados obrigatórios e o documento principal antes de imprimir."
+      });
+      return;
+    }
+    const janela = window.open("", "_blank", "noopener,noreferrer,width=960,height=900");
+    if (!janela) {
+      setPopup({
+        tipo: "aviso",
+        titulo: "Pop-up bloqueado",
+        texto: "Libere a abertura de janelas para gerar a impressão do termo."
+      });
+      return;
+    }
+    janela.document.write(gerarHtmlTermoFomento(form));
+    janela.document.close();
+  }
+
   const acoes: AdminAction[] = [
     { label: "Buscar", icon: Search, onClick: () => setAbaAtiva("listagem"), variant: "outline" },
     { label: "Novo", icon: Plus, onClick: novo, variant: "default", disabled: processando },
     { label: "Salvar", icon: Save, onClick: () => void salvar(), variant: "default", disabled: processando },
     { label: "Cancelar", icon: Undo2, onClick: cancelar, variant: "outline", disabled: processando },
+    {
+      label: "Duplicar termo",
+      icon: FilePlus2,
+      onClick: duplicarTermo,
+      variant: "outline",
+      disabled: processando || !form.numeroTermo
+    },
     {
       label: "Excluir",
       icon: Trash2,
@@ -243,18 +310,9 @@ export function TermoFomentoPage() {
     {
       label: "Imprimir",
       icon: Printer,
-      onClick: () => {
-        try {
-          imprimirConteudoAtual({ titulo: "Termo de fomento" });
-        } catch (error: any) {
-          setPopup({
-            tipo: "erro",
-            titulo: "Erro",
-            texto: error?.message ?? "Não foi possível preparar a impressão."
-          });
-        }
-      },
-      variant: "outline"
+      onClick: imprimirTermo,
+      variant: "outline",
+      disabled: !termoCompletoParaImpressao
     },
     { label: "Fechar", icon: X, onClick: () => navigate("/dashboard/visao-geral"), variant: "outline" }
   ];
@@ -276,7 +334,7 @@ export function TermoFomentoPage() {
             <div className="space-y-1">
               <Label>Pesquisar termo</Label>
               <Input
-                placeholder="número, Órgão concedente ou situação"
+                placeholder="Número, órgão concedente ou situação"
                 value={filtro}
                 onChange={(event) => setFiltro(event.target.value)}
               />
@@ -285,10 +343,10 @@ export function TermoFomentoPage() {
               <table className="min-w-full text-sm">
                 <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]">
                   <tr>
-                    <th className="px-3 py-2 text-left">número</th>
+                    <th className="px-3 py-2 text-left">Número</th>
                     <th className="px-3 py-2 text-left">Tipo</th>
                     <th className="px-3 py-2 text-left">Órgão concedente</th>
-                    <th className="px-3 py-2 text-left">situação</th>
+                    <th className="px-3 py-2 text-left">Situação</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -329,13 +387,14 @@ export function TermoFomentoPage() {
         {abaAtiva === "dadosGerais" ? (
           <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <div className="space-y-1">
-              <Label>número do termo *</Label>
+              <Label>Número do termo *</Label>
               <Input
                 value={form.numeroTermo}
                 onChange={(event) =>
                   setForm((atual) => ({ ...atual, numeroTermo: event.target.value }))
                 }
               />
+              <CampoErro texto={erros.numeroTermo} />
             </div>
             <div className="space-y-1">
               <Label>Tipo do termo *</Label>
@@ -349,9 +408,10 @@ export function TermoFomentoPage() {
                 <option value="Estado">Estado</option>
                 <option value="Municipio">Município</option>
               </Select>
+              <CampoErro texto={erros.tipoTermo} />
             </div>
             <div className="space-y-1">
-              <Label>situação *</Label>
+              <Label>Situação *</Label>
               <Select
                 value={form.situacao}
                 onChange={(event) =>
@@ -363,6 +423,7 @@ export function TermoFomentoPage() {
                 <option value="Encerrado">Encerrado</option>
                 <option value="Cancelado">Cancelado</option>
               </Select>
+              <CampoErro texto={erros.situacao} />
             </div>
             <div className="space-y-1">
               <Label>Valor global</Label>
@@ -378,6 +439,7 @@ export function TermoFomentoPage() {
                   }))
                 }
               />
+              <CampoErro texto={erros.valorGlobal} />
             </div>
             <div className="space-y-1 xl:col-span-2">
               <Label>Órgão concedente</Label>
@@ -387,6 +449,7 @@ export function TermoFomentoPage() {
                   setForm((atual) => ({ ...atual, orgaoConcedente: event.target.value }))
                 }
               />
+              <CampoErro texto={erros.orgaoConcedente} />
             </div>
             <div className="space-y-1">
               <Label>Data de assinatura</Label>
@@ -397,6 +460,7 @@ export function TermoFomentoPage() {
                   setForm((atual) => ({ ...atual, dataAssinatura: event.target.value }))
                 }
               />
+              <CampoErro texto={erros.dataAssinatura} />
             </div>
             <div className="space-y-1">
               <Label>Data de início da vigência</Label>
@@ -407,6 +471,7 @@ export function TermoFomentoPage() {
                   setForm((atual) => ({ ...atual, dataInicioVigencia: event.target.value }))
                 }
               />
+              <CampoErro texto={erros.dataInicioVigencia} />
             </div>
             <div className="space-y-1">
               <Label>Data de fim da vigência</Label>
@@ -417,6 +482,7 @@ export function TermoFomentoPage() {
                   setForm((atual) => ({ ...atual, dataFimVigencia: event.target.value }))
                 }
               />
+              <CampoErro texto={erros.dataFimVigencia} />
             </div>
             <div className="space-y-1 xl:col-span-2">
               <Label>Responsável interno</Label>
@@ -426,6 +492,7 @@ export function TermoFomentoPage() {
                   setForm((atual) => ({ ...atual, responsavelInterno: event.target.value }))
                 }
               />
+              <CampoErro texto={erros.responsavelInterno} />
             </div>
             <div className="space-y-1 md:col-span-2 xl:col-span-4">
               <Label>Descrição do objeto</Label>
@@ -436,6 +503,7 @@ export function TermoFomentoPage() {
                   setForm((atual) => ({ ...atual, descricaoObjeto: event.target.value }))
                 }
               />
+              <CampoErro texto={erros.descricaoObjeto} />
             </div>
           </section>
         ) : null}
@@ -461,6 +529,7 @@ export function TermoFomentoPage() {
                       }))
                     }
                   />
+                  <CampoErro texto={erros["documentoPrincipal.nome"]} />
                 </div>
                 <div className="space-y-1">
                   <Label>URL / arquivo</Label>
@@ -478,6 +547,7 @@ export function TermoFomentoPage() {
                       }))
                     }
                   />
+                  <CampoErro texto={erros["documentoPrincipal.dataUrl"]} />
                 </div>
               </div>
             </div>
@@ -570,6 +640,7 @@ export function TermoFomentoPage() {
                   </tbody>
                 </table>
               </div>
+              <CampoErro texto={erros.documentosRelacionados} />
             </div>
           </section>
         ) : null}
@@ -624,7 +695,7 @@ export function TermoFomentoPage() {
                   />
                 </div>
                 <div className="space-y-1 md:col-span-2 xl:col-span-4">
-                  <Label>ObservAções</Label>
+                  <Label>Observações</Label>
                   <Textarea
                     rows={2}
                     value={novoAditivo.observacoes ?? ""}

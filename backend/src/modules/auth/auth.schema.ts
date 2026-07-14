@@ -38,7 +38,7 @@ export const authLoginSchema = z.object({
     });
   }
 
-  if (!possuiInstituicao && !dispensarInstituicao) {
+  if (!possuiInstituicao && !dispensarInstituicao && !possuiEmail) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["cnpj"],

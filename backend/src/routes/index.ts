@@ -23,6 +23,7 @@ import { doacaoPlanejadaRoutes } from "../modules/doacoes-planejadas/routes/doac
 import { registroPontoRoutes } from "../modules/registro-ponto/routes/registro-ponto.routes.js";
 import { almoxarifadoRoutes } from "../modules/almoxarifado/routes/almoxarifado.routes.js";
 import { controleVeiculosRoutes } from "../modules/controle-veiculos/routes/controle-veiculos.routes.js";
+import { disponibilidadeVeiculosRoutes } from "../modules/controle-veiculos/routes/disponibilidade-veiculos.routes.js";
 import { tarefaAdministrativaRoutes } from "../modules/tarefas-administrativas/routes/tarefa-administrativa.routes.js";
 import { lembreteDiarioRoutes } from "../modules/lembretes-diarios/routes/lembrete-diario.routes.js";
 import { checklistDiarioRoutes } from "../modules/checklist-diario/routes/checklist-diario.routes.js";
@@ -96,6 +97,7 @@ appRoutes.use("/api/doacoes-planejadas", doacaoPlanejadaRoutes);
 appRoutes.use("/api/registro-ponto", registroPontoRoutes);
 appRoutes.use("/api/almoxarifado", almoxarifadoRoutes);
 appRoutes.use("/api/controle-veiculos", controleVeiculosRoutes);
+appRoutes.use("/api/controle-veiculos/disponibilidade", disponibilidadeVeiculosRoutes);
 appRoutes.use("/api/patrimonios", patrimonioRoutes);
 appRoutes.use("/api/administrativo/tarefas", tarefaAdministrativaRoutes);
 appRoutes.use("/api/administrativo/projetos", projetoRoutes);
