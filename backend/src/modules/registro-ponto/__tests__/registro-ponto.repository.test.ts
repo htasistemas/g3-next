@@ -19,11 +19,7 @@ function obterSqlDaQuery(query: unknown) {
 
 test("listarUsuarios do registro de ponto retorna apenas usuarios ativos e nao deletados", async () => {
   const repository = new RegistroPontoRepository();
-  const prismaMock = prisma as unknown as {
-    $queryRaw: (query: unknown) => Promise<unknown>;
-    $executeRaw: (query: unknown) => Promise<number>;
-    $executeRawUnsafe: (query: unknown) => Promise<number>;
-  };
+  const prismaMock = prisma as any;
   const queryRawOriginal = prismaMock.$queryRaw;
   const executeRawOriginal = prismaMock.$executeRaw;
   const executeRawUnsafeOriginal = prismaMock.$executeRawUnsafe;
