@@ -19,16 +19,21 @@ function obterSqlDaQuery(query: unknown) {
 
 test("listarUsuarios do registro de ponto retorna apenas usuarios ativos e nao deletados", async () => {
   const repository = new RegistroPontoRepository();
-  const queryRawOriginal = prisma.$queryRaw;
-  const executeRawOriginal = prisma.$executeRaw;
-  const executeRawUnsafeOriginal = prisma.$executeRawUnsafe;
+  const prismaMock = prisma as unknown as {
+    $queryRaw: (query: unknown) => Promise<unknown>;
+    $executeRaw: (query: unknown) => Promise<number>;
+    $executeRawUnsafe: (query: unknown) => Promise<number>;
+  };
+  const queryRawOriginal = prismaMock.$queryRaw;
+  const executeRawOriginal = prismaMock.$executeRaw;
+  const executeRawUnsafeOriginal = prismaMock.$executeRawUnsafe;
 
   const sqlCapturada: string[] = [];
 
   // O bootstrap de estrutura dispara SQL de criação; aqui isolamos só a query do catálogo.
-  prisma.$executeRaw = async () => 0;
-  prisma.$executeRawUnsafe = async () => 0;
-  prisma.$queryRaw = async (query: unknown) => {
+  prismaMock.$executeRaw = async () => 0;
+  prismaMock.$executeRawUnsafe = async () => 0;
+  prismaMock.$queryRaw = async (query: unknown) => {
     sqlCapturada.push(obterSqlDaQuery(query));
     return [
       {
@@ -48,8 +53,8 @@ test("listarUsuarios do registro de ponto retorna apenas usuarios ativos e nao d
     assert.ok(sqlCapturada[0]?.includes("u.deletado_em IS NULL"));
     assert.ok(sqlCapturada[0]?.includes("COALESCE(u.status, 'ATIVO') = 'ATIVO'"));
   } finally {
-    prisma.$queryRaw = queryRawOriginal;
-    prisma.$executeRaw = executeRawOriginal;
-    prisma.$executeRawUnsafe = executeRawUnsafeOriginal;
+    prismaMock.$queryRaw = queryRawOriginal;
+    prismaMock.$executeRaw = executeRawOriginal;
+    prismaMock.$executeRawUnsafe = executeRawUnsafeOriginal;
   }
 });

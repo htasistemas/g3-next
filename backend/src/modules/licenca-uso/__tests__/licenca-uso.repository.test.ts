@@ -45,10 +45,16 @@ function criarConfiguracaoBase(): LicencaUsoConfiguracao {
 
 test("salvarConfiguracao e registrarPagamentoPendente usam cast de data nas vigencias", async () => {
   const repository = new LicencaUsoRepository();
-  const queryRawUnsafeOriginal = prisma.$queryRawUnsafe;
-  const executeRawUnsafeOriginal = prisma.$executeRawUnsafe;
-  const queryRawOriginal = prisma.$queryRaw;
-  const executeRawOriginal = prisma.$executeRaw;
+  const prismaMock = prisma as unknown as {
+    $queryRawUnsafe: (query: unknown) => Promise<unknown>;
+    $executeRawUnsafe: (query: unknown) => Promise<number>;
+    $queryRaw: (query: unknown) => Promise<unknown>;
+    $executeRaw: (query: unknown) => Promise<number>;
+  };
+  const queryRawUnsafeOriginal = prismaMock.$queryRawUnsafe;
+  const executeRawUnsafeOriginal = prismaMock.$executeRawUnsafe;
+  const queryRawOriginal = prismaMock.$queryRaw;
+  const executeRawOriginal = prismaMock.$executeRaw;
 
   const queries: string[] = [];
 
@@ -119,15 +125,15 @@ test("salvarConfiguracao e registrarPagamentoPendente usam cast de data nas vige
     paid_at: null
   };
 
-  prisma.$executeRawUnsafe = async (query: unknown) => {
+  prismaMock.$executeRawUnsafe = async (query: unknown) => {
     queries.push(textoDaQuery(query));
     return 0;
   };
-  prisma.$executeRaw = async (query: unknown) => {
+  prismaMock.$executeRaw = async (query: unknown) => {
     queries.push(textoDaQuery(query));
     return 0;
   };
-  prisma.$queryRawUnsafe = async (query: unknown) => {
+  prismaMock.$queryRawUnsafe = async (query: unknown) => {
     queries.push(textoDaQuery(query));
     if (queries[queries.length - 1]?.includes("INSERT INTO licenca_uso_configuracoes")) {
       return [retornoConfiguracao];
@@ -137,7 +143,7 @@ test("salvarConfiguracao e registrarPagamentoPendente usam cast de data nas vige
     }
     return [];
   };
-  prisma.$queryRaw = async () => [];
+  prismaMock.$queryRaw = async () => [];
 
   try {
     await repository.salvarConfiguracao(criarConfiguracaoBase(), "sistema", "tenant-1");
@@ -165,9 +171,9 @@ test("salvarConfiguracao e registrarPagamentoPendente usam cast de data nas vige
     assert.ok(insertPagamento?.includes("$6::date"));
     assert.ok(insertPagamento?.includes("$7::date"));
   } finally {
-    prisma.$queryRawUnsafe = queryRawUnsafeOriginal;
-    prisma.$executeRawUnsafe = executeRawUnsafeOriginal;
-    prisma.$queryRaw = queryRawOriginal;
-    prisma.$executeRaw = executeRawOriginal;
+    prismaMock.$queryRawUnsafe = queryRawUnsafeOriginal;
+    prismaMock.$executeRawUnsafe = executeRawUnsafeOriginal;
+    prismaMock.$queryRaw = queryRawOriginal;
+    prismaMock.$executeRaw = executeRawOriginal;
   }
 });

@@ -58,7 +58,7 @@ function criarServiceComRepositorioStub() {
 
 test("listarUsuarios retorna os usuarios do tenant selecionado", async () => {
   const service = criarServiceComRepositorioStub();
-  const resultado = await service.listarUsuarios("instituicao-1");
+  const resultado: any = await service.listarUsuarios("instituicao-1");
 
   assert.equal(resultado.usuarios.length, 1);
   assert.equal(resultado.usuarios[0]?.nome_usuario, "usuario.teste");
@@ -66,7 +66,7 @@ test("listarUsuarios retorna os usuarios do tenant selecionado", async () => {
 
 test("criarUsuario valida e delega o cadastro do usuario do tenant", async () => {
   const service = criarServiceComRepositorioStub();
-  const resultado = await service.criarUsuario(
+  const resultado: any = await service.criarUsuario(
     "instituicao-1",
     {
       nome_completo: "Usuário Teste",
@@ -88,7 +88,7 @@ test("criarUsuario valida e delega o cadastro do usuario do tenant", async () =>
 
 test("atualizarUsuario valida e delega a edicao do usuario do tenant", async () => {
   const service = criarServiceComRepositorioStub();
-  const resultado = await service.atualizarUsuario(
+  const resultado: any = await service.atualizarUsuario(
     "instituicao-1",
     "usuario-1",
     {
@@ -112,7 +112,7 @@ test("atualizarUsuario valida e delega a edicao do usuario do tenant", async () 
 
 test("resetarSenhaUsuario valida e delega a redefinicao da senha do usuario do tenant", async () => {
   const service = criarServiceComRepositorioStub();
-  const resultado = await service.resetarSenhaUsuario(
+  const resultado: any = await service.resetarSenhaUsuario(
     "instituicao-1",
     "usuario-1",
     {
