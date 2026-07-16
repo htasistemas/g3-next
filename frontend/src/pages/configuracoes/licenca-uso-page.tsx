@@ -99,6 +99,12 @@ function obterVigenciaDias(ciclo: LicencaUsoCiclo) {
   return 30;
 }
 
+function normalizarDataIso(valor?: string | null) {
+  const data = String(valor ?? "").trim();
+  if (!data) return "";
+  return data.slice(0, 10);
+}
+
 function adicionarDias(dataIso?: string, dias?: number) {
   if (!dataIso || !dias) return "";
   const data = new Date(`${dataIso}T00:00:00`);
@@ -268,7 +274,8 @@ export function LicencaUsoPage() {
             data.configuracao.pixWebhookUrl ||
             `${window.location.origin}/api/configuracoes/licenca-uso/webhook/infinitepay`,
           dataInicioVigencia:
-            data.configuracao.dataInicioVigencia ?? new Date().toISOString().slice(0, 10),
+            normalizarDataIso(data.configuracao.dataInicioVigencia) ||
+            new Date().toISOString().slice(0, 10),
           vigenciaInicialDias: obterVigenciaDias(cicloNormalizado)
         });
         setResumo(data.resumo);
@@ -298,7 +305,7 @@ export function LicencaUsoPage() {
     () => ofertaPlanos.find((item) => item.id === config.planoId) ?? ofertaPlanos[1],
     [config.planoId]
   );
-  const dataInicio = config.dataInicioVigencia ?? new Date().toISOString().slice(0, 10);
+  const dataInicio = normalizarDataIso(config.dataInicioVigencia) || new Date().toISOString().slice(0, 10);
   const vigenciaCalculadaDias = obterVigenciaDias(cicloComercial);
   const dataFimPrevista = adicionarDias(dataInicio, vigenciaCalculadaDias);
   const totalHoje = config.valorCobranca + (config.implantacaoIsenta ? 0 : config.valorImplantacao);
@@ -938,7 +945,9 @@ export function LicencaUsoPage() {
                       onChange={(event) =>
                         setConfig((atual) => ({
                           ...atual,
-                          dataInicioVigencia: event.target.value || new Date().toISOString().slice(0, 10)
+                          dataInicioVigencia:
+                            normalizarDataIso(event.target.value) ||
+                            new Date().toISOString().slice(0, 10)
                         }))
                       }
                     />
