@@ -24,6 +24,7 @@ export class AuthService {
   async login(rawInput: unknown) {
     const input = authLoginSchema.parse(rawInput);
     const emailNormalizado = input.email?.trim().toLowerCase();
+    let tenantsPorEmail: Awaited<ReturnType<AuthRepository["buscarTenantsPorEmail"]>> | undefined;
     let tenantLookup = {
       cnpj: input.cnpj,
       slug: input.slug,
@@ -37,7 +38,7 @@ export class AuthService {
       !tenantLookup.codigoInstituicao &&
       emailNormalizado !== EMAIL_ADMIN_PADRAO
     ) {
-      const tenantsPorEmail = await this.repository.buscarTenantsPorEmail(emailNormalizado);
+      tenantsPorEmail = await this.repository.buscarTenantsPorEmail(emailNormalizado);
       if (tenantsPorEmail.length === 1) {
         const tenantEncontrado = tenantsPorEmail[0];
         tenantLookup = {
@@ -63,6 +64,35 @@ export class AuthService {
     const identificador = input.email ?? input.nomeUsuario ?? "";
 
     if (!usuario) {
+      if (emailNormalizado) {
+        tenantsPorEmail ??= await this.repository.buscarTenantsPorEmail(emailNormalizado);
+
+        if (
+          (tenantLookup.cnpj || tenantLookup.slug || tenantLookup.codigoInstituicao) &&
+          tenantsPorEmail.length > 0 &&
+          !tenantsPorEmail.some((item) => this.compararTenantLookup(item, tenantLookup))
+        ) {
+          throw new AppError(
+            "O e-mail informado está vinculado a outra instituição. Verifique o CNPJ e o e-mail do administrador inicial cadastrado em Administração inicial.",
+            401
+          );
+        }
+
+        if (
+          !tenantLookup.cnpj &&
+          !tenantLookup.slug &&
+          !tenantLookup.codigoInstituicao &&
+          tenantsPorEmail.length === 1
+        ) {
+          const tenantEncontrado = tenantsPorEmail[0];
+          tenantLookup = {
+            cnpj: tenantEncontrado.cnpj,
+            slug: tenantEncontrado.slug,
+            codigoInstituicao: tenantEncontrado.codigo ?? undefined
+          };
+        }
+      }
+
       await this.repository.registrarEventoAcesso({
         evento: "LOGIN_FALHA",
         identificador,
@@ -331,5 +361,23 @@ export class AuthService {
       senha += alfabeto[randomIndex];
     }
     return senha;
+  }
+
+  private compararTenantLookup(
+    tenant: { cnpj?: string; slug?: string; codigo?: string | null },
+    lookup: { cnpj?: string; slug?: string; codigoInstituicao?: string }
+  ) {
+    const cnpjAtual = tenant.cnpj?.trim().toLowerCase();
+    const slugAtual = tenant.slug?.trim().toLowerCase();
+    const codigoAtual = tenant.codigo?.trim().toLowerCase();
+    const cnpjLookup = lookup.cnpj?.trim().toLowerCase();
+    const slugLookup = lookup.slug?.trim().toLowerCase();
+    const codigoLookup = lookup.codigoInstituicao?.trim().toLowerCase();
+
+    return (
+      (!!cnpjLookup && cnpjAtual === cnpjLookup) ||
+      (!!slugLookup && slugAtual === slugLookup) ||
+      (!!codigoLookup && codigoAtual === codigoLookup)
+    );
   }
 }

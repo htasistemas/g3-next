@@ -544,7 +544,8 @@ export class RegistroPontoRepository {
         u.nome_usuario,
         u.unidade
       FROM usuarios u
-      WHERE COALESCE(u.status, 'ATIVO') <> 'INATIVO'
+      WHERE u.deletado_em IS NULL
+        AND COALESCE(u.status, 'ATIVO') = 'ATIVO'
         AND u.tenant_id::text = ${tenantId}
         AND (
           ${whereTermo ? Prisma.sql`u.nome ILIKE ${`%${whereTermo}%`} OR u.nome_usuario ILIKE ${`%${whereTermo}%`}` : Prisma.sql`TRUE`}

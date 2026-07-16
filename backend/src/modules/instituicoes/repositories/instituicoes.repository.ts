@@ -4,6 +4,8 @@ import { prisma } from "../../../database/prisma.js";
 import { AppError } from "../../../shared/errors/app-error.js";
 import { ensureMultiTenantStructure } from "../../multi-tenant/tenant-estrutura.service.js";
 import { ensureUsuariosGestaoEstrutura } from "../../usuarios/repositories/usuario-estrutura.repository.js";
+import { UsuarioRepository } from "../../usuarios/repositories/usuario.repository.js";
+import type { UsuarioCreateInput, UsuarioResetSenhaInput, UsuarioUpdateInput } from "../../usuarios/usuario.types.js";
 import type { InstituicaoInput, InstituicaoResumo, InstituicaoUpdateInput } from "../instituicoes.types.js";
 
 type InstituicaoRow = {
@@ -85,6 +87,8 @@ function identificarViolacaoUnicidadeInstituicao(error: unknown) {
 }
 
 export class InstituicoesRepository {
+  private readonly usuarioRepository = new UsuarioRepository();
+
   private async ensureEstrutura() {
     await ensureUsuariosGestaoEstrutura(prisma);
     await ensureMultiTenantStructure(prisma);
@@ -139,6 +143,18 @@ export class InstituicoesRepository {
     );
 
     return rows.map(mapRow);
+  }
+
+  async listarUsuarios(id: string) {
+    await this.ensureEstrutura();
+    const instituicao = await this.buscarPorId(id);
+    return this.usuarioRepository.listar(
+      {
+        pagina: 1,
+        tamanho_pagina: 100
+      },
+      instituicao.tenant_id
+    );
   }
 
   async criar(input: InstituicaoInput) {
@@ -405,6 +421,76 @@ export class InstituicoesRepository {
     );
 
     return { sucesso: true };
+  }
+
+  async criarUsuario(id: string, input: UsuarioCreateInput, nomeUsuarioAtor?: string, idAtor?: string) {
+    await this.ensureEstrutura();
+    const instituicao = await this.buscarPorId(id);
+    const senhaHash = await bcrypt.hash(input.senha, 10);
+    const atorNumerico = Number(idAtor);
+    const atorId = Number.isInteger(atorNumerico) && atorNumerico > 0 ? BigInt(atorNumerico) : undefined;
+
+    return this.usuarioRepository.criar(
+      input,
+      senhaHash,
+      {
+        id: atorId,
+        nome_usuario: nomeUsuarioAtor?.trim() || "sistema",
+        tenant_id: instituicao.tenant_id,
+        instituicao_id: instituicao.id
+      }
+    );
+  }
+
+  async atualizarUsuario(
+    id: string,
+    usuarioId: string,
+    input: UsuarioUpdateInput,
+    nomeUsuarioAtor?: string,
+    idAtor?: string
+  ) {
+    await this.ensureEstrutura();
+    const instituicao = await this.buscarPorId(id);
+    const usuarioNumerico = Number(usuarioId);
+    if (!Number.isInteger(usuarioNumerico) || usuarioNumerico <= 0) {
+      throw new AppError("Usuario invalido.", 400);
+    }
+
+    const atorNumerico = Number(idAtor);
+    const atorId = Number.isInteger(atorNumerico) && atorNumerico > 0 ? BigInt(atorNumerico) : undefined;
+
+    return this.usuarioRepository.atualizar(BigInt(usuarioNumerico), input, {
+      id: atorId,
+      nome_usuario: nomeUsuarioAtor?.trim() || "sistema",
+      tenant_id: instituicao.tenant_id,
+      instituicao_id: instituicao.id
+    });
+  }
+
+  async resetarSenhaUsuario(
+    id: string,
+    usuarioId: string,
+    input: UsuarioResetSenhaInput,
+    nomeUsuarioAtor?: string,
+    idAtor?: string
+  ) {
+    await this.ensureEstrutura();
+    const instituicao = await this.buscarPorId(id);
+    const usuarioNumerico = Number(usuarioId);
+    if (!Number.isInteger(usuarioNumerico) || usuarioNumerico <= 0) {
+      throw new AppError("Usuario invalido.", 400);
+    }
+
+    const atorNumerico = Number(idAtor);
+    const atorId = Number.isInteger(atorNumerico) && atorNumerico > 0 ? BigInt(atorNumerico) : undefined;
+    const senhaHash = await bcrypt.hash(input.nova_senha, 10);
+
+    return this.usuarioRepository.resetarSenha(BigInt(usuarioNumerico), senhaHash, input.exigir_troca_senha ?? true, {
+      id: atorId,
+      nome_usuario: nomeUsuarioAtor?.trim() || "sistema",
+      tenant_id: instituicao.tenant_id,
+      instituicao_id: instituicao.id
+    });
   }
 
   async desbloquearAcesso(id: string) {

@@ -187,3 +187,41 @@ test("login pode identificar a instituição pelo e-mail quando o tenant for uni
   assert.equal(resultado.token, "token-teste");
   assert.equal(resultado.usuario.instituicao_slug, "cliente-novo");
 });
+
+test("login informa quando o e-mail pertence a outra instituicao", async () => {
+  const service = criarServiceComStubs({
+    tenantsPorEmail: [{ cnpj: "99999999000199", slug: "outra-instituicao", codigo: "OUT" }],
+    usuario: null,
+    controle: null
+  });
+
+  service.repository.buscarUsuarioPorLogin = async () => null;
+  service.repository.buscarTenantsPorEmail = async () => [
+    {
+      tenant_id: "tenant-9",
+      cnpj: "99999999000199",
+      slug: "outra-instituicao",
+      codigo: "OUT",
+      usuario_id: BigInt(9),
+      email: "admin@outra.org.br"
+    }
+  ];
+
+  await assert.rejects(
+    () =>
+      service.login({
+        email: "admin@cliente.org.br",
+        cnpj: "12.345.678/0001-99",
+        senha: "Senha#123"
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof AppError);
+      assert.equal(
+        error.message,
+        "O e-mail informado está vinculado a outra instituição. Verifique o CNPJ e o e-mail do administrador inicial cadastrado em Administração inicial."
+      );
+      assert.equal(error.statusCode, 401);
+      return true;
+    }
+  );
+});
