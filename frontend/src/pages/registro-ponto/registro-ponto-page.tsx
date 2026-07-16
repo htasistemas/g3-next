@@ -267,12 +267,39 @@ function calcularAssimetriaHorizontal(amostra: Uint8ClampedArray) {
 }
 
 function formatarMinutos(totalMinutos?: number) {
-  const valor = Number(totalMinutos ?? 0);
+  const valor = Math.round(Number(totalMinutos ?? 0));
   const sinal = valor < 0 ? "-" : "";
   const absoluto = Math.abs(valor);
   const horas = Math.floor(absoluto / 60);
   const minutos = absoluto % 60;
   return `${sinal}${horas}h ${String(minutos).padStart(2, "0")}m`;
+}
+
+function formatarMediaMinutos(totalMinutos?: number, base?: number) {
+  const divisor = Number(base ?? 0);
+  if (!divisor) return "---";
+  return formatarMinutos(Math.round(Number(totalMinutos ?? 0) / divisor));
+}
+
+function formatarOcorrenciasEspelho(item: RegistroPontoItem) {
+  const houveJornadaCompleta =
+    !!item.entrada_1 && !!item.saida_1 && !!item.entrada_2 && !!item.saida_2;
+  const semDesviosRelevantes =
+    item.atrasos_minutos === 0 &&
+    item.horas_extras_minutos === 0 &&
+    item.banco_horas_minutos === 0 &&
+    item.faltas_minutos === 0 &&
+    !item.ocorrencias.length;
+
+  if (houveJornadaCompleta && semDesviosRelevantes) {
+    return ["Lançado corretamente"];
+  }
+
+  if (item.ocorrencias.length) {
+    return item.ocorrencias;
+  }
+
+  return ["Sem ocorrência registrada"];
 }
 
 function extrairNumero(valor: unknown) {
@@ -486,6 +513,11 @@ export function RegistroPontoPage() {
   const registros = listaData?.registros ?? [];
   const espelho = espelhoData?.registros ?? [];
   const totaisEspelho = espelhoData?.totais;
+  const totalDiasEspelho = totaisEspelho?.total_dias ?? 0;
+  const totalTrabalhadoEspelho = totaisEspelho?.total_trabalhado_minutos ?? 0;
+  const mediaDiariaEspelho = formatarMediaMinutos(totalTrabalhadoEspelho, totalDiasEspelho);
+  const mediaSemanalEspelho = formatarMediaMinutos(totalTrabalhadoEspelho * 7, totalDiasEspelho);
+  const mediaMensalEspelho = formatarMediaMinutos(totalTrabalhadoEspelho * 30, totalDiasEspelho);
   const usuariosCatalogo = usuariosCatalogoData?.usuarios ?? [];
   const horaExtras = horaExtrasData?.registros ?? [];
   const totaisHoraExtra = horaExtrasData?.totais;
@@ -1470,11 +1502,28 @@ export function RegistroPontoPage() {
                 <td className="px-2 py-2">{formatarMinutos(item.atrasos_minutos)}</td>
                 <td className="px-2 py-2">{formatarMinutos(item.faltas_minutos)}</td>
                 <td className="px-2 py-2">
-                  <span className={`rounded-full border px-2 py-1 text-[11px] font-semibold ${badgeStatusClasse(item.status)}`}>
+                  <span className={`inline-flex rounded-full border px-2 py-1 text-[11px] font-semibold ${badgeStatusClasse(item.status)}`}>
                     {item.status === "COMPLETO" ? "Completo" : "Incompleto"}
                   </span>
                 </td>
-                {exibirOcorrencias ? <td className="px-2 py-2">{item.ocorrencias.join(", ") || "---"}</td> : null}
+                {exibirOcorrencias ? (
+                  <td className="px-2 py-2">
+                    <div className="space-y-0.5">
+                      {formatarOcorrenciasEspelho(item).map((ocorrencia, ocorrenciaIndex) => (
+                        <p
+                          key={`${item.id}-ocorrencia-${ocorrenciaIndex}`}
+                          className={`text-[10px] leading-4 tracking-tight ${
+                            ocorrencia === "Lançado corretamente"
+                              ? "font-medium text-emerald-700"
+                              : "text-slate-500"
+                          }`}
+                        >
+                          {ocorrencia}
+                        </p>
+                      ))}
+                    </div>
+                  </td>
+                ) : null}
               </tr>
             ))}
 
@@ -2220,6 +2269,29 @@ export function RegistroPontoPage() {
             <Card><CardContent className="p-3"><p className="text-xs text-[var(--g3-muted)]">Faltas</p><p className="text-lg font-semibold">{formatarMinutos(totaisEspelho?.faltas_minutos ?? 0)}</p></CardContent></Card>
             <Card><CardContent className="p-3"><p className="text-xs text-[var(--g3-muted)]">Ajustes</p><p className="text-lg font-semibold">{totaisEspelho?.total_ajustes ?? 0}</p></CardContent></Card>
           </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Card>
+              <CardContent className="p-3">
+                <p className="text-xs text-[var(--g3-muted)]">Média por dia</p>
+                <p className="text-lg font-semibold">{mediaDiariaEspelho}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-3">
+                <p className="text-xs text-[var(--g3-muted)]">Média por semana</p>
+                <p className="text-lg font-semibold">{mediaSemanalEspelho}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-3">
+                <p className="text-xs text-[var(--g3-muted)]">Média por mês</p>
+                <p className="text-lg font-semibold">{mediaMensalEspelho}</p>
+              </CardContent>
+            </Card>
+          </div>
+          <p className="text-xs text-[var(--g3-muted)]">
+            Faltas representam o tempo ainda não cumprido nos dias fechados do período. As médias são normalizadas a partir da jornada total trabalhada.
+          </p>
 
           <div className="flex justify-end">
             <Button

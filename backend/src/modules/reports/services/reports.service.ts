@@ -1953,6 +1953,13 @@ export class ReportsService {
       fonteTamanho: 6.5,
       fonteTamanhoCabecalho: 7
     };
+    const totalDiasPeriodo = Number(totais?.total_dias ?? 0);
+    const totalTrabalhadoPeriodo = Number(totais?.total_trabalhado_minutos ?? 0);
+    const mediaDiariaPeriodo = totalDiasPeriodo > 0 ? Math.round(totalTrabalhadoPeriodo / totalDiasPeriodo) : undefined;
+    const mediaSemanalPeriodo =
+      typeof mediaDiariaPeriodo === "number" ? Math.round(mediaDiariaPeriodo * 7) : undefined;
+    const mediaMensalPeriodo =
+      typeof mediaDiariaPeriodo === "number" ? Math.round(mediaDiariaPeriodo * 30) : undefined;
 
     const contexto = await this.montarContextoInstitucional(tenantId);
     const relatorioInput: RelatorioHtmlInput = {
@@ -1970,6 +1977,11 @@ export class ReportsService {
         {
           titulo: "Legenda de ocorrências",
           conteudo: legendaEspelho
+        },
+        {
+          titulo: "Como ler o resumo",
+          conteudo:
+            "Faltas representam o tempo ainda não cumprido nos dias fechados do período. As médias abaixo são normalizadas a partir da jornada total trabalhada."
         }
       ],
       blocos: [
@@ -1990,6 +2002,16 @@ export class ReportsService {
             this.campo("Atrasos", this.formatarMinutosRelatorio(totais?.atrasos_minutos)),
             this.campo("Faltas", this.formatarMinutosRelatorio(totais?.faltas_minutos)),
             this.campo("Ajustes realizados", String(totais?.total_ajustes ?? 0))
+          ]
+        },
+        {
+          titulo: "Médias de jornada",
+          colunas: 3,
+          destaque: true,
+          campos: [
+            this.campo("Média por dia", this.formatarMinutosRelatorio(mediaDiariaPeriodo)),
+            this.campo("Média por semana", this.formatarMinutosRelatorio(mediaSemanalPeriodo)),
+            this.campo("Média por mês", this.formatarMinutosRelatorio(mediaMensalPeriodo))
           ]
         }
       ],

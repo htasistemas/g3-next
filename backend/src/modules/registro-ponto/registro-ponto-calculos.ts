@@ -11,6 +11,8 @@ export type RegistroPontoDesvioCampo = {
   campo: "entrada_1" | "saida_1" | "entrada_2" | "saida_2";
   minutos: number;
   tipo: "ATRASO" | "HORA_EXTRA";
+  horario_previsto: string;
+  horario_real: string;
 };
 
 export type RegistroPontoDesvios = {
@@ -51,10 +53,12 @@ function registrarDesvio(
   detalhes: RegistroPontoDesvioCampo[],
   campo: RegistroPontoDesvioCampo["campo"],
   minutos: number,
-  tipo: RegistroPontoDesvioCampo["tipo"]
+  tipo: RegistroPontoDesvioCampo["tipo"],
+  horarioPrevisto: string,
+  horarioReal: string
 ) {
   if (minutos <= 0) return;
-  detalhes.push({ campo, minutos, tipo });
+  detalhes.push({ campo, minutos, tipo, horario_previsto: horarioPrevisto, horario_real: horarioReal });
 }
 
 export function calcularDesviosRegistroPonto(
@@ -76,19 +80,21 @@ export function calcularDesviosRegistroPonto(
   ];
 
   for (const item of campos) {
-    const horarioPrevisto = toMinutes(previsto[item.campo] ?? HORARIO_PADRAO_PREVISTO[item.campo]);
-    const horarioReal = toMinutes(real[item.campo]);
+    const horarioPrevistoTexto = String(previsto[item.campo] ?? HORARIO_PADRAO_PREVISTO[item.campo] ?? "");
+    const horarioRealTexto = String(real[item.campo] ?? "");
+    const horarioPrevisto = toMinutes(horarioPrevistoTexto);
+    const horarioReal = toMinutes(horarioRealTexto);
     if (horarioPrevisto === null || horarioReal === null) continue;
 
     if (item.tipoEntrada === "entrada") {
       if (horarioReal < horarioPrevisto) {
         const minutos = horarioPrevisto - horarioReal;
         horasExtrasMinutos += minutos;
-        registrarDesvio(detalhes, item.campo, minutos, "HORA_EXTRA");
+        registrarDesvio(detalhes, item.campo, minutos, "HORA_EXTRA", horarioPrevistoTexto, horarioRealTexto);
       } else if (horarioReal > horarioPrevisto) {
         const minutos = horarioReal - horarioPrevisto;
         atrasosMinutos += minutos;
-        registrarDesvio(detalhes, item.campo, minutos, "ATRASO");
+        registrarDesvio(detalhes, item.campo, minutos, "ATRASO", horarioPrevistoTexto, horarioRealTexto);
       }
       continue;
     }
@@ -96,11 +102,11 @@ export function calcularDesviosRegistroPonto(
     if (horarioReal > horarioPrevisto) {
       const minutos = horarioReal - horarioPrevisto;
       horasExtrasMinutos += minutos;
-      registrarDesvio(detalhes, item.campo, minutos, "HORA_EXTRA");
+      registrarDesvio(detalhes, item.campo, minutos, "HORA_EXTRA", horarioPrevistoTexto, horarioRealTexto);
     } else if (horarioReal < horarioPrevisto) {
       const minutos = horarioPrevisto - horarioReal;
       atrasosMinutos += minutos;
-      registrarDesvio(detalhes, item.campo, minutos, "ATRASO");
+      registrarDesvio(detalhes, item.campo, minutos, "ATRASO", horarioPrevistoTexto, horarioRealTexto);
     }
   }
 
