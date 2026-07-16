@@ -35,6 +35,7 @@ type ListaRow = {
   alterado_manualmente: boolean;
   status_registro: "COMPLETO" | "INCOMPLETO";
   ocorrencias: string[] | null;
+  ocorrencias_descricao: string[] | null;
   total_trabalhado_minutos: number | bigint | null;
   criado_em: Date;
   atualizado_em: Date;
@@ -151,6 +152,7 @@ export function mapRegistroPontoRowToResponse(row: ListaRow): RegistroPontoLista
     atrasos_minutos: resumoExibicao.atrasos_minutos,
     observacoes: row.observacoes ?? undefined,
     ocorrencias: row.ocorrencias?.filter(Boolean) ?? [],
+    ocorrencias_descricao: row.ocorrencias_descricao?.filter(Boolean) ?? [],
     alterado_manualmente: !!row.alterado_manualmente,
     status: row.status_registro,
     proxima_batida: obterProximaBatida({ entrada_1, saida_1, entrada_2, saida_2 }),

@@ -1733,6 +1733,7 @@ export class RegistroPontoRepository {
           ELSE 'INCOMPLETO'
         END AS status_registro,
         COALESCE(ARRAY_REMOVE(ARRAY_AGG(DISTINCT o.tipo), NULL), ARRAY[]::text[]) AS ocorrencias,
+        COALESCE(ARRAY_REMOVE(ARRAY_AGG(DISTINCT o.descricao), NULL), ARRAY[]::text[]) AS ocorrencias_descricao,
         (
           GREATEST(0, COALESCE(EXTRACT(EPOCH FROM (r.saida_1 - r.entrada_1)) / 60, 0)::integer)
           + GREATEST(0, COALESCE(EXTRACT(EPOCH FROM (r.saida_2 - r.entrada_2)) / 60, 0)::integer)

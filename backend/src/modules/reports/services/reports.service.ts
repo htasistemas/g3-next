@@ -1967,7 +1967,34 @@ export class ReportsService {
       return valor.replace(/_/g, " ");
     };
 
-    const renderizarOcorrenciasTexto = (item: { ocorrencias?: string[]; entrada_1?: string; saida_1?: string; entrada_2?: string; saida_2?: string; status?: string }) => {
+    const compactarDescricaoOcorrencia = (descricao: string) => {
+      const texto = descricao.trim().replace(/\s+/g, " ").replace(/[.]+$/g, "");
+      if (/^Lançado com atraso em /i.test(texto)) return texto.replace(/^Lançado com atraso em /i, "Atraso em ");
+      if (/^Lançado como hora extra em /i.test(texto)) return texto.replace(/^Lançado como hora extra em /i, "Hora extra em ");
+      if (/^Banco de horas com saldo de /i.test(texto)) return texto;
+      if (/^Saldo de falta de /i.test(texto)) return texto.replace(/^Saldo de falta de /i, "Falta de ");
+      if (/^Horas extras pendentes de autorizacao:/i.test(texto)) {
+        return texto.replace(/^Horas extras pendentes de autorizacao:/i, "Horas extras pendentes:");
+      }
+      if (/^Sequencia de horarios inconsistente/i.test(texto)) return "Sequência de horários inconsistente";
+      if (/^Existem batidas pendentes para fechamento completo do dia/i.test(texto)) return "Esquecimento de batida";
+      return texto;
+    };
+
+    const renderizarOcorrenciasTexto = (item: {
+      ocorrencias?: string[];
+      ocorrencias_descricao?: string[];
+      entrada_1?: string;
+      saida_1?: string;
+      entrada_2?: string;
+      saida_2?: string;
+      status?: string;
+    }) => {
+      const descricoes = (item.ocorrencias_descricao ?? []).map(compactarDescricaoOcorrencia).filter(Boolean);
+      if (descricoes.length) {
+        return descricoes.join(" | ");
+      }
+
       const ocorrencias = (item.ocorrencias ?? []).filter(Boolean);
       const jornadaCompleta = !!item.entrada_1 && !!item.saida_1 && !!item.entrada_2 && !!item.saida_2;
       if (!ocorrencias.length) {
