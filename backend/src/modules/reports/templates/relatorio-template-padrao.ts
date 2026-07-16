@@ -23,9 +23,15 @@ export type ColunaRelatorio = {
   fonteTamanhoCabecalho?: number;
 };
 
+export type RelatorioTabelaCelula = {
+  valor: string;
+  classe?: string;
+  html?: boolean;
+};
+
 export type RelatorioTabela = {
   colunas: ColunaRelatorio[];
-  linhas: Array<string[]>;
+  linhas: Array<Array<string | RelatorioTabelaCelula>>;
 };
 
 export type RelatorioBlocoCampo = {
@@ -82,9 +88,9 @@ export class RelatorioTemplatePadrao {
       .join("");
   }
 
-  private montarClasseColuna(coluna?: ColunaRelatorio): string {
+  private montarClasseColuna(coluna?: ColunaRelatorio, classesExtras: Array<string | undefined> = []): string {
     if (!coluna) return "";
-    const classes = [coluna.classe, coluna.semQuebra ? "coluna-sem-quebra" : ""].filter(Boolean).join(" ");
+    const classes = [coluna.classe, coluna.semQuebra ? "coluna-sem-quebra" : "", ...classesExtras].filter(Boolean).join(" ");
     return classes ? ` class="${this.escapeHtml(classes)}"` : "";
   }
 
@@ -100,23 +106,19 @@ export class RelatorioTemplatePadrao {
         .join("") ?? "";
     const headerCols =
       input.tabela?.colunas
-        .map(
-          (coluna) =>
-            `<th${this.montarClasseColuna(coluna)}${this.montarEstiloColuna(coluna, true)}>${this.escapeHtml(
-              coluna.titulo
-            )}</th>`
-        )
+          .map((coluna) => `<th${this.montarClasseColuna(coluna)}${this.montarEstiloColuna(coluna, true)}>${this.escapeHtml(coluna.titulo)}</th>`)
         .join("") ?? "";
     const bodyRows =
       input.tabela?.linhas
         .map(
           (linha) =>
             `<tr>${linha
-              .map((valor, index) => {
+              .map((celula, index) => {
                 const coluna = input.tabela?.colunas[index];
-                return `<td${this.montarClasseColuna(coluna)}${this.montarEstiloColuna(coluna)}>${this.escapeHtml(
-                  valor
-                )}</td>`;
+                const valor = typeof celula === "string" ? celula : celula.valor;
+                const classeCelula = typeof celula === "string" ? "" : celula.classe ?? "";
+                const conteudo = typeof celula === "string" || !celula.html ? this.escapeHtml(valor) : valor;
+                return `<td${this.montarClasseColuna(coluna, [classeCelula])}${this.montarEstiloColuna(coluna)}>${conteudo}</td>`;
               })
               .join("")}</tr>`
         )
@@ -403,6 +405,37 @@ export class RelatorioTemplatePadrao {
               overflow-wrap: anywhere;
               word-break: break-word;
               line-height: 1.15;
+            }
+            .chip-ocorrencia {
+              display: inline-block;
+              padding: 2px 6px;
+              margin: 1px 4px 1px 0;
+              border-radius: 9999px;
+              font-size: 8.5px;
+              font-weight: 700;
+              line-height: 1.4;
+              border: 1px solid transparent;
+              white-space: nowrap;
+            }
+            .chip-ocorrencia--ok {
+              background: #dcfce7;
+              color: #166534;
+              border-color: #86efac;
+            }
+            .chip-ocorrencia--alerta {
+              background: #ffedd5;
+              color: #9a3412;
+              border-color: #fdba74;
+            }
+            .chip-ocorrencia--info {
+              background: #dbeafe;
+              color: #1d4ed8;
+              border-color: #93c5fd;
+            }
+            .chip-ocorrencia--neutro {
+              background: #e2e8f0;
+              color: #334155;
+              border-color: #cbd5e1;
             }
             tr {
               page-break-inside: avoid;

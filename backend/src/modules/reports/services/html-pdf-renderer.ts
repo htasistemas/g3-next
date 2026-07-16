@@ -3,7 +3,7 @@ import path from "node:path";
 import PDFDocument from "pdfkit";
 import { getStorageProvider } from "../../arquivos/services/storage-factory.js";
 import type { StorageProvider } from "../../arquivos/services/storage-provider.js";
-import type { RelatorioHtmlInput } from "../templates/relatorio-template-padrao.js";
+import type { RelatorioHtmlInput, RelatorioTabelaCelula } from "../templates/relatorio-template-padrao.js";
 
 type RodapeRender = {
   linha1: string;
@@ -409,8 +409,8 @@ export class HtmlPdfRenderer {
           return coluna?.fonteTamanho ?? 10;
         };
 
-        const desenharLinhaTabela = (cels: string[], cabecalho = false) => {
-          const textos = cels.map((cel) => toSafeText(cel));
+        const desenharLinhaTabela = (cels: Array<string | RelatorioTabelaCelula>, cabecalho = false) => {
+          const textos = cels.map((cel) => toSafeText(typeof cel === "string" ? cel : cel.valor));
           const alturas = textos.map((texto, index) => {
             const coluna = tabela.colunas[index];
             const larguraTexto = Math.max(20, larguras[index] - paddingX * 2);

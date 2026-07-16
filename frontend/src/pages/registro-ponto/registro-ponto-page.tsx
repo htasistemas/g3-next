@@ -281,6 +281,30 @@ function formatarMediaMinutos(totalMinutos?: number, base?: number) {
   return formatarMinutos(Math.round(Number(totalMinutos ?? 0) / divisor));
 }
 
+function rotuloOcorrenciaEspelho(valor: string) {
+  const normalizado = valor.trim().toUpperCase();
+  if (normalizado === "ATRASO") return "Atraso";
+  if (normalizado === "FALTA") return "Falta";
+  if (normalizado === "HORA_EXTRA") return "Hora extra";
+  if (normalizado === "BANCO_HORAS") return "Banco de horas";
+  if (normalizado === "ESQUECIMENTO_BATIDA") return "Esquecimento";
+  if (normalizado === "INCONSISTENCIA_SEQUENCIA") return "Inconsistência";
+  if (normalizado === "CORRECAO_ADMINISTRATIVA") return "Correção";
+  if (normalizado === "AJUSTE_MANUAL") return "Ajuste manual";
+  if (normalizado === "OBSERVACAO_OPERACIONAL") return "Observação";
+  return valor.replaceAll("_", " ");
+}
+
+function classeOcorrenciaEspelho(valor: string) {
+  const normalizado = valor.trim().toUpperCase();
+  if (normalizado === "HORA_EXTRA" || normalizado === "BANCO_HORAS") return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if (normalizado === "ATRASO" || normalizado === "FALTA") return "border-amber-200 bg-amber-50 text-amber-700";
+  if (normalizado === "INCONSISTENCIA_SEQUENCIA") return "border-sky-200 bg-sky-50 text-sky-700";
+  if (normalizado === "ESQUECIMENTO_BATIDA" || normalizado === "OBSERVACAO_OPERACIONAL") return "border-slate-200 bg-slate-100 text-slate-600";
+  if (normalizado === "CORRECAO_ADMINISTRATIVA" || normalizado === "AJUSTE_MANUAL") return "border-indigo-200 bg-indigo-50 text-indigo-700";
+  return "border-slate-200 bg-slate-100 text-slate-600";
+}
+
 function formatarOcorrenciasEspelho(item: RegistroPontoItem) {
   const houveJornadaCompleta =
     !!item.entrada_1 && !!item.saida_1 && !!item.entrada_2 && !!item.saida_2;
@@ -292,14 +316,17 @@ function formatarOcorrenciasEspelho(item: RegistroPontoItem) {
     !item.ocorrencias.length;
 
   if (houveJornadaCompleta && semDesviosRelevantes) {
-    return ["Lançado corretamente"];
+    return [{ rotulo: "Lançado corretamente", classe: "border-emerald-200 bg-emerald-50 text-emerald-700" }];
   }
 
   if (item.ocorrencias.length) {
-    return item.ocorrencias;
+    return item.ocorrencias.map((ocorrencia) => ({
+      rotulo: rotuloOcorrenciaEspelho(ocorrencia),
+      classe: classeOcorrenciaEspelho(ocorrencia)
+    }));
   }
 
-  return ["Sem ocorrência registrada"];
+  return [{ rotulo: "Sem ocorrência registrada", classe: "border-slate-200 bg-slate-100 text-slate-600" }];
 }
 
 function extrairNumero(valor: unknown) {
@@ -1508,18 +1535,14 @@ export function RegistroPontoPage() {
                 </td>
                 {exibirOcorrencias ? (
                   <td className="px-2 py-2">
-                    <div className="space-y-0.5">
+                    <div className="flex flex-wrap gap-1">
                       {formatarOcorrenciasEspelho(item).map((ocorrencia, ocorrenciaIndex) => (
-                        <p
+                        <span
                           key={`${item.id}-ocorrencia-${ocorrenciaIndex}`}
-                          className={`text-[10px] leading-4 tracking-tight ${
-                            ocorrencia === "Lançado corretamente"
-                              ? "font-medium text-emerald-700"
-                              : "text-slate-500"
-                          }`}
+                          className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-tight ${ocorrencia.classe}`}
                         >
-                          {ocorrencia}
-                        </p>
+                          {ocorrencia.rotulo}
+                        </span>
                       ))}
                     </div>
                   </td>

@@ -1942,6 +1942,13 @@ export class ReportsService {
       "Afastamento: Suspensão temporária do contrato (Ex: licença-maternidade ou auxílio-doença).",
       "Esquecimento: Marcações inseridas manualmente após aprovação do gestor."
     ].join("\n");
+    const escapeHtml = (valor: string) =>
+      valor
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
     const colunaSemQuebra = {
       classe: "coluna-compacta",
       semQuebra: true,
@@ -1952,6 +1959,47 @@ export class ReportsService {
       classe: "coluna-ocorrencia",
       fonteTamanho: 6.5,
       fonteTamanhoCabecalho: 7
+    };
+    const rotuloOcorrencia = (valor: string) => {
+      const normalizado = valor.trim().toUpperCase();
+      if (normalizado === "ATRASO") return "Atraso";
+      if (normalizado === "FALTA") return "Falta";
+      if (normalizado === "HORA_EXTRA") return "Hora extra";
+      if (normalizado === "BANCO_HORAS") return "Banco de horas";
+      if (normalizado === "ESQUECIMENTO_BATIDA") return "Esquecimento";
+      if (normalizado === "INCONSISTENCIA_SEQUENCIA") return "Inconsistência";
+      if (normalizado === "CORRECAO_ADMINISTRATIVA") return "Correção";
+      if (normalizado === "AJUSTE_MANUAL") return "Ajuste manual";
+      if (normalizado === "OBSERVACAO_OPERACIONAL") return "Observação";
+      return valor.replace(/_/g, " ");
+    };
+
+    const classeOcorrencia = (valor: string) => {
+      const normalizado = valor.trim().toUpperCase();
+      if (normalizado === "HORA_EXTRA" || normalizado === "BANCO_HORAS") return "chip-ocorrencia--ok";
+      if (normalizado === "ATRASO" || normalizado === "FALTA") return "chip-ocorrencia--alerta";
+      if (normalizado === "INCONSISTENCIA_SEQUENCIA") return "chip-ocorrencia--info";
+      if (normalizado === "ESQUECIMENTO_BATIDA" || normalizado === "OBSERVACAO_OPERACIONAL") return "chip-ocorrencia--neutro";
+      if (normalizado === "CORRECAO_ADMINISTRATIVA" || normalizado === "AJUSTE_MANUAL") return "chip-ocorrencia--info";
+      return "chip-ocorrencia--neutro";
+    };
+
+    const renderizarChipsOcorrencias = (item: { ocorrencias?: string[]; entrada_1?: string; saida_1?: string; entrada_2?: string; saida_2?: string; status?: string }) => {
+      const ocorrencias = (item.ocorrencias ?? []).filter(Boolean);
+      const jornadaCompleta = !!item.entrada_1 && !!item.saida_1 && !!item.entrada_2 && !!item.saida_2;
+      if (!ocorrencias.length) {
+        const label = jornadaCompleta && item.status === "COMPLETO" ? "Lançado corretamente" : "Sem ocorrência registrada";
+        return `<span class="chip-ocorrencia ${jornadaCompleta && item.status === "COMPLETO" ? "chip-ocorrencia--ok" : "chip-ocorrencia--neutro"}">${escapeHtml(label)}</span>`;
+      }
+
+      return ocorrencias
+        .map(
+            (ocorrencia) =>
+            `<span class="chip-ocorrencia ${classeOcorrencia(ocorrencia)}">${escapeHtml(
+              rotuloOcorrencia(ocorrencia)
+            )}</span>`
+        )
+        .join("");
     };
     const totalDiasPeriodo = Number(totais?.total_dias ?? 0);
     const totalTrabalhadoPeriodo = Number(totais?.total_trabalhado_minutos ?? 0);
@@ -2038,7 +2086,7 @@ export class ReportsService {
           this.formatarMinutosRelatorio(item.banco_horas_minutos),
           this.formatarMinutosRelatorio(item.atrasos_minutos),
           this.formatarMinutosRelatorio(item.faltas_minutos),
-          item.ocorrencias?.map((ocorrencia) => ocorrencia.replace(/_/g, " ")).join(", ") || "---"
+          { valor: renderizarChipsOcorrencias(item), html: true, classe: "coluna-ocorrencia" }
         ])
       },
       cabecalho: contexto.cabecalho,
