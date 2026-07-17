@@ -81,6 +81,7 @@ export class DocumentosInstituicaoRepository {
         await prisma.$executeRaw(Prisma.sql`
           CREATE TABLE IF NOT EXISTS documentos_instituicao_anexos (
             id BIGSERIAL PRIMARY KEY,
+            arquivo_id BIGINT,
             tenant_id UUID,
             documento_id BIGINT NOT NULL REFERENCES documentos_instituicao(id) ON DELETE CASCADE,
             nome_arquivo VARCHAR(200) NOT NULL,
@@ -95,6 +96,7 @@ export class DocumentosInstituicaoRepository {
         `);
 
         const comandos = [
+          "ALTER TABLE IF EXISTS documentos_instituicao_anexos ADD COLUMN IF NOT EXISTS arquivo_id BIGINT",
           "ALTER TABLE IF EXISTS documentos_instituicao_anexos ADD COLUMN IF NOT EXISTS tenant_id UUID",
           "ALTER TABLE IF EXISTS documentos_instituicao_anexos ADD COLUMN IF NOT EXISTS nome_arquivo VARCHAR(200)",
           "ALTER TABLE IF EXISTS documentos_instituicao_anexos ADD COLUMN IF NOT EXISTS tipo VARCHAR(30)",
@@ -120,6 +122,14 @@ export class DocumentosInstituicaoRepository {
           `
             CREATE INDEX IF NOT EXISTS documentos_instituicao_anexos_tenant_idx
               ON documentos_instituicao_anexos (tenant_id, documento_id, data_upload DESC)
+          `,
+          `
+            UPDATE documentos_instituicao_anexos AS a
+            SET arquivo_id = ar.id
+            FROM arquivos ar
+            WHERE a.arquivo_id IS NULL
+              AND ar.caminho_arquivo = a.caminho_arquivo
+              AND ar.ativo = TRUE
           `,
           `
             UPDATE documentos_instituicao_anexos AS a
@@ -316,6 +326,7 @@ export class DocumentosInstituicaoRepository {
     return prisma.$queryRaw<DocumentoInstituicaoAnexoRow[]>(Prisma.sql`
       SELECT
         id,
+        arquivo_id,
         documento_id,
         nome_arquivo,
         tipo,
@@ -337,6 +348,7 @@ export class DocumentosInstituicaoRepository {
     const rows = await prisma.$queryRaw<DocumentoInstituicaoAnexoRow[]>(Prisma.sql`
       SELECT
         id,
+        arquivo_id,
         documento_id,
         nome_arquivo,
         tipo,
@@ -373,6 +385,7 @@ export class DocumentosInstituicaoRepository {
 
     const inserted = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
       INSERT INTO documentos_instituicao_anexos (
+        arquivo_id,
         tenant_id,
         documento_id,
         nome_arquivo,
@@ -384,6 +397,7 @@ export class DocumentosInstituicaoRepository {
         usuario,
         criado_em
       ) VALUES (
+        ${input.arquivoId ?? null},
         CAST(${tenantId} AS UUID),
         ${documentoId},
         ${input.nomeArquivo},
@@ -417,6 +431,7 @@ export class DocumentosInstituicaoRepository {
     await prisma.$executeRaw(Prisma.sql`
       UPDATE documentos_instituicao_anexos
       SET
+        arquivo_id = ${input.arquivoId ?? null},
         nome_arquivo = ${input.nomeArquivo},
         tipo = ${input.tipo},
         tipo_mime = ${trimOrUndefined(input.tipoMime ?? undefined)},

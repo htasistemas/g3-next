@@ -28,6 +28,7 @@ export type DocumentoInstituicaoAnexoInput = {
   tipo: string;
   tipoMime?: string | null;
   conteudoBase64: string;
+  arquivoId?: bigint | null;
   tamanho?: string | null;
   dataUpload?: string | null;
   usuario: string;
@@ -64,6 +65,7 @@ export type DocumentoInstituicaoRow = {
 
 export type DocumentoInstituicaoAnexoRow = {
   id: bigint;
+  arquivo_id: bigint | null;
   documento_id: bigint;
   nome_arquivo: string;
   tipo: string;

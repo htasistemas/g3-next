@@ -619,21 +619,52 @@ export function GestaoDocumentosPage() {
   }
 
   async function abrirAnexo(item: DocumentoInstituicaoAnexo) {
-    try {
-      await abrirArquivoAutenticado(item.arquivoUrl, item.nomeArquivo);
-    } catch (error: any) {
-      setPopupMensagem({
-        tipo: "erro",
-        titulo: "Erro",
-        texto: error?.message ?? "Não foi possível visualizar o anexo."
-      });
+    const candidatos = [
+      `/api/documentos-instituicao/${item.documentoId}/anexos/${item.id}/arquivo`,
+      item.arquivoId ? `/api/arquivos/${item.arquivoId}/conteudo` : null,
+      item.arquivoUrl ?? null
+    ].filter((valor): valor is string => Boolean(valor));
+
+    for (const valorArquivo of candidatos) {
+      try {
+        await abrirArquivoAutenticado(valorArquivo, item.nomeArquivo);
+        return;
+      } catch (error: any) {
+        const mensagem = String(error?.message ?? "");
+        const eh404 = mensagem.includes("404") || mensagem.toLowerCase().includes("not found");
+        if (!eh404 || valorArquivo === candidatos[candidatos.length - 1]) {
+          setPopupMensagem({
+            tipo: "erro",
+            titulo: "Erro",
+            texto: error?.message ?? "Não foi possível visualizar o anexo."
+          });
+          return;
+        }
+      }
     }
   }
 
   async function imprimirAnexo(item: DocumentoInstituicaoAnexo) {
     setAnexoProcessandoId(item.id);
+    const candidatos = [
+      `/api/documentos-instituicao/${item.documentoId}/anexos/${item.id}/arquivo`,
+      item.arquivoId ? `/api/arquivos/${item.arquivoId}/conteudo` : null,
+      item.arquivoUrl ?? null
+    ].filter((valor): valor is string => Boolean(valor));
+
     try {
-      await imprimirArquivoAutenticado(item.arquivoUrl, item.nomeArquivo);
+      for (const valorArquivo of candidatos) {
+        try {
+          await imprimirArquivoAutenticado(valorArquivo, item.nomeArquivo);
+          return;
+        } catch (error: any) {
+          const mensagem = String(error?.message ?? "");
+          const eh404 = mensagem.includes("404") || mensagem.toLowerCase().includes("not found");
+          if (!eh404 || valorArquivo === candidatos[candidatos.length - 1]) {
+            throw error;
+          }
+        }
+      }
     } catch (error: any) {
       setPopupMensagem({
         tipo: "erro",
@@ -881,6 +912,26 @@ export function GestaoDocumentosPage() {
 
         {abaAtiva === "cadastro" ? (
           <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="md:col-span-2 xl:col-span-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/20 px-4 py-3">
+                <div className="min-w-0 space-y-1">
+                  <p className="text-sm font-semibold text-[var(--g3-active)]">Visualização do documento</p>
+                  <p className="text-xs text-[var(--g3-muted)]">
+                    Acesse o arquivo principal do cadastro ativo com um clique.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="border-emerald-700 bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 hover:text-white"
+                  onClick={() => void abrirAnexo(anexoPrincipal)}
+                  disabled={!anexoPrincipal || anexoProcessandoId === anexoPrincipal.id}
+                >
+                  <Eye className="mr-1.5 h-3.5 w-3.5" />
+                  Visualizar documento
+                </Button>
+              </div>
+            </div>
             <input
               id="arquivoDocumento"
               type="file"
@@ -1074,23 +1125,27 @@ export function GestaoDocumentosPage() {
               />
               Em renovação
             </label>
-            <div className="space-y-1 md:col-span-2 xl:col-span-4">
-              <Label>Descrição</Label>
-              <Textarea
-                rows={3}
-                value={form.descricao ?? ""}
-                onChange={(event) => setForm((atual) => ({ ...atual, descricao: event.target.value }))}
-              />
-            </div>
-            <div className="space-y-1 md:col-span-2 xl:col-span-4">
-              <Label>Observação de renovação</Label>
-              <Textarea
-                rows={2}
-                value={form.observacaoRenovacao ?? ""}
-                onChange={(event) =>
-                  setForm((atual) => ({ ...atual, observacaoRenovacao: event.target.value }))
-                }
-              />
+            <div className="grid gap-3 md:col-span-2 md:grid-cols-2 xl:col-span-4">
+              <div className="space-y-1">
+                <Label>Descrição</Label>
+                <Textarea
+                  rows={2}
+                  className="min-h-20"
+                  value={form.descricao ?? ""}
+                  onChange={(event) => setForm((atual) => ({ ...atual, descricao: event.target.value }))}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Observação de renovação</Label>
+                <Textarea
+                  rows={2}
+                  className="min-h-20"
+                  value={form.observacaoRenovacao ?? ""}
+                  onChange={(event) =>
+                    setForm((atual) => ({ ...atual, observacaoRenovacao: event.target.value }))
+                  }
+                />
+              </div>
             </div>
             <div className="md:col-span-2 xl:col-span-4">
               <Card className="border-[var(--g3-border)]">
@@ -1145,63 +1200,55 @@ export function GestaoDocumentosPage() {
                     </div>
                   ) : anexoPrincipal ? (
                     <div className="space-y-3">
-                      <div className="flex flex-wrap items-start gap-3 rounded-md border border-[var(--g3-border)] bg-[var(--g3-card)] p-3">
-                        <div className="rounded-full bg-[var(--g3-primary-soft)] p-2 text-[var(--g3-active)]">
-                          <FileText className="h-5 w-5" />
-                        </div>
-                        <div className="min-w-0 flex-1 space-y-1">
-                          <p className="truncate text-sm font-semibold">{anexoPrincipal.nomeArquivo}</p>
-                          <p className="text-xs text-[var(--g3-muted)]">
-                            {anexoPrincipal.tipoMime ?? "application/pdf"} • {anexoPrincipal.tamanho ?? "---"}
-                          </p>
-                          {anexosOcultos ? (
+                      <div className="flex flex-col gap-3 rounded-md border border-[var(--g3-border)] bg-[var(--g3-card)] p-3 md:flex-row md:items-start md:justify-between">
+                        <div className="flex min-w-0 items-start gap-3">
+                          <div className="rounded-full bg-[var(--g3-primary-soft)] p-2 text-[var(--g3-active)]">
+                            <FileText className="h-5 w-5" />
+                          </div>
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <p className="truncate text-sm font-semibold">{anexoPrincipal.nomeArquivo}</p>
                             <p className="text-xs text-[var(--g3-muted)]">
-                              Além deste, há {anexosOcultos} arquivo(s) anexado(s) neste documento.
+                              {anexoPrincipal.tipoMime ?? "application/pdf"} • {anexoPrincipal.tamanho ?? "---"}
                             </p>
-                          ) : null}
+                            {anexosOcultos ? (
+                              <p className="text-xs text-[var(--g3-muted)]">
+                                Além deste, há {anexosOcultos} arquivo(s) anexado(s) neste documento.
+                              </p>
+                            ) : null}
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => void abrirAnexo(anexoPrincipal)}
-                          disabled={anexoProcessandoId === anexoPrincipal.id}
-                        >
-                          <Eye className="mr-1.5 h-3.5 w-3.5" />
-                          Visualizar
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => void imprimirAnexo(anexoPrincipal)}
-                          disabled={anexoProcessandoId === anexoPrincipal.id}
-                        >
-                          <Printer className="mr-1.5 h-3.5 w-3.5" />
-                          Imprimir
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => solicitarSubstituicaoAnexo(anexoPrincipal.id)}
-                          disabled={substituirAnexoMutation.isPending || anexoProcessandoId === anexoPrincipal.id}
-                        >
-                          <Upload className="mr-1.5 h-3.5 w-3.5" />
-                          Substituir
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="danger"
-                          size="sm"
-                          onClick={() => void excluirAnexoExistente(anexoPrincipal)}
-                          disabled={excluirAnexoMutation.isPending || anexoProcessandoId === anexoPrincipal.id}
-                        >
-                          <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-                          Excluir
-                        </Button>
+                        <div className="flex flex-wrap gap-2 md:flex-col md:items-stretch lg:flex-row lg:items-center">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => void imprimirAnexo(anexoPrincipal)}
+                            disabled={anexoProcessandoId === anexoPrincipal.id}
+                          >
+                            <Printer className="mr-1.5 h-3.5 w-3.5" />
+                            Imprimir
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => solicitarSubstituicaoAnexo(anexoPrincipal.id)}
+                            disabled={substituirAnexoMutation.isPending || anexoProcessandoId === anexoPrincipal.id}
+                          >
+                            <Upload className="mr-1.5 h-3.5 w-3.5" />
+                            Substituir
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="danger"
+                            size="sm"
+                            onClick={() => void excluirAnexoExistente(anexoPrincipal)}
+                            disabled={excluirAnexoMutation.isPending || anexoProcessandoId === anexoPrincipal.id}
+                          >
+                            <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                            Excluir
+                          </Button>
+                        </div>
                       </div>
                       {anexosParaExibir.length > 1 ? (
                         <div className="space-y-2">

@@ -34,6 +34,7 @@ export type DocumentoInstituicaoPayload = Omit<
 
 export type DocumentoInstituicaoAnexo = {
   id: string;
+  arquivoId?: string;
   documentoId: string;
   nomeArquivo: string;
   tipo: string;

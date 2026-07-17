@@ -1,6 +1,66 @@
 {
   "entries":  [
                     {
+                        "version":  "1.00.635",
+                        "releaseDate":  "2026-07-17",
+                        "title":  "Limpeza de arquivos sem físico",
+                        "description":  "Os registros de arquivos ativos sem binário no storage foram desativados para manter o banco alinhado ao armazenamento físico.",
+                        "changes":  [
+                                        "O backend passou a limpar arquivos ativos sem arquivo físico correspondente no storage, inclusive caminhos já separados por tenant.",
+                                        "Os anexos de documentos vinculados aos arquivos órfãos foram removidos para evitar novas falhas de visualização e download.",
+                                        "Foi adicionado um comando de dry-run para auditar a limpeza antes da execução definitiva."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.634",
+                        "releaseDate":  "2026-07-17",
+                        "title":  "Migração do storage legado por tenant",
+                        "description":  "O storage legado foi migrado para a árvore por tenant e os arquivos passaram a contar com backup local diário em pacote compactado.",
+                        "changes":  [
+                                        "A migração física dos arquivos existentes moveu o que estava disponível para /storage/tenants/<tenant>/..., preservando a separação por instituição.",
+                                        "Os registros sem tenant resolvido foram mantidos em /storage/tenants/sem-tenant/ para não misturar com os arquivos de clientes identificados.",
+                                        "O processo atualizou os caminhos do banco e dos anexos de documentos de acordo com o novo layout, sem regravar binários no banco."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.633",
+                        "releaseDate":  "2026-07-17",
+                        "title":  "Storage por tenant e backup local diário",
+                        "description":  "Os arquivos e imagens passaram a ser gravados por tenant no storage e ganharam backup local diário em pacote compactado.",
+                        "changes":  [
+                                        "Os novos uploads passaram a gravar a árvore de armazenamento em /storage/tenants/<tenant>/..., mantendo isolamento por instituição.",
+                                        "A tela Documentos da instituição continua abrindo anexos pelo caminho armazenado e permanece compatível com os registros antigos.",
+                                        "O backend ganhou backup local diário em /storage/backups/arquivos e o scheduler de imagens passou a reconhecer caminhos prefixados por tenant."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.632",
+                        "releaseDate":  "2026-07-17",
+                        "title":  "Visualização de anexos por id do arquivo",
+                        "description":  "A tela Documentos da instituição passou a abrir o anexo principal pelo identificador do arquivo armazenado, evitando falhas de rota por caminho legado.",
+                        "changes":  [
+                                        "Os anexos de documentos agora persistem o arquivo_id do storage e a visualização passa a usar o endpoint autenticado por id.",
+                                        "Registros antigos recebem backfill de arquivo_id quando o caminho do anexo é encontrado na tabela de arquivos.",
+                                        "O botão Visualizar documento segue no topo da aba Cadastro e edição, com descrição e observação de renovação mais compactas."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.631",
+                        "releaseDate":  "2026-07-17",
+                        "title":  "Visualização de anexos de documentos corrigida",
+                        "description":  "A tela Documentos da instituição passou a abrir anexos corretamente e ganhou o botão principal de visualização no topo da aba Cadastro e edição.",
+                        "changes":  [
+                                        "O upload de anexos da instituição agora grava o tenant autenticado nos metadados do arquivo, evitando 404 ao tentar abrir o documento salvo.",
+                                        "A leitura legada de arquivos da instituição passou a considerar documentos vinculados ao tenant para recuperar anexos antigos sem tenant explícito.",
+                                        "O botão Visualizar documento foi movido para o topo da tela de cadastro e edição, e os campos Descrição e Observação de renovação ficaram mais compactos na altura."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.630",
                         "releaseDate":  "2026-07-14",
                         "title":  "Disponibilidade de veículos e login por e-mail",

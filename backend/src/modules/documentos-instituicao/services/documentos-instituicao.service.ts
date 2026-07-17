@@ -1,4 +1,5 @@
 import { AppError } from "../../../shared/errors/app-error.js";
+import { Readable } from "node:stream";
 import { mapaCamposTextoDocumentosInstituicao } from "../../../utils/text-format-config.js";
 import { normalizarObjetoTexto } from "../../../utils/text-formatter.js";
 import { EmailService } from "../../email/services/email.service.js";
@@ -22,6 +23,7 @@ import {
 } from "../documentos-instituicao.schema.js";
 import { DocumentosInstituicaoRepository } from "../repositories/documentos-instituicao.repository.js";
 import { storageService } from "../../arquivos/services/storage-instance.js";
+import { parseBase64Payload } from "../../arquivos/services/storage-utils.js";
 
 export class DocumentosInstituicaoService {
   private readonly repository = new DocumentosInstituicaoRepository();
@@ -81,6 +83,7 @@ export class DocumentosInstituicaoService {
       nomeOriginal: input.nomeArquivo,
       mimeType: input.tipoMime,
       entidadeId: documentoId,
+      tenantId,
       usuarioUploadId: usuarioId,
       observacao: input.tipoMime ?? input.tipo ?? tipoAnexo
     });
@@ -90,6 +93,7 @@ export class DocumentosInstituicaoService {
         ...input,
         tipo: tipoAnexo,
         conteudoBase64: arquivo.caminhoArquivo ?? input.conteudoBase64,
+        arquivoId: arquivo.registro?.id ?? null,
         nomeArquivo: input.nomeArquivo || arquivo.registro?.nome_original || "anexo",
         tipoMime: input.tipoMime || arquivo.registro?.mime_type
       }, tenantId);
@@ -128,6 +132,7 @@ export class DocumentosInstituicaoService {
       nomeOriginal: input.nomeArquivo,
       mimeType: input.tipoMime,
       entidadeId: documentoId,
+      tenantId,
       usuarioUploadId: usuarioId,
       observacao: input.tipoMime ?? input.tipo ?? tipoAnexo
     });
@@ -137,6 +142,7 @@ export class DocumentosInstituicaoService {
         ...input,
         tipo: tipoAnexo,
         conteudoBase64: arquivo.caminhoArquivo ?? input.conteudoBase64,
+        arquivoId: arquivo.registro?.id ?? null,
         nomeArquivo: input.nomeArquivo || arquivo.registro?.nome_original || "anexo",
         tipoMime: input.tipoMime || arquivo.registro?.mime_type
       }, tenantId);
@@ -193,7 +199,18 @@ export class DocumentosInstituicaoService {
     if (!anexo.caminho_arquivo) {
       throw new AppError("Anexo sem arquivo armazenado.", 404);
     }
-    return anexo.caminho_arquivo;
+
+    const caminho = anexo.caminho_arquivo.trim();
+    if (caminho.startsWith("data:")) {
+      const { buffer, mimeType } = parseBase64Payload(caminho);
+      return {
+        mimeType: mimeType ?? "application/octet-stream",
+        nomeArquivo: anexo.nome_arquivo,
+        stream: Readable.from(buffer)
+      };
+    }
+
+    return storageService.obterConteudoPorCaminhoBruto(caminho);
   }
 
   async listarHistorico(rawDocumentoId: string, rawTenantId?: string) {

@@ -68,7 +68,7 @@ const secoesManual: ManualSecao[] = [
           "Essa recuperação local sem e-mail é apenas de apoio ao desenvolvimento; em ambientes com envio ativo, a senha temporária continua sendo enviada ao endereço cadastrado.",
           "O card Famílias em extrema pobreza foi removido da Visão geral para liberar espaço aos indicadores operacionais de termos, documentos, motoristas, almoxarifado, patrimônio e empréstimos para eventos.",
           "Na impressão da ficha cadastral do beneficiário e no recibo de doação entregue, a logomarca do cabeçalho é carregada diretamente do storage persistente da unidade quando estiver salva como caminho lógico do sistema.",
-          "Fotos, documentos e demais binários agora devem ser enviados para o storage persistente do sistema, com o banco guardando apenas metadados e caminhos lógicos para evitar perda em troca de máquina, backup ou atualização de ambiente.",
+          "Fotos, documentos e demais binários agora devem ser enviados para o storage persistente do sistema, separados por tenant, com o banco guardando apenas metadados e caminhos lógicos para evitar perda em troca de máquina, backup ou atualização de ambiente.",
           "No cadastro da unidade assistencial, a Logomarca da unidade vazado preserva o arquivo original enviado pelo cliente, incluindo SVG e imagens com transparência, enquanto a Logomarca do relatório pode ser normalizada para manter compatibilidade de impressão.",
           "Na aba Salas de atendimento do Cadastro de unidade assistencial, informe o nome da sala e use Incluir sala para montar a lista abaixo; salas vinculadas a uso no sistema não podem ser removidas e devem ser inativadas quando não forem mais utilizadas."
         ]
@@ -451,15 +451,17 @@ const secoesManual: ManualSecao[] = [
         comoUsar: [
           "Cadastre ou selecione um documento na lista para abrir o detalhamento completo.",
           "Quando um documento vencido for renovado, atualize a validade e salve o cadastro. A nova data passa a ser considerada exatamente pelo dia informado.",
+          "Use o botão Visualizar documento no topo da aba Cadastro e edição para abrir o arquivo principal do cadastro ativo em um clique.",
           "Use a seção Arquivos do documento para anexar um ou mais arquivos, substituir, visualizar, imprimir ou excluir cada arquivo em um clique.",
           "Após cada alteração relevante, consulte o histórico do documento para acompanhar registros de cadastro, envio, troca e remoção de anexo."
         ],
         atencoes: [
-          "O sistema aceita anexos PDF, JPG e PNG e grava apenas o caminho do arquivo no cadastro do documento.",
+          "O sistema aceita anexos PDF, JPG e PNG e grava apenas o caminho do arquivo no cadastro do documento, dentro da pasta do tenant autenticado.",
           "A renovação de documento vencido agora respeita corretamente a data de validade informada, inclusive quando a nova validade for o dia atual.",
           "Se o documento já estiver salvo, o anexo é armazenado no storage do sistema e permanece disponível para substituição e exclusão sem duplicar arquivo no banco.",
           "O envio dos anexos na aba Cadastro e edição aceita seleção múltipla e mostra a evolução do upload em barra percentual até a conclusão.",
-          "A tela Documentos da instituição agora lista, cadastra, atualiza e exclui documentos, anexos, arquivos e histórico sempre dentro do tenant autenticado, impedindo mistura de documentos entre instituições."
+          "A tela Documentos da instituição agora lista, cadastra, atualiza e exclui documentos, anexos, arquivos e histórico sempre dentro do tenant autenticado, impedindo mistura de documentos entre instituições.",
+          "Os arquivos dessa tela passam a ficar em /storage/tenants/<tenant>/instituicoes/documentos, mantendo organização por instituição e facilitando backup e restauração."
         ]
       },
       {
@@ -1113,10 +1115,10 @@ const secoesManual: ManualSecao[] = [
         objetivo: "Gerenciar cópias do banco de dados e das imagens geradas pelo sistema com geração, download e restauração guiada.",
         comoUsar: [
           "Use Gerar backup do banco para criar uma cópia completa do PostgreSQL antes de qualquer manutenção crítica.",
-          "Use Gerar backup das imagens para preservar a árvore de imagens do storage do sistema em arquivo compactado.",
+          "Use Gerar backup dos arquivos para preservar a árvore completa de documentos e imagens do storage do sistema em arquivo compactado.",
           "Selecione um item do histórico para baixar o arquivo gerado ou iniciar a restauração correspondente.",
           "Na restauração, digite RESTAURAR para liberar a ação e garanta que o ambiente esteja pronto para a intervenção.",
-          "Os backups ficam organizados em /storage/backups/sistema, separados por banco e imagens, com metadados de auditoria."
+          "Os backups ficam organizados em /storage/backups/sistema para banco e imagens do histórico administrativo, e em /storage/backups/arquivos para a cópia diária local dos arquivos e imagens de usuários."
         ],
         atencoes: [
           "A restauração exige perfil de administrador e pode indisponibilizar temporariamente o banco ou as imagens enquanto o processo ocorre.",

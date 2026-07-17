@@ -16,7 +16,11 @@
     "prisma:generate": "prisma generate",
     "prisma:studio": "prisma studio",
     "dev:seed-admin": "tsx scripts/seed-dev-admin.ts",
-    "g3n:base": "tsx scripts/preparar-tenant-apresentacao.ts"
+    "g3n:base": "tsx scripts/preparar-tenant-apresentacao.ts",
+    "storage:migrate-tenants": "tsx scripts/migrar-storage-tenant.ts",
+    "storage:migrate-tenants:dry-run": "tsx scripts/migrar-storage-tenant.ts --dry-run",
+    "storage:cleanup-missing": "tsx scripts/limpar-arquivos-sem-fisico.ts",
+    "storage:cleanup-missing:dry-run": "tsx scripts/limpar-arquivos-sem-fisico.ts --dry-run"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1075.0",

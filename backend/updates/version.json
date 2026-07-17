@@ -1,9 +1,9 @@
 {
-  "latestVersion": "1.00.630",
-  "releaseDate": "2026-07-14",
-  "description": "A disponibilidade de veículos entrou no Controle de Frotas e o login passou a identificar o tenant por e-mail quando possível.",
+  "latestVersion": "1.00.635",
+  "releaseDate": "2026-07-17",
+  "description": "O storage legado foi migrado para a árvore por tenant e os arquivos passaram a contar com backup local diário em pacote compactado.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.630",
+  "minCompatibleVersion": "1.00.635",
   "releaseType": "stable"
 }

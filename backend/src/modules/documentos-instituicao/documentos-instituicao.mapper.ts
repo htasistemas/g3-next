@@ -36,6 +36,7 @@ export function mapDocumentoInstituicaoToResponse(row: DocumentoInstituicaoRow) 
 export function mapDocumentoInstituicaoAnexoToResponse(row: DocumentoInstituicaoAnexoRow) {
   return {
     id: toStringId(row.id),
+    arquivoId: row.arquivo_id ? toStringId(row.arquivo_id) : undefined,
     documentoId: toStringId(row.documento_id),
     nomeArquivo: row.nome_arquivo,
     tipo: row.tipo,

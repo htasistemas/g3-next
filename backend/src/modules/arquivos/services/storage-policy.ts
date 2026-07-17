@@ -62,6 +62,7 @@ const attachmentExtensions = [...documentExtensions, "mp4", "webm", "mov"];
 const attachmentMimeTypes = [...documentMimeTypes, "video/mp4", "video/webm", "video/quicktime"];
 
 export const requiredStorageDirectories = [
+  "tenants",
   "beneficiarios/documentos",
   "banco-empregos/candidatos/documentos",
   "colaboradores/documentos",
@@ -79,6 +80,8 @@ export const requiredStorageDirectories = [
   "contabilidade/anexos",
   "captacao/doadores/anexos",
   "captacao/campanhas/banners",
+  "backups/arquivos",
+  "backups/imagens",
   "imagens/beneficiarios",
   "imagens/beneficiarios/thumbs",
   "imagens/biblioteca",
