@@ -1,6 +1,30 @@
 {
   "entries":  [
                     {
+                        "version":  "1.00.637",
+                        "releaseDate":  "2026-07-17",
+                        "title":  "Progresso no envio do documento",
+                        "description":  "A tela Documentos da instituição passou a exibir barra de progresso durante o envio do documento e dos anexos pendentes.",
+                        "changes":  [
+                                        "O botão Salvar agora mostra progresso desde o início da requisição do documento.",
+                                        "A mesma barra acompanha o envio dos anexos pendentes até a conclusão do processamento.",
+                                        "A tela mantém o estado visual de pendências até finalizar o ciclo completo de gravação."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.636",
+                        "releaseDate":  "2026-07-17",
+                        "title":  "Anexos no salvar e listagem com clip",
+                        "description":  "A tela de documentos passou a aceitar anexos antes do primeiro salvamento e a listagem ganhou indicador visual de anexo.",
+                        "changes":  [
+                                        "Os arquivos agora podem ser selecionados antes de salvar o documento e são enviados automaticamente no mesmo clique de Salvar.",
+                                        "A aba Cadastro e edição passou a manter uma fila visível de arquivos pendentes até o envio concluir.",
+                                        "A listagem de documentos foi ordenada alfabeticamente e ganhou um indicador com clip para documentos com anexo."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.635",
                         "releaseDate":  "2026-07-17",
                         "title":  "Limpeza de arquivos sem físico",

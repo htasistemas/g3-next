@@ -458,8 +458,10 @@ const secoesManual: ManualSecao[] = [
         atencoes: [
           "O sistema aceita anexos PDF, JPG e PNG e grava apenas o caminho do arquivo no cadastro do documento, dentro da pasta do tenant autenticado.",
           "A renovação de documento vencido agora respeita corretamente a data de validade informada, inclusive quando a nova validade for o dia atual.",
-          "Se o documento já estiver salvo, o anexo é armazenado no storage do sistema e permanece disponível para substituição e exclusão sem duplicar arquivo no banco.",
-          "O envio dos anexos na aba Cadastro e edição aceita seleção múltipla e mostra a evolução do upload em barra percentual até a conclusão.",
+          "Os arquivos podem ser selecionados antes do primeiro salvamento e são enviados automaticamente quando você clicar em Salvar, sem exigir um segundo ciclo de gravação.",
+          "A tela mantém a fila de arquivos pendentes visível até a conclusão do envio e exibe a barra de progresso enquanto o documento e os anexos estão sendo enviados.",
+          "Se o documento já estiver salvo, o anexo permanece disponível para substituição e exclusão sem duplicar arquivo no banco.",
+          "A listagem de documentos mostra um clip quando há anexo cadastrado e orienta o usuário quando ainda não existe arquivo vinculado.",
           "A tela Documentos da instituição agora lista, cadastra, atualiza e exclui documentos, anexos, arquivos e histórico sempre dentro do tenant autenticado, impedindo mistura de documentos entre instituições.",
           "Os arquivos dessa tela passam a ficar em /storage/tenants/<tenant>/instituicoes/documentos, mantendo organização por instituição e facilitando backup e restauração."
         ]

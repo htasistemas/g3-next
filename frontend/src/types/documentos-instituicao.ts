@@ -23,6 +23,8 @@ export type DocumentoInstituicao = {
   semVencimento?: boolean;
   vencimentoIndeterminado?: boolean;
   situacao?: DocumentoSituacao;
+  anexoQuantidade?: number;
+  temAnexo?: boolean;
   criadoEm?: string;
   atualizadoEm?: string;
 };

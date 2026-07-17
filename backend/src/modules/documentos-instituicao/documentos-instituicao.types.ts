@@ -59,6 +59,7 @@ export type DocumentoInstituicaoRow = {
   sem_vencimento: boolean;
   vencimento_indeterminado: boolean;
   situacao: string | null;
+  anexo_quantidade?: number;
   criado_em: Date;
   atualizado_em: Date;
 };

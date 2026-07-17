@@ -157,27 +157,34 @@ export class DocumentosInstituicaoRepository {
     await this.garantirEstrutura();
     return prisma.$queryRaw<DocumentoInstituicaoRow[]>(Prisma.sql`
       SELECT
-        id,
-        tipo_documento,
-        orgao_emissor,
-        descricao,
-        categoria,
-        emissao,
-        validade,
-        responsavel_interno,
-        modo_renovacao,
-        observacao_renovacao,
-        gerar_alerta,
-        dias_antecedencia,
-        forma_alerta,
-        em_renovacao,
-        sem_vencimento,
-        vencimento_indeterminado,
-        situacao,
-        criado_em,
-        atualizado_em
-      FROM documentos_instituicao
-      WHERE tenant_id::text = ${tenantId}
+        d.id,
+        d.tipo_documento,
+        d.orgao_emissor,
+        d.descricao,
+        d.categoria,
+        d.emissao,
+        d.validade,
+        d.responsavel_interno,
+        d.modo_renovacao,
+        d.observacao_renovacao,
+        d.gerar_alerta,
+        d.dias_antecedencia,
+        d.forma_alerta,
+        d.em_renovacao,
+        d.sem_vencimento,
+        d.vencimento_indeterminado,
+        d.situacao,
+        d.criado_em,
+        d.atualizado_em,
+        COALESCE(anexos.total, 0)::int AS anexo_quantidade
+      FROM documentos_instituicao d
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*) AS total
+        FROM documentos_instituicao_anexos a
+        WHERE a.documento_id = d.id
+          AND a.tenant_id::text = ${tenantId}
+      ) anexos ON TRUE
+      WHERE d.tenant_id::text = ${tenantId}
       ORDER BY emissao DESC, id DESC
     `);
   }
@@ -186,28 +193,35 @@ export class DocumentosInstituicaoRepository {
     await this.garantirEstrutura();
     const rows = await prisma.$queryRaw<DocumentoInstituicaoRow[]>(Prisma.sql`
       SELECT
-        id,
-        tipo_documento,
-        orgao_emissor,
-        descricao,
-        categoria,
-        emissao,
-        validade,
-        responsavel_interno,
-        modo_renovacao,
-        observacao_renovacao,
-        gerar_alerta,
-        dias_antecedencia,
-        forma_alerta,
-        em_renovacao,
-        sem_vencimento,
-        vencimento_indeterminado,
-        situacao,
-        criado_em,
-        atualizado_em
-      FROM documentos_instituicao
-      WHERE id = ${id}
-        AND tenant_id::text = ${tenantId}
+        d.id,
+        d.tipo_documento,
+        d.orgao_emissor,
+        d.descricao,
+        d.categoria,
+        d.emissao,
+        d.validade,
+        d.responsavel_interno,
+        d.modo_renovacao,
+        d.observacao_renovacao,
+        d.gerar_alerta,
+        d.dias_antecedencia,
+        d.forma_alerta,
+        d.em_renovacao,
+        d.sem_vencimento,
+        d.vencimento_indeterminado,
+        d.situacao,
+        d.criado_em,
+        d.atualizado_em,
+        COALESCE(anexos.total, 0)::int AS anexo_quantidade
+      FROM documentos_instituicao d
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*) AS total
+        FROM documentos_instituicao_anexos a
+        WHERE a.documento_id = d.id
+          AND a.tenant_id::text = ${tenantId}
+      ) anexos ON TRUE
+      WHERE d.id = ${id}
+        AND d.tenant_id::text = ${tenantId}
       LIMIT 1
     `);
     return rows[0] ?? null;
