@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import type { LucideIcon } from "lucide-react";
 import {
   Building2,
@@ -96,7 +96,7 @@ type AcaoCrud = {
   icon: LucideIcon;
 };
 
-const tituloTela = "Cadastro de unidade assistencial";
+const tituloTela = "Cadastro de unidade de atendimento";
 
 function formatarCnpj(valor?: string) {
   const digitos = somenteDigitos(valor);
@@ -182,6 +182,7 @@ function mapFormularioParaPayload(
 ): UnidadeAssistencial {
   const payload: UnidadeAssistencial = {
     id_unidade: unidadeId,
+    tipo_unidade: values.tipo_unidade,
     nome_fantasia: values.nome_fantasia.trim(),
     razao_social: values.razao_social?.trim() || undefined,
     cnpj: values.cnpj?.trim() || undefined,
@@ -221,12 +222,14 @@ function mapFormularioParaPayload(
 
 export function CadastroUnidadeAssistencialPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { usuario } = useAuth();
   const [abaAtiva, setAbaAtiva] = useState<AbaId>("listagem");
   const [filtroDraft, setFiltroDraft] = useState<UnidadeAssistencialFiltro>({
     nome_fantasia: "",
     cnpj: "",
     cidade: "",
+    tipo_unidade: undefined,
     unidade_principal: undefined
   });
   const [filtros, setFiltros] = useState<UnidadeAssistencialFiltro>(filtroDraft);
@@ -243,6 +246,13 @@ export function CadastroUnidadeAssistencialPage() {
   const ultimoCepConsultadoRef = useRef("");
   const inputLogomarcaRef = useRef<HTMLInputElement | null>(null);
   const inputLogomarcaRelatorioRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    const tipo = new URLSearchParams(location.search).get("tipo_unidade");
+    if (tipo !== "ASSISTENCIAL" && tipo !== "ENSINO") return;
+    setFiltroDraft((atual) => ({ ...atual, tipo_unidade: tipo }));
+    setFiltros((atual) => ({ ...atual, tipo_unidade: tipo }));
+  }, [location.search]);
 
   const { data: listaData, isLoading: carregandoLista } = useUnidadesAssistenciais(filtros);
   const { data: unidadeData, isLoading: carregandoDetalhes } = useUnidadeAssistencial(unidadeSelecionadaId);
@@ -434,10 +444,6 @@ export function CadastroUnidadeAssistencialPage() {
           });
         }
 
-        setMensagem({
-          tipo: "sucesso",
-          texto: "Endereço preenchido automaticamente pelo CEP."
-        });
       } catch (error: any) {
         if (!ativo) return;
         setMensagem({
@@ -980,6 +986,18 @@ export function CadastroUnidadeAssistencialPage() {
                         {...register("razao_social")}
                         onBlurCapture={() => aplicarFormatacaoCampo("razao_social")}
                       />
+                    </div>
+
+                    <div className="xl:col-span-4">
+                      <Label htmlFor="tipo_unidade">Tipo da unidade*</Label>
+                      <select
+                        id="tipo_unidade"
+                        {...register("tipo_unidade")}
+                        className="h-10 w-full rounded-md border border-[var(--g3-border)] bg-[var(--g3-background)] px-3 text-sm text-[var(--g3-foreground)]"
+                      >
+                        <option value="ASSISTENCIAL">Unidade assistencial</option>
+                        <option value="ENSINO">Unidade de ensino</option>
+                      </select>
                     </div>
 
                     <div className="xl:col-span-4">

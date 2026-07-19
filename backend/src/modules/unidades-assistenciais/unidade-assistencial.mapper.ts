@@ -22,6 +22,7 @@ export function mapUnidadeAssistencialToResponse(record: UnidadeAssistencialDbRe
   return {
     id_unidade: toStringId(record.id),
     nome_fantasia: record.nomeFantasia,
+    tipo_unidade: record.tipoUnidade,
     razao_social: record.razaoSocial ?? undefined,
     cnpj: record.cnpj ?? undefined,
     telefone: record.telefone ?? undefined,

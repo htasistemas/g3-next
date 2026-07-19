@@ -25,6 +25,7 @@ export const salaUnidadeSchema = z.object({
 
 export const unidadeAssistencialFormSchema = z.object({
   id_unidade: z.string().optional(),
+  tipo_unidade: z.enum(["ASSISTENCIAL", "ENSINO"]),
   nome_fantasia: z.string().trim().min(3, "Informe o nome fantasia."),
   razao_social: z.string().optional(),
   cnpj: z
@@ -68,6 +69,7 @@ export const unidadeAssistencialFormSchema = z.object({
 export type UnidadeAssistencialFormValues = z.infer<typeof unidadeAssistencialFormSchema>;
 
 export const unidadeAssistencialDefaultValues: UnidadeAssistencialFormValues = {
+  tipo_unidade: "ASSISTENCIAL",
   nome_fantasia: "",
   razao_social: "",
   cnpj: "",

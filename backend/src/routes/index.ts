@@ -90,6 +90,8 @@ appRoutes.use("/api/agendamentos", agendamentosRoutes);
 appRoutes.use("/api/beneficiarios", beneficiarioRoutes);
 appRoutes.use("/api/familias", familiaRoutes);
 appRoutes.use("/api/unidades-assistenciais", unidadeAssistencialRoutes);
+// Alias compatível com a nomenclatura atual; a rota antiga permanece ativa para não quebrar integrações.
+appRoutes.use("/api/unidades-atendimento", unidadeAssistencialRoutes);
 appRoutes.use("/api/profissionais", profissionalRoutes);
 appRoutes.use("/api/voluntarios", voluntarioRoutes);
 appRoutes.use("/api/matriculas", matriculaRoutes);

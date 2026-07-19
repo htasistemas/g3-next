@@ -1332,10 +1332,27 @@ const secoesManual: ManualSecao[] = [
         nome: "Visão geral educacional",
         objetivo: "Acompanhar os principais quantitativos da estrutura educacional do tenant autenticado.",
         comoUsar: [
-          "Acesse o menu Educacional e use Visão geral para consultar alunos, matrículas, turmas, disciplinas e anos letivos abertos.",
-          "Use Estrutura acadêmica para cadastrar anos letivos, etapas, séries, disciplinas e turmas.",
-          "Use Alunos e matrículas para buscar um beneficiário existente e vinculá-lo como aluno sem duplicar seu cadastro.",
-          "Use Alunos por turma para acompanhar as turmas disponíveis; o fluxo de distribuição será ampliado na próxima fase."
+          "Acesse diretamente o submenu Visão geral para consultar alunos, matrículas, turmas, disciplinas e anos letivos abertos.",
+          "O menu Educacional mantém os cadastros principais e agrupa as operações relacionadas em abas: Alunos reúne Alunos, Matrículas, Transferências e Autorizações; Diário de classe reúne Diário, Plano de aula, Avaliações e notas e Chamada e frequência; Professores e equipe pedagógica reúne também o Planejamento pedagógico.",
+          "Ano letivo, Etapas de ensino, Séries e anos escolares, Disciplinas e Turmas ficam agrupados na tela Estrutura acadêmica e não são repetidos como submenus independentes.",
+          "As abas de Alunos, Diário de classe e Professores e equipe pedagógica seguem a navegação lateral numerada do G3N, com o conteúdo exibido ao lado da aba selecionada.",
+          "Na Visão geral educacional, use os filtros de unidade, ano letivo, etapa, turma e turno e clique nos cards para abrir o fluxo relacionado. Os indicadores de frequência, risco, evasão, ocorrências, chamadas pendentes e média são calculados a partir dos registros persistidos.",
+          "O backend também calcula disciplinas ativas e anos letivos abertos diretamente no PostgreSQL. A tela não utiliza números simulados.",
+          "Ao enturmar, o sistema impede que uma matrícula ativa fique em duas turmas ao mesmo tempo, bloqueia turma lotada e mantém a saída anterior com data de fim para preservar o histórico.",
+          "Ao lançar notas, o valor é validado contra o valor máximo da avaliação. Matrículas e turmas vinculadas a unidade devem utilizar somente unidades classificadas como Unidade de ensino.",
+          "As migrations educacionais são aplicadas automaticamente durante o deploy, antes da inicialização do backend, garantindo que as tabelas de frequência e demais estruturas existam antes do uso da Visão geral.",
+          "No desenvolvimento local, o comando npm run dev também verifica e aplica as migrations educacionais. Em bancos legados sem histórico Prisma, aplica os scripts educacionais idempotentes como compatibilidade.",
+          "Use o submenu Alunos para buscar um beneficiário existente e vinculá-lo como aluno sem duplicar seu cadastro; Matrículas e Alunos por turma serão ampliados nas próximas fases.",
+          "Use Professores e equipe pedagógica para abrir o cadastro central de profissionais; os vínculos educacionais serão associados sem duplicar o profissional.",
+          "Use Grade curricular para relacionar componentes a ano letivo, etapa e série. Use Horários para registrar a grade semanal da turma; o sistema bloqueia sobreposição para a mesma turma, professor ou sala."
+          , "Use Diário de classe para registrar conteúdo por turma, componente e data. Em Chamada/Frequência, vincule a situação do aluno à aula registrada; os registros permanecem salvos no histórico.",
+          "Use Plano de aula para registrar tema, objetivos, conteúdo e metodologia. Use Planejamento pedagógico para organizar metas e estratégias por período do ano letivo.",
+          "Use Avaliações e notas para cadastrar avaliações por turma e componente curricular e depois lançar a nota do aluno pela matrícula correspondente."
+          , "Use Boletins para registrar média, frequência e resultado por período da matrícula. Use Histórico escolar para preservar os resultados anuais do aluno sem sobrescrever anos anteriores."
+          , "Use Ocorrências para registrar fatos pedagógicos e providências relacionadas ao aluno. Use Agenda escolar para cadastrar eventos por turma e data."
+          , "Use Documentos/Declarações para registrar o documento e seus metadados; o arquivo físico deve permanecer no storage. Use Relatórios e indicadores para consultar os quantitativos reais da instituição."
+          , "Os registros de Rotina infantil e Desenvolvimento infantil são pedagógicos e não substituem prontuário ou prescrição médica."
+          , "O cadastro mestre passou a se chamar Unidades de atendimento. Cada unidade possui tipo obrigatório: Unidade assistencial ou Unidade de ensino. A filtragem é feita no backend e unidades antigas permanecem assistenciais."
         ],
         atencoes: [
           "Os dados são isolados por instituição/tenant e não devem ser digitados manualmente.",

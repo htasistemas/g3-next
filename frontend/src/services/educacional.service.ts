@@ -9,11 +9,28 @@ export type EducacionalRecurso =
   | "turmas"
   | "alunos"
   | "matriculas"
-  | "enturmacoes";
+  | "enturmacoes"
+  | "grade-curricular"
+  | "horarios"
+  | "diarios"
+  | "frequencias"
+  | "planos-aula"
+  | "planejamentos"
+  | "avaliacoes"
+  | "notas"
+  | "boletins"
+  | "historicos"
+  | "ocorrencias"
+  | "agenda"
+  | "documentos"
+  | "rotinas-infantis"
+  | "desenvolvimentos-infantis"
+  | "transferencias"
+  | "autorizacoes";
 
 export const educacionalService = {
-  async resumo() {
-    const { data } = await httpClient.get<EducacionalResumo>("/api/educacional/resumo");
+  async resumo(filtros?: Record<string, string>) {
+    const { data } = await httpClient.get<EducacionalResumo>("/api/educacional/resumo", { params: filtros });
     return data;
   },
   async listar(recurso: EducacionalRecurso) {

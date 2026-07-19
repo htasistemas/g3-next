@@ -415,10 +415,10 @@ export function LoginPage() {
               <div className="space-y-2 rounded-[24px] border border-emerald-800 bg-emerald-950 px-5 py-5 text-white shadow-2xl shadow-emerald-950/30">
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-100">Sistema G3</p>
                 <h1 className="text-2xl font-semibold leading-tight">
-                  Gestão social moderna, organizada e preparada para crescer.
+                  Gestão moderna, organizada e preparada para crescer.
                 </h1>
                 <p className="text-xs leading-5 text-emerald-50/90">
-                  Plataforma integrada para cadastro, acompanhamento e atendimento de beneficiários.
+                  Plataforma integrada para cadastro, acompanhamento e atendimento de alunos ou beneficiários.
                 </p>
               </div>
             </div>

@@ -124,6 +124,9 @@ export class UnidadeAssistencialRepository {
       if (typeof filters.unidade_principal === "boolean") {
         where.unidadePrincipal = filters.unidade_principal;
       }
+      if (filters.tipo_unidade) {
+        where.tipoUnidade = filters.tipo_unidade;
+      }
 
       const unidades = await prisma.unidadeAssistencial.findMany({
         where,
@@ -268,6 +271,7 @@ export class UnidadeAssistencialRepository {
           telefone: normalizeDigits(input.telefone),
           horarioFuncionamento: trimOrUndefined(input.horario_funcionamento),
           observacoes: trimOrUndefined(input.observacoes),
+          tipoUnidade: input.tipo_unidade ?? "ASSISTENCIAL",
           unidadePrincipal: input.unidade_principal ?? false,
           enderecoId,
           raioPontoMetros: input.raio_ponto_metros ?? 100,
@@ -419,6 +423,7 @@ export class UnidadeAssistencialRepository {
           telefone: normalizeDigits(input.telefone),
           horarioFuncionamento: trimOrUndefined(input.horario_funcionamento),
           observacoes: trimOrUndefined(input.observacoes),
+          tipoUnidade: input.tipo_unidade ?? existing.tipoUnidade,
           unidadePrincipal: input.unidade_principal ?? existing.unidadePrincipal,
           enderecoId,
           raioPontoMetros: input.raio_ponto_metros ?? existing.raioPontoMetros,
@@ -675,6 +680,11 @@ export class UnidadeAssistencialRepository {
     if (typeof filters.unidade_principal === "boolean") {
       params.push(filters.unidade_principal);
       condicoes.push(`ua.unidade_principal = $${params.length}`);
+    }
+
+    if (filters.tipo_unidade) {
+      params.push(filters.tipo_unidade);
+      condicoes.push(`ua.tipo_unidade = $${params.length}`);
     }
 
     const rows = await prisma.$queryRawUnsafe<IdRow[]>(

@@ -106,6 +106,23 @@ const comparadorItensMenu = new Intl.Collator("pt-BR", {
   numeric: true
 });
 
+const ordemItensEducacional = [
+  "educacional-visao-geral",
+  "educacional-alunos",
+  "educacional-responsaveis",
+  "educacional-professores",
+  "educacional-unidades",
+  "educacional-grade-curricular",
+  "educacional-horarios",
+  "educacional-diario",
+  "educacional-boletins",
+  "educacional-ocorrencias",
+  "educacional-agenda",
+  "educacional-documentos",
+  "educacional-historico",
+  "educacional-relatorios"
+];
+
 function ordenarItensMenu<T extends { label: string; id?: string }>(itens: T[]) {
   const prioridadesDashboard = new Map([
     ["dashboard-visao-geral", 0],
@@ -115,6 +132,13 @@ function ordenarItensMenu<T extends { label: string; id?: string }>(itens: T[]) 
   ]);
 
   return [...itens].sort((itemA, itemB) => {
+    const indiceEducacionalA = ordemItensEducacional.indexOf(itemA.id ?? "");
+    const indiceEducacionalB = ordemItensEducacional.indexOf(itemB.id ?? "");
+    if (indiceEducacionalA >= 0 || indiceEducacionalB >= 0) {
+      return (indiceEducacionalA < 0 ? Number.POSITIVE_INFINITY : indiceEducacionalA) -
+        (indiceEducacionalB < 0 ? Number.POSITIVE_INFINITY : indiceEducacionalB);
+    }
+
     const prioridadeA = prioridadesDashboard.get(itemA.id ?? "") ?? Number.POSITIVE_INFINITY;
     const prioridadeB = prioridadesDashboard.get(itemB.id ?? "") ?? Number.POSITIVE_INFINITY;
     if (prioridadeA !== prioridadeB) {
@@ -212,7 +236,7 @@ const menuSectionsBase: MenuSection[] = [
       {
         id: "cadastros-unidades-assistenciais",
         to: "/cadastros/unidades-assistenciais",
-        label: "Unidades assistenciais",
+        label: "Unidades de atendimento",
         icon: Building2
       },
       {
@@ -631,9 +655,19 @@ const menuSectionsBase: MenuSection[] = [
     requiredPermissions: ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS", "EDUCACIONAL_VISUALIZAR", "EDUCACIONAL_MATRICULAS_VISUALIZAR"],
     itens: [
       { id: "educacional-visao-geral", to: "/educacional", label: "Visão geral", icon: ChartPie },
-      { id: "educacional-estrutura", to: "/educacional?aba=estrutura", label: "Estrutura acadêmica", icon: GraduationCap },
-      { id: "educacional-matriculas", to: "/educacional?aba=matriculas", label: "Alunos e matrículas", icon: UsersRound },
-      { id: "educacional-enturmacao", to: "/educacional?aba=enturmacao", label: "Alunos por turma", icon: UsersRound }
+      { id: "educacional-alunos", to: "/educacional?grupo=alunos&aba=alunos", label: "Alunos", icon: UsersRound },
+      { id: "educacional-responsaveis", to: "/cadastros/vinculo-familiar", label: "Responsáveis/Famílias", icon: UsersRound },
+      { id: "educacional-professores", to: "/educacional?grupo=professores&aba=professores", label: "Professores e equipe pedagógica", icon: UsersRound },
+      { id: "educacional-unidades", to: "/cadastros/unidades-assistenciais?tipo_unidade=ENSINO", label: "Unidades escolares", icon: Building2 },
+      { id: "educacional-grade-curricular", to: "/educacional?aba=grade-curricular", label: "Grade curricular", icon: ClipboardPenLine },
+      { id: "educacional-horarios", to: "/educacional?aba=horarios", label: "Horários", icon: Clock3 },
+      { id: "educacional-diario", to: "/educacional?grupo=diario&aba=diarios", label: "Diário de classe", icon: BookOpenText },
+      { id: "educacional-boletins", to: "/educacional?aba=boletins", label: "Boletins", icon: FileText },
+      { id: "educacional-ocorrencias", to: "/educacional?aba=ocorrencias", label: "Ocorrências", icon: Bell },
+      { id: "educacional-agenda", to: "/educacional?aba=agenda", label: "Agenda escolar", icon: CalendarRange },
+      { id: "educacional-documentos", to: "/educacional?aba=documentos", label: "Documentos/Declarações", icon: Files },
+      { id: "educacional-historico", to: "/educacional?aba=historicos", label: "Histórico escolar", icon: HistoryIcon },
+      { id: "educacional-relatorios", to: "/educacional?aba=relatorios", label: "Relatórios e indicadores", icon: ChartPie }
     ]
   },
   {
@@ -682,6 +716,7 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/atendimentos/central-atendimentos")) return "Central de atendimentos";
   if (pathname.startsWith("/atendimentos/matriculas")) return "Inscrições em cursos e atendimentos";
   if (pathname.startsWith("/atendimentos/banco-empregos")) return "Banco de empregos";
+  if (pathname.startsWith("/educacional")) return "Educacional";
   if (pathname.startsWith("/atendimentos/biblioteca")) return "Biblioteca";
   if (pathname.startsWith("/atendimentos/registro-visitas")) return "Registro de visitas";
   if (pathname.startsWith("/atendimentos/agendamentos")) return "Agendamentos";
@@ -760,9 +795,15 @@ function ocultarTituloTopo(pathname: string) {
   );
 }
 
-function itemEstaAtivo(pathname: string, item: MenuItem) {
+function itemEstaAtivo(pathname: string, item: MenuItem, search = "") {
   const rotasAtivas = item.activeMatchPaths?.length ? item.activeMatchPaths : item.to ? [item.to] : [];
-  return rotasAtivas.some((rota) => pathname === rota || pathname.startsWith(`${rota}/`));
+  return rotasAtivas.some((rota) => {
+    const [rotaPathname, rotaSearch = ""] = rota.split("?", 2);
+    if (rotaSearch) {
+      return pathname === rotaPathname && search === `?${rotaSearch}`;
+    }
+    return pathname === rotaPathname || pathname.startsWith(`${rotaPathname}/`);
+  });
 }
 
 export function AppShell() {
@@ -1250,7 +1291,10 @@ export function AppShell() {
                           key={item.id}
                           to={item.to}
                           className={({ isActive }) => {
-                            const itemAtivo = isActive || itemEstaAtivo(location.pathname, item);
+                            // Links educacionais usam query string para abrir a seção correta.
+                            // O NavLink considera apenas o pathname em alguns casos e acabava
+                            // marcando todos os itens /educacional como ativos ao mesmo tempo.
+                            const itemAtivo = itemEstaAtivo(location.pathname, item, location.search) || (isActive && !item.to?.includes("?"));
                             return `flex w-full items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs font-medium leading-tight transition-colors ${
                               itemAtivo
                                 ? "border-[var(--g3-active)] bg-[var(--g3-card)] text-[var(--g3-active)] shadow-sm"

@@ -272,6 +272,7 @@ model UnidadeAssistencial {
   telefone             String?            @db.VarChar(30)
   horarioFuncionamento String?            @map("horario_funcionamento") @db.VarChar(120)
   observacoes          String?
+  tipoUnidade          String             @default("ASSISTENCIAL") @map("tipo_unidade") @db.VarChar(30)
   unidadePrincipal     Boolean            @default(false) @map("unidade_principal")
   enderecoId           BigInt?            @map("endereco_id")
   raioPontoMetros      Int                @default(100) @map("raio_ponto_metros")
@@ -289,6 +290,7 @@ model UnidadeAssistencial {
   salas                SalaUnidade[]
 
   @@map("unidade_assistencial")
+  @@index([tipoUnidade])
 }
 
 model ImagemUnidade {

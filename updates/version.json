@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.655",
+  "latestVersion": "1.00.671",
   "releaseDate": "2026-07-19",
-  "description": "Correção do healthcheck e da ordem de inicialização do deploy Docker.",
+  "description": "Revisão de integridade e navegação do módulo Educacional.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.655",
+  "minCompatibleVersion": "1.00.671",
   "releaseType": "stable",
   "downloadUrl": null
 }

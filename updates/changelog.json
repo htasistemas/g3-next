@@ -1,6 +1,134 @@
 {
   "entries":  [
                     {
+                        "version": "1.00.671",
+                        "releaseDate": "2026-07-19",
+                        "title": "Integridade do fluxo educacional",
+                        "description": "A revisão do módulo Educacional corrigiu a separação entre Alunos e Matrículas, completou indicadores reais e reforçou validações no backend.",
+                        "changes": ["Disciplinas ativas e anos letivos abertos calculados no PostgreSQL.", "Bloqueio de alocação duplicada, turma lotada e nota acima do valor máximo.", "Unidades assistenciais rejeitadas em turmas e matrículas educacionais.", "Fallback de migrations idempotentes para bancos legados sem histórico Prisma."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.670",
+                        "releaseDate": "2026-07-19",
+                        "title": "Mensagem institucional do login",
+                        "description": "A tela de login passou a apresentar uma mensagem abrangendo alunos e beneficiários.",
+                        "changes": ["Texto institucional atualizado na tela de login."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.669",
+                        "releaseDate": "2026-07-19",
+                        "title": "Migrations no desenvolvimento local",
+                        "description": "O comando npm run dev passou a carregar o ambiente, aplicar migrations e tratar bancos legados sem histórico inicial do Prisma.",
+                        "changes": ["Correção da coluna tipo_unidade ausente.", "Correção da tabela educacional_frequencia ausente.", "Fallback idempotente para bancos legados."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.668",
+                        "releaseDate": "2026-07-19",
+                        "title": "Migrations educacionais no deploy",
+                        "description": "O deploy passou a aplicar as migrations do PostgreSQL antes de iniciar o backend, corrigindo a ausência de tabelas educacionais como educacional_frequencia.",
+                        "changes": ["Execução automática de prisma migrate deploy.", "Migrations aplicadas antes do healthcheck do backend.", "Falha de migration mantém o sistema em manutenção para evitar inicialização inconsistente."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.667",
+                        "releaseDate": "2026-07-19",
+                        "title": "Visão geral educacional executiva",
+                        "description": "A Visão geral passou a apresentar indicadores reais de alunos, matrículas, frequência, risco, evasão, ocorrências, chamadas e desempenho.",
+                        "changes": ["Filtros por unidade, ano letivo, etapa, turma e turno.", "Cards clicáveis e painel Atenção da gestão.", "Índice de Atenção Educacional baseado nos registros persistidos."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.666",
+                        "releaseDate": "2026-07-19",
+                        "title": "Padronização visual do Educacional",
+                        "description": "As abas educacionais passaram a utilizar navegação lateral numerada e o título global passou a identificar corretamente o menu Educacional.",
+                        "changes": ["Conteúdo das abas exibido ao lado da navegação.", "Navegação lateral no padrão dos cadastros do G3N.", "Substituição do título genérico Painel de migração."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.665",
+                        "releaseDate": "2026-07-19",
+                        "title": "Estrutura acadêmica sem duplicidade no menu",
+                        "description": "Os cadastros já disponíveis na Estrutura acadêmica deixaram de ser repetidos no menu lateral e receberam navegação numerada no padrão do G3N.",
+                        "changes": ["Remoção de Ano letivo, Etapas, Turmas e Disciplinas como submenus duplicados.", "Abas numeradas com destaque visual do item selecionado.", "Manual do sistema atualizado."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.664",
+                        "releaseDate": "2026-07-19",
+                        "title": "Reorganização educacional e unidades de atendimento",
+                        "description": "O cadastro único de unidades passou a diferenciar unidades assistenciais e de ensino, e o módulo Educacional recebeu abas operacionais para alunos, diário e equipe pedagógica.",
+                        "changes": ["Tipo de unidade com filtro backend e compatibilidade com registros antigos.", "Abas para Alunos, Diário de classe e Professores e equipe pedagógica.", "Persistência de transferências e autorizações por tenant."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.663",
+                        "releaseDate": "2026-07-19",
+                        "title": "Rotina infantil e desenvolvimento",
+                        "description": "O módulo Educacional recebeu registros específicos para creche e educação infantil, separados de dados clínicos.",
+                        "changes": ["Rotina diária da criança.", "Alimentação, humor, atividades e observações.", "Acompanhamento de desenvolvimento por área e período."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.662",
+                        "releaseDate": "2026-07-19",
+                        "title": "Documentos e relatórios educacionais",
+                        "description": "O módulo Educacional passou a registrar metadados de documentos e apresentar indicadores reais da instituição.",
+                        "changes": ["Documentos e declarações vinculados a aluno ou matrícula.", "Armazenamento apenas de metadados e caminho do arquivo.", "Relatórios com indicadores reais do tenant."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.661",
+                        "releaseDate": "2026-07-19",
+                        "title": "Ocorrências e agenda escolar",
+                        "description": "O módulo Educacional passou a registrar ocorrências de alunos e eventos da agenda escolar.",
+                        "changes": ["Ocorrências com tipo, descrição, providências e comunicação do responsável.", "Agenda por turma e data.", "Auditoria e isolamento por instituição."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.660",
+                        "releaseDate": "2026-07-19",
+                        "title": "Boletins e histórico escolar",
+                        "description": "O módulo Educacional passou a registrar boletins por período e histórico escolar por ano letivo, preservando resultados anteriores.",
+                        "changes": ["Boletim vinculado à matrícula e ao ano letivo.", "Histórico escolar permanente por aluno.", "Médias, frequência e resultado final com auditoria."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.659",
+                        "releaseDate": "2026-07-19",
+                        "title": "Avaliações e notas",
+                        "description": "O módulo Educacional passou a cadastrar avaliações e lançar notas vinculadas às matrículas escolares.",
+                        "changes": ["Avaliações por turma, componente e período.", "Notas vinculadas à avaliação e à matrícula do aluno.", "Histórico e auditoria preservados por instituição."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.658",
+                        "releaseDate": "2026-07-19",
+                        "title": "Planos e planejamento pedagógico",
+                        "description": "O módulo Educacional passou a persistir planos de aula e planejamentos pedagógicos por ano letivo, turma e componente curricular.",
+                        "changes": ["Plano de aula com tema, objetivos, conteúdo e metodologia.", "Planejamento pedagógico por período e ano letivo.", "Auditoria e isolamento por instituição."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.657",
+                        "releaseDate": "2026-07-19",
+                        "title": "Diário de classe e frequência",
+                        "description": "A operação pedagógica recebeu registro de aulas e frequência vinculada às matrículas escolares.",
+                        "changes": ["Registro de diário por turma, componente curricular e data.", "Chamada com presença, ausência, justificativa, atraso e saída antecipada.", "Auditoria e isolamento por instituição."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.656",
+                        "releaseDate": "2026-07-19",
+                        "title": "Vida acadêmica educacional",
+                        "description": "A Fase 2 recebeu a base persistente de grade curricular e horários escolares, integrada às turmas e disciplinas do módulo Educacional.",
+                        "changes": ["Grade curricular por ano letivo, etapa, série e componente curricular.", "Horários semanais por turma e disciplina.", "Bloqueio de conflitos de turma, professor e sala por tenant."],
+                        "releaseType": "stable"
+                    },
+                    {
                         "version": "1.00.655",
                         "releaseDate": "2026-07-19",
                         "title": "Correção da inicialização do deploy",
