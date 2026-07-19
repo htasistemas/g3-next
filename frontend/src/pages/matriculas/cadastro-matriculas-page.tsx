@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import type { LucideIcon } from "lucide-react";
 import type { ChangeEvent, KeyboardEvent } from "react";
 import {
@@ -103,7 +103,7 @@ type PopupMensagemState = {
 };
 
 const secaoTela = "Atendimentos diários";
-const tituloTela = "Inscrições em cursos e oficinas";
+const tituloTela = "Inscrições em cursos e atendimentos";
 
 function formatarStatus(status?: string) {
   if (!status) return "Não informado";
@@ -225,6 +225,25 @@ function normalizarHora(valor?: string) {
   return match ? match[1] : undefined;
 }
 
+function calcularHorariosAtendimento(horarioInicial?: string, horarioFinal?: string, intervalo?: number) {
+  const inicio = normalizarHora(horarioInicial);
+  const fim = normalizarHora(horarioFinal);
+  const intervaloMinutos = Number(intervalo ?? 0);
+  if (!inicio || !fim || !Number.isInteger(intervaloMinutos) || intervaloMinutos <= 0) return [];
+
+  const [horaInicial, minutoInicial] = inicio.split(":").map(Number);
+  const [horaFinal, minutoFinal] = fim.split(":").map(Number);
+  const inicioMinutos = horaInicial * 60 + minutoInicial;
+  const fimMinutos = horaFinal * 60 + minutoFinal;
+  if (fimMinutos <= inicioMinutos) return [];
+
+  const horarios: string[] = [];
+  for (let minuto = inicioMinutos; minuto + intervaloMinutos <= fimMinutos; minuto += intervaloMinutos) {
+    horarios.push(`${String(Math.floor(minuto / 60)).padStart(2, "0")}:${String(minuto % 60).padStart(2, "0")}`);
+  }
+  return horarios;
+}
+
 function normalizarEmailOpcional(email?: string) {
   const valor = email?.trim().toLowerCase();
   if (!valor) return undefined;
@@ -279,6 +298,9 @@ function mapMatriculaParaFormulario(matricula: Matricula): MatriculaFormValues {
     instituicao_parceira: matricula.instituicao_parceira ?? "",
     status: normalizarStatusMatricula(matricula.status),
     horario_inicial: matricula.horario_inicial ?? "",
+    controle_horario_atendimento: !!matricula.controle_horario_atendimento,
+    horario_final_atendimento: matricula.horario_final_atendimento ?? "",
+    intervalo_atendimento_minutos: matricula.intervalo_atendimento_minutos,
     data_triagem: matricula.data_triagem ?? "",
     data_encaminhamento: matricula.data_encaminhamento ?? "",
     data_conclusao: matricula.data_conclusao ?? ""
@@ -326,6 +348,16 @@ function mapFormularioParaPayload(
         ? undefined
         : Number(values.carga_horaria),
     horario_inicial: values.horario_inicial?.trim() || undefined,
+    controle_horario_atendimento:
+      values.tipo.trim().toUpperCase() === "ATENDIMENTO" &&
+      !!values.horario_inicial?.trim() &&
+      !!values.horario_final_atendimento?.trim() &&
+      Number(values.duracao_horas) > 0,
+    horario_final_atendimento: values.horario_final_atendimento?.trim() || undefined,
+    intervalo_atendimento_minutos:
+      values.intervalo_atendimento_minutos === undefined || values.intervalo_atendimento_minutos === null
+        ? undefined
+        : Number(values.intervalo_atendimento_minutos),
     duracao_horas: Number(values.duracao_horas) || 0,
     dias_semana: values.dias_semana ?? [],
     faixa_etaria: values.faixa_etaria ?? [],
@@ -474,8 +506,10 @@ function ImagemAutenticada({
 
 export function CadastroMatriculasPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { usuario } = useAuth();
-  const [abaAtiva, setAbaAtiva] = useState<AbaId>("listagem");
+  const abaInicial = searchParams.get("aba") === "dados" ? "dados" : "listagem";
+  const [abaAtiva, setAbaAtiva] = useState<AbaId>(abaInicial);
   const [idSelecionado, setIdSelecionado] = useState<string>();
   const [snapshot, setSnapshot] = useState<MatriculaFormValues | null>(null);
   const [popupMensagem, setPopupMensagem] = useState<PopupMensagemState | null>(null);
@@ -604,6 +638,9 @@ export function CadastroMatriculasPage() {
   const diasSemanaSelecionados = watch("dias_semana") ?? [];
   const faixaEtariaSelecionada = watch("faixa_etaria") ?? [];
   const tipoMatriculaAtual = String(watch("tipo") ?? "");
+  const horarioInicialAtendimento = String(watch("horario_inicial") ?? "");
+  const horarioFinalAtendimento = String(watch("horario_final_atendimento") ?? "");
+  const duracaoAtendimentoMinutos = Number(watch("duracao_horas") ?? 0);
   const imagemAtual = String(watch("imagem") ?? "");
   const profissionalResponsavelValor = String(watch("profissional") ?? "");
   const matriculaIdFormulario = watch("id_matricula");
@@ -630,6 +667,18 @@ export function CadastroMatriculasPage() {
     matriculas.find((item) => item.id_matricula === (idSelecionado ?? matriculaIdFormulario)) ?? null;
   const ehInscricaoAtendimento = (cursoSelecionadoInscricao?.tipo ?? "").trim().toUpperCase() === "ATENDIMENTO";
   const ehTipoAtendimento = tipoMatriculaAtual.trim().toUpperCase() === "ATENDIMENTO";
+  const controleHorarioAtendimento =
+    ehTipoAtendimento &&
+    !!horarioInicialAtendimento.trim() &&
+    !!horarioFinalAtendimento.trim() &&
+    duracaoAtendimentoMinutos > 0;
+  const horariosAtendimento = useMemo(
+    () =>
+      ehTipoAtendimento && controleHorarioAtendimento
+        ? calcularHorariosAtendimento(horarioInicialAtendimento, horarioFinalAtendimento, duracaoAtendimentoMinutos)
+        : [],
+    [controleHorarioAtendimento, duracaoAtendimentoMinutos, ehTipoAtendimento, horarioFinalAtendimento, horarioInicialAtendimento]
+  );
   const abaAtual = abas.find((aba) => aba.id === abaAtiva);
   const possuiMatriculaSelecionada = Boolean(getValues("id_matricula"));
   const inscricoesAtivas = inscricoes.filter((item) => (item.status ?? "ATIVO") !== "CANCELADO");
@@ -817,6 +866,19 @@ export function CadastroMatriculasPage() {
   );
 
   useEffect(() => {
+    if (!controleHorarioAtendimento || !ehTipoAtendimento || horariosAtendimento.length === 0) return;
+    const totalVagas = horariosAtendimento.length;
+    const totalInscritosAtivos = inscricoes.filter((item) => (item.status ?? "ATIVO").trim().toUpperCase() === "ATIVO").length;
+    const vagasDisponiveis = Math.max(totalVagas - totalInscritosAtivos, 0);
+    if (Number(getValues("vagas_totais") ?? 0) !== totalVagas) {
+      setValue("vagas_totais", totalVagas, { shouldDirty: true, shouldValidate: true });
+    }
+    if (Number(getValues("vagas_disponiveis") ?? 0) !== vagasDisponiveis) {
+      setValue("vagas_disponiveis", vagasDisponiveis, { shouldDirty: true, shouldValidate: true });
+    }
+  }, [controleHorarioAtendimento, ehTipoAtendimento, getValues, horariosAtendimento, inscricoes, setValue]);
+
+  useEffect(() => {
     if (!detalhesData?.matricula) return;
     const formValues = mapMatriculaParaFormulario(detalhesData.matricula);
     reset(formValues);
@@ -872,6 +934,15 @@ export function CadastroMatriculasPage() {
     const atual = getValues(campo) ?? [];
     const proximo = atual.includes(item) ? atual.filter((valor) => valor !== item) : [...atual, item];
     setValue(campo, proximo, { shouldDirty: true, shouldValidate: true });
+  }
+
+  function alternarTodasFaixasEtarias() {
+    const atual = getValues("faixa_etaria") ?? [];
+    const todasSelecionadas = faixaEtariaOptions.every((faixa) => atual.includes(faixa));
+    setValue("faixa_etaria", todasSelecionadas ? [] : [...faixaEtariaOptions], {
+      shouldDirty: true,
+      shouldValidate: true
+    });
   }
 
   function selecionarMatricula(matriculaId: string) {
@@ -1136,7 +1207,7 @@ export function CadastroMatriculasPage() {
 
     const horario =
       curso?.horario_inicial && curso?.duracao_horas
-        ? `${curso.horario_inicial} (${curso.duracao_horas}h)`
+        ? `${curso.horario_inicial} (${curso.duracao_horas} min)`
         : curso?.horario_inicial ?? "---";
 
     return {
@@ -1927,6 +1998,19 @@ export function CadastroMatriculasPage() {
     );
     const totalInscritosAtivos = inscricoes.filter((item) => (item.status ?? "ATIVO").trim().toUpperCase() === "ATIVO").length;
     const vagasDisponiveis = Math.max(vagasTotaisCurso - totalInscritosAtivos, 0);
+    const horariosOcupados = new Set(
+      inscricoes
+        .filter((item) => (item.status ?? "ATIVO").trim().toUpperCase() === "ATIVO")
+        .map((item) => String(item.hora_agendada ?? "").trim())
+        .filter(Boolean)
+    );
+    const horaSolicitada = String(novaInscricao.hora_agendada ?? "").trim();
+    const horaAgendadaAtendimento =
+      ehAtendimento && controleHorarioAtendimento && horariosAtendimento.length > 0
+        ? (horaSolicitada && !horariosOcupados.has(horaSolicitada) && horariosAtendimento.includes(horaSolicitada)
+            ? horaSolicitada
+            : horariosAtendimento.find((hora) => !horariosOcupados.has(hora)) ?? "")
+        : horaSolicitada;
 
     if (statusInscricao === "ATIVO" && vagasDisponiveis <= 0) {
       const filaDuplicada = filaEspera.some((item) => {
@@ -1984,20 +2068,25 @@ export function CadastroMatriculasPage() {
         email: novaInscricao.email?.trim() || undefined,
         status: statusInscricao || "ATIVO",
         data_agendada: ehAtendimento ? normalizarDataIso(novaInscricao.data_agendada) : undefined,
-        hora_agendada: ehAtendimento ? novaInscricao.hora_agendada?.trim() || undefined : undefined,
+        hora_agendada: ehAtendimento ? horaAgendadaAtendimento || undefined : undefined,
         status_agendamento: ehAtendimento ? novaInscricao.status_agendamento?.trim() || undefined : undefined,
         profissional_nome: profissionalInscricao || undefined,
         data_matricula: obterDataAtualIso()
       }
     ]);
 
+    const horariosOcupadosAposInclusao = new Set([...horariosOcupados, horaAgendadaAtendimento]);
+    const proximoHorario =
+      ehAtendimento && controleHorarioAtendimento
+        ? horariosAtendimento.find((hora) => !horariosOcupadosAposInclusao.has(hora)) ?? ""
+        : "";
     setNovaInscricao({
       beneficiario_nome: "",
       cpf: "",
       email: "",
       status: "ATIVO",
       data_agendada: "",
-      hora_agendada: "",
+      hora_agendada: proximoHorario,
       status_agendamento: "",
       profissional_nome: "",
       confirmacao_presenca: false
@@ -2147,6 +2236,17 @@ export function CadastroMatriculasPage() {
       return;
     }
 
+    const horariosOcupados = new Set(
+      inscricoes
+        .filter((item) => (item.status ?? "ATIVO").trim().toUpperCase() === "ATIVO")
+        .map((item) => String(item.hora_agendada ?? "").trim())
+        .filter(Boolean)
+    );
+    const horarioFila =
+      controleHorarioAtendimento && horariosAtendimento.length > 0
+        ? horariosAtendimento.find((hora) => !horariosOcupados.has(hora))
+        : undefined;
+
     setInscricoes((atual) => [
       ...atual,
       {
@@ -2155,6 +2255,7 @@ export function CadastroMatriculasPage() {
         telefone: candidatoFila.telefone ? somenteDigitos(candidatoFila.telefone) : undefined,
         status: "ATIVO",
         data_matricula: obterDataAtualIso(),
+        hora_agendada: horarioFila,
         profissional_nome: obterProfissionalUnico(cursoSelecionadoInscricao?.profissional) || undefined,
         id_matricula_item: cursoIdSelecionado
       }
@@ -2684,10 +2785,44 @@ export function CadastroMatriculasPage() {
                       {errors.horario_inicial && <p className="text-xs text-rose-600">{errors.horario_inicial.message}</p>}
                     </div>
                     <div className="space-y-1">
-                      <Label htmlFor="duracao_horas">Duração (horas) *</Label>
+                      <Label htmlFor="duracao_horas">Duração (minutos) *</Label>
                       <Input id="duracao_horas" type="number" min={0} {...register("duracao_horas")} />
                       {errors.duracao_horas && <p className="text-xs text-rose-600">{errors.duracao_horas.message}</p>}
                     </div>
+                    {ehTipoAtendimento && (
+                      <div className="space-y-2 rounded-lg border border-sky-200 bg-sky-50/70 p-3 xl:col-span-4">
+                        <div>
+                          <div>
+                            <Label htmlFor="horario_final_atendimento">Controle automático de vagas por horário</Label>
+                            <p className="text-[11px] text-sky-800/80">
+                              Informe o horário final. Com o horário inicial e a duração em minutos, o sistema calculará as vagas.
+                            </p>
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="horario_final_atendimento">Horário final *</Label>
+                          <Input id="horario_final_atendimento" type="time" {...register("horario_final_atendimento")} />
+                          {errors.horario_final_atendimento && (
+                            <p className="text-xs text-rose-600">{errors.horario_final_atendimento.message}</p>
+                          )}
+                        </div>
+                        <div className="rounded-md border border-sky-200 bg-white px-3 py-2 text-xs text-sky-900">
+                          {horariosAtendimento.length > 0 ? (
+                            <>
+                              <p className="font-semibold">
+                                {horariosAtendimento.length} vaga(s) calculada(s) para o período
+                              </p>
+                              <p className="mt-1">Horários preparados: {horariosAtendimento.join(", ")}</p>
+                            </>
+                          ) : (
+                            <p>Informe horários válidos e uma duração em minutos maior que zero para calcular as vagas.</p>
+                          )}
+                        </div>
+                        {errors.controle_horario_atendimento && (
+                          <p className="text-xs text-rose-600">{errors.controle_horario_atendimento.message}</p>
+                        )}
+                      </div>
+                    )}
                     <div className="space-y-1">
                       <Label htmlFor="carga_horaria">Carga horária total (horas)</Label>
                       <Input id="carga_horaria" type="number" min={0} {...register("carga_horaria")} />
@@ -2695,12 +2830,18 @@ export function CadastroMatriculasPage() {
                     </div>
                     <div className="space-y-1">
                       <Label htmlFor="vagas_totais">Quantidade de vagas totais *</Label>
-                      <Input id="vagas_totais" type="number" min={0} {...register("vagas_totais")} />
+                      <Input id="vagas_totais" type="number" min={0} readOnly={controleHorarioAtendimento} {...register("vagas_totais")} />
                       {errors.vagas_totais && <p className="text-xs text-rose-600">{errors.vagas_totais.message}</p>}
                     </div>
                     <div className="space-y-1">
                       <Label htmlFor="vagas_disponiveis">Vagas disponíveis</Label>
-                      <Input id="vagas_disponiveis" type="number" min={0} {...register("vagas_disponiveis")} />
+                      <Input
+                        id="vagas_disponiveis"
+                        type="number"
+                        min={0}
+                        readOnly={controleHorarioAtendimento}
+                        {...register("vagas_disponiveis")}
+                      />
                       {errors.vagas_disponiveis && <p className="text-xs text-rose-600">{errors.vagas_disponiveis.message}</p>}
                     </div>
                     <div className="space-y-1 xl:col-span-2">
@@ -2940,6 +3081,13 @@ export function CadastroMatriculasPage() {
                   <div className="space-y-2 rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card)] p-3">
                     <p className="text-sm font-semibold text-[var(--g3-foreground)]">Faixa etária</p>
                     <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                      <label className="flex items-center gap-2 rounded border border-sky-200 bg-sky-50 px-2 py-1 text-sm font-medium text-sky-900">
+                        <Checkbox
+                          checked={faixaEtariaOptions.every((faixa) => faixaEtariaSelecionada.includes(faixa))}
+                          onChange={alternarTodasFaixasEtarias}
+                        />
+                        Todas as idades
+                      </label>
                       {faixaEtariaOptions.map((faixa) => (
                         <label
                           key={faixa}
@@ -2997,7 +3145,7 @@ export function CadastroMatriculasPage() {
                         const idadePermitida = item.faixa_etaria?.length ? item.faixa_etaria.join(", ") : "---";
                         const horarioAulas =
                           item.horario_inicial && item.duracao_horas
-                            ? `${item.horario_inicial} (${item.duracao_horas}h)`
+                            ? `${item.horario_inicial} (${item.duracao_horas} min)`
                             : item.horario_inicial ?? "---";
                         const periodoCurso =
                           item.data_triagem || item.data_conclusao
@@ -3191,7 +3339,7 @@ export function CadastroMatriculasPage() {
                           <p className="text-[11px] font-semibold text-[var(--g3-muted)]">Horário do curso</p>
                           <p className="text-xs text-[var(--g3-foreground)]">
                             {cursoSelecionadoInscricao.horario_inicial
-                              ? `${cursoSelecionadoInscricao.horario_inicial} (${cursoSelecionadoInscricao.duracao_horas}h)`
+                              ? `${cursoSelecionadoInscricao.horario_inicial} (${cursoSelecionadoInscricao.duracao_horas} min)`
                               : "Não informado"}
                           </p>
                         </div>

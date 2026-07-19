@@ -110,6 +110,17 @@ export function montarAuditoriaPresenca(payload: {
   };
 }
 
+function calcularVagasPorHorario(input: MatriculaInput) {
+  if (!input.controle_horario_atendimento) return input.vagas_totais;
+  const inicio = input.horario_inicial ? input.horario_inicial.split(":").map(Number) : [];
+  const fim = input.horario_final_atendimento ? input.horario_final_atendimento.split(":").map(Number) : [];
+  const intervalo = Number(input.duracao_horas ?? 0);
+  const inicioMinutos = (inicio[0] ?? 0) * 60 + (inicio[1] ?? 0);
+  const fimMinutos = (fim[0] ?? 0) * 60 + (fim[1] ?? 0);
+  if (fimMinutos <= inicioMinutos || intervalo <= 0) return input.vagas_totais;
+  return Math.floor((fimMinutos - inicioMinutos) / intervalo);
+}
+
 type MatriculaResumoRow = {
   cursos_no_catalogo: bigint | number | null;
   total_vagas: bigint | number | null;
@@ -130,6 +141,9 @@ const estruturaMatriculasSql = [
       vagas_disponiveis INTEGER NOT NULL DEFAULT 0,
       carga_horaria INTEGER,
       horario_inicial TIME,
+      controle_horario_atendimento BOOLEAN NOT NULL DEFAULT FALSE,
+      horario_final_atendimento TIME,
+      intervalo_atendimento_minutos INTEGER,
       duracao_horas INTEGER NOT NULL DEFAULT 0,
       dias_semana TEXT,
       faixa_etaria TEXT,
@@ -156,6 +170,9 @@ const estruturaMatriculasSql = [
   "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS vagas_disponiveis INTEGER NOT NULL DEFAULT 0",
   "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS carga_horaria INTEGER",
   "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS horario_inicial TIME",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS controle_horario_atendimento BOOLEAN NOT NULL DEFAULT FALSE",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS horario_final_atendimento TIME",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS intervalo_atendimento_minutos INTEGER",
   "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS duracao_horas INTEGER NOT NULL DEFAULT 0",
   "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS dias_semana TEXT",
   "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS faixa_etaria TEXT",
@@ -446,6 +463,9 @@ export class MatriculaRepository {
         c.vagas_disponiveis,
         c.carga_horaria,
         c.horario_inicial,
+        c.controle_horario_atendimento,
+        c.horario_final_atendimento,
+        c.intervalo_atendimento_minutos,
         c.duracao_horas,
         c.dias_semana,
         c.faixa_etaria,
@@ -532,6 +552,9 @@ export class MatriculaRepository {
         c.vagas_disponiveis,
         c.carga_horaria,
         c.horario_inicial,
+        c.controle_horario_atendimento,
+        c.horario_final_atendimento,
+        c.intervalo_atendimento_minutos,
         c.duracao_horas,
         c.dias_semana,
         c.faixa_etaria,
@@ -694,7 +717,11 @@ export class MatriculaRepository {
     const cursoId = await prisma.$transaction(async (tx) => {
       const diasSemana = joinList(input.dias_semana);
       const faixaEtaria = joinList(input.faixa_etaria);
-      const vagasDisponiveis = input.vagas_disponiveis ?? input.vagas_totais;
+      const vagasTotais = calcularVagasPorHorario(input);
+      const totalInscritosAtivos = (input.matriculas ?? []).filter((item) => (item.status ?? "ATIVO").trim().toUpperCase() === "ATIVO").length;
+      const vagasDisponiveis = input.controle_horario_atendimento
+        ? Math.max(vagasTotais - totalInscritosAtivos, 0)
+        : input.vagas_disponiveis ?? vagasTotais;
       const dataTriagem = toOptionalDate(input.data_triagem) ?? null;
       const dataEncaminhamento = toOptionalDate(input.data_encaminhamento) ?? null;
       const dataConclusao = toOptionalDate(input.data_conclusao) ?? null;
@@ -710,6 +737,9 @@ export class MatriculaRepository {
           vagas_disponiveis,
           carga_horaria,
           horario_inicial,
+          controle_horario_atendimento,
+          horario_final_atendimento,
+          intervalo_atendimento_minutos,
           duracao_horas,
           dias_semana,
           faixa_etaria,
@@ -731,10 +761,13 @@ export class MatriculaRepository {
           ${input.nome},
           ${trimOrUndefined(input.descricao)},
           ${trimOrUndefined(input.imagem)},
-          ${input.vagas_totais},
+          ${vagasTotais},
           ${vagasDisponiveis},
           ${input.carga_horaria ?? null},
           CAST(${trimOrUndefined(input.horario_inicial) ?? null} AS TIME),
+          ${!!input.controle_horario_atendimento},
+          CAST(${trimOrUndefined(input.horario_final_atendimento) ?? null} AS TIME),
+          ${input.intervalo_atendimento_minutos ?? null},
           ${input.duracao_horas},
           ${diasSemana},
           ${faixaEtaria},
@@ -775,7 +808,11 @@ export class MatriculaRepository {
     await prisma.$transaction(async (tx) => {
       const diasSemana = joinList(input.dias_semana);
       const faixaEtaria = joinList(input.faixa_etaria);
-      const vagasDisponiveis = input.vagas_disponiveis ?? input.vagas_totais;
+      const vagasTotais = calcularVagasPorHorario(input);
+      const totalInscritosAtivos = (input.matriculas ?? []).filter((item) => (item.status ?? "ATIVO").trim().toUpperCase() === "ATIVO").length;
+      const vagasDisponiveis = input.controle_horario_atendimento
+        ? Math.max(vagasTotais - totalInscritosAtivos, 0)
+        : input.vagas_disponiveis ?? vagasTotais;
       const dataTriagem = toOptionalDate(input.data_triagem) ?? null;
       const dataEncaminhamento = toOptionalDate(input.data_encaminhamento) ?? null;
       const dataConclusao = toOptionalDate(input.data_conclusao) ?? null;
@@ -787,10 +824,13 @@ export class MatriculaRepository {
           nome = ${input.nome},
           descricao = ${trimOrUndefined(input.descricao)},
           imagem = ${trimOrUndefined(input.imagem)},
-          vagas_totais = ${input.vagas_totais},
+          vagas_totais = ${vagasTotais},
           vagas_disponiveis = ${vagasDisponiveis},
           carga_horaria = ${input.carga_horaria ?? null},
           horario_inicial = CAST(${trimOrUndefined(input.horario_inicial) ?? null} AS TIME),
+          controle_horario_atendimento = ${!!input.controle_horario_atendimento},
+          horario_final_atendimento = CAST(${trimOrUndefined(input.horario_final_atendimento) ?? null} AS TIME),
+          intervalo_atendimento_minutos = ${input.intervalo_atendimento_minutos ?? null},
           duracao_horas = ${input.duracao_horas},
           dias_semana = ${diasSemana},
           faixa_etaria = ${faixaEtaria},

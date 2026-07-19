@@ -58,6 +58,9 @@ export type MatriculaCursoRow = {
   vagas_disponiveis: number;
   carga_horaria: number | null;
   horario_inicial: Date | string | null;
+  controle_horario_atendimento: boolean | null;
+  horario_final_atendimento: Date | string | null;
+  intervalo_atendimento_minutos: number | null;
   duracao_horas: number;
   dias_semana: string | null;
   faixa_etaria: string | null;
@@ -128,6 +131,9 @@ export function mapCursoToResponse(
     vagas_disponiveis: curso.vagas_disponiveis,
     carga_horaria: curso.carga_horaria ?? undefined,
     horario_inicial: formatTime(curso.horario_inicial),
+    controle_horario_atendimento: !!curso.controle_horario_atendimento,
+    horario_final_atendimento: formatTime(curso.horario_final_atendimento),
+    intervalo_atendimento_minutos: curso.intervalo_atendimento_minutos ?? undefined,
     duracao_horas: curso.duracao_horas,
     dias_semana: splitList(curso.dias_semana),
     faixa_etaria: splitList(curso.faixa_etaria),

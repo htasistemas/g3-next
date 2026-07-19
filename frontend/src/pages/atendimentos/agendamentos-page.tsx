@@ -1128,6 +1128,26 @@ export function AgendamentosPage() {
                         setBeneficiariosSelecionados([]);
                       }}
                     />
+                    {tipo ? (
+                      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm lg:col-span-2">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p className="text-sm font-semibold text-amber-900">Inscreva os beneficiários antes de agendar</p>
+                            <p className="mt-1 text-xs text-amber-800">
+                              Antes de gerar a agenda, faça as inscrições dos beneficiários no curso ou atendimento selecionado.
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="border-amber-300 bg-white text-amber-900 hover:bg-amber-100"
+                            onClick={() => navigate("/atendimentos/matriculas?aba=dados")}
+                          >
+                            Abrir dados da inscrição
+                          </Button>
+                        </div>
+                      </div>
+                    ) : null}
                     <ItemSelector
                       busca={buscaItem}
                       onBuscaChange={setBuscaItem}
@@ -1141,6 +1161,14 @@ export function AgendamentosPage() {
                     />
                   </div>
                   <ItemResumoCard item={itemSelecionado} />
+                  {(() => {
+                    const beneficiarioAgenda = beneficiariosFiltrados.find((item) => beneficiariosSelecionados.includes(item.matriculaId) && item.beneficiarioId);
+                    return beneficiarioAgenda?.beneficiarioId ? (
+                      <Button type="button" variant="outline" onClick={() => navigate(`/atendimentos/prontuario?beneficiarioId=${beneficiarioAgenda.beneficiarioId}`)}>
+                        Abrir prontuário
+                      </Button>
+                    ) : null;
+                  })()}
                   <BeneficiarioSelector
                     busca={buscaBeneficiario}
                     onBuscaChange={setBuscaBeneficiario}

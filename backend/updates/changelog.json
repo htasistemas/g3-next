@@ -1,6 +1,117 @@
 {
   "entries":  [
                     {
+                        "version": "1.00.648",
+                        "releaseDate": "2026-07-18",
+                        "title": "Correção do salvamento do prontuário",
+                        "description": "A camada de persistência passou a converter horários de formulário usando a data do atendimento.",
+                        "changes": ["Criação, atualização e finalização preservam o horário corretamente."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.647",
+                        "releaseDate": "2026-07-18",
+                        "title": "Tipos de atendimento social no prontuário",
+                        "description": "Catálogo inicial de tipos de atendimento social preparado na tela de Prontuário.",
+                        "changes": ["Tipos e descrições apresentados no contexto do atendimento."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.646",
+                        "releaseDate": "2026-07-18",
+                        "title": "Chamada direcionada no prontuário",
+                        "description": "A integração do prontuário com a fila de senhas preserva o destino informado na senha ao realizar a chamada.",
+                        "changes": ["A chamada usa a sala ou destino registrado na fila."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.645",
+                        "releaseDate": "2026-07-18",
+                        "title": "Resumo do beneficiário no prontuário",
+                        "description": "O contexto do prontuário passou a retornar dados cadastrais adicionais do beneficiário.",
+                        "changes": ["Consulta de bairro e nome da mãe no cadastro multi-tenant."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.644",
+                        "releaseDate": "2026-07-18",
+                        "title": "Atendimento de prontuário multiprofissional",
+                        "description": "Novo registro de atendimento com persistência multi-tenant, sigilo e auditoria.",
+                        "changes": ["Endpoints protegidos por permissões específicas.", "Rascunhos, finalizações, adendos e linha do tempo persistidos no PostgreSQL."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version":  "1.00.643",
+                        "releaseDate":  "2026-07-18",
+                        "title":  "Orientação antes do agendamento",
+                        "description":  "A aba Agendamento passou a orientar e direcionar o usuário para as inscrições antes da geração da agenda.",
+                        "changes":  [
+                                        "Após selecionar o tipo de agendamento, a tela exibe uma mensagem orientando a inscrição dos beneficiários.",
+                                        "O botão Abrir dados da inscrição leva diretamente à aba Dados da inscrição.",
+                                        "O Manual do sistema foi atualizado com o novo fluxo."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.642",
+                        "releaseDate":  "2026-07-18",
+                        "title":  "Seleção de todas as idades",
+                        "description":  "A faixa etária ganhou a opção Todas as idades para selecionar ou limpar todas as faixas de uma vez.",
+                        "changes":  [
+                                        "A aba Dados da inscrição ganhou a opção Todas as idades.",
+                                        "A opção marca ou desmarca todas as faixas etárias em um clique.",
+                                        "O Manual do sistema foi atualizado com o novo comportamento."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.641",
+                        "releaseDate":  "2026-07-18",
+                        "title":  "Cálculo automático de vagas por horário",
+                        "description":  "Atendimentos passaram a calcular automaticamente as vagas a partir dos horários inicial e final e da duração em minutos.",
+                        "changes":  [
+                                        "A aba Dados da inscrição usa horário inicial, horário final e duração em minutos para montar os horários do atendimento.",
+                                        "A quantidade de vagas totais e disponíveis é preenchida automaticamente para atendimentos configurados por horário.",
+                                        "O Manual do sistema foi atualizado com a nova regra."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.640",
+                        "releaseDate":  "2026-07-18",
+                        "title":  "Duração em minutos",
+                        "description":  "O campo de duração da tela de inscrições passou a usar minutos na interface.",
+                        "changes":  [
+                                        "A aba Dados da inscrição agora exibe Duração (minutos).",
+                                        "Os resumos e o catálogo da tela passaram a mostrar a duração com a unidade min.",
+                                        "O identificador interno foi preservado para manter compatibilidade com os registros existentes."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.639",
+                        "releaseDate":  "2026-07-18",
+                        "title":  "Controle de atendimentos por horário",
+                        "description":  "Atendimentos passaram a permitir controle opcional por horários e intervalos, com cálculo automático da capacidade do período.",
+                        "changes":  [
+                                        "A aba Dados da inscrição ganhou controle opcional por horário para o tipo Atendimento.",
+                                        "O sistema calcula a quantidade de atendimentos e prepara os horários individuais do período informado.",
+                                        "O Manual do sistema foi atualizado com o novo fluxo."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.638",
+                        "releaseDate":  "2026-07-18",
+                        "title":  "Nomenclatura das inscrições em cursos e atendimentos",
+                        "description":  "O submenu de inscrições em cursos e atendimentos passou a usar a nomenclatura atualizada no sistema e no manual.",
+                        "changes":  [
+                                        "O submenu, o título da tela e o Manual do sistema agora exibem Inscrições em cursos e atendimentos.",
+                                        "A versão oficial do sistema foi atualizada para 1.00.638."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.637",
                         "releaseDate":  "2026-07-17",
                         "title":  "Progresso no envio do documento",

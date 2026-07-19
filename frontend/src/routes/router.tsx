@@ -159,6 +159,7 @@ const BancoEmpregosPage = carregarPagina("/atendimentos/banco-empregos", "BancoE
 const BibliotecaPage = carregarPagina("/atendimentos/biblioteca", "BibliotecaPage");
 const RegistroVisitasPage = carregarPagina("/atendimentos/registro-visitas", "RegistroVisitasPage");
 const AgendamentosPage = carregarPagina("/atendimentos/agendamentos", "AgendamentosPage");
+const ProntuarioPage = carregarPagina("/atendimentos/prontuario", "ProntuarioPage");
 const OcorrenciasPage = carregarPagina("/atendimentos/ocorrencias", "OcorrenciasPage");
 const ChamadaSenhasPage = carregarPagina("/atendimentos/chamada-senhas", "ChamadaSenhasPage");
 const RegistroDoacaoPage = carregarPagina("/financeiro/registro-doacao", "RegistroDoacaoPage");
@@ -594,6 +595,14 @@ export const router = createBrowserRouter([
         element: (
           <RequirePermission permissions={["MASTER_ADMIN"]}>
             {MasterInstituicoesPage}
+          </RequirePermission>
+        )
+      },
+      {
+        path: "/atendimentos/prontuario",
+        element: (
+          <RequirePermission permissions={["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS", "PRONTUARIO_VISUALIZAR", "CENTRAL_ATENDIMENTOS_VISUALIZAR"]}>
+            {ProntuarioPage}
           </RequirePermission>
         )
       },

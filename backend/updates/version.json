@@ -1,9 +1,9 @@
 {
-  "latestVersion": "1.00.637",
-  "releaseDate": "2026-07-17",
-  "description": "O storage legado foi migrado para a árvore por tenant e os arquivos passaram a contar com backup local diário em pacote compactado.",
+  "latestVersion": "1.00.648",
+  "releaseDate": "2026-07-18",
+  "description": "Correção da conversão de horário e persistência do prontuário.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.637",
+  "minCompatibleVersion": "1.00.648",
   "releaseType": "stable"
 }

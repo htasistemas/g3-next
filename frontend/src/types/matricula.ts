@@ -34,6 +34,9 @@ export type Matricula = {
   vagas_disponiveis?: number;
   carga_horaria?: number;
   horario_inicial?: string;
+  controle_horario_atendimento?: boolean;
+  horario_final_atendimento?: string;
+  intervalo_atendimento_minutos?: number;
   duracao_horas: number;
   dias_semana?: string[];
   faixa_etaria?: string[];

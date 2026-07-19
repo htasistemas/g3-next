@@ -243,7 +243,7 @@ export const menuSections: MenuSection[] = [
       {
         id: "atendimentos-matriculas",
         to: "/atendimentos/matriculas",
-        label: "Inscrições em cursos e oficinas",
+        label: "Inscrições em cursos e atendimentos",
         icon: GraduationCap
       },
       {
@@ -270,6 +270,13 @@ export const menuSections: MenuSection[] = [
         label: "Agendamentos",
         icon: CalendarRange,
         requiredPermissions: ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS", "AGENDAMENTOS_VISUALIZAR"]
+      },
+      {
+        id: "atendimentos-prontuario",
+        to: "/atendimentos/prontuario",
+        label: "Prontuário",
+        icon: ClipboardPenLine,
+        requiredPermissions: ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS", "PRONTUARIO_VISUALIZAR", "CENTRAL_ATENDIMENTOS_VISUALIZAR"]
       },
       {
         id: "atendimentos-ocorrencias",
@@ -643,11 +650,12 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/cadastros/profissionais")) return "Cadastro de profissionais";
   if (pathname.startsWith("/cadastros/voluntariado")) return "Cadastro de voluntariado";
   if (pathname.startsWith("/atendimentos/central-atendimentos")) return "Central de atendimentos";
-  if (pathname.startsWith("/atendimentos/matriculas")) return "Inscrições em cursos e oficinas";
+  if (pathname.startsWith("/atendimentos/matriculas")) return "Inscrições em cursos e atendimentos";
   if (pathname.startsWith("/atendimentos/banco-empregos")) return "Banco de empregos";
   if (pathname.startsWith("/atendimentos/biblioteca")) return "Biblioteca";
   if (pathname.startsWith("/atendimentos/registro-visitas")) return "Registro de visitas";
   if (pathname.startsWith("/atendimentos/agendamentos")) return "Agendamentos";
+  if (pathname.startsWith("/atendimentos/prontuario")) return "Prontuário";
   if (pathname.startsWith("/atendimentos/ocorrencias")) return "Ocorrências";
   if (pathname.startsWith("/atendimentos/chamada-senhas")) return "Chamada de senhas";
   if (pathname.startsWith("/financeiro/registro-doacao")) return "Receber doações";

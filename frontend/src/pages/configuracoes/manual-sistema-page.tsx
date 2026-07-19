@@ -195,7 +195,18 @@ const secoesManual: ManualSecao[] = [
         ]
       },
       {
-        nome: "Inscrições em cursos e oficinas",
+        nome: "Prontuário",
+        objetivo: "Registrar atendimentos multiprofissionais em um prontuário único do beneficiário.",
+        comoUsar: [
+          "Localize o beneficiário por nome, CPF ou código e selecione o cadastro com um clique.",
+          "Escolha a especialidade, registre a evolução e use Salvar rascunho para continuar depois.",
+          "Finalize somente quando o registro estiver conferido; alterações posteriores devem ser feitas por adendo.",
+          "A linha do tempo respeita sigilo e permissões. Conteúdos restritos não são exibidos para perfis sem autorização."
+        ],
+        atencoes: ["Os atendimentos são persistidos no PostgreSQL, vinculados ao tenant e auditados por ação."]
+      },
+      {
+        nome: "Inscrições em cursos e atendimentos",
         objetivo: "Gerenciar inscrições em cursos, oficinas e atividades.",
         comoUsar: [
           "Consulte a listagem de inscrições para localizar cada inscrição individual já incluída, com beneficiário, curso, status, data da inscrição, agendamento e profissional; a tabela voltou a carregar os lançamentos reais já salvos na instituição, respeitando os filtros aplicados na própria listagem.",
@@ -203,6 +214,9 @@ const secoesManual: ManualSecao[] = [
           "A aba Catálogo e vagas voltou a usar uma fonte própria de dados, então os cards cadastrados continuam visíveis mesmo quando a listagem estiver filtrada.",
           "As fotos dos cursos, oficinas e atendimentos são enviadas para o storage autenticado do sistema; o cadastro grava apenas o caminho do arquivo e exibe a imagem na prévia e nos cards do catálogo, com fallback automático para a imagem original quando a miniatura não estiver disponível.",
           "Use os dados da inscrição para registrar turma, responsável, datas e observações.",
+          "Quando o tipo for Atendimento, informe o horário inicial, o horário final e a duração de cada atendimento em minutos; o sistema prepara os horários individuais e calcula automaticamente a quantidade de vagas do período.",
+          "O horário final é considerado como limite do período: das 19:00 às 21:00 com duração de 30 minutos são geradas quatro vagas, às 19:00, 19:30, 20:00 e 20:30.",
+          "Na Faixa etária, use a opção Todas as idades para selecionar ou limpar todas as faixas de uma vez.",
           "Revise a fila de espera e a situação de vagas para apoiar decisões de encaminhamento.",
           "Os atendimentos agendados não ficam mais dentro da tela de inscrições; quando precisar operar agenda, use o botão Abrir em Agendamentos.",
           "Na aba Presença, a data da aula exibe somente datas reais da agenda e da frequência já registrada, sem botão para geração manual.",
@@ -213,7 +227,8 @@ const secoesManual: ManualSecao[] = [
         atencoes: [
           "O botão Excluir da barra superior remove todo o curso configurado e exige confirmação específica antes da exclusão.",
           "Na aba Presença, a data exibida na lista e a data impressa na lista de presença agora seguem exatamente o mesmo dia informado, sem recuo por fuso horário.",
-          "A tela de Inscrições em cursos e oficinas agora carrega catálogo, listagem, detalhe, fila de espera, presença, beneficiários, profissionais e salas sempre dentro da instituição autenticada, sem exibir dados de outro CNPJ.",
+          "A tela de Inscrições em cursos e atendimentos agora carrega catálogo, listagem, detalhe, fila de espera, presença, beneficiários, profissionais e salas sempre dentro da instituição autenticada, sem exibir dados de outro CNPJ.",
+          "O controle por horário é opcional e não altera cursos, oficinas ou atendimentos que não estejam com esse recurso ativado.",
           "Quando houver inscrições já realizadas e a tabela estiver vazia, revise primeiro os filtros do topo; o botão Limpar filtros restaura a visão completa da listagem."
         ]
       },
@@ -223,6 +238,7 @@ const secoesManual: ManualSecao[] = [
         comoUsar: [
           "A aba Dashboard agora abre primeiro na tela para mostrar a visão resumida dos agendamentos logo na entrada do módulo.",
           "Na aba Agendamento, escolha o tipo entre curso, atendimento ou oficina para carregar apenas os itens já cadastrados nas inscrições.",
+          "Depois de escolher o tipo, use o botão Abrir dados da inscrição caso ainda seja necessário inscrever os beneficiários; o sistema abre diretamente a aba Dados da inscrição.",
           "Os filtros rápidos foram removidos dessa aba para deixar a operação mais direta; o foco agora é montar o card sem distrações.",
           "Depois selecione o item desejado em cards operacionais exibidos lado a lado, em grade com dois cards por linha, para o sistema preencher automaticamente o resumo com profissional, dias, horário e local na mesma linha, sem redigitação manual.",
           "Use a lista de beneficiários vinculados ao item para marcar quem participará naquela data; a agenda operacional agora usa a própria matrícula da inscrição, os identificadores legados salvos no card e, quando necessário, a lista atual de matriculados do item para localizar o cadastro do beneficiário, exibindo no card e na seleção o telefone cadastrado da aba Contato e reaproveitando o mesmo dado nos envios.",
@@ -1269,6 +1285,9 @@ const secoesManual: ManualSecao[] = [
           "Na aba Cadastro de livros da Biblioteca, use as ações de um clique Imprimir listagem e Imprimir cadastro para emitir, respectivamente, a relação do acervo ou a ficha individual do livro selecionado; nas demais abas, a impressão gera painel ou listagens de empréstimos, devoluções, disponibilidade e alertas em PDF pelo template central de relatórios do G3N, com cabeçalho, metadados e rodapé institucionais.",
           "A tela Agendamentos agora lista agenda, indicadores, lista de espera, participantes e notificações sempre dentro do tenant autenticado, impedindo que uma instituição veja pacientes agendados ou histórico operacional de outra.",
           "As telas Chamada de senhas e Painel de senhas agora emitem, chamam, finalizam e exibem filas, chamadas e configurações sempre dentro do tenant autenticado, impedindo reaproveitamento de senhas entre instituições diferentes.",
+          "Na tela Prontuário, use Chamar próximo beneficiário para abrir a fila de senhas, conferir o destino informado e escolher um beneficiário específico ou chamar o próximo da fila.",
+          "No campo Tipo de atendimento do Prontuário, selecione Atendimento Proativo (Busca Ativa), Atendimento Programado (Acompanhamento), Atividades Coletivas e Comunitárias, Demanda espontânea ou Demanda referenciada; após a seleção, o sistema exibe um popup com a descrição e os exemplos do tipo escolhido.",
+          "Ao salvar ou finalizar um atendimento, o horário inicial é convertido corretamente e o registro finalizado passa a aparecer na Linha do tempo do beneficiário.",
           "A tela Receber doações agora lista, abre, cadastra, atualiza, exclui e pesquisa doadores sempre dentro do tenant autenticado, inclusive na integração automática com o almoxarifado, impedindo mistura de doações e doadores entre instituições.",
           "A tela Cadastro de beneficiários agora lista, abre, cadastra, atualiza, exclui e gera o próximo código sempre dentro do tenant autenticado, impedindo que uma instituição veja os beneficiários de outra.",
           "A tela Usuários e permissões agora lista, abre, cadastra, atualiza, altera status, reseta senha e exclui sempre dentro do tenant autenticado, impedindo acesso cruzado entre instituições mesmo quando alguém tenta operar por ID direto.",
