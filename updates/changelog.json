@@ -1,6 +1,30 @@
 {
   "entries":  [
                     {
+                        "version": "1.00.652",
+                        "releaseDate": "2026-07-19",
+                        "title": "Organização dos menus",
+                        "description": "Os menus principais foram reorganizados para facilitar a localização das funcionalidades.",
+                        "changes": ["Menus a partir de Atendimentos diários em ordem alfabética.", "Configurações gerais e Painel master mantidos como os dois últimos grupos.", "Itens, permissões e rotas preservados."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.651",
+                        "releaseDate": "2026-07-19",
+                        "title": "Nomenclatura educacional mais didática",
+                        "description": "A operação anteriormente chamada Enturmação passou a ser exibida como Alunos por turma.",
+                        "changes": ["Alunos por turma no menu e na tela educacional.", "Séries e anos escolares na estrutura acadêmica.", "Identificadores técnicos e rotas internas preservados."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.650",
+                        "releaseDate": "2026-07-18",
+                        "title": "Fundação do módulo Educacional",
+                        "description": "Incluída a Fase 1 do módulo Educacional com estrutura acadêmica, vínculo de beneficiários e base de matrículas.",
+                        "changes": ["Novo menu Educacional com visão geral, estrutura acadêmica, alunos e enturmação.", "Cadastro de anos letivos, etapas, séries, disciplinas e turmas.", "Vínculo de beneficiários existentes como alunos sem duplicação cadastral.", "Migration PostgreSQL incremental com segregação por tenant e auditoria."],
+                        "releaseType": "stable"
+                    },
+                    {
                         "version": "1.00.649",
                         "releaseDate": "2026-07-18",
                         "title": "Cards e navegação de agendamentos",

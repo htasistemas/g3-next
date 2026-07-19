@@ -3,6 +3,7 @@ import {
   BookOpenText,
   Brain,
   CheckCircle2,
+  GraduationCap,
   Globe2,
   HeartHandshake,
   Link2,
@@ -46,6 +47,7 @@ const secoesManual: ManualSecao[] = [
         objetivo: "Explica a navegação principal por cadastros, atendimentos, setores e configurações.",
         comoUsar: [
           "Comece pelos cadastros para garantir base confiável de beneficiários, famílias e profissionais.",
+          "A navegação principal mantém Painel de indicadores e Cadastros em geral no início; a partir de Atendimentos diários, os setores aparecem em ordem alfabética, com Configurações gerais e Painel master sempre ao final.",
           "Use Atendimentos diários para registrar movimentações sociais, benefícios, inscrições e acompanhamentos.",
           "Use Configurações gerais para manter parâmetros, usuários, backup, IA e o próprio manual atualizados.",
           "Na aba Personalização, use os campos Card da visão geral e Card suave da visão geral para ajustar apenas o dashboard sem alterar o restante do tema.",
@@ -1316,6 +1318,28 @@ const secoesManual: ManualSecao[] = [
           "O index.html, env-config.js e configurações runtime devem continuar publicados com no-store para evitar reaproveitamento de HTML antigo.",
           "Os arquivos de assets versionados por hash podem manter cache longo, pois uma nova build gera novos nomes de arquivos.",
           "Se o erro persistir após a recarga, validar se a publicação dos arquivos do frontend foi concluída no servidor."
+        ]
+      }
+    ]
+  },
+  {
+    id: "educacional",
+    titulo: "Educacional — Fase 1",
+    descricao: "Fundação para integrar beneficiários à gestão escolar da instituição.",
+    icon: GraduationCap,
+    telas: [
+      {
+        nome: "Visão geral educacional",
+        objetivo: "Acompanhar os principais quantitativos da estrutura educacional do tenant autenticado.",
+        comoUsar: [
+          "Acesse o menu Educacional e use Visão geral para consultar alunos, matrículas, turmas, disciplinas e anos letivos abertos.",
+          "Use Estrutura acadêmica para cadastrar anos letivos, etapas, séries, disciplinas e turmas.",
+          "Use Alunos e matrículas para buscar um beneficiário existente e vinculá-lo como aluno sem duplicar seu cadastro.",
+          "Use Alunos por turma para acompanhar as turmas disponíveis; o fluxo de distribuição será ampliado na próxima fase."
+        ],
+        atencoes: [
+          "Os dados são isolados por instituição/tenant e não devem ser digitados manualmente.",
+          "A migration da Fase 1 cria auditoria para alterações educacionais e preserva o vínculo com beneficiários."
         ]
       }
     ]

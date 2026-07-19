@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.649",
+  "latestVersion": "1.00.652",
   "releaseDate": "2026-07-18",
-  "description": "Cards selecionáveis e ajustes de navegação e validação em agendamentos.",
+  "description": "Organização alfabética dos menus principais do sistema.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.649",
+  "minCompatibleVersion": "1.00.652",
   "releaseType": "stable",
   "downloadUrl": null
 }
