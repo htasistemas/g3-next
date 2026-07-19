@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.672",
+  "latestVersion": "1.00.682",
   "releaseDate": "2026-07-19",
-  "description": "Próxima fase da vida acadêmica educacional.",
+  "description": "Correção do aquecimento de mensagens personalizadas no backend.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.672",
+  "minCompatibleVersion": "1.00.678",
   "releaseType": "stable",
   "downloadUrl": null
 }

@@ -20,6 +20,7 @@ export const diretoriaUnidadeSchema = z.object({
 export const salaUnidadeSchema = z.object({
   id: z.string().optional(),
   nome: z.string().trim().optional(),
+  capacidade_maxima: z.coerce.number().int().nonnegative().default(0),
   ativo: z.boolean().default(true)
 });
 

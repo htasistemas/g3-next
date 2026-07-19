@@ -321,12 +321,13 @@ model DiretoriaUnidade {
 }
 
 model SalaUnidade {
-  id          BigInt              @id @default(autoincrement())
-  unidadeId   BigInt              @map("unidade_id")
-  nome        String              @db.VarChar(120)
-  ativo       Boolean             @default(true)
-  criadoEm    DateTime            @default(now()) @map("criado_em")
-  atualizadoEm DateTime           @default(now()) @map("atualizado_em")
+  id               BigInt              @id @default(autoincrement())
+  unidadeId        BigInt              @map("unidade_id")
+  nome             String              @db.VarChar(120)
+  capacidadeMaxima Int                 @default(0) @map("capacidade_maxima")
+  ativo            Boolean             @default(true)
+  criadoEm         DateTime            @default(now()) @map("criado_em")
+  atualizadoEm     DateTime            @default(now()) @map("atualizado_em")
   unidade     UnidadeAssistencial @relation(fields: [unidadeId], references: [id], onDelete: Cascade)
 
   @@map("salas_unidade")

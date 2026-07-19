@@ -30,6 +30,7 @@ export const educacionalRoutes = Router();
 educacionalRoutes.use(ensureAuthenticated);
 educacionalRoutes.get("/resumo", visualizar, controller.resumo.bind(controller));
 educacionalRoutes.get("/alunos/busca", visualizar, controller.buscarBeneficiarios.bind(controller));
+educacionalRoutes.get("/unidades-ensino", visualizar, controller.listarUnidadesEnsino.bind(controller));
 educacionalRoutes.post("/alunos/vincular", ensurePermissions(["ADMINISTRADOR", "OPERADOR", "EDUCACIONAL_ALUNOS_EDITAR", "EDUCACIONAL_MATRICULAS_EDITAR"]), controller.vincularAluno.bind(controller));
 educacionalRoutes.get("/:recurso", visualizar, controller.listar.bind(controller));
 educacionalRoutes.post("/:recurso", editarPorRecurso, controller.salvar.bind(controller));

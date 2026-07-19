@@ -1,6 +1,86 @@
 {
   "entries":  [
                     {
+                        "version": "1.00.682",
+                        "releaseDate": "2026-07-19",
+                        "title": "Correção do aquecimento de mensagens",
+                        "description": "O backend deixa de falhar ao criar modelos-base de mensagens durante chamadas simultâneas de inicialização.",
+                        "changes": ["Preparação da estrutura executada uma única vez por processo.", "Conflitos de chave do tenant tratados atomicamente.", "Inicialização do Windows sem shell global inseguro."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.681",
+                        "releaseDate": "2026-07-19",
+                        "title": "Edição das salas de atendimento",
+                        "description": "A aba Salas de atendimento permite editar nome, vagas e status diretamente na listagem.",
+                        "changes": ["Edição direta do nome e da capacidade.", "Ativação e inativação persistidas corretamente.", "Valores alterados são enviados no mesmo salvamento da unidade."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.680",
+                        "releaseDate": "2026-07-19",
+                        "title": "Logomarcas lado a lado",
+                        "description": "As duas logomarcas do cadastro de unidade de atendimento agora ficam organizadas lado a lado na aba Dados gerais.",
+                        "changes": ["Layout responsivo em duas colunas.", "Em telas menores, os campos continuam empilhados para preservar a usabilidade."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.679",
+                        "releaseDate": "2026-07-19",
+                        "title": "Correção das vagas das salas de atendimento",
+                        "description": "O cadastro de salas passa a preservar a capacidade informada e o status ativo ao salvar a unidade.",
+                        "changes": ["Conversão segura da capacidade enviada pelo formulário.", "Normalização correta do status ativo/inativo."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.678",
+                        "releaseDate": "2026-07-19",
+                        "title": "Vagas por unidade e sala de ensino",
+                        "description": "Matrículas educacionais agora são vinculadas a uma unidade de ensino e a uma sala com capacidade controlada.",
+                        "changes": ["Cadastro de capacidade máxima por sala.", "Exibição de vagas ocupadas e disponíveis na matrícula.", "Bloqueio backend para impedir matrícula em sala lotada ou incompatível."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.677",
+                        "releaseDate": "2026-07-19",
+                        "title": "Destaque exclusivo dos submenus Educacionais",
+                        "description": "A seleção do menu Educacional agora respeita a aba aberta e não mantém Visão geral marcada junto com outro submenu.",
+                        "changes": ["Visão geral ativa somente na rota inicial.", "Alunos, Estrutura acadêmica e demais grupos ficam destacados individualmente.", "Compatibilidade mantida para as rotas com query string."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.676",
+                        "releaseDate": "2026-07-19",
+                        "title": "Padronização das abas Educacionais",
+                        "description": "As abas laterais do módulo Educacional agora reutilizam exatamente o padrão visual do cadastro de beneficiários.",
+                        "changes": ["Fundo institucional nas abas inativas.", "Destaque visual consistente na aba ativa.", "Numeração, espaçamento e tipografia alinhados ao padrão G3N."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.675",
+                        "releaseDate": "2026-07-19",
+                        "title": "Ações contextuais no módulo Educacional",
+                        "description": "As telas Educacionais passaram a usar a barra de ações padrão do G3N conforme o contexto da aba.",
+                        "changes": ["Novo, Salvar e Cancelar nas abas com formulário.", "Buscar na Visão geral e em Matrículas.", "Imprimir e Fechar disponíveis de forma consistente, sem ações decorativas."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.674",
+                        "releaseDate": "2026-07-19",
+                        "title": "Padronização visual das abas Educacionais",
+                        "description": "As abas dos agrupamentos Educacionais passaram a seguir o mesmo padrão lateral numerado do cadastro de beneficiários.",
+                        "changes": ["Itens inativos com fundo suave institucional.", "Item ativo com destaque de borda e numeração.", "Aplicação uniforme em Alunos, Estrutura acadêmica, Professores, Gestão escolar e Relatórios."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.673",
+                        "releaseDate": "2026-07-19",
+                        "title": "Reorganização do menu Educacional",
+                        "description": "As funcionalidades educacionais foram agrupadas em seis menus principais com navegação interna por abas.",
+                        "changes": ["Alunos reúne matrículas, famílias, transferências, autorizações, documentos e histórico.", "Estrutura acadêmica reúne cadastros, gestão acadêmica, grade, horários e unidades escolares.", "Professores e equipe reúne planejamento, diário, frequência, avaliações e boletins.", "Gestão escolar reúne ocorrências, agenda e rotinas infantis.", "Rotas antigas permanecem compatíveis."],
+                        "releaseType": "stable"
+                    },
+                    {
                         "version": "1.00.672",
                         "releaseDate": "2026-07-19",
                         "title": "Gestão acadêmica educacional",

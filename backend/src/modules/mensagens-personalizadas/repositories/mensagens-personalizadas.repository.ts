@@ -114,6 +114,7 @@ type DestinatarioRow = {
 };
 
 let estruturaPromise: Promise<void> | null = null;
+let estruturaCompletaPromise: Promise<void> | null = null;
 
 function toJsonText(value: unknown) {
   return JSON.stringify(value ?? []);
@@ -588,7 +589,8 @@ export class MensagensPersonalizadasRepository {
         ${input.mensagemSugeridaIa ?? false},
         ${input.chaveSistema}
       )
-      ON CONFLICT DO NOTHING
+      ON CONFLICT (tenant_id, chave_sistema) WHERE chave_sistema IS NOT NULL
+      DO UPDATE SET chave_sistema = EXCLUDED.chave_sistema
       RETURNING id
     `);
 
@@ -1082,7 +1084,7 @@ export class MensagensPersonalizadasRepository {
   }
 }
 
-export async function ensureMensagensPersonalizadasEstrutura() {
+async function executarGarantiaEstruturaMensagensPersonalizadas() {
   if (!estruturaPromise) {
     estruturaPromise = (async () => {
       for (const comando of estruturaSql) {
@@ -1209,4 +1211,15 @@ export async function ensureMensagensPersonalizadasEstrutura() {
   await prisma.$executeRawUnsafe(
     "CREATE INDEX IF NOT EXISTS mensagens_personalizadas_auditoria_tenant_data_idx ON mensagens_personalizadas_auditoria(tenant_id, criado_em DESC)"
   );
+}
+
+export async function ensureMensagensPersonalizadasEstrutura() {
+  if (!estruturaCompletaPromise) {
+    estruturaCompletaPromise = executarGarantiaEstruturaMensagensPersonalizadas().catch((error) => {
+      estruturaCompletaPromise = null;
+      throw error;
+    });
+  }
+
+  await estruturaCompletaPromise;
 }

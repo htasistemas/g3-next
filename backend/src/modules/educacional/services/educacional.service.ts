@@ -9,6 +9,7 @@ export class EducacionalService {
   async resumo(rawFiltros: unknown, tenantId?: string) { return this.repository.resumo(painelEducacionalFiltrosSchema.parse(rawFiltros ?? {}), this.tenant(tenantId)); }
   async listar(recurso: EducacionalRecurso, tenantId?: string) { return this.repository.listar(recurso, this.tenant(tenantId)); }
   async buscarBeneficiarios(raw: unknown, tenantId?: string) { const input = buscaBeneficiarioSchema.parse(raw); return this.repository.buscarBeneficiarios(input.busca, this.tenant(tenantId)); }
+  async listarUnidadesEnsino(tenantId?: string) { return this.repository.listarUnidadesEnsino(this.tenant(tenantId)); }
   async vincularAluno(raw: unknown, tenantId?: string, actor: EducacionalActor = {}) { return this.repository.criarAluno(alunoSchema.parse(raw), this.tenant(tenantId), actor); }
   async salvar(recurso: EducacionalRecurso, rawId: string | undefined, raw: unknown, tenantId?: string, actor: EducacionalActor = {}) { const schema = this.schemas[recurso as keyof typeof this.schemas]; if (!schema) throw new AppError("Recurso educacional inválido.", 400); return this.repository.salvar(recurso, rawId, schema.parse(raw), this.tenant(tenantId), actor); }
   private tenant(value?: string) { if (!value?.trim()) throw new AppError("Tenant da sessão não identificado.", 401); return value.trim(); }

@@ -109,17 +109,9 @@ const comparadorItensMenu = new Intl.Collator("pt-BR", {
 const ordemItensEducacional = [
   "educacional-visao-geral",
   "educacional-alunos",
-  "educacional-responsaveis",
+  "educacional-estrutura",
   "educacional-professores",
-  "educacional-unidades",
-  "educacional-grade-curricular",
-  "educacional-horarios",
-  "educacional-diario",
-  "educacional-boletins",
-  "educacional-ocorrencias",
-  "educacional-agenda",
-  "educacional-documentos",
-  "educacional-historico",
+  "educacional-gestao-escolar",
   "educacional-relatorios"
 ];
 
@@ -656,18 +648,9 @@ const menuSectionsBase: MenuSection[] = [
     itens: [
       { id: "educacional-visao-geral", to: "/educacional", label: "Visão geral", icon: ChartPie },
       { id: "educacional-alunos", to: "/educacional?grupo=alunos&aba=alunos", label: "Alunos", icon: UsersRound },
-      { id: "educacional-fluxo-academico", to: "/educacional?aba=fluxo-academico", label: "Gestão acadêmica", icon: CheckSquare2 },
-      { id: "educacional-responsaveis", to: "/cadastros/vinculo-familiar", label: "Responsáveis/Famílias", icon: UsersRound },
+      { id: "educacional-estrutura", to: "/educacional?grupo=estrutura&aba=estrutura", label: "Estrutura acadêmica", icon: Building2 },
       { id: "educacional-professores", to: "/educacional?grupo=professores&aba=professores", label: "Professores e equipe pedagógica", icon: UsersRound },
-      { id: "educacional-unidades", to: "/cadastros/unidades-assistenciais?tipo_unidade=ENSINO", label: "Unidades escolares", icon: Building2 },
-      { id: "educacional-grade-curricular", to: "/educacional?aba=grade-curricular", label: "Grade curricular", icon: ClipboardPenLine },
-      { id: "educacional-horarios", to: "/educacional?aba=horarios", label: "Horários", icon: Clock3 },
-      { id: "educacional-diario", to: "/educacional?grupo=diario&aba=diarios", label: "Diário de classe", icon: BookOpenText },
-      { id: "educacional-boletins", to: "/educacional?aba=boletins", label: "Boletins", icon: FileText },
-      { id: "educacional-ocorrencias", to: "/educacional?aba=ocorrencias", label: "Ocorrências", icon: Bell },
-      { id: "educacional-agenda", to: "/educacional?aba=agenda", label: "Agenda escolar", icon: CalendarRange },
-      { id: "educacional-documentos", to: "/educacional?aba=documentos", label: "Documentos/Declarações", icon: Files },
-      { id: "educacional-historico", to: "/educacional?aba=historicos", label: "Histórico escolar", icon: HistoryIcon },
+      { id: "educacional-gestao-escolar", to: "/educacional?grupo=gestao&aba=ocorrencias", label: "Gestão escolar", icon: CheckSquare2 },
       { id: "educacional-relatorios", to: "/educacional?aba=relatorios", label: "Relatórios e indicadores", icon: ChartPie }
     ]
   },
@@ -805,6 +788,14 @@ function itemEstaAtivo(pathname: string, item: MenuItem, search = "") {
     }
     return pathname === rotaPathname || pathname.startsWith(`${rotaPathname}/`);
   });
+}
+
+function itemMenuEstaAtivo(pathname: string, search: string, item: MenuItem, navLinkAtivo = false) {
+  // Todas as entradas do Educacional usam a query string para definir a aba.
+  // O NavLink considera somente /educacional e, por isso, marcava Visão geral
+  // junto com Alunos, Estrutura acadêmica e os demais grupos.
+  if (item.id?.startsWith("educacional-")) return itemEstaAtivo(pathname, item, search);
+  return itemEstaAtivo(pathname, item, search) || navLinkAtivo;
 }
 
 export function AppShell() {
@@ -1295,7 +1286,7 @@ export function AppShell() {
                             // Links educacionais usam query string para abrir a seção correta.
                             // O NavLink considera apenas o pathname em alguns casos e acabava
                             // marcando todos os itens /educacional como ativos ao mesmo tempo.
-                            const itemAtivo = itemEstaAtivo(location.pathname, item, location.search) || (isActive && !item.to?.includes("?"));
+                            const itemAtivo = itemMenuEstaAtivo(location.pathname, location.search, item, isActive && !item.to?.includes("?"));
                             return `flex w-full items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs font-medium leading-tight transition-colors ${
                               itemAtivo
                                 ? "border-[var(--g3-active)] bg-[var(--g3-card)] text-[var(--g3-active)] shadow-sm"
@@ -1459,7 +1450,7 @@ export function AppShell() {
                             key={item.id}
                             to={item.to}
                             className={({ isActive }) => {
-                              const itemAtivo = isActive || itemEstaAtivo(location.pathname, item);
+                              const itemAtivo = itemMenuEstaAtivo(location.pathname, location.search, item, isActive);
                               return `flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-xs font-medium leading-tight ${
                                 itemAtivo
                                   ? "border-[var(--g3-active)] bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"

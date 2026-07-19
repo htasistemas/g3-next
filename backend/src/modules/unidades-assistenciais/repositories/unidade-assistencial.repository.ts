@@ -18,7 +18,7 @@ const unidadeInclude = {
 
 type TransactionClient = Prisma.TransactionClient;
 type IdRow = { id: bigint };
-type SalaNormalizada = { id?: bigint; nome: string; ativo: boolean };
+type SalaNormalizada = { id?: bigint; nome: string; capacidade_maxima: number; ativo: boolean };
 
 function hasAnyAddressData(input: UnidadeAssistencialInput): boolean {
   return !!(
@@ -88,7 +88,10 @@ function normalizarSalas(salas?: SalaUnidadeInput[]): SalaNormalizada[] {
     if ((chaveId && idsUnicos.has(chaveId)) || nomesUnicos.has(chaveNome)) continue;
     if (chaveId) idsUnicos.add(chaveId);
     nomesUnicos.add(chaveNome);
-    resultado.push({ id, nome, ativo: sala.ativo ?? true });
+    const capacidadeInformada = Number(sala.capacidade_maxima);
+    const capacidade = Number.isInteger(capacidadeInformada) && capacidadeInformada >= 0 ? capacidadeInformada : 0;
+    const ativo = sala.ativo !== false && String(sala.ativo).toLowerCase() !== "false";
+    resultado.push({ id, nome, capacidade_maxima: capacidade, ativo });
   }
   return resultado;
 }
@@ -562,16 +565,20 @@ export class UnidadeAssistencialRepository {
     await db.$executeRawUnsafe(
       "ALTER TABLE salas_unidade ADD COLUMN IF NOT EXISTS ativo BOOLEAN NOT NULL DEFAULT TRUE"
     );
+    await db.$executeRawUnsafe(
+      "ALTER TABLE salas_unidade ADD COLUMN IF NOT EXISTS capacidade_maxima INTEGER NOT NULL DEFAULT 0"
+    );
   }
 
   private async criarSala(tx: TransactionClient, unidadeId: bigint, sala: SalaNormalizada, now: Date) {
     await tx.$executeRawUnsafe(
       `
-      INSERT INTO salas_unidade (unidade_id, nome, ativo, criado_em, atualizado_em)
-      VALUES ($1, $2, $3, $4, $5)
+      INSERT INTO salas_unidade (unidade_id, nome, capacidade_maxima, ativo, criado_em, atualizado_em)
+      VALUES ($1, $2, $3, $4, $5, $6)
       `,
       unidadeId,
       sala.nome,
+      sala.capacidade_maxima,
       sala.ativo,
       now,
       now
@@ -583,14 +590,16 @@ export class UnidadeAssistencialRepository {
       `
       UPDATE salas_unidade
       SET nome = $3,
-          ativo = $4,
-          atualizado_em = $5
+          capacidade_maxima = $4,
+          ativo = $5,
+          atualizado_em = $6
       WHERE id = $1
         AND unidade_id = $2
       `,
       sala.id,
       unidadeId,
       sala.nome,
+      sala.capacidade_maxima,
       sala.ativo,
       now
     );

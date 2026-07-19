@@ -61,7 +61,7 @@ export class EducacionalRepository {
     const rows = recurso === "alunos"
       ? await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`SELECT a.*, b.nome_completo, b.codigo AS codigo_beneficiario, b.data_nascimento, b.nome_mae FROM educacional_aluno a INNER JOIN cadastro_beneficiario b ON b.id = a.beneficiario_id AND b.tenant_id::text = ${tenantId} WHERE a.tenant_id::text = ${tenantId} ORDER BY a.id DESC LIMIT 500`)
       : recurso === "matriculas"
-        ? await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`SELECT m.*, a.beneficiario_id, b.nome_completo AS aluno_nome, t.nome AS turma_nome FROM educacional_matricula m INNER JOIN educacional_aluno a ON a.id = m.aluno_id AND a.tenant_id::text = ${tenantId} INNER JOIN cadastro_beneficiario b ON b.id = a.beneficiario_id AND b.tenant_id::text = ${tenantId} LEFT JOIN educacional_turma t ON t.id = m.turma_id AND t.tenant_id::text = ${tenantId} WHERE m.tenant_id::text = ${tenantId} ORDER BY m.id DESC LIMIT 500`)
+        ? await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`SELECT m.*, a.beneficiario_id, b.nome_completo AS aluno_nome, t.nome AS turma_nome, u.nome_fantasia AS unidade_nome, s.nome AS sala_nome FROM educacional_matricula m INNER JOIN educacional_aluno a ON a.id = m.aluno_id AND a.tenant_id::text = ${tenantId} INNER JOIN cadastro_beneficiario b ON b.id = a.beneficiario_id AND b.tenant_id::text = ${tenantId} LEFT JOIN educacional_turma t ON t.id = m.turma_id AND t.tenant_id::text = ${tenantId} LEFT JOIN unidade_assistencial u ON u.id = m.unidade_id AND u.tenant_id::text = ${tenantId} LEFT JOIN salas_unidade s ON s.id = m.sala_id AND s.unidade_id = m.unidade_id WHERE m.tenant_id::text = ${tenantId} ORDER BY m.id DESC LIMIT 500`)
         : await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`SELECT * FROM ${Prisma.raw(tabela)} WHERE tenant_id::text = ${tenantId} ORDER BY id DESC LIMIT 500`);
     return rows.map((row) => this.serializar(row));
   }
@@ -77,6 +77,40 @@ export class EducacionalRepository {
     `).then((rows) => rows.map((row) => this.serializar(row)));
   }
 
+  async listarUnidadesEnsino(tenantId: string) {
+    const rows = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+      SELECT u.id AS unidade_id, u.nome_fantasia AS unidade_nome,
+             s.id AS sala_id, s.nome AS sala_nome,
+             COALESCE(s.capacidade_maxima, 0) AS capacidade_maxima,
+             COUNT(m.id) FILTER (WHERE m.situacao IN ('ATIVA', 'PENDENTE'))::bigint AS ocupadas
+      FROM unidade_assistencial u
+      LEFT JOIN salas_unidade s ON s.unidade_id = u.id AND COALESCE(s.ativo, TRUE) = TRUE
+      LEFT JOIN educacional_matricula m
+        ON m.unidade_id = u.id AND m.sala_id = s.id AND m.tenant_id::text = ${tenantId}
+      WHERE u.tenant_id::text = ${tenantId} AND u.tipo_unidade = 'ENSINO'
+      GROUP BY u.id, u.nome_fantasia, s.id, s.nome, s.capacidade_maxima
+      ORDER BY u.nome_fantasia ASC, s.nome ASC
+    `);
+    const unidades = new Map<string, { id: string; nome: string; salas: Array<Record<string, unknown>> }>();
+    for (const row of rows) {
+      const unidadeId = String(row.unidade_id);
+      if (!unidades.has(unidadeId)) unidades.set(unidadeId, { id: unidadeId, nome: String(row.unidade_nome ?? ""), salas: [] });
+      if (row.sala_id !== null && row.sala_id !== undefined) {
+        const capacidade = Number(row.capacidade_maxima ?? 0);
+        const ocupadas = Number(row.ocupadas ?? 0);
+        unidades.get(unidadeId)?.salas.push({
+          id: String(row.sala_id),
+          nome: String(row.sala_nome ?? ""),
+          capacidade_maxima: capacidade,
+          ocupadas,
+          disponiveis: capacidade > 0 ? Math.max(capacidade - ocupadas, 0) : null,
+          lotada: capacidade > 0 && ocupadas >= capacidade
+        });
+      }
+    }
+    return [...unidades.values()];
+  }
+
   async criarAluno(input: { beneficiario_id: number; numero_aluno?: string | null; observacoes?: string | null }, tenantId: string, actor: EducacionalActor) {
     const beneficiario = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`SELECT id FROM cadastro_beneficiario WHERE id = ${BigInt(input.beneficiario_id)} AND tenant_id::text = ${tenantId} LIMIT 1`);
     if (!beneficiario[0]) throw new AppError("Beneficiário não encontrado nesta instituição.", 404);
@@ -87,7 +121,7 @@ export class EducacionalRepository {
 
   async salvar(recurso: EducacionalRecurso, rawId: string | undefined, input: Record<string, unknown>, tenantId: string, actor: EducacionalActor) {
     const tabela = this.tabela(recurso);
-    await this.validarReferencias(recurso, input, tenantId);
+    await this.validarReferencias(recurso, input, tenantId, rawId);
     if (recurso === "lista-espera" && input.beneficiario_id) await this.validarBeneficiario(String(input.beneficiario_id), tenantId);
     if (recurso === "recuperacoes" && input.valor !== null && input.valor !== undefined && Number(input.valor) > Number(input.valor_maximo)) throw new AppError("A nota da recuperação não pode ser maior que o valor máximo.", 400);
     if (recurso === "horarios") await this.validarConflitoHorario(input, rawId, tenantId);
@@ -115,7 +149,7 @@ export class EducacionalRepository {
     return this.serializar(rows[0]);
   }
 
-  private async validarReferencias(recurso: EducacionalRecurso, input: Record<string, unknown>, tenantId: string) {
+  private async validarReferencias(recurso: EducacionalRecurso, input: Record<string, unknown>, tenantId: string, rawId?: string) {
     const referencias: Array<[string, string]> = [];
     if (recurso === "series" && input.etapa_id) referencias.push(["educacional_etapa", "etapa_id"]);
     if (recurso === "turmas") {
@@ -215,15 +249,42 @@ export class EducacionalRepository {
     }
     if (recurso === "calendario" && input.ano_letivo_id) referencias.push(["educacional_ano_letivo", "ano_letivo_id"]);
     if ((recurso === "turmas" || recurso === "matriculas" || recurso === "lista-espera" || recurso === "calendario") && input.unidade_id) {
-      const unidade = await prisma.$queryRaw<Array<{ tipo_unidade: string }>>(Prisma.sql`SELECT tipo_unidade FROM unidade_assistencial WHERE id_unidade = ${BigInt(String(input.unidade_id))} AND tenant_id::text = ${tenantId} LIMIT 1`);
+      const unidade = await prisma.$queryRaw<Array<{ tipo_unidade: string }>>(Prisma.sql`SELECT tipo_unidade FROM unidade_assistencial WHERE id = ${BigInt(String(input.unidade_id))} AND tenant_id::text = ${tenantId} LIMIT 1`);
       if (!unidade[0]) throw new AppError("Unidade de ensino não encontrada nesta instituição.", 400);
       if (unidade[0].tipo_unidade !== "ENSINO") throw new AppError("Selecione uma unidade classificada como unidade de ensino.", 400);
     }
+    if (recurso === "matriculas") await this.validarVagaSala(input, tenantId, rawId);
     for (const [tabelaReferencia, campo] of referencias) {
       const valor = BigInt(String(input[campo]));
       const encontrado = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`SELECT id FROM ${Prisma.raw(tabelaReferencia)} WHERE id = ${valor} AND tenant_id::text = ${tenantId} LIMIT 1`);
       if (!encontrado[0]) throw new AppError("A referência informada não pertence à instituição atual.", 400);
     }
+  }
+
+  private async validarVagaSala(input: Record<string, unknown>, tenantId: string, rawId?: string) {
+    const unidadeId = BigInt(String(input.unidade_id));
+    const salaId = BigInt(String(input.sala_id));
+    const sala = await prisma.$queryRaw<Array<{ capacidade_maxima: number }>>(Prisma.sql`
+      SELECT s.capacidade_maxima
+      FROM salas_unidade s
+      INNER JOIN unidade_assistencial u ON u.id = s.unidade_id
+      WHERE s.id = ${salaId} AND s.unidade_id = ${unidadeId}
+        AND u.tenant_id::text = ${tenantId} AND u.tipo_unidade = 'ENSINO'
+        AND COALESCE(s.ativo, TRUE) = TRUE
+      LIMIT 1
+    `);
+    if (!sala[0]) throw new AppError("A sala selecionada não pertence à unidade de ensino ou está inativa.", 400);
+    const capacidade = Number(sala[0].capacidade_maxima ?? 0);
+    if (capacidade < 1) throw new AppError("Configure a capacidade da sala antes de matricular alunos.", 400);
+    const matriculaId = rawId ? BigInt(rawId) : null;
+    const ocupacao = await prisma.$queryRaw<Array<{ total: bigint }>>(Prisma.sql`
+      SELECT COUNT(*)::bigint AS total FROM educacional_matricula
+      WHERE tenant_id::text = ${tenantId} AND unidade_id = ${unidadeId} AND sala_id = ${salaId}
+        AND situacao IN ('ATIVA', 'PENDENTE')
+        AND (${matriculaId}::bigint IS NULL OR id <> ${matriculaId})
+    `);
+    const total = Number(ocupacao[0]?.total ?? 0);
+    if (total >= capacidade) throw new AppError(`A sala está lotada. Capacidade: ${capacidade}; ocupadas: ${total}.`, 409);
   }
 
   private async validarEnturmacao(input: Record<string, unknown>, rawId: string | undefined, tenantId: string) {

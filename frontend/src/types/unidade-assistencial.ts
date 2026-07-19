@@ -10,6 +10,7 @@ export type DiretoriaUnidade = {
 export type SalaUnidade = {
   id?: string;
   nome: string;
+  capacidade_maxima?: number;
   ativo?: boolean;
 };
 

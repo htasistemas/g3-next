@@ -32,6 +32,12 @@ export type EducacionalRecurso =
   | "resultados-finais"
   | "calendario";
 
+export type UnidadeEnsinoCatalogo = {
+  id: string;
+  nome: string;
+  salas: Array<{ id: string; nome: string; capacidade_maxima: number; ocupadas: number; disponiveis: number | null; lotada: boolean }>;
+};
+
 export const educacionalService = {
   async resumo(filtros?: Record<string, string>) {
     const { data } = await httpClient.get<EducacionalResumo>("/api/educacional/resumo", { params: filtros });
@@ -58,6 +64,10 @@ export const educacionalService = {
       dataNascimento: item.data_nascimento ? String(item.data_nascimento) : null,
       nomeMae: item.nome_mae ? String(item.nome_mae) : null
     }));
+  },
+  async listarUnidadesEnsino() {
+    const { data } = await httpClient.get<{ unidades: UnidadeEnsinoCatalogo[] }>("/api/educacional/unidades-ensino");
+    return data.unidades;
   },
   async vincularAluno(beneficiarioId: string) {
     const { data } = await httpClient.post<{ aluno: EducacionalItem }>("/api/educacional/alunos/vincular", {
