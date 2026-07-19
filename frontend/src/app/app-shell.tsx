@@ -168,7 +168,7 @@ const captacaoMenuPermissions = [
   "CAPTACAO_DADOS_SENSIVEIS_VISUALIZAR"
 ];
 
-export const menuSections: MenuSection[] = [
+const menuSectionsBase: MenuSection[] = [
   {
     id: "dashboard",
     secao: "Painel de indicadores",
@@ -625,6 +625,18 @@ export const menuSections: MenuSection[] = [
     ]
   },
   {
+    id: "educacional",
+    secao: "Educacional",
+    icon: BookOpenText,
+    requiredPermissions: ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS", "EDUCACIONAL_VISUALIZAR", "EDUCACIONAL_MATRICULAS_VISUALIZAR"],
+    itens: [
+      { id: "educacional-visao-geral", to: "/educacional", label: "Visão geral", icon: ChartPie },
+      { id: "educacional-estrutura", to: "/educacional?aba=estrutura", label: "Estrutura acadêmica", icon: GraduationCap },
+      { id: "educacional-matriculas", to: "/educacional?aba=matriculas", label: "Alunos e matrículas", icon: UsersRound },
+      { id: "educacional-enturmacao", to: "/educacional?aba=enturmacao", label: "Alunos por turma", icon: UsersRound }
+    ]
+  },
+  {
     id: "painel-master",
     secao: "Painel master",
     icon: ShieldCheck,
@@ -640,6 +652,24 @@ export const menuSections: MenuSection[] = [
     ]
   }
 ];
+
+const ordemSecoesMenu = [
+  "dashboard",
+  "cadastros",
+  "atendimentos",
+  "setor-administrativo",
+  "financeiro",
+  "educacional",
+  "setor-juridico",
+  "portais-acesso",
+  "setor-rh",
+  "configuracoes-gerais",
+  "painel-master"
+];
+
+export const menuSections: MenuSection[] = ordemSecoesMenu
+  .map((id) => menuSectionsBase.find((secao) => secao.id === id))
+  .filter((secao): secao is MenuSection => Boolean(secao));
 
 function obterTitulo(pathname: string): string {
   if (pathname === "/" || pathname.startsWith("/dashboard/visao-geral")) return "Visão geral";
@@ -1071,7 +1101,8 @@ export function AppShell() {
       return;
     }
 
-    if (location.pathname === item.to) {
+    const rotaAtual = `${location.pathname}${location.search}`;
+    if (rotaAtual === item.to) {
       return;
     }
 

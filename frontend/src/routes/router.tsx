@@ -160,6 +160,7 @@ const BibliotecaPage = carregarPagina("/atendimentos/biblioteca", "BibliotecaPag
 const RegistroVisitasPage = carregarPagina("/atendimentos/registro-visitas", "RegistroVisitasPage");
 const AgendamentosPage = carregarPagina("/atendimentos/agendamentos", "AgendamentosPage");
 const ProntuarioPage = carregarPagina("/atendimentos/prontuario", "ProntuarioPage");
+const EducacionalPage = carregarPagina("/educacional", "EducacionalPage");
 const OcorrenciasPage = carregarPagina("/atendimentos/ocorrencias", "OcorrenciasPage");
 const ChamadaSenhasPage = carregarPagina("/atendimentos/chamada-senhas", "ChamadaSenhasPage");
 const RegistroDoacaoPage = carregarPagina("/financeiro/registro-doacao", "RegistroDoacaoPage");
@@ -603,6 +604,14 @@ export const router = createBrowserRouter([
         element: (
           <RequirePermission permissions={["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS", "PRONTUARIO_VISUALIZAR", "CENTRAL_ATENDIMENTOS_VISUALIZAR"]}>
             {ProntuarioPage}
+          </RequirePermission>
+        )
+      },
+      {
+        path: "/educacional",
+        element: (
+          <RequirePermission permissions={["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS", "EDUCACIONAL_VISUALIZAR", "EDUCACIONAL_MATRICULAS_VISUALIZAR"]}>
+            {EducacionalPage}
           </RequirePermission>
         )
       },

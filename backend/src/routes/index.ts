@@ -62,6 +62,7 @@ import { agendamentosRoutes } from "../modules/agendamentos/routes/agendamentos.
 import { instituicoesRoutes } from "../modules/instituicoes/routes/instituicoes.routes.js";
 import { projetoRoutes } from "../modules/projetos/routes/projeto.routes.js";
 import { portaisExternosRoutes } from "../modules/portais-externos/routes/portais-externos.routes.js";
+import { educacionalRoutes } from "../modules/educacional/routes/educacional.routes.js";
 import { obterAtualizacaoSistemaPaths } from "../modules/atualizacao-sistema/services/atualizacao-sistema.paths.js";
 
 export const appRoutes = Router();
@@ -93,6 +94,7 @@ appRoutes.use("/api/profissionais", profissionalRoutes);
 appRoutes.use("/api/voluntarios", voluntarioRoutes);
 appRoutes.use("/api/matriculas", matriculaRoutes);
 appRoutes.use("/api/prontuario", prontuarioRoutes);
+appRoutes.use("/api/educacional", educacionalRoutes);
 appRoutes.use("/api/registro-doacao", registroDoacaoRoutes);
 appRoutes.use("/api/doacoes-realizadas", doacaoRealizadaRoutes);
 appRoutes.use("/api/doacoes-planejadas", doacaoPlanejadaRoutes);
