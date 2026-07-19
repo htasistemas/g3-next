@@ -1,9 +1,9 @@
 {
-  "latestVersion": "1.00.648",
+  "latestVersion": "1.00.649",
   "releaseDate": "2026-07-18",
-  "description": "Correção da conversão de horário e persistência do prontuário.",
+  "description": "Ajuste da validação de horário do prontuário para finalização integrada aos agendamentos.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.648",
+  "minCompatibleVersion": "1.00.649",
   "releaseType": "stable"
 }

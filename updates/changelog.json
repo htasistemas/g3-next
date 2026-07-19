@@ -1,6 +1,14 @@
 {
   "entries":  [
                     {
+                        "version": "1.00.649",
+                        "releaseDate": "2026-07-18",
+                        "title": "Cards e navegação de agendamentos",
+                        "description": "A seleção de cursos e atendimentos na aba Agendamento foi reorganizada em cards e o acesso às inscrições foi direcionado.",
+                        "changes": ["Cards lado a lado com fundo institucional e seleção por clique.", "Botão direcionado para Inscrições e lista de espera.", "Corrigida a validação de horário que impedia a finalização."],
+                        "releaseType": "stable"
+                    },
+                    {
                         "version": "1.00.648",
                         "releaseDate": "2026-07-18",
                         "title": "Correção do salvamento do prontuário",

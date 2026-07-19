@@ -1141,9 +1141,9 @@ export function AgendamentosPage() {
                             type="button"
                             variant="outline"
                             className="border-amber-300 bg-white text-amber-900 hover:bg-amber-100"
-                            onClick={() => navigate("/atendimentos/matriculas?aba=dados")}
+                            onClick={() => navigate("/atendimentos/matriculas?aba=inscricoes")}
                           >
-                            Abrir dados da inscrição
+                            Abrir inscrições e lista de espera
                           </Button>
                         </div>
                       </div>

@@ -93,41 +93,35 @@ export function ItemSelector(props: {
 }) {
   return (
     <div className="space-y-3">
-      <div className="max-h-56 overflow-auto rounded-xl border border-[var(--g3-border)] bg-white shadow-sm">
+      <div className="max-h-72 overflow-auto rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] p-3 shadow-sm">
         {props.carregando ? (
           <p className="px-2 py-6 text-sm text-[var(--g3-muted)]">Carregando itens...</p>
         ) : props.itens.length ? (
-          <table className="w-full border-collapse text-sm">
-            <thead className="sticky top-0 bg-emerald-50 text-left">
-              <tr>
-                <th className="border-b border-[var(--g3-border)] px-3 py-2 font-semibold text-emerald-900">Nome</th>
-                <th className="border-b border-[var(--g3-border)] px-3 py-2 font-semibold text-emerald-900">Profissional</th>
-                <th className="border-b border-[var(--g3-border)] px-3 py-2 font-semibold text-emerald-900">Horário</th>
-                <th className="border-b border-[var(--g3-border)] px-3 py-2 font-semibold text-emerald-900">Local</th>
-              </tr>
-            </thead>
-            <tbody>
-              {props.itens.map((item) => {
-                const ativo = props.selecionadoId === item.id;
-                return (
-                  <tr
-                    key={item.id}
-                    onClick={() => props.onSelect(item)}
-                    className={`cursor-pointer transition-colors ${
-                      ativo ? "bg-emerald-50" : "bg-white hover:bg-[var(--g3-primary-soft)]/35"
-                    }`}
-                  >
-                    <td className="border-b border-[var(--g3-border)] px-3 py-2 font-medium text-[var(--g3-foreground)]">{item.nome}</td>
-                    <td className="border-b border-[var(--g3-border)] px-3 py-2 text-[var(--g3-muted)]">
-                      {item.profissionalNome || "Sem profissional definido"}
-                    </td>
-                    <td className="border-b border-[var(--g3-border)] px-3 py-2 text-[var(--g3-muted)]">{formatarHorario(item.horario)}</td>
-                    <td className="border-b border-[var(--g3-border)] px-3 py-2 text-[var(--g3-muted)]">{item.local || "Não informado"}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {props.itens.map((item) => {
+              const ativo = props.selecionadoId === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => props.onSelect(item)}
+                  className={`rounded-xl border p-4 text-left transition ${
+                    ativo
+                      ? "border-[var(--g3-primary)] bg-[var(--g3-primary-soft)] shadow-md"
+                      : "border-[var(--g3-border)] bg-[var(--g3-card-soft)] hover:border-[var(--g3-primary)] hover:bg-[var(--g3-primary-soft)]/70"
+                  }`}
+                >
+                  <p className="font-semibold text-[var(--g3-foreground)]">{item.nome}</p>
+                  <p className="mt-2 text-sm text-[var(--g3-muted)]">Profissional: {item.profissionalNome || "Sem profissional definido"}</p>
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs text-[var(--g3-muted)]">
+                    <span className="rounded-md bg-[var(--g3-card)] px-2 py-1">Horário: {formatarHorario(item.horario)}</span>
+                    <span className="rounded-md bg-[var(--g3-card)] px-2 py-1">Local: {item.local || "Não informado"}</span>
+                  </div>
+                  {ativo ? <p className="mt-3 text-xs font-semibold text-[var(--g3-primary)]">Selecionado</p> : null}
+                </button>
+              );
+            })}
+          </div>
         ) : (
           <p className="px-2 py-6 text-sm text-[var(--g3-muted)]">Nenhum item encontrado.</p>
         )}

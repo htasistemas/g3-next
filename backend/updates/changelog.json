@@ -1,6 +1,14 @@
 {
   "entries":  [
                     {
+                        "version": "1.00.649",
+                        "releaseDate": "2026-07-18",
+                        "title": "Validação de horário do prontuário",
+                        "description": "O backend passou a aceitar horários curtos do formulário sem exigir dez caracteres.",
+                        "changes": ["Finalização integrada aos agendamentos não falha mais por validação indevida do horário."],
+                        "releaseType": "stable"
+                    },
+                    {
                         "version": "1.00.648",
                         "releaseDate": "2026-07-18",
                         "title": "Correção do salvamento do prontuário",

@@ -16,7 +16,7 @@ const optionalDateTime = z.preprocess((value) => {
   if (typeof value !== "string") return value;
   const trimmed = value.trim();
   return trimmed || undefined;
-}, z.string().min(10).optional());
+}, z.string().refine((value) => /^\d{2}:\d{2}(:\d{2})?$/.test(value) || value.length >= 10, "Informe um horário válido.").optional());
 
 export const prontuarioBuscaSchema = z.object({
   busca: optionalText

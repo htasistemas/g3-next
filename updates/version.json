@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.648",
+  "latestVersion": "1.00.649",
   "releaseDate": "2026-07-18",
-  "description": "Correção de salvamento, finalização e linha do tempo do prontuário.",
+  "description": "Cards selecionáveis e ajustes de navegação e validação em agendamentos.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.648",
+  "minCompatibleVersion": "1.00.649",
   "releaseType": "stable",
   "downloadUrl": null
 }
