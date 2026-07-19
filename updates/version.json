@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.652",
-  "releaseDate": "2026-07-18",
-  "description": "Organização alfabética dos menus principais do sistema.",
+  "latestVersion": "1.00.653",
+  "releaseDate": "2026-07-19",
+  "description": "Deploy resiliente contra containers Docker fora da rede da aplicação.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.652",
+  "minCompatibleVersion": "1.00.653",
   "releaseType": "stable",
   "downloadUrl": null
 }

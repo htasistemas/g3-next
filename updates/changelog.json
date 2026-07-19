@@ -1,6 +1,14 @@
 {
   "entries":  [
                     {
+                        "version": "1.00.653",
+                        "releaseDate": "2026-07-19",
+                        "title": "Correção do deploy Docker",
+                        "description": "O deploy passou a tratar containers antigos que estejam desconectados da rede da aplicação.",
+                        "changes": ["Rede Docker validada e criada quando necessário.", "Containers fora da rede são recriados sem remover volumes persistentes.", "O erro de container não conectado à rede deixa de interromper o deploy antes do build."],
+                        "releaseType": "stable"
+                    },
+                    {
                         "version": "1.00.652",
                         "releaseDate": "2026-07-19",
                         "title": "Organização dos menus",
