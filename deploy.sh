@@ -41,6 +41,17 @@ print_container_logs() {
   docker compose -f "$APP_COMPOSE" logs --tail=200 "$name" || true
 }
 
+print_container_health() {
+  local name="$1"
+  local id
+  id="$(docker compose -f "$APP_COMPOSE" ps -q "$name" || true)"
+  if [[ -z "$id" ]]; then
+    return 0
+  fi
+  log "Health details for $name"
+  docker inspect --format='{{json .State.Health}}' "$id" || true
+}
+
 container_health() {
   local name="$1"
   local id
@@ -121,9 +132,8 @@ enable_maintenance
 log "Maintenance mode enabled"
 
 reconcile_runtime_containers
-docker compose -f "$APP_COMPOSE" up -d --remove-orphans g3n-db nginx-g3n
+docker compose -f "$APP_COMPOSE" up -d --remove-orphans g3n-db
 wait_healthy g3n-db 120
-wait_healthy nginx-g3n 120
 
 docker compose -f "$APP_COMPOSE" build g3n-backend
 docker compose -f "$APP_COMPOSE" build --no-cache g3n-frontend
@@ -149,7 +159,11 @@ fi
 
 log "Refresh nginx-g3n after dependencies are healthy"
 docker compose -f "$APP_COMPOSE" up -d --remove-orphans --force-recreate nginx-g3n
-wait_healthy nginx-g3n 120
+if ! wait_healthy nginx-g3n 120; then
+  print_container_health nginx-g3n
+  print_container_logs nginx-g3n
+  exit 1
+fi
 
 if [[ -n "${TUNNEL_TOKEN:-}" ]]; then
   log "Ensure g3n tunnel is up"

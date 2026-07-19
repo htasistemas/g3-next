@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.654",
+  "latestVersion": "1.00.655",
   "releaseDate": "2026-07-19",
-  "description": "Correção da reconciliação de containers Docker durante o deploy.",
+  "description": "Correção do healthcheck e da ordem de inicialização do deploy Docker.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.654",
+  "minCompatibleVersion": "1.00.655",
   "releaseType": "stable",
   "downloadUrl": null
 }

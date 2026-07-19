@@ -1,6 +1,14 @@
 {
   "entries":  [
                     {
+                        "version": "1.00.655",
+                        "releaseDate": "2026-07-19",
+                        "title": "Correção da inicialização do deploy",
+                        "description": "O deploy passa a validar primeiro o banco, construir e validar backend e frontend e somente depois iniciar o proxy Nginx.",
+                        "changes": ["Healthcheck do Nginx baseado na validação nativa da configuração.", "Remoção da dependência de uma requisição HTTP prematura durante a subida inicial.", "Ordem de inicialização ajustada para reduzir falhas de infraestrutura."],
+                        "releaseType": "stable"
+                    },
+                    {
                         "version": "1.00.654",
                         "releaseDate": "2026-07-19",
                         "title": "Correção definitiva da rede Docker no deploy",
