@@ -1,6 +1,14 @@
 {
   "entries":  [
                     {
+                        "version": "1.00.654",
+                        "releaseDate": "2026-07-19",
+                        "title": "Correção definitiva da rede Docker no deploy",
+                        "description": "O deploy agora recria os containers existentes antes da reconciliação do Docker Compose, preservando os volumes e evitando falhas causadas por redes legadas como g3n_g3n_net.",
+                        "changes": ["Recriação segura dos containers do stack durante o deploy.", "Preservação dos volumes e dos dados persistentes.", "Compatibilidade com containers criados por versões anteriores do Compose."],
+                        "releaseType": "stable"
+                    },
+                    {
                         "version": "1.00.653",
                         "releaseDate": "2026-07-19",
                         "title": "Correção do deploy Docker",

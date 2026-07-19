@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.653",
+  "latestVersion": "1.00.654",
   "releaseDate": "2026-07-19",
-  "description": "Deploy resiliente contra containers Docker fora da rede da aplicação.",
+  "description": "Correção da reconciliação de containers Docker durante o deploy.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.653",
+  "minCompatibleVersion": "1.00.654",
   "releaseType": "stable",
   "downloadUrl": null
 }

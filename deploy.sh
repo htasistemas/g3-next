@@ -8,7 +8,6 @@ DEPLOY_STATE_DIR="${DEPLOY_STATE_DIR:-$HOME/.g3n-deploy}"
 STATE_VERSION_FILE="$DEPLOY_STATE_DIR/version.txt"
 MAINTENANCE_DIR="${MAINTENANCE_DIR:-$APP_DIR/docker/runtime}"
 MAINTENANCE_FLAG="${APP_MAINTENANCE_FLAG_PATH:-$MAINTENANCE_DIR/maintenance.enable}"
-APP_NETWORK_NAME="${APP_NETWORK_NAME:-g3n_net}"
 DEPLOY_OK=0
 
 log() { printf "[%s] %s\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
@@ -77,37 +76,26 @@ wait_healthy() {
   done
 }
 
-ensure_runtime_network() {
-  if ! docker network inspect "$APP_NETWORK_NAME" >/dev/null 2>&1; then
-    log "Creating Docker network $APP_NETWORK_NAME"
-    docker network create "$APP_NETWORK_NAME" >/dev/null
-  fi
-}
-
-reconcile_container_network() {
+remove_runtime_container() {
   local name="$1"
-  local networks
 
   if ! docker inspect "$name" >/dev/null 2>&1; then
     return 0
   fi
 
-  networks="$(docker inspect --format='{{json .NetworkSettings.Networks}}' "$name" 2>/dev/null || true)"
-  if [[ "$networks" == *"\"$APP_NETWORK_NAME\""* ]]; then
-    return 0
-  fi
-
-  log "Removing stale container $name detached from $APP_NETWORK_NAME (volumes preserved)"
+  log "Removing existing container $name before Compose reconciliation (volumes preserved)"
   docker rm -f "$name" >/dev/null
 }
 
 reconcile_runtime_containers() {
-  ensure_runtime_network
-  reconcile_container_network g3n-db
-  reconcile_container_network nginx-g3n
-  reconcile_container_network g3n-backend
-  reconcile_container_network g3n-frontend
-  reconcile_container_network g3n-tunnel
+  # Containers are disposable; named volumes contain the persistent data.
+  # Removing them before Compose prevents failures caused by legacy network
+  # names such as g3n_g3n_net left by older deployments.
+  remove_runtime_container g3n-db
+  remove_runtime_container nginx-g3n
+  remove_runtime_container g3n-backend
+  remove_runtime_container g3n-frontend
+  remove_runtime_container g3n-tunnel
 }
 
 if [ -f "$TUNNEL_COMPOSE" ]; then
