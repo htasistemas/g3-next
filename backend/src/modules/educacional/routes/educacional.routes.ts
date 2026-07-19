@@ -16,7 +16,11 @@ const permissaoPorRecurso: Partial<Record<string, string[]>> = {
   boletins: ["EDUCACIONAL_BOLETINS_EDITAR"],
   documentos: ["EDUCACIONAL_DOCUMENTOS_EDITAR"],
   transferencias: ["EDUCACIONAL_TRANSFERENCIAS"],
-  autorizacoes: ["EDUCACIONAL_AUTORIZACOES"]
+  autorizacoes: ["EDUCACIONAL_AUTORIZACOES"],
+  "lista-espera": ["EDUCACIONAL_LISTA_ESPERA", "EDUCACIONAL_MATRICULAS_EDITAR"],
+  recuperacoes: ["EDUCACIONAL_RECUPERACAO"],
+  "resultados-finais": ["EDUCACIONAL_RESULTADO_FINAL"],
+  calendario: ["EDUCACIONAL_CALENDARIO", "EDUCACIONAL_ESTRUTURA_EDITAR"]
 };
 const editarPorRecurso = (request: Parameters<ReturnType<typeof ensurePermissions>>[0], response: Parameters<ReturnType<typeof ensurePermissions>>[1], next: Parameters<ReturnType<typeof ensurePermissions>>[2]) => {
   const permissoes = permissaoPorRecurso[request.params.recurso] ?? ["EDUCACIONAL_ESTRUTURA_EDITAR"];

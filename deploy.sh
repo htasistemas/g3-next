@@ -151,6 +151,7 @@ if ! docker compose -f "$APP_COMPOSE" run --rm --no-deps g3n-backend npx prisma 
     20260719_create_educacional_documentos \
     20260719_create_educacional_ocorrencias_agenda \
     20260719_create_educacional_planejamento \
+    20260719_create_educacional_fluxo_academico \
     20260719_harden_educacional_integridade; do
     docker compose -f "$APP_COMPOSE" run --rm --no-deps g3n-backend npx prisma db execute --schema prisma/schema.prisma --file "prisma/migrations/$migration/migration.sql"
   done

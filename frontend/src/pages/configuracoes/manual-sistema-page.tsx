@@ -1353,6 +1353,7 @@ const secoesManual: ManualSecao[] = [
           , "Use Documentos/Declarações para registrar o documento e seus metadados; o arquivo físico deve permanecer no storage. Use Relatórios e indicadores para consultar os quantitativos reais da instituição."
           , "Os registros de Rotina infantil e Desenvolvimento infantil são pedagógicos e não substituem prontuário ou prescrição médica."
           , "O cadastro mestre passou a se chamar Unidades de atendimento. Cada unidade possui tipo obrigatório: Unidade assistencial ou Unidade de ensino. A filtragem é feita no backend e unidades antigas permanecem assistenciais."
+          , "Use Gestão acadêmica para registrar lista de espera, recuperações, resultado final e eventos do calendário escolar. Os registros são vinculados ao ano letivo e permanecem separados por instituição."
         ],
         atencoes: [
           "Os dados são isolados por instituição/tenant e não devem ser digitados manualmente.",

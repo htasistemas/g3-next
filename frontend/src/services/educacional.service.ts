@@ -26,7 +26,11 @@ export type EducacionalRecurso =
   | "rotinas-infantis"
   | "desenvolvimentos-infantis"
   | "transferencias"
-  | "autorizacoes";
+  | "autorizacoes"
+  | "lista-espera"
+  | "recuperacoes"
+  | "resultados-finais"
+  | "calendario";
 
 export const educacionalService = {
   async resumo(filtros?: Record<string, string>) {

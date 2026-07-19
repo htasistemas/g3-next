@@ -4,7 +4,7 @@ import { AppError } from "../../../shared/errors/app-error.js";
 import type { EducacionalActor, EducacionalRecurso } from "../educacional.types.js";
 
 const estruturaPromise = new Map<string, Promise<void>>();
-const tabelaPorRecurso: Record<EducacionalRecurso, string> = { "anos-letivos": "educacional_ano_letivo", etapas: "educacional_etapa", series: "educacional_serie", disciplinas: "educacional_disciplina", turmas: "educacional_turma", alunos: "educacional_aluno", matriculas: "educacional_matricula", enturmacoes: "educacional_enturmacao", "grade-curricular": "educacional_grade_curricular", horarios: "educacional_horario", diarios: "educacional_diario_aula", frequencias: "educacional_frequencia", "planos-aula": "educacional_plano_aula", planejamentos: "educacional_planejamento_pedagogico", avaliacoes: "educacional_avaliacao", notas: "educacional_nota", boletins: "educacional_boletim", historicos: "educacional_historico_escolar", ocorrencias: "educacional_ocorrencia", agenda: "educacional_agenda", documentos: "educacional_documento", "rotinas-infantis": "educacional_rotina_infantil", "desenvolvimentos-infantis": "educacional_desenvolvimento_infantil", transferencias: "educacional_transferencia", autorizacoes: "educacional_autorizacao" };
+const tabelaPorRecurso: Record<EducacionalRecurso, string> = { "anos-letivos": "educacional_ano_letivo", etapas: "educacional_etapa", series: "educacional_serie", disciplinas: "educacional_disciplina", turmas: "educacional_turma", alunos: "educacional_aluno", matriculas: "educacional_matricula", enturmacoes: "educacional_enturmacao", "grade-curricular": "educacional_grade_curricular", horarios: "educacional_horario", diarios: "educacional_diario_aula", frequencias: "educacional_frequencia", "planos-aula": "educacional_plano_aula", planejamentos: "educacional_planejamento_pedagogico", avaliacoes: "educacional_avaliacao", notas: "educacional_nota", boletins: "educacional_boletim", historicos: "educacional_historico_escolar", ocorrencias: "educacional_ocorrencia", agenda: "educacional_agenda", documentos: "educacional_documento", "rotinas-infantis": "educacional_rotina_infantil", "desenvolvimentos-infantis": "educacional_desenvolvimento_infantil", transferencias: "educacional_transferencia", autorizacoes: "educacional_autorizacao", "lista-espera": "educacional_lista_espera", recuperacoes: "educacional_recuperacao", "resultados-finais": "educacional_resultado_final", calendario: "educacional_calendario" };
 
 export class EducacionalRepository {
   async garantirEstrutura() {
@@ -88,6 +88,8 @@ export class EducacionalRepository {
   async salvar(recurso: EducacionalRecurso, rawId: string | undefined, input: Record<string, unknown>, tenantId: string, actor: EducacionalActor) {
     const tabela = this.tabela(recurso);
     await this.validarReferencias(recurso, input, tenantId);
+    if (recurso === "lista-espera" && input.beneficiario_id) await this.validarBeneficiario(String(input.beneficiario_id), tenantId);
+    if (recurso === "recuperacoes" && input.valor !== null && input.valor !== undefined && Number(input.valor) > Number(input.valor_maximo)) throw new AppError("A nota da recuperação não pode ser maior que o valor máximo.", 400);
     if (recurso === "horarios") await this.validarConflitoHorario(input, rawId, tenantId);
     if (recurso === "enturmacoes") await this.validarEnturmacao(input, rawId, tenantId);
     if (recurso === "notas") await this.validarNota(input, tenantId);
@@ -197,7 +199,22 @@ export class EducacionalRepository {
     if (recurso === "autorizacoes" && input.aluno_id) {
       referencias.push(["educacional_aluno", "aluno_id"]);
     }
-    if ((recurso === "turmas" || recurso === "matriculas") && input.unidade_id) {
+    if (recurso === "lista-espera") {
+      if (input.aluno_id) referencias.push(["educacional_aluno", "aluno_id"]);
+      if (input.ano_letivo_id) referencias.push(["educacional_ano_letivo", "ano_letivo_id"]);
+      if (input.etapa_id) referencias.push(["educacional_etapa", "etapa_id"]);
+      if (input.serie_id) referencias.push(["educacional_serie", "serie_id"]);
+    }
+    if (recurso === "recuperacoes") {
+      if (input.matricula_id) referencias.push(["educacional_matricula", "matricula_id"]);
+      if (input.disciplina_id) referencias.push(["educacional_disciplina", "disciplina_id"]);
+    }
+    if (recurso === "resultados-finais") {
+      if (input.matricula_id) referencias.push(["educacional_matricula", "matricula_id"]);
+      if (input.ano_letivo_id) referencias.push(["educacional_ano_letivo", "ano_letivo_id"]);
+    }
+    if (recurso === "calendario" && input.ano_letivo_id) referencias.push(["educacional_ano_letivo", "ano_letivo_id"]);
+    if ((recurso === "turmas" || recurso === "matriculas" || recurso === "lista-espera" || recurso === "calendario") && input.unidade_id) {
       const unidade = await prisma.$queryRaw<Array<{ tipo_unidade: string }>>(Prisma.sql`SELECT tipo_unidade FROM unidade_assistencial WHERE id_unidade = ${BigInt(String(input.unidade_id))} AND tenant_id::text = ${tenantId} LIMIT 1`);
       if (!unidade[0]) throw new AppError("Unidade de ensino não encontrada nesta instituição.", 400);
       if (unidade[0].tipo_unidade !== "ENSINO") throw new AppError("Selecione uma unidade classificada como unidade de ensino.", 400);
@@ -230,6 +247,11 @@ export class EducacionalRepository {
     const avaliacao = await prisma.$queryRaw<Array<{ valor_maximo: number }>>(Prisma.sql`SELECT valor_maximo FROM educacional_avaliacao WHERE id = ${BigInt(String(input.avaliacao_id))} AND tenant_id::text = ${tenantId} LIMIT 1`);
     if (!avaliacao[0]) throw new AppError("Avaliação não encontrada nesta instituição.", 404);
     if (Number(input.valor) > Number(avaliacao[0].valor_maximo)) throw new AppError(`A nota não pode ser maior que ${avaliacao[0].valor_maximo}.`, 400);
+  }
+
+  private async validarBeneficiario(rawId: string, tenantId: string) {
+    const encontrado = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`SELECT id FROM cadastro_beneficiario WHERE id = ${BigInt(rawId)} AND tenant_id::text = ${tenantId} LIMIT 1`);
+    if (!encontrado[0]) throw new AppError("Beneficiário não encontrado nesta instituição.", 404);
   }
 
   private async validarConflitoHorario(input: Record<string, unknown>, rawId: string | undefined, tenantId: string) {

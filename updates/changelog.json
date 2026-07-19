@@ -1,6 +1,14 @@
 {
   "entries":  [
                     {
+                        "version": "1.00.672",
+                        "releaseDate": "2026-07-19",
+                        "title": "Gestão acadêmica educacional",
+                        "description": "A próxima fase passou a registrar lista de espera, recuperações, resultado final e calendário escolar com persistência por tenant.",
+                        "changes": ["Nova tela Gestão acadêmica.", "Novas tabelas educacionais para lista de espera, recuperação, resultado final e calendário.", "Validações de referências, valores e unidades de ensino no backend."],
+                        "releaseType": "stable"
+                    },
+                    {
                         "version": "1.00.671",
                         "releaseDate": "2026-07-19",
                         "title": "Integridade do fluxo educacional",
