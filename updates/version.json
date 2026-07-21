@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.704",
+  "latestVersion": "1.00.705",
   "releaseDate": "2026-07-21",
-  "description": "Card da visão geral renomeado para Total de beneficiários.",
+  "description": "Importação normaliza campos vazios antes da persistência dos pendentes.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.703",
+  "minCompatibleVersion": "1.00.704",
   "releaseType": "stable",
   "downloadUrl": null
 }

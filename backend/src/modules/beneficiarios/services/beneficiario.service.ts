@@ -88,12 +88,34 @@ export class BeneficiarioService {
     if (!inputNormalizado || typeof inputNormalizado !== "object") {
       throw new AppError("Dados da importação inválidos.", 422);
     }
+    const dados = { ...(inputNormalizado as Record<string, unknown>) };
+    const camposBooleanos = [
+      "opta_receber_cesta_basica", "apto_receber_cesta_basica", "telefone_principal_whatsapp",
+      "permite_contato_tel", "permite_contato_whatsapp", "permite_contato_sms", "permite_contato_email",
+      "mora_com_familia", "responsavel_legal", "acompanhamento_cras", "acompanhamento_saude",
+      "sabe_ler_escrever", "estuda_atualmente", "possui_deficiencia", "usa_medicacao_continua",
+      "recebe_beneficio", "aceite_lgpd"
+    ];
+    for (const campo of camposBooleanos) {
+      const valor = dados[campo];
+      if (valor === undefined || valor === null || valor === "") dados[campo] = undefined;
+      else if (typeof valor === "string") dados[campo] = ["sim", "s", "true", "1", "yes"].includes(valor.trim().toLowerCase());
+    }
+    for (const campo of ["criancas_adolescentes", "idosos"]) {
+      if (dados[campo] === "") dados[campo] = undefined;
+      else if (typeof dados[campo] === "string") dados[campo] = Number(String(dados[campo]).replace(",", "."));
+    }
+    if (typeof dados.beneficios_recebidos === "string") {
+      const itens = dados.beneficios_recebidos.split(/[;,]/).map((item) => item.trim()).filter(Boolean);
+      dados.beneficios_recebidos = itens.length ? itens : undefined;
+    }
+    if (!Array.isArray(dados.documentos_obrigatorios)) dados.documentos_obrigatorios = undefined;
     // Mantém compatibilidade com bancos de produção que ainda não receberam
     // a migration de campos incompletos. A operação é idempotente e não cria
     // valores artificiais: apenas permite NULL nos campos pendentes.
     await prisma.$executeRawUnsafe("ALTER TABLE cadastro_beneficiario ALTER COLUMN data_nascimento DROP NOT NULL");
     await prisma.$executeRawUnsafe("ALTER TABLE cadastro_beneficiario ALTER COLUMN nome_mae DROP NOT NULL");
-    return this.repository.criar(inputNormalizado as BeneficiarioInput, tenantId);
+    return this.repository.criar(dados as BeneficiarioInput, tenantId);
   }
 
   async atualizar(rawId: string, rawInput: unknown, rawUsuarioId?: string, tenantId?: string) {
