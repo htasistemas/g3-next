@@ -1038,7 +1038,7 @@ export function CadastroUnidadeAssistencialPage() {
                     <div>
                       <input type="hidden" {...register("logomarca")} />
                       <Label>Logomarca da unidade vazado</Label>
-                      <div className="mt-2 flex aspect-[4/3] w-full max-w-[170px] items-center justify-center overflow-hidden rounded-md border border-emerald-800 bg-emerald-900">
+                      <div className="mt-2 flex aspect-[4/3] w-full max-w-[170px] items-center justify-center overflow-hidden rounded-md border border-black bg-black">
                         {logomarcaAtual ? (
                           <img
                             src={previewLogomarcaUrl || resolverUrlArquivo(logomarcaAtual)}

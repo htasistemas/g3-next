@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.698",
+  "latestVersion": "1.00.699",
   "releaseDate": "2026-07-21",
-  "description": "Importação evita duplicidades mesmo em registros incompletos.",
+  "description": "Busca de instituições por nome ou CNPJ e fundo preto na logomarca vazada.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.697",
+  "minCompatibleVersion": "1.00.698",
   "releaseType": "stable",
   "downloadUrl": null
 }

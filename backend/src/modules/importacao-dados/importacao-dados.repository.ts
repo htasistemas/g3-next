@@ -28,10 +28,15 @@ export class ImportacaoDadosRepository {
   async listarInstituicoes(busca?: string): Promise<ImportacaoInstituicao[]> {
     await this.garantirEstrutura();
     const termo = busca?.trim() ?? "";
+    const termoNormalizado = termo.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const cnpjBusca = termo.replace(/\D/g, "");
     return prisma.$queryRaw<ImportacaoInstituicao[]>`
       SELECT id::text, tenant_id::text, razao_social, nome_fantasia, cnpj, status
       FROM instituicoes
-      WHERE (${termo} = '' OR lower(razao_social) LIKE lower(${`%${termo}%`}) OR lower(coalesce(nome_fantasia, '')) LIKE lower(${`%${termo}%`}) OR regexp_replace(cnpj, '[^0-9]', '', 'g') LIKE ${`%${termo.replace(/\D/g, "")}%`})
+      WHERE (${termoNormalizado} = ''
+        OR lower(translate(coalesce(razao_social, ''), 'áàãâäéèêëíìîïóòõôöúùûüç', 'aaaaaeeeeiiiiooooouuuuc')) LIKE ${`%${termoNormalizado}%`}
+        OR lower(translate(coalesce(nome_fantasia, ''), 'áàãâäéèêëíìîïóòõôöúùûüç', 'aaaaaeeeeiiiiooooouuuuc')) LIKE ${`%${termoNormalizado}%`}
+        OR (${cnpjBusca} <> '' AND regexp_replace(coalesce(cnpj, ''), '[^0-9]', '', 'g') LIKE ${`%${cnpjBusca}%`}))
       ORDER BY coalesce(nome_fantasia, razao_social)
       LIMIT 100
     `;
