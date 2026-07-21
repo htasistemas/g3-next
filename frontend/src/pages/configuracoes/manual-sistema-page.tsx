@@ -1315,6 +1315,7 @@ const secoesManual: ManualSecao[] = [
           "Após a confirmação, a importação é processada em lotes no backend e a tela exibe uma barra de progresso com registros processados, importados, atualizados e erros.",
           "Antes de criar um beneficiário, a importação verifica CPF válido e a combinação nome completo mais data de nascimento dentro da tenant selecionada; registros encontrados são ignorados para evitar duplicidade.",
           "Na seleção da instituição da importação, a pesquisa aceita nome, razão social, nome fantasia e CNPJ com ou sem máscara.",
+          "No cadastro de beneficiário, o aviso inicial lista os dados principais obrigatórios; ao salvar com pendências, o sistema abre a aba e posiciona o cursor no primeiro campo que precisa ser preenchido.",
           "A validação não grava beneficiários. A gravação só ocorre após a confirmação manual do MASTER e cada linha inválida permanece registrada como pendência.",
           "Toda consulta operacional do sistema passa a depender do tenant autenticado para evitar mistura de dados entre clientes."
         ]

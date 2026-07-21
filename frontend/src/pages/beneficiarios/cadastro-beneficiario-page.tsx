@@ -174,7 +174,7 @@ function obterPendenciasFormulario(
       return [];
     }
 
-    return [definicao];
+    return [{ campo, ...definicao }];
   });
 }
 
@@ -690,6 +690,7 @@ export function CadastroBeneficiarioPage() {
     register,
     control,
     handleSubmit,
+    setFocus,
     reset,
     setValue,
     getValues,
@@ -1040,6 +1041,8 @@ export function CadastroBeneficiarioPage() {
       const pendenciasDocumentos = obterPendenciasDocumentos(documentos);
       if (!documentoCpf || pendenciasDocumentos.length > 0) {
         setAbaAtiva("documentos");
+        const primeiroDocumentoPendente = documentos.find((documento) => !documento.numeroDocumento?.trim() && !documento.caminhoArquivo && !documento.ignorado);
+        window.setTimeout(() => inputDocumentosRef.current[primeiroDocumentoPendente?.id ?? "cpf"]?.focus(), 100);
         setMensagem({
           tipo: "erro",
           texto: `Preencha ou corrija os campos: ${pendenciasDocumentos.join(", ")}.`
@@ -1123,6 +1126,9 @@ export function CadastroBeneficiarioPage() {
     (submitErrors) => {
       const pendencias = obterPendenciasFormulario(submitErrors);
       setAbaAtiva(pendencias[0]?.aba ?? "dados");
+      if (pendencias[0]?.campo) {
+        window.setTimeout(() => setFocus(pendencias[0].campo as keyof BeneficiarioFormValues), 100);
+      }
       setMensagem({
         tipo: "erro",
         texto: pendencias.length
@@ -2220,6 +2226,11 @@ export function CadastroBeneficiarioPage() {
               </section>
             ) : (
               <form className="min-w-0 space-y-4" onSubmit={onSubmit}>
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-950" role="note">
+                  <p className="font-semibold">Para salvar o cadastro, preencha os dados principais obrigatórios:</p>
+                  <p className="mt-1">Nome completo, data de nascimento, nome da mãe, CEP, telefone principal, CPF, documentos obrigatórios e aceite da LGPD.</p>
+                  <p className="mt-1 text-xs">Ao clicar em Salvar, o sistema levará você automaticamente ao primeiro campo pendente. Depois de preencher, clique novamente em Salvar para avançar ao próximo.</p>
+                </div>
                 {abaAtiva === "dados" && (
                   <section className="grid gap-2 sm:grid-cols-2 xl:grid-cols-12 [&_button]:h-8 [&_input]:h-8 [&_label]:text-xs [&_select]:h-8">
                     <input type="hidden" {...register("foto_3x4")} />

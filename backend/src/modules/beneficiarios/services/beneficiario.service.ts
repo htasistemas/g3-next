@@ -24,6 +24,7 @@ import { normalizarObjetoTexto } from "../../../utils/text-formatter.js";
 import type { BeneficiarioInput } from "../beneficiario.types.js";
 import { storageService } from "../../arquivos/services/storage-instance.js";
 import { ParametrosSistemaService } from "../../configuracoes-gerais/services/parametros-sistema.service.js";
+import { prisma } from "../../../database/prisma.js";
 
 export class BeneficiarioService {
   private readonly repository = new BeneficiarioRepository();
@@ -87,6 +88,11 @@ export class BeneficiarioService {
     if (!inputNormalizado || typeof inputNormalizado !== "object") {
       throw new AppError("Dados da importação inválidos.", 422);
     }
+    // Mantém compatibilidade com bancos de produção que ainda não receberam
+    // a migration de campos incompletos. A operação é idempotente e não cria
+    // valores artificiais: apenas permite NULL nos campos pendentes.
+    await prisma.$executeRawUnsafe("ALTER TABLE cadastro_beneficiario ALTER COLUMN data_nascimento DROP NOT NULL");
+    await prisma.$executeRawUnsafe("ALTER TABLE cadastro_beneficiario ALTER COLUMN nome_mae DROP NOT NULL");
     return this.repository.criar(inputNormalizado as BeneficiarioInput, tenantId);
   }
 
