@@ -233,9 +233,9 @@ export function VisaoGeralPage() {
     if (!data) return [];
     return [
       {
-        label: "Beneficiários no período",
-        valor: String(data.top12.beneficiariosAtendidosPeriodo),
-        hint: "Registros no período filtrado",
+        label: "Total de beneficiários",
+        valor: String(data.cadastros.beneficiarios),
+        hint: "Total de registros na instituição",
         icone: UsersRound,
         rota: "/cadastros/beneficiarios"
       },
