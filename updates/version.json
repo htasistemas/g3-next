@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.691",
+  "latestVersion": "1.00.692",
   "releaseDate": "2026-07-21",
-  "description": "Botão de confirmação habilitado após validação na Importação de dados.",
+  "description": "Importação permite criar cadastros pendentes para correção posterior.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.690",
+  "minCompatibleVersion": "1.00.691",
   "releaseType": "stable",
   "downloadUrl": null
 }

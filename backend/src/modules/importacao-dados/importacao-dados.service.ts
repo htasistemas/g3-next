@@ -120,11 +120,16 @@ export class ImportacaoDadosService {
       const lote = linhas.slice(inicio, inicio + 50);
       await Promise.all(lote.map(async (linha) => {
         if (linha.acao === "IGNORAR" || linha.status === "DUPLICIDADE" || linha.status === "EXISTENTE" && linha.acao !== "ATUALIZAR") { linha.status = "IGNORADO"; ignorados += 1; return; }
-        if (!["PRONTO", "EXISTENTE", "DUPLICIDADE"].includes(linha.status)) return;
         try {
-          const parsed = beneficiarioInputSchema.parse(linha.dados);
-          if (linha.acao === "ATUALIZAR" && linha.beneficiarioId) { await this.beneficiarioService.atualizar(linha.beneficiarioId, parsed, usuarioId, instituicao.tenant_id); linha.status = "ATUALIZADO"; atualizados += 1; }
-          else { await this.beneficiarioService.criar(parsed, usuarioId, instituicao.tenant_id); linha.status = "IMPORTADO"; importados += 1; }
+          if (["INCOMPLETO", "INVALIDO"].includes(linha.status)) {
+            await this.criarCadastroPendente(linha, instituicao.tenant_id);
+            linha.status = "IMPORTADO";
+            importados += 1;
+          } else if (["PRONTO", "EXISTENTE", "DUPLICIDADE"].includes(linha.status)) {
+            const parsed = beneficiarioInputSchema.parse(linha.dados);
+            if (linha.acao === "ATUALIZAR" && linha.beneficiarioId) { await this.beneficiarioService.atualizar(linha.beneficiarioId, parsed, usuarioId, instituicao.tenant_id); linha.status = "ATUALIZADO"; atualizados += 1; }
+            else { await this.beneficiarioService.criar(parsed, usuarioId, instituicao.tenant_id); linha.status = "IMPORTADO"; importados += 1; }
+          }
         } catch (error) {
           linha.status = "ERRO"; linha.problemas = [{ mensagem: error instanceof Error ? error.message : "Falha ao processar a linha." }];
         }
@@ -136,5 +141,17 @@ export class ImportacaoDadosService {
   }
 
   async obter(id: string) { const registro = await this.repository.obter(id); if (!registro) throw new AppError("Importação não encontrada.", 404); return registro; }
+  private async criarCadastroPendente(linha: ImportacaoLinha, tenantId: string) {
+    const dados = linha.dados;
+    const nome = trimOrUndefined(valorTexto(dados.nome_completo)) ?? `Importação - linha ${linha.linha}`;
+    const dataNascimento = /^\d{4}-\d{2}-\d{2}$/.test(valorTexto(dados.data_nascimento)) ? valorTexto(dados.data_nascimento) : null;
+    const nomeMae = trimOrUndefined(valorTexto(dados.nome_mae));
+    const [registro] = await prisma.$queryRaw<Array<{ id: bigint }>>`
+      INSERT INTO cadastro_beneficiario (nome_completo, data_nascimento, nome_mae, status, criado_em, atualizado_em, tenant_id)
+      VALUES (${nome.slice(0, 200)}, ${dataNascimento ? `${dataNascimento}T00:00:00` : null}::date, ${nomeMae ? nomeMae.slice(0, 200) : null}, ${linha.status === "INVALIDO" ? "ERRO" : "INCOMPLETO"}, NOW(), NOW(), ${tenantId}::uuid)
+      RETURNING id
+    `;
+    if (!registro?.id) throw new AppError("Não foi possível criar o cadastro pendente.", 422);
+  }
   private resumo(linhas: ImportacaoLinha[]) { return { prontos: linhas.filter((l) => l.status === "PRONTO").length, existentes: linhas.filter((l) => l.status === "EXISTENTE").length, duplicidades: linhas.filter((l) => l.status === "DUPLICIDADE").length, erros: linhas.filter((l) => ["ERRO", "INVALIDO", "INCOMPLETO"].includes(l.status)).length, ignorados: linhas.filter((l) => l.status === "IGNORADO").length }; }
 }

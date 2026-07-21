@@ -1308,6 +1308,7 @@ const secoesManual: ManualSecao[] = [
           "As linhas do mapeamento alternam entre branco e cinza claro para facilitar a conferência visual entre a coluna do arquivo e o campo escolhido no G3N.",
           "O mapeamento usa duas colunas de mesma largura, metade para o arquivo e metade para o cadastro do G3N, facilitando a comparação em telas maiores.",
           "Na tabela de validação, registros já existentes ou possivelmente duplicados podem ser ignorados ou marcados para atualização controlada; o histórico e o relatório CSV ficam disponíveis na aba Histórico de importações.",
+          "Registros incompletos ou com dados inválidos também podem ser importados como pendentes para correção posterior no cadastro de beneficiários; os problemas continuam registrados no relatório.",
           "O tenant_id não deve ser digitado manualmente em nenhuma operação do usuário final; ele é derivado da instituição autenticada.",
           "A Importação de dados exige a permissão MASTER_ADMIN no frontend e no backend; administradores de tenant e usuários comuns não podem listar instituições, validar arquivos ou confirmar importações.",
           "A validação não grava beneficiários. A gravação só ocorre após a confirmação manual do MASTER e cada linha inválida permanece registrada como pendência.",

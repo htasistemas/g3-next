@@ -37,7 +37,7 @@ model CadastroBeneficiario {
   nomeCompleto           String                  @map("nome_completo") @db.VarChar(200)
   nomeSocial             String?                 @map("nome_social") @db.VarChar(200)
   apelido                String?                 @db.VarChar(120)
-  dataNascimento         DateTime                @map("data_nascimento") @db.Date
+  dataNascimento         DateTime?               @map("data_nascimento") @db.Date
   foto3x4                String?                 @map("foto_3x4")
   sexoBiologico          String?                 @map("sexo_biologico") @db.VarChar(60)
   identidadeGenero       String?                 @map("identidade_genero") @db.VarChar(120)
@@ -46,7 +46,7 @@ model CadastroBeneficiario {
   nacionalidade          String?                 @db.VarChar(120)
   naturalidadeCidade     String?                 @map("naturalidade_cidade") @db.VarChar(150)
   naturalidadeUf         String?                 @map("naturalidade_uf") @db.VarChar(2)
-  nomeMae                String                  @map("nome_mae") @db.VarChar(200)
+  nomeMae                String?                 @map("nome_mae") @db.VarChar(200)
   nomePai                String?                 @map("nome_pai") @db.VarChar(200)
   status                 String?                 @db.VarChar(60)
   optaReceberCestaBasica Boolean?                @map("opta_receber_cesta_basica")
