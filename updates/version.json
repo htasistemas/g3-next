@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.701",
+  "latestVersion": "1.00.702",
   "releaseDate": "2026-07-21",
-  "description": "Importação pendente prepara automaticamente campos opcionais no banco.",
+  "description": "Deploy mantém o proxy ativo e exibe a página de atualização durante a manutenção.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.700",
+  "minCompatibleVersion": "1.00.701",
   "releaseType": "stable",
   "downloadUrl": null
 }

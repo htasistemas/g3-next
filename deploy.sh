@@ -103,7 +103,6 @@ reconcile_runtime_containers() {
   # Removing them before Compose prevents failures caused by legacy network
   # names such as g3n_g3n_net left by older deployments.
   remove_runtime_container g3n-db
-  remove_runtime_container nginx-g3n
   remove_runtime_container g3n-backend
   remove_runtime_container g3n-frontend
   remove_runtime_container g3n-tunnel
@@ -130,6 +129,11 @@ log "Version set to $APP_VERSION"
 
 enable_maintenance
 log "Maintenance mode enabled"
+
+# O proxy de borda deve permanecer ativo durante todo o deploy. Com o modo de
+# manutenção habilitado, ele serve maintenance.html enquanto os demais
+# containers são reconstruídos, evitando que o Cloudflare receba 502.
+docker compose -f "$APP_COMPOSE" up -d --remove-orphans nginx-g3n
 
 reconcile_runtime_containers
 docker compose -f "$APP_COMPOSE" up -d --remove-orphans g3n-db
