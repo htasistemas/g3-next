@@ -17,3 +17,10 @@ export type ValidacaoImportacao = {
   linhas: ImportacaoLinha[];
   resumo: { prontos: number; existentes: number; duplicidades: number; erros: number; ignorados: number };
 };
+
+export type AcompanhamentoImportacao = {
+  id: string;
+  status: string;
+  linhas: ImportacaoLinha[];
+  resumo?: { prontos?: number; existentes?: number; duplicidades?: number; erros?: number; ignorados?: number };
+};

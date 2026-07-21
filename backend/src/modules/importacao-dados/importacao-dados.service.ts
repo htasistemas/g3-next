@@ -17,11 +17,17 @@ const ALIASES: Record<string, string> = {
   mae: "nome_mae", "mãe": "nome_mae", "nome da mae": "nome_mae", "nome da mãe": "nome_mae", "nomemae": "nome_mae", "nome_mae": "nome_mae",
   telefone: "telefone_principal", "celular": "telefone_principal", "telefone principal": "telefone_principal", "telefoneprincipal": "telefone_principal", "telefone_principal": "telefone_principal",
   email: "email", "e-mail": "email", "cep": "cep", "endereco": "logradouro", "endereço": "logradouro", "logradouro": "logradouro",
-  numero: "numero", "bairro": "bairro", "cidade": "municipio", "municipio": "municipio", "município": "municipio", "estado": "uf", "uf": "uf", "status": "status", "aceite lgpd": "aceite_lgpd", "aceitelgpd": "aceite_lgpd", "aceite_lgpd": "aceite_lgpd"
+  numero: "numero", "bairro": "bairro", "cidade": "municipio", "municipio": "municipio", "município": "municipio", "estado": "uf", "uf": "uf", "pais": "nacionalidade", "país": "nacionalidade", "sexo": "sexo_biologico", "sexo biologico": "sexo_biologico", "estado civil": "estado_civil", "estadocivil": "estado_civil", "cpfcnpj": "cpf", "status": "status", "aceite lgpd": "aceite_lgpd", "aceitelgpd": "aceite_lgpd", "aceite_lgpd": "aceite_lgpd"
 };
 
 function chave(valor: string) { return valor.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase().replace(/[._-]+/g, " ").replace(/\s+/g, " "); }
 function valorTexto(valor: unknown) { return valor === null || valor === undefined ? "" : String(valor).trim(); }
+function removerAcentos(valor: unknown) {
+  return typeof valor === "string" ? valor.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : valor;
+}
+function normalizarTextoImportado(dados: Record<string, unknown>) {
+  return Object.fromEntries(Object.entries(dados).map(([campo, valor]) => [campo, removerAcentos(valor)]));
+}
 function normalizarData(valor: unknown) {
   const texto = valorTexto(valor);
   if (!texto) return "";
@@ -67,37 +73,45 @@ export class ImportacaoDadosService {
       if (typeof dados.beneficios_recebidos === "string") dados.beneficios_recebidos = valorTexto(dados.beneficios_recebidos).split(/[;,]/).map((item) => item.trim()).filter(Boolean);
       if (typeof dados.aceite_lgpd === "string") dados.aceite_lgpd = normalizarBool(dados.aceite_lgpd);
       const problemas: ImportacaoLinha["problemas"] = [];
-      if (!trimOrUndefined(valorTexto(dados.nome_completo))) problemas.push({ campo: "nome_completo", mensagem: "Nome completo não informado.", orientacao: "Mapeie uma coluna de nome completo." });
+      const camposObrigatorios = [["nome_completo", "Nome completo"], ["data_nascimento", "Data de nascimento"], ["nome_mae", "Nome da mãe"], ["cep", "CEP"], ["telefone_principal", "Telefone principal"], ["cpf", "CPF"]] as const;
+      for (const [campo, rotulo] of camposObrigatorios) if (!trimOrUndefined(valorTexto(dados[campo]))) problemas.push({ campo, mensagem: `${rotulo} não informado.`, orientacao: `Mapeie ou informe o campo ${rotulo}.` });
       if (dados.cpf && !isValidCpf(valorTexto(dados.cpf))) problemas.push({ campo: "cpf", valor: valorTexto(dados.cpf), mensagem: "CPF inválido.", orientacao: "Informe 11 dígitos válidos." });
       if (dados.cep && !isValidCep(valorTexto(dados.cep))) problemas.push({ campo: "cep", valor: valorTexto(dados.cep), mensagem: "CEP inválido.", orientacao: "Informe 8 dígitos." });
       if (dados.telefone_principal && !isValidPhone(valorTexto(dados.telefone_principal))) problemas.push({ campo: "telefone_principal", valor: valorTexto(dados.telefone_principal), mensagem: "Telefone inválido.", orientacao: "Informe DDD e número com 10 ou 11 dígitos." });
       const parsedInput = beneficiarioInputSchema.safeParse(dados);
-      if (!parsedInput.success) for (const issue of parsedInput.error.issues) if (!problemas.some((item) => item.campo === issue.path[0])) problemas.push({ campo: String(issue.path[0] ?? ""), valor: valorTexto(dados[String(issue.path[0] ?? "")]), mensagem: issue.message, orientacao: "Revise o valor ou o mapeamento da coluna." });
-      let status: ImportacaoLinha["status"] = problemas.length ? (problemas.some((p) => ["cpf", "cep", "telefone_principal"].includes(p.campo ?? "")) ? "INVALIDO" : "INCOMPLETO") : "PRONTO";
+      if (!parsedInput.success) for (const issue of parsedInput.error.issues) if (issue.message !== "Required" && !problemas.some((item) => item.campo === issue.path[0])) problemas.push({ campo: String(issue.path[0] ?? ""), valor: valorTexto(dados[String(issue.path[0] ?? "")]), mensagem: issue.message, orientacao: "Revise o valor ou o mapeamento da coluna." });
+      // Na importação, uma inconsistência não impede a criação do cadastro:
+      // ela deixa o registro pendente para correção posterior no G3N.
+      let status: ImportacaoLinha["status"] = problemas.length ? "INCOMPLETO" : "PRONTO";
       dados.status = problemas.length ? "INCOMPLETO" : cadastroEstaCompleto(dados) ? "COMPLETO" : "INCOMPLETO";
       let beneficiarioId: string | undefined;
-      if (!problemas.length) {
-        if (cpfsNoArquivo.has(String(dados.cpf))) {
+      const cpfNormalizado = normalizeDigits(valorTexto(dados.cpf));
+      if (cpfNormalizado && isValidCpf(cpfNormalizado)) {
+        if (cpfsNoArquivo.has(cpfNormalizado)) {
           status = "DUPLICIDADE";
-          problemas.push({ campo: "cpf", valor: String(dados.cpf), mensagem: "CPF repetido no próprio arquivo.", orientacao: "Mantenha apenas um registro por CPF ou escolha qual linha será importada." });
+          problemas.push({ campo: "cpf", valor: cpfNormalizado, mensagem: "CPF repetido no próprio arquivo.", orientacao: "Mantenha apenas um registro por CPF; esta linha será ignorada." });
         }
-        cpfsNoArquivo.add(String(dados.cpf));
-        if (!problemas.length) {
-          const encontrados = await prisma.$queryRaw<Array<{ id: bigint; nome_completo: string; data_nascimento: Date }>>`
-          SELECT b.id, b.nome_completo, b.data_nascimento
+        cpfsNoArquivo.add(cpfNormalizado);
+        const encontrados = await prisma.$queryRaw<Array<{ id: bigint }>>`
+          SELECT b.id
           FROM cadastro_beneficiario b
           WHERE b.tenant_id = ${instituicao.tenant_id}::uuid
-            AND EXISTS (SELECT 1 FROM documentos d WHERE d.beneficiario_id = b.id AND upper(coalesce(d.tipo_documento, '')) = 'CPF' AND regexp_replace(coalesce(d.numero_documento, ''), '[^0-9]', '', 'g') = ${dados.cpf as string})
+            AND EXISTS (SELECT 1 FROM documentos d WHERE d.beneficiario_id = b.id AND upper(coalesce(d.tipo_documento, '')) = 'CPF' AND regexp_replace(coalesce(d.numero_documento, ''), '[^0-9]', '', 'g') = ${cpfNormalizado})
           LIMIT 2
-          `;
-          if (encontrados.length) { status = "EXISTENTE"; beneficiarioId = String(encontrados[0].id); }
-          else {
-            const possiveis = await prisma.$queryRaw<Array<{ id: bigint }>>`
-            SELECT id FROM cadastro_beneficiario WHERE tenant_id = ${instituicao.tenant_id}::uuid AND lower(trim(nome_completo)) = lower(trim(${dados.nome_completo as string})) AND data_nascimento = ${dados.data_nascimento as string}::date LIMIT 2
-            `;
-            if (possiveis.length) { status = "DUPLICIDADE"; beneficiarioId = String(possiveis[0].id); }
-          }
-        }
+        `;
+        if (encontrados.length) { status = "EXISTENTE"; beneficiarioId = String(encontrados[0].id); }
+      }
+      const nomeParaDuplicidade = trimOrUndefined(valorTexto(dados.nome_completo));
+      const dataParaDuplicidade = valorTexto(dados.data_nascimento);
+      if (!beneficiarioId && nomeParaDuplicidade && /^\d{4}-\d{2}-\d{2}$/.test(dataParaDuplicidade)) {
+        const possiveis = await prisma.$queryRaw<Array<{ id: bigint }>>`
+          SELECT id FROM cadastro_beneficiario
+          WHERE tenant_id = ${instituicao.tenant_id}::uuid
+            AND lower(trim(nome_completo)) = lower(trim(${nomeParaDuplicidade}))
+            AND data_nascimento = ${dataParaDuplicidade}::date
+          LIMIT 2
+        `;
+        if (possiveis.length) { status = "DUPLICIDADE"; beneficiarioId = String(possiveis[0].id); }
       }
       linhas.push({ linha: index + 2, original, dados, status, problemas, beneficiarioId });
     }
@@ -106,6 +120,21 @@ export class ImportacaoDadosService {
   }
 
   async confirmar(id: string, rawAcoes: unknown, rawCorrecoes: unknown, usuarioId: string) {
+    const registro = await this.repository.obter(id);
+    if (!registro) throw new AppError("Importação não encontrada.", 404);
+    if (registro.usuario_master_id && String(registro.usuario_master_id) !== usuarioId) throw new AppError("Somente o MASTER responsável pode confirmar esta importação.", 403);
+    const statusAtual = String(registro.status ?? "");
+    if (statusAtual === "PROCESSANDO") return { id, status: statusAtual, resumo: this.resumo(registro.linhas as ImportacaoLinha[]), linhas: registro.linhas };
+    await this.repository.atualizar(id, "PROCESSANDO", registro.linhas as ImportacaoLinha[], this.resumo(registro.linhas as ImportacaoLinha[]));
+    void this.processarConfirmacao(id, rawAcoes, rawCorrecoes, usuarioId).catch(async (error) => {
+      const linhas = (await this.repository.obter(id))?.linhas as ImportacaoLinha[] | undefined;
+      if (linhas) await this.repository.atualizar(id, "FALHOU", linhas, this.resumo(linhas));
+      console.error("Falha no processamento assíncrono da importação", error);
+    });
+    return { id, status: "PROCESSANDO", resumo: this.resumo(registro.linhas as ImportacaoLinha[]), linhas: registro.linhas };
+  }
+
+  private async processarConfirmacao(id: string, rawAcoes: unknown, rawCorrecoes: unknown, usuarioId: string) {
     const registro = await this.repository.obter(id);
     if (!registro) throw new AppError("Importação não encontrada.", 404);
     if (registro.usuario_master_id && String(registro.usuario_master_id) !== usuarioId) throw new AppError("Somente o MASTER responsável pode confirmar esta importação.", 403);
@@ -118,22 +147,23 @@ export class ImportacaoDadosService {
     let importados = 0; let atualizados = 0; let ignorados = 0;
     for (let inicio = 0; inicio < linhas.length; inicio += 50) {
       const lote = linhas.slice(inicio, inicio + 50);
-      await Promise.all(lote.map(async (linha) => {
-        if (linha.acao === "IGNORAR" || linha.status === "DUPLICIDADE" || linha.status === "EXISTENTE" && linha.acao !== "ATUALIZAR") { linha.status = "IGNORADO"; ignorados += 1; return; }
+      for (const linha of lote) {
+        if (linha.acao === "IGNORAR" || linha.status === "DUPLICIDADE" || linha.status === "EXISTENTE" && linha.acao !== "ATUALIZAR") { linha.status = "IGNORADO"; ignorados += 1; continue; }
         try {
           if (["INCOMPLETO", "INVALIDO"].includes(linha.status)) {
-            await this.criarCadastroPendente(linha, instituicao.tenant_id);
+            await this.beneficiarioService.criarPendenteImportacao(normalizarTextoImportado({ ...linha.dados, nome_completo: valorTexto(linha.dados.nome_completo) || `Importacao - linha ${linha.linha}` }), instituicao.tenant_id);
             linha.status = "IMPORTADO";
             importados += 1;
           } else if (["PRONTO", "EXISTENTE", "DUPLICIDADE"].includes(linha.status)) {
-            const parsed = beneficiarioInputSchema.parse(linha.dados);
+            const parsed = beneficiarioInputSchema.parse(normalizarTextoImportado(linha.dados));
             if (linha.acao === "ATUALIZAR" && linha.beneficiarioId) { await this.beneficiarioService.atualizar(linha.beneficiarioId, parsed, usuarioId, instituicao.tenant_id); linha.status = "ATUALIZADO"; atualizados += 1; }
             else { await this.beneficiarioService.criar(parsed, usuarioId, instituicao.tenant_id); linha.status = "IMPORTADO"; importados += 1; }
           }
         } catch (error) {
           linha.status = "ERRO"; linha.problemas = [{ mensagem: error instanceof Error ? error.message : "Falha ao processar a linha." }];
         }
-      }));
+      }
+      await this.repository.atualizar(id, "PROCESSANDO", linhas, this.resumo(linhas));
     }
     const resumo = this.resumo(linhas); const status = resumo.erros ? (importados || atualizados ? "CONCLUIDA_COM_PENDENCIAS" : "FALHOU") : "CONCLUIDA";
     await this.repository.atualizar(id, status, linhas, { ...resumo, ignorados });
@@ -141,17 +171,5 @@ export class ImportacaoDadosService {
   }
 
   async obter(id: string) { const registro = await this.repository.obter(id); if (!registro) throw new AppError("Importação não encontrada.", 404); return registro; }
-  private async criarCadastroPendente(linha: ImportacaoLinha, tenantId: string) {
-    const dados = linha.dados;
-    const nome = trimOrUndefined(valorTexto(dados.nome_completo)) ?? `Importação - linha ${linha.linha}`;
-    const dataNascimento = /^\d{4}-\d{2}-\d{2}$/.test(valorTexto(dados.data_nascimento)) ? valorTexto(dados.data_nascimento) : null;
-    const nomeMae = trimOrUndefined(valorTexto(dados.nome_mae));
-    const [registro] = await prisma.$queryRaw<Array<{ id: bigint }>>`
-      INSERT INTO cadastro_beneficiario (nome_completo, data_nascimento, nome_mae, status, criado_em, atualizado_em, tenant_id)
-      VALUES (${nome.slice(0, 200)}, ${dataNascimento ? `${dataNascimento}T00:00:00` : null}::date, ${nomeMae ? nomeMae.slice(0, 200) : null}, ${linha.status === "INVALIDO" ? "ERRO" : "INCOMPLETO"}, NOW(), NOW(), ${tenantId}::uuid)
-      RETURNING id
-    `;
-    if (!registro?.id) throw new AppError("Não foi possível criar o cadastro pendente.", 422);
-  }
   private resumo(linhas: ImportacaoLinha[]) { return { prontos: linhas.filter((l) => l.status === "PRONTO").length, existentes: linhas.filter((l) => l.status === "EXISTENTE").length, duplicidades: linhas.filter((l) => l.status === "DUPLICIDADE").length, erros: linhas.filter((l) => ["ERRO", "INVALIDO", "INCOMPLETO"].includes(l.status)).length, ignorados: linhas.filter((l) => l.status === "IGNORADO").length }; }
 }

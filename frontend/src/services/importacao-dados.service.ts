@@ -1,5 +1,5 @@
 import { httpClient } from "./http-client";
-import type { ImportacaoLinha, ValidacaoImportacao } from "@/types/importacao-dados";
+import type { AcompanhamentoImportacao, ImportacaoLinha, ValidacaoImportacao } from "@/types/importacao-dados";
 import type { InstituicaoResumo } from "@/types/instituicao";
 
 export const importacaoDadosService = {
@@ -16,6 +16,10 @@ export const importacaoDadosService = {
   async confirmar(id: string, acoes: Record<string, string>) {
     const { data } = await httpClient.post<{ id: string; status: string; resumo: Record<string, number>; linhas: ImportacaoLinha[] }>(`/api/master/importacao-dados/${id}/confirmar`, { acoes });
     return data;
+  },
+  async obter(id: string) {
+    const { data } = await httpClient.get<{ importacao: AcompanhamentoImportacao }>(`/api/master/importacao-dados/${id}`);
+    return data.importacao;
   },
   async historico() {
     const { data } = await httpClient.get<{ importacoes: Array<Record<string, unknown>> }>("/api/master/importacao-dados/historico"); return data.importacoes ?? [];

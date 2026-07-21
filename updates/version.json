@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.692",
+  "latestVersion": "1.00.698",
   "releaseDate": "2026-07-21",
-  "description": "Importação permite criar cadastros pendentes para correção posterior.",
+  "description": "Importação evita duplicidades mesmo em registros incompletos.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.691",
+  "minCompatibleVersion": "1.00.697",
   "releaseType": "stable",
   "downloadUrl": null
 }

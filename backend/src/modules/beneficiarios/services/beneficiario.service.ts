@@ -82,6 +82,14 @@ export class BeneficiarioService {
     }
   }
 
+  async criarPendenteImportacao(rawInput: unknown, tenantId: string) {
+    const inputNormalizado = this.normalizarPayload(rawInput);
+    if (!inputNormalizado || typeof inputNormalizado !== "object") {
+      throw new AppError("Dados da importação inválidos.", 422);
+    }
+    return this.repository.criar(inputNormalizado as BeneficiarioInput, tenantId);
+  }
+
   async atualizar(rawId: string, rawInput: unknown, rawUsuarioId?: string, tenantId?: string) {
     const id = this.parseId(rawId);
     const inputNormalizado = this.normalizarPayload(rawInput);

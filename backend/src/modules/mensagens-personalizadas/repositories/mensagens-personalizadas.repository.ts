@@ -589,14 +589,18 @@ export class MensagensPersonalizadasRepository {
         ${input.mensagemSugeridaIa ?? false},
         ${input.chaveSistema}
       )
-      ON CONFLICT (tenant_id, chave_sistema) WHERE chave_sistema IS NOT NULL
-      DO UPDATE SET chave_sistema = EXCLUDED.chave_sistema
+      -- A instalação antiga pode ter um índice único global em chave_sistema,
+      -- enquanto as instalações novas usam o índice por tenant. O conflito
+      -- genérico mantém o seed idempotente nos dois formatos.
+      ON CONFLICT DO NOTHING
       RETURNING id
     `);
 
     if (rows[0]?.id) {
       return this.obterModeloOuFalhar(rows[0].id, tenant);
     }
+
+    return this.obterModeloPorChaveSistema(input.chaveSistema, tenant);
 
     const existenteAposConflito = await this.obterModeloPorChaveSistema(input.chaveSistema, tenant);
     if (existenteAposConflito) return existenteAposConflito;
