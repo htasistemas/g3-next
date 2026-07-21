@@ -600,6 +600,14 @@ export const router = createBrowserRouter([
         )
       },
       {
+        path: "/configuracoes/importacao-dados",
+        element: (
+          <RequirePermission permissions={["MASTER_ADMIN"]}>
+            {carregarPagina("/configuracoes/importacao-dados", "ImportacaoDadosPage")}
+          </RequirePermission>
+        )
+      },
+      {
         path: "/atendimentos/prontuario",
         element: (
           <RequirePermission permissions={["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS", "PRONTUARIO_VISUALIZAR", "CENTRAL_ATENDIMENTOS_VISUALIZAR"]}>

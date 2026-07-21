@@ -145,6 +145,20 @@ export const arquivosService = {
     return mapArquivo(data.arquivo);
   },
 
+  async uploadParaDocumentoEducacional(documentoId: string | number, arquivo: File, observacao?: string) {
+    const formData = new FormData();
+    formData.append("scope", "educacional_documento");
+    formData.append("entidadeTipo", "educacional_documento");
+    formData.append("entidadeId", String(documentoId));
+    if (observacao?.trim()) formData.append("observacao", observacao.trim());
+    formData.append("arquivo", arquivo);
+    const { data } = await httpClient.post<{ arquivo: ArquivoApiRow }>("/api/arquivos/upload", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      timeout: 300000
+    });
+    return mapArquivo(data.arquivo);
+  },
+
   async excluir(id: string | number) {
     await httpClient.delete(`/api/arquivos/${id}`);
   }

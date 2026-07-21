@@ -240,6 +240,10 @@ const routeModules: RouteModuleDefinition[] = [
     loader: () => import("@/pages/configuracoes/master-instituicoes-page")
   },
   {
+    path: "/configuracoes/importacao-dados",
+    loader: () => import("@/pages/configuracoes/importacao-dados-page")
+  },
+  {
     path: "/configuracoes/mensagens-personalizadas",
     loader: () => import("@/pages/configuracoes/mensagens-personalizadas-page")
   },

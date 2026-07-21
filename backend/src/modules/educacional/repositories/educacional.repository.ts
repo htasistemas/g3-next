@@ -4,7 +4,7 @@ import { AppError } from "../../../shared/errors/app-error.js";
 import type { EducacionalActor, EducacionalRecurso } from "../educacional.types.js";
 
 const estruturaPromise = new Map<string, Promise<void>>();
-const tabelaPorRecurso: Record<EducacionalRecurso, string> = { "anos-letivos": "educacional_ano_letivo", etapas: "educacional_etapa", series: "educacional_serie", disciplinas: "educacional_disciplina", turmas: "educacional_turma", alunos: "educacional_aluno", matriculas: "educacional_matricula", enturmacoes: "educacional_enturmacao", "grade-curricular": "educacional_grade_curricular", horarios: "educacional_horario", diarios: "educacional_diario_aula", frequencias: "educacional_frequencia", "planos-aula": "educacional_plano_aula", planejamentos: "educacional_planejamento_pedagogico", avaliacoes: "educacional_avaliacao", notas: "educacional_nota", boletins: "educacional_boletim", historicos: "educacional_historico_escolar", ocorrencias: "educacional_ocorrencia", agenda: "educacional_agenda", documentos: "educacional_documento", "rotinas-infantis": "educacional_rotina_infantil", "desenvolvimentos-infantis": "educacional_desenvolvimento_infantil", transferencias: "educacional_transferencia", autorizacoes: "educacional_autorizacao", "lista-espera": "educacional_lista_espera", recuperacoes: "educacional_recuperacao", "resultados-finais": "educacional_resultado_final", calendario: "educacional_calendario" };
+const tabelaPorRecurso: Record<EducacionalRecurso, string> = { "anos-letivos": "educacional_ano_letivo", etapas: "educacional_etapa", series: "educacional_serie", disciplinas: "educacional_disciplina", turmas: "educacional_turma", alunos: "educacional_aluno", matriculas: "educacional_matricula", enturmacoes: "educacional_enturmacao", profissionais: "educacional_profissional_vinculo", "grade-curricular": "educacional_grade_curricular", horarios: "educacional_horario", diarios: "educacional_diario_aula", frequencias: "educacional_frequencia", "planos-aula": "educacional_plano_aula", planejamentos: "educacional_planejamento_pedagogico", avaliacoes: "educacional_avaliacao", notas: "educacional_nota", boletins: "educacional_boletim", historicos: "educacional_historico_escolar", ocorrencias: "educacional_ocorrencia", agenda: "educacional_agenda", documentos: "educacional_documento", "rotinas-infantis": "educacional_rotina_infantil", "desenvolvimentos-infantis": "educacional_desenvolvimento_infantil", transferencias: "educacional_transferencia", autorizacoes: "educacional_autorizacao", "lista-espera": "educacional_lista_espera", recuperacoes: "educacional_recuperacao", "resultados-finais": "educacional_resultado_final", calendario: "educacional_calendario" };
 
 export class EducacionalRepository {
   async garantirEstrutura() {
@@ -62,6 +62,8 @@ export class EducacionalRepository {
       ? await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`SELECT a.*, b.nome_completo, b.codigo AS codigo_beneficiario, b.data_nascimento, b.nome_mae FROM educacional_aluno a INNER JOIN cadastro_beneficiario b ON b.id = a.beneficiario_id AND b.tenant_id::text = ${tenantId} WHERE a.tenant_id::text = ${tenantId} ORDER BY a.id DESC LIMIT 500`)
       : recurso === "matriculas"
         ? await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`SELECT m.*, a.beneficiario_id, b.nome_completo AS aluno_nome, t.nome AS turma_nome, u.nome_fantasia AS unidade_nome, s.nome AS sala_nome FROM educacional_matricula m INNER JOIN educacional_aluno a ON a.id = m.aluno_id AND a.tenant_id::text = ${tenantId} INNER JOIN cadastro_beneficiario b ON b.id = a.beneficiario_id AND b.tenant_id::text = ${tenantId} LEFT JOIN educacional_turma t ON t.id = m.turma_id AND t.tenant_id::text = ${tenantId} LEFT JOIN unidade_assistencial u ON u.id = m.unidade_id AND u.tenant_id::text = ${tenantId} LEFT JOIN salas_unidade s ON s.id = m.sala_id AND s.unidade_id = m.unidade_id WHERE m.tenant_id::text = ${tenantId} ORDER BY m.id DESC LIMIT 500`)
+      : recurso === "profissionais"
+        ? await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`SELECT v.*, p.nome_completo AS profissional_nome, p.categoria AS profissional_categoria FROM educacional_profissional_vinculo v INNER JOIN cadastro_profissionais p ON p.id = v.profissional_id AND p.tenant_id::text = ${tenantId} WHERE v.tenant_id::text = ${tenantId} ORDER BY v.id DESC LIMIT 500`)
         : await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`SELECT * FROM ${Prisma.raw(tabela)} WHERE tenant_id::text = ${tenantId} ORDER BY id DESC LIMIT 500`);
     return rows.map((row) => this.serializar(row));
   }
@@ -72,7 +74,7 @@ export class EducacionalRepository {
       SELECT b.id, b.codigo, b.nome_completo, b.data_nascimento, b.nome_mae
       FROM cadastro_beneficiario b
       WHERE b.tenant_id::text = ${tenantId}
-        AND (b.nome_completo ILIKE ${busca} OR COALESCE(b.codigo, '') ILIKE ${busca})
+        AND (b.nome_completo ILIKE ${busca} OR COALESCE(b.codigo, '') ILIKE ${busca} OR regexp_replace(COALESCE(b.cpf, ''), '[^0-9]', '', 'g') LIKE regexp_replace(${busca}, '[^0-9]', '', 'g'))
       ORDER BY b.nome_completo ASC LIMIT 50
     `).then((rows) => rows.map((row) => this.serializar(row)));
   }
@@ -151,6 +153,13 @@ export class EducacionalRepository {
 
   private async validarReferencias(recurso: EducacionalRecurso, input: Record<string, unknown>, tenantId: string, rawId?: string) {
     const referencias: Array<[string, string]> = [];
+    if (recurso === "profissionais") {
+      const profissional = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`SELECT id FROM cadastro_profissionais WHERE id = ${BigInt(String(input.profissional_id))} AND tenant_id::text = ${tenantId} LIMIT 1`);
+      if (!profissional[0]) throw new AppError("Profissional não encontrado nesta instituição.", 404);
+      if (input.unidade_id) referencias.push(["unidade_assistencial", "unidade_id"]);
+      if (input.disciplina_id) referencias.push(["educacional_disciplina", "disciplina_id"]);
+      if (input.turma_id) referencias.push(["educacional_turma", "turma_id"]);
+    }
     if (recurso === "series" && input.etapa_id) referencias.push(["educacional_etapa", "etapa_id"]);
     if (recurso === "turmas") {
       if (input.ano_letivo_id) referencias.push(["educacional_ano_letivo", "ano_letivo_id"]);

@@ -1,4 +1,5 @@
 import { httpClient } from "./http-client";
+import type { EvidenciaPublica, IndicadorPublico, ParceriaPublica } from "@/types/educacional-parcerias-publicas";
 import type { BeneficiarioBusca, EducacionalItem, EducacionalResumo } from "@/types/educacional";
 
 export type EducacionalRecurso =
@@ -10,6 +11,7 @@ export type EducacionalRecurso =
   | "alunos"
   | "matriculas"
   | "enturmacoes"
+  | "profissionais"
   | "grade-curricular"
   | "horarios"
   | "diarios"
@@ -39,6 +41,22 @@ export type UnidadeEnsinoCatalogo = {
 };
 
 export const educacionalService = {
+  async listarParceriasPublicas() {
+    const { data } = await httpClient.get<{ itens: ParceriaPublica[] }>("/api/educacional/parcerias-publicas");
+    return data.itens;
+  },
+  async criarParceriaPublica(payload: Record<string, unknown>) {
+    const { data } = await httpClient.post<{ item: ParceriaPublica }>("/api/educacional/parcerias-publicas", payload);
+    return data.item;
+  },
+  async criarIndicadorPublico(payload: Record<string, unknown>) {
+    const { data } = await httpClient.post<{ item: IndicadorPublico }>("/api/educacional/parcerias-publicas/indicadores", payload);
+    return data.item;
+  },
+  async criarEvidenciaPublica(payload: Record<string, unknown>) {
+    const { data } = await httpClient.post<{ item: EvidenciaPublica }>("/api/educacional/parcerias-publicas/evidencias", payload);
+    return data.item;
+  },
   async resumo(filtros?: Record<string, string>) {
     const { data } = await httpClient.get<EducacionalResumo>("/api/educacional/resumo", { params: filtros });
     return data;

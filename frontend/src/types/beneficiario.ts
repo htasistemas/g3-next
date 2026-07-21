@@ -1,5 +1,6 @@
 export type BeneficiarioStatus =
   | "ATIVO"
+  | "COMPLETO"
   | "INATIVO"
   | "DESATUALIZADO"
   | "INCOMPLETO"

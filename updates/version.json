@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.682",
-  "releaseDate": "2026-07-19",
-  "description": "Correção do aquecimento de mensagens personalizadas no backend.",
+  "latestVersion": "1.00.691",
+  "releaseDate": "2026-07-21",
+  "description": "Botão de confirmação habilitado após validação na Importação de dados.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.678",
+  "minCompatibleVersion": "1.00.690",
   "releaseType": "stable",
   "downloadUrl": null
 }

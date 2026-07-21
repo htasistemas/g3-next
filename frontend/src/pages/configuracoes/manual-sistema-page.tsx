@@ -53,6 +53,7 @@ const secoesManual: ManualSecao[] = [
           "Na aba Personalização, use os campos Card da visão geral e Card suave da visão geral para ajustar apenas o dashboard sem alterar o restante do tema.",
           "Na aba Personalização de Configurações gerais, ajuste a paleta para alterar as cores dos cards da tela Visão geral antes de salvar as mudanças.",
           "Os cards iniciais da Visão geral acompanham a cor clara do padrão da unidade, como verde claro ou azul claro, de acordo com a personalização ativa.",
+          "Na aba Personalização, o campo Preset oferece novas opções suaves e comerciais: Azul sereno, Verde sage, Turquesa leve, Lavanda suave, Areia premium e Coral acolhedor. Selecione uma opção para aplicar a pré-visualização e salve para confirmar.",
           "Na tela Visão geral, acompanhe também os cards de Termos vencidos, Documentos vencidos, Documentos a vencer, Motoristas autorizados, Itens no almoxarifado, Livros da biblioteca, Quantidade de veículos, Itens no patrimônio, Álbuns e fotos, Empréstimos para eventos e Catálogo e vagas de matrículas para leitura operacional rápida logo na entrada do sistema.",
           "O card Composição financeira da Visão geral exibe valores a receber, em caixa e em banco com base nos saldos e lançamentos financeiros normalizados pelo backend.",
           "O card Empréstimos para eventos mostra a quantidade de eventos ativos em andamento.",
@@ -1300,7 +1301,16 @@ const secoesManual: ManualSecao[] = [
         ],
         atencoes: [
           "A gestão master de instituições aparece apenas para perfil superadmin.",
+          "Use o menu Painel master > Importação de dados para importar beneficiários por CSV, XLSX ou XLS após selecionar explicitamente a instituição de destino.",
+          "A importação começa sempre em validação: revise o mapeamento das colunas, os cards de resultado, as linhas com erros e as possíveis duplicidades antes de confirmar.",
+          "A confirmação exige a marcação de que os dados serão enviados para a instituição exibida; o backend aplica o tenant selecionado e não aceita tenant_id, instituição ou IDs internos vindos do arquivo.",
+          "Na etapa de mapeamento da Importação de dados, a coluna à esquerda representa o arquivo Excel/CSV e o campo à direita representa o cadastro de beneficiários do G3N; a lista inclui todos os campos disponíveis e mostra um exemplo do valor encontrado.",
+          "As linhas do mapeamento alternam entre branco e cinza claro para facilitar a conferência visual entre a coluna do arquivo e o campo escolhido no G3N.",
+          "O mapeamento usa duas colunas de mesma largura, metade para o arquivo e metade para o cadastro do G3N, facilitando a comparação em telas maiores.",
+          "Na tabela de validação, registros já existentes ou possivelmente duplicados podem ser ignorados ou marcados para atualização controlada; o histórico e o relatório CSV ficam disponíveis na aba Histórico de importações.",
           "O tenant_id não deve ser digitado manualmente em nenhuma operação do usuário final; ele é derivado da instituição autenticada.",
+          "A Importação de dados exige a permissão MASTER_ADMIN no frontend e no backend; administradores de tenant e usuários comuns não podem listar instituições, validar arquivos ou confirmar importações.",
+          "A validação não grava beneficiários. A gravação só ocorre após a confirmação manual do MASTER e cada linha inválida permanece registrada como pendência.",
           "Toda consulta operacional do sistema passa a depender do tenant autenticado para evitar mistura de dados entre clientes."
         ]
       },
@@ -1325,7 +1335,7 @@ const secoesManual: ManualSecao[] = [
   {
     id: "educacional",
     titulo: "Educacional — Fase 1",
-    descricao: "Fundação para integrar beneficiários à gestão escolar da instituição.",
+    descricao: "Gestão educacional integrada, com vínculos de alunos e profissionais, documentos em storage, parcerias públicas e indicadores de prestação de contas.",
     icon: GraduationCap,
     telas: [
       {
@@ -1335,7 +1345,7 @@ const secoesManual: ManualSecao[] = [
           "Acesse diretamente o submenu Visão geral para consultar alunos, matrículas, turmas, disciplinas e anos letivos abertos.",
           "O menu Educacional mantém os cadastros principais e agrupa as operações relacionadas em abas: Alunos reúne Alunos, Matrículas, Transferências e Autorizações; Diário de classe reúne Diário, Plano de aula, Avaliações e notas e Chamada e frequência; Professores e equipe pedagógica reúne também o Planejamento pedagógico.",
           "Ano letivo, Etapas de ensino, Séries e anos escolares, Disciplinas e Turmas ficam agrupados na tela Estrutura acadêmica e não são repetidos como submenus independentes.",
-          "As abas de Alunos, Diário de classe e Professores e equipe pedagógica seguem a navegação lateral numerada do G3N, com o conteúdo exibido ao lado da aba selecionada.",
+          "As abas de Alunos, Vida escolar, Estrutura acadêmica, Professores e equipe pedagógica e Gestão escolar seguem a navegação lateral numerada do G3N, com separação visual por assunto e o conteúdo exibido ao lado da aba selecionada.",
           "Na Visão geral educacional, use os filtros de unidade, ano letivo, etapa, turma e turno e clique nos cards para abrir o fluxo relacionado. Os indicadores de frequência, risco, evasão, ocorrências, chamadas pendentes e média são calculados a partir dos registros persistidos.",
           "O backend também calcula disciplinas ativas e anos letivos abertos diretamente no PostgreSQL. A tela não utiliza números simulados.",
           "Ao enturmar, o sistema impede que uma matrícula ativa fique em duas turmas ao mesmo tempo, bloqueia turma lotada e mantém a saída anterior com data de fim para preservar o histórico.",
@@ -1354,7 +1364,7 @@ const secoesManual: ManualSecao[] = [
           , "Os registros de Rotina infantil e Desenvolvimento infantil são pedagógicos e não substituem prontuário ou prescrição médica."
           , "O cadastro mestre passou a se chamar Unidades de atendimento. Cada unidade possui tipo obrigatório: Unidade assistencial ou Unidade de ensino. A filtragem é feita no backend e unidades antigas permanecem assistenciais."
           , "Use Gestão acadêmica para registrar lista de espera, recuperações, resultado final e eventos do calendário escolar. Os registros são vinculados ao ano letivo e permanecem separados por instituição."
-          , "O menu Educacional foi reduzido para seis entradas principais: Visão geral; Alunos; Estrutura acadêmica; Professores e equipe pedagógica; Gestão escolar; e Relatórios e indicadores. As operações relacionadas ficam nas abas internas de cada contexto."
+          , "O menu Educacional foi organizado em entradas principais: Visão geral; Alunos; Vida escolar; Estrutura acadêmica; Professores e equipe pedagógica; Gestão escolar; Parcerias públicas; e Relatórios e indicadores. As operações relacionadas ficam nas abas internas de cada contexto."
           , "As telas Educacionais agora usam a barra de ações padrão do G3N. Nas abas com formulário, Novo limpa o contexto para um novo registro, Salvar envia o formulário visível, Cancelar limpa os dados ainda não gravados, Imprimir usa o relatório da tela e Fechar retorna à Visão geral. Buscar atualiza a Visão geral ou pesquisa beneficiários na aba Matrículas. As abas laterais usam as mesmas cores e estados visuais do Cadastro de beneficiários. Ao selecionar um grupo, somente o submenu correspondente fica destacado; Visão geral fica ativa apenas na rota inicial do Educacional. Na matrícula, selecione a unidade de ensino e depois uma sala com vagas disponíveis; salas lotadas ficam bloqueadas e o backend confirma a lotação antes de salvar."
           , "Na aba Salas de atendimento, informe as vagas da sala e salve a unidade. A capacidade é normalizada corretamente mesmo quando o navegador envia o valor como texto, e o status da sala permanece ativo até que o usuário escolha inativá-la."
           , "Na aba Dados gerais do Cadastro de unidade de atendimento, as logomarcas da unidade e do relatório ficam lado a lado em telas amplas e se reorganizam verticalmente em telas menores."

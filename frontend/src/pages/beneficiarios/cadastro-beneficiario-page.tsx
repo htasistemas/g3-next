@@ -518,6 +518,7 @@ function documentoTemConteudoPersistivel(documento: DocumentoCadastro) {
 function statusVariant(status?: BeneficiarioStatus) {
   switch (status) {
     case "ATIVO":
+    case "COMPLETO":
       return "success" as const;
     case "BLOQUEADO":
       return "danger" as const;

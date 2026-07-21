@@ -1,5 +1,6 @@
 export const beneficiarioStatusValues = [
   "ATIVO",
+  "COMPLETO",
   "INATIVO",
   "DESATUALIZADO",
   "INCOMPLETO",

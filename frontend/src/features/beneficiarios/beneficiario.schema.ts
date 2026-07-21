@@ -36,6 +36,7 @@ function dataIsoReal(value: string) {
 
 export const beneficiarioStatusOptions = [
   "ATIVO",
+  "COMPLETO",
   "INATIVO",
   "DESATUALIZADO",
   "INCOMPLETO",

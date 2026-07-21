@@ -63,6 +63,8 @@ import { instituicoesRoutes } from "../modules/instituicoes/routes/instituicoes.
 import { projetoRoutes } from "../modules/projetos/routes/projeto.routes.js";
 import { portaisExternosRoutes } from "../modules/portais-externos/routes/portais-externos.routes.js";
 import { educacionalRoutes } from "../modules/educacional/routes/educacional.routes.js";
+import { parceriasPublicasRoutes } from "../modules/educacional/parcerias-publicas.routes.js";
+import { importacaoDadosRoutes } from "../modules/importacao-dados/importacao-dados.routes.js";
 import { obterAtualizacaoSistemaPaths } from "../modules/atualizacao-sistema/services/atualizacao-sistema.paths.js";
 
 export const appRoutes = Router();
@@ -83,6 +85,7 @@ appRoutes.get("/health", (_request, response) => {
 
 appRoutes.use("/api/auth", authRoutes);
 appRoutes.use("/api/master/instituicoes", ensureAuthenticated, ensureSuperadmin, instituicoesRoutes);
+appRoutes.use("/api/master/importacao-dados", importacaoDadosRoutes);
 appRoutes.use("/api/ai", ensureAuthenticated, aiRoutes);
 appRoutes.use("/api/semente", ensureAuthenticated, sementeRoutes);
 appRoutes.use("/api/central-atendimentos", centralAtendimentosRoutes);
@@ -96,6 +99,7 @@ appRoutes.use("/api/profissionais", profissionalRoutes);
 appRoutes.use("/api/voluntarios", voluntarioRoutes);
 appRoutes.use("/api/matriculas", matriculaRoutes);
 appRoutes.use("/api/prontuario", prontuarioRoutes);
+appRoutes.use("/api/educacional/parcerias-publicas", parceriasPublicasRoutes);
 appRoutes.use("/api/educacional", educacionalRoutes);
 appRoutes.use("/api/registro-doacao", registroDoacaoRoutes);
 appRoutes.use("/api/doacoes-realizadas", doacaoRealizadaRoutes);

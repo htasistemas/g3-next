@@ -39,6 +39,7 @@ import {
   CircleDollarSign,
   DollarSign,
   FileText,
+  FileSpreadsheet,
   Files,
   FolderKanban,
   FolderOpen,
@@ -109,10 +110,12 @@ const comparadorItensMenu = new Intl.Collator("pt-BR", {
 const ordemItensEducacional = [
   "educacional-visao-geral",
   "educacional-alunos",
+  "educacional-vida-escolar",
   "educacional-estrutura",
   "educacional-professores",
   "educacional-gestao-escolar",
   "educacional-relatorios"
+  ,"educacional-parcerias-publicas"
 ];
 
 function ordenarItensMenu<T extends { label: string; id?: string }>(itens: T[]) {
@@ -648,10 +651,12 @@ const menuSectionsBase: MenuSection[] = [
     itens: [
       { id: "educacional-visao-geral", to: "/educacional", label: "Visão geral", icon: ChartPie },
       { id: "educacional-alunos", to: "/educacional?grupo=alunos&aba=alunos", label: "Alunos", icon: UsersRound },
+      { id: "educacional-vida-escolar", to: "/educacional?grupo=vida-escolar&aba=transferencias", label: "Vida escolar", icon: Files },
       { id: "educacional-estrutura", to: "/educacional?grupo=estrutura&aba=estrutura", label: "Estrutura acadêmica", icon: Building2 },
       { id: "educacional-professores", to: "/educacional?grupo=professores&aba=professores", label: "Professores e equipe pedagógica", icon: UsersRound },
       { id: "educacional-gestao-escolar", to: "/educacional?grupo=gestao&aba=ocorrencias", label: "Gestão escolar", icon: CheckSquare2 },
       { id: "educacional-relatorios", to: "/educacional?aba=relatorios", label: "Relatórios e indicadores", icon: ChartPie }
+      ,{ id: "educacional-parcerias-publicas", to: "/educacional?grupo=parcerias&aba=parcerias", label: "Parcerias públicas", icon: Files }
     ]
   },
   {
@@ -665,6 +670,13 @@ const menuSectionsBase: MenuSection[] = [
         to: "/configuracoes/master-instituicoes",
         label: "Clientes registrados",
         icon: Building2,
+        requiredPermissions: ["MASTER_ADMIN"]
+      },
+      {
+        id: "painel-master-importacao-dados",
+        to: "/configuracoes/importacao-dados",
+        label: "Importação de dados",
+        icon: FileSpreadsheet,
         requiredPermissions: ["MASTER_ADMIN"]
       }
     ]
@@ -794,6 +806,7 @@ function itemMenuEstaAtivo(pathname: string, search: string, item: MenuItem, nav
   // Todas as entradas do Educacional usam a query string para definir a aba.
   // O NavLink considera somente /educacional e, por isso, marcava Visão geral
   // junto com Alunos, Estrutura acadêmica e os demais grupos.
+  if (item.id === "educacional-visao-geral") return pathname === "/educacional" && search === "";
   if (item.id?.startsWith("educacional-")) return itemEstaAtivo(pathname, item, search);
   return itemEstaAtivo(pathname, item, search) || navLinkAtivo;
 }

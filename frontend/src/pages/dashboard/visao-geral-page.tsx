@@ -233,18 +233,18 @@ export function VisaoGeralPage() {
     if (!data) return [];
     return [
       {
-        label: "Álbuns e fotos",
-        valor: `${resumoFotosEventos.totalAlbuns} / ${resumoFotosEventos.totalFotos}`,
-        hint: "Álbuns cadastrados / fotos registradas",
-        icone: Images,
-        rota: "/setor-administrativo/fotos-eventos"
-      },
-      {
         label: "Beneficiários no período",
         valor: String(data.top12.beneficiariosAtendidosPeriodo),
         hint: "Registros no período filtrado",
         icone: UsersRound,
         rota: "/cadastros/beneficiarios"
+      },
+      {
+        label: "Álbuns e fotos",
+        valor: `${resumoFotosEventos.totalAlbuns} / ${resumoFotosEventos.totalFotos}`,
+        hint: "Álbuns cadastrados / fotos registradas",
+        icone: Images,
+        rota: "/setor-administrativo/fotos-eventos"
       },
       {
         label: "Cursos ativos",
