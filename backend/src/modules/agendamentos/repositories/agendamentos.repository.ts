@@ -1337,8 +1337,12 @@ export class AgendamentosRepository {
     return rows[0] ?? null;
   }
 
-  async listarBeneficiariosOperacionais(itemId: bigint, tenantId: string) {
+  async listarBeneficiariosOperacionais(itemId: bigint, tenantId: string, matriculasIds?: number[]) {
     await this.ensureEstrutura();
+
+    const filtroMatriculas = matriculasIds?.length
+      ? Prisma.sql`AND m.id IN (${Prisma.join(matriculasIds.map((id) => BigInt(id)))})`
+      : Prisma.empty;
 
     return prisma.$queryRaw<AgendamentoOperacionalBeneficiarioRow[]>(Prisma.sql`
       SELECT
@@ -1422,6 +1426,7 @@ export class AgendamentosRepository {
       WHERE m.curso_id = ${itemId}
         AND m.tenant_id::text = ${tenantId}
         AND c.tenant_id::text = ${tenantId}
+        ${filtroMatriculas}
       ORDER BY m.beneficiario_nome ASC
     `);
   }
@@ -2274,7 +2279,7 @@ export class AgendamentosRepository {
   private async montarPayloadOperacional(input: AgendamentoOperacionalInput, tenantId: string): Promise<AgendamentoInput> {
     const [item, beneficiarios] = await Promise.all([
       this.obterItemOperacional(BigInt(input.itemId), tenantId),
-      this.listarBeneficiariosOperacionais(BigInt(input.itemId), tenantId)
+      this.listarBeneficiariosOperacionais(BigInt(input.itemId), tenantId, input.matriculasIds)
     ]);
     if (!item) {
       throw new AppError("Item de inscricao nao encontrado para agendamento.", 404);

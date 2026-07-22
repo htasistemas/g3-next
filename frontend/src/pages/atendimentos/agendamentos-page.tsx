@@ -646,12 +646,13 @@ export function AgendamentosPage() {
     const dataExibicao = dataAgendamento;
     try {
       const salvo = await salvarMutation.mutateAsync({
-        id: cardSelecionado?.id ? String(cardSelecionado.id) : undefined,
+        id: cardExistente?.id ? String(cardExistente.id) : undefined,
         tipo,
         itemId: itemSelecionado.id,
         data: dataAgendamento,
         matriculasIds: beneficiariosSelecionados
       });
+      await agendamentosQuery.refetch();
       setSelecionadoId(salvo?.id ?? null);
       setUltimaAgendaDestacadaId(salvo?.id ?? null);
       definirDataVisualizacao(dataExibicao);
