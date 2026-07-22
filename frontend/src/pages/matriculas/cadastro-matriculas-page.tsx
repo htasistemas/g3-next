@@ -143,6 +143,10 @@ function formatarTelefone(telefone?: string) {
   return telefone;
 }
 
+function chavePresenca(matriculaId?: string | number | null) {
+  return String(matriculaId ?? "").trim();
+}
+
 function obterPrimeiroNome(nome?: string) {
   const texto = formatarTextoPadrao(nome ?? "");
   if (!texto) return "---";
@@ -1807,9 +1811,11 @@ export function CadastroMatriculasPage() {
       const mapa: Record<string, MatriculaPresencaStatus> = {};
       const mapaObservacoes: Record<string, string> = {};
       response.presencas.forEach((item) => {
-        mapa[item.matricula_id] = item.status;
+        const chave = chavePresenca(item.matricula_id);
+        if (!chave) return;
+        mapa[chave] = item.status;
         if (item.observacao?.trim()) {
-          mapaObservacoes[item.matricula_id] = item.observacao.trim();
+          mapaObservacoes[chave] = item.observacao.trim();
         }
       });
       setPresencasPorMatricula(mapa);
@@ -1898,12 +1904,12 @@ export function CadastroMatriculasPage() {
       return;
     }
 
-    const presencas = inscricoes
+    const presencas = inscricoesAtivas
       .filter((item): item is MatriculaInscricao & { id_matricula_item: string } => !!item.id_matricula_item)
       .map((item) => ({
-        matricula_id: item.id_matricula_item,
-        status: (presencasPorMatricula[item.id_matricula_item] ?? "NAO_INFORMADO") as MatriculaPresencaStatus,
-        observacao: presencasObservacoesPorMatricula[item.id_matricula_item]?.trim() || undefined
+        matricula_id: chavePresenca(item.id_matricula_item),
+        status: (presencasPorMatricula[chavePresenca(item.id_matricula_item)] ?? "NAO_INFORMADO") as MatriculaPresencaStatus,
+        observacao: presencasObservacoesPorMatricula[chavePresenca(item.id_matricula_item)]?.trim() || undefined
       }));
 
     setPresencaSalvando(true);
@@ -1916,9 +1922,11 @@ export function CadastroMatriculasPage() {
       const mapa: Record<string, MatriculaPresencaStatus> = {};
       const mapaObservacoes: Record<string, string> = {};
       response.presencas.forEach((item) => {
-        mapa[item.matricula_id] = item.status;
+        const chave = chavePresenca(item.matricula_id);
+        if (!chave) return;
+        mapa[chave] = item.status;
         if (item.observacao?.trim()) {
-          mapaObservacoes[item.matricula_id] = item.observacao.trim();
+          mapaObservacoes[chave] = item.observacao.trim();
         }
       });
       setPresencasPorMatricula(mapa);
@@ -4241,6 +4249,9 @@ export function CadastroMatriculasPage() {
                             </option>
                           ))}
                         </Select>
+                        <p className="text-xs text-[var(--g3-muted)]">
+                          Para gerar as datas desta lista, gere a agenda na data selecionada.
+                        </p>
                       </div>
                       <div className="space-y-1 xl:col-span-3">
                         <Label>Título</Label>

@@ -28,7 +28,9 @@ export const agendamentosService = {
   },
 
   async criarOperacional(payload: AgendamentoOperacionalPayload) {
-    const { data } = await httpClient.post<{ agendamento: Agendamento | null }>("/api/agendamentos", payload);
+    const { data } = await httpClient.post<{ agendamento: Agendamento | null }>("/api/agendamentos", payload, {
+      timeout: 120000
+    });
     return data.agendamento;
   },
 
