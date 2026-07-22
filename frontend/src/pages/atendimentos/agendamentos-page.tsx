@@ -460,6 +460,7 @@ export function AgendamentosPage() {
   const [geracaoEmAndamento, setGeracaoEmAndamento] = useState(false);
   const [geracaoEtapa, setGeracaoEtapa] = useState(0);
   const [ultimaAgendaDestacadaId, setUltimaAgendaDestacadaId] = useState<number | null>(null);
+  const [agendaLocalSalva, setAgendaLocalSalva] = useState<Agendamento | null>(null);
   const [confirmacaoParticipanteEmAndamento, setConfirmacaoParticipanteEmAndamento] = useState<{
     agendamentoId: number;
     index: number;
@@ -525,7 +526,7 @@ export function AgendamentosPage() {
 
   const cards = useMemo(
     () =>
-      (agendamentosQuery.data ?? [])
+      [...(agendamentosQuery.data ?? []), ...(agendaLocalSalva && !(agendamentosQuery.data ?? []).some((item) => item.id === agendaLocalSalva.id) ? [agendaLocalSalva] : [])]
         .filter((item) => (item.status ?? "").trim().toUpperCase() !== "CANCELADO")
         .filter((item) => {
           const participantes = item.participantes ?? [];
@@ -539,7 +540,7 @@ export function AgendamentosPage() {
           );
         })
         .sort((a, b) => `${a.data ?? ""}${a.horaInicial ?? ""}`.localeCompare(`${b.data ?? ""}${b.horaInicial ?? ""}`)),
-    [agendamentosQuery.data]
+    [agendaLocalSalva, agendamentosQuery.data]
   );
 
   const cardsVisiveis = cards;
@@ -653,6 +654,7 @@ export function AgendamentosPage() {
         matriculasIds: beneficiariosSelecionados
       });
       await agendamentosQuery.refetch();
+      if (salvo) setAgendaLocalSalva(salvo);
       setSelecionadoId(salvo?.id ?? null);
       setUltimaAgendaDestacadaId(salvo?.id ?? null);
       definirDataVisualizacao(dataExibicao);
@@ -1446,6 +1448,14 @@ export function AgendamentosPage() {
       ) : null}
 
       {popup ? <PopupMensagem popup={popup} onClose={() => setPopup(null)} /> : null}
+      {itemSelecionado && beneficiariosQuery.isFetching && !popup ? (
+        <div className="fixed inset-0 z-[59] flex items-center justify-center bg-slate-900/35 px-4">
+          <div className="flex w-full max-w-sm items-center gap-3 rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] px-5 py-4 shadow-2xl">
+            <LoaderCircle className="h-5 w-5 animate-spin text-[var(--g3-primary)]" />
+            <p className="text-sm font-medium text-[var(--g3-foreground)]">Aguarde, carregando os beneficiários inscritos.</p>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }
