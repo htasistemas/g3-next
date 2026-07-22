@@ -425,7 +425,7 @@ export function AgendaCard(props: {
             {props.ativo ? <Badge variant="warning">Em edição</Badge> : null}
             {props.destaqueRecente ? <Badge variant="default" className="border-white/35 bg-white/15 text-white">Recém salvo</Badge> : null}
             <Badge variant="default" className="border-white/35 bg-white/15 text-white">
-              {participantes.length} participante(s)
+              {participantes.length} beneficiário(s) inscrito(s)
             </Badge>
           </div>
         </div>

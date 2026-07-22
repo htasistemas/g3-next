@@ -81,7 +81,14 @@ const ETAPAS_ENVIO: Array<Record<"WHATSAPP" | "EMAIL", string>> = [
   }
 ];
 
-const ETAPAS_GERACAO_AGS = ["Validando os beneficiários selecionados...", "Salvando a agenda operacional..."];
+const ETAPAS_GERACAO_AGS = [
+  { percentual: 8, texto: "Validando os beneficiários selecionados..." },
+  { percentual: 20, texto: "Buscando as inscrições do item selecionado..." },
+  { percentual: 38, texto: "Preparando beneficiários, contatos e vínculos..." },
+  { percentual: 58, texto: "Montando curso, horário, local e participantes..." },
+  { percentual: 82, texto: "Salvando a agenda do dia no banco de dados..." },
+  { percentual: 100, texto: "Agenda salva. Atualizando a lista do dia..." }
+];
 
 let janelaFichaAgendamentoAtual: Window | null = null;
 let urlFichaAgendamentoAtual: string | null = null;
@@ -634,8 +641,8 @@ export function AgendamentosPage() {
     setGeracaoEmAndamento(true);
     setGeracaoEtapa(0);
     geracaoIntervalo.current = window.setInterval(() => {
-      setGeracaoEtapa((atual) => Math.min(atual + 1, ETAPAS_GERACAO_AGS.length - 1));
-    }, 850);
+      setGeracaoEtapa((atual) => Math.min(atual + 1, ETAPAS_GERACAO_AGS.length - 2));
+    }, 1100);
 
     const cardExistente = cards.find(
       (item) =>
@@ -655,6 +662,8 @@ export function AgendamentosPage() {
       });
       await agendamentosQuery.refetch();
       if (salvo) setAgendaLocalSalva(salvo);
+      setGeracaoEtapa(ETAPAS_GERACAO_AGS.length - 1);
+      await new Promise((resolve) => window.setTimeout(resolve, 350));
       setSelecionadoId(salvo?.id ?? null);
       setUltimaAgendaDestacadaId(salvo?.id ?? null);
       definirDataVisualizacao(dataExibicao);
@@ -1201,14 +1210,17 @@ export function AgendamentosPage() {
                   />
                   {geracaoEmAndamento ? (
                     <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-sm">
-                      <div className="flex items-center gap-3">
-                        <LoaderCircle className="h-4 w-4 animate-spin text-emerald-700" />
-                        <p className="text-sm font-medium text-emerald-900">{ETAPAS_GERACAO_AGS[geracaoEtapa]}</p>
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <LoaderCircle className="h-4 w-4 animate-spin text-emerald-700" />
+                          <p className="text-sm font-medium text-emerald-900">{ETAPAS_GERACAO_AGS[geracaoEtapa].texto}</p>
+                        </div>
+                        <span className="text-sm font-semibold text-emerald-800">{ETAPAS_GERACAO_AGS[geracaoEtapa].percentual}%</span>
                       </div>
                       <div className="mt-3 h-2 overflow-hidden rounded-full bg-emerald-100">
                         <div
                           className="h-full rounded-full bg-emerald-600 transition-all duration-300"
-                          style={{ width: `${((geracaoEtapa + 1) / ETAPAS_GERACAO_AGS.length) * 100}%` }}
+                          style={{ width: `${ETAPAS_GERACAO_AGS[geracaoEtapa].percentual}%` }}
                         />
                       </div>
                     </div>
