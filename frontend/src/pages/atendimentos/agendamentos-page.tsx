@@ -667,7 +667,11 @@ export function AgendamentosPage() {
       }, 4500);
     } catch (error: any) {
       definirDataVisualizacao(dataAgendamento);
-      const mensagem = error?.response?.data?.message ?? "Não foi possível gerar a agenda.";
+      const mensagem =
+        error?.response?.data?.message ??
+        error?.response?.data?.error ??
+        error?.message ??
+        "Não foi possível gerar a agenda.";
       setPopup({
         tipo: "erro",
         titulo: mensagem.startsWith("Conflito de agenda identificado.") ? "Agendamento bloqueador" : "Erro",
