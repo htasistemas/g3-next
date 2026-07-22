@@ -99,13 +99,11 @@ remove_runtime_container() {
 }
 
 reconcile_runtime_containers() {
-  # Containers are disposable; named volumes contain the persistent data.
-  # Removing them before Compose prevents failures caused by legacy network
-  # names such as g3n_g3n_net left by older deployments.
+  # Containers internos são descartáveis; proxy e túnel permanecem ativos
+  # para que o Cloudflare continue exibindo a página de manutenção.
   remove_runtime_container g3n-db
   remove_runtime_container g3n-backend
   remove_runtime_container g3n-frontend
-  remove_runtime_container g3n-tunnel
 }
 
 if [ -f "$TUNNEL_COMPOSE" ]; then

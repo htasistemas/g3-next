@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.705",
+  "latestVersion": "1.00.706",
   "releaseDate": "2026-07-21",
-  "description": "Importação normaliza campos vazios antes da persistência dos pendentes.",
+  "description": "Deploy mantém nginx e túnel Cloudflare ativos durante a atualização.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.704",
+  "minCompatibleVersion": "1.00.705",
   "releaseType": "stable",
   "downloadUrl": null
 }
