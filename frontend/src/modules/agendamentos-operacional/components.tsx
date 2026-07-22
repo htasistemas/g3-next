@@ -92,12 +92,12 @@ export function ItemSelector(props: {
   carregando?: boolean;
 }) {
   return (
-    <div className="space-y-3">
-      <div className="max-h-72 overflow-auto rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] p-3 shadow-sm">
+    <div className="space-y-3 lg:col-span-2">
+      <div className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-3 shadow-sm">
         {props.carregando ? (
           <p className="px-2 py-6 text-sm text-[var(--g3-muted)]">Carregando itens...</p>
         ) : props.itens.length ? (
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {props.itens.map((item) => {
               const ativo = props.selecionadoId === item.id;
               return (
@@ -105,15 +105,15 @@ export function ItemSelector(props: {
                   key={item.id}
                   type="button"
                   onClick={() => props.onSelect(item)}
-                  className={`rounded-xl border p-4 text-left transition ${
+                  className={`min-w-0 break-words rounded-xl border bg-[var(--g3-card)] p-4 text-center transition ${
                     ativo
                       ? "border-[var(--g3-primary)] bg-[var(--g3-primary-soft)] shadow-md"
-                      : "border-[var(--g3-border)] bg-[var(--g3-card-soft)] hover:border-[var(--g3-primary)] hover:bg-[var(--g3-primary-soft)]/70"
+                      : "border-[var(--g3-primary-soft)] bg-[var(--g3-primary-soft)] hover:border-[var(--g3-primary)] hover:bg-[var(--g3-primary-soft-hover)]"
                   }`}
                 >
                   <p className="font-semibold text-[var(--g3-foreground)]">{item.nome}</p>
                   <p className="mt-2 text-sm text-[var(--g3-muted)]">Profissional: {item.profissionalNome || "Sem profissional definido"}</p>
-                  <div className="mt-3 flex flex-wrap gap-2 text-xs text-[var(--g3-muted)]">
+                  <div className="mt-3 flex flex-wrap justify-center gap-2 text-xs text-[var(--g3-muted)]">
                     <span className="rounded-md bg-[var(--g3-card)] px-2 py-1">Horário: {formatarHorario(item.horario)}</span>
                     <span className="rounded-md bg-[var(--g3-card)] px-2 py-1">Local: {item.local || "Não informado"}</span>
                   </div>
