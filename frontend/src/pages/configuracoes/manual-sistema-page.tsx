@@ -248,7 +248,7 @@ const secoesManual: ManualSecao[] = [
           "No topo da aba operacional, acompanhe primeiro o resumo do card com tipo, item, data e quantidade de beneficiários antes de montar a agenda.",
           "Na área principal, o campo Tipo fica ao lado da grade de itens do tipo selecionado, sem campo adicional de curso, atendimento ou oficina, e os beneficiários vinculados passam a aparecer em grade, lado a lado, para agilizar a marcação.",
           "Ao carregar os beneficiários para a agenda operacional, o sistema prioriza automaticamente os registros de cadastro que já tenham telefone e data de nascimento preenchidos, para evitar que nomes com vínculos incompletos apareçam sem contato ou idade no card.",
-          "Informe a data do agendamento e use Gerar Agenda para salvar a agenda do dia com os participantes agrupados no mesmo card. Não há um segundo botão de salvar: o clique em Gerar Agenda já persiste o card imediatamente.",
+          "Informe a data do agendamento e use Gerar Agenda para salvar a agenda do dia com os participantes agrupados no mesmo card. Não há um segundo botão de salvar: o clique em Gerar Agenda já persiste o card imediatamente. Cada nova combinação de item e tipo cria um novo card na mesma data; a agenda existente só é alterada quando você abrir e editar aquele card específico.",
           "Enquanto a agenda está sendo salva, a tela mostra um indicador de progresso com etapas de validação e gravação, para deixar explícito que a ação está em andamento até o banco confirmar a persistência.",
           "Depois de salvar, o card confirmado pelo backend fica destacado por alguns segundos na listagem para facilitar a conferência visual do resultado.",
           "Na listagem da agenda gerada, use a data em exibição com os botões de avançar e voltar para navegar pelos dias e ver somente os cards agendados naquela data, consultando sempre os registros gravados no PostgreSQL para evitar depender de cache, memória ou estado local.",
@@ -270,7 +270,7 @@ const secoesManual: ManualSecao[] = [
         atencoes: [
           "O agendamento operacional reaproveita dados reais das inscrições; se um beneficiário não estiver vinculado ao item, ele não poderá ser selecionado no card.",
           "Quando o telefone já existir no cadastro do beneficiário, a aba Agendamento e os cards vinculados devem mostrar esse número em vez de exibir Telefone não informado, e o relatório impresso deve usar o mesmo telefone formatado em padrão enxuto. Na ficha de agendamento e no relatório de frequência, a idade sai da coluna separada e passa a aparecer abaixo do nome do beneficiário.",
-          "O sistema impede duplicidade do mesmo beneficiário dentro do mesmo card, valida duplicidade por data, horário, profissional e atendimento, e registra auditoria de criação, edição, cancelamento, exclusão, cópia e envios.",
+          "O sistema impede duplicidade do mesmo beneficiário dentro do mesmo card, mantém cards de cursos, atendimentos e oficinas diferentes na mesma data sem sobreposição, valida duplicidade por data, horário, profissional e atendimento, e registra auditoria de criação, edição, cancelamento, exclusão, cópia e envios.",
           "O envio por WhatsApp prepara links diretos para contato e o envio por e-mail depende de endereço válido cadastrado no participante."
         ]
       },
