@@ -252,6 +252,7 @@ const secoesManual: ManualSecao[] = [
           "Enquanto a agenda está sendo salva, a tela mostra um indicador de progresso com etapas de validação e gravação, para deixar explícito que a ação está em andamento até o banco confirmar a persistência.",
           "Depois de salvar, o card confirmado pelo backend fica destacado por alguns segundos na listagem para facilitar a conferência visual do resultado.",
           "Na listagem da agenda gerada, use a data em exibição com os botões de avançar e voltar para navegar pelos dias e ver somente os cards agendados naquela data, consultando sempre os registros gravados no PostgreSQL para evitar depender de cache, memória ou estado local.",
+          "Agendas legadas que tenham sido gravadas sem os identificadores operacionais são recuperadas pela combinação de data, item, profissional e sala, para que continuem visíveis e editáveis como cards.",
           "Os cards ficam organizados por data e horário, em grade com duas colunas na agenda gerada, com cabeçalho verde, sombreamento visual, uma tarja verde clara para profissional, data, horário e local, lista de beneficiários em formato de tabela e botões compactos em linha única.",
           "Abaixo do nome de cada beneficiário, o card exibe a idade calculada a partir da data de nascimento quando esse dado estiver disponível no cadastro.",
           "O botão de confirmação do beneficiário agora mostra o estado atual e, ao clicar em A confirmar, confirma a agenda e muda o indicador para Confirmado.",

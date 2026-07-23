@@ -644,7 +644,7 @@ export function AgendamentosPage() {
       setGeracaoEtapa((atual) => Math.min(atual + 1, ETAPAS_GERACAO_AGS.length - 2));
     }, 1100);
 
-    const cardExistente = cards.find(
+    const cardExistente = (agendamentosQuery.data ?? []).find(
       (item) =>
         item.itemOrigemId === itemSelecionado.id &&
         item.itemTipo === tipo &&

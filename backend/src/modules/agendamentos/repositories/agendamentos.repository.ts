@@ -2363,7 +2363,28 @@ export class AgendamentosRepository {
         ORDER BY atualizado_em DESC, id DESC
         LIMIT 1
       `);
-      const idExistente = existente[0]?.id;
+      let idExistente = existente[0]?.id;
+
+      // Recupera agendas legadas que foram gravadas antes dos identificadores
+      // operacionais existirem, mas possuem a mesma identidade visível.
+      if (!idExistente) {
+        const legado = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+          SELECT id
+          FROM agendamento
+          WHERE tenant_id::text = ${tenantId}
+            AND data_agendamento = ${formatarData(payload.data)}
+            AND COALESCE(status, '') <> 'Cancelado'
+            AND item_tipo IS NULL
+            AND item_origem_id IS NULL
+            AND LOWER(COALESCE(tipo_atendimento, '')) = LOWER(${payload.tipoAtendimento})
+            AND LOWER(COALESCE(profissional_nome, '')) = LOWER(${payload.profissionalNome})
+            AND LOWER(COALESCE(sala, '')) = LOWER(${payload.sala})
+          ORDER BY atualizado_em DESC, id DESC
+          LIMIT 1
+        `);
+        idExistente = legado[0]?.id;
+      }
+
       if (idExistente) {
         return this.atualizar(idExistente, payload, usuario, tenantId);
       }
