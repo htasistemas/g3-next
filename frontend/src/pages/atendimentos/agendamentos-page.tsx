@@ -432,6 +432,7 @@ export function AgendamentosPage() {
   const [buscaBeneficiario, setBuscaBeneficiario] = useState("");
   const [beneficiariosSelecionados, setBeneficiariosSelecionados] = useState<number[]>([]);
   const [selecionadoId, setSelecionadoId] = useState<number | null>(null);
+  const [agendaEmEdicaoId, setAgendaEmEdicaoId] = useState<number | null>(null);
   const [popup, setPopup] = useState<PopupMensagemState | null>(null);
   const [envioEmAndamento, setEnvioEmAndamento] = useState<EnvioAgendamentoEmAndamento | null>(null);
   const [confirmarCancelar, setConfirmarCancelar] = useState<Agendamento | null>(null);
@@ -608,6 +609,7 @@ export function AgendamentosPage() {
       icon: CalendarRange,
       onClick: () => {
         setSelecionadoId(null);
+        setAgendaEmEdicaoId(null);
         setTipo(undefined);
         setBuscaItem("");
         setItemSelecionado(null);
@@ -644,17 +646,10 @@ export function AgendamentosPage() {
       setGeracaoEtapa((atual) => Math.min(atual + 1, ETAPAS_GERACAO_AGS.length - 2));
     }, 1100);
 
-    const cardExistente = (agendamentosQuery.data ?? []).find(
-      (item) =>
-        item.itemOrigemId === itemSelecionado.id &&
-        item.itemTipo === tipo &&
-        (item.data ?? "").slice(0, 10) === dataAgendamento &&
-        (item.status ?? "").trim().toUpperCase() !== "CANCELADO"
-    );
     const dataExibicao = dataAgendamento;
     try {
       const salvo = await salvarMutation.mutateAsync({
-        id: cardExistente?.id ? String(cardExistente.id) : undefined,
+        id: agendaEmEdicaoId ? String(agendaEmEdicaoId) : undefined,
         tipo,
         itemId: itemSelecionado.id,
         data: dataAgendamento,
@@ -670,9 +665,7 @@ export function AgendamentosPage() {
       setPopup({
         tipo: "sucesso",
         titulo: "Confirmação",
-        texto: cardExistente
-          ? "Agenda já existente atualizada com sucesso. O card foi reaproveitado e deve aparecer na data selecionada."
-          : "Agenda gerada com sucesso."
+        texto: agendaEmEdicaoId ? "Agenda atualizada com sucesso." : "Agenda gerada com sucesso."
       });
       destaqueAgendaTimeout.current = window.setTimeout(() => {
         setUltimaAgendaDestacadaId((atual) => (atual === salvo?.id ? null : atual));
@@ -903,6 +896,7 @@ export function AgendamentosPage() {
   function carregarParaEdicao(item: Agendamento) {
     setAbaAtiva("agenda");
     setSelecionadoId(item.id ?? null);
+    setAgendaEmEdicaoId(item.id ?? null);
     setTipo(item.itemTipo);
     setBuscaItem("");
     setBuscaBeneficiario("");
@@ -1140,6 +1134,7 @@ export function AgendamentosPage() {
                       value={tipo}
                       onChange={(value) => {
                         setTipo(value);
+                        setAgendaEmEdicaoId(null);
                         setItemSelecionado(null);
                         setBeneficiariosSelecionados([]);
                       }}
@@ -1170,6 +1165,7 @@ export function AgendamentosPage() {
                       itens={itensQuery.data ?? []}
                       selecionadoId={itemSelecionado?.id ?? null}
                       onSelect={(item) => {
+                        setAgendaEmEdicaoId(null);
                         setItemSelecionado(item);
                         setBeneficiariosSelecionados([]);
                       }}
@@ -1206,7 +1202,7 @@ export function AgendamentosPage() {
                     disabled={!tipo || !itemSelecionado?.id || !beneficiariosSelecionados.length || !dataAgendamento}
                     loading={salvarMutation.isPending || geracaoEmAndamento}
                     onClick={salvarCard}
-                    texto={cardSelecionado?.id ? "Atualizar agenda" : "Gerar agenda"}
+                    texto={agendaEmEdicaoId ? "Atualizar agenda" : "Gerar agenda"}
                   />
                   {geracaoEmAndamento ? (
                     <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-sm">

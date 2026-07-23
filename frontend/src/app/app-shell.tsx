@@ -689,6 +689,7 @@ const ordemSecoesMenu = [
   "atendimentos",
   "setor-administrativo",
   "financeiro",
+  "setor-vendas",
   "educacional",
   "setor-juridico",
   "portais-acesso",

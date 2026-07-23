@@ -1,6 +1,22 @@
 {
   "entries":  [
                     {
+                        "version": "1.00.684",
+                        "releaseDate": "2026-07-23",
+                        "title": "Menu Vendas e Caixa restaurado",
+                        "description": "O grupo Vendas e Caixa voltou a aparecer no menu principal com suas telas de vendas e eventos.",
+                        "changes": ["Frente de caixa disponível no menu.", "Carteira digital do evento disponível no menu.", "Histórico de vendas disponível no menu."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.683",
+                        "releaseDate": "2026-07-23",
+                        "title": "Criação individual de agendas",
+                        "description": "A geração de agendas operacionais passa a criar um card individual para cada ação, sem sobrescrever agendas existentes.",
+                        "changes": ["Gerar agenda sempre cria um novo card.", "Atualizar agenda só ocorre após abrir um card pelo botão Editar.", "Cursos, atendimentos e oficinas permanecem separados na mesma data."],
+                        "releaseType": "stable"
+                    },
+                    {
                         "version": "1.00.649",
                         "releaseDate": "2026-07-18",
                         "title": "Validação de horário do prontuário",

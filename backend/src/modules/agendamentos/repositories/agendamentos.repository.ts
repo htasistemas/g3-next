@@ -2345,51 +2345,8 @@ export class AgendamentosRepository {
 
   async criarOperacional(input: AgendamentoOperacionalInput, usuario: UsuarioActor | undefined, tenantId: string) {
     const payload = await this.montarPayloadOperacional(input, tenantId);
-
-    // Uma nova geração do mesmo item na mesma data deve reaproveitar o card
-    // correspondente. Itens diferentes continuam sendo sempre novos cards,
-    // mesmo quando pertencem ao mesmo dia.
-    const itemOrigemId = payload.itemOrigemId;
-    const itemTipo = trimOrUndefined(payload.itemTipo);
-    if (itemOrigemId && itemTipo) {
-      const existente = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
-        SELECT id
-        FROM agendamento
-        WHERE tenant_id::text = ${tenantId}
-          AND item_tipo = ${itemTipo}
-          AND item_origem_id = ${BigInt(itemOrigemId)}
-          AND data_agendamento = ${formatarData(payload.data)}
-          AND COALESCE(status, '') <> 'Cancelado'
-        ORDER BY atualizado_em DESC, id DESC
-        LIMIT 1
-      `);
-      let idExistente = existente[0]?.id;
-
-      // Recupera agendas legadas que foram gravadas antes dos identificadores
-      // operacionais existirem, mas possuem a mesma identidade visível.
-      if (!idExistente) {
-        const legado = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
-          SELECT id
-          FROM agendamento
-          WHERE tenant_id::text = ${tenantId}
-            AND data_agendamento = ${formatarData(payload.data)}
-            AND COALESCE(status, '') <> 'Cancelado'
-            AND item_tipo IS NULL
-            AND item_origem_id IS NULL
-            AND LOWER(COALESCE(tipo_atendimento, '')) = LOWER(${payload.tipoAtendimento})
-            AND LOWER(COALESCE(profissional_nome, '')) = LOWER(${payload.profissionalNome})
-            AND LOWER(COALESCE(sala, '')) = LOWER(${payload.sala})
-          ORDER BY atualizado_em DESC, id DESC
-          LIMIT 1
-        `);
-        idExistente = legado[0]?.id;
-      }
-
-      if (idExistente) {
-        return this.atualizar(idExistente, payload, usuario, tenantId);
-      }
-    }
-
+    // Toda chamada de criação gera um novo card. A atualização só ocorre
+    // quando o usuário abre um card existente e envia seu identificador.
     return this.criar(payload, usuario, tenantId);
   }
 
