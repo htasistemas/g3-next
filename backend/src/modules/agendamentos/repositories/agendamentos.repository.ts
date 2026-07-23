@@ -2345,6 +2345,30 @@ export class AgendamentosRepository {
 
   async criarOperacional(input: AgendamentoOperacionalInput, usuario: UsuarioActor | undefined, tenantId: string) {
     const payload = await this.montarPayloadOperacional(input, tenantId);
+
+    // Uma nova geração do mesmo item na mesma data deve reaproveitar o card
+    // correspondente. Itens diferentes continuam sendo sempre novos cards,
+    // mesmo quando pertencem ao mesmo dia.
+    const itemOrigemId = payload.itemOrigemId;
+    const itemTipo = trimOrUndefined(payload.itemTipo);
+    if (itemOrigemId && itemTipo) {
+      const existente = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+        SELECT id
+        FROM agendamento
+        WHERE tenant_id::text = ${tenantId}
+          AND item_tipo = ${itemTipo}
+          AND item_origem_id = ${BigInt(itemOrigemId)}
+          AND data_agendamento = ${formatarData(payload.data)}
+          AND COALESCE(status, '') <> 'Cancelado'
+        ORDER BY atualizado_em DESC, id DESC
+        LIMIT 1
+      `);
+      const idExistente = existente[0]?.id;
+      if (idExistente) {
+        return this.atualizar(idExistente, payload, usuario, tenantId);
+      }
+    }
+
     return this.criar(payload, usuario, tenantId);
   }
 
