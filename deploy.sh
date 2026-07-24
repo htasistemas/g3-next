@@ -137,6 +137,9 @@ reconcile_runtime_containers
 docker compose -f "$APP_COMPOSE" up -d --remove-orphans g3n-db
 wait_healthy g3n-db 120
 
+log "Garantindo que o storage MinIO esteja ativo"
+docker compose -f "$APP_COMPOSE" up -d --remove-orphans g3n-minio
+
 docker compose -f "$APP_COMPOSE" build g3n-backend
 log "Aplicando migrations do PostgreSQL"
 if ! docker compose -f "$APP_COMPOSE" run --rm --no-deps g3n-backend npx prisma migrate deploy; then
