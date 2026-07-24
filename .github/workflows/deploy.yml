@@ -71,7 +71,16 @@ jobs:
           git reset --hard origin/main
           git clean -fd
 
+          ACTUAL_SHA="$(git rev-parse HEAD)"
+          if [ "$ACTUAL_SHA" != "$GITHUB_SHA" ]; then
+            echo "::error::Checkout divergente do commit do workflow. Esperado: $GITHUB_SHA; encontrado: $ACTUAL_SHA"
+            exit 1
+          fi
+          echo "Checkout confirmado no commit $ACTUAL_SHA"
+
       - name: Executar deploy
+        env:
+          GITHUB_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
 

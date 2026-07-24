@@ -181,12 +181,30 @@ if [[ "${DEPLOY_SKIP_GIT_PULL:-0}" != "1" ]] && [[ -d ".git" ]]; then
   git pull --ff-only --autostash
 fi
 
+if [[ -n "${GITHUB_SHA:-}" ]]; then
+  actual_sha="$(git rev-parse HEAD)"
+  if [[ "$actual_sha" != "$GITHUB_SHA" ]]; then
+    log "ERROR: checkout divergente do commit do workflow"
+    log "Esperado: $GITHUB_SHA"
+    log "Encontrado: $actual_sha"
+    exit 1
+  fi
+  log "Checkout confirmado no commit $actual_sha"
+fi
+
 APP_VERSION="$(STATE_VERSION_FILE="$STATE_VERSION_FILE" bash ./scripts/bump-version.sh)"
 log "Version set to $APP_VERSION"
 
 enable_maintenance
 log "Maintenance mode enabled"
 ensure_storage_credentials
+
+log "Validando configuracao do Compose antes da reconciliacao"
+if ! docker compose -f "$APP_COMPOSE" config --quiet; then
+  log "ERROR: configuracao do Compose invalida; containers atuais serao preservados"
+  exit 1
+fi
+log "Configuracao do Compose valida"
 
 # O proxy de borda deve permanecer ativo durante todo o deploy. Com o modo de
 # manutenção habilitado, ele serve maintenance.html enquanto os demais

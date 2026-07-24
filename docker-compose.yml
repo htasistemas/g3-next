@@ -98,6 +98,7 @@ services:
         GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
         VITE_GOOGLE_ALLOWED_ORIGINS: ${VITE_GOOGLE_ALLOWED_ORIGINS:-}
         VITE_API_URL: ${VITE_API_URL:-}
+        GIT_SHA: ${GITHUB_SHA:-unknown}
     container_name: g3n-frontend
     restart: unless-stopped
     environment:
