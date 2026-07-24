@@ -2,6 +2,7 @@ import { httpClient } from "./http-client";
 import type { TenantContextoLogin, UsuarioAutenticado } from "@/types/auth";
 
 type LoginResponse = {
+  token: string;
   usuario: UsuarioAutenticado;
 };
 
@@ -19,7 +20,7 @@ type PreferenciaAgendamentosResponse = {
 
 const STORAGE_KEY = "g3_session";
 
-function persistirSessao(usuario: UsuarioAutenticado) {
+function persistirSessao(token: string, usuario: UsuarioAutenticado) {
   if (typeof window === "undefined") {
     return;
   }
@@ -27,6 +28,7 @@ function persistirSessao(usuario: UsuarioAutenticado) {
   window.sessionStorage.setItem(
     STORAGE_KEY,
     JSON.stringify({
+      token,
       user: usuario
     })
   );
@@ -58,7 +60,7 @@ export const authService = {
       nomeUsuario: input.nomeUsuario,
       senha: input.senha
     });
-    persistirSessao(data.usuario);
+    persistirSessao(data.token, data.usuario);
     return data.usuario;
   },
 
@@ -79,7 +81,7 @@ export const authService = {
       slug: input.slug,
       codigoInstituicao: input.codigoInstituicao
     });
-    persistirSessao(data.usuario);
+    persistirSessao(data.token, data.usuario);
     return data.usuario;
   },
 

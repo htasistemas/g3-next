@@ -3,11 +3,9 @@ import { AppError } from "../../shared/errors/app-error.js";
 
 const LIMITE_BYTES = 25 * 1024 * 1024;
 const LIMITE_LINHAS = 100_000;
-const LIMITE_COLUNAS = 200;
 
 function csvEscape(value: string) {
-  const protegido = /^[=+\-@]/.test(value) ? `'${value}` : value;
-  return `"${protegido.replace(/"/g, '""')}"`;
+  return `"${value.replace(/"/g, '""')}"`;
 }
 
 function parseCsv(texto: string): Record<string, string>[] {
@@ -47,28 +45,16 @@ export function lerArquivoImportacao(buffer: Buffer, nomeArquivo: string) {
     linhas = parseCsv(buffer.toString("utf8"));
   } else {
     try {
-      const workbook = XLSX.read(buffer, {
-        type: "buffer",
-        cellDates: false,
-        raw: false,
-        cellFormula: false,
-        bookVBA: false,
-        sheetRows: LIMITE_LINHAS + 2
-      });
+      const workbook = XLSX.read(buffer, { type: "buffer", cellDates: false, raw: false });
       const primeiraAba = workbook.SheetNames[0];
       if (!primeiraAba) throw new Error("Planilha sem abas.");
-      linhas = XLSX.utils.sheet_to_json<Record<string, string>>(workbook.Sheets[primeiraAba], {
-        defval: ""
-      });
+      linhas = XLSX.utils.sheet_to_json<Record<string, string>>(workbook.Sheets[primeiraAba], { defval: "" });
     } catch {
       throw new AppError("Não foi possível ler a planilha. Verifique se o arquivo não está corrompido.", 422);
     }
   }
   if (!linhas.length) throw new AppError("O arquivo não possui registros após o cabeçalho.", 422);
   if (linhas.length > LIMITE_LINHAS) throw new AppError("O arquivo excede o limite de 100.000 linhas.", 413);
-  if (Object.keys(linhas[0] ?? {}).length > LIMITE_COLUNAS) {
-    throw new AppError("O arquivo excede o limite de 200 colunas.", 413);
-  }
   return { linhas, colunas: Object.keys(linhas[0] ?? []), tamanhoBytes: buffer.length };
 }
 

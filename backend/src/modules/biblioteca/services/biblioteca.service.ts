@@ -5,7 +5,6 @@ import { mapEmprestimoRowToResponse, mapLivroRowToResponse } from "../biblioteca
 import { bibliotecaEmprestimoInputSchema, bibliotecaLivroInputSchema } from "../biblioteca.schema.js";
 import { BibliotecaRepository } from "../repositories/biblioteca.repository.js";
 import type { BibliotecaLivroInput, BibliotecaLivroIsbnConsulta } from "../biblioteca.types.js";
-import { validarUrlRemotaPublica } from "../../../utils/remote-url-security.js";
 
 type OpenLibraryBook = {
   title?: string;
@@ -346,10 +345,8 @@ export class BibliotecaService {
   }
 
   private async baixarImagemRemota(url: string): Promise<ImagemRemota> {
-    const urlSegura = await validarUrlRemotaPublica(url);
-    const response = await fetch(urlSegura, {
+    const response = await fetch(url, {
       signal: AbortSignal.timeout(15000),
-      redirect: "manual",
       headers: {
         "User-Agent": "G3-Next/1.0"
       }
@@ -361,7 +358,7 @@ export class BibliotecaService {
 
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    if (!buffer.length || buffer.length > 10 * 1024 * 1024) {
+    if (!buffer.length) {
       throw new AppError("A capa retornada pelo servico externo esta vazia.", 502);
     }
 

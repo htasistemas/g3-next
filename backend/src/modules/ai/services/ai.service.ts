@@ -80,13 +80,8 @@ type QueryContext = {
   query: string;
   normalizedQuery: string;
   userId?: string;
-  tenantId: string;
   context?: AiContextPayload;
 };
-
-function tenantCondition(alias: string, tenantId: string) {
-  return Prisma.sql`${Prisma.raw(alias)}.tenant_id::text = ${tenantId}`;
-}
 
 type DonationSummaryRow = {
   total_registros: bigint | number;
@@ -468,19 +463,13 @@ export class AiService {
   async processQuery(
     query: string,
     userId?: string,
-    tenantId?: string,
     context?: AiContextPayload,
     userName?: string
   ): Promise<AiResponse> {
-    if (!tenantId?.trim()) {
-      throw new Error("Tenant obrigatório para consultas internas da IA.");
-    }
-
     const ctx: QueryContext = {
       query,
       normalizedQuery: normalizeQuery(query),
       userId,
-      tenantId,
       context
     };
 
@@ -493,51 +482,51 @@ export class AiService {
     }
 
     if (this.isOutdatedFamiliesIntent(ctx.normalizedQuery)) {
-      return this.findOutdatedFamilies(extractDays(ctx.normalizedQuery), ctx.tenantId);
+      return this.findOutdatedFamilies(extractDays(ctx.normalizedQuery));
     }
 
     if (this.isLocationIntent(ctx.normalizedQuery)) {
-      return this.countBeneficiariesByLocation(extractLocation(ctx.normalizedQuery), ctx.tenantId);
+      return this.countBeneficiariesByLocation(extractLocation(ctx.normalizedQuery));
     }
 
     if (this.isAgeRangeIntent(ctx.normalizedQuery)) {
-      return this.countBeneficiariesByAgeRange(extractAgeRange(ctx.normalizedQuery), ctx.tenantId);
+      return this.countBeneficiariesByAgeRange(extractAgeRange(ctx.normalizedQuery));
     }
 
     if (this.isBeneficiarySummaryIntent(ctx.normalizedQuery)) {
-      return this.getBeneficiarySummary(ctx.tenantId);
+      return this.getBeneficiarySummary();
     }
 
     if (this.isAttendanceSummaryIntent(ctx.normalizedQuery)) {
-      return this.getAttendanceSummary(ctx.normalizedQuery, ctx.tenantId);
+      return this.getAttendanceSummary(ctx.normalizedQuery);
     }
 
     if (this.isDonationIntent(ctx.normalizedQuery)) {
       if (this.isInadimplenteIntent(ctx.normalizedQuery)) {
-        return this.getMonthlyDelinquentDonors(ctx.tenantId);
+        return this.getMonthlyDelinquentDonors();
       }
       if (this.isCaptacaoPendingIntent(ctx.normalizedQuery)) {
-        return this.getCaptacaoPendingDonations(ctx.tenantId);
+        return this.getCaptacaoPendingDonations();
       }
-      return this.getDonationsSummary(ctx.tenantId);
+      return this.getDonationsSummary();
     }
 
     if (this.isTaskIntent(ctx.normalizedQuery)) {
       if (this.isResponsibleTaskIntent(ctx.normalizedQuery)) {
-        return this.getTasksByResponsible(extractResponsible(ctx.normalizedQuery), ctx.tenantId);
+        return this.getTasksByResponsible(extractResponsible(ctx.normalizedQuery));
       }
-      return this.getPendingTasksSummary(ctx.tenantId);
+      return this.getPendingTasksSummary();
     }
 
     if (this.isEnrollmentIntent(ctx.normalizedQuery)) {
       if (this.isNoVacancyIntent(ctx.normalizedQuery)) {
-        return this.getCoursesWithoutVacancy(ctx.tenantId);
+        return this.getCoursesWithoutVacancy();
       }
-      return this.getEnrollmentSummary(ctx.tenantId);
+      return this.getEnrollmentSummary();
     }
 
     if (this.isSystemOverviewIntent(ctx.normalizedQuery)) {
-      return this.getSystemOverview(ctx.tenantId);
+      return this.getSystemOverview();
     }
 
     const knowledgeAnswer = findKnowledgeAnswer(ctx.normalizedQuery);
@@ -780,51 +769,73 @@ export class AiService {
     };
   }
 
-  private async findOutdatedFamilies(days: number, tenantId: string): Promise<AiResponse> {
+  private async findOutdatedFamilies(days: number): Promise<AiResponse> {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - days);
 
-    const [beneficiariosCountRows, familiasCountRows, oldestBeneficiarios, oldestFamilias] = await Promise.all([
-      prisma.$queryRaw<Array<{ total: bigint | number }>>(Prisma.sql`
-        SELECT COUNT(*)::BIGINT AS total
-        FROM cadastro_beneficiario b
-        WHERE b.atualizado_em < ${cutoffDate} AND ${tenantCondition("b", tenantId)}
-      `),
-      prisma.$queryRaw<Array<{ total: bigint | number }>>(Prisma.sql`
-        SELECT COUNT(*)::BIGINT AS total
-        FROM vinculo_familiar f
-        WHERE f.atualizado_em < ${cutoffDate} AND ${tenantCondition("f", tenantId)}
-      `),
-      prisma.$queryRaw<Array<{ nome_completo: string; atualizado_em: Date; bairro: string | null }>>(Prisma.sql`
-        SELECT b.nome_completo, b.atualizado_em, e.bairro
-        FROM cadastro_beneficiario b
-        LEFT JOIN endereco e ON e.id = b.endereco_id
-        WHERE b.atualizado_em < ${cutoffDate} AND ${tenantCondition("b", tenantId)}
-        ORDER BY b.atualizado_em ASC
-        LIMIT 3
-      `),
-      prisma.$queryRaw<Array<{ nome_familia: string; atualizado_em: Date; bairro: string | null }>>(Prisma.sql`
-        SELECT f.nome_familia, f.atualizado_em, f.bairro
-        FROM vinculo_familiar f
-        WHERE f.atualizado_em < ${cutoffDate} AND ${tenantCondition("f", tenantId)}
-        ORDER BY f.atualizado_em ASC
-        LIMIT 3
-      `)
+    const [beneficiariosCount, familiasCount, oldestBeneficiarios, oldestFamilias] = await Promise.all([
+      prisma.cadastroBeneficiario.count({
+        where: {
+          atualizadoEm: {
+            lt: cutoffDate
+          }
+        }
+      }),
+      prisma.vinculoFamiliar.count({
+        where: {
+          atualizadoEm: {
+            lt: cutoffDate
+          }
+        }
+      }),
+      prisma.cadastroBeneficiario.findMany({
+        where: {
+          atualizadoEm: {
+            lt: cutoffDate
+          }
+        },
+        select: {
+          nomeCompleto: true,
+          atualizadoEm: true,
+          endereco: {
+            select: {
+              bairro: true
+            }
+          }
+        },
+        take: 3,
+        orderBy: {
+          atualizadoEm: "asc"
+        }
+      }),
+      prisma.vinculoFamiliar.findMany({
+        where: {
+          atualizadoEm: {
+            lt: cutoffDate
+          }
+        },
+        select: {
+          nomeFamilia: true,
+          bairro: true,
+          atualizadoEm: true
+        },
+        take: 3,
+        orderBy: {
+          atualizadoEm: "asc"
+        }
+      })
     ]);
 
-    const beneficiariosCount = bigintToNumber(beneficiariosCountRows[0]?.total);
-    const familiasCount = bigintToNumber(familiasCountRows[0]?.total);
-
     const exemplosBeneficiarios = oldestBeneficiarios.map((item) => ({
-      nome: item.nome_completo,
-      bairro: item.bairro ?? "-",
-      ultimaAtualizacao: formatDate(item.atualizado_em)
+      nome: item.nomeCompleto,
+      bairro: item.endereco?.bairro ?? "-",
+      ultimaAtualizacao: formatDate(item.atualizadoEm)
     }));
 
     const exemplosFamilias = oldestFamilias.map((item) => ({
-      nome: item.nome_familia,
+      nome: item.nomeFamilia,
       bairro: item.bairro ?? "-",
-      ultimaAtualizacao: formatDate(item.atualizado_em)
+      ultimaAtualizacao: formatDate(item.atualizadoEm)
     }));
 
     let answer =
@@ -861,7 +872,7 @@ export class AiService {
     };
   }
 
-  private async countBeneficiariesByLocation(location: string | null, tenantId: string): Promise<AiResponse> {
+  private async countBeneficiariesByLocation(location: string | null): Promise<AiResponse> {
     if (!location) {
       return {
         intent: "BENEFICIARIOS_POR_LOCAL",
@@ -871,33 +882,48 @@ export class AiService {
       };
     }
 
-    const termo = `%${location}%`;
-    const [countRows, exemplos] = await Promise.all([
-      prisma.$queryRaw<Array<{ total: bigint | number }>>(Prisma.sql`
-        SELECT COUNT(*)::BIGINT AS total
-        FROM cadastro_beneficiario b
-        LEFT JOIN endereco e ON e.id = b.endereco_id
-        WHERE ${tenantCondition("b", tenantId)}
-          AND (e.bairro ILIKE ${termo} OR e.cidade ILIKE ${termo} OR e.zona ILIKE ${termo} OR e.subzona ILIKE ${termo})
-      `),
-      prisma.$queryRaw<Array<{ nome_completo: string; bairro: string | null; cidade: string | null; zona: string | null }>>(Prisma.sql`
-        SELECT b.nome_completo, e.bairro, e.cidade, e.zona
-        FROM cadastro_beneficiario b
-        LEFT JOIN endereco e ON e.id = b.endereco_id
-        WHERE ${tenantCondition("b", tenantId)}
-          AND (e.bairro ILIKE ${termo} OR e.cidade ILIKE ${termo} OR e.zona ILIKE ${termo} OR e.subzona ILIKE ${termo})
-        ORDER BY b.nome_completo ASC
-        LIMIT 5
-      `)
-    ]);
-    const count = bigintToNumber(countRows[0]?.total);
+    const count = await prisma.cadastroBeneficiario.count({
+      where: {
+        OR: [
+          { endereco: { bairro: { contains: location, mode: "insensitive" } } },
+          { endereco: { cidade: { contains: location, mode: "insensitive" } } },
+          { endereco: { zona: { contains: location, mode: "insensitive" } } },
+          { endereco: { subzona: { contains: location, mode: "insensitive" } } }
+        ]
+      }
+    });
+
+    const exemplos = await prisma.cadastroBeneficiario.findMany({
+      where: {
+        OR: [
+          { endereco: { bairro: { contains: location, mode: "insensitive" } } },
+          { endereco: { cidade: { contains: location, mode: "insensitive" } } },
+          { endereco: { zona: { contains: location, mode: "insensitive" } } },
+          { endereco: { subzona: { contains: location, mode: "insensitive" } } }
+        ]
+      },
+      select: {
+        nomeCompleto: true,
+        endereco: {
+          select: {
+            bairro: true,
+            cidade: true,
+            zona: true
+          }
+        }
+      },
+      take: 5,
+      orderBy: {
+        nomeCompleto: "asc"
+      }
+    });
 
     let answer = `Encontrei **${count} beneficiários** associados à localização **${location}**.\n\n`;
 
     if (exemplos.length > 0) {
       answer += "**Exemplos:**\n";
       for (const item of exemplos) {
-        answer += `- ${item.nome_completo} | bairro: ${item.bairro ?? "-"} | cidade: ${item.cidade ?? "-"}\n`;
+        answer += `- ${item.nomeCompleto} | bairro: ${item.endereco?.bairro ?? "-"} | cidade: ${item.endereco?.cidade ?? "-"}\n`;
       }
     }
 
@@ -908,10 +934,10 @@ export class AiService {
         ["cadastro_beneficiario", "endereco"],
         { totalBeneficiarios: count, local: location },
         exemplos.map((item) => ({
-          nome: item.nome_completo,
-          bairro: item.bairro ?? "-",
-          cidade: item.cidade ?? "-",
-          zona: item.zona ?? "-"
+          nome: item.nomeCompleto,
+          bairro: item.endereco?.bairro ?? "-",
+          cidade: item.endereco?.cidade ?? "-",
+          zona: item.endereco?.zona ?? "-"
         })),
         { local: location }
       )
@@ -919,8 +945,7 @@ export class AiService {
   }
 
   private async countBeneficiariesByAgeRange(
-    faixa: { label: string; min: number; max: number } | null,
-    tenantId: string
+    faixa: { label: string; min: number; max: number } | null
   ): Promise<AiResponse> {
     if (!faixa) {
       return {
@@ -933,10 +958,9 @@ export class AiService {
 
     const countRows = await prisma.$queryRaw<Array<{ total: bigint | number }>>(Prisma.sql`
       SELECT COUNT(*)::BIGINT AS total
-      FROM cadastro_beneficiario b
+      FROM cadastro_beneficiario
       WHERE data_nascimento IS NOT NULL
         AND DATE_PART('year', AGE(CURRENT_DATE, data_nascimento)) BETWEEN ${faixa.min} AND ${faixa.max}
-        AND ${tenantCondition("b", tenantId)}
     `);
 
     const exemplos = await prisma.$queryRaw<
@@ -950,7 +974,6 @@ export class AiService {
       LEFT JOIN endereco e ON e.id = b.endereco_id
       WHERE b.data_nascimento IS NOT NULL
         AND DATE_PART('year', AGE(CURRENT_DATE, b.data_nascimento)) BETWEEN ${faixa.min} AND ${faixa.max}
-        AND ${tenantCondition("b", tenantId)}
       ORDER BY b.nome_completo ASC
       LIMIT 5
     `);
@@ -981,37 +1004,41 @@ export class AiService {
     };
   }
 
-  private async getBeneficiarySummary(tenantId: string): Promise<AiResponse> {
-    const [totalRows, ativosRows, semEnderecoRows, comFamilia, exemplosPendentes] = await Promise.all([
-      prisma.$queryRaw<Array<{ total: bigint | number }>>(Prisma.sql`
-        SELECT COUNT(*)::BIGINT AS total FROM cadastro_beneficiario b WHERE ${tenantCondition("b", tenantId)}
-      `),
-      prisma.$queryRaw<Array<{ total: bigint | number }>>(Prisma.sql`
-        SELECT COUNT(*)::BIGINT AS total FROM cadastro_beneficiario b
-        WHERE LOWER(COALESCE(b.status, '')) = 'ativo' AND ${tenantCondition("b", tenantId)}
-      `),
-      prisma.$queryRaw<Array<{ total: bigint | number }>>(Prisma.sql`
-        SELECT COUNT(*)::BIGINT AS total FROM cadastro_beneficiario b
-        WHERE b.endereco_id IS NULL AND ${tenantCondition("b", tenantId)}
-      `),
+  private async getBeneficiarySummary(): Promise<AiResponse> {
+    const [totalBeneficiarios, ativos, semEndereco, comFamilia, exemplosPendentes] = await Promise.all([
+      prisma.cadastroBeneficiario.count(),
+      prisma.cadastroBeneficiario.count({
+        where: {
+          status: {
+            equals: "ATIVO",
+            mode: "insensitive"
+          }
+        }
+      }),
+      prisma.cadastroBeneficiario.count({
+        where: {
+          enderecoId: null
+        }
+      }),
       prisma.$queryRaw<Array<{ total: bigint | number }>>(Prisma.sql`
         SELECT COUNT(DISTINCT m.beneficiario_id)::BIGINT AS total
         FROM vinculo_familiar_membro m
-        WHERE ${tenantCondition("m", tenantId)}
       `),
-      prisma.$queryRaw<Array<{ nome_completo: string; status: string | null; codigo: string | null }>>(Prisma.sql`
-        SELECT b.nome_completo, b.status, b.codigo
-        FROM cadastro_beneficiario b
-        WHERE ${tenantCondition("b", tenantId)}
-          AND (b.endereco_id IS NULL OR b.status IS NULL OR b.status = '')
-        ORDER BY b.nome_completo ASC
-        LIMIT 5
-      `)
+      prisma.cadastroBeneficiario.findMany({
+        where: {
+          OR: [{ enderecoId: null }, { status: null }, { status: "" }]
+        },
+        select: {
+          nomeCompleto: true,
+          status: true,
+          codigo: true
+        },
+        take: 5,
+        orderBy: {
+          nomeCompleto: "asc"
+        }
+      })
     ]);
-
-    const totalBeneficiarios = bigintToNumber(totalRows[0]?.total);
-    const ativos = bigintToNumber(ativosRows[0]?.total);
-    const semEndereco = bigintToNumber(semEnderecoRows[0]?.total);
 
     const totalComFamilia = bigintToNumber(comFamilia[0]?.total);
     const totalInativos = Math.max(totalBeneficiarios - ativos, 0);
@@ -1052,7 +1079,7 @@ export class AiService {
           comFamilia: totalComFamilia
         },
         exemplosPendentes.map((item) => ({
-          nome: item.nome_completo,
+          nome: item.nomeCompleto,
           codigo: item.codigo ?? "-",
           status: item.status ?? "Sem status"
         })),
@@ -1061,7 +1088,7 @@ export class AiService {
     };
   }
 
-  private async getAttendanceSummary(normalizedQuery: string, tenantId: string): Promise<AiResponse> {
+  private async getAttendanceSummary(normalizedQuery: string): Promise<AiResponse> {
     const periodo = resolveReferencePeriod(normalizedQuery);
     const hoje = new Date();
     const inicioHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
@@ -1078,15 +1105,13 @@ export class AiService {
         SELECT
           COUNT(*) FILTER (WHERE data_hora >= ${inicioHoje} AND data_hora < ${inicioAmanha})::BIGINT AS total_hoje,
           COUNT(*) FILTER (WHERE data_hora >= ${inicioMes})::BIGINT AS total_mes
-        FROM central_atendimento c
-        WHERE ${tenantCondition("c", tenantId)}
+        FROM central_atendimento
       `),
       prisma.$queryRaw<AtendimentoResumoRow[]>(Prisma.sql`
         SELECT
           COUNT(*) FILTER (WHERE data_visita >= ${inicioHoje} AND data_visita < ${inicioAmanha})::BIGINT AS total_hoje,
           COUNT(*) FILTER (WHERE data_visita >= ${inicioMes})::BIGINT AS total_mes
-        FROM visita_domiciliar v
-        WHERE ${tenantCondition("v", tenantId)}
+        FROM visita_domiciliar
       `),
       prisma.$queryRaw<AtendimentoResumoRow[]>(Prisma.sql`
         SELECT
@@ -1099,17 +1124,15 @@ export class AiService {
             WHERE data_agendamento >= ${inicioMes}
               AND COALESCE(status, '') <> 'Cancelado'
           )::BIGINT AS total_mes
-        FROM agendamento a
-        WHERE ${tenantCondition("a", tenantId)}
+        FROM agendamento
       `),
       prisma.$queryRaw<
         Array<{ status: string | null; total: bigint | number }>
       >(Prisma.sql`
         SELECT COALESCE(NULLIF(TRIM(status), ''), 'Sem status') AS status, COUNT(*)::BIGINT AS total
-        FROM agendamento a
-        WHERE ${tenantCondition("a", tenantId)}
-          AND a.data_agendamento >= ${intervaloInicio}
-          AND a.data_agendamento < ${intervaloFim}
+        FROM agendamento
+        WHERE data_agendamento >= ${intervaloInicio}
+          AND data_agendamento < ${intervaloFim}
         GROUP BY COALESCE(NULLIF(TRIM(status), ''), 'Sem status')
         ORDER BY total DESC, status ASC
         LIMIT 5
@@ -1118,10 +1141,9 @@ export class AiService {
         Array<{ tipo: string | null; total: bigint | number }>
       >(Prisma.sql`
         SELECT COALESCE(NULLIF(TRIM(tipo_atendimento), ''), 'Sem tipo definido') AS tipo, COUNT(*)::BIGINT AS total
-        FROM agendamento a
-        WHERE ${tenantCondition("a", tenantId)}
-          AND a.data_agendamento >= ${intervaloInicio}
-          AND a.data_agendamento < ${intervaloFim}
+        FROM agendamento
+        WHERE data_agendamento >= ${intervaloInicio}
+          AND data_agendamento < ${intervaloFim}
         GROUP BY COALESCE(NULLIF(TRIM(tipo_atendimento), ''), 'Sem tipo definido')
         ORDER BY total DESC, tipo ASC
         LIMIT 5
@@ -1205,7 +1227,7 @@ export class AiService {
     };
   }
 
-  private async getDonationsSummary(tenantId: string): Promise<AiResponse> {
+  private async getDonationsSummary(): Promise<AiResponse> {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
@@ -1214,9 +1236,8 @@ export class AiService {
         SELECT
           COUNT(*)::bigint AS total_registros,
           COALESCE(SUM(COALESCE(valor_total, valor, 0)), 0) AS total_valor
-        FROM recebimento_doacao r
-        WHERE r.data_recebimento >= ${startOfMonth}
-          AND ${tenantCondition("r", tenantId)}
+        FROM recebimento_doacao
+        WHERE data_recebimento >= ${startOfMonth}
       `),
       prisma.$queryRaw<DonationTopDonorRow[]>(Prisma.sql`
         SELECT
@@ -1225,7 +1246,6 @@ export class AiService {
         FROM recebimento_doacao r
         LEFT JOIN doador d ON d.id = r.doador_id
         WHERE r.data_recebimento >= ${startOfMonth}
-          AND ${tenantCondition("r", tenantId)}
         GROUP BY d.nome
         ORDER BY total DESC, nome ASC
         LIMIT 3
@@ -1264,14 +1284,13 @@ export class AiService {
     };
   }
 
-  private async getPendingTasksSummary(tenantId: string): Promise<AiResponse> {
+  private async getPendingTasksSummary(): Promise<AiResponse> {
     const [summaryRows, tasks] = await Promise.all([
       prisma.$queryRaw<PendingTaskSummaryRow[]>(Prisma.sql`
         SELECT
           COUNT(*) FILTER (WHERE status IS DISTINCT FROM 'Concluida')::BIGINT AS total_pendentes,
           COUNT(*) FILTER (WHERE COALESCE(status, '') = 'Em atraso')::BIGINT AS total_em_atraso
-        FROM tarefas_pendencias t
-        WHERE ${tenantCondition("t", tenantId)}
+        FROM tarefas_pendencias
       `),
       prisma.$queryRaw<PendingTaskItemRow[]>(Prisma.sql`
         SELECT
@@ -1280,9 +1299,8 @@ export class AiService {
           prioridade,
           status,
           prazo
-        FROM tarefas_pendencias t
-        WHERE ${tenantCondition("t", tenantId)}
-          AND t.status IS DISTINCT FROM 'Concluida'
+        FROM tarefas_pendencias
+        WHERE status IS DISTINCT FROM 'Concluida'
         ORDER BY
           CASE WHEN COALESCE(status, '') = 'Em atraso' THEN 0 ELSE 1 END,
           prazo ASC NULLS LAST,
@@ -1325,7 +1343,7 @@ export class AiService {
     };
   }
 
-  private async getTasksByResponsible(responsavel: string | null, tenantId: string): Promise<AiResponse> {
+  private async getTasksByResponsible(responsavel: string | null): Promise<AiResponse> {
     if (!responsavel) {
       return {
         intent: "TAREFAS_POR_RESPONSAVEL",
@@ -1341,10 +1359,9 @@ export class AiService {
         prioridade,
         status,
         prazo
-      FROM tarefas_pendencias t
-      WHERE ${tenantCondition("t", tenantId)}
-        AND t.status IS DISTINCT FROM 'Concluida'
-        AND COALESCE(t.responsavel, '') ILIKE ${`%${responsavel}%`}
+      FROM tarefas_pendencias
+      WHERE status IS DISTINCT FROM 'Concluida'
+        AND COALESCE(responsavel, '') ILIKE ${`%${responsavel}%`}
       ORDER BY
         CASE WHEN COALESCE(status, '') = 'Em atraso' THEN 0 ELSE 1 END,
         prazo ASC NULLS LAST,
@@ -1378,29 +1395,27 @@ export class AiService {
     };
   }
 
-  private async getEnrollmentSummary(tenantId: string): Promise<AiResponse> {
+  private async getEnrollmentSummary(): Promise<AiResponse> {
     const [summaryRows, spotlightRows] = await Promise.all([
       prisma.$queryRaw<EnrollmentSummaryRow[]>(Prisma.sql`
         SELECT
           COUNT(*)::BIGINT AS cursos_no_catalogo,
           COALESCE(SUM(COALESCE(c.vagas_totais, 0)), 0)::BIGINT AS total_vagas,
           COALESCE(SUM(COALESCE(c.vagas_disponiveis, 0)), 0)::BIGINT AS vagas_disponiveis,
-          (SELECT COUNT(*)::BIGINT FROM cursos_atendimentos_matriculas m WHERE ${tenantCondition("m", tenantId)}) AS inscricoes_ativas,
-          (SELECT COUNT(*)::BIGINT FROM cursos_atendimentos_fila_espera f WHERE ${tenantCondition("f", tenantId)}) AS total_fila_espera
+          (SELECT COUNT(*)::BIGINT FROM cursos_atendimentos_matriculas) AS inscricoes_ativas,
+          (SELECT COUNT(*)::BIGINT FROM cursos_atendimentos_fila_espera) AS total_fila_espera
         FROM cursos_atendimentos c
-        WHERE ${tenantCondition("c", tenantId)}
       `),
       prisma.$queryRaw<EnrollmentSpotlightRow[]>(Prisma.sql`
         SELECT
           c.nome,
           c.vagas_disponiveis,
           c.vagas_totais,
-          (SELECT COUNT(*)::BIGINT FROM cursos_atendimentos_matriculas m WHERE m.curso_id = c.id AND ${tenantCondition("m", tenantId)}) AS total_matriculas,
-          (SELECT COUNT(*)::BIGINT FROM cursos_atendimentos_fila_espera f WHERE f.curso_id = c.id AND ${tenantCondition("f", tenantId)}) AS total_fila_espera
+          (SELECT COUNT(*)::BIGINT FROM cursos_atendimentos_matriculas m WHERE m.curso_id = c.id) AS total_matriculas,
+          (SELECT COUNT(*)::BIGINT FROM cursos_atendimentos_fila_espera f WHERE f.curso_id = c.id) AS total_fila_espera
         FROM cursos_atendimentos c
-        WHERE ${tenantCondition("c", tenantId)}
         ORDER BY
-          (SELECT COUNT(*) FROM cursos_atendimentos_fila_espera f WHERE f.curso_id = c.id AND ${tenantCondition("f", tenantId)}) DESC,
+          (SELECT COUNT(*) FROM cursos_atendimentos_fila_espera f WHERE f.curso_id = c.id) DESC,
           c.nome ASC
         LIMIT 5
       `)
@@ -1451,19 +1466,18 @@ export class AiService {
     };
   }
 
-  private async getCoursesWithoutVacancy(tenantId: string): Promise<AiResponse> {
+  private async getCoursesWithoutVacancy(): Promise<AiResponse> {
     const rows = await prisma.$queryRaw<EnrollmentSpotlightRow[]>(Prisma.sql`
       SELECT
         c.nome,
         c.vagas_disponiveis,
         c.vagas_totais,
-        (SELECT COUNT(*)::BIGINT FROM cursos_atendimentos_matriculas m WHERE m.curso_id = c.id AND ${tenantCondition("m", tenantId)}) AS total_matriculas,
-        (SELECT COUNT(*)::BIGINT FROM cursos_atendimentos_fila_espera f WHERE f.curso_id = c.id AND ${tenantCondition("f", tenantId)}) AS total_fila_espera
+        (SELECT COUNT(*)::BIGINT FROM cursos_atendimentos_matriculas m WHERE m.curso_id = c.id) AS total_matriculas,
+        (SELECT COUNT(*)::BIGINT FROM cursos_atendimentos_fila_espera f WHERE f.curso_id = c.id) AS total_fila_espera
       FROM cursos_atendimentos c
-      WHERE ${tenantCondition("c", tenantId)}
-        AND COALESCE(c.vagas_disponiveis, 0) <= 0
+      WHERE COALESCE(c.vagas_disponiveis, 0) <= 0
       ORDER BY
-        (SELECT COUNT(*) FROM cursos_atendimentos_fila_espera f WHERE f.curso_id = c.id AND ${tenantCondition("f", tenantId)}) DESC,
+        (SELECT COUNT(*) FROM cursos_atendimentos_fila_espera f WHERE f.curso_id = c.id) DESC,
         c.nome ASC
       LIMIT 10
     `);
@@ -1492,16 +1506,15 @@ export class AiService {
     };
   }
 
-  private async getCaptacaoPendingDonations(tenantId: string): Promise<AiResponse> {
+  private async getCaptacaoPendingDonations(): Promise<AiResponse> {
     const [summaryRows, items] = await Promise.all([
       prisma.$queryRaw<CaptacaoPendingSummaryRow[]>(Prisma.sql`
         SELECT
           COUNT(*)::BIGINT AS total_pendentes,
           COALESCE(SUM(COALESCE(valor_liquido, valor, 0)), 0)::DOUBLE PRECISION AS total_valor
-        FROM captacao_doacoes d
-        WHERE ${tenantCondition("d", tenantId)}
-          AND d.deleted_at IS NULL
-          AND d.situacao IN ('pendente', 'aguardando_pagamento')
+        FROM captacao_doacoes
+        WHERE deleted_at IS NULL
+          AND situacao IN ('pendente', 'aguardando_pagamento')
       `),
       prisma.$queryRaw<CaptacaoPendingItemRow[]>(Prisma.sql`
         SELECT
@@ -1512,8 +1525,7 @@ export class AiService {
           d.data_hora
         FROM captacao_doacoes d
         LEFT JOIN captacao_doadores doadores ON doadores.id = d.doador_id
-        WHERE ${tenantCondition("d", tenantId)}
-          AND d.deleted_at IS NULL
+        WHERE d.deleted_at IS NULL
           AND d.situacao IN ('pendente', 'aguardando_pagamento')
         ORDER BY d.data_hora DESC NULLS LAST, d.id DESC
         LIMIT 5
@@ -1554,7 +1566,7 @@ export class AiService {
     };
   }
 
-  private async getMonthlyDelinquentDonors(tenantId: string): Promise<AiResponse> {
+  private async getMonthlyDelinquentDonors(): Promise<AiResponse> {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
@@ -1572,8 +1584,7 @@ export class AiService {
         COUNT(*)::BIGINT AS quantidade
       FROM captacao_doacoes d
       LEFT JOIN captacao_doadores doadores ON doadores.id = d.doador_id
-      WHERE ${tenantCondition("d", tenantId)}
-        AND d.deleted_at IS NULL
+      WHERE d.deleted_at IS NULL
         AND d.data_hora >= ${startOfMonth}
         AND d.data_hora < ${endOfMonth}
         AND (
@@ -1609,27 +1620,17 @@ export class AiService {
     };
   }
 
-  private async getSystemOverview(tenantId: string): Promise<AiResponse> {
-    const [beneficiariosRows, familiasRows, usuariosRows, doadores] = await Promise.all([
-      prisma.$queryRaw<Array<{ total: bigint | number }>>(Prisma.sql`
-        SELECT COUNT(*)::BIGINT AS total FROM cadastro_beneficiario b WHERE ${tenantCondition("b", tenantId)}
-      `),
-      prisma.$queryRaw<Array<{ total: bigint | number }>>(Prisma.sql`
-        SELECT COUNT(*)::BIGINT AS total FROM vinculo_familiar f WHERE ${tenantCondition("f", tenantId)}
-      `),
-      prisma.$queryRaw<Array<{ total: bigint | number }>>(Prisma.sql`
-        SELECT COUNT(*)::BIGINT AS total FROM usuarios u WHERE ${tenantCondition("u", tenantId)}
-      `),
+  private async getSystemOverview(): Promise<AiResponse> {
+    const [beneficiarios, familias, usuarios, doadores] = await Promise.all([
+      prisma.cadastroBeneficiario.count(),
+      prisma.vinculoFamiliar.count(),
+      prisma.usuario.count(),
       prisma.$queryRaw<Array<{ total: bigint | number }>>(Prisma.sql`
         SELECT COUNT(*)::bigint AS total
-        FROM doador d
-        WHERE ${tenantCondition("d", tenantId)}
+        FROM doador
       `)
     ]);
 
-    const beneficiarios = bigintToNumber(beneficiariosRows[0]?.total);
-    const familias = bigintToNumber(familiasRows[0]?.total);
-    const usuarios = bigintToNumber(usuariosRows[0]?.total);
     const totalDoadores = bigintToNumber(doadores[0]?.total);
 
     return {

@@ -14,16 +14,6 @@ Comando recomendado:
 bash ./deploy.sh
 ```
 
-O deploy não executa migrations por padrão. Para aplicar migrations, revise o impacto e execute explicitamente:
-
-```bash
-DEPLOY_RUN_MIGRATIONS=1 bash ./deploy.sh
-```
-
-O arquivo `.env` de produção deve definir explicitamente as credenciais do PostgreSQL, MinIO, SMTP, CORS e o segredo JWT. O `docker-compose.yml` não fornece credenciais padrão para esses serviços.
-
-Em escala horizontal, mantenha os schedulers em apenas uma instância e defina `APP_RUN_SCHEDULERS=false` nas instâncias de API sem função de worker.
-
 O deploy oficial atualiza o checkout Git com `git pull --ff-only --autostash` antes do build. Se houver conflito real no servidor, o deploy para em vez de publicar uma versão antiga ou misturada.
 
 Modo manutencao:

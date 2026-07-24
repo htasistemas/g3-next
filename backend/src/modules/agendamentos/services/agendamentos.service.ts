@@ -40,11 +40,8 @@ export class AgendamentosService {
   async criar(rawInput: unknown, usuario?: UsuarioActor, tenantId?: string, instituicaoSlug?: string) {
     const tenantObrigatorio = this.resolverTenantId(tenantId, instituicaoSlug);
     const body = rawInput as Record<string, unknown>;
-    if (body && "itemId" in body && "tipo" in body && ("beneficiariosIds" in body || "matriculasIds" in body || body.formaAgendamento === "HORARIO")) {
+    if (body && "itemId" in body && "tipo" in body && ("beneficiariosIds" in body || "matriculasIds" in body)) {
       const input = agendamentoOperacionalInputSchema.parse(rawInput);
-      if (input.formaAgendamento === "HORARIO") {
-        return this.repository.criarOperacional(input, usuario, tenantObrigatorio);
-      }
       if (input.id) {
         return this.repository.atualizarOperacional(this.parseId(input.id), input, usuario, tenantObrigatorio);
       }
@@ -140,11 +137,6 @@ export class AgendamentosService {
       throw new AppError("Item operacional invalido.", 400);
     }
     return this.repository.listarBeneficiariosOperacionais(BigInt(itemId), this.resolverTenantId(tenantId, instituicaoSlug));
-  }
-
-  async listarBeneficiariosCadastro(rawBusca: unknown, tenantId?: string, instituicaoSlug?: string) {
-    const busca = typeof rawBusca === "string" ? rawBusca.trim() : undefined;
-    return this.repository.listarBeneficiariosCadastro(busca, this.resolverTenantId(tenantId, instituicaoSlug));
   }
 
   async notificar(rawId: string, rawBody: unknown, usuario?: UsuarioActor, tenantId?: string, instituicaoSlug?: string) {

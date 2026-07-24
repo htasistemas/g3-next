@@ -97,16 +97,12 @@ async function bootstrap() {
       }
     }
     void aquecerEstruturasDeTela();
-    if (process.env.APP_RUN_SCHEDULERS !== "false") {
-      iniciarAtualizacaoSistemaScheduler();
-      iniciarDatasComemorativasScheduler();
-      iniciarDocumentosInstituicaoScheduler();
-      iniciarLicencaUsoScheduler();
-      iniciarBackupImagensScheduler();
-      iniciarBackupArquivosScheduler();
-    } else {
-      console.log("[g3n-backend-node] schedulers desabilitados por APP_RUN_SCHEDULERS=false");
-    }
+    iniciarAtualizacaoSistemaScheduler();
+    iniciarDatasComemorativasScheduler();
+    iniciarDocumentosInstituicaoScheduler();
+    iniciarLicencaUsoScheduler();
+    iniciarBackupImagensScheduler();
+    iniciarBackupArquivosScheduler();
   });
 }
 

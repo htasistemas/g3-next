@@ -6,7 +6,6 @@ ARG VITE_GOOGLE_CLIENT_ID
 ARG GOOGLE_CLIENT_ID
 ARG VITE_GOOGLE_ALLOWED_ORIGINS
 ARG VITE_API_URL=""
-ARG GIT_SHA=unknown
 
 ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
 ENV GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID
@@ -23,13 +22,10 @@ RUN if [ -z "$VITE_GOOGLE_CLIENT_ID" ] && [ -n "$GOOGLE_CLIENT_ID" ]; then expor
 
 FROM nginx:1.27-alpine
 
-ARG GIT_SHA=unknown
-
 RUN apk add --no-cache python3 wget gettext
 
 COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /usr/src/app/dist/ /usr/share/nginx/html/
-RUN printf '{"commit":"%s"}\n' "$GIT_SHA" > /usr/share/nginx/html/build-info.json
 COPY frontend/env-config.js /usr/share/nginx/html/env-config.js
 COPY frontend/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

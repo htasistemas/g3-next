@@ -72,20 +72,10 @@ log "Health OK: $(cat /tmp/g3n-health.json)"
 
 log "Checando frontend em $FRONTEND_URL/"
 frontend_status="$(curl -sS -o /tmp/g3n-frontend.html -w '%{http_code}' "$FRONTEND_URL/")"
-  if [ "$frontend_status" != "200" ]; then
+if [ "$frontend_status" != "200" ]; then
   fail "Falha no frontend (HTTP $frontend_status)"
 fi
 log "Frontend OK"
-
-if [ -n "${GITHUB_SHA:-}" ]; then
-  log "Verificando commit do frontend publicado"
-  build_info="$(curl -sS -H 'Cache-Control: no-cache' "$FRONTEND_URL/build-info.json" || true)"
-  if ! printf '%s' "$build_info" | grep -q "\"commit\":\"$GITHUB_SHA\""; then
-    fail "Frontend publicado com commit divergente. Esperado: $GITHUB_SHA; resposta: $build_info"
-  fi
-  log "Frontend publicado no commit $GITHUB_SHA"
-fi
-
 checar_login_atual "$FRONTEND_URL" "local"
 if [ "$PUBLIC_FRONTEND_URL" != "$FRONTEND_URL" ]; then
   checar_login_atual "$PUBLIC_FRONTEND_URL" "publico"

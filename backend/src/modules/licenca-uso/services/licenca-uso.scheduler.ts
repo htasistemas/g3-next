@@ -3,7 +3,6 @@ import { LicencaUsoService } from "./licenca-uso.service.js";
 
 let schedulerInicializado = false;
 let intervaloScheduler: NodeJS.Timeout | null = null;
-let executando = false;
 
 export function iniciarLicencaUsoScheduler(intervaloMs = 12 * 60 * 60 * 1000) {
   if (schedulerInicializado) return;
@@ -12,19 +11,12 @@ export function iniciarLicencaUsoScheduler(intervaloMs = 12 * 60 * 60 * 1000) {
   const service = new LicencaUsoService();
 
   const executar = async () => {
-    if (executando) return;
-    executando = true;
-    if (!env.APP_EMAIL_HABILITADO) {
-      executando = false;
-      return;
-    }
+    if (!env.APP_EMAIL_HABILITADO) return;
 
     try {
       await service.processarAlertasEmailPendentes();
     } catch (error) {
       console.error("[g3n-backend-node] falha no scheduler de licenca de uso", error);
-    } finally {
-      executando = false;
     }
   };
 
@@ -40,5 +32,4 @@ export function pararLicencaUsoScheduler() {
     intervaloScheduler = null;
   }
   schedulerInicializado = false;
-  executando = false;
 }

@@ -1,7 +1,7 @@
 {
-  "latestVersion": "1.00.710",
-  "releaseDate": "2026-07-24",
-  "description": "Corrige persistência, identidade, conflitos, carregamento e desempenho das agendas operacionais.",
+  "latestVersion": "1.00.706",
+  "releaseDate": "2026-07-21",
+  "description": "Deploy mantém nginx e túnel Cloudflare ativos durante a atualização.",
   "packageName": "",
   "checksum": "",
   "minCompatibleVersion": "1.00.705",

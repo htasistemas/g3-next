@@ -12,18 +12,7 @@ export class ImportacaoDadosController {
   async instituicoes(request: AuthenticatedRequest, response: Response) { return response.json({ instituicoes: await service.listarInstituicoes(typeof request.query.busca === "string" ? request.query.busca : undefined) }); }
   async validar(request: AuthenticatedRequest, response: Response) {
     if (!request.file) throw new AppError("Selecione um arquivo para validar.", 400);
-    let mapeamento: unknown;
-    if (request.body.mapeamento) {
-      try {
-        mapeamento = JSON.parse(String(request.body.mapeamento));
-      } catch {
-        throw new AppError("O mapeamento enviado nao e um JSON valido.", 422);
-      }
-      if (!mapeamento || typeof mapeamento !== "object" || Array.isArray(mapeamento)) {
-        throw new AppError("O mapeamento enviado deve ser um objeto JSON.", 422);
-      }
-    }
-    const resultado = await service.validarArquivo({ buffer: request.file.buffer, nomeArquivo: request.file.originalname, tamanhoBytes: request.file.size, instituicaoId: String(request.body.instituicao_id ?? ""), usuarioId: request.authUser?.id ?? "", usuarioNome: request.authUser?.nome ?? request.authUser?.nomeUsuario ?? "MASTER", mapeamento: mapeamento as Record<string, string> | undefined });
+    const resultado = await service.validarArquivo({ buffer: request.file.buffer, nomeArquivo: request.file.originalname, tamanhoBytes: request.file.size, instituicaoId: String(request.body.instituicao_id ?? ""), usuarioId: request.authUser?.id ?? "", usuarioNome: request.authUser?.nome ?? request.authUser?.nomeUsuario ?? "MASTER", mapeamento: request.body.mapeamento ? JSON.parse(String(request.body.mapeamento)) : undefined });
     return response.status(201).json(resultado);
   }
   async obter(request: AuthenticatedRequest, response: Response) { return response.json({ importacao: await service.obter(request.params.id) }); }

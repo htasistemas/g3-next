@@ -1,5 +1,4 @@
 import { Router } from "express";
-import { publicPortalRateLimit } from "../../auth/middlewares/auth-rate-limit.middleware.js";
 import { asyncHandler } from "../../../shared/http/async-handler.js";
 import {
   ensureAuthenticated,
@@ -206,12 +205,11 @@ captacaoRecursosRoutes.get(
   asyncHandler(controller.exportar.bind(controller))
 );
 
-captacaoRecursosRoutes.post("/portal/login", publicPortalRateLimit, asyncHandler(controller.portalLogin.bind(controller)));
-captacaoRecursosRoutes.get("/portal/painel", publicPortalRateLimit, asyncHandler(controller.portalPainel.bind(controller)));
-captacaoRecursosRoutes.put("/portal/meus-dados", publicPortalRateLimit, asyncHandler(controller.portalAtualizarDados.bind(controller)));
-captacaoRecursosRoutes.post("/portal/doacoes", publicPortalRateLimit, asyncHandler(controller.portalCriarDoacao.bind(controller)));
+captacaoRecursosRoutes.post("/portal/login", asyncHandler(controller.portalLogin.bind(controller)));
+captacaoRecursosRoutes.get("/portal/painel", asyncHandler(controller.portalPainel.bind(controller)));
+captacaoRecursosRoutes.put("/portal/meus-dados", asyncHandler(controller.portalAtualizarDados.bind(controller)));
+captacaoRecursosRoutes.post("/portal/doacoes", asyncHandler(controller.portalCriarDoacao.bind(controller)));
 captacaoRecursosRoutes.post(
   "/portal/recorrencias/:id/cancelar",
-  publicPortalRateLimit,
   asyncHandler(controller.portalCancelarRecorrencia.bind(controller))
 );

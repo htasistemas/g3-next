@@ -28,7 +28,6 @@ agendamentosRoutes.use(ensureAuthenticated);
 agendamentosRoutes.get("/", ensurePermissions(permissoesVisualizacao), asyncHandler(controller.listar.bind(controller)));
 agendamentosRoutes.get("/itens", ensurePermissions(permissoesVisualizacao), asyncHandler(controller.listarItens.bind(controller)));
 agendamentosRoutes.get("/beneficiarios", ensurePermissions(permissoesVisualizacao), asyncHandler(controller.listarBeneficiarios.bind(controller)));
-agendamentosRoutes.get("/beneficiarios-cadastro", ensurePermissions(permissoesVisualizacao), asyncHandler(controller.listarBeneficiariosCadastro.bind(controller)));
 agendamentosRoutes.get("/indicadores", ensurePermissions(permissoesVisualizacao), asyncHandler(controller.indicadores.bind(controller)));
 agendamentosRoutes.get("/catalogos", ensurePermissions(permissoesVisualizacao), asyncHandler(controller.catalogos.bind(controller)));
 agendamentosRoutes.get("/lista-espera", ensurePermissions(permissoesVisualizacao), asyncHandler(controller.listarListaEspera.bind(controller)));

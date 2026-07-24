@@ -4,8 +4,6 @@ import PDFDocument from "pdfkit";
 import { getStorageProvider } from "../../arquivos/services/storage-factory.js";
 import type { StorageProvider } from "../../arquivos/services/storage-provider.js";
 import type { RelatorioHtmlInput, RelatorioTabelaCelula } from "../templates/relatorio-template-padrao.js";
-import { validarUrlRemotaPublica } from "../../../utils/remote-url-security.js";
-import { resolverCaminhoAssetPublico } from "../../../utils/safe-public-asset-path.js";
 
 type RodapeRender = {
   linha1: string;
@@ -681,12 +679,10 @@ export class HtmlPdfRenderer {
 
     if (/^https?:\/\//i.test(valor)) {
       try {
-        const urlSegura = await validarUrlRemotaPublica(valor);
-        const response = await fetch(urlSegura, { redirect: "manual", signal: AbortSignal.timeout(15000) });
+        const response = await fetch(valor);
         if (!response.ok) return undefined;
         const arrayBuffer = await response.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-        return buffer.length <= 10 * 1024 * 1024 ? buffer : undefined;
+        return Buffer.from(arrayBuffer);
       } catch {
         return undefined;
       }
@@ -698,8 +694,12 @@ export class HtmlPdfRenderer {
       return bufferStorage;
     }
 
-    const candidato = resolverCaminhoAssetPublico(caminhoNormalizado);
-    const candidatos = candidato ? [candidato] : [];
+    const candidatos = [
+      caminhoNormalizado,
+      path.resolve(process.cwd(), caminhoNormalizado),
+      path.resolve(process.cwd(), "..", caminhoNormalizado),
+      path.resolve(process.cwd(), "..", "frontend", "public", caminhoNormalizado.replace(/^[/\\]/, ""))
+    ].filter((candidato): candidato is string => Boolean(candidato));
 
     for (const candidato of candidatos) {
       if (fs.existsSync(candidato)) {

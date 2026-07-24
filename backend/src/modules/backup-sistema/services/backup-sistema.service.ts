@@ -1,7 +1,6 @@
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { createHash } from "node:crypto";
-import { createReadStream, existsSync } from "node:fs";
+import { existsSync } from "node:fs";
 import {
   cp,
   mkdir,
@@ -106,17 +105,6 @@ async function salvarMetadata(caminho: string, metadata: BackupMetadata) {
   await writeFile(caminho, `${JSON.stringify(metadata, null, 2)}\n`, "utf-8");
 }
 
-async function calcularSha256Arquivo(caminho: string) {
-  const hash = createHash("sha256");
-  await new Promise<void>((resolve, reject) => {
-    const stream = createReadStream(caminho);
-    stream.on("data", (chunk) => hash.update(chunk));
-    stream.once("end", () => resolve());
-    stream.once("error", reject);
-  });
-  return hash.digest("hex");
-}
-
 export class BackupSistemaService {
   private readonly paths: BackupSistemaPaths;
 
@@ -184,7 +172,6 @@ export class BackupSistemaService {
           arquivoNome: metadata.arquivoNome,
           arquivoCaminho: arquivoCompleto,
           tamanhoBytes: info.size,
-          checksum: metadata.checksum ?? null,
           tamanhoFormatado: formatarBytes(info.size),
           restauradoEm: metadata.restauradoEm ?? null,
           restauradoPor: metadata.restauradoPor ?? null,
@@ -238,7 +225,6 @@ export class BackupSistemaService {
     ]);
 
     const info = await stat(arquivoCompleto);
-    const checksum = await calcularSha256Arquivo(arquivoCompleto);
     const metadata: BackupMetadata = {
       id,
       tipo: "BANCO",
@@ -248,7 +234,6 @@ export class BackupSistemaService {
       arquivoCaminhoRelativo: arquivoNome,
       arquivoCaminho: arquivoCompleto,
       tamanhoBytes: info.size,
-      checksum,
       restauradoEm: null,
       restauradoPor: null,
       databaseNome: obterNomeBanco(),
@@ -282,7 +267,6 @@ export class BackupSistemaService {
     ]);
 
     const info = await stat(arquivoCompleto);
-    const checksum = await calcularSha256Arquivo(arquivoCompleto);
     const metadata: BackupMetadata = {
       id,
       tipo: "IMAGENS",
@@ -292,7 +276,6 @@ export class BackupSistemaService {
       arquivoCaminhoRelativo: arquivoNome,
       arquivoCaminho: arquivoCompleto,
       tamanhoBytes: info.size,
-      checksum,
       restauradoEm: null,
       restauradoPor: null,
       databaseNome: null,
@@ -367,7 +350,6 @@ export class BackupSistemaService {
     if (!backup || backup.tipo !== "BANCO") {
       throw new AppError("Backup do banco de dados não encontrado.", 404);
     }
-    await this.validarIntegridadeBackup(backup);
 
     const backupPreventivo = await mkdtemp(path.join(os.tmpdir(), "g3n-backup-banco-"));
     const arquivoPreventivo = path.join(backupPreventivo, "pre-restore.dump");
@@ -427,7 +409,6 @@ export class BackupSistemaService {
     if (!backup || backup.tipo !== "IMAGENS") {
       throw new AppError("Backup das imagens não encontrado.", 404);
     }
-    await this.validarIntegridadeBackup(backup);
 
     const pastaTemporaria = await mkdtemp(path.join(os.tmpdir(), "g3n-restaura-imagens-"));
     const pastaExtracao = path.join(pastaTemporaria, "extracao");
@@ -474,16 +455,6 @@ export class BackupSistemaService {
       throw normalizarErroComando(error, "restauração das imagens");
     } finally {
       await rm(pastaTemporaria, { recursive: true, force: true }).catch(() => undefined);
-    }
-  }
-
-  private async validarIntegridadeBackup(backup: BackupSistemaItem) {
-    if (!backup.checksum) {
-      throw new AppError("Este backup não possui checksum de integridade e não pode ser restaurado com segurança.", 409);
-    }
-    const checksumAtual = await calcularSha256Arquivo(backup.arquivoCaminho);
-    if (checksumAtual !== backup.checksum) {
-      throw new AppError("O backup foi alterado ou está corrompido. Restauração bloqueada.", 422);
     }
   }
 

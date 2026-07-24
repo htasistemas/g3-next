@@ -9,7 +9,6 @@ STATE_VERSION_FILE="$DEPLOY_STATE_DIR/version.txt"
 MAINTENANCE_DIR="${MAINTENANCE_DIR:-$APP_DIR/docker/runtime}"
 MAINTENANCE_FLAG="${APP_MAINTENANCE_FLAG_PATH:-$MAINTENANCE_DIR/maintenance.enable}"
 DEPLOY_OK=0
-RUNTIME_RECONCILED=0
 
 log() { printf "[%s] %s\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
 
@@ -23,107 +22,15 @@ EOF
 
 disable_maintenance() {
   rm -f "$MAINTENANCE_FLAG"
-  # O Nginx monta o diretorio runtime do projeto; remove tambem o caminho
-  # padrao para evitar flag persistente quando APP_MAINTENANCE_FLAG_PATH vier
-  # definido pelo ambiente do runner.
-  if [[ "$MAINTENANCE_FLAG" != "$MAINTENANCE_DIR/maintenance.enable" ]]; then
-    rm -f "$MAINTENANCE_DIR/maintenance.enable"
-  fi
 }
 
 cleanup() {
-  if [[ "$DEPLOY_OK" -ne 1 ]]; then
-    recover_edge_proxy
-  fi
   if [[ "$DEPLOY_OK" -eq 1 ]]; then
     disable_maintenance
     log "Maintenance mode disabled"
-  elif [[ "$RUNTIME_RECONCILED" -eq 0 ]]; then
-    # Falhas antes da remocao dos containers deixam a versao anterior intacta.
-    # Nesse caso, manter a flag ativa derruba uma instalacao que ainda esta
-    # funcional e impede a recuperacao automatica pelo proxy.
-    disable_maintenance
-    log "Falha antes da reconciliacao dos containers; versao anterior liberada"
   else
     log "Deploy not completed successfully. Maintenance mode remains enabled at $MAINTENANCE_FLAG"
   fi
-}
-
-ensure_storage_credentials() {
-  local env_file="$APP_DIR/.env"
-  local storage_user=""
-  local storage_password=""
-
-  touch "$env_file"
-  storage_user="$(grep -E '^APP_STORAGE_ACCESS_KEY_ID=' "$env_file" | tail -n 1 | cut -d '=' -f 2- || true)"
-  storage_password="$(grep -E '^APP_STORAGE_SECRET_ACCESS_KEY=' "$env_file" | tail -n 1 | cut -d '=' -f 2- || true)"
-
-  if [[ -z "$storage_user" ]]; then
-    storage_user="$(grep -E '^MINIO_ROOT_USER=' "$env_file" | tail -n 1 | cut -d '=' -f 2- || true)"
-  fi
-  if [[ -z "$storage_password" ]]; then
-    storage_password="$(grep -E '^MINIO_ROOT_PASSWORD=' "$env_file" | tail -n 1 | cut -d '=' -f 2- || true)"
-  fi
-
-  if [[ -z "$storage_user" ]]; then
-    storage_user="g3nminio"
-  fi
-  if [[ -z "$storage_password" ]]; then
-    if ! command -v openssl >/dev/null 2>&1; then
-      log "ERROR: openssl e obrigatorio para gerar a credencial inicial do storage"
-      return 1
-    fi
-    storage_password="$(openssl rand -hex 32)"
-  fi
-
-  # Apenas acrescenta chaves ausentes. Valores existentes nunca sao
-  # substituidos, preservando o acesso a um volume MinIO ja configurado.
-  if ! grep -qE '^APP_STORAGE_ACCESS_KEY_ID=' "$env_file"; then
-    printf '\nAPP_STORAGE_ACCESS_KEY_ID=%s\n' "$storage_user" >> "$env_file"
-  fi
-  if ! grep -qE '^APP_STORAGE_SECRET_ACCESS_KEY=' "$env_file"; then
-    printf 'APP_STORAGE_SECRET_ACCESS_KEY=%s\n' "$storage_password" >> "$env_file"
-  fi
-  if ! grep -qE '^MINIO_ROOT_USER=' "$env_file"; then
-    printf 'MINIO_ROOT_USER=%s\n' "$storage_user" >> "$env_file"
-  fi
-  if ! grep -qE '^MINIO_ROOT_PASSWORD=' "$env_file"; then
-    printf 'MINIO_ROOT_PASSWORD=%s\n' "$storage_password" >> "$env_file"
-  fi
-
-  chmod 600 "$env_file"
-  log "Credenciais persistentes do storage verificadas"
-}
-
-ensure_cors_origin() {
-  local env_file="$APP_DIR/.env"
-  local cors_origin=""
-  local public_url=""
-
-  cors_origin="$(grep -E '^CORS_ORIGIN=' "$env_file" | tail -n 1 | cut -d '=' -f 2- || true)"
-  if [[ -n "$cors_origin" ]]; then
-    return 0
-  fi
-
-  public_url="$(grep -E '^APP_PUBLIC_URL=' "$env_file" | tail -n 1 | cut -d '=' -f 2- || true)"
-  if [[ -z "$public_url" ]]; then
-    public_url="https://g3n.htasistemas.com.br"
-  fi
-  public_url="${public_url%/}"
-
-  printf '\nCORS_ORIGIN=%s\n' "$public_url" >> "$env_file"
-  chmod 600 "$env_file"
-  log "CORS_ORIGIN inicializado para $public_url"
-}
-
-recover_edge_proxy() {
-  # O proxy e o túnel devem continuar alcançáveis mesmo quando o backend novo
-  # falhar no healthcheck. Os containers existentes preservam suas credenciais.
-  for container in nginx-g3n g3n-tunnel; do
-    if docker inspect "$container" >/dev/null 2>&1; then
-      docker start "$container" >/dev/null 2>&1 || true
-    fi
-  done
 }
 
 trap cleanup EXIT
@@ -215,67 +122,41 @@ if [[ "${DEPLOY_SKIP_GIT_PULL:-0}" != "1" ]] && [[ -d ".git" ]]; then
   git pull --ff-only --autostash
 fi
 
-if [[ -n "${GITHUB_SHA:-}" ]]; then
-  actual_sha="$(git rev-parse HEAD)"
-  if [[ "$actual_sha" != "$GITHUB_SHA" ]]; then
-    log "ERROR: checkout divergente do commit do workflow"
-    log "Esperado: $GITHUB_SHA"
-    log "Encontrado: $actual_sha"
-    exit 1
-  fi
-  log "Checkout confirmado no commit $actual_sha"
-fi
-
 APP_VERSION="$(STATE_VERSION_FILE="$STATE_VERSION_FILE" bash ./scripts/bump-version.sh)"
 log "Version set to $APP_VERSION"
 
 enable_maintenance
 log "Maintenance mode enabled"
-ensure_storage_credentials
-ensure_cors_origin
-
-log "Validando configuracao do Compose antes da reconciliacao"
-if ! docker compose -f "$APP_COMPOSE" config --quiet; then
-  log "ERROR: configuracao do Compose invalida; containers atuais serao preservados"
-  exit 1
-fi
-log "Configuracao do Compose valida"
 
 # O proxy de borda deve permanecer ativo durante todo o deploy. Com o modo de
 # manutenção habilitado, ele serve maintenance.html enquanto os demais
 # containers são reconstruídos, evitando que o Cloudflare receba 502.
 docker compose -f "$APP_COMPOSE" up -d --remove-orphans nginx-g3n
-recover_edge_proxy
 
 reconcile_runtime_containers
-RUNTIME_RECONCILED=1
 docker compose -f "$APP_COMPOSE" up -d --remove-orphans g3n-db
 wait_healthy g3n-db 120
 
 docker compose -f "$APP_COMPOSE" build g3n-backend
-if [[ "${DEPLOY_RUN_MIGRATIONS:-0}" == "1" ]]; then
-  log "Aplicando migrations do PostgreSQL por solicitação explícita"
-  if ! docker compose -f "$APP_COMPOSE" run --rm --no-deps g3n-backend npx prisma migrate deploy; then
-    log "Historico Prisma ausente em banco legado; aplicando migrations educacionais idempotentes"
-    for migration in \
-      20260718_create_educacional_fase1 \
-      20260719_add_tipo_unidade_atendimento \
-      20260719_create_educacional_academico \
-      20260719_create_educacional_alunos_fluxos \
-      20260719_create_educacional_avaliacoes \
-      20260719_create_educacional_boletim_historico \
-      20260719_create_educacional_creche \
-      20260719_create_educacional_diario \
-      20260719_create_educacional_documentos \
-      20260719_create_educacional_ocorrencias_agenda \
-      20260719_create_educacional_planejamento \
-      20260719_create_educacional_fluxo_academico \
-      20260719_harden_educacional_integridade; do
-      docker compose -f "$APP_COMPOSE" run --rm --no-deps g3n-backend npx prisma db execute --schema prisma/schema.prisma --file "prisma/migrations/$migration/migration.sql"
-    done
-  fi
-else
-  log "Migrations nao executadas. Use DEPLOY_RUN_MIGRATIONS=1 somente apos revisar o impacto."
+log "Aplicando migrations do PostgreSQL"
+if ! docker compose -f "$APP_COMPOSE" run --rm --no-deps g3n-backend npx prisma migrate deploy; then
+  log "Historico Prisma ausente em banco legado; aplicando migrations educacionais idempotentes"
+  for migration in \
+    20260718_create_educacional_fase1 \
+    20260719_add_tipo_unidade_atendimento \
+    20260719_create_educacional_academico \
+    20260719_create_educacional_alunos_fluxos \
+    20260719_create_educacional_avaliacoes \
+    20260719_create_educacional_boletim_historico \
+    20260719_create_educacional_creche \
+    20260719_create_educacional_diario \
+    20260719_create_educacional_documentos \
+    20260719_create_educacional_ocorrencias_agenda \
+    20260719_create_educacional_planejamento \
+    20260719_create_educacional_fluxo_academico \
+    20260719_harden_educacional_integridade; do
+    docker compose -f "$APP_COMPOSE" run --rm --no-deps g3n-backend npx prisma db execute --schema prisma/schema.prisma --file "prisma/migrations/$migration/migration.sql"
+  done
 fi
 docker compose -f "$APP_COMPOSE" build --no-cache g3n-frontend
 docker compose -f "$APP_COMPOSE" up -d --remove-orphans --force-recreate g3n-backend
