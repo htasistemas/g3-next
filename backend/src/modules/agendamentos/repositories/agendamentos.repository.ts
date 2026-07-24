@@ -104,6 +104,7 @@ const estruturaSql = [
   "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS item_dias_semana VARCHAR(200)",
   "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS item_local VARCHAR(200)",
   "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS dia_semana VARCHAR(40)",
+  "CREATE INDEX IF NOT EXISTS agendamento_operacional_identidade_idx ON agendamento(tenant_id, data_agendamento, item_tipo, item_origem_id)",
   `
     CREATE TABLE IF NOT EXISTS agendamento_lista_espera (
       id BIGSERIAL PRIMARY KEY,
@@ -511,6 +512,28 @@ export class AgendamentosRepository {
       WHERE a.tenant_id::text = ${tenantId}
         AND COALESCE(a.status, '') <> 'Cancelado'
         AND ${Prisma.join(criterios, " AND ")}
+      ORDER BY a.id DESC
+      LIMIT 1
+    `);
+
+    return rows[0]?.id ?? null;
+  }
+
+  private async localizarAgendaOperacionalPorIdentidade(
+    payload: Pick<AgendamentoInput, "data" | "itemTipo" | "itemOrigemId">,
+    tenantId: string,
+    db: PrismaExecutor = prisma
+  ) {
+    if (!payload.itemTipo || !payload.itemOrigemId) return null;
+
+    const rows = await db.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+      SELECT a.id
+      FROM agendamento a
+      WHERE a.tenant_id::text = ${tenantId}
+        AND a.data_agendamento = ${formatarData(payload.data)}
+        AND LOWER(COALESCE(a.item_tipo, '')) = LOWER(${payload.itemTipo})
+        AND a.item_origem_id = ${BigInt(payload.itemOrigemId)}
+        AND COALESCE(a.status, '') <> 'Cancelado'
       ORDER BY a.id DESC
       LIMIT 1
     `);
@@ -1021,10 +1044,36 @@ export class AgendamentosRepository {
       return rows;
     }
 
-    const contatos = await this.listarBeneficiariosAgendamentoComContato(
-      rows.map((row) => row.id),
-      tenantId
+    const idsAgendamentos = rows.map((row) => row.id);
+    const participantesOriginais = rows.flatMap((row) =>
+      Array.isArray(row.participantes)
+        ? (row.participantes as Array<Record<string, unknown>>).map((participante) => ({
+            beneficiarioId: lerInteiroParticipante(participante.beneficiarioId ?? participante.beneficiario_id),
+            beneficiarioNome: lerTextoParticipante(participante.beneficiarioNome ?? participante.beneficiario_nome),
+            matriculaId: lerInteiroParticipante(participante.matriculaId ?? participante.matricula_id)
+          }))
+        : []
     );
+    const nomesParticipantes = participantesOriginais
+      .map((participante) => participante.beneficiarioNome)
+      .filter((valor): valor is string => typeof valor === "string" && valor.trim().length > 0);
+    const matriculasParticipantes = participantesOriginais
+      .map((participante) => participante.matriculaId)
+      .filter((valor): valor is number => Number.isInteger(valor) && Number(valor) > 0);
+    const itensOperacionais = rows
+      .map((row) => (row.item_origem_id ? Number(row.item_origem_id) : null))
+      .filter((valor): valor is number => typeof valor === "number" && Number.isInteger(valor) && valor > 0);
+
+    const [contatos, contatosFallback, contatosPorNomeExato, contatosPorMatricula, contatosItensOperacionais] = await Promise.all([
+      this.listarBeneficiariosAgendamentoComContato(idsAgendamentos, tenantId),
+      this.listarContatosPorParticipantes(
+        participantesOriginais.map(({ beneficiarioId, beneficiarioNome }) => ({ beneficiarioId, beneficiarioNome })),
+        tenantId
+      ),
+      this.listarContatosPorNomes(nomesParticipantes, tenantId),
+      this.listarContatosPorMatriculas(matriculasParticipantes, tenantId),
+      this.listarContatosPorItensOperacionais(itensOperacionais, tenantId)
+    ]);
 
     const contatosPorAgendamento = new Map<string, AgendamentoBeneficiarioRow[]>();
     for (const contato of contatos) {
@@ -1037,51 +1086,6 @@ export class AgendamentosRepository {
       }
     }
 
-    const contatosFallback = await this.listarContatosPorParticipantes(
-      rows.flatMap((row) =>
-        Array.isArray(row.participantes)
-          ? (row.participantes as Array<Record<string, unknown>>).map((participante) => ({
-              beneficiarioId: lerInteiroParticipante(
-                participante.beneficiarioId ?? participante.beneficiario_id
-              ),
-              beneficiarioNome: lerTextoParticipante(
-                participante.beneficiarioNome ?? participante.beneficiario_nome
-              )
-            }))
-          : []
-      ),
-      tenantId
-    );
-    const contatosPorNomeExato = await this.listarContatosPorNomes(
-      rows.flatMap((row) =>
-        Array.isArray(row.participantes)
-          ? (row.participantes as Array<Record<string, unknown>>)
-              .map((participante) =>
-                lerTextoParticipante(participante.beneficiarioNome ?? participante.beneficiario_nome)
-              )
-              .filter((valor): valor is string => typeof valor === "string" && valor.trim().length > 0)
-          : []
-      ),
-      tenantId
-    );
-    const contatosPorMatricula = await this.listarContatosPorMatriculas(
-      rows.flatMap((row) =>
-        Array.isArray(row.participantes)
-          ? (row.participantes as Array<Record<string, unknown>>)
-              .map((participante) =>
-                lerInteiroParticipante(participante.matriculaId ?? participante.matricula_id)
-              )
-              .filter((valor): valor is number => Number.isInteger(valor) && Number(valor) > 0)
-          : []
-      ),
-      tenantId
-    );
-    const contatosItensOperacionais = await this.listarContatosPorItensOperacionais(
-      rows
-        .map((row) => (row.item_origem_id ? Number(row.item_origem_id) : null))
-        .filter((valor): valor is number => Number.isInteger(valor) && Number(valor) > 0),
-      tenantId
-    );
     const contatosPorMatriculaMap = new Map<
       number,
       {
@@ -2375,9 +2379,23 @@ export class AgendamentosRepository {
 
   async criarOperacional(input: AgendamentoOperacionalInput, usuario: UsuarioActor | undefined, tenantId: string) {
     const payload = await this.montarPayloadOperacional(input, tenantId);
-    // Toda chamada de criação gera um novo card. A atualização só ocorre
-    // quando o usuário abre um card existente e envia seu identificador.
-    return this.criar(payload, usuario, tenantId);
+    const existente = await this.localizarAgendaOperacionalPorIdentidade(payload, tenantId);
+    if (existente) {
+      return this.atualizar(existente, payload, usuario, tenantId);
+    }
+
+    try {
+      return await this.criar(payload, usuario, tenantId);
+    } catch (error) {
+      // Duas requisições simultâneas podem passar pela busca inicial. O lock
+      // transacional de criação protege o banco; neste caso, convertemos o
+      // conflito de duplicidade em atualização idempotente, sem mascarar
+      // conflitos reais de sala, profissional ou recurso.
+      if (!(error instanceof AppError) || error.statusCode !== 409) throw error;
+      const criadoPorOutraRequisicao = await this.localizarAgendaOperacionalPorIdentidade(payload, tenantId);
+      if (!criadoPorOutraRequisicao) throw error;
+      return this.atualizar(criadoPorOutraRequisicao, payload, usuario, tenantId);
+    }
   }
 
   async atualizarOperacional(id: bigint, input: AgendamentoOperacionalInput, usuario: UsuarioActor | undefined, tenantId: string) {

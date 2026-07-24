@@ -1,4 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
   BadgeCheck,
@@ -26,6 +27,7 @@ import { authService } from "@/services/auth.service";
 import { useUnidadeAssistencialAtual } from "@/features/unidades-assistenciais/use-unidades-assistenciais";
 import { obterUrlArquivoAutenticado } from "@/lib/arquivos";
 import { formatarCnpj, formatarTelefone } from "@/lib/br-utils";
+import { agendamentosService } from "@/services/agendamentos.service";
 import {
   AgendaCardList,
   BeneficiarioSelector,
@@ -468,12 +470,11 @@ export function AgendamentosPage() {
   const [geracaoEmAndamento, setGeracaoEmAndamento] = useState(false);
   const [geracaoEtapa, setGeracaoEtapa] = useState(0);
   const [ultimaAgendaDestacadaId, setUltimaAgendaDestacadaId] = useState<number | null>(null);
-  const [agendaLocalSalva, setAgendaLocalSalva] = useState<Agendamento | null>(null);
   const [confirmacaoParticipanteEmAndamento, setConfirmacaoParticipanteEmAndamento] = useState<{
     agendamentoId: number;
     index: number;
   } | null>(null);
-  const geracaoIntervalo = useRef<number | null>(null);
+  const queryClient = useQueryClient();
   const destaqueAgendaTimeout = useRef<number | null>(null);
   const dataVisualizacaoInteragida = useRef(false);
 
@@ -534,7 +535,7 @@ export function AgendamentosPage() {
 
   const cards = useMemo(
     () =>
-      [...(agendamentosQuery.data ?? []), ...(agendaLocalSalva && !(agendamentosQuery.data ?? []).some((item) => item.id === agendaLocalSalva.id) ? [agendaLocalSalva] : [])]
+      [...(agendamentosQuery.data ?? [])]
         .filter((item) => (item.status ?? "").trim().toUpperCase() !== "CANCELADO")
         .filter((item) => {
           const participantes = item.participantes ?? [];
@@ -548,7 +549,7 @@ export function AgendamentosPage() {
           );
         })
         .sort((a, b) => `${a.data ?? ""}${a.horaInicial ?? ""}`.localeCompare(`${b.data ?? ""}${b.horaInicial ?? ""}`)),
-    [agendaLocalSalva, agendamentosQuery.data]
+    [agendamentosQuery.data]
   );
 
   const cardsVisiveis = cards;
@@ -631,10 +632,6 @@ export function AgendamentosPage() {
       return;
     }
 
-    if (geracaoIntervalo.current) {
-      window.clearInterval(geracaoIntervalo.current);
-      geracaoIntervalo.current = null;
-    }
     if (destaqueAgendaTimeout.current) {
       window.clearTimeout(destaqueAgendaTimeout.current);
       destaqueAgendaTimeout.current = null;
@@ -642,9 +639,6 @@ export function AgendamentosPage() {
 
     setGeracaoEmAndamento(true);
     setGeracaoEtapa(0);
-    geracaoIntervalo.current = window.setInterval(() => {
-      setGeracaoEtapa((atual) => Math.min(atual + 1, ETAPAS_GERACAO_AGS.length - 2));
-    }, 1100);
 
     const dataExibicao = dataAgendamento;
     try {
@@ -655,13 +649,16 @@ export function AgendamentosPage() {
         data: dataAgendamento,
         matriculasIds: beneficiariosSelecionados
       });
-      await agendamentosQuery.refetch();
-      if (salvo) setAgendaLocalSalva(salvo);
       setGeracaoEtapa(ETAPAS_GERACAO_AGS.length - 1);
-      await new Promise((resolve) => window.setTimeout(resolve, 350));
+      definirDataVisualizacao(dataExibicao);
+      const tenantKey = usuario?.tenant_id ?? "sem-tenant";
+      const filtrosDaData = { periodoInicio: dataExibicao, periodoFim: dataExibicao };
+      await queryClient.fetchQuery({
+        queryKey: ["agendamentos", tenantKey, filtrosDaData],
+        queryFn: () => agendamentosService.listar(filtrosDaData)
+      });
       setSelecionadoId(salvo?.id ?? null);
       setUltimaAgendaDestacadaId(salvo?.id ?? null);
-      definirDataVisualizacao(dataExibicao);
       setPopup({
         tipo: "sucesso",
         titulo: "Confirmação",
@@ -684,10 +681,6 @@ export function AgendamentosPage() {
       });
     }
     finally {
-      if (geracaoIntervalo.current) {
-        window.clearInterval(geracaoIntervalo.current);
-        geracaoIntervalo.current = null;
-      }
       setGeracaoEmAndamento(false);
       setGeracaoEtapa(0);
     }
@@ -1254,6 +1247,12 @@ export function AgendamentosPage() {
                   </div>
                   <AgendaCardList
                     cards={cardsDoDia}
+                    carregando={agendamentosQuery.isLoading || agendamentosQuery.isFetching}
+                    erro={
+                      agendamentosQuery.isError
+                        ? "Não foi possível carregar as agendas desta data. Tente novamente."
+                        : null
+                    }
                     selecionadoId={selecionadoId}
                     destaqueRecenteId={ultimaAgendaDestacadaId}
                     envioEmAndamento={envioEmAndamento}

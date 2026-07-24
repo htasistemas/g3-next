@@ -97,7 +97,13 @@ export function useSalvarAgendamentoOperacional() {
   return useMutation({
     mutationFn: (payload: AgendamentoOperacionalPayload) => agendamentosService.criarOperacional(payload),
     onSuccess: async () => {
-      await invalidarAgendamentos(queryClient);
+      // A tela operacional faz o refetch explícito da data persistida após o
+      // commit. Evitamos refetchar a data anterior e depois repetir a mesma
+      // consulta para a nova data.
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["agendamentos"], refetchType: "none" }),
+        queryClient.invalidateQueries({ queryKey: ["agendamento"], refetchType: "none" })
+      ]);
     }
   });
 }

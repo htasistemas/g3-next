@@ -1,6 +1,9 @@
+import { useState } from "react";
 import {
   CalendarDays,
   Clock3,
+  ChevronDown,
+  ChevronUp,
   Copy,
   LoaderCircle,
   Mail,
@@ -297,6 +300,8 @@ export function GenerateCardButton(props: { disabled?: boolean; loading?: boolea
 
 export function AgendaCardList(props: {
   cards: Agendamento[];
+  carregando?: boolean;
+  erro?: string | null;
   selecionadoId?: number | null;
   destaqueRecenteId?: number | null;
   envioEmAndamento?: {
@@ -320,6 +325,25 @@ export function AgendaCardList(props: {
     index: number;
   } | null;
 }) {
+  if (props.carregando) {
+    return (
+      <Card className="border-[var(--g3-border)]">
+        <CardContent className="flex items-center gap-2 px-4 py-8 text-sm text-[var(--g3-muted)]">
+          <LoaderCircle className="h-4 w-4 animate-spin text-emerald-700" />
+          Carregando agendas persistidas...
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (props.erro) {
+    return (
+      <Card className="border-rose-200">
+        <CardContent className="px-4 py-8 text-sm text-rose-700">{props.erro}</CardContent>
+      </Card>
+    );
+  }
+
   if (!props.cards.length) {
     return (
       <Card className="border-[var(--g3-border)]">
@@ -390,6 +414,7 @@ export function AgendaCard(props: {
     index: number;
   } | null;
 }) {
+  const [recolhido, setRecolhido] = useState(false);
   const participantes = props.item.participantes ?? [];
   const canalEmEnvio = props.envioEmAndamento?.canal;
   const progressoEnvio = props.envioEmAndamento ? ((props.envioEmAndamento.etapa + 1) / 3) * 100 : 0;
@@ -427,10 +452,21 @@ export function AgendaCard(props: {
             <Badge variant="default" className="border-white/35 bg-white/15 text-white">
               {participantes.length} beneficiário(s) inscrito(s)
             </Badge>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-8 gap-1 border-white/40 bg-white/10 px-2 text-xs text-white hover:bg-white/20 hover:text-white"
+              onClick={() => setRecolhido((atual) => !atual)}
+              aria-expanded={!recolhido}
+              aria-label={recolhido ? "Expandir agenda" : "Recolher agenda"}
+            >
+              {recolhido ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+              {recolhido ? "Expandir" : "Recolher"}
+            </Button>
           </div>
         </div>
       </div>
-      <CardContent className="space-y-4 px-4 py-4">
+      {!recolhido ? <CardContent className="space-y-4 px-4 py-4">
         {props.ativo ? (
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-900">
             Este card está aberto no formulário para edição. Qualquer alteração será aplicada neste agendamento.
@@ -596,7 +632,7 @@ export function AgendaCard(props: {
             </div>
           </div>
         ) : null}
-      </CardContent>
+      </CardContent> : null}
     </Card>
   );
 }
