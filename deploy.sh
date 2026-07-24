@@ -9,6 +9,7 @@ STATE_VERSION_FILE="$DEPLOY_STATE_DIR/version.txt"
 MAINTENANCE_DIR="${MAINTENANCE_DIR:-$APP_DIR/docker/runtime}"
 MAINTENANCE_FLAG="${APP_MAINTENANCE_FLAG_PATH:-$MAINTENANCE_DIR/maintenance.enable}"
 DEPLOY_OK=0
+RUNTIME_RECONCILED=0
 
 log() { printf "[%s] %s\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
 
@@ -28,6 +29,12 @@ cleanup() {
   if [[ "$DEPLOY_OK" -eq 1 ]]; then
     disable_maintenance
     log "Maintenance mode disabled"
+  elif [[ "$RUNTIME_RECONCILED" -eq 0 ]]; then
+    # Falhas antes da remocao dos containers deixam a versao anterior intacta.
+    # Nesse caso, manter a flag ativa derruba uma instalacao que ainda esta
+    # funcional e impede a recuperacao automatica pelo proxy.
+    disable_maintenance
+    log "Falha antes da reconciliacao dos containers; versao anterior liberada"
   else
     log "Deploy not completed successfully. Maintenance mode remains enabled at $MAINTENANCE_FLAG"
   fi
@@ -181,6 +188,7 @@ ensure_storage_credentials
 docker compose -f "$APP_COMPOSE" up -d --remove-orphans nginx-g3n
 
 reconcile_runtime_containers
+RUNTIME_RECONCILED=1
 docker compose -f "$APP_COMPOSE" up -d --remove-orphans g3n-db
 wait_healthy g3n-db 120
 
