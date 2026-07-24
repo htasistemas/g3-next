@@ -32,6 +32,9 @@ disable_maintenance() {
 }
 
 cleanup() {
+  if [[ "$DEPLOY_OK" -ne 1 ]]; then
+    recover_edge_proxy
+  fi
   if [[ "$DEPLOY_OK" -eq 1 ]]; then
     disable_maintenance
     log "Maintenance mode disabled"
@@ -111,6 +114,16 @@ ensure_cors_origin() {
   printf '\nCORS_ORIGIN=%s\n' "$public_url" >> "$env_file"
   chmod 600 "$env_file"
   log "CORS_ORIGIN inicializado para $public_url"
+}
+
+recover_edge_proxy() {
+  # O proxy e o túnel devem continuar alcançáveis mesmo quando o backend novo
+  # falhar no healthcheck. Os containers existentes preservam suas credenciais.
+  for container in nginx-g3n g3n-tunnel; do
+    if docker inspect "$container" >/dev/null 2>&1; then
+      docker start "$container" >/dev/null 2>&1 || true
+    fi
+  done
 }
 
 trap cleanup EXIT
@@ -232,6 +245,7 @@ log "Configuracao do Compose valida"
 # manutenção habilitado, ele serve maintenance.html enquanto os demais
 # containers são reconstruídos, evitando que o Cloudflare receba 502.
 docker compose -f "$APP_COMPOSE" up -d --remove-orphans nginx-g3n
+recover_edge_proxy
 
 reconcile_runtime_containers
 RUNTIME_RECONCILED=1

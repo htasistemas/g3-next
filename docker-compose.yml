@@ -150,8 +150,6 @@ services:
     depends_on:
       nginx-g3n:
         condition: service_healthy
-      g3n-backend:
-        condition: service_healthy
     networks:
       - g3n_net
 
