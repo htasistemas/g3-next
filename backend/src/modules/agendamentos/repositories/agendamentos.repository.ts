@@ -3,6 +3,7 @@ import { prisma } from "../../../database/prisma.js";
 import { EmailService } from "../../email/services/email.service.js";
 import { AppError } from "../../../shared/errors/app-error.js";
 import { normalizeDigits, toIsoDate, toOptionalDate, trimOrUndefined } from "../../../utils/string-utils.js";
+import { gerarHorariosDisponiveis } from "../agendamento-horarios.js";
 import type {
   AgendamentoBeneficiarioRow,
   AgendamentoCheckInInput,
@@ -104,7 +105,37 @@ const estruturaSql = [
   "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS item_dias_semana VARCHAR(200)",
   "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS item_local VARCHAR(200)",
   "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS dia_semana VARCHAR(40)",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS agenda_pai_id BIGINT",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS agenda_horario_id BIGINT",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS forma_agendamento VARCHAR(20) NOT NULL DEFAULT 'COLETIVO'",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS horario_individual TIME",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS agenda_principal BOOLEAN NOT NULL DEFAULT FALSE",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS atualizado_por_usuario_id BIGINT",
+  "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS atualizado_por_nome VARCHAR(160)",
   "CREATE INDEX IF NOT EXISTS agendamento_operacional_identidade_idx ON agendamento(tenant_id, data_agendamento, item_tipo, item_origem_id)",
+  "CREATE INDEX IF NOT EXISTS agendamento_agenda_pai_idx ON agendamento(tenant_id, agenda_pai_id, data_agendamento, horario_individual)",
+  `
+    CREATE TABLE IF NOT EXISTS agendamento_horario (
+      id BIGSERIAL PRIMARY KEY,
+      tenant_id UUID NOT NULL,
+      agenda_id BIGINT NOT NULL REFERENCES agendamento(id) ON DELETE CASCADE,
+      hora_inicial TIME NOT NULL,
+      hora_final TIME NOT NULL,
+      status VARCHAR(40) NOT NULL DEFAULT 'Disponível',
+      agendamento_id BIGINT REFERENCES agendamento(id) ON DELETE SET NULL,
+      motivo TEXT,
+      criado_por_usuario_id BIGINT,
+      criado_por_nome VARCHAR(160),
+      criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+      atualizado_por_usuario_id BIGINT,
+      atualizado_por_nome VARCHAR(160),
+      atualizado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+      ativo BOOLEAN NOT NULL DEFAULT TRUE,
+      UNIQUE (tenant_id, agenda_id, hora_inicial)
+    )
+  `,
+  "ALTER TABLE agendamento_horario ADD COLUMN IF NOT EXISTS ativo BOOLEAN NOT NULL DEFAULT TRUE",
+  "CREATE INDEX IF NOT EXISTS agendamento_horario_tenant_data_idx ON agendamento_horario(tenant_id, agenda_id, hora_inicial)",
   `
     CREATE TABLE IF NOT EXISTS agendamento_lista_espera (
       id BIGSERIAL PRIMARY KEY,
@@ -476,6 +507,7 @@ export class AgendamentosRepository {
       tipoAtendimento?: string | null;
       itemTipo?: string | null;
       itemOrigemId?: number | null;
+      agendaPaiId?: number | null;
     },
     tenantId: string,
     idIgnorar?: bigint | null,
@@ -500,6 +532,10 @@ export class AgendamentosRepository {
 
     if (payload.itemOrigemId) {
       criterios.push(Prisma.sql`a.item_origem_id = ${BigInt(payload.itemOrigemId)}`);
+    }
+
+    if (payload.agendaPaiId) {
+      criterios.push(Prisma.sql`(a.agenda_pai_id IS NULL OR a.agenda_pai_id <> ${BigInt(payload.agendaPaiId)})`);
     }
 
     if (idIgnorar) {
@@ -1462,6 +1498,47 @@ export class AgendamentosRepository {
     `);
   }
 
+  async listarBeneficiariosCadastro(busca: string | undefined, tenantId: string) {
+    await this.ensureEstrutura();
+    const termo = trimOrUndefined(busca);
+    const like = termo ? `%${termo}%` : null;
+    return prisma.$queryRaw<Array<{
+      beneficiario_id: bigint;
+      codigo: string | null;
+      beneficiario_nome: string;
+      telefone: string | null;
+      email: string | null;
+    }>>(Prisma.sql`
+      SELECT
+        b.id AS beneficiario_id,
+        b.codigo,
+        b.nome_completo AS beneficiario_nome,
+        ${sqlTelefoneLimpo(Prisma.sql`contato.telefone_principal`)} AS telefone,
+        NULLIF(TRIM(contato.email), '') AS email
+      FROM cadastro_beneficiario b
+      LEFT JOIN LATERAL (
+        SELECT c.telefone_principal, c.telefone_secundario, c.telefone_recado_numero, c.email
+        FROM contato_beneficiario c
+        WHERE c.beneficiario_id = b.id AND c.tenant_id::text = ${tenantId}
+        ORDER BY c.id DESC
+        LIMIT 1
+      ) contato ON TRUE
+      WHERE b.tenant_id::text = ${tenantId}
+        ${like ? Prisma.sql`AND (
+          b.nome_completo ILIKE ${like}
+          OR COALESCE(b.codigo, '') ILIKE ${like}
+          OR COALESCE(${sqlTelefoneLimpo(Prisma.sql`contato.telefone_principal`)}, '') ILIKE ${like}
+          OR EXISTS (
+            SELECT 1 FROM documentos d
+            WHERE d.beneficiario_id = b.id AND d.tenant_id::text = ${tenantId}
+              AND COALESCE(d.numero_documento, '') ILIKE ${like}
+          )
+        )` : Prisma.empty}
+      ORDER BY b.nome_completo ASC
+      LIMIT 100
+    `);
+  }
+
   private async listarConflitos(payload: {
     data: string;
     horaInicial: string;
@@ -1469,6 +1546,8 @@ export class AgendamentosRepository {
     profissionalNome?: string | null;
     sala?: string | null;
     recurso?: string | null;
+    agendaPaiId?: number | null;
+    agendaPrincipalId?: bigint | null;
     idIgnorar?: bigint | null;
     tenantId: string;
   }, db: PrismaExecutor = prisma) {
@@ -1481,6 +1560,14 @@ export class AgendamentosRepository {
       Prisma.sql`COALESCE(a.status, '') NOT IN ('Cancelado', 'Faltou', 'Alta')`,
       Prisma.sql`(${horaInicial}::time <= COALESCE(a.hora_final, a.hora_inicial) AND ${horaFinal}::time >= a.hora_inicial)`
     ];
+
+    condicoes.push(Prisma.sql`COALESCE(a.agenda_principal, FALSE) = FALSE`);
+    if (payload.agendaPaiId) {
+      condicoes.push(Prisma.sql`(a.agenda_pai_id IS NULL OR a.agenda_pai_id <> ${BigInt(payload.agendaPaiId)})`);
+    }
+    if (payload.agendaPrincipalId) {
+      condicoes.push(Prisma.sql`(a.agenda_pai_id IS NULL OR a.agenda_pai_id <> ${payload.agendaPrincipalId})`);
+    }
 
     if (payload.idIgnorar) {
       condicoes.push(Prisma.sql`a.id <> ${payload.idIgnorar}`);
@@ -1600,7 +1687,24 @@ export class AgendamentosRepository {
     if (trimOrUndefined(filtros.periodoFim)) where.push(Prisma.sql`a.data_agendamento <= ${formatarData(filtros.periodoFim)}`);
 
     const rows = await prisma.$queryRaw<AgendamentoRow[]>(Prisma.sql`
-      SELECT *
+      SELECT a.*,
+        CASE WHEN a.agenda_principal THEN COALESCE((
+          SELECT jsonb_agg(
+            jsonb_build_object(
+              'id', h.id,
+              'horarioInicial', TO_CHAR(h.hora_inicial, 'HH24:MI'),
+              'horarioFinal', TO_CHAR(h.hora_final, 'HH24:MI'),
+              'status', h.status,
+              'agendamentoId', h.agendamento_id,
+              'ativo', h.ativo,
+              'beneficiarioNome', child.beneficiario_nome
+            ) ORDER BY h.hora_inicial
+          )
+          FROM agendamento_horario h
+          LEFT JOIN agendamento child ON child.id = h.agendamento_id AND child.tenant_id::text = ${tenantId}
+          WHERE h.agenda_id = a.id AND h.tenant_id::text = ${tenantId}
+            AND (h.ativo = TRUE OR h.agendamento_id IS NOT NULL)
+        ), '[]'::jsonb) ELSE '[]'::jsonb END AS horarios
       FROM agendamento a
       WHERE a.tenant_id::text = ${tenantId}
       ${where.length ? Prisma.sql`AND ${Prisma.join(where, " AND ")}` : Prisma.empty}
@@ -1630,6 +1734,7 @@ export class AgendamentosRepository {
         profissionalNome: input.profissionalNome,
         sala: input.sala,
         recurso: input.recurso,
+        agendaPaiId: input.agendaPaiId,
         tenantId
       }, tx);
 
@@ -1644,7 +1749,8 @@ export class AgendamentosRepository {
           profissionalNome: input.profissionalNome,
           tipoAtendimento: input.tipoAtendimento,
           itemTipo: input.itemTipo,
-          itemOrigemId: input.itemOrigemId
+          itemOrigemId: input.itemOrigemId,
+          agendaPaiId: input.agendaPaiId
         },
         tenantId,
         null,
@@ -1663,7 +1769,8 @@ export class AgendamentosRepository {
           origem_atendimento, prioridade, status, motivo, objetivo, observacao_interna, observacao_curta, coletivo,
           titulo_coletivo, capacidade_maxima, participantes, recorrencia, retorno_programado_para, encaminhamento_origem,
           primeira_vez, retorno, urgencia, documentos_pendentes, autorizacao_pendente, item_tipo, item_origem_id,
-          item_nome, item_dias_semana, item_local, dia_semana, criado_por_usuario_id, criado_por_nome
+          item_nome, item_dias_semana, item_local, dia_semana, agenda_pai_id, agenda_horario_id,
+          forma_agendamento, horario_individual, agenda_principal, criado_por_usuario_id, criado_por_nome
         ) VALUES (
           ${tenantId}::uuid,
           ${input.beneficiarioId ? BigInt(input.beneficiarioId) : null},
@@ -1718,6 +1825,11 @@ export class AgendamentosRepository {
           ${trimOrUndefined(input.itemDiasSemana)},
           ${trimOrUndefined(input.itemLocal)},
           ${trimOrUndefined(input.diaSemana) ?? this.formatarDiaSemana(input.data)},
+          ${input.agendaPaiId ? BigInt(input.agendaPaiId) : null},
+          ${input.agendaHorarioId ? BigInt(input.agendaHorarioId) : null},
+          ${input.formaAgendamento ?? "COLETIVO"},
+          ${sqlTime(input.horarioIndividual)},
+          ${input.agendaPrincipal ?? false},
           ${usuario?.id ? BigInt(usuario.id) : null},
           ${trimOrUndefined(usuario?.nome ?? usuario?.nomeUsuario)}
         ) RETURNING id
@@ -1748,6 +1860,8 @@ export class AgendamentosRepository {
         profissionalNome: input.profissionalNome,
         sala: input.sala,
         recurso: input.recurso,
+        agendaPaiId: input.agendaPaiId,
+        agendaPrincipalId: input.agendaPrincipal ? id : null,
         idIgnorar: id,
         tenantId
       }, tx);
@@ -1762,7 +1876,8 @@ export class AgendamentosRepository {
           profissionalNome: input.profissionalNome,
           tipoAtendimento: input.tipoAtendimento,
           itemTipo: input.itemTipo,
-          itemOrigemId: input.itemOrigemId
+          itemOrigemId: input.itemOrigemId,
+          agendaPaiId: input.agendaPaiId
         },
         tenantId,
         id,
@@ -1827,6 +1942,13 @@ export class AgendamentosRepository {
           item_dias_semana = ${trimOrUndefined(input.itemDiasSemana)},
           item_local = ${trimOrUndefined(input.itemLocal)},
           dia_semana = ${trimOrUndefined(input.diaSemana) ?? this.formatarDiaSemana(input.data)},
+          agenda_pai_id = ${input.agendaPaiId ? BigInt(input.agendaPaiId) : null},
+          agenda_horario_id = ${input.agendaHorarioId ? BigInt(input.agendaHorarioId) : null},
+          forma_agendamento = ${input.formaAgendamento ?? anterior.forma_agendamento ?? "COLETIVO"},
+          horario_individual = ${sqlTime(input.horarioIndividual)},
+          agenda_principal = ${input.agendaPrincipal ?? anterior.agenda_principal ?? false},
+          atualizado_por_usuario_id = ${usuario?.id ? BigInt(usuario.id) : null},
+          atualizado_por_nome = ${trimOrUndefined(usuario?.nome ?? usuario?.nomeUsuario)},
           atualizado_em = NOW()
         WHERE id = ${id}
           AND tenant_id::text = ${tenantId}
@@ -2045,6 +2167,14 @@ export class AgendamentosRepository {
       WHERE id = ${id}
         AND tenant_id::text = ${tenantId}
     `);
+
+    if (anterior.agenda_horario_id) {
+      await prisma.$executeRaw(Prisma.sql`
+        UPDATE agendamento_horario
+        SET status = 'Disponível', agendamento_id = NULL, atualizado_por_usuario_id = ${usuario?.id ? BigInt(usuario.id) : null}, atualizado_por_nome = ${trimOrUndefined(usuario?.nome ?? usuario?.nomeUsuario)}, atualizado_em = NOW()
+        WHERE id = ${BigInt(anterior.agenda_horario_id)} AND tenant_id::text = ${tenantId}
+      `);
+    }
 
     const atual = await this.obter(id, tenantId);
     await this.registrarLog(id, "cancelar", usuario, tenantId, anterior, atual);
@@ -2310,6 +2440,194 @@ export class AgendamentosRepository {
     return created;
   }
 
+  private async listarBeneficiariosCadastroPorIds(ids: number[], tenantId: string) {
+    const unicos = Array.from(new Set(ids.filter((id) => Number.isInteger(id) && id > 0)));
+    if (!unicos.length) return [];
+
+    return prisma.$queryRaw<Array<{
+      id: bigint;
+      codigo: string | null;
+      nome_completo: string;
+      telefone: string | null;
+      email: string | null;
+    }>>(Prisma.sql`
+      SELECT
+        b.id,
+        b.codigo,
+        b.nome_completo,
+        ${sqlTelefoneLimpo(Prisma.sql`contato.telefone_principal`)} AS telefone,
+        NULLIF(TRIM(contato.email), '') AS email
+      FROM cadastro_beneficiario b
+      LEFT JOIN LATERAL (
+        SELECT c.telefone_principal, c.email
+        FROM contato_beneficiario c
+        WHERE c.beneficiario_id = b.id AND c.tenant_id::text = ${tenantId}
+        ORDER BY c.id DESC
+        LIMIT 1
+      ) contato ON TRUE
+      WHERE b.tenant_id::text = ${tenantId}
+        AND b.id IN (${Prisma.join(unicos.map((id) => BigInt(id)))})
+      ORDER BY b.nome_completo ASC
+    `);
+  }
+
+  private async localizarAgendaPrincipalPorIdentidade(input: AgendamentoOperacionalInput, tenantId: string) {
+    const rows = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+      SELECT id
+      FROM agendamento
+      WHERE tenant_id::text = ${tenantId}
+        AND data_agendamento = ${formatarData(input.data)}
+        AND item_tipo = ${input.tipo}
+        AND item_origem_id = ${BigInt(input.itemId)}
+        AND COALESCE(agenda_principal, FALSE) = TRUE
+        AND forma_agendamento = 'HORARIO'
+        AND COALESCE(status, '') <> 'Cancelado'
+      ORDER BY id DESC
+      LIMIT 1
+    `);
+    return rows[0]?.id ?? null;
+  }
+
+  private async montarPayloadAgendaIndividual(
+    input: AgendamentoOperacionalInput,
+    tenantId: string,
+    beneficiario?: { id: bigint; codigo: string | null; nome_completo: string; telefone: string | null; email: string | null },
+    slot?: { id: bigint; horarioInicial: string; horarioFinal: string }
+  ): Promise<AgendamentoInput> {
+    const item = await this.obterItemOperacional(BigInt(input.itemId), tenantId);
+    if (!item) throw new AppError("Item de inscricao nao encontrado para agendamento.", 404);
+    const horaInicial = slot?.horarioInicial ?? input.horaInicial;
+    const horaFinal = slot?.horarioFinal ?? input.horaFinal;
+    const local = trimOrUndefined(item.sala_nome) ?? trimOrUndefined(item.instituicao_parceira) ?? "Local a definir";
+    return {
+      beneficiarioId: beneficiario ? Number(beneficiario.id) : undefined,
+      beneficiarioNome: beneficiario?.nome_completo ?? item.nome,
+      telefone: beneficiario?.telefone,
+      email: beneficiario?.email,
+      unidade: local,
+      setor: input.tipo === "curso" ? "Curso" : input.tipo === "oficina" ? "Oficina" : "Atendimento",
+      tipoAtendimento: item.nome,
+      profissionalNome: trimOrUndefined(item.profissional) ?? "Equipe institucional",
+      data: input.data,
+      horaInicial: horaInicial ?? "08:00",
+      horaFinal,
+      duracaoMinutos: input.duracaoMinutos,
+      modalidade: "Presencial",
+      prioridade: "Normal",
+      status: "Agendado",
+      coletivo: false,
+      itemTipo: input.tipo,
+      itemOrigemId: input.itemId,
+      itemNome: item.nome,
+      itemDiasSemana: trimOrUndefined(item.dias_semana),
+      itemLocal: local,
+      diaSemana: this.formatarDiaSemana(input.data),
+      sala: local,
+      observacaoCurta: beneficiario ? `Horario individual ${horaInicial}.` : "Agenda principal por horario.",
+      agendaPaiId: null,
+      agendaHorarioId: slot?.id ? Number(slot.id) : null,
+      formaAgendamento: "HORARIO",
+      horarioIndividual: horaInicial,
+      agendaPrincipal: !beneficiario
+    };
+  }
+
+  private async criarOperacionalPorHorario(input: AgendamentoOperacionalInput, usuario: UsuarioActor | undefined, tenantId: string) {
+    const horarios = gerarHorariosDisponiveis(input.horaInicial!, input.horaFinal!, input.duracaoMinutos!);
+    const informados = input.horarios ?? [];
+    const permitidos = new Map(horarios.map((horario) => [horario.horarioInicial, horario]));
+    const selecionados = informados.filter((slot) => slot.beneficiarioId != null);
+    for (const slot of informados) {
+      if (!permitidos.has(slot.horarioInicial)) {
+        throw new AppError(`O horario ${slot.horarioInicial} esta fora do periodo configurado.`, 400);
+      }
+    }
+    const beneficiarioIds = selecionados.map((slot) => Number(slot.beneficiarioId));
+    if (new Set(beneficiarioIds).size !== beneficiarioIds.length) {
+      throw new AppError("O mesmo beneficiario nao pode ocupar dois horarios nesta agenda.", 409);
+    }
+    const beneficiarios = await this.listarBeneficiariosCadastroPorIds(beneficiarioIds, tenantId);
+    if (beneficiarios.length !== new Set(beneficiarioIds).size) {
+      throw new AppError("Um ou mais beneficiarios nao pertencem a instituicao atual.", 400);
+    }
+    const beneficiariosPorId = new Map(beneficiarios.map((beneficiario) => [Number(beneficiario.id), beneficiario]));
+    const existente = await this.localizarAgendaPrincipalPorIdentidade(input, tenantId);
+    const payloadPrincipal = await this.montarPayloadAgendaIndividual(input, tenantId);
+    const principal = existente
+      ? await this.atualizar(existente, payloadPrincipal, usuario, tenantId)
+      : await this.criar(payloadPrincipal, usuario, tenantId);
+    const principalId = BigInt(principal.id);
+
+    await prisma.$transaction(async (tx) => {
+      for (const horario of horarios) {
+        const slot = await tx.$queryRaw<Array<{ id: bigint; agendamento_id: bigint | null; status: string }>>(Prisma.sql`
+          SELECT id, agendamento_id, status
+          FROM agendamento_horario
+          WHERE tenant_id::text = ${tenantId} AND agenda_id = ${principalId} AND hora_inicial = ${sqlTime(horario.horarioInicial)}
+          FOR UPDATE
+        `);
+        let slotExistente = slot[0];
+        if (!slotExistente) {
+          await tx.$executeRaw(Prisma.sql`
+            INSERT INTO agendamento_horario (tenant_id, agenda_id, hora_inicial, hora_final, status, criado_por_usuario_id, criado_por_nome)
+            VALUES (${tenantId}::uuid, ${principalId}, ${sqlTime(horario.horarioInicial)}, ${sqlTime(horario.horarioFinal)}, 'Disponível', ${usuario?.id ? BigInt(usuario.id) : null}, ${trimOrUndefined(usuario?.nome ?? usuario?.nomeUsuario)})
+          `);
+          const criado = await tx.$queryRaw<Array<{ id: bigint; agendamento_id: bigint | null; status: string }>>(Prisma.sql`
+            SELECT id, agendamento_id, status FROM agendamento_horario
+            WHERE tenant_id::text = ${tenantId} AND agenda_id = ${principalId} AND hora_inicial = ${sqlTime(horario.horarioInicial)}
+          `);
+          slotExistente = criado[0];
+        }
+        const selecionado = informados.find((item) => item.horarioInicial === horario.horarioInicial && item.beneficiarioId != null);
+        const beneficiario = selecionado ? beneficiariosPorId.get(Number(selecionado.beneficiarioId)) : undefined;
+        if (slotExistente?.agendamento_id && beneficiario) {
+          const atual = await tx.$queryRaw<Array<{ beneficiario_nome: string; beneficiario_id: bigint | null; telefone: string | null; email: string | null }>>(Prisma.sql`
+            SELECT beneficiario_nome, beneficiario_id, telefone, email FROM agendamento WHERE id = ${slotExistente.agendamento_id} AND tenant_id::text = ${tenantId}
+          `);
+          const nomeAtual = atual[0]?.beneficiario_nome;
+          const novoNome = beneficiario.nome_completo;
+          if (nomeAtual && nomeAtual !== novoNome) {
+            await tx.$executeRaw(Prisma.sql`
+              UPDATE agendamento
+              SET beneficiario_id = ${beneficiario.id}, beneficiario_nome = ${novoNome}, telefone = ${beneficiario.telefone}, email = ${beneficiario.email}, atualizado_por_usuario_id = ${usuario?.id ? BigInt(usuario.id) : null}, atualizado_por_nome = ${trimOrUndefined(usuario?.nome ?? usuario?.nomeUsuario)}, atualizado_em = NOW()
+              WHERE id = ${slotExistente.agendamento_id} AND tenant_id::text = ${tenantId}
+            `);
+            await this.registrarLog(slotExistente.agendamento_id, "alterar_beneficiario", usuario, tenantId, atual[0], beneficiario, tx);
+          }
+        }
+        let agendamentoId = slotExistente?.agendamento_id ?? null;
+        if (beneficiario && !agendamentoId) {
+          const payload = await this.montarPayloadAgendaIndividual(input, tenantId, beneficiario, { id: slotExistente?.id ?? 0n, horarioInicial: horario.horarioInicial, horarioFinal: horario.horarioFinal });
+          payload.agendaPaiId = Number(principalId);
+          payload.agendaHorarioId = slotExistente?.id ? Number(slotExistente.id) : null;
+          const child = await this.criar(payload, usuario, tenantId);
+          agendamentoId = BigInt(child.id);
+        }
+        if (slotExistente) {
+          await tx.$executeRaw(Prisma.sql`
+            UPDATE agendamento_horario
+            SET hora_final = ${sqlTime(horario.horarioFinal)},
+                status = ${agendamentoId ? "Agendado" : "Disponível"},
+                agendamento_id = ${agendamentoId},
+                ativo = TRUE,
+                atualizado_por_usuario_id = ${usuario?.id ? BigInt(usuario.id) : null},
+                atualizado_por_nome = ${trimOrUndefined(usuario?.nome ?? usuario?.nomeUsuario)},
+                atualizado_em = NOW()
+            WHERE id = ${slotExistente.id} AND tenant_id::text = ${tenantId}
+          `);
+        }
+      }
+      await tx.$executeRaw(Prisma.sql`
+        UPDATE agendamento_horario
+        SET ativo = FALSE, atualizado_em = NOW()
+        WHERE tenant_id::text = ${tenantId} AND agenda_id = ${principalId}
+          AND hora_inicial NOT IN (${Prisma.join(horarios.map((horario) => sqlTime(horario.horarioInicial)))})
+          AND agendamento_id IS NULL
+      `);
+    });
+    return this.obter(principalId, tenantId);
+  }
+
   private async montarPayloadOperacional(input: AgendamentoOperacionalInput, tenantId: string): Promise<AgendamentoInput> {
     const [item, beneficiarios] = await Promise.all([
       this.obterItemOperacional(BigInt(input.itemId), tenantId),
@@ -2378,6 +2696,9 @@ export class AgendamentosRepository {
   }
 
   async criarOperacional(input: AgendamentoOperacionalInput, usuario: UsuarioActor | undefined, tenantId: string) {
+    if (input.formaAgendamento === "HORARIO") {
+      return this.criarOperacionalPorHorario(input, usuario, tenantId);
+    }
     const payload = await this.montarPayloadOperacional(input, tenantId);
     const existente = await this.localizarAgendaOperacionalPorIdentidade(payload, tenantId);
     if (existente) {

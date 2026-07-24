@@ -83,6 +83,11 @@ export type AgendamentoInput = {
   itemDiasSemana?: string | null;
   itemLocal?: string | null;
   diaSemana?: string | null;
+  agendaPaiId?: number | null;
+  agendaHorarioId?: number | null;
+  formaAgendamento?: "HORARIO" | "COLETIVO";
+  horarioIndividual?: string | null;
+  agendaPrincipal?: boolean;
 };
 
 export type AgendamentoOperacionalInput = {
@@ -90,6 +95,11 @@ export type AgendamentoOperacionalInput = {
   tipo: AgendamentoOperacionalTipo;
   itemId: number;
   data: string;
+  formaAgendamento?: "HORARIO" | "COLETIVO";
+  horaInicial?: string;
+  horaFinal?: string;
+  duracaoMinutos?: number;
+  horarios?: Array<{ horarioInicial: string; beneficiarioId?: number | null }>;
   beneficiariosIds?: number[];
   matriculasIds?: number[];
 };
@@ -286,6 +296,19 @@ export type AgendamentoRow = {
   criado_por_nome: string | null;
   criado_em: Date;
   atualizado_em: Date;
+  agenda_pai_id?: bigint | null;
+  agenda_horario_id?: bigint | null;
+  forma_agendamento?: string | null;
+  horario_individual?: Date | string | null;
+  agenda_principal?: boolean | null;
+  horarios?: Array<{
+    id: string | number;
+    horarioInicial: string;
+    horarioFinal: string;
+    status: string;
+    agendamentoId?: number | null;
+    beneficiarioNome?: string | null;
+  }>;
 };
 
 export type AgendamentoListaEsperaRow = {

@@ -108,6 +108,16 @@ export function useSalvarAgendamentoOperacional() {
   });
 }
 
+export function useBeneficiariosCadastroAgendamento(busca?: string) {
+  const { usuario } = useAuth();
+  return useQuery({
+    queryKey: ["agendamentos", "beneficiarios-cadastro", usuario?.tenant_id ?? "sem-tenant", busca ?? ""],
+    queryFn: () => agendamentosService.listarBeneficiariosCadastro(busca),
+    enabled: !!usuario,
+    staleTime: 30_000
+  });
+}
+
 export function useCancelarAgendamento() {
   const queryClient = useQueryClient();
   return useMutation({

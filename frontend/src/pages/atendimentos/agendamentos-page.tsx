@@ -30,6 +30,7 @@ import { formatarCnpj, formatarTelefone } from "@/lib/br-utils";
 import { agendamentosService } from "@/services/agendamentos.service";
 import {
   AgendaCardList,
+  AtendimentoPorHorarioEditor,
   BeneficiarioSelector,
   DataSelector,
   GenerateCardButton,
@@ -41,6 +42,7 @@ import {
   useAgendamentos,
   useCopiarAgendamento,
   useBeneficiariosOperacionaisAgendamento,
+  useBeneficiariosCadastroAgendamento,
   useCancelarAgendamento,
   useIndicadoresAgendamentos,
   useItensOperacionaisAgendamento,
@@ -433,6 +435,12 @@ export function AgendamentosPage() {
   const [preferenciaCarregada, setPreferenciaCarregada] = useState(false);
   const [buscaBeneficiario, setBuscaBeneficiario] = useState("");
   const [beneficiariosSelecionados, setBeneficiariosSelecionados] = useState<number[]>([]);
+  const [formaAgendamento, setFormaAgendamento] = useState<"HORARIO" | "COLETIVO">("COLETIVO");
+  const [horaInicialIndividual, setHoraInicialIndividual] = useState("08:00");
+  const [horaFinalIndividual, setHoraFinalIndividual] = useState("12:00");
+  const [duracaoIndividual, setDuracaoIndividual] = useState(30);
+  const [buscaCadastroBeneficiario, setBuscaCadastroBeneficiario] = useState("");
+  const [ocupacoesPorHorario, setOcupacoesPorHorario] = useState<Record<string, number | null>>({});
   const [selecionadoId, setSelecionadoId] = useState<number | null>(null);
   const [agendaEmEdicaoId, setAgendaEmEdicaoId] = useState<number | null>(null);
   const [popup, setPopup] = useState<PopupMensagemState | null>(null);
@@ -457,6 +465,7 @@ export function AgendamentosPage() {
   const listaEsperaQuery = useListaEsperaAgendamentos();
   const itensQuery = useItensOperacionaisAgendamento(tipo, buscaItemAdiada);
   const beneficiariosQuery = useBeneficiariosOperacionaisAgendamento(itemSelecionado?.id ?? null);
+  const beneficiariosCadastroQuery = useBeneficiariosCadastroAgendamento(buscaCadastroBeneficiario);
   const unidadeAtualQuery = useUnidadeAssistencialAtual();
   const salvarAgendamentoMutation = useSalvarAgendamento();
   const salvarMutation = useSalvarAgendamentoOperacional();
@@ -537,6 +546,7 @@ export function AgendamentosPage() {
     () =>
       [...(agendamentosQuery.data ?? [])]
         .filter((item) => (item.status ?? "").trim().toUpperCase() !== "CANCELADO")
+        .filter((item) => !item.agendaPrincipal)
         .filter((item) => {
           const participantes = item.participantes ?? [];
           return (
@@ -559,6 +569,26 @@ export function AgendamentosPage() {
     () => cardsVisiveis.filter((item) => (item.data ?? "").slice(0, 10) === dataVisualizacao),
     [cardsVisiveis, dataVisualizacao]
   );
+  const agendaPrincipalDoDia = useMemo(
+    () => (agendamentosQuery.data ?? []).find((item) => item.agendaPrincipal && (item.data ?? "").slice(0, 10) === dataVisualizacao),
+    [agendamentosQuery.data, dataVisualizacao]
+  );
+
+  useEffect(() => {
+    if (!agendaPrincipalDoDia) return;
+    setFormaAgendamento("HORARIO");
+    setHoraInicialIndividual(agendaPrincipalDoDia.horaInicial?.slice(0, 5) ?? "08:00");
+    setHoraFinalIndividual(agendaPrincipalDoDia.horaFinal?.slice(0, 5) ?? "12:00");
+    setDuracaoIndividual(agendaPrincipalDoDia.duracaoMinutos ?? 30);
+    const ocupacoes: Record<string, number | null> = {};
+    for (const horario of agendaPrincipalDoDia.horarios ?? []) {
+      if (horario.agendamentoId) {
+        const child = (agendamentosQuery.data ?? []).find((item) => item.id === horario.agendamentoId);
+        ocupacoes[horario.horarioInicial] = child?.beneficiarioId ?? null;
+      }
+    }
+    setOcupacoesPorHorario(ocupacoes);
+  }, [agendaPrincipalDoDia, agendamentosQuery.data]);
 
   const beneficiariosFiltrados = useMemo(() => {
     const termo = buscaBeneficiario.trim().toLowerCase();
@@ -627,8 +657,8 @@ export function AgendamentosPage() {
   ];
 
   async function salvarCard() {
-    if (!tipo || !itemSelecionado?.id || !beneficiariosSelecionados.length || !dataAgendamento) {
-      setPopup({ tipo: "erro", titulo: "Atenção", texto: "Selecione tipo, item, beneficiários e data antes de gerar a agenda." });
+    if (!tipo || !itemSelecionado?.id || !dataAgendamento || (formaAgendamento === "COLETIVO" && !beneficiariosSelecionados.length)) {
+      setPopup({ tipo: "erro", titulo: "Atenção", texto: formaAgendamento === "HORARIO" ? "Selecione tipo, item, período e data antes de gerar a agenda." : "Selecione tipo, item, beneficiários e data antes de gerar a agenda." });
       return;
     }
 
@@ -647,7 +677,15 @@ export function AgendamentosPage() {
         tipo,
         itemId: itemSelecionado.id,
         data: dataAgendamento,
-        matriculasIds: beneficiariosSelecionados
+        ...(formaAgendamento === "HORARIO"
+          ? {
+              formaAgendamento,
+              horaInicial: horaInicialIndividual,
+              horaFinal: horaFinalIndividual,
+              duracaoMinutos: duracaoIndividual,
+              horarios: Object.entries(ocupacoesPorHorario).map(([horarioInicial, beneficiarioId]) => ({ horarioInicial, beneficiarioId }))
+            }
+          : { matriculasIds: beneficiariosSelecionados })
       });
       setGeracaoEtapa(ETAPAS_GERACAO_AGS.length - 1);
       definirDataVisualizacao(dataExibicao);
@@ -1127,11 +1165,23 @@ export function AgendamentosPage() {
                       value={tipo}
                       onChange={(value) => {
                         setTipo(value);
+                        setFormaAgendamento("COLETIVO");
                         setAgendaEmEdicaoId(null);
                         setItemSelecionado(null);
                         setBeneficiariosSelecionados([]);
                       }}
                     />
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-[var(--g3-foreground)]">Forma de agendamento</label>
+                      <select
+                        value={formaAgendamento}
+                        onChange={(event) => setFormaAgendamento(event.target.value as "HORARIO" | "COLETIVO")}
+                        className="h-10 w-full rounded-xl border border-[var(--g3-border)] bg-white px-3 text-sm"
+                      >
+                        <option value="COLETIVO">Atendimento coletivo/lista de participantes</option>
+                        <option value="HORARIO">Atendimento por horário marcado</option>
+                      </select>
+                    </div>
                     {tipo ? (
                       <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm lg:col-span-2">
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1161,12 +1211,14 @@ export function AgendamentosPage() {
                         setAgendaEmEdicaoId(null);
                         setItemSelecionado(item);
                         setBeneficiariosSelecionados([]);
+                        if (item.horario) setHoraInicialIndividual(item.horario.slice(0, 5));
+                        if (item.duracaoMinutos) setDuracaoIndividual(item.duracaoMinutos);
                       }}
                       carregando={itensQuery.isLoading}
                     />
                   </div>
                   <ItemResumoCard item={itemSelecionado} />
-                  {(() => {
+                  {formaAgendamento === "COLETIVO" ? <>{(() => {
                     const beneficiarioAgenda = beneficiariosFiltrados.find((item) => beneficiariosSelecionados.includes(item.matriculaId) && item.beneficiarioId);
                     return beneficiarioAgenda?.beneficiarioId ? (
                       <Button type="button" variant="outline" onClick={() => navigate(`/atendimentos/prontuario?beneficiarioId=${beneficiarioAgenda.beneficiarioId}`)}>
@@ -1189,10 +1241,23 @@ export function AgendamentosPage() {
                     }
                     onLimparSelecao={() => setBeneficiariosSelecionados([])}
                     carregando={beneficiariosQuery.isLoading}
-                  />
+                  /></> : <AtendimentoPorHorarioEditor
+                    horaInicial={horaInicialIndividual}
+                    horaFinal={horaFinalIndividual}
+                    duracaoMinutos={duracaoIndividual}
+                    busca={buscaCadastroBeneficiario}
+                    beneficiarios={beneficiariosCadastroQuery.data ?? []}
+                    ocupacoes={ocupacoesPorHorario}
+                    carregandoBeneficiarios={beneficiariosCadastroQuery.isLoading}
+                    onHoraInicialChange={setHoraInicialIndividual}
+                    onHoraFinalChange={setHoraFinalIndividual}
+                    onDuracaoChange={setDuracaoIndividual}
+                    onBuscaChange={setBuscaCadastroBeneficiario}
+                    onBeneficiarioChange={(horario, beneficiarioId) => setOcupacoesPorHorario((atual) => ({ ...atual, [horario]: beneficiarioId }))}
+                  />}
                   <DataSelector value={dataAgendamento} onChange={setDataAgendamento} />
                   <GenerateCardButton
-                    disabled={!tipo || !itemSelecionado?.id || !beneficiariosSelecionados.length || !dataAgendamento}
+                    disabled={!tipo || !itemSelecionado?.id || (formaAgendamento === "COLETIVO" && !beneficiariosSelecionados.length) || !dataAgendamento}
                     loading={salvarMutation.isPending || geracaoEmAndamento}
                     onClick={salvarCard}
                     texto={agendaEmEdicaoId ? "Atualizar agenda" : "Gerar agenda"}
@@ -1245,6 +1310,22 @@ export function AgendamentosPage() {
                       </Button>
                     </div>
                   </div>
+                  {agendaPrincipalDoDia ? (
+                    <div className="rounded-2xl border border-blue-200 bg-white p-4 shadow-sm">
+                      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">{agendaPrincipalDoDia.itemNome || agendaPrincipalDoDia.tipoAtendimento}</p>
+                          <p className="text-xs text-slate-500">Agenda principal · {agendaPrincipalDoDia.horaInicial?.slice(0, 5)} às {agendaPrincipalDoDia.horaFinal?.slice(0, 5)}</p>
+                        </div>
+                        <span className="rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-800">{(agendaPrincipalDoDia.horarios ?? []).filter((item) => item.status === "Agendado").length} agendado(s)</span>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm"><thead className="text-xs uppercase text-slate-500"><tr><th className="px-2 py-2">Horário</th><th className="px-2 py-2">Beneficiário</th><th className="px-2 py-2">Situação</th></tr></thead><tbody>
+                          {(agendaPrincipalDoDia.horarios ?? []).map((horario) => <tr key={horario.id} className="border-t border-slate-100"><td className="px-2 py-2 font-semibold">{horario.horarioInicial}</td><td className="px-2 py-2">{horario.beneficiarioNome || "Disponível"}</td><td className="px-2 py-2"><span className={horario.status === "Agendado" ? "text-blue-700" : "text-emerald-700"}>{horario.status === "Agendado" ? "Agendado" : "Livre"}</span></td></tr>)}
+                        </tbody></table>
+                      </div>
+                    </div>
+                  ) : null}
                   <AgendaCardList
                     cards={cardsDoDia}
                     carregando={agendamentosQuery.isLoading || agendamentosQuery.isFetching}
@@ -1268,6 +1349,10 @@ export function AgendamentosPage() {
                     onWhatsApp={(item) => void executarNotificacao(item, "WHATSAPP")}
                     onEmail={(item) => void executarNotificacao(item, "EMAIL")}
                     onImprimir={imprimirFichaPresenca}
+                    onIniciarAtendimento={(item) => {
+                      if (!item.beneficiarioId) return;
+                      navigate(`/atendimentos/prontuario?beneficiarioId=${item.beneficiarioId}&data=${item.data?.slice(0, 10) ?? ""}&horario=${item.horaInicial?.slice(0, 5) ?? ""}&agendaId=${item.id ?? ""}`);
+                    }}
                   />
                 </CardContent>
               </Card>

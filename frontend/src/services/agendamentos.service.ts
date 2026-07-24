@@ -4,6 +4,7 @@ import type {
   AgendamentoFiltros,
   AgendamentoListaEspera,
   AgendamentoOperacionalBeneficiario,
+  AgendamentoCadastroBeneficiario,
   AgendamentoOperacionalItem,
   AgendamentoOperacionalPayload,
   AgendamentoOperacionalTipo
@@ -118,6 +119,13 @@ export const agendamentosService = {
   async listarBeneficiarios(itemId: number) {
     const { data } = await httpClient.get<{ beneficiarios: AgendamentoOperacionalBeneficiario[] }>("/api/agendamentos/beneficiarios", {
       params: { itemId }
+    });
+    return data.beneficiarios ?? [];
+  },
+
+  async listarBeneficiariosCadastro(busca?: string) {
+    const { data } = await httpClient.get<{ beneficiarios: AgendamentoCadastroBeneficiario[] }>("/api/agendamentos/beneficiarios-cadastro", {
+      params: { busca }
     });
     return data.beneficiarios ?? [];
   },

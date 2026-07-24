@@ -21,6 +21,12 @@ const optionalTime = z.preprocess((value) => {
 const prioridadeSchema = z.enum(["Normal", "Media", "Alta", "Urgencia"]);
 const modalidadeSchema = z.enum(["Presencial", "Remoto", "Domiciliar", "Externo", "Coletivo"]);
 const tipoOperacionalSchema = z.enum(["curso", "atendimento", "oficina"]);
+const formaAgendamentoSchema = z.enum(["HORARIO", "COLETIVO"]);
+
+const agendamentoOperacionalHorarioSchema = z.object({
+  horarioInicial: z.string().trim().regex(/^\d{2}:\d{2}(:\d{2})?$/),
+  beneficiarioId: z.coerce.number().int().positive().optional().nullable()
+});
 
 export const agendamentoParticipanteSchema = z.object({
   matriculaId: z.coerce.number().int().positive().optional().nullable(),
@@ -111,6 +117,11 @@ export const agendamentoInputSchema = z.object({
   itemDiasSemana: optionalTrimmedString.nullable().optional(),
   itemLocal: optionalTrimmedString.nullable().optional(),
   diaSemana: optionalTrimmedString.nullable().optional()
+  ,agendaPaiId: z.coerce.number().int().positive().nullable().optional()
+  ,agendaHorarioId: z.coerce.number().int().positive().nullable().optional()
+  ,formaAgendamento: formaAgendamentoSchema.optional()
+  ,horarioIndividual: optionalTime.nullable().optional()
+  ,agendaPrincipal: z.coerce.boolean().optional()
 });
 
 export const agendamentoOperacionalInputSchema = z.object({
@@ -118,6 +129,11 @@ export const agendamentoOperacionalInputSchema = z.object({
   tipo: tipoOperacionalSchema,
   itemId: z.coerce.number().int().positive(),
   data: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/),
+  formaAgendamento: formaAgendamentoSchema.optional().default("COLETIVO"),
+  horaInicial: optionalTime,
+  horaFinal: optionalTime,
+  duracaoMinutos: z.coerce.number().int().positive().max(1440).optional(),
+  horarios: z.array(agendamentoOperacionalHorarioSchema).optional(),
   beneficiariosIds: z
     .array(z.coerce.number().int().positive())
     .optional(),
@@ -125,6 +141,12 @@ export const agendamentoOperacionalInputSchema = z.object({
     .array(z.coerce.number().int().positive())
     .optional()
 }).superRefine((input, ctx) => {
+  if (input.formaAgendamento === "HORARIO") {
+    if (!input.horaInicial) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["horaInicial"], message: "Informe o horário inicial." });
+    if (!input.horaFinal) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["horaFinal"], message: "Informe o horário final." });
+    if (!input.duracaoMinutos) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["duracaoMinutos"], message: "Informe a duração do atendimento." });
+    return;
+  }
   const totalBeneficiarios = input.beneficiariosIds?.length ?? 0;
   const totalMatriculas = input.matriculasIds?.length ?? 0;
   if (!totalBeneficiarios && !totalMatriculas) {

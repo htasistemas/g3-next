@@ -29,6 +29,7 @@ export class AgendamentosController {
         nome: item.nome,
         profissionalNome: item.profissional ?? undefined,
         horario: item.horario_inicial ? String(item.horario_inicial).slice(0, 5) : undefined,
+        duracaoMinutos: item.duracao_horas != null ? Number(item.duracao_horas) * 60 : undefined,
         diasSemana: item.dias_semana ?? undefined,
         local: item.sala_nome ?? item.instituicao_parceira ?? undefined
       }))
@@ -52,6 +53,23 @@ export class AgendamentosController {
         status: item.status ?? undefined,
         profissionalNome: item.profissional_nome ?? undefined,
         selecionavel: Boolean(item.matricula_id)
+      }))
+    });
+  }
+
+  async listarBeneficiariosCadastro(request: AuthenticatedRequest, response: Response) {
+    const itens = await service.listarBeneficiariosCadastro(
+      request.query.busca,
+      request.authUser?.tenant_id,
+      request.authUser?.instituicao_slug
+    );
+    return response.json({
+      beneficiarios: itens.map((item) => ({
+        id: Number(item.beneficiario_id),
+        codigo: item.codigo ?? undefined,
+        nomeCompleto: item.beneficiario_nome,
+        telefone: item.telefone ?? undefined,
+        email: item.email ?? undefined
       }))
     });
   }

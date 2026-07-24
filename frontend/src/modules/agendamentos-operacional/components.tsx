@@ -25,10 +25,12 @@ import { Select } from "@/components/ui/select";
 import { formatarTelefone } from "@/lib/br-utils";
 import type {
   Agendamento,
+  AgendamentoCadastroBeneficiario,
   AgendamentoOperacionalBeneficiario,
   AgendamentoOperacionalItem,
   AgendamentoOperacionalTipo
 } from "@/types/agendamento";
+import { gerarHorariosDisponiveis } from "@/lib/agendamento-horarios";
 
 const formatarData = (data?: string) => {
   if (!data) return "---";
@@ -298,6 +300,61 @@ export function GenerateCardButton(props: { disabled?: boolean; loading?: boolea
   );
 }
 
+export function AtendimentoPorHorarioEditor(props: {
+  horaInicial: string;
+  horaFinal: string;
+  duracaoMinutos: number;
+  busca: string;
+  beneficiarios: AgendamentoCadastroBeneficiario[];
+  ocupacoes: Record<string, number | null>;
+  carregandoBeneficiarios?: boolean;
+  onHoraInicialChange: (value: string) => void;
+  onHoraFinalChange: (value: string) => void;
+  onDuracaoChange: (value: number) => void;
+  onBuscaChange: (value: string) => void;
+  onBeneficiarioChange: (horario: string, beneficiarioId: number | null) => void;
+}) {
+  const horarios = gerarHorariosDisponiveis(props.horaInicial, props.horaFinal, props.duracaoMinutos);
+  const usados = new Set(Object.values(props.ocupacoes).filter((id): id is number => Boolean(id)));
+  return (
+    <div className="space-y-4 rounded-2xl border border-blue-200 bg-blue-50/50 p-4 lg:col-span-2">
+      <div className="grid gap-3 md:grid-cols-3">
+        <div><Label>Horário inicial</Label><Input type="time" value={props.horaInicial} onChange={(event) => props.onHoraInicialChange(event.target.value)} /></div>
+        <div><Label>Horário final</Label><Input type="time" value={props.horaFinal} onChange={(event) => props.onHoraFinalChange(event.target.value)} /></div>
+        <div>
+          <Label>Duração do atendimento</Label>
+          <Select value={String(props.duracaoMinutos)} onChange={(event) => props.onDuracaoChange(Number(event.target.value))}>
+            {[10, 15, 20, 30, 40, 45, 60].map((minutos) => <option key={minutos} value={minutos}>{minutos} minutos</option>)}
+          </Select>
+        </div>
+      </div>
+      <div>
+        <Label>Buscar beneficiário por nome, CPF, matrícula ou telefone</Label>
+        <Input value={props.busca} onChange={(event) => props.onBuscaChange(event.target.value)} placeholder="Digite para pesquisar no cadastro oficial" />
+      </div>
+      <div className="overflow-x-auto rounded-xl border border-blue-200 bg-white">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-blue-50 text-xs uppercase text-blue-900"><tr><th className="px-3 py-2">Horário</th><th className="px-3 py-2">Beneficiário</th><th className="px-3 py-2">Situação</th></tr></thead>
+          <tbody>
+            {!horarios.length ? <tr><td colSpan={3} className="px-3 py-4 text-center text-slate-500">Informe um período válido para gerar os horários.</td></tr> : horarios.map((horario) => {
+              const atual = props.ocupacoes[horario.horarioInicial] ?? null;
+              return <tr key={horario.horarioInicial} className="border-t border-slate-100">
+                <td className="px-3 py-2 font-semibold text-slate-900">{horario.horarioInicial}–{horario.horarioFinal}</td>
+                <td className="px-3 py-2"><Select value={atual ? String(atual) : ""} onChange={(event) => props.onBeneficiarioChange(horario.horarioInicial, event.target.value ? Number(event.target.value) : null)}>
+                  <option value="">Disponível</option>
+                  {props.beneficiarios.map((beneficiario) => <option key={beneficiario.id} value={beneficiario.id} disabled={usados.has(beneficiario.id) && atual !== beneficiario.id}>{beneficiario.nomeCompleto}{beneficiario.codigo ? ` — ${beneficiario.codigo}` : ""}</option>)}
+                </Select></td>
+                <td className="px-3 py-2"><span className={atual ? "rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-800" : "rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800"}>{atual ? "Agendado" : "Livre"}</span></td>
+              </tr>;
+            })}
+          </tbody>
+        </table>
+      </div>
+      {props.carregandoBeneficiarios ? <p className="text-xs text-blue-800">Buscando beneficiários...</p> : null}
+    </div>
+  );
+}
+
 export function AgendaCardList(props: {
   cards: Agendamento[];
   carregando?: boolean;
@@ -320,6 +377,7 @@ export function AgendaCardList(props: {
   onWhatsApp: (item: Agendamento) => void;
   onEmail: (item: Agendamento) => void;
   onImprimir: (item: Agendamento) => void;
+  onIniciarAtendimento?: (item: Agendamento) => void;
   confirmacaoEmAndamento?: {
     agendamentoId: number;
     index: number;
@@ -378,6 +436,7 @@ export function AgendaCardList(props: {
           onWhatsApp={() => props.onWhatsApp(item)}
           onEmail={() => props.onEmail(item)}
           onImprimir={() => props.onImprimir(item)}
+          onIniciarAtendimento={props.onIniciarAtendimento ? () => props.onIniciarAtendimento?.(item) : undefined}
           confirmacaoEmAndamento={
             props.confirmacaoEmAndamento && Number(item.id) === props.confirmacaoEmAndamento.agendamentoId
               ? props.confirmacaoEmAndamento
@@ -409,6 +468,7 @@ export function AgendaCard(props: {
   onImprimir: () => void;
   onEditar: () => void;
   onCancelar: () => void;
+  onIniciarAtendimento?: () => void;
   confirmacaoEmAndamento?: {
     agendamentoId: number;
     index: number;
@@ -463,6 +523,11 @@ export function AgendaCard(props: {
               {recolhido ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
               {recolhido ? "Expandir" : "Recolher"}
             </Button>
+            {props.onIniciarAtendimento && props.item.beneficiarioId ? (
+              <Button type="button" className="h-8 bg-white px-2 text-xs text-emerald-800 hover:bg-emerald-50" onClick={props.onIniciarAtendimento}>
+                Iniciar atendimento
+              </Button>
+            ) : null}
           </div>
         </div>
       </div>
