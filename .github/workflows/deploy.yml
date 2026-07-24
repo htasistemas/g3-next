@@ -85,4 +85,13 @@ jobs:
           set -euo pipefail
 
           cd "$APP_DIR"
+          echo "Recuperacao emergencial da borda antes do deploy"
+          for container in nginx-g3n g3n-tunnel; do
+            if docker inspect "$container" >/dev/null 2>&1; then
+              docker start "$container" >/dev/null 2>&1 || true
+              echo "Container de borda verificado: $container"
+            else
+              echo "Container de borda inexistente: $container"
+            fi
+          done
           APP_DIR="$APP_DIR" DEPLOY_STATE_DIR="$DEPLOY_STATE_DIR" bash ./deploy.sh
