@@ -166,11 +166,12 @@ export function PortalDoadorPage() {
   }
 
   useEffect(() => {
-    const salvo = window.localStorage.getItem(TOKEN_KEY) ?? "";
+    const salvo = window.sessionStorage.getItem(TOKEN_KEY) ?? "";
+    window.localStorage.removeItem(TOKEN_KEY);
     if (!salvo) return;
     setToken(salvo);
     void carregarPainel(salvo).catch(() => {
-      window.localStorage.removeItem(TOKEN_KEY);
+      window.sessionStorage.removeItem(TOKEN_KEY);
       setToken("");
     });
   }, []);
@@ -179,7 +180,7 @@ export function PortalDoadorPage() {
     setCarregando(true);
     try {
       const resultado = await captacaoRecursosService.portalLogin(normalizarEmail(email), normalizarCpf(documento) || normalizarCnpj(documento) || documento.trim());
-      window.localStorage.setItem(TOKEN_KEY, resultado.token);
+      window.sessionStorage.setItem(TOKEN_KEY, resultado.token);
       setToken(resultado.token);
       await carregarPainel(resultado.token);
       setPopup({ tipo: "sucesso", titulo: "Acesso liberado", texto: "Seu portal foi carregado com sucesso." });
@@ -350,7 +351,7 @@ export function PortalDoadorPage() {
   }
 
   function sair() {
-    window.localStorage.removeItem(TOKEN_KEY);
+    window.sessionStorage.removeItem(TOKEN_KEY);
     setToken("");
     setPainel(null);
   }

@@ -121,6 +121,10 @@ function montarId(entidadeTipo: GeoEntityType, id: bigint | number | string) {
   return `${entidadeTipo}:${String(id)}`;
 }
 
+function tenantCondition(alias: string, tenantId: string) {
+  return Prisma.sql`${Prisma.raw(alias)}.tenant_id::text = ${tenantId}`;
+}
+
 function quebrarIdComposto(id: string) {
   const [entidadeTipo, valor] = id.split(":");
   if (!entidadeTipo || !valor) {
@@ -352,22 +356,112 @@ export class DashboardGeorreferenciamentoService {
   private readonly optionsCache = new TtlCache<Awaited<ReturnType<DashboardGeorreferenciamentoRepository["listarOpcoesFiltros"]>>>(300_000, 4);
   private readonly queryCache = new TtlCache<GeoQueryResponse>(25_000, 16);
 
+  private async filtrarEntidadesPorTenant<T extends { id: bigint }>(
+    rows: T[],
+    tabela: string,
+    tenantId: string
+  ) {
+    if (!rows.length) return rows;
+
+    const ids = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+      SELECT id
+      FROM ${Prisma.raw(tabela)}
+      WHERE tenant_id::text = ${tenantId}
+    `);
+    const permitidos = new Set(ids.map((item) => item.id.toString()));
+    return rows.filter((item) => permitidos.has(item.id.toString()));
+  }
+
+  private async filtrarPontosManuaisPorTenant(
+    pontos: ManualPointRow[],
+    tenantId: string
+  ) {
+    const tabelas: Partial<Record<GeoEntityType, string>> = {
+      BENEFICIARIO: "cadastro_beneficiario",
+      FAMILIA: "vinculo_familiar",
+      PROFISSIONAL: "cadastro_profissionais",
+      VOLUNTARIO: "cadastro_voluntario",
+      INSTITUICAO: "unidade_assistencial",
+      DOADOR: "doador",
+      DISTRIBUICAO: "doacao_realizada"
+    };
+    const permitidos = new Set<string>();
+
+    for (const [tipo, tabela] of Object.entries(tabelas)) {
+      const ids = pontos
+        .filter((item) => item.entidade_tipo === tipo && item.entidade_id)
+        .map((item) => item.entidade_id as bigint);
+      if (!ids.length || !tabela) continue;
+
+      const rows = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+        SELECT id
+        FROM ${Prisma.raw(tabela)}
+        WHERE tenant_id::text = ${tenantId}
+          AND id IN (${Prisma.join(ids)})
+      `);
+      rows.forEach((row) => permitidos.add(`${tipo}:${row.id.toString()}`));
+    }
+
+    return pontos.filter((item) =>
+      item.entidade_tipo && item.entidade_id
+        ? permitidos.has(`${item.entidade_tipo}:${item.entidade_id.toString()}`)
+        : false
+    );
+  }
+
+  private async filtrarLocalizacoesPorTenant(
+    localizacoes: TerritorialLocationRow[],
+    tenantId: string
+  ) {
+    const tabelas: Partial<Record<GeoEntityType, string>> = {
+      BENEFICIARIO: "cadastro_beneficiario",
+      FAMILIA: "vinculo_familiar",
+      PROFISSIONAL: "cadastro_profissionais",
+      VOLUNTARIO: "cadastro_voluntario",
+      INSTITUICAO: "unidade_assistencial",
+      DOADOR: "doador",
+      DISTRIBUICAO: "doacao_realizada"
+    };
+    const permitidos = new Set<string>();
+
+    for (const [tipo, tabela] of Object.entries(tabelas)) {
+      const ids = localizacoes
+        .filter((item) => item.entidade_tipo === tipo)
+        .map((item) => item.entidade_id);
+      if (!ids.length || !tabela) continue;
+
+      const rows = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+        SELECT id
+        FROM ${Prisma.raw(tabela)}
+        WHERE tenant_id::text = ${tenantId}
+          AND id IN (${Prisma.join(ids)})
+      `);
+      rows.forEach((row) => permitidos.add(`${tipo}:${row.id.toString()}`));
+    }
+
+    return localizacoes.filter((item) =>
+      permitidos.has(`${item.entidade_tipo}:${item.entidade_id.toString()}`)
+    );
+  }
+
   async listarOpcoesFiltros(authUser?: AuthUser) {
     const tenantId = this.parseTenant(authUser);
-    return this.optionsCache.getOrSet(`opcoes:${tenantId}`, async () => this.repository.listarOpcoesFiltros());
+    return this.optionsCache.getOrSet(`opcoes:${tenantId}`, async () => this.repository.listarOpcoesFiltros(tenantId));
   }
 
   async consultar(rawInput: unknown, authUser?: AuthUser): Promise<GeoQueryResponse> {
     const filtros = dashboardGeorreferenciamentoConsultaSchema.parse(rawInput);
+    const tenantId = this.parseTenant(authUser);
     const cacheKey = JSON.stringify({
+      tenantId,
       filtros,
       perfil: [...(authUser?.permissoes ?? [])].sort()
     });
 
     return this.queryCache.getOrSet(cacheKey, async () => {
       const [unidade, diagnostico, localizacoesAtivas, pontosManuais] = await Promise.all([
-        this.unidadeRepository.buscarAtual(),
-        this.repository.buscarDiagnostico(),
+        this.unidadeRepository.buscarAtual(tenantId),
+        this.repository.buscarDiagnostico(tenantId),
         this.repository.listarLocalizacoesAtivas(),
         filtros.camadas.some((camada) =>
           ["pontos_distribuicao", "demandas_territoriais", "vulnerabilidade", "violencia"].includes(camada)
@@ -376,7 +470,9 @@ export class DashboardGeorreferenciamentoService {
           : Promise.resolve([] as ManualPointRow[])
       ]);
 
-      const mapaLocalizacoes = criarMapaLocalizacoes(localizacoesAtivas);
+      const pontosManuaisDoTenant = await this.filtrarPontosManuaisPorTenant(pontosManuais, tenantId);
+      const localizacoesDoTenant = await this.filtrarLocalizacoesPorTenant(localizacoesAtivas, tenantId);
+      const mapaLocalizacoes = criarMapaLocalizacoes(localizacoesDoTenant);
       const precisaBeneficiarios = filtros.camadas.some((camada) =>
         ["beneficiarios", "vulnerabilidade"].includes(camada)
       );
@@ -401,29 +497,29 @@ export class DashboardGeorreferenciamentoService {
         ocorrencias
       ] = await Promise.all([
         precisaBeneficiarios
-          ? this.carregarBeneficiarios()
+          ? this.carregarBeneficiarios(tenantId)
           : Promise.resolve([] as Awaited<ReturnType<DashboardGeorreferenciamentoService["carregarBeneficiarios"]>>),
         precisaFamilias
-          ? this.carregarFamilias()
+          ? this.carregarFamilias(tenantId)
           : Promise.resolve([] as Awaited<ReturnType<DashboardGeorreferenciamentoService["carregarFamilias"]>>),
         precisaProfissionais
-          ? this.carregarProfissionais()
+          ? this.carregarProfissionais(tenantId)
           : Promise.resolve(
               [] as Awaited<ReturnType<DashboardGeorreferenciamentoService["carregarProfissionais"]>>
             ),
         precisaVoluntarios
-          ? this.carregarVoluntarios()
+          ? this.carregarVoluntarios(tenantId)
           : Promise.resolve(
               [] as Awaited<ReturnType<DashboardGeorreferenciamentoService["carregarVoluntarios"]>>
             ),
         precisaInstituicoes
-          ? this.carregarInstituicoes()
+          ? this.carregarInstituicoes(tenantId)
           : Promise.resolve(
               [] as Awaited<ReturnType<DashboardGeorreferenciamentoService["carregarInstituicoes"]>>
             ),
-        precisaDoadores ? this.carregarDoadores(mapaLocalizacoes, authUser) : Promise.resolve([]),
-        precisaDistribuicoes ? this.carregarDistribuicoes(mapaLocalizacoes, authUser) : Promise.resolve([]),
-        precisaOcorrencias ? this.carregarOcorrencias(mapaLocalizacoes, authUser) : Promise.resolve([])
+        precisaDoadores ? this.carregarDoadores(mapaLocalizacoes, authUser, tenantId) : Promise.resolve([]),
+        precisaDistribuicoes ? this.carregarDistribuicoes(mapaLocalizacoes, authUser, tenantId) : Promise.resolve([]),
+        precisaOcorrencias ? this.carregarOcorrencias(mapaLocalizacoes, authUser, tenantId) : Promise.resolve([])
       ]);
 
       const dadosCamadasBase: Record<string, InternalGeoPoint[]> = {
@@ -435,17 +531,17 @@ export class DashboardGeorreferenciamentoService {
         doadores: doadores,
         pontos_distribuicao: [
           ...distribuicoes,
-          ...this.mapearPontosManuais(pontosManuais, "pontos_distribuicao", authUser)
+          ...this.mapearPontosManuais(pontosManuaisDoTenant, "pontos_distribuicao", authUser)
         ],
-        violencia: [...ocorrencias, ...this.mapearPontosManuais(pontosManuais, "violencia", authUser)],
-        demandas_territoriais: this.mapearPontosManuais(pontosManuais, "demandas_territoriais", authUser),
+        violencia: [...ocorrencias, ...this.mapearPontosManuais(pontosManuaisDoTenant, "violencia", authUser)],
+        demandas_territoriais: this.mapearPontosManuais(pontosManuaisDoTenant, "demandas_territoriais", authUser),
         vulnerabilidade: []
       };
 
       dadosCamadasBase.vulnerabilidade = [
         ...dadosCamadasBase.beneficiarios.filter((item) => Boolean(item.situacaoResumo)),
         ...dadosCamadasBase.familias.filter((item) => Boolean(item.situacaoResumo)),
-        ...this.mapearPontosManuais(pontosManuais, "vulnerabilidade", authUser)
+        ...this.mapearPontosManuais(pontosManuaisDoTenant, "vulnerabilidade", authUser)
       ];
 
       const camadasSelecionadas = filtros.camadas;
@@ -517,10 +613,13 @@ export class DashboardGeorreferenciamentoService {
   }
 
   async obterDetalhe(idComposto: string, authUser?: AuthUser): Promise<GeoDetailResponse> {
+    const tenantId = this.parseTenant(authUser);
     const { entidadeTipo, entidadeId } = quebrarIdComposto(idComposto);
     if (entidadeTipo === "PONTO_MANUAL") {
       const detalhe = await this.repository.montarDetalhePontoManual(entidadeId);
-      if (!detalhe) throw new AppError("Ponto territorial não encontrado.", 404);
+      if (!detalhe || !(await this.pontoManualPertenceAoTenant(entidadeId, tenantId))) {
+        throw new AppError("Ponto territorial não encontrado.", 404);
+      }
       return detalhe;
     }
 
@@ -531,69 +630,74 @@ export class DashboardGeorreferenciamentoService {
     idComposto: string,
     authUser?: AuthUser
   ): Promise<GeoDetailResponse> {
+    const tenantId = this.parseTenant(authUser);
     const { entidadeTipo, entidadeId } = quebrarIdComposto(idComposto);
     if (entidadeTipo === "PONTO_MANUAL") {
       const detalhe = await this.repository.montarDetalhePontoManual(entidadeId);
+      if (detalhe && !(await this.pontoManualPertenceAoTenant(entidadeId, tenantId))) {
+        throw new AppError("Ponto territorial não encontrado.", 404);
+      }
       if (!detalhe) throw new AppError("Ponto territorial nÃ£o encontrado.", 404);
       return detalhe;
     }
 
     const localizacoesAtivas = await this.repository.listarLocalizacoesAtivas();
-    const mapaLocalizacoes = criarMapaLocalizacoes(localizacoesAtivas);
+    const localizacoesDoTenant = await this.filtrarLocalizacoesPorTenant(localizacoesAtivas, tenantId);
+    const mapaLocalizacoes = criarMapaLocalizacoes(localizacoesDoTenant);
     const idProcurado = montarId(entidadeTipo, entidadeId);
 
     switch (entidadeTipo) {
       case "BENEFICIARIO": {
         const ponto = this
-          .mapearBeneficiarios(await this.carregarBeneficiarios(), mapaLocalizacoes, authUser)
+          .mapearBeneficiarios(await this.carregarBeneficiarios(tenantId), mapaLocalizacoes, authUser)
           .find((item) => item.id === idProcurado);
         if (ponto) return montarDetalheTerritorial(ponto);
         break;
       }
       case "FAMILIA": {
         const ponto = this
-          .mapearFamilias(await this.carregarFamilias(), mapaLocalizacoes, authUser)
+          .mapearFamilias(await this.carregarFamilias(tenantId), mapaLocalizacoes, authUser)
           .find((item) => item.id === idProcurado);
         if (ponto) return montarDetalheTerritorial(ponto);
         break;
       }
       case "PROFISSIONAL": {
         const ponto = this
-          .mapearProfissionais(await this.carregarProfissionais(), mapaLocalizacoes, authUser)
+          .mapearProfissionais(await this.carregarProfissionais(tenantId), mapaLocalizacoes, authUser)
           .find((item) => item.id === idProcurado);
         if (ponto) return montarDetalheTerritorial(ponto);
         break;
       }
       case "VOLUNTARIO": {
         const ponto = this
-          .mapearVoluntarios(await this.carregarVoluntarios(), mapaLocalizacoes, authUser)
+          .mapearVoluntarios(await this.carregarVoluntarios(tenantId), mapaLocalizacoes, authUser)
           .find((item) => item.id === idProcurado);
         if (ponto) return montarDetalheTerritorial(ponto);
         break;
       }
       case "INSTITUICAO": {
         const ponto = this
-          .mapearInstituicoes(await this.carregarInstituicoes(), mapaLocalizacoes, authUser)
+          .mapearInstituicoes(await this.carregarInstituicoes(tenantId), mapaLocalizacoes, authUser)
           .find((item) => item.id === idProcurado);
         if (ponto) return montarDetalheTerritorial(ponto);
         break;
       }
       case "DOADOR": {
-        const ponto = (await this.carregarDoadores(mapaLocalizacoes, authUser)).find(
+        const ponto = (await this.carregarDoadores(mapaLocalizacoes, authUser, tenantId)).find(
           (item) => item.id === idProcurado
         );
         if (ponto) return montarDetalheTerritorial(ponto);
         break;
       }
       case "DISTRIBUICAO": {
-        const ponto = (await this.carregarDistribuicoes(mapaLocalizacoes, authUser)).find(
+        const ponto = (await this.carregarDistribuicoes(mapaLocalizacoes, authUser, tenantId)).find(
           (item) => item.id === idProcurado
         );
         if (ponto) return montarDetalheTerritorial(ponto);
         break;
       }
       case "OCORRENCIA_VIOLENCIA": {
-        const ponto = (await this.carregarOcorrencias(mapaLocalizacoes, authUser)).find(
+        const ponto = (await this.carregarOcorrencias(mapaLocalizacoes, authUser, tenantId)).find(
           (item) => item.id === idProcurado
         );
         if (ponto) return montarDetalheTerritorial(ponto);
@@ -744,8 +848,76 @@ export class DashboardGeorreferenciamentoService {
     return tenantId;
   }
 
+  private async pontoManualPertenceAoTenant(
+    pontoManualId: bigint,
+    tenantId: string
+  ) {
+    const pontos = await prisma.$queryRaw<Array<{ entidade_tipo: GeoEntityType | null; entidade_id: bigint | null }>>(Prisma.sql`
+      SELECT entidade_tipo, entidade_id
+      FROM territorial_ponto_manual
+      WHERE id = ${pontoManualId}
+      LIMIT 1
+    `);
+    const entidadeTipo = pontos[0]?.entidade_tipo;
+    const entidadeId = pontos[0]?.entidade_id;
+    const tabelaPorEntidade: Partial<Record<GeoEntityType, string>> = {
+      BENEFICIARIO: "cadastro_beneficiario",
+      FAMILIA: "vinculo_familiar",
+      PROFISSIONAL: "cadastro_profissionais",
+      VOLUNTARIO: "cadastro_voluntario",
+      INSTITUICAO: "unidade_assistencial",
+      DOADOR: "doador",
+      DISTRIBUICAO: "doacao_realizada"
+    };
+    const tabela = entidadeTipo ? tabelaPorEntidade[entidadeTipo] : undefined;
+    if (!tabela || !entidadeId) return false;
+
+    const rows = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+      SELECT id
+      FROM ${Prisma.raw(tabela)}
+      WHERE id = ${entidadeId}
+        AND tenant_id::text = ${tenantId}
+      LIMIT 1
+    `);
+    return rows.length > 0;
+  }
+
+  private async entidadePertenceAoTenant(
+    entidadeTipo: GeoEntityType,
+    entidadeId: string,
+    tenantId: string
+  ) {
+    const tabelaPorEntidade: Partial<Record<GeoEntityType, string>> = {
+      BENEFICIARIO: "cadastro_beneficiario",
+      FAMILIA: "vinculo_familiar",
+      PROFISSIONAL: "cadastro_profissionais",
+      VOLUNTARIO: "cadastro_voluntario",
+      INSTITUICAO: "unidade_assistencial",
+      DOADOR: "doador",
+      DISTRIBUICAO: "doacao_realizada"
+    };
+    const tabela = tabelaPorEntidade[entidadeTipo];
+    if (!tabela) return false;
+
+    const rows = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+      SELECT id
+      FROM ${Prisma.raw(tabela)}
+      WHERE id = ${BigInt(entidadeId)}
+        AND tenant_id::text = ${tenantId}
+      LIMIT 1
+    `);
+    return rows.length > 0;
+  }
+
   async salvarMarcacao(rawInput: unknown, authUser?: AuthUser) {
     const input = dashboardGeorreferenciamentoMarcacaoSchema.parse(rawInput);
+    const tenantId = this.parseTenant(authUser);
+    if (input.entidadeTipo && input.entidadeId) {
+      const pertence = await this.entidadePertenceAoTenant(input.entidadeTipo, input.entidadeId, tenantId);
+      if (!pertence) throw new AppError("Entidade territorial não pertence ao tenant autenticado.", 404);
+    } else if (input.acao === "PONTO_TERRITORIAL") {
+      throw new AppError("Ponto territorial sem entidade vinculada não pode ser criado com segurança nesta versão.", 422);
+    }
     const resultado =
       input.acao === "LOCALIZACAO_VINCULADA"
         ? await this.repository.salvarMarcacaoVinculada(input, authUser)
@@ -757,6 +929,13 @@ export class DashboardGeorreferenciamentoService {
   }
 
   async geocodificarPendentes(rawInput: unknown, authUser?: AuthUser): Promise<GeoPendingGeocodingResponse> {
+    this.parseTenant(authUser);
+    throw new AppError(
+      "A geocodificação em lote está temporariamente bloqueada até que as pendências territoriais tenham isolamento por tenant.",
+      501
+    );
+
+    /* istanbul ignore next */
     const input = dashboardGeorreferenciamentoGeocodingSchema.parse(rawInput);
     const totalAntes = await this.repository.contarPendenciasGeocodificacao();
     const pendencias = await this.repository.listarPendenciasGeocodificacao(input.limite);
@@ -809,8 +988,8 @@ export class DashboardGeorreferenciamentoService {
 
         await this.repository.aplicarCoordenadasGeocodificadas(
           pendencia,
-          coordenadas.latitude,
-          coordenadas.longitude,
+          coordenadas!.latitude,
+          coordenadas!.longitude,
           authUser
         );
         await this.repository.registrarLogGeocoding(
@@ -830,7 +1009,7 @@ export class DashboardGeorreferenciamentoService {
           pendencia.origem,
           enderecoReferencia,
           "FALHA",
-          error instanceof Error ? error.message : "Falha ao geocodificar."
+          String(error)
         );
       }
 
@@ -906,8 +1085,8 @@ export class DashboardGeorreferenciamentoService {
     });
   }
 
-  private async carregarBeneficiarios() {
-    return prisma.cadastroBeneficiario.findMany({
+  private async carregarBeneficiarios(tenantId: string) {
+    const rows = await prisma.cadastroBeneficiario.findMany({
       orderBy: { nomeCompleto: "asc" },
       select: {
         id: true,
@@ -951,6 +1130,7 @@ export class DashboardGeorreferenciamentoService {
         }
       }
     });
+    return this.filtrarEntidadesPorTenant(rows, "cadastro_beneficiario", tenantId);
   }
 
   private mapearFamilias(
@@ -1020,8 +1200,8 @@ export class DashboardGeorreferenciamentoService {
     });
   }
 
-  private async carregarFamilias() {
-    return prisma.vinculoFamiliar.findMany({
+  private async carregarFamilias(tenantId: string) {
+    const rows = await prisma.vinculoFamiliar.findMany({
       orderBy: { nomeFamilia: "asc" },
       select: {
         id: true,
@@ -1066,6 +1246,7 @@ export class DashboardGeorreferenciamentoService {
         }
       }
     });
+    return this.filtrarEntidadesPorTenant(rows, "vinculo_familiar", tenantId);
   }
 
   private mapearProfissionais(
@@ -1118,8 +1299,8 @@ export class DashboardGeorreferenciamentoService {
     });
   }
 
-  private async carregarProfissionais() {
-    return prisma.cadastroProfissional.findMany({
+  private async carregarProfissionais(tenantId: string) {
+    const rows = await prisma.cadastroProfissional.findMany({
       orderBy: { nomeCompleto: "asc" },
       select: {
         id: true,
@@ -1150,6 +1331,7 @@ export class DashboardGeorreferenciamentoService {
         }
       }
     });
+    return this.filtrarEntidadesPorTenant(rows, "cadastro_profissionais", tenantId);
   }
 
   private mapearVoluntarios(
@@ -1200,8 +1382,8 @@ export class DashboardGeorreferenciamentoService {
     });
   }
 
-  private async carregarVoluntarios() {
-    return prisma.cadastroVoluntario.findMany({
+  private async carregarVoluntarios(tenantId: string) {
+    const rows = await prisma.cadastroVoluntario.findMany({
       orderBy: { nomeCompleto: "asc" },
       select: {
         id: true,
@@ -1232,6 +1414,7 @@ export class DashboardGeorreferenciamentoService {
         }
       }
     });
+    return this.filtrarEntidadesPorTenant(rows, "cadastro_voluntario", tenantId);
   }
 
   private mapearInstituicoes(
@@ -1276,8 +1459,8 @@ export class DashboardGeorreferenciamentoService {
     });
   }
 
-  private async carregarInstituicoes() {
-    return prisma.unidadeAssistencial.findMany({
+  private async carregarInstituicoes(tenantId: string) {
+    const rows = await prisma.unidadeAssistencial.findMany({
       orderBy: { nomeFantasia: "asc" },
       select: {
         id: true,
@@ -1301,11 +1484,13 @@ export class DashboardGeorreferenciamentoService {
         }
       }
     });
+    return this.filtrarEntidadesPorTenant(rows, "unidade_assistencial", tenantId);
   }
 
   private async carregarDoadores(
     localizacoes: Map<string, TerritorialLocationRow>,
-    authUser?: AuthUser
+    authUser: AuthUser | undefined,
+    tenantId: string
   ): Promise<InternalGeoPoint[]> {
     const rows = await prisma.$queryRaw<
       Array<{
@@ -1338,7 +1523,8 @@ export class DashboardGeorreferenciamentoService {
         observacoes,
         criado_em,
         atualizado_em
-      FROM doador
+      FROM doador d
+      WHERE ${tenantCondition("d", tenantId)}
       ORDER BY nome ASC
     `);
 
@@ -1379,7 +1565,8 @@ export class DashboardGeorreferenciamentoService {
 
   private async carregarDistribuicoes(
     localizacoes: Map<string, TerritorialLocationRow>,
-    authUser?: AuthUser
+    authUser: AuthUser | undefined,
+    tenantId: string
   ): Promise<InternalGeoPoint[]> {
     const rows = await prisma.$queryRaw<
       Array<{
@@ -1441,6 +1628,7 @@ export class DashboardGeorreferenciamentoService {
       LEFT JOIN vinculo_familiar vf ON vf.id = d.vinculo_familiar_id
       LEFT JOIN cadastro_beneficiario ref_b ON ref_b.id = vf.id_referencia_familiar
       LEFT JOIN endereco re ON re.id = ref_b.endereco_id
+      WHERE ${tenantCondition("d", tenantId)}
       ORDER BY d.data_doacao DESC, d.id DESC
     `);
 
@@ -1486,7 +1674,8 @@ export class DashboardGeorreferenciamentoService {
 
   private async carregarOcorrencias(
     localizacoes: Map<string, TerritorialLocationRow>,
-    _authUser?: AuthUser
+    _authUser: AuthUser | undefined,
+    tenantId: string
   ): Promise<InternalGeoPoint[]> {
     const rows = await prisma.$queryRaw<
       Array<{
@@ -1525,12 +1714,14 @@ export class DashboardGeorreferenciamentoService {
       LEFT JOIN LATERAL (
         SELECT b.id AS beneficiario_id, b.endereco_id
         FROM cadastro_beneficiario b
-        WHERE lower(trim(coalesce(b.nome_completo, ''))) = lower(trim(coalesce(o.payload->>'vitimaNome', '')))
-           OR lower(trim(coalesce(b.nome_social, ''))) = lower(trim(coalesce(o.payload->>'vitimaNome', '')))
+        WHERE b.tenant_id::text = ${tenantId}
+          AND (lower(trim(coalesce(b.nome_completo, ''))) = lower(trim(coalesce(o.payload->>'vitimaNome', '')))
+           OR lower(trim(coalesce(b.nome_social, ''))) = lower(trim(coalesce(o.payload->>'vitimaNome', ''))))
         ORDER BY b.atualizado_em DESC
         LIMIT 1
       ) end_b ON TRUE
       LEFT JOIN endereco e ON e.id = end_b.endereco_id
+      WHERE end_b.beneficiario_id IS NOT NULL
       ORDER BY o.id DESC
     `);
 

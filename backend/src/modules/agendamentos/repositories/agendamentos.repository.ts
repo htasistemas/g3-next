@@ -518,6 +518,33 @@ export class AgendamentosRepository {
     return rows[0]?.id ?? null;
   }
 
+  private async bloquearChaveAgenda(
+    db: PrismaExecutor,
+    tenantId: string,
+    payload: {
+      data: string;
+      horaInicial: string;
+      profissionalNome?: string | null;
+      tipoAtendimento?: string | null;
+      itemTipo?: string | null;
+      itemOrigemId?: number | null;
+    }
+  ) {
+    const chave = [
+      tenantId,
+      payload.data,
+      payload.horaInicial,
+      trimOrUndefined(payload.profissionalNome) ?? "",
+      trimOrUndefined(payload.tipoAtendimento) ?? "",
+      trimOrUndefined(payload.itemTipo) ?? "",
+      payload.itemOrigemId ? String(payload.itemOrigemId) : ""
+    ].join("|");
+
+    await db.$executeRaw(Prisma.sql`
+      SELECT pg_advisory_xact_lock(hashtextextended(${chave}, 0))
+    `);
+  }
+
   private chaveParticipante(nome?: string | null, beneficiarioId?: bigint | null) {
     if (beneficiarioId) {
       return `id:${beneficiarioId.toString()}`;
@@ -1591,6 +1618,7 @@ export class AgendamentosRepository {
     await this.ensureEstrutura();
     const familiaResolvida = await this.resolverFamiliaDoBeneficiario(input.beneficiarioId);
     const id = await prisma.$transaction(async (tx) => {
+      await this.bloquearChaveAgenda(tx, tenantId, input);
       const conflitos = await this.listarConflitos({
         data: input.data,
         horaInicial: input.horaInicial,
@@ -1708,6 +1736,7 @@ export class AgendamentosRepository {
     const anterior = await this.obter(id, tenantId);
     if (!anterior) throw new AppError("Agendamento nao encontrado.", 404);
     await prisma.$transaction(async (tx) => {
+      await this.bloquearChaveAgenda(tx, tenantId, input);
       const conflitos = await this.listarConflitos({
         data: input.data,
         horaInicial: input.horaInicial,
@@ -1891,6 +1920,7 @@ export class AgendamentosRepository {
     };
 
     const novoId = await prisma.$transaction(async (tx) => {
+      await this.bloquearChaveAgenda(tx, tenantId, payload);
       const conflitos = await this.listarConflitos({
         data: payload.data,
         horaInicial: payload.horaInicial,

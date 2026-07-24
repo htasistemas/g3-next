@@ -31,13 +31,13 @@ function obterMensagemPrisma(error: unknown): { statusCode: number; message: str
   if (prismaError.code === "P2010") {
     return {
       statusCode: 500,
-      message: prismaError.meta?.message ?? prismaError.message ?? "Falha ao executar a operação no banco de dados."
+      message: "Falha ao executar a operação no banco de dados."
     };
   }
 
   return {
     statusCode: 500,
-    message: prismaError.meta?.message ?? prismaError.message ?? "Falha ao executar a operação no banco de dados."
+    message: "Falha ao executar a operação no banco de dados."
   };
 }
 
@@ -98,6 +98,8 @@ export function errorHandler(
     return response.status(prismaTratado.statusCode).json({ message: prismaTratado.message });
   }
 
-  console.error(error);
+  console.error("Erro interno não tratado", {
+    nome: error instanceof Error ? error.name : typeof error
+  });
   return response.status(500).json({ message: "Erro interno do servidor." });
 }

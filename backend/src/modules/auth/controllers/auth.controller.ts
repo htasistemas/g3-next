@@ -27,13 +27,13 @@ export class AuthController {
   async login(request: Request, response: Response) {
     const data = await authService.login(request.body);
     response.cookie(AUTH_COOKIE_NAME, data.token, authCookieOptions());
-    return response.json(data);
+    return response.json({ usuario: data.usuario });
   }
 
   async loginGoogle(request: Request, response: Response) {
     const data = await authService.loginGoogle(request.body);
     response.cookie(AUTH_COOKIE_NAME, data.token, authCookieOptions());
-    return response.json(data);
+    return response.json({ usuario: data.usuario });
   }
 
   async me(request: AuthenticatedRequest, response: Response) {

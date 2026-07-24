@@ -185,7 +185,7 @@ export class PortaisExternosService {
       throw new AppError("Informe os dados de acesso para entrar no portal.", 400);
     }
 
-    if (tipo === "voluntario") return this.acessarVoluntario(identificador);
+    if (tipo === "voluntario") return this.acessarVoluntario(identificador, senha);
     if (tipo === "beneficiario") return this.acessarBeneficiarioFamilia(identificador, senha);
     if (tipo === "parceiro") return this.acessarParceiro(identificador);
 
@@ -278,66 +278,11 @@ export class PortaisExternosService {
     };
   }
 
-  private async acessarVoluntario(identificador: string): Promise<PortalPainel> {
-    const cpf = somenteDigitos(identificador);
-    const email = normalizarEmail(identificador);
-    const rows = await prisma.$queryRaw<
-      Array<{
-        id: bigint;
-        tenant_id: string | null;
-        nome_completo: string;
-        cpf: string | null;
-        email: string | null;
-        telefone: string | null;
-        area_interesse: string | null;
-        habilidades: string | null;
-        status: string | null;
-        disponibilidade_dias: string | null;
-        carga_horaria_semanal: string | null;
-      }>
-    >(Prisma.sql`
-      SELECT id, tenant_id::text AS tenant_id, nome_completo, cpf, email, telefone, area_interesse, habilidades, status, disponibilidade_dias, carga_horaria_semanal
-      FROM cadastro_voluntario v
-      WHERE COALESCE(v.status, 'ATIVO') <> 'INATIVO'
-        AND (
-          ${cpf || ""} <> '' AND REGEXP_REPLACE(COALESCE(v.cpf, ''), '\\D', '', 'g') = ${cpf}
-          OR ${email} <> '' AND LOWER(COALESCE(v.email, '')) = ${email}
-        )
-      ORDER BY atualizado_em DESC, id DESC
-      LIMIT 1
-    `);
-
-    const voluntario = rows[0];
-    if (!voluntario) throw new AppError("Voluntario nao encontrado para os dados informados.", 404);
-
-    return {
-      tipo: "voluntario",
-      token: montarToken("voluntario", bigintToString(voluntario.id), voluntario.tenant_id ?? undefined),
-      pessoa: {
-        id: bigintToString(voluntario.id),
-        nome: voluntario.nome_completo,
-        documento: voluntario.cpf ?? undefined,
-        email: voluntario.email ?? undefined,
-        telefone: voluntario.telefone ?? undefined,
-        tenantId: voluntario.tenant_id ?? undefined
-      },
-      indicadores: [
-        { label: "Horas registradas", valor: voluntario.carga_horaria_semanal ?? "0h" },
-        { label: "Escalas futuras", valor: "0" },
-        { label: "Certificados", valor: voluntario.status === "ATIVO" ? "1" : "0" }
-      ],
-      cards: [
-        { titulo: "Oportunidades disponíveis", texto: voluntario.area_interesse ?? "Área de interesse ainda não informada." },
-        { titulo: "Escalas e check-in", texto: voluntario.disponibilidade_dias ?? "Disponibilidade ainda não informada." },
-        { titulo: "Certificados e termos", texto: voluntario.habilidades ?? "Histórico pronto para receber certificados reais." }
-      ],
-      linhaDoTempo: [
-        { titulo: "Cadastro localizado", detalhe: `Status atual: ${voluntario.status ?? "ATIVO"}.` },
-        { titulo: "Disponibilidade", detalhe: voluntario.disponibilidade_dias ?? "Sem disponibilidade registrada." },
-        { titulo: "Próximo passo", detalhe: "Escalas e certificados serão exibidos conforme registros do módulo de voluntariado." }
-      ],
-      itens: []
-    };
+  private async acessarVoluntario(_identificador: string, _senha: string): Promise<PortalPainel> {
+    throw new AppError(
+      "O portal de voluntários está temporariamente indisponível até que exista uma credencial de senha individual por voluntário.",
+      501
+    );
   }
 
   private async acessarBeneficiarioFamilia(identificador: string, senha: string): Promise<PortalPainel> {

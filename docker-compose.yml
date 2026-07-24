@@ -4,13 +4,13 @@ services:
     container_name: g3n-db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${DB_USERNAME:-g3n}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-admin}
-      POSTGRES_DB: ${DB_NAME:-g3n}
+      POSTGRES_USER: ${DB_USERNAME:?DB_USERNAME obrigatorio}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD obrigatoria}
+      POSTGRES_DB: ${DB_NAME:?DB_NAME obrigatorio}
     volumes:
       - g3n_db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-g3n} -d $${POSTGRES_DB:-g3n}"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -24,8 +24,8 @@ services:
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-g3nminio}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-g3nminio123}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER obrigatorio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD obrigatoria}
     volumes:
       - g3n_minio_data:/data
     ports:
@@ -47,9 +47,9 @@ services:
       API_PORT: 3333
       API_HOST: 0.0.0.0
       APP_MAINTENANCE_FLAG_PATH: ${APP_MAINTENANCE_FLAG_PATH:-/var/run/g3n/maintenance.enable}
-      DATABASE_URL: postgresql://${DB_USERNAME:-g3n}:${DB_PASSWORD:-admin}@g3n-db:5432/${DB_NAME:-g3n}?schema=public
-      CORS_ORIGIN: ${CORS_ORIGIN:-https://g3n.htasistemas.com.br,http://localhost:5173,http://127.0.0.1:5173,http://0.0.0.0:5173,http://localhost:4200,http://127.0.0.1:4200,http://0.0.0.0:4200}
-      APP_AUTH_TOKEN_SECRET: ${APP_AUTH_TOKEN_SECRET:-g3-next-dev-token-secret-2026}
+      DATABASE_URL: postgresql://${DB_USERNAME:?DB_USERNAME obrigatorio}:${DB_PASSWORD:?DB_PASSWORD obrigatoria}@g3n-db:5432/${DB_NAME:?DB_NAME obrigatorio}?schema=public
+      CORS_ORIGIN: ${CORS_ORIGIN:?CORS_ORIGIN obrigatorio}
+      APP_AUTH_TOKEN_SECRET: ${APP_AUTH_TOKEN_SECRET:?APP_AUTH_TOKEN_SECRET obrigatorio}
       APP_AUTH_TOKEN_EXPIRATION_MINUTES: ${APP_AUTH_TOKEN_EXPIRATION_MINUTES:-480}
       APP_AUTH_COOKIE_NAME: ${APP_AUTH_COOKIE_NAME:-g3n_auth_token}
       APP_AUTH_COOKIE_DOMAIN: ${APP_AUTH_COOKIE_DOMAIN:-}
@@ -57,8 +57,8 @@ services:
       APP_STORAGE_ROOT: ${APP_STORAGE_ROOT:-storage}
       APP_STORAGE_ENDPOINT: ${APP_STORAGE_ENDPOINT:-http://g3n-minio:9000}
       APP_STORAGE_BUCKET: ${APP_STORAGE_BUCKET:-g3n-storage}
-      APP_STORAGE_ACCESS_KEY_ID: ${APP_STORAGE_ACCESS_KEY_ID:-g3nminio}
-      APP_STORAGE_SECRET_ACCESS_KEY: ${APP_STORAGE_SECRET_ACCESS_KEY:-g3nminio123}
+      APP_STORAGE_ACCESS_KEY_ID: ${APP_STORAGE_ACCESS_KEY_ID:?APP_STORAGE_ACCESS_KEY_ID obrigatorio}
+      APP_STORAGE_SECRET_ACCESS_KEY: ${APP_STORAGE_SECRET_ACCESS_KEY:?APP_STORAGE_SECRET_ACCESS_KEY obrigatorio}
       APP_STORAGE_REGION: ${APP_STORAGE_REGION:-us-east-1}
       APP_STORAGE_FORCE_PATH_STYLE: ${APP_STORAGE_FORCE_PATH_STYLE:-true}
       APP_GOOGLE_CLIENT_ID: ${APP_GOOGLE_CLIENT_ID:-}
@@ -69,7 +69,7 @@ services:
       MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
       MAIL_PORT: ${MAIL_PORT:-587}
       MAIL_USER: ${MAIL_USER:-htasistemas@gmail.com}
-      MAIL_PASS: ${MAIL_PASS:-alterar-em-producao}
+      MAIL_PASS: ${MAIL_PASS:?MAIL_PASS obrigatoria}
     volumes:
       - g3n_backend_storage:/app/storage
       - ./docker/runtime:/var/run/g3n
@@ -77,7 +77,7 @@ services:
       g3n-db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:3333/health || exit 1"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3333/health/ready || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 12

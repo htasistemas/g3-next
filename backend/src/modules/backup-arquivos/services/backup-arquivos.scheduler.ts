@@ -3,6 +3,7 @@ import { BackupArquivosService } from "./backup-arquivos.service.js";
 
 let schedulerInicializado = false;
 let intervaloScheduler: NodeJS.Timeout | null = null;
+let executando = false;
 
 function milissegundosAteProximaExecucao(horaConfig = "23:40") {
   const [horaTexto, minutoTexto] = horaConfig.split(":");
@@ -26,6 +27,8 @@ export function iniciarBackupArquivosScheduler() {
   const service = new BackupArquivosService();
 
   const executar = async () => {
+    if (executando) return;
+    executando = true;
     try {
       const resultado = await service.executar();
       if (resultado.executado) {
@@ -33,6 +36,8 @@ export function iniciarBackupArquivosScheduler() {
       }
     } catch (error) {
       console.error("[g3n-backend-node] falha no backup diario de arquivos", error);
+    } finally {
+      executando = false;
     }
   };
 
@@ -52,4 +57,5 @@ export function pararBackupArquivosScheduler() {
     intervaloScheduler = null;
   }
   schedulerInicializado = false;
+  executando = false;
 }

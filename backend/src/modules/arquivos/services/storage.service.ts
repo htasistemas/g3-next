@@ -281,6 +281,10 @@ export class StorageService {
     const mimeType =
       mimeAssinado ?? input.mimeType ?? extToMime(extensaoInferida) ?? "application/octet-stream";
 
+    if (mimeType === "image/svg+xml") {
+      throw new AppError("Arquivos SVG nao sao permitidos por risco de conteudo ativo.", 400);
+    }
+
     garantirExtensaoPermitida(extensaoInferida, policy.allowedExtensions);
     garantirMimeTypePermitido(mimeType, policy.allowedMimeTypes);
 

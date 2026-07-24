@@ -2,7 +2,8 @@ import { Router } from "express";
 import { asyncHandler } from "../../../shared/http/async-handler.js";
 import {
   ensureAuthenticated,
-  ensurePermissions
+  ensurePermissions,
+  ensureSuperadmin
 } from "../../auth/middlewares/auth.middleware.js";
 import { AtualizacaoSistemaController } from "../controllers/atualizacao-sistema.controller.js";
 
@@ -62,6 +63,7 @@ atualizacaoSistemaRoutes.post(
   "/download-update",
   ensureAuthenticated,
   ensurePermissions(["ADMINISTRADOR", "CONFIG_ATUALIZAR_SISTEMA"]),
+  ensureSuperadmin,
   asyncHandler(controller.baixarAtualizacao.bind(controller))
 );
 
@@ -69,6 +71,7 @@ atualizacaoSistemaRoutes.post(
   "/apply-update",
   ensureAuthenticated,
   ensurePermissions(["ADMINISTRADOR", "CONFIG_ATUALIZAR_SISTEMA"]),
+  ensureSuperadmin,
   asyncHandler(controller.aplicarAtualizacao.bind(controller))
 );
 
@@ -76,6 +79,7 @@ atualizacaoSistemaRoutes.post(
   "/rollback",
   ensureAuthenticated,
   ensurePermissions(["ADMINISTRADOR", "CONFIG_EXECUTAR_ROLLBACK"]),
+  ensureSuperadmin,
   asyncHandler(controller.rollback.bind(controller))
 );
 

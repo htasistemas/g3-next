@@ -3,6 +3,7 @@ import { HolidaySyncService } from "./holiday-sync.service.js";
 
 let schedulerInicializado = false;
 let intervaloScheduler: NodeJS.Timeout | null = null;
+let executando = false;
 
 function precisaExecutarNovamente(
   frequencia: "diaria" | "semanal" | "mensal" | "manual",
@@ -27,6 +28,8 @@ export function iniciarDatasComemorativasScheduler(intervaloMs = 60 * 60 * 1000)
   const syncService = new HolidaySyncService();
 
   const executar = async () => {
+    if (executando) return;
+    executando = true;
     try {
       const configuracoes = await repository.buscarConfiguracoes();
       if (!configuracoes.ativo || !configuracoes.sincronizacaoAutomatica) {
@@ -50,6 +53,8 @@ export function iniciarDatasComemorativasScheduler(intervaloMs = 60 * 60 * 1000)
       await syncService.syncCurrentAndNextYear();
     } catch (error) {
       console.error("[g3n-backend-node] falha no scheduler de datas comemorativas", error);
+    } finally {
+      executando = false;
     }
   };
 
@@ -65,4 +70,5 @@ export function pararDatasComemorativasScheduler() {
     intervaloScheduler = null;
   }
   schedulerInicializado = false;
+  executando = false;
 }

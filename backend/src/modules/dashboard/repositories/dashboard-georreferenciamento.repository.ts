@@ -362,12 +362,12 @@ export class DashboardGeorreferenciamentoRepository {
     await ensureDashboardGeorreferenciamentoEstrutura();
   }
 
-  async buscarDiagnostico() {
+  async buscarDiagnostico(tenantId: string) {
     await this.garantirEstrutura();
 
     const rows = await prisma.$queryRaw<DiagnosticoRow[]>(Prisma.sql`
       SELECT
-        (SELECT COUNT(*) FROM cadastro_beneficiario)::BIGINT AS beneficiarios_total,
+        (SELECT COUNT(*) FROM cadastro_beneficiario WHERE tenant_id::text = ${tenantId})::BIGINT AS beneficiarios_total,
         (
           SELECT COUNT(*)
           FROM cadastro_beneficiario cb
@@ -376,10 +376,11 @@ export class DashboardGeorreferenciamentoRepository {
             ON tl.entidade_tipo = 'BENEFICIARIO'
            AND tl.entidade_id = cb.id
            AND tl.ativo = TRUE
-          WHERE COALESCE(tl.latitude, e.latitude) IS NOT NULL
+          WHERE cb.tenant_id::text = ${tenantId}
+            AND COALESCE(tl.latitude, e.latitude) IS NOT NULL
             AND COALESCE(tl.longitude, e.longitude) IS NOT NULL
         )::BIGINT AS beneficiarios_geo,
-        (SELECT COUNT(*) FROM vinculo_familiar)::BIGINT AS familias_total,
+        (SELECT COUNT(*) FROM vinculo_familiar WHERE tenant_id::text = ${tenantId})::BIGINT AS familias_total,
         (
           SELECT COUNT(*)
           FROM vinculo_familiar vf
@@ -389,17 +390,19 @@ export class DashboardGeorreferenciamentoRepository {
             ON tl.entidade_tipo = 'FAMILIA'
            AND tl.entidade_id = vf.id
            AND tl.ativo = TRUE
-          WHERE COALESCE(tl.latitude, re.latitude) IS NOT NULL
+          WHERE vf.tenant_id::text = ${tenantId}
+            AND COALESCE(tl.latitude, re.latitude) IS NOT NULL
             AND COALESCE(tl.longitude, re.longitude) IS NOT NULL
         )::BIGINT AS familias_ref_geo,
         (
           SELECT COUNT(*)
           FROM vinculo_familiar vf
-          WHERE COALESCE(TRIM(vf.logradouro), '') <> ''
+          WHERE vf.tenant_id::text = ${tenantId}
+            AND (COALESCE(TRIM(vf.logradouro), '') <> ''
              OR COALESCE(TRIM(vf.bairro), '') <> ''
-             OR COALESCE(TRIM(vf.municipio), '') <> ''
+             OR COALESCE(TRIM(vf.municipio), '') <> '')
         )::BIGINT AS familias_endereco_proprio,
-        (SELECT COUNT(*) FROM cadastro_voluntario)::BIGINT AS voluntarios_total,
+        (SELECT COUNT(*) FROM cadastro_voluntario WHERE tenant_id::text = ${tenantId})::BIGINT AS voluntarios_total,
         (
           SELECT COUNT(*)
           FROM cadastro_voluntario v
@@ -408,10 +411,11 @@ export class DashboardGeorreferenciamentoRepository {
             ON tl.entidade_tipo = 'VOLUNTARIO'
            AND tl.entidade_id = v.id
            AND tl.ativo = TRUE
-          WHERE COALESCE(tl.latitude, e.latitude) IS NOT NULL
+          WHERE v.tenant_id::text = ${tenantId}
+            AND COALESCE(tl.latitude, e.latitude) IS NOT NULL
             AND COALESCE(tl.longitude, e.longitude) IS NOT NULL
         )::BIGINT AS voluntarios_geo,
-        (SELECT COUNT(*) FROM cadastro_profissionais)::BIGINT AS profissionais_total,
+        (SELECT COUNT(*) FROM cadastro_profissionais WHERE tenant_id::text = ${tenantId})::BIGINT AS profissionais_total,
         (
           SELECT COUNT(*)
           FROM cadastro_profissionais p
@@ -420,10 +424,11 @@ export class DashboardGeorreferenciamentoRepository {
             ON tl.entidade_tipo = 'PROFISSIONAL'
            AND tl.entidade_id = p.id
            AND tl.ativo = TRUE
-          WHERE COALESCE(tl.latitude, e.latitude) IS NOT NULL
+          WHERE p.tenant_id::text = ${tenantId}
+            AND COALESCE(tl.latitude, e.latitude) IS NOT NULL
             AND COALESCE(tl.longitude, e.longitude) IS NOT NULL
         )::BIGINT AS profissionais_geo,
-        (SELECT COUNT(*) FROM unidade_assistencial)::BIGINT AS instituicoes_total,
+        (SELECT COUNT(*) FROM unidade_assistencial WHERE tenant_id::text = ${tenantId})::BIGINT AS instituicoes_total,
         (
           SELECT COUNT(*)
           FROM unidade_assistencial u
@@ -432,10 +437,11 @@ export class DashboardGeorreferenciamentoRepository {
             ON tl.entidade_tipo = 'INSTITUICAO'
            AND tl.entidade_id = u.id
            AND tl.ativo = TRUE
-          WHERE COALESCE(tl.latitude, e.latitude) IS NOT NULL
+          WHERE u.tenant_id::text = ${tenantId}
+            AND COALESCE(tl.latitude, e.latitude) IS NOT NULL
             AND COALESCE(tl.longitude, e.longitude) IS NOT NULL
         )::BIGINT AS instituicoes_geo,
-        (SELECT COUNT(*) FROM doador)::BIGINT AS doadores_total,
+        (SELECT COUNT(*) FROM doador WHERE tenant_id::text = ${tenantId})::BIGINT AS doadores_total,
         (
           SELECT COUNT(*)
           FROM doador d
@@ -443,7 +449,8 @@ export class DashboardGeorreferenciamentoRepository {
             ON tl.entidade_tipo = 'DOADOR'
            AND tl.entidade_id = d.id
            AND tl.ativo = TRUE
-          WHERE tl.latitude IS NOT NULL
+          WHERE d.tenant_id::text = ${tenantId}
+            AND tl.latitude IS NOT NULL
             AND tl.longitude IS NOT NULL
         )::BIGINT AS doadores_geo
     `);
@@ -466,22 +473,16 @@ export class DashboardGeorreferenciamentoRepository {
     };
   }
 
-  async listarOpcoesFiltros(): Promise<GeoFilterOptionsResponse> {
+  async listarOpcoesFiltros(tenantId: string): Promise<GeoFilterOptionsResponse> {
     await this.garantirEstrutura();
     const [bairrosRows, regioesRows, sexoRows, vulnerabilidadeRows, unidadeRows, statusRows, diagnostico] =
       await Promise.all([
         prisma.$queryRaw<Array<{ valor: string }>>(Prisma.sql`
           SELECT DISTINCT valor
           FROM (
-            SELECT TRIM(bairro) AS valor FROM endereco
+            SELECT TRIM(bairro) AS valor FROM vinculo_familiar WHERE tenant_id::text = ${tenantId}
             UNION
-            SELECT TRIM(bairro) AS valor FROM vinculo_familiar
-            UNION
-            SELECT TRIM(bairro) AS valor FROM doador
-            UNION
-            SELECT TRIM(bairro) AS valor FROM territorial_localizacao
-            UNION
-            SELECT TRIM(bairro) AS valor FROM territorial_ponto_manual
+            SELECT TRIM(bairro) AS valor FROM doador WHERE tenant_id::text = ${tenantId}
           ) base
           WHERE COALESCE(valor, '') <> ''
           ORDER BY valor ASC
@@ -489,13 +490,7 @@ export class DashboardGeorreferenciamentoRepository {
         prisma.$queryRaw<Array<{ valor: string }>>(Prisma.sql`
           SELECT DISTINCT valor
           FROM (
-            SELECT NULLIF(TRIM(CONCAT_WS(' / ', zona, subzona)), '') AS valor FROM endereco
-            UNION
-            SELECT TRIM(zona) AS valor FROM vinculo_familiar
-            UNION
-            SELECT TRIM(regiao) AS valor FROM territorial_localizacao
-            UNION
-            SELECT TRIM(regiao) AS valor FROM territorial_ponto_manual
+            SELECT TRIM(zona) AS valor FROM vinculo_familiar WHERE tenant_id::text = ${tenantId}
           ) base
           WHERE COALESCE(valor, '') <> ''
           ORDER BY valor ASC
@@ -503,11 +498,11 @@ export class DashboardGeorreferenciamentoRepository {
         prisma.$queryRaw<Array<{ valor: string }>>(Prisma.sql`
           SELECT DISTINCT valor
           FROM (
-            SELECT TRIM(sexo_biologico) AS valor FROM cadastro_beneficiario
+            SELECT TRIM(sexo_biologico) AS valor FROM cadastro_beneficiario WHERE tenant_id::text = ${tenantId}
             UNION
-            SELECT TRIM(sexo_biologico) AS valor FROM cadastro_profissionais
+            SELECT TRIM(sexo_biologico) AS valor FROM cadastro_profissionais WHERE tenant_id::text = ${tenantId}
             UNION
-            SELECT TRIM(genero) AS valor FROM cadastro_voluntario
+            SELECT TRIM(genero) AS valor FROM cadastro_voluntario WHERE tenant_id::text = ${tenantId}
           ) base
           WHERE COALESCE(valor, '') <> ''
           ORDER BY valor ASC
@@ -515,9 +510,7 @@ export class DashboardGeorreferenciamentoRepository {
         prisma.$queryRaw<Array<{ valor: string }>>(Prisma.sql`
           SELECT DISTINCT valor
           FROM (
-            SELECT TRIM(situacao_vulnerabilidade) AS valor FROM situacao_social
-            UNION
-            SELECT TRIM(vulnerabilidades_familia) AS valor FROM vinculo_familiar
+            SELECT TRIM(vulnerabilidades_familia) AS valor FROM vinculo_familiar WHERE tenant_id::text = ${tenantId}
           ) base
           WHERE COALESCE(valor, '') <> ''
           ORDER BY valor ASC
@@ -525,9 +518,7 @@ export class DashboardGeorreferenciamentoRepository {
         prisma.$queryRaw<Array<{ valor: string }>>(Prisma.sql`
           SELECT DISTINCT valor
           FROM (
-            SELECT TRIM(nome_fantasia) AS valor FROM unidade_assistencial
-            UNION
-            SELECT TRIM(unidade_referencia) AS valor FROM territorial_ponto_manual
+            SELECT TRIM(nome_fantasia) AS valor FROM unidade_assistencial WHERE tenant_id::text = ${tenantId}
           ) base
           WHERE COALESCE(valor, '') <> ''
           ORDER BY valor ASC
@@ -535,20 +526,18 @@ export class DashboardGeorreferenciamentoRepository {
         prisma.$queryRaw<Array<{ valor: string }>>(Prisma.sql`
           SELECT DISTINCT valor
           FROM (
-            SELECT TRIM(status) AS valor FROM cadastro_beneficiario
+            SELECT TRIM(status) AS valor FROM cadastro_beneficiario WHERE tenant_id::text = ${tenantId}
             UNION
-            SELECT TRIM(status) AS valor FROM vinculo_familiar
+            SELECT TRIM(status) AS valor FROM vinculo_familiar WHERE tenant_id::text = ${tenantId}
             UNION
-            SELECT TRIM(status) AS valor FROM cadastro_profissionais
+            SELECT TRIM(status) AS valor FROM cadastro_profissionais WHERE tenant_id::text = ${tenantId}
             UNION
-            SELECT TRIM(status) AS valor FROM cadastro_voluntario
-            UNION
-            SELECT TRIM(status) AS valor FROM territorial_ponto_manual
+            SELECT TRIM(status) AS valor FROM cadastro_voluntario WHERE tenant_id::text = ${tenantId}
           ) base
           WHERE COALESCE(valor, '') <> ''
           ORDER BY valor ASC
         `),
-        this.buscarDiagnostico()
+        this.buscarDiagnostico(tenantId)
       ]);
 
     return {

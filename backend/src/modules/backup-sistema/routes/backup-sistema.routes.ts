@@ -2,7 +2,8 @@ import { Router } from "express";
 import { asyncHandler } from "../../../shared/http/async-handler.js";
 import {
   ensureAuthenticated,
-  ensurePermissions
+  ensurePermissions,
+  ensureSuperadmin
 } from "../../auth/middlewares/auth.middleware.js";
 import { BackupSistemaController } from "../controllers/backup-sistema.controller.js";
 
@@ -43,6 +44,7 @@ backupSistemaRoutes.post(
   "/banco/restaurar",
   ensureAuthenticated,
   ensurePermissions(permissoesBackup),
+  ensureSuperadmin,
   asyncHandler(controller.restaurarBackupBanco.bind(controller))
 );
 
@@ -50,6 +52,7 @@ backupSistemaRoutes.post(
   "/imagens/restaurar",
   ensureAuthenticated,
   ensurePermissions(permissoesBackup),
+  ensureSuperadmin,
   asyncHandler(controller.restaurarBackupImagens.bind(controller))
 );
 
@@ -57,5 +60,6 @@ backupSistemaRoutes.get(
   "/:backupId/download",
   ensureAuthenticated,
   ensurePermissions(permissoesBackup),
+  ensureSuperadmin,
   asyncHandler(controller.baixarBackup.bind(controller))
 );

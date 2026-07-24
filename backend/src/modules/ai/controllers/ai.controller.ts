@@ -3,6 +3,7 @@ import { AiService } from "../services/ai.service.js";
 import type { AuthenticatedRequest } from "../../auth/middlewares/auth.middleware.js";
 import { AiRepository } from "../repositories/ai.repository.js";
 import { sanitizeAiHistoryValue } from "../services/ai-history-sanitizer.js";
+import { AppError } from "../../../shared/errors/app-error.js";
 
 export class AiController {
   private service = new AiService();
@@ -13,6 +14,11 @@ export class AiController {
       const startedAt = Date.now();
       const { query, context } = request.body;
       const userId = request.authUser?.id;
+      const tenantId = request.authUser?.tenant_id;
+
+      if (!tenantId) {
+        throw new AppError("O tenant do usuário autenticado não foi identificado.", 403);
+      }
 
       if (typeof query !== "string" || !query.trim()) {
         response.status(400).json({ error: "Informe uma pergunta válida." });
@@ -22,6 +28,7 @@ export class AiController {
       const result = await this.service.processQuery(
         query,
         userId,
+        tenantId,
         context,
         request.authUser?.nome ?? request.authUser?.nomeUsuario
       );
@@ -56,7 +63,9 @@ export class AiController {
       }
       response.json(result);
     } catch (error) {
-      console.error("AI Error:", error);
+      console.error("Falha interna no módulo de IA", {
+        nome: error instanceof Error ? error.name : typeof error
+      });
       response.status(500).json({ 
         answer: "Desculpe, ocorreu um erro ao processar sua solicitação.", 
         intent: "ERROR" 

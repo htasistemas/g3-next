@@ -66,6 +66,7 @@ import { educacionalRoutes } from "../modules/educacional/routes/educacional.rou
 import { parceriasPublicasRoutes } from "../modules/educacional/parcerias-publicas.routes.js";
 import { importacaoDadosRoutes } from "../modules/importacao-dados/importacao-dados.routes.js";
 import { obterAtualizacaoSistemaPaths } from "../modules/atualizacao-sistema/services/atualizacao-sistema.paths.js";
+import { prisma } from "../database/prisma.js";
 
 export const appRoutes = Router();
 
@@ -81,6 +82,15 @@ function obterVersaoSaude() {
 
 appRoutes.get("/health", (_request, response) => {
   response.json({ status: "ok", service: "g3n-backend-node", version: obterVersaoSaude() });
+});
+
+appRoutes.get("/health/ready", async (_request, response) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    response.json({ status: "ready", service: "g3n-backend-node", version: obterVersaoSaude() });
+  } catch {
+    response.status(503).json({ status: "not_ready", service: "g3n-backend-node" });
+  }
 });
 
 appRoutes.use("/api/auth", authRoutes);

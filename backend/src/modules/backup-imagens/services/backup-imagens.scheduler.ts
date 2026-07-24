@@ -3,6 +3,7 @@ import { env } from "../../../config/env.js";
 
 let schedulerInicializado = false;
 let intervaloScheduler: NodeJS.Timeout | null = null;
+let executando = false;
 
 function milissegundosAteProximaExecucao(horaConfig = "02:00") {
   const [horaTexto, minutoTexto] = horaConfig.split(":");
@@ -26,6 +27,8 @@ export function iniciarBackupImagensScheduler() {
   const service = new BackupImagensService();
 
   const executar = async () => {
+    if (executando) return;
+    executando = true;
     try {
       const resultado = await service.executar();
       if (resultado.executado) {
@@ -33,6 +36,8 @@ export function iniciarBackupImagensScheduler() {
       }
     } catch (error) {
       console.error("[g3n-backend-node] falha no backup diario de imagens", error);
+    } finally {
+      executando = false;
     }
   };
 
@@ -52,4 +57,5 @@ export function pararBackupImagensScheduler() {
     intervaloScheduler = null;
   }
   schedulerInicializado = false;
+  executando = false;
 }

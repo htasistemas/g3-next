@@ -1,6 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import PDFDocument from "pdfkit";
+import { validarUrlRemotaPublica } from "../../../utils/remote-url-security.js";
+import { resolverCaminhoAssetPublico } from "../../../utils/safe-public-asset-path.js";
+import { getStorageProvider } from "../../arquivos/services/storage-factory.js";
 
 type OficioCampoComplementar = {
   rotulo: string;
@@ -110,6 +113,7 @@ function drawCenteredSingleLine(
 }
 
 export class OficioDocumentRenderer {
+  private readonly storageProvider = getStorageProvider();
   async render(layout: OficioDocumentoLayout): Promise<Buffer> {
     const logoBuffer = await this.carregarImagem(layout.instituicao.logoUrl);
 
@@ -461,22 +465,22 @@ export class OficioDocumentRenderer {
 
     if (/^https?:\/\//i.test(valor)) {
       try {
-        const response = await fetch(valor);
+        const urlSegura = await validarUrlRemotaPublica(valor);
+        const response = await fetch(urlSegura, { redirect: "manual", signal: AbortSignal.timeout(15000) });
         if (!response.ok) return undefined;
         const arrayBuffer = await response.arrayBuffer();
-        return Buffer.from(arrayBuffer);
+        const buffer = Buffer.from(arrayBuffer);
+        return buffer.length <= 10 * 1024 * 1024 ? buffer : undefined;
       } catch {
         return undefined;
       }
     }
 
     const caminhoNormalizado = valor.replace(/^file:\/\//i, "");
-    const candidatos = [
-      caminhoNormalizado,
-      path.resolve(process.cwd(), caminhoNormalizado),
-      path.resolve(process.cwd(), "..", caminhoNormalizado),
-      path.resolve(process.cwd(), "..", "frontend", "public", caminhoNormalizado.replace(/^[/\\]/, ""))
-    ];
+    const bufferStorage = await this.storageProvider.lerBuffer(caminhoNormalizado);
+    if (bufferStorage) return bufferStorage;
+    const candidato = resolverCaminhoAssetPublico(caminhoNormalizado);
+    const candidatos = candidato ? [candidato] : [];
 
     for (const candidato of candidatos) {
       if (fs.existsSync(candidato)) {

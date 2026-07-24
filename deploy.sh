@@ -138,25 +138,29 @@ docker compose -f "$APP_COMPOSE" up -d --remove-orphans g3n-db
 wait_healthy g3n-db 120
 
 docker compose -f "$APP_COMPOSE" build g3n-backend
-log "Aplicando migrations do PostgreSQL"
-if ! docker compose -f "$APP_COMPOSE" run --rm --no-deps g3n-backend npx prisma migrate deploy; then
-  log "Historico Prisma ausente em banco legado; aplicando migrations educacionais idempotentes"
-  for migration in \
-    20260718_create_educacional_fase1 \
-    20260719_add_tipo_unidade_atendimento \
-    20260719_create_educacional_academico \
-    20260719_create_educacional_alunos_fluxos \
-    20260719_create_educacional_avaliacoes \
-    20260719_create_educacional_boletim_historico \
-    20260719_create_educacional_creche \
-    20260719_create_educacional_diario \
-    20260719_create_educacional_documentos \
-    20260719_create_educacional_ocorrencias_agenda \
-    20260719_create_educacional_planejamento \
-    20260719_create_educacional_fluxo_academico \
-    20260719_harden_educacional_integridade; do
-    docker compose -f "$APP_COMPOSE" run --rm --no-deps g3n-backend npx prisma db execute --schema prisma/schema.prisma --file "prisma/migrations/$migration/migration.sql"
-  done
+if [[ "${DEPLOY_RUN_MIGRATIONS:-0}" == "1" ]]; then
+  log "Aplicando migrations do PostgreSQL por solicitação explícita"
+  if ! docker compose -f "$APP_COMPOSE" run --rm --no-deps g3n-backend npx prisma migrate deploy; then
+    log "Historico Prisma ausente em banco legado; aplicando migrations educacionais idempotentes"
+    for migration in \
+      20260718_create_educacional_fase1 \
+      20260719_add_tipo_unidade_atendimento \
+      20260719_create_educacional_academico \
+      20260719_create_educacional_alunos_fluxos \
+      20260719_create_educacional_avaliacoes \
+      20260719_create_educacional_boletim_historico \
+      20260719_create_educacional_creche \
+      20260719_create_educacional_diario \
+      20260719_create_educacional_documentos \
+      20260719_create_educacional_ocorrencias_agenda \
+      20260719_create_educacional_planejamento \
+      20260719_create_educacional_fluxo_academico \
+      20260719_harden_educacional_integridade; do
+      docker compose -f "$APP_COMPOSE" run --rm --no-deps g3n-backend npx prisma db execute --schema prisma/schema.prisma --file "prisma/migrations/$migration/migration.sql"
+    done
+  fi
+else
+  log "Migrations nao executadas. Use DEPLOY_RUN_MIGRATIONS=1 somente apos revisar o impacto."
 fi
 docker compose -f "$APP_COMPOSE" build --no-cache g3n-frontend
 docker compose -f "$APP_COMPOSE" up -d --remove-orphans --force-recreate g3n-backend

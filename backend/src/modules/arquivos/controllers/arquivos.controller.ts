@@ -69,6 +69,7 @@ export class ArquivosController {
       typeof download === "string" && ["1", "true", "sim", "yes"].includes(download.toLowerCase());
 
     response.setHeader("Content-Type", conteudo.mimeType);
+    response.setHeader("X-Content-Type-Options", "nosniff");
     response.setHeader("Cache-Control", "private, max-age=3600");
     response.setHeader(
       "Content-Disposition",

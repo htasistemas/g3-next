@@ -2,6 +2,7 @@ import { AtualizacaoSistemaService } from "./atualizacao-sistema.service.js";
 
 let schedulerInicializado = false;
 let intervaloScheduler: NodeJS.Timeout | null = null;
+let executando = false;
 
 export function iniciarAtualizacaoSistemaScheduler(intervaloMs = 5 * 60 * 1000) {
   if (schedulerInicializado) return;
@@ -10,10 +11,14 @@ export function iniciarAtualizacaoSistemaScheduler(intervaloMs = 5 * 60 * 1000) 
   const service = new AtualizacaoSistemaService();
 
   const executar = async () => {
+    if (executando) return;
+    executando = true;
     try {
       await service.verificarEAplicarAutomaticamente();
     } catch (error) {
       console.error("[g3n-backend-node] falha no scheduler de atualizacao do sistema", error);
+    } finally {
+      executando = false;
     }
   };
 
@@ -29,4 +34,5 @@ export function pararAtualizacaoSistemaScheduler() {
     intervaloScheduler = null;
   }
   schedulerInicializado = false;
+  executando = false;
 }

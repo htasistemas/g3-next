@@ -8,6 +8,7 @@ export type BackupSistemaItem = {
   arquivoNome: string;
   arquivoCaminho: string;
   tamanhoBytes: number;
+  checksum?: string | null;
   tamanhoFormatado: string;
   restauradoEm?: string | null;
   restauradoPor?: string | null;
