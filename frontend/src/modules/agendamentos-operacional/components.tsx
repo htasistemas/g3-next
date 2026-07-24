@@ -1,5 +1,7 @@
 import {
   CalendarDays,
+  ChevronDown,
+  ChevronUp,
   Clock3,
   Copy,
   LoaderCircle,
@@ -12,6 +14,7 @@ import {
   Users,
   XCircle
 } from "lucide-react";
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -244,13 +247,13 @@ export function BeneficiarioSelector(props: {
                       <Badge variant="info">{item.status || "Ativo"}</Badge>
                       {!item.selecionavel ? <Badge variant="warning">Cadastro não vinculado</Badge> : null}
                     </div>
-                    {item.dataNascimento ? (
-                      <p className="mt-0.5 text-xs text-[var(--g3-muted)]">{formatarIdade(item.dataNascimento)}</p>
-                    ) : null}
-                    <p className="mt-1 text-xs text-[var(--g3-muted)]">
-                      {formatarTelefone(item.telefone) || item.telefone || "Telefone não informado"}
-                      {item.email ? ` - ${item.email}` : ""}
-                    </p>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-[var(--g3-muted)]">
+                      {item.dataNascimento ? <span>{formatarIdade(item.dataNascimento)}</span> : null}
+                      <span>
+                        {formatarTelefone(item.telefone) || item.telefone || "Telefone não informado"}
+                      </span>
+                    </div>
+                    {item.email ? <p className="mt-0.5 truncate text-xs text-[var(--g3-muted)]">{item.email}</p> : null}
                   </div>
                 </label>
               );
@@ -391,6 +394,7 @@ export function AgendaCard(props: {
   } | null;
 }) {
   const participantes = props.item.participantes ?? [];
+  const [expandido, setExpandido] = useState(false);
   const canalEmEnvio = props.envioEmAndamento?.canal;
   const progressoEnvio = props.envioEmAndamento ? ((props.envioEmAndamento.etapa + 1) / 3) * 100 : 0;
   const textoEnvio =
@@ -418,19 +422,30 @@ export function AgendaCard(props: {
           : "hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(15,23,42,0.16)]"
       }`}
     >
-      <div className={`px-4 py-3 ${props.ativo ? "bg-emerald-700" : props.destaqueRecente ? "bg-amber-600" : "bg-emerald-600"}`}>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-base font-semibold text-white">{props.item.itemNome || props.item.tipoAtendimento}</p>
-          <div className="flex flex-wrap items-center gap-2">
-            {props.ativo ? <Badge variant="warning">Em edição</Badge> : null}
-            {props.destaqueRecente ? <Badge variant="default" className="border-white/35 bg-white/15 text-white">Recém salvo</Badge> : null}
-            <Badge variant="default" className="border-white/35 bg-white/15 text-white">
-              {participantes.length} beneficiário(s) inscrito(s)
-            </Badge>
-          </div>
+      <div className={`relative min-h-[88px] px-4 py-3 pr-36 ${props.ativo ? "bg-emerald-700" : props.destaqueRecente ? "bg-amber-600" : "bg-emerald-600"}`}>
+        <p className="line-clamp-2 min-h-10 text-base font-semibold leading-5 text-white">
+          {props.item.itemNome || props.item.tipoAtendimento}
+        </p>
+        <div className="mt-2 flex min-h-6 flex-wrap items-center gap-2">
+          {props.ativo ? <Badge variant="warning">Em edição</Badge> : null}
+          {props.destaqueRecente ? <Badge variant="default" className="border-white/35 bg-white/15 text-white">Recém salvo</Badge> : null}
+          <Badge variant="default" className="border-white/35 bg-white/15 text-white">
+            {participantes.length} beneficiário(s) inscrito(s)
+          </Badge>
         </div>
+        <button
+          type="button"
+          onClick={() => setExpandido((atual) => !atual)}
+          className="absolute right-3 top-3 inline-flex h-8 items-center gap-1 rounded-md border border-white/35 bg-white/15 px-2 text-xs font-medium text-white transition-colors hover:bg-white/25"
+          aria-expanded={expandido}
+          aria-label={expandido ? "Recolher agenda" : "Expandir agenda"}
+          title={expandido ? "Recolher agenda" : "Expandir agenda"}
+        >
+          {expandido ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          {expandido ? "Recolher" : "Expandir"}
+        </button>
       </div>
-      <CardContent className="space-y-4 px-4 py-4">
+      {expandido ? <CardContent className="space-y-4 px-4 py-4">
         {props.ativo ? (
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-900">
             Este card está aberto no formulário para edição. Qualquer alteração será aplicada neste agendamento.
@@ -596,7 +611,7 @@ export function AgendaCard(props: {
             </div>
           </div>
         ) : null}
-      </CardContent>
+      </CardContent> : null}
     </Card>
   );
 }

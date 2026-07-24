@@ -160,6 +160,10 @@ const estruturaSql = [
   "CREATE INDEX IF NOT EXISTS agendamento_beneficiario_agendamento_idx ON agendamento_beneficiario(agendamento_id)",
   "CREATE INDEX IF NOT EXISTS agendamento_beneficiario_tenant_idx ON agendamento_beneficiario(tenant_id, agendamento_id)",
   "CREATE INDEX IF NOT EXISTS agendamento_beneficiario_beneficiario_idx ON agendamento_beneficiario(beneficiario_id)",
+  "CREATE INDEX IF NOT EXISTS cursos_atendimentos_matriculas_curso_tenant_idx ON cursos_atendimentos_matriculas(curso_id, tenant_id, status)",
+  "CREATE INDEX IF NOT EXISTS cadastro_beneficiario_tenant_nome_idx ON cadastro_beneficiario(tenant_id, nome_completo)",
+  "CREATE INDEX IF NOT EXISTS documentos_beneficiario_tenant_tipo_idx ON documentos(beneficiario_id, tenant_id, tipo_documento, nome_documento)",
+  "CREATE INDEX IF NOT EXISTS contato_beneficiario_beneficiario_tenant_idx ON contato_beneficiario(beneficiario_id, tenant_id, id DESC)",
   `
     CREATE TABLE IF NOT EXISTS agendamento_envio (
       id BIGSERIAL PRIMARY KEY,
@@ -511,6 +515,45 @@ export class AgendamentosRepository {
       WHERE a.tenant_id::text = ${tenantId}
         AND COALESCE(a.status, '') <> 'Cancelado'
         AND ${Prisma.join(criterios, " AND ")}
+      ORDER BY a.id DESC
+      LIMIT 1
+    `);
+
+    return rows[0]?.id ?? null;
+  }
+
+  private async buscarAgendaOperacionalExistente(
+    payload: { data: string; horaInicial: string; itemOrigemId?: number | null; itemNome?: string | null; itemTipo?: string | null },
+    tenantId: string
+  ) {
+    const itemId = Number(payload.itemOrigemId);
+    const itemNome = trimOrUndefined(payload.itemNome);
+    const itemTipo = trimOrUndefined(payload.itemTipo);
+    const identidadeItem = Number.isInteger(itemId) && itemId > 0
+      ? Prisma.sql`
+          (
+            a.item_origem_id = ${BigInt(itemId)}
+            OR (
+              a.item_origem_id IS NULL
+              AND LOWER(COALESCE(a.item_nome, '')) = LOWER(COALESCE(${itemNome}, a.item_nome, ''))
+              AND LOWER(COALESCE(a.item_tipo, '')) = LOWER(COALESCE(${itemTipo}, a.item_tipo, ''))
+            )
+          )
+        `
+      : Prisma.sql`
+          a.item_origem_id IS NULL
+          AND LOWER(COALESCE(a.item_nome, '')) = LOWER(COALESCE(${itemNome}, a.item_nome, ''))
+          AND LOWER(COALESCE(a.item_tipo, '')) = LOWER(COALESCE(${itemTipo}, a.item_tipo, ''))
+        `;
+
+    const rows = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+      SELECT a.id
+      FROM agendamento a
+      WHERE a.tenant_id::text = ${tenantId}
+        AND COALESCE(a.status, '') <> 'Cancelado'
+        AND a.data_agendamento = ${formatarData(payload.data)}
+        AND a.hora_inicial = ${sqlTime(payload.horaInicial)}
+        AND ${identidadeItem}
       ORDER BY a.id DESC
       LIMIT 1
     `);
@@ -1516,6 +1559,8 @@ export class AgendamentosRepository {
 
     return [
       "Conflito de agenda identificado.",
+      "Este horário não pode ser utilizado porque outra agenda já ocupa o mesmo período com o mesmo profissional, a mesma sala ou outro recurso exclusivo.",
+      "Escolha outro horário, profissional ou sala para continuar.",
       "Agendamento(s) bloqueador(es):",
       ...resumo
     ].join("\n");
@@ -2345,8 +2390,12 @@ export class AgendamentosRepository {
 
   async criarOperacional(input: AgendamentoOperacionalInput, usuario: UsuarioActor | undefined, tenantId: string) {
     const payload = await this.montarPayloadOperacional(input, tenantId);
-    // Toda chamada de criação gera um novo card. A atualização só ocorre
-    // quando o usuário abre um card existente e envia seu identificador.
+    const agendaExistenteId = await this.buscarAgendaOperacionalExistente(payload, tenantId);
+
+    if (agendaExistenteId) {
+      return this.atualizar(agendaExistenteId, payload, usuario, tenantId);
+    }
+
     return this.criar(payload, usuario, tenantId);
   }
 

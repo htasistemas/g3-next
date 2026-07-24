@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/use-auth";
 import { authService } from "@/services/auth.service";
+import { agendamentosService } from "@/services/agendamentos.service";
 import { useUnidadeAssistencialAtual } from "@/features/unidades-assistenciais/use-unidades-assistenciais";
 import { obterUrlArquivoAutenticado } from "@/lib/arquivos";
 import { formatarCnpj, formatarTelefone } from "@/lib/br-utils";
@@ -641,10 +642,7 @@ export function AgendamentosPage() {
     }
 
     setGeracaoEmAndamento(true);
-    setGeracaoEtapa(0);
-    geracaoIntervalo.current = window.setInterval(() => {
-      setGeracaoEtapa((atual) => Math.min(atual + 1, ETAPAS_GERACAO_AGS.length - 2));
-    }, 1100);
+    setGeracaoEtapa(1);
 
     const dataExibicao = dataAgendamento;
     try {
@@ -655,10 +653,15 @@ export function AgendamentosPage() {
         data: dataAgendamento,
         matriculasIds: beneficiariosSelecionados
       });
-      await agendamentosQuery.refetch();
-      if (salvo) setAgendaLocalSalva(salvo);
+      const consultaOficial = await agendamentosService.listar({ periodoInicio: dataExibicao, periodoFim: dataExibicao });
+      if (salvo) {
+        const persistido = consultaOficial.some((item) => item.id === salvo.id);
+        if (!persistido) {
+          throw new Error("A agenda foi enviada, mas não foi encontrada na consulta oficial do banco. Nenhum card temporário foi mantido.");
+        }
+        setAgendaLocalSalva(null);
+      }
       setGeracaoEtapa(ETAPAS_GERACAO_AGS.length - 1);
-      await new Promise((resolve) => window.setTimeout(resolve, 350));
       setSelecionadoId(salvo?.id ?? null);
       setUltimaAgendaDestacadaId(salvo?.id ?? null);
       definirDataVisualizacao(dataExibicao);
@@ -1456,14 +1459,6 @@ export function AgendamentosPage() {
       ) : null}
 
       {popup ? <PopupMensagem popup={popup} onClose={() => setPopup(null)} /> : null}
-      {itemSelecionado && beneficiariosQuery.isFetching && !popup ? (
-        <div className="fixed inset-0 z-[59] flex items-center justify-center bg-slate-900/35 px-4">
-          <div className="flex w-full max-w-sm items-center gap-3 rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] px-5 py-4 shadow-2xl">
-            <LoaderCircle className="h-5 w-5 animate-spin text-[var(--g3-primary)]" />
-            <p className="text-sm font-medium text-[var(--g3-foreground)]">Aguarde, carregando os beneficiários inscritos.</p>
-          </div>
-        </div>
-      ) : null}
     </>
   );
 }

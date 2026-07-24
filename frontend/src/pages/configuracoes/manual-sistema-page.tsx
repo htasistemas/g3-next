@@ -221,7 +221,7 @@ const secoesManual: ManualSecao[] = [
           "O horário final é considerado como limite do período: das 19:00 às 21:00 com duração de 30 minutos são geradas quatro vagas, às 19:00, 19:30, 20:00 e 20:30.",
           "Na Faixa etária, use a opção Todas as idades para selecionar ou limpar todas as faixas de uma vez.",
           "Revise a fila de espera e a situação de vagas para apoiar decisões de encaminhamento.",
-          "Os atendimentos agendados não ficam mais dentro da tela de inscrições; quando precisar operar agenda, use o botão Abrir em Agendamentos.",
+          "A aba Agendamento concentra a marcação dos inscritos no próprio fluxo da inscrição, com data, horário, profissional e status; a tela global Agendamentos continua disponível para a visão consolidada do dia.",
           "Na aba Presença, a data da aula exibe somente datas reais da agenda e da frequência já registrada, sem botão para geração manual.",
           "Ao salvar as presenças, o sistema grava status, observações e auditoria no PostgreSQL e recarrega a mesma lista a partir do backend, sem depender de estado local do navegador.",
           "A barra superior da tela usa ações realmente contextuais por aba: a listagem fica com Buscar, Nova, Imprimir e Fechar; as abas de edição mostram apenas as ações que fazem sentido para aquele conteúdo, como Salvar dados da inscrição, Salvar catálogo e vagas, Salvar inscrições e fila ou Imprimir Frequência.",
