@@ -88,7 +88,9 @@ appRoutes.get("/health/ready", async (_request, response) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
     response.json({ status: "ready", service: "g3n-backend-node", version: obterVersaoSaude() });
-  } catch {
+  } catch (error) {
+    const detalhe = error instanceof Error ? error.message : String(error);
+    console.error(`[g3n-backend-node] readiness do banco falhou: ${detalhe}`);
     response.status(503).json({ status: "not_ready", service: "g3n-backend-node" });
   }
 });
