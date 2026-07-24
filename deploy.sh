@@ -92,6 +92,27 @@ ensure_storage_credentials() {
   log "Credenciais persistentes do storage verificadas"
 }
 
+ensure_cors_origin() {
+  local env_file="$APP_DIR/.env"
+  local cors_origin=""
+  local public_url=""
+
+  cors_origin="$(grep -E '^CORS_ORIGIN=' "$env_file" | tail -n 1 | cut -d '=' -f 2- || true)"
+  if [[ -n "$cors_origin" ]]; then
+    return 0
+  fi
+
+  public_url="$(grep -E '^APP_PUBLIC_URL=' "$env_file" | tail -n 1 | cut -d '=' -f 2- || true)"
+  if [[ -z "$public_url" ]]; then
+    public_url="https://g3n.htasistemas.com.br"
+  fi
+  public_url="${public_url%/}"
+
+  printf '\nCORS_ORIGIN=%s\n' "$public_url" >> "$env_file"
+  chmod 600 "$env_file"
+  log "CORS_ORIGIN inicializado para $public_url"
+}
+
 trap cleanup EXIT
 
 print_container_logs() {
@@ -198,6 +219,7 @@ log "Version set to $APP_VERSION"
 enable_maintenance
 log "Maintenance mode enabled"
 ensure_storage_credentials
+ensure_cors_origin
 
 log "Validando configuracao do Compose antes da reconciliacao"
 if ! docker compose -f "$APP_COMPOSE" config --quiet; then
