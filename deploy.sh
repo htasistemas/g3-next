@@ -23,6 +23,12 @@ EOF
 
 disable_maintenance() {
   rm -f "$MAINTENANCE_FLAG"
+  # O Nginx monta o diretorio runtime do projeto; remove tambem o caminho
+  # padrao para evitar flag persistente quando APP_MAINTENANCE_FLAG_PATH vier
+  # definido pelo ambiente do runner.
+  if [[ "$MAINTENANCE_FLAG" != "$MAINTENANCE_DIR/maintenance.enable" ]]; then
+    rm -f "$MAINTENANCE_DIR/maintenance.enable"
+  fi
 }
 
 cleanup() {
