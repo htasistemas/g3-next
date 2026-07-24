@@ -1,4 +1,5 @@
 import { AppError } from "../../../shared/errors/app-error.js";
+import bcrypt from "bcryptjs";
 import { mapaCamposTextoMatricula } from "../../../utils/text-format-config.js";
 import { normalizarObjetoTexto } from "../../../utils/text-formatter.js";
 import { toIsoDate, toStringId } from "../../../utils/string-utils.js";
@@ -14,12 +15,15 @@ import {
   matriculaInputSchema,
   matriculaPresencaDataCreateSchema,
   matriculaPresencaDataUpdateSchema,
+  matriculaPresencaSenhaSchema,
   matriculaPresencaSalvarSchema
 } from "../matricula.schema.js";
 import { MatriculaRepository } from "../repositories/matricula.repository.js";
+import { AuthRepository } from "../../auth/repositories/auth.repository.js";
 
 export class MatriculaService {
   private readonly repository = new MatriculaRepository();
+  private readonly authRepository = new AuthRepository();
 
   async listar(rawFilters: unknown, rawTenantId?: string) {
     const filtersNormalizados =
@@ -245,12 +249,22 @@ export class MatriculaService {
     const cursoId = this.parseId(rawCursoId);
     const presencaDataId = this.parseId(rawPresencaDataId);
     const input = matriculaPresencaSalvarSchema.parse(rawInput);
+    const usuario = this.parseUsuario(rawUsuario);
+    if (input.senha_confirmacao) {
+      if (!usuario?.id) {
+        throw new AppError("Usuario autenticado invalido para confirmar a alteracao.", 401);
+      }
+      const usuarioAtual = await this.authRepository.buscarUsuarioPorId(usuario.id, this.parseTenant(rawTenantId));
+      if (!usuarioAtual?.senhaHash || !(await bcrypt.compare(input.senha_confirmacao, usuarioAtual.senhaHash))) {
+        throw new AppError("Senha invalida para alterar a presenca ou ausencia.", 401);
+      }
+    }
     const resultado = await this.repository.salvarPresencasPorData(
       cursoId,
       presencaDataId,
       input,
       this.parseTenant(rawTenantId),
-      this.parseUsuario(rawUsuario)
+      usuario
     );
 
     return {
@@ -263,6 +277,25 @@ export class MatriculaService {
         observacao: item.observacao ?? undefined
       }))
     };
+  }
+
+  async validarSenhaPresenca(
+    rawInput: unknown,
+    rawTenantId?: string,
+    rawUsuario?: { id?: string; nome?: string }
+  ) {
+    const input = matriculaPresencaSenhaSchema.parse(rawInput);
+    const usuario = this.parseUsuario(rawUsuario);
+    if (!usuario?.id) {
+      throw new AppError("Usuario autenticado invalido para confirmar a alteracao.", 401);
+    }
+
+    const usuarioAtual = await this.authRepository.buscarUsuarioPorId(usuario.id, this.parseTenant(rawTenantId));
+    if (!usuarioAtual?.senhaHash || !(await bcrypt.compare(input.senha, usuarioAtual.senhaHash))) {
+      throw new AppError("Senha invalida para alterar a presenca ou ausencia.", 401);
+    }
+
+    return { valido: true };
   }
 
   private parseId(rawId: string): bigint {

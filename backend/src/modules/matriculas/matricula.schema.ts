@@ -157,6 +157,7 @@ export const matriculaPresencaDataUpdateSchema = z.object({
 export const matriculaPresencaSalvarSchema = z.object({
   data_aula: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Informe a data da aula."),
   observacoes: optionalTrimmedString,
+  senha_confirmacao: optionalTrimmedString,
   presencas: z
     .array(
       z.object({
@@ -166,4 +167,8 @@ export const matriculaPresencaSalvarSchema = z.object({
       })
     )
     .default([])
+});
+
+export const matriculaPresencaSenhaSchema = z.object({
+  senha: z.string().trim().min(1, "Informe a senha do usuário logado.")
 });

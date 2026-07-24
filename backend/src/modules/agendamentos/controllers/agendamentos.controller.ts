@@ -29,6 +29,9 @@ export class AgendamentosController {
         nome: item.nome,
         profissionalNome: item.profissional ?? undefined,
         horario: item.horario_inicial ? String(item.horario_inicial).slice(0, 5) : undefined,
+        controleHorarioAtendimento: Boolean(item.controle_horario_atendimento),
+        horarioFinal: item.horario_final_atendimento ? String(item.horario_final_atendimento).slice(0, 5) : undefined,
+        duracaoMinutos: item.intervalo_atendimento_minutos ?? item.duracao_horas ?? undefined,
         diasSemana: item.dias_semana ?? undefined,
         local: item.sala_nome ?? item.instituicao_parceira ?? undefined
       }))

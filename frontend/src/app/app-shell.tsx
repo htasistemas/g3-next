@@ -293,7 +293,7 @@ const menuSectionsBase: MenuSection[] = [
       {
         id: "atendimentos-prontuario",
         to: "/atendimentos/prontuario",
-        label: "Prontuário",
+        label: "Prontuário eletrônico",
         icon: ClipboardPenLine,
         requiredPermissions: ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS", "PRONTUARIO_VISUALIZAR", "CENTRAL_ATENDIMENTOS_VISUALIZAR"]
       },
@@ -717,7 +717,7 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/atendimentos/biblioteca")) return "Biblioteca";
   if (pathname.startsWith("/atendimentos/registro-visitas")) return "Registro de visitas";
   if (pathname.startsWith("/atendimentos/agendamentos")) return "Agendamentos";
-  if (pathname.startsWith("/atendimentos/prontuario")) return "Prontuário";
+  if (pathname.startsWith("/atendimentos/prontuario")) return "Prontuário eletrônico";
   if (pathname.startsWith("/atendimentos/ocorrencias")) return "Ocorrências";
   if (pathname.startsWith("/atendimentos/chamada-senhas")) return "Chamada de senhas";
   if (pathname.startsWith("/financeiro/registro-doacao")) return "Receber doações";

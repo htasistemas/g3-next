@@ -30,7 +30,8 @@ export const agendamentoParticipanteSchema = z.object({
   dataNascimento: optionalIsoDate.nullable().optional(),
   telefone: optionalTrimmedString.nullable().optional(),
   comparecimento: z.enum(["Pendente", "Presente", "Faltou", "Justificado"]).optional(),
-  observacao: optionalTrimmedString.nullable().optional()
+  observacao: optionalTrimmedString.nullable().optional(),
+  horario: optionalTime.nullable().optional()
 });
 
 export const agendamentoInputSchema = z.object({
@@ -118,11 +119,17 @@ export const agendamentoOperacionalInputSchema = z.object({
   tipo: tipoOperacionalSchema,
   itemId: z.coerce.number().int().positive(),
   data: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/),
+  horaInicial: optionalTime,
+  horaFinal: optionalTime,
+  duracaoMinutos: z.coerce.number().int().positive().max(1440).optional(),
   beneficiariosIds: z
     .array(z.coerce.number().int().positive())
     .optional(),
   matriculasIds: z
     .array(z.coerce.number().int().positive())
+    .optional(),
+  horariosPorMatricula: z
+    .record(z.string().trim().regex(/^\d{2}:\d{2}(?::\d{2})?$/))
     .optional()
 }).superRefine((input, ctx) => {
   const totalBeneficiarios = input.beneficiariosIds?.length ?? 0;

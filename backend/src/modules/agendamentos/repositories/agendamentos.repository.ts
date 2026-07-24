@@ -104,6 +104,9 @@ const estruturaSql = [
   "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS item_dias_semana VARCHAR(200)",
   "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS item_local VARCHAR(200)",
   "ALTER TABLE agendamento ADD COLUMN IF NOT EXISTS dia_semana VARCHAR(40)",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS controle_horario_atendimento BOOLEAN NOT NULL DEFAULT FALSE",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS horario_final_atendimento TIME",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS duracao_horas INTEGER NOT NULL DEFAULT 0",
   `
     CREATE TABLE IF NOT EXISTS agendamento_lista_espera (
       id BIGSERIAL PRIMARY KEY,
@@ -524,7 +527,8 @@ export class AgendamentosRepository {
 
   private async buscarAgendaOperacionalExistente(
     payload: { data: string; horaInicial: string; itemOrigemId?: number | null; itemNome?: string | null; itemTipo?: string | null },
-    tenantId: string
+    tenantId: string,
+    agruparPorData = false
   ) {
     const itemId = Number(payload.itemOrigemId);
     const itemNome = trimOrUndefined(payload.itemNome);
@@ -552,7 +556,7 @@ export class AgendamentosRepository {
       WHERE a.tenant_id::text = ${tenantId}
         AND COALESCE(a.status, '') <> 'Cancelado'
         AND a.data_agendamento = ${formatarData(payload.data)}
-        AND a.hora_inicial = ${sqlTime(payload.horaInicial)}
+        ${agruparPorData ? Prisma.empty : Prisma.sql`AND a.hora_inicial = ${sqlTime(payload.horaInicial)}`}
         AND ${identidadeItem}
       ORDER BY a.id DESC
       LIMIT 1
@@ -1339,6 +1343,9 @@ export class AgendamentosRepository {
         c.nome,
         c.profissional,
         TO_CHAR(c.horario_inicial, 'HH24:MI') AS horario_inicial,
+        c.controle_horario_atendimento,
+        TO_CHAR(c.horario_final_atendimento, 'HH24:MI') AS horario_final_atendimento,
+        c.intervalo_atendimento_minutos,
         c.duracao_horas,
         c.dias_semana,
         s.nome AS sala_nome,
@@ -1364,6 +1371,9 @@ export class AgendamentosRepository {
         c.nome,
         c.profissional,
         TO_CHAR(c.horario_inicial, 'HH24:MI') AS horario_inicial,
+        c.controle_horario_atendimento,
+        TO_CHAR(c.horario_final_atendimento, 'HH24:MI') AS horario_final_atendimento,
+        c.intervalo_atendimento_minutos,
         c.duracao_horas,
         c.dias_semana,
         s.nome AS sala_nome,
@@ -1491,7 +1501,7 @@ export class AgendamentosRepository {
     const condicoes: Prisma.Sql[] = [
       Prisma.sql`a.data_agendamento = ${formatarData(payload.data)}`,
       Prisma.sql`COALESCE(a.status, '') NOT IN ('Cancelado', 'Faltou', 'Alta')`,
-      Prisma.sql`(${horaInicial}::time <= COALESCE(a.hora_final, a.hora_inicial) AND ${horaFinal}::time >= a.hora_inicial)`
+      Prisma.sql`(${horaInicial}::time < COALESCE(a.hora_final, a.hora_inicial) AND ${horaFinal}::time > a.hora_inicial)`
     ];
 
     if (payload.idIgnorar) {
@@ -2350,13 +2360,15 @@ export class AgendamentosRepository {
       beneficiarioId: entry.beneficiario_id ? Number(entry.beneficiario_id) : undefined,
       codigo: entry.codigo ?? undefined,
       beneficiarioNome: entry.beneficiario_nome,
-      dataNascimento: entry.data_nascimento ? entry.data_nascimento.toISOString().slice(0, 10) : undefined,
+      dataNascimento: formatarDataEntrada(entry.data_nascimento),
       telefone: entry.telefone ?? undefined,
       email: entry.email ?? undefined,
+      horario: input.horariosPorMatricula?.[String(entry.matricula_id)] ?? input.horaInicial ?? undefined,
       comparecimento: "Pendente" as const
     }));
 
-    const horarioBase = formatarHoraEntrada(item.horario_inicial) ?? "08:00:00";
+    const horarioBase = formatarHoraEntrada(input.horaInicial ?? item.horario_inicial) ?? "08:00:00";
+    const horarioFinal = formatarHoraEntrada(input.horaFinal ?? item.horario_final_atendimento);
     const profissionalNome = trimOrUndefined(item.profissional) ?? trimOrUndefined(selecionados[0]?.profissional_nome) ?? "Equipe institucional";
     const local = trimOrUndefined(item.sala_nome) ?? trimOrUndefined(item.instituicao_parceira) ?? "Local a definir";
 
@@ -2369,11 +2381,12 @@ export class AgendamentosRepository {
       profissionalNome,
       data: input.data,
       horaInicial: horarioBase.slice(0, 5),
-      horaFinal: undefined,
+      horaFinal: horarioFinal,
+      duracaoMinutos: input.duracaoMinutos ?? item.intervalo_atendimento_minutos ?? item.duracao_horas ?? undefined,
       modalidade: "Coletivo",
       prioridade: "Normal",
       status: "Agendado",
-      coletivo: true,
+      coletivo: input.tipo !== "atendimento" || !item.controle_horario_atendimento,
       tituloColetivo: item.nome,
       capacidadeMaxima: participantes.length,
       participantes,
@@ -2390,9 +2403,39 @@ export class AgendamentosRepository {
 
   async criarOperacional(input: AgendamentoOperacionalInput, usuario: UsuarioActor | undefined, tenantId: string) {
     const payload = await this.montarPayloadOperacional(input, tenantId);
-    const agendaExistenteId = await this.buscarAgendaOperacionalExistente(payload, tenantId);
+    const atendimentoPorHorario = input.tipo === "atendimento" && Object.keys(input.horariosPorMatricula ?? {}).length > 0;
+    const agendaExistenteId = await this.buscarAgendaOperacionalExistente(payload, tenantId, atendimentoPorHorario);
 
     if (agendaExistenteId) {
+      if (atendimentoPorHorario) {
+        const existente = await this.obter(agendaExistenteId, tenantId);
+        const participantesExistentes = Array.isArray(existente?.participantes)
+          ? (existente.participantes as Array<Record<string, unknown>>)
+          : [];
+        const participantesNovos = payload.participantes ?? [];
+        const participantesPorMatricula = new Map<string, Record<string, unknown>>();
+
+        for (const participante of participantesExistentes) {
+          const matriculaId = lerInteiroParticipante(participante.matriculaId ?? participante.matricula_id);
+          if (matriculaId) participantesPorMatricula.set(String(matriculaId), participante);
+        }
+        for (const participante of participantesNovos) {
+          const matriculaId = participante.matriculaId;
+          if (matriculaId) participantesPorMatricula.set(String(matriculaId), participante);
+        }
+
+        const participantes = Array.from(participantesPorMatricula.values());
+        return this.atualizar(
+          agendaExistenteId,
+          {
+            ...payload,
+            capacidadeMaxima: participantes.length,
+            participantes: participantes as AgendamentoInput["participantes"]
+          },
+          usuario,
+          tenantId
+        );
+      }
       return this.atualizar(agendaExistenteId, payload, usuario, tenantId);
     }
 

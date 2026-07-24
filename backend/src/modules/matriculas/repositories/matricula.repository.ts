@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../../database/prisma.js";
 import { AppError } from "../../../shared/errors/app-error.js";
-import { normalizeDigits, toOptionalDate, trimOrUndefined } from "../../../utils/string-utils.js";
+import { normalizeDigits, toIsoDate, toOptionalDate, trimOrUndefined } from "../../../utils/string-utils.js";
 import { ensureArquivosEstrutura } from "../../arquivos/repositories/arquivos-estrutura.repository.js";
 import type {
   MatriculaFilaEsperaInput,
@@ -1195,6 +1195,10 @@ export class MatriculaRepository {
   async listarPresencasPorData(cursoId: bigint, presencaDataId: bigint, tenantId: string) {
     await this.ensureEstrutura();
     const presencaData = await this.buscarPresencaDataOuFalhar(cursoId, presencaDataId, tenantId);
+    const dataAulaIso = toIsoDate(presencaData.data_aula);
+    if (!dataAulaIso) {
+      throw new AppError("Data da aula invalida.", 500);
+    }
 
     const itens = await prisma.$queryRaw<MatriculaPresencaItemRow[]>(Prisma.sql`
       SELECT
@@ -1210,7 +1214,7 @@ export class MatriculaRepository {
         ON p.curso_id = m.curso_id
        AND p.matricula_id = m.id
        AND p.tenant_id::text = ${tenantId}
-       AND p.data_aula = ${presencaData.data_aula}
+       AND p.data_aula = ${dataAulaIso}::date
       LEFT JOIN cadastro_beneficiario b
         ON b.tenant_id::text = ${tenantId}
        AND (
@@ -1256,6 +1260,10 @@ export class MatriculaRepository {
     await this.ensureEstrutura();
     const presencaData = await this.buscarPresencaDataOuFalhar(cursoId, presencaDataId, tenantId);
     const dataAula = toOptionalDate(input.data_aula) ?? presencaData.data_aula;
+    const dataAulaIso = toIsoDate(dataAula);
+    if (!dataAulaIso) {
+      throw new AppError("Data da aula invalida.", 400);
+    }
     const observacoesGerais = trimOrUndefined(input.observacoes);
 
     await prisma.$transaction(async (tx) => {
@@ -1282,7 +1290,7 @@ export class MatriculaRepository {
             ON p.tenant_id::text = ${tenantId}
            AND p.curso_id = ${cursoId}
            AND p.matricula_id = m.id
-           AND p.data_aula = ${dataAula}
+           AND p.data_aula = ${dataAulaIso}::date
           LEFT JOIN cadastro_beneficiario b
             ON b.tenant_id::text = ${tenantId}
            AND (
@@ -1332,9 +1340,18 @@ export class MatriculaRepository {
           WHERE tenant_id::text = ${tenantId}
             AND curso_id = ${cursoId}
             AND matricula_id = ${matriculaId}
-            AND data_aula = ${dataAula}
+            AND data_aula = ${dataAulaIso}::date
           LIMIT 1
         `);
+
+        const statusAnterior = usuarioAnterior[0]?.status;
+        const presencaJaConfirmada = statusAnterior === "PRESENTE" || statusAnterior === "AUSENTE" || statusAnterior === "JUSTIFICADO";
+        if (presencaJaConfirmada && statusAnterior !== item.status && !input.senha_confirmacao) {
+          throw new AppError(
+            "A presença ou ausência deste beneficiário já foi salva. Confirme a alteração informando a senha do usuário logado.",
+            409
+          );
+        }
 
         await tx.$executeRaw(Prisma.sql`
           INSERT INTO cursos_atendimentos_presencas (
@@ -1354,7 +1371,7 @@ export class MatriculaRepository {
             ${tenantId}::uuid,
             ${cursoId},
             ${matriculaId},
-            ${dataAula},
+            ${dataAulaIso}::date,
             ${item.status},
             ${trimOrUndefined(item.observacao) ?? null},
             ${usuario?.id ?? null},
@@ -1394,7 +1411,7 @@ export class MatriculaRepository {
       await tx.$executeRaw(Prisma.sql`
         UPDATE cursos_atendimentos_presenca_datas
         SET
-          data_aula = ${dataAula},
+          data_aula = ${dataAulaIso}::date,
           observacoes = COALESCE(${observacoesGerais}, observacoes),
           status = 'PREENCHIDA',
           atualizado_em = NOW()

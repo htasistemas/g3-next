@@ -81,6 +81,12 @@ matriculaRoutes.post(
   ensurePermissions(permissoesEscrita),
   asyncHandler(controller.salvarPresencasPorData.bind(controller))
 );
+matriculaRoutes.post(
+  "/:id/presencas/datas/:presencaDataId/validar-senha",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.validarSenhaPresenca.bind(controller))
+);
 
 matriculaRoutes.get(
   "/",

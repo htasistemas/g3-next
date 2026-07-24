@@ -485,6 +485,7 @@ export function AgendaCard(props: {
           <table className="w-full border-collapse text-sm">
             <thead className="bg-emerald-50 text-left">
               <tr>
+                <th className="border-b border-[var(--g3-border)] px-3 py-2 font-semibold text-emerald-900">Horário</th>
                 <th className="border-b border-[var(--g3-border)] px-3 py-2 font-semibold text-emerald-900">Beneficiário</th>
                 <th className="border-b border-[var(--g3-border)] px-3 py-2 font-semibold text-emerald-900">Telefone</th>
                 <th className="border-b border-[var(--g3-border)] px-3 py-2 text-center font-semibold text-emerald-900">Ações</th>
@@ -499,6 +500,9 @@ export function AgendaCard(props: {
                     key={`${participante.matriculaId ?? participante.beneficiarioId ?? participante.beneficiarioNome}-${index}`}
                     className="bg-white"
                   >
+                    <td className="border-b border-[var(--g3-border)] px-3 py-2 font-semibold text-emerald-800">
+                      {participante.horario || props.item.horaInicial || "---"}
+                    </td>
                     <td className="border-b border-[var(--g3-border)] px-3 py-2 text-[var(--g3-foreground)]">
                       <div className="space-y-0.5">
                         <p className="font-medium">{participante.beneficiarioNome}</p>
@@ -535,7 +539,7 @@ export function AgendaCard(props: {
                 })
               ) : (
                 <tr className="bg-white">
-                  <td colSpan={3} className="px-3 py-4 text-center text-[var(--g3-muted)]">
+                  <td colSpan={4} className="px-3 py-4 text-center text-[var(--g3-muted)]">
                     Nenhum beneficiário vinculado.
                   </td>
                 </tr>

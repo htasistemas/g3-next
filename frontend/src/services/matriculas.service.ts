@@ -16,6 +16,7 @@ import type {
 type MatriculaPresencaSalvarPayload = {
   data_aula: string;
   observacoes?: string;
+  senha_confirmacao?: string;
   presencas: Array<MatriculaPresencaItem & { matricula_id: string }>;
 };
 
@@ -95,6 +96,14 @@ export const matriculasService = {
     const { data } = await httpClient.post<MatriculaPresencaResponse>(
       `/api/matriculas/${cursoId}/presencas/datas/${presencaDataId}/itens`,
       payload
+    );
+    return data;
+  },
+
+  async validarSenhaPresenca(cursoId: string, presencaDataId: string, senha: string) {
+    const { data } = await httpClient.post<{ valido: boolean }>(
+      `/api/matriculas/${cursoId}/presencas/datas/${presencaDataId}/validar-senha`,
+      { senha }
     );
     return data;
   },

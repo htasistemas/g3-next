@@ -83,11 +83,10 @@ const abas = [
   { id: "dados", label: "Dados da inscrição", icon: BookOpenCheck },
   { id: "catalogo", label: "Catálogo e vagas", icon: CalendarClock },
   { id: "inscricoes", label: "Inscrições e lista de espera", icon: UserPlus },
-  { id: "agenda", label: "Agendamento", icon: CalendarClock },
-  { id: "presenca", label: "Presença", icon: Users }
+  { id: "presenca", label: "Confirmar presença", icon: Users }
 ] as const;
 
-type AbaId = "listagem" | "dados" | "catalogo" | "inscricoes" | "agenda" | "presenca";
+type AbaId = "listagem" | "dados" | "catalogo" | "inscricoes" | "presenca";
 
 type AcaoCrud = {
   label: string;
@@ -576,6 +575,7 @@ export function CadastroMatriculasPage() {
   const [presencaDatas, setPresencaDatas] = useState<MatriculaPresencaData[]>([]);
   const [presencaDataSelecionada, setPresencaDataSelecionada] = useState<MatriculaPresencaData | null>(null);
   const [presencasPorMatricula, setPresencasPorMatricula] = useState<Record<string, MatriculaPresencaStatus>>({});
+  const [presencasSalvasPorMatricula, setPresencasSalvasPorMatricula] = useState<Record<string, MatriculaPresencaStatus>>({});
   const [presencasObservacoesPorMatricula, setPresencasObservacoesPorMatricula] = useState<Record<string, string>>({});
   const [dataPresencaSelecionada, setDataPresencaSelecionada] = useState(obterDataAtualIso);
   const [presencaObservacoes, setPresencaObservacoes] = useState("");
@@ -584,6 +584,15 @@ export function CadastroMatriculasPage() {
   const [presencaSalvando, setPresencaSalvando] = useState(false);
   const [presencaExcluindo, setPresencaExcluindo] = useState(false);
   const [presencaPendente, setPresencaPendente] = useState(false);
+  const [presencaAlteracaoPendente, setPresencaAlteracaoPendente] = useState<{
+    matriculaId: string;
+    status: MatriculaPresencaStatus;
+    beneficiarioNome: string;
+  } | null>(null);
+  const [senhaConfirmacaoPresenca, setSenhaConfirmacaoPresenca] = useState("");
+  const [presencaListaAutorizada, setPresencaListaAutorizada] = useState<string | null>(null);
+  const [presencaValidandoSenha, setPresencaValidandoSenha] = useState(false);
+  const [presencaErroSenha, setPresencaErroSenha] = useState("");
   const [imagemCursoArquivo, setImagemCursoArquivo] = useState<File | null>(null);
   const [salvandoImagemCurso, setSalvandoImagemCurso] = useState(false);
   const inputImagemRef = useRef<HTMLInputElement | null>(null);
@@ -1020,7 +1029,6 @@ export function CadastroMatriculasPage() {
       profissional_nome: profissionalPadrao,
       status_agendamento: "AGUARDANDO"
     });
-    setAbaAtiva("agenda");
   }
 
   function buscar() {
@@ -1090,7 +1098,11 @@ export function CadastroMatriculasPage() {
     });
     setPresencaDatas([]);
     setPresencaDataSelecionada(null);
+    setPresencaListaAutorizada(null);
+    setSenhaConfirmacaoPresenca("");
+    setPresencaAlteracaoPendente(null);
     setPresencasPorMatricula({});
+    setPresencasSalvasPorMatricula({});
     setDataPresencaSelecionada(obterDataAtualIso());
     setPresencaObservacoes("");
     setPresencaPendente(false);
@@ -1144,6 +1156,9 @@ export function CadastroMatriculasPage() {
       status_agendamento: "AGUARDANDO"
     });
     setPresencaDataSelecionada(null);
+    setPresencaListaAutorizada(null);
+    setSenhaConfirmacaoPresenca("");
+    setPresencaAlteracaoPendente(null);
     setPresencasPorMatricula({});
     setDataPresencaSelecionada(obterDataAtualIso());
     setPresencaObservacoes("");
@@ -1805,7 +1820,12 @@ export function CadastroMatriculasPage() {
     if (!cursoId) {
       setPresencaDatas([]);
       setPresencaDataSelecionada(null);
+      setPresencaListaAutorizada(null);
+      setSenhaConfirmacaoPresenca("");
+      setPresencaErroSenha("");
+      setPresencaAlteracaoPendente(null);
       setPresencasPorMatricula({});
+      setPresencasSalvasPorMatricula({});
       setPresencasObservacoesPorMatricula({});
       return;
     }
@@ -1818,8 +1838,12 @@ export function CadastroMatriculasPage() {
 
       if (!datas.length) {
         setPresencaDataSelecionada(null);
+        setPresencaListaAutorizada(null);
+        setSenhaConfirmacaoPresenca("");
+        setPresencaAlteracaoPendente(null);
         setDataPresencaSelecionada("");
         setPresencasPorMatricula({});
+        setPresencasSalvasPorMatricula({});
         setPresencasObservacoesPorMatricula({});
         setPresencaObservacoes("");
         setPresencaPendente(false);
@@ -1841,8 +1865,13 @@ export function CadastroMatriculasPage() {
       });
       setPresencaDatas([]);
       setPresencaDataSelecionada(null);
+      setPresencaListaAutorizada(null);
+      setSenhaConfirmacaoPresenca("");
+      setPresencaErroSenha("");
+      setPresencaAlteracaoPendente(null);
       setDataPresencaSelecionada("");
       setPresencasPorMatricula({});
+      setPresencasSalvasPorMatricula({});
       setPresencasObservacoesPorMatricula({});
     } finally {
       setPresencaCarregando(false);
@@ -1852,6 +1881,15 @@ export function CadastroMatriculasPage() {
   async function selecionarPresencaData(data: MatriculaPresencaData) {
     const cursoId = idSelecionado ?? getValues("id_matricula");
     if (!cursoId) return;
+
+    const chaveLista = `${cursoId}:${data.id}`;
+    const chaveListaAtual = presencaDataSelecionada ? `${cursoId}:${presencaDataSelecionada.id}` : null;
+    if (chaveListaAtual !== chaveLista) {
+      setPresencaListaAutorizada(null);
+      setSenhaConfirmacaoPresenca("");
+      setPresencaErroSenha("");
+      setPresencaAlteracaoPendente(null);
+    }
 
     setPresencaDataSelecionada(data);
     setDataPresencaSelecionada(data.data_aula);
@@ -1871,6 +1909,7 @@ export function CadastroMatriculasPage() {
         }
       });
       setPresencasPorMatricula(mapa);
+      setPresencasSalvasPorMatricula(mapa);
       setPresencasObservacoesPorMatricula(mapaObservacoes);
       setPresencaPendente(false);
     } catch (error: any) {
@@ -1885,12 +1924,52 @@ export function CadastroMatriculasPage() {
     }
   }
 
+  function solicitarAtualizacaoPresenca(matriculaId: string, status: MatriculaPresencaStatus, beneficiarioNome: string) {
+    const statusSalvo = presencasSalvasPorMatricula[matriculaId];
+    const chaveListaAtual = presencaDataSelecionada
+      ? `${idSelecionado ?? getValues("id_matricula")}:${presencaDataSelecionada.id}`
+      : null;
+    const listaJaAutorizada = chaveListaAtual && presencaListaAutorizada === chaveListaAtual;
+    if (statusSalvo && statusSalvo !== status && !listaJaAutorizada) {
+      setPresencaAlteracaoPendente({ matriculaId, status, beneficiarioNome });
+      setSenhaConfirmacaoPresenca("");
+      setPresencaErroSenha("");
+      return;
+    }
+    atualizarPresenca(matriculaId, status);
+  }
+
   function atualizarPresenca(matriculaId: string, status: MatriculaPresencaStatus) {
     setPresencasPorMatricula((atual) => ({
       ...atual,
       [matriculaId]: status
     }));
     setPresencaPendente(true);
+  }
+
+  async function confirmarAlteracaoPresenca() {
+    if (!presencaAlteracaoPendente || !senhaConfirmacaoPresenca.trim()) {
+      setPresencaErroSenha("Informe a senha do usuário logado para confirmar a alteração.");
+      return;
+    }
+    const cursoId = idSelecionado ?? getValues("id_matricula");
+    if (!cursoId || !presencaDataSelecionada) return;
+
+    setPresencaValidandoSenha(true);
+    try {
+      await matriculasService.validarSenhaPresenca(
+        cursoId,
+        presencaDataSelecionada.id,
+        senhaConfirmacaoPresenca.trim()
+      );
+      atualizarPresenca(presencaAlteracaoPendente.matriculaId, presencaAlteracaoPendente.status);
+      setPresencaListaAutorizada(`${cursoId}:${presencaDataSelecionada.id}`);
+      setPresencaAlteracaoPendente(null);
+    } catch (error: any) {
+      setPresencaErroSenha(error?.response?.data?.message ?? "A senha informada está incorreta. A alteração não foi aplicada.");
+    } finally {
+      setPresencaValidandoSenha(false);
+    }
   }
 
   function alternarInscricaoAgenda(chave: string, selecionada: boolean) {
@@ -1940,7 +2019,11 @@ export function CadastroMatriculasPage() {
       await matriculasService.removerPresencaData(cursoId, presencaDataSelecionada.id);
       setPopupExcluirPresencaAberto(false);
       setPresencaDataSelecionada(null);
+      setPresencaListaAutorizada(null);
+      setSenhaConfirmacaoPresenca("");
+      setPresencaAlteracaoPendente(null);
       setPresencasPorMatricula({});
+      setPresencasSalvasPorMatricula({});
       setPresencasObservacoesPorMatricula({});
       setPresencaObservacoes("");
       setDataPresencaSelecionada("");
@@ -1986,6 +2069,7 @@ export function CadastroMatriculasPage() {
       const response = await matriculasService.salvarPresencasPorData(cursoId, presencaDataSelecionada.id, {
         data_aula: presencaDataSelecionada.data_aula,
         observacoes: presencaObservacoes || undefined,
+        senha_confirmacao: senhaConfirmacaoPresenca.trim() || undefined,
         presencas
       });
       const mapa: Record<string, MatriculaPresencaStatus> = {};
@@ -1999,6 +2083,7 @@ export function CadastroMatriculasPage() {
         }
       });
       setPresencasPorMatricula(mapa);
+      setPresencasSalvasPorMatricula(mapa);
       setPresencasObservacoesPorMatricula(mapaObservacoes);
       setPresencaPendente(false);
       await carregarPresencaDatas();
@@ -2485,19 +2570,12 @@ export function CadastroMatriculasPage() {
       { label: "Excluir inscrição", icon: Trash2, onClick: excluir, variant: "danger", disabled: acaoEmAndamento || !possuiMatriculaSelecionada },
       { label: "Fechar", icon: X, onClick: fechar, variant: "outline" }
     ],
-    agenda: [
-      { label: "Nova inscrição", icon: Plus, onClick: novo, variant: "default", disabled: acaoEmAndamento },
-      { label: "Salvar agendamentos", icon: Save, onClick: () => void handleSubmit(salvar)(), variant: "default", disabled: acaoEmAndamento },
-      { label: "Cancelar edição", icon: Undo2, onClick: cancelar, variant: "outline", disabled: acaoEmAndamento },
-      { label: "Excluir inscrição", icon: Trash2, onClick: excluir, variant: "danger", disabled: acaoEmAndamento || !possuiMatriculaSelecionada },
-      { label: "Fechar", icon: X, onClick: fechar, variant: "outline" }
-    ],
     presenca: [
       { label: "Nova inscrição", icon: Plus, onClick: novo, variant: "default", disabled: acaoEmAndamento },
       {
         label: "Salvar presenças",
         icon: Save,
-        onClick: () => void handleSubmit(salvar)(),
+        onClick: () => void salvarPresencas(),
         variant: "default",
         disabled: acaoEmAndamento || !presencaDataSelecionada || !presencaPendente
       },
@@ -3367,14 +3445,11 @@ export function CadastroMatriculasPage() {
                   <div className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-3">
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                       <div>
-                        <p className="text-sm font-semibold text-[var(--g3-foreground)]">Agendamento no fluxo da inscrição</p>
+                        <p className="text-sm font-semibold text-[var(--g3-foreground)]">Inscrições e lista de espera</p>
                         <p className="text-xs text-[var(--g3-muted)]">
-                          Selecione os inscritos e configure data, horário, profissional e status sem sair desta tela.
+                          Consulte e gerencie os beneficiários inscritos e a fila de espera deste curso ou atendimento.
                         </p>
                       </div>
-                      <Button type="button" variant="outline" onClick={() => setAbaAtiva("agenda")}>
-                        Abrir agendamento
-                      </Button>
                     </div>
                   </div>
                   <div className="rounded-lg border border-[var(--g3-border)] p-3">
@@ -3910,469 +3985,6 @@ export function CadastroMatriculasPage() {
               </div>
               )}
 
-              {abaAtiva === "agenda" && (
-                <div className="space-y-3">
-                  <div className="rounded-lg border border-[var(--g3-border)] p-3">
-                    <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
-                      <div className="space-y-1">
-                        <Label htmlFor="agenda-curso">Curso ou atendimento</Label>
-                        <Select
-                          id="agenda-curso"
-                          value={idSelecionado ?? getValues("id_matricula") ?? ""}
-                          onChange={(event) => selecionarCursoParaAgendamento(event.target.value)}
-                        >
-                          <option value="">Selecione o curso ou atendimento</option>
-                          {matriculas
-                            .filter((item) => !!item.id_matricula)
-                            .map((item) => (
-                              <option key={item.id_matricula} value={item.id_matricula}>
-                                {item.tipo} — {item.nome}
-                              </option>
-                            ))}
-                        </Select>
-                      </div>
-                      {cursoSelecionadoInscricao && (
-                        <div className="rounded-md border border-[var(--g3-border)] bg-[var(--g3-card-soft)] px-3 py-2 text-xs">
-                          <span className="font-semibold text-[var(--g3-foreground)]">
-                            {inscricoesAtivas.length} inscritos ativos
-                          </span>
-                          <span className="ml-2 text-[var(--g3-muted)]">{cursoSelecionadoInscricao.tipo}</span>
-                        </div>
-                      )}
-                    </div>
-                    {!cursoSelecionadoInscricao && (
-                      <p className="mt-2 text-[11px] text-[var(--g3-muted)]">
-                        Selecione um curso ou atendimento para carregar os inscritos e iniciar os agendamentos.
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="rounded-lg border border-[var(--g3-border)] p-3">
-                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-12">
-                      <div className="space-y-1 xl:col-span-6">
-                        <Label htmlFor="agenda-beneficiario">Beneficiário inscrito</Label>
-                        <Input
-                          id="agenda-beneficiario"
-                          value={termoAgendaBeneficiario}
-                          onChange={(event) => {
-                            const valor = event.target.value;
-                            setTermoAgendaBeneficiario(valor);
-                            setMostrarSugestoesAgendaBeneficiario(true);
-                            setAgendaForm((atual) => ({ ...atual, chave_inscricao: "" }));
-                          }}
-                          onFocus={() => setMostrarSugestoesAgendaBeneficiario(true)}
-                          onBlur={(event) => {
-                            const valorFormatado = formatarTextoPadrao(event.target.value);
-                            setTermoAgendaBeneficiario(valorFormatado);
-                            setTimeout(() => setMostrarSugestoesAgendaBeneficiario(false), 120);
-                          }}
-                          placeholder={
-                            cursoSelecionadoInscricao
-                              ? "Digite para buscar entre os beneficiários inscritos"
-                              : "Selecione uma inscrição para listar os inscritos"
-                          }
-                          disabled={!cursoSelecionadoInscricao || inscricoesAtivas.length === 0}
-                        />
-                        {!cursoSelecionadoInscricao ? (
-                          <p className="text-[11px] text-[var(--g3-muted)]">
-                            Selecione uma inscrição para trazer os beneficiários inscritos.
-                          </p>
-                        ) : inscricoesAtivas.length === 0 ? (
-                          <p className="text-[11px] text-[var(--g3-muted)]">
-                            Não há beneficiários inscritos disponíveis para agendamento.
-                          </p>
-                        ) : null}
-                        {cursoSelecionadoInscricao && inscricoesAtivas.length > 0 && (
-                          <div className="mt-2 rounded-md border border-[var(--g3-border)] bg-[var(--g3-card)] p-2">
-                            <div className="mb-2 flex items-center justify-between gap-2 border-b border-[var(--g3-border)] pb-2">
-                              <label className="flex items-center gap-2 text-xs font-semibold text-[var(--g3-foreground)]">
-                                <input
-                                  type="checkbox"
-                                  checked={todasInscricoesAgendaSelecionadas}
-                                  onChange={(event) => alternarTodasInscricoesAgenda(event.target.checked)}
-                                />
-                                Selecionar todos
-                              </label>
-                              <span className="text-[11px] text-[var(--g3-muted)]">
-                                {inscricoesAgendaSelecionadas.length} selecionado(s)
-                              </span>
-                            </div>
-                            <div className="max-h-56 space-y-1 overflow-y-auto">
-                              {inscricoesAgendaCatalogo.map(({ chave, item }) => (
-                                <label
-                                  key={`agenda-selecao-${chave}`}
-                                  className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-[var(--g3-primary-soft)]"
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={inscricoesAgendaSelecionadas.includes(chave)}
-                                    onChange={(event) => alternarInscricaoAgenda(chave, event.target.checked)}
-                                  />
-                                  <span className="min-w-0 flex-1">
-                                    <span className="block truncate font-medium text-[var(--g3-foreground)]">
-                                      {item.beneficiario_nome}
-                                    </span>
-                                    <span className="block text-[11px] text-[var(--g3-muted)]">
-                                      {item.data_agendada
-                                        ? `Agendado em ${formatarData(item.data_agendada)} ${item.hora_agendada ?? ""}`.trim()
-                                        : "Sem agendamento"}
-                                    </span>
-                                  </span>
-                                </label>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        {mostrarSugestoesAgendaBeneficiario && cursoSelecionadoInscricao && inscricoesAtivas.length > 0 && (
-                          <div className="max-h-40 overflow-y-auto rounded-md border border-[var(--g3-border)] bg-[var(--g3-card)] p-1">
-                            {inscricoesAgendaCatalogo.length ? (
-                              inscricoesAgendaCatalogo.map(({ chave, item }) => (
-                                <button
-                                  key={chave}
-                                  type="button"
-                                  className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-[var(--g3-primary-soft)]"
-                                  onMouseDown={(event) => event.preventDefault()}
-                                  onClick={() => {
-                                    preencherAgendaPorInscricao(chave);
-                                    setInscricoesAgendaSelecionadas([chave]);
-                                  }}
-                                >
-                                  <span className="font-medium text-[var(--g3-foreground)]">{item.beneficiario_nome}</span>
-                                  <span className="block text-[11px] text-[var(--g3-muted)]">
-                                    {formatarCpf(item.cpf)}
-                                    {item.telefone ? ` • Tel.: ${formatarTelefone(item.telefone)}` : " • Tel.: ---"}
-                                    {item.data_agendada
-                                      ? ` • Agendado em ${formatarData(item.data_agendada)} ${item.hora_agendada ?? ""}`.trim()
-                                      : " • Sem agendamento"}
-                                  </span>
-                                </button>
-                              ))
-                            ) : (
-                              <p className="px-2 py-1 text-xs text-[var(--g3-muted)]">
-                                Nenhum beneficiário inscrito encontrado.
-                              </p>
-                            )}
-                          </div>
-                        )}
-                        {inscricaoAgendaSelecionada && (
-                          <p className="text-[11px] text-emerald-700">
-                            Selecionado: {inscricaoAgendaSelecionada.item.beneficiario_nome}
-                            {inscricaoAgendaSelecionada.item.cpf
-                              ? ` • CPF ${formatarCpf(inscricaoAgendaSelecionada.item.cpf)}`
-                              : ""}
-                            {inscricaoAgendaSelecionada.item.telefone
-                              ? ` • Tel. ${formatarTelefone(inscricaoAgendaSelecionada.item.telefone)}`
-                              : " • Tel. ---"}
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="space-y-1 xl:col-span-2">
-                        <Label htmlFor="agenda-data">Data</Label>
-                        <Input
-                          id="agenda-data"
-                          type="date"
-                          value={agendaForm.data_agendada}
-                          onChange={(event) =>
-                            setAgendaForm((atual) => ({ ...atual, data_agendada: event.target.value }))
-                          }
-                        />
-                      </div>
-
-                      <div className="space-y-1 xl:col-span-2">
-                        <Label htmlFor="agenda-hora">Hora</Label>
-                        <Input
-                          id="agenda-hora"
-                          type="time"
-                          value={agendaForm.hora_agendada}
-                          onChange={(event) =>
-                            setAgendaForm((atual) => ({ ...atual, hora_agendada: event.target.value }))
-                          }
-                        />
-                      </div>
-
-                      <div className="space-y-1 xl:col-span-2">
-                        <Label htmlFor="agenda-status">Status</Label>
-                        <Select
-                          id="agenda-status"
-                          value={agendaForm.status_agendamento}
-                          onChange={(event) =>
-                            setAgendaForm((atual) => ({ ...atual, status_agendamento: event.target.value }))
-                          }
-                        >
-                          {statusAgendamentoOptions.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </Select>
-                      </div>
-
-                      <div className="space-y-1 xl:col-span-9">
-                        <Label htmlFor="agenda-profissional">Profissional responsável</Label>
-                        <Input
-                          id="agenda-profissional"
-                          value={agendaForm.profissional_nome}
-                          onChange={(event) => {
-                            const valor = event.target.value;
-                            setAgendaForm((atual) => ({ ...atual, profissional_nome: valor }));
-                            setTermoCatalogoAgendaProfissional(valor);
-                            setMostrarSugestoesAgendaProfissional(true);
-                          }}
-                          onFocus={() => {
-                            setTermoCatalogoAgendaProfissional(agendaForm.profissional_nome ?? "");
-                            setMostrarSugestoesAgendaProfissional(true);
-                          }}
-                          onBlur={(event) => {
-                            const valorFormatado = formatarTextoPadrao(event.target.value);
-                            setAgendaForm((atual) => ({
-                              ...atual,
-                              profissional_nome: valorFormatado
-                            }));
-                            setTermoCatalogoAgendaProfissional(valorFormatado);
-                            setTimeout(() => setMostrarSugestoesAgendaProfissional(false), 120);
-                          }}
-                          placeholder="Digite para buscar profissional"
-                        />
-                        {mostrarSugestoesAgendaProfissional &&
-                          termoCatalogoAgendaProfissional.trim().length > 0 &&
-                          termoCatalogoAgendaProfissional.trim().length < 2 && (
-                            <p className="text-[11px] text-[var(--g3-muted)]">
-                              Digite pelo menos 2 caracteres para buscar.
-                            </p>
-                          )}
-                        {mostrarSugestoesAgendaProfissional &&
-                          (carregandoProfissionaisAgendaCatalogo || profissionaisAgendaCatalogo.length > 0) &&
-                          termoCatalogoAgendaProfissional.trim().length >= 2 && (
-                            <div className="max-h-32 overflow-y-auto rounded-md border border-[var(--g3-border)] bg-[var(--g3-card)] p-1">
-                              {carregandoProfissionaisAgendaCatalogo ? (
-                                <p className="px-2 py-1 text-xs text-[var(--g3-muted)]">Buscando profissionais...</p>
-                              ) : (
-                                profissionaisAgendaCatalogo.map((item) => (
-                                  <button
-                                    key={`${item.id_profissional}-${item.categoria}`}
-                                    type="button"
-                                    className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-[var(--g3-primary-soft)]"
-                                    onMouseDown={(event) => event.preventDefault()}
-                                    onClick={() => preencherAgendaComProfissional(item)}
-                                  >
-                                    {item.nome_completo} ({item.categoria})
-                                  </button>
-                                ))
-                              )}
-                            </div>
-                          )}
-                      </div>
-                      <div className="flex items-end xl:col-span-3">
-                        <Button type="button" className="w-full" onClick={agendarAtendimento}>
-                          <CalendarClock className="h-4 w-4" />
-                          Agendar
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="rounded-lg border border-[var(--g3-border)] p-3">
-                    <p className="mb-3 text-sm font-semibold text-[var(--g3-foreground)]">Agenda por dia</p>
-                    <div className="grid gap-3 md:grid-cols-3">
-                      <div className="space-y-1">
-                        <Label htmlFor="agenda-filtro-data">Data</Label>
-                        <Input
-                          id="agenda-filtro-data"
-                          type="date"
-                          value={agendaDataSelecionada}
-                          onChange={(event) => setAgendaDataSelecionada(event.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label htmlFor="agenda-filtro-status">Status</Label>
-                        <Select
-                          id="agenda-filtro-status"
-                          value={agendaStatusFiltro}
-                          onChange={(event) => setAgendaStatusFiltro(event.target.value)}
-                        >
-                          <option value="">Todos</option>
-                          {statusAgendamentoOptions.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </Select>
-                      </div>
-                      <div className="space-y-1">
-                        <Label htmlFor="agenda-filtro-profissional">Profissional</Label>
-                        <Input
-                          id="agenda-filtro-profissional"
-                          value={agendaProfissionalFiltro}
-                          onChange={(event) => setAgendaProfissionalFiltro(event.target.value)}
-                          placeholder="Filtrar por profissional"
-                        />
-                      </div>
-                    </div>
-                    <div className="mt-3 rounded-md border border-[var(--g3-border)] bg-[var(--g3-card)] p-3">
-                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
-                        Copiar / mover agenda
-                      </p>
-                      <div className="grid gap-3 md:grid-cols-4">
-                        <div className="space-y-1">
-                          <Label htmlFor="agenda-copia-origem">Data de origem</Label>
-                          <Input
-                            id="agenda-copia-origem"
-                            type="date"
-                            value={agendaCopiaOrigem}
-                            onChange={(event) => {
-                              const valor = event.target.value;
-                              setAgendaCopiaOrigem(valor);
-                              if (!agendaCopiaDestino && valor) {
-                                setAgendaCopiaDestino(somarDiasDataIso(valor, 7));
-                              }
-                            }}
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label htmlFor="agenda-copia-destino">Data de destino</Label>
-                          <Input
-                            id="agenda-copia-destino"
-                            type="date"
-                            value={agendaCopiaDestino}
-                            onChange={(event) => setAgendaCopiaDestino(event.target.value)}
-                          />
-                        </div>
-                        <div className="flex items-end">
-                          <Button type="button" variant="outline" className="w-full" onClick={copiarAgendaEntreDatas}>
-                            <Copy className="h-4 w-4" />
-                            Copiar agenda
-                          </Button>
-                        </div>
-                        <div className="flex items-end">
-                          <Button type="button" className="w-full" onClick={moverAgendaEntreDatas}>
-                            <Copy className="h-4 w-4" />
-                            Mover agenda
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {agendamentosPorData.length ? (
-                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
-                      {agendamentosPorData.map(([data, itens]) => {
-                        const horariosDoDia = Array.from(
-                          new Set(
-                            itens
-                              .map(({ item }) => String(item.hora_agendada ?? "").trim())
-                              .filter((hora) => hora.length > 0)
-                          )
-                        );
-                        const horarioDoDia =
-                          horariosDoDia.length === 1
-                            ? horariosDoDia[0]
-                            : horariosDoDia.length > 1
-                              ? "Vários horários"
-                              : "---";
-
-                        return (
-                          <div
-                            key={data}
-                            className="flex flex-col overflow-hidden rounded-lg border border-[var(--g3-border)]"
-                          >
-                            <div className="flex items-center justify-between border-b border-[var(--g3-border)] bg-[var(--g3-primary-soft)] px-3 py-2">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <p className="text-sm font-semibold text-[var(--g3-active)]">Dia: {formatarData(data)}</p>
-                                <span className="rounded-full bg-[var(--g3-card)] px-2 py-0.5 text-[11px] font-semibold text-[var(--g3-foreground)]">
-                                  Hora: {horarioDoDia}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  className="h-8 w-8 p-0"
-                                  title="Enviar lembrete no WhatsApp"
-                                  aria-label="Enviar lembrete no WhatsApp"
-                                  onClick={() => enviarLembreteWhatsappDia(data, itens)}
-                                >
-                                  <MessageCircle className="h-4 w-4 text-emerald-700" />
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  className="h-8 w-8 p-0"
-                                  title="Enviar lembrete por e-mail"
-                                  aria-label="Enviar lembrete por e-mail"
-                                  onClick={() => void enviarLembreteEmailDia(data, itens)}
-                                  disabled={dataEnviandoLembreteEmail === data}
-                                >
-                                  <Mail className="h-4 w-4 text-sky-700" />
-                                </Button>
-                                <span className="rounded-full bg-[var(--g3-card)] px-2 py-0.5 text-[11px] font-semibold text-[var(--g3-foreground)]">
-                                  {itens.length} agendamento(s)
-                                </span>
-                              </div>
-                            </div>
-                            <div className="flex-1 divide-y divide-[var(--g3-border)]">
-                              {itens.map(({ chave, item }, index) => (
-                                <div
-                                  key={chave}
-                                  className={`px-3 py-3 ${
-                                    itens.length > 1
-                                      ? index % 2 === 0
-                                        ? "bg-[var(--g3-card)]"
-                                        : "bg-[var(--g3-primary-soft)]/55"
-                                      : "bg-[var(--g3-card)]"
-                                  }`}
-                                >
-                                  <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-                                    <div className="min-w-0">
-                                      <p className="truncate text-sm text-[var(--g3-foreground)]">
-                                        <span className="font-semibold">{item.beneficiario_nome}</span>
-                                        <span className="font-normal text-[var(--g3-muted)]">
-                                          {" "}
-                                          - {item.telefone ? `Tel.: ${formatarTelefone(item.telefone)}` : "Tel.: ---"}
-                                        </span>
-                                      </p>
-                                    </div>
-                                    <div className="flex items-center justify-end gap-2">
-                                      {item.confirmacao_presenca ? (
-                                        <span className="w-fit rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700">
-                                          Confirmada
-                                        </span>
-                                      ) : (
-                                        <span className="w-fit rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700">
-                                          Pendente
-                                        </span>
-                                      )}
-                                      <Button
-                                        type="button"
-                                        variant="outline"
-                                        onClick={() => alternarConfirmacaoPresencaAgendamento(chave)}
-                                        className="h-9 w-9 p-0"
-                                        title={item.confirmacao_presenca ? "Desconfirmar presença" : "Confirmar presença"}
-                                        aria-label={item.confirmacao_presenca ? "Desconfirmar presença" : "Confirmar presença"}
-                                      >
-                                        {item.confirmacao_presenca ? (
-                                          <Undo2 className="h-4 w-4" />
-                                        ) : (
-                                          <Check className="h-4 w-4" />
-                                        )}
-                                      </Button>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card)] px-4 py-8 text-center text-sm text-[var(--g3-muted)]">
-                      Nenhum atendimento agendado para os filtros informados.
-                    </div>
-                  )}
-                </div>
-              )}
-
               {abaAtiva === "presenca" && (
                 <div className="space-y-3">
                   <div className="rounded-lg border border-[var(--g3-border)] p-3">
@@ -4398,7 +4010,8 @@ export function CadastroMatriculasPage() {
                           ))}
                         </Select>
                         <p className="text-xs text-[var(--g3-muted)]">
-                          Para gerar as datas desta lista, gere a agenda na data selecionada.
+                          Para gerar as datas desta lista, gere a agenda na data selecionada no menu Agendamentos.<br />
+                          Para selecionar a data da aula, primeiro você deve selecionar o curso ou atendimento na aba Catálogo e vagas.
                         </p>
                       </div>
                       <div className="space-y-1 xl:col-span-3">
@@ -4426,26 +4039,29 @@ export function CadastroMatriculasPage() {
 
                   {presencaDataSelecionada && (
                     <div className="space-y-3 rounded-lg border border-[var(--g3-border)] p-3">
-                      <div className="rounded-md border border-[var(--g3-border)] bg-[var(--g3-card)] px-3 py-2">
-                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--g3-muted)]">
-                          {cursoSelecionadoInscricao?.tipo ?? "Atividade"}
-                        </p>
-                        <p className="text-sm font-semibold text-[var(--g3-foreground)]">{cursoSelecionadoInscricao?.nome ?? "Atividade"}</p>
-                        <p className="text-xs text-[var(--g3-muted)]">
-                          {formatarData(presencaDataSelecionada.data_aula)} • {presencaDataSelecionada.status}
-                        </p>
-                      </div>
-                      <div className="space-y-1">
-                        <Label htmlFor="presenca-observacoes">Observações da data</Label>
-                        <Textarea
-                          id="presenca-observacoes"
-                          rows={3}
-                          value={presencaObservacoes}
-                          onChange={(event) => {
-                            setPresencaObservacoes(event.target.value);
-                            setPresencaPendente(true);
-                          }}
-                        />
+                      <div className="grid gap-3 md:grid-cols-2 md:items-stretch">
+                        <div className="rounded-md border border-[var(--g3-border)] bg-[var(--g3-card)] px-3 py-2">
+                          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--g3-muted)]">
+                            {cursoSelecionadoInscricao?.tipo ?? "Atividade"}
+                          </p>
+                          <p className="text-sm font-semibold text-[var(--g3-foreground)]">{cursoSelecionadoInscricao?.nome ?? "Atividade"}</p>
+                          <p className="text-xs text-[var(--g3-muted)]">
+                            {formatarData(presencaDataSelecionada.data_aula)} • {presencaDataSelecionada.status}
+                          </p>
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="presenca-observacoes">Observações da data</Label>
+                          <Textarea
+                            id="presenca-observacoes"
+                            rows={2}
+                            className="min-h-0"
+                            value={presencaObservacoes}
+                            onChange={(event) => {
+                              setPresencaObservacoes(event.target.value);
+                              setPresencaPendente(true);
+                            }}
+                          />
+                        </div>
                       </div>
                       <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]">
                         <table className="min-w-full text-sm">
@@ -4454,14 +4070,14 @@ export function CadastroMatriculasPage() {
                               <th className="px-3 py-2 text-left font-semibold">Beneficiário</th>
                               {presencaExibirCpf && <th className="px-3 py-2 text-left font-semibold">CPF</th>}
                               <th className="px-3 py-2 text-left font-semibold">Telefone</th>
-                              <th className="px-3 py-2 text-left font-semibold">Status</th>
+                              <th className="px-3 py-2 text-left font-semibold">Confirmação</th>
                               <th className="px-3 py-2 text-left font-semibold">Observação</th>
                             </tr>
                           </thead>
                           <tbody>
                             {inscricoesAtivas.length ? (
                               inscricoesAtivas.map((inscricao, index) => {
-                                const matriculaId = inscricao.id_matricula_item;
+                                const matriculaId = chavePresenca(inscricao.id_matricula_item);
                                 const statusAtual = matriculaId ? presencasPorMatricula[matriculaId] ?? "NAO_INFORMADO" : "NAO_INFORMADO";
                                 const observacaoAtual = matriculaId ? presencasObservacoesPorMatricula[matriculaId] ?? "" : "";
                                 return (
@@ -4475,18 +4091,38 @@ export function CadastroMatriculasPage() {
                                     {presencaExibirCpf && <td className="px-3 py-2">{formatarCpf(inscricao.cpf)}</td>}
                                     <td className="px-3 py-2">{formatarTelefone(inscricao.telefone)}</td>
                                     <td className="px-3 py-2">
-                                      <Select
-                                        value={statusAtual}
-                                        onChange={(event) =>
-                                          matriculaId && atualizarPresenca(matriculaId, event.target.value as MatriculaPresencaStatus)
-                                        }
-                                        disabled={!matriculaId || presencaDataSelecionada.status === "CANCELADA"}
-                                      >
-                                        <option value="NAO_INFORMADO">Não informado</option>
-                                        <option value="PRESENTE">Presente</option>
-                                        <option value="AUSENTE">Ausente</option>
-                                        <option value="JUSTIFICADO">Justificado</option>
-                                      </Select>
+                                      <div className="flex flex-wrap gap-3">
+                                        <label className="inline-flex items-center gap-2 text-sm text-[var(--g3-foreground)]">
+                                          <Checkbox
+                                            checked={statusAtual === "PRESENTE"}
+                                            onChange={(event) =>
+                                              matriculaId &&
+                                              solicitarAtualizacaoPresenca(
+                                                matriculaId,
+                                                event.target.checked ? "PRESENTE" : "NAO_INFORMADO",
+                                                inscricao.beneficiario_nome
+                                              )
+                                            }
+                                            disabled={!matriculaId || presencaDataSelecionada.status === "CANCELADA"}
+                                          />
+                                          Presença
+                                        </label>
+                                        <label className="inline-flex items-center gap-2 text-sm text-[var(--g3-foreground)]">
+                                          <Checkbox
+                                            checked={statusAtual === "AUSENTE"}
+                                            onChange={(event) =>
+                                              matriculaId &&
+                                              solicitarAtualizacaoPresenca(
+                                                matriculaId,
+                                                event.target.checked ? "AUSENTE" : "NAO_INFORMADO",
+                                                inscricao.beneficiario_nome
+                                              )
+                                            }
+                                            disabled={!matriculaId || presencaDataSelecionada.status === "CANCELADA"}
+                                          />
+                                          Ausência
+                                        </label>
+                                      </div>
                                     </td>
                                     <td className="px-3 py-2">
                                       <Input
@@ -4522,6 +4158,54 @@ export function CadastroMatriculasPage() {
           </Card>
         </div>
       </div>
+
+      {presencaAlteracaoPendente && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/45 px-4">
+          <div className="w-full max-w-md rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] shadow-2xl">
+            <div className="border-b border-[var(--g3-border)] px-5 py-4">
+              <h3 className="text-base font-semibold text-[var(--g3-foreground)]">Confirmar alteração de presença</h3>
+            </div>
+            <div className="space-y-3 px-5 py-4 text-sm text-[var(--g3-muted)]">
+              <p>
+                A presença ou ausência de <strong className="text-[var(--g3-foreground)]">{presencaAlteracaoPendente.beneficiarioNome}</strong> já foi salva.
+                Deseja realmente alterar para <strong className="text-[var(--g3-foreground)]">{formatarStatus(presencaAlteracaoPendente.status)}</strong>?
+              </p>
+              <div className="space-y-1">
+                <Label htmlFor="senha-confirmacao-presenca">Senha do usuário logado</Label>
+                <Input
+                  id="senha-confirmacao-presenca"
+                  type="password"
+                  autoComplete="current-password"
+                  value={senhaConfirmacaoPresenca}
+                  onChange={(event) => {
+                    setSenhaConfirmacaoPresenca(event.target.value);
+                    setPresencaErroSenha("");
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") confirmarAlteracaoPresenca();
+                  }}
+                />
+                {presencaErroSenha && <p className="text-sm font-medium text-rose-700">{presencaErroSenha}</p>}
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-[var(--g3-border)] px-5 py-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setPresencaAlteracaoPendente(null);
+                  setPresencaErroSenha("");
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button type="button" onClick={() => void confirmarAlteracaoPresenca()} disabled={presencaValidandoSenha}>
+                {presencaValidandoSenha ? "Validando senha..." : "Confirmar alteração"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {popupMensagem && <PopupMensagem popup={popupMensagem} onClose={() => setPopupMensagem(null)} />}
 

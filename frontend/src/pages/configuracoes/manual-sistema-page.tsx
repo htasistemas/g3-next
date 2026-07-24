@@ -198,7 +198,7 @@ const secoesManual: ManualSecao[] = [
         ]
       },
       {
-        nome: "Prontuário",
+        nome: "Prontuário eletrônico",
         objetivo: "Registrar atendimentos multiprofissionais em um prontuário único do beneficiário.",
         comoUsar: [
           "Localize o beneficiário por nome, CPF ou código e selecione o cadastro com um clique.",
@@ -218,18 +218,20 @@ const secoesManual: ManualSecao[] = [
           "As fotos dos cursos, oficinas e atendimentos são enviadas para o storage autenticado do sistema; o cadastro grava apenas o caminho do arquivo e exibe a imagem na prévia e nos cards do catálogo, com fallback automático para a imagem original quando a miniatura não estiver disponível.",
           "Use os dados da inscrição para registrar turma, responsável, datas e observações.",
           "Quando o tipo for Atendimento, informe o horário inicial, o horário final e a duração de cada atendimento em minutos; o sistema prepara os horários individuais e calcula automaticamente a quantidade de vagas do período.",
+          "Os horários de uma mesma especialidade/item e data são gravados em um único card da agenda, com cada beneficiário vinculado ao seu horário individual.",
           "O horário final é considerado como limite do período: das 19:00 às 21:00 com duração de 30 minutos são geradas quatro vagas, às 19:00, 19:30, 20:00 e 20:30.",
           "Na Faixa etária, use a opção Todas as idades para selecionar ou limpar todas as faixas de uma vez.",
           "Revise a fila de espera e a situação de vagas para apoiar decisões de encaminhamento.",
-          "A aba Agendamento concentra a marcação dos inscritos no próprio fluxo da inscrição, com data, horário, profissional e status; a tela global Agendamentos continua disponível para a visão consolidada do dia.",
-          "Na aba Presença, a data da aula exibe somente datas reais da agenda e da frequência já registrada, sem botão para geração manual.",
+          "A tela global Agendamentos concentra a marcação dos inscritos, com data, horário, profissional e status, sem manter uma aba de agendamento dentro da tela de inscrições.",
+          "Na aba Confirmar presença, a data da aula exibe somente datas reais da agenda e da frequência já registrada, sem botão para geração manual.",
           "Ao salvar as presenças, o sistema grava status, observações e auditoria no PostgreSQL e recarrega a mesma lista a partir do backend, sem depender de estado local do navegador.",
+          "Na lista de presença, Presente e Ausente são opções independentes e mutuamente exclusivas. Depois que um registro já foi salvo, a primeira alteração exige confirmação explícita e a senha do usuário logado; essa autorização vale somente para a lista selecionada enquanto ela permanecer aberta. Ao trocar de curso ou data, a senha é solicitada novamente. Cada alteração fica registrada na auditoria com data, curso, beneficiário, status anterior, novo status e responsável.",
           "A barra superior da tela usa ações realmente contextuais por aba: a listagem fica com Buscar, Nova, Imprimir e Fechar; as abas de edição mostram apenas as ações que fazem sentido para aquele conteúdo, como Salvar dados da inscrição, Salvar catálogo e vagas, Salvar inscrições e fila ou Imprimir Frequência.",
           "Na impressão de frequência, o relatório agora consolida o acompanhamento por período, mostra presentes, ausentes, justificados e não informados, e não exibe campo de assinatura do beneficiário."
         ],
         atencoes: [
           "O botão Excluir da barra superior remove todo o curso configurado e exige confirmação específica antes da exclusão.",
-          "Na aba Presença, a data exibida na lista e a data impressa na lista de presença agora seguem exatamente o mesmo dia informado, sem recuo por fuso horário.",
+          "Na aba Confirmar presença, a data exibida na lista e a data impressa na lista de presença agora seguem exatamente o mesmo dia informado, sem recuo por fuso horário.",
           "A tela de Inscrições em cursos e atendimentos agora carrega catálogo, listagem, detalhe, fila de espera, presença, beneficiários, profissionais e salas sempre dentro da instituição autenticada, sem exibir dados de outro CNPJ.",
           "O controle por horário é opcional e não altera cursos, oficinas ou atendimentos que não estejam com esse recurso ativado.",
           "Quando houver inscrições já realizadas e a tabela estiver vazia, revise primeiro os filtros do topo; o botão Limpar filtros restaura a visão completa da listagem."
@@ -249,6 +251,7 @@ const secoesManual: ManualSecao[] = [
           "Na área principal, o campo Tipo fica ao lado da grade de itens do tipo selecionado, sem campo adicional de curso, atendimento ou oficina, e os beneficiários vinculados passam a aparecer em grade, lado a lado, para agilizar a marcação.",
           "Ao carregar os beneficiários para a agenda operacional, o sistema prioriza automaticamente os registros de cadastro que já tenham telefone e data de nascimento preenchidos, para evitar que nomes com vínculos incompletos apareçam sem contato ou idade no card.",
           "Informe a data do agendamento e use Gerar Agenda para salvar a agenda do dia com os participantes agrupados no mesmo card. Não há um segundo botão de salvar: o clique em Gerar Agenda já persiste um novo card, mesmo que já exista outra agenda para o mesmo item e data. Para alterar uma agenda existente, use o botão Editar do próprio card e depois Atualizar agenda.",
+          "Quando o item for um atendimento com controle por horário, os horários disponíveis são gerados a partir do início, fim e duração configurados no cadastro. Escolha cada beneficiário diretamente no horário desejado; a ordem da lista não define a sequência dos atendimentos.",
           "Enquanto a agenda está sendo salva, a tela mostra um indicador de progresso com etapas de validação e gravação, para deixar explícito que a ação está em andamento até o banco confirmar a persistência.",
           "Depois de salvar, o card confirmado pelo backend fica destacado por alguns segundos na listagem para facilitar a conferência visual do resultado.",
           "Na listagem da agenda gerada, use a data em exibição com os botões de avançar e voltar para navegar pelos dias e ver somente os cards agendados naquela data, consultando sempre os registros gravados no PostgreSQL para evitar depender de cache, memória ou estado local.",
@@ -1290,9 +1293,9 @@ const secoesManual: ManualSecao[] = [
           "Na aba Cadastro de livros da Biblioteca, use as ações de um clique Imprimir listagem e Imprimir cadastro para emitir, respectivamente, a relação do acervo ou a ficha individual do livro selecionado; nas demais abas, a impressão gera painel ou listagens de empréstimos, devoluções, disponibilidade e alertas em PDF pelo template central de relatórios do G3N, com cabeçalho, metadados e rodapé institucionais.",
           "A tela Agendamentos agora lista agenda, indicadores, lista de espera, participantes e notificações sempre dentro do tenant autenticado, impedindo que uma instituição veja pacientes agendados ou histórico operacional de outra.",
           "As telas Chamada de senhas e Painel de senhas agora emitem, chamam, finalizam e exibem filas, chamadas e configurações sempre dentro do tenant autenticado, impedindo reaproveitamento de senhas entre instituições diferentes.",
-          "Na tela Prontuário, use Chamar próximo beneficiário para abrir a fila de senhas, conferir o destino informado e escolher um beneficiário específico ou chamar o próximo da fila.",
+          "Na tela Prontuário eletrônico, use Chamar próximo beneficiário para abrir a fila de senhas, conferir o destino informado e escolher um beneficiário específico ou chamar o próximo da fila.",
           "Na aba Agendamento, os cursos e atendimentos são apresentados em cards selecionáveis; o botão Abrir inscrições e lista de espera leva diretamente à aba correspondente antes da geração da agenda.",
-          "No campo Tipo de atendimento do Prontuário, selecione Atendimento Proativo (Busca Ativa), Atendimento Programado (Acompanhamento), Atividades Coletivas e Comunitárias, Demanda espontânea ou Demanda referenciada; após a seleção, o sistema exibe um popup com a descrição e os exemplos do tipo escolhido.",
+          "No campo Tipo de atendimento do Prontuário eletrônico, selecione Atendimento Proativo (Busca Ativa), Atendimento Programado (Acompanhamento), Atividades Coletivas e Comunitárias, Demanda espontânea ou Demanda referenciada; após a seleção, o sistema exibe um popup com a descrição e os exemplos do tipo escolhido.",
           "Ao salvar ou finalizar um atendimento, o horário inicial é convertido corretamente e o registro finalizado passa a aparecer na Linha do tempo do beneficiário.",
           "A tela Receber doações agora lista, abre, cadastra, atualiza, exclui e pesquisa doadores sempre dentro do tenant autenticado, inclusive na integração automática com o almoxarifado, impedindo mistura de doações e doadores entre instituições.",
           "A tela Cadastro de beneficiários agora lista, abre, cadastra, atualiza, exclui e gera o próximo código sempre dentro do tenant autenticado, impedindo que uma instituição veja os beneficiários de outra.",

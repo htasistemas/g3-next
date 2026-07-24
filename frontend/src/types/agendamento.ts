@@ -27,6 +27,7 @@ export type AgendamentoParticipante = {
   telefone?: string;
   comparecimento?: "Pendente" | "Presente" | "Faltou" | "Justificado";
   observacao?: string;
+  horario?: string;
 };
 
 export type Agendamento = {
@@ -152,6 +153,9 @@ export type AgendamentoOperacionalItem = {
   nome: string;
   profissionalNome?: string;
   horario?: string;
+  horarioFinal?: string;
+  duracaoMinutos?: number;
+  controleHorarioAtendimento?: boolean;
   diasSemana?: string;
   local?: string;
 };
@@ -173,6 +177,11 @@ export type AgendamentoOperacionalPayload = {
   tipo: AgendamentoOperacionalTipo;
   itemId: number;
   data: string;
+  horaInicial?: string;
+  horaFinal?: string;
+  duracaoMinutos?: number;
   beneficiariosIds?: number[];
   matriculasIds?: number[];
+  /** Horário individual de cada matrícula quando o atendimento usa slots. */
+  horariosPorMatricula?: Record<string, string>;
 };

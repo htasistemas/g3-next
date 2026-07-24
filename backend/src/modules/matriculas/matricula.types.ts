@@ -78,5 +78,6 @@ export type MatriculaPresencaItemInput = {
 export type MatriculaPresencaSalvarInput = {
   data_aula: string;
   observacoes?: string;
+  senha_confirmacao?: string;
   presencas: MatriculaPresencaItemInput[];
 };

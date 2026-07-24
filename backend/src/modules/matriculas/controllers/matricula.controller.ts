@@ -114,4 +114,18 @@ export class MatriculaController {
     );
     return response.json(resultado);
   }
+
+  async validarSenhaPresenca(request: AuthenticatedRequest, response: Response) {
+    const resultado = await service.validarSenhaPresenca(
+      request.body,
+      request.authUser?.tenant_id,
+      request.authUser
+        ? {
+            id: request.authUser.id,
+            nome: request.authUser.nome ?? request.authUser.nomeUsuario
+          }
+        : undefined
+    );
+    return response.json(resultado);
+  }
 }
