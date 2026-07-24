@@ -33,6 +33,52 @@ cleanup() {
   fi
 }
 
+ensure_storage_credentials() {
+  local env_file="$APP_DIR/.env"
+  local storage_user=""
+  local storage_password=""
+
+  touch "$env_file"
+  storage_user="$(grep -E '^APP_STORAGE_ACCESS_KEY_ID=' "$env_file" | tail -n 1 | cut -d '=' -f 2- || true)"
+  storage_password="$(grep -E '^APP_STORAGE_SECRET_ACCESS_KEY=' "$env_file" | tail -n 1 | cut -d '=' -f 2- || true)"
+
+  if [[ -z "$storage_user" ]]; then
+    storage_user="$(grep -E '^MINIO_ROOT_USER=' "$env_file" | tail -n 1 | cut -d '=' -f 2- || true)"
+  fi
+  if [[ -z "$storage_password" ]]; then
+    storage_password="$(grep -E '^MINIO_ROOT_PASSWORD=' "$env_file" | tail -n 1 | cut -d '=' -f 2- || true)"
+  fi
+
+  if [[ -z "$storage_user" ]]; then
+    storage_user="g3nminio"
+  fi
+  if [[ -z "$storage_password" ]]; then
+    if ! command -v openssl >/dev/null 2>&1; then
+      log "ERROR: openssl e obrigatorio para gerar a credencial inicial do storage"
+      return 1
+    fi
+    storage_password="$(openssl rand -hex 32)"
+  fi
+
+  # Apenas acrescenta chaves ausentes. Valores existentes nunca sao
+  # substituidos, preservando o acesso a um volume MinIO ja configurado.
+  if ! grep -qE '^APP_STORAGE_ACCESS_KEY_ID=' "$env_file"; then
+    printf '\nAPP_STORAGE_ACCESS_KEY_ID=%s\n' "$storage_user" >> "$env_file"
+  fi
+  if ! grep -qE '^APP_STORAGE_SECRET_ACCESS_KEY=' "$env_file"; then
+    printf 'APP_STORAGE_SECRET_ACCESS_KEY=%s\n' "$storage_password" >> "$env_file"
+  fi
+  if ! grep -qE '^MINIO_ROOT_USER=' "$env_file"; then
+    printf 'MINIO_ROOT_USER=%s\n' "$storage_user" >> "$env_file"
+  fi
+  if ! grep -qE '^MINIO_ROOT_PASSWORD=' "$env_file"; then
+    printf 'MINIO_ROOT_PASSWORD=%s\n' "$storage_password" >> "$env_file"
+  fi
+
+  chmod 600 "$env_file"
+  log "Credenciais persistentes do storage verificadas"
+}
+
 trap cleanup EXIT
 
 print_container_logs() {
@@ -127,6 +173,7 @@ log "Version set to $APP_VERSION"
 
 enable_maintenance
 log "Maintenance mode enabled"
+ensure_storage_credentials
 
 # O proxy de borda deve permanecer ativo durante todo o deploy. Com o modo de
 # manutenção habilitado, ele serve maintenance.html enquanto os demais
