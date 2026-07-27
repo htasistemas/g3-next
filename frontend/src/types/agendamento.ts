@@ -152,6 +152,7 @@ export type AgendamentoOperacionalItem = {
   tipo?: string;
   nome: string;
   profissionalNome?: string;
+  profissionais?: string[];
   horario?: string;
   horarioFinal?: string;
   duracaoMinutos?: number;
@@ -176,6 +177,7 @@ export type AgendamentoOperacionalPayload = {
   id?: string;
   tipo: AgendamentoOperacionalTipo;
   itemId: number;
+  profissionalNome?: string;
   data: string;
   horaInicial?: string;
   horaFinal?: string;

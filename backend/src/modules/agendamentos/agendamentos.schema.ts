@@ -118,6 +118,7 @@ export const agendamentoOperacionalInputSchema = z.object({
   id: optionalTrimmedString.optional(),
   tipo: tipoOperacionalSchema,
   itemId: z.coerce.number().int().positive(),
+  profissionalNome: optionalTrimmedString.optional(),
   data: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/),
   horaInicial: optionalTime,
   horaFinal: optionalTime,

@@ -5,6 +5,16 @@ import { AgendamentosService } from "../services/agendamentos.service.js";
 
 const service = new AgendamentosService();
 
+function listarProfissionaisRelacionados(valor?: string | null) {
+  const profissionais: string[] = [];
+  for (const nome of String(valor ?? "").split(/[;,]/g).map((item) => item.trim()).filter(Boolean)) {
+    if (!profissionais.some((atual) => atual.toLocaleLowerCase("pt-BR") === nome.toLocaleLowerCase("pt-BR"))) {
+      profissionais.push(nome);
+    }
+  }
+  return profissionais;
+}
+
 export class AgendamentosController {
   async listar(request: AuthenticatedRequest, response: Response) {
     const itens = await service.listar(
@@ -28,6 +38,7 @@ export class AgendamentosController {
         tipo: item.tipo ?? undefined,
         nome: item.nome,
         profissionalNome: item.profissional ?? undefined,
+        profissionais: listarProfissionaisRelacionados(item.profissional),
         horario: item.horario_inicial ? String(item.horario_inicial).slice(0, 5) : undefined,
         controleHorarioAtendimento: Boolean(item.controle_horario_atendimento),
         horarioFinal: item.horario_final_atendimento ? String(item.horario_final_atendimento).slice(0, 5) : undefined,

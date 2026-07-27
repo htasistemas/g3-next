@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   BookOpenText,
   Brain,
@@ -251,7 +251,7 @@ const secoesManual: ManualSecao[] = [
           "Na área principal, o campo Tipo fica ao lado da grade de itens do tipo selecionado, sem campo adicional de curso, atendimento ou oficina, e os beneficiários vinculados passam a aparecer em grade, lado a lado, para agilizar a marcação.",
           "Ao carregar os beneficiários para a agenda operacional, o sistema prioriza automaticamente os registros de cadastro que já tenham telefone e data de nascimento preenchidos, para evitar que nomes com vínculos incompletos apareçam sem contato ou idade no card.",
           "Informe a data do agendamento e use Gerar Agenda para salvar a agenda do dia com os participantes agrupados no mesmo card. Não há um segundo botão de salvar: o clique em Gerar Agenda já persiste um novo card, mesmo que já exista outra agenda para o mesmo item e data. Para alterar uma agenda existente, use o botão Editar do próprio card e depois Atualizar agenda.",
-          "Quando o item for um atendimento com controle por horário, os horários disponíveis são gerados a partir do início, fim e duração configurados no cadastro. Escolha cada beneficiário diretamente no horário desejado; a ordem da lista não define a sequência dos atendimentos.",
+          "Quando o item for um atendimento com controle por horário, os horários disponíveis são gerados a partir do início, fim e duração configurados no cadastro. Escolha cada beneficiário diretamente no horário desejado; a ordem da lista não define a sequência dos atendimentos. Depois que um horário for ocupado em uma agenda do mesmo atendimento e dia, ele deixa de aparecer como disponível.",
           "Enquanto a agenda está sendo salva, a tela mostra um indicador de progresso com etapas de validação e gravação, para deixar explícito que a ação está em andamento até o banco confirmar a persistência.",
           "Depois de salvar, o card confirmado pelo backend fica destacado por alguns segundos na listagem para facilitar a conferência visual do resultado.",
           "Na listagem da agenda gerada, use a data em exibição com os botões de avançar e voltar para navegar pelos dias e ver somente os cards agendados naquela data, consultando sempre os registros gravados no PostgreSQL para evitar depender de cache, memória ou estado local.",
@@ -266,7 +266,7 @@ const secoesManual: ManualSecao[] = [
           "A versão exibida na interface passa a ser lida em runtime a partir da instância do backend, evitando manter número antigo em produção quando apenas o frontend não tiver recompilado com a constante embutida.",
           "Ao usar o botão de impressão do card, o sistema abre o relatório de acompanhamento de frequência em nova janela de visualização como folha A4 do G3N, com logomarca autenticada do relatório, nome da instituição em tamanho mais discreto, título do relatório ampliado, resumo do período em blocos compactos, tabela com presentes, ausentes, justificados e não informados por data e rodapé institucional, sem campo de assinatura do beneficiário.",
           "Na lista de beneficiários agendados dentro do card, use o ícone de verificado ou de interrogação dentro da própria coluna de ações, ao lado de mover e excluir, para alternar o status do participante entre confirmado e a confirmar.",
-          "Cada beneficiário da agenda também pode ser movido individualmente para outra data ou removido apenas daquele dia, sem precisar alterar todos os participantes do card.",
+          "Cada beneficiário da agenda também pode ser remanejado individualmente para outro horário livre ou outra data, ou removido apenas daquele dia, sem precisar alterar todos os participantes do card.",
           "As mensagens preparadas para WhatsApp passaram a exibir a data do agendamento em português do Brasil.",
           "Na aba Dashboard, acompanhe pacientes agendados, frequência média, faltas da semana, sessões do mês, lista de espera, total de cards e confirmados em cards com ícones e leitura centralizada.",
           "Na aba Lista de espera, acompanhe demandas ainda não convertidas em agenda."
@@ -1581,9 +1581,3 @@ export function ManualSistemaPage() {
     </AdminPageLayout>
   );
 }
-
-
-
-
-
-

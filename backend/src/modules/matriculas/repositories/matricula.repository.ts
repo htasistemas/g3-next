@@ -216,6 +216,7 @@ const estruturaMatriculasSql = [
   "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS cpf VARCHAR(20)",
   "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS email VARCHAR(150)",
   "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS status VARCHAR(20)",
+  "ALTER TABLE cursos_atendimentos_matriculas ALTER COLUMN status TYPE VARCHAR(80)",
   "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS data_matricula TIMESTAMP NOT NULL DEFAULT NOW()",
   "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS data_agendada DATE",
   "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS hora_agendada TIME",
@@ -223,6 +224,7 @@ const estruturaMatriculasSql = [
   "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS profissional_id VARCHAR(40)",
   "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS profissional_nome VARCHAR(200)",
   "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS profissional_tipo VARCHAR(20)",
+  "ALTER TABLE cursos_atendimentos_matriculas ALTER COLUMN profissional_tipo TYPE VARCHAR(80)",
   "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS confirmacao_presenca BOOLEAN NOT NULL DEFAULT FALSE",
   "CREATE INDEX IF NOT EXISTS cursos_atendimentos_matriculas_tenant_curso_idx ON cursos_atendimentos_matriculas (tenant_id, curso_id)",
   `

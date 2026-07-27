@@ -2369,7 +2369,22 @@ export class AgendamentosRepository {
 
     const horarioBase = formatarHoraEntrada(input.horaInicial ?? item.horario_inicial) ?? "08:00:00";
     const horarioFinal = formatarHoraEntrada(input.horaFinal ?? item.horario_final_atendimento);
-    const profissionalNome = trimOrUndefined(item.profissional) ?? trimOrUndefined(selecionados[0]?.profissional_nome) ?? "Equipe institucional";
+    const profissionaisRelacionados = String(item.profissional ?? "")
+      .split(/[;,]/g)
+      .map((nome) => nome.trim())
+      .filter(Boolean);
+    const profissionalSelecionado = trimOrUndefined(input.profissionalNome);
+    if (
+      profissionalSelecionado &&
+      profissionaisRelacionados.length &&
+      !profissionaisRelacionados.some(
+        (nome) => nome.toLocaleLowerCase("pt-BR") === profissionalSelecionado.toLocaleLowerCase("pt-BR")
+      )
+    ) {
+      throw new AppError("O profissional selecionado nao esta relacionado ao item.", 400);
+    }
+    const profissionalNome =
+      profissionalSelecionado ?? profissionaisRelacionados[0] ?? trimOrUndefined(selecionados[0]?.profissional_nome) ?? "Equipe institucional";
     const local = trimOrUndefined(item.sala_nome) ?? trimOrUndefined(item.instituicao_parceira) ?? "Local a definir";
 
     return {

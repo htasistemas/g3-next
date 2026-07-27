@@ -89,6 +89,7 @@ export type AgendamentoOperacionalInput = {
   id?: string;
   tipo: AgendamentoOperacionalTipo;
   itemId: number;
+  profissionalNome?: string;
   data: string;
   horaInicial?: string;
   horaFinal?: string;

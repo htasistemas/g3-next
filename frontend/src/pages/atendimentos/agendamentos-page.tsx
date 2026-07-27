@@ -470,6 +470,7 @@ export function AgendamentosPage() {
   const [agendaParaExcluir, setAgendaParaExcluir] = useState<Agendamento | null>(null);
   const [agendaParaData, setAgendaParaData] = useState<{ acao: "copiar" | "mover"; item: Agendamento } | null>(null);
   const [novaDataAgenda, setNovaDataAgenda] = useState(hoje);
+  const [novoHorarioParticipante, setNovoHorarioParticipante] = useState("");
   const [participanteParaMover, setParticipanteParaMover] = useState<{ item: Agendamento; index: number } | null>(null);
   const [participanteParaExcluir, setParticipanteParaExcluir] = useState<{ item: Agendamento; index: number } | null>(null);
 
@@ -482,6 +483,10 @@ export function AgendamentosPage() {
   );
 
   const agendamentosQuery = useAgendamentos(filtrosAgendamentos);
+  const agendamentosDisponibilidadeQuery = useAgendamentos({
+    periodoInicio: dataAgendamento,
+    periodoFim: dataAgendamento
+  });
   const indicadoresQuery = useIndicadoresAgendamentos({});
   const listaEsperaQuery = useListaEsperaAgendamentos();
   const itensQuery = useItensOperacionaisAgendamento(tipo, buscaItemAdiada);
@@ -597,14 +602,42 @@ export function AgendamentosPage() {
     return base.filter((item) => item.nomeCompleto.toLowerCase().includes(termo));
   }, [beneficiariosQuery.data, buscaBeneficiario]);
 
-  const horariosDisponiveis = useMemo(() => gerarHorariosDisponiveis(itemSelecionado), [itemSelecionado]);
   const atendimentoPorHorario = tipo === "atendimento" && Boolean(itemSelecionado?.controleHorarioAtendimento);
+  const horariosOcupados = useMemo(() => {
+    if (!atendimentoPorHorario || !itemSelecionado?.id || !dataAgendamento) return new Set<string>();
+
+    const ocupados = new Set<string>();
+    const agendas = [...(agendamentosDisponibilidadeQuery.data ?? []), ...(agendaLocalSalva ? [agendaLocalSalva] : [])];
+    for (const agenda of agendas) {
+      const mesmaData = (agenda.data ?? "").slice(0, 10) === dataAgendamento;
+      const mesmoItem = agenda.itemOrigemId === itemSelecionado.id;
+      const cancelada = (agenda.status ?? "").trim().toUpperCase() === "CANCELADO";
+      if (!mesmaData || !mesmoItem || cancelada || agenda.id === agendaEmEdicaoId) continue;
+
+      const participantes = agenda.participantes ?? [];
+      const horarios = participantes.map((participante) => participante.horario).filter(Boolean);
+      if (horarios.length) {
+        horarios.forEach((horario) => ocupados.add(String(horario).slice(0, 5)));
+      } else if (agenda.horaInicial) {
+        ocupados.add(agenda.horaInicial.slice(0, 5));
+      }
+    }
+    return ocupados;
+  }, [agendaEmEdicaoId, agendaLocalSalva, agendamentosDisponibilidadeQuery.data, atendimentoPorHorario, dataAgendamento, itemSelecionado?.id]);
+
+  const horariosDisponiveis = useMemo(
+    () => gerarHorariosDisponiveis(itemSelecionado).filter((horario) => !horariosOcupados.has(horario.horaInicial)),
+    [horariosOcupados, itemSelecionado]
+  );
 
   const resumoOperacional = [
     { label: "Tipo", value: tipo ? tipo.charAt(0).toUpperCase() + tipo.slice(1) : "Não selecionado" },
     { label: "Item", value: itemSelecionado?.nome || "Não selecionado" },
     { label: "Data", value: dataAgendamento ? new Date(`${dataAgendamento}T12:00:00`).toLocaleDateString("pt-BR") : "Não selecionada" },
-    { label: "Beneficiários", value: `${beneficiariosSelecionados.length} selecionado(s)` }
+    {
+      label: "Beneficiários",
+      value: `${atendimentoPorHorario ? new Set(Object.values(beneficiariosPorHorario)).size : beneficiariosSelecionados.length} selecionado(s)`
+    }
   ];
 
   const dashboardResumo = useMemo<DashboardCard[]>(() => {
@@ -692,6 +725,7 @@ export function AgendamentosPage() {
     try {
       const salvos = atendimentoPorHorario
         ? [await salvarMutation.mutateAsync({
+            id: agendaEmEdicaoId ? String(agendaEmEdicaoId) : undefined,
             tipo,
             itemId: itemSelecionado.id,
             data: dataAgendamento,
@@ -1116,6 +1150,7 @@ export function AgendamentosPage() {
   function solicitarMoverParticipante(item: Agendamento, index: number) {
     setParticipanteParaMover({ item, index });
     setNovaDataAgenda(item.data?.slice(0, 10) || hoje);
+    setNovoHorarioParticipante(item.participantes?.[index]?.horario || item.horaInicial || "");
   }
 
   function solicitarExcluirParticipante(item: Agendamento, index: number) {
@@ -1150,26 +1185,55 @@ export function AgendamentosPage() {
     const matriculaId = participante?.matriculaId;
     const itemId = participanteParaMover.item.itemOrigemId;
     const tipoItem = participanteParaMover.item.itemTipo;
+    const horarioDestino = novoHorarioParticipante.trim() || participante?.horario || participanteParaMover.item.horaInicial;
 
     if (!participante || !matriculaId || !itemId || !tipoItem) {
       setPopup({ tipo: "erro", titulo: "Atenção", texto: "Não foi possível mover este beneficiário." });
       return;
     }
 
-    try {
-      await salvarMutation.mutateAsync({
-        tipo: tipoItem,
-        itemId,
-        data: novaDataAgenda,
-        matriculasIds: [matriculaId]
-      });
+    const horariosDoItem = gerarHorariosDisponiveis({
+      id: itemId,
+      nome: participanteParaMover.item.itemNome || participanteParaMover.item.tipoAtendimento,
+      horario: participanteParaMover.item.horaInicial,
+      horarioFinal: participanteParaMover.item.horaFinal,
+      duracaoMinutos: participanteParaMover.item.duracaoMinutos,
+      controleHorarioAtendimento: tipoItem === "atendimento" && Boolean(participanteParaMover.item.horaFinal && participanteParaMover.item.duracaoMinutos)
+    });
+    const horariosOcupados = new Set(
+      (participanteParaMover.item.participantes ?? [])
+        .filter((_, index) => index !== participanteParaMover.index)
+        .map((item) => item.horario)
+        .filter(Boolean)
+    );
+    if (horariosDoItem.length && (!horariosDoItem.some((item) => item.horaInicial === horarioDestino) || horariosOcupados.has(horarioDestino))) {
+      setPopup({ tipo: "erro", titulo: "Horário indisponível", texto: "Escolha um horário livre para remanejar o beneficiário." });
+      return;
+    }
 
-      const participantesRestantes = (participanteParaMover.item.participantes ?? []).filter((_, index) => index !== participanteParaMover.index);
-      await salvarParticipantesAtualizados(participanteParaMover.item, participantesRestantes);
+    try {
+      if (novaDataAgenda === (participanteParaMover.item.data ?? "").slice(0, 10)) {
+        const participantesAtualizados = (participanteParaMover.item.participantes ?? []).map((item, index) =>
+          index === participanteParaMover.index ? { ...item, horario: horarioDestino } : item
+        );
+        await salvarParticipantesAtualizados(participanteParaMover.item, participantesAtualizados);
+      } else {
+        await salvarMutation.mutateAsync({
+          tipo: tipoItem,
+          itemId,
+          data: novaDataAgenda,
+          horaInicial: horarioDestino,
+          matriculasIds: [matriculaId],
+          horariosPorMatricula: { [String(matriculaId)]: horarioDestino }
+        });
+
+        const participantesRestantes = (participanteParaMover.item.participantes ?? []).filter((_, index) => index !== participanteParaMover.index);
+        await salvarParticipantesAtualizados(participanteParaMover.item, participantesRestantes);
+      }
 
       definirDataVisualizacao(novaDataAgenda);
       setParticipanteParaMover(null);
-      setPopup({ tipo: "sucesso", titulo: "Confirmação", texto: "Beneficiário movido para a nova data com sucesso." });
+      setPopup({ tipo: "sucesso", titulo: "Confirmação", texto: "Beneficiário remanejado para o horário selecionado com sucesso." });
     } catch (error: any) {
       setPopup({ tipo: "erro", titulo: "Erro", texto: error?.response?.data?.message ?? "Não foi possível mover o beneficiário." });
     }
@@ -1279,8 +1343,8 @@ export function AgendamentosPage() {
                           Selecione diretamente o horário disponível. A ordem da lista não define o atendimento.
                         </p>
                       </div>
-                      {beneficiariosQuery.isLoading ? (
-                        <p className="rounded-lg bg-white px-3 py-4 text-sm text-[var(--g3-muted)]">Carregando beneficiários...</p>
+                      {beneficiariosQuery.isLoading || agendamentosDisponibilidadeQuery.isLoading ? (
+                        <p className="rounded-lg bg-white px-3 py-4 text-sm text-[var(--g3-muted)]">Carregando beneficiários e horários...</p>
                       ) : horariosDisponiveis.length ? (
                         <div className="overflow-hidden rounded-lg border border-emerald-200 bg-white">
                           <div className="grid grid-cols-[120px_minmax(0,1fr)] bg-emerald-100 px-3 py-2 text-xs font-semibold text-emerald-900">
@@ -1320,6 +1384,10 @@ export function AgendamentosPage() {
                             </div>
                           ))}
                         </div>
+                      ) : horariosOcupados.size ? (
+                        <p className="rounded-lg bg-white px-3 py-4 text-sm text-amber-800">
+                          Não há horários disponíveis para este atendimento nesta data.
+                        </p>
                       ) : (
                         <p className="rounded-lg bg-white px-3 py-4 text-sm text-amber-800">
                           Configure horário inicial, horário final e duração no cadastro deste atendimento.
@@ -1344,7 +1412,13 @@ export function AgendamentosPage() {
                       carregando={beneficiariosQuery.isLoading}
                     />
                   )}
-                  <DataSelector value={dataAgendamento} onChange={setDataAgendamento} />
+                  <DataSelector
+                    value={dataAgendamento}
+                    onChange={(value) => {
+                      setDataAgendamento(value);
+                      setBeneficiariosPorHorario({});
+                    }}
+                  />
                   <GenerateCardButton
                     disabled={!tipo || !itemSelecionado?.id || (atendimentoPorHorario ? !Object.keys(beneficiariosPorHorario).length : !beneficiariosSelecionados.length) || !dataAgendamento}
                     loading={salvarMutation.isPending || geracaoEmAndamento}
@@ -1582,13 +1656,46 @@ export function AgendamentosPage() {
               <h3 className="text-base font-semibold text-emerald-800">Mover beneficiário</h3>
             </div>
             <div className="space-y-4 px-5 py-4">
-              <p className="text-sm text-slate-700">Informe a nova data para transferir apenas este beneficiário.</p>
+              <p className="text-sm text-slate-700">Informe a data e, quando houver controle por horário, escolha também o novo horário.</p>
               <input
                 type="date"
                 value={novaDataAgenda}
                 onChange={(event) => setNovaDataAgenda(event.target.value)}
                 className="h-10 w-full rounded-xl border border-[var(--g3-border)] bg-white px-3 text-sm text-[var(--g3-foreground)] shadow-sm outline-none focus:border-emerald-400"
               />
+              {participanteParaMover.item.itemTipo === "atendimento" ? (() => {
+                const horarios = gerarHorariosDisponiveis({
+                  id: participanteParaMover.item.itemOrigemId ?? 0,
+                  nome: participanteParaMover.item.itemNome || participanteParaMover.item.tipoAtendimento,
+                  horario: participanteParaMover.item.horaInicial,
+                  horarioFinal: participanteParaMover.item.horaFinal,
+                  duracaoMinutos: participanteParaMover.item.duracaoMinutos,
+                  controleHorarioAtendimento: Boolean(participanteParaMover.item.horaFinal && participanteParaMover.item.duracaoMinutos)
+                });
+                const ocupados = new Set(
+                  (participanteParaMover.item.participantes ?? [])
+                    .filter((_, index) => index !== participanteParaMover.index)
+                    .map((item) => item.horario)
+                    .filter(Boolean)
+                );
+                return horarios.length ? (
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium text-slate-700" htmlFor="novo-horario-participante">Novo horário</label>
+                    <select
+                      id="novo-horario-participante"
+                      value={novoHorarioParticipante}
+                      onChange={(event) => setNovoHorarioParticipante(event.target.value)}
+                      className="h-10 w-full rounded-xl border border-[var(--g3-border)] bg-white px-3 text-sm text-[var(--g3-foreground)]"
+                    >
+                      {horarios.map((horario) => (
+                        <option key={horario.horaInicial} value={horario.horaInicial} disabled={ocupados.has(horario.horaInicial)}>
+                          {horario.horaInicial} - {horario.horaFinal}{ocupados.has(horario.horaInicial) ? " (ocupado)" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null;
+              })() : null}
             </div>
             <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3">
               <Button type="button" variant="outline" onClick={() => setParticipanteParaMover(null)}>
