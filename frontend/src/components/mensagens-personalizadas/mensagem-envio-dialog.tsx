@@ -80,7 +80,11 @@ export function MensagemEnvioDialog({
   });
   const buscarDestinatariosMutation = useBuscarDestinatariosMensagem();
   const buscarTodosMutation = useBuscarTodosDestinatariosMensagem();
-  const previewMutation = useGerarPreviewMensagem();
+  const {
+    data: previewData,
+    isPending: previewCarregando,
+    mutateAsync: gerarPreview
+  } = useGerarPreviewMensagem();
   const enviarMutation = useEnviarMensagemPersonalizada();
 
   const sugestoesDestinatarios = buscarDestinatariosMutation.data ?? [];
@@ -123,11 +127,14 @@ export function MensagemEnvioDialog({
     }
 
     const handle = window.setTimeout(() => {
-      void buscarDestinatariosMutation.mutateAsync({
-        tipo: tipoDestinatario,
-        termo,
-        somenteAtivos: true
-      });
+      void buscarDestinatariosMutation
+        .mutateAsync({ tipo: tipoDestinatario, termo, somenteAtivos: true })
+        .catch((error: any) => {
+          onFeedback?.({
+            tipo: "erro",
+            texto: error?.response?.data?.message ?? "Não foi possível buscar os destinatários."
+          });
+        });
     }, 250);
 
     return () => window.clearTimeout(handle);
@@ -142,7 +149,14 @@ export function MensagemEnvioDialog({
       onFeedback?.({ tipo: "aviso", texto: "Digite pelo menos 2 caracteres para buscar." });
       return;
     }
-    void buscarDestinatariosMutation.mutateAsync({ tipo: tipoDestinatario, termo, somenteAtivos: true });
+    void buscarDestinatariosMutation
+      .mutateAsync({ tipo: tipoDestinatario, termo, somenteAtivos: true })
+      .catch((error: any) => {
+        onFeedback?.({
+          tipo: "erro",
+          texto: error?.response?.data?.message ?? "Não foi possível buscar os destinatários."
+        });
+      });
   }
 
   useEffect(() => {
@@ -150,15 +164,21 @@ export function MensagemEnvioDialog({
     if (!aberto || !modeloId || !primeiroDestinatario) return;
 
     const handle = window.setTimeout(() => {
-      void previewMutation.mutateAsync({
-        modeloId,
-        canal,
-        destinatarioTipo: tipoDestinatario,
-        destinatarioId: primeiroDestinatario.id,
-        assuntoEditado,
-        mensagemEditada,
-        contextoExtra
-      });
+      void gerarPreview({
+          modeloId,
+          canal,
+          destinatarioTipo: tipoDestinatario,
+          destinatarioId: primeiroDestinatario.id,
+          assuntoEditado,
+          mensagemEditada,
+          contextoExtra
+        })
+        .catch((error: any) => {
+          onFeedback?.({
+            tipo: "erro",
+            texto: error?.response?.data?.message ?? "Não foi possível gerar a prévia da mensagem."
+          });
+        });
     }, 250);
 
     return () => window.clearTimeout(handle);
@@ -172,11 +192,15 @@ export function MensagemEnvioDialog({
     todosDestinatarios,
     assuntoEditado,
     mensagemEditada,
-    contextoExtra,
-    previewMutation
+    contextoExtra
+    // A função de mutation é usada apenas como disparador; o estado da mutation
+    // não deve reiniciar este efeito depois que a prévia foi carregada.
   ]);
 
-  const preview = previewMutation.data ?? null;
+  const preview = previewData ?? null;
+  const primeiroDestinatarioPreview = modoDestinatarios === "TODOS"
+    ? todosDestinatarios[0]
+    : destinatariosSelecionados[0];
   const resumoEnvio = useMemo(() => {
     if (destinatariosSelecionados.length > 1) {
       return `${destinatariosSelecionados.length} destinatários selecionados`;
@@ -440,21 +464,27 @@ export function MensagemEnvioDialog({
               variant="outline"
               size="sm"
               onClick={() => {
-                const primeiro = destinatariosSelecionados[0];
+                const primeiro = primeiroDestinatarioPreview;
                 if (!modeloId || !primeiro) return;
-                void previewMutation.mutateAsync({
-                  modeloId,
-                  canal,
-                  destinatarioTipo: tipoDestinatario,
-                  destinatarioId: primeiro.id,
-                  assuntoEditado,
-                  mensagemEditada,
-                  contextoExtra
-                });
+                void gerarPreview({
+                    modeloId,
+                    canal,
+                    destinatarioTipo: tipoDestinatario,
+                    destinatarioId: primeiro.id,
+                    assuntoEditado,
+                    mensagemEditada,
+                    contextoExtra
+                  })
+                  .catch((error: any) => {
+                    onFeedback?.({
+                      tipo: "erro",
+                      texto: error?.response?.data?.message ?? "Não foi possível gerar a prévia da mensagem."
+                    });
+                  });
               }}
-              disabled={!modeloId || (modoDestinatarios === "TODOS" ? !todosDestinatarios.length : !destinatariosSelecionados.length) || previewMutation.isPending}
+              disabled={!modeloId || (modoDestinatarios === "TODOS" ? !todosDestinatarios.length : !destinatariosSelecionados.length) || previewCarregando}
             >
-              <RefreshCcw className={`mr-1.5 h-3.5 w-3.5 ${previewMutation.isPending ? "animate-spin" : ""}`} />
+              <RefreshCcw className={`mr-1.5 h-3.5 w-3.5 ${previewCarregando ? "animate-spin" : ""}`} />
               Atualizar prévia
             </Button>
 
@@ -462,7 +492,7 @@ export function MensagemEnvioDialog({
               variant="outline"
               size="sm"
               onClick={() => setPreviewConferida(true)}
-              disabled={!preview || previewMutation.isPending}
+              disabled={!preview || previewCarregando}
             >
               Confirmar prévia
             </Button>

@@ -1,6 +1,62 @@
 {
   "entries":  [
                     {
+                        "version": "1.00.730",
+                        "releaseDate": "2026-07-27",
+                        "title": "Prévia de mensagens sem piscada",
+                        "description": "A prévia de WhatsApp e e-mail deixou de ser regenerada continuamente após carregar, mantendo a visualização estável.",
+                        "changes": ["Efeito de geração desacoplado do estado interno da mutation.", "Prévia continua sendo atualizada quando mensagem, canal ou destinatário mudam.", "Estado de carregamento preservado nos botões de atualização e confirmação."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.729",
+                        "releaseDate": "2026-07-27",
+                        "title": "Busca e prévia de mensagens corrigidas",
+                        "description": "A tela de mensagens personalizadas volta a buscar destinatários por nome e habilitar corretamente a prévia antes do envio.",
+                        "changes": ["Consulta de destinatários compatível com bases legadas.", "Erros de busca agora recebem feedback visível.", "A atualização da prévia usa corretamente o primeiro destinatário também no envio para todos."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.728",
+                        "releaseDate": "2026-07-27",
+                        "title": "Cor padrão da unidade nas confirmações",
+                        "description": "Os modais de conclusão dos cadastros principais agora seguem a cor padrão configurada para a unidade autenticada.",
+                        "changes": ["Ícones de sucesso usam a cor temática da unidade.", "Botões Finalizar cadastro usam as cores padrão do tema.", "Beneficiários, profissionais, unidades e voluntários mantêm o mesmo padrão visual."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.727",
+                        "releaseDate": "2026-07-27",
+                        "title": "Confirmação visual no cadastro de voluntariado",
+                        "description": "A conclusão do cadastro de voluntário agora exibe uma confirmação visual com ícone de sucesso, número do cadastro e botão Finalizar cadastro.",
+                        "changes": ["Novo modal de sucesso alinhado ao fluxo de cadastro.", "Exibição do ID persistido como número do cadastro.", "Fechamento com um clique pelo botão principal ou pelo ícone de fechar."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.726",
+                        "releaseDate": "2026-07-27",
+                        "title": "Confirmação visual no cadastro de unidades",
+                        "description": "A conclusão do cadastro de unidade de atendimento agora exibe uma confirmação visual com ícone de sucesso, número do cadastro e botão Finalizar cadastro.",
+                        "changes": ["Novo modal de sucesso alinhado ao fluxo de cadastro.", "Exibição do ID persistido como número do cadastro.", "Fechamento com um clique pelo botão principal ou pelo ícone de fechar."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.725",
+                        "releaseDate": "2026-07-27",
+                        "title": "Confirmação visual no cadastro de profissionais",
+                        "description": "A conclusão do cadastro de profissional agora exibe uma confirmação visual com ícone de sucesso, número do cadastro e botão Finalizar cadastro.",
+                        "changes": ["Novo modal de sucesso alinhado ao fluxo de cadastro.", "Exibição do ID persistido como número do cadastro.", "Fechamento com um clique pelo botão principal ou pelo ícone de fechar."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.724",
+                        "releaseDate": "2026-07-27",
+                        "title": "Confirmação visual no cadastro de beneficiários",
+                        "description": "A conclusão do cadastro de beneficiário agora exibe uma confirmação visual com ícone de sucesso, número do cadastro e botão Finalizar cadastro.",
+                        "changes": ["Novo modal de sucesso alinhado ao fluxo de cadastro.", "Exibição do número gerado para conferência.", "Fechamento com um clique pelo botão principal ou pelo ícone de fechar."],
+                        "releaseType": "stable"
+                    },
+                    {
                         "version": "1.00.682",
                         "releaseDate": "2026-07-19",
                         "title": "Correção do aquecimento de mensagens",

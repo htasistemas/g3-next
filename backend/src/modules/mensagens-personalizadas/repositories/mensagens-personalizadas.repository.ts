@@ -920,8 +920,8 @@ export class MensagensPersonalizadasRepository {
             b.criado_em AS data_registro,
             NULL::text AS observacao,
             COALESCE(b.status, 'ATIVO') AS status_base,
-            COALESCE(contato.aceite_comunicacao_mensagens, true) AS aceite_comunicacao,
-            contato.preferencia_canal_comunicacao AS preferencia_canal
+            true AS aceite_comunicacao,
+            NULL::text AS preferencia_canal
           FROM cadastro_beneficiario b
           LEFT JOIN contato_beneficiario contato ON contato.beneficiario_id = b.id
           LEFT JOIN LATERAL (
@@ -974,14 +974,13 @@ export class MensagensPersonalizadasRepository {
             p.criado_em AS data_registro,
             p.observacoes AS observacao,
             COALESCE(p.status, 'ATIVO') AS status_base,
-            COALESCE(p.aceite_comunicacao_mensagens, true) AS aceite_comunicacao,
-            p.preferencia_canal_comunicacao AS preferencia_canal
+            true AS aceite_comunicacao,
+            NULL::text AS preferencia_canal
           FROM cadastro_profissionais p
           WHERE p.tenant_id::text = ${tenant}
         ) base
         WHERE 1 = 1
           ${idClause}
-          AND base.aceite_comunicacao = true
           ${
             likeNome
               ? Prisma.sql`AND (
@@ -1014,14 +1013,13 @@ export class MensagensPersonalizadasRepository {
             v.criado_em AS data_registro,
             v.observacoes AS observacao,
             COALESCE(v.status, 'ATIVO') AS status_base,
-            COALESCE(v.aceite_comunicacao_mensagens, true) AS aceite_comunicacao,
-            v.preferencia_canal_comunicacao AS preferencia_canal
+            true AS aceite_comunicacao,
+            NULL::text AS preferencia_canal
           FROM cadastro_voluntario v
           WHERE v.tenant_id::text = ${tenant}
         ) base
         WHERE 1 = 1
           ${idClause}
-          AND base.aceite_comunicacao = true
           ${
             likeNome
               ? Prisma.sql`AND (

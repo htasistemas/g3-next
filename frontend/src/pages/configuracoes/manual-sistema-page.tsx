@@ -122,7 +122,8 @@ const secoesManual: ManualSecao[] = [
           "A senha do portal do beneficiário é criada no próprio cadastro com 4 dígitos e será usada no acesso do portal do beneficiário e da família junto com o CPF.",
           "Revise a aba Documentos e use a regra de obrigatoriedade definida em parâmetros do sistema; quando houver muitos documentos, a rolagem fica dentro do card da lista de documentos.",
           "Ao abrir um beneficiário, leia o aviso de pendências antes de continuar o atendimento.",
-          "Na aba Listagem de beneficiários, use os filtros no topo e o botão Limpar para localizar registros. A listagem não exibe mais o resumo do beneficiário selecionado acima dos resultados, mantendo a rolagem apenas na grade de beneficiários."
+          "Na aba Listagem de beneficiários, use os filtros no topo e o botão Limpar para localizar registros. A listagem não exibe mais o resumo do beneficiário selecionado acima dos resultados, mantendo a rolagem apenas na grade de beneficiários.",
+          "Ao concluir o cadastro de um beneficiário, confira a confirmação visual com o ícone na cor padrão da unidade e o número do cadastro. Clique em Finalizar cadastro para fechar a mensagem e continuar na tela."
         ],
         atencoes: [
           "CPF, e-mail, telefone e CEP devem respeitar as máscaras e validações padronizadas.",
@@ -855,6 +856,7 @@ const secoesManual: ManualSecao[] = [
         comoUsar: [
           "Use a foto 3x4 do profissional apenas em formatos aceitos pelo sistema e finalize o salvamento após revisar os dados principais.",
           "Na aba Listagem de profissionais, use Imprimir listagem para emitir a relação filtrada; nas abas do cadastro selecionado, use Imprimir cadastro para emitir a ficha individual no padrão institucional de relatórios.",
+          "Ao concluir o cadastro de um profissional, confira a confirmação visual com o ícone na cor padrão da unidade e o número do cadastro. Clique em Finalizar cadastro para fechar a mensagem e continuar na tela.",
           "Quando houver falha no processamento ou na vinculação da foto, a tela deve exibir o motivo operacional real retornado pelo backend.",
           "Em produção, após trocar a foto do profissional, o sistema mantém o cadastro mesmo se a limpeza do arquivo antigo falhar no storage."
         ],
@@ -876,6 +878,7 @@ const secoesManual: ManualSecao[] = [
           "A mesma aba agora exibe um mapa semanal com todas as escalas cadastradas no sistema, organizado por dia, sala, unidade e horário para facilitar a leitura da ocupação.",
           "A listagem detalhada do voluntário continua disponível abaixo do mapa para editar ou excluir apenas as escalas do cadastro aberto.",
           "Na aba Listagem de voluntários, use Imprimir para emitir a relação filtrada; nas abas do cadastro selecionado, use Imprimir e escolha entre ficha cadastral ou termo de voluntariado no padrão institucional de relatórios.",
+          "Ao concluir o cadastro de um voluntário, confira a confirmação visual com o ícone na cor padrão da unidade e o número do cadastro. Clique em Finalizar cadastro para fechar a mensagem e continuar na tela.",
           "Quando houver foto 3x4, o sistema processa o arquivo antes do salvamento e informa o motivo real caso a imagem não possa ser utilizada.",
           "Em produção, o cadastro foi ajustado para funcionar também em bases legadas que ainda não possuem colunas novas de comunicação na tabela cadastro_voluntario."
         ],
@@ -1190,12 +1193,14 @@ const secoesManual: ManualSecao[] = [
           "Na aba Mensagens pré-prontas, filtre, visualize, edite, duplique e ative ou inative modelos reutilizáveis.",
           "Na aba Categorias e assuntos, mantenha categorias, assuntos, tipos de comunicação e tags usados nos modelos.",
           "Ao preparar um envio, selecione destinatário, canal, assunto e conteúdo e confira a prévia final antes de disparar.",
+          "Na seleção individual, digite pelo menos duas letras do nome e aguarde a busca automática ou clique em Buscar; depois selecione o destinatário para habilitar a prévia e a confirmação do envio.",
+          "A prévia permanece estável após ser carregada e só é atualizada quando a mensagem, o canal ou o destinatário realmente mudam.",
           "Use Configurar envios para verificar a integração de e-mail, o modo de WhatsApp e as regras de conferência."
         ],
         atencoes: [
           "A tela Mensagens personalizadas lista, abre, cria, edita, duplica, inativa, remove e registra histórico sempre dentro do tenant autenticado.",
           "Cada destinatário gera seu próprio registro no histórico com mensagem final, canal, contato e resultado; o dashboard consolida esses registros.",
-          "A busca de destinatários considera apenas beneficiários, profissionais, voluntários, doadores e instituições da própria organização logada.",
+          "A busca de destinatários considera apenas beneficiários, profissionais, voluntários, doadores e instituições da própria organização logada e permanece compatível com bases legadas sem colunas opcionais de autorização de comunicação.",
           "Ao trocar de instituição na mesma estação, faça novo login para garantir recarga completa do cache da tela por tenant."
         ]
       },
@@ -1389,6 +1394,7 @@ const secoesManual: ManualSecao[] = [
           , "As telas Educacionais agora usam a barra de ações padrão do G3N. Nas abas com formulário, Novo limpa o contexto para um novo registro, Salvar envia o formulário visível, Cancelar limpa os dados ainda não gravados, Imprimir usa o relatório da tela e Fechar retorna à Visão geral. Buscar atualiza a Visão geral ou pesquisa beneficiários na aba Matrículas. As abas laterais usam as mesmas cores e estados visuais do Cadastro de beneficiários. Ao selecionar um grupo, somente o submenu correspondente fica destacado; Visão geral fica ativa apenas na rota inicial do Educacional. Na matrícula, selecione a unidade de ensino e depois uma sala com vagas disponíveis; salas lotadas ficam bloqueadas e o backend confirma a lotação antes de salvar."
           , "Na aba Salas de atendimento, informe as vagas da sala e salve a unidade. A capacidade é normalizada corretamente mesmo quando o navegador envia o valor como texto, e o status da sala permanece ativo até que o usuário escolha inativá-la."
           , "Na aba Dados gerais do Cadastro de unidade de atendimento, as logomarcas da unidade e do relatório ficam lado a lado em telas amplas e se reorganizam verticalmente em telas menores."
+          , "Ao concluir o cadastro de uma unidade de atendimento, confira a confirmação visual com o ícone na cor padrão da unidade e o número do cadastro. Clique em Finalizar cadastro para fechar a mensagem e continuar na tela."
           , "Na aba Salas de atendimento, edite o nome e as vagas diretamente nos campos da sala. Use Inativar sala ou Reativar para alterar o status; depois clique em Salvar para persistir as mudanças."
           , "O aquecimento inicial das mensagens personalizadas é executado uma única vez por processo e mantém os modelos-base isolados por instituição."
         ],
