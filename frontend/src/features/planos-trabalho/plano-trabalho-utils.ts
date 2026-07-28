@@ -223,34 +223,43 @@ export function gerarCronogramaExecucao(plano: PlanoTrabalhoPayload): PlanoCrono
 export function validarPlano(plano: PlanoTrabalhoPayload, modo: "rascunho" | "envio" = "rascunho"): PlanoErros {
   const erros: PlanoErros = {};
 
-  if (!plano.titulo.trim()) erros.titulo = "Informe o título do plano.";
-  if (!plano.tipoParceria.trim()) erros.tipoParceria = "Informe o tipo da parceria.";
-  if (!plano.orgaoParceiro.trim()) erros.orgaoParceiro = "Informe o órgão concedente ou parceiro.";
-  if (!plano.periodoInicio) erros.periodoInicio = "Informe o início da execução.";
-  if (!plano.periodoFim) erros.periodoFim = "Informe o término da execução.";
   if (plano.periodoInicio && plano.periodoFim && plano.periodoFim < plano.periodoInicio) {
     erros.periodoFim = "A data final não pode ser menor que a data inicial.";
   }
-  if (!plano.responsavelTecnico.trim()) erros.responsavelTecnico = "Informe o responsável técnico.";
-  if (!plano.responsavelLegal.trim()) erros.responsavelLegal = "Informe o responsável legal.";
-  if (!plano.razaoSocial.trim()) erros.razaoSocial = "Informe a razão social.";
-  if (!validarCnpj(plano.cnpj)) erros.cnpj = "Informe um CNPJ válido.";
   if (plano.cep && normalizarCep(plano.cep).length !== 8) erros.cep = "Informe um CEP válido.";
   if (plano.telefone) {
     const telefone = normalizarTelefone(plano.telefone);
     if (![10, 11].includes(telefone.length)) erros.telefone = "Informe um telefone válido.";
   }
   if (plano.email && !validarEmail(plano.email)) erros.email = "Informe um e-mail válido.";
-  if (!plano.representanteLegal.trim()) erros.representanteLegal = "Informe o representante legal.";
-  if (!validarCpf(plano.representanteCpf)) erros.representanteCpf = "Informe um CPF válido.";
-  if (!plano.descricaoObjeto.trim()) erros.descricaoObjeto = "Informe o objeto do plano.";
-  if (!plano.areaAtuacao.trim()) erros.areaAtuacao = "Informe a área de atuação.";
-  if (!plano.localExecucao.trim()) erros.localExecucao = "Informe o local de execução.";
-  if (!plano.publicoAlvo.trim()) erros.publicoAlvo = "Informe o público-alvo.";
-  if (!plano.problemaSocial.trim()) erros.problemaSocial = "Informe o problema social.";
-  if (!plano.objetivoGeral.trim()) erros.objetivoGeral = "Informe o objetivo geral.";
+  if (plano.cnpj && !validarCnpj(plano.cnpj)) erros.cnpj = "Informe um CNPJ válido.";
+  if (plano.representanteCpf && !validarCpf(plano.representanteCpf)) {
+    erros.representanteCpf = "Informe um CPF válido.";
+  }
+  if (plano.cpfRepresentanteDeclaracao && !validarCpf(plano.cpfRepresentanteDeclaracao)) {
+    erros.cpfRepresentanteDeclaracao = "Informe um CPF válido.";
+  }
 
   if (modo === "envio") {
+    if (!plano.titulo.trim()) erros.titulo = "Informe o título do plano.";
+    if (!plano.tipoParceria.trim()) erros.tipoParceria = "Informe o tipo da parceria.";
+    if (!plano.orgaoParceiro.trim()) erros.orgaoParceiro = "Informe o órgão concedente ou parceiro.";
+    if (!plano.periodoInicio) erros.periodoInicio = "Informe o início da execução.";
+    if (!plano.periodoFim) erros.periodoFim = "Informe o término da execução.";
+    if (!plano.responsavelTecnico.trim()) erros.responsavelTecnico = "Informe o responsável técnico.";
+    if (!plano.responsavelLegal.trim()) erros.responsavelLegal = "Informe o responsável legal.";
+    if (!plano.razaoSocial.trim()) erros.razaoSocial = "Informe a razão social.";
+    if (!plano.cnpj.trim() || !validarCnpj(plano.cnpj)) erros.cnpj = "Informe um CNPJ válido.";
+    if (!plano.representanteLegal.trim()) erros.representanteLegal = "Informe o representante legal.";
+    if (!plano.representanteCpf.trim() || !validarCpf(plano.representanteCpf)) {
+      erros.representanteCpf = "Informe um CPF válido.";
+    }
+    if (!plano.descricaoObjeto.trim()) erros.descricaoObjeto = "Informe o objeto do plano.";
+    if (!plano.areaAtuacao.trim()) erros.areaAtuacao = "Informe a área de atuação.";
+    if (!plano.localExecucao.trim()) erros.localExecucao = "Informe o local de execução.";
+    if (!plano.publicoAlvo.trim()) erros.publicoAlvo = "Informe o público-alvo.";
+    if (!plano.problemaSocial.trim()) erros.problemaSocial = "Informe o problema social.";
+    if (!plano.objetivoGeral.trim()) erros.objetivoGeral = "Informe o objetivo geral.";
     if (!(plano.metas ?? []).length) erros.metas = "Cadastre pelo menos uma meta.";
     if ((plano.metas ?? []).some((meta) => !meta.indicadorResultado?.trim())) {
       erros.metasIndicadores = "Todas as metas devem possuir indicador.";

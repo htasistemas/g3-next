@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Edit3, Save, Trash2 } from "lucide-react";
+import { CheckCircle2, Edit3, Save, Trash2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -182,6 +182,7 @@ export function VoluntarioEscalasPanel({
   const [form, setForm] = useState<FormState>(formInicial);
   const [tituloManual, setTituloManual] = useState(false);
   const [mensagem, setMensagem] = useState<{ tipo: "sucesso" | "erro"; texto: string } | null>(null);
+  const [cadastroConcluido, setCadastroConcluido] = useState<{ id: string; atualizacao: boolean } | null>(null);
 
   const { data: escalasData, isLoading: carregandoEscalas } = useVoluntarioEscalas(voluntarioId);
   const { data: escalasSistemaData, isLoading: carregandoEscalasSistema } = useVoluntarioEscalasGeral();
@@ -229,6 +230,7 @@ export function VoluntarioEscalasPanel({
     setForm(formInicial);
     setTituloManual(false);
     setMensagem(null);
+    setCadastroConcluido(null);
   }, [voluntarioId]);
 
   useEffect(() => {
@@ -294,12 +296,13 @@ export function VoluntarioEscalasPanel({
     };
 
     try {
-      await salvarMutation.mutateAsync(payload);
+      const resposta = await salvarMutation.mutateAsync(payload);
       setForm(formInicial);
       setTituloManual(false);
-      setMensagem({
-        tipo: "sucesso",
-        texto: "Escala de voluntariado salva com sucesso."
+      setMensagem(null);
+      setCadastroConcluido({
+        id: resposta.escala?.id_escala ?? payload.id_escala ?? "—",
+        atualizacao: Boolean(payload.id_escala)
       });
     } catch (error: any) {
       setMensagem({
@@ -500,6 +503,47 @@ export function VoluntarioEscalasPanel({
             {mensagem.texto}
           </CardContent>
         </Card>
+      )}
+
+      {cadastroConcluido && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/45 px-4 py-6"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setCadastroConcluido(null)}
+        >
+          <div
+            className="relative w-full max-w-md rounded-2xl border border-slate-200 bg-white px-6 pb-6 pt-8 shadow-2xl sm:px-8"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              aria-label="Fechar confirmação da escala"
+              className="absolute right-4 top-4 rounded-full p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+              onClick={() => setCadastroConcluido(null)}
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <div className="flex flex-col items-center text-center">
+              <CheckCircle2 className="h-20 w-20 stroke-[1.8] text-[var(--g3-primary)]" aria-hidden="true" />
+              <h3 className="mt-5 text-xl font-semibold text-slate-800">
+                {cadastroConcluido.atualizacao ? "Cadastro atualizado com sucesso" : "Cadastro realizado com sucesso"}
+              </h3>
+              <p className="mt-3 text-sm text-slate-500">
+                Número do cadastro: <span className="font-semibold text-slate-700">{cadastroConcluido.id}</span>
+              </p>
+            </div>
+            <div className="mt-7">
+              <Button
+                type="button"
+                className="h-12 w-full rounded-lg bg-[var(--g3-primary-button)] text-base font-semibold text-white shadow-sm hover:bg-[var(--g3-primary-button-hover)]"
+                onClick={() => setCadastroConcluido(null)}
+              >
+                Finalizar cadastro
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
 
       <Card>

@@ -11,6 +11,7 @@ import {
   Search,
   Trash2,
   Undo2,
+  Upload,
   X
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -18,6 +19,10 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { CadastroSucessoModal } from "@/components/admin/cadastro-sucesso-modal";
+import { useProfissionais } from "@/features/profissionais/use-profissionais";
+import { formatarMoedaInput, normalizarMoeda } from "@/lib/br-utils";
+import { arquivosService } from "@/services/arquivos.service";
 import { AdminPageLayout, type AdminAction, type AdminTab } from "@/components/admin/admin-page-layout";
 import { PopupConfirmacao, PopupMensagem, type PopupMensagemState } from "@/components/admin/admin-popups";
 import { gerarHtmlTermoFomento } from "@/features/termos-fomento/termo-fomento-report";
@@ -66,6 +71,39 @@ const documentoVazio: TermoDocumento = {
   tipo: "outro"
 };
 
+const orgaosConcedentesPrincipais = [
+  "Prefeitura Municipal",
+  "Secretaria Municipal de Assistência Social",
+  "Secretaria Municipal de Saúde",
+  "Secretaria Municipal de Educação",
+  "Fundo Municipal de Assistência Social",
+  "Governo do Estado",
+  "Secretaria Estadual de Assistência Social",
+  "Secretaria Estadual de Saúde",
+  "Secretaria Estadual de Educação",
+  "Fundo Estadual de Assistência Social",
+  "Governo Federal",
+  "Ministério do Desenvolvimento e Assistência Social, Família e Combate à Fome",
+  "Ministério da Saúde",
+  "Ministério da Educação",
+  "Fundo Nacional de Assistência Social",
+  "Caixa Econômica Federal"
+];
+
+const tiposAditivoPrincipais = [
+  "Prorrogação de vigência",
+  "Alteração de valor",
+  "Acréscimo de valor",
+  "Supressão de valor",
+  "Alteração do objeto",
+  "Alteração do plano de trabalho",
+  "Alteração de órgão ou partícipe",
+  "Remanejamento orçamentário",
+  "Rerratificação",
+  "Rescisão",
+  "Outro"
+];
+
 export function TermoFomentoPage() {
   const navigate = useNavigate();
   const [abaAtiva, setAbaAtiva] = useState<AbaId>("listagem");
@@ -75,7 +113,14 @@ export function TermoFomentoPage() {
   const [snapshot, setSnapshot] = useState<TermoFomentoPayload>(termoVazio);
   const [novoAditivo, setNovoAditivo] = useState<AditivoTermoFomento>(aditivoVazio);
   const [novoDocumento, setNovoDocumento] = useState<TermoDocumento>(documentoVazio);
+  const [valorGlobalInput, setValorGlobalInput] = useState("");
+  const [mostrarSugestoesOrgaos, setMostrarSugestoesOrgaos] = useState(false);
+  const [arquivoTermo, setArquivoTermo] = useState<File | null>(null);
+  const [arquivoRelacionado, setArquivoRelacionado] = useState<File | null>(null);
+  const [novoAditivoValorInput, setNovoAditivoValorInput] = useState("");
+  const [enviandoArquivo, setEnviandoArquivo] = useState(false);
   const [popup, setPopup] = useState<PopupMensagemState | null>(null);
+  const [cadastroSucesso, setCadastroSucesso] = useState<{ id: string; novo: boolean } | null>(null);
   const [confirmarExclusao, setConfirmarExclusao] = useState(false);
   const [erros, setErros] = useState<Record<string, string>>({});
 
@@ -83,13 +128,14 @@ export function TermoFomentoPage() {
   const salvarMutation = useSalvarTermoFomento();
   const excluirMutation = useExcluirTermoFomento();
   const adicionarAditivoMutation = useAdicionarAditivoTermoFomento();
+  const profissionaisQuery = useProfissionais({ status: "ATIVO" });
 
   const termos = termosQuery.data ?? [];
   const termosFiltrados = useMemo(() => {
     const termo = filtro.trim().toLowerCase();
     if (!termo) return termos;
     return termos.filter((item) => {
-      const alvo = `${item.numeroTermo} ${item.tipoTermo} ${item.orgaoConcedente ?? ""} ${item.situacao}`;
+      const alvo = `${item.numeroTermo} ${item.tipoTermo} ${item.referenciaTermo ?? ""} ${item.responsavelIndicacao ?? ""} ${item.orgaoConcedente ?? ""} ${item.situacao}`;
       return alvo.toLowerCase().includes(termo);
     });
   }, [filtro, termos]);
@@ -97,14 +143,24 @@ export function TermoFomentoPage() {
   const processando =
     salvarMutation.isPending || excluirMutation.isPending || adicionarAditivoMutation.isPending;
   const termoCompletoParaImpressao = Object.keys(validarTermoFomentoParaImpressao(form)).length === 0;
+  const orgaosFiltrados = useMemo(() => {
+    const termo = (form.orgaoConcedente ?? "").trim().toLocaleLowerCase("pt-BR");
+    return orgaosConcedentesPrincipais
+      .filter((orgao) => !termo || orgao.toLocaleLowerCase("pt-BR").includes(termo))
+      .slice(0, 8);
+  }, [form.orgaoConcedente]);
 
   function novo() {
     setTermoIdSelecionado(undefined);
     setForm(termoVazio);
+    setValorGlobalInput("");
     setSnapshot(termoVazio);
     setErros({});
     setNovoAditivo(aditivoVazio);
+    setNovoAditivoValorInput("");
     setNovoDocumento(documentoVazio);
+    setArquivoTermo(null);
+    setArquivoRelacionado(null);
     setAbaAtiva("dadosGerais");
   }
 
@@ -118,7 +174,10 @@ export function TermoFomentoPage() {
     };
     setTermoIdSelecionado(termo.id);
     setForm(normalizado);
+    setValorGlobalInput(normalizado.valorGlobal == null ? "" : formatarMoedaInput(normalizado.valorGlobal));
     setSnapshot(normalizado);
+    setArquivoTermo(null);
+    setArquivoRelacionado(null);
     setErros({});
     setAbaAtiva("dadosGerais");
   }
@@ -126,6 +185,43 @@ export function TermoFomentoPage() {
   function cancelar() {
     setForm(clonarTermoFomento(snapshot));
     setErros({});
+  }
+
+  async function enviarDocumentoPrincipal() {
+    if (!termoIdSelecionado) {
+      setPopup({ tipo: "aviso", titulo: "Salve o termo", texto: "Salve o termo antes de enviar o documento principal." });
+      return;
+    }
+    if (!arquivoTermo) {
+      setPopup({ tipo: "aviso", titulo: "Arquivo não selecionado", texto: "Selecione o arquivo do documento principal." });
+      return;
+    }
+
+    try {
+      setEnviandoArquivo(true);
+      const arquivo = await arquivosService.uploadPorEntidade({
+        scope: "termo_fomento_documento",
+        entidadeTipo: "termo_fomento",
+        entidadeId: termoIdSelecionado,
+        arquivo: arquivoTermo,
+        observacao: "Documento principal do termo de fomento"
+      });
+      setForm((atual) => ({
+        ...atual,
+        termoDocumento: {
+          id: String(arquivo.id),
+          tipo: "termo",
+          nome: arquivo.nomeOriginal,
+          dataUrl: arquivo.caminhoArquivo
+        }
+      }));
+      setArquivoTermo(null);
+      setPopup({ tipo: "sucesso", titulo: "Arquivo enviado", texto: "O documento principal foi armazenado. Clique em Salvar para registrar o vínculo no termo." });
+    } catch (error: any) {
+      setPopup({ tipo: "erro", titulo: "Erro no upload", texto: error?.response?.data?.message ?? "Não foi possível armazenar o documento." });
+    } finally {
+      setEnviandoArquivo(false);
+    }
   }
 
   async function salvar() {
@@ -150,9 +246,11 @@ export function TermoFomentoPage() {
       });
       setTermoIdSelecionado(response.id);
       setForm(response);
+      setValorGlobalInput(response.valorGlobal == null ? "" : formatarMoedaInput(response.valorGlobal));
       setSnapshot(response);
       setErros({});
-      setPopup({ tipo: "sucesso", titulo: "Confirmação", texto: "Termo salvo com sucesso." });
+      setAbaAtiva("listagem");
+      setCadastroSucesso({ id: response.id, novo: !termoIdSelecionado });
     } catch (error: any) {
       setPopup({
         tipo: "erro",
@@ -178,7 +276,7 @@ export function TermoFomentoPage() {
     }
   }
 
-  function adicionarDocumentoRelacionado() {
+  async function adicionarDocumentoRelacionado() {
     if (!novoDocumento.nome?.trim()) {
       setPopup({
         tipo: "aviso",
@@ -187,11 +285,42 @@ export function TermoFomentoPage() {
       });
       return;
     }
-    setForm((atual) => ({
-      ...atual,
-      documentosRelacionados: [...(atual.documentosRelacionados ?? []), novoDocumento]
-    }));
-    setNovoDocumento(documentoVazio);
+    if (!termoIdSelecionado) {
+      setPopup({ tipo: "aviso", titulo: "Salve o termo", texto: "Salve o termo antes de enviar documentos relacionados." });
+      return;
+    }
+    if (!arquivoRelacionado) {
+      setPopup({ tipo: "aviso", titulo: "Arquivo não selecionado", texto: "Selecione o arquivo do documento relacionado." });
+      return;
+    }
+
+    try {
+      setEnviandoArquivo(true);
+      const arquivo = await arquivosService.uploadPorEntidade({
+        scope: "termo_fomento_documento",
+        entidadeTipo: "termo_fomento",
+        entidadeId: termoIdSelecionado,
+        arquivo: arquivoRelacionado,
+        observacao: `Documento relacionado: ${novoDocumento.nome.trim()}`
+      });
+      const documento = {
+        ...novoDocumento,
+        id: String(arquivo.id),
+        nome: novoDocumento.nome.trim() || arquivo.nomeOriginal,
+        dataUrl: arquivo.caminhoArquivo
+      };
+      setForm((atual) => ({
+        ...atual,
+        documentosRelacionados: [...(atual.documentosRelacionados ?? []), documento]
+      }));
+      setNovoDocumento(documentoVazio);
+      setArquivoRelacionado(null);
+      setPopup({ tipo: "sucesso", titulo: "Arquivo enviado", texto: "O documento relacionado foi armazenado. Clique em Salvar para registrar o vínculo no termo." });
+    } catch (error: any) {
+      setPopup({ tipo: "erro", titulo: "Erro no upload", texto: error?.response?.data?.message ?? "Não foi possível armazenar o documento." });
+    } finally {
+      setEnviandoArquivo(false);
+    }
   }
 
   function removerDocumentoRelacionado(indice: number) {
@@ -218,8 +347,10 @@ export function TermoFomentoPage() {
           payload: novoAditivo
         });
         setForm(response);
+        setValorGlobalInput(response.valorGlobal == null ? "" : formatarMoedaInput(response.valorGlobal));
         setSnapshot(response);
         setNovoAditivo(aditivoVazio);
+        setNovoAditivoValorInput("");
         setPopup({ tipo: "sucesso", titulo: "Confirmação", texto: "Aditivo adicionado com sucesso." });
         return;
       } catch (error: any) {
@@ -237,6 +368,7 @@ export function TermoFomentoPage() {
       aditivos: [...(atual.aditivos ?? []), novoAditivo]
     }));
     setNovoAditivo(aditivoVazio);
+    setNovoAditivoValorInput("");
   }
 
   function removerAditivo(indice: number) {
@@ -254,6 +386,7 @@ export function TermoFomentoPage() {
     duplicado.aditivos = [];
     setTermoIdSelecionado(undefined);
     setForm(duplicado);
+    setValorGlobalInput(duplicado.valorGlobal == null ? "" : formatarMoedaInput(duplicado.valorGlobal));
     setSnapshot(clonarTermoFomento(duplicado));
     setErros({});
     setAbaAtiva("dadosGerais");
@@ -345,6 +478,7 @@ export function TermoFomentoPage() {
                   <tr>
                     <th className="px-3 py-2 text-left">Número</th>
                     <th className="px-3 py-2 text-left">Tipo</th>
+                    <th className="px-3 py-2 text-left">Referente a</th>
                     <th className="px-3 py-2 text-left">Órgão concedente</th>
                     <th className="px-3 py-2 text-left">Situação</th>
                   </tr>
@@ -352,7 +486,7 @@ export function TermoFomentoPage() {
                 <tbody>
                   {termosQuery.isLoading ? (
                     <tr>
-                      <td colSpan={4} className="px-3 py-4 text-center">
+                      <td colSpan={5} className="px-3 py-4 text-center">
                         Carregando termos...
                       </td>
                     </tr>
@@ -367,13 +501,14 @@ export function TermoFomentoPage() {
                       >
                         <td className="px-3 py-2 font-medium">{item.numeroTermo}</td>
                         <td className="px-3 py-2">{item.tipoTermo}</td>
+                        <td className="px-3 py-2">{item.referenciaTermo ?? "---"}</td>
                         <td className="px-3 py-2">{item.orgaoConcedente ?? "---"}</td>
                         <td className="px-3 py-2">{item.situacao}</td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={4} className="px-3 py-4 text-center">
+                      <td colSpan={5} className="px-3 py-4 text-center">
                         Nenhum termo encontrado.
                       </td>
                     </tr>
@@ -410,6 +545,32 @@ export function TermoFomentoPage() {
               </Select>
               <CampoErro texto={erros.tipoTermo} />
             </div>
+            <div className="space-y-1 md:col-span-2">
+              <Label>Referente a</Label>
+              <Input
+                value={form.referenciaTermo ?? ""}
+                onChange={(event) =>
+                  setForm((atual) => ({ ...atual, referenciaTermo: event.target.value }))
+                }
+                placeholder="Ex.: execução do projeto de atendimento social"
+              />
+              <p className="text-xs text-[var(--g3-muted)]">
+                Informe de forma resumida a finalidade ou o projeto ao qual o termo se refere.
+              </p>
+            </div>
+            <div className="space-y-1 md:col-span-2">
+              <Label>Responsável pela indicação</Label>
+              <Input
+                value={form.responsavelIndicacao ?? ""}
+                onChange={(event) =>
+                  setForm((atual) => ({ ...atual, responsavelIndicacao: event.target.value }))
+                }
+                placeholder="Ex.: Vereador(a) X ou Deputado(a) Y"
+              />
+              <p className="text-xs text-[var(--g3-muted)]">
+                Informe o nome e o cargo de quem indicou ou articulou o termo, quando aplicável.
+              </p>
+            </div>
             <div className="space-y-1">
               <Label>Situação *</Label>
               <Select
@@ -428,27 +589,52 @@ export function TermoFomentoPage() {
             <div className="space-y-1">
               <Label>Valor global</Label>
               <Input
-                type="number"
-                min={0}
-                step="0.01"
-                value={form.valorGlobal ?? ""}
-                onChange={(event) =>
-                  setForm((atual) => ({
-                    ...atual,
-                    valorGlobal: event.target.value ? Number(event.target.value) : undefined
-                  }))
-                }
+                inputMode="decimal"
+                placeholder="0,00"
+                value={valorGlobalInput}
+                onChange={(event) => {
+                  const valor = event.target.value.replace(/[^\d,.-]/g, "");
+                  setValorGlobalInput(valor);
+                  setForm((atual) => ({ ...atual, valorGlobal: valor.trim() ? normalizarMoeda(valor) : undefined }));
+                }}
+                onBlur={() => setValorGlobalInput(form.valorGlobal == null ? "" : formatarMoedaInput(form.valorGlobal))}
               />
               <CampoErro texto={erros.valorGlobal} />
             </div>
             <div className="space-y-1 xl:col-span-2">
               <Label>Órgão concedente</Label>
-              <Input
-                value={form.orgaoConcedente ?? ""}
-                onChange={(event) =>
-                  setForm((atual) => ({ ...atual, orgaoConcedente: event.target.value }))
-                }
-              />
+              <div className="relative">
+                <Input
+                  value={form.orgaoConcedente ?? ""}
+                  onFocus={() => setMostrarSugestoesOrgaos(true)}
+                  onBlur={() => window.setTimeout(() => setMostrarSugestoesOrgaos(false), 150)}
+                  onChange={(event) => {
+                    setForm((atual) => ({ ...atual, orgaoConcedente: event.target.value }));
+                    setMostrarSugestoesOrgaos(true);
+                  }}
+                  placeholder="Selecione ou digite outro órgão"
+                  autoComplete="off"
+                />
+                {mostrarSugestoesOrgaos && orgaosFiltrados.length ? (
+                  <div className="absolute z-30 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card)] p-1 shadow-lg">
+                    {orgaosFiltrados.map((orgao) => (
+                      <button
+                        key={orgao}
+                        type="button"
+                        className="block w-full rounded-md px-3 py-2 text-left text-sm text-[var(--g3-foreground)] transition hover:bg-[var(--g3-primary-soft)]"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => {
+                          setForm((atual) => ({ ...atual, orgaoConcedente: orgao }));
+                          setMostrarSugestoesOrgaos(false);
+                        }}
+                      >
+                        {orgao}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+              <p className="text-xs text-[var(--g3-muted)]">Selecione uma sugestão ou informe manualmente outro órgão.</p>
               <CampoErro texto={erros.orgaoConcedente} />
             </div>
             <div className="space-y-1">
@@ -486,12 +672,22 @@ export function TermoFomentoPage() {
             </div>
             <div className="space-y-1 xl:col-span-2">
               <Label>Responsável interno</Label>
-              <Input
+              <Select
                 value={form.responsavelInterno ?? ""}
                 onChange={(event) =>
                   setForm((atual) => ({ ...atual, responsavelInterno: event.target.value }))
                 }
-              />
+              >
+                <option value="">Selecione um profissional</option>
+                {(profissionaisQuery.data?.profissionais ?? []).map((profissional) => (
+                  <option key={profissional.id_profissional ?? profissional.nome_completo} value={profissional.nome_completo}>
+                    {profissional.nome_completo}{profissional.categoria ? ` - ${profissional.categoria}` : ""}
+                  </option>
+                ))}
+              </Select>
+              {!profissionaisQuery.isLoading && !(profissionaisQuery.data?.profissionais ?? []).length ? (
+                <p className="text-xs text-[var(--g3-muted)]">Nenhum profissional ativo cadastrado.</p>
+              ) : null}
               <CampoErro texto={erros.responsavelInterno} />
             </div>
             <div className="space-y-1 md:col-span-2 xl:col-span-4">
@@ -532,21 +728,19 @@ export function TermoFomentoPage() {
                   <CampoErro texto={erros["documentoPrincipal.nome"]} />
                 </div>
                 <div className="space-y-1">
-                  <Label>URL / arquivo</Label>
+                  <Label>Arquivo</Label>
                   <Input
-                    value={form.termoDocumento?.dataUrl ?? ""}
-                    onChange={(event) =>
-                      setForm((atual) => ({
-                        ...atual,
-                        termoDocumento: {
-                          id: atual.termoDocumento?.id,
-                          tipo: "termo",
-                          nome: atual.termoDocumento?.nome ?? "",
-                          dataUrl: event.target.value
-                        }
-                      }))
-                    }
+                    type="file"
+                    onChange={(event) => setArquivoTermo(event.target.files?.[0] ?? null)}
+                    disabled={enviandoArquivo || !termoIdSelecionado}
                   />
+                  <p className="text-xs text-[var(--g3-muted)]">
+                    {form.termoDocumento?.dataUrl ? `Arquivo armazenado: ${form.termoDocumento.nome}` : "Salve o termo antes de enviar o arquivo."}
+                  </p>
+                  <Button type="button" size="sm" variant="outline" onClick={() => void enviarDocumentoPrincipal()} disabled={enviandoArquivo || !arquivoTermo || !termoIdSelecionado}>
+                    <Upload className="mr-1.5 h-3.5 w-3.5" />
+                    {enviandoArquivo ? "Enviando..." : "Enviar arquivo"}
+                  </Button>
                   <CampoErro texto={erros["documentoPrincipal.dataUrl"]} />
                 </div>
               </div>
@@ -581,19 +775,25 @@ export function TermoFomentoPage() {
                   </Select>
                 </div>
                 <div className="space-y-1">
-                  <Label>URL / arquivo</Label>
+                  <Label>Arquivo</Label>
                   <Input
-                    value={novoDocumento.dataUrl ?? ""}
-                    onChange={(event) =>
-                      setNovoDocumento((atual) => ({ ...atual, dataUrl: event.target.value }))
-                    }
+                    type="file"
+                    onChange={(event) => {
+                      const arquivo = event.target.files?.[0] ?? null;
+                      setArquivoRelacionado(arquivo);
+                      if (arquivo && !novoDocumento.nome.trim()) {
+                        setNovoDocumento((atual) => ({ ...atual, nome: arquivo.name }));
+                      }
+                    }}
+                    disabled={enviandoArquivo || !termoIdSelecionado}
                   />
+                  <p className="text-xs text-[var(--g3-muted)]">O arquivo será armazenado no storage do sistema.</p>
                 </div>
               </div>
               <div className="mt-3">
-                <Button type="button" size="sm" onClick={adicionarDocumentoRelacionado}>
+                <Button type="button" size="sm" onClick={() => void adicionarDocumentoRelacionado()} disabled={enviandoArquivo || !termoIdSelecionado}>
                   <Plus className="mr-1.5 h-3.5 w-3.5" />
-                  Adicionar documento
+                  {enviandoArquivo ? "Enviando..." : "Enviar documento"}
                 </Button>
               </div>
               <div className="mt-3 overflow-x-auto rounded-lg border border-[var(--g3-border)]">
@@ -652,12 +852,17 @@ export function TermoFomentoPage() {
               <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <div className="space-y-1">
                   <Label>Tipo de aditivo *</Label>
-                  <Input
+                  <Select
                     value={novoAditivo.tipoAditivo}
                     onChange={(event) =>
                       setNovoAditivo((atual) => ({ ...atual, tipoAditivo: event.target.value }))
                     }
-                  />
+                  >
+                    <option value="">Selecione o tipo</option>
+                    {tiposAditivoPrincipais.map((tipo) => (
+                      <option key={tipo} value={tipo}>{tipo}</option>
+                    ))}
+                  </Select>
                 </div>
                 <div className="space-y-1">
                   <Label>Data *</Label>
@@ -682,16 +887,15 @@ export function TermoFomentoPage() {
                 <div className="space-y-1">
                   <Label>Novo valor</Label>
                   <Input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={novoAditivo.novoValor ?? ""}
-                    onChange={(event) =>
-                      setNovoAditivo((atual) => ({
-                        ...atual,
-                        novoValor: event.target.value ? Number(event.target.value) : undefined
-                      }))
-                    }
+                    inputMode="decimal"
+                    placeholder="0,00"
+                    value={novoAditivoValorInput}
+                    onChange={(event) => {
+                      const valor = event.target.value.replace(/[^\d,.-]/g, "");
+                      setNovoAditivoValorInput(valor);
+                      setNovoAditivo((atual) => ({ ...atual, novoValor: valor.trim() ? normalizarMoeda(valor) : undefined }));
+                    }}
+                    onBlur={() => setNovoAditivoValorInput(novoAditivo.novoValor == null ? "" : formatarMoedaInput(novoAditivo.novoValor))}
                   />
                 </div>
                 <div className="space-y-1 md:col-span-2 xl:col-span-4">
@@ -771,6 +975,13 @@ export function TermoFomentoPage() {
       </AdminPageLayout>
 
       {popup ? <PopupMensagem popup={popup} onClose={() => setPopup(null)} /> : null}
+      <CadastroSucessoModal
+        aberto={Boolean(cadastroSucesso)}
+        titulo={cadastroSucesso?.novo ? "Termo cadastrado com sucesso" : "Termo atualizado com sucesso"}
+        rotuloNumero="Número do termo"
+        numero={cadastroSucesso?.id}
+        onClose={() => setCadastroSucesso(null)}
+      />
       <PopupConfirmacao
         aberto={confirmarExclusao}
         titulo="Confirmar exclusão"

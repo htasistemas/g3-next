@@ -22,6 +22,8 @@ export type TermoFomentoPayload = {
   id?: string;
   numeroTermo: string;
   tipoTermo: TipoTermoFomento | string;
+  referenciaTermo?: string;
+  responsavelIndicacao?: string;
   orgaoConcedente?: string;
   dataAssinatura?: string;
   dataInicioVigencia?: string;

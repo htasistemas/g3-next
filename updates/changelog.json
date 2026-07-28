@@ -1,6 +1,134 @@
 {
   "entries":  [
                     {
+                        "version": "1.00.746",
+                        "releaseDate": "2026-07-28",
+                        "title": "Validação imediata das datas de metas",
+                        "description": "Datas de metas e etapas agora são criticadas no momento do preenchimento conforme o período de execução do plano.",
+                        "changes": ["Campos de data recebem limite mínimo e máximo do período do plano.", "Mensagens mostram as datas permitidas para início e término.", "Também é indicada a inconsistência quando o término fica antes do início."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.745",
+                        "releaseDate": "2026-07-28",
+                        "title": "Correção das sugestões de IA nos campos",
+                        "description": "Sugestões textuais agora são encaminhadas corretamente para geração de conteúdo, sem serem interpretadas como consultas internas do sistema.",
+                        "changes": ["Consultas de campo não acionam mais buscas automáticas de beneficiários, localização ou faixa etária.", "A IA recebe o título, o contexto e o conteúdo atual do campo.", "A resposta é solicitada em texto corrido para preenchimento direto."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.744",
+                        "releaseDate": "2026-07-28",
+                        "title": "Sugestões de IA em monitoramento e prestação",
+                        "description": "As abas Monitoramento e avaliação e Prestação de contas agora possuem sugestões de IA contextualizadas.",
+                        "changes": ["Sugestões para acompanhamento, indicadores, periodicidade, responsável, resultados e evidências.", "Sugestões para responsável, documentos exigidos e observações da prestação de contas.", "Novas solicitações consideram o conteúdo já editado."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.743",
+                        "releaseDate": "2026-07-28",
+                        "title": "Sugestões de IA na justificativa",
+                        "description": "Todos os campos da aba Justificativa do plano de trabalho agora possuem sugestões de IA contextualizadas.",
+                        "changes": ["Sugestões para problema social, causas e consequências, indicadores, capacidade de execução e impacto.", "A IA utiliza o contexto do plano e da instituição.", "Novas sugestões consideram o texto já editado para aprimoramento."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.742",
+                        "releaseDate": "2026-07-28",
+                        "title": "Sugestões de IA na apresentação institucional",
+                        "description": "A aba Apresentação e histórico do plano de trabalho agora oferece sugestões de IA contextualizadas para os campos institucionais.",
+                        "changes": ["Sugestões para histórico, finalidade, experiência, registros, público atendido e capacidade técnica.", "Contexto da instituição, objeto e público do plano enviado à IA.", "Nova solicitação considera o texto já editado para aprimorar a sugestão."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.741",
+                        "releaseDate": "2026-07-28",
+                        "title": "Retorno automático para a listagem de termos",
+                        "description": "Após salvar ou atualizar um termo de fomento, a tela agora retorna automaticamente para a aba de listagem.",
+                        "changes": ["A aba Listagem de termos é aberta após o salvamento.", "O registro salvo permanece disponível na listagem atualizada.", "A confirmação de sucesso continua sendo exibida após a operação."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.740",
+                        "releaseDate": "2026-07-28",
+                        "title": "Responsável pela indicação do termo",
+                        "description": "A aba Dados gerais do termo de fomento agora permite registrar quem indicou ou articulou o instrumento.",
+                        "changes": ["Novo campo Responsável pela indicação.", "Informação persistida e considerada na busca dos termos.", "Responsável exibido no relatório de impressão."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.739",
+                        "releaseDate": "2026-07-28",
+                        "title": "Finalidade na listagem de termos",
+                        "description": "A listagem de termos de fomento agora exibe a finalidade informada no campo Referente a.",
+                        "changes": ["Nova coluna Referente a na aba Listagem de termos.", "Termos sem finalidade exibem ---.", "Busca continua considerando a finalidade do termo."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.738",
+                        "releaseDate": "2026-07-28",
+                        "title": "Identificação do termo de fomento",
+                        "description": "A aba Dados gerais do termo de fomento agora permite informar a finalidade ou o projeto ao qual o instrumento se refere.",
+                        "changes": ["Novo campo Referente a com orientação de preenchimento.", "A informação é persistida e considerada na busca dos termos.", "A identificação também aparece no relatório de impressão."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.737",
+                        "releaseDate": "2026-07-28",
+                        "title": "Digitação livre no valor do termo",
+                        "description": "A máscara monetária do valor global e do novo valor de aditivos agora permite digitação contínua, aplicando a formatação ao finalizar o campo.",
+                        "changes": ["Valor global aceita números maiores que 1,00 durante a digitação.", "Formatação brasileira é aplicada ao sair do campo.", "A mesma correção foi aplicada ao novo valor dos aditivos."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.736",
+                        "releaseDate": "2026-07-28",
+                        "title": "Uploads e aditivos no termo de fomento",
+                        "description": "A aba Documentos do termo de fomento agora utiliza upload real para armazenamento institucional, e a aba Aditivos recebeu tipos padronizados e máscara monetária.",
+                        "changes": ["Documento principal e documentos relacionados passam a ser enviados ao storage do sistema.", "Novo escopo de armazenamento termo_fomento_documento, separado por entidade e categoria.", "Campo Tipo de aditivo substituído por lista de tipos recorrentes em termos e contratos.", "Campo Novo valor com máscara monetária brasileira e persistência numérica."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.735",
+                        "releaseDate": "2026-07-28",
+                        "title": "Sugestões de órgãos no padrão visual",
+                        "description": "O campo de órgão concedente do plano deixou de usar o menu nativo do navegador e passou a exibir sugestões com o padrão visual do G3N.",
+                        "changes": ["Menu de sugestões próprio com cores, bordas e rolagem do sistema.", "Digitação manual de órgãos preservada.", "Filtros das sugestões aplicados conforme o texto digitado."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.734",
+                        "releaseDate": "2026-07-28",
+                        "title": "Órgãos e termos vinculados no plano",
+                        "description": "A identificação do plano agora facilita a escolha do órgão parceiro e o vínculo com termos de fomento cadastrados.",
+                        "changes": ["Sugestões de órgãos municipais, estaduais e federais no campo Órgão concedente ou parceiro.", "Inclusão manual de outros órgãos preservada.", "Termos de fomento disponíveis para seleção quando o tipo da parceria for correspondente.", "Botão Cadastrar termo abre a tela de termos de fomento quando necessário.", "A seleção do termo pode reaproveitar órgão concedente e período de vigência no plano."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.733",
+                        "releaseDate": "2026-07-28",
+                        "title": "Confirmação visual no cadastro de escalas",
+                        "description": "O cadastro de escala de voluntariado deixou de usar a confirmação antiga e agora apresenta o modal padrão de sucesso do G3N.",
+                        "changes": ["Novo modal com ícone verde, número do cadastro e botão Finalizar cadastro.", "A confirmação informa se a escala foi criada ou atualizada.", "Mensagens de erro continuam sendo exibidas separadamente."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.732",
+                        "releaseDate": "2026-07-28",
+                        "title": "Sugestões de preenchimento com IA no plano",
+                        "description": "O preenchimento do plano de trabalho agora conta com sugestões geradas pela IA nos campos textuais principais.",
+                        "changes": ["Novo botão Sugerir com IA no objeto do plano, justificativa, objetivo geral, objetivos específicos e metas.", "A sugestão considera o contexto já preenchido no plano.", "O texto gerado é aplicado ao campo para revisão e edição antes do salvamento.", "O sistema mantém feedback de carregamento e erro durante a geração."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.731",
+                        "releaseDate": "2026-07-28",
+                        "title": "Rascunho de plano com CPF corrigido",
+                        "description": "A aba Declaração e aprovação permite salvar rascunhos incompletos sem bloquear campos ainda não preenchidos e trata corretamente CPFs opcionais.",
+                        "changes": ["Campos vazios opcionais não são mais interpretados como CPF inválido.", "O CPF é validado quando informado, inclusive no representante da declaração.", "A validação completa permanece obrigatória no envio para análise ou aprovação.", "A porcentagem de conclusão continua indicando as pendências do rascunho."],
+                        "releaseType": "stable"
+                    },
+                    {
                         "version": "1.00.730",
                         "releaseDate": "2026-07-27",
                         "title": "Prévia de mensagens sem piscada",

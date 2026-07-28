@@ -73,6 +73,8 @@ export function gerarHtmlTermoFomento(termo: TermoFomentoPayload) {
 
         <h2>Dados gerais</h2>
         <p><strong>Responsável interno:</strong> ${termo.responsavelInterno || "-"}</p>
+        <p><strong>Referente a:</strong> ${termo.referenciaTermo || "-"}</p>
+        <p><strong>Responsável pela indicação:</strong> ${termo.responsavelIndicacao || "-"}</p>
         <p><strong>Descrição do objeto:</strong> ${termo.descricaoObjeto || "-"}</p>
 
         <h2>Documento principal</h2>

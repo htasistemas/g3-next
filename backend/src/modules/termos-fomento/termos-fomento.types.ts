@@ -19,6 +19,8 @@ export type TermoFomentoInput = {
   id?: string;
   numeroTermo: string;
   tipoTermo: string;
+  referenciaTermo?: string | null;
+  responsavelIndicacao?: string | null;
   orgaoConcedente?: string | null;
   dataAssinatura?: string | null;
   dataInicioVigencia?: string | null;
@@ -36,6 +38,8 @@ export type TermoFomentoRow = {
   id: bigint;
   numero_termo: string;
   tipo_termo: string;
+  referencia_termo: string | null;
+  responsavel_indicacao: string | null;
   orgao_concedente: string | null;
   data_assinatura: Date | null;
   data_inicio_vigencia: Date | null;

@@ -649,9 +649,14 @@ const secoesManual: ManualSecao[] = [
         objetivo: "Cadastrar, acompanhar e atualizar termos, aditivos e documentos oficiais vinculados aos instrumentos da instituição.",
         comoUsar: [
           "Use a listagem para localizar rapidamente os termos já cadastrados e abrir o registro completo para edição ou consulta.",
-          "Ao cadastrar um termo, informe número, tipo, órgão concedente, vigência, situação, objeto, valor global e responsável interno.",
+          "Na listagem, consulte a coluna Referente a para identificar rapidamente a finalidade ou o projeto relacionado a cada termo.",
+          "No campo Responsável pela indicação, informe o nome e o cargo da pessoa que indicou ou articulou o termo, quando aplicável.",
+          "Após salvar ou atualizar um termo, a tela retorna automaticamente para a aba Listagem de termos com o registro atualizado.",
+          "Ao cadastrar um termo, informe número, tipo, a finalidade no campo Referente a, órgão concedente, vigência, situação, objeto, valor global e responsável interno.",
           "Use os aditivos para registrar alterações de prazo, valor ou condição do instrumento sem perder o histórico do termo principal.",
+          "Na aba Documentos, salve o termo e use os campos de upload para armazenar o documento principal e os documentos relacionados no storage do sistema; o banco guarda apenas os metadados e o caminho do arquivo.",
           "Os documentos relacionados e anexos de aditivos ficam vinculados ao termo para manter a organização documental do processo.",
+          "Na aba Aditivos, escolha um tipo padronizado e informe o novo valor com máscara monetária brasileira quando houver alteração financeira.",
           "Use Duplicar termo para criar uma nova cópia a partir de um termo existente, preservando os dados base e reiniciando o número e os aditivos.",
           "Quando o termo estiver completo, a ação Imprimir libera o relatório em layout oficial com dados gerais, documento principal, documentos relacionados e aditivos."
         ],
@@ -669,6 +674,15 @@ const secoesManual: ManualSecao[] = [
           "Na aba Anexos, por exemplo, aparecem ações de documento, PDF, impressão e exportação; nas abas sem anexo esse botão não é exibido.",
           "Na aba Dados da instituição, selecione uma unidade assistencial cadastrada para preencher automaticamente razão social, endereço, contato e representante quando houver dados disponíveis.",
           "No card Dados bancários, selecione uma conta bancária cadastrada para reaproveitar banco, agência, conta, Pix e observações estruturadas no próprio plano.",
+          "Na Identificação do plano, o campo Órgão concedente ou parceiro oferece sugestões de órgãos municipais, estaduais e federais, mas também permite digitar manualmente outra instituição.",
+          "Quando o tipo for Termo de fomento, selecione um termo já cadastrado para vincular ao plano; se ele não existir, clique em Cadastrar termo para abrir a tela de termos de fomento.",
+          "Use Salvar rascunho para registrar o plano mesmo com etapas incompletas; a porcentagem de conclusão indica o que ainda precisa ser preenchido. A validação de CPF ocorre quando o campo é informado.",
+          "Nos campos de objeto, justificativa, objetivo geral, objetivos específicos e descrição de metas, use Sugerir com IA para gerar um texto inicial com base no contexto informado. Revise e ajuste o conteúdo antes de salvar ou enviar.",
+          "Na aba Apresentação e histórico, use Sugerir com IA nos campos de histórico, finalidade, experiência, registros, público atendido e capacidade técnica. A sugestão considera os dados da instituição e o conteúdo já digitado; ao clicar novamente, a IA aprimora a versão atual.",
+          "Na aba Justificativa, use Sugerir com IA nos cinco campos para estruturar o problema, causas, indicadores, capacidade de execução e impacto esperado. A segunda solicitação considera o texto revisado.",
+          "Nas abas Monitoramento e avaliação e Prestação de contas, use Sugerir com IA nos campos textuais e de orientação. As sugestões consideram metas, objeto, indicadores e o conteúdo já revisado.",
+          "As sugestões de IA dos campos textuais são tratadas como geração de conteúdo: elas usam o título do campo, o contexto preenchido e o texto atual, sem executar consultas de beneficiários, localização ou faixa etária.",
+          "Ao informar datas de metas ou etapas, o sistema critica imediatamente o período e mostra as datas permitidas conforme o início e o fim da execução do plano.",
           "Quando o plano estiver completo para envio e os dados bancários essenciais estiverem preenchidos, a barra superior libera a ação de gerar PDF e imprimir no layout oficial do sistema.",
           "Os botões do topo continuam organizados em grade responsiva para não invadir o título da tela e facilitar a leitura em resoluções menores e maiores."
         ],
@@ -676,6 +690,7 @@ const secoesManual: ManualSecao[] = [
           "Os botões continuam executando em um clique e respeitam bloqueio temporário durante processamentos para evitar acionamento duplo.",
           "A tela Plano de trabalho agora lista, abre, cadastra, atualiza e exclui planos sempre dentro do tenant autenticado, impedindo mistura de dados entre instituições.",
           "O preenchimento automático usa os dados já cadastrados na unidade assistencial e na conta bancária; campos sem origem equivalente permanecem editáveis manualmente.",
+          "Rascunhos aceitam campos ainda vazios e guardam os dados preenchidos para continuidade posterior; o envio para análise continua exigindo os campos obrigatórios e os documentos de conformidade.",
           "Metas, etapas, aplicação de recursos, desembolso e checklist de prestação seguem vinculados apenas aos planos da instituição logada.",
           "Se uma ação estiver desabilitada, revise o status do plano e os campos mínimos obrigatórios antes de tentar novamente."
         ]
@@ -875,6 +890,7 @@ const secoesManual: ManualSecao[] = [
           "Na aba Dados pessoais, selecione o campo Sexo entre as opções disponíveis no cadastro.",
           "Na aba Endereço, informe o CEP com máscara; ao completar um CEP válido, o sistema consulta o endereço e preenche logradouro, bairro, município e UF quando encontrados.",
           "Na aba Escalas, monte a agenda do voluntário escolhendo sala, tipo de atividade, dias da semana, hora inicial e hora final; o sistema calcula a carga semanal estimada e mantém a escala vinculada ao tenant.",
+          "Ao salvar uma nova escala, confira o modal com ícone de sucesso e o número do cadastro. Clique em Finalizar cadastro para fechar a confirmação.",
           "A mesma aba agora exibe um mapa semanal com todas as escalas cadastradas no sistema, organizado por dia, sala, unidade e horário para facilitar a leitura da ocupação.",
           "A listagem detalhada do voluntário continua disponível abaixo do mapa para editar ou excluir apenas as escalas do cadastro aberto.",
           "Na aba Listagem de voluntários, use Imprimir para emitir a relação filtrada; nas abas do cadastro selecionado, use Imprimir e escolha entre ficha cadastral ou termo de voluntariado no padrão institucional de relatórios.",

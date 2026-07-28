@@ -19,6 +19,7 @@ export type StorageScopeKey =
   | "ocorrencia_anexo"
   | "oficio_documento"
   | "plano_trabalho_documento"
+  | "termo_fomento_documento"
   | "autorizacao_compra_anexo"
   | "contabilidade_lancamento_anexo"
   | "captacao_doador_anexo"
@@ -78,6 +79,7 @@ export const requiredStorageDirectories = [
   "ocorrencias/anexos",
   "oficios/documentos",
   "planos-trabalho/documentos",
+  "termos-fomento/documentos",
   "compras/anexos",
   "contabilidade/anexos",
   "captacao/doadores/anexos",
@@ -328,6 +330,15 @@ export const storagePolicies: Record<StorageScopeKey, StoragePolicy> = {
     allowedMimeTypes: imageMimeTypes,
     maxSizeBytes: 10 * 1024 * 1024,
     imageOnly: true,
+    generateThumbnail: true
+  },
+  termo_fomento_documento: {
+    entidadeTipo: "termo_fomento",
+    categoria: "documento",
+    subdirectory: "termos-fomento/documentos",
+    allowedExtensions: documentExtensions,
+    allowedMimeTypes: documentMimeTypes,
+    maxSizeBytes: 25 * 1024 * 1024,
     generateThumbnail: true
   },
   educacional_documento: {

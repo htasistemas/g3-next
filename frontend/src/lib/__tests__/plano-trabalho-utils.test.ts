@@ -246,6 +246,18 @@ describe("plano-trabalho-utils", () => {
     expect(validarPlanoParaImpressao(plano)).toEqual({});
   });
 
+  it("permite salvar rascunho incompleto e valida CPF somente quando informado", () => {
+    const plano = planoVazio();
+
+    expect(validarPlano(plano, "rascunho")).toEqual({});
+
+    plano.cpfRepresentanteDeclaracao = "52998224725";
+    expect(validarPlano(plano, "rascunho")).toEqual({});
+
+    plano.cpfRepresentanteDeclaracao = "12345678900";
+    expect(validarPlano(plano, "rascunho").cpfRepresentanteDeclaracao).toContain("CPF");
+  });
+
   it("faz clone profundo do plano sem compartilhar referências internas", () => {
     const original = montarPlanoCompleto();
     const clone = clonarPlano(original);
