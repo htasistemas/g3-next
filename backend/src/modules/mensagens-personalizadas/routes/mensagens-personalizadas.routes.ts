@@ -118,6 +118,13 @@ mensagensPersonalizadasRoutes.get(
 );
 
 mensagensPersonalizadasRoutes.get(
+  "/destinatarios/todos",
+  ensureAuthenticated,
+  ensurePermissions(permissoesVisualizacao),
+  asyncHandler(controller.buscarTodosDestinatarios.bind(controller))
+);
+
+mensagensPersonalizadasRoutes.get(
   "/destinatarios",
   ensureAuthenticated,
   ensurePermissions(permissoesVisualizacao),

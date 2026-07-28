@@ -1,9 +1,9 @@
 {
-  "latestVersion": "1.00.649",
-  "releaseDate": "2026-07-18",
-  "description": "Ajuste da validação de horário do prontuário para finalização integrada aos agendamentos.",
+  "latestVersion": "1.00.723",
+  "releaseDate": "2026-07-27",
+  "description": "Histórico imutável de versões do parecer da prestação de contas.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.649",
+  "minCompatibleVersion": "1.00.722",
   "releaseType": "stable"
 }

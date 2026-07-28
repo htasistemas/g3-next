@@ -126,6 +126,14 @@ export const mensagensPersonalizadasService = {
     return data.destinatarios ?? [];
   },
 
+  async buscarTodosDestinatarios(tipo: string) {
+    const { data } = await httpClient.get<{ destinatarios: MensagemDestinatario[] }>(
+      "/api/mensagens-personalizadas/destinatarios/todos",
+      { params: { tipo } }
+    );
+    return data.destinatarios ?? [];
+  },
+
   async gerarPreview(payload: {
     modeloId?: string;
     canal: "WHATSAPP" | "EMAIL";

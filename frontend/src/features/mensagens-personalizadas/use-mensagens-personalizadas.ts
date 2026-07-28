@@ -142,6 +142,12 @@ export function useBuscarDestinatariosMensagem() {
   });
 }
 
+export function useBuscarTodosDestinatariosMensagem() {
+  return useMutation({
+    mutationFn: (tipo: string) => mensagensPersonalizadasService.buscarTodosDestinatarios(tipo)
+  });
+}
+
 export function useGerarPreviewMensagem() {
   return useMutation({
     mutationFn: (payload: {

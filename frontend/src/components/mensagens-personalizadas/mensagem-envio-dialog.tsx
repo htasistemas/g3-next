@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Mail, MessageCircle, Plus, RefreshCcw, Send, X } from "lucide-react";
+import { Loader2, Mail, MessageCircle, Plus, RefreshCcw, Search, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,6 +7,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
   useBuscarDestinatariosMensagem,
+  useBuscarTodosDestinatariosMensagem,
   useEnviarMensagemPersonalizada,
   useGerarPreviewMensagem,
   useMensagensPersonalizadasModelos
@@ -52,7 +53,13 @@ export function MensagemEnvioDialog({
   destinatariosFixos,
   contextoExtra
 }: Props) {
-  const destinatariosTravados = destinatariosFixos?.length ? deduplicarDestinatarios(destinatariosFixos) : [];
+  // Mantém a referência estável. Antes, o array era recriado em cada render e o
+  // efeito de inicialização limpava o campo de busca a cada tecla/clique.
+  const destinatariosFixosChave = (destinatariosFixos ?? []).map((item) => `${item.tipo}:${item.id}`).join("|");
+  const destinatariosTravados = useMemo(
+    () => (destinatariosFixos?.length ? deduplicarDestinatarios(destinatariosFixos) : []),
+    [destinatariosFixosChave]
+  );
   const [tipoDestinatario, setTipoDestinatario] = useState<MensagemDestinatarioTipo>(tipoDestinatarioInicial);
   const [canal, setCanal] = useState<MensagemCanalEnvio>(canalInicial);
   const [buscaDestinatario, setBuscaDestinatario] = useState("");
@@ -62,6 +69,9 @@ export function MensagemEnvioDialog({
   const [modeloId, setModeloId] = useState("");
   const [assuntoEditado, setAssuntoEditado] = useState("");
   const [mensagemEditada, setMensagemEditada] = useState("");
+  const [previewConferida, setPreviewConferida] = useState(false);
+  const [modoDestinatarios, setModoDestinatarios] = useState<"TODOS" | "INDIVIDUAIS">("INDIVIDUAIS");
+  const [todosDestinatarios, setTodosDestinatarios] = useState<MensagemDestinatario[]>([]);
 
   const modelosQuery = useMensagensPersonalizadasModelos({
     somenteAtivas: true,
@@ -69,6 +79,7 @@ export function MensagemEnvioDialog({
     canal
   });
   const buscarDestinatariosMutation = useBuscarDestinatariosMensagem();
+  const buscarTodosMutation = useBuscarTodosDestinatariosMensagem();
   const previewMutation = useGerarPreviewMensagem();
   const enviarMutation = useEnviarMensagemPersonalizada();
 
@@ -86,18 +97,30 @@ export function MensagemEnvioDialog({
     setModeloId("");
     setAssuntoEditado("");
     setMensagemEditada("");
+    setPreviewConferida(false);
+    setModoDestinatarios("INDIVIDUAIS");
+    setTodosDestinatarios([]);
   }, [aberto, tipoDestinatarioInicial, canalInicial, destinatariosTravados]);
+
+  useEffect(() => {
+    if (!aberto || modoDestinatarios !== "TODOS" || possuiDestinatarioFixo) return;
+    void buscarTodosMutation.mutateAsync(tipoDestinatario).then(setTodosDestinatarios).catch(() => setTodosDestinatarios([]));
+  }, [aberto, modoDestinatarios, tipoDestinatario, possuiDestinatarioFixo]);
 
   useEffect(() => {
     if (!modeloSelecionado) return;
     setAssuntoEditado(modeloSelecionado.assunto ?? modeloSelecionado.titulo);
     setMensagemEditada(modeloSelecionado.mensagemBase);
+    setPreviewConferida(false);
   }, [modeloSelecionado]);
 
   useEffect(() => {
     if (!aberto || possuiDestinatarioFixo) return;
     const termo = buscaDestinatario.trim();
-    if (termo.length < 2) return;
+    if (termo.length < 2) {
+      buscarDestinatariosMutation.reset();
+      return;
+    }
 
     const handle = window.setTimeout(() => {
       void buscarDestinatariosMutation.mutateAsync({
@@ -108,10 +131,22 @@ export function MensagemEnvioDialog({
     }, 250);
 
     return () => window.clearTimeout(handle);
-  }, [aberto, buscaDestinatario, tipoDestinatario, possuiDestinatarioFixo, buscarDestinatariosMutation]);
+    // A mutação não entra nas dependências: seu estado muda durante a busca e
+    // não pode cancelar/reiniciar o debounce enquanto o usuário digita.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aberto, buscaDestinatario, tipoDestinatario, possuiDestinatarioFixo]);
+
+  function buscarDestinatariosAgora() {
+    const termo = buscaDestinatario.trim();
+    if (termo.length < 2) {
+      onFeedback?.({ tipo: "aviso", texto: "Digite pelo menos 2 caracteres para buscar." });
+      return;
+    }
+    void buscarDestinatariosMutation.mutateAsync({ tipo: tipoDestinatario, termo, somenteAtivos: true });
+  }
 
   useEffect(() => {
-    const primeiroDestinatario = destinatariosSelecionados[0];
+    const primeiroDestinatario = modoDestinatarios === "TODOS" ? todosDestinatarios[0] : destinatariosSelecionados[0];
     if (!aberto || !modeloId || !primeiroDestinatario) return;
 
     const handle = window.setTimeout(() => {
@@ -133,6 +168,8 @@ export function MensagemEnvioDialog({
     canal,
     tipoDestinatario,
     destinatariosSelecionados,
+    modoDestinatarios,
+    todosDestinatarios,
     assuntoEditado,
     mensagemEditada,
     contextoExtra,
@@ -178,7 +215,18 @@ export function MensagemEnvioDialog({
       return;
     }
 
-    if (!destinatariosSelecionados.length) {
+    if (!preview) {
+      onFeedback?.({ tipo: "aviso", texto: "Gere a prévia antes de enviar." });
+      return;
+    }
+
+    if (!previewConferida) {
+      onFeedback?.({ tipo: "aviso", texto: "Confira a prévia e confirme antes de disparar." });
+      return;
+    }
+
+    const quantidadeDestinatarios = modoDestinatarios === "TODOS" ? todosDestinatarios.length : destinatariosSelecionados.length;
+    if (!quantidadeDestinatarios) {
       onFeedback?.({ tipo: "aviso", texto: "Selecione ao menos um destinatário." });
       return;
     }
@@ -188,8 +236,9 @@ export function MensagemEnvioDialog({
         modeloId,
         canal,
         destinatarioTipo: tipoDestinatario,
-        destinatarioIds: destinatariosSelecionados.map((item) => item.id),
-        tipoEnvio: destinatariosSelecionados.length > 1 ? "LOTE" : "INDIVIDUAL",
+        destinatarioIds: modoDestinatarios === "TODOS" ? [] : destinatariosSelecionados.map((item) => item.id),
+        destinatariosTodos: modoDestinatarios === "TODOS",
+        tipoEnvio: quantidadeDestinatarios > 1 ? "LOTE" : "INDIVIDUAL",
         assuntoEditado,
         mensagemEditada,
         contextoExtra
@@ -265,23 +314,30 @@ export function MensagemEnvioDialog({
 
         <div className="space-y-2 rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] p-4">
           <div className="flex items-center justify-between gap-3">
-            <Label className="text-sm font-semibold text-slate-900 uppercase tracking-wider">
-              Seleção de Público
+              <Label className="text-sm font-semibold text-slate-900 tracking-wider">
+              Destinatários
             </Label>
             <span className="text-xs font-medium text-[var(--g3-active)] bg-[var(--g3-primary-soft)] px-2 py-0.5 rounded-full">
-              {resumoEnvio}
-            </span>
-          </div>
+              {modoDestinatarios === "TODOS" ? (buscarTodosMutation.isPending ? "Consultando ativos..." : `${todosDestinatarios.length} ativos elegíveis`) : resumoEnvio}
+              </span>
+            </div>
 
-          {!possuiDestinatarioFixo ? (
+          {!possuiDestinatarioFixo ? <div className="grid gap-2 sm:grid-cols-2"><button type="button" onClick={() => { setModoDestinatarios("TODOS"); setDestinatariosSelecionados([]); setPreviewConferida(false); }} className={`rounded-lg border p-3 text-left ${modoDestinatarios === "TODOS" ? "border-[var(--g3-active)] bg-[var(--g3-primary-soft)]" : "border-[var(--g3-border)]"}`}><span className="block text-sm font-semibold">Enviar para todos os ativos</span><span className="text-xs text-[var(--g3-muted)]">Inclui todos que aceitam comunicação.</span></button><button type="button" onClick={() => { setModoDestinatarios("INDIVIDUAIS"); setTodosDestinatarios([]); setPreviewConferida(false); }} className={`rounded-lg border p-3 text-left ${modoDestinatarios === "INDIVIDUAIS" ? "border-[var(--g3-active)] bg-[var(--g3-primary-soft)]" : "border-[var(--g3-border)]"}`}><span className="block text-sm font-semibold">Selecionar individualmente</span><span className="text-xs text-[var(--g3-muted)]">Escolha uma ou várias pessoas.</span></button></div> : null}
+
+          {!possuiDestinatarioFixo && modoDestinatarios === "INDIVIDUAIS" ? (
             <div className="space-y-2">
               <div className="flex gap-2">
                 <Input
                   value={buscaDestinatario}
                   onChange={(event) => setBuscaDestinatario(event.target.value)}
+                  onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); buscarDestinatariosAgora(); } }}
                   placeholder={`Buscar ${tipoDestinatario.toLowerCase()} por nome, documento ou código...`}
                   className="flex-1"
                 />
+                <Button type="button" variant="outline" size="sm" onClick={buscarDestinatariosAgora} disabled={buscarDestinatariosMutation.isPending} title="Buscar destinatários">
+                  <Search className="h-4 w-4" />
+                  <span className="ml-1 hidden sm:inline">Buscar</span>
+                </Button>
                 <Button type="button" variant="outline" size="sm" onClick={marcarTodos} disabled={!sugestoesDestinatarios.length}>
                   Marcar todos
                 </Button>
@@ -309,6 +365,7 @@ export function MensagemEnvioDialog({
                         <span className="block text-xs text-[var(--g3-muted)]">
                           {[item.detalhe, item.documento].filter(Boolean).join(" • ")}
                         </span>
+                        {item.aceitaComunicacao === false ? <span className="block text-xs font-medium text-amber-700">Sem autorização para receber mensagens</span> : null}
                       </span>
                       <Plus className="h-4 w-4 text-[var(--g3-active)]" />
                     </button>
@@ -324,7 +381,7 @@ export function MensagemEnvioDialog({
             </div>
           ) : null}
 
-          {destinatariosSelecionados.length > 0 && (
+          {modoDestinatarios === "TODOS" ? <div className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">O envio será realizado para todos os destinatários ativos e autorizados do tipo selecionado.</div> : destinatariosSelecionados.length > 0 && (
             <div className="flex flex-wrap gap-2 pt-2">
               {destinatariosSelecionados.map((item) => (
                 <span
@@ -352,7 +409,7 @@ export function MensagemEnvioDialog({
             <Label>Assunto (exclusivo para e-mail)</Label>
             <Input 
               value={assuntoEditado} 
-              onChange={(event) => setAssuntoEditado(event.target.value)} 
+              onChange={(event) => { setAssuntoEditado(event.target.value); setPreviewConferida(false); }}
               placeholder="Digite o assunto da mensagem..."
               disabled={canal === "WHATSAPP"}
             />
@@ -366,7 +423,7 @@ export function MensagemEnvioDialog({
             <Textarea
               rows={8}
               value={mensagemEditada}
-              onChange={(event) => setMensagemEditada(event.target.value)}
+              onChange={(event) => { setMensagemEditada(event.target.value); setPreviewConferida(false); }}
               placeholder="Escreva sua mensagem aqui ou selecione um modelo acima..."
               className="resize-none"
             />
@@ -395,17 +452,26 @@ export function MensagemEnvioDialog({
                   contextoExtra
                 });
               }}
-              disabled={!modeloId || !destinatariosSelecionados.length || previewMutation.isPending}
+              disabled={!modeloId || (modoDestinatarios === "TODOS" ? !todosDestinatarios.length : !destinatariosSelecionados.length) || previewMutation.isPending}
             >
               <RefreshCcw className={`mr-1.5 h-3.5 w-3.5 ${previewMutation.isPending ? "animate-spin" : ""}`} />
               Atualizar prévia
             </Button>
 
             <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPreviewConferida(true)}
+              disabled={!preview || previewMutation.isPending}
+            >
+              Confirmar prévia
+            </Button>
+
+            <Button
               size="sm"
               className="bg-[var(--g3-primary-button)] hover:bg-[var(--g3-primary-button-hover)]"
               onClick={() => void confirmarEnvio()}
-              disabled={!modeloId || !destinatariosSelecionados.length || enviarMutation.isPending}
+              disabled={!modeloId || (modoDestinatarios === "TODOS" ? !todosDestinatarios.length : !destinatariosSelecionados.length) || !previewConferida || enviarMutation.isPending}
             >
               {enviarMutation.isPending ? (
                 <>

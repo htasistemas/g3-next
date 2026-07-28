@@ -111,6 +111,7 @@ type DestinatarioRow = {
   cargo: string | null;
   data_registro: Date | null;
   observacao: string | null;
+  aceite_comunicacao?: boolean | null;
 };
 
 let estruturaPromise: Promise<void> | null = null;
@@ -135,6 +136,13 @@ function actorId(actor?: MensagemAtor) {
 
 function actorName(actor?: MensagemAtor) {
   return actor?.nomeUsuario?.trim() || null;
+}
+
+const caracteresBusca = "áàãâäéèêëíìîïóòõôöúùûüçÁÀÃÂÄÉÈÊËÍÌÎÏÓÒÕÔÖÚÙÛÜÇ";
+const substitutosBusca = "aaaaaeeeeiiiiooooouuuucAAAAAEEEEIIIIOOOOOUUUUC";
+
+function normalizarTermoBusca(valor?: string) {
+  return (valor ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 }
 
 function requireTenant(tenantId?: string | null) {
@@ -825,7 +833,22 @@ export class MensagensPersonalizadasRepository {
       documento: item.documento ?? undefined,
       email: item.email ?? undefined,
       telefone: item.telefone ?? undefined,
-      detalhe: item.detalhe ?? undefined
+      detalhe: item.detalhe ?? undefined,
+      aceitaComunicacao: item.aceite_comunicacao !== false
+    }));
+  }
+
+  async listarTodosDestinatarios(tipo: MensagemDestinatarioTipo, tenantId: string): Promise<MensagemDestinatarioCatalogo[]> {
+    const rows = await this.consultarDestinatarios(tipo, undefined, true, undefined, tenantId, undefined);
+    return rows.map((item) => ({
+      tipo,
+      id: item.id,
+      nome: item.nome,
+      documento: item.documento ?? undefined,
+      email: item.email ?? undefined,
+      telefone: item.telefone ?? undefined,
+      detalhe: item.detalhe ?? undefined,
+      aceitaComunicacao: item.aceite_comunicacao !== false
     }));
   }
 
@@ -853,7 +876,8 @@ export class MensagensPersonalizadasRepository {
       setor: item.setor ?? undefined,
       cargo: item.cargo ?? undefined,
       dataRegistro: item.data_registro?.toISOString() ?? undefined,
-      observacao: item.observacao ?? undefined
+      observacao: item.observacao ?? undefined,
+      aceitaComunicacao: item.aceite_comunicacao !== false
     };
   }
 
@@ -862,13 +886,15 @@ export class MensagensPersonalizadasRepository {
     termo?: string,
     somenteAtivos?: boolean,
     idEspecifico?: string,
-    tenantId?: string
+    tenantId?: string,
+    limite = 30
   ) {
     await this.garantirEstrutura();
     const tenant = requireTenant(tenantId);
     const termoBusca = termo?.trim();
     const idClause = idEspecifico ? Prisma.sql`AND base.id = ${idEspecifico}` : Prisma.empty;
     const likeNome = termoBusca ? `%${termoBusca}%` : undefined;
+    const likeNomeNormalizado = termoBusca ? `%${normalizarTermoBusca(termoBusca)}%` : undefined;
     const digits = termoBusca ? termoBusca.replace(/\D/g, "") : "";
 
     if (tipo === "BENEFICIARIO") {
@@ -878,6 +904,8 @@ export class MensagensPersonalizadasRepository {
           SELECT
             b.id::text AS id,
             b.nome_completo AS nome,
+            b.nome_social AS nome_social,
+            b.apelido AS apelido,
             cpf_doc.numero_documento AS documento,
             contato.email AS email,
             COALESCE(
@@ -909,11 +937,15 @@ export class MensagensPersonalizadasRepository {
         ) base
         WHERE 1 = 1
           ${idClause}
-          AND base.aceite_comunicacao = true
           ${
             likeNome
               ? Prisma.sql`AND (
                   base.nome ILIKE ${likeNome}
+                  OR COALESCE(base.nome_social, '') ILIKE ${likeNome}
+                  OR COALESCE(base.apelido, '') ILIKE ${likeNome}
+                  OR translate(lower(coalesce(base.nome, '')), ${caracteresBusca}, ${substitutosBusca}) ILIKE ${likeNomeNormalizado}
+                  OR translate(lower(coalesce(base.nome_social, '')), ${caracteresBusca}, ${substitutosBusca}) ILIKE ${likeNomeNormalizado}
+                  OR translate(lower(coalesce(base.apelido, '')), ${caracteresBusca}, ${substitutosBusca}) ILIKE ${likeNomeNormalizado}
                   OR COALESCE(base.documento, '') ILIKE ${`%${digits || termoBusca}%`}
                   OR COALESCE(base.detalhe, '') ILIKE ${likeNome}
                 )`
@@ -921,7 +953,7 @@ export class MensagensPersonalizadasRepository {
           }
           ${somenteAtivos ? Prisma.sql`AND base.status_base = 'ATIVO'` : Prisma.empty}
         ORDER BY base.nome ASC
-        LIMIT 30
+        ${limite ? Prisma.sql`LIMIT ${limite}` : Prisma.empty}
       `);
     }
 
@@ -961,7 +993,7 @@ export class MensagensPersonalizadasRepository {
           }
           ${somenteAtivos ? Prisma.sql`AND base.status_base = 'ATIVO'` : Prisma.empty}
         ORDER BY base.nome ASC
-        LIMIT 30
+        ${limite ? Prisma.sql`LIMIT ${limite}` : Prisma.empty}
       `);
     }
 
@@ -1001,7 +1033,7 @@ export class MensagensPersonalizadasRepository {
           }
           ${somenteAtivos ? Prisma.sql`AND base.status_base = 'ATIVO'` : Prisma.empty}
         ORDER BY base.nome ASC
-        LIMIT 30
+        ${limite ? Prisma.sql`LIMIT ${limite}` : Prisma.empty}
       `);
     }
 
@@ -1037,7 +1069,7 @@ export class MensagensPersonalizadasRepository {
               : Prisma.empty
           }
         ORDER BY base.nome ASC
-        LIMIT 30
+        ${limite ? Prisma.sql`LIMIT ${limite}` : Prisma.empty}
       `);
     }
 
@@ -1072,7 +1104,7 @@ export class MensagensPersonalizadasRepository {
             : Prisma.empty
         }
       ORDER BY base.nome ASC
-      LIMIT 30
+      ${limite ? Prisma.sql`LIMIT ${limite}` : Prisma.empty}
     `);
   }
 

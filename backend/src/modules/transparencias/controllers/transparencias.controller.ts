@@ -21,12 +21,17 @@ export class TransparenciasController {
   }
 
   async atualizar(request: AuthenticatedRequest, response: Response) {
-    const transparencia = await service.atualizar(request.params.id, request.body, request.authUser?.tenant_id);
+    const transparencia = await service.atualizar(request.params.id, request.body, request.authUser?.tenant_id, request.authUser);
     return response.json({ transparencia });
   }
 
   async excluir(request: AuthenticatedRequest, response: Response) {
     await service.remover(request.params.id, request.authUser?.tenant_id);
     return response.status(204).send();
+  }
+
+  async alterarWorkflow(request: AuthenticatedRequest, response: Response) {
+    const transparencia = await service.alterarWorkflow(request.params.id, request.body, request.authUser);
+    return response.json({ transparencia });
   }
 }

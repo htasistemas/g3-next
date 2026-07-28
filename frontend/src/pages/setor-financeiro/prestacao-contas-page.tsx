@@ -15,6 +15,7 @@ import {
   Search,
   Trash2,
   Undo2,
+  Upload,
   X
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -29,8 +30,11 @@ import { PopupConfirmacao, PopupMensagem, type PopupMensagemState } from "@/comp
 import { imprimirConteudoAtual } from "@/lib/report-utils";
 import { formatarMoeda as formatarMoedaBr, formatarMoedaInput, normalizarMoeda } from "@/lib/br-utils";
 import { cn } from "@/lib/utils";
+import { arquivosService } from "@/services/arquivos.service";
+import { useAuth } from "@/hooks/use-auth";
 import {
   useExcluirPrestacaoContas,
+  useAlterarWorkflowPrestacao,
   usePrestacoesContas,
   useSalvarPrestacaoContas
 } from "@/features/prestacao-contas/use-prestacao-contas";
@@ -40,9 +44,11 @@ import type {
   PrestacaoContas,
   PrestacaoContasPayload,
   PrestacaoDestinacao,
+  PrestacaoDespesa,
   PrestacaoRecebimento,
   PrestacaoTimeline,
-  StatusPrestacaoContas
+  StatusPrestacaoContas,
+  StatusWorkflowPrestacao
 } from "@/types/prestacao-contas";
 
 type AbaId = "listagem" | "visao-geral" | "receitas" | "aplicacao" | "documentos" | "revisao";
@@ -55,6 +61,7 @@ type DestinacaoErrors = Partial<Record<"titulo" | "percentual", string>>;
 type ComprovanteErrors = Partial<Record<"titulo" | "arquivoNome", string>>;
 type TimelineErrors = Partial<Record<"titulo", string>>;
 type ChecklistErrors = Partial<Record<"titulo", string>>;
+type DespesaErrors = Partial<Record<"descricao" | "valor", string>>;
 
 type ResumoPrestacao = {
   status: StatusPrestacaoContas;
@@ -63,6 +70,8 @@ type ResumoPrestacao = {
   totalChecklistConcluido: number;
   totalChecklistPendente: number;
   totalComprovantes: number;
+  totalDespesas: number;
+  diferencaConciliacao: number;
   percentualChecklist: number;
   saldoCalculado?: number;
   pendencias: string[];
@@ -91,7 +100,9 @@ const registroVazio: PrestacaoContasPayload = {
   destinacoes: [],
   comprovantes: [],
   timelines: [],
-  checklist: []
+  checklist: [],
+  despesas: []
+  ,parecerHistorico: []
 };
 
 const recebimentoVazio: PrestacaoRecebimento = { fonte: "" };
@@ -99,6 +110,7 @@ const destinacaoVazia: PrestacaoDestinacao = { titulo: "" };
 const comprovanteVazio: PrestacaoComprovante = { titulo: "" };
 const timelineVazio: PrestacaoTimeline = { titulo: "", status: "pendente" };
 const checklistVazio: PrestacaoChecklist = { titulo: "", status: "pendente" };
+const despesaVazia: PrestacaoDespesa = { descricao: "", status: "PENDENTE" };
 const LIMITE_RESUMO_EXECUTIVO = 200;
 
 function normalizarBusca(valor: string) {
@@ -137,9 +149,11 @@ function calcularResumo(form: PrestacaoContasPayload): ResumoPrestacao {
   const totalChecklistPendente = (form.checklist ?? []).filter((item) => item.status !== "concluido").length;
   const totalChecklist = (form.checklist ?? []).length;
   const totalComprovantes = (form.comprovantes ?? []).length;
+  const totalDespesas = (form.despesas ?? []).reduce((acc, item) => acc + (item.valor ?? 0), 0);
   const percentualChecklist = totalChecklist ? (totalChecklistConcluido / totalChecklist) * 100 : 0;
   const saldoCalculado =
     form.totalRecebido != null && form.totalAplicado != null ? form.totalRecebido - form.totalAplicado : undefined;
+  const diferencaConciliacao = form.totalAplicado != null ? totalDespesas - form.totalAplicado : 0;
 
   const pendencias: string[] = [];
 
@@ -149,6 +163,14 @@ function calcularResumo(form: PrestacaoContasPayload): ResumoPrestacao {
 
   if (!form.totalAplicado && !(form.destinacoes ?? []).length) {
     pendencias.push("Informe o total aplicado ou detalhe a aplicação dos recursos.");
+  }
+
+  if (form.totalAplicado != null && form.totalAplicado > 0 && !(form.despesas ?? []).length) {
+    pendencias.push("Detalhe as despesas e pagamentos realizados.");
+  }
+
+  if (form.despesas?.length && Math.abs(diferencaConciliacao) > 0.01) {
+    pendencias.push("A soma das despesas difere do total aplicado.");
   }
 
   if (!(form.comprovantes ?? []).length) {
@@ -199,6 +221,8 @@ function calcularResumo(form: PrestacaoContasPayload): ResumoPrestacao {
     totalChecklistConcluido,
     totalChecklistPendente,
     totalComprovantes,
+    totalDespesas,
+    diferencaConciliacao,
     percentualChecklist,
     saldoCalculado,
     pendencias
@@ -247,6 +271,19 @@ function getStatusLabel(status: StatusPrestacaoContas) {
   if (status === "concluido") return "Concluído";
   if (status === "andamento") return "Em andamento";
   return "Pendente";
+}
+
+function getWorkflowLabel(status?: StatusWorkflowPrestacao) {
+  const labels: Record<StatusWorkflowPrestacao, string> = {
+    RASCUNHO: "Rascunho",
+    EM_ANALISE: "Em análise",
+    EM_DILIGENCIA: "Em diligência",
+    APROVADA: "Aprovada",
+    APROVADA_RESSALVAS: "Aprovada com ressalvas",
+    REJEITADA: "Rejeitada",
+    ENCERRADA: "Encerrada"
+  };
+  return labels[status ?? "RASCUNHO"];
 }
 
 function getListagemBusca(item: PrestacaoContas, resumo: ResumoPrestacao) {
@@ -371,6 +408,11 @@ function HintText({ text }: { text: string }) {
 
 export function PrestacaoContasPage() {
   const navigate = useNavigate();
+  const { usuario } = useAuth();
+  const permissoes = usuario?.permissoes ?? [];
+  const podeEditar = permissoes.some((item) => ["ADMINISTRADOR", "OPERADOR", "PRESTACAO_CONTAS_ELABORAR"].includes(item));
+  const podeRevisar = permissoes.some((item) => ["ADMINISTRADOR", "OPERADOR", "PRESTACAO_CONTAS_REVISAR"].includes(item));
+  const podeAprovar = permissoes.some((item) => ["ADMINISTRADOR", "PRESTACAO_CONTAS_APROVAR"].includes(item));
   const [abaAtiva, setAbaAtiva] = useState<AbaId>("listagem");
   const [registroSelecionadoId, setRegistroSelecionadoId] = useState<string>();
   const [filtro, setFiltro] = useState("");
@@ -381,24 +423,29 @@ export function PrestacaoContasPage() {
   const [novoRecebimento, setNovoRecebimento] = useState<PrestacaoRecebimento>(recebimentoVazio);
   const [novaDestinacao, setNovaDestinacao] = useState<PrestacaoDestinacao>(destinacaoVazia);
   const [novoComprovante, setNovoComprovante] = useState<PrestacaoComprovante>(comprovanteVazio);
+  const [arquivoComprovante, setArquivoComprovante] = useState<File | null>(null);
+  const [enviandoArquivo, setEnviandoArquivo] = useState(false);
   const [novaTimeline, setNovaTimeline] = useState<PrestacaoTimeline>(timelineVazio);
   const [novoChecklist, setNovoChecklist] = useState<PrestacaoChecklist>(checklistVazio);
+  const [novaDespesa, setNovaDespesa] = useState<PrestacaoDespesa>(despesaVazia);
   const [mainErrors, setMainErrors] = useState<MainErrors>({});
   const [recebimentoErrors, setRecebimentoErrors] = useState<RecebimentoErrors>({});
   const [destinacaoErrors, setDestinacaoErrors] = useState<DestinacaoErrors>({});
   const [comprovanteErrors, setComprovanteErrors] = useState<ComprovanteErrors>({});
   const [timelineErrors, setTimelineErrors] = useState<TimelineErrors>({});
   const [checklistErrors, setChecklistErrors] = useState<ChecklistErrors>({});
+  const [despesaErrors, setDespesaErrors] = useState<DespesaErrors>({});
   const [popup, setPopup] = useState<PopupMensagemState | null>(null);
   const [confirmarExclusao, setConfirmarExclusao] = useState(false);
 
   const prestacoesQuery = usePrestacoesContas();
   const salvarMutation = useSalvarPrestacaoContas();
   const excluirMutation = useExcluirPrestacaoContas();
+  const workflowMutation = useAlterarWorkflowPrestacao();
 
   const prestacoes = prestacoesQuery.data ?? [];
   const resumoAtual = useMemo(() => calcularResumo(form), [form]);
-  const processando = salvarMutation.isPending || excluirMutation.isPending;
+  const processando = salvarMutation.isPending || excluirMutation.isPending || workflowMutation.isPending || enviandoArquivo;
 
   const registrosFiltrados = useMemo(() => {
     const termo = normalizarBusca(filtro.trim());
@@ -445,6 +492,8 @@ export function PrestacaoContasPage() {
     setComprovanteErrors({});
     setTimelineErrors({});
     setChecklistErrors({});
+    setDespesaErrors({});
+    setArquivoComprovante(null);
   }
 
   function atualizarCampoPrincipal(field: MainField, value?: number) {
@@ -495,6 +544,21 @@ export function PrestacaoContasPage() {
     }
   }
 
+  async function alterarWorkflow(acao: string) {
+    if (!registroSelecionadoId) {
+      setPopup({ tipo: "aviso", titulo: "Selecione uma prestação", texto: "Salve ou selecione uma prestação antes de alterar o workflow." });
+      return;
+    }
+    try {
+      const registro = await workflowMutation.mutateAsync({ id: registroSelecionadoId, acao });
+      setForm(registro);
+      setSnapshot(registro);
+      setPopup({ tipo: "sucesso", titulo: "Workflow atualizado", texto: `A prestação agora está: ${getWorkflowLabel(registro.statusWorkflow)}.` });
+    } catch (error: any) {
+      setPopup({ tipo: "erro", titulo: "Não foi possível avançar", texto: extrairMensagemErro(error, "Revise os requisitos da etapa antes de continuar.") });
+    }
+  }
+
   async function confirmarExclusaoRegistro() {
     if (!registroSelecionadoId) return;
     try {
@@ -536,7 +600,32 @@ export function PrestacaoContasPage() {
     if (Object.keys(erros).length) return;
     setForm((atual) => ({ ...atual, comprovantes: [...(atual.comprovantes ?? []), novoComprovante] }));
     setNovoComprovante(comprovanteVazio);
+    setArquivoComprovante(null);
     setComprovanteErrors({});
+  }
+
+  async function enviarArquivoComprovante() {
+    if (!registroSelecionadoId || !arquivoComprovante) return;
+    setEnviandoArquivo(true);
+    try {
+      const arquivo = await arquivosService.uploadParaPrestacaoContas(
+        registroSelecionadoId,
+        arquivoComprovante,
+        novoComprovante.descricao
+      );
+      setNovoComprovante((atual) => ({
+        ...atual,
+        titulo: atual.titulo.trim() || arquivo.nomeOriginal,
+        arquivoNome: arquivo.nomeOriginal,
+        arquivoUrl: `/api/arquivos/${arquivo.id}/conteudo`
+      }));
+      setArquivoComprovante(null);
+      setPopup({ tipo: "sucesso", titulo: "Arquivo enviado", texto: "O arquivo foi anexado. Clique em Adicionar comprovante e depois salve a prestação." });
+    } catch (error: any) {
+      setPopup({ tipo: "erro", titulo: "Falha no upload", texto: extrairMensagemErro(error, "Não foi possível enviar o arquivo." ) });
+    } finally {
+      setEnviandoArquivo(false);
+    }
   }
 
   function adicionarTimeline() {
@@ -557,8 +646,19 @@ export function PrestacaoContasPage() {
     setChecklistErrors({});
   }
 
+  function adicionarDespesa() {
+    const erros: DespesaErrors = {};
+    if (!novaDespesa.descricao?.trim()) erros.descricao = "Informe a descrição da despesa.";
+    if (novaDespesa.valor == null || novaDespesa.valor < 0) erros.valor = "Informe um valor válido.";
+    setDespesaErrors(erros);
+    if (Object.keys(erros).length) return;
+    setForm((atual) => ({ ...atual, despesas: [...(atual.despesas ?? []), novaDespesa] }));
+    setNovaDespesa(despesaVazia);
+    setDespesaErrors({});
+  }
+
   function removerItem(
-    tipo: "recebimentos" | "destinacoes" | "comprovantes" | "timelines" | "checklist",
+    tipo: "recebimentos" | "destinacoes" | "comprovantes" | "timelines" | "checklist" | "despesas",
     indice: number
   ) {
     setForm((atual) => ({
@@ -569,15 +669,15 @@ export function PrestacaoContasPage() {
 
   const acoes: AdminAction[] = [
     { label: "Buscar", icon: Search, onClick: () => setAbaAtiva("listagem"), variant: "outline" },
-    { label: "Novo", icon: Plus, onClick: novo, variant: "default", disabled: processando },
-    { label: "Salvar", icon: Save, onClick: () => void salvar(), variant: "default", disabled: processando },
-    { label: "Cancelar", icon: Undo2, onClick: cancelar, variant: "outline", disabled: processando },
+    { label: "Novo", icon: Plus, onClick: novo, variant: "default", disabled: processando || !podeEditar },
+    { label: "Salvar", icon: Save, onClick: () => void salvar(), variant: "default", disabled: processando || !podeEditar },
+    { label: "Cancelar", icon: Undo2, onClick: cancelar, variant: "outline", disabled: processando || !podeEditar },
     {
       label: "Excluir",
       icon: Trash2,
       onClick: () => setConfirmarExclusao(true),
       variant: "danger",
-      disabled: processando || !registroSelecionadoId
+      disabled: processando || !registroSelecionadoId || !permissoes.includes("ADMINISTRADOR")
     },
     {
       label: "Imprimir",
@@ -598,13 +698,29 @@ export function PrestacaoContasPage() {
     { label: "Fechar", icon: X, onClick: () => navigate("/dashboard/visao-geral"), variant: "outline" }
   ];
 
+  const workflowStatus = form.statusWorkflow ?? "RASCUNHO";
+  const acoesWorkflow: AdminAction[] = workflowStatus === "RASCUNHO"
+    ? [{ label: "Enviar para análise", icon: FileCheck, onClick: () => void alterarWorkflow("ENVIAR_ANALISE"), variant: "default", disabled: processando || !podeEditar }]
+    : workflowStatus === "EM_ANALISE"
+      ? [
+          { label: "Devolver para diligência", icon: AlertTriangle, onClick: () => void alterarWorkflow("DEVOLVER_DILIGENCIA"), variant: "outline", disabled: processando || !podeRevisar },
+          { label: "Aprovar", icon: CheckCircle2, onClick: () => void alterarWorkflow("APROVAR"), variant: "default", disabled: processando || !podeAprovar },
+          { label: "Aprovar com ressalvas", icon: FileCheck, onClick: () => void alterarWorkflow("APROVAR_RESSALVAS"), variant: "outline", disabled: processando || !podeAprovar },
+          { label: "Rejeitar", icon: X, onClick: () => void alterarWorkflow("REJEITAR"), variant: "danger", disabled: processando || !podeAprovar }
+        ]
+      : workflowStatus === "EM_DILIGENCIA"
+        ? [{ label: "Reenviar para análise", icon: FileCheck, onClick: () => void alterarWorkflow("ENVIAR_ANALISE"), variant: "default", disabled: processando || !podeEditar }]
+        : workflowStatus === "APROVADA" || workflowStatus === "APROVADA_RESSALVAS"
+          ? [{ label: "Encerrar prestação", icon: CheckCircle2, onClick: () => void alterarWorkflow("ENCERRAR"), variant: "default", disabled: processando || !podeAprovar }]
+          : [];
+
   return (
     <>
       <AdminPageLayout
         tabs={abas}
         activeTab={abaAtiva}
         onChangeTab={(tabId) => setAbaAtiva(tabId as AbaId)}
-        actions={acoes}
+        actions={[...acoes, ...acoesWorkflow]}
         sectionLabel="Contabilidade e finanças"
         pageTitle={tituloTela}
         activeTitle={abas.find((item) => item.id === abaAtiva)?.label}
@@ -780,6 +896,23 @@ export function PrestacaoContasPage() {
 
             <Card>
               <CardHeader>
+                <CardTitle>Identificação da prestação</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <div className="space-y-1 xl:col-span-2"><Label>Instrumento ou parceria *</Label><Input value={form.instrumento ?? ""} placeholder="Ex.: Termo de fomento nº 12/2026" onChange={(event) => setForm((atual) => ({ ...atual, instrumento: event.target.value }))} /></div>
+                  <div className="space-y-1"><Label>Tipo de prestação</Label><Select value={form.tipoPrestacao ?? "FINAL"} onChange={(event) => setForm((atual) => ({ ...atual, tipoPrestacao: event.target.value as any }))}><option value="PARCIAL">Parcial</option><option value="ANUAL">Anual</option><option value="FINAL">Final</option></Select></div>
+                  <div className="space-y-1"><Label>Status do workflow</Label><Input value={getWorkflowLabel(form.statusWorkflow)} disabled /></div>
+                  <div className="space-y-1"><Label>Início do período *</Label><Input type="date" value={form.periodoInicio ?? ""} onChange={(event) => setForm((atual) => ({ ...atual, periodoInicio: event.target.value }))} /></div>
+                  <div className="space-y-1"><Label>Fim do período *</Label><Input type="date" value={form.periodoFim ?? ""} onChange={(event) => setForm((atual) => ({ ...atual, periodoFim: event.target.value }))} /></div>
+                  <div className="space-y-1 md:col-span-2"><Label>Objeto da parceria *</Label><Textarea rows={3} value={form.objeto ?? ""} placeholder="Descreva o objeto executado e o resultado esperado." onChange={(event) => setForm((atual) => ({ ...atual, objeto: event.target.value }))} /></div>
+                </div>
+                <HintText text="Esses dados identificam a prestação formalmente e são obrigatórios para enviá-la à análise." />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
                 <CardTitle>Resumo financeiro e orientação do processo</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -872,6 +1005,48 @@ export function PrestacaoContasPage() {
                       form.totalRecebidoHelper?.length ?? 0
                     )}/${LIMITE_RESUMO_EXECUTIVO} caracteres.`}
                   />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Despesas e pagamentos</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+                  <div className="space-y-1 xl:col-span-2">
+                    <Label>Descrição *</Label>
+                    <Input value={novaDespesa.descricao} className={despesaErrors.descricao ? "border-red-300" : undefined} onChange={(event) => setNovaDespesa((atual) => ({ ...atual, descricao: event.target.value }))} />
+                    <ErrorText message={despesaErrors.descricao} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Fornecedor</Label>
+                    <Input value={novaDespesa.fornecedor ?? ""} onChange={(event) => setNovaDespesa((atual) => ({ ...atual, fornecedor: event.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Documento fiscal</Label>
+                    <Input value={novaDespesa.documentoFiscal ?? ""} onChange={(event) => setNovaDespesa((atual) => ({ ...atual, documentoFiscal: event.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Data do pagamento</Label>
+                    <Input type="date" value={novaDespesa.dataPagamento ?? ""} onChange={(event) => setNovaDespesa((atual) => ({ ...atual, dataPagamento: event.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Valor *</Label>
+                    <Input type="number" min="0" step="0.01" value={novaDespesa.valor ?? ""} className={despesaErrors.valor ? "border-red-300" : undefined} onChange={(event) => setNovaDespesa((atual) => ({ ...atual, valor: event.target.value === "" ? undefined : Number(event.target.value) }))} />
+                    <ErrorText message={despesaErrors.valor} />
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <HintText text={`Total detalhado: ${formatarMoeda(resumoAtual.totalDespesas)} · Diferença para o total aplicado: ${formatarMoeda(resumoAtual.diferencaConciliacao)}`} />
+                  <Button type="button" size="sm" onClick={adicionarDespesa}><Plus className="mr-1.5 h-3.5 w-3.5" />Adicionar despesa</Button>
+                </div>
+                <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"><tr><th className="px-3 py-2 text-left">Descrição</th><th className="px-3 py-2 text-left">Fornecedor</th><th className="px-3 py-2 text-left">Pagamento</th><th className="px-3 py-2 text-right">Valor</th><th className="px-3 py-2 text-right">Ações</th></tr></thead>
+                    <tbody>{(form.despesas ?? []).length ? form.despesas.map((item, index) => <tr key={`${item.descricao}-${index}`} className="border-t border-[var(--g3-border)]"><td className="px-3 py-2">{item.descricao}</td><td className="px-3 py-2">{item.fornecedor || "—"}</td><td className="px-3 py-2">{item.dataPagamento || "—"}</td><td className="px-3 py-2 text-right">{formatarMoeda(item.valor)}</td><td className="px-3 py-2 text-right"><Button size="sm" variant="danger" onClick={() => removerItem("despesas", index)}>Remover</Button></td></tr>) : <tr><td colSpan={5} className="px-3 py-4 text-center text-[var(--g3-muted)]">Nenhuma despesa detalhada.</td></tr>}</tbody>
+                  </table>
                 </div>
               </CardContent>
             </Card>
@@ -1176,6 +1351,30 @@ export function PrestacaoContasPage() {
                   </div>
 
                   <div className="space-y-1">
+                    <Label>Enviar arquivo</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="file"
+                        accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.jpg,.jpeg,.png,.webp"
+                        disabled={!registroSelecionadoId || enviandoArquivo}
+                        onChange={(event) => setArquivoComprovante(event.target.files?.[0] ?? null)}
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={!registroSelecionadoId || !arquivoComprovante || enviandoArquivo}
+                        onClick={() => void enviarArquivoComprovante()}
+                        title={!registroSelecionadoId ? "Salve a prestação antes de enviar arquivos" : undefined}
+                      >
+                        <Upload className="mr-1.5 h-3.5 w-3.5" />
+                        Enviar
+                      </Button>
+                    </div>
+                    <HintText text={registroSelecionadoId ? "Formatos aceitos: PDF, documentos, planilhas e imagens, até 25 MB." : "Salve a prestação antes de enviar um arquivo."} />
+                  </div>
+
+                  <div className="space-y-1">
                     <Label>Descrição</Label>
                     <Input
                       value={novoComprovante.descricao ?? ""}
@@ -1305,7 +1504,13 @@ export function PrestacaoContasPage() {
                       >
                         <div className="min-w-0 flex-1">
                           <p className="font-medium text-[var(--g3-foreground)]">{item.titulo}</p>
-                          <p className="text-sm text-[var(--g3-muted)]">{item.arquivoNome || item.arquivoUrl || "Sem referência"}</p>
+                          {item.arquivoUrl?.startsWith("/api/arquivos/") ? (
+                            <a className="text-sm text-[var(--g3-primary)] underline" href={item.arquivoUrl} target="_blank" rel="noreferrer">
+                              {item.arquivoNome || "Abrir arquivo"}
+                            </a>
+                          ) : (
+                            <p className="text-sm text-[var(--g3-muted)]">{item.arquivoNome || item.arquivoUrl || "Sem referência"}</p>
+                          )}
                           {item.descricao ? <p className="mt-1 text-sm text-[var(--g3-muted)]">{item.descricao}</p> : null}
                         </div>
                         <Button size="sm" variant="danger" onClick={() => removerItem("comprovantes", index)}>
@@ -1405,6 +1610,69 @@ export function PrestacaoContasPage() {
                 </CardContent>
               </Card>
             </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Parecer técnico e decisão</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div className="space-y-1">
+                    <Label>Conclusão do parecer</Label>
+                    <Select value={form.parecerConclusao ?? ""} onChange={(event) => setForm((atual) => ({ ...atual, parecerConclusao: (event.target.value || undefined) as PrestacaoContasPayload["parecerConclusao"] }))}>
+                      <option value="">Selecione</option>
+                      <option value="APROVAR">Aprovar</option>
+                      <option value="APROVAR_RESSALVAS">Aprovar com ressalvas</option>
+                      <option value="REJEITAR">Rejeitar</option>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Responsável pela análise</Label>
+                    <Input value={form.parecerResponsavel ?? ""} onChange={(event) => setForm((atual) => ({ ...atual, parecerResponsavel: event.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Data do parecer</Label>
+                    <Input type="date" value={form.parecerData ?? ""} onChange={(event) => setForm((atual) => ({ ...atual, parecerData: event.target.value }))} />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label>Parecer técnico *</Label>
+                  <Textarea rows={4} value={form.parecerTexto ?? ""} placeholder="Registre a análise da execução financeira, documental e dos resultados." onChange={(event) => setForm((atual) => ({ ...atual, parecerTexto: event.target.value }))} />
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label>Ressalvas</Label>
+                    <Textarea rows={3} value={form.parecerRessalvas ?? ""} placeholder="Informe as ressalvas, quando houver." onChange={(event) => setForm((atual) => ({ ...atual, parecerRessalvas: event.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Recomendações</Label>
+                    <Textarea rows={3} value={form.parecerRecomendacoes ?? ""} placeholder="Registre recomendações para o próximo período." onChange={(event) => setForm((atual) => ({ ...atual, parecerRecomendacoes: event.target.value }))} />
+                  </div>
+                </div>
+                <HintText text="Salve o parecer antes de aprovar, aprovar com ressalvas ou rejeitar a prestação." />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Histórico de versões do parecer</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {(form.parecerHistorico ?? []).length ? form.parecerHistorico.map((versao) => (
+                  <div key={versao.id} className="rounded-lg border border-[var(--g3-border)] p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="info">Versão {versao.versao}</Badge>
+                        <span className="text-sm font-medium">{versao.conclusao === "APROVAR_RESSALVAS" ? "Aprovar com ressalvas" : versao.conclusao === "APROVAR" ? "Aprovar" : versao.conclusao === "REJEITAR" ? "Rejeitar" : "Sem conclusão"}</span>
+                      </div>
+                      <span className="text-xs text-[var(--g3-muted)]">{versao.usuarioNome || versao.responsavel || "Usuário não informado"} · {versao.criadoEm ? new Date(versao.criadoEm).toLocaleString("pt-BR") : "—"}</span>
+                    </div>
+                    {versao.parecerTexto ? <p className="mt-2 text-sm text-[var(--g3-foreground)]">{versao.parecerTexto}</p> : null}
+                    {versao.ressalvas ? <p className="mt-1 text-sm text-amber-700"><strong>Ressalvas:</strong> {versao.ressalvas}</p> : null}
+                  </div>
+                )) : <p className="text-sm text-[var(--g3-muted)]">Nenhuma versão de parecer registrada.</p>}
+              </CardContent>
+            </Card>
 
             <div className="grid gap-4 xl:grid-cols-2">
               <Card>

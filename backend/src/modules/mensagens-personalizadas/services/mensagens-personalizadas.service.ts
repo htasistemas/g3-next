@@ -493,6 +493,13 @@ export class MensagensPersonalizadasService {
     return this.repository.buscarDestinatarios(query.tipo, query.termo, query.somenteAtivos, tenantId);
   }
 
+  async buscarTodosDestinatarios(rawQuery: unknown, actor?: MensagemAtor) {
+    const tenantId = this.parseTenant(actor?.tenant_id);
+    await this.garantirBase(tenantId);
+    const query = mensagemDestinatarioBuscaSchema.pick({ tipo: true }).parse(rawQuery);
+    return this.repository.listarTodosDestinatarios(query.tipo, tenantId);
+  }
+
   async gerarPreview(rawInput: unknown, actor?: MensagemAtor) {
     const tenantId = this.parseTenant(actor?.tenant_id);
     await this.garantirBase(tenantId);
@@ -533,11 +540,20 @@ export class MensagensPersonalizadasService {
     const input = mensagemEnvioInputSchema.parse(rawInput);
     const modelo = await this.resolverModeloPreview(input.modeloId, input, tenantId, actor);
 
-    if (input.tipoEnvio === "LOTE" && input.destinatarioIds.length < 2) {
+    const destinatariosTodos = Boolean(input.destinatariosTodos);
+    const idsSolicitados = destinatariosTodos
+      ? (await this.repository.listarTodosDestinatarios(input.destinatarioTipo, tenantId)).map((item) => item.id)
+      : input.destinatarioIds;
+
+    if (!idsSolicitados.length) {
+      throw new AppError("Nenhum destinatário ativo e autorizado para comunicação foi encontrado.", 422);
+    }
+
+    if (input.tipoEnvio === "LOTE" && idsSolicitados.length < 2) {
       throw new AppError("Envio em lote requer ao menos dois destinatarios.", 422);
     }
 
-    const idsUnicos = deduplicarStrings(input.destinatarioIds);
+    const idsUnicos = deduplicarStrings(idsSolicitados);
     const itens: Array<{
       destinatarioId: string;
       destinatarioNome: string;
@@ -550,6 +566,9 @@ export class MensagensPersonalizadasService {
 
     for (const destinatarioId of idsUnicos) {
       const destinatario = await this.resolverDestinatario(input.destinatarioTipo, destinatarioId, tenantId);
+      if (input.destinatarioTipo === "BENEFICIARIO" && destinatario.aceitaComunicacao === false) {
+        throw new AppError(`O beneficiário ${destinatario.nome} não autorizou o recebimento de mensagens.`, 422);
+      }
       const contexto = this.montarContexto(destinatario, actor, input.contextoExtra);
       const assuntoBase = input.assuntoEditado?.trim() || modelo.assunto || modelo.titulo;
       const corpoBase = input.mensagemEditada?.trim() || modelo.mensagemBase;

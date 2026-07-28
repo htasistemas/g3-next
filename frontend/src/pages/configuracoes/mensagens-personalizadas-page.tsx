@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   BookText,
+  BarChart3,
   FilterX,
   History,
   Mail,
@@ -10,6 +11,7 @@ import {
   Plus,
   RefreshCcw,
   Save,
+  Settings2,
   Search,
   Sparkles,
   Tags,
@@ -51,11 +53,13 @@ import type {
 } from "@/types/mensagens-personalizadas";
 
 const abas: AdminTab[] = [
+  { id: "dashboard", label: "Dashboard de envios", icon: BarChart3 },
   { id: "envio", label: "Envio de mensagens", icon: MailPlus },
   { id: "pre-prontas", label: "Mensagens pré-prontas", icon: BookText },
   { id: "sugestoes-ia", label: "Sugestões da IA", icon: Sparkles },
   { id: "categorias", label: "Categorias e assuntos", icon: Tags },
-  { id: "historico", label: "Histórico / utilização", icon: History }
+  { id: "historico", label: "Histórico / utilização", icon: History },
+  { id: "configuracao", label: "Configurar envios", icon: Settings2 }
 ];
 
 const tonsVozIA = [
@@ -388,7 +392,7 @@ function ModeloDialog({
 
 export function MensagensPersonalizadasPage() {
   const { usuario } = useAuth();
-  const [abaAtiva, setAbaAtiva] = useState<AbaId>("envio");
+  const [abaAtiva, setAbaAtiva] = useState<AbaId>("dashboard");
   const [filtros, setFiltros] = useState<MensagemModeloFiltros>({
     busca: "",
     status: undefined,
@@ -412,6 +416,7 @@ export function MensagensPersonalizadasPage() {
   const [modeloAtual, setModeloAtual] = useState<MensagemModelo | undefined>();
   const [confirmarExclusaoId, setConfirmarExclusaoId] = useState<string>();
   const [taxonomiaEdicao, setTaxonomiaEdicao] = useState<MensagemTaxonomia | null>(null);
+  const [historicoSelecionado, setHistoricoSelecionado] = useState<string>();
   const [taxonomiaForm, setTaxonomiaForm] = useState({ tipo: "CATEGORIA" as MensagemTaxonomiaTipo, nome: "", descricao: "", status: "ATIVA" as MensagemStatus });
 
   const suporteQuery = useMensagensPersonalizadasSuporte();
@@ -442,6 +447,19 @@ export function MensagensPersonalizadasPage() {
   const placeholders = suporteQuery.data?.placeholders ?? [];
   const sugestoesIa = modelos.filter((item) => item.mensagemSugeridaIa);
   const historico = historicoQuery.data ?? [];
+
+  const metricas = useMemo(() => {
+    const total = historico.length;
+    const enviados = historico.filter((item) => item.status === "ENVIADO").length;
+    const preparados = historico.filter((item) => item.status === "PREPARADO").length;
+    const rejeitados = historico.filter((item) => item.status === "ERRO").length;
+    const porMensagem = historico.reduce<Record<string, number>>((acc, item) => {
+      acc[item.nomeMensagem] = (acc[item.nomeMensagem] ?? 0) + 1;
+      return acc;
+    }, {});
+    const maisEnviadas = Object.entries(porMensagem).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    return { total, enviados, preparados, rejeitados, maisEnviadas };
+  }, [historico]);
 
   const podeEditar = (usuario?.permissoes ?? []).some((permissao) =>
     ["ADMINISTRADOR", "OPERADOR", "MENSAGENS_PERSONALIZADAS_CADASTRAR", "MENSAGENS_PERSONALIZADAS_EDITAR"].includes(permissao)
@@ -535,6 +553,37 @@ export function MensagensPersonalizadasPage() {
           </CardContent>
         </Card>
 
+        {abaAtiva === "dashboard" && (
+          <div className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+              {[
+                ["Total de registros", metricas.total, "bg-slate-50 text-slate-800"],
+                ["Enviadas", metricas.enviados, "bg-emerald-50 text-emerald-700"],
+                ["Não enviadas / preparadas", metricas.preparados, "bg-blue-50 text-blue-700"],
+                ["Rejeitadas / falhas", metricas.rejeitados, "bg-rose-50 text-rose-700"],
+                ["Devolvidas", 0, "bg-amber-50 text-amber-700"],
+                ["Mensagens ativas", modelos.filter((item) => item.status === "ATIVA").length, "bg-violet-50 text-violet-700"]
+              ].map(([label, value, style]) => (
+                <Card key={String(label)} className={String(style)}><CardContent className="p-5">
+                  <p className="text-sm font-medium opacity-80">{label}</p>
+                  <p className="mt-2 text-3xl font-bold">{value}</p>
+                </CardContent></Card>
+              ))}
+            </div>
+            <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+              <Card><CardHeader><CardTitle className="text-base">Mensagens mais utilizadas</CardTitle></CardHeader><CardContent>
+                {metricas.maisEnviadas.length ? <div className="space-y-3">{metricas.maisEnviadas.map(([nome, quantidade], index) => (
+                  <div key={nome} className="flex items-center gap-3"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--g3-primary-soft)] text-xs font-bold text-[var(--g3-active)]">{index + 1}</span><span className="min-w-0 flex-1 truncate text-sm font-medium">{nome}</span><span className="text-sm font-bold">{quantidade}</span></div>
+                ))}</div> : <p className="text-sm text-[var(--g3-muted)]">Ainda não há registros de envio para analisar.</p>}
+              </CardContent></Card>
+              <Card><CardHeader><CardTitle className="text-base">Canais utilizados</CardTitle></CardHeader><CardContent className="space-y-4">
+                {(["WHATSAPP", "EMAIL"] as const).map((canal) => { const total = historico.filter((item) => item.canal === canal).length; const percentual = metricas.total ? Math.round((total / metricas.total) * 100) : 0; return <div key={canal}><div className="mb-1 flex justify-between text-sm"><span>{canal === "WHATSAPP" ? "WhatsApp" : "E-mail"}</span><strong>{total} ({percentual}%)</strong></div><div className="h-2 rounded-full bg-slate-100"><div className="h-2 rounded-full bg-[var(--g3-primary-button)]" style={{ width: `${percentual}%` }} /></div></div>; })}
+              </CardContent></Card>
+            </div>
+            <Card><CardContent className="flex flex-wrap items-center justify-between gap-3 p-4"><div><p className="font-semibold">Acompanhe a operação em tempo real</p><p className="text-sm text-[var(--g3-muted)]">O dashboard usa o histórico registrado por destinatário, canal e mensagem.</p></div><Button variant="outline" onClick={() => { setAbaAtiva("historico"); void historicoQuery.refetch(); }}><History className="mr-2 h-4 w-4" />Ver histórico detalhado</Button></CardContent></Card>
+          </div>
+        )}
+
         {abaAtiva === "envio" && (
           <MensagemEnvioDialog
             inline
@@ -542,6 +591,24 @@ export function MensagensPersonalizadasPage() {
               setPopup({ tipo, titulo: "Mensagens personalizadas", texto })
             }
           />
+        )}
+
+        {abaAtiva === "pre-prontas" && (
+          <div className="space-y-4">
+            <Card className="bg-slate-50"><CardContent className="grid gap-3 p-4 md:grid-cols-[1fr_220px_180px_auto]"><Input value={filtros.busca ?? ""} onChange={(e) => setFiltros((v) => ({ ...v, busca: e.target.value }))} placeholder="Buscar por título ou conteúdo" /><Select value={filtros.canal ?? ""} onChange={(e) => setFiltros((v) => ({ ...v, canal: (e.target.value || undefined) as any }))}><option value="">Todos os canais</option><option value="WHATSAPP">WhatsApp</option><option value="EMAIL">E-mail</option></Select><Select value={filtros.status ?? ""} onChange={(e) => setFiltros((v) => ({ ...v, status: (e.target.value || undefined) as any }))}><option value="">Todos os status</option><option value="ATIVA">Ativas</option><option value="INATIVA">Inativas</option></Select><Button variant="outline" onClick={() => setFiltros({ busca: "", status: undefined, somenteAtivas: false, destinatario: undefined, canal: undefined, categoriaId: undefined })}><FilterX className="mr-2 h-4 w-4" />Limpar filtros</Button></CardContent></Card>
+            <Card><CardContent className="overflow-x-auto p-0"><table className="min-w-full text-sm"><thead className="bg-[var(--g3-primary-soft)]/60"><tr>{["Mensagem", "Categoria", "Canais", "Status", "Ações"].map((label) => <th key={label} className="px-4 py-3 text-left font-semibold">{label}</th>)}</tr></thead><tbody className="divide-y divide-[var(--g3-border)]">{modelos.length ? modelos.map((item) => <tr key={item.id} className="hover:bg-slate-50"><td className="px-4 py-3"><p className="font-semibold">{item.titulo}</p><p className="line-clamp-1 max-w-lg text-xs text-[var(--g3-muted)]">{item.mensagemBase}</p></td><td className="px-4 py-3">{item.categoria ?? "Sem categoria"}</td><td className="px-4 py-3">{item.canaisPermitidos.map(rotuloCanal).join(" e ")}</td><td className="px-4 py-3"><span className={`rounded-full px-2 py-1 text-xs ${item.status === "ATIVA" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>{rotuloStatus(item.status)}</span></td><td className="px-4 py-3"><div className="flex gap-1"><Button size="sm" variant="ghost" onClick={() => { setModeloAtual(item); setModoDialog("visualizar"); setDialogAberto(true); }} title="Visualizar"><Search className="h-4 w-4" /></Button><Button size="sm" variant="ghost" onClick={() => { setModeloAtual(item); setModoDialog("editar"); setDialogAberto(true); }} title="Editar"><Pencil className="h-4 w-4" /></Button><Button size="sm" variant="ghost" onClick={() => void duplicarModelo(item.id)} title="Duplicar"><Plus className="h-4 w-4" /></Button><Button size="sm" variant="ghost" onClick={() => void alternarStatus(item)} title="Ativar ou inativar"><RefreshCcw className="h-4 w-4" /></Button></div></td></tr>) : <tr><td colSpan={5} className="px-4 py-10 text-center text-[var(--g3-muted)]">Nenhuma mensagem pré-pronta encontrada.</td></tr>}</tbody></table></CardContent></Card>
+          </div>
+        )}
+
+        {abaAtiva === "categorias" && (
+          <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
+            <Card><CardHeader><CardTitle className="text-base">{taxonomiaEdicao ? "Editar item" : "Novo item"}</CardTitle></CardHeader><CardContent className="space-y-3"><div className="space-y-1"><Label>Tipo</Label><Select value={taxonomiaForm.tipo} onChange={(e) => setTaxonomiaForm((v) => ({ ...v, tipo: e.target.value as MensagemTaxonomiaTipo }))} disabled={!!taxonomiaEdicao}><option value="CATEGORIA">Categoria</option><option value="ASSUNTO">Assunto</option><option value="TIPO_COMUNICACAO">Tipo de comunicação</option><option value="TAG">Tag</option></Select></div><div className="space-y-1"><Label>Nome</Label><Input value={taxonomiaForm.nome} onChange={(e) => setTaxonomiaForm((v) => ({ ...v, nome: e.target.value }))} placeholder="Ex.: Lembretes" /></div><div className="space-y-1"><Label>Descrição</Label><Textarea rows={3} value={taxonomiaForm.descricao} onChange={(e) => setTaxonomiaForm((v) => ({ ...v, descricao: e.target.value }))} /></div><div className="flex gap-2"><Button onClick={() => void salvarTaxonomia()} disabled={salvarTaxonomiaMutation.isPending || taxonomiaForm.nome.trim().length < 2}>{salvarTaxonomiaMutation.isPending ? "Salvando..." : "Salvar item"}</Button>{taxonomiaEdicao ? <Button variant="outline" onClick={() => { setTaxonomiaEdicao(null); setTaxonomiaForm({ tipo: "CATEGORIA", nome: "", descricao: "", status: "ATIVA" }); }}>Cancelar</Button> : null}</div></CardContent></Card>
+            <Card><CardHeader><CardTitle className="text-base">Categorias, assuntos e tags</CardTitle></CardHeader><CardContent><div className="grid gap-3 md:grid-cols-2">{taxonomias.map((item) => <div key={item.id} className="rounded-xl border border-[var(--g3-border)] p-3"><div className="flex items-start justify-between gap-2"><div><p className="font-semibold">{item.nome}</p><p className="text-xs text-[var(--g3-muted)]">{rotuloTaxonomia(item.tipo)} · {item.descricao || "Sem descrição"}</p></div><span className="text-xs text-emerald-700">{rotuloStatus(item.status)}</span></div><div className="mt-3 flex gap-2"><Button size="sm" variant="outline" onClick={() => { setTaxonomiaEdicao(item); setTaxonomiaForm({ tipo: item.tipo, nome: item.nome, descricao: item.descricao ?? "", status: item.status }); }}>Editar</Button><Button size="sm" variant="ghost" className="text-rose-600" onClick={() => void removerTaxonomia(item.id)}>Remover</Button></div></div>)}</div></CardContent></Card>
+          </div>
+        )}
+
+        {abaAtiva === "configuracao" && (
+          <div className="grid gap-4 lg:grid-cols-2"><Card><CardHeader><CardTitle className="text-base">Canais de envio</CardTitle></CardHeader><CardContent className="space-y-3"><div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4"><p className="font-semibold text-emerald-800">E-mail</p><p className="text-sm text-emerald-700">{suporteQuery.data?.integracoes.emailHabilitado ? "Integração habilitada para envio transacional." : "Integração ainda não habilitada."}</p></div><div className="rounded-xl border border-amber-200 bg-amber-50 p-4"><p className="font-semibold text-amber-800">WhatsApp</p><p className="text-sm text-amber-700">{suporteQuery.data?.integracoes.whatsappProviderHabilitado ? "Provedor conectado." : "Modo atual: link preparado. O envio é conferido e aberto no WhatsApp."}</p></div></CardContent></Card><Card><CardHeader><CardTitle className="text-base">Regras de segurança</CardTitle></CardHeader><CardContent className="space-y-3 text-sm text-[var(--g3-muted)]"><p>• A mensagem final é montada com as variáveis do destinatário antes do disparo.</p><p>• A prévia deve ser conferida antes de liberar o envio.</p><p>• Cada destinatário gera um registro próprio no histórico, incluindo conteúdo, canal e resultado.</p><p>• Falhas de contato são rejeitadas e ficam disponíveis para análise.</p></CardContent></Card></div>
         )}
 
         {abaAtiva === "sugestoes-ia" && (
@@ -698,7 +765,7 @@ export function MensagensPersonalizadasPage() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex justify-end gap-1">
-                          <Button size="sm" variant="ghost" className="h-8 w-8 p-0" title="Ver detalhes"><Search className="h-4 w-4" /></Button>
+                          <Button size="sm" variant="ghost" className="h-8 w-8 p-0" title="Ver detalhes" onClick={() => setHistoricoSelecionado(item.id)}><Search className="h-4 w-4" /></Button>
                           <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-indigo-600" title="Reenviar"><RefreshCcw className="h-4 w-4" /></Button>
                         </div>
                       </td>
@@ -711,6 +778,7 @@ export function MensagensPersonalizadasPage() {
                 </tbody>
               </table>
             </div>
+            {historicoSelecionado ? (() => { const item = historico.find((registro) => registro.id === historicoSelecionado); if (!item) return null; return <Card className="border-[var(--g3-active)]"><CardHeader className="flex-row items-center justify-between space-y-0"><div><CardTitle className="text-base">Detalhes do envio</CardTitle><p className="text-sm text-[var(--g3-muted)]">{item.nomeMensagem} · {item.destinatarioNome ?? "Destinatário não identificado"}</p></div><Button variant="ghost" onClick={() => setHistoricoSelecionado(undefined)}>Fechar</Button></CardHeader><CardContent className="grid gap-3 md:grid-cols-3"><div><p className="text-xs text-[var(--g3-muted)]">Contato</p><p className="text-sm font-medium">{item.destinatarioContato ?? "Não informado"}</p></div><div><p className="text-xs text-[var(--g3-muted)]">Assunto</p><p className="text-sm font-medium">{item.assuntoFinal ?? "Sem assunto"}</p></div><div><p className="text-xs text-[var(--g3-muted)]">Status</p><p className="text-sm font-medium">{item.status === "ERRO" ? item.erroObservacao ?? "Falha no envio" : item.status === "PREPARADO" ? "Link preparado para WhatsApp" : "Mensagem enviada"}</p></div><div className="md:col-span-3"><p className="text-xs text-[var(--g3-muted)]">Mensagem registrada</p><p className="whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-sm">{item.mensagemFinal ?? "Sem conteúdo registrado"}</p></div></CardContent></Card>; })() : null}
           </div>
         )}
       </AdminPageLayout>

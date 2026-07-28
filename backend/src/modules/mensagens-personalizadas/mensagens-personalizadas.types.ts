@@ -124,6 +124,7 @@ export type MensagemDestinatarioCatalogo = {
   email?: string;
   telefone?: string;
   detalhe?: string;
+  aceitaComunicacao?: boolean;
 };
 
 export type MensagemPreviewInput = {
@@ -141,6 +142,7 @@ export type MensagemEnvioInput = {
   canal: MensagemCanalEnvio;
   destinatarioTipo: MensagemDestinatarioTipo;
   destinatarioIds: string[];
+  destinatariosTodos?: boolean;
   tipoEnvio: MensagemTipoEnvio;
   assuntoEditado?: string | null;
   mensagemEditada?: string | null;
@@ -221,6 +223,7 @@ export type MensagemDestinatarioDetalhe = {
   cargo?: string;
   dataRegistro?: string;
   observacao?: string;
+  aceitaComunicacao?: boolean;
 };
 
 export type MensagemVariavelDisponivel = {

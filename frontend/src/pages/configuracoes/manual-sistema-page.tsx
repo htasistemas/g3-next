@@ -792,15 +792,22 @@ const secoesManual: ManualSecao[] = [
           "Comece pela aba Listagem para localizar um registro existente ou usar Novo para abrir uma nova prestação.",
           "Na listagem, use os filtros no topo para pesquisar por código, resumo, fontes, aplicações ou documentos, selecione a situação desejada e use Limpar filtros quando precisar reiniciar a busca.",
           "As linhas da tabela são clicáveis e o registro selecionado fica destacado visualmente para reduzir erro de operação.",
-          "Na aba Visão geral, informe total recebido, total aplicado, saldo disponível, prestado no mês e o resumo executivo da prestação em linguagem simples.",
+          "Na aba Visão geral, informe instrumento/parceria, tipo, período, objeto, total recebido, total aplicado, saldo disponível, prestado no mês e o resumo executivo.",
           "Na aba Receitas, cadastre cada entrada com fonte, valor, periodicidade e situação para consolidar a composição do total recebido.",
           "Na aba Aplicação dos recursos, detalhe onde o recurso foi utilizado, com percentual e descrição, para facilitar a leitura por quem analisa a prestação.",
+          "Na Visão geral, informe despesas e pagamentos realizados com descrição, fornecedor, documento fiscal, data e valor. O sistema totaliza os lançamentos e mostra a diferença para o total aplicado.",
           "Na aba Documentos e checklist, lance os comprovantes e monte o checklist de conferência antes de avançar.",
-          "Na aba Revisão e envio, acompanhe a situação geral, as pendências encontradas pela tela, a timeline da prestação e os indicadores finais de conferência antes de salvar ou imprimir."
+          "Para anexar um documento real, salve primeiro a prestação, selecione o arquivo na área Enviar arquivo e clique em Enviar. Depois clique em Adicionar comprovante e salve novamente; os arquivos ficam no storage por tenant e podem ser abertos pelo comprovante.",
+          "São aceitos PDF, documentos, planilhas e imagens de até 25 MB. O banco guarda apenas os metadados e o caminho lógico do arquivo.",
+          "Na aba Revisão e envio, acompanhe a situação geral, as pendências encontradas pela tela, a timeline da prestação e os indicadores finais de conferência antes de salvar ou imprimir.",
+          "Registre o parecer técnico, a conclusão, o responsável, a data, as ressalvas e as recomendações antes de tomar uma decisão formal. A conclusão precisa corresponder à ação escolhida no workflow.",
+          "A elaboração e o envio para análise usam as permissões de elaboração. A devolução para diligência usa revisão. Aprovação, aprovação com ressalvas, rejeição e encerramento exigem permissão de aprovação; usuários de leitura podem consultar e auditar sem alterar o processo.",
+          "O Histórico de versões do parecer registra cada salvamento do parecer com número da versão, usuário, data, conclusão, texto e ressalvas. Esse histórico é somente leitura e não pode ser apagado pela tela.",
+          "Depois de salvar, use Enviar para análise. A prestação pode seguir para diligência, aprovação, aprovação com ressalvas, rejeição e encerramento conforme o workflow."
         ],
         atencoes: [
           "Os campos monetários exibem formatação brasileira e a tela alerta quando o saldo informado divergir do saldo calculado pelos totais.",
-          "A prestação só fica realmente pronta para conferência quando houver receitas ou total recebido, aplicação ou total aplicado, comprovantes e checklist sem pendências.",
+          "A prestação só fica realmente pronta para envio quando houver identificação do instrumento, período, objeto, receitas ou total recebido, aplicação ou total aplicado, comprovantes e checklist sem pendências.",
           "A revisão final mostra claramente o que ainda falta, evitando depender de treinamento informal para concluir a operação.",
           "A tela Prestação de contas agora separa os dados por instituição e CNPJ da sessão autenticada, incluindo listagem, detalhe, criação, edição, exclusão, recebimentos, destinações, comprovantes, timeline e checklist."
         ]
@@ -1179,12 +1186,15 @@ const secoesManual: ManualSecao[] = [
         nome: "Mensagens personalizadas",
         objetivo: "Gerenciar mensagens pré-prontas, sugestões da IA, categorias, destinatários e histórico de envios por WhatsApp e e-mail.",
         comoUsar: [
-          "Use as abas da tela para criar mensagens, revisar sugestões da IA, manter categorias e assuntos e consultar o histórico de utilização.",
-          "Ao preparar um envio, selecione destinatário, canal, assunto e conteúdo e finalize a ação em um clique.",
-          "Use a visualização prévia para validar variáveis, saudação, assinatura e o conteúdo final antes de disparar ou preparar o link de WhatsApp."
+          "Use o Dashboard de envios para acompanhar totais, falhas, canais e mensagens mais utilizadas.",
+          "Na aba Mensagens pré-prontas, filtre, visualize, edite, duplique e ative ou inative modelos reutilizáveis.",
+          "Na aba Categorias e assuntos, mantenha categorias, assuntos, tipos de comunicação e tags usados nos modelos.",
+          "Ao preparar um envio, selecione destinatário, canal, assunto e conteúdo e confira a prévia final antes de disparar.",
+          "Use Configurar envios para verificar a integração de e-mail, o modo de WhatsApp e as regras de conferência."
         ],
         atencoes: [
-          "A tela Mensagens personalizadas agora lista, abre, cria, edita, duplica, inativa, remove e registra histórico sempre dentro do tenant autenticado.",
+          "A tela Mensagens personalizadas lista, abre, cria, edita, duplica, inativa, remove e registra histórico sempre dentro do tenant autenticado.",
+          "Cada destinatário gera seu próprio registro no histórico com mensagem final, canal, contato e resultado; o dashboard consolida esses registros.",
           "A busca de destinatários considera apenas beneficiários, profissionais, voluntários, doadores e instituições da própria organização logada.",
           "Ao trocar de instituição na mesma estação, faça novo login para garantir recarga completa do cache da tela por tenant."
         ]

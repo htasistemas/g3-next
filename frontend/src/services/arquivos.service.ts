@@ -159,6 +159,20 @@ export const arquivosService = {
     return mapArquivo(data.arquivo);
   },
 
+  async uploadParaPrestacaoContas(prestacaoId: string | number, arquivo: File, observacao?: string) {
+    const formData = new FormData();
+    formData.append("scope", "prestacao_contas_documento");
+    formData.append("entidadeTipo", "prestacao_contas");
+    formData.append("entidadeId", String(prestacaoId));
+    if (observacao?.trim()) formData.append("observacao", observacao.trim());
+    formData.append("arquivo", arquivo);
+    const { data } = await httpClient.post<{ arquivo: ArquivoApiRow }>("/api/arquivos/upload", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      timeout: 300000
+    });
+    return mapArquivo(data.arquivo);
+  },
+
   async excluir(id: string | number) {
     await httpClient.delete(`/api/arquivos/${id}`);
   }

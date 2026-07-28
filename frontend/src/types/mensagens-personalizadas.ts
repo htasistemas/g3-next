@@ -106,6 +106,7 @@ export type MensagemDestinatario = {
   email?: string;
   telefone?: string;
   detalhe?: string;
+  aceitaComunicacao?: boolean;
 };
 
 export type MensagemPreview = {
@@ -177,6 +178,7 @@ export type MensagemEnvioPayload = {
   canal: MensagemCanalEnvio;
   destinatarioTipo: MensagemDestinatarioTipo;
   destinatarioIds: string[];
+  destinatariosTodos?: boolean;
   tipoEnvio: "INDIVIDUAL" | "LOTE";
   assuntoEditado?: string;
   mensagemEditada?: string;
