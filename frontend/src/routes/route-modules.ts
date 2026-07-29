@@ -231,6 +231,10 @@ const routeModules: RouteModuleDefinition[] = [
     loader: () => import("@/pages/portais/portal-externo-page")
   },
   {
+    path: "/portal-transparencia/:slug",
+    loader: () => import("@/pages/portais/portal-externo-page")
+  },
+  {
     path: "/portal-parceiro-financiador",
     loader: () => import("@/pages/portais/portal-externo-page")
   },

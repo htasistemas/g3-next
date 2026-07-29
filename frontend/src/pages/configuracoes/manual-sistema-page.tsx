@@ -935,7 +935,7 @@ const secoesManual: ManualSecao[] = [
         nome: "Portal do doador",
         objetivo: "Disponibilizar campanhas, dados do doador, doações, comprovantes e pagamento externo.",
         comoUsar: [
-          "Use a rota /portal-doador para abrir o portal público do doador.",
+          "Use a rota /portal-doador para abrir o portal externo do doador no mesmo padrão visual do Portal da Transparência.",
           "Quando não houver token real disponível para teste, use Acessar demonstração para validar painel, doações, comprovantes, recorrências e preferências sem depender de backend.",
           "Mantenha campanhas, doadores, doações, comprovantes e formas de pagamento atualizados em Captação de recursos antes de divulgar o link.",
           "Quando o acesso vier de uma campanha ou doador identificado, confira se o vínculo do tenant está correto antes de gerar cobrança ou comprovante."
@@ -949,7 +949,7 @@ const secoesManual: ManualSecao[] = [
         nome: "Portal do voluntário",
         objetivo: "Preparar o acesso de voluntários a oportunidades, escalas, horas registradas, certificados e termos.",
         comoUsar: [
-          "Use a rota /portal-voluntario para abrir a interface externa do voluntário.",
+          "Use a rota /portal-voluntario para abrir a interface externa do voluntário no padrão visual institucional dos portais públicos.",
           "O voluntário informa e-mail ou CPF e senha para acessar a área restrita.",
           "Após o acesso, o portal consulta o cadastro real do voluntário e exibe indicadores, área de interesse, disponibilidade, status e informações resumidas.",
           "Use o módulo Cadastro de voluntários para manter CPF, e-mail, status, disponibilidade, área de interesse e habilidades atualizados."
@@ -963,8 +963,9 @@ const secoesManual: ManualSecao[] = [
         nome: "Portal do beneficiário e família",
         objetivo: "Preparar o acompanhamento externo de atendimentos, agenda familiar, documentos e comunicados.",
         comoUsar: [
-          "Use a rota /portal-beneficiario-familia para abrir a interface externa da família acompanhada.",
+          "Use a rota /portal-beneficiario-familia para abrir a interface externa da família acompanhada no mesmo padrão visual do Portal da Transparência.",
           "O beneficiário informa CPF e a senha de 4 dígitos criada no cadastro para acessar o portal.",
+          "Se o mesmo CPF e senha estiverem vinculados a mais de uma instituição, o portal apresenta as instituições disponíveis; selecione uma para abrir somente os dados daquele vínculo.",
           "O portal carrega automaticamente as cores padrão da instituição após a autenticação para manter a identidade visual do tenant.",
           "Após o acesso, o portal consulta beneficiário, vínculo familiar, agenda, atendimentos e documentos pendentes em formato resumido.",
           "Mantenha CPF, código familiar, vínculos, contatos, agendamentos e documentos atualizados nos módulos internos para alimentar o portal."
@@ -978,10 +979,11 @@ const secoesManual: ManualSecao[] = [
         nome: "Portal da transparência",
         objetivo: "Publicar projetos, indicadores, documentos públicos, prestação social e evidências autorizadas.",
         comoUsar: [
-          "Use a rota /portal-transparencia para abrir a consulta pública de transparência.",
-          "A busca permite preparar consulta por projeto, campanha, documento ou período.",
-          "A consulta pública já carrega projetos, prestação pública, campanhas visíveis ao público, documentos institucionais e unidades cadastradas.",
-          "Revise os dados de Projetos, Prestação de contas, Documentos da instituição e Captação antes de divulgar a página."
+          "Use /portal-transparencia para buscar uma instituição por nome ou CNPJ, ou /portal-transparencia/{slug} para abrir diretamente o portal público de uma instituição.",
+          "O slug é único por instituição e garante que projetos, termos, documentos, campanhas, unidades e valores sejam filtrados pelo tenant correto.",
+          "Dentro do portal, a logomarca da instituição selecionada é exibida e o botão Trocar instituição retorna à busca sem listar instituições antes da digitação.",
+          "A página publica dados reais cadastrados no G3N e apresenta uma checklist de transparência com sugestões para informações ainda pendentes.",
+          "Revise os dados de Termos de fomento, Planos de trabalho, Projetos, Prestação de contas, Documentos da instituição e Captação antes de divulgar a página."
         ],
         atencoes: [
           "O Portal da transparência é público por natureza; publique apenas informações aprovadas para divulgação externa.",
@@ -992,7 +994,7 @@ const secoesManual: ManualSecao[] = [
         nome: "Portal do parceiro e financiador",
         objetivo: "Preparar o acompanhamento de projetos apoiados, metas, documentos, relatórios e comunicação com a equipe.",
         comoUsar: [
-          "Use a rota /portal-parceiro-financiador para abrir a área externa de parceiros e financiadores.",
+          "Use a rota /portal-parceiro-financiador para abrir a área externa de parceiros e financiadores no padrão visual do Portal da Transparência.",
           "O parceiro informa e-mail institucional e senha para acessar projetos autorizados.",
           "Após o acesso, o portal consulta projetos reais relacionados ao parceiro por fonte de recurso, responsável ou nome do projeto.",
           "Use o módulo Projetos para manter fonte de recurso, responsável, status e tarefas atualizados para alimentar o painel externo."

@@ -7,6 +7,16 @@ const controller = new PortaisExternosController();
 export const portaisExternosRoutes = Router();
 
 portaisExternosRoutes.get(
+  "/transparencia/:slug/logo",
+  asyncHandler(controller.logo.bind(controller))
+);
+
+portaisExternosRoutes.get(
+  "/transparencia/:slug",
+  asyncHandler(controller.transparencia.bind(controller))
+);
+
+portaisExternosRoutes.get(
   "/transparencia",
   asyncHandler(controller.transparencia.bind(controller))
 );

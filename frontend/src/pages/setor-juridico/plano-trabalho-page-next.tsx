@@ -43,7 +43,8 @@ import {
   type PopupMensagemState
 } from "@/components/admin/admin-popups";
 import { arquivosService } from "@/services/arquivos.service";
-import { resolverUrlArquivo } from "@/lib/arquivos";
+import { obterUrlArquivoAutenticado, resolverUrlArquivo } from "@/lib/arquivos";
+import { useAuth } from "@/hooks/use-auth";
 import { useContasBancarias } from "@/features/contabilidade/use-contabilidade";
 import { useExcluirPlanoTrabalho, usePlanosTrabalho, useSalvarPlanoTrabalho } from "@/features/planos-trabalho/use-planos-trabalho";
 import {
@@ -72,7 +73,7 @@ import {
   validarPlanoParaImpressao
 } from "@/features/planos-trabalho/plano-trabalho-utils";
 import { gerarHtmlPlanoTrabalho } from "@/features/planos-trabalho/plano-trabalho-report";
-import { useUnidadesAssistenciais } from "@/features/unidades-assistenciais/use-unidades-assistenciais";
+import { useUnidadeAssistencialAtual, useUnidadesAssistenciais } from "@/features/unidades-assistenciais/use-unidades-assistenciais";
 import { useTermosFomento } from "@/features/termos-fomento/use-termos-fomento";
 import type { ArquivoMetadata } from "@/types/arquivo";
 import type {
@@ -372,6 +373,7 @@ function BadgePendencia({ texto }: { texto: string }) {
 }
 
 export function PlanoTrabalhoPage() {
+  const { usuario } = useAuth();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -401,6 +403,7 @@ export function PlanoTrabalhoPage() {
   const salvarMutation = useSalvarPlanoTrabalho();
   const excluirMutation = useExcluirPlanoTrabalho();
   const unidadesAssistenciaisQuery = useUnidadesAssistenciais({});
+  const unidadeAtualQuery = useUnidadeAssistencialAtual();
   const contasBancariasQuery = useContasBancarias();
 
   const planos = planosQuery.data ?? [];
@@ -772,7 +775,7 @@ export function PlanoTrabalhoPage() {
     URL.revokeObjectURL(url);
   }
 
-  function imprimirOuPdf() {
+  async function imprimirOuPdf() {
     const faltantes = validarPlanoParaImpressao(form);
     if (Object.keys(faltantes).length) {
       setPopup({
@@ -782,17 +785,55 @@ export function PlanoTrabalhoPage() {
       });
       return;
     }
-    const janela = window.open("", "_blank", "noopener,noreferrer,width=960,height=900");
-    if (!janela) {
-      setPopup({
-        tipo: "aviso",
-        titulo: "Pop-up bloqueado",
-        texto: "Libere a abertura de janelas para gerar a versão de impressão/PDF."
+    let logomarcaUrl = "";
+    let revogarLogomarca: (() => void) | undefined;
+    const caminhoLogomarca =
+      unidadeAtualQuery.data?.unidade?.logomarca_relatorio ||
+      unidadeAtualQuery.data?.unidade?.logomarca ||
+      usuario?.instituicao_logo_url;
+    try {
+      const arquivoLogomarca = await obterUrlArquivoAutenticado(caminhoLogomarca, {
+        cache: false,
+        auditar: false
       });
-      return;
+      logomarcaUrl = arquivoLogomarca.url;
+      revogarLogomarca = arquivoLogomarca.revoke;
+    } catch {
+      logomarcaUrl = caminhoLogomarca ? resolverUrlArquivo(caminhoLogomarca) : "";
     }
-    janela.document.write(gerarHtmlPlanoTrabalho(form, cronogramaExecucao, arquivos));
-    janela.document.close();
+
+    const iframe = document.createElement("iframe");
+    iframe.setAttribute("aria-hidden", "true");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    iframe.style.visibility = "hidden";
+    document.body.appendChild(iframe);
+
+    iframe.onload = () => {
+      window.setTimeout(() => {
+        const janela = iframe.contentWindow;
+        if (!janela) {
+          iframe.remove();
+          setPopup({
+            tipo: "erro",
+            titulo: "Erro ao imprimir",
+            texto: "Não foi possível preparar o relatório para impressão."
+          });
+          return;
+        }
+        janela.focus();
+        janela.print();
+        window.setTimeout(() => {
+          iframe.remove();
+          revogarLogomarca?.();
+        }, 1000);
+      }, 100);
+    };
+    iframe.srcdoc = gerarHtmlPlanoTrabalho(form, cronogramaExecucao, arquivos, logomarcaUrl);
   }
 
   async function anexarDocumento() {

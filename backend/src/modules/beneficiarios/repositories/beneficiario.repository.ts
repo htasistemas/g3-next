@@ -62,6 +62,9 @@ type DuplicateBeneficiarioRow = {
 type BeneficiarioPortalAcessoRow = {
   beneficiario_id: bigint;
   tenant_id: string | null;
+  instituicao_id?: string | null;
+  instituicao_nome?: string | null;
+  instituicao_cnpj?: string | null;
   nome_completo: string;
   codigo: string | null;
   cpf: string | null;
@@ -194,7 +197,7 @@ export async function possuiBeneficiarioPortalAcesso(beneficiarioId: bigint, ten
   return rows.length > 0;
 }
 
-export async function obterBeneficiarioPortalPorCpf(cpf: string) {
+export async function obterBeneficiariosPortalPorCpf(cpf: string) {
   await ensureBeneficiarioPortalAcessoEstrutura();
   const rows = await prisma.$queryRaw<BeneficiarioPortalAcessoRow[]>(Prisma.sql`
     SELECT
@@ -205,6 +208,9 @@ export async function obterBeneficiarioPortalPorCpf(cpf: string) {
         vf.tenant_id::text,
         m.tenant_id::text
       ) AS tenant_id,
+      i.id::text AS instituicao_id,
+      COALESCE(i.nome_fantasia, i.razao_social) AS instituicao_nome,
+      i.cnpj AS instituicao_cnpj,
       b.nome_completo,
       b.codigo,
       doc.numero_documento AS cpf,
@@ -225,12 +231,18 @@ export async function obterBeneficiarioPortalPorCpf(cpf: string) {
       ON m.beneficiario_id = b.id
     LEFT JOIN vinculo_familiar vf
       ON vf.id = m.vinculo_familiar_id
+    LEFT JOIN instituicoes i
+      ON i.tenant_id = COALESCE(b.tenant_id, acesso.tenant_id, vf.tenant_id, m.tenant_id)
     WHERE COALESCE(b.status, 'ATIVO') <> 'INATIVO'
       AND REGEXP_REPLACE(COALESCE(doc.numero_documento, ''), '\\D', '', 'g') = ${cpf}
     ORDER BY b.atualizado_em DESC, b.id DESC
-    LIMIT 1
   `);
 
+  return rows;
+}
+
+export async function obterBeneficiarioPortalPorCpf(cpf: string) {
+  const rows = await obterBeneficiariosPortalPorCpf(cpf);
   return rows[0] ?? null;
 }
 

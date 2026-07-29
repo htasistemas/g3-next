@@ -1,6 +1,142 @@
 {
   "entries":  [
                     {
+                        "version": "1.00.770",
+                        "releaseDate": "2026-07-28",
+                        "title": "Correção do padrão visual do Portal do Doador",
+                        "description": "A página pública do Portal do Doador foi ajustada para seguir a mesma composição visual do Portal da Transparência.",
+                        "changes": ["Largura e espaçamento institucionais ajustados.", "Hero azul no padrão do portal de referência.", "Cards horizontais de serviços reorganizados.", "Fluxo de acesso do doador preservado."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.769",
+                        "releaseDate": "2026-07-28",
+                        "title": "Ajuste completo do Portal do Doador",
+                        "description": "A tela de entrada e o painel autenticado do Portal do Doador agora seguem o padrão visual do Portal da Transparência.",
+                        "changes": ["Cabeçalho e navegação institucional.", "Hero azul no padrão dos demais portais.", "Categorias e cartões de serviços.", "Painel autenticado com rodapé institucional."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.768",
+                        "releaseDate": "2026-07-28",
+                        "title": "Padrão visual dos portais externos",
+                        "description": "Os portais do doador, voluntário e parceiro/financiador foram alinhados ao formato institucional do Portal da Transparência.",
+                        "changes": ["Cabeçalho, hero e navegação institucional nos portais.", "Categorias e cartões de serviços.", "Indicadores e rodapé com o mesmo padrão visual.", "Fluxos de acesso existentes preservados."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.767",
+                        "releaseDate": "2026-07-28",
+                        "title": "Acesso multi-instituição do beneficiário",
+                        "description": "O acesso do beneficiário agora localiza todos os vínculos institucionais do CPF e permite escolher a instituição antes de carregar os dados.",
+                        "changes": ["Busca de todos os vínculos do CPF.", "Validação da senha por instituição.", "Seleção da instituição antes da abertura do painel.", "Dados operacionais carregados somente para o tenant selecionado."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.766",
+                        "releaseDate": "2026-07-28",
+                        "title": "Novo layout do Portal do beneficiário e família",
+                        "description": "O portal do beneficiário e família agora utiliza o mesmo padrão visual institucional do Portal da Transparência.",
+                        "changes": ["Cabeçalho e hero institucional.", "Entrada com CPF e senha em destaque.", "Categorias e cartões de serviços.", "Indicadores, acompanhamento e rodapé no padrão público."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.765",
+                        "releaseDate": "2026-07-28",
+                        "title": "Logomarca da instituição no rodapé",
+                        "description": "O rodapé do Portal da Transparência agora utiliza a mesma logomarca institucional exibida no cabeçalho.",
+                        "changes": ["Substituído o ícone genérico do rodapé pela logomarca da instituição.", "Mantido fallback para o ícone institucional quando não houver imagem."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.764",
+                        "releaseDate": "2026-07-28",
+                        "title": "Correção da URL da logomarca pública",
+                        "description": "A logomarca do Portal da Transparência agora usa a base correta da API, evitando que o frontend tente carregar o HTML como imagem.",
+                        "changes": ["URL absoluta baseada na configuração do cliente HTTP.", "Compatibilidade com frontend na porta 5173 e backend na porta 3333.", "Mantida a resolução dos caminhos físicos dentro do tenant."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.763",
+                        "releaseDate": "2026-07-28",
+                        "title": "Correção do carregamento da logomarca pública",
+                        "description": "O Portal da Transparência agora resolve caminhos antigos e atuais de armazenamento da logomarca dentro do tenant.",
+                        "changes": ["Compatibilidade com caminhos legados de arquivos.", "Fallback para o diretório físico do tenant.", "Endpoint validado com resposta 200 e imagem JPEG."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.762",
+                        "releaseDate": "2026-07-28",
+                        "title": "Logomarca da unidade no Portal da Transparência",
+                        "description": "A logomarca pública agora utiliza a logo da instituição e, quando ausente, a logomarca da unidade principal cadastrada no G3N.",
+                        "changes": ["Fallback para imagens_unidade.logomarca_relatorio e logomarca.", "Endpoint público de logo atualizado para a mesma origem do cabeçalho.", "Mantida a separação por tenant e slug."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.761",
+                        "releaseDate": "2026-07-28",
+                        "title": "Ajuste do campo de busca institucional",
+                        "description": "O campo de busca da instituição foi reorganizado para manter o rótulo acima e a orientação ao lado do campo.",
+                        "changes": ["Rótulo Buscar instituição em linha própria.", "Orientação de pesquisa posicionada ao lado do campo.", "Removida a frase sobre listagem automática."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.760",
+                        "releaseDate": "2026-07-28",
+                        "title": "Busca e identidade do Portal da Transparência",
+                        "description": "A busca de instituições agora ocorre por nome ou CNPJ, com troca de instituição e logomarca correspondente no portal.",
+                        "changes": ["Instituições não são listadas antes da digitação.", "Busca com resultados clicáveis por nome ou CNPJ.", "Botão Trocar instituição disponível no portal selecionado.", "Logomarca da instituição exibida no cabeçalho e na apresentação."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.759",
+                        "releaseDate": "2026-07-28",
+                        "title": "Portal da Transparência multi-instituição",
+                        "description": "O portal público agora identifica a instituição por slug, filtra os dados pelo tenant correto e apresenta dados reais com checklist de transparência.",
+                        "changes": ["Seleção de instituição no endereço público sem slug.", "Rotas individuais no formato /portal-transparencia/{slug}.", "Publicação de identificação institucional, projetos, termos de fomento, indicadores e dados financeiros cadastrados.", "Checklist baseada na Lei nº 13.019/2014 e Decreto nº 8.726/2016, com sugestões para dados ausentes."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.758",
+                        "releaseDate": "2026-07-28",
+                        "title": "Cores do rodapé alinhadas ao topo",
+                        "description": "O rodapé do Portal da Transparência agora utiliza o mesmo gradiente azul institucional da faixa superior.",
+                        "changes": ["Gradiente do rodapé igual ao hero do portal.", "Contraste dos textos e links preservado para leitura."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.757",
+                        "releaseDate": "2026-07-28",
+                        "title": "Rodapé institucional do Portal da Transparência",
+                        "description": "O rodapé do portal foi alinhado ao modelo institucional com identificação, contato, links legais e retorno ao topo.",
+                        "changes": ["Faixa escura institucional em largura total.", "Identificação e contato organizados em colunas.", "Links de LGPD, política de privacidade e termos de uso.", "Versão pública e botão Voltar ao topo."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.756",
+                        "releaseDate": "2026-07-28",
+                        "title": "Novo layout do Portal da Transparência",
+                        "description": "O portal público de transparência agora segue o padrão visual institucional com cabeçalho, hero, busca, categorias e cartões de serviços.",
+                        "changes": ["Cabeçalho público com navegação e ação de consulta.", "Hero institucional com busca centralizada.", "Categorias horizontais e cartões de serviços com acesso rápido.", "Resultados públicos filtrados pela busca e indicadores destacados."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.755",
+                        "releaseDate": "2026-07-28",
+                        "title": "Logomarca no relatório do plano de trabalho",
+                        "description": "O relatório impresso ou exportado para PDF agora carrega a logomarca configurada para a unidade ou instituição.",
+                        "changes": ["Logomarca da unidade incluída no cabeçalho do relatório.", "Suporte a arquivos protegidos por URL temporária autenticada.", "Fallback para a logomarca configurada no cadastro da instituição."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.754",
+                        "releaseDate": "2026-07-28",
+                        "title": "Impressão do plano sem bloqueio de pop-up",
+                        "description": "A geração do relatório completo do plano de trabalho agora utiliza impressão integrada, sem depender da abertura de uma nova janela.",
+                        "changes": ["Removida a dependência de pop-up para Imprimir e Gerar PDF.", "Relatório carregado em iframe invisível e enviado à caixa de impressão do navegador.", "Mensagem de bloqueio de janela substituída por tratamento de erro de preparação."],
+                        "releaseType": "stable"
+                    },
+                    {
                         "version": "1.00.753",
                         "releaseDate": "2026-07-28",
                         "title": "Navegação pelas pendências do plano",

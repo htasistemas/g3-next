@@ -375,14 +375,18 @@ export function PortalDoadorPage() {
   if (!token || !painel) {
     return (
       <>
-        <main className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#eef5ff_100%)] px-4 py-10">
-          <div className="mx-auto max-w-4xl space-y-6">
-            <div className="rounded-3xl bg-[linear-gradient(135deg,#0f766e_0%,#2563eb_100%)] px-6 py-8 text-white shadow-[0_25px_80px_-40px_rgba(15,118,110,0.7)]">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/75">Portal do doador</p>
-              <h1 className="mt-2 text-3xl font-semibold tracking-tight">Acompanhe sua jornada de apoio com transparência</h1>
-              <p className="mt-3 max-w-2xl text-sm text-white/85">Consulte doações, comprovantes, recorrências e apoie novamente em um ambiente seguro e acolhedor.</p>
+        <main className="min-h-screen bg-slate-50 px-4 py-0 text-slate-900">
+          <div className="mx-auto max-w-7xl space-y-0">
+            <header className="flex flex-wrap items-center justify-between gap-4 rounded-b-[26px] bg-white px-6 py-3 shadow-sm">
+              <div className="flex items-center gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-xl text-blue-800"><HandCoins className="h-8 w-8" /></span><div><p className="text-lg font-bold text-slate-900">Portal do Doador</p><p className="text-sm text-slate-600">Consulta pública institucional</p></div></div>
+              <nav className="flex gap-5 text-sm font-semibold text-slate-900"><span className="border-b-4 border-blue-700 px-2 py-3">Início</span><span className="px-2 py-3">Campanhas</span><span className="px-2 py-3">Comprovantes</span></nav>
+            </header>
+            <div className="mt-0 rounded-none bg-[linear-gradient(135deg,#173f70_0%,#0d2d52_100%)] px-6 py-9 text-white shadow-xl sm:px-8">
+              <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-5 sm:gap-8"><div className="flex h-32 w-32 items-center justify-center rounded-3xl border border-white/20 bg-white/10 shadow-inner sm:h-36 sm:w-36"><HandCoins className="h-20 w-20 text-blue-100" /></div><div><p className="text-sm font-bold uppercase tracking-[0.14em] text-blue-200">Portal do doador</p><h1 className="mt-2 text-4xl font-black tracking-tight sm:text-5xl">Portal do Doador</h1><p className="mt-3 max-w-2xl text-base text-blue-100">Acesse suas doações, comprovantes, campanhas e informações públicas da instituição.</p></div></div>
+              <div className="mx-auto mt-7 max-w-6xl rounded-2xl border border-white/20 bg-slate-950/25 p-3 shadow-xl"><p className="px-2 pb-2 text-sm text-blue-100">Acesse seu portal para consultar suas informações</p><div className="h-2 rounded-full bg-white/10" /></div>
             </div>
-            <Card className="mx-auto max-w-xl border-[var(--g3-border)]">
+            <div className="mx-auto max-w-6xl px-0 py-7"><div className="flex gap-3 overflow-x-auto pb-2">{["Minhas doações", "Comprovantes", "Campanhas apoiadas"].map((item) => <div key={item} className="flex min-w-[190px] items-center gap-3 rounded-2xl border border-blue-200 bg-blue-50/60 px-4 py-4 text-sm font-bold text-slate-900 shadow-sm"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-200/70 text-blue-900"><HandCoins className="h-5 w-5" /></span>{item}</div>)}</div></div>
+            <Card className="mx-auto mb-10 max-w-xl border-[var(--g3-border)]">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg"><ShieldUser className="h-5 w-5" />Acessar meu portal</CardTitle>
               </CardHeader>
@@ -412,9 +416,13 @@ export function PortalDoadorPage() {
 
   return (
     <>
-      <main className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#eef5ff_100%)] px-4 py-8">
+      <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900">
         <div className="mx-auto max-w-7xl space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl bg-[linear-gradient(135deg,#0f766e_0%,#2563eb_100%)] px-6 py-6 text-white shadow-[0_25px_80px_-40px_rgba(15,118,110,0.7)]">
+          <header className="flex flex-wrap items-center justify-between gap-4 rounded-b-[26px] bg-white px-6 py-3 shadow-sm">
+            <div className="flex items-center gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-xl text-blue-800"><HandCoins className="h-8 w-8" /></span><div><p className="text-lg font-bold">Portal do Doador</p><p className="text-sm text-slate-600">Consulta pública institucional</p></div></div>
+            <nav className="flex flex-wrap items-center gap-2 text-sm font-semibold sm:gap-7"><span className="border-b-4 border-blue-700 px-2 py-3">Início</span><span className="px-2 py-3">Doações</span><span className="px-2 py-3">Comprovantes</span><Button type="button" size="sm" variant="outline" onClick={sair}>Sair</Button></nav>
+          </header>
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl bg-[linear-gradient(135deg,#173f70_0%,#0d2d52_100%)] px-6 py-7 text-white shadow-xl">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/75">Meu painel</p>
               <h1 className="mt-1 text-2xl font-semibold tracking-tight">{painel.doador.nome}</h1>
@@ -425,6 +433,8 @@ export function PortalDoadorPage() {
               Sair
             </Button>
           </div>
+
+          <div className="flex gap-3 overflow-x-auto pb-1">{["Minhas doações", "Comprovantes", "Campanhas", "Recorrências"].map((item) => <div key={item} className="flex min-w-[160px] items-center gap-2 rounded-2xl border border-blue-200 bg-white px-4 py-3 text-sm font-bold text-slate-800 shadow-sm"><HandCoins className="h-5 w-5 text-blue-700" />{item}</div>)}</div>
 
           <div className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
             <Card className="border-[var(--g3-border)]">
@@ -489,6 +499,7 @@ export function PortalDoadorPage() {
               </Card>
             </div>
           </div>
+          <footer className="rounded-3xl bg-[linear-gradient(135deg,#173f70_0%,#0d2d52_100%)] px-6 py-7 text-blue-100"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-bold text-white">Portal do Doador</p><p className="mt-1 text-sm">Informações de apoio e comprovantes da instituição.</p></div><span className="text-sm">G3N · portal externo</span></div></footer>
         </div>
       </main>
       {popup ? <PopupMensagem popup={popup} onClose={() => setPopup(null)} /> : null}

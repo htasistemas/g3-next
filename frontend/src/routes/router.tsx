@@ -313,6 +313,11 @@ export const router = createBrowserRouter([
     errorElement: <RouteErrorBoundary />
   },
   {
+    path: "/portal-transparencia/:slug",
+    element: PortalTransparenciaPage,
+    errorElement: <RouteErrorBoundary />
+  },
+  {
     path: "/portal-parceiro-financiador",
     element: PortalParceiroFinanciadorPage,
     errorElement: <RouteErrorBoundary />

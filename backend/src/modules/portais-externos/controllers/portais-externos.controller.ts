@@ -11,7 +11,16 @@ export class PortaisExternosController {
 
   async transparencia(request: Request, response: Response) {
     const tenantId = typeof request.query.tenantId === "string" ? request.query.tenantId : undefined;
-    const painel = await service.obterTransparencia(tenantId);
+    const slug = typeof request.params.slug === "string" ? request.params.slug : undefined;
+    const painel = await service.obterTransparencia(tenantId, slug);
     return response.json({ painel });
+  }
+
+  async logo(request: Request, response: Response) {
+    const logo = await service.obterLogoInstituicao(request.params.slug);
+    if ("url" in logo) return response.redirect(logo.url);
+    response.setHeader("Content-Type", logo.mimeType);
+    response.setHeader("Cache-Control", "public, max-age=3600");
+    return logo.stream.pipe(response);
   }
 }

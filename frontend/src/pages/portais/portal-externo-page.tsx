@@ -1,21 +1,28 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useParams } from "react-router-dom";
 import {
   BarChart3,
   Building2,
   CalendarCheck,
   CheckCircle2,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ClipboardList,
+  CircleDollarSign,
   Eye,
   FileCheck2,
   FileText,
   HandHeart,
   HandCoins,
   HeartHandshake,
+  Landmark,
   LockKeyhole,
   Mail,
   MapPinned,
   MessageCircle,
   PieChart,
+  Search,
   ShieldCheck,
   Target,
   UsersRound
@@ -30,6 +37,7 @@ import { darken, lighten } from "@/lib/color-utils";
 import { formatarCpf, somenteDigitos } from "@/lib/br-utils";
 import {
   portaisExternosService,
+  obterUrlLogoTransparencia,
   type PortalExternoCard,
   type PortalExternoIndicador,
   type PortalExternoPainel,
@@ -290,9 +298,11 @@ const portalConfigs: Record<PortalTipo, PortalConfig> = {
   }
 };
 
-function PortalExternoPage({ tipo }: { tipo: PortalTipo }) {
+function PortalExternoPage({ tipo, tenantSlug }: { tipo: PortalTipo; tenantSlug?: string }) {
   const config = portalConfigs[tipo];
   const [identificador, setIdentificador] = useState("");
+  const [instituicaoBusca, setInstituicaoBusca] = useState("");
+  const [instituicaoBeneficiario, setInstituicaoBeneficiario] = useState("");
   const [senha, setSenha] = useState("");
   const [acessoLiberado, setAcessoLiberado] = useState(!config.acessoRestrito);
   const [painel, setPainel] = useState<PortalExternoPainel | null>(null);
@@ -330,6 +340,8 @@ function PortalExternoPage({ tipo }: { tipo: PortalTipo }) {
 
   useEffect(() => {
     setIdentificador("");
+    setInstituicaoBusca("");
+    setInstituicaoBeneficiario("");
     setSenha("");
     setPainel(null);
     setAcessoLiberado(!config.acessoRestrito);
@@ -339,7 +351,7 @@ function PortalExternoPage({ tipo }: { tipo: PortalTipo }) {
     let ativo = true;
     setCarregando(true);
     portaisExternosService
-      .obterTransparencia()
+      .obterTransparencia(tenantSlug)
       .then((dados) => {
         if (!ativo) return;
         setPainel(dados);
@@ -360,7 +372,7 @@ function PortalExternoPage({ tipo }: { tipo: PortalTipo }) {
     return () => {
       ativo = false;
     };
-  }, [config.acessoRestrito, tipo]);
+  }, [config.acessoRestrito, tenantSlug, tipo]);
 
   useEffect(() => {
     if (tipo !== "beneficiario") return;
@@ -368,7 +380,7 @@ function PortalExternoPage({ tipo }: { tipo: PortalTipo }) {
     setSenha((valorAtual) => somenteDigitos(valorAtual).slice(0, 4));
   }, [tipo]);
 
-  async function acessarPortal() {
+  async function acessarPortal(tenantSelecionadoOverride?: string) {
     const cpfNormalizado = somenteDigitos(identificador).slice(0, 11);
     const senhaNormalizada = somenteDigitos(senha).slice(0, 4);
 
@@ -404,18 +416,23 @@ function PortalExternoPage({ tipo }: { tipo: PortalTipo }) {
     setCarregando(true);
     try {
       if (tipo === "transparencia") {
-        const dados = await portaisExternosService.obterTransparencia();
+        const dados = await portaisExternosService.obterTransparencia(tenantSlug);
         setPainel(dados);
       } else {
         const dados = await portaisExternosService.acessar(
           tipo,
           tipo === "beneficiario" ? cpfNormalizado : identificador,
-          tipo === "beneficiario" ? senhaNormalizada : senha
+          tipo === "beneficiario" ? senhaNormalizada : senha,
+          tipo === "beneficiario" ? tenantSelecionadoOverride || instituicaoBeneficiario || undefined : undefined
         );
         setPainel(dados);
+        if (tipo === "beneficiario") {
+          const precisaEscolherInstituicao = (dados.instituicoesBeneficiario?.length ?? 0) > 1 && !dados.pessoa;
+          setAcessoLiberado(!precisaEscolherInstituicao);
+        }
       }
 
-      setAcessoLiberado(true);
+      if (tipo !== "beneficiario") setAcessoLiberado(true);
       setPopup({
         tipo: "sucesso",
         titulo: config.acessoRestrito ? "Acesso liberado" : "Consulta aberta",
@@ -462,6 +479,412 @@ function PortalExternoPage({ tipo }: { tipo: PortalTipo }) {
       ...atual,
       [chave]: atual[chave] + 5
     }));
+  }
+
+  function renderPortalTransparencia() {
+    const instituicao = painel?.instituicao;
+    const logoInstituicao = instituicao?.logoUrl
+      ? (/^(https?:\/\/|data:)/i.test(instituicao.logoUrl)
+          ? instituicao.logoUrl
+          : obterUrlLogoTransparencia(instituicao.slug))
+      : "";
+    const buscaInstituicao = instituicaoBusca.trim().toLowerCase();
+    const instituicoesFiltradas = (painel?.instituicoesDisponiveis ?? []).filter((item) =>
+      !buscaInstituicao || `${item.nome} ${item.cnpj}`.toLowerCase().includes(buscaInstituicao)
+    );
+    const termoBusca = identificador.trim().toLowerCase();
+    const itensPublicos = (painel?.itens ?? []).filter((item) => {
+      if (!termoBusca) return true;
+      return [item.titulo, item.subtitulo, item.status].some((valor) =>
+        String(valor ?? "").toLowerCase().includes(termoBusca)
+      );
+    });
+    const categorias = [
+      { titulo: "Serviços", Icone: Landmark },
+      { titulo: "Receitas", Icone: CircleDollarSign },
+      { titulo: "Despesas", Icone: FileText },
+      { titulo: "Convênios", Icone: HeartHandshake },
+      { titulo: "Projetos", Icone: Target },
+      { titulo: "Documentos", Icone: FileCheck2 }
+    ];
+
+    return (
+      <main className="min-h-screen bg-slate-50 text-slate-900">
+        <header className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-4 rounded-b-[26px] bg-white px-6 py-3 shadow-[0_10px_30px_-18px_rgba(15,23,42,0.55)] sm:px-8">
+          <div className="flex items-center gap-3">
+            <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl text-[var(--g3-primary)]">
+              {logoInstituicao ? <img src={logoInstituicao} alt={`Logomarca de ${instituicao?.nome ?? "instituição"}`} className="h-full w-full object-contain" /> : <Landmark className="h-9 w-9" />}
+            </span>
+            <div>
+              <p className="text-lg font-bold leading-5 text-slate-900">Portal da Transparência</p>
+              <p className="text-sm text-slate-600">Consulta pública institucional</p>
+            </div>
+          </div>
+          <nav className="flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-800 sm:gap-7">
+            <button type="button" className="border-b-4 border-[var(--g3-primary)] px-2 py-3">Início</button>
+            <button type="button" onClick={() => setIdentificador("")} className="px-2 py-3">Serviços</button>
+            <button type="button" onClick={() => setIdentificador("projeto")} className="px-2 py-3">Projetos</button>
+            <button type="button" onClick={() => setIdentificador("documento")} className="px-2 py-3">Documentos</button>
+            <button type="button" className="inline-flex items-center gap-1 px-2 py-3">Mais <ChevronDown className="h-4 w-4" /></button>
+            <Button type="button" size="sm" onClick={() => setPopup({ tipo: "aviso", titulo: "Área pública", texto: "Esta consulta não exige login. Utilize a busca para localizar informações publicadas." })}>
+              <Eye className="mr-1.5 h-4 w-4" /> Consultar
+            </Button>
+            {instituicao ? <Button type="button" size="sm" variant="outline" onClick={() => { window.location.href = "/portal-transparencia"; }}>Trocar instituição</Button> : null}
+          </nav>
+        </header>
+
+        <section className="bg-[linear-gradient(135deg,#173f70_0%,#0d2d52_100%)] px-5 pb-10 pt-9 text-white sm:px-8">
+          <div className="mx-auto max-w-6xl">
+            <div className="flex flex-wrap items-center gap-5 sm:gap-8">
+              <div className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-3xl border border-white/20 bg-white/10 p-3 shadow-inner sm:h-36 sm:w-36">
+                {logoInstituicao ? <img src={logoInstituicao} alt={`Logomarca de ${instituicao?.nome ?? "instituição"}`} className="h-full w-full object-contain" /> : <Landmark className="h-20 w-20 text-blue-100" />}
+              </div>
+              <div>
+              <p className="text-sm font-bold uppercase tracking-[0.14em] text-blue-200">{instituicao?.nome ?? "Transparência institucional"}</p>
+                <h1 className="mt-2 text-4xl font-black tracking-tight sm:text-5xl">Portal da Transparência</h1>
+              <p className="mt-3 max-w-2xl text-base text-blue-100">Acesse serviços, projetos, documentos e informações públicas da instituição.</p>
+                {instituicao ? <p className="mt-2 text-sm text-blue-200">CNPJ: {instituicao.cnpj}</p> : null}
+              </div>
+            </div>
+
+            {!instituicao && painel?.instituicoesDisponiveis?.length ? (
+              <div className="mt-6 rounded-2xl border border-white/20 bg-white/10 p-4">
+                <label className="block text-sm font-semibold text-white" htmlFor="instituicao-portal-transparencia">
+                  Buscar instituição
+                </label>
+                <div className="mt-2 flex flex-col items-start gap-2 sm:flex-row sm:items-center">
+                  <Input
+                    id="instituicao-portal-transparencia"
+                    value={instituicaoBusca}
+                    onChange={(event) => setInstituicaoBusca(event.target.value)}
+                    placeholder="Digite o nome ou CNPJ da instituição"
+                    className="min-h-12 w-full border-white/20 bg-white text-slate-900 placeholder:text-slate-500 sm:max-w-xl"
+                  />
+                  <span className="text-xs text-blue-100 sm:whitespace-nowrap">Digite para localizar uma instituição.</span>
+                </div>
+                {instituicaoBusca.trim() ? (
+                  <div className="mt-2 grid max-h-56 gap-2 overflow-y-auto sm:max-w-xl">
+                    {instituicoesFiltradas.length ? instituicoesFiltradas.map((item) => (
+                      <button key={item.slug} type="button" onClick={() => { window.location.href = `/portal-transparencia/${item.slug}`; }} className="rounded-xl bg-white px-4 py-3 text-left text-sm text-slate-900 transition hover:bg-blue-50">
+                        <span className="block font-semibold">{item.nome}</span>
+                        <span className="mt-1 block text-xs text-slate-500">CNPJ: {item.cnpj}</span>
+                      </button>
+                    )) : <p className="rounded-xl bg-white px-4 py-3 text-sm text-slate-600">Nenhuma instituição encontrada.</p>}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            <div className="mt-7 flex flex-col gap-2 rounded-2xl border border-white/20 bg-slate-950/25 p-2 shadow-xl sm:flex-row">
+              <div className="flex min-h-12 flex-1 items-center gap-3 rounded-xl bg-white/10 px-4">
+                <Search className="h-5 w-5 shrink-0 text-blue-200" />
+                <Input
+                  value={identificador}
+                  onChange={(event) => setIdentificador(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") void acessarPortal();
+                  }}
+                  placeholder="Buscar projetos, documentos ou informações..."
+                  className="border-0 bg-transparent p-0 text-white placeholder:text-blue-200 focus-visible:ring-0"
+                />
+              </div>
+              <Button type="button" className="min-h-12 bg-blue-600 px-7 hover:bg-blue-500" onClick={() => void acessarPortal()} disabled={carregando}>
+                {carregando ? "Buscando..." : "Buscar"}
+              </Button>
+            </div>
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-6xl px-5 py-7 sm:px-8">
+          <div className="flex items-center gap-3">
+            <button type="button" className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="Voltar ao início">
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <span className="rounded-full border border-blue-300 bg-blue-50 px-4 py-2 text-sm font-bold text-blue-900">Serviços</span>
+          </div>
+
+          <div className="mt-5 flex items-center gap-3 overflow-hidden">
+            <button type="button" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600" aria-label="Categoria anterior"><ChevronLeft className="h-5 w-5" /></button>
+            <div className="flex min-w-0 gap-3 overflow-x-auto pb-2">
+              {categorias.map(({ titulo, Icone }) => (
+                <button key={titulo} type="button" onClick={() => setIdentificador(titulo)} className="flex min-w-[150px] items-center gap-3 rounded-2xl border border-blue-200 bg-blue-50/60 px-4 py-4 text-left font-bold text-slate-800 transition hover:border-blue-400 hover:bg-blue-100">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-200/70 text-blue-900"><Icone className="h-5 w-5" /></span>
+                  {titulo}
+                </button>
+              ))}
+            </div>
+            <button type="button" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600" aria-label="Próxima categoria"><ChevronRight className="h-5 w-5" /></button>
+          </div>
+
+          <div className="mt-7 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+            {(cards.length ? cards : config.cards).map((card, index) => {
+              const Icone = config.cards[index]?.Icone ?? Target;
+              return (
+                <article key={card.titulo} className="flex min-h-[270px] flex-col rounded-3xl border-2 border-blue-200 bg-white p-5 shadow-[0_14px_35px_-25px_rgba(30,64,175,0.8)]">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-700"><Icone className="h-7 w-7" /></div>
+                  <span className="mt-4 w-fit rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">Transparência</span>
+                  <h2 className="mt-4 text-xl font-bold leading-tight text-slate-900">{card.titulo}</h2>
+                  <p className="mt-3 flex-1 text-sm leading-6 text-slate-500">{card.texto}</p>
+                  <Button type="button" className="mt-5 w-full bg-blue-600 hover:bg-blue-700" onClick={() => setIdentificador(card.titulo)}>
+                    Acessar <ChevronRight className="ml-1.5 h-4 w-4" />
+                  </Button>
+                </article>
+              );
+            })}
+          </div>
+
+          <div className="mt-8 grid gap-5 lg:grid-cols-3">
+            {(indicadores ?? []).map((indicador) => (
+              <div key={indicador.label} className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+                <p className="text-sm text-slate-500">{indicador.label}</p>
+                <p className="mt-1 text-2xl font-black text-blue-900">{indicador.valor}</p>
+              </div>
+            ))}
+          </div>
+
+          {instituicao && painel?.checklistTransparencia?.length ? (
+            <section className="mt-8 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Conformidade da publicação</p>
+                <h2 className="mt-1 text-xl font-bold text-slate-900">Informações de transparência</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-500">A situação abaixo é calculada com base nos dados cadastrados no G3N. Itens pendentes mostram o que a instituição deve complementar.</p>
+              </div>
+              <div className="mt-5 grid gap-3 md:grid-cols-2">
+                {painel.checklistTransparencia.map((item) => (
+                  <div key={item.codigo} className={`rounded-2xl border px-4 py-4 ${item.status === "PUBLICADO" ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="font-bold text-slate-900">{item.titulo}</p>
+                      <Badge variant={item.status === "PUBLICADO" ? "success" : "warning"}>{item.status === "PUBLICADO" ? "Publicado" : "Pendente"}</Badge>
+                    </div>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">{item.sugestao}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          {instituicao && painel?.parcerias?.length ? (
+            <section className="mt-8 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Parcerias públicas</p>
+              <h2 className="mt-1 text-xl font-bold text-slate-900">Instrumentos e termos publicados</h2>
+              <div className="mt-4 grid gap-3">
+                {painel.parcerias.map((parceria) => (
+                  <article key={parceria.id} className="rounded-2xl border border-slate-200 px-4 py-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="font-bold text-slate-900">{parceria.numero} · {parceria.tipo}</p>
+                        <p className="mt-1 text-sm text-slate-500">Órgão concedente: {parceria.orgaoConcedente ?? "Não informado"}</p>
+                      </div>
+                      <Badge variant="info">{parceria.situacao}</Badge>
+                    </div>
+                    <p className="mt-3 text-sm leading-6 text-slate-600">{parceria.objeto ?? "Objeto não informado"}</p>
+                    <p className="mt-2 text-sm font-semibold text-blue-900">Valor global: {formatarMoedaPortal(parceria.valorGlobal)}</p>
+                  </article>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          {termoBusca ? (
+            <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div><p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Resultado da busca</p><h2 className="mt-1 text-xl font-bold">Informações encontradas</h2></div>
+                <Button type="button" variant="outline" onClick={() => setIdentificador("")}>Limpar busca</Button>
+              </div>
+              <div className="mt-4 grid gap-3">
+                {itensPublicos.length ? itensPublicos.map((item) => (
+                  <div key={item.id} className="rounded-2xl border border-slate-200 px-4 py-3">
+                    <p className="font-bold text-slate-900">{item.titulo}</p>
+                    <p className="mt-1 text-sm text-slate-500">{item.subtitulo}</p>
+                    <Badge className="mt-2" variant="info">{item.status ?? "Ativo"}</Badge>
+                  </div>
+                )) : <p className="text-sm text-slate-500">Nenhuma informação encontrada para a busca.</p>}
+              </div>
+            </div>
+          ) : null}
+        </section>
+
+        <footer className="bg-[linear-gradient(135deg,#173f70_0%,#0d2d52_100%)] px-5 py-9 text-blue-100 sm:px-8">
+          <div className="mx-auto max-w-6xl">
+            <div className="flex flex-col justify-between gap-8 md:flex-row">
+              <div className="flex items-start gap-3">
+                <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl border border-white/15 bg-white/10 p-1 text-blue-100">
+                  {logoInstituicao ? <img src={logoInstituicao} alt={`Logomarca de ${instituicao?.nome ?? "instituição"}`} className="h-full w-full object-contain" /> : <Landmark className="h-6 w-6" />}
+                </span>
+                <div>
+                  <p className="font-bold text-white">{instituicao?.nome ?? "Portal da Transparência"}</p>
+                  <p className="mt-1 text-sm text-blue-200">Informações públicas institucionais</p>
+                  <p className="mt-1 text-xs text-blue-300">Dados publicados conforme disponibilidade e aprovação institucional.</p>
+                </div>
+              </div>
+              <div className="md:text-right">
+                <p className="font-bold uppercase tracking-[0.14em] text-white">Contato</p>
+                <p className="mt-2 text-sm text-blue-200">{instituicao?.email ?? "Atendimento público institucional"}</p>
+                <p className="mt-1 text-sm text-blue-200">{instituicao?.telefone ?? instituicao?.endereco ?? "Utilize os canais oficiais da instituição responsável."}</p>
+              </div>
+            </div>
+            <div className="my-7 h-px bg-white/15" />
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <button type="button" onClick={() => setPopup({ tipo: "aviso", titulo: "LGPD", texto: "Consulte a política de proteção de dados da instituição responsável por este portal." })} className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-blue-100 transition hover:bg-white/10">LGPD</button>
+              <button type="button" onClick={() => setPopup({ tipo: "aviso", titulo: "Política de privacidade", texto: "A política de privacidade será disponibilizada pela instituição responsável." })} className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-blue-100 transition hover:bg-white/10">Política de privacidade</button>
+              <button type="button" onClick={() => setPopup({ tipo: "aviso", titulo: "Termos de uso", texto: "Os termos de uso serão disponibilizados pela instituição responsável." })} className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-blue-100 transition hover:bg-white/10">Termos de uso</button>
+            </div>
+            <div className="mt-7 flex flex-wrap items-center justify-between gap-3 text-xs text-blue-300">
+              <span>© Portal da Transparência</span>
+              <span>G3N · versão pública</span>
+              <button type="button" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="rounded-full border border-white/15 px-4 py-2 font-semibold text-blue-100 transition hover:bg-white/10">Voltar ao topo</button>
+            </div>
+          </div>
+        </footer>
+      </main>
+    );
+  }
+
+  function renderPortalBeneficiario() {
+    const pessoa = painel?.pessoa;
+    const categorias = [
+      { titulo: "Atendimentos", Icone: HeartHandshake },
+      { titulo: "Agendamentos", Icone: CalendarCheck },
+      { titulo: "Benefícios", Icone: HandCoins },
+      { titulo: "Documentos", Icone: FileCheck2 },
+      { titulo: "Comunicados", Icone: MessageCircle }
+    ];
+
+    return (
+      <main className="min-h-screen bg-slate-50 text-slate-900">
+        <header className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-4 rounded-b-[26px] bg-white px-6 py-3 shadow-[0_10px_30px_-18px_rgba(15,23,42,0.55)] sm:px-8">
+          <div className="flex items-center gap-3">
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl text-[var(--g3-primary)]"><HeartHandshake className="h-9 w-9" /></span>
+            <div><p className="text-lg font-bold leading-5 text-slate-900">Portal do Beneficiário e Família</p><p className="text-sm text-slate-600">Acompanhamento público e seguro</p></div>
+          </div>
+          <nav className="flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-800 sm:gap-7">
+            <button type="button" className="border-b-4 border-[var(--g3-primary)] px-2 py-3">Início</button>
+            <button type="button" onClick={() => setIdentificador(identificador)} className="px-2 py-3">Atendimentos</button>
+            <button type="button" onClick={() => setIdentificador(identificador)} className="px-2 py-3">Agenda</button>
+            <button type="button" onClick={() => setIdentificador(identificador)} className="px-2 py-3">Documentos</button>
+            {acessoLiberado ? <Button type="button" size="sm" variant="outline" onClick={sairPortal}>Sair</Button> : null}
+          </nav>
+        </header>
+
+        <section className="bg-[linear-gradient(135deg,#173f70_0%,#0d2d52_100%)] px-5 pb-10 pt-9 text-white sm:px-8">
+          <div className="mx-auto max-w-6xl">
+            <div className="flex flex-wrap items-center gap-5 sm:gap-8">
+              <div className="flex h-32 w-32 items-center justify-center rounded-3xl border border-white/20 bg-white/10 shadow-inner sm:h-36 sm:w-36"><HeartHandshake className="h-20 w-20 text-blue-100" /></div>
+              <div>
+                <p className="text-sm font-bold uppercase tracking-[0.14em] text-blue-200">Minha jornada de atendimento</p>
+                <h1 className="mt-2 text-4xl font-black tracking-tight sm:text-5xl">Portal do beneficiário e família</h1>
+                <p className="mt-3 max-w-2xl text-base text-blue-100">Consulte atendimentos, agenda, benefícios, documentos e comunicados autorizados.</p>
+                {pessoa?.nome ? <p className="mt-2 text-sm text-blue-200">Beneficiário: {pessoa.nome}</p> : null}
+              </div>
+            </div>
+
+            {!acessoLiberado ? (
+              painel?.instituicoesBeneficiario?.length && !pessoa ? (
+                <div className="mt-7 rounded-2xl border border-white/20 bg-slate-950/25 p-4 shadow-xl">
+                  <p className="text-sm font-semibold text-white">Selecione a instituição para continuar</p>
+                  <p className="mt-1 text-xs text-blue-100">Seu CPF e senha estão vinculados a mais de uma instituição.</p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {painel.instituicoesBeneficiario.map((item) => (
+                      <button key={item.tenantId} type="button" onClick={() => { setInstituicaoBeneficiario(item.tenantId); void acessarPortal(item.tenantId); }} className="rounded-xl bg-white px-4 py-3 text-left text-slate-900 transition hover:bg-blue-50">
+                        <span className="block font-semibold">{item.nome}</span>
+                        {item.cnpj ? <span className="mt-1 block text-xs text-slate-500">CNPJ: {item.cnpj}</span> : null}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null
+            ) : null}
+
+            {!acessoLiberado && !(painel?.instituicoesBeneficiario?.length && !pessoa) ? (
+              <div className="mt-7 grid gap-3 rounded-2xl border border-white/20 bg-slate-950/25 p-3 shadow-xl md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+                <Input
+                  value={identificador}
+                  onChange={(event) => setIdentificador(formatarCpf(somenteDigitos(event.target.value).slice(0, 11)))}
+                  placeholder="Digite o CPF do beneficiário"
+                  inputMode="numeric"
+                  maxLength={14}
+                  className="min-h-12 border-white/20 bg-white text-slate-900 placeholder:text-slate-500"
+                />
+                <Input
+                  type="password"
+                  value={senha}
+                  onChange={(event) => setSenha(somenteDigitos(event.target.value).slice(0, 4))}
+                  placeholder="Senha de 4 dígitos"
+                  inputMode="numeric"
+                  maxLength={4}
+                  className="min-h-12 border-white/20 bg-white text-slate-900 placeholder:text-slate-500"
+                />
+                <Button type="button" className="min-h-12 bg-blue-600 px-7 hover:bg-blue-500" onClick={() => void acessarPortal()} disabled={carregando}>{carregando ? "Entrando..." : "Entrar"}</Button>
+              </div>
+            ) : null}
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-6xl px-5 py-7 sm:px-8">
+          <div className="flex items-center gap-3"><span className="rounded-full border border-blue-300 bg-blue-50 px-4 py-2 text-sm font-bold text-blue-900">Serviços</span></div>
+          <div className="mt-5 flex gap-3 overflow-x-auto pb-2">
+            {categorias.map(({ titulo, Icone }) => <button key={titulo} type="button" className="flex min-w-[150px] items-center gap-3 rounded-2xl border border-blue-200 bg-blue-50/60 px-4 py-4 text-left font-bold text-slate-800 transition hover:border-blue-400 hover:bg-blue-100"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-200/70 text-blue-900"><Icone className="h-5 w-5" /></span>{titulo}</button>)}
+          </div>
+
+          <div className="mt-7 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+            {cards.map((card, index) => {
+              const Icone = config.cards[index]?.Icone ?? Target;
+              return <article key={card.titulo} className="flex min-h-[250px] flex-col rounded-3xl border-2 border-blue-200 bg-white p-5 shadow-[0_14px_35px_-25px_rgba(30,64,175,0.8)]"><div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-700"><Icone className="h-7 w-7" /></div><span className="mt-4 w-fit rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">Área do beneficiário</span><h2 className="mt-4 text-xl font-bold leading-tight text-slate-900">{card.titulo}</h2><p className="mt-3 flex-1 text-sm leading-6 text-slate-500">{card.texto}</p><Button type="button" className="mt-5 w-full bg-blue-600 hover:bg-blue-700" onClick={() => executarAcao(card.titulo)}>{acessoLiberado ? "Acessar" : "Entrar para acessar"}<ChevronRight className="ml-1.5 h-4 w-4" /></Button></article>;
+            })}
+          </div>
+
+          <div className="mt-8 grid gap-5 lg:grid-cols-3">
+            {indicadores.map((indicador) => <div key={indicador.label} className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm"><p className="text-sm text-slate-500">{indicador.label}</p><p className="mt-1 text-2xl font-black text-blue-900">{indicador.valor}</p></div>)}
+          </div>
+
+          {acessoLiberado ? <section className="mt-8 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"><p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Acompanhamento</p><h2 className="mt-1 text-xl font-bold">Dados do beneficiário</h2><div className="mt-4 grid gap-3 md:grid-cols-2"><div className="rounded-2xl bg-blue-50 px-4 py-4"><p className="text-sm text-slate-500">Nome</p><p className="mt-1 font-bold">{pessoa?.nome ?? identificador}</p></div><div className="rounded-2xl bg-blue-50 px-4 py-4"><p className="text-sm text-slate-500">Status do acesso</p><p className="mt-1 font-bold text-emerald-700">Acesso validado</p></div></div></section> : null}
+        </section>
+
+        <footer className="bg-[linear-gradient(135deg,#173f70_0%,#0d2d52_100%)] px-5 py-9 text-blue-100 sm:px-8"><div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4"><div><p className="font-bold text-white">Portal do Beneficiário e Família</p><p className="mt-1 text-sm text-blue-200">Informações protegidas e autorizadas pela instituição.</p></div><p className="text-sm text-blue-200">G3N · portal externo</p></div></footer>
+      </main>
+    );
+  }
+
+  function renderPortalInstitucional() {
+    const isVoluntario = tipo === "voluntario";
+    const tituloArea = isVoluntario ? "Portal do voluntário" : "Portal do parceiro e financiador";
+    const categorias = isVoluntario
+      ? ["Oportunidades", "Escalas", "Horas", "Certificados"]
+      : ["Projetos", "Metas", "Relatórios", "Documentos"];
+    const IconeArea = isVoluntario ? HandHeart : Building2;
+
+    return (
+      <main className="min-h-screen bg-slate-50 text-slate-900">
+        <header className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-4 rounded-b-[26px] bg-white px-6 py-3 shadow-[0_10px_30px_-18px_rgba(15,23,42,0.55)] sm:px-8">
+          <div className="flex items-center gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-xl text-[var(--g3-primary)]"><IconeArea className="h-9 w-9" /></span><div><p className="text-lg font-bold leading-5">{tituloArea}</p><p className="text-sm text-slate-600">Consulta pública institucional</p></div></div>
+          <nav className="flex flex-wrap items-center gap-2 text-sm font-semibold sm:gap-7"><button type="button" className="border-b-4 border-[var(--g3-primary)] px-2 py-3">Início</button>{categorias.slice(0, 3).map((item) => <button key={item} type="button" className="px-2 py-3">{item}</button>)}{acessoLiberado ? <Button type="button" size="sm" variant="outline" onClick={sairPortal}>Sair</Button> : null}</nav>
+        </header>
+        <section className="bg-[linear-gradient(135deg,#173f70_0%,#0d2d52_100%)] px-5 pb-10 pt-9 text-white sm:px-8"><div className="mx-auto max-w-6xl"><div className="flex flex-wrap items-center gap-5 sm:gap-8"><div className="flex h-32 w-32 items-center justify-center rounded-3xl border border-white/20 bg-white/10 shadow-inner sm:h-36 sm:w-36"><IconeArea className="h-20 w-20 text-blue-100" /></div><div><p className="text-sm font-bold uppercase tracking-[0.14em] text-blue-200">{config.destaque}</p><h1 className="mt-2 text-4xl font-black tracking-tight sm:text-5xl">{tituloArea}</h1><p className="mt-3 max-w-2xl text-base text-blue-100">{config.subtitulo}</p></div></div>{!acessoLiberado ? <div className="mt-7 grid gap-3 rounded-2xl border border-white/20 bg-slate-950/25 p-3 shadow-xl md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"><Input value={identificador} onChange={(event) => setIdentificador(event.target.value)} placeholder={config.identificadorPlaceholder} className="min-h-12 border-white/20 bg-white text-slate-900 placeholder:text-slate-500" /><Input type="password" value={senha} onChange={(event) => setSenha(event.target.value)} placeholder={config.senhaPlaceholder} className="min-h-12 border-white/20 bg-white text-slate-900 placeholder:text-slate-500" /><Button type="button" className="min-h-12 bg-blue-600 px-7 hover:bg-blue-500" onClick={() => void acessarPortal()} disabled={carregando}>{carregando ? "Entrando..." : config.acaoPrimaria}</Button></div> : null}</div></section>
+        <section className="mx-auto max-w-6xl px-5 py-7 sm:px-8"><span className="rounded-full border border-blue-300 bg-blue-50 px-4 py-2 text-sm font-bold text-blue-900">Serviços</span><div className="mt-5 flex gap-3 overflow-x-auto pb-2">{categorias.map((item, index) => <button key={item} type="button" className="flex min-w-[150px] items-center gap-3 rounded-2xl border border-blue-200 bg-blue-50/60 px-4 py-4 text-left font-bold"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-200/70 text-blue-900"><IconeArea className="h-5 w-5" /></span>{item}</button>)}</div><div className="mt-7 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">{cards.map((card) => <article key={card.titulo} className="flex min-h-[250px] flex-col rounded-3xl border-2 border-blue-200 bg-white p-5 shadow-sm"><div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-700"><Target className="h-7 w-7" /></div><span className="mt-4 w-fit rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold">{isVoluntario ? "Voluntariado" : "Parceria"}</span><h2 className="mt-4 text-xl font-bold">{card.titulo}</h2><p className="mt-3 flex-1 text-sm leading-6 text-slate-500">{card.texto}</p><Button type="button" className="mt-5 w-full bg-blue-600" onClick={() => executarAcao(card.titulo)}>{acessoLiberado ? "Acessar" : "Entrar para acessar"}<ChevronRight className="ml-1.5 h-4 w-4" /></Button></article>)}</div><div className="mt-8 grid gap-5 lg:grid-cols-3">{indicadores.map((item) => <div key={item.label} className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm"><p className="text-sm text-slate-500">{item.label}</p><p className="mt-1 text-2xl font-black text-blue-900">{item.valor}</p></div>)}</div></section><footer className="bg-[linear-gradient(135deg,#173f70_0%,#0d2d52_100%)] px-5 py-9 text-blue-100 sm:px-8"><div className="mx-auto flex max-w-6xl flex-wrap justify-between gap-4"><p className="font-bold text-white">{tituloArea}</p><p className="text-sm">G3N · portal externo</p></div></footer>
+      </main>
+    );
+  }
+
+  if (tipo === "beneficiario") {
+    return (
+      <div style={portalThemeStyle}>
+        {renderPortalBeneficiario()}
+        {popup ? <PopupMensagem popup={popup} onClose={() => setPopup(null)} /> : null}
+      </div>
+    );
+  }
+
+  if (tipo === "voluntario" || tipo === "parceiro") {
+    return <div style={portalThemeStyle}>{renderPortalInstitucional()}{popup ? <PopupMensagem popup={popup} onClose={() => setPopup(null)} /> : null}</div>;
+  }
+
+  if (tipo === "transparencia") {
+    return (
+      <div style={portalThemeStyle}>
+        {renderPortalTransparencia()}
+        {popup ? <PopupMensagem popup={popup} onClose={() => setPopup(null)} /> : null}
+      </div>
+    );
   }
 
   return (
@@ -511,24 +934,9 @@ function PortalExternoPage({ tipo }: { tipo: PortalTipo }) {
                     <Label>{config.identificadorLabel}</Label>
                     <Input
                       value={identificador}
-                      onChange={(event) => {
-                        const valor = event.target.value;
-                        if (tipo === "beneficiario") {
-                          setIdentificador(formatarCpf(somenteDigitos(valor).slice(0, 11)));
-                          return;
-                        }
-                        setIdentificador(valor);
-                      }}
-                      onBlur={() => {
-                        if (tipo === "beneficiario") {
-                          setIdentificador((valorAtual) =>
-                            formatarCpf(somenteDigitos(valorAtual).slice(0, 11))
-                          );
-                        }
-                      }}
+                      onChange={(event) => setIdentificador(event.target.value)}
                       placeholder={config.identificadorPlaceholder}
-                      inputMode={tipo === "beneficiario" ? "numeric" : "text"}
-                      maxLength={tipo === "beneficiario" ? 14 : undefined}
+                      inputMode="text"
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -536,25 +944,12 @@ function PortalExternoPage({ tipo }: { tipo: PortalTipo }) {
                     <Input
                       type={config.acessoRestrito ? "password" : "text"}
                       value={senha}
-                      onChange={(event) => {
-                        const valor = event.target.value;
-                        if (tipo === "beneficiario") {
-                          setSenha(somenteDigitos(valor).slice(0, 4));
-                          return;
-                        }
-                        setSenha(valor);
-                      }}
-                      onBlur={() => {
-                        if (tipo === "beneficiario") {
-                          setSenha((valorAtual) => somenteDigitos(valorAtual).slice(0, 4));
-                        }
-                      }}
+                      onChange={(event) => setSenha(event.target.value)}
                       placeholder={config.senhaPlaceholder}
-                      inputMode={tipo === "beneficiario" ? "numeric" : "text"}
-                      maxLength={tipo === "beneficiario" ? 4 : undefined}
+                      inputMode="text"
                     />
                   </div>
-                  <Button className="w-full" onClick={acessarPortal} disabled={carregando}>
+                  <Button className="w-full" onClick={() => void acessarPortal()} disabled={carregando}>
                     {carregando ? "Carregando..." : config.acaoPrimaria}
                   </Button>
                   {acessoLiberado && config.acessoRestrito ? (
@@ -999,7 +1394,8 @@ export function PortalBeneficiarioFamiliaPage() {
 }
 
 export function PortalTransparenciaPage() {
-  return <PortalExternoPage tipo="transparencia" />;
+  const { slug } = useParams<{ slug?: string }>();
+  return <PortalExternoPage tipo="transparencia" tenantSlug={slug} />;
 }
 
 export function PortalParceiroFinanciadorPage() {

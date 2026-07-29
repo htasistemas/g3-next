@@ -20,7 +20,8 @@ function montarLinhaCidade(plano: PlanoTrabalhoPayload) {
 export function gerarHtmlPlanoTrabalho(
   plano: PlanoTrabalhoPayload,
   cronograma: PlanoCronogramaExecucaoItem[],
-  anexos: ArquivoMetadata[]
+  anexos: ArquivoMetadata[],
+  logomarcaUrl = ""
 ) {
   const linhasMetas = (plano.metas ?? [])
     .map(
@@ -129,7 +130,8 @@ export function gerarHtmlPlanoTrabalho(
         .capa .identificacao { margin: 34px auto; max-width: 560px; border-top: 2px solid #0f766e; border-bottom: 2px solid #0f766e; padding: 18px 12px; }
         .capa .rodape-capa { font-size: 12px; color: #64748b; }
         .topo { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #0f766e; padding-bottom: 16px; }
-        .logo { width: 120px; height: 72px; border: 1px dashed #94a3b8; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #64748b; }
+        .logo { width: 120px; height: 72px; border: 1px dashed #94a3b8; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #64748b; overflow: hidden; }
+        .logo img { max-width: 100%; max-height: 100%; object-fit: contain; }
         h1 { margin: 0; font-size: 26px; }
         h2 { font-size: 16px; margin: 24px 0 10px; padding: 6px 0; border-top: 1px solid #cbd5e1; border-bottom: 1px solid #cbd5e1; }
         .quebra { page-break-before: always; }
@@ -169,7 +171,7 @@ export function gerarHtmlPlanoTrabalho(
             <p style="margin:0; color:#0f766e; font-weight:700;">${plano.razaoSocial || "Instituição"}</p>
             <p style="margin:4px 0 0;">CNPJ ${formatarCnpj(plano.cnpj)}</p>
           </div>
-          <div class="logo">Logomarca da instituição</div>
+          <div class="logo">${logomarcaUrl ? `<img src="${logomarcaUrl}" alt="Logomarca da instituição" />` : "Logomarca da instituição"}</div>
         </div>
         <h1 style="text-align:center; margin:18px 0 6px;">Plano de trabalho</h1>
         <div style="height:1px; background:#cbd5e1; margin-bottom:18px;"></div>
