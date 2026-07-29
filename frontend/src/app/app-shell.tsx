@@ -645,7 +645,7 @@ const menuSectionsBase: MenuSection[] = [
   },
   {
     id: "educacional",
-    secao: "Educacional",
+    secao: "Gestão educacional",
     icon: BookOpenText,
     requiredPermissions: ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS", "EDUCACIONAL_VISUALIZAR", "EDUCACIONAL_MATRICULAS_VISUALIZAR"],
     itens: [
@@ -713,7 +713,7 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/atendimentos/central-atendimentos")) return "Central de atendimentos";
   if (pathname.startsWith("/atendimentos/matriculas")) return "Inscrições em cursos e atendimentos";
   if (pathname.startsWith("/atendimentos/banco-empregos")) return "Banco de empregos";
-  if (pathname.startsWith("/educacional")) return "Educacional";
+  if (pathname.startsWith("/educacional")) return "Gestão educacional";
   if (pathname.startsWith("/atendimentos/biblioteca")) return "Biblioteca";
   if (pathname.startsWith("/atendimentos/registro-visitas")) return "Registro de visitas";
   if (pathname.startsWith("/atendimentos/agendamentos")) return "Agendamentos";
@@ -1380,17 +1380,25 @@ export function AppShell() {
                 {tarefaAlertaVisivel && (
                   <button
                     type="button"
-                    className={`inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold uppercase text-sky-700 ${
+                    className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase ${
+                      tarefaPisca
+                        ? "border-red-200 bg-red-50 text-red-700"
+                        : "border-sky-200 bg-sky-50 text-sky-700"
+                    } ${
                       tarefaPisca ? "animate-pulse" : ""
                     }`}
                     onClick={abrirTarefas}
                     aria-label="Abrir tarefas e pendências"
-                    title="Abrir tarefas e pendências"
+                    title={tarefaPisca ? "Há tarefas vencidas. Abrir tarefas e pendências" : "Abrir tarefas e pendências"}
                   >
                     <ListTodo className="h-3.5 w-3.5" />
                     Tarefas
                     {totalTarefasPendentes > 0 && (
-                      <span className="ml-1 rounded-full bg-sky-600 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                      <span
+                        className={`ml-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold text-white ${
+                          tarefaPisca ? "bg-red-600" : "bg-sky-600"
+                        }`}
+                      >
                         {totalTarefasPendentes}
                       </span>
                     )}

@@ -5,7 +5,7 @@ export type TermoDocumento = {
   id?: string;
   nome: string;
   dataUrl?: string;
-  tipo?: "termo" | "aditivo" | "outro";
+  tipo?: string;
 };
 
 export type AditivoTermoFomento = {

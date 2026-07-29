@@ -2,7 +2,7 @@ export type TermoDocumentoInput = {
   id?: string;
   nome: string;
   dataUrl?: string | null;
-  tipo?: "termo" | "aditivo" | "outro" | null;
+  tipo?: string | null;
 };
 
 export type TermoAditivoInput = {

@@ -4,6 +4,7 @@ import {
   FilePlus2,
   FileSignature,
   Files,
+  Eye,
   List,
   Plus,
   Printer,
@@ -22,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { CadastroSucessoModal } from "@/components/admin/cadastro-sucesso-modal";
 import { useProfissionais } from "@/features/profissionais/use-profissionais";
 import { formatarMoedaInput, normalizarMoeda } from "@/lib/br-utils";
+import { abrirArquivoAutenticado, imprimirArquivoAutenticado } from "@/lib/arquivos";
 import { arquivosService } from "@/services/arquivos.service";
 import { AdminPageLayout, type AdminAction, type AdminTab } from "@/components/admin/admin-page-layout";
 import { PopupConfirmacao, PopupMensagem, type PopupMensagemState } from "@/components/admin/admin-popups";
@@ -42,6 +44,32 @@ import {
 function CampoErro({ texto }: { texto?: string }) {
   if (!texto) return null;
   return <p className="text-xs text-red-600">{texto}</p>;
+}
+
+function ProgressoUpload({ nome, progresso }: { nome: string; progresso: number | null }) {
+  if (progresso === null) return null;
+
+  return (
+    <div
+      className="rounded-md border border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/20 p-3"
+      role="status"
+      aria-live="polite"
+      aria-label={`Progresso do envio de ${nome}`}
+    >
+      <div className="mb-2 flex items-center justify-between gap-2 text-xs">
+        <span className="font-semibold text-[var(--g3-active)]">
+          Enviando {nome.toLocaleLowerCase("pt-BR")}
+        </span>
+        <span className="font-semibold text-[var(--g3-active)]">{progresso}%</span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-[var(--g3-border)]">
+        <div
+          className="h-full rounded-full bg-[var(--g3-active)] transition-all"
+          style={{ width: `${progresso}%` }}
+        />
+      </div>
+    </div>
+  );
 }
 
 type AbaId = "listagem" | "dadosGerais" | "documentos" | "aditivos";
@@ -68,8 +96,17 @@ const aditivoVazio: AditivoTermoFomento = {
 
 const documentoVazio: TermoDocumento = {
   nome: "",
-  tipo: "outro"
+  tipo: "Termo de Fomento"
 };
+
+const tiposDocumento = [
+  "Termo de Fomento",
+  "Primeiro Aditivo",
+  "Segundo Aditivo",
+  "Terceiro Aditivo",
+  "Quarto Aditivo",
+  "Quinto Aditivo"
+];
 
 const orgaosConcedentesPrincipais = [
   "Prefeitura Municipal",
@@ -115,13 +152,19 @@ export function TermoFomentoPage() {
   const [novoDocumento, setNovoDocumento] = useState<TermoDocumento>(documentoVazio);
   const [valorGlobalInput, setValorGlobalInput] = useState("");
   const [mostrarSugestoesOrgaos, setMostrarSugestoesOrgaos] = useState(false);
-  const [arquivoTermo, setArquivoTermo] = useState<File | null>(null);
-  const [arquivoRelacionado, setArquivoRelacionado] = useState<File | null>(null);
+  const [arquivoDocumento, setArquivoDocumento] = useState<File | null>(null);
   const [novoAditivoValorInput, setNovoAditivoValorInput] = useState("");
   const [enviandoArquivo, setEnviandoArquivo] = useState(false);
+  const [progressoArquivo, setProgressoArquivo] = useState<number | null>(null);
+  const [nomeArquivoEmEnvio, setNomeArquivoEmEnvio] = useState("");
   const [popup, setPopup] = useState<PopupMensagemState | null>(null);
   const [cadastroSucesso, setCadastroSucesso] = useState<{ id: string; novo: boolean } | null>(null);
   const [confirmarExclusao, setConfirmarExclusao] = useState(false);
+  const [documentoParaExcluir, setDocumentoParaExcluir] = useState<{
+    documento: TermoDocumento;
+    indiceRelacionado: number | null;
+  } | null>(null);
+  const [excluindoDocumento, setExcluindoDocumento] = useState(false);
   const [erros, setErros] = useState<Record<string, string>>({});
 
   const termosQuery = useTermosFomento();
@@ -131,6 +174,19 @@ export function TermoFomentoPage() {
   const profissionaisQuery = useProfissionais({ status: "ATIVO" });
 
   const termos = termosQuery.data ?? [];
+  const documentosVinculados = useMemo(
+    () => [
+      ...(form.termoDocumento?.dataUrl
+        ? [{ ...form.termoDocumento, tipo: "termo" as const, origem: "Documento principal", indiceRelacionado: null }]
+        : []),
+      ...(form.documentosRelacionados ?? []).map((documento, indiceRelacionado) => ({
+        ...documento,
+        origem: "Documento relacionado",
+        indiceRelacionado
+      }))
+    ],
+    [form.documentosRelacionados, form.termoDocumento]
+  );
   const termosFiltrados = useMemo(() => {
     const termo = filtro.trim().toLowerCase();
     if (!termo) return termos;
@@ -159,8 +215,7 @@ export function TermoFomentoPage() {
     setNovoAditivo(aditivoVazio);
     setNovoAditivoValorInput("");
     setNovoDocumento(documentoVazio);
-    setArquivoTermo(null);
-    setArquivoRelacionado(null);
+    setArquivoDocumento(null);
     setAbaAtiva("dadosGerais");
   }
 
@@ -176,8 +231,7 @@ export function TermoFomentoPage() {
     setForm(normalizado);
     setValorGlobalInput(normalizado.valorGlobal == null ? "" : formatarMoedaInput(normalizado.valorGlobal));
     setSnapshot(normalizado);
-    setArquivoTermo(null);
-    setArquivoRelacionado(null);
+    setArquivoDocumento(null);
     setErros({});
     setAbaAtiva("dadosGerais");
   }
@@ -185,43 +239,6 @@ export function TermoFomentoPage() {
   function cancelar() {
     setForm(clonarTermoFomento(snapshot));
     setErros({});
-  }
-
-  async function enviarDocumentoPrincipal() {
-    if (!termoIdSelecionado) {
-      setPopup({ tipo: "aviso", titulo: "Salve o termo", texto: "Salve o termo antes de enviar o documento principal." });
-      return;
-    }
-    if (!arquivoTermo) {
-      setPopup({ tipo: "aviso", titulo: "Arquivo não selecionado", texto: "Selecione o arquivo do documento principal." });
-      return;
-    }
-
-    try {
-      setEnviandoArquivo(true);
-      const arquivo = await arquivosService.uploadPorEntidade({
-        scope: "termo_fomento_documento",
-        entidadeTipo: "termo_fomento",
-        entidadeId: termoIdSelecionado,
-        arquivo: arquivoTermo,
-        observacao: "Documento principal do termo de fomento"
-      });
-      setForm((atual) => ({
-        ...atual,
-        termoDocumento: {
-          id: String(arquivo.id),
-          tipo: "termo",
-          nome: arquivo.nomeOriginal,
-          dataUrl: arquivo.caminhoArquivo
-        }
-      }));
-      setArquivoTermo(null);
-      setPopup({ tipo: "sucesso", titulo: "Arquivo enviado", texto: "O documento principal foi armazenado. Clique em Salvar para registrar o vínculo no termo." });
-    } catch (error: any) {
-      setPopup({ tipo: "erro", titulo: "Erro no upload", texto: error?.response?.data?.message ?? "Não foi possível armazenar o documento." });
-    } finally {
-      setEnviandoArquivo(false);
-    }
   }
 
   async function salvar() {
@@ -276,37 +293,37 @@ export function TermoFomentoPage() {
     }
   }
 
-  async function adicionarDocumentoRelacionado() {
-    if (!novoDocumento.nome?.trim()) {
-      setPopup({
-        tipo: "aviso",
-        titulo: "Validação",
-        texto: "Informe o nome do documento."
-      });
-      return;
-    }
+  async function enviarDocumento() {
     if (!termoIdSelecionado) {
-      setPopup({ tipo: "aviso", titulo: "Salve o termo", texto: "Salve o termo antes de enviar documentos relacionados." });
+      setPopup({ tipo: "aviso", titulo: "Salve o termo", texto: "Salve o termo antes de enviar documentos." });
       return;
     }
-    if (!arquivoRelacionado) {
-      setPopup({ tipo: "aviso", titulo: "Arquivo não selecionado", texto: "Selecione o arquivo do documento relacionado." });
+    if (!arquivoDocumento) {
+      setPopup({ tipo: "aviso", titulo: "Arquivo não selecionado", texto: "Selecione o arquivo do documento." });
       return;
     }
 
     try {
       setEnviandoArquivo(true);
+      setNomeArquivoEmEnvio(arquivoDocumento.name);
+      setProgressoArquivo(0);
       const arquivo = await arquivosService.uploadPorEntidade({
         scope: "termo_fomento_documento",
         entidadeTipo: "termo_fomento",
         entidadeId: termoIdSelecionado,
-        arquivo: arquivoRelacionado,
-        observacao: `Documento relacionado: ${novoDocumento.nome.trim()}`
+        arquivo: arquivoDocumento,
+        observacao: `Documento do termo de fomento: ${novoDocumento.tipo ?? "Termo de Fomento"}`,
+        onUploadProgress: (event) => {
+          const total = event.total ?? 0;
+          const progresso = total > 0 ? Math.round((event.loaded * 100) / total) : 95;
+          setProgressoArquivo(Math.max(1, Math.min(95, progresso)));
+        }
       });
+      setProgressoArquivo(100);
       const documento = {
         ...novoDocumento,
         id: String(arquivo.id),
-        nome: novoDocumento.nome.trim() || arquivo.nomeOriginal,
+        nome: arquivo.nomeOriginal,
         dataUrl: arquivo.caminhoArquivo
       };
       setForm((atual) => ({
@@ -314,12 +331,50 @@ export function TermoFomentoPage() {
         documentosRelacionados: [...(atual.documentosRelacionados ?? []), documento]
       }));
       setNovoDocumento(documentoVazio);
-      setArquivoRelacionado(null);
-      setPopup({ tipo: "sucesso", titulo: "Arquivo enviado", texto: "O documento relacionado foi armazenado. Clique em Salvar para registrar o vínculo no termo." });
+      setArquivoDocumento(null);
+      setPopup({ tipo: "sucesso", titulo: "Arquivo enviado", texto: "O documento foi armazenado. Clique em Salvar para registrar o vínculo no termo." });
     } catch (error: any) {
       setPopup({ tipo: "erro", titulo: "Erro no upload", texto: error?.response?.data?.message ?? "Não foi possível armazenar o documento." });
     } finally {
       setEnviandoArquivo(false);
+      setProgressoArquivo(null);
+      setNomeArquivoEmEnvio("");
+    }
+  }
+
+  async function confirmarExclusaoDocumento() {
+    const item = documentoParaExcluir;
+    if (!item?.documento.id) {
+      setPopup({
+        tipo: "erro",
+        titulo: "Erro ao excluir documento",
+        texto: "Não foi possível identificar o arquivo enviado."
+      });
+      return;
+    }
+
+    try {
+      setExcluindoDocumento(true);
+      await arquivosService.excluir(item.documento.id);
+      if (item.indiceRelacionado != null) {
+        removerDocumentoRelacionado(item.indiceRelacionado);
+      } else {
+        setForm((atual) => ({ ...atual, termoDocumento: null }));
+      }
+      setDocumentoParaExcluir(null);
+      setPopup({
+        tipo: "sucesso",
+        titulo: "Documento excluído",
+        texto: "O arquivo foi removido. Clique em Salvar para registrar a alteração no termo."
+      });
+    } catch (error: any) {
+      setPopup({
+        tipo: "erro",
+        titulo: "Erro ao excluir documento",
+        texto: error?.response?.data?.message ?? "Não foi possível excluir o arquivo."
+      });
+    } finally {
+      setExcluindoDocumento(false);
     }
   }
 
@@ -328,6 +383,30 @@ export function TermoFomentoPage() {
       ...atual,
       documentosRelacionados: (atual.documentosRelacionados ?? []).filter((_, idx) => idx !== indice)
     }));
+  }
+
+  async function visualizarDocumento(documento: TermoDocumento) {
+    try {
+      await abrirArquivoAutenticado(documento.dataUrl, documento.nome || "Documento do termo de fomento");
+    } catch (error: any) {
+      setPopup({
+        tipo: "erro",
+        titulo: "Erro ao visualizar documento",
+        texto: error?.message ?? "Não foi possível visualizar o documento."
+      });
+    }
+  }
+
+  async function imprimirDocumento(documento: TermoDocumento) {
+    try {
+      await imprimirArquivoAutenticado(documento.dataUrl, documento.nome || "Documento do termo de fomento");
+    } catch (error: any) {
+      setPopup({
+        tipo: "erro",
+        titulo: "Erro ao imprimir documento",
+        texto: error?.message ?? "Não foi possível preparar a impressão do documento."
+      });
+    }
   }
 
   async function adicionarAditivo() {
@@ -707,133 +786,118 @@ export function TermoFomentoPage() {
         {abaAtiva === "documentos" ? (
           <section className="space-y-4">
             <div className="rounded-lg border border-[var(--g3-border)] p-3">
-              <h3 className="text-sm font-semibold text-[var(--g3-active)]">Documento principal do termo</h3>
+              <h3 className="text-sm font-semibold text-[var(--g3-active)]">Enviar documento</h3>
+              <p className="mt-1 text-xs text-[var(--g3-muted)]">
+                Envie qualquer documento relacionado ao termo de fomento. Todos os arquivos serão listados abaixo.
+              </p>
               <div className="mt-3 grid gap-3 md:grid-cols-2">
-                <div className="space-y-1">
-                  <Label>Nome</Label>
-                  <Input
-                    value={form.termoDocumento?.nome ?? ""}
-                    onChange={(event) =>
-                      setForm((atual) => ({
-                        ...atual,
-                        termoDocumento: {
-                          id: atual.termoDocumento?.id,
-                          tipo: "termo",
-                          nome: event.target.value,
-                          dataUrl: atual.termoDocumento?.dataUrl
-                        }
-                      }))
-                    }
-                  />
-                  <CampoErro texto={erros["documentoPrincipal.nome"]} />
-                </div>
-                <div className="space-y-1">
-                  <Label>Arquivo</Label>
-                  <Input
-                    type="file"
-                    onChange={(event) => setArquivoTermo(event.target.files?.[0] ?? null)}
-                    disabled={enviandoArquivo || !termoIdSelecionado}
-                  />
-                  <p className="text-xs text-[var(--g3-muted)]">
-                    {form.termoDocumento?.dataUrl ? `Arquivo armazenado: ${form.termoDocumento.nome}` : "Salve o termo antes de enviar o arquivo."}
-                  </p>
-                  <Button type="button" size="sm" variant="outline" onClick={() => void enviarDocumentoPrincipal()} disabled={enviandoArquivo || !arquivoTermo || !termoIdSelecionado}>
-                    <Upload className="mr-1.5 h-3.5 w-3.5" />
-                    {enviandoArquivo ? "Enviando..." : "Enviar arquivo"}
-                  </Button>
-                  <CampoErro texto={erros["documentoPrincipal.dataUrl"]} />
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-lg border border-[var(--g3-border)] p-3">
-              <h3 className="text-sm font-semibold text-[var(--g3-active)]">Documentos relacionados</h3>
-              <div className="mt-3 grid gap-3 md:grid-cols-3">
-                <div className="space-y-1">
-                  <Label>Nome do documento</Label>
-                  <Input
-                    value={novoDocumento.nome}
-                    onChange={(event) =>
-                      setNovoDocumento((atual) => ({ ...atual, nome: event.target.value }))
-                    }
-                  />
-                </div>
                 <div className="space-y-1">
                   <Label>Tipo</Label>
                   <Select
                     value={novoDocumento.tipo}
-                    onChange={(event) =>
-                      setNovoDocumento((atual) => ({
-                        ...atual,
-                        tipo: event.target.value as TermoDocumento["tipo"]
-                      }))
-                    }
+                    onChange={(event) => setNovoDocumento((atual) => ({ ...atual, tipo: event.target.value }))}
                   >
-                    <option value="outro">Outro</option>
-                    <option value="termo">Termo</option>
-                    <option value="aditivo">Aditivo</option>
+                    {tiposDocumento.map((tipo) => <option key={tipo} value={tipo}>{tipo}</option>)}
                   </Select>
                 </div>
                 <div className="space-y-1">
                   <Label>Arquivo</Label>
-                  <Input
-                    type="file"
-                    onChange={(event) => {
-                      const arquivo = event.target.files?.[0] ?? null;
-                      setArquivoRelacionado(arquivo);
-                      if (arquivo && !novoDocumento.nome.trim()) {
-                        setNovoDocumento((atual) => ({ ...atual, nome: arquivo.name }));
-                      }
-                    }}
-                    disabled={enviandoArquivo || !termoIdSelecionado}
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="file"
+                      onChange={(event) => setArquivoDocumento(event.target.files?.[0] ?? null)}
+                      disabled={enviandoArquivo || !termoIdSelecionado}
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => void enviarDocumento()}
+                      disabled={enviandoArquivo || !termoIdSelecionado || !arquivoDocumento}
+                    >
+                      <Upload className="mr-1.5 h-3.5 w-3.5" />
+                      {enviandoArquivo ? "Enviando..." : "Enviar documento"}
+                    </Button>
+                  </div>
+                  <ProgressoUpload
+                    nome={nomeArquivoEmEnvio || "arquivo"}
+                    progresso={progressoArquivo}
                   />
-                  <p className="text-xs text-[var(--g3-muted)]">O arquivo será armazenado no storage do sistema.</p>
+                  <p className="text-xs text-[var(--g3-muted)]">
+                    {termoIdSelecionado ? "O arquivo será armazenado no storage do sistema." : "Salve o termo antes de enviar documentos."}
+                  </p>
                 </div>
               </div>
-              <div className="mt-3">
-                <Button type="button" size="sm" onClick={() => void adicionarDocumentoRelacionado()} disabled={enviandoArquivo || !termoIdSelecionado}>
-                  <Plus className="mr-1.5 h-3.5 w-3.5" />
-                  {enviandoArquivo ? "Enviando..." : "Enviar documento"}
-                </Button>
+              <div className="mt-3 rounded-lg border border-[var(--g3-border)] p-3">
+                <h4 className="text-sm font-semibold text-[var(--g3-active)]">Documentos vinculados ao termo</h4>
+                <p className="mt-1 text-xs text-[var(--g3-muted)]">
+                  Visualize ou imprima qualquer documento já enviado para este termo de fomento.
+                </p>
               </div>
-              <div className="mt-3 overflow-x-auto rounded-lg border border-[var(--g3-border)]">
+              <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]">
                 <table className="min-w-full text-sm">
                   <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]">
                     <tr>
                       <th className="px-3 py-2 text-left">Nome</th>
                       <th className="px-3 py-2 text-left">Tipo</th>
-                      <th className="px-3 py-2 text-left">Arquivo</th>
+                      <th className="px-3 py-2 text-left">Origem</th>
                       <th className="px-3 py-2 text-right">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {(form.documentosRelacionados ?? []).length ? (
-                      (form.documentosRelacionados ?? []).map((item, index) => (
+                    {documentosVinculados.length ? (
+                      documentosVinculados.map((item, index) => (
                         <tr
-                          key={`${item.nome}-${index}`}
+                          key={`${item.id ?? item.dataUrl ?? item.nome}-${index}`}
                           className={`border-t border-[var(--g3-border)] ${
                             index % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35"
                           }`}
                         >
                           <td className="px-3 py-2">{item.nome}</td>
                           <td className="px-3 py-2">{item.tipo ?? "outro"}</td>
-                          <td className="px-3 py-2">{item.dataUrl ?? "---"}</td>
+                          <td className="px-3 py-2">{item.origem}</td>
                           <td className="px-3 py-2 text-right">
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="danger"
-                              onClick={() => removerDocumentoRelacionado(index)}
-                            >
-                              Remover
-                            </Button>
+                            <div className="flex flex-wrap justify-end gap-2">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => void visualizarDocumento(item)}
+                                disabled={!item.dataUrl}
+                                aria-label={`Visualizar ${item.nome}`}
+                                title="Visualizar documento"
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => void imprimirDocumento(item)}
+                                disabled={!item.dataUrl}
+                                aria-label={`Imprimir ${item.nome}`}
+                                title="Imprimir documento"
+                              >
+                                <Printer className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="danger"
+                                onClick={() => setDocumentoParaExcluir({ documento: item, indiceRelacionado: item.indiceRelacionado })}
+                                disabled={!item.id}
+                                aria-label={`Excluir ${item.nome}`}
+                                title="Excluir documento"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
                           </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
                         <td colSpan={4} className="px-3 py-4 text-center">
-                          Nenhum documento relacionado adicionado.
+                          Nenhum documento vinculado ao termo.
                         </td>
                       </tr>
                     )}
@@ -990,6 +1054,17 @@ export function TermoFomentoPage() {
         onCancel={() => setConfirmarExclusao(false)}
         onConfirm={() => void confirmarExclusaoTermo()}
         confirmarTexto="Excluir"
+      />
+      <PopupConfirmacao
+        aberto={Boolean(documentoParaExcluir)}
+        titulo="Excluir documento"
+        texto="O arquivo será removido do armazenamento e da listagem do termo. Deseja continuar?"
+        processando={excluindoDocumento}
+        onCancel={() => {
+          if (!excluindoDocumento) setDocumentoParaExcluir(null);
+        }}
+        onConfirm={() => void confirmarExclusaoDocumento()}
+        confirmarTexto="Excluir documento"
       />
     </>
   );

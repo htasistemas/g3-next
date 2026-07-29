@@ -1383,7 +1383,7 @@ const secoesManual: ManualSecao[] = [
   },
   {
     id: "educacional",
-    titulo: "Educacional — Fase 1",
+    titulo: "Gestão educacional — Fase 1",
     descricao: "Gestão educacional integrada, com vínculos de alunos e profissionais, documentos em storage, parcerias públicas e indicadores de prestação de contas.",
     icon: GraduationCap,
     telas: [
@@ -1392,7 +1392,7 @@ const secoesManual: ManualSecao[] = [
         objetivo: "Acompanhar os principais quantitativos da estrutura educacional do tenant autenticado.",
         comoUsar: [
           "Acesse diretamente o submenu Visão geral para consultar alunos, matrículas, turmas, disciplinas e anos letivos abertos.",
-          "O menu Educacional mantém os cadastros principais e agrupa as operações relacionadas em abas: Alunos reúne Alunos, Matrículas, Transferências e Autorizações; Diário de classe reúne Diário, Plano de aula, Avaliações e notas e Chamada e frequência; Professores e equipe pedagógica reúne também o Planejamento pedagógico.",
+          "O menu Gestão educacional mantém os cadastros principais e agrupa as operações relacionadas em abas: Alunos reúne Alunos, Matrículas, Transferências e Autorizações; Diário de classe reúne Diário, Plano de aula, Avaliações e notas e Chamada e frequência; Professores e equipe pedagógica reúne também o Planejamento pedagógico.",
           "Ano letivo, Etapas de ensino, Séries e anos escolares, Disciplinas e Turmas ficam agrupados na tela Estrutura acadêmica e não são repetidos como submenus independentes.",
           "As abas de Alunos, Vida escolar, Estrutura acadêmica, Professores e equipe pedagógica e Gestão escolar seguem a navegação lateral numerada do G3N, com separação visual por assunto e o conteúdo exibido ao lado da aba selecionada.",
           "Na Visão geral educacional, use os filtros de unidade, ano letivo, etapa, turma e turno e clique nos cards para abrir o fluxo relacionado. Os indicadores de frequência, risco, evasão, ocorrências, chamadas pendentes e média são calculados a partir dos registros persistidos.",
@@ -1413,7 +1413,7 @@ const secoesManual: ManualSecao[] = [
           , "Os registros de Rotina infantil e Desenvolvimento infantil são pedagógicos e não substituem prontuário ou prescrição médica."
           , "O cadastro mestre passou a se chamar Unidades de atendimento. Cada unidade possui tipo obrigatório: Unidade assistencial ou Unidade de ensino. A filtragem é feita no backend e unidades antigas permanecem assistenciais."
           , "Use Gestão acadêmica para registrar lista de espera, recuperações, resultado final e eventos do calendário escolar. Os registros são vinculados ao ano letivo e permanecem separados por instituição."
-          , "O menu Educacional foi organizado em entradas principais: Visão geral; Alunos; Vida escolar; Estrutura acadêmica; Professores e equipe pedagógica; Gestão escolar; Parcerias públicas; e Relatórios e indicadores. As operações relacionadas ficam nas abas internas de cada contexto."
+          , "O menu Gestão educacional foi organizado em entradas principais: Visão geral; Alunos; Vida escolar; Estrutura acadêmica; Professores e equipe pedagógica; Gestão escolar; Parcerias públicas; e Relatórios e indicadores. As operações relacionadas ficam nas abas internas de cada contexto."
           , "As telas Educacionais agora usam a barra de ações padrão do G3N. Nas abas com formulário, Novo limpa o contexto para um novo registro, Salvar envia o formulário visível, Cancelar limpa os dados ainda não gravados, Imprimir usa o relatório da tela e Fechar retorna à Visão geral. Buscar atualiza a Visão geral ou pesquisa beneficiários na aba Matrículas. As abas laterais usam as mesmas cores e estados visuais do Cadastro de beneficiários. Ao selecionar um grupo, somente o submenu correspondente fica destacado; Visão geral fica ativa apenas na rota inicial do Educacional. Na matrícula, selecione a unidade de ensino e depois uma sala com vagas disponíveis; salas lotadas ficam bloqueadas e o backend confirma a lotação antes de salvar."
           , "Na aba Salas de atendimento, informe as vagas da sala e salve a unidade. A capacidade é normalizada corretamente mesmo quando o navegador envia o valor como texto, e o status da sala permanece ativo até que o usuário escolha inativá-la."
           , "Na aba Dados gerais do Cadastro de unidade de atendimento, as logomarcas da unidade e do relatório ficam lado a lado em telas amplas e se reorganizam verticalmente em telas menores."

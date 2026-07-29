@@ -1,5 +1,6 @@
 import { httpClient } from "./http-client";
 import type { ArquivoMetadata } from "@/types/arquivo";
+import type { AxiosProgressEvent } from "axios";
 
 type ArquivoApiRow = {
   id: number;
@@ -49,6 +50,7 @@ export const arquivosService = {
     entidadeId: string | number;
     arquivo: File;
     observacao?: string;
+    onUploadProgress?: (progressEvent: AxiosProgressEvent) => void;
   }) {
     const formData = new FormData();
     formData.append("scope", input.scope);
@@ -66,7 +68,8 @@ export const arquivosService = {
         headers: {
           "Content-Type": "multipart/form-data"
         },
-        timeout: 300000
+        timeout: 300000,
+        onUploadProgress: input.onUploadProgress
       }
     );
 

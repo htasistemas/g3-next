@@ -1,6 +1,78 @@
 {
   "entries":  [
                     {
+                        "version": "1.00.779",
+                        "releaseDate": "2026-07-29",
+                        "title": "Correção do alerta de tarefas vencidas",
+                        "description": "O alerta do topo agora identifica tarefas não concluídas cujo prazo já passou, mesmo quando o status ainda está como Aberta.",
+                        "changes": ["Prazo vencido considerado no resumo de tarefas.", "Tarefas abertas fora do prazo passam a acionar o alerta vermelho e piscante.", "Tarefas concluídas continuam fora do alerta."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.778",
+                        "releaseDate": "2026-07-29",
+                        "title": "Renomeação do menu Educacional",
+                        "description": "O menu do sistema agora exibe o nome Gestão educacional, mantendo as rotas e funcionalidades existentes.",
+                        "changes": ["Nome da seção atualizado no menu lateral.", "Título superior da área atualizado.", "Manual do sistema alinhado à nova nomenclatura."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.777",
+                        "releaseDate": "2026-07-29",
+                        "title": "Alerta visual para tarefas vencidas",
+                        "description": "O ícone Tarefas no topo agora muda para vermelho e pisca quando existem tarefas em atraso, direcionando o usuário para a resolução.",
+                        "changes": ["Indicador vermelho para tarefas vencidas.", "Animação de alerta enquanto houver atraso.", "Navegação para a listagem de tarefas ao clicar no indicador."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.776",
+                        "releaseDate": "2026-07-29",
+                        "title": "Listagem simplificada de documentos do Termo de fomento",
+                        "description": "A tabela da aba Documentos foi simplificada, mantendo apenas identificação, origem e ações dos arquivos.",
+                        "changes": ["Coluna Arquivo removida da listagem.", "Ações de visualizar, imprimir e excluir preservadas."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.775",
+                        "releaseDate": "2026-07-29",
+                        "title": "Ações por ícones nos documentos do Termo de fomento",
+                        "description": "A listagem de documentos agora apresenta visualizar, imprimir e excluir de forma compacta por ícones.",
+                        "changes": ["Ícone para visualizar documento.", "Ícone para imprimir documento.", "Ícone para excluir documento com confirmação."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.774",
+                        "releaseDate": "2026-07-29",
+                        "title": "Tipos simplificados de documentos do Termo de fomento",
+                        "description": "O envio de documentos agora usa somente o tipo do documento e o arquivo, com o botão de envio ao lado do seletor.",
+                        "changes": ["Campo Nome removido.", "Tipos Termo de Fomento e Primeiro a Quinto Aditivo disponíveis.", "Botão Enviar documento posicionado ao lado do arquivo."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.773",
+                        "releaseDate": "2026-07-29",
+                        "title": "Envio unificado de documentos do Termo de fomento",
+                        "description": "A aba Documentos agora usa um único formulário para enviar e listar todos os arquivos vinculados ao termo.",
+                        "changes": ["Formulário único de envio de documentos.", "Lista consolidada de documentos vinculados.", "Visualização, impressão e remoção mantidas na listagem."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.772",
+                        "releaseDate": "2026-07-29",
+                        "title": "Correção da configuração da IA em produção",
+                        "description": "As variáveis do provedor Gemini agora são encaminhadas corretamente para o backend executado pelo Docker Compose.",
+                        "changes": ["Chave Gemini disponibilizada ao container do backend.", "Provedor e modelo de IA alinhados entre teste e produção.", "Sugestões com IA do plano de trabalho restauradas quando a chave estiver configurada no servidor."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.771",
+                        "releaseDate": "2026-07-29",
+                        "title": "Progresso no envio de documentos do Termo de fomento",
+                        "description": "A aba Documentos agora mostra o andamento do upload do documento principal e dos documentos relacionados até a confirmação do envio.",
+                        "changes": ["Barra de progresso no envio do documento principal.", "Barra de progresso no envio de documentos relacionados.", "Feedback visual acessível durante o upload."],
+                        "releaseType": "stable"
+                    },
+                    {
                         "version": "1.00.770",
                         "releaseDate": "2026-07-28",
                         "title": "Correção do padrão visual do Portal do Doador",

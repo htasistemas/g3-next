@@ -26,7 +26,7 @@ export const termoDocumentoInputSchema = z.object({
   id: optionalTrimmedString,
   nome: z.string().trim().min(2, "Informe o nome do documento."),
   dataUrl: optionalTrimmedString.nullable().optional(),
-  tipo: z.enum(["termo", "aditivo", "outro"]).nullable().optional()
+  tipo: z.string().trim().min(2).nullable().optional()
 });
 
 export const termoAditivoInputSchema = z.object({
