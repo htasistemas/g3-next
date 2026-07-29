@@ -1,6 +1,62 @@
 {
   "entries":  [
                     {
+                        "version": "1.00.753",
+                        "releaseDate": "2026-07-28",
+                        "title": "Navegação pelas pendências do plano",
+                        "description": "A checklist da aba Declaração e aprovação agora permite abrir diretamente a seção que precisa de preenchimento.",
+                        "changes": ["Pendências transformadas em ações clicáveis.", "Navegação direta para a aba correspondente ao campo pendente.", "Validação e mensagens de erro preservadas."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.752",
+                        "releaseDate": "2026-07-28",
+                        "title": "Acesso à impressão do plano de trabalho",
+                        "description": "As ações Gerar PDF e Imprimir agora ficam disponíveis nas abas de edição do plano de trabalho.",
+                        "changes": ["Ações de impressão exibidas em todas as abas de edição.", "Validação dos campos pendentes realizada somente ao solicitar a impressão.", "Relatório completo mantido no padrão A4 com capa e conteúdo institucional."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.751",
+                        "releaseDate": "2026-07-28",
+                        "title": "Relatório completo do plano de trabalho",
+                        "description": "A impressão e o PDF do plano de trabalho agora geram um documento completo com capa e todas as seções do plano.",
+                        "changes": ["Capa institucional com título, instituição, CNPJ, órgão e período.", "Inclusão completa das abas de apresentação, justificativa, objetivos, metas, cronograma, orçamento, monitoramento, prestação, anexos e declaração.", "Layout A4 com cabeçalhos de tabela repetidos e quebras de página para impressão."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.750",
+                        "releaseDate": "2026-07-28",
+                        "title": "Confirmação padrão no plano de trabalho",
+                        "description": "O salvamento do plano de trabalho agora utiliza o modal padrão de cadastro com ícone, número do registro e botão Finalizar cadastro.",
+                        "changes": ["Confirmação visual padronizada no salvamento do plano.", "Número do cadastro exibido no modal.", "Regra reforçada no agents.md para telas novas e existentes."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.749",
+                        "releaseDate": "2026-07-28",
+                        "title": "Cores por situação na listagem do plano",
+                        "description": "A listagem de planos de trabalho agora diferencia visualmente cada situação por cor de fundo.",
+                        "changes": ["Em análise em amarelo, Aprovado em verde e Reprovado em vermelho.", "Rascunho em branco, Concluído em azul e Em execução em cinza.", "Legenda de cores adicionada e destaque do item selecionado preservado."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.748",
+                        "releaseDate": "2026-07-28",
+                        "title": "Correção ao abrir planos existentes",
+                        "description": "Planos de trabalho antigos ou com campos vazios agora são normalizados ao serem abertos pela listagem.",
+                        "changes": ["Campos textuais ausentes recebem valores vazios compatíveis com a edição.", "Metas, etapas e listas relacionadas são carregadas com estruturas padrão.", "A abertura do plano não gera mais erro de trim em campos indefinidos."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.747",
+                        "releaseDate": "2026-07-28",
+                        "title": "Correção do limite do órgão do plano",
+                        "description": "O salvamento do plano de trabalho agora suporta nomes de órgãos concedentes ou parceiros maiores que 40 caracteres.",
+                        "changes": ["Coluna legada orgao_concedente ampliada para 200 caracteres.", "Compatibilidade mantida com a coluna orgao_parceiro já utilizada pela tela.", "Nomes completos de órgãos não geram mais erro de persistência."],
+                        "releaseType": "stable"
+                    },
+                    {
                         "version": "1.00.746",
                         "releaseDate": "2026-07-28",
                         "title": "Validação imediata das datas de metas",

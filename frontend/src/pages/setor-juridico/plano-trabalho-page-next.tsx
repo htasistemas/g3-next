@@ -27,6 +27,7 @@ import {
   XCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CadastroSucessoModal } from "@/components/admin/cadastro-sucesso-modal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -252,6 +253,83 @@ function calcularProgressoSecao(form: PlanoTrabalhoPayload) {
   };
 }
 
+function normalizarPlanoCarregado(plano: PlanoTrabalhoPayload): PlanoTrabalhoPayload {
+  const base = planoVazio();
+  return {
+    ...base,
+    ...clonarPlano(plano),
+    titulo: plano.titulo ?? "",
+    tipoParceria: plano.tipoParceria ?? base.tipoParceria,
+    orgaoParceiro: plano.orgaoParceiro ?? "",
+    periodoInicio: plano.periodoInicio ?? "",
+    periodoFim: plano.periodoFim ?? "",
+    status: plano.status ?? base.status,
+    responsavelTecnico: plano.responsavelTecnico ?? "",
+    responsavelLegal: plano.responsavelLegal ?? "",
+    razaoSocial: plano.razaoSocial ?? "",
+    cnpj: plano.cnpj ?? "",
+    representanteLegal: plano.representanteLegal ?? "",
+    representanteCpf: plano.representanteCpf ?? "",
+    descricaoObjeto: plano.descricaoObjeto ?? "",
+    areaAtuacao: plano.areaAtuacao ?? "",
+    localExecucao: plano.localExecucao ?? "",
+    publicoAlvo: plano.publicoAlvo ?? "",
+    objetivoGeral: plano.objetivoGeral ?? "",
+    objetivosEspecificos: (plano.objetivosEspecificos ?? []).map((objetivo) => ({
+      ...objetivo,
+      descricao: objetivo.descricao ?? "",
+      metasVinculadas: objetivo.metasVinculadas ?? []
+    })),
+    metas: (plano.metas ?? []).map((meta) => ({
+      ...novaMeta(),
+      ...meta,
+      numeroMeta: meta.numeroMeta ?? "",
+      descricao: meta.descricao ?? "",
+      etapas: (meta.etapas ?? []).map((etapa) => ({ ...novaEtapaMeta(), ...etapa, nome: etapa.nome ?? "" }))
+    })),
+    aplicacaoRecursos: plano.aplicacaoRecursos ?? [],
+    desembolso: plano.desembolso ?? [],
+    instrumentosMonitoramento: plano.instrumentosMonitoramento ?? [],
+    checklistPrestacao: plano.checklistPrestacao ?? []
+  };
+}
+
+function classeCorSituacaoPlano(status: string) {
+  switch (status) {
+    case "EM_ANALISE":
+      return "bg-yellow-50";
+    case "APROVADO":
+      return "bg-green-50";
+    case "REPROVADO":
+      return "bg-red-50";
+    case "CONCLUIDO":
+      return "bg-blue-50";
+    case "EM_EXECUCAO":
+      return "bg-gray-100";
+    case "RASCUNHO":
+    default:
+      return "bg-white";
+  }
+}
+
+function corFundoSituacaoPlano(status: string) {
+  switch (status) {
+    case "EM_ANALISE":
+      return "#FEF9C3";
+    case "APROVADO":
+      return "#DCFCE7";
+    case "REPROVADO":
+      return "#FEE2E2";
+    case "CONCLUIDO":
+      return "#DBEAFE";
+    case "EM_EXECUCAO":
+      return "#F3F4F6";
+    case "RASCUNHO":
+    default:
+      return "#FFFFFF";
+  }
+}
+
 function primeiraMensagemErro(erros: Record<string, string>) {
   return Object.values(erros)[0] ?? "Existem pendências no plano.";
 }
@@ -305,6 +383,7 @@ export function PlanoTrabalhoPage() {
   const [form, setForm] = useState<PlanoTrabalhoPayload>(clonarPlano(planoVazio()));
   const [snapshot, setSnapshot] = useState<PlanoTrabalhoPayload>(clonarPlano(planoVazio()));
   const [popup, setPopup] = useState<PopupMensagemState | null>(null);
+  const [cadastroSucesso, setCadastroSucesso] = useState<string | null>(null);
   const [confirmarExclusao, setConfirmarExclusao] = useState(false);
   const [erros, setErros] = useState<Record<string, string>>({});
   const [arquivos, setArquivos] = useState<ArquivoMetadata[]>([]);
@@ -349,8 +428,6 @@ export function PlanoTrabalhoPage() {
   const totalAplicacao = useMemo(() => somarAplicacaoRecursos(form), [form]);
   const totalDesembolso = useMemo(() => somarDesembolso(form), [form]);
   const pendenciasEnvio = useMemo(() => validarPlano(form, "envio"), [form]);
-  const pendenciasImpressao = useMemo(() => validarPlanoParaImpressao(form), [form]);
-  const planoCompletoParaImpressao = Object.keys(pendenciasImpressao).length === 0;
   const [unidadeAssistencialSelecionadaId, setUnidadeAssistencialSelecionadaId] = useState("");
   const [contaBancariaSelecionadaId, setContaBancariaSelecionadaId] = useState("");
   const [mostrarSugestoesOrgaos, setMostrarSugestoesOrgaos] = useState(false);
@@ -528,7 +605,7 @@ export function PlanoTrabalhoPage() {
   }
 
   function selecionarPlano(plano: PlanoTrabalho) {
-    const normalizado = clonarPlano(plano);
+    const normalizado = normalizarPlanoCarregado(plano);
     setPlanoSelecionadoId(plano.id);
     setUnidadeAssistencialSelecionadaId("");
     setContaBancariaSelecionadaId("");
@@ -577,11 +654,11 @@ export function PlanoTrabalhoPage() {
           termoFomentoId: payload.termoFomentoId?.trim() ? payload.termoFomentoId : undefined
         }
       });
-      const normalizado = clonarPlano(salvo);
+      const normalizado = normalizarPlanoCarregado(salvo);
       setPlanoSelecionadoId(salvo.id);
       setForm(normalizado);
       setSnapshot(normalizado);
-      setPopup({ tipo: "sucesso", titulo: "Plano atualizado", texto: mensagemSucesso });
+      setCadastroSucesso(salvo.codigoInterno || salvo.id);
     } catch (error: any) {
       setPopup({
         tipo: "erro",
@@ -631,6 +708,40 @@ export function PlanoTrabalhoPage() {
       titulo: "Plano validado",
       texto: "O plano está consistente e pode ser enviado para análise."
     });
+  }
+
+  function navegarParaPendencia(chave: string) {
+    const abaPorCampo: Record<string, AbaId> = {
+      titulo: "identificacao",
+      tipoParceria: "identificacao",
+      orgaoParceiro: "identificacao",
+      periodoInicio: "identificacao",
+      periodoFim: "identificacao",
+      responsavelTecnico: "identificacao",
+      responsavelLegal: "identificacao",
+      razaoSocial: "instituicao",
+      cnpj: "instituicao",
+      representanteLegal: "instituicao",
+      representanteCpf: "instituicao",
+      descricaoObjeto: "objeto",
+      areaAtuacao: "objeto",
+      localExecucao: "objeto",
+      publicoAlvo: "objeto",
+      problemaSocial: "justificativa",
+      objetivoGeral: "objetivos",
+      objetivosEspecificos: "objetivos",
+      metas: "metas",
+      metasIndicadores: "metas",
+      metasEtapas: "metas",
+      etapasResponsavel: "metas",
+      cronogramaExecucao: "cronograma",
+      aplicacaoRecursos: "aplicacao",
+      desembolso: "desembolso",
+      checklistPrestacao: "prestacao",
+      declaracaoVeracidade: "declaracao"
+    };
+
+    setAbaAtiva(abaPorCampo[chave] ?? "declaracao");
   }
 
   function duplicarPlano() {
@@ -1018,24 +1129,20 @@ export function PlanoTrabalhoPage() {
       variant: "outline",
       disabled: processando || !form.titulo
     },
-    ...(planoCompletoParaImpressao
-      ? [
-          {
-            id: "gerar_pdf",
-            label: "Gerar PDF",
-            icon: FileText,
-            onClick: imprimirOuPdf,
-            variant: "outline" as const
-          },
-          {
-            id: "imprimir",
-            label: "Imprimir",
-            icon: Printer,
-            onClick: imprimirOuPdf,
-            variant: "outline" as const
-          }
-        ]
-      : []),
+    {
+      id: "gerar_pdf",
+      label: "Gerar PDF",
+      icon: FileText,
+      onClick: imprimirOuPdf,
+      variant: "outline" as const
+    },
+    {
+      id: "imprimir",
+      label: "Imprimir",
+      icon: Printer,
+      onClick: imprimirOuPdf,
+      variant: "outline" as const
+    },
     {
       id: "exportar",
       label: "Exportar",
@@ -1077,18 +1184,18 @@ export function PlanoTrabalhoPage() {
 
   const acoesVisiveisPorAba: Partial<Record<AbaId, string[]>> = {
     listagem: ["Novo plano", "Duplicar plano", "Excluir", "Fechar"],
-    identificacao: ["Novo plano", "Salvar rascunho", "Duplicar plano", "Cancelar", "Fechar"],
-    instituicao: ["Salvar rascunho", "Cancelar", "Fechar"],
-    historico: ["Salvar rascunho", "Cancelar", "Fechar"],
-    objeto: ["Salvar rascunho", "Cancelar", "Fechar"],
-    justificativa: ["Salvar rascunho", "Cancelar", "Fechar"],
-    objetivos: ["Salvar rascunho", "Cancelar", "Fechar"],
-    metas: ["Salvar rascunho", "Cancelar", "Fechar"],
-    cronograma: ["Salvar rascunho", "Cancelar", "Fechar"],
-    aplicacao: ["Salvar rascunho", "Cancelar", "Fechar"],
-    desembolso: ["Salvar rascunho", "Cancelar", "Fechar"],
-    monitoramento: ["Salvar rascunho", "Cancelar", "Fechar"],
-    prestacao: ["Salvar rascunho", "Anexar documento", "Cancelar", "Fechar"],
+    identificacao: ["Novo plano", "Salvar rascunho", "Duplicar plano", "Gerar PDF", "Imprimir", "Cancelar", "Fechar"],
+    instituicao: ["Salvar rascunho", "Gerar PDF", "Imprimir", "Cancelar", "Fechar"],
+    historico: ["Salvar rascunho", "Gerar PDF", "Imprimir", "Cancelar", "Fechar"],
+    objeto: ["Salvar rascunho", "Gerar PDF", "Imprimir", "Cancelar", "Fechar"],
+    justificativa: ["Salvar rascunho", "Gerar PDF", "Imprimir", "Cancelar", "Fechar"],
+    objetivos: ["Salvar rascunho", "Gerar PDF", "Imprimir", "Cancelar", "Fechar"],
+    metas: ["Salvar rascunho", "Gerar PDF", "Imprimir", "Cancelar", "Fechar"],
+    cronograma: ["Salvar rascunho", "Gerar PDF", "Imprimir", "Cancelar", "Fechar"],
+    aplicacao: ["Salvar rascunho", "Gerar PDF", "Imprimir", "Cancelar", "Fechar"],
+    desembolso: ["Salvar rascunho", "Gerar PDF", "Imprimir", "Cancelar", "Fechar"],
+    monitoramento: ["Salvar rascunho", "Gerar PDF", "Imprimir", "Cancelar", "Fechar"],
+    prestacao: ["Salvar rascunho", "Anexar documento", "Gerar PDF", "Imprimir", "Cancelar", "Fechar"],
     anexos: ["Salvar rascunho", "Gerar PDF", "Imprimir", "Exportar", "Cancelar", "Excluir", "Fechar"],
     declaracao: [
       "Salvar rascunho",
@@ -1175,6 +1282,22 @@ export function PlanoTrabalhoPage() {
               </Button>
             </div>
 
+            <div className="flex flex-wrap gap-3 text-xs text-[var(--g3-muted)]" aria-label="Legenda das situações">
+              {[
+                ["bg-yellow-50", "Em análise"],
+                ["bg-green-50", "Aprovado"],
+                ["bg-red-50", "Reprovado"],
+                ["bg-white", "Rascunho"],
+                ["bg-blue-50", "Concluído"],
+                ["bg-gray-100", "Em execução"]
+              ].map(([cor, label]) => (
+                <span key={label} className="inline-flex items-center gap-1.5">
+                  <span style={{ backgroundColor: cor === "bg-yellow-50" ? "#FEF9C3" : cor === "bg-green-50" ? "#DCFCE7" : cor === "bg-red-50" ? "#FEE2E2" : cor === "bg-blue-50" ? "#DBEAFE" : cor === "bg-gray-100" ? "#F3F4F6" : "#FFFFFF" }} className="h-3 w-3 rounded border border-[var(--g3-border)]" />
+                  {label}
+                </span>
+              ))}
+            </div>
+
             <div className="overflow-x-auto rounded-xl border border-[var(--g3-border)]">
               <table className="min-w-full text-sm">
                 <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]">
@@ -1200,10 +1323,9 @@ export function PlanoTrabalhoPage() {
                       <tr
                         key={plano.id}
                         onClick={() => selecionarPlano(plano)}
-                        className={`cursor-pointer border-t border-[var(--g3-border)] transition-colors ${
-                          planoSelecionadoId === plano.id
-                            ? "bg-[var(--g3-primary-soft)]"
-                            : "hover:bg-[var(--g3-primary-soft)]/35"
+                        style={{ backgroundColor: corFundoSituacaoPlano(plano.status) }}
+                        className={`cursor-pointer border-t border-[var(--g3-border)] transition-colors ${classeCorSituacaoPlano(plano.status)} hover:bg-[var(--g3-primary-soft)]/35 ${
+                          planoSelecionadoId === plano.id ? "ring-2 ring-inset ring-[var(--g3-primary)]" : ""
                         }`}
                       >
                         <td className="px-3 py-3 font-semibold">{plano.codigoInterno}</td>
@@ -2592,10 +2714,16 @@ export function PlanoTrabalhoPage() {
               <h3 className="text-sm font-semibold text-[var(--g3-active)]">Checklist final de conformidade</h3>
               <div className="mt-3 grid gap-2">
                 {Object.keys(pendenciasEnvio).length ? (
-                  Object.values(pendenciasEnvio).map((item) => (
-                    <div key={item} className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                  Object.entries(pendenciasEnvio).map(([chave, item]) => (
+                    <button
+                      key={chave}
+                      type="button"
+                      className="w-full rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-left text-sm text-amber-700 transition hover:border-amber-500 hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                      onClick={() => navegarParaPendencia(chave)}
+                      title="Clique para abrir a seção correspondente"
+                    >
                       {item}
-                    </div>
+                    </button>
                   ))
                 ) : (
                   <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
@@ -2610,6 +2738,13 @@ export function PlanoTrabalhoPage() {
       </AdminPageLayout>
 
       {popup ? <PopupMensagem popup={popup} onClose={() => setPopup(null)} /> : null}
+      <CadastroSucessoModal
+        aberto={Boolean(cadastroSucesso)}
+        titulo="Cadastro realizado com sucesso"
+        rotuloNumero="Número do cadastro"
+        numero={cadastroSucesso}
+        onClose={() => setCadastroSucesso(null)}
+      />
       <PopupConfirmacao
         aberto={confirmarExclusao}
         titulo="Confirmar exclusão"

@@ -683,6 +683,11 @@ const secoesManual: ManualSecao[] = [
           "Nas abas Monitoramento e avaliação e Prestação de contas, use Sugerir com IA nos campos textuais e de orientação. As sugestões consideram metas, objeto, indicadores e o conteúdo já revisado.",
           "As sugestões de IA dos campos textuais são tratadas como geração de conteúdo: elas usam o título do campo, o contexto preenchido e o texto atual, sem executar consultas de beneficiários, localização ou faixa etária.",
           "Ao informar datas de metas ou etapas, o sistema critica imediatamente o período e mostra as datas permitidas conforme o início e o fim da execução do plano.",
+          "Órgãos concedentes ou parceiros com nomes longos podem ser salvos normalmente; a tela mantém espaço compatível para nomes completos.",
+          "Ao abrir um plano existente pela listagem, os campos antigos ou sem preenchimento são normalizados automaticamente para permitir edição sem erro de navegação.",
+          "Na listagem do plano de trabalho, as linhas usam cores por situação: amarelo para Em análise, verde para Aprovado, vermelho para Reprovado, branco para Rascunho, azul para Concluído e cinza para Em execução.",
+          "Ao salvar o plano de trabalho, confira o modal padrão de confirmação com o número do cadastro e use Finalizar cadastro para fechá-lo.",
+          "Quando o plano estiver completo, use Gerar PDF ou Imprimir nas ações do topo. O relatório possui capa, identificação, dados da instituição, apresentação e histórico, objeto, justificativa, objetivos, metas, etapas, cronograma, aplicação, desembolso, monitoramento, prestação de contas, anexos e declaração/aprovação.",
           "Quando o plano estiver completo para envio e os dados bancários essenciais estiverem preenchidos, a barra superior libera a ação de gerar PDF e imprimir no layout oficial do sistema.",
           "Os botões do topo continuam organizados em grade responsiva para não invadir o título da tela e facilitar a leitura em resoluções menores e maiores."
         ],
