@@ -44,6 +44,8 @@ export type Matricula = {
   instituicao_parceira?: string;
   sala_id?: string;
   sala_nome?: string;
+  unidade_id?: string;
+  unidade_nome?: string;
   status: string;
   data_triagem?: string;
   data_encaminhamento?: string;
@@ -70,6 +72,8 @@ export type MatriculaFiltro = {
   status?: string;
   profissional?: string;
   beneficiario?: string;
+  unidade_id?: string;
+  sala_id?: string;
 };
 
 export type MatriculaBeneficiarioCatalogo = {
@@ -90,6 +94,7 @@ export type MatriculaProfissionalCatalogo = {
 export type MatriculaSalaCatalogo = {
   id_sala: string;
   nome: string;
+  unidade_id?: string;
   unidade_nome?: string;
 };
 

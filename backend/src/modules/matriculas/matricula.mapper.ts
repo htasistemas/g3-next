@@ -68,6 +68,8 @@ export type MatriculaCursoRow = {
   instituicao_parceira: string | null;
   sala_id: bigint | null;
   sala_nome: string | null;
+  unidade_id: bigint | null;
+  unidade_nome: string | null;
   status: string;
   data_triagem: NullableDate;
   data_encaminhamento: NullableDate;
@@ -137,6 +139,8 @@ export function mapCursoToResponse(
     instituicao_parceira: curso.instituicao_parceira ?? undefined,
     sala_id: curso.sala_id ? toStringId(curso.sala_id) : undefined,
     sala_nome: curso.sala_nome ?? undefined,
+    unidade_id: curso.unidade_id ? toStringId(curso.unidade_id) : undefined,
+    unidade_nome: curso.unidade_nome ?? undefined,
     status: curso.status,
     data_triagem: formatDate(curso.data_triagem),
     data_encaminhamento: formatDate(curso.data_encaminhamento),
@@ -204,11 +208,13 @@ export function mapProfissionalCatalogoToResponse(record: {
 export function mapSalaCatalogoToResponse(record: {
   id: bigint;
   nome: string;
+  unidade_id: bigint | null;
   unidade_nome: string | null;
 }) {
   return {
     id_sala: toStringId(record.id),
     nome: record.nome,
+    unidade_id: record.unidade_id ? toStringId(record.unidade_id) : undefined,
     unidade_nome: record.unidade_nome ?? undefined
   };
 }

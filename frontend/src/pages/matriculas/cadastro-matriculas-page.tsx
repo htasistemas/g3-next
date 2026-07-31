@@ -272,6 +272,7 @@ function mapMatriculaParaFormulario(matricula: Matricula): MatriculaFormValues {
     imagem: matricula.imagem ?? "",
     dias_semana: matricula.dias_semana ?? [],
     faixa_etaria: matricula.faixa_etaria ?? [],
+    unidade_id: matricula.unidade_id ?? "",
     sala_id: matricula.sala_id ?? "",
     descricao: matricula.descricao ?? "",
     restricoes: matricula.restricoes ?? "",
@@ -486,7 +487,9 @@ export function CadastroMatriculasPage() {
     tipo: "",
     status: "",
     profissional: "",
-    beneficiario: ""
+    beneficiario: "",
+    unidade_id: "",
+    sala_id: ""
   });
   const [filtros, setFiltros] = useState<MatriculaFiltro>(filtroDraft);
   const [filtroStatusAgendamentoRapido, setFiltroStatusAgendamentoRapido] = useState<"" | "AGENDADO" | "PENDENTE" | "CANCELADA" | "FINALIZADA">("");
@@ -605,6 +608,8 @@ export function CadastroMatriculasPage() {
   const tipoMatriculaAtual = String(watch("tipo") ?? "");
   const imagemAtual = String(watch("imagem") ?? "");
   const profissionalResponsavelValor = String(watch("profissional") ?? "");
+  const unidadeIdFormulario = String(watch("unidade_id") ?? "");
+  const salaIdFormulario = String(watch("sala_id") ?? "");
   const matriculaIdFormulario = watch("id_matricula");
   const vagasTotaisFormulario = watch("vagas_totais");
   const acaoEmAndamento =
@@ -613,6 +618,26 @@ export function CadastroMatriculasPage() {
   const matriculas = catalogoData?.matriculas ?? [];
   const matriculasListagem = listaData?.matriculas ?? [];
   const salasCatalogo = salasData?.salas ?? [];
+  const unidadesCatalogo = useMemo(() => {
+    const mapa = new Map<string, { id: string; nome: string }>();
+
+    salasCatalogo.forEach((sala) => {
+      const id = String(sala.unidade_id ?? "").trim();
+      const nome = String(sala.unidade_nome ?? "").trim();
+      if (!id || !nome || mapa.has(id)) return;
+      mapa.set(id, { id, nome });
+    });
+
+    return Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+  }, [salasCatalogo]);
+  const salasFormulario = useMemo(
+    () =>
+      salasCatalogo.filter((sala) => {
+        if (!unidadeIdFormulario) return true;
+        return String(sala.unidade_id ?? "") === unidadeIdFormulario;
+      }),
+    [salasCatalogo, unidadeIdFormulario]
+  );
   const beneficiariosCatalogo = beneficiariosCatalogoData?.beneficiarios ?? [];
   const beneficiariosFilaCatalogo = beneficiariosFilaCatalogoData?.beneficiarios ?? [];
   const profissionaisCatalogo = profissionaisCatalogoData?.profissionais ?? [];
@@ -655,12 +680,41 @@ export function CadastroMatriculasPage() {
       ocupacao
     };
   }, [matriculasListagem]);
+  const unidadesListagem = useMemo(() => {
+    const mapa = new Map<string, { id: string; nome: string }>();
+
+    matriculasListagem.forEach((curso) => {
+      const id = String(curso.unidade_id ?? "").trim();
+      const nome = String(curso.unidade_nome ?? "").trim();
+      if (!id || !nome || mapa.has(id)) return;
+      mapa.set(id, { id, nome });
+    });
+
+    return Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+  }, [matriculasListagem]);
+  const salasListagem = useMemo(() => {
+    const unidadeFiltro = String(filtroDraft.unidade_id ?? "").trim();
+    const mapa = new Map<string, { id: string; nome: string; unidade_id?: string }>();
+
+    matriculasListagem.forEach((curso) => {
+      const id = String(curso.sala_id ?? "").trim();
+      const nome = String(curso.sala_nome ?? "").trim();
+      const unidadeId = String(curso.unidade_id ?? "").trim();
+      if (!id || !nome || mapa.has(id)) return;
+      if (unidadeFiltro && unidadeId !== unidadeFiltro) return;
+      mapa.set(id, { id, nome, unidade_id: unidadeId || undefined });
+    });
+
+    return Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+  }, [filtroDraft.unidade_id, matriculasListagem]);
   const inscricoesListagem = useMemo(() => {
     const termoNome = normalizarNomeComparacaoTexto(filtros.nome);
     const termoTipo = normalizarNomeComparacaoTexto(filtros.tipo);
     const termoStatus = normalizarNomeComparacaoTexto(filtros.status);
     const termoProfissional = normalizarNomeComparacaoTexto(filtros.profissional);
     const termoBeneficiario = normalizarNomeComparacaoTexto(filtros.beneficiario);
+    const filtroUnidadeId = String(filtros.unidade_id ?? "").trim();
+    const filtroSalaId = String(filtros.sala_id ?? "").trim();
 
     return matriculasListagem
       .flatMap((curso) =>
@@ -669,7 +723,11 @@ export function CadastroMatriculasPage() {
           curso_id: curso.id_matricula,
           curso_nome: curso.nome,
           curso_tipo: curso.tipo,
-          curso_status: curso.status
+          curso_status: curso.status,
+          sala_id: curso.sala_id,
+          sala_nome: curso.sala_nome,
+          unidade_id: curso.unidade_id,
+          unidade_nome: curso.unidade_nome
         }))
       )
       .filter((item) => {
@@ -688,6 +746,8 @@ export function CadastroMatriculasPage() {
         if (termoStatus && !normalizarNomeComparacaoTexto(item.status ?? item.curso_status).includes(termoStatus)) return false;
         if (termoProfissional && !normalizarNomeComparacaoTexto(item.profissional_nome).includes(termoProfissional)) return false;
         if (termoBeneficiario && !normalizarNomeComparacaoTexto(item.beneficiario_nome).includes(termoBeneficiario)) return false;
+        if (filtroUnidadeId && String(item.unidade_id ?? "") !== filtroUnidadeId) return false;
+        if (filtroSalaId && String(item.sala_id ?? "") !== filtroSalaId) return false;
         if (filtroStatusAgendamentoRapido && statusAgendamentoNormalizado !== filtroStatusAgendamentoRapido) return false;
         return true;
       })
@@ -698,6 +758,36 @@ export function CadastroMatriculasPage() {
         return a.beneficiario_nome.localeCompare(b.beneficiario_nome, "pt-BR");
       });
   }, [filtroStatusAgendamentoRapido, filtros, matriculasListagem]);
+  const alunosPorUnidadeSala = useMemo(() => {
+    const grupos = new Map<
+      string,
+      {
+        unidadeNome: string;
+        salaNome: string;
+        alunos: typeof inscricoesListagem;
+      }
+    >();
+
+    inscricoesListagem.forEach((item) => {
+      const unidadeNome = String(item.unidade_nome ?? "Sem unidade").trim() || "Sem unidade";
+      const salaNome = String(item.sala_nome ?? "Sem sala").trim() || "Sem sala";
+      const chave = `${item.unidade_id ?? "sem-unidade"}:${item.sala_id ?? "sem-sala"}`;
+      const grupo = grupos.get(chave) ?? { unidadeNome, salaNome, alunos: [] };
+      grupo.alunos.push(item);
+      grupos.set(chave, grupo);
+    });
+
+    return Array.from(grupos.values())
+      .map((grupo) => ({
+        ...grupo,
+        alunos: [...grupo.alunos].sort((a, b) => a.beneficiario_nome.localeCompare(b.beneficiario_nome, "pt-BR"))
+      }))
+      .sort((a, b) => {
+        const unidade = a.unidadeNome.localeCompare(b.unidadeNome, "pt-BR");
+        if (unidade !== 0) return unidade;
+        return a.salaNome.localeCompare(b.salaNome, "pt-BR");
+      });
+  }, [inscricoesListagem]);
   const podeAdicionarInscricao = useMemo(() => {
     const nome = formatarTextoPadrao(novaInscricao.beneficiario_nome);
     if (nome.length < 3) return false;
@@ -817,6 +907,14 @@ export function CadastroMatriculasPage() {
   }, [detalhesData, reset]);
 
   useEffect(() => {
+    if (!salaIdFormulario) return;
+    const salaSelecionada = salasCatalogo.find((sala) => sala.id_sala === salaIdFormulario);
+    const unidadeId = String(salaSelecionada?.unidade_id ?? "").trim();
+    if (!unidadeId || unidadeId === unidadeIdFormulario) return;
+    setValue("unidade_id", unidadeId, { shouldDirty: false, shouldValidate: true });
+  }, [salaIdFormulario, salasCatalogo, setValue, unidadeIdFormulario]);
+
+  useEffect(() => {
     if (!ehTipoAtendimento) {
       setProfissionaisAtendimentoSelecionados([]);
       return;
@@ -922,7 +1020,7 @@ export function CadastroMatriculasPage() {
   }
 
   function limparFiltros() {
-    const base = { nome: "", tipo: "", status: "", profissional: "", beneficiario: "" };
+    const base = { nome: "", tipo: "", status: "", profissional: "", beneficiario: "", unidade_id: "", sala_id: "" };
     setFiltroDraft(base);
     setFiltros(base);
     setFiltroStatusAgendamentoRapido("");
@@ -2472,7 +2570,7 @@ export function CadastroMatriculasPage() {
                     </div>
                   </div>
 
-                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-7">
                     <div className="space-y-1">
                       <Label htmlFor="filtro-nome">Nome</Label>
                       <Input
@@ -2539,6 +2637,45 @@ export function CadastroMatriculasPage() {
                         placeholder="Nome do beneficiário"
                       />
                     </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="filtro-unidade">Unidade</Label>
+                      <Select
+                        id="filtro-unidade"
+                        value={filtroDraft.unidade_id ?? ""}
+                        onChange={(event) =>
+                          setFiltroDraft((atual) => ({
+                            ...atual,
+                            unidade_id: event.target.value,
+                            sala_id: ""
+                          }))
+                        }
+                        onKeyDown={onFiltroEnter}
+                      >
+                        <option value="">Todas</option>
+                        {unidadesListagem.map((unidade) => (
+                          <option key={unidade.id} value={unidade.id}>
+                            {unidade.nome}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="filtro-sala">Sala</Label>
+                      <Select
+                        id="filtro-sala"
+                        value={filtroDraft.sala_id ?? ""}
+                        onChange={(event) => setFiltroDraft((atual) => ({ ...atual, sala_id: event.target.value }))}
+                        onKeyDown={onFiltroEnter}
+                        disabled={!salasListagem.length}
+                      >
+                        <option value="">Todas</option>
+                        {salasListagem.map((sala) => (
+                          <option key={sala.id} value={sala.id}>
+                            {sala.nome}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
                   </div>
 
                   <div className="flex justify-end">
@@ -2570,6 +2707,68 @@ export function CadastroMatriculasPage() {
                         {item.label}
                       </Button>
                     ))}
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h3 className="text-sm font-semibold text-[var(--g3-foreground)]">Alunos por unidade e sala</h3>
+                      <span className="text-xs text-[var(--g3-muted)]">
+                        {alunosPorUnidadeSala.length} sala(s) com alunos vinculados
+                      </span>
+                    </div>
+                    {carregandoLista ? (
+                      <div className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card)] p-4 text-sm text-[var(--g3-muted)]">
+                        Carregando alunos por sala...
+                      </div>
+                    ) : alunosPorUnidadeSala.length ? (
+                      <div className="grid gap-3 xl:grid-cols-2">
+                        {alunosPorUnidadeSala.map((grupo) => (
+                          <div
+                            key={`${grupo.unidadeNome}-${grupo.salaNome}`}
+                            className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card)] p-3"
+                          >
+                            <div className="flex flex-wrap items-start justify-between gap-2 border-b border-[var(--g3-border)] pb-2">
+                              <div>
+                                <p className="text-sm font-semibold text-[var(--g3-foreground)]">{grupo.unidadeNome}</p>
+                                <p className="text-xs text-[var(--g3-muted)]">{grupo.salaNome}</p>
+                              </div>
+                              <span className="rounded-full bg-[var(--g3-primary-soft)] px-2 py-1 text-xs font-semibold text-[var(--g3-active)]">
+                                {grupo.alunos.length} aluno(s)
+                              </span>
+                            </div>
+                            <div className="mt-2 max-h-56 overflow-y-auto">
+                              <table className="min-w-full text-xs">
+                                <thead className="text-[var(--g3-muted)]">
+                                  <tr>
+                                    <th className="px-2 py-1 text-left font-semibold">Aluno</th>
+                                    <th className="px-2 py-1 text-left font-semibold">Curso / atendimento</th>
+                                    <th className="px-2 py-1 text-left font-semibold">Status</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {grupo.alunos.map((aluno, alunoIndex) => (
+                                    <tr
+                                      key={`${aluno.id_matricula_item ?? aluno.beneficiario_nome}-${alunoIndex}`}
+                                      className="border-t border-[var(--g3-border)]"
+                                    >
+                                      <td className="px-2 py-1 align-top font-medium text-[var(--g3-foreground)]">
+                                        {aluno.beneficiario_nome}
+                                      </td>
+                                      <td className="px-2 py-1 align-top text-[var(--g3-muted)]">{aluno.curso_nome}</td>
+                                      <td className="px-2 py-1 align-top text-[var(--g3-muted)]">{aluno.status ?? "---"}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card)] p-4 text-sm text-[var(--g3-muted)]">
+                        Nenhum aluno vinculado a unidade e sala com os filtros atuais.
+                      </div>
+                    )}
                   </div>
 
                   <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]">
@@ -2707,14 +2906,33 @@ export function CadastroMatriculasPage() {
                       <Input id="vagas_disponiveis" type="number" min={0} {...register("vagas_disponiveis")} />
                       {errors.vagas_disponiveis && <p className="text-xs text-rose-600">{errors.vagas_disponiveis.message}</p>}
                     </div>
-                    <div className="space-y-1 xl:col-span-2">
+                    <div className="space-y-1">
+                      <Label htmlFor="unidade_id">Unidade *</Label>
+                      <Select
+                        id="unidade_id"
+                        {...register("unidade_id")}
+                        onChange={(event) => {
+                          setValue("unidade_id", event.target.value, { shouldDirty: true, shouldValidate: true });
+                          setValue("sala_id", "", { shouldDirty: true, shouldValidate: true });
+                        }}
+                      >
+                        <option value="">Selecione a unidade</option>
+                        {unidadesCatalogo.map((unidade) => (
+                          <option key={unidade.id} value={unidade.id}>
+                            {unidade.nome}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
                       <Label htmlFor="sala_id">Sala *</Label>
-                      <Select id="sala_id" {...register("sala_id")}>
-                        <option value="">Selecione a sala</option>
-                        {salasCatalogo.map((sala: MatriculaSalaCatalogo) => (
+                      <Select id="sala_id" {...register("sala_id")} disabled={!unidadeIdFormulario && unidadesCatalogo.length > 0}>
+                        <option value="">
+                          {unidadeIdFormulario || !unidadesCatalogo.length ? "Selecione a sala" : "Selecione a unidade primeiro"}
+                        </option>
+                        {salasFormulario.map((sala: MatriculaSalaCatalogo) => (
                           <option key={sala.id_sala} value={sala.id_sala}>
                             {sala.nome}
-                            {sala.unidade_nome ? ` - ${sala.unidade_nome}` : ""}
                           </option>
                         ))}
                       </Select>
@@ -3111,6 +3329,9 @@ export function CadastroMatriculasPage() {
                               </p>
                               <p>
                                 <span className="text-[var(--g3-muted)]">Sala:</span> {item.sala_nome ?? "---"}
+                              </p>
+                              <p>
+                                <span className="text-[var(--g3-muted)]">Unidade:</span> {item.unidade_nome ?? "---"}
                               </p>
                               <p>
                                 <span className="text-[var(--g3-muted)]">Instituição:</span>{" "}

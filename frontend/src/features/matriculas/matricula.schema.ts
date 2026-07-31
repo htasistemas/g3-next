@@ -39,6 +39,7 @@ export const matriculaFormSchema = z.object({
   restricoes: optionalTrimmedString,
   profissional: optionalTrimmedString,
   instituicao_parceira: optionalTrimmedString,
+  unidade_id: optionalTrimmedString,
   sala_id: optionalTrimmedString,
   status: z.enum(matriculaStatusValues, {
     required_error: "Informe o status.",
@@ -69,6 +70,7 @@ export const matriculaDefaultValues: MatriculaFormValues = {
   restricoes: "",
   profissional: "",
   instituicao_parceira: "",
+  unidade_id: "",
   sala_id: "",
   status: "ATIVO",
   data_triagem: "",

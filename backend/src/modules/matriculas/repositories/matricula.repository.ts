@@ -391,6 +391,8 @@ export class MatriculaRepository {
         c.instituicao_parceira,
         c.sala_id,
         s.nome AS sala_nome,
+        u.id AS unidade_id,
+        u.nome_fantasia AS unidade_nome,
         c.status,
         c.data_triagem,
         c.data_encaminhamento,
@@ -411,6 +413,7 @@ export class MatriculaRepository {
         )::BIGINT AS total_fila_espera
       FROM cursos_atendimentos c
       LEFT JOIN salas_unidade s ON s.id = c.sala_id
+      LEFT JOIN unidade_assistencial u ON u.id = s.unidade_id AND u.tenant_id::text = ${tenantId}
       LEFT JOIN LATERAL (
         SELECT a.thumbnail_caminho
         FROM arquivos a
@@ -477,6 +480,8 @@ export class MatriculaRepository {
         c.instituicao_parceira,
         c.sala_id,
         s.nome AS sala_nome,
+        u.id AS unidade_id,
+        u.nome_fantasia AS unidade_nome,
         c.status,
         c.data_triagem,
         c.data_encaminhamento,
@@ -497,6 +502,7 @@ export class MatriculaRepository {
         )::BIGINT AS total_fila_espera
       FROM cursos_atendimentos c
       LEFT JOIN salas_unidade s ON s.id = c.sala_id
+      LEFT JOIN unidade_assistencial u ON u.id = s.unidade_id AND u.tenant_id::text = ${tenantId}
       LEFT JOIN LATERAL (
         SELECT a.thumbnail_caminho
         FROM arquivos a
@@ -873,14 +879,16 @@ export class MatriculaRepository {
 
   async listarSalas(tenantId: string) {
     await this.ensureEstrutura();
-    return prisma.$queryRaw<Array<{ id: bigint; nome: string; unidade_nome: string | null }>>(Prisma.sql`
+    return prisma.$queryRaw<Array<{ id: bigint; nome: string; unidade_id: bigint | null; unidade_nome: string | null }>>(Prisma.sql`
       SELECT
         s.id,
         s.nome,
+        u.id AS unidade_id,
         u.nome_fantasia AS unidade_nome
       FROM salas_unidade s
-      LEFT JOIN unidade_assistencial u ON u.id = s.unidade_id
-      WHERE 1 = 1
+      INNER JOIN unidade_assistencial u ON u.id = s.unidade_id
+      WHERE u.tenant_id::text = ${tenantId}
+        AND s.ativo = TRUE
       ORDER BY u.nome_fantasia ASC, s.nome ASC
     `);
   }
