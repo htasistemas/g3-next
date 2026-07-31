@@ -198,6 +198,10 @@ const ChecklistDiarioPage = carregarPagina(
   "/setor-administrativo/checklist-diario",
   "ChecklistDiarioPage"
 );
+const InformacoesAdministrativasPage = carregarPagina(
+  "/setor-administrativo/informacoes-administrativas",
+  "InformacoesAdministrativasPage"
+);
 const PlanoTrabalhoPage = carregarPagina("/setor-juridico/plano-trabalho", "PlanoTrabalhoPage");
 const TermoFomentoPage = carregarPagina("/setor-juridico/termo-fomento", "TermoFomentoPage");
 const AutorizacaoComprasPage = carregarPagina(
@@ -414,6 +418,14 @@ export const router = createBrowserRouter([
             ]}
           >
             {ChecklistDiarioPage}
+          </RequirePermission>
+        )
+      },
+      {
+        path: "/setor-administrativo/informacoes-administrativas",
+        element: (
+          <RequirePermission permissions={["ADMINISTRADOR", "MASTER_ADMIN"]}>
+            {InformacoesAdministrativasPage}
           </RequirePermission>
         )
       },

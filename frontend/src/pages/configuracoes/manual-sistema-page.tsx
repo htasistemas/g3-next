@@ -558,6 +558,28 @@ const secoesManual: ManualSecao[] = [
           "A tela Tarefas e pendências agora lista, resume, cadastra, atualiza, exclui tarefas, checklist e histórico sempre dentro do tenant autenticado, impedindo mistura de tarefas entre instituições.",
           "Checklist e histórico seguem vinculados apenas às tarefas da instituição logada e não são compartilhados entre tenants."
         ]
+      },
+      {
+        nome: "Informações administrativas",
+        objetivo: "Guardar registros, acessos, senhas, links e informações sigilosas de controle interno da instituição.",
+        comoUsar: [
+          "Acesse Administração e gestão > Informações administrativas com usuário master ou administrador.",
+          "Antes de consultar ou alterar dados, informe a senha do próprio usuário logado para confirmar o acesso.",
+          "Na aba Cadastro, registre categoria, título, informações, usuário ou login, senha ou chave, link e observações.",
+          "Ao escolher a categoria, o cadastro ajusta automaticamente os rótulos e dicas dos campos conforme o modelo inteligente identificado.",
+          "Na aba Listagem, use os filtros no topo para buscar por título, categoria, usuário, link ou observação; use Limpar filtros para restaurar a consulta completa.",
+          "Na aba Listagem, a busca também considera sinônimos e termos técnicos; por exemplo, modem localiza registros de internet, roteador, Wi-Fi e configuração de rede.",
+          "Na aba Categorias, cadastre, edite, ative, inative ou exclua categorias e consulte os modelos inteligentes disponíveis.",
+          "Clique uma vez na linha da listagem para abrir o registro no cadastro, editar ou excluir."
+        ],
+        atencoes: [
+          "A tela é restrita a administradores e usuários master e o backend valida a senha confirmada em cada operação.",
+          "No cadastro, os campos Usuário ou login e Senha ou chave bloqueiam preenchimento automático do navegador para evitar exposição indevida das credenciais do usuário logado.",
+          "Os modelos inteligentes cobrem inicialmente dados institucionais, sedes e contatos, registros e credenciamentos, internet/modem/roteador, e-mail, câmeras, sistemas e portais, projetos e programas, informações bancárias, doações e Pix, nuvem e documentos, protocolos, compras web e certidões.",
+          "Ao renomear uma categoria, os registros vinculados recebem o novo nome automaticamente; a exclusão de categoria é bloqueada quando houver informação administrativa usando aquela categoria.",
+          "Informações cadastradas ficam vinculadas ao tenant autenticado e não são compartilhadas entre instituições.",
+          "Use esta tela apenas para controle interno sigiloso, como registros institucionais, acessos de internet, e-mails, câmeras, sistemas e links administrativos."
+        ]
       }
     ]
   },

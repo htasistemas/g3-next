@@ -48,6 +48,7 @@ import {
   HeartHandshake,
   History as HistoryIcon,
   ImageIcon,
+  KeyRound,
   LibraryBig,
   Landmark,
   LayoutDashboard,
@@ -365,6 +366,13 @@ export const menuSections: MenuSection[] = [
           "SETOR_ADMINISTRATIVO_CHECKLIST_DIARIO_VISUALIZAR_PROPRIO",
           "SETOR_ADMINISTRATIVO_CHECKLIST_DIARIO_VISUALIZAR_TODOS"
         ]
+      },
+      {
+        id: "setor-administrativo-informacoes-administrativas",
+        to: "/setor-administrativo/informacoes-administrativas",
+        label: "Informações administrativas",
+        icon: KeyRound,
+        requiredPermissions: ["ADMINISTRADOR", "MASTER_ADMIN"]
       }
     ]
   },
@@ -658,6 +666,7 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/setor-administrativo/tarefas-pendencias")) return "Tarefas e pendências";
   if (pathname.startsWith("/setor-administrativo/lembretes-diarios")) return "Lembretes diários";
   if (pathname.startsWith("/setor-administrativo/checklist-diario")) return "Checklist diário";
+  if (pathname.startsWith("/setor-administrativo/informacoes-administrativas")) return "Informações administrativas";
   if (pathname.startsWith("/setor-juridico/plano-trabalho")) return "Plano de trabalho";
   if (pathname.startsWith("/setor-juridico/termo-fomento")) return "Termo de fomento";
   if (pathname.startsWith("/setor-financeiro/autorizacao-compras")) return "Autorização de compras";

@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.581",
-  "releaseDate": "2026-07-02",
-  "description": "A gestao master de instituicoes passou a permitir desbloquear acesso de tenants e usuarios bloqueados por tentativas invalidas, alem de reativar o administrador ao redefinir senha.",
+  "latestVersion": "1.00.589",
+  "releaseDate": "2026-07-31",
+  "description": "Categorias inteligentes de informacoes administrativas passaram a cobrir dados institucionais, sedes e registros oficiais.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.581",
+  "minCompatibleVersion": "1.00.589",
   "releaseType": "stable",
   "downloadUrl": null
 }

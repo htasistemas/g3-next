@@ -1,6 +1,84 @@
 {
   "entries":  [
                     {
+                        "version":  "1.00.589",
+                        "releaseDate":  "2026-07-31",
+                        "title":  "Modelos institucionais nas informacoes administrativas",
+                        "description":  "Categorias inteligentes passaram a reconhecer dados institucionais, sedes, contatos, registros e credenciamentos oficiais.",
+                        "changes":  [
+                                        "Foram adicionados modelos para razao social, nome fantasia, CNPJ, sedes, enderecos, telefones, e-mails, redes sociais e registros oficiais.",
+                                        "A busca passou a aceitar termos como CNPJ, CAGEC, CMAS, OSC, sede, endereco, telefone e ADRA para localizar registros relacionados.",
+                                        "As categorias padrao do backend foram ampliadas para novos tenants sem alterar a estrutura do banco.",
+                                        "O manual do sistema foi atualizado com o novo escopo dos modelos inteligentes."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.588",
+                        "releaseDate":  "2026-07-31",
+                        "title":  "Categorias inteligentes nas informacoes administrativas",
+                        "description":  "Gestao de informacoes administrativas ganhou modelos de campos por categoria e busca ampliada por sinonimos.",
+                        "changes":  [
+                                        "O cadastro passou a ajustar rotulos e dicas dos campos conforme categorias como modem, banco, Pix, Drive, protocolo, compras, certidoes e projetos.",
+                                        "A busca passou a considerar palavras-chave e sinonimos dos modelos inteligentes, permitindo localizar registros tecnicos por termos como modem, roteador ou internet.",
+                                        "A aba Categorias passou a mostrar o modelo inteligente aplicado em cada categoria e a lista de modelos disponiveis.",
+                                        "As categorias padrao do backend foram ampliadas sem alterar a estrutura do banco de dados.",
+                                        "O manual do sistema foi atualizado na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.587",
+                        "releaseDate":  "2026-07-31",
+                        "title":  "Credenciais protegidas no cadastro administrativo",
+                        "description":  "Cadastro de informacoes administrativas passou a impedir preenchimento automatico de login e senha do usuario logado.",
+                        "changes":  [
+                                        "Os campos Usuario ou login e Senha ou chave receberam bloqueio de autocomplete e identificadores especificos da tela.",
+                                        "Ao iniciar novo cadastro ou abrir um registro, a senha volta automaticamente para o modo oculto.",
+                                        "O manual do sistema foi atualizado para orientar a protecao contra exposicao indevida de credenciais."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.586",
+                        "releaseDate":  "2026-07-31",
+                        "title":  "Categorias nas informacoes administrativas",
+                        "description":  "Informacoes administrativas ganhou gerenciamento proprio de categorias com cadastro, edicao e exclusao.",
+                        "changes":  [
+                                        "A tela recebeu a aba Categorias para cadastrar, editar, ativar, inativar e excluir categorias.",
+                                        "As operacoes de categoria exigem a mesma confirmacao de senha usada para dados sigilosos.",
+                                        "Ao renomear uma categoria, os registros vinculados recebem o novo nome automaticamente.",
+                                        "A exclusao de categoria e bloqueada quando houver informacao administrativa vinculada."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.585",
+                        "releaseDate":  "2026-07-31",
+                        "title":  "Alunos vinculados por unidade e sala",
+                        "description":  "Inscricoes em cursos e oficinas passou a separar a escolha de unidade e sala e a listar alunos agrupados por local.",
+                        "changes":  [
+                                        "O cadastro agora seleciona primeiro a unidade e depois filtra as salas daquela unidade.",
+                                        "O catalogo de salas passou a respeitar o tenant autenticado e retornar unidade_id e unidade_nome.",
+                                        "A listagem ganhou filtros de unidade e sala e uma visao agrupada com os nomes dos alunos por unidade e sala.",
+                                        "O manual do sistema e a versao oficial foram atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.584",
+                        "releaseDate":  "2026-07-31",
+                        "title":  "Informacoes administrativas sigilosas",
+                        "description":  "Administracao e gestao ganhou uma tela para guardar registros, acessos, senhas, links e dados internos com acesso restrito a administradores e master.",
+                        "changes":  [
+                                        "A nova tela exige confirmacao da senha do usuario logado antes de consultar, salvar ou excluir informacoes sigilosas.",
+                                        "O backend criou tabela propria por tenant, permissoes administrativas e auditoria de confirmacao de acesso e alteracoes.",
+                                        "A listagem segue filtros no topo, limpar filtros, tabela com rolagem, linha clicavel, destaque do item selecionado e estados de carregamento e vazio.",
+                                        "O manual do sistema e a versao oficial foram atualizados na mesma entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.583",
                         "releaseDate":  "2026-07-03",
                         "title":  "Espelho de ponto com cálculo em leitura",

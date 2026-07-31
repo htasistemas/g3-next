@@ -58,6 +58,7 @@ import { carteiraEventoRoutes } from "../modules/carteira-evento/routes/carteira
 import { agendamentosRoutes } from "../modules/agendamentos/routes/agendamentos.routes.js";
 import { instituicoesRoutes } from "../modules/instituicoes/routes/instituicoes.routes.js";
 import { projetoRoutes } from "../modules/projetos/routes/projeto.routes.js";
+import { informacoesAdministrativasRoutes } from "../modules/informacoes-administrativas/routes/informacoes-administrativas.routes.js";
 import { portaisExternosRoutes } from "../modules/portais-externos/routes/portais-externos.routes.js";
 import { obterAtualizacaoSistemaPaths } from "../modules/atualizacao-sistema/services/atualizacao-sistema.paths.js";
 
@@ -98,6 +99,7 @@ appRoutes.use("/api/controle-veiculos", controleVeiculosRoutes);
 appRoutes.use("/api/patrimonios", patrimonioRoutes);
 appRoutes.use("/api/administrativo/tarefas", tarefaAdministrativaRoutes);
 appRoutes.use("/api/administrativo/projetos", projetoRoutes);
+appRoutes.use("/api/administrativo/informacoes-administrativas", informacoesAdministrativasRoutes);
 appRoutes.use("/api/administrativo/checklist-diario", checklistDiarioRoutes);
 appRoutes.use("/api/lembretes-diarios", lembreteDiarioRoutes);
 appRoutes.use("/api/emprestimos-eventos", emprestimosEventosRoutes);
