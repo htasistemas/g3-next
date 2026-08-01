@@ -1,4 +1,5 @@
 import { prisma } from "../../../database/prisma.js";
+import { formatarBairro, sqlNormalizarBairro } from "../dashboard-bairro.utils.js";
 import type { DashboardTermoAlerta } from "../dashboard.types.js";
 
 type TotalRow = { total: unknown };
@@ -269,7 +270,7 @@ export class DashboardRepository {
     }, {});
   }
 
-  async contarBeneficiariosPorBairro(limit = 12) {
+  async contarBeneficiariosPorBairro(limit?: number) {
     const possuiBeneficiario = await this.tabelaExiste("cadastro_beneficiario");
     const possuiEndereco = await this.tabelaExiste("endereco");
     const possuiEnderecoId = await this.colunaExiste("cadastro_beneficiario", "endereco_id");
@@ -283,20 +284,20 @@ export class DashboardRepository {
     const rows = await this.consultarRows<ChaveValorRow>(
       `
       SELECT
-        COALESCE(NULLIF(TRIM(e.bairro), ''), 'Nao informado') AS chave,
+        COALESCE(NULLIF(MIN(NULLIF(TRIM(e.bairro), '')), ''), 'Nao informado') AS chave,
         COUNT(*)::bigint AS total
       FROM cadastro_beneficiario b
       LEFT JOIN endereco e ON e.id = b.endereco_id
       ${tenant.sql ? `WHERE ${tenant.sql}` : ""}
-      GROUP BY COALESCE(NULLIF(TRIM(e.bairro), ''), 'Nao informado')
+      GROUP BY ${sqlNormalizarBairro("e.bairro")}
       ORDER BY total DESC, chave ASC
-      LIMIT $${tenant.params.length + 1}
+      ${Number.isInteger(limit) && (limit ?? 0) > 0 ? `LIMIT $${tenant.params.length + 1}` : ""}
       `,
-      [...tenant.params, limit]
+      Number.isInteger(limit) && (limit ?? 0) > 0 ? [...tenant.params, limit] : tenant.params
     );
 
     return rows.reduce<Record<string, number>>((acc, row) => {
-      acc[row.chave ?? "Nao informado"] = toNumber(row.total);
+      acc[formatarBairro(row.chave)] = toNumber(row.total);
       return acc;
     }, {});
   }
@@ -325,7 +326,7 @@ export class DashboardRepository {
     }
     return this.consultarTotal(
       `
-      SELECT COALESCE(SUM(valor), 0) AS total
+      SELECT COALESCE(SUM(valor::float8), 0) AS total
       FROM lancamento_financeiro
       WHERE ${condicoes.join(" AND ")}
       `,
@@ -352,7 +353,7 @@ export class DashboardRepository {
         ${possuiNumero ? "numero" : "NULL::text"} AS numero,
         ${possuiTipo ? "tipo" : "NULL::text"} AS tipo,
         ${possuiRecebimentoLocal ? "recebimento_local" : "NULL::boolean"} AS recebimento_local,
-        saldo
+        saldo::float8 AS saldo
       FROM conta_bancaria
       ${tenant.sql ? `WHERE ${tenant.sql}` : ""}
       ORDER BY COALESCE(NULLIF(TRIM(${possuiBanco ? "banco" : "''"}), ''), 'Conta') ASC,
@@ -391,7 +392,7 @@ export class DashboardRepository {
       : condicoes.map((condicao) => `(${condicao})`).join(" OR ");
     return this.consultarTotal(
       `
-      SELECT COALESCE(SUM(saldo), 0) AS total
+      SELECT COALESCE(SUM(saldo::float8), 0) AS total
       FROM conta_bancaria
       WHERE ${where}
       `,
@@ -429,7 +430,7 @@ export class DashboardRepository {
     const where = tenant.sql ? `${tenant.sql} AND ${filtroBanco}` : filtroBanco;
     return this.consultarTotal(
       `
-      SELECT COALESCE(SUM(saldo), 0) AS total
+      SELECT COALESCE(SUM(saldo::float8), 0) AS total
       FROM conta_bancaria
       WHERE ${where}
       `,
@@ -445,7 +446,7 @@ export class DashboardRepository {
     const tenant = await this.montarFiltroTenant("lancamento_financeiro");
     return this.consultarRows<DashboardLancamentoFinanceiroRow>(
       `
-      SELECT tipo, situacao, valor
+      SELECT tipo, situacao, valor::float8 AS valor
       FROM lancamento_financeiro
       ${tenant.sql ? `WHERE ${tenant.sql}` : ""}
       `,

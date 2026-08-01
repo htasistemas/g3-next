@@ -39,6 +39,15 @@ export class ArquivosRepository {
                 AND u.tenant_id::text = ${tenantId}
             )
           )
+          OR (
+            entidade_tipo = 'instituicao'
+            AND EXISTS (
+              SELECT 1
+              FROM documentos_instituicao d
+              WHERE d.id = arquivos.entidade_id
+                AND d.tenant_id::text = ${tenantId}
+            )
+          )
         )
       )
     `;

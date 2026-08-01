@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import type { LucideIcon } from "lucide-react";
 import {
   Building2,
@@ -20,7 +20,8 @@ import {
   Upload,
   UserPlus,
   UsersRound,
-  X
+  X,
+  CheckCircle2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -96,7 +97,7 @@ type AcaoCrud = {
   icon: LucideIcon;
 };
 
-const tituloTela = "Cadastro de unidade assistencial";
+const tituloTela = "Cadastro de unidade de atendimento";
 
 function formatarCnpj(valor?: string) {
   const digitos = somenteDigitos(valor);
@@ -135,6 +136,7 @@ function mapUnidadeParaFormulario(unidade: UnidadeAssistencial): UnidadeAssisten
       unidade.salas?.map((sala) => ({
         id: sala.id,
         nome: sala.nome ?? "",
+        capacidade_maxima: sala.capacidade_maxima ?? 0,
         ativo: sala.ativo ?? true
       })) ?? []
   };
@@ -156,14 +158,19 @@ function limparDiretoria(payload: Array<Partial<DiretoriaUnidade>>): DiretoriaUn
     .filter((membro) => membro.nome_completo && membro.documento && membro.funcao);
 }
 
-function limparSalas(payload: Array<{ id?: string; nome?: string; ativo?: boolean }>) {
+function limparSalas(
+  payload: Array<{ id?: string; nome?: string; capacidade_maxima?: number | string; ativo?: boolean | string }>
+) {
   const salasNormalizadas = payload
     .map((sala) => {
       const salaNormalizada = normalizarObjetoTexto(sala, mapaSalaUnidadeForm);
+      const capacidade = Number(sala.capacidade_maxima);
+      const ativo = sala.ativo !== false && String(sala.ativo).toLowerCase() !== "false";
       return {
         id: sala.id,
         nome: salaNormalizada.nome?.trim() ?? "",
-        ativo: sala.ativo ?? true
+        capacidade_maxima: Number.isInteger(capacidade) && capacidade >= 0 ? capacidade : 0,
+        ativo
       };
     })
     .filter((sala) => sala.nome.length > 0);
@@ -182,6 +189,7 @@ function mapFormularioParaPayload(
 ): UnidadeAssistencial {
   const payload: UnidadeAssistencial = {
     id_unidade: unidadeId,
+    tipo_unidade: values.tipo_unidade,
     nome_fantasia: values.nome_fantasia.trim(),
     razao_social: values.razao_social?.trim() || undefined,
     cnpj: values.cnpj?.trim() || undefined,
@@ -221,12 +229,14 @@ function mapFormularioParaPayload(
 
 export function CadastroUnidadeAssistencialPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { usuario } = useAuth();
   const [abaAtiva, setAbaAtiva] = useState<AbaId>("listagem");
   const [filtroDraft, setFiltroDraft] = useState<UnidadeAssistencialFiltro>({
     nome_fantasia: "",
     cnpj: "",
     cidade: "",
+    tipo_unidade: undefined,
     unidade_principal: undefined
   });
   const [filtros, setFiltros] = useState<UnidadeAssistencialFiltro>(filtroDraft);
@@ -234,8 +244,10 @@ export function CadastroUnidadeAssistencialPage() {
   const [snapshot, setSnapshot] = useState<UnidadeAssistencialFormValues | null>(null);
   const [mensagem, setMensagem] = useState<{ tipo: "sucesso" | "erro"; texto: string } | null>(null);
   const [popupSalvarAberto, setPopupSalvarAberto] = useState(false);
+  const [codigoCadastroSalvo, setCodigoCadastroSalvo] = useState("");
   const [popupExcluirAberto, setPopupExcluirAberto] = useState(false);
   const [nomeSalaNova, setNomeSalaNova] = useState("");
+  const [capacidadeSalaNova, setCapacidadeSalaNova] = useState("0");
   const [carregandoCep, setCarregandoCep] = useState(false);
   const [imprimindoRelatorio, setImprimindoRelatorio] = useState(false);
   const [previewLogomarcaUrl, setPreviewLogomarcaUrl] = useState("");
@@ -243,6 +255,13 @@ export function CadastroUnidadeAssistencialPage() {
   const ultimoCepConsultadoRef = useRef("");
   const inputLogomarcaRef = useRef<HTMLInputElement | null>(null);
   const inputLogomarcaRelatorioRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    const tipo = new URLSearchParams(location.search).get("tipo_unidade");
+    if (tipo !== "ASSISTENCIAL" && tipo !== "ENSINO") return;
+    setFiltroDraft((atual) => ({ ...atual, tipo_unidade: tipo }));
+    setFiltros((atual) => ({ ...atual, tipo_unidade: tipo }));
+  }, [location.search]);
 
   const { data: listaData, isLoading: carregandoLista } = useUnidadesAssistenciais(filtros);
   const { data: unidadeData, isLoading: carregandoDetalhes } = useUnidadeAssistencial(unidadeSelecionadaId);
@@ -305,6 +324,7 @@ export function CadastroUnidadeAssistencialPage() {
     replaceDiretoria(values.diretoria ?? []);
     replaceSalas(values.salas ?? []);
     setNomeSalaNova("");
+    setCapacidadeSalaNova("0");
     setSnapshot(values);
     setMensagem(null);
     setAbaAtiva("dados");
@@ -434,10 +454,6 @@ export function CadastroUnidadeAssistencialPage() {
           });
         }
 
-        setMensagem({
-          tipo: "sucesso",
-          texto: "Endereço preenchido automaticamente pelo CEP."
-        });
       } catch (error: any) {
         if (!ativo) return;
         setMensagem({
@@ -532,6 +548,12 @@ export function CadastroUnidadeAssistencialPage() {
       return;
     }
 
+    const capacidade = Number(capacidadeSalaNova);
+    if (!Number.isInteger(capacidade) || capacidade < 0 || (watch("tipo_unidade") === "ENSINO" && capacidade < 1)) {
+      setMensagem({ tipo: "erro", texto: "Informe uma capacidade válida. Para unidade de ensino, a capacidade deve ser maior que zero." });
+      return;
+    }
+
     const salasAtuais = getValues("salas") ?? [];
     const existeSala = salasAtuais.some(
       (sala) => normalizarNomeSala(sala.nome ?? "").toLocaleLowerCase("pt-BR") === nome.toLocaleLowerCase("pt-BR")
@@ -541,8 +563,9 @@ export function CadastroUnidadeAssistencialPage() {
       return;
     }
 
-    appendSala({ nome, ativo: true });
+    appendSala({ nome, capacidade_maxima: capacidade, ativo: true });
     setNomeSalaNova("");
+    setCapacidadeSalaNova("0");
     setMensagem(null);
   }
 
@@ -573,9 +596,22 @@ export function CadastroUnidadeAssistencialPage() {
   }
 
   function alternarSalaAtiva(indice: number) {
-    const ativa = getValues(`salas.${indice}.ativo`) ?? true;
+    const valorAtual = getValues(`salas.${indice}.ativo`);
+    const ativa = valorAtual !== false && String(valorAtual).toLowerCase() !== "false";
     setValue(`salas.${indice}.ativo`, !ativa, { shouldDirty: true, shouldValidate: true });
     setMensagem(null);
+  }
+
+  function atualizarNomeSala(indice: number, valor: string) {
+    setValue(`salas.${indice}.nome`, valor, { shouldDirty: true, shouldValidate: true });
+  }
+
+  function atualizarCapacidadeSala(indice: number, valor: string) {
+    const capacidade = valor === "" ? 0 : Number(valor);
+    setValue(`salas.${indice}.capacidade_maxima`, Number.isInteger(capacidade) && capacidade >= 0 ? capacidade : 0, {
+      shouldDirty: true,
+      shouldValidate: true
+    });
   }
 
   async function carregarLogomarca(
@@ -637,6 +673,7 @@ export function CadastroUnidadeAssistencialPage() {
         replaceDiretoria(atualizado.diretoria ?? []);
         replaceSalas(atualizado.salas ?? []);
         setSnapshot(atualizado);
+        setCodigoCadastroSalvo(unidade?.id_unidade ?? unidadeSelecionadaId ?? "");
         setFiltros((estadoAtual) => ({ ...estadoAtual }));
         setPopupSalvarAberto(true);
       } catch (error: any) {
@@ -983,15 +1020,28 @@ export function CadastroUnidadeAssistencialPage() {
                     </div>
 
                     <div className="xl:col-span-4">
+                      <Label htmlFor="tipo_unidade">Tipo da unidade*</Label>
+                      <select
+                        id="tipo_unidade"
+                        {...register("tipo_unidade")}
+                        className="h-10 w-full rounded-md border border-[var(--g3-border)] bg-[var(--g3-background)] px-3 text-sm text-[var(--g3-foreground)]"
+                      >
+                        <option value="ASSISTENCIAL">Unidade assistencial</option>
+                        <option value="ENSINO">Unidade de ensino</option>
+                      </select>
+                    </div>
+
+                    <div className="xl:col-span-4">
                       <Label htmlFor="cnpj">CNPJ</Label>
                       <Input id="cnpj" {...register("cnpj")} placeholder="00.000.000/0000-00" />
                       {errors.cnpj && <p className="mt-1 text-xs text-red-600">{errors.cnpj.message}</p>}
                     </div>
 
-                    <div className="xl:col-span-3">
+                    <div className="sm:col-span-2 xl:col-span-6 grid gap-4 sm:grid-cols-2">
+                    <div>
                       <input type="hidden" {...register("logomarca")} />
                       <Label>Logomarca da unidade vazado</Label>
-                      <div className="mt-2 flex aspect-[4/3] w-full max-w-[170px] items-center justify-center overflow-hidden rounded-md border border-emerald-800 bg-emerald-900">
+                      <div className="mt-2 flex aspect-[4/3] w-full max-w-[170px] items-center justify-center overflow-hidden rounded-md border border-black bg-black">
                         {logomarcaAtual ? (
                           <img
                             src={previewLogomarcaUrl || resolverUrlArquivo(logomarcaAtual)}
@@ -1034,7 +1084,7 @@ export function CadastroUnidadeAssistencialPage() {
                       </div>
                     </div>
 
-                    <div className="xl:col-span-3">
+                    <div>
                       <input type="hidden" {...register("logomarca_relatorio")} />
                       <Label>Logomarca do relatório</Label>
                       <div className="mt-2 flex aspect-[4/3] w-full max-w-[170px] items-center justify-center overflow-hidden rounded-md border border-[var(--g3-border)] bg-[var(--g3-card-soft)]">
@@ -1081,6 +1131,7 @@ export function CadastroUnidadeAssistencialPage() {
                           Remover
                         </Button>
                       </div>
+                    </div>
                     </div>
 
                     <div className="sm:col-span-2 xl:col-span-12">
@@ -1442,7 +1493,7 @@ export function CadastroUnidadeAssistencialPage() {
 
                 {abaAtiva === "salas" && (
                   <section className="space-y-3">
-                    <div className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 md:grid-cols-[1fr_auto] md:items-end">
+                    <div className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 md:grid-cols-[minmax(0,1fr)_180px_auto] md:items-end">
                       <div>
                         <Label htmlFor="nome_sala_nova">Nome da sala</Label>
                         <Input
@@ -1451,6 +1502,17 @@ export function CadastroUnidadeAssistencialPage() {
                           onChange={(event) => setNomeSalaNova(event.target.value)}
                           onBlur={() => setNomeSalaNova((valor) => normalizarNomeSala(valor))}
                           placeholder="Ex.: Sala 01, Auditório principal"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="capacidade_sala_nova">Vagas da sala</Label>
+                        <Input
+                          id="capacidade_sala_nova"
+                          type="number"
+                          min="0"
+                          value={capacidadeSalaNova}
+                          onChange={(event) => setCapacidadeSalaNova(event.target.value)}
+                          placeholder="Ex.: 30"
                         />
                       </div>
                       <Button
@@ -1474,6 +1536,7 @@ export function CadastroUnidadeAssistencialPage() {
                             <tr>
                               <th className="w-16 px-3 py-2 font-semibold">#</th>
                               <th className="px-3 py-2 font-semibold">Nome da sala ou auditório</th>
+                              <th className="w-28 px-3 py-2 font-semibold">Vagas</th>
                               <th className="w-28 px-3 py-2 font-semibold">Status</th>
                               <th className="w-56 px-3 py-2 text-right font-semibold">Ações</th>
                             </tr>
@@ -1486,15 +1549,24 @@ export function CadastroUnidadeAssistencialPage() {
                               >
                                 <td className="px-3 py-2 text-slate-600">{indice + 1}</td>
                                 <td className="px-3 py-2">
-                                  <input type="hidden" {...register(`salas.${indice}.id`)} value={sala.id ?? ""} readOnly />
-                                  <input type="hidden" {...register(`salas.${indice}.nome`)} value={sala.nome ?? ""} readOnly />
-                                  <input
-                                    type="hidden"
-                                    {...register(`salas.${indice}.ativo`, { setValueAs: (value) => value === "true" })}
-                                    value={(sala.ativo ?? true) ? "true" : "false"}
-                                    readOnly
+                                  <input type="hidden" {...register(`salas.${indice}.id`)} defaultValue={sala.id ?? ""} />
+                                  <input type="hidden" {...register(`salas.${indice}.ativo`)} />
+                                  <Input
+                                    value={sala.nome ?? ""}
+                                    onChange={(event) => atualizarNomeSala(indice, event.target.value)}
+                                    onBlur={() => atualizarNomeSala(indice, normalizarNomeSala(getValues(`salas.${indice}.nome`) ?? ""))}
+                                    aria-label={`Nome da sala ${indice + 1}`}
                                   />
-                                  <span className="font-medium text-slate-800">{sala.nome}</span>
+                                </td>
+                                <td className="px-3 py-2">
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    className="w-24"
+                                    value={String(sala.capacidade_maxima ?? 0)}
+                                    onChange={(event) => atualizarCapacidadeSala(indice, event.target.value)}
+                                    aria-label={`Vagas da sala ${indice + 1}`}
+                                  />
                                 </td>
                                 <td className="px-3 py-2">
                                   <Badge variant={(sala.ativo ?? true) ? "success" : "default"}>
@@ -1582,24 +1654,39 @@ export function CadastroUnidadeAssistencialPage() {
 
       {popupSalvarAberto && (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/45 px-4"
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/45 px-4 py-6"
           role="dialog"
           aria-modal="true"
           onClick={() => setPopupSalvarAberto(false)}
         >
           <div
-            className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl"
+            className="relative w-full max-w-md rounded-2xl border border-slate-200 bg-white px-6 pb-6 pt-8 shadow-2xl sm:px-8"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="border-b border-slate-100 px-5 py-4">
-              <h3 className="text-base font-semibold text-slate-900">Confirmação</h3>
+            <button
+              type="button"
+              aria-label="Fechar confirmação do cadastro"
+              className="absolute right-4 top-4 rounded-full p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+              onClick={() => setPopupSalvarAberto(false)}
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <div className="flex flex-col items-center text-center">
+              <CheckCircle2 className="h-20 w-20 stroke-[1.8] text-[var(--g3-primary)]" aria-hidden="true" />
+              <h3 className="mt-5 text-xl font-semibold text-slate-800">
+                Cadastro realizado com sucesso
+              </h3>
+              <p className="mt-3 text-sm text-slate-500">
+                Número do cadastro: <span className="font-semibold text-slate-700">{codigoCadastroSalvo || "—"}</span>
+              </p>
             </div>
-            <div className="px-5 py-4">
-              <p className="text-sm text-slate-700">Salvo com sucesso</p>
-            </div>
-            <div className="flex justify-end border-t border-slate-100 px-5 py-3">
-              <Button type="button" onClick={() => setPopupSalvarAberto(false)}>
-                OK
+            <div className="mt-7">
+              <Button
+                type="button"
+                className="h-12 w-full rounded-lg bg-[var(--g3-primary-button)] text-base font-semibold text-white shadow-sm hover:bg-[var(--g3-primary-button-hover)]"
+                onClick={() => setPopupSalvarAberto(false)}
+              >
+                Finalizar cadastro
               </Button>
             </div>
           </div>

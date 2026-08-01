@@ -66,7 +66,7 @@ matriculaRoutes.patch(
 matriculaRoutes.delete(
   "/:id/presencas/datas/:presencaDataId",
   ensureAuthenticated,
-  ensurePermissions(permissoesEscrita),
+  ensurePermissions(permissaoExclusao),
   asyncHandler(controller.removerPresencaData.bind(controller))
 );
 matriculaRoutes.get(
@@ -80,6 +80,12 @@ matriculaRoutes.post(
   ensureAuthenticated,
   ensurePermissions(permissoesEscrita),
   asyncHandler(controller.salvarPresencasPorData.bind(controller))
+);
+matriculaRoutes.post(
+  "/:id/presencas/datas/:presencaDataId/validar-senha",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.validarSenhaPresenca.bind(controller))
 );
 
 matriculaRoutes.get(

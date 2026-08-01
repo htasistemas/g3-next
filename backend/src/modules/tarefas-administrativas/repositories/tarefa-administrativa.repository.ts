@@ -124,7 +124,13 @@ export class TarefaAdministrativaRepository {
     const rows = await prisma.$queryRaw<TarefaResumoRow[]>(Prisma.sql`
       SELECT
         COUNT(*) FILTER (WHERE status IS DISTINCT FROM 'Concluida')::BIGINT AS total_pendentes,
-        COUNT(*) FILTER (WHERE COALESCE(status, '') = 'Em atraso')::BIGINT AS total_em_atraso
+        COUNT(*) FILTER (
+          WHERE status IS DISTINCT FROM 'Concluida'
+            AND (
+              COALESCE(status, '') = 'Em atraso'
+              OR (prazo IS NOT NULL AND prazo < CURRENT_DATE)
+            )
+        )::BIGINT AS total_em_atraso
       FROM tarefas_pendencias
       WHERE tenant_id::text = ${tenantId}
     `);

@@ -1,0 +1,21 @@
+import { Router } from "express";
+import { asyncHandler } from "../../../shared/http/async-handler.js";
+import { ensureAuthenticated, ensurePermissions } from "../../auth/middlewares/auth.middleware.js";
+import { ProntuarioController } from "../controllers/prontuario.controller.js";
+
+const controller = new ProntuarioController();
+const router = Router();
+const leitura = ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS", "PRONTUARIO_VISUALIZAR", "CENTRAL_ATENDIMENTOS_VISUALIZAR"];
+const atendimento = ["ADMINISTRADOR", "OPERADOR", "PRONTUARIO_ATENDER"];
+const finalizar = ["ADMINISTRADOR", "OPERADOR", "PRONTUARIO_FINALIZAR"];
+const adendo = ["ADMINISTRADOR", "OPERADOR", "PRONTUARIO_ADENDO"];
+
+router.use(ensureAuthenticated);
+router.get("/beneficiarios/busca", ensurePermissions(leitura), asyncHandler(controller.buscarBeneficiarios.bind(controller)));
+router.get("/beneficiarios/:beneficiarioId/contexto", ensurePermissions(leitura), asyncHandler(controller.obterContexto.bind(controller)));
+router.post("/beneficiarios/:beneficiarioId/atendimentos", ensurePermissions(atendimento), asyncHandler(controller.criarAtendimento.bind(controller)));
+router.put("/atendimentos/:id", ensurePermissions(atendimento), asyncHandler(controller.atualizarAtendimento.bind(controller)));
+router.post("/atendimentos/:id/finalizar", ensurePermissions(finalizar), asyncHandler(controller.finalizarAtendimento.bind(controller)));
+router.post("/atendimentos/:id/adendos", ensurePermissions(adendo), asyncHandler(controller.criarAdendo.bind(controller)));
+
+export const prontuarioRoutes = router;

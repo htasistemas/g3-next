@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   CheckCircle2,
@@ -1502,7 +1502,7 @@ export function CaptacaoRecursosPage() {
           </SecaoCard>
         </div>
         <div className="grid gap-3 xl:grid-cols-2">
-          <SecaoCard titulo="ArrecadaÃ§Ã£o por mÃªs">
+          <SecaoCard titulo="Arrecadação por mês">
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={graficos?.arrecadacaoPorMes ?? []}>
@@ -1515,7 +1515,7 @@ export function CaptacaoRecursosPage() {
               </ResponsiveContainer>
             </div>
           </SecaoCard>
-          <SecaoCard titulo="ArrecadaÃ§Ã£o por forma de pagamento">
+          <SecaoCard titulo="Arrecadação por forma de pagamento">
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -1543,7 +1543,7 @@ export function CaptacaoRecursosPage() {
               </ResponsiveContainer>
             </div>
           </SecaoCard>
-          <SecaoCard titulo="EvoluÃ§Ã£o de novos doadores">
+          <SecaoCard titulo="Evolução de novos doadores">
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={graficos?.evolucaoNovosDoadores ?? []}>

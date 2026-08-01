@@ -1,6 +1,7 @@
 export type AiContext = {
   pathname?: string;
   pageTitle?: string;
+  mode?: "field_suggestion" | "assistant";
 };
 
 export type ChatMessage = {

@@ -26,7 +26,7 @@ export const termoDocumentoInputSchema = z.object({
   id: optionalTrimmedString,
   nome: z.string().trim().min(2, "Informe o nome do documento."),
   dataUrl: optionalTrimmedString.nullable().optional(),
-  tipo: z.enum(["termo", "aditivo", "outro"]).nullable().optional()
+  tipo: z.string().trim().min(2).nullable().optional()
 });
 
 export const termoAditivoInputSchema = z.object({
@@ -43,6 +43,8 @@ export const termoFomentoInputSchema = z.object({
   id: optionalTrimmedString,
   numeroTermo: z.string().trim().min(2, "Informe o número do termo."),
   tipoTermo: z.string().trim().min(2, "Informe o tipo do termo."),
+  referenciaTermo: optionalTrimmedString.nullable().optional(),
+  responsavelIndicacao: optionalTrimmedString.nullable().optional(),
   orgaoConcedente: optionalTrimmedString.nullable().optional(),
   dataAssinatura: optionalIsoDate.nullable().optional(),
   dataInicioVigencia: optionalIsoDate.nullable().optional(),

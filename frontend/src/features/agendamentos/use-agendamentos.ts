@@ -14,7 +14,9 @@ export function useAgendamentos(filtros: AgendamentoFiltros) {
   return useQuery({
     queryKey: ["agendamentos", usuario?.tenant_id ?? "sem-tenant", filtros],
     queryFn: () => agendamentosService.listar(filtros),
-    enabled: !!usuario
+    enabled: !!usuario,
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: false
   });
 }
 
@@ -68,7 +70,11 @@ export function useBeneficiariosOperacionaisAgendamento(itemId?: number | null) 
   return useQuery({
     queryKey: ["agendamentos", "beneficiarios", usuario?.tenant_id ?? "sem-tenant", itemId],
     queryFn: () => agendamentosService.listarBeneficiarios(itemId as number),
-    enabled: !!usuario && Boolean(itemId)
+    enabled: !!usuario && Boolean(itemId),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    retry: 1
   });
 }
 
@@ -128,6 +134,17 @@ export function useRemarcarAgendamento() {
   return useMutation({
     mutationFn: ({ id, payload }: { id: string | number; payload: Partial<Agendamento> }) =>
       agendamentosService.remarcar(id, payload),
+    onSuccess: async () => {
+      await invalidarAgendamentos(queryClient);
+    }
+  });
+}
+
+export function useCopiarAgendamento() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: string | number; payload: { data: string } }) =>
+      agendamentosService.copiar(id, payload),
     onSuccess: async () => {
       await invalidarAgendamentos(queryClient);
     }

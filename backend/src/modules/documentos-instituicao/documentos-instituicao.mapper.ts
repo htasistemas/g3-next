@@ -28,6 +28,7 @@ export function mapDocumentoInstituicaoToResponse(row: DocumentoInstituicaoRow) 
     semVencimento: row.sem_vencimento,
     vencimentoIndeterminado: row.vencimento_indeterminado,
     situacao: calcularSituacaoDocumentoInstituicao(row),
+    anexoQuantidade: row.anexo_quantidade ?? 0,
     criadoEm: row.criado_em.toISOString(),
     atualizadoEm: row.atualizado_em.toISOString()
   };
@@ -36,6 +37,7 @@ export function mapDocumentoInstituicaoToResponse(row: DocumentoInstituicaoRow) 
 export function mapDocumentoInstituicaoAnexoToResponse(row: DocumentoInstituicaoAnexoRow) {
   return {
     id: toStringId(row.id),
+    arquivoId: row.arquivo_id ? toStringId(row.arquivo_id) : undefined,
     documentoId: toStringId(row.documento_id),
     nomeArquivo: row.nome_arquivo,
     tipo: row.tipo,

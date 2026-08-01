@@ -23,6 +23,8 @@ export type DocumentoInstituicao = {
   semVencimento?: boolean;
   vencimentoIndeterminado?: boolean;
   situacao?: DocumentoSituacao;
+  anexoQuantidade?: number;
+  temAnexo?: boolean;
   criadoEm?: string;
   atualizadoEm?: string;
 };
@@ -34,6 +36,7 @@ export type DocumentoInstituicaoPayload = Omit<
 
 export type DocumentoInstituicaoAnexo = {
   id: string;
+  arquivoId?: string;
   documentoId: string;
   nomeArquivo: string;
   tipo: string;

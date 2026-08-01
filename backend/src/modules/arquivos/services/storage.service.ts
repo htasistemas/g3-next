@@ -50,9 +50,35 @@ type PersistirBufferInput = Omit<PersistirCampoInput, "valor"> & {
   buffer: Buffer;
 };
 
+const STORAGE_TENANTS_ROOT = "tenants";
+const STORAGE_TENANT_FALLBACK = "sem-tenant";
+
+function escaparExpressaoRegular(texto: string) {
+  return texto.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 export class StorageService {
   private readonly repository = new ArquivosRepository();
   private readonly provider = getStorageProvider();
+
+  private normalizarTenantRoot(tenantId?: string | null) {
+    return normalizarCaminhoLogico(
+      `${STORAGE_TENANTS_ROOT}/${tenantId?.trim() || STORAGE_TENANT_FALLBACK}`
+    );
+  }
+
+  private construirDiretorioBase(policy: { subdirectory: string; imageOnly?: boolean }, input: PersistirBufferInput, data: Date) {
+    const tenantRoot = this.normalizarTenantRoot(input.tenantId);
+    const year = data.getFullYear();
+    const month = String(data.getMonth() + 1).padStart(2, "0");
+
+    if (policy.imageOnly) {
+      const entitySegment = input.entidadeId ? toStringId(input.entidadeId) : "pendente";
+      return `${tenantRoot}/${policy.subdirectory}/${entitySegment}/${year}/${month}`;
+    }
+
+    return `${tenantRoot}/${policy.subdirectory}/${year}/${month}`;
+  }
 
   async listar(rawFilters: {
     tenantId?: string;
@@ -94,6 +120,15 @@ export class StorageService {
       throw new AppError("Arquivo nao encontrado ou sem permissao de acesso.", 404);
     }
     return this.obterConteudoPorCaminhoInterno(caminhoArquivo, arquivo, usuarioId, "VIEW", auditar);
+  }
+
+  async obterConteudoPorCaminhoBruto(rawPath: string) {
+    if (!rawPath?.trim()) {
+      throw new AppError("Caminho do arquivo nao informado.", 400);
+    }
+
+    const caminhoArquivo = this.provider.normalizePath(rawPath);
+    return this.obterConteudoPorCaminhoInterno(caminhoArquivo, undefined, undefined, "VIEW", false);
   }
 
   async excluirLogico(rawId: string, usuarioId?: bigint, tenantId?: string) {
@@ -303,16 +338,17 @@ export class StorageService {
       120
     );
     const fileName = `${uniqueName}.${extensaoInferida}`;
-    const entitySegment = policy.imageOnly ? (input.entidadeId ? toStringId(input.entidadeId) : "pendente") : undefined;
-    const relativeDir = policy.imageOnly
-      ? `${policy.subdirectory}/${entitySegment}/${data.getFullYear()}/${String(data.getMonth() + 1).padStart(2, "0")}`
-      : `${policy.subdirectory}/${data.getFullYear()}/${String(data.getMonth() + 1).padStart(2, "0")}`;
+    const relativeDir = this.construirDiretorioBase(policy, input, data);
     const caminhoArquivo = normalizarCaminhoLogico(`${relativeDir}/${fileName}`);
     const thumbnailCaminho = thumbnailBuffer
       ? normalizarCaminhoLogico(
           policy.imageOnly
-            ? `${policy.subdirectory}/thumbs/${entitySegment}/${data.getFullYear()}/${String(data.getMonth() + 1).padStart(2, "0")}/${fileName}`
-            : `${policy.subdirectory}/thumbs/${data.getFullYear()}/${String(data.getMonth() + 1).padStart(2, "0")}/${fileName}`
+            ? `${this.normalizarTenantRoot(input.tenantId)}/${policy.subdirectory}/thumbs/${
+                input.entidadeId ? toStringId(input.entidadeId) : "pendente"
+              }/${data.getFullYear()}/${String(data.getMonth() + 1).padStart(2, "0")}/${fileName}`
+            : `${this.normalizarTenantRoot(input.tenantId)}/${policy.subdirectory}/thumbs/${data.getFullYear()}/${String(
+                data.getMonth() + 1
+              ).padStart(2, "0")}/${fileName}`
         )
       : undefined;
 
@@ -426,14 +462,29 @@ export class StorageService {
     if (!policy.imageOnly) return caminhoArquivo;
 
     const entitySegment = toStringId(entidadeId);
-    const prefix = thumb ? `${policy.subdirectory}/thumbs/pendente/` : `${policy.subdirectory}/pendente/`;
-    if (!caminhoArquivo.startsWith(prefix)) {
-      return caminhoArquivo;
+    const subdirectoryRegex = escaparExpressaoRegular(policy.subdirectory);
+    const tenantPattern = new RegExp(
+      `^${STORAGE_TENANTS_ROOT}/([^/]+)/${subdirectoryRegex}/${thumb ? "thumbs/" : ""}pendente/`
+    );
+    const tenantMatch = caminhoArquivo.match(tenantPattern);
+    if (tenantMatch?.[1]) {
+      const tenantSegment = tenantMatch[1];
+      return caminhoArquivo.replace(
+        tenantPattern,
+        `${STORAGE_TENANTS_ROOT}/${tenantSegment}/${policy.subdirectory}/${thumb ? "thumbs/" : ""}${entitySegment}/`
+      );
     }
 
-    return caminhoArquivo.replace(
-      prefix,
-      thumb ? `${policy.subdirectory}/thumbs/${entitySegment}/` : `${policy.subdirectory}/${entitySegment}/`
-    );
+    const legacyPrefix = thumb
+      ? `${policy.subdirectory}/thumbs/pendente/`
+      : `${policy.subdirectory}/pendente/`;
+    if (caminhoArquivo.startsWith(legacyPrefix)) {
+      return caminhoArquivo.replace(
+        legacyPrefix,
+        `${STORAGE_TENANTS_ROOT}/${STORAGE_TENANT_FALLBACK}/${policy.subdirectory}/${thumb ? "thumbs/" : ""}${entitySegment}/`
+      );
+    }
+
+    return caminhoArquivo;
   }
 }

@@ -19,10 +19,13 @@ export type StorageScopeKey =
   | "ocorrencia_anexo"
   | "oficio_documento"
   | "plano_trabalho_documento"
+  | "termo_fomento_documento"
   | "autorizacao_compra_anexo"
   | "contabilidade_lancamento_anexo"
   | "captacao_doador_anexo"
   | "captacao_campanha_banner"
+  | "educacional_documento"
+  | "prestacao_contas_documento"
   | "geral_outro";
 
 export type StoragePolicy = {
@@ -62,6 +65,7 @@ const attachmentExtensions = [...documentExtensions, "mp4", "webm", "mov"];
 const attachmentMimeTypes = [...documentMimeTypes, "video/mp4", "video/webm", "video/quicktime"];
 
 export const requiredStorageDirectories = [
+  "tenants",
   "beneficiarios/documentos",
   "banco-empregos/candidatos/documentos",
   "colaboradores/documentos",
@@ -75,10 +79,15 @@ export const requiredStorageDirectories = [
   "ocorrencias/anexos",
   "oficios/documentos",
   "planos-trabalho/documentos",
+  "termos-fomento/documentos",
   "compras/anexos",
   "contabilidade/anexos",
   "captacao/doadores/anexos",
   "captacao/campanhas/banners",
+  "educacional/documentos",
+  "prestacao-contas/documentos",
+  "backups/arquivos",
+  "backups/imagens",
   "imagens/beneficiarios",
   "imagens/beneficiarios/thumbs",
   "imagens/biblioteca",
@@ -321,6 +330,33 @@ export const storagePolicies: Record<StorageScopeKey, StoragePolicy> = {
     allowedMimeTypes: imageMimeTypes,
     maxSizeBytes: 10 * 1024 * 1024,
     imageOnly: true,
+    generateThumbnail: true
+  },
+  termo_fomento_documento: {
+    entidadeTipo: "termo_fomento",
+    categoria: "documento",
+    subdirectory: "termos-fomento/documentos",
+    allowedExtensions: documentExtensions,
+    allowedMimeTypes: documentMimeTypes,
+    maxSizeBytes: 25 * 1024 * 1024,
+    generateThumbnail: true
+  },
+  educacional_documento: {
+    entidadeTipo: "educacional_documento",
+    categoria: "documento",
+    subdirectory: "educacional/documentos",
+    allowedExtensions: documentExtensions,
+    allowedMimeTypes: documentMimeTypes,
+    maxSizeBytes: 20 * 1024 * 1024,
+    generateThumbnail: true
+  },
+  prestacao_contas_documento: {
+    entidadeTipo: "prestacao_contas",
+    categoria: "documento",
+    subdirectory: "prestacao-contas/documentos",
+    allowedExtensions: documentExtensions,
+    allowedMimeTypes: documentMimeTypes,
+    maxSizeBytes: 25 * 1024 * 1024,
     generateThumbnail: true
   },
   geral_outro: {

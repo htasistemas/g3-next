@@ -79,6 +79,11 @@ export class MensagensPersonalizadasController {
     return response.json({ destinatarios });
   }
 
+  async buscarTodosDestinatarios(request: AuthenticatedRequest, response: Response) {
+    const destinatarios = await service.buscarTodosDestinatarios(request.query, request.authUser);
+    return response.json({ destinatarios });
+  }
+
   async gerarPreview(request: AuthenticatedRequest, response: Response) {
     const preview = await service.gerarPreview(request.body, request.authUser);
     return response.json({ preview });

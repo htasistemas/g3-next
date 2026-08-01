@@ -9,6 +9,7 @@ import {
   Clock3,
   FileDown,
   LayoutGrid,
+  LoaderCircle,
   TriangleAlert,
   TrendingUp,
   Users,
@@ -22,8 +23,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/use-auth";
 import { authService } from "@/services/auth.service";
+import { agendamentosService } from "@/services/agendamentos.service";
 import { useUnidadeAssistencialAtual } from "@/features/unidades-assistenciais/use-unidades-assistenciais";
-import { resolverUrlArquivo } from "@/lib/arquivos";
+import { obterUrlArquivoAutenticado } from "@/lib/arquivos";
 import { formatarCnpj, formatarTelefone } from "@/lib/br-utils";
 import {
   AgendaCardList,
@@ -36,9 +38,9 @@ import {
 } from "@/modules/agendamentos-operacional/components";
 import {
   useAgendamentos,
+  useCopiarAgendamento,
   useBeneficiariosOperacionaisAgendamento,
   useCancelarAgendamento,
-  useConfirmarAgendamento,
   useIndicadoresAgendamentos,
   useItensOperacionaisAgendamento,
   useListaEsperaAgendamentos,
@@ -65,6 +67,11 @@ type EnvioAgendamentoEmAndamento = {
   etapa: number;
 };
 
+type HorarioDisponivel = {
+  horaInicial: string;
+  horaFinal: string;
+};
+
 const ETAPAS_ENVIO: Array<Record<"WHATSAPP" | "EMAIL", string>> = [
   {
     WHATSAPP: "Preparando links e validando contatos do WhatsApp...",
@@ -78,6 +85,15 @@ const ETAPAS_ENVIO: Array<Record<"WHATSAPP" | "EMAIL", string>> = [
     WHATSAPP: "Finalizando os links para abertura do WhatsApp...",
     EMAIL: "Finalizando o disparo dos e-mails da agenda..."
   }
+];
+
+const ETAPAS_GERACAO_AGS = [
+  { percentual: 8, texto: "Validando os beneficiários selecionados..." },
+  { percentual: 20, texto: "Buscando as inscrições do item selecionado..." },
+  { percentual: 38, texto: "Preparando beneficiários, contatos e vínculos..." },
+  { percentual: 58, texto: "Montando curso, horário, local e participantes..." },
+  { percentual: 82, texto: "Salvando a agenda do dia no banco de dados..." },
+  { percentual: 100, texto: "Agenda salva. Atualizando a lista do dia..." }
 ];
 
 let janelaFichaAgendamentoAtual: Window | null = null;
@@ -119,6 +135,30 @@ function somarDias(data: string, deslocamento: number) {
   return base.toISOString().slice(0, 10);
 }
 
+function converterHoraEmMinutos(hora?: string) {
+  const partes = String(hora ?? "").split(":").map(Number);
+  if (partes.length < 2 || partes.some((parte) => Number.isNaN(parte))) return null;
+  return partes[0] * 60 + partes[1];
+}
+
+function formatarHoraMinutos(total: number) {
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+
+function gerarHorariosDisponiveis(item?: AgendamentoOperacionalItem | null): HorarioDisponivel[] {
+  if (!item?.controleHorarioAtendimento) return [];
+  const inicio = converterHoraEmMinutos(item.horario);
+  const fim = converterHoraEmMinutos(item.horarioFinal);
+  const duracao = Number(item.duracaoMinutos ?? 0);
+  if (inicio === null || fim === null || !duracao || fim <= inicio) return [];
+
+  const horarios: HorarioDisponivel[] = [];
+  for (let atual = inicio; atual + duracao <= fim; atual += duracao) {
+    horarios.push({ horaInicial: formatarHoraMinutos(atual), horaFinal: formatarHoraMinutos(atual + duracao) });
+  }
+  return horarios;
+}
+
 function formatarDataExtensa(data?: string) {
   const parsed = normalizarData(data);
   if (!parsed) return "---";
@@ -129,6 +169,38 @@ function formatarDataExtensa(data?: string) {
     year: "numeric"
   }).format(parsed);
   return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
+
+function formatarIdade(dataNascimento?: string) {
+  if (!dataNascimento) return "---";
+
+  const nascimento = new Date(`${dataNascimento.slice(0, 10)}T12:00:00`);
+  if (Number.isNaN(nascimento.getTime())) return "---";
+
+  const hojeAtual = new Date();
+  let idade = hojeAtual.getFullYear() - nascimento.getFullYear();
+  const mesAtual = hojeAtual.getMonth();
+  const mesNascimento = nascimento.getMonth();
+  const diaAtual = hojeAtual.getDate();
+  const diaNascimento = nascimento.getDate();
+
+  if (mesAtual < mesNascimento || (mesAtual === mesNascimento && diaAtual < diaNascimento)) {
+    idade -= 1;
+  }
+
+  return idade >= 0 ? `${idade} ano${idade === 1 ? "" : "s"}` : "---";
+}
+
+function formatarTelefoneRelatorio(telefone?: string | null) {
+  if (!telefone?.trim()) return "";
+  const digitos = telefone.replace(/\D/g, "");
+  if (digitos.length === 11) {
+    return `${digitos.slice(0, 2)} ${digitos.slice(2, 7)}-${digitos.slice(7)}`;
+  }
+  if (digitos.length === 10) {
+    return `${digitos.slice(0, 2)} ${digitos.slice(2, 6)}-${digitos.slice(6)}`;
+  }
+  return telefone.trim();
 }
 
 function escapeHtml(value?: string | number | null) {
@@ -389,17 +461,32 @@ export function AgendamentosPage() {
   const [preferenciaCarregada, setPreferenciaCarregada] = useState(false);
   const [buscaBeneficiario, setBuscaBeneficiario] = useState("");
   const [beneficiariosSelecionados, setBeneficiariosSelecionados] = useState<number[]>([]);
+  const [beneficiariosPorHorario, setBeneficiariosPorHorario] = useState<Record<string, number>>({});
   const [selecionadoId, setSelecionadoId] = useState<number | null>(null);
+  const [agendaEmEdicaoId, setAgendaEmEdicaoId] = useState<number | null>(null);
   const [popup, setPopup] = useState<PopupMensagemState | null>(null);
   const [envioEmAndamento, setEnvioEmAndamento] = useState<EnvioAgendamentoEmAndamento | null>(null);
   const [confirmarCancelar, setConfirmarCancelar] = useState<Agendamento | null>(null);
   const [agendaParaExcluir, setAgendaParaExcluir] = useState<Agendamento | null>(null);
   const [agendaParaData, setAgendaParaData] = useState<{ acao: "copiar" | "mover"; item: Agendamento } | null>(null);
   const [novaDataAgenda, setNovaDataAgenda] = useState(hoje);
+  const [novoHorarioParticipante, setNovoHorarioParticipante] = useState("");
   const [participanteParaMover, setParticipanteParaMover] = useState<{ item: Agendamento; index: number } | null>(null);
   const [participanteParaExcluir, setParticipanteParaExcluir] = useState<{ item: Agendamento; index: number } | null>(null);
 
-  const agendamentosQuery = useAgendamentos({});
+  const filtrosAgendamentos = useMemo(
+    () => ({
+      periodoInicio: dataVisualizacao,
+      periodoFim: dataVisualizacao
+    }),
+    [dataVisualizacao]
+  );
+
+  const agendamentosQuery = useAgendamentos(filtrosAgendamentos);
+  const agendamentosDisponibilidadeQuery = useAgendamentos({
+    periodoInicio: dataAgendamento,
+    periodoFim: dataAgendamento
+  });
   const indicadoresQuery = useIndicadoresAgendamentos({});
   const listaEsperaQuery = useListaEsperaAgendamentos();
   const itensQuery = useItensOperacionaisAgendamento(tipo, buscaItemAdiada);
@@ -407,12 +494,29 @@ export function AgendamentosPage() {
   const unidadeAtualQuery = useUnidadeAssistencialAtual();
   const salvarAgendamentoMutation = useSalvarAgendamento();
   const salvarMutation = useSalvarAgendamentoOperacional();
+  const copiarAgendamentoMutation = useCopiarAgendamento();
   const cancelarMutation = useCancelarAgendamento();
-  const confirmarMutation = useConfirmarAgendamento();
   const excluirMutation = useExcluirAgendamento();
   const notificarMutation = useNotificarAgendamento();
   const remarcarMutation = useRemarcarAgendamento();
   const preferenciaSalvando = useRef<number | null>(null);
+  const [agendaCopiando, setAgendaCopiando] = useState(false);
+  const [geracaoEmAndamento, setGeracaoEmAndamento] = useState(false);
+  const [geracaoEtapa, setGeracaoEtapa] = useState(0);
+  const [ultimaAgendaDestacadaId, setUltimaAgendaDestacadaId] = useState<number | null>(null);
+  const [agendaLocalSalva, setAgendaLocalSalva] = useState<Agendamento | null>(null);
+  const [confirmacaoParticipanteEmAndamento, setConfirmacaoParticipanteEmAndamento] = useState<{
+    agendamentoId: number;
+    index: number;
+  } | null>(null);
+  const geracaoIntervalo = useRef<number | null>(null);
+  const destaqueAgendaTimeout = useRef<number | null>(null);
+  const dataVisualizacaoInteragida = useRef(false);
+
+  function definirDataVisualizacao(novaData: string) {
+    dataVisualizacaoInteragida.current = true;
+    setDataVisualizacao(novaData);
+  }
 
   useEffect(() => {
     let ativo = true;
@@ -429,7 +533,7 @@ export function AgendamentosPage() {
       try {
         const dataPreferencia = await authService.obterPreferenciaAgendamentos();
         if (!ativo) return;
-        if (dataPreferencia) {
+        if (dataPreferencia && !dataVisualizacaoInteragida.current) {
           setDataVisualizacao(dataPreferencia);
         }
       } catch {
@@ -466,15 +570,30 @@ export function AgendamentosPage() {
 
   const cards = useMemo(
     () =>
-      (agendamentosQuery.data ?? [])
+      [...(agendamentosQuery.data ?? []), ...(agendaLocalSalva && !(agendamentosQuery.data ?? []).some((item) => item.id === agendaLocalSalva.id) ? [agendaLocalSalva] : [])]
         .filter((item) => (item.status ?? "").trim().toUpperCase() !== "CANCELADO")
-        .filter((item) => item.itemOrigemId || item.itemNome || item.coletivo)
+        .filter((item) => {
+          const participantes = item.participantes ?? [];
+          return (
+            item.itemOrigemId ||
+            item.itemNome ||
+            item.itemTipo ||
+            item.tituloColetivo ||
+            item.coletivo ||
+            participantes.length > 0
+          );
+        })
         .sort((a, b) => `${a.data ?? ""}${a.horaInicial ?? ""}`.localeCompare(`${b.data ?? ""}${b.horaInicial ?? ""}`)),
-    [agendamentosQuery.data]
+    [agendaLocalSalva, agendamentosQuery.data]
   );
 
-  const cardSelecionado = cards.find((item) => item.id === selecionadoId) ?? null;
-  const cardsDoDia = useMemo(() => cards.filter((item) => (item.data ?? "").slice(0, 10) === dataVisualizacao), [cards, dataVisualizacao]);
+  const cardsVisiveis = cards;
+
+  const cardSelecionado = cardsVisiveis.find((item) => item.id === selecionadoId) ?? null;
+  const cardsDoDia = useMemo(
+    () => cardsVisiveis.filter((item) => (item.data ?? "").slice(0, 10) === dataVisualizacao),
+    [cardsVisiveis, dataVisualizacao]
+  );
 
   const beneficiariosFiltrados = useMemo(() => {
     const termo = buscaBeneficiario.trim().toLowerCase();
@@ -483,11 +602,42 @@ export function AgendamentosPage() {
     return base.filter((item) => item.nomeCompleto.toLowerCase().includes(termo));
   }, [beneficiariosQuery.data, buscaBeneficiario]);
 
+  const atendimentoPorHorario = tipo === "atendimento" && Boolean(itemSelecionado?.controleHorarioAtendimento);
+  const horariosOcupados = useMemo(() => {
+    if (!atendimentoPorHorario || !itemSelecionado?.id || !dataAgendamento) return new Set<string>();
+
+    const ocupados = new Set<string>();
+    const agendas = [...(agendamentosDisponibilidadeQuery.data ?? []), ...(agendaLocalSalva ? [agendaLocalSalva] : [])];
+    for (const agenda of agendas) {
+      const mesmaData = (agenda.data ?? "").slice(0, 10) === dataAgendamento;
+      const mesmoItem = agenda.itemOrigemId === itemSelecionado.id;
+      const cancelada = (agenda.status ?? "").trim().toUpperCase() === "CANCELADO";
+      if (!mesmaData || !mesmoItem || cancelada || agenda.id === agendaEmEdicaoId) continue;
+
+      const participantes = agenda.participantes ?? [];
+      const horarios = participantes.map((participante) => participante.horario).filter(Boolean);
+      if (horarios.length) {
+        horarios.forEach((horario) => ocupados.add(String(horario).slice(0, 5)));
+      } else if (agenda.horaInicial) {
+        ocupados.add(agenda.horaInicial.slice(0, 5));
+      }
+    }
+    return ocupados;
+  }, [agendaEmEdicaoId, agendaLocalSalva, agendamentosDisponibilidadeQuery.data, atendimentoPorHorario, dataAgendamento, itemSelecionado?.id]);
+
+  const horariosDisponiveis = useMemo(
+    () => gerarHorariosDisponiveis(itemSelecionado).filter((horario) => !horariosOcupados.has(horario.horaInicial)),
+    [horariosOcupados, itemSelecionado]
+  );
+
   const resumoOperacional = [
     { label: "Tipo", value: tipo ? tipo.charAt(0).toUpperCase() + tipo.slice(1) : "Não selecionado" },
     { label: "Item", value: itemSelecionado?.nome || "Não selecionado" },
     { label: "Data", value: dataAgendamento ? new Date(`${dataAgendamento}T12:00:00`).toLocaleDateString("pt-BR") : "Não selecionada" },
-    { label: "Beneficiários", value: `${beneficiariosSelecionados.length} selecionado(s)` }
+    {
+      label: "Beneficiários",
+      value: `${atendimentoPorHorario ? new Set(Object.values(beneficiariosPorHorario)).size : beneficiariosSelecionados.length} selecionado(s)`
+    }
   ];
 
   const dashboardResumo = useMemo<DashboardCard[]>(() => {
@@ -510,7 +660,7 @@ export function AgendamentosPage() {
     }).length;
 
     return [
-      { label: "Pacientes agendados", value: participantesAgendados, icon: Users },
+      { label: "Beneficiários atendidos", value: participantesAgendados, icon: Users },
       { label: "Frequência média", value: frequenciaMedia.toLocaleString("pt-BR"), icon: TrendingUp },
       { label: "Faltas da semana", value: faltasSemana, icon: TriangleAlert },
       { label: "Sessões do mês", value: sessoesMes, icon: CalendarDays },
@@ -526,13 +676,15 @@ export function AgendamentosPage() {
       icon: CalendarRange,
       onClick: () => {
         setSelecionadoId(null);
+        setAgendaEmEdicaoId(null);
         setTipo(undefined);
         setBuscaItem("");
         setItemSelecionado(null);
         setBuscaBeneficiario("");
         setBeneficiariosSelecionados([]);
+        setBeneficiariosPorHorario({});
         setDataAgendamento(hoje);
-        setDataVisualizacao(hoje);
+        definirDataVisualizacao(hoje);
         setAbaAtiva("agenda");
       },
       variant: "default"
@@ -542,33 +694,110 @@ export function AgendamentosPage() {
   ];
 
   async function salvarCard() {
-    if (!tipo || !itemSelecionado?.id || !beneficiariosSelecionados.length || !dataAgendamento) {
+    const atribuicoesPorHorario = horariosDisponiveis
+      .map((horario) => ({ horario, matriculaId: beneficiariosPorHorario[horario.horaInicial] }))
+      .filter((item): item is { horario: HorarioDisponivel; matriculaId: number } => Number.isInteger(item.matriculaId));
+    const possuiBeneficiarios = atendimentoPorHorario ? atribuicoesPorHorario.length > 0 : beneficiariosSelecionados.length > 0;
+
+    if (!tipo || !itemSelecionado?.id || !possuiBeneficiarios || !dataAgendamento) {
       setPopup({ tipo: "erro", titulo: "Atenção", texto: "Selecione tipo, item, beneficiários e data antes de gerar a agenda." });
       return;
     }
 
+    if (atendimentoPorHorario && !horariosDisponiveis.length) {
+      setPopup({ tipo: "erro", titulo: "Configuração incompleta", texto: "Este atendimento precisa ter horário inicial, horário final e duração configurados para gerar os horários disponíveis." });
+      return;
+    }
+
+    if (geracaoIntervalo.current) {
+      window.clearInterval(geracaoIntervalo.current);
+      geracaoIntervalo.current = null;
+    }
+    if (destaqueAgendaTimeout.current) {
+      window.clearTimeout(destaqueAgendaTimeout.current);
+      destaqueAgendaTimeout.current = null;
+    }
+
+    setGeracaoEmAndamento(true);
+    setGeracaoEtapa(1);
+
+    const dataExibicao = dataAgendamento;
     try {
-      const salvo = await salvarMutation.mutateAsync({
-        id: cardSelecionado?.id ? String(cardSelecionado.id) : undefined,
-        tipo,
-        itemId: itemSelecionado.id,
-        data: dataAgendamento,
-        matriculasIds: beneficiariosSelecionados
-      });
+      const salvos = atendimentoPorHorario
+        ? [await salvarMutation.mutateAsync({
+            id: agendaEmEdicaoId ? String(agendaEmEdicaoId) : undefined,
+            tipo,
+            itemId: itemSelecionado.id,
+            data: dataAgendamento,
+            horaInicial: atribuicoesPorHorario[0]?.horario.horaInicial,
+            horaFinal: atribuicoesPorHorario[atribuicoesPorHorario.length - 1]?.horario.horaFinal,
+            duracaoMinutos: itemSelecionado.duracaoMinutos,
+            matriculasIds: atribuicoesPorHorario.map(({ matriculaId }) => matriculaId),
+            horariosPorMatricula: Object.fromEntries(
+              atribuicoesPorHorario.map(({ horario, matriculaId }) => [String(matriculaId), horario.horaInicial])
+            )
+          })]
+        : [await salvarMutation.mutateAsync({
+            id: agendaEmEdicaoId ? String(agendaEmEdicaoId) : undefined,
+            tipo,
+            itemId: itemSelecionado.id,
+            data: dataAgendamento,
+            matriculasIds: beneficiariosSelecionados
+          })];
+      const salvo = salvos[salvos.length - 1];
+      let consultaOficial: Agendamento[] = [];
+      let falhaAoAtualizarCards = false;
+      try {
+        consultaOficial = await agendamentosService.listar({ periodoInicio: dataExibicao, periodoFim: dataExibicao });
+      } catch {
+        falhaAoAtualizarCards = true;
+      }
+      if (salvos.length) {
+        const idsSalvos = new Set(salvos.filter(Boolean).map((item) => item?.id));
+        const persistido = idsSalvos.size > 0 && consultaOficial.filter((item) => idsSalvos.has(item.id)).length === idsSalvos.size;
+        if (persistido) {
+          setAgendaLocalSalva(null);
+        } else if (salvo) {
+          setAgendaLocalSalva(salvo);
+          falhaAoAtualizarCards = true;
+        }
+      }
+      setGeracaoEtapa(ETAPAS_GERACAO_AGS.length - 1);
       setSelecionadoId(salvo?.id ?? null);
-      setDataVisualizacao(dataAgendamento);
+      setUltimaAgendaDestacadaId(salvo?.id ?? null);
+      definirDataVisualizacao(dataExibicao);
       setPopup({
-        tipo: "sucesso",
-        titulo: "Confirmação",
-        texto: cardSelecionado?.id ? "Agenda atualizada com sucesso." : "Agenda gerada com sucesso."
+        tipo: falhaAoAtualizarCards ? "aviso" : "sucesso",
+        titulo: falhaAoAtualizarCards ? "Agenda criada" : "Confirmação",
+        texto: falhaAoAtualizarCards
+          ? "A agenda foi gravada no banco, mas houve uma falha ao atualizar os cards da tela. Atualize a página para consultar os dados persistidos."
+          : agendaEmEdicaoId
+            ? "Agenda atualizada com sucesso."
+            : "Agenda gerada com sucesso."
       });
+      destaqueAgendaTimeout.current = window.setTimeout(() => {
+        setUltimaAgendaDestacadaId((atual) => (atual === salvo?.id ? null : atual));
+      }, 4500);
     } catch (error: any) {
-      const mensagem = error?.response?.data?.message ?? "Não foi possível gerar a agenda.";
+      definirDataVisualizacao(dataAgendamento);
+      const mensagem =
+        error?.response?.data?.message ??
+        error?.response?.data?.error ??
+        error?.message ??
+        "Não foi possível gerar a agenda.";
       setPopup({
         tipo: "erro",
         titulo: mensagem.startsWith("Conflito de agenda identificado.") ? "Agendamento bloqueador" : "Erro",
         texto: mensagem
       });
+    }
+    finally {
+      if (geracaoIntervalo.current) {
+        window.clearInterval(geracaoIntervalo.current);
+        geracaoIntervalo.current = null;
+      }
+      setGeracaoEmAndamento(false);
+      setGeracaoEtapa(0);
     }
   }
 
@@ -620,7 +849,7 @@ export function AgendamentosPage() {
     }
   }
 
-  function imprimirFichaPresenca(item: Agendamento) {
+  async function imprimirFichaPresenca(item: Agendamento) {
     const unidadeAtual = unidadeAtualQuery.data?.unidade;
     const participantes = item.participantes ?? [];
     const atividade = item.itemNome || item.tipoAtendimento;
@@ -630,25 +859,44 @@ export function AgendamentosPage() {
     const horario = item.horaInicial || "-";
     const local = item.itemLocal || item.sala || item.unidade || "-";
     const nomeInstituicao = unidadeAtual?.razao_social?.trim() || unidadeAtual?.nome_fantasia?.trim() || "Instituição não cadastrada";
-    const logomarcaRelatorio = resolverUrlArquivo(unidadeAtual?.logomarca_relatorio || unidadeAtual?.logomarca);
+    let logomarcaRelatorio = "";
+    try {
+      const logo = await obterUrlArquivoAutenticado(unidadeAtual?.logomarca_relatorio || unidadeAtual?.logomarca, {
+        cache: false,
+        auditar: false
+      });
+      logomarcaRelatorio = logo.url;
+      window.setTimeout(() => logo.revoke?.(), 60_000);
+    } catch {
+      logomarcaRelatorio = "";
+    }
     const rodapeInstitucional = montarRodapeInstitucional(unidadeAtual ?? undefined);
     const linhas = participantes.length
       ? participantes
           .map(
-            (participante, index) => `
+            (participante, index) => {
+              const idade = formatarIdade(participante.dataNascimento);
+              return `
               <tr>
                 <td>${index + 1}</td>
-                <td>${escapeHtml(participante.beneficiarioNome)}</td>
-                <td>${escapeHtml(participante.telefone || "-")}</td>
-                <td>${escapeHtml(participante.comparecimento || "Pendente")}</td>
-                <td></td>
-              </tr>`
+                <td>${escapeHtml(participante.codigo || participante.beneficiarioId?.toString() || participante.matriculaId?.toString() || "-")}</td>
+                <td>${escapeHtml(participante.horario || horario)}</td>
+                <td>
+                  <div class="g3-beneficiario">
+                    <span class="g3-beneficiario-nome">${escapeHtml(participante.beneficiarioNome)}</span>
+                    <span class="g3-beneficiario-idade">Idade: ${escapeHtml(idade)}</span>
+                  </div>
+                </td>
+                <td>${escapeHtml(formatarTelefoneRelatorio(participante.telefone) || "-")}</td>
+                <td><span class="g3-assinatura-campo" aria-hidden="true"></span></td>
+              </tr>`;
+            }
           )
           .join("")
       : `
         <tr>
           <td>1</td>
-          <td colspan="4">Sem beneficiários vinculados ao card.</td>
+          <td colspan="5">Sem beneficiários vinculados ao card.</td>
         </tr>`;
 
     const emitidoEm = new Date().toLocaleString("pt-BR");
@@ -669,11 +917,11 @@ export function AgendamentosPage() {
         .g3-topo h1 { margin: 0; font-size: 18px; font-weight: 700; color: #14532d; }
         .g3-topo h2 { margin: 4px 0 0; font-size: 24px; font-weight: 800; color: #1f2937; font-family: Arial, sans-serif; }
         .g3-bloco { margin-bottom: 16px; border: 1px solid #dbe7df; border-radius: 16px; background: #ffffff; overflow: hidden; }
-        .g3-bloco-titulo { margin: 0; padding: 12px 16px; background: #eef8f2; border-bottom: 1px solid #dbe7df; font-size: 14px; font-weight: 700; color: #166534; }
-        .g3-meta { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; padding: 14px 16px 16px; }
-        .g3-meta-item { border: 1px solid #dbe7df; border-radius: 12px; padding: 10px 12px; background: #f9fcfa; text-align: center; }
-        .g3-meta-item strong { display: block; margin-bottom: 4px; font-size: 11px; font-weight: 600; color: #5d7467; }
-        .g3-meta-item span { display: block; font-size: 14px; font-weight: 700; color: #163027; }
+        .g3-bloco-titulo { margin: 0; padding: 10px 14px; background: #eef8f2; border-bottom: 1px solid #dbe7df; font-size: 13px; font-weight: 700; color: #166534; }
+        .g3-meta { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 10px 12px 12px; }
+        .g3-meta-item { border: 1px solid #dbe7df; border-radius: 12px; padding: 8px 10px; background: #f9fcfa; text-align: center; }
+        .g3-meta-item strong { display: block; margin-bottom: 3px; font-size: 10px; font-weight: 600; color: #5d7467; }
+        .g3-meta-item span { display: block; font-size: 13px; font-weight: 700; color: #163027; line-height: 1.15; }
         .g3-orientacao { margin: 0 0 16px; border-left: 4px solid #0f8a57; border-radius: 10px; padding: 10px 12px; background: #f4fbf7; font-size: 12px; color: #4b6356; }
         .g3-tabela { width: 100%; table-layout: fixed; border: 1px solid #dbe7df; border-radius: 16px; overflow: hidden; }
         .g3-tabela thead th { padding: 11px 12px; background: #0f8a57; color: #ffffff; font-size: 12px; font-weight: 700; text-align: left; }
@@ -681,9 +929,25 @@ export function AgendamentosPage() {
         .g3-tabela tbody tr:nth-child(even) td { background: #f8fbf9; }
         .g3-tabela td { font-size: 13px; color: #233a31; min-height: 36px; }
         .g3-tabela td:first-child,
-        .g3-tabela td:nth-child(3),
+        .g3-tabela td:nth-child(2),
         .g3-tabela td:nth-child(4),
         .g3-tabela td:nth-child(5) { white-space: nowrap; }
+        .g3-tabela td:nth-child(3) { white-space: nowrap; }
+        .g3-tabela td:nth-child(4) { white-space: normal; }
+        .g3-tabela th:nth-child(2),
+        .g3-tabela td:nth-child(2) { width: 54px; }
+        .g3-tabela th:nth-child(3),
+        .g3-tabela td:nth-child(3) { width: 82px; }
+        .g3-tabela th:nth-child(4),
+        .g3-tabela td:nth-child(4) { width: 34%; }
+        .g3-tabela th:nth-child(5),
+        .g3-tabela td:nth-child(5) { width: 132px; }
+        .g3-tabela th:nth-child(6),
+        .g3-tabela td:nth-child(6) { width: 158px; }
+        .g3-beneficiario { display: flex; flex-direction: column; gap: 2px; }
+        .g3-beneficiario-nome { display: block; line-height: 1.2; white-space: normal; word-break: normal; overflow-wrap: anywhere; }
+        .g3-beneficiario-idade { display: block; font-size: 11px; color: #6b7f75; line-height: 1.15; }
+        .g3-assinatura-campo { display: block; min-height: 20px; border-bottom: 1px solid #96b3a2; }
         .g3-rodape { margin-top: 18px; padding-top: 12px; border-top: 1px solid #dbe7df; font-size: 11px; color: #6b7f75; text-align: center; }
         .g3-rodape div + div { margin-top: 2px; }
       `,
@@ -722,11 +986,12 @@ export function AgendamentosPage() {
           <table class="g3-tabela">
             <thead>
               <tr>
-                <th style="width: 42px;">Nº</th>
+                <th style="width: 42px;">Número</th>
+                <th style="width: 54px;">Código</th>
+                <th style="width: 82px;">Horário</th>
                 <th>Beneficiário</th>
                 <th style="width: 132px;">Telefone</th>
-                <th style="width: 108px;">Status</th>
-                <th style="width: 120px;">Presença</th>
+                <th style="width: 158px;">Assinatura</th>
               </tr>
             </thead>
             <tbody>${linhas}</tbody>
@@ -744,10 +1009,12 @@ export function AgendamentosPage() {
   function carregarParaEdicao(item: Agendamento) {
     setAbaAtiva("agenda");
     setSelecionadoId(item.id ?? null);
+    setAgendaEmEdicaoId(item.id ?? null);
     setTipo(item.itemTipo);
     setBuscaItem("");
     setBuscaBeneficiario("");
-    const itemResumo: AgendamentoOperacionalItem = {
+    const itemCatalogo = itensQuery.data?.find((catalogo) => catalogo.id === item.itemOrigemId);
+    const itemResumo: AgendamentoOperacionalItem = itemCatalogo ?? {
       id: item.itemOrigemId ?? 0,
       nome: item.itemNome || item.tipoAtendimento,
       profissionalNome: item.profissionalNome,
@@ -755,13 +1022,21 @@ export function AgendamentosPage() {
       diasSemana: item.itemDiasSemana,
       local: item.itemLocal || item.sala || item.unidade
     };
+    if (itemCatalogo && item.horaInicial) itemResumo.horario = item.horaInicial;
     setItemSelecionado(itemResumo.id ? itemResumo : null);
     setDataAgendamento(item.data ?? hoje);
-    setDataVisualizacao(item.data ?? hoje);
+    definirDataVisualizacao(item.data ?? hoje);
     setBeneficiariosSelecionados(
       (item.participantes ?? [])
         .map((participante) => participante.matriculaId ?? participante.beneficiarioId)
         .filter(Boolean) as number[]
+    );
+    setBeneficiariosPorHorario(
+      Object.fromEntries(
+        (item.participantes ?? [])
+          .filter((participante) => participante.horario && (participante.matriculaId ?? participante.beneficiarioId))
+          .map((participante) => [participante.horario as string, (participante.matriculaId ?? participante.beneficiarioId) as number])
+      )
     );
   }
 
@@ -793,34 +1068,25 @@ export function AgendamentosPage() {
       return;
     }
 
+    setAgendaCopiando(true);
     try {
       if (agendaParaData.acao === "copiar") {
-        const agendaOriginal = agendaParaData.item;
-        const participantes = (agendaOriginal.participantes ?? []).map<AgendamentoParticipante>((participante) => ({
-          ...participante,
-          comparecimento: "Pendente" as const
-        }));
-
-        const novaAgenda: Agendamento = {
-          ...agendaOriginal,
-          id: undefined,
-          data: novaDataAgenda,
-          diaSemana: undefined,
-          status: "Agendado",
-          confirmadoEm: undefined,
-          confirmadoPorNome: undefined,
-          confirmacaoCanal: undefined,
-          observacaoConfirmacao: undefined,
-          participantes
-        };
-
-        const salvo = await salvarAgendamentoMutation.mutateAsync(novaAgenda);
+        if (!agendaParaData.item.id) {
+          setPopup({ tipo: "erro", titulo: "Atenção", texto: "Não foi possível copiar esta agenda porque faltam dados obrigatórios." });
+          return;
+        }
+        const salvo = await copiarAgendamentoMutation.mutateAsync({
+          id: agendaParaData.item.id,
+          payload: { data: novaDataAgenda }
+        });
 
         if (!salvo?.id) {
           setPopup({ tipo: "erro", titulo: "Erro", texto: "Não foi possível copiar a agenda." });
           return;
         }
 
+        setSelecionadoId(salvo.id ?? null);
+        setUltimaAgendaDestacadaId(salvo.id ?? null);
         setPopup({ tipo: "sucesso", titulo: "Confirmação", texto: "Agenda copiada com sucesso para a nova data." });
       } else {
         if (!agendaParaData.item.id) return;
@@ -831,50 +1097,60 @@ export function AgendamentosPage() {
         setPopup({ tipo: "sucesso", titulo: "Confirmação", texto: "Agenda remarcada com sucesso." });
       }
 
-      setDataVisualizacao(novaDataAgenda);
+      definirDataVisualizacao(novaDataAgenda);
       setAgendaParaData(null);
     } catch (error: any) {
       setPopup({
         tipo: "erro",
         titulo: "Erro",
         texto:
-          error?.response?.data?.message ??
+          error?.response?.data?.message ?? 
           (agendaParaData.acao === "copiar" ? "Não foi possível copiar a agenda." : "Não foi possível remarcar a agenda.")
       });
+    } finally {
+      setAgendaCopiando(false);
     }
   }
 
   async function alternarConfirmacaoParticipante(item: Agendamento, index: number) {
     if (!item.id) return;
-    if (item.status === "Confirmado") return;
+    const participanteAtual = item.participantes?.[index];
+    if (!participanteAtual || participanteAtual.comparecimento === "Presente") return;
 
     const participantes = (item.participantes ?? []).map<AgendamentoParticipante>((participante, participanteIndex) =>
       participanteIndex === index
         ? {
             ...participante,
             comparecimento: "Presente"
-          }
+        }
         : participante
     );
+    const statusAtualizado = participantes.every((participante) => participante.comparecimento === "Presente")
+      ? "Confirmado"
+      : item.status;
 
+    setConfirmacaoParticipanteEmAndamento({ agendamentoId: item.id, index });
     try {
-      await confirmarMutation.mutateAsync({
-        id: item.id,
-        payload: { observacao: "Confirmado pelo card." }
-      });
       await salvarAgendamentoMutation.mutateAsync({
         ...item,
-        status: "Confirmado",
+        status: statusAtualizado,
         participantes
       });
+      await agendamentosQuery.refetch();
+      setPopup({ tipo: "sucesso", titulo: "Confirmação", texto: "Participante confirmado com sucesso." });
     } catch (error: any) {
       setPopup({ tipo: "erro", titulo: "Erro", texto: error?.response?.data?.message ?? "Não foi possível atualizar a confirmação." });
+    } finally {
+      setConfirmacaoParticipanteEmAndamento((atual) =>
+        atual && atual.agendamentoId === item.id && atual.index === index ? null : atual
+      );
     }
   }
 
   function solicitarMoverParticipante(item: Agendamento, index: number) {
     setParticipanteParaMover({ item, index });
     setNovaDataAgenda(item.data?.slice(0, 10) || hoje);
+    setNovoHorarioParticipante(item.participantes?.[index]?.horario || item.horaInicial || "");
   }
 
   function solicitarExcluirParticipante(item: Agendamento, index: number) {
@@ -909,26 +1185,55 @@ export function AgendamentosPage() {
     const matriculaId = participante?.matriculaId;
     const itemId = participanteParaMover.item.itemOrigemId;
     const tipoItem = participanteParaMover.item.itemTipo;
+    const horarioDestino = novoHorarioParticipante.trim() || participante?.horario || participanteParaMover.item.horaInicial;
 
     if (!participante || !matriculaId || !itemId || !tipoItem) {
       setPopup({ tipo: "erro", titulo: "Atenção", texto: "Não foi possível mover este beneficiário." });
       return;
     }
 
+    const horariosDoItem = gerarHorariosDisponiveis({
+      id: itemId,
+      nome: participanteParaMover.item.itemNome || participanteParaMover.item.tipoAtendimento,
+      horario: participanteParaMover.item.horaInicial,
+      horarioFinal: participanteParaMover.item.horaFinal,
+      duracaoMinutos: participanteParaMover.item.duracaoMinutos,
+      controleHorarioAtendimento: tipoItem === "atendimento" && Boolean(participanteParaMover.item.horaFinal && participanteParaMover.item.duracaoMinutos)
+    });
+    const horariosOcupados = new Set(
+      (participanteParaMover.item.participantes ?? [])
+        .filter((_, index) => index !== participanteParaMover.index)
+        .map((item) => item.horario)
+        .filter(Boolean)
+    );
+    if (horariosDoItem.length && (!horariosDoItem.some((item) => item.horaInicial === horarioDestino) || horariosOcupados.has(horarioDestino))) {
+      setPopup({ tipo: "erro", titulo: "Horário indisponível", texto: "Escolha um horário livre para remanejar o beneficiário." });
+      return;
+    }
+
     try {
-      await salvarMutation.mutateAsync({
-        tipo: tipoItem,
-        itemId,
-        data: novaDataAgenda,
-        matriculasIds: [matriculaId]
-      });
+      if (novaDataAgenda === (participanteParaMover.item.data ?? "").slice(0, 10)) {
+        const participantesAtualizados = (participanteParaMover.item.participantes ?? []).map((item, index) =>
+          index === participanteParaMover.index ? { ...item, horario: horarioDestino } : item
+        );
+        await salvarParticipantesAtualizados(participanteParaMover.item, participantesAtualizados);
+      } else {
+        await salvarMutation.mutateAsync({
+          tipo: tipoItem,
+          itemId,
+          data: novaDataAgenda,
+          horaInicial: horarioDestino,
+          matriculasIds: [matriculaId],
+          horariosPorMatricula: { [String(matriculaId)]: horarioDestino }
+        });
 
-      const participantesRestantes = (participanteParaMover.item.participantes ?? []).filter((_, index) => index !== participanteParaMover.index);
-      await salvarParticipantesAtualizados(participanteParaMover.item, participantesRestantes);
+        const participantesRestantes = (participanteParaMover.item.participantes ?? []).filter((_, index) => index !== participanteParaMover.index);
+        await salvarParticipantesAtualizados(participanteParaMover.item, participantesRestantes);
+      }
 
-      setDataVisualizacao(novaDataAgenda);
+      definirDataVisualizacao(novaDataAgenda);
       setParticipanteParaMover(null);
-      setPopup({ tipo: "sucesso", titulo: "Confirmação", texto: "Beneficiário movido para a nova data com sucesso." });
+      setPopup({ tipo: "sucesso", titulo: "Confirmação", texto: "Beneficiário remanejado para o horário selecionado com sucesso." });
     } catch (error: any) {
       setPopup({ tipo: "erro", titulo: "Erro", texto: error?.response?.data?.message ?? "Não foi possível mover o beneficiário." });
     }
@@ -981,46 +1286,162 @@ export function AgendamentosPage() {
                       value={tipo}
                       onChange={(value) => {
                         setTipo(value);
+                        setAgendaEmEdicaoId(null);
                         setItemSelecionado(null);
                         setBeneficiariosSelecionados([]);
+                        setBeneficiariosPorHorario({});
                       }}
                     />
+                    {tipo ? (
+                      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm lg:col-span-2">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p className="text-sm font-semibold text-amber-900">Inscreva os beneficiários antes de agendar</p>
+                            <p className="mt-1 text-xs text-amber-800">
+                              Antes de gerar a agenda, faça as inscrições dos beneficiários no curso ou atendimento selecionado.
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="border-amber-300 bg-white text-amber-900 hover:bg-amber-100"
+                            onClick={() => navigate("/atendimentos/matriculas?aba=inscricoes")}
+                          >
+                            Abrir inscrições e lista de espera
+                          </Button>
+                        </div>
+                      </div>
+                    ) : null}
                     <ItemSelector
                       busca={buscaItem}
                       onBuscaChange={setBuscaItem}
                       itens={itensQuery.data ?? []}
                       selecionadoId={itemSelecionado?.id ?? null}
                       onSelect={(item) => {
+                        setAgendaEmEdicaoId(null);
                         setItemSelecionado(item);
                         setBeneficiariosSelecionados([]);
+                        setBeneficiariosPorHorario({});
                       }}
                       carregando={itensQuery.isLoading}
                     />
                   </div>
                   <ItemResumoCard item={itemSelecionado} />
-                  <BeneficiarioSelector
-                    busca={buscaBeneficiario}
-                    onBuscaChange={setBuscaBeneficiario}
-                    beneficiarios={beneficiariosFiltrados}
-                    selecionados={beneficiariosSelecionados}
-                    onToggle={(matriculaId) =>
-                      setBeneficiariosSelecionados((atual) =>
-                        atual.includes(matriculaId) ? atual.filter((item) => item !== matriculaId) : [...atual, matriculaId]
-                      )
-                    }
-                    onSelecionarTodos={() =>
-                      setBeneficiariosSelecionados(beneficiariosFiltrados.filter((item) => item.selecionavel).map((item) => item.matriculaId))
-                    }
-                    onLimparSelecao={() => setBeneficiariosSelecionados([])}
-                    carregando={beneficiariosQuery.isLoading}
+                  {(() => {
+                    const beneficiarioAgenda = beneficiariosFiltrados.find((item) => beneficiariosSelecionados.includes(item.matriculaId) && item.beneficiarioId);
+                    return beneficiarioAgenda?.beneficiarioId ? (
+                      <Button type="button" variant="outline" onClick={() => navigate(`/atendimentos/prontuario?beneficiarioId=${beneficiarioAgenda.beneficiarioId}`)}>
+                        Abrir prontuário eletrônico
+                      </Button>
+                    ) : null;
+                  })()}
+                  {atendimentoPorHorario ? (
+                    <div className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
+                      <div>
+                        <p className="text-sm font-semibold text-emerald-900">Defina o horário de cada beneficiário</p>
+                        <p className="mt-1 text-xs text-emerald-800">
+                          Selecione diretamente o horário disponível. A ordem da lista não define o atendimento.
+                        </p>
+                      </div>
+                      {beneficiariosQuery.isLoading || agendamentosDisponibilidadeQuery.isLoading ? (
+                        <p className="rounded-lg bg-white px-3 py-4 text-sm text-[var(--g3-muted)]">Carregando beneficiários e horários...</p>
+                      ) : horariosDisponiveis.length ? (
+                        <div className="overflow-hidden rounded-lg border border-emerald-200 bg-white">
+                          <div className="grid grid-cols-[120px_minmax(0,1fr)] bg-emerald-100 px-3 py-2 text-xs font-semibold text-emerald-900">
+                            <span>Horário</span>
+                            <span>Beneficiário</span>
+                          </div>
+                          {horariosDisponiveis.map((horario) => (
+                            <div key={horario.horaInicial} className="grid items-center gap-3 border-t border-emerald-100 px-3 py-2 md:grid-cols-[120px_minmax(0,1fr)]">
+                              <span className="text-sm font-semibold text-[var(--g3-foreground)]">
+                                {horario.horaInicial} - {horario.horaFinal}
+                              </span>
+                              <select
+                                value={beneficiariosPorHorario[horario.horaInicial] ?? ""}
+                                onChange={(event) => {
+                                  const valor = Number(event.target.value);
+                                  setBeneficiariosPorHorario((atual) => {
+                                    const proximo = { ...atual };
+                                    if (valor) proximo[horario.horaInicial] = valor;
+                                    else delete proximo[horario.horaInicial];
+                                    return proximo;
+                                  });
+                                }}
+                                className="h-10 w-full rounded-md border border-[var(--g3-border)] bg-white px-3 text-sm text-[var(--g3-foreground)]"
+                              >
+                                <option value="">Horário disponível - selecionar beneficiário</option>
+                                {(beneficiariosQuery.data ?? []).filter((item) => item.selecionavel).map((beneficiario) => {
+                                  const usadoEmOutroHorario = Object.entries(beneficiariosPorHorario).some(
+                                    ([hora, matriculaId]) => hora !== horario.horaInicial && Number(matriculaId) === beneficiario.matriculaId
+                                  );
+                                  return (
+                                    <option key={beneficiario.matriculaId} value={beneficiario.matriculaId} disabled={usadoEmOutroHorario}>
+                                      {beneficiario.nomeCompleto}
+                                    </option>
+                                  );
+                                })}
+                              </select>
+                            </div>
+                          ))}
+                        </div>
+                      ) : horariosOcupados.size ? (
+                        <p className="rounded-lg bg-white px-3 py-4 text-sm text-amber-800">
+                          Não há horários disponíveis para este atendimento nesta data.
+                        </p>
+                      ) : (
+                        <p className="rounded-lg bg-white px-3 py-4 text-sm text-amber-800">
+                          Configure horário inicial, horário final e duração no cadastro deste atendimento.
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <BeneficiarioSelector
+                      busca={buscaBeneficiario}
+                      onBuscaChange={setBuscaBeneficiario}
+                      beneficiarios={beneficiariosFiltrados}
+                      selecionados={beneficiariosSelecionados}
+                      onToggle={(matriculaId) =>
+                        setBeneficiariosSelecionados((atual) =>
+                          atual.includes(matriculaId) ? atual.filter((item) => item !== matriculaId) : [...atual, matriculaId]
+                        )
+                      }
+                      onSelecionarTodos={() =>
+                        setBeneficiariosSelecionados(beneficiariosFiltrados.filter((item) => item.selecionavel).map((item) => item.matriculaId))
+                      }
+                      onLimparSelecao={() => setBeneficiariosSelecionados([])}
+                      carregando={beneficiariosQuery.isLoading}
+                    />
+                  )}
+                  <DataSelector
+                    value={dataAgendamento}
+                    onChange={(value) => {
+                      setDataAgendamento(value);
+                      setBeneficiariosPorHorario({});
+                    }}
                   />
-                  <DataSelector value={dataAgendamento} onChange={setDataAgendamento} />
                   <GenerateCardButton
-                    disabled={!tipo || !itemSelecionado?.id || !beneficiariosSelecionados.length || !dataAgendamento}
-                    loading={salvarMutation.isPending}
+                    disabled={!tipo || !itemSelecionado?.id || (atendimentoPorHorario ? !Object.keys(beneficiariosPorHorario).length : !beneficiariosSelecionados.length) || !dataAgendamento}
+                    loading={salvarMutation.isPending || geracaoEmAndamento}
                     onClick={salvarCard}
-                    texto={cardSelecionado?.id ? "Atualizar agenda" : "Gerar agenda"}
+                    texto={agendaEmEdicaoId ? "Atualizar agenda" : "Gerar agenda"}
                   />
+                  {geracaoEmAndamento ? (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-sm">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <LoaderCircle className="h-4 w-4 animate-spin text-emerald-700" />
+                          <p className="text-sm font-medium text-emerald-900">{ETAPAS_GERACAO_AGS[geracaoEtapa].texto}</p>
+                        </div>
+                        <span className="text-sm font-semibold text-emerald-800">{ETAPAS_GERACAO_AGS[geracaoEtapa].percentual}%</span>
+                      </div>
+                      <div className="mt-3 h-2 overflow-hidden rounded-full bg-emerald-100">
+                        <div
+                          className="h-full rounded-full bg-emerald-600 transition-all duration-300"
+                          style={{ width: `${ETAPAS_GERACAO_AGS[geracaoEtapa].percentual}%` }}
+                        />
+                      </div>
+                    </div>
+                  ) : null}
                 </CardContent>
               </Card>
 
@@ -1038,16 +1459,16 @@ export function AgendamentosPage() {
                       <p className="mt-1 text-base font-semibold text-emerald-950">{formatarDataExtensa(dataVisualizacao)}</p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <Button type="button" variant="outline" className="shadow-sm" onClick={() => setDataVisualizacao((atual) => somarDias(atual, -1))}>
+                      <Button type="button" variant="outline" className="shadow-sm" onClick={() => definirDataVisualizacao(somarDias(dataVisualizacao, -1))}>
                         <ChevronLeft className="h-4 w-4" />
                       </Button>
                       <input
                         type="date"
                         value={dataVisualizacao}
-                        onChange={(event) => setDataVisualizacao(event.target.value)}
+                        onChange={(event) => definirDataVisualizacao(event.target.value)}
                         className="h-10 rounded-xl border border-[var(--g3-border)] bg-white px-3 text-sm text-[var(--g3-foreground)] shadow-sm outline-none focus:border-emerald-400"
                       />
-                      <Button type="button" variant="outline" className="shadow-sm" onClick={() => setDataVisualizacao((atual) => somarDias(atual, 1))}>
+                      <Button type="button" variant="outline" className="shadow-sm" onClick={() => definirDataVisualizacao(somarDias(dataVisualizacao, 1))}>
                         <ChevronRight className="h-4 w-4" />
                       </Button>
                     </div>
@@ -1055,7 +1476,9 @@ export function AgendamentosPage() {
                   <AgendaCardList
                     cards={cardsDoDia}
                     selecionadoId={selecionadoId}
+                    destaqueRecenteId={ultimaAgendaDestacadaId}
                     envioEmAndamento={envioEmAndamento}
+                    confirmacaoEmAndamento={confirmacaoParticipanteEmAndamento}
                     onAlternarConfirmacao={(item, index) => void alternarConfirmacaoParticipante(item, index)}
                     onMoverParticipante={(item, index) => solicitarMoverParticipante(item, index)}
                     onExcluirParticipante={(item, index) => solicitarExcluirParticipante(item, index)}
@@ -1176,8 +1599,19 @@ export function AgendamentosPage() {
       />
 
       {agendaParaData ? (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/45 px-4" onClick={() => setAgendaParaData(null)}>
-          <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <div
+          className={`fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/45 px-4 ${agendaCopiando ? "cursor-wait" : "cursor-default"}`}
+          onClick={() => !agendaCopiando && setAgendaParaData(null)}
+        >
+          <div className="relative w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            {agendaCopiando ? (
+              <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-white/65 backdrop-blur-[1px]">
+                <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-800 shadow-sm">
+                  <LoaderCircle className="h-4 w-4 animate-spin" />
+                  Copiando agenda...
+                </div>
+              </div>
+            ) : null}
             <div className="border-b border-slate-100 px-5 py-4">
               <h3 className="text-base font-semibold text-emerald-800">
                 {agendaParaData.acao === "copiar" ? "Copiar agenda" : "Mover agenda"}
@@ -1197,11 +1631,18 @@ export function AgendamentosPage() {
               />
             </div>
             <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3">
-              <Button type="button" variant="outline" onClick={() => setAgendaParaData(null)}>
+              <Button type="button" variant="outline" onClick={() => setAgendaParaData(null)} disabled={agendaCopiando}>
                 Cancelar
               </Button>
-              <Button type="button" onClick={() => void confirmarAcaoComData()}>
-                Salvar data
+              <Button type="button" onClick={() => void confirmarAcaoComData()} disabled={agendaCopiando}>
+                {agendaCopiando ? (
+                  <>
+                    <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+                    Copiando...
+                  </>
+                ) : (
+                  "Salvar data"
+                )}
               </Button>
             </div>
           </div>
@@ -1215,13 +1656,46 @@ export function AgendamentosPage() {
               <h3 className="text-base font-semibold text-emerald-800">Mover beneficiário</h3>
             </div>
             <div className="space-y-4 px-5 py-4">
-              <p className="text-sm text-slate-700">Informe a nova data para transferir apenas este beneficiário.</p>
+              <p className="text-sm text-slate-700">Informe a data e, quando houver controle por horário, escolha também o novo horário.</p>
               <input
                 type="date"
                 value={novaDataAgenda}
                 onChange={(event) => setNovaDataAgenda(event.target.value)}
                 className="h-10 w-full rounded-xl border border-[var(--g3-border)] bg-white px-3 text-sm text-[var(--g3-foreground)] shadow-sm outline-none focus:border-emerald-400"
               />
+              {participanteParaMover.item.itemTipo === "atendimento" ? (() => {
+                const horarios = gerarHorariosDisponiveis({
+                  id: participanteParaMover.item.itemOrigemId ?? 0,
+                  nome: participanteParaMover.item.itemNome || participanteParaMover.item.tipoAtendimento,
+                  horario: participanteParaMover.item.horaInicial,
+                  horarioFinal: participanteParaMover.item.horaFinal,
+                  duracaoMinutos: participanteParaMover.item.duracaoMinutos,
+                  controleHorarioAtendimento: Boolean(participanteParaMover.item.horaFinal && participanteParaMover.item.duracaoMinutos)
+                });
+                const ocupados = new Set(
+                  (participanteParaMover.item.participantes ?? [])
+                    .filter((_, index) => index !== participanteParaMover.index)
+                    .map((item) => item.horario)
+                    .filter(Boolean)
+                );
+                return horarios.length ? (
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium text-slate-700" htmlFor="novo-horario-participante">Novo horário</label>
+                    <select
+                      id="novo-horario-participante"
+                      value={novoHorarioParticipante}
+                      onChange={(event) => setNovoHorarioParticipante(event.target.value)}
+                      className="h-10 w-full rounded-xl border border-[var(--g3-border)] bg-white px-3 text-sm text-[var(--g3-foreground)]"
+                    >
+                      {horarios.map((horario) => (
+                        <option key={horario.horaInicial} value={horario.horaInicial} disabled={ocupados.has(horario.horaInicial)}>
+                          {horario.horaInicial} - {horario.horaFinal}{ocupados.has(horario.horaInicial) ? " (ocupado)" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null;
+              })() : null}
             </div>
             <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3">
               <Button type="button" variant="outline" onClick={() => setParticipanteParaMover(null)}>

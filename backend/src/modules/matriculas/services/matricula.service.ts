@@ -1,4 +1,5 @@
 import { AppError } from "../../../shared/errors/app-error.js";
+import bcrypt from "bcryptjs";
 import { mapaCamposTextoMatricula } from "../../../utils/text-format-config.js";
 import { normalizarObjetoTexto } from "../../../utils/text-formatter.js";
 import { toIsoDate, toStringId } from "../../../utils/string-utils.js";
@@ -14,12 +15,15 @@ import {
   matriculaInputSchema,
   matriculaPresencaDataCreateSchema,
   matriculaPresencaDataUpdateSchema,
+  matriculaPresencaSenhaSchema,
   matriculaPresencaSalvarSchema
 } from "../matricula.schema.js";
 import { MatriculaRepository } from "../repositories/matricula.repository.js";
+import { AuthRepository } from "../../auth/repositories/auth.repository.js";
 
 export class MatriculaService {
   private readonly repository = new MatriculaRepository();
+  private readonly authRepository = new AuthRepository();
 
   async listar(rawFilters: unknown, rawTenantId?: string) {
     const filtersNormalizados =
@@ -207,10 +211,15 @@ export class MatriculaService {
     };
   }
 
-  async removerPresencaData(rawCursoId: string, rawPresencaDataId: string, rawTenantId?: string) {
+  async removerPresencaData(
+    rawCursoId: string,
+    rawPresencaDataId: string,
+    rawTenantId?: string,
+    rawUsuario?: { id?: string; nome?: string }
+  ) {
     const cursoId = this.parseId(rawCursoId);
     const presencaDataId = this.parseId(rawPresencaDataId);
-    await this.repository.removerPresencaData(cursoId, presencaDataId, this.parseTenant(rawTenantId));
+    await this.repository.removerPresencaData(cursoId, presencaDataId, this.parseTenant(rawTenantId), this.parseUsuario(rawUsuario));
   }
 
   async listarPresencasPorData(rawCursoId: string, rawPresencaDataId: string, rawTenantId?: string) {
@@ -224,16 +233,39 @@ export class MatriculaService {
         matricula_id: toStringId(item.matricula_id),
         beneficiario_nome: item.beneficiario_nome,
         cpf: item.cpf ?? undefined,
-        status: item.status === "PRESENTE" ? "PRESENTE" : "AUSENTE"
+        status: this.normalizarStatusPresenca(item.status),
+        observacao: item.observacao ?? undefined
       }))
     };
   }
 
-  async salvarPresencasPorData(rawCursoId: string, rawPresencaDataId: string, rawInput: unknown, rawTenantId?: string) {
+  async salvarPresencasPorData(
+    rawCursoId: string,
+    rawPresencaDataId: string,
+    rawInput: unknown,
+    rawTenantId?: string,
+    rawUsuario?: { id?: string; nome?: string }
+  ) {
     const cursoId = this.parseId(rawCursoId);
     const presencaDataId = this.parseId(rawPresencaDataId);
     const input = matriculaPresencaSalvarSchema.parse(rawInput);
-    const resultado = await this.repository.salvarPresencasPorData(cursoId, presencaDataId, input, this.parseTenant(rawTenantId));
+    const usuario = this.parseUsuario(rawUsuario);
+    if (input.senha_confirmacao) {
+      if (!usuario?.id) {
+        throw new AppError("Usuario autenticado invalido para confirmar a alteracao.", 401);
+      }
+      const usuarioAtual = await this.authRepository.buscarUsuarioPorId(usuario.id, this.parseTenant(rawTenantId));
+      if (!usuarioAtual?.senhaHash || !(await bcrypt.compare(input.senha_confirmacao, usuarioAtual.senhaHash))) {
+        throw new AppError("Senha invalida para alterar a presenca ou ausencia.", 401);
+      }
+    }
+    const resultado = await this.repository.salvarPresencasPorData(
+      cursoId,
+      presencaDataId,
+      input,
+      this.parseTenant(rawTenantId),
+      usuario
+    );
 
     return {
       data_aula: toIsoDate(resultado.data_aula) ?? "",
@@ -241,9 +273,29 @@ export class MatriculaService {
         matricula_id: toStringId(item.matricula_id),
         beneficiario_nome: item.beneficiario_nome,
         cpf: item.cpf ?? undefined,
-        status: item.status === "PRESENTE" ? "PRESENTE" : "AUSENTE"
+        status: this.normalizarStatusPresenca(item.status),
+        observacao: item.observacao ?? undefined
       }))
     };
+  }
+
+  async validarSenhaPresenca(
+    rawInput: unknown,
+    rawTenantId?: string,
+    rawUsuario?: { id?: string; nome?: string }
+  ) {
+    const input = matriculaPresencaSenhaSchema.parse(rawInput);
+    const usuario = this.parseUsuario(rawUsuario);
+    if (!usuario?.id) {
+      throw new AppError("Usuario autenticado invalido para confirmar a alteracao.", 401);
+    }
+
+    const usuarioAtual = await this.authRepository.buscarUsuarioPorId(usuario.id, this.parseTenant(rawTenantId));
+    if (!usuarioAtual?.senhaHash || !(await bcrypt.compare(input.senha, usuarioAtual.senhaHash))) {
+      throw new AppError("Senha invalida para alterar a presenca ou ausencia.", 401);
+    }
+
+    return { valido: true };
   }
 
   private parseId(rawId: string): bigint {
@@ -308,5 +360,26 @@ export class MatriculaService {
       throw new AppError("Tenant da sessao nao identificado.", 401);
     }
     return tenantId;
+  }
+
+  private parseUsuario(rawUsuario?: { id?: string; nome?: string }) {
+    if (!rawUsuario?.id) return undefined;
+    const id = Number(rawUsuario.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      return undefined;
+    }
+
+    return {
+      id: BigInt(id),
+      nome: rawUsuario.nome?.trim() || undefined
+    };
+  }
+
+  private normalizarStatusPresenca(status?: string | null) {
+    const valor = String(status ?? "").trim().toUpperCase();
+    if (valor === "PRESENTE" || valor === "AUSENTE" || valor === "JUSTIFICADO" || valor === "NAO_INFORMADO") {
+      return valor;
+    }
+    return "NAO_INFORMADO";
   }
 }

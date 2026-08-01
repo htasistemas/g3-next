@@ -119,6 +119,8 @@ export const matriculasRelacaoRequestSchema = z.object({
 export const matriculaListaPresencaRequestSchema = z.object({
   matriculaId: z.string().trim().min(1, "matriculaId e obrigatorio."),
   dataAula: optionalString,
+  periodoInicio: optionalString,
+  periodoFim: optionalString,
   exibirCpf: optionalBoolean,
   usuarioEmissor: optionalString
 });

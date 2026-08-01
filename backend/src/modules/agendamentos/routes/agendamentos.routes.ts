@@ -52,6 +52,11 @@ agendamentosRoutes.post(
   asyncHandler(controller.remarcar.bind(controller))
 );
 agendamentosRoutes.post(
+  "/:id/copiar",
+  ensurePermissions(permissoesEdicao),
+  asyncHandler(controller.copiar.bind(controller))
+);
+agendamentosRoutes.post(
   "/:id/confirmar",
   ensurePermissions(["ADMINISTRADOR", "OPERADOR", "AGENDAMENTOS_CONFIRMAR"]),
   asyncHandler(controller.confirmar.bind(controller))

@@ -29,5 +29,10 @@ export const prestacaoContasService = {
 
   async excluir(id: string) {
     await httpClient.delete(`${baseUrl}/${id}`);
+  },
+
+  async alterarWorkflow(id: string, acao: string) {
+    const { data } = await httpClient.post<{ transparencia: PrestacaoContas }>(`${baseUrl}/${id}/workflow`, { acao });
+    return data.transparencia;
   }
 };

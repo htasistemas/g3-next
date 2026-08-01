@@ -63,6 +63,12 @@ services:
       APP_STORAGE_FORCE_PATH_STYLE: ${APP_STORAGE_FORCE_PATH_STYLE:-true}
       APP_GOOGLE_CLIENT_ID: ${APP_GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      APP_GEMINI_API_KEY: ${APP_GEMINI_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GOOGLE_GEMINI_API_KEY: ${GOOGLE_GEMINI_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      IA_PROVIDER: ${IA_PROVIDER:-gemini}
+      IA_MODEL: ${IA_MODEL:-gemini-2.5-flash}
       APP_EMAIL_HABILITADO: ${APP_EMAIL_HABILITADO:-true}
       APP_EMAIL_REMETENTE: ${APP_EMAIL_REMETENTE:-htasistemas@gmail.com}
       APP_EMAIL_NOME: ${APP_EMAIL_NOME:-HTA Sistemas}
@@ -127,7 +133,7 @@ services:
       - ./frontend/public/maintenance.css:/usr/share/nginx/html/maintenance.css:ro
       - ./docker/runtime:/var/run/g3n
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz > /dev/null || exit 1"]
+      test: ["CMD-SHELL", "nginx -t >/dev/null 2>&1"]
       interval: 10s
       timeout: 5s
       retries: 6

@@ -37,7 +37,7 @@ model CadastroBeneficiario {
   nomeCompleto           String                  @map("nome_completo") @db.VarChar(200)
   nomeSocial             String?                 @map("nome_social") @db.VarChar(200)
   apelido                String?                 @db.VarChar(120)
-  dataNascimento         DateTime                @map("data_nascimento") @db.Date
+  dataNascimento         DateTime?               @map("data_nascimento") @db.Date
   foto3x4                String?                 @map("foto_3x4")
   sexoBiologico          String?                 @map("sexo_biologico") @db.VarChar(60)
   identidadeGenero       String?                 @map("identidade_genero") @db.VarChar(120)
@@ -46,7 +46,7 @@ model CadastroBeneficiario {
   nacionalidade          String?                 @db.VarChar(120)
   naturalidadeCidade     String?                 @map("naturalidade_cidade") @db.VarChar(150)
   naturalidadeUf         String?                 @map("naturalidade_uf") @db.VarChar(2)
-  nomeMae                String                  @map("nome_mae") @db.VarChar(200)
+  nomeMae                String?                 @map("nome_mae") @db.VarChar(200)
   nomePai                String?                 @map("nome_pai") @db.VarChar(200)
   status                 String?                 @db.VarChar(60)
   optaReceberCestaBasica Boolean?                @map("opta_receber_cesta_basica")
@@ -272,6 +272,7 @@ model UnidadeAssistencial {
   telefone             String?            @db.VarChar(30)
   horarioFuncionamento String?            @map("horario_funcionamento") @db.VarChar(120)
   observacoes          String?
+  tipoUnidade          String             @default("ASSISTENCIAL") @map("tipo_unidade") @db.VarChar(30)
   unidadePrincipal     Boolean            @default(false) @map("unidade_principal")
   enderecoId           BigInt?            @map("endereco_id")
   raioPontoMetros      Int                @default(100) @map("raio_ponto_metros")
@@ -289,6 +290,7 @@ model UnidadeAssistencial {
   salas                SalaUnidade[]
 
   @@map("unidade_assistencial")
+  @@index([tipoUnidade])
 }
 
 model ImagemUnidade {
@@ -319,12 +321,13 @@ model DiretoriaUnidade {
 }
 
 model SalaUnidade {
-  id          BigInt              @id @default(autoincrement())
-  unidadeId   BigInt              @map("unidade_id")
-  nome        String              @db.VarChar(120)
-  ativo       Boolean             @default(true)
-  criadoEm    DateTime            @default(now()) @map("criado_em")
-  atualizadoEm DateTime           @default(now()) @map("atualizado_em")
+  id               BigInt              @id @default(autoincrement())
+  unidadeId        BigInt              @map("unidade_id")
+  nome             String              @db.VarChar(120)
+  capacidadeMaxima Int                 @default(0) @map("capacidade_maxima")
+  ativo            Boolean             @default(true)
+  criadoEm         DateTime            @default(now()) @map("criado_em")
+  atualizadoEm     DateTime            @default(now()) @map("atualizado_em")
   unidade     UnidadeAssistencial @relation(fields: [unidadeId], references: [id], onDelete: Cascade)
 
   @@map("salas_unidade")

@@ -1,5 +1,6 @@
 import { httpClient } from "./http-client";
 import type { ArquivoMetadata } from "@/types/arquivo";
+import type { AxiosProgressEvent } from "axios";
 
 type ArquivoApiRow = {
   id: number;
@@ -49,6 +50,7 @@ export const arquivosService = {
     entidadeId: string | number;
     arquivo: File;
     observacao?: string;
+    onUploadProgress?: (progressEvent: AxiosProgressEvent) => void;
   }) {
     const formData = new FormData();
     formData.append("scope", input.scope);
@@ -66,7 +68,8 @@ export const arquivosService = {
         headers: {
           "Content-Type": "multipart/form-data"
         },
-        timeout: 300000
+        timeout: 300000,
+        onUploadProgress: input.onUploadProgress
       }
     );
 
@@ -142,6 +145,34 @@ export const arquivosService = {
       }
     );
 
+    return mapArquivo(data.arquivo);
+  },
+
+  async uploadParaDocumentoEducacional(documentoId: string | number, arquivo: File, observacao?: string) {
+    const formData = new FormData();
+    formData.append("scope", "educacional_documento");
+    formData.append("entidadeTipo", "educacional_documento");
+    formData.append("entidadeId", String(documentoId));
+    if (observacao?.trim()) formData.append("observacao", observacao.trim());
+    formData.append("arquivo", arquivo);
+    const { data } = await httpClient.post<{ arquivo: ArquivoApiRow }>("/api/arquivos/upload", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      timeout: 300000
+    });
+    return mapArquivo(data.arquivo);
+  },
+
+  async uploadParaPrestacaoContas(prestacaoId: string | number, arquivo: File, observacao?: string) {
+    const formData = new FormData();
+    formData.append("scope", "prestacao_contas_documento");
+    formData.append("entidadeTipo", "prestacao_contas");
+    formData.append("entidadeId", String(prestacaoId));
+    if (observacao?.trim()) formData.append("observacao", observacao.trim());
+    formData.append("arquivo", arquivo);
+    const { data } = await httpClient.post<{ arquivo: ArquivoApiRow }>("/api/arquivos/upload", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      timeout: 300000
+    });
     return mapArquivo(data.arquivo);
   },
 

@@ -12,6 +12,8 @@ export type PaletaTema = {
   border: string;
   muted: string;
   card: string;
+  dashboard_card: string;
+  dashboard_card_soft: string;
   danger: string;
   warning: string;
   success: string;

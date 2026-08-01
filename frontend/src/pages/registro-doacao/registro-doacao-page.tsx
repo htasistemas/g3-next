@@ -98,6 +98,11 @@ type PopupMensagemState = {
   texto: string;
 };
 
+type DoadorPadrao = Doador & {
+  resumo: string;
+  site?: string;
+};
+
 const secaoTela = "Contabilidade e finanças";
 const tituloTela = "Receber doações";
 
@@ -117,6 +122,58 @@ const tipoDoacaoDestinoMap: Record<string, string> = {
 const tiposComFormaRecebimento = new Set([
   "Doação financeira"
 ]);
+
+const doadoresPadrao: DoadorPadrao[] = [
+  {
+    nome: "Sesc Mesa Brasil",
+    tipo_pessoa: "JURIDICA",
+    telefone: "(11) 2607-8850",
+    email: "mesabrasil@sescsp.org.br",
+    logradouro: "Rua Dr. Plínio Barreto, 285",
+    bairro: "Bela Vista",
+    cidade: "São Paulo",
+    uf: "SP",
+    resumo:
+      "Rede privada de bancos de alimentos da América Latina, com foco em recebimento e redistribuição de alimentos para entidades sociais.",
+    site: "https://www.sesc.com.br/atuacoes/assistencia/sesc-mesa-brasil/"
+  },
+  {
+    nome: "Caixa Econômica Federal",
+    tipo_pessoa: "JURIDICA",
+    telefone: "(61) 4004-0104",
+    email: "fsa@caixa.gov.br",
+    logradouro: "SBS Quadra 4, Lote 3/4",
+    bairro: "Asa Sul",
+    cidade: "Brasília",
+    uf: "DF",
+    cep: "70070-140",
+    resumo:
+      "Atua com o Fundo Socioambiental CAIXA e iniciativas sociais, incluindo apoio a organizações sociais com doação de mobiliário e bens de apoio.",
+    site: "https://www.caixa.gov.br/sustentabilidade/fundo-socioambiental-caixa/Paginas/default.aspx"
+  },
+  {
+    nome: "Receita Federal",
+    tipo_pessoa: "JURIDICA",
+    cidade: "Brasília",
+    uf: "DF",
+    resumo:
+      "As doações de mercadorias apreendidas são solicitadas por Requerimentos Web no e-CAC, com identificação, contato e finalidade informados no pedido.",
+    site: "https://www.gov.br/receitafederal/pt-br/assuntos/leilao/pdm/doacoes"
+  },
+  {
+    nome: "Cacau Show",
+    tipo_pessoa: "JURIDICA",
+    telefone: "0800 11 9263",
+    logradouro: "Avenida Hélio Ossamu Daikuara, 1445",
+    bairro: "Jardim Vista Alegre",
+    cidade: "Embu das Artes",
+    uf: "SP",
+    cep: "06807-000",
+    resumo:
+      "Apoia ações sociais e campanhas de Páscoa solidária, com canal institucional e endereço oficial divulgados pela própria marca.",
+    site: "https://sustentabilidade.cacaushow.com.br/social/"
+  }
+];
 
 const labelsCamposRegistroDoacao: Partial<Record<keyof RegistroDoacaoFormValues, string>> = {
   doador_id: "Doador",
@@ -240,6 +297,7 @@ export function RegistroDoacaoPage() {
   const [termoDoador, setTermoDoador] = useState("");
   const [doadorForm, setDoadorForm] = useState<Doador>({ nome: "", tipo_pessoa: "FISICA" });
   const [doadorSelecionado, setDoadorSelecionado] = useState<Doador | null>(null);
+  const [instituicaoPadraoExpandida, setInstituicaoPadraoExpandida] = useState<string | null>(null);
   const [canalGestao, setCanalGestao] = useState("WhatsApp");
   const [mensagemGestao, setMensagemGestao] = useState("");
   const [formaRecebimentoOptions, setFormaRecebimentoOptions] = useState<string[]>(
@@ -437,6 +495,26 @@ export function RegistroDoacaoPage() {
     setDoadorSelecionado(null);
     setTermoDoador("");
     setValue("doador_id", "", { shouldDirty: true, shouldValidate: true });
+  }
+
+  function preencherDoadorPadrao(doador: DoadorPadrao) {
+    setDoadorForm({
+      nome: doador.nome,
+      tipo_pessoa: doador.tipo_pessoa ?? "JURIDICA",
+      telefone: doador.telefone,
+      email: doador.email,
+      logradouro: doador.logradouro,
+      bairro: doador.bairro,
+      cidade: doador.cidade,
+      uf: doador.uf,
+      cep: doador.cep,
+      observacoes: doador.resumo,
+      responsavel_empresa: doador.responsavel_empresa
+    });
+    setDoadorSelecionado(null);
+    setTermoDoador(doador.nome);
+    setValue("doador_id", "", { shouldDirty: true, shouldValidate: true });
+    setAbaAtiva("doador");
   }
 
   function aplicarFormatacaoDoadorCampo(campo: keyof Doador) {
@@ -954,6 +1032,67 @@ export function RegistroDoacaoPage() {
 
               {abaAtiva === "doador" && (
                 <div className="space-y-3">
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="space-y-1">
+                        <Label className="text-sm font-semibold">Instituições padrão</Label>
+                        <p className="text-xs text-[var(--g3-muted)]">
+                          Clique no nome da instituição para expandir os dados e, se quiser, use o modelo em um clique.
+                        </p>
+                      </div>
+                      <span className="rounded-full border border-[var(--g3-border)] px-2 py-1 text-xs text-[var(--g3-muted)]">
+                        4 modelos prontos
+                      </span>
+                    </div>
+                    <div className="mt-3 grid gap-3 xl:grid-cols-2">
+                      {doadoresPadrao.map((doador) => (
+                        <div key={doador.nome} className="flex h-full flex-col justify-between rounded-lg border border-emerald-200 bg-emerald-100/70 p-3 shadow-sm">
+                          <div className="space-y-2">
+                            <button
+                              type="button"
+                              className="flex w-full items-center justify-between gap-2 rounded-md px-1 py-1 text-left"
+                              onClick={() =>
+                                setInstituicaoPadraoExpandida((atual) =>
+                                  atual === doador.nome ? null : doador.nome
+                                )
+                              }
+                              aria-expanded={instituicaoPadraoExpandida === doador.nome}
+                            >
+                              <span className="text-sm font-semibold text-[var(--g3-text)]">{doador.nome}</span>
+                              <span className="text-xs text-[var(--g3-muted)]">
+                                {instituicaoPadraoExpandida === doador.nome ? "Recolher" : "Expandir"}
+                              </span>
+                            </button>
+                            {instituicaoPadraoExpandida === doador.nome ? (
+                              <div className="space-y-2 border-t border-emerald-200 pt-2">
+                                <p className="text-xs text-[var(--g3-muted)]">
+                                  {doador.cidade ? `${doador.cidade}${doador.uf ? ` / ${doador.uf}` : ""}` : "Cidade não informada"}
+                                </p>
+                                <p className="text-xs leading-5 text-[var(--g3-muted)]">{doador.resumo}</p>
+                                <div className="grid gap-1 text-xs text-[var(--g3-text)]">
+                                  {doador.telefone ? <span><strong>Telefone:</strong> {doador.telefone}</span> : null}
+                                  {doador.email ? <span><strong>E-mail:</strong> {doador.email}</span> : null}
+                                  {doador.logradouro ? (
+                                    <span>
+                                      <strong>Endereço:</strong>{" "}
+                                      {[doador.logradouro, doador.bairro, doador.cidade, doador.uf, doador.cep]
+                                        .filter(Boolean)
+                                        .join(" - ")}
+                                    </span>
+                                  ) : null}
+                                  {doador.site ? <span><strong>Site:</strong> {doador.site}</span> : null}
+                                </div>
+                                <Button type="button" variant="outline" size="sm" onClick={() => preencherDoadorPadrao(doador)}>
+                                  Usar modelo
+                                </Button>
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                     <div className="space-y-1 xl:col-span-2"><Label>Nome *</Label><Input value={doadorForm.nome ?? ""} onChange={(e) => setDoadorForm((a) => ({ ...a, nome: e.target.value }))} onBlur={() => aplicarFormatacaoDoadorCampo("nome")} /></div>
                     <div className="space-y-1"><Label>Tipo de pessoa</Label><Select value={doadorForm.tipo_pessoa ?? "FISICA"} onChange={(e) => setDoadorForm((a) => ({ ...a, tipo_pessoa: e.target.value }))}><option value="FISICA">Física</option><option value="JURIDICA">Jurídica</option></Select></div>

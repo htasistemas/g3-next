@@ -66,12 +66,20 @@ export class DocumentosInstituicaoController {
   }
 
   async obterArquivoAnexo(request: AuthenticatedRequest, response: Response) {
-    const arquivo = await service.obterArquivoAnexo(
+    const conteudo = await service.obterArquivoAnexo(
       request.params.id,
       request.params.anexoId,
       request.authUser?.tenant_id
     );
-    return response.json({ arquivo });
+
+    response.setHeader("Content-Type", conteudo.mimeType);
+    response.setHeader("Cache-Control", "private, max-age=3600");
+    response.setHeader(
+      "Content-Disposition",
+      `inline; filename="${encodeURIComponent(conteudo.nomeArquivo)}"`
+    );
+
+    return conteudo.stream.pipe(response);
   }
 
   async listarHistorico(request: AuthenticatedRequest, response: Response) {

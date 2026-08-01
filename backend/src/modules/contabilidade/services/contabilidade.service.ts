@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { AppError } from "../../../shared/errors/app-error.js";
 import { mapaCamposTextoContabilidade } from "../../../utils/text-format-config.js";
@@ -34,6 +35,52 @@ import {
 } from "../contabilidade.schema.js";
 import type { ContabilidadeAtor } from "../contabilidade.types.js";
 import { ContabilidadeRepository } from "../repositories/contabilidade.repository.js";
+
+function tratarErroPersistenciaLancamentoFinanceiro(error: unknown, acao: string): never {
+  if (error instanceof AppError) {
+    throw error;
+  }
+
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    const rawCode = typeof error.meta?.code === "string" ? error.meta.code : undefined;
+    const contexto = `${error.message} ${typeof error.meta?.message === "string" ? error.meta.message : ""}`.toLowerCase();
+
+    if (error.code === "P2002" || (error.code === "P2010" && rawCode === "23505")) {
+      if (contexto.includes("compra_id")) {
+        throw new AppError("Já existe um lançamento financeiro vinculado a esta compra.", 409);
+      }
+
+      throw new AppError("Já existe um lançamento com dados que exigem valor único.", 409);
+    }
+
+    if (error.code === "P2003" || (error.code === "P2010" && rawCode === "23503")) {
+      throw new AppError(
+        "Uma das referências informadas não existe ou não pertence à instituição autenticada.",
+        400
+      );
+    }
+
+    if (error.code === "P2025") {
+      throw new AppError("Lançamento financeiro não encontrado.", 404);
+    }
+
+    if (
+      error.code === "P2000" ||
+      (error.code === "P2010" && ["22001", "22003", "22007", "22P02"].includes(rawCode ?? ""))
+    ) {
+      throw new AppError(
+        "Um dos campos do lançamento possui valor inválido ou excede o limite permitido.",
+        400
+      );
+    }
+  }
+
+  if (error instanceof Error && error.message.trim()) {
+    throw new AppError(`Não foi possível ${acao}. ${error.message.trim()}`, 500);
+  }
+
+  throw new AppError(`Não foi possível ${acao}.`, 500);
+}
 
 export class ContabilidadeService {
   private readonly repository = new ContabilidadeRepository();
@@ -115,15 +162,23 @@ export class ContabilidadeService {
 
   async criarLancamento(rawInput: unknown, ator?: ContabilidadeAtor) {
     const input = lancamentoFinanceiroInputSchema.parse(this.normalizarPayload(rawInput));
-    const row = await this.repository.criarLancamento(input, ator);
-    return mapLancamentoToResponse(row);
+    try {
+      const row = await this.repository.criarLancamento(input, ator);
+      return mapLancamentoToResponse(row);
+    } catch (error) {
+      tratarErroPersistenciaLancamentoFinanceiro(error, "salvar o lançamento financeiro");
+    }
   }
 
   async atualizarLancamento(rawId: string, rawInput: unknown, ator?: ContabilidadeAtor) {
     const id = this.parseId(rawId);
     const input = lancamentoFinanceiroInputSchema.parse(this.normalizarPayload(rawInput));
-    const row = await this.repository.atualizarLancamento(id, input, ator);
-    return mapLancamentoToResponse(row);
+    try {
+      const row = await this.repository.atualizarLancamento(id, input, ator);
+      return mapLancamentoToResponse(row);
+    } catch (error) {
+      tratarErroPersistenciaLancamentoFinanceiro(error, "atualizar o lançamento financeiro");
+    }
   }
 
   async atualizarSituacaoLancamento(rawId: string, rawInput: unknown, ator?: ContabilidadeAtor) {

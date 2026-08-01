@@ -11,6 +11,7 @@ import {
   FileText,
   Flag,
   Goal,
+  ExternalLink,
   List,
   Plus,
   Printer,
@@ -26,6 +27,7 @@ import {
   XCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CadastroSucessoModal } from "@/components/admin/cadastro-sucesso-modal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -41,7 +43,9 @@ import {
   type PopupMensagemState
 } from "@/components/admin/admin-popups";
 import { arquivosService } from "@/services/arquivos.service";
-import { resolverUrlArquivo } from "@/lib/arquivos";
+import { obterUrlArquivoAutenticado, resolverUrlArquivo } from "@/lib/arquivos";
+import { useAuth } from "@/hooks/use-auth";
+import { useContasBancarias } from "@/features/contabilidade/use-contabilidade";
 import { useExcluirPlanoTrabalho, usePlanosTrabalho, useSalvarPlanoTrabalho } from "@/features/planos-trabalho/use-planos-trabalho";
 import {
   calcularValorTotalAplicacao,
@@ -65,14 +69,16 @@ import {
   planoVazio,
   somarAplicacaoRecursos,
   somarDesembolso,
-  validarPlano
+  validarPlano,
+  validarPlanoParaImpressao
 } from "@/features/planos-trabalho/plano-trabalho-utils";
+import { gerarHtmlPlanoTrabalho } from "@/features/planos-trabalho/plano-trabalho-report";
+import { useUnidadeAssistencialAtual, useUnidadesAssistenciais } from "@/features/unidades-assistenciais/use-unidades-assistenciais";
 import { useTermosFomento } from "@/features/termos-fomento/use-termos-fomento";
 import type { ArquivoMetadata } from "@/types/arquivo";
 import type {
   PlanoAplicacaoRecurso,
   PlanoChecklistPrestacao,
-  PlanoCronogramaExecucaoItem,
   PlanoDesembolso,
   PlanoMeta,
   PlanoMetaEtapa,
@@ -81,6 +87,9 @@ import type {
   PlanoTrabalho,
   PlanoTrabalhoPayload
 } from "@/types/plano-trabalho";
+import type { ContaBancaria } from "@/types/contabilidade";
+import type { UnidadeAssistencial } from "@/types/unidade-assistencial";
+import { AiFieldSuggestionButton } from "@/modules/ai/components/ai-field-suggestion-button";
 
 type AbaId =
   | "listagem"
@@ -138,6 +147,25 @@ const tiposParceria = [
   "Emenda",
   "Recurso Próprio",
   "Outro"
+];
+
+const orgaosConcedentesPrincipais = [
+  "Prefeitura Municipal",
+  "Secretaria Municipal de Assistência Social",
+  "Secretaria Municipal de Saúde",
+  "Secretaria Municipal de Educação",
+  "Fundo Municipal de Assistência Social",
+  "Governo do Estado",
+  "Secretaria Estadual de Assistência Social",
+  "Secretaria Estadual de Saúde",
+  "Secretaria Estadual de Educação",
+  "Fundo Estadual de Assistência Social",
+  "Governo Federal",
+  "Ministério do Desenvolvimento e Assistência Social, Família e Combate à Fome",
+  "Ministério da Saúde",
+  "Ministério da Educação",
+  "Fundo Nacional de Assistência Social",
+  "Caixa Econômica Federal"
 ];
 
 const areasAtuacao = [
@@ -226,212 +254,85 @@ function calcularProgressoSecao(form: PlanoTrabalhoPayload) {
   };
 }
 
-function primeiraMensagemErro(erros: Record<string, string>) {
-  return Object.values(erros)[0] ?? "Existem pendências no plano.";
+function normalizarPlanoCarregado(plano: PlanoTrabalhoPayload): PlanoTrabalhoPayload {
+  const base = planoVazio();
+  return {
+    ...base,
+    ...clonarPlano(plano),
+    titulo: plano.titulo ?? "",
+    tipoParceria: plano.tipoParceria ?? base.tipoParceria,
+    orgaoParceiro: plano.orgaoParceiro ?? "",
+    periodoInicio: plano.periodoInicio ?? "",
+    periodoFim: plano.periodoFim ?? "",
+    status: plano.status ?? base.status,
+    responsavelTecnico: plano.responsavelTecnico ?? "",
+    responsavelLegal: plano.responsavelLegal ?? "",
+    razaoSocial: plano.razaoSocial ?? "",
+    cnpj: plano.cnpj ?? "",
+    representanteLegal: plano.representanteLegal ?? "",
+    representanteCpf: plano.representanteCpf ?? "",
+    descricaoObjeto: plano.descricaoObjeto ?? "",
+    areaAtuacao: plano.areaAtuacao ?? "",
+    localExecucao: plano.localExecucao ?? "",
+    publicoAlvo: plano.publicoAlvo ?? "",
+    objetivoGeral: plano.objetivoGeral ?? "",
+    objetivosEspecificos: (plano.objetivosEspecificos ?? []).map((objetivo) => ({
+      ...objetivo,
+      descricao: objetivo.descricao ?? "",
+      metasVinculadas: objetivo.metasVinculadas ?? []
+    })),
+    metas: (plano.metas ?? []).map((meta) => ({
+      ...novaMeta(),
+      ...meta,
+      numeroMeta: meta.numeroMeta ?? "",
+      descricao: meta.descricao ?? "",
+      etapas: (meta.etapas ?? []).map((etapa) => ({ ...novaEtapaMeta(), ...etapa, nome: etapa.nome ?? "" }))
+    })),
+    aplicacaoRecursos: plano.aplicacaoRecursos ?? [],
+    desembolso: plano.desembolso ?? [],
+    instrumentosMonitoramento: plano.instrumentosMonitoramento ?? [],
+    checklistPrestacao: plano.checklistPrestacao ?? []
+  };
 }
 
-function construirHtmlRelatorio(
-  plano: PlanoTrabalhoPayload,
-  cronograma: PlanoCronogramaExecucaoItem[],
-  anexos: ArquivoMetadata[]
-) {
-  const linhasMetas = (plano.metas ?? [])
-    .map(
-      (meta) => `
-        <tr>
-          <td>${meta.numeroMeta || "-"}</td>
-          <td>${meta.descricao || "-"}</td>
-          <td>${meta.indicadorResultado || "-"}</td>
-          <td>${meta.unidadeMedida || "-"}</td>
-          <td>${meta.quantidadePrevista ?? "-"}</td>
-          <td>${meta.meioVerificacao || "-"}</td>
-          <td>${formatarDataPtBr(meta.dataInicio)}</td>
-          <td>${formatarDataPtBr(meta.dataFim)}</td>
-        </tr>`
-    )
-    .join("");
+function classeCorSituacaoPlano(status: string) {
+  switch (status) {
+    case "EM_ANALISE":
+      return "bg-yellow-50";
+    case "APROVADO":
+      return "bg-green-50";
+    case "REPROVADO":
+      return "bg-red-50";
+    case "CONCLUIDO":
+      return "bg-blue-50";
+    case "EM_EXECUCAO":
+      return "bg-gray-100";
+    case "RASCUNHO":
+    default:
+      return "bg-white";
+  }
+}
 
-  const linhasEtapas = (plano.metas ?? [])
-    .flatMap((meta) =>
-      (meta.etapas ?? []).map(
-        (etapa) => `
-        <tr>
-          <td>${meta.numeroMeta || "-"}</td>
-          <td>${etapa.nome || "-"}</td>
-          <td>${etapa.acaoExecutar || etapa.descricaoDetalhada || "-"}</td>
-          <td>${etapa.unidade || "-"}</td>
-          <td>${etapa.quantidade ?? "-"}</td>
-          <td>${formatarMoeda(etapa.valorEstimado ?? 0)}</td>
-          <td>${formatarDataPtBr(etapa.dataInicio)}</td>
-          <td>${formatarDataPtBr(etapa.dataFim)}</td>
-        </tr>`
-      )
-    )
-    .join("");
+function corFundoSituacaoPlano(status: string) {
+  switch (status) {
+    case "EM_ANALISE":
+      return "#FEF9C3";
+    case "APROVADO":
+      return "#DCFCE7";
+    case "REPROVADO":
+      return "#FEE2E2";
+    case "CONCLUIDO":
+      return "#DBEAFE";
+    case "EM_EXECUCAO":
+      return "#F3F4F6";
+    case "RASCUNHO":
+    default:
+      return "#FFFFFF";
+  }
+}
 
-  const linhasCronograma = cronograma
-    .map(
-      (item) => `
-        <tr>
-          <td>${item.metaNumero || "-"}</td>
-          <td>${item.etapaNome || "-"}</td>
-          <td>${item.especificacao || "-"}</td>
-          <td>${item.unidade || "-"}</td>
-          <td>${item.quantidade ?? "-"}</td>
-          <td>${formatarDataPtBr(item.inicio)}</td>
-          <td>${formatarDataPtBr(item.termino)}</td>
-          <td>${item.responsavel || "-"}</td>
-          <td>${item.status || "-"}</td>
-        </tr>`
-    )
-    .join("");
-
-  const linhasAplicacao = (plano.aplicacaoRecursos ?? [])
-    .map(
-      (item) => `
-        <tr>
-          <td>${item.categoriaDespesa || "-"}</td>
-          <td>${item.item || "-"}</td>
-          <td>${item.descricao || "-"}</td>
-          <td>${item.quantidade ?? "-"}</td>
-          <td>${item.unidade || "-"}</td>
-          <td>${formatarMoeda(item.valorUnitario ?? 0)}</td>
-          <td>${formatarMoeda(calcularValorTotalAplicacao(item))}</td>
-          <td>${item.fonteRecurso || "-"}</td>
-        </tr>`
-    )
-    .join("");
-
-  const linhasDesembolso = (plano.desembolso ?? [])
-    .map(
-      (item) => `
-        <tr>
-          <td>${item.mesAno || "-"}</td>
-          <td>${formatarMoeda(item.valorPrevisto ?? 0)}</td>
-          <td>${item.fonteRecurso || "-"}</td>
-          <td>${item.metaNumero || "-"}</td>
-          <td>${item.observacao || "-"}</td>
-        </tr>`
-    )
-    .join("");
-
-  const listaObjetivos = (plano.objetivosEspecificos ?? [])
-    .map((item) => `<li><strong>${item.descricao}</strong><br/>${item.resultadoEsperado || "-"}</li>`)
-    .join("");
-
-  const listaAnexos = anexos.map((item) => `<li>${item.nomeOriginal}</li>`).join("");
-
-  return `<!doctype html>
-  <html lang="pt-BR">
-    <head>
-      <meta charset="utf-8" />
-      <title>Plano de trabalho</title>
-      <style>
-        * { box-sizing: border-box; }
-        body { font-family: Arial, sans-serif; color: #1f2937; margin: 0; padding: 28px; }
-        .page { max-width: 794px; margin: 0 auto; }
-        .topo { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #0f766e; padding-bottom: 16px; }
-        .logo { width: 120px; height: 72px; border: 1px dashed #94a3b8; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #64748b; }
-        h1 { margin: 0; font-size: 26px; }
-        h2 { font-size: 16px; margin: 24px 0 10px; padding: 6px 0; border-top: 1px solid #cbd5e1; border-bottom: 1px solid #cbd5e1; }
-        p, li { font-size: 12px; line-height: 1.55; }
-        .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-        .box { border: 1px solid #cbd5e1; padding: 10px; border-radius: 6px; background: #f8fafc; }
-        .label { display: block; font-size: 10px; text-transform: uppercase; color: #64748b; margin-bottom: 4px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { border: 1px solid #cbd5e1; padding: 6px 8px; font-size: 11px; vertical-align: top; }
-        th { background: #e2f4f2; text-align: left; }
-        ul { margin: 8px 0 0 18px; padding: 0; }
-        .rodape { margin-top: 24px; font-size: 11px; color: #475569; border-top: 2px solid #0f766e; padding-top: 10px; }
-      </style>
-    </head>
-    <body>
-      <div class="page">
-        <div class="topo">
-          <div>
-            <p style="margin:0; color:#0f766e; font-weight:700;">${plano.razaoSocial || "Instituição"}</p>
-            <p style="margin:4px 0 0;">CNPJ ${formatarCnpj(plano.cnpj)}</p>
-          </div>
-          <div class="logo">Logomarca da instituição</div>
-        </div>
-        <h1 style="text-align:center; margin:18px 0 6px;">Plano de trabalho</h1>
-        <div style="height:1px; background:#cbd5e1; margin-bottom:18px;"></div>
-
-        <div class="grid">
-          <div class="box"><span class="label">Título</span>${plano.titulo || "-"}</div>
-          <div class="box"><span class="label">Tipo</span>${plano.tipoParceria || "-"}</div>
-          <div class="box"><span class="label">Órgão parceiro</span>${plano.orgaoParceiro || "-"}</div>
-          <div class="box"><span class="label">Período</span>${formatarDataPtBr(plano.periodoInicio)} a ${formatarDataPtBr(plano.periodoFim)}</div>
-        </div>
-
-        <h2>Dados da instituição</h2>
-        <div class="grid">
-          <div class="box"><span class="label">Razão social</span>${plano.razaoSocial || "-"}</div>
-          <div class="box"><span class="label">Nome fantasia</span>${plano.nomeFantasia || "-"}</div>
-          <div class="box"><span class="label">Representante legal</span>${plano.representanteLegal || "-"}</div>
-          <div class="box"><span class="label">CPF</span>${formatarCpf(plano.representanteCpf)}</div>
-        </div>
-
-        <h2>Apresentação e histórico</h2>
-        <p>${plano.historicoOsc || "-"}</p>
-        <p><strong>Finalidade institucional:</strong> ${plano.finalidadeInstitucional || "-"}</p>
-        <p><strong>Capacidade técnica e operacional:</strong> ${plano.capacidadeTecnicaOperacional || "-"}</p>
-
-        <h2>Objeto e justificativa</h2>
-        <p><strong>Objeto:</strong> ${plano.descricaoObjeto || "-"}</p>
-        <p><strong>Público-alvo:</strong> ${plano.publicoAlvo || "-"}</p>
-        <p><strong>Problema social:</strong> ${plano.problemaSocial || "-"}</p>
-        <p><strong>Dados e indicadores:</strong> ${plano.dadosIndicadores || "-"}</p>
-        <p><strong>Impacto esperado:</strong> ${plano.impactoEsperado || "-"}</p>
-
-        <h2>Objetivos</h2>
-        <p><strong>Objetivo geral:</strong> ${plano.objetivoGeral || "-"}</p>
-        <ul>${listaObjetivos || "<li>Nenhum objetivo específico cadastrado.</li>"}</ul>
-
-        <h2>Metas</h2>
-        <table>
-          <thead><tr><th>Meta</th><th>Descrição</th><th>Indicador</th><th>Unidade</th><th>Quantidade</th><th>Meio de verificação</th><th>Início</th><th>Fim</th></tr></thead>
-          <tbody>${linhasMetas || "<tr><td colspan='8'>Nenhuma meta cadastrada.</td></tr>"}</tbody>
-        </table>
-
-        <h2>Etapas e fases</h2>
-        <table>
-          <thead><tr><th>Meta</th><th>Etapa</th><th>Ação</th><th>Unidade</th><th>Quantidade</th><th>Valor</th><th>Início</th><th>Fim</th></tr></thead>
-          <tbody>${linhasEtapas || "<tr><td colspan='8'>Nenhuma etapa cadastrada.</td></tr>"}</tbody>
-        </table>
-
-        <h2>Cronograma de execução</h2>
-        <table>
-          <thead><tr><th>Meta</th><th>Etapa</th><th>Especificação</th><th>Unidade</th><th>Quantidade</th><th>Início</th><th>Término</th><th>Responsável</th><th>Status</th></tr></thead>
-          <tbody>${linhasCronograma || "<tr><td colspan='9'>Nenhum item gerado.</td></tr>"}</tbody>
-        </table>
-
-        <h2>Plano de aplicação dos recursos</h2>
-        <table>
-          <thead><tr><th>Categoria</th><th>Item</th><th>Descrição</th><th>Quantidade</th><th>Unidade</th><th>Valor unitário</th><th>Valor total</th><th>Fonte</th></tr></thead>
-          <tbody>${linhasAplicacao || "<tr><td colspan='8'>Nenhuma despesa cadastrada.</td></tr>"}</tbody>
-        </table>
-
-        <h2>Cronograma de desembolso</h2>
-        <table>
-          <thead><tr><th>Mês/ano</th><th>Valor previsto</th><th>Fonte</th><th>Meta</th><th>Observação</th></tr></thead>
-          <tbody>${linhasDesembolso || "<tr><td colspan='5'>Nenhum desembolso cadastrado.</td></tr>"}</tbody>
-        </table>
-
-        <h2>Monitoramento, prestação de contas e anexos</h2>
-        <p><strong>Forma de acompanhamento:</strong> ${plano.formaAcompanhamento || "-"}</p>
-        <p><strong>Periodicidade de monitoramento:</strong> ${plano.periodicidadeMonitoramento || "-"}</p>
-        <p><strong>Periodicidade da prestação de contas:</strong> ${plano.periodicidadePrestacao || "-"}</p>
-        <p><strong>Documentos exigidos:</strong> ${plano.documentosExigidos || "-"}</p>
-        <ul>${listaAnexos || "<li>Nenhum anexo registrado.</li>"}</ul>
-
-        <div class="rodape">
-          ${plano.razaoSocial || "-"} | CNPJ ${formatarCnpj(plano.cnpj)} | ${plano.logradouro || "-"}, ${plano.numero || "-"} - ${plano.bairro || "-"} - ${plano.cidade || "-"} | ${mascararTelefoneInput(plano.telefone || "") || "-"} | ${plano.email || "-"}
-        </div>
-      </div>
-      <script>window.onload = () => window.print();</script>
-    </body>
-  </html>`;
+function primeiraMensagemErro(erros: Record<string, string>) {
+  return Object.values(erros)[0] ?? "Existem pendências no plano.";
 }
 
 function BlocoAjuda({
@@ -472,6 +373,7 @@ function BadgePendencia({ texto }: { texto: string }) {
 }
 
 export function PlanoTrabalhoPage() {
+  const { usuario } = useAuth();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -483,6 +385,7 @@ export function PlanoTrabalhoPage() {
   const [form, setForm] = useState<PlanoTrabalhoPayload>(clonarPlano(planoVazio()));
   const [snapshot, setSnapshot] = useState<PlanoTrabalhoPayload>(clonarPlano(planoVazio()));
   const [popup, setPopup] = useState<PopupMensagemState | null>(null);
+  const [cadastroSucesso, setCadastroSucesso] = useState<string | null>(null);
   const [confirmarExclusao, setConfirmarExclusao] = useState(false);
   const [erros, setErros] = useState<Record<string, string>>({});
   const [arquivos, setArquivos] = useState<ArquivoMetadata[]>([]);
@@ -499,15 +402,111 @@ export function PlanoTrabalhoPage() {
   const termosQuery = useTermosFomento();
   const salvarMutation = useSalvarPlanoTrabalho();
   const excluirMutation = useExcluirPlanoTrabalho();
+  const unidadesAssistenciaisQuery = useUnidadesAssistenciais({});
+  const unidadeAtualQuery = useUnidadeAssistencialAtual();
+  const contasBancariasQuery = useContasBancarias();
 
   const planos = planosQuery.data ?? [];
   const termos = termosQuery.data ?? [];
+  const unidadesAssistenciais = useMemo(
+    () => unidadesAssistenciaisQuery.data?.unidades ?? [],
+    [unidadesAssistenciaisQuery.data]
+  );
+  const contasBancarias = contasBancariasQuery.data ?? [];
   const processando = salvarMutation.isPending || excluirMutation.isPending || uploading;
   const cronogramaExecucao = useMemo(() => gerarCronogramaExecucao(form), [form]);
+  const contextoApresentacaoIa = [
+    `Instituição: ${form.razaoSocial || form.nomeFantasia || "não informada"}.`,
+    `Área de atuação: ${form.areaAtuacao || "não informada"}.`,
+    `Objeto do plano: ${form.descricaoObjeto || "não informado"}.`,
+    `Público-alvo do plano: ${form.publicoAlvo || "não informado"}.`,
+    `Histórico atual: ${form.historicoOsc || "não informado"}.`,
+    `Finalidade institucional atual: ${form.finalidadeInstitucional || "não informada"}.`,
+    `Experiência anterior atual: ${form.experienciaAnterior || "não informada"}.`,
+    `Conselhos, certificações ou registros atuais: ${form.conselhosCertificacoes || "não informado"}.`,
+    `Público atendido atualmente: ${form.publicoAtendidoAtual || "não informado"}.`,
+    `Capacidade técnica e operacional atual: ${form.capacidadeTecnicaOperacional || "não informada"}.`
+  ].join(" ");
   const progresso = useMemo(() => calcularProgressoSecao(form), [form]);
   const totalAplicacao = useMemo(() => somarAplicacaoRecursos(form), [form]);
   const totalDesembolso = useMemo(() => somarDesembolso(form), [form]);
   const pendenciasEnvio = useMemo(() => validarPlano(form, "envio"), [form]);
+  const [unidadeAssistencialSelecionadaId, setUnidadeAssistencialSelecionadaId] = useState("");
+  const [contaBancariaSelecionadaId, setContaBancariaSelecionadaId] = useState("");
+  const [mostrarSugestoesOrgaos, setMostrarSugestoesOrgaos] = useState(false);
+
+  function obterRepresentanteDaUnidade(unidade: UnidadeAssistencial) {
+    const diretoria = unidade.diretoria ?? [];
+    const preferido = diretoria.find((item) =>
+      /presidente|representante|diretor|coordena|secret[aá]rio/i.test(item.funcao || "")
+    );
+    return preferido ?? diretoria[0] ?? null;
+  }
+
+  function preencherDadosDaUnidade(unidade: UnidadeAssistencial) {
+    const representante = obterRepresentanteDaUnidade(unidade);
+    setForm((atual) => ({
+      ...atual,
+      razaoSocial: unidade.razao_social?.trim() || unidade.nome_fantasia || atual.razaoSocial,
+      nomeFantasia: unidade.nome_fantasia || atual.nomeFantasia,
+      cnpj: unidade.cnpj?.trim() || atual.cnpj,
+      cep: unidade.cep?.trim() || atual.cep,
+      logradouro: unidade.logradouro?.trim() || atual.logradouro,
+      numero: unidade.numero?.trim() || atual.numero,
+      complemento: unidade.complemento?.trim() || atual.complemento,
+      bairro: unidade.bairro?.trim() || atual.bairro,
+      cidade: unidade.cidade?.trim() || atual.cidade,
+      uf: unidade.estado?.trim()?.toUpperCase() || atual.uf,
+      telefone: unidade.telefone?.replace(/\D/g, "") || atual.telefone,
+      email: unidade.email?.trim().toLowerCase() || atual.email,
+      representanteLegal: representante?.nome_completo?.trim() || atual.representanteLegal,
+      representanteCpf:
+        representante?.documento?.replace(/\D/g, "").length === 11
+          ? representante.documento.replace(/\D/g, "")
+          : atual.representanteCpf,
+      representanteCargo: representante?.funcao?.trim() || atual.representanteCargo
+    }));
+  }
+
+  function obterContaDescricao(conta: ContaBancaria) {
+    const partes = [conta.nomeConta, conta.banco, conta.agencia, conta.numero, conta.digito].filter(Boolean);
+    return partes.join(" - ");
+  }
+
+  function formatarOperacaoConta(conta: ContaBancaria) {
+    switch (conta.tipo) {
+      case "CONTA_CORRENTE":
+        return "Conta corrente";
+      case "POUPANCA":
+        return "Poupança";
+      case "APLICACAO":
+        return "Aplicação";
+      case "CAIXA_INTERNO":
+        return "Caixa interno";
+      default:
+        return "";
+    }
+  }
+
+  function preencherDadosBancarios(conta: ContaBancaria) {
+    const numeroConta = [conta.numero?.trim(), conta.digito?.trim()].filter(Boolean).join("-");
+    setForm((atual) => ({
+      ...atual,
+      bancoNome: conta.banco?.trim() || atual.bancoNome,
+      bancoAgencia: conta.agencia?.trim() || atual.bancoAgencia,
+      bancoConta: numeroConta || atual.bancoConta,
+      bancoOperacao: formatarOperacaoConta(conta) || atual.bancoOperacao,
+      bancoPix: conta.chavePix?.trim() || atual.bancoPix,
+      bancoObservacao: [
+        conta.nomeConta?.trim(),
+        conta.titular?.trim() ? `Titular: ${conta.titular.trim()}` : "",
+        conta.projetoVinculado?.trim() ? `Projeto: ${conta.projetoVinculado.trim()}` : "",
+        conta.observacao?.trim() ?? ""
+      ]
+        .filter(Boolean)
+        .join(" | ") || atual.bancoObservacao
+    }));
+  }
 
   useEffect(() => {
     if (!planoSelecionadoId) {
@@ -570,14 +569,37 @@ export function PlanoTrabalhoPage() {
     () => termos.find((item) => item.id === form.termoFomentoId) ?? null,
     [form.termoFomentoId, termos]
   );
+  const termosFomentoDisponiveis = useMemo(
+    () => (form.tipoParceria === "Termo de Fomento" ? termos : []),
+    [form.tipoParceria, termos]
+  );
+  const orgaosFiltrados = useMemo(() => {
+    const termo = form.orgaoParceiro.trim().toLocaleLowerCase("pt-BR");
+    return orgaosConcedentesPrincipais
+      .filter((orgao) => !termo || orgao.toLocaleLowerCase("pt-BR").includes(termo))
+      .slice(0, 8);
+  }, [form.orgaoParceiro]);
 
   function atualizarCampo<K extends keyof PlanoTrabalhoPayload>(campo: K, valor: PlanoTrabalhoPayload[K]) {
     setForm((atual) => ({ ...atual, [campo]: valor }));
   }
 
+  function vincularTermoFomento(termoId: string) {
+    const termo = termosFomentoDisponiveis.find((item) => item.id === termoId);
+    setForm((atual) => ({
+      ...atual,
+      termoFomentoId: termoId,
+      orgaoParceiro: termo?.orgaoConcedente?.trim() || atual.orgaoParceiro,
+      periodoInicio: termo?.dataInicioVigencia || atual.periodoInicio,
+      periodoFim: termo?.dataFimVigencia || atual.periodoFim
+    }));
+  }
+
   function novoPlano() {
     const vazio = clonarPlano(planoVazio());
     setPlanoSelecionadoId(undefined);
+    setUnidadeAssistencialSelecionadaId("");
+    setContaBancariaSelecionadaId("");
     setForm(vazio);
     setSnapshot(vazio);
     setErros({});
@@ -586,8 +608,10 @@ export function PlanoTrabalhoPage() {
   }
 
   function selecionarPlano(plano: PlanoTrabalho) {
-    const normalizado = clonarPlano(plano);
+    const normalizado = normalizarPlanoCarregado(plano);
     setPlanoSelecionadoId(plano.id);
+    setUnidadeAssistencialSelecionadaId("");
+    setContaBancariaSelecionadaId("");
     setForm(normalizado);
     setSnapshot(normalizado);
     setErros({});
@@ -597,6 +621,8 @@ export function PlanoTrabalhoPage() {
   function cancelarEdicao() {
     setForm(clonarPlano(snapshot));
     setErros({});
+    setUnidadeAssistencialSelecionadaId("");
+    setContaBancariaSelecionadaId("");
   }
 
   function limparFiltros() {
@@ -631,11 +657,11 @@ export function PlanoTrabalhoPage() {
           termoFomentoId: payload.termoFomentoId?.trim() ? payload.termoFomentoId : undefined
         }
       });
-      const normalizado = clonarPlano(salvo);
+      const normalizado = normalizarPlanoCarregado(salvo);
       setPlanoSelecionadoId(salvo.id);
       setForm(normalizado);
       setSnapshot(normalizado);
-      setPopup({ tipo: "sucesso", titulo: "Plano atualizado", texto: mensagemSucesso });
+      setCadastroSucesso(salvo.codigoInterno || salvo.id);
     } catch (error: any) {
       setPopup({
         tipo: "erro",
@@ -687,6 +713,40 @@ export function PlanoTrabalhoPage() {
     });
   }
 
+  function navegarParaPendencia(chave: string) {
+    const abaPorCampo: Record<string, AbaId> = {
+      titulo: "identificacao",
+      tipoParceria: "identificacao",
+      orgaoParceiro: "identificacao",
+      periodoInicio: "identificacao",
+      periodoFim: "identificacao",
+      responsavelTecnico: "identificacao",
+      responsavelLegal: "identificacao",
+      razaoSocial: "instituicao",
+      cnpj: "instituicao",
+      representanteLegal: "instituicao",
+      representanteCpf: "instituicao",
+      descricaoObjeto: "objeto",
+      areaAtuacao: "objeto",
+      localExecucao: "objeto",
+      publicoAlvo: "objeto",
+      problemaSocial: "justificativa",
+      objetivoGeral: "objetivos",
+      objetivosEspecificos: "objetivos",
+      metas: "metas",
+      metasIndicadores: "metas",
+      metasEtapas: "metas",
+      etapasResponsavel: "metas",
+      cronogramaExecucao: "cronograma",
+      aplicacaoRecursos: "aplicacao",
+      desembolso: "desembolso",
+      checklistPrestacao: "prestacao",
+      declaracaoVeracidade: "declaracao"
+    };
+
+    setAbaAtiva(abaPorCampo[chave] ?? "declaracao");
+  }
+
   function duplicarPlano() {
     const duplicado = clonarPlano(form);
     duplicado.id = undefined;
@@ -715,18 +775,65 @@ export function PlanoTrabalhoPage() {
     URL.revokeObjectURL(url);
   }
 
-  function imprimirOuPdf() {
-    const janela = window.open("", "_blank", "noopener,noreferrer,width=960,height=900");
-    if (!janela) {
+  async function imprimirOuPdf() {
+    const faltantes = validarPlanoParaImpressao(form);
+    if (Object.keys(faltantes).length) {
       setPopup({
         tipo: "aviso",
-        titulo: "Pop-up bloqueado",
-        texto: "Libere a abertura de janelas para gerar a versão de impressão/PDF."
+        titulo: "Plano incompleto",
+        texto: "Complete os campos obrigatórios antes de imprimir o plano de trabalho."
       });
       return;
     }
-    janela.document.write(construirHtmlRelatorio(form, cronogramaExecucao, arquivos));
-    janela.document.close();
+    let logomarcaUrl = "";
+    let revogarLogomarca: (() => void) | undefined;
+    const caminhoLogomarca =
+      unidadeAtualQuery.data?.unidade?.logomarca_relatorio ||
+      unidadeAtualQuery.data?.unidade?.logomarca ||
+      usuario?.instituicao_logo_url;
+    try {
+      const arquivoLogomarca = await obterUrlArquivoAutenticado(caminhoLogomarca, {
+        cache: false,
+        auditar: false
+      });
+      logomarcaUrl = arquivoLogomarca.url;
+      revogarLogomarca = arquivoLogomarca.revoke;
+    } catch {
+      logomarcaUrl = caminhoLogomarca ? resolverUrlArquivo(caminhoLogomarca) : "";
+    }
+
+    const iframe = document.createElement("iframe");
+    iframe.setAttribute("aria-hidden", "true");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    iframe.style.visibility = "hidden";
+    document.body.appendChild(iframe);
+
+    iframe.onload = () => {
+      window.setTimeout(() => {
+        const janela = iframe.contentWindow;
+        if (!janela) {
+          iframe.remove();
+          setPopup({
+            tipo: "erro",
+            titulo: "Erro ao imprimir",
+            texto: "Não foi possível preparar o relatório para impressão."
+          });
+          return;
+        }
+        janela.focus();
+        janela.print();
+        window.setTimeout(() => {
+          iframe.remove();
+          revogarLogomarca?.();
+        }, 1000);
+      }, 100);
+    };
+    iframe.srcdoc = gerarHtmlPlanoTrabalho(form, cronogramaExecucao, arquivos, logomarcaUrl);
   }
 
   async function anexarDocumento() {
@@ -911,13 +1018,25 @@ export function PlanoTrabalhoPage() {
   }
 
   function atualizarMeta(index: number, patch: Partial<PlanoMeta>) {
+    const metaAtual = form.metas[index];
+    const metaAtualizada = metaAtual ? { ...metaAtual, ...patch } : null;
     setForm((atual) => ({
       ...atual,
       metas: (atual.metas ?? []).map((item, idx) => (idx === index ? { ...item, ...patch } : item))
     }));
+    if (metaAtualizada && ("dataInicio" in patch || "dataFim" in patch)) {
+      validarPeriodoRegistro(
+        `meta_${index}_`,
+        metaAtualizada.dataInicio,
+        metaAtualizada.dataFim,
+        "A meta"
+      );
+    }
   }
 
   function atualizarEtapa(metaIndex: number, etapaIndex: number, patch: Partial<PlanoMetaEtapa>) {
+    const etapaAtual = form.metas[metaIndex]?.etapas?.[etapaIndex];
+    const etapaAtualizada = etapaAtual ? { ...etapaAtual, ...patch } : null;
     setForm((atual) => ({
       ...atual,
       metas: (atual.metas ?? []).map((meta, idx) =>
@@ -931,6 +1050,42 @@ export function PlanoTrabalhoPage() {
           : meta
       )
     }));
+    if (etapaAtualizada && ("dataInicio" in patch || "dataFim" in patch)) {
+      validarPeriodoRegistro(
+        `meta_${metaIndex}_etapa_${etapaIndex}_`,
+        etapaAtualizada.dataInicio,
+        etapaAtualizada.dataFim,
+        "A etapa"
+      );
+    }
+  }
+
+  function validarPeriodoRegistro(
+    chave: string,
+    dataInicio: string | null | undefined,
+    dataFim: string | null | undefined,
+    rotulo: string
+  ) {
+    setErros((atuais) => {
+      const novos = { ...atuais };
+      delete novos[`${chave}dataInicio`];
+      delete novos[`${chave}dataFim`];
+
+      if (form.periodoInicio && form.periodoFim && dataInicio) {
+        if (dataInicio < form.periodoInicio || dataInicio > form.periodoFim) {
+          novos[`${chave}dataInicio`] = `${rotulo} deve iniciar entre ${formatarDataPtBr(form.periodoInicio)} e ${formatarDataPtBr(form.periodoFim)}.`;
+        }
+      }
+      if (form.periodoInicio && form.periodoFim && dataFim) {
+        if (dataFim < form.periodoInicio || dataFim > form.periodoFim) {
+          novos[`${chave}dataFim`] = `${rotulo} deve terminar entre ${formatarDataPtBr(form.periodoInicio)} e ${formatarDataPtBr(form.periodoFim)}.`;
+        }
+      }
+      if (dataInicio && dataFim && dataFim < dataInicio) {
+        novos[`${chave}dataFim`] = `${rotulo} não pode terminar antes do início (${formatarDataPtBr(dataInicio)}).`;
+      }
+      return novos;
+    });
   }
 
   function atualizarAplicacao(index: number, patch: Partial<PlanoAplicacaoRecurso>) {
@@ -1020,14 +1175,14 @@ export function PlanoTrabalhoPage() {
       label: "Gerar PDF",
       icon: FileText,
       onClick: imprimirOuPdf,
-      variant: "outline"
+      variant: "outline" as const
     },
     {
       id: "imprimir",
       label: "Imprimir",
       icon: Printer,
       onClick: imprimirOuPdf,
-      variant: "outline"
+      variant: "outline" as const
     },
     {
       id: "exportar",
@@ -1070,18 +1225,18 @@ export function PlanoTrabalhoPage() {
 
   const acoesVisiveisPorAba: Partial<Record<AbaId, string[]>> = {
     listagem: ["Novo plano", "Duplicar plano", "Excluir", "Fechar"],
-    identificacao: ["Novo plano", "Salvar rascunho", "Duplicar plano", "Cancelar", "Fechar"],
-    instituicao: ["Salvar rascunho", "Cancelar", "Fechar"],
-    historico: ["Salvar rascunho", "Cancelar", "Fechar"],
-    objeto: ["Salvar rascunho", "Cancelar", "Fechar"],
-    justificativa: ["Salvar rascunho", "Cancelar", "Fechar"],
-    objetivos: ["Salvar rascunho", "Cancelar", "Fechar"],
-    metas: ["Salvar rascunho", "Cancelar", "Fechar"],
-    cronograma: ["Salvar rascunho", "Cancelar", "Fechar"],
-    aplicacao: ["Salvar rascunho", "Cancelar", "Fechar"],
-    desembolso: ["Salvar rascunho", "Cancelar", "Fechar"],
-    monitoramento: ["Salvar rascunho", "Cancelar", "Fechar"],
-    prestacao: ["Salvar rascunho", "Anexar documento", "Cancelar", "Fechar"],
+    identificacao: ["Novo plano", "Salvar rascunho", "Duplicar plano", "Gerar PDF", "Imprimir", "Cancelar", "Fechar"],
+    instituicao: ["Salvar rascunho", "Gerar PDF", "Imprimir", "Cancelar", "Fechar"],
+    historico: ["Salvar rascunho", "Gerar PDF", "Imprimir", "Cancelar", "Fechar"],
+    objeto: ["Salvar rascunho", "Gerar PDF", "Imprimir", "Cancelar", "Fechar"],
+    justificativa: ["Salvar rascunho", "Gerar PDF", "Imprimir", "Cancelar", "Fechar"],
+    objetivos: ["Salvar rascunho", "Gerar PDF", "Imprimir", "Cancelar", "Fechar"],
+    metas: ["Salvar rascunho", "Gerar PDF", "Imprimir", "Cancelar", "Fechar"],
+    cronograma: ["Salvar rascunho", "Gerar PDF", "Imprimir", "Cancelar", "Fechar"],
+    aplicacao: ["Salvar rascunho", "Gerar PDF", "Imprimir", "Cancelar", "Fechar"],
+    desembolso: ["Salvar rascunho", "Gerar PDF", "Imprimir", "Cancelar", "Fechar"],
+    monitoramento: ["Salvar rascunho", "Gerar PDF", "Imprimir", "Cancelar", "Fechar"],
+    prestacao: ["Salvar rascunho", "Anexar documento", "Gerar PDF", "Imprimir", "Cancelar", "Fechar"],
     anexos: ["Salvar rascunho", "Gerar PDF", "Imprimir", "Exportar", "Cancelar", "Excluir", "Fechar"],
     declaracao: [
       "Salvar rascunho",
@@ -1168,6 +1323,22 @@ export function PlanoTrabalhoPage() {
               </Button>
             </div>
 
+            <div className="flex flex-wrap gap-3 text-xs text-[var(--g3-muted)]" aria-label="Legenda das situações">
+              {[
+                ["bg-yellow-50", "Em análise"],
+                ["bg-green-50", "Aprovado"],
+                ["bg-red-50", "Reprovado"],
+                ["bg-white", "Rascunho"],
+                ["bg-blue-50", "Concluído"],
+                ["bg-gray-100", "Em execução"]
+              ].map(([cor, label]) => (
+                <span key={label} className="inline-flex items-center gap-1.5">
+                  <span style={{ backgroundColor: cor === "bg-yellow-50" ? "#FEF9C3" : cor === "bg-green-50" ? "#DCFCE7" : cor === "bg-red-50" ? "#FEE2E2" : cor === "bg-blue-50" ? "#DBEAFE" : cor === "bg-gray-100" ? "#F3F4F6" : "#FFFFFF" }} className="h-3 w-3 rounded border border-[var(--g3-border)]" />
+                  {label}
+                </span>
+              ))}
+            </div>
+
             <div className="overflow-x-auto rounded-xl border border-[var(--g3-border)]">
               <table className="min-w-full text-sm">
                 <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]">
@@ -1193,10 +1364,9 @@ export function PlanoTrabalhoPage() {
                       <tr
                         key={plano.id}
                         onClick={() => selecionarPlano(plano)}
-                        className={`cursor-pointer border-t border-[var(--g3-border)] transition-colors ${
-                          planoSelecionadoId === plano.id
-                            ? "bg-[var(--g3-primary-soft)]"
-                            : "hover:bg-[var(--g3-primary-soft)]/35"
+                        style={{ backgroundColor: corFundoSituacaoPlano(plano.status) }}
+                        className={`cursor-pointer border-t border-[var(--g3-border)] transition-colors ${classeCorSituacaoPlano(plano.status)} hover:bg-[var(--g3-primary-soft)]/35 ${
+                          planoSelecionadoId === plano.id ? "ring-2 ring-inset ring-[var(--g3-primary)]" : ""
                         }`}
                       >
                         <td className="px-3 py-3 font-semibold">{plano.codigoInterno}</td>
@@ -1243,7 +1413,14 @@ export function PlanoTrabalhoPage() {
                 <Label>Tipo *</Label>
                 <Select
                   value={form.tipoParceria}
-                  onChange={(event) => atualizarCampo("tipoParceria", event.target.value)}
+                  onChange={(event) => {
+                    const tipo = event.target.value;
+                    setForm((atual) => ({
+                      ...atual,
+                      tipoParceria: tipo,
+                      termoFomentoId: tipo === "Termo de Fomento" ? atual.termoFomentoId : undefined
+                    }));
+                  }}
                 >
                   {tiposParceria.map((item) => (
                     <option key={item} value={item}>
@@ -1265,10 +1442,38 @@ export function PlanoTrabalhoPage() {
               </div>
               <div className="space-y-1 xl:col-span-2">
                 <Label>Órgão concedente ou parceiro *</Label>
-                <Input
-                  value={form.orgaoParceiro}
-                  onChange={(event) => atualizarCampo("orgaoParceiro", event.target.value)}
-                />
+                <div className="relative">
+                  <Input
+                    value={form.orgaoParceiro}
+                    onFocus={() => setMostrarSugestoesOrgaos(true)}
+                    onBlur={() => window.setTimeout(() => setMostrarSugestoesOrgaos(false), 150)}
+                    onChange={(event) => {
+                      atualizarCampo("orgaoParceiro", event.target.value);
+                      setMostrarSugestoesOrgaos(true);
+                    }}
+                    placeholder="Selecione ou digite outro órgão"
+                    autoComplete="off"
+                  />
+                  {mostrarSugestoesOrgaos && orgaosFiltrados.length ? (
+                    <div className="absolute z-30 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card)] p-1 shadow-lg">
+                      {orgaosFiltrados.map((orgao) => (
+                        <button
+                          key={orgao}
+                          type="button"
+                          className="block w-full rounded-md px-3 py-2 text-left text-sm text-[var(--g3-foreground)] transition hover:bg-[var(--g3-primary-soft)]"
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => {
+                            atualizarCampo("orgaoParceiro", orgao);
+                            setMostrarSugestoesOrgaos(false);
+                          }}
+                        >
+                          {orgao}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+                <p className="text-xs text-[var(--g3-muted)]">Você pode selecionar uma sugestão ou informar manualmente outro órgão.</p>
                 <CampoErro texto={erros.orgaoParceiro} />
               </div>
               <div className="space-y-1">
@@ -1322,18 +1527,34 @@ export function PlanoTrabalhoPage() {
                 <CampoErro texto={erros.responsavelLegal} />
               </div>
               <div className="space-y-1 xl:col-span-2">
-                <Label>Termo de fomento vinculado</Label>
-                <Select
-                  value={form.termoFomentoId ?? ""}
-                  onChange={(event) => atualizarCampo("termoFomentoId", event.target.value)}
-                >
-                  <option value="">Não vincular agora</option>
-                  {termos.map((termo) => (
-                    <option key={termo.id} value={termo.id}>
-                      {termo.numeroTermo} - {termo.descricaoObjeto || termo.orgaoConcedente || "Sem descrição"}
-                    </option>
-                  ))}
-                </Select>
+                <div className="flex items-center justify-between gap-2">
+                  <Label>Termo de fomento vinculado</Label>
+                  {form.tipoParceria === "Termo de Fomento" ? (
+                    <Button type="button" variant="outline" size="sm" onClick={() => navigate("/setor-juridico/termo-fomento")}>
+                      <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                      Cadastrar termo
+                    </Button>
+                  ) : null}
+                </div>
+                {form.tipoParceria === "Termo de Fomento" ? (
+                  <>
+                    <Select value={form.termoFomentoId ?? ""} onChange={(event) => vincularTermoFomento(event.target.value)}>
+                      <option value="">Selecione um termo cadastrado</option>
+                      {termosFomentoDisponiveis.map((termo) => (
+                        <option key={termo.id} value={termo.id}>
+                          {termo.numeroTermo} - {termo.descricaoObjeto || termo.orgaoConcedente || "Sem descrição"}
+                        </option>
+                      ))}
+                    </Select>
+                    {!termosFomentoDisponiveis.length ? (
+                      <p className="text-xs text-[var(--g3-muted)]">Nenhum termo de fomento cadastrado. Use Cadastrar termo para incluir um novo.</p>
+                    ) : null}
+                  </>
+                ) : (
+                  <p className="rounded-lg border border-dashed border-[var(--g3-border)] px-3 py-2 text-xs text-[var(--g3-muted)]">
+                    O vínculo fica disponível quando o tipo da parceria for Termo de fomento.
+                  </p>
+                )}
               </div>
               {termoSelecionado ? (
                 <div className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/35 p-3 xl:col-span-2">
@@ -1350,6 +1571,51 @@ export function PlanoTrabalhoPage() {
 
         {abaAtiva === "instituicao" ? (
           <section className="space-y-4">
+            <div className="grid gap-3 rounded-xl border border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/25 p-4 md:grid-cols-2">
+              <div className="space-y-1">
+                <Label>Carregar dados da unidade assistencial</Label>
+                <Select
+                  value={unidadeAssistencialSelecionadaId}
+                  onChange={(event) => {
+                    const unidadeId = event.target.value;
+                    setUnidadeAssistencialSelecionadaId(unidadeId);
+                    if (!unidadeId) return;
+                    const unidade = unidadesAssistenciais.find(
+                      (item) => item.id_unidade === unidadeId
+                    );
+                    if (unidade) preencherDadosDaUnidade(unidade);
+                  }}
+                >
+                  <option value="">Selecionar unidade cadastrada</option>
+                  {unidadesAssistenciais.map((item) => (
+                    <option key={item.id_unidade} value={item.id_unidade}>
+                      {item.nome_fantasia}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>Carregar dados bancários da conta</Label>
+                <Select
+                  value={contaBancariaSelecionadaId}
+                  onChange={(event) => {
+                    const contaId = event.target.value;
+                    setContaBancariaSelecionadaId(contaId);
+                    if (!contaId) return;
+                    const conta = contasBancarias.find((item) => String(item.id) === contaId);
+                    if (conta) preencherDadosBancarios(conta);
+                  }}
+                >
+                  <option value="">Selecionar conta cadastrada</option>
+                  {contasBancarias.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {obterContaDescricao(item)}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            </div>
+
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <div className="space-y-1 xl:col-span-2">
                 <Label>Razão social *</Label>
@@ -1472,17 +1738,20 @@ export function PlanoTrabalhoPage() {
               <h3 className="text-sm font-semibold text-[var(--g3-active)]">Dados bancários da conta específica</h3>
               <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
                 <div className="space-y-1">
-                  <Label>Banco</Label>
-                  <Input value={form.bancoNome ?? ""} onChange={(event) => atualizarCampo("bancoNome", event.target.value)} />
-                </div>
-                <div className="space-y-1">
-                  <Label>Agência</Label>
-                  <Input value={form.bancoAgencia ?? ""} onChange={(event) => atualizarCampo("bancoAgencia", event.target.value)} />
-                </div>
-                <div className="space-y-1">
-                  <Label>Conta</Label>
-                  <Input value={form.bancoConta ?? ""} onChange={(event) => atualizarCampo("bancoConta", event.target.value)} />
-                </div>
+                <Label>Banco</Label>
+                <Input value={form.bancoNome ?? ""} onChange={(event) => atualizarCampo("bancoNome", event.target.value)} />
+                <CampoErro texto={erros.bancoNome} />
+              </div>
+              <div className="space-y-1">
+                <Label>Agência</Label>
+                <Input value={form.bancoAgencia ?? ""} onChange={(event) => atualizarCampo("bancoAgencia", event.target.value)} />
+                <CampoErro texto={erros.bancoAgencia} />
+              </div>
+              <div className="space-y-1">
+                <Label>Conta</Label>
+                <Input value={form.bancoConta ?? ""} onChange={(event) => atualizarCampo("bancoConta", event.target.value)} />
+                <CampoErro texto={erros.bancoConta} />
+              </div>
                 <div className="space-y-1">
                   <Label>Operação</Label>
                   <Input value={form.bancoOperacao ?? ""} onChange={(event) => atualizarCampo("bancoOperacao", event.target.value)} />
@@ -1497,9 +1766,9 @@ export function PlanoTrabalhoPage() {
                 </div>
               </div>
             </div>
-            {renderNavegacaoAba()}
-          </section>
-        ) : null}
+          {renderNavegacaoAba()}
+        </section>
+      ) : null}
 
         {abaAtiva === "historico" ? (
           <section className="space-y-4">
@@ -1515,27 +1784,63 @@ export function PlanoTrabalhoPage() {
             />
             <div className="grid gap-3">
               <div className="space-y-1">
-                <Label>Histórico da OSC</Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label>Histórico da OSC</Label>
+                  <AiFieldSuggestionButton
+                    prompt={`Redija um histórico institucional claro e formal para a seção Apresentação e histórico de um plano de trabalho. ${contextoApresentacaoIa} O texto atual deste campo é: ${form.historicoOsc || "vazio"}. Preserve fatos informados, organize a trajetória, os marcos e a atuação da instituição. Se o texto atual estiver preenchido, aprimore-o e complemente-o sem inventar dados.`}
+                    onApply={(suggestao) => atualizarCampo("historicoOsc", suggestao)}
+                  />
+                </div>
                 <Textarea rows={4} value={form.historicoOsc ?? ""} onChange={(event) => atualizarCampo("historicoOsc", event.target.value)} />
               </div>
               <div className="space-y-1">
-                <Label>Finalidade institucional</Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label>Finalidade institucional</Label>
+                  <AiFieldSuggestionButton
+                    prompt={`Redija a finalidade institucional de uma organização da sociedade civil para um plano de trabalho. ${contextoApresentacaoIa} O texto atual deste campo é: ${form.finalidadeInstitucional || "vazio"}. Torne o texto claro, objetivo e alinhado à missão da instituição, sem criar informações não fornecidas.`}
+                    onApply={(suggestao) => atualizarCampo("finalidadeInstitucional", suggestao)}
+                  />
+                </div>
                 <Textarea rows={3} value={form.finalidadeInstitucional ?? ""} onChange={(event) => atualizarCampo("finalidadeInstitucional", event.target.value)} />
               </div>
               <div className="space-y-1">
-                <Label>Experiência anterior na área</Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label>Experiência anterior na área</Label>
+                  <AiFieldSuggestionButton
+                    prompt={`Descreva a experiência anterior da instituição na área do plano de trabalho. ${contextoApresentacaoIa} O texto atual deste campo é: ${form.experienciaAnterior || "vazio"}. Organize experiências, serviços e resultados apenas com base nas informações fornecidas; quando faltarem dados, use uma redação prudente sem inventar números ou nomes.`}
+                    onApply={(suggestao) => atualizarCampo("experienciaAnterior", suggestao)}
+                  />
+                </div>
                 <Textarea rows={3} value={form.experienciaAnterior ?? ""} onChange={(event) => atualizarCampo("experienciaAnterior", event.target.value)} />
               </div>
               <div className="space-y-1">
-                <Label>Conselhos, certificações ou registros</Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label>Conselhos, certificações ou registros</Label>
+                  <AiFieldSuggestionButton
+                    prompt={`Organize as informações sobre conselhos, certificações e registros da instituição para um plano de trabalho. ${contextoApresentacaoIa} O texto atual deste campo é: ${form.conselhosCertificacoes || "vazio"}. Melhore a clareza e a apresentação sem inventar certificações, números ou órgãos.`}
+                    onApply={(suggestao) => atualizarCampo("conselhosCertificacoes", suggestao)}
+                  />
+                </div>
                 <Textarea rows={3} value={form.conselhosCertificacoes ?? ""} onChange={(event) => atualizarCampo("conselhosCertificacoes", event.target.value)} />
               </div>
               <div className="space-y-1">
-                <Label>Público atendido atualmente</Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label>Público atendido atualmente</Label>
+                  <AiFieldSuggestionButton
+                    prompt={`Descreva o público atendido atualmente pela instituição para um plano de trabalho. ${contextoApresentacaoIa} O texto atual deste campo é: ${form.publicoAtendidoAtual || "vazio"}. Organize o perfil do público e a forma de atendimento somente com base no contexto informado, sem inventar quantitativos.`}
+                    onApply={(suggestao) => atualizarCampo("publicoAtendidoAtual", suggestao)}
+                  />
+                </div>
                 <Textarea rows={3} value={form.publicoAtendidoAtual ?? ""} onChange={(event) => atualizarCampo("publicoAtendidoAtual", event.target.value)} />
               </div>
               <div className="space-y-1">
-                <Label>Capacidade técnica e operacional</Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label>Capacidade técnica e operacional</Label>
+                  <AiFieldSuggestionButton
+                    prompt={`Descreva a capacidade técnica e operacional da instituição para executar o plano de trabalho. ${contextoApresentacaoIa} O texto atual deste campo é: ${form.capacidadeTecnicaOperacional || "vazio"}. Relacione equipe, estrutura, processos e experiência apenas quando houver base nas informações fornecidas; aprimore o texto atual sem inventar dados.`}
+                    onApply={(suggestao) => atualizarCampo("capacidadeTecnicaOperacional", suggestao)}
+                  />
+                </div>
                 <Textarea rows={3} value={form.capacidadeTecnicaOperacional ?? ""} onChange={(event) => atualizarCampo("capacidadeTecnicaOperacional", event.target.value)} />
               </div>
             </div>
@@ -1547,7 +1852,13 @@ export function PlanoTrabalhoPage() {
           <section className="space-y-4">
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <div className="space-y-1 xl:col-span-4">
-                <Label>Descrição objetiva do que será executado *</Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label>Descrição objetiva do que será executado *</Label>
+                  <AiFieldSuggestionButton
+                    prompt={`Sugira o objeto de um plano de trabalho de assistência social. Contexto: área de atuação ${form.areaAtuacao || "não informada"}, público-alvo ${form.publicoAlvo || "não informado"}, local de execução ${form.localExecucao || "não informado"}.`}
+                    onApply={(suggestao) => atualizarCampo("descricaoObjeto", suggestao)}
+                  />
+                </div>
                 <Textarea rows={4} value={form.descricaoObjeto} onChange={(event) => atualizarCampo("descricaoObjeto", event.target.value)} />
                 <CampoErro texto={erros.descricaoObjeto} />
               </div>
@@ -1603,24 +1914,54 @@ export function PlanoTrabalhoPage() {
             />
             <div className="grid gap-3">
               <div className="space-y-1">
-                <Label>Qual problema social será enfrentado? *</Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label>Qual problema social será enfrentado? *</Label>
+                  <AiFieldSuggestionButton
+                    prompt={`Descreva o problema social que justifica este plano de trabalho. Área: ${form.areaAtuacao || "não informada"}. Público-alvo: ${form.publicoAlvo || "não informado"}. Objeto: ${form.descricaoObjeto || "não informado"}. Local: ${form.localExecucao || "não informado"}. Histórico e capacidade da instituição: ${form.historicoOsc || form.capacidadeTecnicaOperacional || "não informados"}. Texto atual: ${form.problemaSocial || "vazio"}. Aprimore o texto atual quando houver, sem inventar dados ou estatísticas.`}
+                    onApply={(suggestao) => atualizarCampo("problemaSocial", suggestao)}
+                  />
+                </div>
                 <Textarea rows={4} value={form.problemaSocial} onChange={(event) => atualizarCampo("problemaSocial", event.target.value)} />
                 <CampoErro texto={erros.problemaSocial} />
               </div>
               <div className="space-y-1">
-                <Label>Quais são as causas e consequências?</Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label>Quais são as causas e consequências?</Label>
+                  <AiFieldSuggestionButton
+                    prompt={`Explique as principais causas e consequências do problema social deste plano de trabalho. Área: ${form.areaAtuacao || "não informada"}. Público-alvo: ${form.publicoAlvo || "não informado"}. Problema descrito: ${form.problemaSocial || "não informado"}. Texto atual: ${form.causasConsequencias || "vazio"}. Organize a relação de causa e efeito e aprimore o texto atual sem inventar fatos.`}
+                    onApply={(suggestao) => atualizarCampo("causasConsequencias", suggestao)}
+                  />
+                </div>
                 <Textarea rows={3} value={form.causasConsequencias ?? ""} onChange={(event) => atualizarCampo("causasConsequencias", event.target.value)} />
               </div>
               <div className="space-y-1">
-                <Label>Quais dados ou indicadores justificam a proposta?</Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label>Quais dados ou indicadores justificam a proposta?</Label>
+                  <AiFieldSuggestionButton
+                    prompt={`Sugira como apresentar os dados e indicadores que justificam este plano de trabalho. Problema social: ${form.problemaSocial || "não informado"}. Público-alvo: ${form.publicoAlvo || "não informado"}. Local: ${form.localExecucao || "não informado"}. Dados atuais informados: ${form.dadosIndicadores || "nenhum"}. Texto atual: ${form.dadosIndicadores || "vazio"}. Não invente números, fontes ou estatísticas; se não houver dados, sugira uma redação prudente indicando a necessidade de complementar as fontes.`}
+                    onApply={(suggestao) => atualizarCampo("dadosIndicadores", suggestao)}
+                  />
+                </div>
                 <Textarea rows={3} value={form.dadosIndicadores ?? ""} onChange={(event) => atualizarCampo("dadosIndicadores", event.target.value)} />
               </div>
               <div className="space-y-1">
-                <Label>Por que a instituição tem capacidade de executar?</Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label>Por que a instituição tem capacidade de executar?</Label>
+                  <AiFieldSuggestionButton
+                    prompt={`Justifique por que a instituição tem capacidade para executar este plano de trabalho. Histórico: ${form.historicoOsc || "não informado"}. Finalidade: ${form.finalidadeInstitucional || "não informada"}. Experiência: ${form.experienciaAnterior || "não informada"}. Capacidade técnica e operacional: ${form.capacidadeTecnicaOperacional || "não informada"}. Objeto: ${form.descricaoObjeto || "não informado"}. Texto atual: ${form.capacidadeExecucao || "vazio"}. Aprimore o texto sem inventar equipe, estrutura, certificações ou resultados.`}
+                    onApply={(suggestao) => atualizarCampo("capacidadeExecucao", suggestao)}
+                  />
+                </div>
                 <Textarea rows={3} value={form.capacidadeExecucao ?? ""} onChange={(event) => atualizarCampo("capacidadeExecucao", event.target.value)} />
               </div>
               <div className="space-y-1">
-                <Label>Qual impacto esperado?</Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label>Qual impacto esperado?</Label>
+                  <AiFieldSuggestionButton
+                    prompt={`Descreva o impacto esperado deste plano de trabalho. Objeto: ${form.descricaoObjeto || "não informado"}. Problema social: ${form.problemaSocial || "não informado"}. Público-alvo: ${form.publicoAlvo || "não informado"}. Objetivo geral: ${form.objetivoGeral || "não informado"}. Texto atual: ${form.impactoEsperado || "vazio"}. Relacione mudanças esperadas de forma clara e mensurável quando houver base, sem inventar números ou resultados garantidos.`}
+                    onApply={(suggestao) => atualizarCampo("impactoEsperado", suggestao)}
+                  />
+                </div>
                 <Textarea rows={3} value={form.impactoEsperado ?? ""} onChange={(event) => atualizarCampo("impactoEsperado", event.target.value)} />
               </div>
             </div>
@@ -1631,7 +1972,13 @@ export function PlanoTrabalhoPage() {
         {abaAtiva === "objetivos" ? (
           <section className="space-y-4">
             <div className="space-y-1">
-              <Label>Objetivo geral *</Label>
+              <div className="flex items-center justify-between gap-2">
+                <Label>Objetivo geral *</Label>
+                <AiFieldSuggestionButton
+                  prompt={`Sugira um objetivo geral para um plano de trabalho de assistência social. Objeto: ${form.descricaoObjeto || "não informado"}. Problema social: ${form.problemaSocial || "não informado"}. Público-alvo: ${form.publicoAlvo || "não informado"}.`}
+                  onApply={(suggestao) => atualizarCampo("objetivoGeral", suggestao)}
+                />
+              </div>
               <Textarea rows={3} value={form.objetivoGeral} onChange={(event) => atualizarCampo("objetivoGeral", event.target.value)} />
               <CampoErro texto={erros.objetivoGeral} />
             </div>
@@ -1650,7 +1997,13 @@ export function PlanoTrabalhoPage() {
                     <div key={`objetivo-${index}`} className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/20 p-4">
                       <div className="grid gap-3">
                         <div className="space-y-1">
-                          <Label>Descrição</Label>
+                          <div className="flex items-center justify-between gap-2">
+                            <Label>Descrição</Label>
+                            <AiFieldSuggestionButton
+                              prompt={`Sugira um objetivo específico mensurável para o plano. Objeto: ${form.descricaoObjeto || "não informado"}. Objetivo geral: ${form.objetivoGeral || "não informado"}.`}
+                              onApply={(suggestao) => atualizarObjetivo(index, { descricao: suggestao })}
+                            />
+                          </div>
                           <Textarea rows={2} value={objetivo.descricao} onChange={(event) => atualizarObjetivo(index, { descricao: event.target.value })} />
                         </div>
                         <div className="space-y-1">
@@ -1726,7 +2079,13 @@ export function PlanoTrabalhoPage() {
                         <Input value={meta.numeroMeta} onChange={(event) => atualizarMeta(metaIndex, { numeroMeta: event.target.value })} />
                       </div>
                       <div className="space-y-1 xl:col-span-2">
-                        <Label>Descrição da meta *</Label>
+                        <div className="flex items-center justify-between gap-2">
+                          <Label>Descrição da meta *</Label>
+                          <AiFieldSuggestionButton
+                            prompt={`Sugira uma meta clara, específica e mensurável para o plano. Objeto: ${form.descricaoObjeto || "não informado"}. Objetivo geral: ${form.objetivoGeral || "não informado"}. Público-alvo: ${form.publicoAlvo || "não informado"}.`}
+                            onApply={(suggestao) => atualizarMeta(metaIndex, { descricao: suggestao })}
+                          />
+                        </div>
                         <Input value={meta.descricao} onChange={(event) => atualizarMeta(metaIndex, { descricao: event.target.value })} />
                       </div>
                       <div className="space-y-1">
@@ -1747,11 +2106,13 @@ export function PlanoTrabalhoPage() {
                       </div>
                       <div className="space-y-1">
                         <Label>Data inicial</Label>
-                        <Input type="date" value={meta.dataInicio ?? ""} onChange={(event) => atualizarMeta(metaIndex, { dataInicio: event.target.value })} />
+                        <Input type="date" min={form.periodoInicio || undefined} max={form.periodoFim || undefined} value={meta.dataInicio ?? ""} onChange={(event) => atualizarMeta(metaIndex, { dataInicio: event.target.value })} />
+                        <CampoErro texto={erros[`meta_${metaIndex}_dataInicio`]} />
                       </div>
                       <div className="space-y-1">
                         <Label>Data final</Label>
-                        <Input type="date" value={meta.dataFim ?? ""} onChange={(event) => atualizarMeta(metaIndex, { dataFim: event.target.value })} />
+                        <Input type="date" min={form.periodoInicio || undefined} max={form.periodoFim || undefined} value={meta.dataFim ?? ""} onChange={(event) => atualizarMeta(metaIndex, { dataFim: event.target.value })} />
+                        <CampoErro texto={erros[`meta_${metaIndex}_dataFim`]} />
                       </div>
                       <div className="space-y-1">
                         <Label>Responsável</Label>
@@ -1814,11 +2175,13 @@ export function PlanoTrabalhoPage() {
                                 </div>
                                 <div className="space-y-1">
                                   <Label>Data inicial</Label>
-                                  <Input type="date" value={etapa.dataInicio ?? ""} onChange={(event) => atualizarEtapa(metaIndex, etapaIndex, { dataInicio: event.target.value })} />
+                                  <Input type="date" min={form.periodoInicio || undefined} max={form.periodoFim || undefined} value={etapa.dataInicio ?? ""} onChange={(event) => atualizarEtapa(metaIndex, etapaIndex, { dataInicio: event.target.value })} />
+                                  <CampoErro texto={erros[`meta_${metaIndex}_etapa_${etapaIndex}_dataInicio`]} />
                                 </div>
                                 <div className="space-y-1">
                                   <Label>Data final</Label>
-                                  <Input type="date" value={etapa.dataFim ?? ""} onChange={(event) => atualizarEtapa(metaIndex, etapaIndex, { dataFim: event.target.value })} />
+                                  <Input type="date" min={form.periodoInicio || undefined} max={form.periodoFim || undefined} value={etapa.dataFim ?? ""} onChange={(event) => atualizarEtapa(metaIndex, etapaIndex, { dataFim: event.target.value })} />
+                                  <CampoErro texto={erros[`meta_${metaIndex}_etapa_${etapaIndex}_dataFim`]} />
                                 </div>
                                 <div className="space-y-1">
                                   <Label>Valor estimado</Label>
@@ -2112,20 +2475,44 @@ export function PlanoTrabalhoPage() {
           <section className="space-y-4">
             <div className="grid gap-3">
               <div className="space-y-1">
-                <Label>Forma de acompanhamento</Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label>Forma de acompanhamento</Label>
+                  <AiFieldSuggestionButton
+                    prompt={`Sugira uma forma clara de acompanhamento e monitoramento para este plano de trabalho. Objeto: ${form.descricaoObjeto || "não informado"}. Metas: ${form.metas.length ? form.metas.map((meta) => meta.descricao).join("; ") : "não informadas"}. Público-alvo: ${form.publicoAlvo || "não informado"}. Instrumentos selecionados: ${form.instrumentosMonitoramento?.join(", ") || "não informados"}. Texto atual: ${form.formaAcompanhamento || "vazio"}. Aprimore o texto existente sem inventar estruturas ou procedimentos não informados.`}
+                    onApply={(suggestao) => atualizarCampo("formaAcompanhamento", suggestao)}
+                  />
+                </div>
                 <Textarea rows={3} value={form.formaAcompanhamento ?? ""} onChange={(event) => atualizarCampo("formaAcompanhamento", event.target.value)} />
               </div>
               <div className="space-y-1">
-                <Label>Indicadores de monitoramento</Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label>Indicadores de monitoramento</Label>
+                  <AiFieldSuggestionButton
+                    prompt={`Sugira indicadores de monitoramento para este plano de trabalho. Objeto: ${form.descricaoObjeto || "não informado"}. Objetivo geral: ${form.objetivoGeral || "não informado"}. Metas: ${form.metas.length ? form.metas.map((meta) => meta.descricao).join("; ") : "não informadas"}. Resultado esperado: ${form.resultadoEsperadoMonitoramento || "não informado"}. Texto atual: ${form.indicadoresMonitoramento || "vazio"}. Proponha indicadores observáveis e formas de verificação sem inventar metas numéricas.`}
+                    onApply={(suggestao) => atualizarCampo("indicadoresMonitoramento", suggestao)}
+                  />
+                </div>
                 <Textarea rows={3} value={form.indicadoresMonitoramento ?? ""} onChange={(event) => atualizarCampo("indicadoresMonitoramento", event.target.value)} />
               </div>
               <div className="grid gap-3 md:grid-cols-3">
                 <div className="space-y-1">
-                  <Label>Periodicidade</Label>
+                  <div className="flex items-center justify-between gap-2">
+                    <Label>Periodicidade</Label>
+                    <AiFieldSuggestionButton
+                      prompt={`Sugira uma periodicidade adequada para o monitoramento deste plano de trabalho, considerando objeto, metas, indicadores e complexidade da execução. Objeto: ${form.descricaoObjeto || "não informado"}. Indicadores: ${form.indicadoresMonitoramento || "não informados"}. Valor atual: ${form.periodicidadeMonitoramento || "vazio"}. Responda somente com uma sugestão curta como mensal, bimestral, trimestral ou semestral.`}
+                      onApply={(suggestao) => atualizarCampo("periodicidadeMonitoramento", suggestao)}
+                    />
+                  </div>
                   <Input value={form.periodicidadeMonitoramento ?? ""} onChange={(event) => atualizarCampo("periodicidadeMonitoramento", event.target.value)} />
                 </div>
                 <div className="space-y-1 md:col-span-2">
-                  <Label>Responsável pela coleta dos dados</Label>
+                  <div className="flex items-center justify-between gap-2">
+                    <Label>Responsável pela coleta dos dados</Label>
+                    <AiFieldSuggestionButton
+                      prompt={`Sugira como identificar o responsável pela coleta dos dados do monitoramento deste plano. Instituição: ${form.razaoSocial || form.nomeFantasia || "não informada"}. Capacidade técnica: ${form.capacidadeTecnicaOperacional || "não informada"}. Forma de acompanhamento: ${form.formaAcompanhamento || "não informada"}. Valor atual: ${form.responsavelColetaDados || "vazio"}. Se não houver nome informado, indique uma função ou equipe sem inventar pessoa.`}
+                      onApply={(suggestao) => atualizarCampo("responsavelColetaDados", suggestao)}
+                    />
+                  </div>
                   <Input value={form.responsavelColetaDados ?? ""} onChange={(event) => atualizarCampo("responsavelColetaDados", event.target.value)} onBlur={(event) => atualizarCampo("responsavelColetaDados", normalizarNomePessoaInput(event.target.value))} />
                 </div>
               </div>
@@ -2155,11 +2542,23 @@ export function PlanoTrabalhoPage() {
                 </div>
               </div>
               <div className="space-y-1">
-                <Label>Resultado esperado</Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label>Resultado esperado</Label>
+                  <AiFieldSuggestionButton
+                    prompt={`Descreva os resultados esperados do monitoramento deste plano de trabalho. Objeto: ${form.descricaoObjeto || "não informado"}. Objetivo geral: ${form.objetivoGeral || "não informado"}. Indicadores: ${form.indicadoresMonitoramento || "não informados"}. Público-alvo: ${form.publicoAlvo || "não informado"}. Texto atual: ${form.resultadoEsperadoMonitoramento || "vazio"}. Aprimore o texto com resultados verificáveis, sem inventar números ou garantias.`}
+                    onApply={(suggestao) => atualizarCampo("resultadoEsperadoMonitoramento", suggestao)}
+                  />
+                </div>
                 <Textarea rows={3} value={form.resultadoEsperadoMonitoramento ?? ""} onChange={(event) => atualizarCampo("resultadoEsperadoMonitoramento", event.target.value)} />
               </div>
               <div className="space-y-1">
-                <Label>Evidências obrigatórias</Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label>Evidências obrigatórias</Label>
+                  <AiFieldSuggestionButton
+                    prompt={`Sugira evidências e documentos que comprovem a execução e os resultados deste plano de trabalho. Objeto: ${form.descricaoObjeto || "não informado"}. Metas: ${form.metas.length ? form.metas.map((meta) => meta.descricao).join("; ") : "não informadas"}. Instrumentos de monitoramento: ${form.instrumentosMonitoramento?.join(", ") || "não informados"}. Texto atual: ${form.evidenciasObrigatorias || "vazio"}. Organize a lista e aprimore o texto existente sem inventar exigências legais específicas.`}
+                    onApply={(suggestao) => atualizarCampo("evidenciasObrigatorias", suggestao)}
+                  />
+                </div>
                 <Textarea rows={3} value={form.evidenciasObrigatorias ?? ""} onChange={(event) => atualizarCampo("evidenciasObrigatorias", event.target.value)} />
               </div>
             </div>
@@ -2182,15 +2581,33 @@ export function PlanoTrabalhoPage() {
                 <Input type="date" value={form.dataLimitePrestacao ?? ""} onChange={(event) => atualizarCampo("dataLimitePrestacao", event.target.value)} />
               </div>
               <div className="space-y-1 xl:col-span-2">
-                <Label>Responsável</Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label>Responsável</Label>
+                  <AiFieldSuggestionButton
+                    prompt={`Sugira o perfil ou função responsável pela prestação de contas deste plano. Instituição: ${form.razaoSocial || form.nomeFantasia || "não informada"}. Capacidade técnica: ${form.capacidadeTecnicaOperacional || "não informada"}. Texto atual: ${form.responsavelPrestacao || "vazio"}. Se não houver nome informado, sugira uma função sem inventar pessoa.`}
+                    onApply={(suggestao) => atualizarCampo("responsavelPrestacao", suggestao)}
+                  />
+                </div>
                 <Input value={form.responsavelPrestacao ?? ""} onChange={(event) => atualizarCampo("responsavelPrestacao", event.target.value)} onBlur={(event) => atualizarCampo("responsavelPrestacao", normalizarNomePessoaInput(event.target.value))} />
               </div>
               <div className="space-y-1 xl:col-span-4">
-                <Label>Documentos exigidos</Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label>Documentos exigidos</Label>
+                  <AiFieldSuggestionButton
+                    prompt={`Sugira uma lista de documentos para a prestação de contas deste plano de trabalho. Objeto: ${form.descricaoObjeto || "não informado"}. Metas: ${form.metas.length ? form.metas.map((meta) => meta.descricao).join("; ") : "não informadas"}. Forma de acompanhamento: ${form.formaAcompanhamento || "não informada"}. Evidências obrigatórias: ${form.evidenciasObrigatorias || "não informadas"}. Texto atual: ${form.documentosExigidos || "vazio"}. Organize os itens sem inventar uma exigência legal específica e considere os documentos normalmente relacionados à execução descrita.`}
+                    onApply={(suggestao) => atualizarCampo("documentosExigidos", suggestao)}
+                  />
+                </div>
                 <Textarea rows={3} value={form.documentosExigidos ?? ""} onChange={(event) => atualizarCampo("documentosExigidos", event.target.value)} />
               </div>
               <div className="space-y-1 xl:col-span-4">
-                <Label>Observações</Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label>Observações</Label>
+                  <AiFieldSuggestionButton
+                    prompt={`Redija observações úteis para a prestação de contas deste plano de trabalho. Objeto: ${form.descricaoObjeto || "não informado"}. Periodicidade: ${form.periodicidadePrestacao || "não informada"}. Responsável: ${form.responsavelPrestacao || "não informado"}. Documentos exigidos: ${form.documentosExigidos || "não informados"}. Texto atual: ${form.observacoesPrestacao || "vazio"}. Aprimore o texto atual com orientações práticas, sem criar prazos ou obrigações não informados.`}
+                    onApply={(suggestao) => atualizarCampo("observacoesPrestacao", suggestao)}
+                  />
+                </div>
                 <Textarea rows={3} value={form.observacoesPrestacao ?? ""} onChange={(event) => atualizarCampo("observacoesPrestacao", event.target.value)} />
               </div>
             </div>
@@ -2307,6 +2724,7 @@ export function PlanoTrabalhoPage() {
               <div className="space-y-1">
                 <Label>CPF</Label>
                 <Input value={formatarCpf(form.cpfRepresentanteDeclaracao)} onChange={(event) => atualizarCampo("cpfRepresentanteDeclaracao", normalizarCpf(event.target.value))} />
+                <CampoErro texto={erros.cpfRepresentanteDeclaracao} />
               </div>
               <div className="space-y-1">
                 <Label>Cargo</Label>
@@ -2337,10 +2755,16 @@ export function PlanoTrabalhoPage() {
               <h3 className="text-sm font-semibold text-[var(--g3-active)]">Checklist final de conformidade</h3>
               <div className="mt-3 grid gap-2">
                 {Object.keys(pendenciasEnvio).length ? (
-                  Object.values(pendenciasEnvio).map((item) => (
-                    <div key={item} className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                  Object.entries(pendenciasEnvio).map(([chave, item]) => (
+                    <button
+                      key={chave}
+                      type="button"
+                      className="w-full rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-left text-sm text-amber-700 transition hover:border-amber-500 hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                      onClick={() => navegarParaPendencia(chave)}
+                      title="Clique para abrir a seção correspondente"
+                    >
                       {item}
-                    </div>
+                    </button>
                   ))
                 ) : (
                   <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
@@ -2355,6 +2779,13 @@ export function PlanoTrabalhoPage() {
       </AdminPageLayout>
 
       {popup ? <PopupMensagem popup={popup} onClose={() => setPopup(null)} /> : null}
+      <CadastroSucessoModal
+        aberto={Boolean(cadastroSucesso)}
+        titulo="Cadastro realizado com sucesso"
+        rotuloNumero="Número do cadastro"
+        numero={cadastroSucesso}
+        onClose={() => setCadastroSucesso(null)}
+      />
       <PopupConfirmacao
         aberto={confirmarExclusao}
         titulo="Confirmar exclusão"

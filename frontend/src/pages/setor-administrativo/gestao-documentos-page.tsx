@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
@@ -10,6 +10,7 @@ import {
   FileText,
   FileStack,
   FolderOpen,
+  Paperclip,
   Plus,
   Printer,
   Save,
@@ -238,10 +239,13 @@ export function GestaoDocumentosPage() {
   const [confirmarExcluir, setConfirmarExcluir] = useState(false);
   const [historicoTexto, setHistoricoTexto] = useState("");
   const [anexosLocais, setAnexosLocais] = useState<DocumentoInstituicaoAnexo[]>([]);
+  const [anexosPendentes, setAnexosPendentes] = useState<File[]>([]);
   const [anexoParaSubstituirId, setAnexoParaSubstituirId] = useState<string | null>(null);
   const [anexoProcessandoId, setAnexoProcessandoId] = useState<string | null>(null);
   const [uploadFileProgress, setUploadFileProgress] = useState<number | null>(null);
   const [uploadFileProgressNome, setUploadFileProgressNome] = useState("");
+  const arquivoDocumentoInputRef = useRef<HTMLInputElement>(null);
+  const arquivoDocumentoSubstituicaoInputRef = useRef<HTMLInputElement>(null);
 
   // Estados para Links Externos
   const [linksExternos, setLinksExternos] = useState<LinkExterno[]>([]);
@@ -267,10 +271,12 @@ export function GestaoDocumentosPage() {
   const documentosFiltrados = useMemo(() => {
     const termo = busca.trim().toLowerCase();
     if (!termo) return documentos;
-    return documentos.filter((item) => {
-      const alvo = `${item.tipoDocumento} ${item.orgaoEmissor} ${item.categoria ?? ""} ${item.situacao ?? ""}`;
-      return alvo.toLowerCase().includes(termo);
-    });
+    return [...documentos]
+      .filter((item) => {
+        const alvo = `${item.tipoDocumento} ${item.orgaoEmissor} ${item.categoria ?? ""} ${item.situacao ?? ""}`;
+        return alvo.toLowerCase().includes(termo);
+      })
+      .sort((a, b) => a.tipoDocumento.localeCompare(b.tipoDocumento, "pt-BR"));
   }, [busca, documentos]);
 
   const alertas = useMemo(() => {
@@ -315,12 +321,6 @@ export function GestaoDocumentosPage() {
         }
     );
   }, [responsavelLogado]);
-
-  useEffect(() => {
-    setAnexosLocais([]);
-    setUploadFileProgress(null);
-    setUploadFileProgressNome("");
-  }, [form.id]);
 
   // Carregar Links Externos
   useEffect(() => {
@@ -372,6 +372,10 @@ export function GestaoDocumentosPage() {
     setForm(proximo);
     setSnapshot(proximo);
     setHistoricoTexto("");
+    setAnexosLocais([]);
+    setAnexosPendentes([]);
+    setUploadFileProgress(null);
+    setUploadFileProgressNome("");
     setAbaAtiva("cadastro");
   }
 
@@ -396,6 +400,10 @@ export function GestaoDocumentosPage() {
     };
     setForm(proximo);
     setSnapshot(proximo);
+    setAnexosLocais([]);
+    setAnexosPendentes([]);
+    setUploadFileProgress(null);
+    setUploadFileProgressNome("");
     setAbaAtiva("cadastro");
   }
 
@@ -405,6 +413,10 @@ export function GestaoDocumentosPage() {
 
   function cancelar() {
     setForm(snapshot);
+    setAnexosLocais([]);
+    setAnexosPendentes([]);
+    setUploadFileProgress(null);
+    setUploadFileProgressNome("");
   }
 
   async function salvar() {
@@ -430,17 +442,52 @@ export function GestaoDocumentosPage() {
         formaAlerta: form.formaAlerta?.trim() || undefined
       };
 
-      const response = await salvarMutation.mutateAsync(payload);
-      const proximo = { ...payload, id: response.id };
+      const temAnexosPendentes = anexosPendentes.length > 0;
+      setUploadFileProgressNome("Documento");
+      setUploadFileProgress(0);
+
+      const response = await salvarMutation.mutateAsync({
+        ...payload,
+        onUploadProgress: (event) => {
+          const total = event.total ?? 0;
+          const progresso = total > 0 ? Math.round((event.loaded * 100) / total) : 95;
+          setUploadFileProgress(Math.max(1, Math.min(95, progresso)));
+        }
+      });
+      const documentoId = response.id;
+      const proximo = { ...payload, id: documentoId };
       setForm(proximo);
       setSnapshot(proximo);
-      setPopupMensagem({ tipo: "sucesso", titulo: "Confirmação", texto: "Documento salvo com sucesso." });
+
+      const resultadoAnexos = await enviarAnexosPendentes(documentoId);
+      if (!temAnexosPendentes) {
+        setUploadFileProgress(100);
+      }
+      const mensagem =
+        resultadoAnexos.enviados > 0
+          ? resultadoAnexos.falhou
+            ? `Documento salvo, com ${resultadoAnexos.enviados} anexo(s) enviado(s) e arquivos pendentes na fila.`
+            : resultadoAnexos.enviados === 1
+              ? "Documento salvo com 1 anexo enviado."
+              : `Documento salvo com ${resultadoAnexos.enviados} anexos enviados.`
+          : resultadoAnexos.falhou
+            ? "Documento salvo, mas alguns anexos ficaram pendentes."
+            : "Documento salvo com sucesso.";
+      setPopupMensagem({
+        tipo: resultadoAnexos.falhou ? "aviso" : "sucesso",
+        titulo: "Confirmação",
+        texto: mensagem
+      });
     } catch (error: any) {
+      setUploadFileProgress(null);
+      setUploadFileProgressNome("");
       setPopupMensagem({
         tipo: "erro",
         titulo: "Erro",
         texto: error?.response?.data?.message ?? "Não foi possível salvar o documento."
       });
+    } finally {
+      limparUploadFileProgress();
     }
   }
 
@@ -476,7 +523,16 @@ export function GestaoDocumentosPage() {
     }
   }
 
-  async function subirAnexos(files: File[]) {
+  function limparArquivoPendente(indice: number) {
+    setAnexosPendentes((atuais) => atuais.filter((_, posicao) => posicao !== indice));
+  }
+
+  function formatarTamanhoArquivo(file: File) {
+    const tamanhoKb = Math.max(1, Math.round(file.size / 1024));
+    return `${tamanhoKb} KB`;
+  }
+
+  function adicionarArquivosPendentes(files: File[]) {
     if (!files.length) return;
 
     const arquivosInvalidos = files.filter((file) => !ehArquivoPermitido(file));
@@ -489,21 +545,20 @@ export function GestaoDocumentosPage() {
       return;
     }
 
-    if (!form.id) {
-      setPopupMensagem({
-        tipo: "aviso",
-        titulo: "Atenção",
-        texto: "Selecione um documento antes de anexar arquivo."
-      });
-      return;
-    }
+    setAnexosPendentes((atuais) => [...atuais, ...files]);
+  }
+
+  async function enviarAnexosPendentes(documentoId: string) {
+    if (!anexosPendentes.length) return { enviados: 0, falhou: false };
+
+    const pendentes = [...anexosPendentes];
+    const anexosEnviados: DocumentoInstituicaoAnexo[] = [];
+    const totalArquivos = pendentes.length;
 
     try {
-      const anexosEnviados: DocumentoInstituicaoAnexo[] = [];
-      const totalArquivos = files.length;
       setUploadFileProgress(0);
 
-      for (const [indice, file] of files.entries()) {
+      for (const [indice, file] of pendentes.entries()) {
         const progressoBase = Math.round((indice / totalArquivos) * 100);
         const nomeProgresso =
           totalArquivos > 1 ? `${file.name} (${indice + 1}/${totalArquivos})` : file.name;
@@ -517,7 +572,7 @@ export function GestaoDocumentosPage() {
         });
 
         const anexo = await anexoMutation.mutateAsync({
-          id: form.id,
+          id: documentoId,
           payload,
           onUploadProgress: (event) => {
             const total = event.total ?? 0;
@@ -528,26 +583,20 @@ export function GestaoDocumentosPage() {
         });
 
         anexosEnviados.push(anexo);
+        pendentes.shift();
+        setAnexosPendentes([...pendentes]);
       }
 
       setUploadFileProgress(100);
       setAnexosLocais((atuais) => [...anexosEnviados, ...atuais]);
-      setPopupMensagem({
-        tipo: "sucesso",
-        titulo: "Confirmação",
-        texto:
-          totalArquivos > 1
-            ? `${totalArquivos} arquivos enviados com sucesso.`
-            : "Anexo enviado com sucesso."
-      });
+      setAnexosPendentes([]);
+      limparUploadFileProgress();
+      return { enviados: anexosEnviados.length, falhou: false };
     } catch (error: any) {
-      setPopupMensagem({
-        tipo: "erro",
-        titulo: "Erro",
-        texto: error?.response?.data?.message ?? "Não foi possível enviar o anexo."
-      });
+      setAnexosPendentes(pendentes);
+      limparUploadFileProgress();
+      return { enviados: anexosEnviados.length, falhou: true };
     }
-    limparUploadFileProgress();
   }
 
   function limparUploadFileProgress() {
@@ -619,21 +668,52 @@ export function GestaoDocumentosPage() {
   }
 
   async function abrirAnexo(item: DocumentoInstituicaoAnexo) {
-    try {
-      await abrirArquivoAutenticado(item.arquivoUrl, item.nomeArquivo);
-    } catch (error: any) {
-      setPopupMensagem({
-        tipo: "erro",
-        titulo: "Erro",
-        texto: error?.message ?? "Não foi possível visualizar o anexo."
-      });
+    const candidatos = [
+      `/api/documentos-instituicao/${item.documentoId}/anexos/${item.id}/arquivo`,
+      item.arquivoId ? `/api/arquivos/${item.arquivoId}/conteudo` : null,
+      item.arquivoUrl ?? null
+    ].filter((valor): valor is string => Boolean(valor));
+
+    for (const valorArquivo of candidatos) {
+      try {
+        await abrirArquivoAutenticado(valorArquivo, item.nomeArquivo);
+        return;
+      } catch (error: any) {
+        const mensagem = String(error?.message ?? "");
+        const eh404 = mensagem.includes("404") || mensagem.toLowerCase().includes("not found");
+        if (!eh404 || valorArquivo === candidatos[candidatos.length - 1]) {
+          setPopupMensagem({
+            tipo: "erro",
+            titulo: "Erro",
+            texto: error?.message ?? "Não foi possível visualizar o anexo."
+          });
+          return;
+        }
+      }
     }
   }
 
   async function imprimirAnexo(item: DocumentoInstituicaoAnexo) {
     setAnexoProcessandoId(item.id);
+    const candidatos = [
+      `/api/documentos-instituicao/${item.documentoId}/anexos/${item.id}/arquivo`,
+      item.arquivoId ? `/api/arquivos/${item.arquivoId}/conteudo` : null,
+      item.arquivoUrl ?? null
+    ].filter((valor): valor is string => Boolean(valor));
+
     try {
-      await imprimirArquivoAutenticado(item.arquivoUrl, item.nomeArquivo);
+      for (const valorArquivo of candidatos) {
+        try {
+          await imprimirArquivoAutenticado(valorArquivo, item.nomeArquivo);
+          return;
+        } catch (error: any) {
+          const mensagem = String(error?.message ?? "");
+          const eh404 = mensagem.includes("404") || mensagem.toLowerCase().includes("not found");
+          if (!eh404 || valorArquivo === candidatos[candidatos.length - 1]) {
+            throw error;
+          }
+        }
+      }
     } catch (error: any) {
       setPopupMensagem({
         tipo: "erro",
@@ -647,7 +727,11 @@ export function GestaoDocumentosPage() {
 
   function solicitarSubstituicaoAnexo(anexoId: string) {
     setAnexoParaSubstituirId(anexoId);
-    document.getElementById("arquivoDocumentoSubstituicao")?.click();
+    arquivoDocumentoSubstituicaoInputRef.current?.click();
+  }
+
+  function abrirSeletorArquivosPendentes() {
+    arquivoDocumentoInputRef.current?.click();
   }
 
   async function excluirAnexoExistente(item: DocumentoInstituicaoAnexo) {
@@ -808,6 +892,34 @@ export function GestaoDocumentosPage() {
 
   return (
     <>
+      <input
+        ref={arquivoDocumentoInputRef}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={(event) => {
+          const files = Array.from(event.target.files ?? []);
+          if (files.length > 0) {
+            adicionarArquivosPendentes(files);
+          }
+          event.target.value = "";
+        }}
+      />
+      <input
+        ref={arquivoDocumentoSubstituicaoInputRef}
+        type="file"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          const anexoId = anexoParaSubstituirId;
+          if (file && anexoId) {
+            void substituirAnexoExistente(anexoId, file);
+          } else {
+            setAnexoParaSubstituirId(null);
+          }
+          event.target.value = "";
+        }}
+      />
       <AdminPageLayout
         tabs={abas}
         activeTab={abaAtiva}
@@ -835,6 +947,7 @@ export function GestaoDocumentosPage() {
                   <tr>
                     <th className="px-3 py-2 text-left">Tipo</th>
                     <th className="px-3 py-2 text-left">Órgão emissor</th>
+                    <th className="px-3 py-2 text-left">Anexo</th>
                     <th className="px-3 py-2 text-left">Emissão</th>
                     <th className="px-3 py-2 text-left">Validade</th>
                     <th className="px-3 py-2 text-left">Situação</th>
@@ -843,7 +956,7 @@ export function GestaoDocumentosPage() {
                 <tbody>
                   {isLoading ? (
                     <tr>
-                      <td colSpan={5} className="px-3 py-4 text-center">
+                      <td colSpan={6} className="px-3 py-4 text-center">
                         Carregando documentos...
                       </td>
                     </tr>
@@ -856,6 +969,22 @@ export function GestaoDocumentosPage() {
                       >
                         <td className="px-3 py-2 font-medium">{item.tipoDocumento}</td>
                         <td className="px-3 py-2">{item.orgaoEmissor}</td>
+                        <td className="px-3 py-2">
+                          {item.anexoQuantidade && item.anexoQuantidade > 0 ? (
+                            <span
+                              className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800"
+                              title={`${item.anexoQuantidade} anexo(s) cadastrado(s)`}
+                            >
+                              <Paperclip className="h-3.5 w-3.5" />
+                              {item.anexoQuantidade} anexo(s)
+                            </span>
+                          ) : (
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-xs text-[var(--g3-muted)]">Sem anexo</span>
+                              <span className="text-[10px] text-amber-700">Sugestão: inclua o arquivo no cadastro.</span>
+                            </div>
+                          )}
+                        </td>
                         <td className="px-3 py-2">{item.emissao ? formatarDataPtBr(item.emissao) : "---"}</td>
                         <td className="px-3 py-2">{item.validade ? formatarDataPtBr(item.validade) : "---"}</td>
                         <td className="px-3 py-2">
@@ -868,7 +997,7 @@ export function GestaoDocumentosPage() {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={5} className="px-3 py-4 text-center">
+                      <td colSpan={6} className="px-3 py-4 text-center">
                         Nenhum documento encontrado.
                       </td>
                     </tr>
@@ -881,34 +1010,26 @@ export function GestaoDocumentosPage() {
 
         {abaAtiva === "cadastro" ? (
           <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <input
-              id="arquivoDocumento"
-              type="file"
-              multiple
-              className="hidden"
-              onChange={(event) => {
-                const files = Array.from(event.target.files ?? []);
-                if (files.length > 0) {
-                  void subirAnexos(files);
-                }
-                event.target.value = "";
-              }}
-            />
-            <input
-              id="arquivoDocumentoSubstituicao"
-              type="file"
-              className="hidden"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                const anexoId = anexoParaSubstituirId;
-                if (file && anexoId) {
-                  void substituirAnexoExistente(anexoId, file);
-                } else {
-                  setAnexoParaSubstituirId(null);
-                }
-                event.target.value = "";
-              }}
-            />
+            <div className="md:col-span-2 xl:col-span-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/20 px-4 py-3">
+                <div className="min-w-0 space-y-1">
+                  <p className="text-sm font-semibold text-[var(--g3-active)]">Visualização do documento</p>
+                  <p className="text-xs text-[var(--g3-muted)]">
+                    Acesse o arquivo principal do cadastro ativo com um clique.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="border-emerald-700 bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 hover:text-white"
+                  onClick={() => void abrirAnexo(anexoPrincipal)}
+                  disabled={!anexoPrincipal || anexoProcessandoId === anexoPrincipal.id}
+                >
+                  <Eye className="mr-1.5 h-3.5 w-3.5" />
+                  Visualizar documento
+                </Button>
+              </div>
+            </div>
             <div className="space-y-1">
               <Label>Tipo de documento *</Label>
               <Select
@@ -1074,23 +1195,27 @@ export function GestaoDocumentosPage() {
               />
               Em renovação
             </label>
-            <div className="space-y-1 md:col-span-2 xl:col-span-4">
-              <Label>Descrição</Label>
-              <Textarea
-                rows={3}
-                value={form.descricao ?? ""}
-                onChange={(event) => setForm((atual) => ({ ...atual, descricao: event.target.value }))}
-              />
-            </div>
-            <div className="space-y-1 md:col-span-2 xl:col-span-4">
-              <Label>Observação de renovação</Label>
-              <Textarea
-                rows={2}
-                value={form.observacaoRenovacao ?? ""}
-                onChange={(event) =>
-                  setForm((atual) => ({ ...atual, observacaoRenovacao: event.target.value }))
-                }
-              />
+            <div className="grid gap-3 md:col-span-2 md:grid-cols-2 xl:col-span-4">
+              <div className="space-y-1">
+                <Label>Descrição</Label>
+                <Textarea
+                  rows={2}
+                  className="min-h-20"
+                  value={form.descricao ?? ""}
+                  onChange={(event) => setForm((atual) => ({ ...atual, descricao: event.target.value }))}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Observação de renovação</Label>
+                <Textarea
+                  rows={2}
+                  className="min-h-20"
+                  value={form.observacaoRenovacao ?? ""}
+                  onChange={(event) =>
+                    setForm((atual) => ({ ...atual, observacaoRenovacao: event.target.value }))
+                  }
+                />
+              </div>
             </div>
             <div className="md:col-span-2 xl:col-span-4">
               <Card className="border-[var(--g3-border)]">
@@ -1105,11 +1230,11 @@ export function GestaoDocumentosPage() {
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => document.getElementById("arquivoDocumento")?.click()}
-                      disabled={!form.id || carregandoAcoes}
+                      onClick={abrirSeletorArquivosPendentes}
+                      disabled={carregandoAcoes}
                     >
                       <Upload className="mr-1.5 h-3.5 w-3.5" />
-                      {anexosParaExibir.length > 0 ? "Adicionar arquivos" : "Enviar arquivos"}
+                      {anexosPendentes.length > 0 || anexosParaExibir.length > 0 ? "Adicionar arquivos" : "Selecionar arquivos"}
                     </Button>
                   </div>
                 </CardHeader>
@@ -1123,7 +1248,9 @@ export function GestaoDocumentosPage() {
                     >
                       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs">
                         <span className="font-semibold text-[var(--g3-active)]">
-                          Enviando arquivo{uploadFileProgressNome ? `: ${uploadFileProgressNome}` : ""}
+                          {uploadFileProgressNome === "Documento"
+                            ? "Salvando documento"
+                            : `Enviando arquivo${uploadFileProgressNome ? `: ${uploadFileProgressNome}` : ""}`}
                         </span>
                         <span className="font-semibold text-[var(--g3-active)]">{uploadFileProgress}%</span>
                       </div>
@@ -1135,9 +1262,41 @@ export function GestaoDocumentosPage() {
                       </div>
                     </div>
                   ) : null}
-                  {!form.id ? (
-                    <div className="rounded-md border border-dashed border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/20 p-4 text-sm text-[var(--g3-muted)]">
-                      Salve o documento primeiro para habilitar o envio do arquivo.
+                  {anexosPendentes.length > 0 ? (
+                    <div className="space-y-2 rounded-md border border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/10 p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-semibold text-[var(--g3-foreground)]">
+                          Arquivos prontos para envio
+                        </p>
+                        <span className="text-xs text-[var(--g3-muted)]">
+                          {anexosPendentes.length} arquivo(s)
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        {anexosPendentes.map((file, index) => (
+                          <div
+                            key={`${file.name}-${index}`}
+                            className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-[var(--g3-border)] bg-[var(--g3-card)] px-3 py-2 text-sm"
+                          >
+                            <div className="min-w-0">
+                              <p className="truncate font-semibold">{file.name}</p>
+                              <p className="text-xs text-[var(--g3-muted)]">{formatarTamanhoArquivo(file)}</p>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => limparArquivoPendente(index)}
+                              disabled={carregandoAcoes}
+                            >
+                              Remover
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-xs text-[var(--g3-muted)]">
+                        Os arquivos serão enviados automaticamente quando você clicar em salvar.
+                      </p>
                     </div>
                   ) : carregandoAnexo ? (
                     <div className="rounded-md border border-dashed border-[var(--g3-border)] bg-[var(--g3-primary-soft)]/15 p-4 text-sm text-[var(--g3-muted)]">
@@ -1145,63 +1304,55 @@ export function GestaoDocumentosPage() {
                     </div>
                   ) : anexoPrincipal ? (
                     <div className="space-y-3">
-                      <div className="flex flex-wrap items-start gap-3 rounded-md border border-[var(--g3-border)] bg-[var(--g3-card)] p-3">
-                        <div className="rounded-full bg-[var(--g3-primary-soft)] p-2 text-[var(--g3-active)]">
-                          <FileText className="h-5 w-5" />
-                        </div>
-                        <div className="min-w-0 flex-1 space-y-1">
-                          <p className="truncate text-sm font-semibold">{anexoPrincipal.nomeArquivo}</p>
-                          <p className="text-xs text-[var(--g3-muted)]">
-                            {anexoPrincipal.tipoMime ?? "application/pdf"} • {anexoPrincipal.tamanho ?? "---"}
-                          </p>
-                          {anexosOcultos ? (
+                      <div className="flex flex-col gap-3 rounded-md border border-[var(--g3-border)] bg-[var(--g3-card)] p-3 md:flex-row md:items-start md:justify-between">
+                        <div className="flex min-w-0 items-start gap-3">
+                          <div className="rounded-full bg-[var(--g3-primary-soft)] p-2 text-[var(--g3-active)]">
+                            <FileText className="h-5 w-5" />
+                          </div>
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <p className="truncate text-sm font-semibold">{anexoPrincipal.nomeArquivo}</p>
                             <p className="text-xs text-[var(--g3-muted)]">
-                              Além deste, há {anexosOcultos} arquivo(s) anexado(s) neste documento.
+                              {anexoPrincipal.tipoMime ?? "application/pdf"} • {anexoPrincipal.tamanho ?? "---"}
                             </p>
-                          ) : null}
+                            {anexosOcultos ? (
+                              <p className="text-xs text-[var(--g3-muted)]">
+                                Além deste, há {anexosOcultos} arquivo(s) anexado(s) neste documento.
+                              </p>
+                            ) : null}
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => void abrirAnexo(anexoPrincipal)}
-                          disabled={anexoProcessandoId === anexoPrincipal.id}
-                        >
-                          <Eye className="mr-1.5 h-3.5 w-3.5" />
-                          Visualizar
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => void imprimirAnexo(anexoPrincipal)}
-                          disabled={anexoProcessandoId === anexoPrincipal.id}
-                        >
-                          <Printer className="mr-1.5 h-3.5 w-3.5" />
-                          Imprimir
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => solicitarSubstituicaoAnexo(anexoPrincipal.id)}
-                          disabled={substituirAnexoMutation.isPending || anexoProcessandoId === anexoPrincipal.id}
-                        >
-                          <Upload className="mr-1.5 h-3.5 w-3.5" />
-                          Substituir
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="danger"
-                          size="sm"
-                          onClick={() => void excluirAnexoExistente(anexoPrincipal)}
-                          disabled={excluirAnexoMutation.isPending || anexoProcessandoId === anexoPrincipal.id}
-                        >
-                          <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-                          Excluir
-                        </Button>
+                        <div className="flex flex-wrap gap-2 md:flex-col md:items-stretch lg:flex-row lg:items-center">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => void imprimirAnexo(anexoPrincipal)}
+                            disabled={anexoProcessandoId === anexoPrincipal.id}
+                          >
+                            <Printer className="mr-1.5 h-3.5 w-3.5" />
+                            Imprimir
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => solicitarSubstituicaoAnexo(anexoPrincipal.id)}
+                            disabled={substituirAnexoMutation.isPending || anexoProcessandoId === anexoPrincipal.id}
+                          >
+                            <Upload className="mr-1.5 h-3.5 w-3.5" />
+                            Substituir
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="danger"
+                            size="sm"
+                            onClick={() => void excluirAnexoExistente(anexoPrincipal)}
+                            disabled={excluirAnexoMutation.isPending || anexoProcessandoId === anexoPrincipal.id}
+                          >
+                            <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                            Excluir
+                          </Button>
+                        </div>
                       </div>
                       {anexosParaExibir.length > 1 ? (
                         <div className="space-y-2">
@@ -1431,46 +1582,41 @@ export function GestaoDocumentosPage() {
         {abaAtiva === "anexos" ? (
           <section className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">
-              <input
-                id="arquivoDocumento"
-                type="file"
-                multiple
-                className="hidden"
-                onChange={(event) => {
-                  const files = Array.from(event.target.files ?? []);
-                  if (files.length > 0) {
-                    void subirAnexos(files);
-                  }
-                  event.target.value = "";
-                }}
-              />
-              <input
-                id="arquivoDocumentoSubstituicao"
-                type="file"
-                className="hidden"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  const anexoId = anexoParaSubstituirId;
-                  if (file && anexoId) {
-                    void substituirAnexoExistente(anexoId, file);
-                  } else {
-                    setAnexoParaSubstituirId(null);
-                  }
-                  event.target.value = "";
-                }}
-              />
-              <Button
-                variant="outline"
-                onClick={() => document.getElementById("arquivoDocumento")?.click()}
-                disabled={!form.id}
-              >
+              <Button variant="outline" onClick={abrirSeletorArquivosPendentes} disabled={carregandoAcoes}>
                 <Upload className="mr-1 h-3.5 w-3.5" />
-                Enviar anexos
+                Adicionar arquivos
               </Button>
               <span className="text-sm text-[var(--g3-muted)]">
-                Documento selecionado: {form.id ? form.tipoDocumento : "Nenhum"}
+                Documento selecionado: {form.id ? form.tipoDocumento : "Nenhum ainda salvo"}
               </span>
             </div>
+
+            {anexosPendentes.length > 0 ? (
+              <Card className="border-[var(--g3-border)]">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Arquivos pendentes</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {anexosPendentes.map((file, index) => (
+                    <div
+                      key={`${file.name}-${index}`}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-[var(--g3-border)] bg-[var(--g3-card)] px-3 py-2 text-sm"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold">{file.name}</p>
+                        <p className="text-xs text-[var(--g3-muted)]">{formatarTamanhoArquivo(file)}</p>
+                      </div>
+                      <Button type="button" variant="ghost" size="sm" onClick={() => limparArquivoPendente(index)}>
+                        Remover
+                      </Button>
+                    </div>
+                  ))}
+                  <p className="text-xs text-[var(--g3-muted)]">
+                    Esses arquivos serão gravados quando você clicar em salvar o documento.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : null}
 
             <div className="grid gap-3 md:grid-cols-2">
               <Card className="border-[var(--g3-border)]">

@@ -24,7 +24,8 @@ import {
   HeartPulse,
   HandCoins,
   FileText,
-  ArrowUpDown
+  ArrowUpDown,
+  CheckCircle2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -174,7 +175,7 @@ function obterPendenciasFormulario(
       return [];
     }
 
-    return [definicao];
+    return [{ campo, ...definicao }];
   });
 }
 
@@ -250,6 +251,24 @@ function formatarCep(cep?: string) {
 
 function normalizarEmailDigitado(email?: string) {
   return (email ?? "").replace(/\s+/g, "").toLowerCase();
+}
+
+function gerarSenhaPortalAcesso() {
+  return String(Math.floor(1000 + Math.random() * 9000));
+}
+
+function chaveSenhaPortalBeneficiario(id?: string) {
+  return id ? `g3n:beneficiario:senha-portal:${id}` : "";
+}
+
+function salvarSenhaPortalNaSessao(id?: string, senha?: string) {
+  if (!id || !senha || typeof window === "undefined") return;
+  window.sessionStorage.setItem(chaveSenhaPortalBeneficiario(id), senha);
+}
+
+function lerSenhaPortalDaSessao(id?: string) {
+  if (!id || typeof window === "undefined") return "";
+  return window.sessionStorage.getItem(chaveSenhaPortalBeneficiario(id)) ?? "";
 }
 
 function emailValido(email?: string) {
@@ -408,6 +427,7 @@ function mapearBeneficiarioParaFormulario(item?: Beneficiario): BeneficiarioForm
     telefone_secundario: formatarTelefoneInput(item.telefone_secundario),
     telefone_recado_numero: formatarTelefoneInput(item.telefone_recado_numero),
     email: normalizarEmailDigitado(item.email),
+    senha_portal: "",
     status: item.status ?? "EM_ANALISE",
     aceite_lgpd: item.aceite_lgpd ?? false
   };
@@ -499,6 +519,7 @@ function documentoTemConteudoPersistivel(documento: DocumentoCadastro) {
 function statusVariant(status?: BeneficiarioStatus) {
   switch (status) {
     case "ATIVO":
+    case "COMPLETO":
       return "success" as const;
     case "BLOQUEADO":
       return "danger" as const;
@@ -636,6 +657,8 @@ export function CadastroBeneficiarioPage() {
   >(documentosObrigatoriedadeBeneficiarioPadrao);
   const [documentos, setDocumentos] = useState<DocumentoCadastro[]>(() => criarDocumentosPadrao());
   const [popupSalvarAberto, setPopupSalvarAberto] = useState(false);
+  const [codigoCadastroSalvo, setCodigoCadastroSalvo] = useState("");
+  const [senhaPortalGerada, setSenhaPortalGerada] = useState("");
   const [popupExcluirAberto, setPopupExcluirAberto] = useState(false);
   const [popupImprimirAberto, setPopupImprimirAberto] = useState(false);
   const [popupDeclaracaoResidenciaAberto, setPopupDeclaracaoResidenciaAberto] = useState(false);
@@ -669,6 +692,7 @@ export function CadastroBeneficiarioPage() {
     register,
     control,
     handleSubmit,
+    setFocus,
     reset,
     setValue,
     getValues,
@@ -737,6 +761,7 @@ export function CadastroBeneficiarioPage() {
     const item = detalhesData.beneficiario;
 
     reset(mapearBeneficiarioParaFormulario(item));
+    setSenhaPortalGerada(lerSenhaPortalDaSessao(item.id_beneficiario));
     setDocumentos(mapearDocumentosDoBeneficiario(item, configuracaoDocumentos));
     if (exibirAvisoPendenciasAoCarregarRef.current) {
       setAvisoPendenciasSelecao(obterPendenciasAvisoBeneficiario(item));
@@ -750,14 +775,17 @@ export function CadastroBeneficiarioPage() {
   useEffect(() => {
     if (beneficiarioSelecionadoId) return;
     const codigo = proximoCodigoData?.codigo;
+    const senhaPortal = gerarSenhaPortalAcesso();
     reset({
       ...beneficiarioDefaultValues,
-      codigo: codigo ?? beneficiarioDefaultValues.codigo
+      codigo: codigo ?? beneficiarioDefaultValues.codigo,
+      senha_portal: senhaPortal
     });
     setDocumentos(criarDocumentosPadrao(configuracaoDocumentos));
     setAvisoPendenciasSelecao([]);
     exibirAvisoPendenciasAoCarregarRef.current = false;
     setPopupExcluirDocumentoId(null);
+    setSenhaPortalGerada(senhaPortal);
     ultimoCepConsultadoRef.current = "";
   }, [beneficiarioSelecionadoId, configuracaoDocumentos, proximoCodigoData, reset]);
 
@@ -1015,6 +1043,8 @@ export function CadastroBeneficiarioPage() {
       const pendenciasDocumentos = obterPendenciasDocumentos(documentos);
       if (!documentoCpf || pendenciasDocumentos.length > 0) {
         setAbaAtiva("documentos");
+        const primeiroDocumentoPendente = documentos.find((documento) => !documento.numeroDocumento?.trim() && !documento.caminhoArquivo && !documento.ignorado);
+        window.setTimeout(() => inputDocumentosRef.current[primeiroDocumentoPendente?.id ?? "cpf"]?.focus(), 100);
         setMensagem({
           tipo: "erro",
           texto: `Preencha ou corrija os campos: ${pendenciasDocumentos.join(", ")}.`
@@ -1050,6 +1080,7 @@ export function CadastroBeneficiarioPage() {
         ...valoresNormalizados,
         id_beneficiario: beneficiarioSelecionadoId,
         codigo: valoresNormalizados.codigo || beneficiarioPersistido?.codigo || proximoCodigoData?.codigo,
+        senha_portal: valoresNormalizados.senha_portal || beneficiarioPersistido?.senha_portal || undefined,
         cpf: documentoCpf.numeroDocumento,
         rg_numero: beneficiarioPersistido?.rg_numero || undefined,
         rg_orgao_emissor: beneficiarioPersistido?.rg_orgao_emissor || undefined,
@@ -1078,7 +1109,13 @@ export function CadastroBeneficiarioPage() {
         reset(mapearBeneficiarioParaFormulario(beneficiarioAtualizado));
         setDocumentos(mapearDocumentosDoBeneficiario(beneficiarioAtualizado, configuracaoDocumentos));
         setPopupExcluirDocumentoId(null);
+        setSenhaPortalGerada(response.senha_portal_gerada || valoresNormalizados.senha_portal || "");
+        salvarSenhaPortalNaSessao(
+          beneficiarioAtualizado.id_beneficiario,
+          response.senha_portal_gerada || valoresNormalizados.senha_portal || ""
+        );
         setMensagem(null);
+        setCodigoCadastroSalvo(beneficiarioAtualizado.codigo ?? "");
         setPopupSalvarAberto(true);
         setFiltros((prev) => ({ ...prev }));
         await refetchProximoCodigo();
@@ -1092,6 +1129,9 @@ export function CadastroBeneficiarioPage() {
     (submitErrors) => {
       const pendencias = obterPendenciasFormulario(submitErrors);
       setAbaAtiva(pendencias[0]?.aba ?? "dados");
+      if (pendencias[0]?.campo) {
+        window.setTimeout(() => setFocus(pendencias[0].campo as keyof BeneficiarioFormValues), 100);
+      }
       setMensagem({
         tipo: "erro",
         texto: pendencias.length
@@ -1508,11 +1548,15 @@ export function CadastroBeneficiarioPage() {
     encerrarWebcamDocumento();
     setBeneficiarioSelecionadoId(undefined);
     setAbaAtiva("dados");
+    const novaSenhaPortal = gerarSenhaPortalAcesso();
     await refetchProximoCodigo();
     reset({
       ...beneficiarioDefaultValues,
-      codigo: proximoCodigoData?.codigo
+      codigo: proximoCodigoData?.codigo,
+      senha_portal: novaSenhaPortal
     });
+    setSenhaPortalGerada(novaSenhaPortal);
+    salvarSenhaPortalNaSessao(undefined, novaSenhaPortal);
     setDocumentos(criarDocumentosPadrao(configuracaoDocumentos));
     setPopupExcluirDocumentoId(null);
     setMensagem(null);
@@ -1523,6 +1567,7 @@ export function CadastroBeneficiarioPage() {
     encerrarWebcamDocumento();
     if (detalhesData?.beneficiario) {
       reset(mapearBeneficiarioParaFormulario(detalhesData.beneficiario));
+      setSenhaPortalGerada(lerSenhaPortalDaSessao(detalhesData.beneficiario.id_beneficiario));
       setDocumentos(mapearDocumentosDoBeneficiario(detalhesData.beneficiario, configuracaoDocumentos));
       setPopupExcluirDocumentoId(null);
       setMensagem(null);
@@ -1998,6 +2043,32 @@ export function CadastroBeneficiarioPage() {
                   {formatarStatus(detalhesData.beneficiario.status)}
                 </Badge>
               )}
+              <div className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-2 py-1">
+                <span className="text-xs font-bold text-emerald-900">Senha do portal</span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-8 px-3 text-xs"
+                  onClick={() => {
+                    const novaSenha = gerarSenhaPortalAcesso();
+                    setValue("senha_portal", novaSenha, {
+                      shouldDirty: true,
+                      shouldValidate: true
+                    });
+                    setSenhaPortalGerada(novaSenha);
+                  }}
+                >
+                  Gerar
+                </Button>
+                {senhaPortalGerada ? (
+                  <Badge
+                    variant="default"
+                    className="h-8 rounded-md border-emerald-200 bg-emerald-50 px-3 text-xs font-semibold tracking-[0.16em] text-emerald-900"
+                  >
+                    {senhaPortalGerada}
+                  </Badge>
+                ) : null}
+              </div>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-emerald-900">Código do beneficiário</span>
                 <Badge
@@ -2158,6 +2229,11 @@ export function CadastroBeneficiarioPage() {
               </section>
             ) : (
               <form className="min-w-0 space-y-4" onSubmit={onSubmit}>
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-950" role="note">
+                  <p className="font-semibold">Para salvar o cadastro, preencha os dados principais obrigatórios:</p>
+                  <p className="mt-1">Nome completo, data de nascimento, nome da mãe, CEP, telefone principal, CPF, documentos obrigatórios e aceite da LGPD.</p>
+                  <p className="mt-1 text-xs">Ao clicar em Salvar, o sistema levará você automaticamente ao primeiro campo pendente. Depois de preencher, clique novamente em Salvar para avançar ao próximo.</p>
+                </div>
                 {abaAtiva === "dados" && (
                   <section className="grid gap-2 sm:grid-cols-2 xl:grid-cols-12 [&_button]:h-8 [&_input]:h-8 [&_label]:text-xs [&_select]:h-8">
                     <input type="hidden" {...register("foto_3x4")} />
@@ -2218,11 +2294,15 @@ export function CadastroBeneficiarioPage() {
                           </p>
                         </div>
 
-                        <div className="w-28 self-end rounded-md border border-emerald-200 bg-white px-2 py-1 text-center md:ml-auto md:self-center">
-                          <p className="text-[10px] font-medium text-emerald-700">Idade</p>
-                          <p className="text-xs font-semibold text-slate-900">
-                            {idadeAtual === "---" ? "Informe a data" : idadeAtual}
-                          </p>
+                        <div className="flex flex-col gap-3 md:ml-auto md:flex-row md:items-end">
+                          <div className="w-28 rounded-md border border-emerald-200 bg-white px-2 py-1 text-center md:self-center">
+                            <p className="text-[10px] font-medium text-emerald-700">Idade</p>
+                            <p className="text-xs font-semibold text-slate-900">
+                              {idadeAtual === "---" ? "Informe a data" : idadeAtual}
+                            </p>
+                          </div>
+
+                          <input type="hidden" {...register("senha_portal")} />
                         </div>
                       </div>
                     </div>
@@ -3042,24 +3122,39 @@ export function CadastroBeneficiarioPage() {
 
       {popupSalvarAberto && (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/45 px-4"
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/45 px-4 py-6"
           role="dialog"
           aria-modal="true"
           onClick={() => setPopupSalvarAberto(false)}
         >
           <div
-            className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl"
+            className="relative w-full max-w-md rounded-2xl border border-slate-200 bg-white px-6 pb-6 pt-8 shadow-2xl sm:px-8"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="border-b border-slate-100 px-5 py-4">
-              <h3 className="text-base font-semibold text-slate-900">Confirmação</h3>
+            <button
+              type="button"
+              aria-label="Fechar confirmação do cadastro"
+              className="absolute right-4 top-4 rounded-full p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+              onClick={() => setPopupSalvarAberto(false)}
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <div className="flex flex-col items-center text-center">
+              <CheckCircle2 className="h-20 w-20 stroke-[1.8] text-[var(--g3-primary)]" aria-hidden="true" />
+              <h3 className="mt-5 text-xl font-semibold text-slate-800">
+                Cadastro realizado com sucesso
+              </h3>
+              <p className="mt-3 text-sm text-slate-500">
+                Número do cadastro: <span className="font-semibold text-slate-700">{codigoCadastroSalvo || "—"}</span>
+              </p>
             </div>
-            <div className="px-5 py-4">
-              <p className="text-sm text-slate-700">Salvo com sucesso</p>
-            </div>
-            <div className="flex justify-end border-t border-slate-100 px-5 py-3">
-              <Button type="button" onClick={() => setPopupSalvarAberto(false)}>
-                OK
+            <div className="mt-7">
+              <Button
+                type="button"
+                className="h-12 w-full rounded-lg bg-[var(--g3-primary-button)] text-base font-semibold text-white shadow-sm hover:bg-[var(--g3-primary-button-hover)]"
+                onClick={() => setPopupSalvarAberto(false)}
+              >
+                Finalizar cadastro
               </Button>
             </div>
           </div>

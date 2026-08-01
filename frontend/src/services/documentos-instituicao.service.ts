@@ -19,18 +19,20 @@ export const documentosInstituicaoService = {
     return data;
   },
 
-  async criar(payload: DocumentoInstituicaoPayload) {
+  async criar(payload: DocumentoInstituicaoPayload, options?: UploadProgressOptions) {
     const { data } = await httpClient.post<DocumentoInstituicao>(
       "/api/documentos-instituicao",
-      payload
+      payload,
+      { timeout: 300000, onUploadProgress: options?.onUploadProgress }
     );
     return data;
   },
 
-  async atualizar(id: string, payload: DocumentoInstituicaoPayload) {
+  async atualizar(id: string, payload: DocumentoInstituicaoPayload, options?: UploadProgressOptions) {
     const { data } = await httpClient.put<DocumentoInstituicao>(
       `/api/documentos-instituicao/${id}`,
-      payload
+      payload,
+      { timeout: 300000, onUploadProgress: options?.onUploadProgress }
     );
     return data;
   },

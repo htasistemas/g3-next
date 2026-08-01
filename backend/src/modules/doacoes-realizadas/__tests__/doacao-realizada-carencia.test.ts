@@ -120,6 +120,7 @@ test("deve bloquear entrega do mesmo item dentro da carencia sem autorizacao adm
         {
           id: "2",
           nomeUsuario: "operador",
+          tenant_id: "tenant-teste",
           permissoes: ["OPERADOR"]
         }
       ),
@@ -150,6 +151,7 @@ test("deve permitir entrega quando o item ja cumpriu a carencia", async () => {
     {
       id: "2",
       nomeUsuario: "operador",
+      tenant_id: "tenant-teste",
       permissoes: ["OPERADOR"]
     }
   );
@@ -167,11 +169,15 @@ test("deve registrar autorizacao administrativa ao liberar entrega dentro da car
   });
 
   const senhaHash = await bcrypt.hash("123456", 10);
-  (service as any).buscarUsuarioAutenticadoPorId = async () => ({
-    nomeUsuario: "admin",
-    nome: "Administrador G3",
-    senhaHash
-  });
+  let consultaUsuario: { id?: bigint; tenantId?: string } | undefined;
+  (service as any).authRepository.buscarUsuarioPorId = async (id: bigint, tenantId: string) => {
+    consultaUsuario = { id, tenantId };
+    return {
+      nomeUsuario: "admin",
+      nome: "Administrador G3",
+      senhaHash
+    };
+  };
 
   await service.criar(
     {
@@ -188,6 +194,7 @@ test("deve registrar autorizacao administrativa ao liberar entrega dentro da car
     {
       id: "99",
       nomeUsuario: "admin",
+      tenant_id: "tenant-teste",
       permissoes: ["ADMINISTRADOR"]
     }
   );
@@ -200,4 +207,6 @@ test("deve registrar autorizacao administrativa ao liberar entrega dentro da car
   assert.equal(payloadCriado?.itens[0]?.autorizado_por_nome, "Administrador G3");
   assert.equal(payloadCriado?.itens[0]?.ultima_entrega_em, "2026-03-10");
   assert.ok(payloadCriado?.itens[0]?.autorizacao_carencia_em);
+  assert.equal(consultaUsuario?.id, 99n);
+  assert.equal(consultaUsuario?.tenantId, "tenant-teste");
 });

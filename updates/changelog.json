@@ -1,109 +1,1406 @@
 {
   "entries":  [
                     {
-                        "version":  "1.00.591",
-                        "releaseDate":  "2026-08-01",
-                        "title":  "Menu Gestao educacional restaurado",
-                        "description":  "O menu Gestao educacional voltou ao shell principal com a tela educacional dedicada, o catalogo de salas foi compatibilizado e a regra de exclusao de menus passou a exigir autorizacao confirmada.",
+                        "version": "1.00.780",
+                        "releaseDate": "2026-08-01",
+                        "title": "Sincronizacao da base de teste",
+                        "description": "A base de teste foi alinhada com a branch principal disponivel no GitHub, preservando a restauracao do menu Gestao educacional e as validacoes da carteira digital do evento.",
+                        "changes": ["Branch de teste recebeu os commits de origin/main.", "Arquivos oficiais de versao foram normalizados para 1.00.780.", "Regra de exclusao de menus sem confirmacao foi preservada."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.779",
+                        "releaseDate": "2026-07-29",
+                        "title": "Correção do alerta de tarefas vencidas",
+                        "description": "O alerta do topo agora identifica tarefas não concluídas cujo prazo já passou, mesmo quando o status ainda está como Aberta.",
+                        "changes": ["Prazo vencido considerado no resumo de tarefas.", "Tarefas abertas fora do prazo passam a acionar o alerta vermelho e piscante.", "Tarefas concluídas continuam fora do alerta."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.778",
+                        "releaseDate": "2026-07-29",
+                        "title": "Renomeação do menu Educacional",
+                        "description": "O menu do sistema agora exibe o nome Gestão educacional, mantendo as rotas e funcionalidades existentes.",
+                        "changes": ["Nome da seção atualizado no menu lateral.", "Título superior da área atualizado.", "Manual do sistema alinhado à nova nomenclatura."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.777",
+                        "releaseDate": "2026-07-29",
+                        "title": "Alerta visual para tarefas vencidas",
+                        "description": "O ícone Tarefas no topo agora muda para vermelho e pisca quando existem tarefas em atraso, direcionando o usuário para a resolução.",
+                        "changes": ["Indicador vermelho para tarefas vencidas.", "Animação de alerta enquanto houver atraso.", "Navegação para a listagem de tarefas ao clicar no indicador."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.776",
+                        "releaseDate": "2026-07-29",
+                        "title": "Listagem simplificada de documentos do Termo de fomento",
+                        "description": "A tabela da aba Documentos foi simplificada, mantendo apenas identificação, origem e ações dos arquivos.",
+                        "changes": ["Coluna Arquivo removida da listagem.", "Ações de visualizar, imprimir e excluir preservadas."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.775",
+                        "releaseDate": "2026-07-29",
+                        "title": "Ações por ícones nos documentos do Termo de fomento",
+                        "description": "A listagem de documentos agora apresenta visualizar, imprimir e excluir de forma compacta por ícones.",
+                        "changes": ["Ícone para visualizar documento.", "Ícone para imprimir documento.", "Ícone para excluir documento com confirmação."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.774",
+                        "releaseDate": "2026-07-29",
+                        "title": "Tipos simplificados de documentos do Termo de fomento",
+                        "description": "O envio de documentos agora usa somente o tipo do documento e o arquivo, com o botão de envio ao lado do seletor.",
+                        "changes": ["Campo Nome removido.", "Tipos Termo de Fomento e Primeiro a Quinto Aditivo disponíveis.", "Botão Enviar documento posicionado ao lado do arquivo."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.773",
+                        "releaseDate": "2026-07-29",
+                        "title": "Envio unificado de documentos do Termo de fomento",
+                        "description": "A aba Documentos agora usa um único formulário para enviar e listar todos os arquivos vinculados ao termo.",
+                        "changes": ["Formulário único de envio de documentos.", "Lista consolidada de documentos vinculados.", "Visualização, impressão e remoção mantidas na listagem."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.772",
+                        "releaseDate": "2026-07-29",
+                        "title": "Correção da configuração da IA em produção",
+                        "description": "As variáveis do provedor Gemini agora são encaminhadas corretamente para o backend executado pelo Docker Compose.",
+                        "changes": ["Chave Gemini disponibilizada ao container do backend.", "Provedor e modelo de IA alinhados entre teste e produção.", "Sugestões com IA do plano de trabalho restauradas quando a chave estiver configurada no servidor."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.771",
+                        "releaseDate": "2026-07-29",
+                        "title": "Progresso no envio de documentos do Termo de fomento",
+                        "description": "A aba Documentos agora mostra o andamento do upload do documento principal e dos documentos relacionados até a confirmação do envio.",
+                        "changes": ["Barra de progresso no envio do documento principal.", "Barra de progresso no envio de documentos relacionados.", "Feedback visual acessível durante o upload."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.770",
+                        "releaseDate": "2026-07-28",
+                        "title": "Correção do padrão visual do Portal do Doador",
+                        "description": "A página pública do Portal do Doador foi ajustada para seguir a mesma composição visual do Portal da Transparência.",
+                        "changes": ["Largura e espaçamento institucionais ajustados.", "Hero azul no padrão do portal de referência.", "Cards horizontais de serviços reorganizados.", "Fluxo de acesso do doador preservado."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.769",
+                        "releaseDate": "2026-07-28",
+                        "title": "Ajuste completo do Portal do Doador",
+                        "description": "A tela de entrada e o painel autenticado do Portal do Doador agora seguem o padrão visual do Portal da Transparência.",
+                        "changes": ["Cabeçalho e navegação institucional.", "Hero azul no padrão dos demais portais.", "Categorias e cartões de serviços.", "Painel autenticado com rodapé institucional."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.768",
+                        "releaseDate": "2026-07-28",
+                        "title": "Padrão visual dos portais externos",
+                        "description": "Os portais do doador, voluntário e parceiro/financiador foram alinhados ao formato institucional do Portal da Transparência.",
+                        "changes": ["Cabeçalho, hero e navegação institucional nos portais.", "Categorias e cartões de serviços.", "Indicadores e rodapé com o mesmo padrão visual.", "Fluxos de acesso existentes preservados."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.767",
+                        "releaseDate": "2026-07-28",
+                        "title": "Acesso multi-instituição do beneficiário",
+                        "description": "O acesso do beneficiário agora localiza todos os vínculos institucionais do CPF e permite escolher a instituição antes de carregar os dados.",
+                        "changes": ["Busca de todos os vínculos do CPF.", "Validação da senha por instituição.", "Seleção da instituição antes da abertura do painel.", "Dados operacionais carregados somente para o tenant selecionado."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.766",
+                        "releaseDate": "2026-07-28",
+                        "title": "Novo layout do Portal do beneficiário e família",
+                        "description": "O portal do beneficiário e família agora utiliza o mesmo padrão visual institucional do Portal da Transparência.",
+                        "changes": ["Cabeçalho e hero institucional.", "Entrada com CPF e senha em destaque.", "Categorias e cartões de serviços.", "Indicadores, acompanhamento e rodapé no padrão público."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.765",
+                        "releaseDate": "2026-07-28",
+                        "title": "Logomarca da instituição no rodapé",
+                        "description": "O rodapé do Portal da Transparência agora utiliza a mesma logomarca institucional exibida no cabeçalho.",
+                        "changes": ["Substituído o ícone genérico do rodapé pela logomarca da instituição.", "Mantido fallback para o ícone institucional quando não houver imagem."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.764",
+                        "releaseDate": "2026-07-28",
+                        "title": "Correção da URL da logomarca pública",
+                        "description": "A logomarca do Portal da Transparência agora usa a base correta da API, evitando que o frontend tente carregar o HTML como imagem.",
+                        "changes": ["URL absoluta baseada na configuração do cliente HTTP.", "Compatibilidade com frontend na porta 5173 e backend na porta 3333.", "Mantida a resolução dos caminhos físicos dentro do tenant."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.763",
+                        "releaseDate": "2026-07-28",
+                        "title": "Correção do carregamento da logomarca pública",
+                        "description": "O Portal da Transparência agora resolve caminhos antigos e atuais de armazenamento da logomarca dentro do tenant.",
+                        "changes": ["Compatibilidade com caminhos legados de arquivos.", "Fallback para o diretório físico do tenant.", "Endpoint validado com resposta 200 e imagem JPEG."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.762",
+                        "releaseDate": "2026-07-28",
+                        "title": "Logomarca da unidade no Portal da Transparência",
+                        "description": "A logomarca pública agora utiliza a logo da instituição e, quando ausente, a logomarca da unidade principal cadastrada no G3N.",
+                        "changes": ["Fallback para imagens_unidade.logomarca_relatorio e logomarca.", "Endpoint público de logo atualizado para a mesma origem do cabeçalho.", "Mantida a separação por tenant e slug."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.761",
+                        "releaseDate": "2026-07-28",
+                        "title": "Ajuste do campo de busca institucional",
+                        "description": "O campo de busca da instituição foi reorganizado para manter o rótulo acima e a orientação ao lado do campo.",
+                        "changes": ["Rótulo Buscar instituição em linha própria.", "Orientação de pesquisa posicionada ao lado do campo.", "Removida a frase sobre listagem automática."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.760",
+                        "releaseDate": "2026-07-28",
+                        "title": "Busca e identidade do Portal da Transparência",
+                        "description": "A busca de instituições agora ocorre por nome ou CNPJ, com troca de instituição e logomarca correspondente no portal.",
+                        "changes": ["Instituições não são listadas antes da digitação.", "Busca com resultados clicáveis por nome ou CNPJ.", "Botão Trocar instituição disponível no portal selecionado.", "Logomarca da instituição exibida no cabeçalho e na apresentação."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.759",
+                        "releaseDate": "2026-07-28",
+                        "title": "Portal da Transparência multi-instituição",
+                        "description": "O portal público agora identifica a instituição por slug, filtra os dados pelo tenant correto e apresenta dados reais com checklist de transparência.",
+                        "changes": ["Seleção de instituição no endereço público sem slug.", "Rotas individuais no formato /portal-transparencia/{slug}.", "Publicação de identificação institucional, projetos, termos de fomento, indicadores e dados financeiros cadastrados.", "Checklist baseada na Lei nº 13.019/2014 e Decreto nº 8.726/2016, com sugestões para dados ausentes."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.758",
+                        "releaseDate": "2026-07-28",
+                        "title": "Cores do rodapé alinhadas ao topo",
+                        "description": "O rodapé do Portal da Transparência agora utiliza o mesmo gradiente azul institucional da faixa superior.",
+                        "changes": ["Gradiente do rodapé igual ao hero do portal.", "Contraste dos textos e links preservado para leitura."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.757",
+                        "releaseDate": "2026-07-28",
+                        "title": "Rodapé institucional do Portal da Transparência",
+                        "description": "O rodapé do portal foi alinhado ao modelo institucional com identificação, contato, links legais e retorno ao topo.",
+                        "changes": ["Faixa escura institucional em largura total.", "Identificação e contato organizados em colunas.", "Links de LGPD, política de privacidade e termos de uso.", "Versão pública e botão Voltar ao topo."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.756",
+                        "releaseDate": "2026-07-28",
+                        "title": "Novo layout do Portal da Transparência",
+                        "description": "O portal público de transparência agora segue o padrão visual institucional com cabeçalho, hero, busca, categorias e cartões de serviços.",
+                        "changes": ["Cabeçalho público com navegação e ação de consulta.", "Hero institucional com busca centralizada.", "Categorias horizontais e cartões de serviços com acesso rápido.", "Resultados públicos filtrados pela busca e indicadores destacados."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.755",
+                        "releaseDate": "2026-07-28",
+                        "title": "Logomarca no relatório do plano de trabalho",
+                        "description": "O relatório impresso ou exportado para PDF agora carrega a logomarca configurada para a unidade ou instituição.",
+                        "changes": ["Logomarca da unidade incluída no cabeçalho do relatório.", "Suporte a arquivos protegidos por URL temporária autenticada.", "Fallback para a logomarca configurada no cadastro da instituição."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.754",
+                        "releaseDate": "2026-07-28",
+                        "title": "Impressão do plano sem bloqueio de pop-up",
+                        "description": "A geração do relatório completo do plano de trabalho agora utiliza impressão integrada, sem depender da abertura de uma nova janela.",
+                        "changes": ["Removida a dependência de pop-up para Imprimir e Gerar PDF.", "Relatório carregado em iframe invisível e enviado à caixa de impressão do navegador.", "Mensagem de bloqueio de janela substituída por tratamento de erro de preparação."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.753",
+                        "releaseDate": "2026-07-28",
+                        "title": "Navegação pelas pendências do plano",
+                        "description": "A checklist da aba Declaração e aprovação agora permite abrir diretamente a seção que precisa de preenchimento.",
+                        "changes": ["Pendências transformadas em ações clicáveis.", "Navegação direta para a aba correspondente ao campo pendente.", "Validação e mensagens de erro preservadas."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.752",
+                        "releaseDate": "2026-07-28",
+                        "title": "Acesso à impressão do plano de trabalho",
+                        "description": "As ações Gerar PDF e Imprimir agora ficam disponíveis nas abas de edição do plano de trabalho.",
+                        "changes": ["Ações de impressão exibidas em todas as abas de edição.", "Validação dos campos pendentes realizada somente ao solicitar a impressão.", "Relatório completo mantido no padrão A4 com capa e conteúdo institucional."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.751",
+                        "releaseDate": "2026-07-28",
+                        "title": "Relatório completo do plano de trabalho",
+                        "description": "A impressão e o PDF do plano de trabalho agora geram um documento completo com capa e todas as seções do plano.",
+                        "changes": ["Capa institucional com título, instituição, CNPJ, órgão e período.", "Inclusão completa das abas de apresentação, justificativa, objetivos, metas, cronograma, orçamento, monitoramento, prestação, anexos e declaração.", "Layout A4 com cabeçalhos de tabela repetidos e quebras de página para impressão."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.750",
+                        "releaseDate": "2026-07-28",
+                        "title": "Confirmação padrão no plano de trabalho",
+                        "description": "O salvamento do plano de trabalho agora utiliza o modal padrão de cadastro com ícone, número do registro e botão Finalizar cadastro.",
+                        "changes": ["Confirmação visual padronizada no salvamento do plano.", "Número do cadastro exibido no modal.", "Regra reforçada no agents.md para telas novas e existentes."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.749",
+                        "releaseDate": "2026-07-28",
+                        "title": "Cores por situação na listagem do plano",
+                        "description": "A listagem de planos de trabalho agora diferencia visualmente cada situação por cor de fundo.",
+                        "changes": ["Em análise em amarelo, Aprovado em verde e Reprovado em vermelho.", "Rascunho em branco, Concluído em azul e Em execução em cinza.", "Legenda de cores adicionada e destaque do item selecionado preservado."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.748",
+                        "releaseDate": "2026-07-28",
+                        "title": "Correção ao abrir planos existentes",
+                        "description": "Planos de trabalho antigos ou com campos vazios agora são normalizados ao serem abertos pela listagem.",
+                        "changes": ["Campos textuais ausentes recebem valores vazios compatíveis com a edição.", "Metas, etapas e listas relacionadas são carregadas com estruturas padrão.", "A abertura do plano não gera mais erro de trim em campos indefinidos."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.747",
+                        "releaseDate": "2026-07-28",
+                        "title": "Correção do limite do órgão do plano",
+                        "description": "O salvamento do plano de trabalho agora suporta nomes de órgãos concedentes ou parceiros maiores que 40 caracteres.",
+                        "changes": ["Coluna legada orgao_concedente ampliada para 200 caracteres.", "Compatibilidade mantida com a coluna orgao_parceiro já utilizada pela tela.", "Nomes completos de órgãos não geram mais erro de persistência."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.746",
+                        "releaseDate": "2026-07-28",
+                        "title": "Validação imediata das datas de metas",
+                        "description": "Datas de metas e etapas agora são criticadas no momento do preenchimento conforme o período de execução do plano.",
+                        "changes": ["Campos de data recebem limite mínimo e máximo do período do plano.", "Mensagens mostram as datas permitidas para início e término.", "Também é indicada a inconsistência quando o término fica antes do início."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.745",
+                        "releaseDate": "2026-07-28",
+                        "title": "Correção das sugestões de IA nos campos",
+                        "description": "Sugestões textuais agora são encaminhadas corretamente para geração de conteúdo, sem serem interpretadas como consultas internas do sistema.",
+                        "changes": ["Consultas de campo não acionam mais buscas automáticas de beneficiários, localização ou faixa etária.", "A IA recebe o título, o contexto e o conteúdo atual do campo.", "A resposta é solicitada em texto corrido para preenchimento direto."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.744",
+                        "releaseDate": "2026-07-28",
+                        "title": "Sugestões de IA em monitoramento e prestação",
+                        "description": "As abas Monitoramento e avaliação e Prestação de contas agora possuem sugestões de IA contextualizadas.",
+                        "changes": ["Sugestões para acompanhamento, indicadores, periodicidade, responsável, resultados e evidências.", "Sugestões para responsável, documentos exigidos e observações da prestação de contas.", "Novas solicitações consideram o conteúdo já editado."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.743",
+                        "releaseDate": "2026-07-28",
+                        "title": "Sugestões de IA na justificativa",
+                        "description": "Todos os campos da aba Justificativa do plano de trabalho agora possuem sugestões de IA contextualizadas.",
+                        "changes": ["Sugestões para problema social, causas e consequências, indicadores, capacidade de execução e impacto.", "A IA utiliza o contexto do plano e da instituição.", "Novas sugestões consideram o texto já editado para aprimoramento."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.742",
+                        "releaseDate": "2026-07-28",
+                        "title": "Sugestões de IA na apresentação institucional",
+                        "description": "A aba Apresentação e histórico do plano de trabalho agora oferece sugestões de IA contextualizadas para os campos institucionais.",
+                        "changes": ["Sugestões para histórico, finalidade, experiência, registros, público atendido e capacidade técnica.", "Contexto da instituição, objeto e público do plano enviado à IA.", "Nova solicitação considera o texto já editado para aprimorar a sugestão."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.741",
+                        "releaseDate": "2026-07-28",
+                        "title": "Retorno automático para a listagem de termos",
+                        "description": "Após salvar ou atualizar um termo de fomento, a tela agora retorna automaticamente para a aba de listagem.",
+                        "changes": ["A aba Listagem de termos é aberta após o salvamento.", "O registro salvo permanece disponível na listagem atualizada.", "A confirmação de sucesso continua sendo exibida após a operação."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.740",
+                        "releaseDate": "2026-07-28",
+                        "title": "Responsável pela indicação do termo",
+                        "description": "A aba Dados gerais do termo de fomento agora permite registrar quem indicou ou articulou o instrumento.",
+                        "changes": ["Novo campo Responsável pela indicação.", "Informação persistida e considerada na busca dos termos.", "Responsável exibido no relatório de impressão."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.739",
+                        "releaseDate": "2026-07-28",
+                        "title": "Finalidade na listagem de termos",
+                        "description": "A listagem de termos de fomento agora exibe a finalidade informada no campo Referente a.",
+                        "changes": ["Nova coluna Referente a na aba Listagem de termos.", "Termos sem finalidade exibem ---.", "Busca continua considerando a finalidade do termo."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.738",
+                        "releaseDate": "2026-07-28",
+                        "title": "Identificação do termo de fomento",
+                        "description": "A aba Dados gerais do termo de fomento agora permite informar a finalidade ou o projeto ao qual o instrumento se refere.",
+                        "changes": ["Novo campo Referente a com orientação de preenchimento.", "A informação é persistida e considerada na busca dos termos.", "A identificação também aparece no relatório de impressão."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.737",
+                        "releaseDate": "2026-07-28",
+                        "title": "Digitação livre no valor do termo",
+                        "description": "A máscara monetária do valor global e do novo valor de aditivos agora permite digitação contínua, aplicando a formatação ao finalizar o campo.",
+                        "changes": ["Valor global aceita números maiores que 1,00 durante a digitação.", "Formatação brasileira é aplicada ao sair do campo.", "A mesma correção foi aplicada ao novo valor dos aditivos."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.736",
+                        "releaseDate": "2026-07-28",
+                        "title": "Uploads e aditivos no termo de fomento",
+                        "description": "A aba Documentos do termo de fomento agora utiliza upload real para armazenamento institucional, e a aba Aditivos recebeu tipos padronizados e máscara monetária.",
+                        "changes": ["Documento principal e documentos relacionados passam a ser enviados ao storage do sistema.", "Novo escopo de armazenamento termo_fomento_documento, separado por entidade e categoria.", "Campo Tipo de aditivo substituído por lista de tipos recorrentes em termos e contratos.", "Campo Novo valor com máscara monetária brasileira e persistência numérica."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.735",
+                        "releaseDate": "2026-07-28",
+                        "title": "Sugestões de órgãos no padrão visual",
+                        "description": "O campo de órgão concedente do plano deixou de usar o menu nativo do navegador e passou a exibir sugestões com o padrão visual do G3N.",
+                        "changes": ["Menu de sugestões próprio com cores, bordas e rolagem do sistema.", "Digitação manual de órgãos preservada.", "Filtros das sugestões aplicados conforme o texto digitado."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.734",
+                        "releaseDate": "2026-07-28",
+                        "title": "Órgãos e termos vinculados no plano",
+                        "description": "A identificação do plano agora facilita a escolha do órgão parceiro e o vínculo com termos de fomento cadastrados.",
+                        "changes": ["Sugestões de órgãos municipais, estaduais e federais no campo Órgão concedente ou parceiro.", "Inclusão manual de outros órgãos preservada.", "Termos de fomento disponíveis para seleção quando o tipo da parceria for correspondente.", "Botão Cadastrar termo abre a tela de termos de fomento quando necessário.", "A seleção do termo pode reaproveitar órgão concedente e período de vigência no plano."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.733",
+                        "releaseDate": "2026-07-28",
+                        "title": "Confirmação visual no cadastro de escalas",
+                        "description": "O cadastro de escala de voluntariado deixou de usar a confirmação antiga e agora apresenta o modal padrão de sucesso do G3N.",
+                        "changes": ["Novo modal com ícone verde, número do cadastro e botão Finalizar cadastro.", "A confirmação informa se a escala foi criada ou atualizada.", "Mensagens de erro continuam sendo exibidas separadamente."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.732",
+                        "releaseDate": "2026-07-28",
+                        "title": "Sugestões de preenchimento com IA no plano",
+                        "description": "O preenchimento do plano de trabalho agora conta com sugestões geradas pela IA nos campos textuais principais.",
+                        "changes": ["Novo botão Sugerir com IA no objeto do plano, justificativa, objetivo geral, objetivos específicos e metas.", "A sugestão considera o contexto já preenchido no plano.", "O texto gerado é aplicado ao campo para revisão e edição antes do salvamento.", "O sistema mantém feedback de carregamento e erro durante a geração."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.731",
+                        "releaseDate": "2026-07-28",
+                        "title": "Rascunho de plano com CPF corrigido",
+                        "description": "A aba Declaração e aprovação permite salvar rascunhos incompletos sem bloquear campos ainda não preenchidos e trata corretamente CPFs opcionais.",
+                        "changes": ["Campos vazios opcionais não são mais interpretados como CPF inválido.", "O CPF é validado quando informado, inclusive no representante da declaração.", "A validação completa permanece obrigatória no envio para análise ou aprovação.", "A porcentagem de conclusão continua indicando as pendências do rascunho."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.730",
+                        "releaseDate": "2026-07-27",
+                        "title": "Prévia de mensagens sem piscada",
+                        "description": "A prévia de WhatsApp e e-mail deixou de ser regenerada continuamente após carregar, mantendo a visualização estável.",
+                        "changes": ["Efeito de geração desacoplado do estado interno da mutation.", "Prévia continua sendo atualizada quando mensagem, canal ou destinatário mudam.", "Estado de carregamento preservado nos botões de atualização e confirmação."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.729",
+                        "releaseDate": "2026-07-27",
+                        "title": "Busca e prévia de mensagens corrigidas",
+                        "description": "A tela de mensagens personalizadas volta a buscar destinatários por nome e habilitar corretamente a prévia antes do envio.",
+                        "changes": ["Consulta de destinatários compatível com bases legadas.", "Erros de busca agora recebem feedback visível.", "A atualização da prévia usa corretamente o primeiro destinatário também no envio para todos."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.728",
+                        "releaseDate": "2026-07-27",
+                        "title": "Cor padrão da unidade nas confirmações",
+                        "description": "Os modais de conclusão dos cadastros principais agora seguem a cor padrão configurada para a unidade autenticada.",
+                        "changes": ["Ícones de sucesso usam a cor temática da unidade.", "Botões Finalizar cadastro usam as cores padrão do tema.", "Beneficiários, profissionais, unidades e voluntários mantêm o mesmo padrão visual."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.727",
+                        "releaseDate": "2026-07-27",
+                        "title": "Confirmação visual no cadastro de voluntariado",
+                        "description": "A conclusão do cadastro de voluntário agora exibe uma confirmação visual com ícone de sucesso, número do cadastro e botão Finalizar cadastro.",
+                        "changes": ["Novo modal de sucesso alinhado ao fluxo de cadastro.", "Exibição do ID persistido como número do cadastro.", "Fechamento com um clique pelo botão principal ou pelo ícone de fechar."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.726",
+                        "releaseDate": "2026-07-27",
+                        "title": "Confirmação visual no cadastro de unidades",
+                        "description": "A conclusão do cadastro de unidade de atendimento agora exibe uma confirmação visual com ícone de sucesso, número do cadastro e botão Finalizar cadastro.",
+                        "changes": ["Novo modal de sucesso alinhado ao fluxo de cadastro.", "Exibição do ID persistido como número do cadastro.", "Fechamento com um clique pelo botão principal ou pelo ícone de fechar."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.725",
+                        "releaseDate": "2026-07-27",
+                        "title": "Confirmação visual no cadastro de profissionais",
+                        "description": "A conclusão do cadastro de profissional agora exibe uma confirmação visual com ícone de sucesso, número do cadastro e botão Finalizar cadastro.",
+                        "changes": ["Novo modal de sucesso alinhado ao fluxo de cadastro.", "Exibição do ID persistido como número do cadastro.", "Fechamento com um clique pelo botão principal ou pelo ícone de fechar."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.724",
+                        "releaseDate": "2026-07-27",
+                        "title": "Confirmação visual no cadastro de beneficiários",
+                        "description": "A conclusão do cadastro de beneficiário agora exibe uma confirmação visual com ícone de sucesso, número do cadastro e botão Finalizar cadastro.",
+                        "changes": ["Novo modal de sucesso alinhado ao fluxo de cadastro.", "Exibição do número gerado para conferência.", "Fechamento com um clique pelo botão principal ou pelo ícone de fechar."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.682",
+                        "releaseDate": "2026-07-19",
+                        "title": "Correção do aquecimento de mensagens",
+                        "description": "O backend deixa de falhar ao criar modelos-base de mensagens durante chamadas simultâneas de inicialização.",
+                        "changes": ["Preparação da estrutura executada uma única vez por processo.", "Conflitos de chave do tenant tratados atomicamente.", "Inicialização do Windows sem shell global inseguro."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.681",
+                        "releaseDate": "2026-07-19",
+                        "title": "Edição das salas de atendimento",
+                        "description": "A aba Salas de atendimento permite editar nome, vagas e status diretamente na listagem.",
+                        "changes": ["Edição direta do nome e da capacidade.", "Ativação e inativação persistidas corretamente.", "Valores alterados são enviados no mesmo salvamento da unidade."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.680",
+                        "releaseDate": "2026-07-19",
+                        "title": "Logomarcas lado a lado",
+                        "description": "As duas logomarcas do cadastro de unidade de atendimento agora ficam organizadas lado a lado na aba Dados gerais.",
+                        "changes": ["Layout responsivo em duas colunas.", "Em telas menores, os campos continuam empilhados para preservar a usabilidade."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.679",
+                        "releaseDate": "2026-07-19",
+                        "title": "Correção das vagas das salas de atendimento",
+                        "description": "O cadastro de salas passa a preservar a capacidade informada e o status ativo ao salvar a unidade.",
+                        "changes": ["Conversão segura da capacidade enviada pelo formulário.", "Normalização correta do status ativo/inativo."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.678",
+                        "releaseDate": "2026-07-19",
+                        "title": "Vagas por unidade e sala de ensino",
+                        "description": "Matrículas educacionais agora são vinculadas a uma unidade de ensino e a uma sala com capacidade controlada.",
+                        "changes": ["Cadastro de capacidade máxima por sala.", "Exibição de vagas ocupadas e disponíveis na matrícula.", "Bloqueio backend para impedir matrícula em sala lotada ou incompatível."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.677",
+                        "releaseDate": "2026-07-19",
+                        "title": "Destaque exclusivo dos submenus Educacionais",
+                        "description": "A seleção do menu Educacional agora respeita a aba aberta e não mantém Visão geral marcada junto com outro submenu.",
+                        "changes": ["Visão geral ativa somente na rota inicial.", "Alunos, Estrutura acadêmica e demais grupos ficam destacados individualmente.", "Compatibilidade mantida para as rotas com query string."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.676",
+                        "releaseDate": "2026-07-19",
+                        "title": "Padronização das abas Educacionais",
+                        "description": "As abas laterais do módulo Educacional agora reutilizam exatamente o padrão visual do cadastro de beneficiários.",
+                        "changes": ["Fundo institucional nas abas inativas.", "Destaque visual consistente na aba ativa.", "Numeração, espaçamento e tipografia alinhados ao padrão G3N."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.675",
+                        "releaseDate": "2026-07-19",
+                        "title": "Ações contextuais no módulo Educacional",
+                        "description": "As telas Educacionais passaram a usar a barra de ações padrão do G3N conforme o contexto da aba.",
+                        "changes": ["Novo, Salvar e Cancelar nas abas com formulário.", "Buscar na Visão geral e em Matrículas.", "Imprimir e Fechar disponíveis de forma consistente, sem ações decorativas."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.674",
+                        "releaseDate": "2026-07-19",
+                        "title": "Padronização visual das abas Educacionais",
+                        "description": "As abas dos agrupamentos Educacionais passaram a seguir o mesmo padrão lateral numerado do cadastro de beneficiários.",
+                        "changes": ["Itens inativos com fundo suave institucional.", "Item ativo com destaque de borda e numeração.", "Aplicação uniforme em Alunos, Estrutura acadêmica, Professores, Gestão escolar e Relatórios."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.673",
+                        "releaseDate": "2026-07-19",
+                        "title": "Reorganização do menu Educacional",
+                        "description": "As funcionalidades educacionais foram agrupadas em seis menus principais com navegação interna por abas.",
+                        "changes": ["Alunos reúne matrículas, famílias, transferências, autorizações, documentos e histórico.", "Estrutura acadêmica reúne cadastros, gestão acadêmica, grade, horários e unidades escolares.", "Professores e equipe reúne planejamento, diário, frequência, avaliações e boletins.", "Gestão escolar reúne ocorrências, agenda e rotinas infantis.", "Rotas antigas permanecem compatíveis."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.672",
+                        "releaseDate": "2026-07-19",
+                        "title": "Gestão acadêmica educacional",
+                        "description": "A próxima fase passou a registrar lista de espera, recuperações, resultado final e calendário escolar com persistência por tenant.",
+                        "changes": ["Nova tela Gestão acadêmica.", "Novas tabelas educacionais para lista de espera, recuperação, resultado final e calendário.", "Validações de referências, valores e unidades de ensino no backend."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.671",
+                        "releaseDate": "2026-07-19",
+                        "title": "Integridade do fluxo educacional",
+                        "description": "A revisão do módulo Educacional corrigiu a separação entre Alunos e Matrículas, completou indicadores reais e reforçou validações no backend.",
+                        "changes": ["Disciplinas ativas e anos letivos abertos calculados no PostgreSQL.", "Bloqueio de alocação duplicada, turma lotada e nota acima do valor máximo.", "Unidades assistenciais rejeitadas em turmas e matrículas educacionais.", "Fallback de migrations idempotentes para bancos legados sem histórico Prisma."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.670",
+                        "releaseDate": "2026-07-19",
+                        "title": "Mensagem institucional do login",
+                        "description": "A tela de login passou a apresentar uma mensagem abrangendo alunos e beneficiários.",
+                        "changes": ["Texto institucional atualizado na tela de login."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.669",
+                        "releaseDate": "2026-07-19",
+                        "title": "Migrations no desenvolvimento local",
+                        "description": "O comando npm run dev passou a carregar o ambiente, aplicar migrations e tratar bancos legados sem histórico inicial do Prisma.",
+                        "changes": ["Correção da coluna tipo_unidade ausente.", "Correção da tabela educacional_frequencia ausente.", "Fallback idempotente para bancos legados."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.668",
+                        "releaseDate": "2026-07-19",
+                        "title": "Migrations educacionais no deploy",
+                        "description": "O deploy passou a aplicar as migrations do PostgreSQL antes de iniciar o backend, corrigindo a ausência de tabelas educacionais como educacional_frequencia.",
+                        "changes": ["Execução automática de prisma migrate deploy.", "Migrations aplicadas antes do healthcheck do backend.", "Falha de migration mantém o sistema em manutenção para evitar inicialização inconsistente."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.667",
+                        "releaseDate": "2026-07-19",
+                        "title": "Visão geral educacional executiva",
+                        "description": "A Visão geral passou a apresentar indicadores reais de alunos, matrículas, frequência, risco, evasão, ocorrências, chamadas e desempenho.",
+                        "changes": ["Filtros por unidade, ano letivo, etapa, turma e turno.", "Cards clicáveis e painel Atenção da gestão.", "Índice de Atenção Educacional baseado nos registros persistidos."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.666",
+                        "releaseDate": "2026-07-19",
+                        "title": "Padronização visual do Educacional",
+                        "description": "As abas educacionais passaram a utilizar navegação lateral numerada e o título global passou a identificar corretamente o menu Educacional.",
+                        "changes": ["Conteúdo das abas exibido ao lado da navegação.", "Navegação lateral no padrão dos cadastros do G3N.", "Substituição do título genérico Painel de migração."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.665",
+                        "releaseDate": "2026-07-19",
+                        "title": "Estrutura acadêmica sem duplicidade no menu",
+                        "description": "Os cadastros já disponíveis na Estrutura acadêmica deixaram de ser repetidos no menu lateral e receberam navegação numerada no padrão do G3N.",
+                        "changes": ["Remoção de Ano letivo, Etapas, Turmas e Disciplinas como submenus duplicados.", "Abas numeradas com destaque visual do item selecionado.", "Manual do sistema atualizado."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.664",
+                        "releaseDate": "2026-07-19",
+                        "title": "Reorganização educacional e unidades de atendimento",
+                        "description": "O cadastro único de unidades passou a diferenciar unidades assistenciais e de ensino, e o módulo Educacional recebeu abas operacionais para alunos, diário e equipe pedagógica.",
+                        "changes": ["Tipo de unidade com filtro backend e compatibilidade com registros antigos.", "Abas para Alunos, Diário de classe e Professores e equipe pedagógica.", "Persistência de transferências e autorizações por tenant."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.663",
+                        "releaseDate": "2026-07-19",
+                        "title": "Rotina infantil e desenvolvimento",
+                        "description": "O módulo Educacional recebeu registros específicos para creche e educação infantil, separados de dados clínicos.",
+                        "changes": ["Rotina diária da criança.", "Alimentação, humor, atividades e observações.", "Acompanhamento de desenvolvimento por área e período."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.662",
+                        "releaseDate": "2026-07-19",
+                        "title": "Documentos e relatórios educacionais",
+                        "description": "O módulo Educacional passou a registrar metadados de documentos e apresentar indicadores reais da instituição.",
+                        "changes": ["Documentos e declarações vinculados a aluno ou matrícula.", "Armazenamento apenas de metadados e caminho do arquivo.", "Relatórios com indicadores reais do tenant."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.661",
+                        "releaseDate": "2026-07-19",
+                        "title": "Ocorrências e agenda escolar",
+                        "description": "O módulo Educacional passou a registrar ocorrências de alunos e eventos da agenda escolar.",
+                        "changes": ["Ocorrências com tipo, descrição, providências e comunicação do responsável.", "Agenda por turma e data.", "Auditoria e isolamento por instituição."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.660",
+                        "releaseDate": "2026-07-19",
+                        "title": "Boletins e histórico escolar",
+                        "description": "O módulo Educacional passou a registrar boletins por período e histórico escolar por ano letivo, preservando resultados anteriores.",
+                        "changes": ["Boletim vinculado à matrícula e ao ano letivo.", "Histórico escolar permanente por aluno.", "Médias, frequência e resultado final com auditoria."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.659",
+                        "releaseDate": "2026-07-19",
+                        "title": "Avaliações e notas",
+                        "description": "O módulo Educacional passou a cadastrar avaliações e lançar notas vinculadas às matrículas escolares.",
+                        "changes": ["Avaliações por turma, componente e período.", "Notas vinculadas à avaliação e à matrícula do aluno.", "Histórico e auditoria preservados por instituição."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.658",
+                        "releaseDate": "2026-07-19",
+                        "title": "Planos e planejamento pedagógico",
+                        "description": "O módulo Educacional passou a persistir planos de aula e planejamentos pedagógicos por ano letivo, turma e componente curricular.",
+                        "changes": ["Plano de aula com tema, objetivos, conteúdo e metodologia.", "Planejamento pedagógico por período e ano letivo.", "Auditoria e isolamento por instituição."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.657",
+                        "releaseDate": "2026-07-19",
+                        "title": "Diário de classe e frequência",
+                        "description": "A operação pedagógica recebeu registro de aulas e frequência vinculada às matrículas escolares.",
+                        "changes": ["Registro de diário por turma, componente curricular e data.", "Chamada com presença, ausência, justificativa, atraso e saída antecipada.", "Auditoria e isolamento por instituição."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.656",
+                        "releaseDate": "2026-07-19",
+                        "title": "Vida acadêmica educacional",
+                        "description": "A Fase 2 recebeu a base persistente de grade curricular e horários escolares, integrada às turmas e disciplinas do módulo Educacional.",
+                        "changes": ["Grade curricular por ano letivo, etapa, série e componente curricular.", "Horários semanais por turma e disciplina.", "Bloqueio de conflitos de turma, professor e sala por tenant."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.655",
+                        "releaseDate": "2026-07-19",
+                        "title": "Correção da inicialização do deploy",
+                        "description": "O deploy passa a validar primeiro o banco, construir e validar backend e frontend e somente depois iniciar o proxy Nginx.",
+                        "changes": ["Healthcheck do Nginx baseado na validação nativa da configuração.", "Remoção da dependência de uma requisição HTTP prematura durante a subida inicial.", "Ordem de inicialização ajustada para reduzir falhas de infraestrutura."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.654",
+                        "releaseDate": "2026-07-19",
+                        "title": "Correção definitiva da rede Docker no deploy",
+                        "description": "O deploy agora recria os containers existentes antes da reconciliação do Docker Compose, preservando os volumes e evitando falhas causadas por redes legadas como g3n_g3n_net.",
+                        "changes": ["Recriação segura dos containers do stack durante o deploy.", "Preservação dos volumes e dos dados persistentes.", "Compatibilidade com containers criados por versões anteriores do Compose."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.653",
+                        "releaseDate": "2026-07-19",
+                        "title": "Correção do deploy Docker",
+                        "description": "O deploy passou a tratar containers antigos que estejam desconectados da rede da aplicação.",
+                        "changes": ["Rede Docker validada e criada quando necessário.", "Containers fora da rede são recriados sem remover volumes persistentes.", "O erro de container não conectado à rede deixa de interromper o deploy antes do build."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.652",
+                        "releaseDate": "2026-07-19",
+                        "title": "Organização dos menus",
+                        "description": "Os menus principais foram reorganizados para facilitar a localização das funcionalidades.",
+                        "changes": ["Menus a partir de Atendimentos diários em ordem alfabética.", "Configurações gerais e Painel master mantidos como os dois últimos grupos.", "Itens, permissões e rotas preservados."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.651",
+                        "releaseDate": "2026-07-19",
+                        "title": "Nomenclatura educacional mais didática",
+                        "description": "A operação anteriormente chamada Enturmação passou a ser exibida como Alunos por turma.",
+                        "changes": ["Alunos por turma no menu e na tela educacional.", "Séries e anos escolares na estrutura acadêmica.", "Identificadores técnicos e rotas internas preservados."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.650",
+                        "releaseDate": "2026-07-18",
+                        "title": "Fundação do módulo Educacional",
+                        "description": "Incluída a Fase 1 do módulo Educacional com estrutura acadêmica, vínculo de beneficiários e base de matrículas.",
+                        "changes": ["Novo menu Educacional com visão geral, estrutura acadêmica, alunos e enturmação.", "Cadastro de anos letivos, etapas, séries, disciplinas e turmas.", "Vínculo de beneficiários existentes como alunos sem duplicação cadastral.", "Migration PostgreSQL incremental com segregação por tenant e auditoria."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.649",
+                        "releaseDate": "2026-07-18",
+                        "title": "Cards e navegação de agendamentos",
+                        "description": "A seleção de cursos e atendimentos na aba Agendamento foi reorganizada em cards e o acesso às inscrições foi direcionado.",
+                        "changes": ["Cards lado a lado com fundo institucional e seleção por clique.", "Botão direcionado para Inscrições e lista de espera.", "Corrigida a validação de horário que impedia a finalização."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.648",
+                        "releaseDate": "2026-07-18",
+                        "title": "Correção do salvamento do prontuário",
+                        "description": "Corrigida a persistência dos horários e a finalização do atendimento na linha do tempo.",
+                        "changes": ["Horários no formato HH:MM são convertidos corretamente.", "Finalizar atendimento salva o registro quando ainda não existe rascunho."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.647",
+                        "releaseDate": "2026-07-18",
+                        "title": "Tipos de atendimento social no prontuário",
+                        "description": "O campo Tipo de atendimento passou a oferecer categorias sociais com explicações contextuais.",
+                        "changes": ["Incluídos atendimentos proativos, programados e atividades coletivas.", "Popup explicativo exibido após a seleção do tipo."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.646",
+                        "releaseDate": "2026-07-18",
+                        "title": "Chamada direcionada no prontuário",
+                        "description": "A tela de Prontuário passou a abrir a fila de senhas antes da chamada do beneficiário.",
+                        "changes": ["O usuário pode conferir o destino da senha.", "É possível chamar um beneficiário específico ou o próximo da fila."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.645",
+                        "releaseDate": "2026-07-18",
+                        "title": "Resumo do beneficiário no prontuário",
+                        "description": "A seleção do beneficiário no prontuário agora oculta os demais resultados e apresenta os principais dados cadastrais.",
+                        "changes": ["Card com nome, código, telefone, idade, data de nascimento, bairro, CPF e nome da mãe.", "Dados de bairro e nome da mãe carregados do cadastro do beneficiário."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.644",
+                        "releaseDate": "2026-07-18",
+                        "title": "Atendimento de prontuário multiprofissional",
+                        "description": "Novo registro de atendimento com rascunho, finalização, sigilo, auditoria e linha do tempo.",
+                        "changes": ["Menu Atendimento de prontuário integrado a Atendimentos diários.", "Persistência multi-tenant no PostgreSQL com adendos e histórico."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version":  "1.00.643",
+                        "releaseDate":  "2026-07-18",
+                        "title":  "Orientação antes do agendamento",
+                        "description":  "A aba Agendamento passou a orientar e direcionar o usuário para as inscrições antes da geração da agenda.",
                         "changes":  [
-                                        "Foi restaurada a secao Gestao educacional no menu principal com os itens Visao geral, Alunos, Vida escolar, Estrutura academica, Professores e equipe pedagogica, Gestao escolar, Relatorios e indicadores e Parcerias publicas apontando para /educacional.",
-                                        "Foi integrado o modulo educacional dedicado disponivel na branch local de revisao, com frontend em /educacional e backend em /api/educacional.",
-                                        "Como esta base de migracao nao contem as telas dedicadas da producao 1.00.780, os itens educacionais mantem acesso compativel para Inscricoes em cursos e oficinas ate a sincronizacao completa.",
-                                        "O atalho existente em Atendimentos diarios foi mantido para preservar compatibilidade de acesso.",
-                                        "A estrutura de matriculas passou a garantir a coluna ativo em salas_unidade antes de consultar o catalogo de salas.",
-                                        "O AGENTS.md recebeu regra explicita proibindo remocao de menus, modulos, rotas ou itens de navegacao sem autorizacao especifica e extremamente confirmada.",
-                                        "O manual do sistema foi atualizado com o caminho Gestao educacional e suas abas principais."
+                                        "Após selecionar o tipo de agendamento, a tela exibe uma mensagem orientando a inscrição dos beneficiários.",
+                                        "O botão Abrir dados da inscrição leva diretamente à aba Dados da inscrição.",
+                                        "O Manual do sistema foi atualizado com o novo fluxo."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.642",
+                        "releaseDate":  "2026-07-18",
+                        "title":  "Seleção de todas as idades",
+                        "description":  "A faixa etária ganhou a opção Todas as idades para selecionar ou limpar todas as faixas de uma vez.",
+                        "changes":  [
+                                        "A aba Dados da inscrição ganhou a opção Todas as idades.",
+                                        "A opção marca ou desmarca todas as faixas etárias em um clique.",
+                                        "O Manual do sistema foi atualizado com o novo comportamento."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.641",
+                        "releaseDate":  "2026-07-18",
+                        "title":  "Cálculo automático de vagas por horário",
+                        "description":  "Atendimentos passaram a calcular automaticamente as vagas a partir dos horários inicial e final e da duração em minutos.",
+                        "changes":  [
+                                        "A aba Dados da inscrição usa horário inicial, horário final e duração em minutos para montar os horários do atendimento.",
+                                        "A quantidade de vagas totais e disponíveis é preenchida automaticamente para atendimentos configurados por horário.",
+                                        "O Manual do sistema foi atualizado com a nova regra."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.640",
+                        "releaseDate":  "2026-07-18",
+                        "title":  "Duração em minutos",
+                        "description":  "O campo de duração da tela de inscrições passou a usar minutos na interface.",
+                        "changes":  [
+                                        "A aba Dados da inscrição agora exibe Duração (minutos).",
+                                        "Os resumos e o catálogo da tela passaram a mostrar a duração com a unidade min.",
+                                        "O identificador interno foi preservado para manter compatibilidade com os registros existentes."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.639",
+                        "releaseDate":  "2026-07-18",
+                        "title":  "Controle de atendimentos por horário",
+                        "description":  "Atendimentos passaram a permitir controle opcional por horários e intervalos, com cálculo automático da capacidade do período.",
+                        "changes":  [
+                                        "A aba Dados da inscrição ganhou controle opcional por horário para o tipo Atendimento.",
+                                        "O sistema calcula a quantidade de atendimentos e prepara os horários individuais do período informado.",
+                                        "O Manual do sistema foi atualizado com o novo fluxo."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.638",
+                        "releaseDate":  "2026-07-18",
+                        "title":  "Nomenclatura das inscrições em cursos e atendimentos",
+                        "description":  "O submenu de inscrições em cursos e atendimentos passou a usar a nomenclatura atualizada no sistema e no manual.",
+                        "changes":  [
+                                        "O submenu, o título da tela e o Manual do sistema agora exibem Inscrições em cursos e atendimentos.",
+                                        "A versão oficial do sistema foi atualizada para 1.00.638."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.637",
+                        "releaseDate":  "2026-07-17",
+                        "title":  "Progresso no envio do documento",
+                        "description":  "A tela Documentos da instituição passou a exibir barra de progresso durante o envio do documento e dos anexos pendentes.",
+                        "changes":  [
+                                        "O botão Salvar agora mostra progresso desde o início da requisição do documento.",
+                                        "A mesma barra acompanha o envio dos anexos pendentes até a conclusão do processamento.",
+                                        "A tela mantém o estado visual de pendências até finalizar o ciclo completo de gravação."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.636",
+                        "releaseDate":  "2026-07-17",
+                        "title":  "Anexos no salvar e listagem com clip",
+                        "description":  "A tela de documentos passou a aceitar anexos antes do primeiro salvamento e a listagem ganhou indicador visual de anexo.",
+                        "changes":  [
+                                        "Os arquivos agora podem ser selecionados antes de salvar o documento e são enviados automaticamente no mesmo clique de Salvar.",
+                                        "A aba Cadastro e edição passou a manter uma fila visível de arquivos pendentes até o envio concluir.",
+                                        "A listagem de documentos foi ordenada alfabeticamente e ganhou um indicador com clip para documentos com anexo."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.635",
+                        "releaseDate":  "2026-07-17",
+                        "title":  "Limpeza de arquivos sem físico",
+                        "description":  "Os registros de arquivos ativos sem binário no storage foram desativados para manter o banco alinhado ao armazenamento físico.",
+                        "changes":  [
+                                        "O backend passou a limpar arquivos ativos sem arquivo físico correspondente no storage, inclusive caminhos já separados por tenant.",
+                                        "Os anexos de documentos vinculados aos arquivos órfãos foram removidos para evitar novas falhas de visualização e download.",
+                                        "Foi adicionado um comando de dry-run para auditar a limpeza antes da execução definitiva."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.634",
+                        "releaseDate":  "2026-07-17",
+                        "title":  "Migração do storage legado por tenant",
+                        "description":  "O storage legado foi migrado para a árvore por tenant e os arquivos passaram a contar com backup local diário em pacote compactado.",
+                        "changes":  [
+                                        "A migração física dos arquivos existentes moveu o que estava disponível para /storage/tenants/<tenant>/..., preservando a separação por instituição.",
+                                        "Os registros sem tenant resolvido foram mantidos em /storage/tenants/sem-tenant/ para não misturar com os arquivos de clientes identificados.",
+                                        "O processo atualizou os caminhos do banco e dos anexos de documentos de acordo com o novo layout, sem regravar binários no banco."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.633",
+                        "releaseDate":  "2026-07-17",
+                        "title":  "Storage por tenant e backup local diário",
+                        "description":  "Os arquivos e imagens passaram a ser gravados por tenant no storage e ganharam backup local diário em pacote compactado.",
+                        "changes":  [
+                                        "Os novos uploads passaram a gravar a árvore de armazenamento em /storage/tenants/<tenant>/..., mantendo isolamento por instituição.",
+                                        "A tela Documentos da instituição continua abrindo anexos pelo caminho armazenado e permanece compatível com os registros antigos.",
+                                        "O backend ganhou backup local diário em /storage/backups/arquivos e o scheduler de imagens passou a reconhecer caminhos prefixados por tenant."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.632",
+                        "releaseDate":  "2026-07-17",
+                        "title":  "Visualização de anexos por id do arquivo",
+                        "description":  "A tela Documentos da instituição passou a abrir o anexo principal pelo identificador do arquivo armazenado, evitando falhas de rota por caminho legado.",
+                        "changes":  [
+                                        "Os anexos de documentos agora persistem o arquivo_id do storage e a visualização passa a usar o endpoint autenticado por id.",
+                                        "Registros antigos recebem backfill de arquivo_id quando o caminho do anexo é encontrado na tabela de arquivos.",
+                                        "O botão Visualizar documento segue no topo da aba Cadastro e edição, com descrição e observação de renovação mais compactas."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.631",
+                        "releaseDate":  "2026-07-17",
+                        "title":  "Visualização de anexos de documentos corrigida",
+                        "description":  "A tela Documentos da instituição passou a abrir anexos corretamente e ganhou o botão principal de visualização no topo da aba Cadastro e edição.",
+                        "changes":  [
+                                        "O upload de anexos da instituição agora grava o tenant autenticado nos metadados do arquivo, evitando 404 ao tentar abrir o documento salvo.",
+                                        "A leitura legada de arquivos da instituição passou a considerar documentos vinculados ao tenant para recuperar anexos antigos sem tenant explícito.",
+                                        "O botão Visualizar documento foi movido para o topo da tela de cadastro e edição, e os campos Descrição e Observação de renovação ficaram mais compactos na altura."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.630",
+                        "releaseDate":  "2026-07-14",
+                        "title":  "Disponibilidade de veículos e login por e-mail",
+                        "description":  "O Controle de Frotas passou a contar com a nova aba de disponibilidade de veículos e o login passou a identificar a instituição automaticamente quando o e-mail for exclusivo de um tenant.",
+                        "changes":  [
+                                        "A tela Controle de frotas ganhou a aba Disponibilidade de veículos com consulta por data e hora, cards por situação e formulário de reserva ou indisponibilidade.",
+                                        "A agenda passou a considerar veículos ativos do tenant autenticado, com ações de editar, cancelar, encerrar e excluir logicamente com validação de conflito no backend.",
+                                        "A autenticação agora tenta localizar a instituição pelo e-mail quando o tenant não for informado e o endereço for exclusivo de um único cliente."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.629",
+                        "releaseDate":  "2026-07-14",
+                        "title":  "Painel master e login com erro mais claro",
+                        "description":  "O menu Painel master foi criado para reunir os acessos exclusivos do superadmin e o login passou a explicar melhor se a falha está na instituição ou na senha.",
+                        "changes":  [
+                                        "A tela Clientes registrados foi movida para o novo menu Painel master, visível somente para master administrativo.",
+                                        "A rota de clientes registrados passou a seguir a mesma regra de acesso master do menu lateral.",
+                                        "O login agora diferencia erro de instituição localizada e erro de senha para reduzir a mensagem genérica de credenciais inválidas."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.628",
+                        "releaseDate":  "2026-07-14",
+                        "title":  "Termo de fomento validado em simulação completa",
+                        "description":  "A tela Termo de fomento passou por simulação automática com preenchimento total, duplicação de registro e validação da impressão.",
+                        "changes":  [
+                                        "A tela passou a validar os campos obrigatórios antes de salvar e antes de liberar a impressão do termo.",
+                                        "Foi adicionada a ação Duplicar termo para criar um novo registro a partir de um termo existente.",
+                                        "A geração do relatório de termo de fomento foi extraída para um utilitário testável e coberta por teste automatizado."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.627",
+                        "releaseDate":  "2026-07-14",
+                        "title":  "Plano de trabalho validado em simulação completa",
+                        "description":  "A tela Plano de trabalho passou por simulação automática com preenchimento total, clone profundo e validação da estrutura de impressão.",
+                        "changes":  [
+                                        "A validação de impressão agora exige também os dados bancários essenciais antes de liberar a ação no topo.",
+                                        "A geração do HTML de impressão foi extraída para um utilitário testável e passou a ser coberta por teste automatizado.",
+                                        "O clone do plano foi verificado para não compartilhar referências internas entre metas e objetivos específicos."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.626",
+                        "releaseDate":  "2026-07-14",
+                        "title":  "Plano de trabalho com preenchimento automático e impressão guiada",
+                        "description":  "A tela Plano de trabalho passou a preencher dados da instituição pela unidade assistencial e dados bancários pelo cadastro de contas, além de liberar a impressão apenas quando o termo estiver completo.",
+                        "changes":  [
+                                        "Na aba Dados da instituição, o usuário pode carregar os dados de uma unidade assistencial cadastrada e preencher o bloco inteiro de forma automática.",
+                                        "No card de dados bancários, o usuário pode carregar uma conta bancária cadastrada e reaproveitar os dados disponíveis no plano.",
+                                        "A opção de imprimir o plano de trabalho agora aparece somente quando o formulário atende aos campos críticos de envio."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.625",
+                        "releaseDate":  "2026-07-14",
+                        "title":  "Controle de frotas",
+                        "description":  "O submenu Controle de veículos passou a ser exibido como Controle de frotas.",
+                        "changes":  [
+                                        "O item do menu lateral foi renomeado para Controle de frotas.",
+                                        "O título da rota de controle de veículos também passou a exibir Controle de frotas.",
+                                        "O manual do sistema foi atualizado com a nova nomenclatura."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.624",
+                        "releaseDate":  "2026-07-14",
+                        "title":  "Cards iniciais da visão geral com cor da unidade",
+                        "description":  "Os cards iniciais da Visão geral passaram a seguir a cor clara do padrão da unidade.",
+                        "changes":  [
+                                        "Os cards-resumo da Visão geral agora usam a variação clara da cor principal da unidade autenticada.",
+                                        "O destaque acompanha o tema ativo, ficando verde claro, azul claro ou outro tom equivalente conforme a personalização.",
+                                        "O manual do sistema foi atualizado com a nova regra visual."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.623",
+                        "releaseDate":  "2026-07-13",
+                        "title":  "Instituições padrão em verde claro",
+                        "description":  "As instituições padrão do cadastro do doador passaram a aparecer em cards com fundo verde claro.",
+                        "changes":  [
+                                        "Os cards das 4 instituições padrão receberam fundo verde claro para destacá-los na aba Cadastro do doador.",
+                                        "O destaque visual foi aplicado sem alterar o comportamento de expandir e preencher o modelo.",
+                                        "O manual do sistema foi atualizado com a orientação visual."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.622",
+                        "releaseDate":  "2026-07-13",
+                        "title":  "Salvamento do doador corrigido",
+                        "description":  "O cadastro do doador passou a tratar erros do banco com mensagem útil e corrigiu a rotina de estrutura que impedia o salvamento.",
+                        "changes":  [
+                                        "A rotina que preparava a estrutura da tabela de doadores foi corrigida para não derrubar o salvamento com SQL inválido.",
+                                        "Erros conhecidos do Prisma agora retornam mensagens mais claras, como conflito, registro não encontrado ou falha de banco.",
+                                        "O manual do sistema foi atualizado com a nova tratativa."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.621",
+                        "releaseDate":  "2026-07-13",
+                        "title":  "Instituições padrão recolhíveis",
+                        "description":  "A lista de instituições padrão no cadastro do doador passou a mostrar apenas o nome por padrão e expandir os detalhes ao clicar.",
+                        "changes":  [
+                                        "A aba Cadastro do doador agora exibe somente o nome da instituição até o usuário expandir o card.",
+                                        "Os detalhes ficam ocultos por padrão e aparecem sob clique, mantendo a tela mais limpa.",
+                                        "O atalho de preencher o cadastro continua disponível dentro de cada card expandido."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.620",
+                        "releaseDate":  "2026-07-13",
+                        "title":  "Modelos padrão no cadastro do doador",
+                        "description":  "A tela Receber doações ganhou modelos padrão para preencher o cadastro do doador com instituições conhecidas.",
+                        "changes":  [
+                                        "A aba Cadastro do doador passou a exibir 4 instituições padrão com preenchimento em um clique.",
+                                        "Os modelos incluem nome, telefone, cidade, endereço e observações quando os dados estão confirmados em canais oficiais.",
+                                        "O manual do sistema foi atualizado para refletir o novo atalho."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.619",
+                        "releaseDate":  "2026-07-13",
+                        "title":  "Bloqueio cross-origin removido",
+                        "description":  "A API passou a liberar consumo cross-origin para evitar o bloqueio NotSameOrigin no frontend.",
+                        "changes":  [
+                                        "O Helmet deixou de impor crossOriginResourcePolicy same-origin na API.",
+                                        "Chamadas do frontend para o backend em portas diferentes deixam de ser bloqueadas pelo navegador.",
+                                        "O comportamento continua protegido por CORS e autenticação."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.618",
+                        "releaseDate":  "2026-07-13",
+                        "title":  "Checkout da InfinitePay corrigido",
+                        "description":  "A geração de cobrança da licença de uso passou a usar o endpoint público correto da InfinitePay e a devolver mensagens tratáveis em caso de erro.",
+                        "changes":  [
+                                        "O adaptador passou a usar o host público atual da InfinitePay para criação e validação de checkout.",
+                                        "Falhas da integração agora retornam AppError com a mensagem da própria API ou da comunicação.",
+                                        "O manual do sistema foi atualizado com a orientação sobre a mensagem exibida."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.617",
+                        "releaseDate":  "2026-07-13",
+                        "title":  "Resumo comercial mais discreto",
+                        "description":  "O card de resumo comercial da licença de uso foi reduzido para dar mais protagonismo à chave de cobrança.",
+                        "changes":  [
+                                        "O card lateral ganhou largura menor e padding reduzido.",
+                                        "A tipografia e os blocos internos ficaram mais compactos.",
+                                        "A hierarquia visual favorece agora o seletor de cobrança no topo."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.616",
+                        "releaseDate":  "2026-07-13",
+                        "title":  "Chave de cobrança em primeiro lugar",
+                        "description":  "A tela de licença de uso passou a mostrar o card de chave de cobrança como primeiro bloco da página.",
+                        "changes":  [
+                                        "O card Chave de cobrança foi movido para o topo do conteúdo.",
+                                        "O banner comercial passou a aparecer logo abaixo do seletor de ciclo.",
+                                        "A ordem visual da página foi ajustada sem alterar a rota."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.615",
+                        "releaseDate":  "2026-07-13",
+                        "title":  "Licença de uso reconfigurada",
+                        "description":  "A tela de licença de uso foi ajustada para manter o conteúdo em coluna única e evitar desconfiguração visual.",
+                        "changes":  [
+                                        "O layout sem abas passou a usar coluna única real no grid.",
+                                        "A página de licença deixou de herdar o espaço lateral vazio do layout de abas.",
+                                        "A estrutura visual foi redimensionada para voltar a ocupar a largura correta."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.614",
+                        "releaseDate":  "2026-07-13",
+                        "title":  "Licença de uso sem aba intermediária",
+                        "description":  "A tela de licença de uso passou a abrir diretamente no conteúdo comercial ao clicar no menu.",
+                        "changes":  [
+                                        "A aba interna da licença foi removida da navegação da página.",
+                                        "Ao clicar em Licença de uso no menu, o sistema abre a tela diretamente no conteúdo.",
+                                        "O manual do sistema foi atualizado com o novo fluxo."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.613",
+                        "releaseDate":  "2026-07-13",
+                        "title":  "Clientes registrados",
+                        "description":  "A tela master de instituições passou a aparecer com o novo nome Clientes registrados no menu e no cabeçalho.",
+                        "changes":  [
+                                        "O item do menu lateral foi renomeado para Clientes registrados.",
+                                        "O título da página master foi alterado para Clientes registrados.",
+                                        "O manual do sistema foi atualizado com o novo nome da tela."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.612",
+                        "releaseDate":  "2026-07-13",
+                        "title":  "Bairros consolidados por normalização",
+                        "description":  "O ranking de bairros passou a somar nomes repetidos independentemente de caixa e padronizar a exibição do rótulo.",
+                        "changes":  [
+                                        "Bairros com o mesmo nome, mas escritos em caixa alta, caixa baixa ou capitalização inicial, agora são consolidados em uma única soma.",
+                                        "O rótulo exibido no ranking passa por formatação padronizada antes de aparecer na tela.",
+                                        "O manual do sistema foi atualizado com a orientação do novo comportamento."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.611",
+                        "releaseDate":  "2026-07-13",
+                        "title":  "Velocímetro sem ponteiro central",
+                        "description":  "A tela de indicadores passou a exibir os KPI em estilo velocímetro sem ponteiro central, preservando o valor no meio do gráfico.",
+                        "changes":  [
+                                        "O ponteiro central foi removido para não competir com o valor principal do KPI.",
+                                        "Os cards continuam no estilo velocímetro e mantêm a leitura de desempenho.",
+                                        "O ranking de bairros segue com rolagem interna e lista completa."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.610",
+                        "releaseDate":  "2026-07-13",
+                        "title":  "Indicadores com velocímetro e ponteiro",
+                        "description":  "A tela de indicadores passou a exibir os KPI principais em estilo velocímetro de carro, com ponteiro visual e ranking de bairros completo.",
+                        "changes":  [
+                                        "Os cards Beneficiários ativos, Cadastro completo e Renda média familiar receberam ponteiro visual para reforçar a leitura de desempenho.",
+                                        "O estilo passou a lembrar um velocímetro automotivo, mantendo a leitura por contagem, percentual e valor.",
+                                        "O ranking de bairros continua com rolagem interna e lista completa de bairros cadastrados."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.609",
+                        "releaseDate":  "2026-07-13",
+                        "title":  "Indicadores com medidores KPI",
+                        "description":  "A tela de indicadores passou a exibir medidores KPI nos principais cards e um ranking de bairros com rolagem completa.",
+                        "changes":  [
+                                        "Os cards Beneficiários ativos, Cadastro completo e Renda média familiar passaram a usar medidor KPI de desempenho.",
+                                        "A leitura do ranking de bairros segue com rolagem interna e mantém os 12 primeiros no topo da tela.",
+                                        "O backend continua entregando todos os bairros cadastrados para a listagem completa."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.608",
+                        "releaseDate":  "2026-07-13",
+                        "title":  "Indicadores com velocímetros e ranking completo",
+                        "description":  "A tela de indicadores ganhou velocímetros nos principais cards e um ranking de bairros com rolagem completa.",
+                        "changes":  [
+                                        "Os cards Beneficiários ativos, Cadastro completo e Renda média familiar passaram a usar velocímetro para leitura visual rápida.",
+                                        "O ranking de bairros mantém os 12 primeiros como referência e permite rolagem para consultar todos os demais bairros cadastrados.",
+                                        "O backend continua devolvendo todos os bairros para a listagem completa do card."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.607",
+                        "releaseDate":  "2026-07-13",
+                        "title":  "Ranking de bairros com rolagem completa",
+                        "description":  "A tela de indicadores passou a exibir o ranking de bairros com rolagem interna, mantendo os 12 primeiros no topo e permitindo consultar todos os bairros cadastrados.",
+                        "changes":  [
+                                        "O backend passou a devolver todos os bairros com beneficiários cadastrados, em vez de limitar o ranking a 12 itens.",
+                                        "O card Ranking de bairros agora usa rolagem interna para mostrar os bairros restantes sem perder a leitura dos primeiros colocados.",
+                                        "O gráfico de bairros continua exibindo apenas os 12 primeiros, preservando a visão resumida."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.606",
+                        "releaseDate":  "2026-07-13",
+                        "title":  "Login master preservado contra status da instituição",
+                        "description":  "O e-mail master htasistemas@gmail.com passou a acessar o sistema mesmo quando a instituição vinculada estiver bloqueada ou inativa.",
+                        "changes":  [
+                                        "A validação de acesso do backend passou a ignorar status inativo ou bloqueado para o usuário master.",
+                                        "A tela de login continua dispensando CNPJ, código ou slug para o e-mail master e agora também preserva o acesso administrativo global quando a instituição vinculada estiver indisponível.",
+                                        "Foi adicionada regressão automatizada para cobrir o login master com instituição bloqueada."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.605",
+                        "releaseDate":  "2026-07-10",
+                        "title":  "Autorização fora da carência corrigida",
+                        "description":  "A validação da senha administrativa em doações fora da carência passou a usar a tabela e o hash corretos do módulo de autenticação.",
+                        "changes":  [
+                                        "O lookup do usuário autenticado deixou de consultar a estrutura incorreta e passou a reutilizar o repositório de autenticação do sistema.",
+                                        "A autorização fora da carência agora respeita tenant e hash de senha corretos antes de liberar a entrega.",
+                                        "Foi adicionada regressão automatizada para cobrir a confirmação administrativa."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.604",
+                        "releaseDate":  "2026-07-10",
+                        "title":  "Doações realizadas com entrega transacional",
+                        "description":  "A tela Doações realizadas passou a confirmar entregas com persistência transacional, tratamento explícito de conflitos e bloqueio de reenvio duplicado.",
+                        "changes":  [
+                                        "O backend passou a retornar a doação persistida sem depender de uma leitura pós-commit suscetível a falhas transitórias.",
+                                        "Erros conhecidos do Prisma passaram a ser traduzidos para respostas específicas de conflito, validação e ausência de registro.",
+                                        "O frontend passou a bloquear submissões duplicadas durante o processamento da entrega."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.603",
+                        "releaseDate":  "2026-07-10",
+                        "title":  "Frequência por agenda e relatório consolidado",
+                        "description":  "A aba Presença passou a carregar datas reais da agenda, salvar observações junto com as presenças e gerar relatório de acompanhamento sem assinatura manual.",
+                        "changes":  [
+                                        "O campo Data da aula passou a listar somente datas reais derivadas da agenda e das frequências já persistidas.",
+                                        "O salvamento de presenças agora grava status, observações gerais e observações individuais na mesma transação.",
+                                        "O relatório de frequência foi remodelado para consolidar status por período e remover o campo de assinatura do beneficiário."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.602",
+                        "releaseDate":  "2026-07-10",
+                        "title":  "Presença persistida em inscrições",
+                        "description":  "A presença das inscrições passou a ser gravada e recarregada pelo PostgreSQL, com auditoria e isolamento por tenant.",
+                        "changes":  [
+                                        "O salvamento de presença agora usa tenant_id, curso_id, matricula_id e data_aula como chave lógica.",
+                                        "A gravação passou a registrar usuário responsável, data/hora de registro e data/hora de atualização.",
+                                        "A alteração de presença passou a registrar auditoria com status anterior, novo status e dados institucionais."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.594",
+                        "releaseDate":  "2026-07-08",
+                        "title":  "Agendamentos com persistência transacional",
+                        "description":  "A aba Agendamento passou a gravar, consultar, editar, remover e copiar cards com confirmação real do PostgreSQL e sem dependência de estado local.",
+                        "changes":  [
+                                        "A gravação da agenda operacional passou a ocorrer em transação e com batch insert dos participantes.",
+                                        "A cópia de agenda ganhou endpoint próprio e só confirma sucesso depois da persistência no banco.",
+                                        "A tela passou a consultar os cards pela data selecionada diretamente do backend, sem usar cache, memória ou localStorage como fonte de verdade."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.593",
+                        "releaseDate":  "2026-07-08",
+                        "title":  "Cadastros por tipo com cores do sistema",
+                        "description":  "O bloco Cadastros por tipo da Visão geral passou a usar a paleta padrão do sistema, sem azul fixo.",
+                        "changes":  [
+                                        "Os segmentos e marcadores do bloco Cadastros por tipo passaram a usar as cores padrão do sistema.",
+                                        "A leitura visual do painel ficou coerente com o restante da interface e sem tonalidade azul travada.",
+                                        "O manual do sistema foi atualizado para registrar a mudança de paleta do bloco."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.592",
+                        "releaseDate":  "2026-07-08",
+                        "title":  "Visão geral em cinza claro",
+                        "description":  "Os cards da Visão geral passaram a iniciar com fundo cinza claro nos controles dedicados da personalização.",
+                        "changes":  [
+                                        "Os defaults dos campos Card da visão geral e Card suave da visão geral passaram a usar tons de cinza claro.",
+                                        "A experiência de abertura da personalização passou a mostrar o dashboard já com fundo neutro e mais discreto.",
+                                        "O manual do sistema foi atualizado para registrar o novo padrão inicial."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.591",
+                        "releaseDate":  "2026-07-08",
+                        "title":  "Cards da visão geral com cores próprias",
+                        "description":  "Os cards da Visão geral passaram a ter cores separadas da paleta global e a aba Personalização ganhou controles específicos para esse dashboard.",
+                        "changes":  [
+                                        "A Visão geral passou a usar variáveis próprias para o card principal e para os cards suaves, sem depender só da cor global do tema.",
+                                        "A aba Personalização ganhou os campos Card da visão geral e Card suave da visão geral para alterar apenas esse dashboard.",
+                                        "O manual do sistema foi atualizado para explicar o novo controle dedicado aos cards da Visão geral."
                                     ],
                         "releaseType":  "stable"
                     },
                     {
                         "version":  "1.00.590",
-                        "releaseDate":  "2026-08-01",
-                        "title":  "Auditoria de campos na carteira digital do evento",
-                        "description":  "Carteira digital do evento passou a validar status, periodo, moeda e estoque antes do salvamento.",
+                        "releaseDate":  "2026-07-08",
+                        "title":  "Visão geral com cores personalizáveis",
+                        "description":  "A visão geral passou a seguir a paleta definida em Configurações gerais > Personalização e ganhou preview específico dos cards de dashboard.",
                         "changes":  [
-                                        "O status Encerrado foi corrigido para Finalizado no cadastro de evento, alinhando a UI ao enum aceito pelo backend.",
-                                        "Evento, barraca e produto passaram a exibir erro visual local para nomes curtos, datas invalidas, periodo incoerente, preco zerado e estoque nao numerico.",
-                                        "O preco do produto agora aceita digitacao monetaria brasileira e e normalizado antes de enviar ao backend.",
-                                        "Foram adicionados testes de schema para proteger o status Finalizado e rejeitar payloads invalidos do modulo."
+                                        "Os cards da Visão geral deixaram de usar azuis fixos e passaram a responder às cores do tema definido na personalização.",
+                                        "A aba Personalização de Configurações gerais passou a exibir um aviso e um preview dos cards da Visão geral para facilitar o ajuste antes de salvar.",
+                                        "O manual do sistema foi atualizado para registrar o novo comportamento visual e o vínculo com a personalização."
                                     ],
                         "releaseType":  "stable"
                     },
                     {
                         "version":  "1.00.589",
-                        "releaseDate":  "2026-07-31",
-                        "title":  "Modelos institucionais nas informacoes administrativas",
-                        "description":  "Categorias inteligentes passaram a reconhecer dados institucionais, sedes, contatos, registros e credenciamentos oficiais.",
+                        "releaseDate":  "2026-07-07",
+                        "title":  "Tema e logo da apresentação",
+                        "description":  "A base de apresentação passou a forçar tema azul e a exibir a logomarca institucional G3N no topo apenas nesse tenant.",
                         "changes":  [
-                                        "Foram adicionados modelos para razao social, nome fantasia, CNPJ, sedes, enderecos, telefones, e-mails, redes sociais e registros oficiais.",
-                                        "A busca passou a aceitar termos como CNPJ, CAGEC, CMAS, OSC, sede, endereco, telefone e ADRA para localizar registros relacionados.",
-                                        "As categorias padrao do backend foram ampliadas para novos tenants sem alterar a estrutura do banco.",
-                                        "O manual do sistema foi atualizado com o novo escopo dos modelos inteligentes."
+                                        "O tenant de apresentação passou a carregar a identidade visual azul a partir da personalização própria do schema g3n_apresentacao.",
+                                        "O topo passou a usar a logo institucional G3N da apresentação, enquanto as demais bases continuam lendo a logomarca da unidade assistencial.",
+                                        "A regra foi aplicada apenas ao tenant de apresentação, sem alterar o comportamento das outras instituições."
                                     ],
                         "releaseType":  "stable"
                     },
                     {
                         "version":  "1.00.588",
-                        "releaseDate":  "2026-07-31",
-                        "title":  "Categorias inteligentes nas informacoes administrativas",
-                        "description":  "Gestao de informacoes administrativas ganhou modelos de campos por categoria e busca ampliada por sinonimos.",
+                        "releaseDate":  "2026-07-07",
+                        "title":  "Apresentação em azul",
+                        "description":  "A base G3N de apresentação passou a usar identidade visual azul com logomarca G3N em destaque, sem alterar as demais bases.",
                         "changes":  [
-                                        "O cadastro passou a ajustar rotulos e dicas dos campos conforme categorias como modem, banco, Pix, Drive, protocolo, compras, certidoes e projetos.",
-                                        "A busca passou a considerar palavras-chave e sinonimos dos modelos inteligentes, permitindo localizar registros tecnicos por termos como modem, roteador ou internet.",
-                                        "A aba Categorias passou a mostrar o modelo inteligente aplicado em cada categoria e a lista de modelos disponiveis.",
-                                        "As categorias padrao do backend foram ampliadas sem alterar a estrutura do banco de dados.",
-                                        "O manual do sistema foi atualizado na mesma entrega."
+                                        "O script de preparação da base de apresentação agora gera uma logomarca G3N em letras grandes e negrito com paleta azul.",
+                                        "A cor tema da instituição de apresentação passou a usar azul, enquanto as outras bases continuam herdando a logomarca configurada na unidade assistencial.",
+                                        "O ambiente de apresentação permanece isolado no schema g3n_apresentacao do mesmo banco e segue reconstruível a partir do schema public."
                                     ],
                         "releaseType":  "stable"
                     },
                     {
                         "version":  "1.00.587",
-                        "releaseDate":  "2026-07-31",
-                        "title":  "Credenciais protegidas no cadastro administrativo",
-                        "description":  "Cadastro de informacoes administrativas passou a impedir preenchimento automatico de login e senha do usuario logado.",
+                        "releaseDate":  "2026-07-06",
+                        "title":  "Tenant G3N no mesmo banco",
+                        "description":  "A base de apresentação passou a ser criada dentro do mesmo PostgreSQL em um schema isolado, com cópia do tenant ADRA, sem alterar a base original, e acesso próprio.",
                         "changes":  [
-                                        "Os campos Usuario ou login e Senha ou chave receberam bloqueio de autocomplete e identificadores especificos da tela.",
-                                        "Ao iniciar novo cadastro ou abrir um registro, a senha volta automaticamente para o modo oculto.",
-                                        "O manual do sistema foi atualizado para orientar a protecao contra exposicao indevida de credenciais."
+                                        "O comando de preparação agora clona o schema public para g3n_apresentacao e filtra os dados do tenant ADRA para uma base exclusiva de demonstração.",
+                                        "A instituição, a unidade principal, a logomarca e o usuário de acesso passam a ser ajustados dentro do schema de apresentação sem depender de um banco separado.",
+                                        "O schema public da ADRA permanece intacto e serve como origem sempre que a base de apresentação for recriada.",
+                                        "O arquivo .env.g3n-apresentacao passou a apontar para a mesma DATABASE_URL com schema dedicado, facilitando o uso da base de demonstração."
                                     ],
                         "releaseType":  "stable"
                     },
                     {
                         "version":  "1.00.586",
-                        "releaseDate":  "2026-07-31",
-                        "title":  "Categorias nas informacoes administrativas",
-                        "description":  "Informacoes administrativas ganhou gerenciamento proprio de categorias com cadastro, edicao e exclusao.",
+                        "releaseDate":  "2026-07-06",
+                        "title":  "Base G3N de apresentação",
+                        "description":  "Foi criado o processo para clonar a base atual no mesmo banco, em um schema isolado, com identidade G3N, logo própria e usuário de acesso dedicado.",
                         "changes":  [
-                                        "A tela recebeu a aba Categorias para cadastrar, editar, ativar, inativar e excluir categorias.",
-                                        "As operacoes de categoria exigem a mesma confirmacao de senha usada para dados sigilosos.",
-                                        "Ao renomear uma categoria, os registros vinculados recebem o novo nome automaticamente.",
-                                        "A exclusao de categoria e bloqueada quando houver informacao administrativa vinculada."
+                                        "O backend ganhou um script para clonar o schema public para g3n_apresentacao, preservando os dados e a integridade das tabelas.",
+                                        "A instituição principal e a unidade principal do clone passam a exibir a marca G3N, com logomarca gravada em storage e caminho lógico atualizado no schema de apresentação.",
+                                        "O processo também cria o usuário g3n@apresentacao.com e grava o arquivo .env.g3n-apresentacao com a DATABASE_URL do ambiente de demonstração."
                                     ],
                         "releaseType":  "stable"
                     },
                     {
                         "version":  "1.00.585",
-                        "releaseDate":  "2026-07-31",
-                        "title":  "Alunos vinculados por unidade e sala",
-                        "description":  "Inscricoes em cursos e oficinas passou a separar a escolha de unidade e sala e a listar alunos agrupados por local.",
+                        "releaseDate":  "2026-07-06",
+                        "title":  "Backup e restauração unificados",
+                        "description":  "A nova tela de Configurações gerais passou a centralizar backup e restauração do banco de dados e das imagens do sistema.",
                         "changes":  [
-                                        "O cadastro agora seleciona primeiro a unidade e depois filtra as salas daquela unidade.",
-                                        "O catalogo de salas passou a respeitar o tenant autenticado e retornar unidade_id e unidade_nome.",
-                                        "A listagem ganhou filtros de unidade e sala e uma visao agrupada com os nomes dos alunos por unidade e sala.",
-                                        "O manual do sistema e a versao oficial foram atualizados na mesma entrega."
+                                        "Foi criada a tela Backup e restauração com ações para gerar, listar, baixar e restaurar backups do banco e das imagens.",
+                                        "O backend passou a gerar backups reais com pg_dump e arquivos compactados das imagens, além de restaurar com backup preventivo.",
+                                        "O manual do sistema e a numeração oficial da versão foram atualizados para registrar a nova área administrativa."
                                     ],
                         "releaseType":  "stable"
                     },
                     {
                         "version":  "1.00.584",
-                        "releaseDate":  "2026-07-31",
-                        "title":  "Informacoes administrativas sigilosas",
-                        "description":  "Administracao e gestao ganhou uma tela para guardar registros, acessos, senhas, links e dados internos com acesso restrito a administradores e master.",
+                        "releaseDate":  "2026-07-06",
+                        "title":  "Composição financeira com valores normalizados",
+                        "description":  "O card Composição financeira da Visão geral passou a ler saldos e lançamentos financeiros já convertidos para número no backend.",
                         "changes":  [
-                                        "A nova tela exige confirmacao da senha do usuario logado antes de consultar, salvar ou excluir informacoes sigilosas.",
-                                        "O backend criou tabela propria por tenant, permissoes administrativas e auditoria de confirmacao de acesso e alteracoes.",
-                                        "A listagem segue filtros no topo, limpar filtros, tabela com rolagem, linha clicavel, destaque do item selecionado e estados de carregamento e vazio.",
-                                        "O manual do sistema e a versao oficial foram atualizados na mesma entrega."
+                                        "As queries financeiras da visão geral agora retornam saldo e valor como float8, evitando que campos monetários sejam lidos como zero.",
+                                        "Os cards de Valores a receber, Em caixa e Em banco passaram a refletir corretamente os valores armazenados nas contas e lançamentos.",
+                                        "O manual do sistema e a versão oficial foram atualizados para registrar o ajuste."
                                     ],
                         "releaseType":  "stable"
                     },

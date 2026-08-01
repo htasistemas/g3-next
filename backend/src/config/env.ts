@@ -35,6 +35,7 @@ const envSchema = z
     APP_STORAGE_FORCE_PATH_STYLE: booleanFromEnv.default(true),
     APP_BACKUP_IMAGES_HABILITADO: booleanFromEnv.default(false),
     APP_BACKUP_IMAGES_HORA: z.string().trim().min(1).default("23:30"),
+    APP_BACKUP_ARQUIVOS_HORA: z.string().trim().min(1).default("23:40"),
     APP_BACKUP_IMAGES_GOOGLE_DRIVE_FOLDER_ID: optionalTrimmedStringFromEnv,
     APP_BACKUP_IMAGES_GOOGLE_CLIENT_ID: optionalTrimmedStringFromEnv,
     APP_BACKUP_IMAGES_GOOGLE_CLIENT_SECRET: optionalTrimmedStringFromEnv,

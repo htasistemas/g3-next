@@ -9,6 +9,9 @@ import type {
   TransparenciaComprovanteRow,
   TransparenciaDestinacaoInput,
   TransparenciaDestinacaoRow,
+  TransparenciaDespesaInput,
+  TransparenciaDespesaRow,
+  TransparenciaParecerHistoricoRow,
   TransparenciaInput,
   TransparenciaRecebimentoInput,
   TransparenciaRecebimentoRow,
@@ -22,18 +25,75 @@ type TransactionClient = Prisma.TransactionClient;
 let estruturaPromise: Promise<void> | null = null;
 
 const estruturaSql = [
+  `CREATE TABLE IF NOT EXISTS transparencia_parecer_historico (
+    id BIGSERIAL PRIMARY KEY,
+    tenant_id UUID NOT NULL,
+    transparencia_id BIGINT NOT NULL,
+    versao INTEGER NOT NULL,
+    conclusao VARCHAR(30),
+    parecer_texto TEXT,
+    ressalvas TEXT,
+    recomendacoes TEXT,
+    responsavel VARCHAR(180),
+    data_parecer DATE,
+    usuario_id VARCHAR(80),
+    usuario_nome VARCHAR(180),
+    criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+  )`,
+  `CREATE TABLE IF NOT EXISTS transparencia_despesas (
+    id BIGSERIAL PRIMARY KEY,
+    tenant_id UUID NOT NULL,
+    transparencia_id BIGINT NOT NULL,
+    descricao VARCHAR(240) NOT NULL,
+    fornecedor VARCHAR(180),
+    documento_fiscal VARCHAR(100),
+    data_pagamento DATE,
+    categoria VARCHAR(120),
+    valor NUMERIC(14,2),
+    status VARCHAR(30) DEFAULT 'PENDENTE',
+    ordem INTEGER NOT NULL DEFAULT 0
+  )`,
+  `CREATE TABLE IF NOT EXISTS transparencia_auditoria (
+    id BIGSERIAL PRIMARY KEY,
+    tenant_id UUID NOT NULL,
+    transparencia_id BIGINT NOT NULL,
+    acao VARCHAR(40) NOT NULL,
+    status_anterior VARCHAR(30),
+    status_novo VARCHAR(30),
+    usuario_id VARCHAR(80),
+    usuario_nome VARCHAR(180),
+    observacao TEXT,
+    criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+  )`,
   "ALTER TABLE IF EXISTS transparencia ADD COLUMN IF NOT EXISTS tenant_id UUID",
+  "ALTER TABLE IF EXISTS transparencia ADD COLUMN IF NOT EXISTS instrumento VARCHAR(180)",
+  "ALTER TABLE IF EXISTS transparencia ADD COLUMN IF NOT EXISTS objeto TEXT",
+  "ALTER TABLE IF EXISTS transparencia ADD COLUMN IF NOT EXISTS periodo_inicio DATE",
+  "ALTER TABLE IF EXISTS transparencia ADD COLUMN IF NOT EXISTS periodo_fim DATE",
+  "ALTER TABLE IF EXISTS transparencia ADD COLUMN IF NOT EXISTS tipo_prestacao VARCHAR(20) DEFAULT 'FINAL'",
+  "ALTER TABLE IF EXISTS transparencia ADD COLUMN IF NOT EXISTS status_workflow VARCHAR(30) DEFAULT 'RASCUNHO'",
+  "ALTER TABLE IF EXISTS transparencia ADD COLUMN IF NOT EXISTS criado_em TIMESTAMP DEFAULT NOW()",
+  "ALTER TABLE IF EXISTS transparencia ADD COLUMN IF NOT EXISTS atualizado_em TIMESTAMP DEFAULT NOW()",
+  "ALTER TABLE IF EXISTS transparencia ADD COLUMN IF NOT EXISTS parecer_conclusao VARCHAR(30)",
+  "ALTER TABLE IF EXISTS transparencia ADD COLUMN IF NOT EXISTS parecer_texto TEXT",
+  "ALTER TABLE IF EXISTS transparencia ADD COLUMN IF NOT EXISTS parecer_ressalvas TEXT",
+  "ALTER TABLE IF EXISTS transparencia ADD COLUMN IF NOT EXISTS parecer_recomendacoes TEXT",
+  "ALTER TABLE IF EXISTS transparencia ADD COLUMN IF NOT EXISTS parecer_responsavel VARCHAR(180)",
+  "ALTER TABLE IF EXISTS transparencia ADD COLUMN IF NOT EXISTS parecer_data DATE",
   "ALTER TABLE IF EXISTS transparencia_recebimentos ADD COLUMN IF NOT EXISTS tenant_id UUID",
   "ALTER TABLE IF EXISTS transparencia_destinacoes ADD COLUMN IF NOT EXISTS tenant_id UUID",
   "ALTER TABLE IF EXISTS transparencia_comprovantes ADD COLUMN IF NOT EXISTS tenant_id UUID",
   "ALTER TABLE IF EXISTS transparencia_timelines ADD COLUMN IF NOT EXISTS tenant_id UUID",
   "ALTER TABLE IF EXISTS transparencia_checklist ADD COLUMN IF NOT EXISTS tenant_id UUID",
+  "CREATE INDEX IF NOT EXISTS transparencia_despesas_tenant_idx ON transparencia_despesas(tenant_id, transparencia_id, id)",
+  "CREATE INDEX IF NOT EXISTS transparencia_parecer_historico_tenant_idx ON transparencia_parecer_historico(tenant_id, transparencia_id, versao DESC)",
   "CREATE INDEX IF NOT EXISTS transparencia_tenant_idx ON transparencia(tenant_id, id DESC)",
   "CREATE INDEX IF NOT EXISTS transparencia_recebimentos_tenant_idx ON transparencia_recebimentos(tenant_id, transparencia_id, id)",
   "CREATE INDEX IF NOT EXISTS transparencia_destinacoes_tenant_idx ON transparencia_destinacoes(tenant_id, transparencia_id, id)",
   "CREATE INDEX IF NOT EXISTS transparencia_comprovantes_tenant_idx ON transparencia_comprovantes(tenant_id, transparencia_id, id)",
   "CREATE INDEX IF NOT EXISTS transparencia_timelines_tenant_idx ON transparencia_timelines(tenant_id, transparencia_id, id)",
   "CREATE INDEX IF NOT EXISTS transparencia_checklist_tenant_idx ON transparencia_checklist(tenant_id, transparencia_id, id)"
+  ,"CREATE INDEX IF NOT EXISTS transparencia_auditoria_tenant_idx ON transparencia_auditoria(tenant_id, transparencia_id, criado_em DESC)"
 ];
 
 async function ensureTransparenciasEstrutura() {
@@ -114,6 +174,14 @@ export class TransparenciasRepository {
       SELECT
         id,
         unidade_id,
+        instrumento,
+        objeto,
+        periodo_inicio,
+        periodo_fim,
+        tipo_prestacao,
+        COALESCE(status_workflow, 'RASCUNHO') AS status_workflow,
+        criado_em,
+        atualizado_em,
         total_recebido::float8 AS total_recebido,
         total_recebido_helper,
         total_aplicado::float8 AS total_aplicado,
@@ -122,6 +190,7 @@ export class TransparenciasRepository {
         saldo_disponivel_helper,
         prestado_mes::float8 AS prestado_mes,
         prestado_mes_helper
+        ,parecer_conclusao, parecer_texto, parecer_ressalvas, parecer_recomendacoes, parecer_responsavel, parecer_data
       FROM transparencia AS t
       WHERE ${tenantFilter("t", tenantId)}
       ORDER BY t.id DESC
@@ -133,6 +202,8 @@ export class TransparenciasRepository {
     const comprovantes = ids.length ? await this.listarComprovantes(ids, tenantId) : [];
     const timelines = ids.length ? await this.listarTimelines(ids, tenantId) : [];
     const checklist = ids.length ? await this.listarChecklist(ids, tenantId) : [];
+    const despesas = ids.length ? await this.listarDespesas(ids, tenantId) : [];
+    const parecerHistorico = ids.length ? await this.listarParecerHistorico(ids, tenantId) : [];
 
     return transparencias.map((transparencia) => ({
       transparencia,
@@ -141,6 +212,7 @@ export class TransparenciasRepository {
       comprovantes,
       timelines,
       checklist
+      ,despesas, parecerHistorico
     }));
   }
 
@@ -151,6 +223,14 @@ export class TransparenciasRepository {
       SELECT
         id,
         unidade_id,
+        instrumento,
+        objeto,
+        periodo_inicio,
+        periodo_fim,
+        tipo_prestacao,
+        COALESCE(status_workflow, 'RASCUNHO') AS status_workflow,
+        criado_em,
+        atualizado_em,
         total_recebido::float8 AS total_recebido,
         total_recebido_helper,
         total_aplicado::float8 AS total_aplicado,
@@ -159,6 +239,7 @@ export class TransparenciasRepository {
         saldo_disponivel_helper,
         prestado_mes::float8 AS prestado_mes,
         prestado_mes_helper
+        ,parecer_conclusao, parecer_texto, parecer_ressalvas, parecer_recomendacoes, parecer_responsavel, parecer_data
       FROM transparencia AS t
       WHERE t.id = ${id}
         AND ${tenantFilter("t", tenantId)}
@@ -173,6 +254,8 @@ export class TransparenciasRepository {
     const comprovantes = await this.listarComprovantes([id], tenantId);
     const timelines = await this.listarTimelines([id], tenantId);
     const checklist = await this.listarChecklist([id], tenantId);
+    const despesas = await this.listarDespesas([id], tenantId);
+    const parecerHistorico = await this.listarParecerHistorico([id], tenantId);
 
     return {
       transparencia,
@@ -181,6 +264,7 @@ export class TransparenciasRepository {
       comprovantes,
       timelines,
       checklist
+      ,despesas, parecerHistorico
     };
   }
 
@@ -199,6 +283,12 @@ export class TransparenciasRepository {
         INSERT INTO transparencia (
           tenant_id,
           unidade_id,
+          instrumento,
+          objeto,
+          periodo_inicio,
+          periodo_fim,
+          tipo_prestacao,
+          status_workflow,
           total_recebido,
           total_recebido_helper,
           total_aplicado,
@@ -207,11 +297,23 @@ export class TransparenciasRepository {
           saldo_disponivel_helper,
           prestado_mes,
           prestado_mes_helper,
+          parecer_conclusao,
+          parecer_texto,
+          parecer_ressalvas,
+          parecer_recomendacoes,
+          parecer_responsavel,
+          parecer_data,
           criado_em,
           atualizado_em
         ) VALUES (
           ${tenantId}::uuid,
           ${unidadeId},
+          ${trimOrUndefined(input.instrumento ?? undefined)},
+          ${trimOrUndefined(input.objeto ?? undefined)},
+          ${input.periodoInicio ?? null},
+          ${input.periodoFim ?? null},
+          ${input.tipoPrestacao ?? "FINAL"},
+          'RASCUNHO',
           ${input.totalRecebido ?? null},
           ${trimOrUndefined(input.totalRecebidoHelper ?? undefined)},
           ${input.totalAplicado ?? null},
@@ -220,6 +322,12 @@ export class TransparenciasRepository {
           ${trimOrUndefined(input.saldoDisponivelHelper ?? undefined)},
           ${input.prestadoMes ?? null},
           ${trimOrUndefined(input.prestadoMesHelper ?? undefined)},
+          ${input.parecerConclusao ?? null},
+          ${trimOrUndefined(input.parecerTexto ?? undefined)},
+          ${trimOrUndefined(input.parecerRessalvas ?? undefined)},
+          ${trimOrUndefined(input.parecerRecomendacoes ?? undefined)},
+          ${trimOrUndefined(input.parecerResponsavel ?? undefined)},
+          ${input.parecerData ?? null},
           NOW(),
           NOW()
         )
@@ -236,7 +344,7 @@ export class TransparenciasRepository {
     return this.buscarPorIdOuFalhar(id, tenantId);
   }
 
-  async atualizar(id: bigint, input: TransparenciaInput, tenantId: string) {
+  async atualizar(id: bigint, input: TransparenciaInput, tenantId: string, usuarioId?: string, usuarioNome?: string) {
     await ensureTransparenciasEstrutura();
     await this.buscarPorIdOuFalhar(id, tenantId);
 
@@ -246,6 +354,12 @@ export class TransparenciasRepository {
         UPDATE transparencia AS t
         SET
           unidade_id = ${unidadeId},
+          instrumento = ${trimOrUndefined(input.instrumento ?? undefined)},
+          objeto = ${trimOrUndefined(input.objeto ?? undefined)},
+          periodo_inicio = ${input.periodoInicio ?? null},
+          periodo_fim = ${input.periodoFim ?? null},
+          tipo_prestacao = ${input.tipoPrestacao ?? "FINAL"},
+          atualizado_em = NOW(),
           total_recebido = ${input.totalRecebido ?? null},
           total_recebido_helper = ${trimOrUndefined(input.totalRecebidoHelper ?? undefined)},
           total_aplicado = ${input.totalAplicado ?? null},
@@ -253,13 +367,18 @@ export class TransparenciasRepository {
           saldo_disponivel = ${input.saldoDisponivel ?? null},
           saldo_disponivel_helper = ${trimOrUndefined(input.saldoDisponivelHelper ?? undefined)},
           prestado_mes = ${input.prestadoMes ?? null},
-          prestado_mes_helper = ${trimOrUndefined(input.prestadoMesHelper ?? undefined)},
-          atualizado_em = NOW()
+          prestado_mes_helper = ${trimOrUndefined(input.prestadoMesHelper ?? undefined)}
+          ,parecer_conclusao = ${input.parecerConclusao ?? null}
+          ,parecer_texto = ${trimOrUndefined(input.parecerTexto ?? undefined)}
+          ,parecer_ressalvas = ${trimOrUndefined(input.parecerRessalvas ?? undefined)}
+          ,parecer_recomendacoes = ${trimOrUndefined(input.parecerRecomendacoes ?? undefined)}
+          ,parecer_responsavel = ${trimOrUndefined(input.parecerResponsavel ?? undefined)}
+          ,parecer_data = ${input.parecerData ?? null}
         WHERE t.id = ${id}
           AND ${tenantFilter("t", tenantId)}
       `);
 
-      await this.salvarRelacionamentos(tx, id, input, tenantId);
+      await this.salvarRelacionamentos(tx, id, input, tenantId, usuarioId, usuarioNome);
     });
 
     return this.buscarPorIdOuFalhar(id, tenantId);
@@ -274,6 +393,32 @@ export class TransparenciasRepository {
       WHERE t.id = ${id}
         AND ${tenantFilter("t", tenantId)}
     `);
+  }
+
+  async atualizarStatusWorkflow(
+    id: bigint,
+    status: string,
+    tenantId: string,
+    usuarioId?: string,
+    usuarioNome?: string,
+    observacao?: string
+  ) {
+    await ensureTransparenciasEstrutura();
+    const atual = await this.buscarPorIdOuFalhar(id, tenantId);
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw(Prisma.sql`
+        UPDATE transparencia
+        SET status_workflow = ${status}, atualizado_em = NOW()
+        WHERE id = ${id} AND tenant_id::text = ${tenantId}
+      `);
+      await tx.$executeRaw(Prisma.sql`
+        INSERT INTO transparencia_auditoria
+          (tenant_id, transparencia_id, acao, status_anterior, status_novo, usuario_id, usuario_nome, observacao)
+        VALUES
+          (${tenantId}::uuid, ${id}, 'ALTERAR_STATUS', ${atual.transparencia.status_workflow ?? "RASCUNHO"}, ${status}, ${usuarioId ?? null}, ${usuarioNome ?? null}, ${observacao ?? null})
+      `);
+    });
+    return this.buscarPorIdOuFalhar(id, tenantId);
   }
 
   private async validarUnidade(unidadeId: string | null | undefined, tenantId: string) {
@@ -384,11 +529,55 @@ export class TransparenciasRepository {
     `);
   }
 
+  private async listarDespesas(ids: bigint[], tenantId: string) {
+    return prisma.$queryRaw<TransparenciaDespesaRow[]>(Prisma.sql`
+      SELECT
+        id,
+        transparencia_id,
+        descricao,
+        fornecedor,
+        documento_fiscal,
+        data_pagamento,
+        categoria,
+        valor::float8 AS valor,
+        status,
+        ordem
+      FROM transparencia_despesas AS d
+      WHERE d.transparencia_id IN (${Prisma.join(ids)})
+        AND ${tenantFilter("d", tenantId)}
+      ORDER BY d.transparencia_id, d.data_pagamento, d.ordem, d.id
+    `);
+  }
+
+  private async listarParecerHistorico(ids: bigint[], tenantId: string) {
+    return prisma.$queryRaw<TransparenciaParecerHistoricoRow[]>(Prisma.sql`
+      SELECT
+        id,
+        transparencia_id,
+        versao,
+        conclusao,
+        parecer_texto,
+        ressalvas,
+        recomendacoes,
+        responsavel,
+        data_parecer,
+        usuario_id,
+        usuario_nome,
+        criado_em
+      FROM transparencia_parecer_historico AS ph
+      WHERE ph.transparencia_id IN (${Prisma.join(ids)})
+        AND ${tenantFilter("ph", tenantId)}
+      ORDER BY ph.transparencia_id, ph.versao DESC
+    `);
+  }
+
   private async salvarRelacionamentos(
     tx: TransactionClient,
     transparenciaId: bigint,
     input: TransparenciaInput,
-    tenantId: string
+    tenantId: string,
+    usuarioId?: string,
+    usuarioNome?: string
   ) {
     await tx.$executeRaw(Prisma.sql`
       DELETE FROM transparencia_recebimentos AS r
@@ -420,11 +609,49 @@ export class TransparenciasRepository {
         AND ${tenantFilter("cl", tenantId)}
     `);
 
+    await tx.$executeRaw(Prisma.sql`
+      DELETE FROM transparencia_despesas AS d
+      WHERE d.transparencia_id = ${transparenciaId}
+        AND ${tenantFilter("d", tenantId)}
+    `);
+
     await this.inserirRecebimentos(tx, transparenciaId, input.recebimentos ?? [], tenantId);
     await this.inserirDestinacoes(tx, transparenciaId, input.destinacoes ?? [], tenantId);
     await this.inserirComprovantes(tx, transparenciaId, input.comprovantes ?? [], tenantId);
     await this.inserirTimelines(tx, transparenciaId, input.timelines ?? [], tenantId);
     await this.inserirChecklist(tx, transparenciaId, input.checklist ?? [], tenantId);
+    await this.inserirDespesas(tx, transparenciaId, input.despesas ?? [], tenantId);
+    if (input.parecerTexto?.trim() || input.parecerConclusao) {
+      await this.registrarParecerHistorico(tx, transparenciaId, input, tenantId, usuarioId, usuarioNome);
+    }
+  }
+
+  private async registrarParecerHistorico(
+    tx: TransactionClient,
+    transparenciaId: bigint,
+    input: TransparenciaInput,
+    tenantId: string,
+    usuarioId?: string,
+    usuarioNome?: string
+  ) {
+    await tx.$executeRaw(Prisma.sql`
+      INSERT INTO transparencia_parecer_historico (
+        tenant_id, transparencia_id, versao, conclusao, parecer_texto, ressalvas,
+        recomendacoes, responsavel, data_parecer, usuario_id, usuario_nome
+      ) VALUES (
+        ${tenantId}::uuid,
+        ${transparenciaId},
+        COALESCE((SELECT MAX(versao) + 1 FROM transparencia_parecer_historico WHERE transparencia_id = ${transparenciaId} AND tenant_id::text = ${tenantId}), 1),
+        ${input.parecerConclusao ?? null},
+        ${trimOrUndefined(input.parecerTexto ?? undefined)},
+        ${trimOrUndefined(input.parecerRessalvas ?? undefined)},
+        ${trimOrUndefined(input.parecerRecomendacoes ?? undefined)},
+        ${trimOrUndefined(input.parecerResponsavel ?? undefined)},
+        ${input.parecerData ?? null},
+        ${usuarioId ?? null},
+        ${usuarioNome ?? null}
+      )
+    `);
   }
 
   private async inserirRecebimentos(
@@ -565,6 +792,42 @@ export class TransparenciasRepository {
           ${item.titulo},
           ${trimOrUndefined(item.descricao ?? undefined)},
           ${trimOrUndefined(item.status ?? undefined)},
+          ${index}
+        )
+      `);
+    }
+  }
+
+  private async inserirDespesas(
+    tx: TransactionClient,
+    transparenciaId: bigint,
+    lista: TransparenciaDespesaInput[],
+    tenantId: string
+  ) {
+    for (let index = 0; index < lista.length; index += 1) {
+      const item = lista[index];
+      await tx.$executeRaw(Prisma.sql`
+        INSERT INTO transparencia_despesas (
+          tenant_id,
+          transparencia_id,
+          descricao,
+          fornecedor,
+          documento_fiscal,
+          data_pagamento,
+          categoria,
+          valor,
+          status,
+          ordem
+        ) VALUES (
+          ${tenantId}::uuid,
+          ${transparenciaId},
+          ${item.descricao},
+          ${trimOrUndefined(item.fornecedor ?? undefined)},
+          ${trimOrUndefined(item.documentoFiscal ?? undefined)},
+          ${item.dataPagamento ?? null},
+          ${trimOrUndefined(item.categoria ?? undefined)},
+          ${item.valor ?? null},
+          ${trimOrUndefined(item.status ?? undefined) ?? "PENDENTE"},
           ${index}
         )
       `);

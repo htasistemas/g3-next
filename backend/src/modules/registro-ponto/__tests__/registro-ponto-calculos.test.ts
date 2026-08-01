@@ -22,10 +22,10 @@ test("calcula horas extras quando a batida acontece antes ou depois do previsto"
   assert.equal(resultado.atrasos_minutos, 0);
   assert.equal(resultado.banco_horas_minutos, 60);
   assert.deepEqual(resultado.detalhes, [
-    { campo: "entrada_1", minutos: 15, tipo: "HORA_EXTRA" },
-    { campo: "saida_1", minutos: 15, tipo: "HORA_EXTRA" },
-    { campo: "entrada_2", minutos: 10, tipo: "HORA_EXTRA" },
-    { campo: "saida_2", minutos: 20, tipo: "HORA_EXTRA" }
+    { campo: "entrada_1", minutos: 15, tipo: "HORA_EXTRA", horario_previsto: "08:00", horario_real: "07:45" },
+    { campo: "saida_1", minutos: 15, tipo: "HORA_EXTRA", horario_previsto: "12:00", horario_real: "12:15" },
+    { campo: "entrada_2", minutos: 10, tipo: "HORA_EXTRA", horario_previsto: "13:00", horario_real: "12:50" },
+    { campo: "saida_2", minutos: 20, tipo: "HORA_EXTRA", horario_previsto: "17:00", horario_real: "17:20" }
   ]);
 });
 
@@ -49,10 +49,10 @@ test("calcula atrasos e saldo negativo quando a batida ocorre fora do horario", 
   assert.equal(resultado.atrasos_minutos, 85);
   assert.equal(resultado.banco_horas_minutos, -85);
   assert.deepEqual(resultado.detalhes, [
-    { campo: "entrada_1", minutos: 20, tipo: "ATRASO" },
-    { campo: "saida_1", minutos: 20, tipo: "ATRASO" },
-    { campo: "entrada_2", minutos: 15, tipo: "ATRASO" },
-    { campo: "saida_2", minutos: 30, tipo: "ATRASO" }
+    { campo: "entrada_1", minutos: 20, tipo: "ATRASO", horario_previsto: "08:00", horario_real: "08:20" },
+    { campo: "saida_1", minutos: 20, tipo: "ATRASO", horario_previsto: "12:00", horario_real: "11:40" },
+    { campo: "entrada_2", minutos: 15, tipo: "ATRASO", horario_previsto: "13:00", horario_real: "13:15" },
+    { campo: "saida_2", minutos: 30, tipo: "ATRASO", horario_previsto: "17:00", horario_real: "16:30" }
   ]);
 });
 
@@ -76,8 +76,8 @@ test("usa jornada padrao quando alguns horarios nao estiverem configurados", () 
   assert.equal(resultado.atrasos_minutos, 0);
   assert.equal(resultado.banco_horas_minutos, 20);
   assert.deepEqual(resultado.detalhes, [
-    { campo: "entrada_1", minutos: 10, tipo: "HORA_EXTRA" },
-    { campo: "saida_1", minutos: 10, tipo: "HORA_EXTRA" }
+    { campo: "entrada_1", minutos: 10, tipo: "HORA_EXTRA", horario_previsto: "08:00", horario_real: "07:50" },
+    { campo: "saida_1", minutos: 10, tipo: "HORA_EXTRA", horario_previsto: "12:00", horario_real: "12:10" }
   ]);
 });
 
@@ -95,4 +95,9 @@ test("usa jornada padrao quando o horario previsto nao estiver configurado", () 
   assert.equal(resultado.horas_extras_minutos, 21);
   assert.equal(resultado.atrasos_minutos, 1);
   assert.equal(resultado.banco_horas_minutos, 20);
+  assert.deepEqual(resultado.detalhes, [
+    { campo: "entrada_1", minutos: 14, tipo: "HORA_EXTRA", horario_previsto: "08:00", horario_real: "07:46" },
+    { campo: "entrada_2", minutos: 1, tipo: "ATRASO", horario_previsto: "13:00", horario_real: "13:01" },
+    { campo: "saida_2", minutos: 7, tipo: "HORA_EXTRA", horario_previsto: "17:00", horario_real: "17:07" }
+  ]);
 });

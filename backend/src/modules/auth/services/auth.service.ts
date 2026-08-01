@@ -23,16 +23,76 @@ export class AuthService {
 
   async login(rawInput: unknown) {
     const input = authLoginSchema.parse(rawInput);
-    const usuario = await this.repository.buscarUsuarioPorLogin({
-      nomeUsuario: input.nomeUsuario,
-      email: input.email,
+    const emailNormalizado = input.email?.trim().toLowerCase();
+    let tenantsPorEmail: Awaited<ReturnType<AuthRepository["buscarTenantsPorEmail"]>> | undefined;
+    let tenantLookup = {
       cnpj: input.cnpj,
       slug: input.slug,
       codigoInstituicao: input.codigoInstituicao
+    };
+
+    if (
+      emailNormalizado &&
+      !tenantLookup.cnpj &&
+      !tenantLookup.slug &&
+      !tenantLookup.codigoInstituicao &&
+      emailNormalizado !== EMAIL_ADMIN_PADRAO
+    ) {
+      tenantsPorEmail = await this.repository.buscarTenantsPorEmail(emailNormalizado);
+      if (tenantsPorEmail.length === 1) {
+        const tenantEncontrado = tenantsPorEmail[0];
+        tenantLookup = {
+          cnpj: tenantEncontrado.cnpj,
+          slug: tenantEncontrado.slug,
+          codigoInstituicao: tenantEncontrado.codigo ?? undefined
+        };
+      } else if (tenantsPorEmail.length > 1) {
+        throw new AppError(
+          "Foi encontrado mais de um cliente com este e-mail. Informe o CNPJ, código ou slug da instituição para continuar.",
+          400
+        );
+      }
+    }
+
+    const usuario = await this.repository.buscarUsuarioPorLogin({
+      nomeUsuario: input.nomeUsuario,
+      email: input.email,
+      cnpj: tenantLookup.cnpj,
+      slug: tenantLookup.slug,
+      codigoInstituicao: tenantLookup.codigoInstituicao
     });
     const identificador = input.email ?? input.nomeUsuario ?? "";
 
     if (!usuario) {
+      if (emailNormalizado) {
+        tenantsPorEmail ??= await this.repository.buscarTenantsPorEmail(emailNormalizado);
+
+        if (
+          (tenantLookup.cnpj || tenantLookup.slug || tenantLookup.codigoInstituicao) &&
+          tenantsPorEmail.length > 0 &&
+          !tenantsPorEmail.some((item) => this.compararTenantLookup(item, tenantLookup))
+        ) {
+          throw new AppError(
+            "O e-mail informado está vinculado a outra instituição. Verifique o CNPJ e o e-mail do administrador inicial cadastrado em Administração inicial.",
+            401
+          );
+        }
+
+        if (
+          !tenantLookup.cnpj &&
+          !tenantLookup.slug &&
+          !tenantLookup.codigoInstituicao &&
+          tenantsPorEmail.length === 1
+        ) {
+          const tenantEncontrado = tenantsPorEmail[0];
+          tenantLookup = {
+            cnpj: tenantEncontrado.cnpj,
+            slug: tenantEncontrado.slug,
+            codigoInstituicao: tenantEncontrado.codigo ?? undefined
+          };
+        }
+      }
+
       await this.repository.registrarEventoAcesso({
         evento: "LOGIN_FALHA",
         identificador,
@@ -43,11 +103,17 @@ export class AuthService {
         }
       });
       console.warn(`[auth] tentativa de login invalida para usuario: ${identificador}`);
-      throw new AppError("Credenciais invalidas.", 401);
+      const possuiContextoTenant = Boolean(input.cnpj?.trim() || input.slug?.trim() || input.codigoInstituicao?.trim());
+      throw new AppError(
+        possuiContextoTenant
+          ? "Nao foi possivel localizar o usuario informado para a instituicao. Verifique e-mail, CNPJ, codigo ou slug e tente novamente."
+          : "Informe o CNPJ, codigo ou slug da instituicao para acessar este cliente.",
+        401
+      );
     }
 
     const controle = await this.repository.buscarControleAcessoPorUsuarioId(usuario.id);
-    this.validarAcessoUsuario(controle?.status, usuario.instituicaoStatus, usuario.email);
+    this.validarAcessoUsuario(controle?.status, usuario.instituicaoStatus, usuario.email, usuario.isSuperadmin);
 
     const senhaValida = await bcrypt.compare(input.senha, usuario.senhaHash);
     if (!senhaValida) {
@@ -63,7 +129,7 @@ export class AuthService {
       if ((atualizado?.status ?? "").toUpperCase() === "BLOQUEADO") {
         throw new AppError("Usuario bloqueado por tentativas invalidas de acesso.", 403);
       }
-      throw new AppError("Credenciais invalidas.", 401);
+      throw new AppError("Senha invalida para o usuario informado.", 401);
     }
 
     await this.repository.registrarLoginSucesso(usuario.id);
@@ -132,7 +198,7 @@ export class AuthService {
     }
 
     const controle = await this.repository.buscarControleAcessoPorUsuarioId(usuario.id);
-    this.validarAcessoUsuario(controle?.status, usuario.instituicaoStatus, usuario.email);
+    this.validarAcessoUsuario(controle?.status, usuario.instituicaoStatus, usuario.email, usuario.isSuperadmin);
     await this.repository.registrarLoginSucesso(usuario.id);
     await this.repository.registrarEventoAcesso({
       tenant_id: usuario.tenantId ?? undefined,
@@ -163,7 +229,7 @@ export class AuthService {
     }
 
     const controle = await this.repository.buscarControleAcessoPorUsuarioId(usuario.id);
-    this.validarAcessoUsuario(controle?.status, usuario.instituicaoStatus, usuario.email);
+    this.validarAcessoUsuario(controle?.status, usuario.instituicaoStatus, usuario.email, usuario.isSuperadmin);
 
     return this.mapUsuarioAutenticado(usuario);
   }
@@ -249,6 +315,7 @@ export class AuthService {
       instituicao_id: usuario.instituicaoId ?? undefined,
       instituicao_nome: usuario.instituicaoNome ?? undefined,
       instituicao_slug: usuario.instituicaoSlug ?? undefined,
+      instituicao_logo_url: usuario.instituicaoLogoUrl ?? undefined,
       cnpj: usuario.instituicaoCnpj ?? undefined,
       plano: usuario.instituicaoPlano ?? undefined,
       perfil: usuario.perfilAcesso ?? (usuario.isSuperadmin ? "MASTER" : undefined),
@@ -257,25 +324,31 @@ export class AuthService {
     };
   }
 
-  private validarAcessoUsuario(status?: string | null, statusInstituicao?: string | null, email?: string | null) {
+  private validarAcessoUsuario(
+    status?: string | null,
+    statusInstituicao?: string | null,
+    email?: string | null,
+    isSuperadmin?: boolean | null
+  ) {
     const statusNormalizado = (status ?? "").trim().toUpperCase();
     const emailNormalizado = (email ?? "").trim().toLowerCase();
     const ehEmailAdminPadrao = emailNormalizado === EMAIL_ADMIN_PADRAO;
+    const ehMaster = Boolean(isSuperadmin) || ehEmailAdminPadrao;
 
-    if (statusNormalizado === "INATIVO" && !ehEmailAdminPadrao) {
+    if (statusNormalizado === "INATIVO" && !ehMaster) {
       throw new AppError("Usuario inativo. Procure o administrador.", 403);
     }
 
-    if (statusNormalizado === "BLOQUEADO" && !ehEmailAdminPadrao) {
+    if (statusNormalizado === "BLOQUEADO" && !ehMaster) {
       throw new AppError("Usuario bloqueado. Procure o administrador.", 403);
     }
 
     const statusTenant = (statusInstituicao ?? "").trim().toUpperCase();
-    if (statusTenant === "INATIVO") {
+    if (statusTenant === "INATIVO" && !ehMaster) {
       throw new AppError("Instituicao inativa. Procure o suporte da plataforma.", 403);
     }
 
-    if (statusTenant === "BLOQUEADO") {
+    if (statusTenant === "BLOQUEADO" && !ehMaster) {
       throw new AppError("Instituicao bloqueada. Regularize o acesso com o suporte da plataforma.", 403);
     }
   }
@@ -288,5 +361,23 @@ export class AuthService {
       senha += alfabeto[randomIndex];
     }
     return senha;
+  }
+
+  private compararTenantLookup(
+    tenant: { cnpj?: string; slug?: string; codigo?: string | null },
+    lookup: { cnpj?: string; slug?: string; codigoInstituicao?: string }
+  ) {
+    const cnpjAtual = tenant.cnpj?.trim().toLowerCase();
+    const slugAtual = tenant.slug?.trim().toLowerCase();
+    const codigoAtual = tenant.codigo?.trim().toLowerCase();
+    const cnpjLookup = lookup.cnpj?.trim().toLowerCase();
+    const slugLookup = lookup.slug?.trim().toLowerCase();
+    const codigoLookup = lookup.codigoInstituicao?.trim().toLowerCase();
+
+    return (
+      (!!cnpjLookup && cnpjAtual === cnpjLookup) ||
+      (!!slugLookup && slugAtual === slugLookup) ||
+      (!!codigoLookup && codigoAtual === codigoLookup)
+    );
   }
 }

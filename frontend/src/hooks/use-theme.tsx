@@ -9,7 +9,7 @@ import {
 } from "react";
 import { darken, lighten, sanitizeHex } from "@/lib/color-utils";
 import { useAuth } from "@/hooks/use-auth";
-import { defaultThemeSettings } from "@/lib/theme-presets";
+import { defaultThemeSettings, themePresets } from "@/lib/theme-presets";
 import { parametrosSistemaService } from "@/services/parametros-sistema.service";
 import type { ThemeSettings } from "@/types/theme";
 
@@ -25,6 +25,15 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 const STORAGE_KEY = "g3_theme_settings";
 const STORAGE_KEY_LEGADO = "g3_theme_settings";
+const SLUG_APRESENTACAO = "g3n-apresentacao";
+
+function obterTemaApresentacao() {
+  return themePresets.find((preset) => preset.id === "azul_corporativo")?.settings ?? defaultThemeSettings;
+}
+
+function ehBaseApresentacao(slug?: string | null) {
+  return slug?.trim().toLowerCase() === SLUG_APRESENTACAO;
+}
 
 function getSistemaEscuroPreferido() {
   if (typeof window === "undefined" || !window.matchMedia) return false;
@@ -53,6 +62,14 @@ function normalizarSettings(input: ThemeSettings): ThemeSettings {
       border: sanitizeHex(input.paleta.border, defaultThemeSettings.paleta.border),
       muted: sanitizeHex(input.paleta.muted, defaultThemeSettings.paleta.muted),
       card: sanitizeHex(input.paleta.card, defaultThemeSettings.paleta.card),
+      dashboardCard: sanitizeHex(
+        input.paleta.dashboardCard,
+        defaultThemeSettings.paleta.dashboardCard
+      ),
+      dashboardCardSoft: sanitizeHex(
+        input.paleta.dashboardCardSoft,
+        defaultThemeSettings.paleta.dashboardCardSoft
+      ),
       danger: sanitizeHex(input.paleta.danger, defaultThemeSettings.paleta.danger),
       warning: sanitizeHex(input.paleta.warning, defaultThemeSettings.paleta.warning),
       success: sanitizeHex(input.paleta.success, defaultThemeSettings.paleta.success),
@@ -90,6 +107,8 @@ function aplicarVariaveisCss(settings: ThemeSettings) {
   root.style.setProperty("--g3-page-gradient-end", lighten(background, temaEscuro ? 0.02 : 0.04));
   root.style.setProperty("--g3-card", card);
   root.style.setProperty("--g3-card-soft", temaEscuro ? "#0F172A" : lighten(card, 0.02));
+  root.style.setProperty("--g3-dashboard-card", paleta.dashboardCard);
+  root.style.setProperty("--g3-dashboard-card-soft", paleta.dashboardCardSoft);
   root.style.setProperty("--g3-foreground", foreground);
   root.style.setProperty("--g3-muted", muted);
   root.style.setProperty("--g3-border", border);
@@ -136,7 +155,10 @@ function carregarLocalStorage(tenantId?: string | null): ThemeSettings {
 export function ThemeProvider({ children }: PropsWithChildren) {
   const { autenticado, usuario } = useAuth();
   const tenantId = usuario?.tenant_id ?? null;
-  const [settings, setSettings] = useState<ThemeSettings>(() => carregarLocalStorage());
+  const baseApresentacao = ehBaseApresentacao(usuario?.instituicao_slug);
+  const [settings, setSettings] = useState<ThemeSettings>(() =>
+    baseApresentacao ? obterTemaApresentacao() : carregarLocalStorage()
+  );
   const [carregando, setCarregando] = useState(true);
   const [previewAtivo, setPreviewAtivo] = useState<ThemeSettings | null>(null);
 
@@ -174,7 +196,7 @@ export function ThemeProvider({ children }: PropsWithChildren) {
       try {
         const remoto = await parametrosSistemaService.obterPersonalizacao();
         if (!ativo) return;
-        const normalizado = normalizarSettings(remoto);
+        const normalizado = baseApresentacao ? obterTemaApresentacao() : normalizarSettings(remoto);
         setSettings(normalizado);
         localStorage.setItem(chaveStoragePorTenant(tenantId), JSON.stringify(normalizado));
         if (tenantId) {
@@ -193,18 +215,18 @@ export function ThemeProvider({ children }: PropsWithChildren) {
     return () => {
       ativo = false;
     };
-  }, [autenticado, tenantId]);
+  }, [autenticado, tenantId, baseApresentacao]);
 
   const applyPreview = useCallback((draft: ThemeSettings) => {
-    setPreviewAtivo(normalizarSettings(draft));
-  }, []);
+    setPreviewAtivo(baseApresentacao ? obterTemaApresentacao() : normalizarSettings(draft));
+  }, [baseApresentacao]);
 
   const clearPreview = useCallback(() => {
     setPreviewAtivo(null);
   }, []);
 
   const saveSettings = useCallback(async (novo: ThemeSettings) => {
-    const normalizado = normalizarSettings(novo);
+    const normalizado = baseApresentacao ? obterTemaApresentacao() : normalizarSettings(novo);
     const remoto = await parametrosSistemaService.salvarPersonalizacao(normalizado);
     const remotoNormalizado = normalizarSettings(remoto);
 
@@ -214,7 +236,7 @@ export function ThemeProvider({ children }: PropsWithChildren) {
     if (tenantId) {
       localStorage.removeItem(STORAGE_KEY_LEGADO);
     }
-  }, [tenantId]);
+  }, [tenantId, baseApresentacao]);
 
   const value = useMemo<ThemeContextValue>(
     () => ({

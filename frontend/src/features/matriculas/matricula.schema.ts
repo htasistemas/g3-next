@@ -31,6 +31,9 @@ export const matriculaFormSchema = z.object({
   vagas_disponiveis: optionalInteger,
   carga_horaria: optionalInteger,
   horario_inicial: optionalTrimmedString,
+  controle_horario_atendimento: z.boolean().default(false),
+  horario_final_atendimento: optionalTrimmedString,
+  intervalo_atendimento_minutos: optionalInteger,
   duracao_horas: requiredInteger,
   dias_semana: z.array(z.string()).default([]),
   faixa_etaria: z.array(z.string()).default([]),
@@ -48,6 +51,25 @@ export const matriculaFormSchema = z.object({
   data_triagem: optionalTrimmedString,
   data_encaminhamento: optionalTrimmedString,
   data_conclusao: optionalTrimmedString
+}).superRefine((value, context) => {
+  if (!value.controle_horario_atendimento) return;
+  if (value.tipo.trim().toUpperCase() !== "ATENDIMENTO") {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["controle_horario_atendimento"], message: "O controle por horário está disponível apenas para atendimentos." });
+    return;
+  }
+  if (!value.horario_inicial || !value.horario_final_atendimento || value.duracao_horas <= 0) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["duracao_horas"], message: "Informe os horários inicial e final e a duração do atendimento em minutos." });
+    return;
+  }
+  const [horaInicial, minutoInicial] = value.horario_inicial.split(":").map(Number);
+  const [horaFinal, minutoFinal] = value.horario_final_atendimento.split(":").map(Number);
+  const inicio = horaInicial * 60 + minutoInicial;
+  const fim = horaFinal * 60 + minutoFinal;
+  if (fim <= inicio) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["horario_final_atendimento"], message: "O horário final deve ser posterior ao horário inicial." });
+  } else if ((fim - inicio) % value.duracao_horas !== 0) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["duracao_horas"], message: "A duração em minutos deve dividir exatamente o período informado." });
+  }
 });
 
 export type MatriculaFormInput = z.input<typeof matriculaFormSchema>;
@@ -62,6 +84,9 @@ export const matriculaDefaultValues: MatriculaFormValues = {
   vagas_disponiveis: 0,
   carga_horaria: undefined,
   horario_inicial: "",
+  controle_horario_atendimento: false,
+  horario_final_atendimento: "",
+  intervalo_atendimento_minutos: undefined,
   duracao_horas: 0,
   dias_semana: [],
   faixa_etaria: [],

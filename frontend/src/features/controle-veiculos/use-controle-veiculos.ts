@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { controleVeiculosService } from "@/services/controle-veiculos.service";
 import type {
+  DisponibilidadeVeiculoConsulta,
+  DisponibilidadeVeiculoRegistro,
   LocalDestinoVeiculo,
   MotoristaAutorizado,
   RegistroDiarioBordo,
@@ -152,6 +154,115 @@ export function useRemoverMotoristaAutorizado() {
     mutationFn: (id: number) => controleVeiculosService.removerMotoristaAutorizado(id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["controle-veiculos", "motoristas-autorizados"] });
+    }
+  });
+}
+
+export function useDisponibilidades() {
+  const { usuario } = useAuth();
+  return useQuery({
+    queryKey: ["controle-veiculos", "disponibilidades", usuario?.tenant_id ?? "sem-tenant"],
+    queryFn: () => controleVeiculosService.listarDisponibilidades()
+  });
+}
+
+export function useConsultaDisponibilidade(params: DisponibilidadeVeiculoConsulta) {
+  const { usuario } = useAuth();
+  return useQuery({
+    queryKey: [
+      "controle-veiculos",
+      "consulta-disponibilidade",
+      usuario?.tenant_id ?? "sem-tenant",
+      params
+    ],
+    queryFn: () => controleVeiculosService.consultarDisponibilidade(params)
+  });
+}
+
+export function useResumoDisponibilidade(params: DisponibilidadeVeiculoConsulta) {
+  const { usuario } = useAuth();
+  return useQuery({
+    queryKey: ["controle-veiculos", "resumo-disponibilidade", usuario?.tenant_id ?? "sem-tenant", params],
+    queryFn: () => controleVeiculosService.resumirDisponibilidade(params)
+  });
+}
+
+export function useVeiculosDisponibilidade() {
+  const { usuario } = useAuth();
+  return useQuery({
+    queryKey: ["controle-veiculos", "veiculos-disponibilidade", usuario?.tenant_id ?? "sem-tenant"],
+    queryFn: () => controleVeiculosService.listarVeiculosDisponibilidade()
+  });
+}
+
+export function useAgendaVeiculoDisponibilidade(veiculoId?: number | null, params?: DisponibilidadeVeiculoConsulta) {
+  const { usuario } = useAuth();
+  return useQuery({
+    queryKey: [
+      "controle-veiculos",
+      "agenda-disponibilidade",
+      usuario?.tenant_id ?? "sem-tenant",
+      veiculoId ?? "todos",
+      params
+    ],
+    queryFn: () => controleVeiculosService.obterAgendaVeiculo(veiculoId as number, params as DisponibilidadeVeiculoConsulta),
+    enabled: Boolean(veiculoId && params)
+  });
+}
+
+export function useSalvarDisponibilidadeVeiculo() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: DisponibilidadeVeiculoRegistro) => {
+      if (payload.id) {
+        return controleVeiculosService.atualizarDisponibilidade(
+          payload.id,
+          payload as Omit<
+            DisponibilidadeVeiculoRegistro,
+            "id" | "tenantId" | "version" | "bloqueios" | "proximaLiberacao" | "situacao" | "ativo"
+          >
+        );
+      }
+      return controleVeiculosService.criarDisponibilidade(
+        payload as Omit<
+          DisponibilidadeVeiculoRegistro,
+          "id" | "tenantId" | "version" | "bloqueios" | "proximaLiberacao" | "situacao" | "ativo"
+        >
+      );
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["controle-veiculos"] });
+    }
+  });
+}
+
+export function useCancelarDisponibilidadeVeiculo() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, motivoCancelamento }: { id: number; motivoCancelamento: string }) =>
+      controleVeiculosService.cancelarDisponibilidade(id, motivoCancelamento),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["controle-veiculos"] });
+    }
+  });
+}
+
+export function useEncerrarDisponibilidadeVeiculo() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => controleVeiculosService.encerrarDisponibilidade(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["controle-veiculos"] });
+    }
+  });
+}
+
+export function useExcluirDisponibilidadeVeiculo() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => controleVeiculosService.excluirDisponibilidade(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["controle-veiculos"] });
     }
   });
 }

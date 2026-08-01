@@ -54,6 +54,8 @@ const camposCor = [
   { key: "border", label: "Borda" },
   { key: "muted", label: "Muted" },
   { key: "card", label: "Card" },
+  { key: "dashboardCard", label: "Card da visão geral" },
+  { key: "dashboardCardSoft", label: "Card suave da visão geral" },
   { key: "danger", label: "Cor de erro" },
   { key: "warning", label: "Cor de aviso" },
   { key: "success", label: "Cor de sucesso" },
@@ -434,6 +436,10 @@ export function ParametrosSistemaPage() {
                   ))}
                 </div>
 
+                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+                  Os cards da visão geral usam os campos específicos acima e continuam com a base global de tema.
+                </div>
+
                 <div className="rounded-xl border border-slate-200 bg-white p-4">
                   <p className="mb-3 text-sm font-semibold text-slate-900">Preview</p>
                   <div className="grid gap-3 md:grid-cols-2">
@@ -461,6 +467,39 @@ export function ParametrosSistemaPage() {
                       <span className="text-sm underline underline-offset-2 text-[var(--g3-link)]">
                         Link de exemplo
                       </span>
+                    </div>
+                    <div
+                      className="space-y-2 rounded-lg border p-3 md:col-span-2"
+                      style={{
+                        borderColor: draft.paleta.border,
+                        backgroundImage: `linear-gradient(180deg, ${draft.paleta.dashboardCard} 0%, ${draft.paleta.dashboardCardSoft} 100%)`
+                      }}
+                    >
+                      <p className="text-sm font-semibold" style={{ color: draft.paleta.foreground }}>
+                        Visão geral
+                      </p>
+                      <p className="text-xs" style={{ color: draft.paleta.muted }}>
+                        Exemplo de card de resumo com a paleta atual.
+                      </p>
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: draft.paleta.muted }}>
+                            Beneficiários no período
+                          </p>
+                          <p className="mt-1 text-2xl font-semibold" style={{ color: draft.paleta.corPrimaria }}>
+                            128
+                          </p>
+                        </div>
+                        <span
+                          className="rounded-md px-2 py-2"
+                          style={{
+                            backgroundColor: draft.paleta.corPrimaria,
+                            color: draft.paleta.dashboardCard
+                          }}
+                        >
+                          VG
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>

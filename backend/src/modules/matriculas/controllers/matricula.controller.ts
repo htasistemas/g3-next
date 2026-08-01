@@ -80,7 +80,17 @@ export class MatriculaController {
   }
 
   async removerPresencaData(request: AuthenticatedRequest, response: Response) {
-    await service.removerPresencaData(request.params.id, request.params.presencaDataId, request.authUser?.tenant_id);
+    await service.removerPresencaData(
+      request.params.id,
+      request.params.presencaDataId,
+      request.authUser?.tenant_id,
+      request.authUser
+        ? {
+            id: request.authUser.id,
+            nome: request.authUser.nome ?? request.authUser.nomeUsuario
+          }
+        : undefined
+    );
     return response.status(204).send();
   }
 
@@ -90,7 +100,32 @@ export class MatriculaController {
   }
 
   async salvarPresencasPorData(request: AuthenticatedRequest, response: Response) {
-    const resultado = await service.salvarPresencasPorData(request.params.id, request.params.presencaDataId, request.body, request.authUser?.tenant_id);
+    const resultado = await service.salvarPresencasPorData(
+      request.params.id,
+      request.params.presencaDataId,
+      request.body,
+      request.authUser?.tenant_id,
+      request.authUser
+        ? {
+            id: request.authUser.id,
+            nome: request.authUser.nome ?? request.authUser.nomeUsuario
+          }
+        : undefined
+    );
+    return response.json(resultado);
+  }
+
+  async validarSenhaPresenca(request: AuthenticatedRequest, response: Response) {
+    const resultado = await service.validarSenhaPresenca(
+      request.body,
+      request.authUser?.tenant_id,
+      request.authUser
+        ? {
+            id: request.authUser.id,
+            nome: request.authUser.nome ?? request.authUser.nomeUsuario
+          }
+        : undefined
+    );
     return response.json(resultado);
   }
 }

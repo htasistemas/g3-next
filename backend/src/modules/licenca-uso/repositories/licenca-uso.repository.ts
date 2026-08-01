@@ -318,7 +318,7 @@ export class LicencaUsoRepository {
           ultimo_checkout_pago, ultimo_valor_pago, updated_at, updated_by
         )
         VALUES (
-          $1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16::jsonb, $17::jsonb,
+          $1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::date, $13::date, $14, $15, $16::jsonb, $17::jsonb,
           $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34,
           $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, NOW(), $45
         )
@@ -454,7 +454,7 @@ export class LicencaUsoRepository {
           tenant_id, status, descricao, plano_id, ciclo_cobranca, vigencia_inicio, vigencia_fim, vigencia_dias,
           valor_licenca, valor_implantacao, valor_total, order_nsu, invoice_slug, checkout_url
         )
-        VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        VALUES ($1::uuid, $2, $3, $4, $5, $6::date, $7::date, $8, $9, $10, $11, $12, $13, $14)
         RETURNING *
       `,
       input.tenantId,

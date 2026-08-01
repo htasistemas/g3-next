@@ -73,6 +73,10 @@ const routeModules: RouteModuleDefinition[] = [
     path: "/atendimentos/agendamentos",
     loader: () => import("@/pages/atendimentos/agendamentos-page")
   },
+  {
+    path: "/atendimentos/prontuario",
+    loader: () => import("@/pages/atendimentos/prontuario-page")
+  },
   { path: "/educacional", loader: () => import("@/pages/educacional/educacional-page") },
   { path: "/atendimentos/ocorrencias", loader: () => import("@/pages/atendimentos/ocorrencias-page") },
   {
@@ -131,10 +135,6 @@ const routeModules: RouteModuleDefinition[] = [
     loader: () => import("@/pages/setor-administrativo/checklist-diario-page")
   },
   {
-    path: "/setor-administrativo/informacoes-administrativas",
-    loader: () => import("@/pages/setor-administrativo/informacoes-administrativas-page")
-  },
-  {
     path: "/setor-juridico/plano-trabalho",
     loader: () => import("@/pages/setor-juridico/plano-trabalho-page-next")
   },
@@ -165,6 +165,10 @@ const routeModules: RouteModuleDefinition[] = [
   {
     path: "/configuracoes/parametros-sistema",
     loader: () => import("@/pages/configuracoes/parametros-sistema-page")
+  },
+  {
+    path: "/configuracoes/backup-restauracao",
+    loader: () => import("@/pages/configuracoes/backup-restauracao-page")
   },
   {
     path: "/configuracoes/atualizar-sistema",
@@ -227,6 +231,10 @@ const routeModules: RouteModuleDefinition[] = [
     loader: () => import("@/pages/portais/portal-externo-page")
   },
   {
+    path: "/portal-transparencia/:slug",
+    loader: () => import("@/pages/portais/portal-externo-page")
+  },
+  {
     path: "/portal-parceiro-financiador",
     loader: () => import("@/pages/portais/portal-externo-page")
   },
@@ -234,6 +242,10 @@ const routeModules: RouteModuleDefinition[] = [
   {
     path: "/configuracoes/master-instituicoes",
     loader: () => import("@/pages/configuracoes/master-instituicoes-page")
+  },
+  {
+    path: "/configuracoes/importacao-dados",
+    loader: () => import("@/pages/configuracoes/importacao-dados-page")
   },
   {
     path: "/configuracoes/mensagens-personalizadas",

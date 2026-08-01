@@ -14,7 +14,8 @@ import {
   type RelatorioBloco,
   type RelatorioBlocoCampo,
   type RelatorioHtmlInput,
-  type RelatorioMetaTopo
+  type RelatorioMetaTopo,
+  type RelatorioTabela
 } from "../templates/relatorio-template-padrao.js";
 import { HtmlPdfRenderer } from "./html-pdf-renderer.js";
 import {
@@ -167,6 +168,26 @@ export class ReportsService {
     return this.dateTimeFormatter.format(data);
   }
 
+  private formatarIdade(valor?: string | Date | null): string {
+    if (!valor) return "---";
+
+    const data = valor instanceof Date ? valor : new Date(valor);
+    if (Number.isNaN(data.getTime())) return "---";
+
+    const hoje = new Date();
+    let idade = hoje.getFullYear() - data.getFullYear();
+    const mesAtual = hoje.getMonth();
+    const mesNascimento = data.getMonth();
+    const diaAtual = hoje.getDate();
+    const diaNascimento = data.getDate();
+
+    if (mesAtual < mesNascimento || (mesAtual === mesNascimento && diaAtual < diaNascimento)) {
+      idade -= 1;
+    }
+
+    return idade >= 0 ? `${idade} ano${idade === 1 ? "" : "s"}` : "---";
+  }
+
   private formatarPeriodoCurso(dataInicial?: string, dataFinal?: string): string | undefined {
     const inicio = this.normalizarTexto(dataInicial);
     const fim = this.normalizarTexto(dataFinal);
@@ -224,6 +245,21 @@ export class ReportsService {
       .filter(Boolean)
       .map((parte) => parte.charAt(0) + parte.slice(1).toLowerCase())
       .join(" ");
+  }
+
+  private formatarStatusPresencaRelatorio(valor?: string | null): string {
+    const texto = this.normalizarTexto(valor);
+    if (!texto) return "Não informado";
+
+    const normalizado = texto.toUpperCase();
+    const mapa: Record<string, string> = {
+      PRESENTE: "Presente",
+      AUSENTE: "Ausente",
+      JUSTIFICADO: "Justificado",
+      NAO_INFORMADO: "Não informado"
+    };
+
+    return mapa[normalizado] ?? this.formatarValorEnumerado(normalizado);
   }
 
   private montarMetadadosTopo(usuarioEmissor?: string): RelatorioMetaTopo[] {
@@ -788,6 +824,22 @@ export class ReportsService {
     const tenantId = this.parseTenant(authUser?.tenant_id);
     const matricula = await this.matriculaService.buscarPorId(payload.matriculaId, tenantId);
     const contexto = await this.montarContextoInstitucional(tenantId);
+    const datasExistentes = await this.matriculaService.listarPresencaDatas(payload.matriculaId, false, tenantId);
+    const datasOrdenadas = [...datasExistentes]
+      .filter((data) => {
+        if (payload.periodoInicio && data.data_aula < payload.periodoInicio) return false;
+        if (payload.periodoFim && data.data_aula > payload.periodoFim) return false;
+        if (!payload.periodoInicio && !payload.periodoFim && payload.dataAula) {
+          return data.data_aula === payload.dataAula;
+        }
+        return true;
+      })
+      .sort((a, b) => a.data_aula.localeCompare(b.data_aula));
+
+    const datasRelatorio =
+      payload.periodoInicio || payload.periodoFim || payload.dataAula
+        ? datasOrdenadas
+        : datasExistentes.sort((a, b) => a.data_aula.localeCompare(b.data_aula));
     const participantes = [...(matricula.matriculas ?? [])]
       .filter((item) => (item.status ?? "ATIVO").trim().toUpperCase() !== "CANCELADO")
       .sort((a, b) => (a.beneficiario_nome || "").localeCompare(b.beneficiario_nome || "", "pt-BR"));
@@ -796,82 +848,179 @@ export class ReportsService {
       matricula.horario_inicial && matricula.duracao_horas
         ? `${matricula.horario_inicial} (${matricula.duracao_horas}h)`
         : matricula.horario_inicial ?? undefined;
-    const tabela = {
-      colunas: exibirCpf
+
+    const presencasPorData = new Map<
+      string,
+      Array<{ matricula_id: string; beneficiario_nome: string; cpf?: string; status: string; observacao?: string }>
+    >();
+    for (const data of datasRelatorio) {
+      const resultado = await this.matriculaService.listarPresencasPorData(payload.matriculaId, data.id, tenantId);
+      presencasPorData.set(data.data_aula, resultado.presencas);
+    }
+
+    const datasCabecalho = datasRelatorio.map((data) => ({
+      data: data.data_aula,
+      titulo: this.formatarDataComHifen(data.data_aula)
+    }));
+
+    const matrizStatus = new Map<string, Map<string, string>>();
+    for (const participante of participantes) {
+      matrizStatus.set(participante.id_matricula_item ?? participante.beneficiario_nome, new Map());
+    }
+
+    for (const data of datasRelatorio) {
+      const presencas = presencasPorData.get(data.data_aula) ?? [];
+      const porMatricula = new Map(presencas.map((item) => [item.matricula_id, item]));
+      for (const participante of participantes) {
+        const chave = participante.id_matricula_item ?? participante.beneficiario_nome;
+        const registro = participante.id_matricula_item ? porMatricula.get(participante.id_matricula_item) : undefined;
+        const status = registro?.status ?? "NAO_INFORMADO";
+        matrizStatus.get(chave)?.set(data.data_aula, status);
+      }
+    }
+
+    const resumoParticipantes = participantes.map((participante, index) => {
+      const chave = participante.id_matricula_item ?? participante.beneficiario_nome;
+      const statusPorData = matrizStatus.get(chave) ?? new Map<string, string>();
+      const statusList = datasRelatorio.map((data) => statusPorData.get(data.data_aula) ?? "NAO_INFORMADO");
+      const totalPresencas = statusList.filter((status) => status === "PRESENTE").length;
+      const totalAusencias = statusList.filter((status) => status === "AUSENTE").length;
+      const totalJustificados = statusList.filter((status) => status === "JUSTIFICADO").length;
+      const totalNaoInformados = statusList.filter((status) => status === "NAO_INFORMADO").length;
+      const percentualFrequencia = datasRelatorio.length
+        ? Math.round((totalPresencas / datasRelatorio.length) * 100)
+        : 0;
+
+      return {
+        index: index + 1,
+        participante,
+        totalPresencas,
+        totalAusencias,
+        totalJustificados,
+        totalNaoInformados,
+        percentualFrequencia,
+        statusList
+      };
+    });
+
+    const totaisGerais = resumoParticipantes.reduce(
+      (acc, item) => {
+        acc.presencas += item.totalPresencas;
+        acc.ausencias += item.totalAusencias;
+        acc.justificados += item.totalJustificados;
+        acc.naoInformados += item.totalNaoInformados;
+        return acc;
+      },
+      { presencas: 0, ausencias: 0, justificados: 0, naoInformados: 0 }
+    );
+
+    const totalRegistros = datasRelatorio.length * Math.max(participantes.length, 1);
+    const percentualFrequenciaGeral = totalRegistros
+      ? Math.round((totaisGerais.presencas / totalRegistros) * 100)
+      : 0;
+    const periodoInicio = datasRelatorio[0]?.data_aula ?? payload.periodoInicio ?? payload.dataAula ?? undefined;
+    const periodoFim = datasRelatorio[datasRelatorio.length - 1]?.data_aula ?? payload.periodoFim ?? payload.dataAula ?? undefined;
+
+    const colunas = [
+      { titulo: "Nº", largura: "5%" },
+      { titulo: "Beneficiário", largura: "24%" },
+      { titulo: "CPF", largura: exibirCpf ? "12%" : "0%", fonteTamanho: 8, fonteTamanhoCabecalho: 8 },
+      { titulo: "Presenças", largura: "8%", fonteTamanho: 8, fonteTamanhoCabecalho: 8 },
+      { titulo: "Ausências", largura: "8%", fonteTamanho: 8, fonteTamanhoCabecalho: 8 },
+      { titulo: "Justificados", largura: "10%", fonteTamanho: 8, fonteTamanhoCabecalho: 8 },
+      { titulo: "Frequência", largura: "8%", fonteTamanho: 8, fonteTamanhoCabecalho: 8 },
+      ...datasCabecalho.map((data) => ({
+        titulo: data.titulo,
+        largura: datasCabecalho.length ? `${Math.max(4, Math.floor(23 / datasCabecalho.length))}%` : "23%",
+        fonteTamanho: 8,
+        fonteTamanhoCabecalho: 8,
+        semQuebra: true
+      }))
+    ].filter((coluna) => coluna.largura !== "0%");
+
+    const linhasTabela: string[][] = resumoParticipantes.length
+      ? resumoParticipantes.map((item) => [
+          String(item.index),
+          item.participante.beneficiario_nome || "---",
+          ...(exibirCpf ? [item.participante.cpf || "---"] : []),
+          String(item.totalPresencas),
+          String(item.totalAusencias),
+          String(item.totalJustificados),
+          `${item.percentualFrequencia}%`,
+          ...item.statusList.map((status) => this.formatarStatusPresencaRelatorio(status))
+        ])
+      : exibirCpf
         ? [
-            { titulo: "Nº", largura: "8%" },
-            { titulo: "Participante", largura: "54%" },
-            { titulo: "CPF", largura: "22%" },
-            { titulo: "P", largura: "8%" },
-            { titulo: "A", largura: "8%" }
+            [
+              "1",
+              "Nenhum participante inscrito.",
+              "---",
+              "---",
+              "---",
+              "---",
+              "---",
+              ...datasRelatorio.map(() => "Não informado")
+            ]
           ]
         : [
-            { titulo: "Nº", largura: "8%" },
-            { titulo: "Participante", largura: "72%" },
-            { titulo: "P", largura: "10%" },
-            { titulo: "A", largura: "10%" }
-          ],
-      linhas: participantes.length
-        ? participantes.map((item, index) =>
-            exibirCpf
-              ? [String(index + 1), item.beneficiario_nome || "---", item.cpf || "---", " ", " "]
-              : [String(index + 1), item.beneficiario_nome || "---", " ", " "]
-          )
-        : [
-            exibirCpf
-              ? ["1", "Nenhum participante inscrito.", "---", " ", " "]
-              : ["1", "Nenhum participante inscrito.", " ", " "]
-          ]
+            [
+              "1",
+              "Nenhum participante inscrito.",
+              "---",
+              "---",
+              "---",
+              "---",
+              ...datasRelatorio.map(() => "Não informado")
+            ]
+          ];
+
+    const tabela: RelatorioTabela = {
+      colunas,
+      linhas: linhasTabela
     };
 
+    const observacoesDatas = datasRelatorio
+      .map((data) => {
+        const texto = this.normalizarTexto(data.observacoes);
+        return texto ? `${this.formatarDataComHifen(data.data_aula)}: ${texto}` : null;
+      })
+      .filter((item): item is string => !!item);
+
     const relatorioInput: RelatorioHtmlInput = {
-      titulo: "Lista de presença do curso/atendimento",
+      titulo: "Relatório de Acompanhamento de Frequência",
+      subtitulo:
+        periodoInicio && periodoFim
+          ? `${this.formatarDataComHifen(periodoInicio)} a ${this.formatarDataComHifen(periodoFim)}`
+          : this.formatarDataComHifen(periodoInicio ?? periodoFim),
       metadadosTopo: this.montarMetadadosTopo(payload.usuarioEmissor),
       descricao:
-        "Relatório completo para acompanhamento de frequência, com identificação do curso/atendimento e espaço para marcação manual de presença.",
+        "Relatório de acompanhamento de frequência com dados persistidos no PostgreSQL, sem campo de assinatura manual.",
       blocos: [
         {
-          titulo: "Identificação do curso/atendimento",
+          titulo: "Identificação da atividade",
           colunas: 2,
           destaque: true,
           campos: [
-            this.campo("Curso/atendimento", matricula.nome),
+            this.campo("Curso, atendimento ou oficina", matricula.nome),
             this.campo("Tipo", matricula.tipo),
+            this.campo("Turma", matricula.nome),
             this.campo("Status", this.formatarStatus(matricula.status)),
-            this.campo(
-              "Data da aula",
-              this.normalizarTexto(payload.dataAula) ? this.formatarDataComHifen(payload.dataAula) : "Não definida"
-            )
-          ]
-        },
-        {
-          titulo: "Organização da turma",
-          colunas: 3,
-          campos: [
             this.campo("Profissional responsável", matricula.profissional),
-            this.campo("Sala", matricula.sala_nome),
-            this.campo("Instituição parceira", matricula.instituicao_parceira),
-            this.campo("Horário", horario),
-            this.campo("Dias", matricula.dias_semana?.length ? matricula.dias_semana.join(", ") : undefined),
-            this.campo("Período", this.formatarPeriodoCurso(matricula.data_triagem, matricula.data_conclusao)),
-            this.campo("Carga horária", matricula.carga_horaria ? `${matricula.carga_horaria}h` : undefined),
-            this.campo("Duração prevista", matricula.duracao_horas ? `${matricula.duracao_horas}h` : undefined),
-            this.campo("Faixa etária", matricula.faixa_etaria?.length ? matricula.faixa_etaria.join(", ") : undefined)
+            this.campo("Responsável pela emissão", payload.usuarioEmissor)
           ]
         },
         {
-          titulo: "Participantes e critérios",
+          titulo: "Resumo do período",
           colunas: 3,
           campos: [
-            this.campo("Participantes inscritos", String(participantes.length)),
-            this.campo("Vagas totais", String(matricula.vagas_totais ?? 0)),
-            this.campo("Vagas disponíveis", String(matricula.vagas_disponiveis ?? 0)),
-            this.campo(
-              "Sexo permitido",
-              matricula.sexo_permitido ? this.formatarValorEnumerado(matricula.sexo_permitido) : "Todos"
-            ),
-            this.campo("Fila de espera", String(matricula.total_fila_espera ?? 0)),
-            this.campo("Preferencial para idosos", this.formatarSimNao(matricula.vaga_preferencial_idosos))
+            this.campo("Período", periodoInicio && periodoFim ? `${this.formatarDataComHifen(periodoInicio)} a ${this.formatarDataComHifen(periodoFim)}` : this.formatarDataComHifen(periodoInicio ?? periodoFim)),
+            this.campo("Participantes", String(participantes.length)),
+            this.campo("Datas registradas", String(datasRelatorio.length)),
+            this.campo("Presenças", String(totaisGerais.presencas)),
+            this.campo("Ausências", String(totaisGerais.ausencias)),
+            this.campo("Justificados", String(totaisGerais.justificados)),
+            this.campo("Não informados", String(totaisGerais.naoInformados)),
+            this.campo("Frequência geral", `${percentualFrequenciaGeral}%`)
           ]
         },
         this.blocoComCampos("Descrição e restrições", 1, [
@@ -882,19 +1031,21 @@ export class ReportsService {
       tabela,
       secoes: [
         {
-          titulo: "Orientação de preenchimento",
-          conteudo:
-            "Utilize a coluna P para presente e a coluna A para ausente. A marcação deve ser feita manualmente no momento da aula ou atendimento."
-        },
-        {
-          titulo: "Assinatura do profissional responsável",
+          titulo: "Legenda de status",
           conteudo: [
-            `Profissional responsável: ${this.normalizarTexto(matricula.profissional) ?? "Não informado"}`,
-            "[[espaco:3.2]]",
-            "_______________________________________________________________"
+            "Presente: registro confirmado no banco.",
+            "Ausente: ausência registrada no banco.",
+            "Justificado: ausência justificada no banco.",
+            "Não informado: ausência de registro para a data."
           ].join("\n")
-        }
-      ],
+        },
+        observacoesDatas.length
+          ? {
+              titulo: "Observações registradas",
+              conteudo: observacoesDatas.join("\n")
+            }
+          : null
+      ].filter((secao): secao is { titulo: string; conteudo: string } => !!secao),
       cabecalho: contexto.cabecalho,
       rodape: contexto.rodape
     };
@@ -904,7 +1055,7 @@ export class ReportsService {
     return {
       html,
       pdf,
-      filename: `lista-presenca-matricula-${matricula.id_matricula ?? payload.matriculaId}.pdf`
+      filename: `relatorio-acompanhamento-frequencia-matricula-${matricula.id_matricula ?? payload.matriculaId}.pdf`
     };
   }
 
@@ -1802,6 +1953,65 @@ export class ReportsService {
       fonteTamanho: 6.5,
       fonteTamanhoCabecalho: 7
     };
+    const rotuloOcorrencia = (valor: string) => {
+      const normalizado = valor.trim().toUpperCase();
+      if (normalizado === "ATRASO") return "Atraso";
+      if (normalizado === "FALTA") return "Falta";
+      if (normalizado === "HORA_EXTRA") return "Hora extra";
+      if (normalizado === "BANCO_HORAS") return "Banco de horas";
+      if (normalizado === "ESQUECIMENTO_BATIDA") return "Esquecimento";
+      if (normalizado === "INCONSISTENCIA_SEQUENCIA") return "Inconsistência";
+      if (normalizado === "CORRECAO_ADMINISTRATIVA") return "Correção";
+      if (normalizado === "AJUSTE_MANUAL") return "Ajuste manual";
+      if (normalizado === "OBSERVACAO_OPERACIONAL") return "Observação";
+      return valor.replace(/_/g, " ");
+    };
+
+    const compactarDescricaoOcorrencia = (descricao: string) => {
+      const texto = descricao.trim().replace(/\s+/g, " ").replace(/[.]+$/g, "");
+      if (/^Lançado com atraso em /i.test(texto)) return texto.replace(/^Lançado com atraso em /i, "Atraso em ");
+      if (/^Lançado como hora extra em /i.test(texto)) return texto.replace(/^Lançado como hora extra em /i, "Hora extra em ");
+      if (/^Banco de horas com saldo de /i.test(texto)) return texto;
+      if (/^Saldo de falta de /i.test(texto)) return texto.replace(/^Saldo de falta de /i, "Falta de ");
+      if (/^Horas extras pendentes de autorizacao:/i.test(texto)) {
+        return texto.replace(/^Horas extras pendentes de autorizacao:/i, "Horas extras pendentes:");
+      }
+      if (/^Sequencia de horarios inconsistente/i.test(texto)) return "Sequência de horários inconsistente";
+      if (/^Existem batidas pendentes para fechamento completo do dia/i.test(texto)) return "Esquecimento de batida";
+      return texto;
+    };
+
+    const renderizarOcorrenciasTexto = (item: {
+      ocorrencias?: string[];
+      ocorrencias_descricao?: string[];
+      entrada_1?: string;
+      saida_1?: string;
+      entrada_2?: string;
+      saida_2?: string;
+      status?: string;
+    }) => {
+      const descricoes = (item.ocorrencias_descricao ?? []).map(compactarDescricaoOcorrencia).filter(Boolean);
+      if (descricoes.length) {
+        return descricoes.join(" | ");
+      }
+
+      const ocorrencias = (item.ocorrencias ?? []).filter(Boolean);
+      const jornadaCompleta = !!item.entrada_1 && !!item.saida_1 && !!item.entrada_2 && !!item.saida_2;
+      if (!ocorrencias.length) {
+        return jornadaCompleta && item.status === "COMPLETO" ? "Lançado corretamente" : "Sem ocorrência registrada";
+      }
+
+      return ocorrencias
+        .map((ocorrencia) => rotuloOcorrencia(ocorrencia))
+        .join(" | ");
+    };
+    const totalDiasPeriodo = Number(totais?.total_dias ?? 0);
+    const totalTrabalhadoPeriodo = Number(totais?.total_trabalhado_minutos ?? 0);
+    const mediaDiariaPeriodo = totalDiasPeriodo > 0 ? Math.round(totalTrabalhadoPeriodo / totalDiasPeriodo) : undefined;
+    const mediaSemanalPeriodo =
+      typeof mediaDiariaPeriodo === "number" ? Math.round(mediaDiariaPeriodo * 7) : undefined;
+    const mediaMensalPeriodo =
+      typeof mediaDiariaPeriodo === "number" ? Math.round(mediaDiariaPeriodo * 30) : undefined;
 
     const contexto = await this.montarContextoInstitucional(tenantId);
     const relatorioInput: RelatorioHtmlInput = {
@@ -1819,6 +2029,11 @@ export class ReportsService {
         {
           titulo: "Legenda de ocorrências",
           conteudo: legendaEspelho
+        },
+        {
+          titulo: "Como ler o resumo",
+          conteudo:
+            "Faltas representam o tempo ainda não cumprido nos dias fechados do período. As médias abaixo são normalizadas a partir da jornada total trabalhada."
         }
       ],
       blocos: [
@@ -1839,6 +2054,16 @@ export class ReportsService {
             this.campo("Atrasos", this.formatarMinutosRelatorio(totais?.atrasos_minutos)),
             this.campo("Faltas", this.formatarMinutosRelatorio(totais?.faltas_minutos)),
             this.campo("Ajustes realizados", String(totais?.total_ajustes ?? 0))
+          ]
+        },
+        {
+          titulo: "Médias de jornada",
+          colunas: 3,
+          destaque: true,
+          campos: [
+            this.campo("Média por dia", this.formatarMinutosRelatorio(mediaDiariaPeriodo)),
+            this.campo("Média por semana", this.formatarMinutosRelatorio(mediaSemanalPeriodo)),
+            this.campo("Média por mês", this.formatarMinutosRelatorio(mediaMensalPeriodo))
           ]
         }
       ],
@@ -1865,7 +2090,7 @@ export class ReportsService {
           this.formatarMinutosRelatorio(item.banco_horas_minutos),
           this.formatarMinutosRelatorio(item.atrasos_minutos),
           this.formatarMinutosRelatorio(item.faltas_minutos),
-          item.ocorrencias?.map((ocorrencia) => ocorrencia.replace(/_/g, " ")).join(", ") || "---"
+          { valor: renderizarOcorrenciasTexto(item), classe: "coluna-ocorrencia" }
         ])
       },
       cabecalho: contexto.cabecalho,

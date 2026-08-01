@@ -174,11 +174,11 @@ export class BackupImagensService {
 
     for (const arquivo of arquivos) {
       const caminho = normalizarCaminho(arquivo.caminho_arquivo);
-      if (!caminho.startsWith("imagens/")) continue;
+      if (!caminho.startsWith("imagens/") && !caminho.includes("/imagens/")) continue;
       caminhos.add(caminho);
 
       const thumbnail = arquivo.thumbnail_caminho?.trim();
-      if (thumbnail?.startsWith("imagens/")) {
+      if (thumbnail && (thumbnail.startsWith("imagens/") || thumbnail.includes("/imagens/"))) {
         caminhos.add(normalizarCaminho(thumbnail));
       }
     }

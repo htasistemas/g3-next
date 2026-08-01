@@ -22,6 +22,7 @@ import { ensureCaptacaoRecursosEstrutura } from "./modules/captacao-recursos/rep
 import { ensureLicencaUsoEstrutura } from "./modules/licenca-uso/repositories/licenca-uso.repository.js";
 import { iniciarLicencaUsoScheduler } from "./modules/licenca-uso/services/licenca-uso.scheduler.js";
 import { iniciarBackupImagensScheduler } from "./modules/backup-imagens/services/backup-imagens.scheduler.js";
+import { iniciarBackupArquivosScheduler } from "./modules/backup-arquivos/services/backup-arquivos.scheduler.js";
 import { ensureUsuariosGestaoEstrutura } from "./modules/usuarios/repositories/usuario-estrutura.repository.js";
 import { ensureVisitasDomiciliaresEstrutura } from "./modules/visitas-domiciliares/repositories/visitas-domiciliares.repository.js";
 import { ensureAgendamentosEstrutura } from "./modules/agendamentos/repositories/agendamentos.repository.js";
@@ -101,6 +102,7 @@ async function bootstrap() {
     iniciarDocumentosInstituicaoScheduler();
     iniciarLicencaUsoScheduler();
     iniciarBackupImagensScheduler();
+    iniciarBackupArquivosScheduler();
   });
 }
 

@@ -28,7 +28,9 @@ export const agendamentosService = {
   },
 
   async criarOperacional(payload: AgendamentoOperacionalPayload) {
-    const { data } = await httpClient.post<{ agendamento: Agendamento | null }>("/api/agendamentos", payload);
+    const { data } = await httpClient.post<{ agendamento: Agendamento | null }>("/api/agendamentos", payload, {
+      timeout: 120000
+    });
     return data.agendamento;
   },
 
@@ -49,6 +51,11 @@ export const agendamentosService = {
 
   async remarcar(id: string | number, payload: Partial<Agendamento>) {
     const { data } = await httpClient.post<{ agendamento: Agendamento | null }>(`/api/agendamentos/${id}/remarcar`, payload);
+    return data.agendamento;
+  },
+
+  async copiar(id: string | number, payload: { data: string }) {
+    const { data } = await httpClient.post<{ agendamento: Agendamento | null }>(`/api/agendamentos/${id}/copiar`, payload);
     return data.agendamento;
   },
 

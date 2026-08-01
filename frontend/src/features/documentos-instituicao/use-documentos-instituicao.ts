@@ -47,9 +47,16 @@ export function useHistoricoDocumentoInstituicao(documentoId?: string) {
 export function useSalvarDocumentoInstituicao() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: DocumentoInstituicaoPayload & { id?: string }) => {
-      if (payload.id) return documentosInstituicaoService.atualizar(payload.id, payload);
-      return documentosInstituicaoService.criar(payload);
+    mutationFn: async ({
+      id,
+      onUploadProgress,
+      ...payload
+    }: DocumentoInstituicaoPayload & {
+      id?: string;
+      onUploadProgress?: (progressEvent: AxiosProgressEvent) => void;
+    }) => {
+      if (id) return documentosInstituicaoService.atualizar(id, payload, { onUploadProgress });
+      return documentosInstituicaoService.criar(payload, { onUploadProgress });
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["documentos-instituicao"] });

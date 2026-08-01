@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../../database/prisma.js";
 import { AppError } from "../../../shared/errors/app-error.js";
-import { normalizeDigits, toOptionalDate, trimOrUndefined } from "../../../utils/string-utils.js";
+import { normalizeDigits, toIsoDate, toOptionalDate, trimOrUndefined } from "../../../utils/string-utils.js";
 import { ensureArquivosEstrutura } from "../../arquivos/repositories/arquivos-estrutura.repository.js";
 import type {
   MatriculaFilaEsperaInput,
@@ -52,11 +52,74 @@ type MatriculaPresencaDataRow = {
 };
 
 type MatriculaPresencaItemRow = {
+  beneficiario_id: bigint | null;
   matricula_id: bigint;
   beneficiario_nome: string;
   cpf: string | null;
+  data_nascimento: Date | null;
   status: string;
+  observacao: string | null;
 };
+
+type UsuarioRegistro = {
+  id?: bigint;
+  nome?: string;
+};
+
+export function montarAuditoriaPresenca(payload: {
+  tenantId: string;
+  cursoId: bigint;
+  presencaDataId: bigint;
+  dataAula: Date;
+  matriculaId: bigint;
+  beneficiarioId?: bigint | null;
+  beneficiarioNome: string;
+  cpf?: string | null;
+  statusAnterior: string | null;
+  statusNovo: string;
+  observacao?: string | null;
+  usuarioId?: bigint;
+  usuarioNome?: string;
+}) {
+  return {
+    tenant_id: payload.tenantId,
+    beneficiario_id: payload.beneficiarioId ?? null,
+    entidade: "PRESENCA_MATRICULA",
+    entidade_id: payload.presencaDataId,
+    acao: payload.statusAnterior ? "ATUALIZAR" : "CRIAR",
+    descricao: payload.statusAnterior
+      ? `Presença atualizada de ${payload.statusAnterior} para ${payload.statusNovo}.`
+      : `Presença registrada como ${payload.statusNovo}.`,
+    dados_novos: {
+      tenantId: payload.tenantId,
+      cursoId: payload.cursoId.toString(),
+      presencaDataId: payload.presencaDataId.toString(),
+      dataAula: payload.dataAula.toISOString(),
+      matriculaId: payload.matriculaId.toString(),
+      beneficiarioId: payload.beneficiarioId?.toString() ?? null,
+      beneficiarioNome: payload.beneficiarioNome,
+      cpf: payload.cpf ?? null,
+      statusAnterior: payload.statusAnterior,
+      statusNovo: payload.statusNovo,
+      observacao: payload.observacao ?? null,
+      usuarioId: payload.usuarioId?.toString() ?? null,
+      usuarioNome: payload.usuarioNome ?? null
+    },
+    usuario_id: payload.usuarioId ?? null,
+    usuario_nome: payload.usuarioNome ?? null
+  };
+}
+
+function calcularVagasPorHorario(input: MatriculaInput) {
+  if (!input.controle_horario_atendimento) return input.vagas_totais;
+  const inicio = input.horario_inicial ? input.horario_inicial.split(":").map(Number) : [];
+  const fim = input.horario_final_atendimento ? input.horario_final_atendimento.split(":").map(Number) : [];
+  const intervalo = Number(input.duracao_horas ?? 0);
+  const inicioMinutos = (inicio[0] ?? 0) * 60 + (inicio[1] ?? 0);
+  const fimMinutos = (fim[0] ?? 0) * 60 + (fim[1] ?? 0);
+  if (fimMinutos <= inicioMinutos || intervalo <= 0) return input.vagas_totais;
+  return Math.floor((fimMinutos - inicioMinutos) / intervalo);
+}
 
 type MatriculaResumoRow = {
   cursos_no_catalogo: bigint | number | null;
@@ -78,6 +141,9 @@ const estruturaMatriculasSql = [
       vagas_disponiveis INTEGER NOT NULL DEFAULT 0,
       carga_horaria INTEGER,
       horario_inicial TIME,
+      controle_horario_atendimento BOOLEAN NOT NULL DEFAULT FALSE,
+      horario_final_atendimento TIME,
+      intervalo_atendimento_minutos INTEGER,
       duracao_horas INTEGER NOT NULL DEFAULT 0,
       dias_semana TEXT,
       faixa_etaria TEXT,
@@ -104,6 +170,9 @@ const estruturaMatriculasSql = [
   "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS vagas_disponiveis INTEGER NOT NULL DEFAULT 0",
   "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS carga_horaria INTEGER",
   "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS horario_inicial TIME",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS controle_horario_atendimento BOOLEAN NOT NULL DEFAULT FALSE",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS horario_final_atendimento TIME",
+  "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS intervalo_atendimento_minutos INTEGER",
   "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS duracao_horas INTEGER NOT NULL DEFAULT 0",
   "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS dias_semana TEXT",
   "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS faixa_etaria TEXT",
@@ -148,6 +217,7 @@ const estruturaMatriculasSql = [
   "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS cpf VARCHAR(20)",
   "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS email VARCHAR(150)",
   "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS status VARCHAR(20)",
+  "ALTER TABLE cursos_atendimentos_matriculas ALTER COLUMN status TYPE VARCHAR(80)",
   "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS data_matricula TIMESTAMP NOT NULL DEFAULT NOW()",
   "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS data_agendada DATE",
   "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS hora_agendada TIME",
@@ -155,6 +225,7 @@ const estruturaMatriculasSql = [
   "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS profissional_id VARCHAR(40)",
   "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS profissional_nome VARCHAR(200)",
   "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS profissional_tipo VARCHAR(20)",
+  "ALTER TABLE cursos_atendimentos_matriculas ALTER COLUMN profissional_tipo TYPE VARCHAR(80)",
   "ALTER TABLE cursos_atendimentos_matriculas ADD COLUMN IF NOT EXISTS confirmacao_presenca BOOLEAN NOT NULL DEFAULT FALSE",
   "CREATE INDEX IF NOT EXISTS cursos_atendimentos_matriculas_tenant_curso_idx ON cursos_atendimentos_matriculas (tenant_id, curso_id)",
   `
@@ -180,7 +251,8 @@ const estruturaMatriculasSql = [
       curso_id BIGINT NOT NULL REFERENCES cursos_atendimentos(id) ON DELETE CASCADE,
       matricula_id BIGINT NOT NULL REFERENCES cursos_atendimentos_matriculas(id) ON DELETE CASCADE,
       data_aula DATE NOT NULL,
-      status VARCHAR(10) NOT NULL,
+      status VARCHAR(20) NOT NULL,
+      observacao TEXT,
       criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
       atualizado_em TIMESTAMP NOT NULL DEFAULT NOW(),
       UNIQUE (curso_id, matricula_id, data_aula)
@@ -190,10 +262,19 @@ const estruturaMatriculasSql = [
   "ALTER TABLE cursos_atendimentos_presencas ADD COLUMN IF NOT EXISTS curso_id BIGINT",
   "ALTER TABLE cursos_atendimentos_presencas ADD COLUMN IF NOT EXISTS matricula_id BIGINT",
   "ALTER TABLE cursos_atendimentos_presencas ADD COLUMN IF NOT EXISTS data_aula DATE",
-  "ALTER TABLE cursos_atendimentos_presencas ADD COLUMN IF NOT EXISTS status VARCHAR(10)",
+  "ALTER TABLE cursos_atendimentos_presencas ADD COLUMN IF NOT EXISTS status VARCHAR(20)",
+  "ALTER TABLE cursos_atendimentos_presencas ADD COLUMN IF NOT EXISTS observacao TEXT",
+  "ALTER TABLE cursos_atendimentos_presencas ALTER COLUMN status TYPE VARCHAR(20)",
+  "ALTER TABLE cursos_atendimentos_presencas ADD COLUMN IF NOT EXISTS usuario_registro_id BIGINT",
+  "ALTER TABLE cursos_atendimentos_presencas ADD COLUMN IF NOT EXISTS usuario_registro_nome VARCHAR(160)",
+  "ALTER TABLE cursos_atendimentos_presencas ADD COLUMN IF NOT EXISTS data_hora_registro TIMESTAMP NOT NULL DEFAULT NOW()",
+  "ALTER TABLE cursos_atendimentos_presencas ADD COLUMN IF NOT EXISTS data_hora_atualizacao TIMESTAMP NOT NULL DEFAULT NOW()",
   "ALTER TABLE cursos_atendimentos_presencas ADD COLUMN IF NOT EXISTS criado_em TIMESTAMP NOT NULL DEFAULT NOW()",
   "ALTER TABLE cursos_atendimentos_presencas ADD COLUMN IF NOT EXISTS atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()",
-  "CREATE INDEX IF NOT EXISTS cursos_atendimentos_presencas_curso_data_idx ON cursos_atendimentos_presencas (curso_id, data_aula)",
+  "ALTER TABLE cursos_atendimentos_presencas DROP CONSTRAINT IF EXISTS cursos_atendimentos_presencas_curso_id_matricula_id_data_aula_key",
+  "DROP INDEX IF EXISTS cursos_atendimentos_presencas_curso_id_matricula_id_data_aula_key",
+  "CREATE UNIQUE INDEX IF NOT EXISTS cursos_atendimentos_presencas_tenant_curso_matricula_data_uidx ON cursos_atendimentos_presencas (tenant_id, curso_id, matricula_id, data_aula)",
+  "CREATE INDEX IF NOT EXISTS cursos_atendimentos_presencas_tenant_curso_data_idx ON cursos_atendimentos_presencas (tenant_id, curso_id, data_aula)",
   `
     CREATE TABLE IF NOT EXISTS cursos_atendimentos_presenca_datas (
       id BIGSERIAL PRIMARY KEY,
@@ -204,7 +285,7 @@ const estruturaMatriculasSql = [
       observacoes TEXT,
       criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
       atualizado_em TIMESTAMP NOT NULL DEFAULT NOW(),
-      UNIQUE (curso_id, data_aula)
+      UNIQUE (tenant_id, curso_id, data_aula)
     )
   `,
   "ALTER TABLE cursos_atendimentos_presenca_datas ADD COLUMN IF NOT EXISTS tenant_id UUID",
@@ -214,7 +295,10 @@ const estruturaMatriculasSql = [
   "ALTER TABLE cursos_atendimentos_presenca_datas ADD COLUMN IF NOT EXISTS observacoes TEXT",
   "ALTER TABLE cursos_atendimentos_presenca_datas ADD COLUMN IF NOT EXISTS criado_em TIMESTAMP NOT NULL DEFAULT NOW()",
   "ALTER TABLE cursos_atendimentos_presenca_datas ADD COLUMN IF NOT EXISTS atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()",
-  "CREATE INDEX IF NOT EXISTS cursos_atendimentos_presenca_datas_curso_data_idx ON cursos_atendimentos_presenca_datas (curso_id, data_aula)",
+  "ALTER TABLE cursos_atendimentos_presenca_datas DROP CONSTRAINT IF EXISTS cursos_atendimentos_presenca_datas_curso_id_data_aula_key",
+  "DROP INDEX IF EXISTS cursos_atendimentos_presenca_datas_curso_id_data_aula_key",
+  "CREATE UNIQUE INDEX IF NOT EXISTS cursos_atendimentos_presenca_datas_tenant_curso_data_uidx ON cursos_atendimentos_presenca_datas (tenant_id, curso_id, data_aula)",
+  "CREATE INDEX IF NOT EXISTS cursos_atendimentos_presenca_datas_tenant_curso_data_idx ON cursos_atendimentos_presenca_datas (tenant_id, curso_id, data_aula)",
   `
     CREATE TABLE IF NOT EXISTS cursos_atendimentos_presenca_anexos (
       id BIGSERIAL PRIMARY KEY,
@@ -382,6 +466,9 @@ export class MatriculaRepository {
         c.vagas_disponiveis,
         c.carga_horaria,
         c.horario_inicial,
+        c.controle_horario_atendimento,
+        c.horario_final_atendimento,
+        c.intervalo_atendimento_minutos,
         c.duracao_horas,
         c.dias_semana,
         c.faixa_etaria,
@@ -471,6 +558,9 @@ export class MatriculaRepository {
         c.vagas_disponiveis,
         c.carga_horaria,
         c.horario_inicial,
+        c.controle_horario_atendimento,
+        c.horario_final_atendimento,
+        c.intervalo_atendimento_minutos,
         c.duracao_horas,
         c.dias_semana,
         c.faixa_etaria,
@@ -526,6 +616,7 @@ export class MatriculaRepository {
         m.curso_id,
         m.beneficiario_nome,
         m.cpf,
+        contato.data_nascimento AS data_nascimento,
         contato.telefone_principal AS telefone,
         contato.email AS email,
         m.status,
@@ -539,7 +630,7 @@ export class MatriculaRepository {
         m.confirmacao_presenca
       FROM cursos_atendimentos_matriculas m
       LEFT JOIN LATERAL (
-        SELECT c.telefone_principal, c.email
+        SELECT c.telefone_principal, c.email, b.data_nascimento
         FROM cadastro_beneficiario b
         LEFT JOIN contato_beneficiario c ON c.beneficiario_id = b.id AND c.tenant_id::text = ${tenantId}
         LEFT JOIN LATERAL (
@@ -635,7 +726,11 @@ export class MatriculaRepository {
     const cursoId = await prisma.$transaction(async (tx) => {
       const diasSemana = joinList(input.dias_semana);
       const faixaEtaria = joinList(input.faixa_etaria);
-      const vagasDisponiveis = input.vagas_disponiveis ?? input.vagas_totais;
+      const vagasTotais = calcularVagasPorHorario(input);
+      const totalInscritosAtivos = (input.matriculas ?? []).filter((item) => (item.status ?? "ATIVO").trim().toUpperCase() === "ATIVO").length;
+      const vagasDisponiveis = input.controle_horario_atendimento
+        ? Math.max(vagasTotais - totalInscritosAtivos, 0)
+        : input.vagas_disponiveis ?? vagasTotais;
       const dataTriagem = toOptionalDate(input.data_triagem) ?? null;
       const dataEncaminhamento = toOptionalDate(input.data_encaminhamento) ?? null;
       const dataConclusao = toOptionalDate(input.data_conclusao) ?? null;
@@ -651,6 +746,9 @@ export class MatriculaRepository {
           vagas_disponiveis,
           carga_horaria,
           horario_inicial,
+          controle_horario_atendimento,
+          horario_final_atendimento,
+          intervalo_atendimento_minutos,
           duracao_horas,
           dias_semana,
           faixa_etaria,
@@ -672,10 +770,13 @@ export class MatriculaRepository {
           ${input.nome},
           ${trimOrUndefined(input.descricao)},
           ${trimOrUndefined(input.imagem)},
-          ${input.vagas_totais},
+          ${vagasTotais},
           ${vagasDisponiveis},
           ${input.carga_horaria ?? null},
           CAST(${trimOrUndefined(input.horario_inicial) ?? null} AS TIME),
+          ${!!input.controle_horario_atendimento},
+          CAST(${trimOrUndefined(input.horario_final_atendimento) ?? null} AS TIME),
+          ${input.intervalo_atendimento_minutos ?? null},
           ${input.duracao_horas},
           ${diasSemana},
           ${faixaEtaria},
@@ -716,7 +817,11 @@ export class MatriculaRepository {
     await prisma.$transaction(async (tx) => {
       const diasSemana = joinList(input.dias_semana);
       const faixaEtaria = joinList(input.faixa_etaria);
-      const vagasDisponiveis = input.vagas_disponiveis ?? input.vagas_totais;
+      const vagasTotais = calcularVagasPorHorario(input);
+      const totalInscritosAtivos = (input.matriculas ?? []).filter((item) => (item.status ?? "ATIVO").trim().toUpperCase() === "ATIVO").length;
+      const vagasDisponiveis = input.controle_horario_atendimento
+        ? Math.max(vagasTotais - totalInscritosAtivos, 0)
+        : input.vagas_disponiveis ?? vagasTotais;
       const dataTriagem = toOptionalDate(input.data_triagem) ?? null;
       const dataEncaminhamento = toOptionalDate(input.data_encaminhamento) ?? null;
       const dataConclusao = toOptionalDate(input.data_conclusao) ?? null;
@@ -728,10 +833,13 @@ export class MatriculaRepository {
           nome = ${input.nome},
           descricao = ${trimOrUndefined(input.descricao)},
           imagem = ${trimOrUndefined(input.imagem)},
-          vagas_totais = ${input.vagas_totais},
+          vagas_totais = ${vagasTotais},
           vagas_disponiveis = ${vagasDisponiveis},
           carga_horaria = ${input.carga_horaria ?? null},
           horario_inicial = CAST(${trimOrUndefined(input.horario_inicial) ?? null} AS TIME),
+          controle_horario_atendimento = ${!!input.controle_horario_atendimento},
+          horario_final_atendimento = CAST(${trimOrUndefined(input.horario_final_atendimento) ?? null} AS TIME),
+          intervalo_atendimento_minutos = ${input.intervalo_atendimento_minutos ?? null},
           duracao_horas = ${input.duracao_horas},
           dias_semana = ${diasSemana},
           faixa_etaria = ${faixaEtaria},
@@ -896,7 +1004,8 @@ export class MatriculaRepository {
 
   async listarPresencaDatas(cursoId: bigint, tenantId: string, somentePendentes = false) {
     await this.ensureEstrutura();
-    await this.buscarPorIdOuFalhar(cursoId, tenantId);
+    const curso = await this.buscarPorIdOuFalhar(cursoId, tenantId);
+    await this.sincronizarPresencaDatasRealizadas(cursoId, tenantId, curso.curso.tipo);
 
     const filtroStatus = somentePendentes
       ? Prisma.sql`AND pd.status = 'GERADA'`
@@ -932,6 +1041,37 @@ export class MatriculaRepository {
     `);
   }
 
+  private async sincronizarPresencaDatasRealizadas(cursoId: bigint, tenantId: string, tipoCurso: string) {
+    const tipoNormalizado = trimOrUndefined(tipoCurso)?.toUpperCase();
+    if (!tipoNormalizado) return;
+
+    await prisma.$executeRaw(Prisma.sql`
+      INSERT INTO cursos_atendimentos_presenca_datas (
+        tenant_id,
+        curso_id,
+        data_aula,
+        status,
+        criado_em,
+        atualizado_em
+      )
+      SELECT DISTINCT
+        ${tenantId}::uuid,
+        ${cursoId},
+        a.data_agendamento,
+        'GERADA',
+        NOW(),
+        NOW()
+      FROM agendamento a
+      WHERE a.tenant_id::text = ${tenantId}
+        AND a.item_origem_id = ${cursoId}
+        AND LOWER(COALESCE(a.item_tipo, '')) = LOWER(${tipoNormalizado})
+        AND a.data_agendamento IS NOT NULL
+        AND LOWER(COALESCE(a.status, '')) <> 'cancelado'
+      ON CONFLICT (tenant_id, curso_id, data_aula)
+      DO NOTHING
+    `);
+  }
+
   async criarPresencaData(cursoId: bigint, input: MatriculaPresencaDataInput, tenantId: string) {
     await this.ensureEstrutura();
     await this.buscarPorIdOuFalhar(cursoId, tenantId);
@@ -961,7 +1101,7 @@ export class MatriculaRepository {
         NOW(),
         NOW()
       )
-      ON CONFLICT (curso_id, data_aula)
+      ON CONFLICT (tenant_id, curso_id, data_aula)
       DO UPDATE SET
         observacoes = COALESCE(EXCLUDED.observacoes, cursos_atendimentos_presenca_datas.observacoes),
         atualizado_em = NOW()
@@ -1023,39 +1163,92 @@ export class MatriculaRepository {
     return this.atualizarPresencaData(cursoId, presencaDataId, { status: "CANCELADA" }, tenantId);
   }
 
-  async removerPresencaData(cursoId: bigint, presencaDataId: bigint, tenantId: string) {
+  async removerPresencaData(cursoId: bigint, presencaDataId: bigint, tenantId: string, usuario?: UsuarioRegistro) {
     await this.ensureEstrutura();
     const presencaData = await this.buscarPresencaDataOuFalhar(cursoId, presencaDataId, tenantId);
-    await prisma.$executeRaw(Prisma.sql`
-      DELETE FROM cursos_atendimentos_presencas
-      WHERE curso_id = ${cursoId}
-        AND tenant_id::text = ${tenantId}
-        AND data_aula = ${presencaData.data_aula}
-    `);
-    await prisma.$executeRaw(Prisma.sql`
-      DELETE FROM cursos_atendimentos_presenca_datas
-      WHERE id = ${presencaDataId}
-        AND curso_id = ${cursoId}
-        AND tenant_id::text = ${tenantId}
-    `);
+
+    await prisma.$transaction(async (tx) => {
+      const excluidos = await tx.$queryRaw<Array<{ total: bigint | number | null }>>(Prisma.sql`
+        SELECT COUNT(*)::BIGINT AS total
+        FROM cursos_atendimentos_presencas
+        WHERE curso_id = ${cursoId}
+          AND tenant_id::text = ${tenantId}
+          AND data_aula = ${presencaData.data_aula}
+      `);
+
+      const totalExcluidos = Number(excluidos[0]?.total ?? 0);
+
+      await tx.$executeRaw(Prisma.sql`
+        DELETE FROM cursos_atendimentos_presencas
+        WHERE curso_id = ${cursoId}
+          AND tenant_id::text = ${tenantId}
+          AND data_aula = ${presencaData.data_aula}
+      `);
+      await tx.$executeRaw(Prisma.sql`
+        DELETE FROM cursos_atendimentos_presenca_datas
+        WHERE id = ${presencaDataId}
+          AND curso_id = ${cursoId}
+          AND tenant_id::text = ${tenantId}
+      `);
+
+      await this.registrarAuditoriaExclusaoPresencaDataTx(tx, {
+        tenantId,
+        cursoId,
+        presencaDataId,
+        dataAula: presencaData.data_aula,
+        totalExcluidos,
+        usuarioId: usuario?.id,
+        usuarioNome: usuario?.nome
+      });
+    });
   }
 
   async listarPresencasPorData(cursoId: bigint, presencaDataId: bigint, tenantId: string) {
     await this.ensureEstrutura();
     const presencaData = await this.buscarPresencaDataOuFalhar(cursoId, presencaDataId, tenantId);
+    const dataAulaIso = toIsoDate(presencaData.data_aula);
+    if (!dataAulaIso) {
+      throw new AppError("Data da aula invalida.", 500);
+    }
 
     const itens = await prisma.$queryRaw<MatriculaPresencaItemRow[]>(Prisma.sql`
       SELECT
+        b.id AS beneficiario_id,
         m.id AS matricula_id,
         m.beneficiario_nome,
         m.cpf,
-        COALESCE(p.status, 'AUSENTE') AS status
+        b.data_nascimento,
+        COALESCE(p.status, 'NAO_INFORMADO') AS status,
+        p.observacao
       FROM cursos_atendimentos_matriculas m
       LEFT JOIN cursos_atendimentos_presencas p
         ON p.curso_id = m.curso_id
        AND p.matricula_id = m.id
        AND p.tenant_id::text = ${tenantId}
-       AND p.data_aula = ${presencaData.data_aula}
+       AND p.data_aula = ${dataAulaIso}::date
+      LEFT JOIN cadastro_beneficiario b
+        ON b.tenant_id::text = ${tenantId}
+       AND (
+         (
+           regexp_replace(COALESCE(m.cpf, ''), '\\D', '', 'g') <> ''
+           AND EXISTS (
+             SELECT 1
+             FROM documentos d
+             WHERE d.beneficiario_id = b.id
+               AND d.tenant_id::text = ${tenantId}
+               AND (
+                 UPPER(COALESCE(d.tipo_documento, '')) = 'CPF'
+                 OR UPPER(COALESCE(d.nome_documento, '')) LIKE '%CPF%'
+               )
+               AND regexp_replace(COALESCE(d.numero_documento, ''), '\\D', '', 'g') =
+                 regexp_replace(COALESCE(m.cpf, ''), '\\D', '', 'g')
+           )
+         )
+         OR (
+           regexp_replace(COALESCE(m.cpf, ''), '\\D', '', 'g') = ''
+           AND LOWER(TRIM(COALESCE(b.nome_completo, ''))) = LOWER(TRIM(COALESCE(m.beneficiario_nome, '')))
+         )
+       )
       WHERE m.curso_id = ${cursoId}
         AND m.tenant_id::text = ${tenantId}
         AND UPPER(COALESCE(m.status, 'ATIVO')) <> 'CANCELADO'
@@ -1068,26 +1261,107 @@ export class MatriculaRepository {
     };
   }
 
-  async salvarPresencasPorData(cursoId: bigint, presencaDataId: bigint, input: MatriculaPresencaSalvarInput, tenantId: string) {
+  async salvarPresencasPorData(
+    cursoId: bigint,
+    presencaDataId: bigint,
+    input: MatriculaPresencaSalvarInput,
+    tenantId: string,
+    usuario?: UsuarioRegistro
+  ) {
     await this.ensureEstrutura();
     const presencaData = await this.buscarPresencaDataOuFalhar(cursoId, presencaDataId, tenantId);
     const dataAula = toOptionalDate(input.data_aula) ?? presencaData.data_aula;
+    const dataAulaIso = toIsoDate(dataAula);
+    if (!dataAulaIso) {
+      throw new AppError("Data da aula invalida.", 400);
+    }
+    const observacoesGerais = trimOrUndefined(input.observacoes);
 
     await prisma.$transaction(async (tx) => {
       for (const item of input.presencas) {
         const matriculaId = BigInt(item.matricula_id);
 
-        const matriculaExiste = await tx.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
-          SELECT id
-          FROM cursos_atendimentos_matriculas
-          WHERE id = ${matriculaId}
-            AND curso_id = ${cursoId}
-            AND tenant_id::text = ${tenantId}
+        const matriculaExiste = await tx.$queryRaw<Array<{
+          id: bigint;
+          beneficiario_id: bigint | null;
+          beneficiario_nome: string;
+          cpf: string | null;
+          status: string | null;
+          observacao: string | null;
+        }>>(Prisma.sql`
+          SELECT
+            m.id,
+            b.id AS beneficiario_id,
+            m.beneficiario_nome,
+            m.cpf,
+            p.status,
+            p.observacao
+          FROM cursos_atendimentos_matriculas m
+          LEFT JOIN cursos_atendimentos_presencas p
+            ON p.tenant_id::text = ${tenantId}
+           AND p.curso_id = ${cursoId}
+           AND p.matricula_id = m.id
+           AND p.data_aula = ${dataAulaIso}::date
+          LEFT JOIN cadastro_beneficiario b
+            ON b.tenant_id::text = ${tenantId}
+           AND (
+             (
+               regexp_replace(COALESCE(m.cpf, ''), '\\D', '', 'g') <> ''
+               AND EXISTS (
+                 SELECT 1
+                 FROM documentos d
+                 WHERE d.beneficiario_id = b.id
+                   AND d.tenant_id::text = ${tenantId}
+                   AND (
+                     UPPER(COALESCE(d.tipo_documento, '')) = 'CPF'
+                     OR UPPER(COALESCE(d.nome_documento, '')) LIKE '%CPF%'
+                   )
+                   AND regexp_replace(COALESCE(d.numero_documento, ''), '\\D', '', 'g') =
+                     regexp_replace(COALESCE(m.cpf, ''), '\\D', '', 'g')
+               )
+             )
+             OR (
+               regexp_replace(COALESCE(m.cpf, ''), '\\D', '', 'g') = ''
+               AND LOWER(TRIM(COALESCE(b.nome_completo, ''))) = LOWER(TRIM(COALESCE(m.beneficiario_nome, '')))
+             )
+           )
+          WHERE m.id = ${matriculaId}
+            AND m.curso_id = ${cursoId}
+            AND m.tenant_id::text = ${tenantId}
           LIMIT 1
         `);
 
-        if (!matriculaExiste.length) {
+        const matriculaAtual = matriculaExiste[0];
+        if (!matriculaAtual) {
           throw new AppError("Matricula de presenca nao encontrada.", 404);
+        }
+
+        const usuarioAnterior = await tx.$queryRaw<Array<{
+          status: string;
+          usuario_registro_id: bigint | null;
+          usuario_registro_nome: string | null;
+          data_hora_atualizacao: Date | null;
+        }>>(Prisma.sql`
+          SELECT
+            status,
+            usuario_registro_id,
+            usuario_registro_nome,
+            data_hora_atualizacao
+          FROM cursos_atendimentos_presencas
+          WHERE tenant_id::text = ${tenantId}
+            AND curso_id = ${cursoId}
+            AND matricula_id = ${matriculaId}
+            AND data_aula = ${dataAulaIso}::date
+          LIMIT 1
+        `);
+
+        const statusAnterior = usuarioAnterior[0]?.status;
+        const presencaJaConfirmada = statusAnterior === "PRESENTE" || statusAnterior === "AUSENTE" || statusAnterior === "JUSTIFICADO";
+        if (presencaJaConfirmada && statusAnterior !== item.status && !input.senha_confirmacao) {
+          throw new AppError(
+            "A presença ou ausência deste beneficiário já foi salva. Confirme a alteração informando a senha do usuário logado.",
+            409
+          );
         }
 
         await tx.$executeRaw(Prisma.sql`
@@ -1097,28 +1371,59 @@ export class MatriculaRepository {
             matricula_id,
             data_aula,
             status,
+            observacao,
+            usuario_registro_id,
+            usuario_registro_nome,
+            data_hora_registro,
+            data_hora_atualizacao,
             criado_em,
             atualizado_em
           ) VALUES (
             ${tenantId}::uuid,
             ${cursoId},
             ${matriculaId},
-            ${dataAula},
+            ${dataAulaIso}::date,
             ${item.status},
+            ${trimOrUndefined(item.observacao) ?? null},
+            ${usuario?.id ?? null},
+            ${usuario?.nome ?? null},
+            NOW(),
+            NOW(),
             NOW(),
             NOW()
           )
-          ON CONFLICT (curso_id, matricula_id, data_aula)
+          ON CONFLICT (tenant_id, curso_id, matricula_id, data_aula)
           DO UPDATE SET
             status = EXCLUDED.status,
+            observacao = EXCLUDED.observacao,
+            usuario_registro_id = EXCLUDED.usuario_registro_id,
+            usuario_registro_nome = EXCLUDED.usuario_registro_nome,
+            data_hora_atualizacao = NOW(),
             atualizado_em = NOW()
         `);
+
+        await this.registrarAuditoriaPresencaTx(tx, {
+          tenantId,
+          cursoId,
+          presencaDataId,
+          dataAula,
+          matriculaId,
+          beneficiarioId: matriculaAtual.beneficiario_id ?? undefined,
+          beneficiarioNome: matriculaAtual.beneficiario_nome,
+          cpf: matriculaAtual.cpf ?? undefined,
+          statusAnterior: usuarioAnterior[0]?.status ?? null,
+          statusNovo: item.status,
+          observacao: trimOrUndefined(item.observacao) ?? matriculaAtual.observacao ?? undefined,
+          usuarioId: usuario?.id,
+          usuarioNome: usuario?.nome
+        });
       }
 
       await tx.$executeRaw(Prisma.sql`
         UPDATE cursos_atendimentos_presenca_datas
         SET
-          data_aula = ${dataAula},
+          data_aula = ${dataAulaIso}::date,
+          observacoes = COALESCE(${observacoesGerais}, observacoes),
           status = 'PREENCHIDA',
           atualizado_em = NOW()
         WHERE id = ${presencaDataId}
@@ -1151,6 +1456,121 @@ export class MatriculaRepository {
       throw new AppError("Data de presenca nao encontrada.", 404);
     }
     return registro;
+  }
+
+  private async registrarAuditoriaPresencaTx(
+    tx: TransactionClient,
+    payload: {
+      tenantId: string;
+      cursoId: bigint;
+      presencaDataId: bigint;
+      dataAula: Date;
+      matriculaId: bigint;
+      beneficiarioId?: bigint | null;
+      beneficiarioNome: string;
+      cpf?: string | null;
+      statusAnterior: string | null;
+      statusNovo: string;
+      observacao?: string | null;
+      usuarioId?: bigint;
+      usuarioNome?: string;
+    }
+  ) {
+    try {
+      const auditoria = montarAuditoriaPresenca(payload);
+      await tx.$executeRawUnsafe(
+        `
+          INSERT INTO central_auditoria (
+            tenant_id,
+            beneficiario_id,
+            entidade,
+            entidade_id,
+            acao,
+            descricao,
+            dados_novos,
+            usuario_id,
+            usuario_nome,
+            criado_em
+          ) VALUES (
+            $1::uuid,
+            $2,
+            'PRESENCA_MATRICULA',
+            $3,
+            $4,
+            $5,
+            $6::jsonb,
+            $7,
+            $8,
+            NOW()
+          )
+        `,
+        auditoria.tenant_id,
+        auditoria.beneficiario_id,
+        auditoria.entidade_id,
+        auditoria.acao,
+        auditoria.descricao,
+        JSON.stringify(auditoria.dados_novos),
+        auditoria.usuario_id,
+        auditoria.usuario_nome
+      );
+    } catch (error) {
+      console.warn("[matriculas] falha ao registrar auditoria de presenca:", error);
+    }
+  }
+
+  private async registrarAuditoriaExclusaoPresencaDataTx(
+    tx: TransactionClient,
+    payload: {
+      tenantId: string;
+      cursoId: bigint;
+      presencaDataId: bigint;
+      dataAula: Date;
+      totalExcluidos: number;
+      usuarioId?: bigint;
+      usuarioNome?: string;
+    }
+  ) {
+    try {
+      await tx.$executeRawUnsafe(
+        `
+          INSERT INTO central_auditoria (
+            tenant_id,
+            entidade,
+            entidade_id,
+            acao,
+            descricao,
+            dados_novos,
+            usuario_id,
+            usuario_nome,
+            criado_em
+          ) VALUES (
+            $1::uuid,
+            'PRESENCA_DATA',
+            $2,
+            'EXCLUIR',
+            $3,
+            $4::jsonb,
+            $5,
+            $6,
+            NOW()
+          )
+        `,
+        payload.tenantId,
+        payload.presencaDataId,
+        `Data de presença excluída em ${payload.dataAula.toISOString().slice(0, 10)} com ${payload.totalExcluidos} registro(s) removido(s).`,
+        JSON.stringify({
+          tenantId: payload.tenantId,
+          cursoId: payload.cursoId.toString(),
+          presencaDataId: payload.presencaDataId.toString(),
+          dataAula: payload.dataAula.toISOString(),
+          totalExcluidos: payload.totalExcluidos
+        }),
+        payload.usuarioId ?? null,
+        payload.usuarioNome ?? null
+      );
+    } catch (error) {
+      console.warn("[matriculas] falha ao registrar auditoria de exclusao de presenca:", error);
+    }
   }
 
   private async inserirMatriculas(

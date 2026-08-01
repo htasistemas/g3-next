@@ -1,7 +1,7 @@
 import {
-  BadgeCheck,
   CalendarDays,
-  CircleHelp,
+  ChevronDown,
+  ChevronUp,
   Clock3,
   Copy,
   LoaderCircle,
@@ -14,6 +14,7 @@ import {
   Users,
   XCircle
 } from "lucide-react";
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -94,42 +95,36 @@ export function ItemSelector(props: {
   carregando?: boolean;
 }) {
   return (
-    <div className="space-y-3">
-      <div className="max-h-56 overflow-auto rounded-xl border border-[var(--g3-border)] bg-white shadow-sm">
+    <div className="space-y-3 lg:col-span-2">
+      <div className="rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-3 shadow-sm">
         {props.carregando ? (
           <p className="px-2 py-6 text-sm text-[var(--g3-muted)]">Carregando itens...</p>
         ) : props.itens.length ? (
-          <table className="w-full border-collapse text-sm">
-            <thead className="sticky top-0 bg-emerald-50 text-left">
-              <tr>
-                <th className="border-b border-[var(--g3-border)] px-3 py-2 font-semibold text-emerald-900">Nome</th>
-                <th className="border-b border-[var(--g3-border)] px-3 py-2 font-semibold text-emerald-900">Profissional</th>
-                <th className="border-b border-[var(--g3-border)] px-3 py-2 font-semibold text-emerald-900">Horário</th>
-                <th className="border-b border-[var(--g3-border)] px-3 py-2 font-semibold text-emerald-900">Local</th>
-              </tr>
-            </thead>
-            <tbody>
-              {props.itens.map((item) => {
-                const ativo = props.selecionadoId === item.id;
-                return (
-                  <tr
-                    key={item.id}
-                    onClick={() => props.onSelect(item)}
-                    className={`cursor-pointer transition-colors ${
-                      ativo ? "bg-emerald-50" : "bg-white hover:bg-[var(--g3-primary-soft)]/35"
-                    }`}
-                  >
-                    <td className="border-b border-[var(--g3-border)] px-3 py-2 font-medium text-[var(--g3-foreground)]">{item.nome}</td>
-                    <td className="border-b border-[var(--g3-border)] px-3 py-2 text-[var(--g3-muted)]">
-                      {item.profissionalNome || "Sem profissional definido"}
-                    </td>
-                    <td className="border-b border-[var(--g3-border)] px-3 py-2 text-[var(--g3-muted)]">{formatarHorario(item.horario)}</td>
-                    <td className="border-b border-[var(--g3-border)] px-3 py-2 text-[var(--g3-muted)]">{item.local || "Não informado"}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {props.itens.map((item) => {
+              const ativo = props.selecionadoId === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => props.onSelect(item)}
+                  className={`min-w-0 break-words rounded-xl border bg-[var(--g3-card)] p-4 text-center transition ${
+                    ativo
+                      ? "border-[var(--g3-primary)] bg-[var(--g3-primary-soft)] shadow-md"
+                      : "border-[var(--g3-primary-soft)] bg-[var(--g3-primary-soft)] hover:border-[var(--g3-primary)] hover:bg-[var(--g3-primary-soft-hover)]"
+                  }`}
+                >
+                  <p className="font-semibold text-[var(--g3-foreground)]">{item.nome}</p>
+                  <p className="mt-2 text-sm text-[var(--g3-muted)]">Profissional: {item.profissionalNome || "Sem profissional definido"}</p>
+                  <div className="mt-3 flex flex-wrap justify-center gap-2 text-xs text-[var(--g3-muted)]">
+                    <span className="rounded-md bg-[var(--g3-card)] px-2 py-1">Horário: {formatarHorario(item.horario)}</span>
+                    <span className="rounded-md bg-[var(--g3-card)] px-2 py-1">Local: {item.local || "Não informado"}</span>
+                  </div>
+                  {ativo ? <p className="mt-3 text-xs font-semibold text-[var(--g3-primary)]">Selecionado</p> : null}
+                </button>
+              );
+            })}
+          </div>
         ) : (
           <p className="px-2 py-6 text-sm text-[var(--g3-muted)]">Nenhum item encontrado.</p>
         )}
@@ -252,10 +247,13 @@ export function BeneficiarioSelector(props: {
                       <Badge variant="info">{item.status || "Ativo"}</Badge>
                       {!item.selecionavel ? <Badge variant="warning">Cadastro não vinculado</Badge> : null}
                     </div>
-                    <p className="mt-1 text-xs text-[var(--g3-muted)]">
-                      {formatarTelefone(item.telefone) || item.telefone || "Sem telefone"}
-                      {item.email ? ` - ${item.email}` : ""}
-                    </p>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-[var(--g3-muted)]">
+                      {item.dataNascimento ? <span>{formatarIdade(item.dataNascimento)}</span> : null}
+                      <span>
+                        {formatarTelefone(item.telefone) || item.telefone || "Telefone não informado"}
+                      </span>
+                    </div>
+                    {item.email ? <p className="mt-0.5 truncate text-xs text-[var(--g3-muted)]">{item.email}</p> : null}
                   </div>
                 </label>
               );
@@ -303,6 +301,7 @@ export function GenerateCardButton(props: { disabled?: boolean; loading?: boolea
 export function AgendaCardList(props: {
   cards: Agendamento[];
   selecionadoId?: number | null;
+  destaqueRecenteId?: number | null;
   envioEmAndamento?: {
     agendamentoId: number;
     canal: "WHATSAPP" | "EMAIL";
@@ -319,6 +318,10 @@ export function AgendaCardList(props: {
   onWhatsApp: (item: Agendamento) => void;
   onEmail: (item: Agendamento) => void;
   onImprimir: (item: Agendamento) => void;
+  confirmacaoEmAndamento?: {
+    agendamentoId: number;
+    index: number;
+  } | null;
 }) {
   if (!props.cards.length) {
     return (
@@ -337,6 +340,7 @@ export function AgendaCardList(props: {
           key={item.id ?? `${item.itemOrigemId}-${item.data}`}
           item={item}
           ativo={props.selecionadoId === item.id}
+          destaqueRecente={props.destaqueRecenteId === item.id}
           envioEmAndamento={
             props.envioEmAndamento && Number(item.id) === props.envioEmAndamento.agendamentoId
               ? props.envioEmAndamento
@@ -353,6 +357,11 @@ export function AgendaCardList(props: {
           onWhatsApp={() => props.onWhatsApp(item)}
           onEmail={() => props.onEmail(item)}
           onImprimir={() => props.onImprimir(item)}
+          confirmacaoEmAndamento={
+            props.confirmacaoEmAndamento && Number(item.id) === props.confirmacaoEmAndamento.agendamentoId
+              ? props.confirmacaoEmAndamento
+              : null
+          }
         />
       ))}
     </div>
@@ -362,6 +371,7 @@ export function AgendaCardList(props: {
 export function AgendaCard(props: {
   item: Agendamento;
   ativo?: boolean;
+  destaqueRecente?: boolean;
   envioEmAndamento?: {
     agendamentoId: number;
     canal: "WHATSAPP" | "EMAIL";
@@ -378,8 +388,13 @@ export function AgendaCard(props: {
   onImprimir: () => void;
   onEditar: () => void;
   onCancelar: () => void;
+  confirmacaoEmAndamento?: {
+    agendamentoId: number;
+    index: number;
+  } | null;
 }) {
   const participantes = props.item.participantes ?? [];
+  const [expandido, setExpandido] = useState(false);
   const canalEmEnvio = props.envioEmAndamento?.canal;
   const progressoEnvio = props.envioEmAndamento ? ((props.envioEmAndamento.etapa + 1) / 3) * 100 : 0;
   const textoEnvio =
@@ -402,21 +417,35 @@ export function AgendaCard(props: {
       className={`overflow-hidden border-[var(--g3-border)] bg-white shadow-[0_14px_34px_rgba(15,23,42,0.10)] transition-all ${
         props.ativo
           ? "border-emerald-300 bg-[linear-gradient(180deg,#ffffff_0%,#f4fbf6_100%)] ring-2 ring-emerald-500 ring-offset-2 shadow-[0_18px_40px_rgba(5,150,105,0.18)]"
+          : props.destaqueRecente
+            ? "border-amber-300 bg-[linear-gradient(180deg,#fffdf5_0%,#fef7e8_100%)] ring-2 ring-amber-500 ring-offset-2 shadow-[0_18px_40px_rgba(180,83,9,0.14)]"
           : "hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(15,23,42,0.16)]"
       }`}
     >
-      <div className={`px-4 py-3 ${props.ativo ? "bg-emerald-700" : "bg-emerald-600"}`}>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-base font-semibold text-white">{props.item.itemNome || props.item.tipoAtendimento}</p>
-          <div className="flex flex-wrap items-center gap-2">
-            {props.ativo ? <Badge variant="warning">Em edição</Badge> : null}
-            <Badge variant="default" className="border-white/35 bg-white/15 text-white">
-              {participantes.length} participante(s)
-            </Badge>
-          </div>
+      <div className={`relative min-h-[88px] px-4 py-3 pr-36 ${props.ativo ? "bg-emerald-700" : props.destaqueRecente ? "bg-amber-600" : "bg-emerald-600"}`}>
+        <p className="line-clamp-2 min-h-10 text-base font-semibold leading-5 text-white">
+          {props.item.itemNome || props.item.tipoAtendimento}
+        </p>
+        <div className="mt-2 flex min-h-6 flex-wrap items-center gap-2">
+          {props.ativo ? <Badge variant="warning">Em edição</Badge> : null}
+          {props.destaqueRecente ? <Badge variant="default" className="border-white/35 bg-white/15 text-white">Recém salvo</Badge> : null}
+          <Badge variant="default" className="border-white/35 bg-white/15 text-white">
+            {participantes.length} beneficiário(s) inscrito(s)
+          </Badge>
         </div>
+        <button
+          type="button"
+          onClick={() => setExpandido((atual) => !atual)}
+          className="absolute right-3 top-3 inline-flex h-8 items-center gap-1 rounded-md border border-white/35 bg-white/15 px-2 text-xs font-medium text-white transition-colors hover:bg-white/25"
+          aria-expanded={expandido}
+          aria-label={expandido ? "Recolher agenda" : "Expandir agenda"}
+          title={expandido ? "Recolher agenda" : "Expandir agenda"}
+        >
+          {expandido ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          {expandido ? "Recolher" : "Expandir"}
+        </button>
       </div>
-      <CardContent className="space-y-4 px-4 py-4">
+      {expandido ? <CardContent className="space-y-4 px-4 py-4">
         {props.ativo ? (
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-900">
             Este card está aberto no formulário para edição. Qualquer alteração será aplicada neste agendamento.
@@ -456,6 +485,7 @@ export function AgendaCard(props: {
           <table className="w-full border-collapse text-sm">
             <thead className="bg-emerald-50 text-left">
               <tr>
+                <th className="border-b border-[var(--g3-border)] px-3 py-2 font-semibold text-emerald-900">Horário</th>
                 <th className="border-b border-[var(--g3-border)] px-3 py-2 font-semibold text-emerald-900">Beneficiário</th>
                 <th className="border-b border-[var(--g3-border)] px-3 py-2 font-semibold text-emerald-900">Telefone</th>
                 <th className="border-b border-[var(--g3-border)] px-3 py-2 text-center font-semibold text-emerald-900">Ações</th>
@@ -464,13 +494,15 @@ export function AgendaCard(props: {
             <tbody>
               {participantes.length ? (
                 participantes.map((participante, index) => {
-                  const confirmado = props.item.status === "Confirmado" || participante.comparecimento === "Presente";
                   const idade = formatarIdade(participante.dataNascimento);
                   return (
                   <tr
                     key={`${participante.matriculaId ?? participante.beneficiarioId ?? participante.beneficiarioNome}-${index}`}
                     className="bg-white"
                   >
+                    <td className="border-b border-[var(--g3-border)] px-3 py-2 font-semibold text-emerald-800">
+                      {participante.horario || props.item.horaInicial || "---"}
+                    </td>
                     <td className="border-b border-[var(--g3-border)] px-3 py-2 text-[var(--g3-foreground)]">
                       <div className="space-y-0.5">
                         <p className="font-medium">{participante.beneficiarioNome}</p>
@@ -478,25 +510,10 @@ export function AgendaCard(props: {
                       </div>
                     </td>
                     <td className="border-b border-[var(--g3-border)] px-3 py-2 text-[var(--g3-muted)] whitespace-nowrap">
-                      {formatarTelefone(participante.telefone) || participante.telefone || "Sem telefone cadastrado"}
+                      {formatarTelefone(participante.telefone) || participante.telefone || "Telefone não informado"}
                     </td>
                     <td className="border-b border-[var(--g3-border)] px-3 py-2">
                       <div className="flex items-center justify-center gap-2">
-                        <button
-                          type="button"
-                          disabled={confirmado}
-                          onClick={() => props.onAlternarConfirmacao(index)}
-                          className={`inline-flex h-9 min-w-28 items-center justify-center gap-1.5 rounded-full border px-3 transition-colors ${
-                            confirmado
-                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                              : "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
-                          }`}
-                          title={confirmado ? "Confirmado" : "A confirmar"}
-                          aria-label={confirmado ? "Confirmado" : "A confirmar"}
-                        >
-                          {confirmado ? <BadgeCheck className="h-4 w-4" /> : <CircleHelp className="h-4 w-4" />}
-                          <span className="text-xs font-semibold">{confirmado ? "Confirmado" : "A confirmar"}</span>
-                        </button>
                         <button
                           type="button"
                           onClick={() => props.onMoverParticipante(index)}
@@ -522,7 +539,7 @@ export function AgendaCard(props: {
                 })
               ) : (
                 <tr className="bg-white">
-                  <td colSpan={3} className="px-3 py-4 text-center text-[var(--g3-muted)]">
+                  <td colSpan={4} className="px-3 py-4 text-center text-[var(--g3-muted)]">
                     Nenhum beneficiário vinculado.
                   </td>
                 </tr>
@@ -598,7 +615,7 @@ export function AgendaCard(props: {
             </div>
           </div>
         ) : null}
-      </CardContent>
+      </CardContent> : null}
     </Card>
   );
 }

@@ -10,11 +10,13 @@ export type DiretoriaUnidadeInput = {
 export type SalaUnidadeInput = {
   id?: string | number;
   nome: string;
-  ativo?: boolean;
+  capacidade_maxima?: number | string;
+  ativo?: boolean | string;
 };
 
 export type UnidadeAssistencialInput = {
   nome_fantasia: string;
+  tipo_unidade?: "ASSISTENCIAL" | "ENSINO";
   razao_social?: string;
   cnpj?: string;
   telefone?: string;
@@ -49,6 +51,7 @@ export type UnidadeAssistencialInput = {
 };
 
 export type UnidadeAssistencialFilters = {
+  tipo_unidade?: "ASSISTENCIAL" | "ENSINO";
   nome_fantasia?: string;
   cnpj?: string;
   cidade?: string;

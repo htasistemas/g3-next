@@ -1,4 +1,5 @@
-import { Prisma } from "@prisma/client";
+import { createHash } from "node:crypto";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { prisma } from "../../../database/prisma.js";
 import {
   calcularEstoqueDisponivelKit,
@@ -17,6 +18,7 @@ import type {
 } from "../doacao-realizada.mapper.js";
 
 type TransactionClient = Prisma.TransactionClient;
+type QueryClient = PrismaClient | Prisma.TransactionClient;
 
 type AlmoxarifadoItemEstoqueRow = {
   id: bigint;
@@ -54,6 +56,10 @@ const estruturaDoacaoRealizadaSql = [
     ADD COLUMN IF NOT EXISTS tenant_id UUID
   `,
   `
+    ALTER TABLE doacao_realizada
+    ADD COLUMN IF NOT EXISTS chave_operacao VARCHAR(64)
+  `,
+  `
     UPDATE doacao_realizada d
     SET tenant_id = b.tenant_id
     FROM cadastro_beneficiario b
@@ -79,6 +85,7 @@ const estruturaDoacaoRealizadaSql = [
       AND ai.tenant_id IS NOT NULL
   `,
   "CREATE INDEX IF NOT EXISTS doacao_realizada_tenant_idx ON doacao_realizada(tenant_id, data_doacao DESC)",
+  "CREATE UNIQUE INDEX IF NOT EXISTS doacao_realizada_tenant_chave_operacao_unique_idx ON doacao_realizada(tenant_id, chave_operacao) WHERE chave_operacao IS NOT NULL",
   `
     ALTER TABLE doacao_realizada_item
     ADD COLUMN IF NOT EXISTS fora_carencia BOOLEAN NOT NULL DEFAULT FALSE
@@ -124,6 +131,34 @@ function toIsoDateInput(value?: Date | string | null) {
   return texto.slice(0, 10);
 }
 
+function calcularChaveOperacaoDoacaoRealizada(input: DoacaoRealizadaInput, tenantId: string) {
+  const itens = [...input.itens]
+    .map((item) => ({
+      item_id: Number(item.item_id),
+      quantidade: Number(item.quantidade),
+      observacoes: trimOrUndefined(item.observacoes) ?? ""
+    }))
+    .sort((a, b) => {
+      if (a.item_id !== b.item_id) return a.item_id - b.item_id;
+      if (a.quantidade !== b.quantidade) return a.quantidade - b.quantidade;
+      return a.observacoes.localeCompare(b.observacoes);
+    });
+
+  const payload = JSON.stringify({
+    tenantId,
+    beneficiario_id: input.beneficiario_id ?? null,
+    vinculo_familiar_id: input.vinculo_familiar_id ?? null,
+    tipo_doacao: trimOrUndefined(input.tipo_doacao) ?? "",
+    situacao: trimOrUndefined(input.situacao) ?? "",
+    responsavel: trimOrUndefined(input.responsavel) ?? "",
+    observacoes: trimOrUndefined(input.observacoes) ?? "",
+    data_doacao: input.data_doacao,
+    itens
+  });
+
+  return createHash("sha256").update(payload).digest("hex");
+}
+
 export function calcularSaldoMovimentacaoDoacao(
   estoqueAtual: number,
   quantidade: number,
@@ -138,6 +173,49 @@ export function calcularSaldoMovimentacaoDoacao(
   }
 
   return estoqueAtual - quantidade;
+}
+
+export function tratarErroPersistenciaDoacaoRealizada(error: unknown, acao = "processar a doacao realizada"): never {
+  if (error instanceof AppError) {
+    throw error;
+  }
+
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    const rawCode = typeof error.meta?.code === "string" ? error.meta.code : undefined;
+    const contexto = `${error.message} ${typeof error.meta?.message === "string" ? error.meta.message : ""}`.toLowerCase();
+
+    if (error.code === "P2002" || (error.code === "P2010" && rawCode === "23505")) {
+      if (contexto.includes("almoxarifario_movimentacao") || contexto.includes("doacao_realizada_item")) {
+        throw new AppError("Esta entrega ja foi registrada.", 409);
+      }
+
+      throw new AppError("Esta entrega ja foi registrada.", 409);
+    }
+
+    if (error.code === "P2003" || (error.code === "P2010" && rawCode === "23503")) {
+      throw new AppError(
+        "O registro informado nao pertence a esta instituicao ou nao existe no banco.",
+        400
+      );
+    }
+
+    if (error.code === "P2025") {
+      throw new AppError("Doacao realizada nao encontrada.", 404);
+    }
+
+    if (
+      error.code === "P2000" ||
+      (error.code === "P2010" && ["22001", "22003", "22007", "22P02"].includes(rawCode ?? ""))
+    ) {
+      throw new AppError("Dados invalidos para registrar a entrega.", 400);
+    }
+  }
+
+  if (error instanceof Error && error.message.trim()) {
+    throw new AppError(`Nao foi possivel ${acao}. ${error.message.trim()}`, 500);
+  }
+
+  throw new AppError(`Nao foi possivel ${acao}.`, 500);
 }
 
 export class DoacaoRealizadaRepository {
@@ -220,7 +298,39 @@ export class DoacaoRealizadaRepository {
   async buscarPorId(id: bigint, tenantId: string) {
     await this.ensureEstrutura();
 
-    const registros = await prisma.$queryRaw<DoacaoRealizadaRow[]>(Prisma.sql`
+    const registro = await this.buscarPorIdEmCliente(prisma, id, tenantId);
+    if (!registro) return null;
+
+    const itens = await prisma.$queryRaw<DoacaoRealizadaItemRow[]>(Prisma.sql`
+      SELECT
+        di.id,
+        di.doacao_realizada_id,
+        di.almoxarifado_item_id,
+        ai.codigo AS codigo_item,
+        ai.descricao AS descricao_item,
+        ai.unidade AS unidade_item,
+        di.quantidade,
+        di.observacoes,
+        COALESCE(di.fora_carencia, FALSE) AS fora_carencia,
+        di.carencia_dias,
+        di.autorizado_por_nome,
+        di.autorizacao_carencia_em,
+        di.ultima_entrega_em
+      FROM doacao_realizada_item di
+      INNER JOIN almoxarifado_item ai ON ai.id = di.almoxarifado_item_id AND ai.tenant_id::text = ${tenantId}
+      WHERE di.doacao_realizada_id = ${id}
+      ORDER BY di.id ASC
+    `);
+
+    return { registro, itens };
+  }
+
+  private async buscarPorIdEmCliente(
+    client: QueryClient,
+    id: bigint,
+    tenantId: string
+  ) {
+    const registros = await client.$queryRaw<DoacaoRealizadaRow[]>(Prisma.sql`
       SELECT
         d.id,
         d.beneficiario_id,
@@ -253,31 +363,7 @@ export class DoacaoRealizadaRepository {
       LIMIT 1
     `);
 
-    const registro = registros[0];
-    if (!registro) return null;
-
-    const itens = await prisma.$queryRaw<DoacaoRealizadaItemRow[]>(Prisma.sql`
-      SELECT
-        di.id,
-        di.doacao_realizada_id,
-        di.almoxarifado_item_id,
-        ai.codigo AS codigo_item,
-        ai.descricao AS descricao_item,
-        ai.unidade AS unidade_item,
-        di.quantidade,
-        di.observacoes,
-        COALESCE(di.fora_carencia, FALSE) AS fora_carencia,
-        di.carencia_dias,
-        di.autorizado_por_nome,
-        di.autorizacao_carencia_em,
-        di.ultima_entrega_em
-      FROM doacao_realizada_item di
-      INNER JOIN almoxarifado_item ai ON ai.id = di.almoxarifado_item_id AND ai.tenant_id::text = ${tenantId}
-      WHERE di.doacao_realizada_id = ${id}
-      ORDER BY di.id ASC
-    `);
-
-    return { registro, itens };
+    return registros[0] ?? null;
   }
 
   async buscarPorIdOuFalhar(id: bigint, tenantId: string) {
@@ -291,108 +377,176 @@ export class DoacaoRealizadaRepository {
   async criar(input: DoacaoRealizadaInput, tenantId: string) {
     await this.ensureEstrutura();
 
-    const id = await prisma.$transaction(async (tx) => {
-      const inserted = await tx.$queryRaw<{ id: bigint }[]>(Prisma.sql`
-        INSERT INTO doacao_realizada (
-          tenant_id,
-          beneficiario_id,
-          vinculo_familiar_id,
-          tipo_doacao,
-          situacao,
-          responsavel,
-          observacoes,
-          data_doacao,
-          criado_em,
-          atualizado_em
-        ) VALUES (
-          ${tenantId}::uuid,
-          ${input.beneficiario_id ? BigInt(input.beneficiario_id) : null},
-          ${input.vinculo_familiar_id ? BigInt(input.vinculo_familiar_id) : null},
-          ${input.tipo_doacao},
-          ${input.situacao},
-          ${trimOrUndefined(input.responsavel)},
-          ${trimOrUndefined(input.observacoes)},
-          ${toOptionalDate(input.data_doacao)},
-          NOW(),
-          NOW()
-        )
-        RETURNING id
-      `);
+    try {
+      return await prisma.$transaction(async (tx) => {
+        const chaveOperacao = calcularChaveOperacaoDoacaoRealizada(input, tenantId);
+        const inserted = await tx.$queryRaw<{ id: bigint }[]>(Prisma.sql`
+          INSERT INTO doacao_realizada (
+            tenant_id,
+            chave_operacao,
+            beneficiario_id,
+            vinculo_familiar_id,
+            tipo_doacao,
+            situacao,
+            responsavel,
+            observacoes,
+            data_doacao,
+            criado_em,
+            atualizado_em
+          ) VALUES (
+            ${tenantId}::uuid,
+            ${chaveOperacao},
+            ${input.beneficiario_id ? BigInt(input.beneficiario_id) : null},
+            ${input.vinculo_familiar_id ? BigInt(input.vinculo_familiar_id) : null},
+            ${input.tipo_doacao},
+            ${input.situacao},
+            ${trimOrUndefined(input.responsavel)},
+            ${trimOrUndefined(input.observacoes)},
+            ${toOptionalDate(input.data_doacao)},
+            NOW(),
+            NOW()
+          )
+          RETURNING id
+        `);
 
-      const registroId = inserted[0]?.id;
-      if (!registroId) {
-        throw new AppError("Nao foi possivel criar a doacao realizada.", 500);
-      }
+        const registroId = inserted[0]?.id;
+        if (!registroId) {
+          throw new AppError("Nao foi possivel criar a doacao realizada.", 500);
+        }
 
-      await this.inserirItens(tx, registroId, input.itens, {
-        tenantId,
-        dataMovimentacao: input.data_doacao,
-        responsavel: input.responsavel
+        await this.inserirItens(tx, registroId, input.itens, {
+          tenantId,
+          dataMovimentacao: input.data_doacao,
+          responsavel: input.responsavel
+        });
+
+        const registro = await this.buscarPorIdEmCliente(tx, registroId, tenantId);
+        if (!registro) {
+          throw new AppError("Nao foi possivel localizar a doacao salva.", 500);
+        }
+
+        const itens = await tx.$queryRaw<DoacaoRealizadaItemRow[]>(Prisma.sql`
+          SELECT
+            di.id,
+            di.doacao_realizada_id,
+            di.almoxarifado_item_id,
+            ai.codigo AS codigo_item,
+            ai.descricao AS descricao_item,
+            ai.unidade AS unidade_item,
+            di.quantidade,
+            di.observacoes,
+            COALESCE(di.fora_carencia, FALSE) AS fora_carencia,
+            di.carencia_dias,
+            di.autorizado_por_nome,
+            di.autorizacao_carencia_em,
+            di.ultima_entrega_em
+          FROM doacao_realizada_item di
+          INNER JOIN almoxarifado_item ai ON ai.id = di.almoxarifado_item_id AND ai.tenant_id::text = ${tenantId}
+          WHERE di.doacao_realizada_id = ${registroId}
+          ORDER BY di.id ASC
+        `);
+
+        return { registro, itens };
       });
-      return registroId;
-    });
-
-    return this.buscarPorIdOuFalhar(id, tenantId);
+    } catch (error) {
+      return tratarErroPersistenciaDoacaoRealizada(error, "criar a doacao realizada");
+    }
   }
 
   async atualizar(id: bigint, input: DoacaoRealizadaInput, tenantId: string) {
     await this.ensureEstrutura();
     const atual = await this.buscarPorIdOuFalhar(id, tenantId);
 
-    await prisma.$transaction(async (tx) => {
-      await this.restaurarEstoqueItens(tx, id, {
-        tenantId,
-        dataMovimentacao: toIsoDateInput(atual.registro.data_doacao),
-        responsavel: atual.registro.responsavel ?? input.responsavel ?? undefined
+    try {
+      return await prisma.$transaction(async (tx) => {
+        const chaveOperacao = calcularChaveOperacaoDoacaoRealizada(input, tenantId);
+        await this.restaurarEstoqueItens(tx, id, {
+          tenantId,
+          dataMovimentacao: toIsoDateInput(atual.registro.data_doacao),
+          responsavel: atual.registro.responsavel ?? input.responsavel ?? undefined
+        });
+
+        await tx.$executeRaw(Prisma.sql`
+          UPDATE doacao_realizada
+          SET
+            chave_operacao = ${chaveOperacao},
+            beneficiario_id = ${input.beneficiario_id ? BigInt(input.beneficiario_id) : null},
+            vinculo_familiar_id = ${input.vinculo_familiar_id ? BigInt(input.vinculo_familiar_id) : null},
+            tipo_doacao = ${input.tipo_doacao},
+            situacao = ${input.situacao},
+            responsavel = ${trimOrUndefined(input.responsavel)},
+            observacoes = ${trimOrUndefined(input.observacoes)},
+            data_doacao = ${toOptionalDate(input.data_doacao)},
+            atualizado_em = NOW()
+          WHERE id = ${id}
+            AND tenant_id::text = ${tenantId}
+        `);
+
+        await tx.$executeRaw(Prisma.sql`
+          DELETE FROM doacao_realizada_item
+          WHERE doacao_realizada_id = ${id}
+        `);
+
+        await this.inserirItens(tx, id, input.itens, {
+          tenantId,
+          dataMovimentacao: input.data_doacao,
+          responsavel: input.responsavel
+        });
+
+        const registro = await this.buscarPorIdEmCliente(tx, id, tenantId);
+        if (!registro) {
+          throw new AppError("Nao foi possivel localizar a doacao atualizada.", 500);
+        }
+
+        const itens = await tx.$queryRaw<DoacaoRealizadaItemRow[]>(Prisma.sql`
+          SELECT
+            di.id,
+            di.doacao_realizada_id,
+            di.almoxarifado_item_id,
+            ai.codigo AS codigo_item,
+            ai.descricao AS descricao_item,
+            ai.unidade AS unidade_item,
+            di.quantidade,
+            di.observacoes,
+            COALESCE(di.fora_carencia, FALSE) AS fora_carencia,
+            di.carencia_dias,
+            di.autorizado_por_nome,
+            di.autorizacao_carencia_em,
+            di.ultima_entrega_em
+          FROM doacao_realizada_item di
+          INNER JOIN almoxarifado_item ai ON ai.id = di.almoxarifado_item_id AND ai.tenant_id::text = ${tenantId}
+          WHERE di.doacao_realizada_id = ${id}
+          ORDER BY di.id ASC
+        `);
+
+        return { registro, itens };
       });
-
-      await tx.$executeRaw(Prisma.sql`
-        UPDATE doacao_realizada
-        SET
-          beneficiario_id = ${input.beneficiario_id ? BigInt(input.beneficiario_id) : null},
-          vinculo_familiar_id = ${input.vinculo_familiar_id ? BigInt(input.vinculo_familiar_id) : null},
-          tipo_doacao = ${input.tipo_doacao},
-          situacao = ${input.situacao},
-          responsavel = ${trimOrUndefined(input.responsavel)},
-          observacoes = ${trimOrUndefined(input.observacoes)},
-          data_doacao = ${toOptionalDate(input.data_doacao)},
-          atualizado_em = NOW()
-        WHERE id = ${id}
-          AND tenant_id::text = ${tenantId}
-      `);
-
-      await tx.$executeRaw(Prisma.sql`
-        DELETE FROM doacao_realizada_item
-        WHERE doacao_realizada_id = ${id}
-      `);
-
-      await this.inserirItens(tx, id, input.itens, {
-        tenantId,
-        dataMovimentacao: input.data_doacao,
-        responsavel: input.responsavel
-      });
-    });
-
-    return this.buscarPorIdOuFalhar(id, tenantId);
+    } catch (error) {
+      return tratarErroPersistenciaDoacaoRealizada(error, "atualizar a doacao realizada");
+    }
   }
 
   async remover(id: bigint, tenantId: string) {
     await this.ensureEstrutura();
     const atual = await this.buscarPorIdOuFalhar(id, tenantId);
 
-    await prisma.$transaction(async (tx) => {
-      await this.restaurarEstoqueItens(tx, id, {
-        tenantId,
-        dataMovimentacao: toIsoDateInput(atual.registro.data_doacao),
-        responsavel: atual.registro.responsavel ?? undefined
-      });
+    try {
+      await prisma.$transaction(async (tx) => {
+        await this.restaurarEstoqueItens(tx, id, {
+          tenantId,
+          dataMovimentacao: toIsoDateInput(atual.registro.data_doacao),
+          responsavel: atual.registro.responsavel ?? undefined
+        });
 
-      await tx.$executeRaw(Prisma.sql`
-        DELETE FROM doacao_realizada
-        WHERE id = ${id}
-          AND tenant_id::text = ${tenantId}
-      `);
-    });
+        await tx.$executeRaw(Prisma.sql`
+          DELETE FROM doacao_realizada
+          WHERE id = ${id}
+            AND tenant_id::text = ${tenantId}
+        `);
+      });
+    } catch (error) {
+      return tratarErroPersistenciaDoacaoRealizada(error, "remover a doacao realizada");
+    }
   }
 
   async listarBeneficiarios(termo: string | undefined, tenantId: string) {

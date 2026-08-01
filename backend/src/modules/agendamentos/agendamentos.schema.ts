@@ -25,10 +25,13 @@ const tipoOperacionalSchema = z.enum(["curso", "atendimento", "oficina"]);
 export const agendamentoParticipanteSchema = z.object({
   matriculaId: z.coerce.number().int().positive().optional().nullable(),
   beneficiarioId: z.coerce.number().int().positive().optional().nullable(),
+  codigo: optionalTrimmedString.nullable().optional(),
   beneficiarioNome: z.string().trim().min(2, "Informe o participante."),
+  dataNascimento: optionalIsoDate.nullable().optional(),
   telefone: optionalTrimmedString.nullable().optional(),
   comparecimento: z.enum(["Pendente", "Presente", "Faltou", "Justificado"]).optional(),
-  observacao: optionalTrimmedString.nullable().optional()
+  observacao: optionalTrimmedString.nullable().optional(),
+  horario: optionalTime.nullable().optional()
 });
 
 export const agendamentoInputSchema = z.object({
@@ -115,12 +118,19 @@ export const agendamentoOperacionalInputSchema = z.object({
   id: optionalTrimmedString.optional(),
   tipo: tipoOperacionalSchema,
   itemId: z.coerce.number().int().positive(),
+  profissionalNome: optionalTrimmedString.optional(),
   data: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/),
+  horaInicial: optionalTime,
+  horaFinal: optionalTime,
+  duracaoMinutos: z.coerce.number().int().positive().max(1440).optional(),
   beneficiariosIds: z
     .array(z.coerce.number().int().positive())
     .optional(),
   matriculasIds: z
     .array(z.coerce.number().int().positive())
+    .optional(),
+  horariosPorMatricula: z
+    .record(z.string().trim().regex(/^\d{2}:\d{2}(?::\d{2})?$/))
     .optional()
 }).superRefine((input, ctx) => {
   const totalBeneficiarios = input.beneficiariosIds?.length ?? 0;
@@ -188,6 +198,10 @@ export const agendamentoRemarcacaoInputSchema = z.object({
   recurso: optionalTrimmedString.nullable().optional(),
   permitirConflito: z.coerce.boolean().optional(),
   motivo: optionalTrimmedString.nullable().optional()
+});
+
+export const agendamentoCopiaInputSchema = z.object({
+  data: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/)
 });
 
 export const agendamentoFiltrosSchema = z.object({

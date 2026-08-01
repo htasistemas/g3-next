@@ -106,6 +106,25 @@ function obterMensagemErro(error: any, fallback: string) {
   return error?.response?.data?.message ?? error?.response?.data?.mensagem ?? fallback;
 }
 
+function obterMensagemErroLogin(error: any) {
+  const mensagem = obterMensagemErro(error, "Não foi possível autenticar.");
+  const normalizada = mensagem.toLowerCase();
+
+  if (normalizada.includes("senha invalida")) {
+    return "Senha incorreta para este usuário. Verifique a credencial cadastrada ou redefina o acesso.";
+  }
+
+  if (normalizada.includes("nao foi possivel localizar o usuario informado")) {
+    return "Não localizamos um usuário para este CNPJ e e-mail. Confirme a instituição e o login cadastrados.";
+  }
+
+  if (normalizada.includes("vinculado a outra instituicao")) {
+    return "O e-mail informado está vinculado a outra instituição. Verifique o CNPJ e a Administração inicial.";
+  }
+
+  return mensagem;
+}
+
 function ehEmailMasterSemTenant(email: string) {
   return email.trim().toLowerCase() === EMAIL_MASTER_SEM_TENANT;
 }
@@ -176,7 +195,7 @@ export function LoginPage() {
     const cnpjNormalizado = normalizarCnpj(cnpj);
     const emailNormalizado = email.trim().toLowerCase();
     const dispensarInstituicao = !slugSubdominio && ehEmailMasterSemTenant(emailNormalizado);
-    if (!dispensarInstituicao && !slugSubdominio && cnpjNormalizado.length !== 14) {
+    if (!dispensarInstituicao && !slugSubdominio && !emailNormalizado && cnpjNormalizado.length !== 14) {
       setErro("Informe o CNPJ da instituição para continuar.");
       return;
     }
@@ -215,7 +234,7 @@ export function LoginPage() {
 
       navigate(destino, { replace: true });
     } catch (error: any) {
-      setErro(obterMensagemErro(error, "Não foi possível autenticar."));
+      setErro(obterMensagemErroLogin(error));
     } finally {
       setCarregando(false);
     }
@@ -396,10 +415,10 @@ export function LoginPage() {
               <div className="space-y-2 rounded-[24px] border border-emerald-800 bg-emerald-950 px-5 py-5 text-white shadow-2xl shadow-emerald-950/30">
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-100">Sistema G3</p>
                 <h1 className="text-2xl font-semibold leading-tight">
-                  Gestão social moderna, organizada e preparada para crescer.
+                  Gestão moderna, organizada e preparada para crescer.
                 </h1>
                 <p className="text-xs leading-5 text-emerald-50/90">
-                  Plataforma integrada para cadastro, acompanhamento e atendimento de beneficiários.
+                  Plataforma integrada para cadastro, acompanhamento e atendimento de alunos ou beneficiários.
                 </p>
               </div>
             </div>

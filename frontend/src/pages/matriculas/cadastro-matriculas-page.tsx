@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import type { LucideIcon } from "lucide-react";
 import type { ChangeEvent, KeyboardEvent } from "react";
 import {
@@ -83,10 +83,10 @@ const abas = [
   { id: "dados", label: "Dados da inscrição", icon: BookOpenCheck },
   { id: "catalogo", label: "Catálogo e vagas", icon: CalendarClock },
   { id: "inscricoes", label: "Inscrições e lista de espera", icon: UserPlus },
-  { id: "presenca", label: "Presença", icon: Users }
+  { id: "presenca", label: "Confirmar presença", icon: Users }
 ] as const;
 
-type AbaId = "listagem" | "dados" | "catalogo" | "inscricoes" | "agenda" | "presenca";
+type AbaId = "listagem" | "dados" | "catalogo" | "inscricoes" | "presenca";
 
 type AcaoCrud = {
   label: string;
@@ -103,7 +103,7 @@ type PopupMensagemState = {
 };
 
 const secaoTela = "Atendimentos diários";
-const tituloTela = "Inscrições em cursos e oficinas";
+const tituloTela = "Inscrições em cursos e atendimentos";
 
 function formatarStatus(status?: string) {
   if (!status) return "Não informado";
@@ -141,6 +141,10 @@ function formatarTelefone(telefone?: string) {
     return `(${digitos.slice(0, 2)}) ${digitos.slice(2, 6)}-${digitos.slice(6)}`;
   }
   return telefone;
+}
+
+function chavePresenca(matriculaId?: string | number | null) {
+  return String(matriculaId ?? "").trim();
 }
 
 function obterPrimeiroNome(nome?: string) {
@@ -225,6 +229,25 @@ function normalizarHora(valor?: string) {
   return match ? match[1] : undefined;
 }
 
+function calcularHorariosAtendimento(horarioInicial?: string, horarioFinal?: string, intervalo?: number) {
+  const inicio = normalizarHora(horarioInicial);
+  const fim = normalizarHora(horarioFinal);
+  const intervaloMinutos = Number(intervalo ?? 0);
+  if (!inicio || !fim || !Number.isInteger(intervaloMinutos) || intervaloMinutos <= 0) return [];
+
+  const [horaInicial, minutoInicial] = inicio.split(":").map(Number);
+  const [horaFinal, minutoFinal] = fim.split(":").map(Number);
+  const inicioMinutos = horaInicial * 60 + minutoInicial;
+  const fimMinutos = horaFinal * 60 + minutoFinal;
+  if (fimMinutos <= inicioMinutos) return [];
+
+  const horarios: string[] = [];
+  for (let minuto = inicioMinutos; minuto + intervaloMinutos <= fimMinutos; minuto += intervaloMinutos) {
+    horarios.push(`${String(Math.floor(minuto / 60)).padStart(2, "0")}:${String(minuto % 60).padStart(2, "0")}`);
+  }
+  return horarios;
+}
+
 function normalizarEmailOpcional(email?: string) {
   const valor = email?.trim().toLowerCase();
   if (!valor) return undefined;
@@ -280,6 +303,9 @@ function mapMatriculaParaFormulario(matricula: Matricula): MatriculaFormValues {
     instituicao_parceira: matricula.instituicao_parceira ?? "",
     status: normalizarStatusMatricula(matricula.status),
     horario_inicial: matricula.horario_inicial ?? "",
+    controle_horario_atendimento: !!matricula.controle_horario_atendimento,
+    horario_final_atendimento: matricula.horario_final_atendimento ?? "",
+    intervalo_atendimento_minutos: matricula.intervalo_atendimento_minutos,
     data_triagem: matricula.data_triagem ?? "",
     data_encaminhamento: matricula.data_encaminhamento ?? "",
     data_conclusao: matricula.data_conclusao ?? ""
@@ -327,6 +353,16 @@ function mapFormularioParaPayload(
         ? undefined
         : Number(values.carga_horaria),
     horario_inicial: values.horario_inicial?.trim() || undefined,
+    controle_horario_atendimento:
+      values.tipo.trim().toUpperCase() === "ATENDIMENTO" &&
+      !!values.horario_inicial?.trim() &&
+      !!values.horario_final_atendimento?.trim() &&
+      Number(values.duracao_horas) > 0,
+    horario_final_atendimento: values.horario_final_atendimento?.trim() || undefined,
+    intervalo_atendimento_minutos:
+      values.intervalo_atendimento_minutos === undefined || values.intervalo_atendimento_minutos === null
+        ? undefined
+        : Number(values.intervalo_atendimento_minutos),
     duracao_horas: Number(values.duracao_horas) || 0,
     dias_semana: values.dias_semana ?? [],
     faixa_etaria: values.faixa_etaria ?? [],
@@ -475,8 +511,10 @@ function ImagemAutenticada({
 
 export function CadastroMatriculasPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { usuario } = useAuth();
-  const [abaAtiva, setAbaAtiva] = useState<AbaId>("listagem");
+  const abaInicial = searchParams.get("aba") === "dados" ? "dados" : "listagem";
+  const [abaAtiva, setAbaAtiva] = useState<AbaId>(abaInicial);
   const [idSelecionado, setIdSelecionado] = useState<string>();
   const [snapshot, setSnapshot] = useState<MatriculaFormValues | null>(null);
   const [popupMensagem, setPopupMensagem] = useState<PopupMensagemState | null>(null);
@@ -522,6 +560,7 @@ export function CadastroMatriculasPage() {
   const [mostrarSugestoesAgendaProfissional, setMostrarSugestoesAgendaProfissional] = useState(false);
   const [termoAgendaBeneficiario, setTermoAgendaBeneficiario] = useState("");
   const [mostrarSugestoesAgendaBeneficiario, setMostrarSugestoesAgendaBeneficiario] = useState(false);
+  const [inscricoesAgendaSelecionadas, setInscricoesAgendaSelecionadas] = useState<string[]>([]);
   const [profissionaisAtendimentoSelecionados, setProfissionaisAtendimentoSelecionados] = useState<string[]>([]);
   const [agendaDataSelecionada, setAgendaDataSelecionada] = useState("");
   const [agendaStatusFiltro, setAgendaStatusFiltro] = useState("");
@@ -539,6 +578,8 @@ export function CadastroMatriculasPage() {
   const [presencaDatas, setPresencaDatas] = useState<MatriculaPresencaData[]>([]);
   const [presencaDataSelecionada, setPresencaDataSelecionada] = useState<MatriculaPresencaData | null>(null);
   const [presencasPorMatricula, setPresencasPorMatricula] = useState<Record<string, MatriculaPresencaStatus>>({});
+  const [presencasSalvasPorMatricula, setPresencasSalvasPorMatricula] = useState<Record<string, MatriculaPresencaStatus>>({});
+  const [presencasObservacoesPorMatricula, setPresencasObservacoesPorMatricula] = useState<Record<string, string>>({});
   const [dataPresencaSelecionada, setDataPresencaSelecionada] = useState(obterDataAtualIso);
   const [presencaObservacoes, setPresencaObservacoes] = useState("");
   const [presencaExibirCpf, setPresencaExibirCpf] = useState(true);
@@ -546,6 +587,15 @@ export function CadastroMatriculasPage() {
   const [presencaSalvando, setPresencaSalvando] = useState(false);
   const [presencaExcluindo, setPresencaExcluindo] = useState(false);
   const [presencaPendente, setPresencaPendente] = useState(false);
+  const [presencaAlteracaoPendente, setPresencaAlteracaoPendente] = useState<{
+    matriculaId: string;
+    status: MatriculaPresencaStatus;
+    beneficiarioNome: string;
+  } | null>(null);
+  const [senhaConfirmacaoPresenca, setSenhaConfirmacaoPresenca] = useState("");
+  const [presencaListaAutorizada, setPresencaListaAutorizada] = useState<string | null>(null);
+  const [presencaValidandoSenha, setPresencaValidandoSenha] = useState(false);
+  const [presencaErroSenha, setPresencaErroSenha] = useState("");
   const [imagemCursoArquivo, setImagemCursoArquivo] = useState<File | null>(null);
   const [salvandoImagemCurso, setSalvandoImagemCurso] = useState(false);
   const inputImagemRef = useRef<HTMLInputElement | null>(null);
@@ -606,6 +656,9 @@ export function CadastroMatriculasPage() {
   const diasSemanaSelecionados = watch("dias_semana") ?? [];
   const faixaEtariaSelecionada = watch("faixa_etaria") ?? [];
   const tipoMatriculaAtual = String(watch("tipo") ?? "");
+  const horarioInicialAtendimento = String(watch("horario_inicial") ?? "");
+  const horarioFinalAtendimento = String(watch("horario_final_atendimento") ?? "");
+  const duracaoAtendimentoMinutos = Number(watch("duracao_horas") ?? 0);
   const imagemAtual = String(watch("imagem") ?? "");
   const profissionalResponsavelValor = String(watch("profissional") ?? "");
   const unidadeIdFormulario = String(watch("unidade_id") ?? "");
@@ -613,7 +666,14 @@ export function CadastroMatriculasPage() {
   const matriculaIdFormulario = watch("id_matricula");
   const vagasTotaisFormulario = watch("vagas_totais");
   const acaoEmAndamento =
-    salvarMutation.isPending || removerMutation.isPending || carregandoDetalhes || atualizandoLista || salvandoImagemCurso;
+    salvarMutation.isPending ||
+    removerMutation.isPending ||
+    carregandoDetalhes ||
+    atualizandoLista ||
+    salvandoImagemCurso ||
+    presencaSalvando ||
+    presencaExcluindo ||
+    presencaCarregando;
 
   const matriculas = catalogoData?.matriculas ?? [];
   const matriculasListagem = listaData?.matriculas ?? [];
@@ -647,9 +707,26 @@ export function CadastroMatriculasPage() {
     matriculas.find((item) => item.id_matricula === (idSelecionado ?? matriculaIdFormulario)) ?? null;
   const ehInscricaoAtendimento = (cursoSelecionadoInscricao?.tipo ?? "").trim().toUpperCase() === "ATENDIMENTO";
   const ehTipoAtendimento = tipoMatriculaAtual.trim().toUpperCase() === "ATENDIMENTO";
+  const controleHorarioAtendimento =
+    ehTipoAtendimento &&
+    !!horarioInicialAtendimento.trim() &&
+    !!horarioFinalAtendimento.trim() &&
+    duracaoAtendimentoMinutos > 0;
+  const horariosAtendimento = useMemo(
+    () =>
+      ehTipoAtendimento && controleHorarioAtendimento
+        ? calcularHorariosAtendimento(horarioInicialAtendimento, horarioFinalAtendimento, duracaoAtendimentoMinutos)
+        : [],
+    [controleHorarioAtendimento, duracaoAtendimentoMinutos, ehTipoAtendimento, horarioFinalAtendimento, horarioInicialAtendimento]
+  );
   const abaAtual = abas.find((aba) => aba.id === abaAtiva);
   const possuiMatriculaSelecionada = Boolean(getValues("id_matricula"));
   const inscricoesAtivas = inscricoes.filter((item) => (item.status ?? "ATIVO") !== "CANCELADO");
+  const presencaDatasOrdenadas = [...presencaDatas].sort((a, b) => a.data_aula.localeCompare(b.data_aula));
+  const dataPresencaTitulo = presencaDataSelecionada?.data_aula ?? dataPresencaSelecionada ?? "";
+  const presencaTitulo = cursoSelecionadoInscricao
+    ? `Frequência — ${cursoSelecionadoInscricao.nome} — ${formatarData(dataPresencaTitulo)}`
+    : "Frequência";
   const horaPadraoAgenda = useMemo(
     () => String(cursoSelecionadoInscricao?.horario_inicial ?? getValues("horario_inicial") ?? "").trim(),
     [cursoSelecionadoInscricao?.horario_inicial, getValues]
@@ -879,9 +956,11 @@ export function CadastroMatriculasPage() {
           (termoCpf && !!telefone && telefone.includes(termoCpf))
         );
       })
-      .sort((a, b) => a.item.beneficiario_nome.localeCompare(b.item.beneficiario_nome, "pt-BR"))
-      .slice(0, 20);
+      .sort((a, b) => a.item.beneficiario_nome.localeCompare(b.item.beneficiario_nome, "pt-BR"));
   }, [inscricoesAtivas, termoAgendaBeneficiario]);
+  const todasInscricoesAgendaSelecionadas =
+    inscricoesAgendaCatalogo.length > 0 &&
+    inscricoesAgendaCatalogo.every(({ chave }) => inscricoesAgendaSelecionadas.includes(chave));
   const inscricaoAgendaSelecionada = useMemo(
     () =>
       inscricoesAtivas
@@ -892,6 +971,19 @@ export function CadastroMatriculasPage() {
         .find((item) => item.chave === agendaForm.chave_inscricao) ?? null,
     [agendaForm.chave_inscricao, inscricoesAtivas]
   );
+
+  useEffect(() => {
+    if (!controleHorarioAtendimento || !ehTipoAtendimento || horariosAtendimento.length === 0) return;
+    const totalVagas = horariosAtendimento.length;
+    const totalInscritosAtivos = inscricoes.filter((item) => (item.status ?? "ATIVO").trim().toUpperCase() === "ATIVO").length;
+    const vagasDisponiveis = Math.max(totalVagas - totalInscritosAtivos, 0);
+    if (Number(getValues("vagas_totais") ?? 0) !== totalVagas) {
+      setValue("vagas_totais", totalVagas, { shouldDirty: true, shouldValidate: true });
+    }
+    if (Number(getValues("vagas_disponiveis") ?? 0) !== vagasDisponiveis) {
+      setValue("vagas_disponiveis", vagasDisponiveis, { shouldDirty: true, shouldValidate: true });
+    }
+  }, [controleHorarioAtendimento, ehTipoAtendimento, getValues, horariosAtendimento, inscricoes, setValue]);
 
   useEffect(() => {
     if (!detalhesData?.matricula) return;
@@ -926,7 +1018,7 @@ export function CadastroMatriculasPage() {
     if (abaAtiva !== "presenca") return;
     if (!idSelecionado && !getValues("id_matricula")) return;
     void carregarPresencaDatas();
-  }, [abaAtiva, idSelecionado]);
+  }, [abaAtiva, idSelecionado, getValues]);
 
   useEffect(() => {
     if (!horaPadraoAgenda) return;
@@ -957,6 +1049,15 @@ export function CadastroMatriculasPage() {
     const atual = getValues(campo) ?? [];
     const proximo = atual.includes(item) ? atual.filter((valor) => valor !== item) : [...atual, item];
     setValue(campo, proximo, { shouldDirty: true, shouldValidate: true });
+  }
+
+  function alternarTodasFaixasEtarias() {
+    const atual = getValues("faixa_etaria") ?? [];
+    const todasSelecionadas = faixaEtariaOptions.every((faixa) => atual.includes(faixa));
+    setValue("faixa_etaria", todasSelecionadas ? [] : [...faixaEtariaOptions], {
+      shouldDirty: true,
+      shouldValidate: true
+    });
   }
 
   function selecionarMatricula(matriculaId: string) {
@@ -1004,6 +1105,30 @@ export function CadastroMatriculasPage() {
     setAbaAtiva("inscricoes");
   }
 
+  function selecionarCursoParaAgendamento(matriculaId: string) {
+    if (!matriculaId) {
+      setIdSelecionado(undefined);
+      setInscricoes([]);
+      setAgendaForm((atual) => ({ ...atual, chave_inscricao: "", profissional_nome: "" }));
+      return;
+    }
+
+    const cursoSelecionado = matriculas.find((item) => item.id_matricula === matriculaId);
+    const profissionalPadrao = obterProfissionalUnico(cursoSelecionado?.profissional);
+
+    setIdSelecionado(matriculaId);
+    setTermoAgendaBeneficiario("");
+    setMostrarSugestoesAgendaBeneficiario(false);
+    setInscricoesAgendaSelecionadas([]);
+    setAgendaForm({
+      chave_inscricao: "",
+      data_agendada: obterDataAtualIso(),
+      hora_agendada: String(cursoSelecionado?.horario_inicial ?? "").trim(),
+      profissional_nome: profissionalPadrao,
+      status_agendamento: "AGUARDANDO"
+    });
+  }
+
   function buscar() {
     setFiltros({ ...filtroDraft });
     setAbaAtiva("listagem");
@@ -1042,6 +1167,7 @@ export function CadastroMatriculasPage() {
     setMostrarSugestoesAgendaProfissional(false);
     setTermoAgendaBeneficiario("");
     setMostrarSugestoesAgendaBeneficiario(false);
+    setInscricoesAgendaSelecionadas([]);
     setInscricoes([]);
     setFilaEspera([]);
     setNovaInscricao({
@@ -1070,7 +1196,11 @@ export function CadastroMatriculasPage() {
     });
     setPresencaDatas([]);
     setPresencaDataSelecionada(null);
+    setPresencaListaAutorizada(null);
+    setSenhaConfirmacaoPresenca("");
+    setPresencaAlteracaoPendente(null);
     setPresencasPorMatricula({});
+    setPresencasSalvasPorMatricula({});
     setDataPresencaSelecionada(obterDataAtualIso());
     setPresencaObservacoes("");
     setPresencaPendente(false);
@@ -1124,6 +1254,9 @@ export function CadastroMatriculasPage() {
       status_agendamento: "AGUARDANDO"
     });
     setPresencaDataSelecionada(null);
+    setPresencaListaAutorizada(null);
+    setSenhaConfirmacaoPresenca("");
+    setPresencaAlteracaoPendente(null);
     setPresencasPorMatricula({});
     setDataPresencaSelecionada(obterDataAtualIso());
     setPresencaObservacoes("");
@@ -1193,9 +1326,12 @@ export function CadastroMatriculasPage() {
     }
 
     try {
+      const datasOrdenadas = [...presencaDatas].sort((a, b) => a.data_aula.localeCompare(b.data_aula));
       const blob = await reportsService.gerarListaPresencaMatricula({
         matriculaId: cursoId,
         dataAula: (presencaDataSelecionada?.data_aula ?? dataPresencaSelecionada) || undefined,
+        periodoInicio: datasOrdenadas[0]?.data_aula,
+        periodoFim: datasOrdenadas[datasOrdenadas.length - 1]?.data_aula,
         exibirCpf: presencaExibirCpf,
         usuarioEmissor: usuario?.nomeUsuario
       });
@@ -1218,7 +1354,7 @@ export function CadastroMatriculasPage() {
 
     const horario =
       curso?.horario_inicial && curso?.duracao_horas
-        ? `${curso.horario_inicial} (${curso.duracao_horas}h)`
+        ? `${curso.horario_inicial} (${curso.duracao_horas} min)`
         : curso?.horario_inicial ?? "---";
 
     return {
@@ -1700,11 +1836,17 @@ export function CadastroMatriculasPage() {
   }
 
   function agendarAtendimento() {
-    if (!agendaForm.chave_inscricao) {
+    const chavesSelecionadas = inscricoesAgendaSelecionadas.length
+      ? inscricoesAgendaSelecionadas
+      : agendaForm.chave_inscricao
+        ? [agendaForm.chave_inscricao]
+        : [];
+
+    if (chavesSelecionadas.length === 0) {
       setPopupMensagem({
         tipo: "aviso",
         titulo: "Validação",
-        texto: "Selecione uma inscrição para agendar o atendimento."
+        texto: "Selecione um ou mais beneficiários inscritos para agendar."
       });
       return;
     }
@@ -1725,18 +1867,34 @@ export function CadastroMatriculasPage() {
       return;
     }
 
-    atualizarInscricaoPorChave(agendaForm.chave_inscricao, (item) => ({
-      ...item,
-      data_agendada: agendaForm.data_agendada,
-      hora_agendada: agendaForm.hora_agendada,
-      profissional_nome: agendaForm.profissional_nome.trim(),
-      status_agendamento: agendaForm.status_agendamento
-    }));
+    if (controleHorarioAtendimento && chavesSelecionadas.length > 1) {
+      setPopupMensagem({
+        tipo: "aviso",
+        titulo: "Seleção de horário",
+        texto: "Em atendimento por horário, agende um beneficiário por vez para evitar duplicidade no mesmo horário."
+      });
+      return;
+    }
+
+    setInscricoes((atual) =>
+      atual.map((item, index) => {
+        const chave = obterChaveInscricao(item, index);
+        return chavesSelecionadas.includes(chave)
+          ? {
+              ...item,
+              data_agendada: agendaForm.data_agendada,
+              hora_agendada: agendaForm.hora_agendada,
+              profissional_nome: agendaForm.profissional_nome.trim(),
+              status_agendamento: agendaForm.status_agendamento
+            }
+          : item;
+      })
+    );
 
     setPopupMensagem({
       tipo: "sucesso",
       titulo: "Confirmação",
-      texto: "Atendimento agendado com sucesso."
+      texto: `${chavesSelecionadas.length} beneficiário(s) agendado(s) com sucesso.`
     });
   }
 
@@ -1760,7 +1918,13 @@ export function CadastroMatriculasPage() {
     if (!cursoId) {
       setPresencaDatas([]);
       setPresencaDataSelecionada(null);
+      setPresencaListaAutorizada(null);
+      setSenhaConfirmacaoPresenca("");
+      setPresencaErroSenha("");
+      setPresencaAlteracaoPendente(null);
       setPresencasPorMatricula({});
+      setPresencasSalvasPorMatricula({});
+      setPresencasObservacoesPorMatricula({});
       return;
     }
 
@@ -1770,12 +1934,26 @@ export function CadastroMatriculasPage() {
       const datas = response.datas ?? [];
       setPresencaDatas(datas);
 
-      if (presencaDataSelecionada) {
-        const atualizada = datas.find((item) => item.id === presencaDataSelecionada.id);
-        if (atualizada) {
-          setPresencaDataSelecionada(atualizada);
-          setPresencaObservacoes(atualizada.observacoes ?? "");
-        }
+      if (!datas.length) {
+        setPresencaDataSelecionada(null);
+        setPresencaListaAutorizada(null);
+        setSenhaConfirmacaoPresenca("");
+        setPresencaAlteracaoPendente(null);
+        setDataPresencaSelecionada("");
+        setPresencasPorMatricula({});
+        setPresencasSalvasPorMatricula({});
+        setPresencasObservacoesPorMatricula({});
+        setPresencaObservacoes("");
+        setPresencaPendente(false);
+        return;
+      }
+
+      const selecionadaAtual = presencaDataSelecionada
+        ? datas.find((item) => item.id === presencaDataSelecionada.id) ?? null
+        : null;
+
+      if (selecionadaAtual ?? datas[0]) {
+        await selecionarPresencaData(selecionadaAtual ?? datas[0]);
       }
     } catch (error: any) {
       setPopupMensagem({
@@ -1784,6 +1962,15 @@ export function CadastroMatriculasPage() {
         texto: error?.response?.data?.message ?? "Não foi possível carregar as datas de presença."
       });
       setPresencaDatas([]);
+      setPresencaDataSelecionada(null);
+      setPresencaListaAutorizada(null);
+      setSenhaConfirmacaoPresenca("");
+      setPresencaErroSenha("");
+      setPresencaAlteracaoPendente(null);
+      setDataPresencaSelecionada("");
+      setPresencasPorMatricula({});
+      setPresencasSalvasPorMatricula({});
+      setPresencasObservacoesPorMatricula({});
     } finally {
       setPresencaCarregando(false);
     }
@@ -1793,6 +1980,15 @@ export function CadastroMatriculasPage() {
     const cursoId = idSelecionado ?? getValues("id_matricula");
     if (!cursoId) return;
 
+    const chaveLista = `${cursoId}:${data.id}`;
+    const chaveListaAtual = presencaDataSelecionada ? `${cursoId}:${presencaDataSelecionada.id}` : null;
+    if (chaveListaAtual !== chaveLista) {
+      setPresencaListaAutorizada(null);
+      setSenhaConfirmacaoPresenca("");
+      setPresencaErroSenha("");
+      setPresencaAlteracaoPendente(null);
+    }
+
     setPresencaDataSelecionada(data);
     setDataPresencaSelecionada(data.data_aula);
     setPresencaObservacoes(data.observacoes ?? "");
@@ -1801,10 +1997,18 @@ export function CadastroMatriculasPage() {
     try {
       const response = await matriculasService.listarPresencasPorData(cursoId, data.id);
       const mapa: Record<string, MatriculaPresencaStatus> = {};
+      const mapaObservacoes: Record<string, string> = {};
       response.presencas.forEach((item) => {
-        mapa[item.matricula_id] = item.status;
+        const chave = chavePresenca(item.matricula_id);
+        if (!chave) return;
+        mapa[chave] = item.status;
+        if (item.observacao?.trim()) {
+          mapaObservacoes[chave] = item.observacao.trim();
+        }
       });
       setPresencasPorMatricula(mapa);
+      setPresencasSalvasPorMatricula(mapa);
+      setPresencasObservacoesPorMatricula(mapaObservacoes);
       setPresencaPendente(false);
     } catch (error: any) {
       setPopupMensagem({
@@ -1818,82 +2022,77 @@ export function CadastroMatriculasPage() {
     }
   }
 
+  function solicitarAtualizacaoPresenca(matriculaId: string, status: MatriculaPresencaStatus, beneficiarioNome: string) {
+    const statusSalvo = presencasSalvasPorMatricula[matriculaId];
+    const chaveListaAtual = presencaDataSelecionada
+      ? `${idSelecionado ?? getValues("id_matricula")}:${presencaDataSelecionada.id}`
+      : null;
+    const listaJaAutorizada = chaveListaAtual && presencaListaAutorizada === chaveListaAtual;
+    if (statusSalvo && statusSalvo !== status && !listaJaAutorizada) {
+      setPresencaAlteracaoPendente({ matriculaId, status, beneficiarioNome });
+      setSenhaConfirmacaoPresenca("");
+      setPresencaErroSenha("");
+      return;
+    }
+    atualizarPresenca(matriculaId, status);
+  }
+
   function atualizarPresenca(matriculaId: string, status: MatriculaPresencaStatus) {
     setPresencasPorMatricula((atual) => ({
       ...atual,
-      [matriculaId]: atual[matriculaId] === status ? "AUSENTE" : status
+      [matriculaId]: status
     }));
     setPresencaPendente(true);
   }
 
-  async function gerarDataPresenca() {
-    const cursoId = idSelecionado ?? getValues("id_matricula");
-    if (!cursoId) {
-      setPopupMensagem({
-        tipo: "aviso",
-        titulo: "Atenção",
-        texto: "Selecione e salve uma inscrição antes de gerar presença."
-      });
+  async function confirmarAlteracaoPresenca() {
+    if (!presencaAlteracaoPendente || !senhaConfirmacaoPresenca.trim()) {
+      setPresencaErroSenha("Informe a senha do usuário logado para confirmar a alteração.");
       return;
     }
-    if (!dataPresencaSelecionada) {
-      setPopupMensagem({
-        tipo: "aviso",
-        titulo: "Validação",
-        texto: "Informe a data da aula."
-      });
-      return;
-    }
-
-    setPresencaSalvando(true);
-    try {
-      const data = await matriculasService.criarPresencaData(cursoId, {
-        data_aula: dataPresencaSelecionada,
-        observacoes: presencaObservacoes || undefined
-      });
-      await carregarPresencaDatas();
-      await selecionarPresencaData(data);
-      setPopupMensagem({
-        tipo: "sucesso",
-        titulo: "Confirmação",
-        texto: "Data de presença preparada com sucesso."
-      });
-    } catch (error: any) {
-      setPopupMensagem({
-        tipo: "erro",
-        titulo: "Erro",
-        texto: error?.response?.data?.message ?? "Não foi possível gerar a data de presença."
-      });
-    } finally {
-      setPresencaSalvando(false);
-    }
-  }
-
-  async function salvarObservacoesPresenca() {
     const cursoId = idSelecionado ?? getValues("id_matricula");
     if (!cursoId || !presencaDataSelecionada) return;
 
-    setPresencaSalvando(true);
+    setPresencaValidandoSenha(true);
     try {
-      const atualizado = await matriculasService.atualizarPresencaData(cursoId, presencaDataSelecionada.id, {
-        observacoes: presencaObservacoes
-      });
-      setPresencaDataSelecionada(atualizado);
-      await carregarPresencaDatas();
-      setPopupMensagem({
-        tipo: "sucesso",
-        titulo: "Confirmação",
-        texto: "Observações da presença salvas com sucesso."
-      });
+      await matriculasService.validarSenhaPresenca(
+        cursoId,
+        presencaDataSelecionada.id,
+        senhaConfirmacaoPresenca.trim()
+      );
+      atualizarPresenca(presencaAlteracaoPendente.matriculaId, presencaAlteracaoPendente.status);
+      setPresencaListaAutorizada(`${cursoId}:${presencaDataSelecionada.id}`);
+      setPresencaAlteracaoPendente(null);
     } catch (error: any) {
-      setPopupMensagem({
-        tipo: "erro",
-        titulo: "Erro",
-        texto: error?.response?.data?.message ?? "Não foi possível salvar as observações."
-      });
+      setPresencaErroSenha(error?.response?.data?.message ?? "A senha informada está incorreta. A alteração não foi aplicada.");
     } finally {
-      setPresencaSalvando(false);
+      setPresencaValidandoSenha(false);
     }
+  }
+
+  function alternarInscricaoAgenda(chave: string, selecionada: boolean) {
+    if (selecionada) preencherAgendaPorInscricao(chave);
+    setInscricoesAgendaSelecionadas((atual) =>
+      selecionada ? (atual.includes(chave) ? atual : [...atual, chave]) : atual.filter((item) => item !== chave)
+    );
+  }
+
+  function alternarTodasInscricoesAgenda(selecionadas: boolean) {
+    const chaves = inscricoesAgendaCatalogo.map(({ chave }) => chave);
+    if (selecionadas && chaves[0]) {
+      preencherAgendaPorInscricao(chaves[0]);
+      setTermoAgendaBeneficiario("");
+      setMostrarSugestoesAgendaBeneficiario(false);
+    }
+    setInscricoesAgendaSelecionadas(selecionadas ? chaves : []);
+  }
+
+  function atualizarObservacaoPresenca(matriculaId: string, observacao: string) {
+    setPresencasObservacoesPorMatricula((atual) => ({
+      ...atual,
+      [matriculaId]: observacao
+    }));
+    setPresencaPendente(true);
   }
 
   function excluirDataPresenca() {
@@ -1918,8 +2117,14 @@ export function CadastroMatriculasPage() {
       await matriculasService.removerPresencaData(cursoId, presencaDataSelecionada.id);
       setPopupExcluirPresencaAberto(false);
       setPresencaDataSelecionada(null);
+      setPresencaListaAutorizada(null);
+      setSenhaConfirmacaoPresenca("");
+      setPresencaAlteracaoPendente(null);
       setPresencasPorMatricula({});
+      setPresencasSalvasPorMatricula({});
+      setPresencasObservacoesPorMatricula({});
       setPresencaObservacoes("");
+      setDataPresencaSelecionada("");
       setPresencaPendente(false);
       await carregarPresencaDatas();
       setPopupMensagem({
@@ -1949,24 +2154,35 @@ export function CadastroMatriculasPage() {
       return;
     }
 
-    const presencas = inscricoes
+    const presencas = inscricoesAtivas
       .filter((item): item is MatriculaInscricao & { id_matricula_item: string } => !!item.id_matricula_item)
       .map((item) => ({
-        matricula_id: item.id_matricula_item,
-        status: (presencasPorMatricula[item.id_matricula_item] ?? "AUSENTE") as MatriculaPresencaStatus
+        matricula_id: chavePresenca(item.id_matricula_item),
+        status: (presencasPorMatricula[chavePresenca(item.id_matricula_item)] ?? "NAO_INFORMADO") as MatriculaPresencaStatus,
+        observacao: presencasObservacoesPorMatricula[chavePresenca(item.id_matricula_item)]?.trim() || undefined
       }));
 
     setPresencaSalvando(true);
     try {
       const response = await matriculasService.salvarPresencasPorData(cursoId, presencaDataSelecionada.id, {
         data_aula: presencaDataSelecionada.data_aula,
+        observacoes: presencaObservacoes || undefined,
+        senha_confirmacao: senhaConfirmacaoPresenca.trim() || undefined,
         presencas
       });
       const mapa: Record<string, MatriculaPresencaStatus> = {};
+      const mapaObservacoes: Record<string, string> = {};
       response.presencas.forEach((item) => {
-        mapa[item.matricula_id] = item.status;
+        const chave = chavePresenca(item.matricula_id);
+        if (!chave) return;
+        mapa[chave] = item.status;
+        if (item.observacao?.trim()) {
+          mapaObservacoes[chave] = item.observacao.trim();
+        }
       });
       setPresencasPorMatricula(mapa);
+      setPresencasSalvasPorMatricula(mapa);
+      setPresencasObservacoesPorMatricula(mapaObservacoes);
       setPresencaPendente(false);
       await carregarPresencaDatas();
       setPopupMensagem({
@@ -2042,6 +2258,19 @@ export function CadastroMatriculasPage() {
     );
     const totalInscritosAtivos = inscricoes.filter((item) => (item.status ?? "ATIVO").trim().toUpperCase() === "ATIVO").length;
     const vagasDisponiveis = Math.max(vagasTotaisCurso - totalInscritosAtivos, 0);
+    const horariosOcupados = new Set(
+      inscricoes
+        .filter((item) => (item.status ?? "ATIVO").trim().toUpperCase() === "ATIVO")
+        .map((item) => String(item.hora_agendada ?? "").trim())
+        .filter(Boolean)
+    );
+    const horaSolicitada = String(novaInscricao.hora_agendada ?? "").trim();
+    const horaAgendadaAtendimento =
+      ehAtendimento && controleHorarioAtendimento && horariosAtendimento.length > 0
+        ? (horaSolicitada && !horariosOcupados.has(horaSolicitada) && horariosAtendimento.includes(horaSolicitada)
+            ? horaSolicitada
+            : horariosAtendimento.find((hora) => !horariosOcupados.has(hora)) ?? "")
+        : horaSolicitada;
 
     if (statusInscricao === "ATIVO" && vagasDisponiveis <= 0) {
       const filaDuplicada = filaEspera.some((item) => {
@@ -2099,20 +2328,25 @@ export function CadastroMatriculasPage() {
         email: novaInscricao.email?.trim() || undefined,
         status: statusInscricao || "ATIVO",
         data_agendada: ehAtendimento ? normalizarDataIso(novaInscricao.data_agendada) : undefined,
-        hora_agendada: ehAtendimento ? novaInscricao.hora_agendada?.trim() || undefined : undefined,
+        hora_agendada: ehAtendimento ? horaAgendadaAtendimento || undefined : undefined,
         status_agendamento: ehAtendimento ? novaInscricao.status_agendamento?.trim() || undefined : undefined,
         profissional_nome: profissionalInscricao || undefined,
         data_matricula: obterDataAtualIso()
       }
     ]);
 
+    const horariosOcupadosAposInclusao = new Set([...horariosOcupados, horaAgendadaAtendimento]);
+    const proximoHorario =
+      ehAtendimento && controleHorarioAtendimento
+        ? horariosAtendimento.find((hora) => !horariosOcupadosAposInclusao.has(hora)) ?? ""
+        : "";
     setNovaInscricao({
       beneficiario_nome: "",
       cpf: "",
       email: "",
       status: "ATIVO",
       data_agendada: "",
-      hora_agendada: "",
+      hora_agendada: proximoHorario,
       status_agendamento: "",
       profissional_nome: "",
       confirmacao_presenca: false
@@ -2262,6 +2496,17 @@ export function CadastroMatriculasPage() {
       return;
     }
 
+    const horariosOcupados = new Set(
+      inscricoes
+        .filter((item) => (item.status ?? "ATIVO").trim().toUpperCase() === "ATIVO")
+        .map((item) => String(item.hora_agendada ?? "").trim())
+        .filter(Boolean)
+    );
+    const horarioFila =
+      controleHorarioAtendimento && horariosAtendimento.length > 0
+        ? horariosAtendimento.find((hora) => !horariosOcupados.has(hora))
+        : undefined;
+
     setInscricoes((atual) => [
       ...atual,
       {
@@ -2270,6 +2515,7 @@ export function CadastroMatriculasPage() {
         telefone: candidatoFila.telefone ? somenteDigitos(candidatoFila.telefone) : undefined,
         status: "ATIVO",
         data_matricula: obterDataAtualIso(),
+        hora_agendada: horarioFila,
         profissional_nome: obterProfissionalUnico(cursoSelecionadoInscricao?.profissional) || undefined,
         id_matricula_item: cursoIdSelecionado
       }
@@ -2422,18 +2668,24 @@ export function CadastroMatriculasPage() {
       { label: "Excluir inscrição", icon: Trash2, onClick: excluir, variant: "danger", disabled: acaoEmAndamento || !possuiMatriculaSelecionada },
       { label: "Fechar", icon: X, onClick: fechar, variant: "outline" }
     ],
-    agenda: [
-      { label: "Nova inscrição", icon: Plus, onClick: novo, variant: "default", disabled: acaoEmAndamento },
-      { label: "Salvar agendamentos", icon: Save, onClick: () => void handleSubmit(salvar)(), variant: "default", disabled: acaoEmAndamento },
-      { label: "Cancelar edição", icon: Undo2, onClick: cancelar, variant: "outline", disabled: acaoEmAndamento },
-      { label: "Excluir inscrição", icon: Trash2, onClick: excluir, variant: "danger", disabled: acaoEmAndamento || !possuiMatriculaSelecionada },
-      { label: "Fechar", icon: X, onClick: fechar, variant: "outline" }
-    ],
     presenca: [
       { label: "Nova inscrição", icon: Plus, onClick: novo, variant: "default", disabled: acaoEmAndamento },
-      { label: "Salvar presença", icon: Save, onClick: () => void handleSubmit(salvar)(), variant: "default", disabled: acaoEmAndamento },
+      {
+        label: "Salvar presenças",
+        icon: Save,
+        onClick: () => void salvarPresencas(),
+        variant: "default",
+        disabled: acaoEmAndamento || !presencaDataSelecionada || !presencaPendente
+      },
+      {
+        label: "Excluir data de presença",
+        icon: Trash2,
+        onClick: excluirDataPresenca,
+        variant: "danger",
+        disabled: acaoEmAndamento || !presencaDataSelecionada || !usuario?.permissoes?.includes("ADMINISTRADOR")
+      },
+      { label: "Imprimir Frequência", icon: Printer, onClick: () => void imprimirListaPresenca(), variant: "outline", disabled: acaoEmAndamento },
       { label: "Cancelar edição", icon: Undo2, onClick: cancelar, variant: "outline", disabled: acaoEmAndamento },
-      { label: "Imprimir lista de presença", icon: Printer, onClick: () => void imprimir(), variant: "outline", disabled: acaoEmAndamento },
       { label: "Fechar", icon: X, onClick: fechar, variant: "outline" }
     ]
   };
@@ -2887,10 +3139,44 @@ export function CadastroMatriculasPage() {
                       {errors.horario_inicial && <p className="text-xs text-rose-600">{errors.horario_inicial.message}</p>}
                     </div>
                     <div className="space-y-1">
-                      <Label htmlFor="duracao_horas">Duração (horas) *</Label>
+                      <Label htmlFor="duracao_horas">Duração (minutos) *</Label>
                       <Input id="duracao_horas" type="number" min={0} {...register("duracao_horas")} />
                       {errors.duracao_horas && <p className="text-xs text-rose-600">{errors.duracao_horas.message}</p>}
                     </div>
+                    {ehTipoAtendimento && (
+                      <div className="space-y-2 rounded-lg border border-sky-200 bg-sky-50/70 p-3 xl:col-span-4">
+                        <div>
+                          <div>
+                            <Label htmlFor="horario_final_atendimento">Controle automático de vagas por horário</Label>
+                            <p className="text-[11px] text-sky-800/80">
+                              Informe o horário final. Com o horário inicial e a duração em minutos, o sistema calculará as vagas.
+                            </p>
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="horario_final_atendimento">Horário final *</Label>
+                          <Input id="horario_final_atendimento" type="time" {...register("horario_final_atendimento")} />
+                          {errors.horario_final_atendimento && (
+                            <p className="text-xs text-rose-600">{errors.horario_final_atendimento.message}</p>
+                          )}
+                        </div>
+                        <div className="rounded-md border border-sky-200 bg-white px-3 py-2 text-xs text-sky-900">
+                          {horariosAtendimento.length > 0 ? (
+                            <>
+                              <p className="font-semibold">
+                                {horariosAtendimento.length} vaga(s) calculada(s) para o período
+                              </p>
+                              <p className="mt-1">Horários preparados: {horariosAtendimento.join(", ")}</p>
+                            </>
+                          ) : (
+                            <p>Informe horários válidos e uma duração em minutos maior que zero para calcular as vagas.</p>
+                          )}
+                        </div>
+                        {errors.controle_horario_atendimento && (
+                          <p className="text-xs text-rose-600">{errors.controle_horario_atendimento.message}</p>
+                        )}
+                      </div>
+                    )}
                     <div className="space-y-1">
                       <Label htmlFor="carga_horaria">Carga horária total (horas)</Label>
                       <Input id="carga_horaria" type="number" min={0} {...register("carga_horaria")} />
@@ -2898,12 +3184,18 @@ export function CadastroMatriculasPage() {
                     </div>
                     <div className="space-y-1">
                       <Label htmlFor="vagas_totais">Quantidade de vagas totais *</Label>
-                      <Input id="vagas_totais" type="number" min={0} {...register("vagas_totais")} />
+                      <Input id="vagas_totais" type="number" min={0} readOnly={controleHorarioAtendimento} {...register("vagas_totais")} />
                       {errors.vagas_totais && <p className="text-xs text-rose-600">{errors.vagas_totais.message}</p>}
                     </div>
                     <div className="space-y-1">
                       <Label htmlFor="vagas_disponiveis">Vagas disponíveis</Label>
-                      <Input id="vagas_disponiveis" type="number" min={0} {...register("vagas_disponiveis")} />
+                      <Input
+                        id="vagas_disponiveis"
+                        type="number"
+                        min={0}
+                        readOnly={controleHorarioAtendimento}
+                        {...register("vagas_disponiveis")}
+                      />
                       {errors.vagas_disponiveis && <p className="text-xs text-rose-600">{errors.vagas_disponiveis.message}</p>}
                     </div>
                     <div className="space-y-1">
@@ -3162,6 +3454,13 @@ export function CadastroMatriculasPage() {
                   <div className="space-y-2 rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card)] p-3">
                     <p className="text-sm font-semibold text-[var(--g3-foreground)]">Faixa etária</p>
                     <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                      <label className="flex items-center gap-2 rounded border border-sky-200 bg-sky-50 px-2 py-1 text-sm font-medium text-sky-900">
+                        <Checkbox
+                          checked={faixaEtariaOptions.every((faixa) => faixaEtariaSelecionada.includes(faixa))}
+                          onChange={alternarTodasFaixasEtarias}
+                        />
+                        Todas as idades
+                      </label>
                       {faixaEtariaOptions.map((faixa) => (
                         <label
                           key={faixa}
@@ -3219,7 +3518,7 @@ export function CadastroMatriculasPage() {
                         const idadePermitida = item.faixa_etaria?.length ? item.faixa_etaria.join(", ") : "---";
                         const horarioAulas =
                           item.horario_inicial && item.duracao_horas
-                            ? `${item.horario_inicial} (${item.duracao_horas}h)`
+                            ? `${item.horario_inicial} (${item.duracao_horas} min)`
                             : item.horario_inicial ?? "---";
                         const periodoCurso =
                           item.data_triagem || item.data_conclusao
@@ -3367,14 +3666,11 @@ export function CadastroMatriculasPage() {
                   <div className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-3">
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                       <div>
-                        <p className="text-sm font-semibold text-[var(--g3-foreground)]">Agendamentos agora ficam em tela própria</p>
+                        <p className="text-sm font-semibold text-[var(--g3-foreground)]">Inscrições e lista de espera</p>
                         <p className="text-xs text-[var(--g3-muted)]">
-                          Use a central <strong>Agendamentos</strong> para marcar, confirmar, encaixar, concluir e acompanhar a fila de espera.
+                          Consulte e gerencie os beneficiários inscritos e a fila de espera deste curso ou atendimento.
                         </p>
                       </div>
-                      <Button type="button" variant="outline" onClick={() => navigate("/atendimentos/agendamentos")}>
-                        Abrir em Agendamentos
-                      </Button>
                     </div>
                   </div>
                   <div className="rounded-lg border border-[var(--g3-border)] p-3">
@@ -3416,7 +3712,7 @@ export function CadastroMatriculasPage() {
                           <p className="text-[11px] font-semibold text-[var(--g3-muted)]">Horário do curso</p>
                           <p className="text-xs text-[var(--g3-foreground)]">
                             {cursoSelecionadoInscricao.horario_inicial
-                              ? `${cursoSelecionadoInscricao.horario_inicial} (${cursoSelecionadoInscricao.duracao_horas}h)`
+                              ? `${cursoSelecionadoInscricao.horario_inicial} (${cursoSelecionadoInscricao.duracao_horas} min)`
                               : "Não informado"}
                           </p>
                         </div>
@@ -3910,428 +4206,45 @@ export function CadastroMatriculasPage() {
               </div>
               )}
 
-              {abaAtiva === "agenda" && (
-                <div className="space-y-3">
-                  <div className="rounded-lg border border-[var(--g3-border)] p-3">
-                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-12">
-                      <div className="space-y-1 xl:col-span-6">
-                        <Label htmlFor="agenda-beneficiario">Beneficiário inscrito</Label>
-                        <Input
-                          id="agenda-beneficiario"
-                          value={termoAgendaBeneficiario}
-                          onChange={(event) => {
-                            const valor = event.target.value;
-                            setTermoAgendaBeneficiario(valor);
-                            setMostrarSugestoesAgendaBeneficiario(true);
-                            setAgendaForm((atual) => ({ ...atual, chave_inscricao: "" }));
-                          }}
-                          onFocus={() => setMostrarSugestoesAgendaBeneficiario(true)}
-                          onBlur={(event) => {
-                            const valorFormatado = formatarTextoPadrao(event.target.value);
-                            setTermoAgendaBeneficiario(valorFormatado);
-                            setTimeout(() => setMostrarSugestoesAgendaBeneficiario(false), 120);
-                          }}
-                          placeholder={
-                            cursoSelecionadoInscricao
-                              ? "Digite para buscar entre os beneficiários inscritos"
-                              : "Selecione uma inscrição para listar os inscritos"
-                          }
-                          disabled={!cursoSelecionadoInscricao || inscricoesAtivas.length === 0}
-                        />
-                        {!cursoSelecionadoInscricao ? (
-                          <p className="text-[11px] text-[var(--g3-muted)]">
-                            Selecione uma inscrição para trazer os beneficiários inscritos.
-                          </p>
-                        ) : inscricoesAtivas.length === 0 ? (
-                          <p className="text-[11px] text-[var(--g3-muted)]">
-                            Não há beneficiários inscritos disponíveis para agendamento.
-                          </p>
-                        ) : null}
-                        {mostrarSugestoesAgendaBeneficiario && cursoSelecionadoInscricao && inscricoesAtivas.length > 0 && (
-                          <div className="max-h-40 overflow-y-auto rounded-md border border-[var(--g3-border)] bg-[var(--g3-card)] p-1">
-                            {inscricoesAgendaCatalogo.length ? (
-                              inscricoesAgendaCatalogo.map(({ chave, item }) => (
-                                <button
-                                  key={chave}
-                                  type="button"
-                                  className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-[var(--g3-primary-soft)]"
-                                  onMouseDown={(event) => event.preventDefault()}
-                                  onClick={() => preencherAgendaPorInscricao(chave)}
-                                >
-                                  <span className="font-medium text-[var(--g3-foreground)]">{item.beneficiario_nome}</span>
-                                  <span className="block text-[11px] text-[var(--g3-muted)]">
-                                    {formatarCpf(item.cpf)}
-                                    {item.telefone ? ` • Tel.: ${formatarTelefone(item.telefone)}` : " • Tel.: ---"}
-                                    {item.data_agendada
-                                      ? ` • Agendado em ${formatarData(item.data_agendada)} ${item.hora_agendada ?? ""}`.trim()
-                                      : " • Sem agendamento"}
-                                  </span>
-                                </button>
-                              ))
-                            ) : (
-                              <p className="px-2 py-1 text-xs text-[var(--g3-muted)]">
-                                Nenhum beneficiário inscrito encontrado.
-                              </p>
-                            )}
-                          </div>
-                        )}
-                        {inscricaoAgendaSelecionada && (
-                          <p className="text-[11px] text-emerald-700">
-                            Selecionado: {inscricaoAgendaSelecionada.item.beneficiario_nome}
-                            {inscricaoAgendaSelecionada.item.cpf
-                              ? ` • CPF ${formatarCpf(inscricaoAgendaSelecionada.item.cpf)}`
-                              : ""}
-                            {inscricaoAgendaSelecionada.item.telefone
-                              ? ` • Tel. ${formatarTelefone(inscricaoAgendaSelecionada.item.telefone)}`
-                              : " • Tel. ---"}
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="space-y-1 xl:col-span-2">
-                        <Label htmlFor="agenda-data">Data</Label>
-                        <Input
-                          id="agenda-data"
-                          type="date"
-                          value={agendaForm.data_agendada}
-                          onChange={(event) =>
-                            setAgendaForm((atual) => ({ ...atual, data_agendada: event.target.value }))
-                          }
-                        />
-                      </div>
-
-                      <div className="space-y-1 xl:col-span-2">
-                        <Label htmlFor="agenda-hora">Hora</Label>
-                        <Input
-                          id="agenda-hora"
-                          type="time"
-                          value={agendaForm.hora_agendada}
-                          onChange={(event) =>
-                            setAgendaForm((atual) => ({ ...atual, hora_agendada: event.target.value }))
-                          }
-                        />
-                      </div>
-
-                      <div className="space-y-1 xl:col-span-2">
-                        <Label htmlFor="agenda-status">Status</Label>
-                        <Select
-                          id="agenda-status"
-                          value={agendaForm.status_agendamento}
-                          onChange={(event) =>
-                            setAgendaForm((atual) => ({ ...atual, status_agendamento: event.target.value }))
-                          }
-                        >
-                          {statusAgendamentoOptions.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </Select>
-                      </div>
-
-                      <div className="space-y-1 xl:col-span-9">
-                        <Label htmlFor="agenda-profissional">Profissional responsável</Label>
-                        <Input
-                          id="agenda-profissional"
-                          value={agendaForm.profissional_nome}
-                          onChange={(event) => {
-                            const valor = event.target.value;
-                            setAgendaForm((atual) => ({ ...atual, profissional_nome: valor }));
-                            setTermoCatalogoAgendaProfissional(valor);
-                            setMostrarSugestoesAgendaProfissional(true);
-                          }}
-                          onFocus={() => {
-                            setTermoCatalogoAgendaProfissional(agendaForm.profissional_nome ?? "");
-                            setMostrarSugestoesAgendaProfissional(true);
-                          }}
-                          onBlur={(event) => {
-                            const valorFormatado = formatarTextoPadrao(event.target.value);
-                            setAgendaForm((atual) => ({
-                              ...atual,
-                              profissional_nome: valorFormatado
-                            }));
-                            setTermoCatalogoAgendaProfissional(valorFormatado);
-                            setTimeout(() => setMostrarSugestoesAgendaProfissional(false), 120);
-                          }}
-                          placeholder="Digite para buscar profissional"
-                        />
-                        {mostrarSugestoesAgendaProfissional &&
-                          termoCatalogoAgendaProfissional.trim().length > 0 &&
-                          termoCatalogoAgendaProfissional.trim().length < 2 && (
-                            <p className="text-[11px] text-[var(--g3-muted)]">
-                              Digite pelo menos 2 caracteres para buscar.
-                            </p>
-                          )}
-                        {mostrarSugestoesAgendaProfissional &&
-                          (carregandoProfissionaisAgendaCatalogo || profissionaisAgendaCatalogo.length > 0) &&
-                          termoCatalogoAgendaProfissional.trim().length >= 2 && (
-                            <div className="max-h-32 overflow-y-auto rounded-md border border-[var(--g3-border)] bg-[var(--g3-card)] p-1">
-                              {carregandoProfissionaisAgendaCatalogo ? (
-                                <p className="px-2 py-1 text-xs text-[var(--g3-muted)]">Buscando profissionais...</p>
-                              ) : (
-                                profissionaisAgendaCatalogo.map((item) => (
-                                  <button
-                                    key={`${item.id_profissional}-${item.categoria}`}
-                                    type="button"
-                                    className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-[var(--g3-primary-soft)]"
-                                    onMouseDown={(event) => event.preventDefault()}
-                                    onClick={() => preencherAgendaComProfissional(item)}
-                                  >
-                                    {item.nome_completo} ({item.categoria})
-                                  </button>
-                                ))
-                              )}
-                            </div>
-                          )}
-                      </div>
-                      <div className="flex items-end xl:col-span-3">
-                        <Button type="button" className="w-full" onClick={agendarAtendimento}>
-                          <CalendarClock className="h-4 w-4" />
-                          Agendar
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="rounded-lg border border-[var(--g3-border)] p-3">
-                    <p className="mb-3 text-sm font-semibold text-[var(--g3-foreground)]">Agenda por dia</p>
-                    <div className="grid gap-3 md:grid-cols-3">
-                      <div className="space-y-1">
-                        <Label htmlFor="agenda-filtro-data">Data</Label>
-                        <Input
-                          id="agenda-filtro-data"
-                          type="date"
-                          value={agendaDataSelecionada}
-                          onChange={(event) => setAgendaDataSelecionada(event.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label htmlFor="agenda-filtro-status">Status</Label>
-                        <Select
-                          id="agenda-filtro-status"
-                          value={agendaStatusFiltro}
-                          onChange={(event) => setAgendaStatusFiltro(event.target.value)}
-                        >
-                          <option value="">Todos</option>
-                          {statusAgendamentoOptions.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </Select>
-                      </div>
-                      <div className="space-y-1">
-                        <Label htmlFor="agenda-filtro-profissional">Profissional</Label>
-                        <Input
-                          id="agenda-filtro-profissional"
-                          value={agendaProfissionalFiltro}
-                          onChange={(event) => setAgendaProfissionalFiltro(event.target.value)}
-                          placeholder="Filtrar por profissional"
-                        />
-                      </div>
-                    </div>
-                    <div className="mt-3 rounded-md border border-[var(--g3-border)] bg-[var(--g3-card)] p-3">
-                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
-                        Copiar / mover agenda
-                      </p>
-                      <div className="grid gap-3 md:grid-cols-4">
-                        <div className="space-y-1">
-                          <Label htmlFor="agenda-copia-origem">Data de origem</Label>
-                          <Input
-                            id="agenda-copia-origem"
-                            type="date"
-                            value={agendaCopiaOrigem}
-                            onChange={(event) => {
-                              const valor = event.target.value;
-                              setAgendaCopiaOrigem(valor);
-                              if (!agendaCopiaDestino && valor) {
-                                setAgendaCopiaDestino(somarDiasDataIso(valor, 7));
-                              }
-                            }}
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label htmlFor="agenda-copia-destino">Data de destino</Label>
-                          <Input
-                            id="agenda-copia-destino"
-                            type="date"
-                            value={agendaCopiaDestino}
-                            onChange={(event) => setAgendaCopiaDestino(event.target.value)}
-                          />
-                        </div>
-                        <div className="flex items-end">
-                          <Button type="button" variant="outline" className="w-full" onClick={copiarAgendaEntreDatas}>
-                            <Copy className="h-4 w-4" />
-                            Copiar agenda
-                          </Button>
-                        </div>
-                        <div className="flex items-end">
-                          <Button type="button" className="w-full" onClick={moverAgendaEntreDatas}>
-                            <Copy className="h-4 w-4" />
-                            Mover agenda
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {agendamentosPorData.length ? (
-                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
-                      {agendamentosPorData.map(([data, itens]) => {
-                        const horariosDoDia = Array.from(
-                          new Set(
-                            itens
-                              .map(({ item }) => String(item.hora_agendada ?? "").trim())
-                              .filter((hora) => hora.length > 0)
-                          )
-                        );
-                        const horarioDoDia =
-                          horariosDoDia.length === 1
-                            ? horariosDoDia[0]
-                            : horariosDoDia.length > 1
-                              ? "Vários horários"
-                              : "---";
-
-                        return (
-                          <div
-                            key={data}
-                            className="flex flex-col overflow-hidden rounded-lg border border-[var(--g3-border)]"
-                          >
-                            <div className="flex items-center justify-between border-b border-[var(--g3-border)] bg-[var(--g3-primary-soft)] px-3 py-2">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <p className="text-sm font-semibold text-[var(--g3-active)]">Dia: {formatarData(data)}</p>
-                                <span className="rounded-full bg-[var(--g3-card)] px-2 py-0.5 text-[11px] font-semibold text-[var(--g3-foreground)]">
-                                  Hora: {horarioDoDia}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  className="h-8 w-8 p-0"
-                                  title="Enviar lembrete no WhatsApp"
-                                  aria-label="Enviar lembrete no WhatsApp"
-                                  onClick={() => enviarLembreteWhatsappDia(data, itens)}
-                                >
-                                  <MessageCircle className="h-4 w-4 text-emerald-700" />
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  className="h-8 w-8 p-0"
-                                  title="Enviar lembrete por e-mail"
-                                  aria-label="Enviar lembrete por e-mail"
-                                  onClick={() => void enviarLembreteEmailDia(data, itens)}
-                                  disabled={dataEnviandoLembreteEmail === data}
-                                >
-                                  <Mail className="h-4 w-4 text-sky-700" />
-                                </Button>
-                                <span className="rounded-full bg-[var(--g3-card)] px-2 py-0.5 text-[11px] font-semibold text-[var(--g3-foreground)]">
-                                  {itens.length} agendamento(s)
-                                </span>
-                              </div>
-                            </div>
-                            <div className="flex-1 divide-y divide-[var(--g3-border)]">
-                              {itens.map(({ chave, item }, index) => (
-                                <div
-                                  key={chave}
-                                  className={`px-3 py-3 ${
-                                    itens.length > 1
-                                      ? index % 2 === 0
-                                        ? "bg-[var(--g3-card)]"
-                                        : "bg-[var(--g3-primary-soft)]/55"
-                                      : "bg-[var(--g3-card)]"
-                                  }`}
-                                >
-                                  <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-                                    <div className="min-w-0">
-                                      <p className="truncate text-sm text-[var(--g3-foreground)]">
-                                        <span className="font-semibold">{item.beneficiario_nome}</span>
-                                        <span className="font-normal text-[var(--g3-muted)]">
-                                          {" "}
-                                          - {item.telefone ? `Tel.: ${formatarTelefone(item.telefone)}` : "Tel.: ---"}
-                                        </span>
-                                      </p>
-                                    </div>
-                                    <div className="flex items-center justify-end gap-2">
-                                      {item.confirmacao_presenca ? (
-                                        <span className="w-fit rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700">
-                                          Confirmada
-                                        </span>
-                                      ) : (
-                                        <span className="w-fit rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700">
-                                          Pendente
-                                        </span>
-                                      )}
-                                      <Button
-                                        type="button"
-                                        variant="outline"
-                                        onClick={() => alternarConfirmacaoPresencaAgendamento(chave)}
-                                        className="h-9 w-9 p-0"
-                                        title={item.confirmacao_presenca ? "Desconfirmar presença" : "Confirmar presença"}
-                                        aria-label={item.confirmacao_presenca ? "Desconfirmar presença" : "Confirmar presença"}
-                                      >
-                                        {item.confirmacao_presenca ? (
-                                          <Undo2 className="h-4 w-4" />
-                                        ) : (
-                                          <Check className="h-4 w-4" />
-                                        )}
-                                      </Button>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card)] px-4 py-8 text-center text-sm text-[var(--g3-muted)]">
-                      Nenhum atendimento agendado para os filtros informados.
-                    </div>
-                  )}
-                </div>
-              )}
-
               {abaAtiva === "presenca" && (
                 <div className="space-y-3">
                   <div className="rounded-lg border border-[var(--g3-border)] p-3">
                     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-12">
-                      <div className="space-y-1 xl:col-span-3">
+                      <div className="space-y-1 xl:col-span-5">
                         <Label htmlFor="presenca-data-aula">Data da aula</Label>
-                        <Input
+                        <Select
                           id="presenca-data-aula"
-                          type="date"
-                          value={dataPresencaSelecionada}
-                          onChange={(event) => setDataPresencaSelecionada(event.target.value)}
-                        />
+                          value={presencaDataSelecionada?.id ?? ""}
+                          onChange={(event) => {
+                            const selecionada = presencaDatasOrdenadas.find((item) => item.id === event.target.value);
+                            if (selecionada) {
+                              void selecionarPresencaData(selecionada);
+                            }
+                          }}
+                          disabled={presencaCarregando || !presencaDatasOrdenadas.length}
+                        >
+                          <option value="">Selecione uma data real</option>
+                          {presencaDatasOrdenadas.map((data) => (
+                            <option key={data.id} value={data.id}>
+                              {formatarData(data.data_aula)} - {data.status}
+                            </option>
+                          ))}
+                        </Select>
+                        <p className="text-xs text-[var(--g3-muted)]">
+                          Para gerar as datas desta lista, gere a agenda na data selecionada no menu Agendamentos.<br />
+                          Para selecionar a data da aula, primeiro você deve selecionar o curso ou atendimento na aba Catálogo e vagas.
+                        </p>
+                      </div>
+                      <div className="space-y-1 xl:col-span-3">
+                        <Label>Título</Label>
+                        <div className="rounded-md border border-[var(--g3-border)] bg-[var(--g3-primary-soft)] px-3 py-2 text-sm font-semibold text-[var(--g3-active)]">
+                          {presencaTitulo}
+                        </div>
                       </div>
                       <label className="xl:col-span-2 flex items-end gap-2 pb-2 text-sm">
                         <Checkbox checked={presencaExibirCpf} onChange={() => setPresencaExibirCpf((atual) => !atual)} />
                         Exibir CPF na lista
                       </label>
-                      <div className="flex items-end xl:col-span-3">
-                        <Button type="button" variant="outline" className="w-full" onClick={() => void gerarDataPresenca()} disabled={presencaSalvando}>
-                          {presencaSalvando ? "Processando..." : "Gerar data de presença"}
-                        </Button>
-                      </div>
-                      <div className="flex items-end xl:col-span-2">
-                        <Button
-                          type="button"
-                          className="w-full"
-                          onClick={() => void salvarPresencas()}
-                          disabled={presencaSalvando || !presencaDataSelecionada || !presencaPendente}
-                        >
-                          {presencaSalvando ? "Salvando..." : "Salvar presenças"}
-                        </Button>
-                      </div>
-                      <div className="flex items-end xl:col-span-2">
-                        <Button type="button" variant="outline" className="w-full" onClick={() => void imprimirListaPresenca()}>
-                          <Printer className="h-4 w-4" />
-                          Imprimir lista
-                        </Button>
-                      </div>
                     </div>
                   </div>
 
@@ -4339,63 +4252,38 @@ export function CadastroMatriculasPage() {
                     <div className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card)] px-4 py-4 text-sm text-[var(--g3-muted)]">
                       Carregando presença...
                     </div>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {presencaDatas.map((data) => (
-                        <button
-                          key={data.id}
-                          type="button"
-                          onClick={() => void selecionarPresencaData(data)}
-                          className={`rounded-md border px-3 py-2 text-left text-xs ${
-                            presencaDataSelecionada?.id === data.id
-                              ? "border-[var(--g3-active)] bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"
-                              : "border-[var(--g3-border)] bg-[var(--g3-card)] text-[var(--g3-foreground)]"
-                          }`}
-                        >
-                          <p className="font-semibold">{formatarData(data.data_aula)}</p>
-                          <p>{data.status}</p>
-                        </button>
-                      ))}
-                      {!presencaDatas.length && (
-                        <div className="rounded-md border border-[var(--g3-border)] bg-[var(--g3-card)] px-3 py-2 text-xs text-[var(--g3-muted)]">
-                          Nenhuma data de presença cadastrada.
-                        </div>
-                      )}
+                  ) : !presencaDatasOrdenadas.length ? (
+                    <div className="rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card)] px-4 py-4 text-sm text-[var(--g3-muted)]">
+                      Nenhuma data real de atividade foi encontrada para esta inscrição.
                     </div>
-                  )}
+                  ) : null}
 
                   {presencaDataSelecionada && (
                     <div className="space-y-3 rounded-lg border border-[var(--g3-border)] p-3">
-                      <div className="space-y-1">
-                        <Label htmlFor="presenca-observacoes">Observações da data</Label>
-                        <Textarea
-                          id="presenca-observacoes"
-                          rows={3}
-                          value={presencaObservacoes}
-                          onChange={(event) => setPresencaObservacoes(event.target.value)}
-                        />
-                      </div>
-                      <div className="flex justify-end">
-                        <div className="flex flex-wrap justify-end gap-2">
-                          <Button
-                            type="button"
-                            variant="danger"
-                            onClick={excluirDataPresenca}
-                            disabled={presencaSalvando || presencaExcluindo}
-                          >
-                            {presencaExcluindo ? "Excluindo..." : "Excluir data de presença"}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => void salvarObservacoesPresenca()}
-                            disabled={presencaSalvando || presencaExcluindo}
-                          >
-                            Salvar observações
-                          </Button>
+                      <div className="grid gap-3 md:grid-cols-2 md:items-stretch">
+                        <div className="rounded-md border border-[var(--g3-border)] bg-[var(--g3-card)] px-3 py-2">
+                          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--g3-muted)]">
+                            {cursoSelecionadoInscricao?.tipo ?? "Atividade"}
+                          </p>
+                          <p className="text-sm font-semibold text-[var(--g3-foreground)]">{cursoSelecionadoInscricao?.nome ?? "Atividade"}</p>
+                          <p className="text-xs text-[var(--g3-muted)]">
+                            {formatarData(presencaDataSelecionada.data_aula)} • {presencaDataSelecionada.status}
+                          </p>
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="presenca-observacoes">Observações da data</Label>
+                          <Textarea
+                            id="presenca-observacoes"
+                            rows={2}
+                            className="min-h-0"
+                            value={presencaObservacoes}
+                            onChange={(event) => {
+                              setPresencaObservacoes(event.target.value);
+                              setPresencaPendente(true);
+                            }}
+                          />
                         </div>
                       </div>
-
                       <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]">
                         <table className="min-w-full text-sm">
                           <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]">
@@ -4403,15 +4291,16 @@ export function CadastroMatriculasPage() {
                               <th className="px-3 py-2 text-left font-semibold">Beneficiário</th>
                               {presencaExibirCpf && <th className="px-3 py-2 text-left font-semibold">CPF</th>}
                               <th className="px-3 py-2 text-left font-semibold">Telefone</th>
-                              <th className="px-3 py-2 text-left font-semibold">Presente</th>
-                              <th className="px-3 py-2 text-left font-semibold">Ausente</th>
+                              <th className="px-3 py-2 text-left font-semibold">Confirmação</th>
+                              <th className="px-3 py-2 text-left font-semibold">Observação</th>
                             </tr>
                           </thead>
                           <tbody>
                             {inscricoesAtivas.length ? (
                               inscricoesAtivas.map((inscricao, index) => {
-                                const matriculaId = inscricao.id_matricula_item;
-                                const statusAtual = matriculaId ? presencasPorMatricula[matriculaId] ?? "AUSENTE" : "AUSENTE";
+                                const matriculaId = chavePresenca(inscricao.id_matricula_item);
+                                const statusAtual = matriculaId ? presencasPorMatricula[matriculaId] ?? "NAO_INFORMADO" : "NAO_INFORMADO";
+                                const observacaoAtual = matriculaId ? presencasObservacoesPorMatricula[matriculaId] ?? "" : "";
                                 return (
                                   <tr
                                     key={obterChaveInscricao(inscricao, index)}
@@ -4423,17 +4312,47 @@ export function CadastroMatriculasPage() {
                                     {presencaExibirCpf && <td className="px-3 py-2">{formatarCpf(inscricao.cpf)}</td>}
                                     <td className="px-3 py-2">{formatarTelefone(inscricao.telefone)}</td>
                                     <td className="px-3 py-2">
-                                      <Checkbox
-                                        checked={statusAtual === "PRESENTE"}
-                                        onChange={() => matriculaId && atualizarPresenca(matriculaId, "PRESENTE")}
-                                        disabled={!matriculaId || presencaDataSelecionada.status === "CANCELADA"}
-                                      />
+                                      <div className="flex flex-wrap gap-3">
+                                        <label className="inline-flex items-center gap-2 text-sm text-[var(--g3-foreground)]">
+                                          <Checkbox
+                                            checked={statusAtual === "PRESENTE"}
+                                            onChange={(event) =>
+                                              matriculaId &&
+                                              solicitarAtualizacaoPresenca(
+                                                matriculaId,
+                                                event.target.checked ? "PRESENTE" : "NAO_INFORMADO",
+                                                inscricao.beneficiario_nome
+                                              )
+                                            }
+                                            disabled={!matriculaId || presencaDataSelecionada.status === "CANCELADA"}
+                                          />
+                                          Presença
+                                        </label>
+                                        <label className="inline-flex items-center gap-2 text-sm text-[var(--g3-foreground)]">
+                                          <Checkbox
+                                            checked={statusAtual === "AUSENTE"}
+                                            onChange={(event) =>
+                                              matriculaId &&
+                                              solicitarAtualizacaoPresenca(
+                                                matriculaId,
+                                                event.target.checked ? "AUSENTE" : "NAO_INFORMADO",
+                                                inscricao.beneficiario_nome
+                                              )
+                                            }
+                                            disabled={!matriculaId || presencaDataSelecionada.status === "CANCELADA"}
+                                          />
+                                          Ausência
+                                        </label>
+                                      </div>
                                     </td>
                                     <td className="px-3 py-2">
-                                      <Checkbox
-                                        checked={statusAtual === "AUSENTE"}
-                                        onChange={() => matriculaId && atualizarPresenca(matriculaId, "AUSENTE")}
+                                      <Input
+                                        value={observacaoAtual}
+                                        onChange={(event) =>
+                                          matriculaId && atualizarObservacaoPresenca(matriculaId, event.target.value)
+                                        }
                                         disabled={!matriculaId || presencaDataSelecionada.status === "CANCELADA"}
+                                        placeholder="Observação opcional"
                                       />
                                     </td>
                                   </tr>
@@ -4461,6 +4380,54 @@ export function CadastroMatriculasPage() {
         </div>
       </div>
 
+      {presencaAlteracaoPendente && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/45 px-4">
+          <div className="w-full max-w-md rounded-xl border border-[var(--g3-border)] bg-[var(--g3-card)] shadow-2xl">
+            <div className="border-b border-[var(--g3-border)] px-5 py-4">
+              <h3 className="text-base font-semibold text-[var(--g3-foreground)]">Confirmar alteração de presença</h3>
+            </div>
+            <div className="space-y-3 px-5 py-4 text-sm text-[var(--g3-muted)]">
+              <p>
+                A presença ou ausência de <strong className="text-[var(--g3-foreground)]">{presencaAlteracaoPendente.beneficiarioNome}</strong> já foi salva.
+                Deseja realmente alterar para <strong className="text-[var(--g3-foreground)]">{formatarStatus(presencaAlteracaoPendente.status)}</strong>?
+              </p>
+              <div className="space-y-1">
+                <Label htmlFor="senha-confirmacao-presenca">Senha do usuário logado</Label>
+                <Input
+                  id="senha-confirmacao-presenca"
+                  type="password"
+                  autoComplete="current-password"
+                  value={senhaConfirmacaoPresenca}
+                  onChange={(event) => {
+                    setSenhaConfirmacaoPresenca(event.target.value);
+                    setPresencaErroSenha("");
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") confirmarAlteracaoPresenca();
+                  }}
+                />
+                {presencaErroSenha && <p className="text-sm font-medium text-rose-700">{presencaErroSenha}</p>}
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-[var(--g3-border)] px-5 py-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setPresencaAlteracaoPendente(null);
+                  setPresencaErroSenha("");
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button type="button" onClick={() => void confirmarAlteracaoPresenca()} disabled={presencaValidandoSenha}>
+                {presencaValidandoSenha ? "Validando senha..." : "Confirmar alteração"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {popupMensagem && <PopupMensagem popup={popupMensagem} onClose={() => setPopupMensagem(null)} />}
 
       <PopupConfirmacao
@@ -4476,11 +4443,11 @@ export function CadastroMatriculasPage() {
       <PopupConfirmacao
         aberto={popupExcluirPresencaAberto}
         titulo="Excluir data de presença"
-        texto="Esta ação exclui apenas a data de presença selecionada. Deseja continuar? Essa ação é irreversível."
+        texto="Se você continuar, todos os registros de presença e ausência desta data serão excluídos. Essa ação afetará todos os beneficiários vinculados a esta aula."
         processando={presencaExcluindo}
         onCancel={() => setPopupExcluirPresencaAberto(false)}
         onConfirm={() => void confirmarExclusaoDataPresenca()}
-        confirmarTexto="Excluir"
+        confirmarTexto="Sim, excluir presenças"
       />
     </section>
   );

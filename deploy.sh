@@ -41,6 +41,17 @@ print_container_logs() {
   docker compose -f "$APP_COMPOSE" logs --tail=200 "$name" || true
 }
 
+print_container_health() {
+  local name="$1"
+  local id
+  id="$(docker compose -f "$APP_COMPOSE" ps -q "$name" || true)"
+  if [[ -z "$id" ]]; then
+    return 0
+  fi
+  log "Health details for $name"
+  docker inspect --format='{{json .State.Health}}' "$id" || true
+}
+
 container_health() {
   local name="$1"
   local id
@@ -76,6 +87,25 @@ wait_healthy() {
   done
 }
 
+remove_runtime_container() {
+  local name="$1"
+
+  if ! docker inspect "$name" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  log "Removing existing container $name before Compose reconciliation (volumes preserved)"
+  docker rm -f "$name" >/dev/null
+}
+
+reconcile_runtime_containers() {
+  # Containers internos são descartáveis; proxy e túnel permanecem ativos
+  # para que o Cloudflare continue exibindo a página de manutenção.
+  remove_runtime_container g3n-db
+  remove_runtime_container g3n-backend
+  remove_runtime_container g3n-frontend
+}
+
 if [ -f "$TUNNEL_COMPOSE" ]; then
   log "ERROR: $TUNNEL_COMPOSE existe. Este arquivo nao deve ser usado."
   log "Remova-o para evitar queda do sistema."
@@ -98,11 +128,39 @@ log "Version set to $APP_VERSION"
 enable_maintenance
 log "Maintenance mode enabled"
 
-docker compose -f "$APP_COMPOSE" up -d --remove-orphans g3n-db nginx-g3n
+# O proxy de borda deve permanecer ativo durante todo o deploy. Com o modo de
+# manutenção habilitado, ele serve maintenance.html enquanto os demais
+# containers são reconstruídos, evitando que o Cloudflare receba 502.
+docker compose -f "$APP_COMPOSE" up -d --remove-orphans nginx-g3n
+
+reconcile_runtime_containers
+docker compose -f "$APP_COMPOSE" up -d --remove-orphans g3n-db
 wait_healthy g3n-db 120
-wait_healthy nginx-g3n 120
+
+log "Garantindo que o storage MinIO esteja ativo"
+docker compose -f "$APP_COMPOSE" up -d --remove-orphans g3n-minio
 
 docker compose -f "$APP_COMPOSE" build g3n-backend
+log "Aplicando migrations do PostgreSQL"
+if ! docker compose -f "$APP_COMPOSE" run --rm --no-deps g3n-backend npx prisma migrate deploy; then
+  log "Historico Prisma ausente em banco legado; aplicando migrations educacionais idempotentes"
+  for migration in \
+    20260718_create_educacional_fase1 \
+    20260719_add_tipo_unidade_atendimento \
+    20260719_create_educacional_academico \
+    20260719_create_educacional_alunos_fluxos \
+    20260719_create_educacional_avaliacoes \
+    20260719_create_educacional_boletim_historico \
+    20260719_create_educacional_creche \
+    20260719_create_educacional_diario \
+    20260719_create_educacional_documentos \
+    20260719_create_educacional_ocorrencias_agenda \
+    20260719_create_educacional_planejamento \
+    20260719_create_educacional_fluxo_academico \
+    20260719_harden_educacional_integridade; do
+    docker compose -f "$APP_COMPOSE" run --rm --no-deps g3n-backend npx prisma db execute --schema prisma/schema.prisma --file "prisma/migrations/$migration/migration.sql"
+  done
+fi
 docker compose -f "$APP_COMPOSE" build --no-cache g3n-frontend
 docker compose -f "$APP_COMPOSE" up -d --remove-orphans --force-recreate g3n-backend
 
@@ -126,7 +184,11 @@ fi
 
 log "Refresh nginx-g3n after dependencies are healthy"
 docker compose -f "$APP_COMPOSE" up -d --remove-orphans --force-recreate nginx-g3n
-wait_healthy nginx-g3n 120
+if ! wait_healthy nginx-g3n 120; then
+  print_container_health nginx-g3n
+  print_container_logs nginx-g3n
+  exit 1
+fi
 
 if [[ -n "${TUNNEL_TOKEN:-}" ]]; then
   log "Ensure g3n tunnel is up"

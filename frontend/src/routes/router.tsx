@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { AppShell } from "@/app/app-shell";
 import { RequireAuth } from "@/app/require-auth";
 import { RequirePermission } from "@/app/require-permission";
-import { RequireSuperadmin } from "@/app/require-superadmin";
 import { carregarModuloRota, obterLoaderRota } from "@/routes/route-modules";
 
 const CHUNK_RELOAD_KEY = "g3:chunk-reload";
@@ -160,6 +159,7 @@ const BancoEmpregosPage = carregarPagina("/atendimentos/banco-empregos", "BancoE
 const BibliotecaPage = carregarPagina("/atendimentos/biblioteca", "BibliotecaPage");
 const RegistroVisitasPage = carregarPagina("/atendimentos/registro-visitas", "RegistroVisitasPage");
 const AgendamentosPage = carregarPagina("/atendimentos/agendamentos", "AgendamentosPage");
+const ProntuarioPage = carregarPagina("/atendimentos/prontuario", "ProntuarioPage");
 const EducacionalPage = carregarPagina("/educacional", "EducacionalPage");
 const OcorrenciasPage = carregarPagina("/atendimentos/ocorrencias", "OcorrenciasPage");
 const ChamadaSenhasPage = carregarPagina("/atendimentos/chamada-senhas", "ChamadaSenhasPage");
@@ -199,10 +199,6 @@ const ChecklistDiarioPage = carregarPagina(
   "/setor-administrativo/checklist-diario",
   "ChecklistDiarioPage"
 );
-const InformacoesAdministrativasPage = carregarPagina(
-  "/setor-administrativo/informacoes-administrativas",
-  "InformacoesAdministrativasPage"
-);
 const PlanoTrabalhoPage = carregarPagina("/setor-juridico/plano-trabalho", "PlanoTrabalhoPage");
 const TermoFomentoPage = carregarPagina("/setor-juridico/termo-fomento", "TermoFomentoPage");
 const AutorizacaoComprasPage = carregarPagina(
@@ -222,6 +218,10 @@ const CadastroVinculoFamiliarPage = carregarPagina(
 const ParametrosSistemaPage = carregarPagina(
   "/configuracoes/parametros-sistema",
   "ParametrosSistemaPage"
+);
+const BackupRestauracaoPage = carregarPagina(
+  "/configuracoes/backup-restauracao",
+  "BackupRestauracaoPage"
 );
 const DatasComemorativasPage = carregarPagina(
   "/configuracoes/datas-comemorativas",
@@ -313,6 +313,11 @@ export const router = createBrowserRouter([
     errorElement: <RouteErrorBoundary />
   },
   {
+    path: "/portal-transparencia/:slug",
+    element: PortalTransparenciaPage,
+    errorElement: <RouteErrorBoundary />
+  },
+  {
     path: "/portal-parceiro-financiador",
     element: PortalParceiroFinanciadorPage,
     errorElement: <RouteErrorBoundary />
@@ -376,22 +381,6 @@ export const router = createBrowserRouter([
           </RequirePermission>
         )
       },
-      {
-        path: "/educacional",
-        element: (
-          <RequirePermission
-            permissions={[
-              "ADMINISTRADOR",
-              "OPERADOR",
-              "LEITURA_APENAS",
-              "EDUCACIONAL_VISUALIZAR",
-              "EDUCACIONAL_MATRICULAS_VISUALIZAR"
-            ]}
-          >
-            {EducacionalPage}
-          </RequirePermission>
-        )
-      },
       { path: "/atendimentos/ocorrencias", element: OcorrenciasPage },
       { path: "/atendimentos/chamada-senhas", element: ChamadaSenhasPage },
       { path: "/financeiro/registro-doacao", element: RegistroDoacaoPage },
@@ -435,14 +424,6 @@ export const router = createBrowserRouter([
             ]}
           >
             {ChecklistDiarioPage}
-          </RequirePermission>
-        )
-      },
-      {
-        path: "/setor-administrativo/informacoes-administrativas",
-        element: (
-          <RequirePermission permissions={["ADMINISTRADOR", "MASTER_ADMIN"]}>
-            {InformacoesAdministrativasPage}
           </RequirePermission>
         )
       },
@@ -585,6 +566,14 @@ export const router = createBrowserRouter([
         )
       },
       {
+        path: "/configuracoes/backup-restauracao",
+        element: (
+          <RequirePermission permissions={["ADMINISTRADOR"]}>
+            {BackupRestauracaoPage}
+          </RequirePermission>
+        )
+      },
+      {
         path: "/configuracoes/atualizar-sistema",
         element: (
           <RequirePermission
@@ -609,7 +598,35 @@ export const router = createBrowserRouter([
       },
       {
         path: "/configuracoes/master-instituicoes",
-        element: <RequireSuperadmin>{MasterInstituicoesPage}</RequireSuperadmin>
+        element: (
+          <RequirePermission permissions={["MASTER_ADMIN"]}>
+            {MasterInstituicoesPage}
+          </RequirePermission>
+        )
+      },
+      {
+        path: "/configuracoes/importacao-dados",
+        element: (
+          <RequirePermission permissions={["MASTER_ADMIN"]}>
+            {carregarPagina("/configuracoes/importacao-dados", "ImportacaoDadosPage")}
+          </RequirePermission>
+        )
+      },
+      {
+        path: "/atendimentos/prontuario",
+        element: (
+          <RequirePermission permissions={["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS", "PRONTUARIO_VISUALIZAR", "CENTRAL_ATENDIMENTOS_VISUALIZAR"]}>
+            {ProntuarioPage}
+          </RequirePermission>
+        )
+      },
+      {
+        path: "/educacional",
+        element: (
+          <RequirePermission permissions={["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS", "EDUCACIONAL_VISUALIZAR", "EDUCACIONAL_MATRICULAS_VISUALIZAR"]}>
+            {EducacionalPage}
+          </RequirePermission>
+        )
       },
       {
         path: "/configuracoes/chamado-tecnico",

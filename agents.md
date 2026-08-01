@@ -20,11 +20,19 @@
 - Frontend (UI): Português Brasil (pt-BR) com acentuação correta.
 - Backend (código e banco): identificadores sem acentos.
 
+### Versionamento e Git
+
+- MUST NOT fazer `commit` ou `push` automaticamente.
+- MUST only executar `commit` ou `push` mediante ordem explícita do usuário.
+- MUST manter alterações locais preparadas e aguardando confirmação quando houver necessidade de versionamento remoto.
+
 ### UX e Interação
 
 - Toda ação deve funcionar com 1 clique.
 - Não aceitar fluxo com clique duplo para executar ação.
 - Exibir feedback visual em ações assíncronas (carregando, sucesso, erro).
+- Toda confirmação de gravação bem-sucedida de cadastro MUST usar o modal padrão com ícone de confirmação azul na cor padrão da unidade, título do cadastro, número do registro quando disponível e botão `Finalizar cadastro`.
+- Telas novas e telas existentes MUST reutilizar o componente `CadastroSucessoModal` para novos cadastros e gravações principais; mensagens simples de sucesso ficam reservadas para atualizações, uploads e demais ações que não criam ou gravam o cadastro principal.
 
 ### Menus e Navegação
 

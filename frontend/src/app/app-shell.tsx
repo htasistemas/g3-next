@@ -27,6 +27,7 @@ import {
   CalendarRange,
   Bell,
   CarFront,
+  DatabaseZap,
   ChartColumn,
   ChartPie,
   CheckSquare2,
@@ -38,6 +39,7 @@ import {
   CircleDollarSign,
   DollarSign,
   FileText,
+  FileSpreadsheet,
   Files,
   FolderKanban,
   FolderOpen,
@@ -48,7 +50,6 @@ import {
   HeartHandshake,
   History as HistoryIcon,
   ImageIcon,
-  KeyRound,
   LibraryBig,
   Landmark,
   LayoutDashboard,
@@ -106,10 +107,41 @@ const comparadorItensMenu = new Intl.Collator("pt-BR", {
   numeric: true
 });
 
-function ordenarItensMenu<T extends { label: string }>(itens: T[]) {
-  return [...itens].sort((itemA, itemB) =>
-    comparadorItensMenu.compare(itemA.label.trim(), itemB.label.trim())
-  );
+const ordemItensEducacional = [
+  "educacional-visao-geral",
+  "educacional-alunos",
+  "educacional-vida-escolar",
+  "educacional-estrutura",
+  "educacional-professores",
+  "educacional-gestao-escolar",
+  "educacional-relatorios"
+  ,"educacional-parcerias-publicas"
+];
+
+function ordenarItensMenu<T extends { label: string; id?: string }>(itens: T[]) {
+  const prioridadesDashboard = new Map([
+    ["dashboard-visao-geral", 0],
+    ["dashboard-indicadores", 1],
+    ["dashboard-vulnerabilidade", 2],
+    ["dashboard-power-bi", 3]
+  ]);
+
+  return [...itens].sort((itemA, itemB) => {
+    const indiceEducacionalA = ordemItensEducacional.indexOf(itemA.id ?? "");
+    const indiceEducacionalB = ordemItensEducacional.indexOf(itemB.id ?? "");
+    if (indiceEducacionalA >= 0 || indiceEducacionalB >= 0) {
+      return (indiceEducacionalA < 0 ? Number.POSITIVE_INFINITY : indiceEducacionalA) -
+        (indiceEducacionalB < 0 ? Number.POSITIVE_INFINITY : indiceEducacionalB);
+    }
+
+    const prioridadeA = prioridadesDashboard.get(itemA.id ?? "") ?? Number.POSITIVE_INFINITY;
+    const prioridadeB = prioridadesDashboard.get(itemB.id ?? "") ?? Number.POSITIVE_INFINITY;
+    if (prioridadeA !== prioridadeB) {
+      return prioridadeA - prioridadeB;
+    }
+
+    return comparadorItensMenu.compare(itemA.label.trim(), itemB.label.trim());
+  });
 }
 
 function listarRotasMenuParaPrecarregar(secoes: MenuSection[], rotaAtual: string) {
@@ -155,7 +187,7 @@ const captacaoMenuPermissions = [
   "CAPTACAO_DADOS_SENSIVEIS_VISUALIZAR"
 ];
 
-export const menuSections: MenuSection[] = [
+const menuSectionsBase: MenuSection[] = [
   {
     id: "dashboard",
     secao: "Painel de indicadores",
@@ -199,7 +231,7 @@ export const menuSections: MenuSection[] = [
       {
         id: "cadastros-unidades-assistenciais",
         to: "/cadastros/unidades-assistenciais",
-        label: "Unidades assistenciais",
+        label: "Unidades de atendimento",
         icon: Building2
       },
       {
@@ -230,7 +262,7 @@ export const menuSections: MenuSection[] = [
       {
         id: "atendimentos-matriculas",
         to: "/atendimentos/matriculas",
-        label: "Inscrições em cursos e oficinas",
+        label: "Inscrições em cursos e atendimentos",
         icon: GraduationCap
       },
       {
@@ -257,6 +289,13 @@ export const menuSections: MenuSection[] = [
         label: "Agendamentos",
         icon: CalendarRange,
         requiredPermissions: ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS", "AGENDAMENTOS_VISUALIZAR"]
+      },
+      {
+        id: "atendimentos-prontuario",
+        to: "/atendimentos/prontuario",
+        label: "Prontuário eletrônico",
+        icon: ClipboardPenLine,
+        requiredPermissions: ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS", "PRONTUARIO_VISUALIZAR", "CENTRAL_ATENDIMENTOS_VISUALIZAR"]
       },
       {
         id: "atendimentos-ocorrencias",
@@ -292,69 +331,6 @@ export const menuSections: MenuSection[] = [
     ]
   },
   {
-    id: "gestao-educacional",
-    secao: "Gestão educacional",
-    icon: GraduationCap,
-    itens: [
-      {
-        id: "gestao-educacional-visao-geral",
-        to: "/educacional",
-        label: "Visão geral",
-        icon: ChartPie,
-        activeMatchPaths: ["/educacional"]
-      },
-      {
-        id: "gestao-educacional-alunos",
-        to: "/educacional?grupo=alunos&aba=alunos",
-        label: "Alunos",
-        icon: UsersRound,
-        activeMatchPaths: ["/educacional"]
-      },
-      {
-        id: "gestao-educacional-vida-escolar",
-        to: "/educacional?aba=historicos",
-        label: "Vida escolar",
-        icon: FileText,
-        activeMatchPaths: ["/educacional"]
-      },
-      {
-        id: "gestao-educacional-estrutura-academica",
-        to: "/educacional?aba=estrutura",
-        label: "Estrutura acadêmica",
-        icon: Building2,
-        activeMatchPaths: ["/educacional"]
-      },
-      {
-        id: "gestao-educacional-professores-equipe",
-        to: "/educacional?grupo=professores&aba=professores",
-        label: "Professores e equipe pedagógica",
-        icon: UserRoundCheck,
-        activeMatchPaths: ["/educacional"]
-      },
-      {
-        id: "gestao-educacional-gestao-escolar",
-        to: "/educacional?aba=fluxo-academico",
-        label: "Gestão escolar",
-        icon: CheckSquare2,
-        activeMatchPaths: ["/educacional"]
-      },
-      {
-        id: "gestao-educacional-relatorios-indicadores",
-        to: "/educacional?aba=relatorios",
-        label: "Relatórios e indicadores",
-        icon: ChartColumn,
-        activeMatchPaths: ["/educacional"]
-      },
-      {
-        id: "gestao-educacional-parcerias-publicas",
-        to: "/educacional?aba=documentos",
-        label: "Parcerias públicas",
-        icon: Files,
-        activeMatchPaths: ["/educacional"]
-      }
-    ]
-  },
-  {
     id: "setor-administrativo",
     secao: "Administração e gestão",
     icon: FolderKanban,
@@ -368,7 +344,7 @@ export const menuSections: MenuSection[] = [
       {
         id: "setor-administrativo-controle-veiculos",
         to: "/setor-administrativo/controle-veiculos",
-        label: "Controle de veículos",
+        label: "Controle de frotas",
         icon: CarFront
       },
       {
@@ -429,13 +405,6 @@ export const menuSections: MenuSection[] = [
           "SETOR_ADMINISTRATIVO_CHECKLIST_DIARIO_VISUALIZAR_PROPRIO",
           "SETOR_ADMINISTRATIVO_CHECKLIST_DIARIO_VISUALIZAR_TODOS"
         ]
-      },
-      {
-        id: "setor-administrativo-informacoes-administrativas",
-        to: "/setor-administrativo/informacoes-administrativas",
-        label: "Informações administrativas",
-        icon: KeyRound,
-        requiredPermissions: ["ADMINISTRADOR", "MASTER_ADMIN"]
       }
     ]
   },
@@ -659,21 +628,79 @@ export const menuSections: MenuSection[] = [
         requiredPermissions: ["ADMINISTRADOR"]
       },
       {
+        id: "configuracoes-backup-restauracao",
+        to: "/configuracoes/backup-restauracao",
+        label: "Backup e restauração",
+        icon: DatabaseZap,
+        requiredPermissions: ["ADMINISTRADOR"]
+      },
+      {
         id: "configuracoes-usuarios",
         to: "/configuracoes/usuarios",
         label: "Usuários",
         icon: UsersRound,
         requiredPermissions: ["ADMINISTRADOR"]
+      }
+    ]
+  },
+  {
+    id: "educacional",
+    secao: "Gestão educacional",
+    icon: BookOpenText,
+    requiredPermissions: ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS", "EDUCACIONAL_VISUALIZAR", "EDUCACIONAL_MATRICULAS_VISUALIZAR"],
+    itens: [
+      { id: "educacional-visao-geral", to: "/educacional", label: "Visão geral", icon: ChartPie },
+      { id: "educacional-alunos", to: "/educacional?grupo=alunos&aba=alunos", label: "Alunos", icon: UsersRound },
+      { id: "educacional-vida-escolar", to: "/educacional?grupo=vida-escolar&aba=transferencias", label: "Vida escolar", icon: Files },
+      { id: "educacional-estrutura", to: "/educacional?grupo=estrutura&aba=estrutura", label: "Estrutura acadêmica", icon: Building2 },
+      { id: "educacional-professores", to: "/educacional?grupo=professores&aba=professores", label: "Professores e equipe pedagógica", icon: UsersRound },
+      { id: "educacional-gestao-escolar", to: "/educacional?grupo=gestao&aba=ocorrencias", label: "Gestão escolar", icon: CheckSquare2 },
+      { id: "educacional-relatorios", to: "/educacional?aba=relatorios", label: "Relatórios e indicadores", icon: ChartPie }
+      ,{ id: "educacional-parcerias-publicas", to: "/educacional?grupo=parcerias&aba=parcerias", label: "Parcerias públicas", icon: Files }
+    ]
+  },
+  {
+    id: "painel-master",
+    secao: "Painel master",
+    icon: ShieldCheck,
+    requiredPermissions: ["MASTER_ADMIN"],
+    itens: [
+      {
+        id: "painel-master-clientes-registrados",
+        to: "/configuracoes/master-instituicoes",
+        label: "Clientes registrados",
+        icon: Building2,
+        requiredPermissions: ["MASTER_ADMIN"]
       },
       {
-        id: "configuracoes-master-instituicoes",
-        to: "/configuracoes/master-instituicoes",
-        label: "Instituições do sistema",
-        icon: Building2
+        id: "painel-master-importacao-dados",
+        to: "/configuracoes/importacao-dados",
+        label: "Importação de dados",
+        icon: FileSpreadsheet,
+        requiredPermissions: ["MASTER_ADMIN"]
       }
     ]
   }
 ];
+
+const ordemSecoesMenu = [
+  "dashboard",
+  "cadastros",
+  "atendimentos",
+  "setor-administrativo",
+  "financeiro",
+  "setor-vendas",
+  "educacional",
+  "setor-juridico",
+  "portais-acesso",
+  "setor-rh",
+  "configuracoes-gerais",
+  "painel-master"
+];
+
+export const menuSections: MenuSection[] = ordemSecoesMenu
+  .map((id) => menuSectionsBase.find((secao) => secao.id === id))
+  .filter((secao): secao is MenuSection => Boolean(secao));
 
 function obterTitulo(pathname: string): string {
   if (pathname === "/" || pathname.startsWith("/dashboard/visao-geral")) return "Visão geral";
@@ -684,12 +711,13 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/cadastros/profissionais")) return "Cadastro de profissionais";
   if (pathname.startsWith("/cadastros/voluntariado")) return "Cadastro de voluntariado";
   if (pathname.startsWith("/atendimentos/central-atendimentos")) return "Central de atendimentos";
-  if (pathname.startsWith("/atendimentos/matriculas")) return "Inscrições em cursos e oficinas";
-  if (pathname.startsWith("/educacional")) return "Gestão educacional";
+  if (pathname.startsWith("/atendimentos/matriculas")) return "Inscrições em cursos e atendimentos";
   if (pathname.startsWith("/atendimentos/banco-empregos")) return "Banco de empregos";
+  if (pathname.startsWith("/educacional")) return "Gestão educacional";
   if (pathname.startsWith("/atendimentos/biblioteca")) return "Biblioteca";
   if (pathname.startsWith("/atendimentos/registro-visitas")) return "Registro de visitas";
   if (pathname.startsWith("/atendimentos/agendamentos")) return "Agendamentos";
+  if (pathname.startsWith("/atendimentos/prontuario")) return "Prontuário eletrônico";
   if (pathname.startsWith("/atendimentos/ocorrencias")) return "Ocorrências";
   if (pathname.startsWith("/atendimentos/chamada-senhas")) return "Chamada de senhas";
   if (pathname.startsWith("/financeiro/registro-doacao")) return "Receber doações";
@@ -706,12 +734,13 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/captacao-recursos/relatorios")) return "Relatórios";
   if (pathname.startsWith("/captacao-recursos/permissoes")) return "Permissões da captação";
   if (pathname.startsWith("/configuracoes/parametros-sistema")) return "Configurações do sistema";
+  if (pathname.startsWith("/configuracoes/backup-restauracao")) return "Backup e restauração";
   if (pathname.startsWith("/configuracoes/datas-comemorativas")) return "Datas comemorativas";
   if (pathname.startsWith("/configuracoes/atualizar-sistema")) return "Atualizar sistema";
   if (pathname.startsWith("/configuracoes/chamado-tecnico")) return "Chamado técnico";
   if (pathname.startsWith("/configuracoes/licenca-uso")) return "Licença de uso";
   if (pathname.startsWith("/configuracoes/manual-do-sistema")) return "Manual do sistema";
-  if (pathname.startsWith("/configuracoes/master-instituicoes")) return "Instituições do sistema";
+  if (pathname.startsWith("/configuracoes/master-instituicoes")) return "Clientes registrados";
   if (pathname.startsWith("/configuracoes/pesquise-na-ia")) return "Pergunte à IA";
   if (pathname.startsWith("/configuracoes/sobre-o-sistema")) return "Sobre o sistema";
   if (pathname.startsWith("/configuracoes/mensagens-personalizadas")) return "Mensagens personalizadas";
@@ -720,7 +749,7 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/setor-vendas/historico")) return "Histórico de vendas";
   if (pathname.startsWith("/setor-rh/registro-ponto")) return "Registro de ponto";
   if (pathname.startsWith("/setor-administrativo/almoxarifado")) return "Almoxarifado";
-  if (pathname.startsWith("/setor-administrativo/controle-veiculos")) return "Controle de veículos";
+  if (pathname.startsWith("/setor-administrativo/controle-veiculos")) return "Controle de frotas";
   if (pathname.startsWith("/setor-administrativo/emprestimo-eventos")) return "Empréstimos para eventos";
   if (pathname.startsWith("/setor-administrativo/fotos-eventos")) return "Fotos de eventos";
   if (pathname.startsWith("/setor-administrativo/projetos")) return "Projetos";
@@ -730,7 +759,6 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/setor-administrativo/tarefas-pendencias")) return "Tarefas e pendências";
   if (pathname.startsWith("/setor-administrativo/lembretes-diarios")) return "Lembretes diários";
   if (pathname.startsWith("/setor-administrativo/checklist-diario")) return "Checklist diário";
-  if (pathname.startsWith("/setor-administrativo/informacoes-administrativas")) return "Informações administrativas";
   if (pathname.startsWith("/setor-juridico/plano-trabalho")) return "Plano de trabalho";
   if (pathname.startsWith("/setor-juridico/termo-fomento")) return "Termo de fomento";
   if (pathname.startsWith("/setor-financeiro/autorizacao-compras")) return "Autorização de compras";
@@ -748,7 +776,6 @@ function ocultarTituloTopo(pathname: string) {
     pathname.startsWith("/configuracoes/mensagens-personalizadas") ||
     pathname.startsWith("/atendimentos/central-atendimentos") ||
     pathname.startsWith("/atendimentos/matriculas") ||
-    pathname.startsWith("/educacional") ||
     pathname.startsWith("/atendimentos/banco-empregos") ||
     pathname.startsWith("/atendimentos/biblioteca") ||
     pathname.startsWith("/atendimentos/registro-visitas") ||
@@ -765,9 +792,24 @@ function ocultarTituloTopo(pathname: string) {
   );
 }
 
-function itemEstaAtivo(pathname: string, item: MenuItem) {
+function itemEstaAtivo(pathname: string, item: MenuItem, search = "") {
   const rotasAtivas = item.activeMatchPaths?.length ? item.activeMatchPaths : item.to ? [item.to] : [];
-  return rotasAtivas.some((rota) => pathname === rota || pathname.startsWith(`${rota}/`));
+  return rotasAtivas.some((rota) => {
+    const [rotaPathname, rotaSearch = ""] = rota.split("?", 2);
+    if (rotaSearch) {
+      return pathname === rotaPathname && search === `?${rotaSearch}`;
+    }
+    return pathname === rotaPathname || pathname.startsWith(`${rotaPathname}/`);
+  });
+}
+
+function itemMenuEstaAtivo(pathname: string, search: string, item: MenuItem, navLinkAtivo = false) {
+  // Todas as entradas do Educacional usam a query string para definir a aba.
+  // O NavLink considera somente /educacional e, por isso, marcava Visão geral
+  // junto com Alunos, Estrutura acadêmica e os demais grupos.
+  if (item.id === "educacional-visao-geral") return pathname === "/educacional" && search === "";
+  if (item.id?.startsWith("educacional-")) return itemEstaAtivo(pathname, item, search);
+  return itemEstaAtivo(pathname, item, search) || navLinkAtivo;
 }
 
 export function AppShell() {
@@ -793,7 +835,10 @@ export function AppShell() {
   const [gruposAbertos, setGruposAbertos] = useState<Record<string, boolean>>({});
   const [lembreteAlertaAtivo, setLembreteAlertaAtivo] = useState(false);
   const [logomarcaTopoUrl, setLogomarcaTopoUrl] = useState("");
-  const logomarcaInstituicao = unidadeAtualData?.unidade?.logomarca;
+  const baseApresentacao = usuario?.instituicao_slug?.trim().toLowerCase() === "g3n-apresentacao";
+  const logomarcaInstituicao = baseApresentacao
+    ? usuario?.instituicao_logo_url?.trim()
+    : unidadeAtualData?.unidade?.logomarca;
   const nomeInstituicao =
     usuario?.instituicao_nome ??
     unidadeAtualData?.unidade?.nome_fantasia ??
@@ -826,16 +871,12 @@ export function AppShell() {
         ...secao,
         itens: ordenarItensMenu(
           secao.itens.filter((item) => {
-            const emailAdminPadrao = usuario?.nomeUsuario?.trim().toLowerCase() === "htasistemas@gmail.com";
-            if (item.id === "configuracoes-master-instituicoes" && !usuario?.is_superadmin && !emailAdminPadrao) {
-              return false;
-            }
             return possuiPermissao(item.requiredPermissions);
           })
         )
       }))
       .filter((secao) => secao.itens.length > 0);
-  }, [possuiPermissao, usuario?.is_superadmin, usuario?.nomeUsuario]);
+  }, [possuiPermissao]);
 
   const secaoAtivaId = useMemo(() => {
     for (const secao of menuSectionsVisiveis) {
@@ -1107,7 +1148,8 @@ export function AppShell() {
       return;
     }
 
-    if (location.pathname === item.to) {
+    const rotaAtual = `${location.pathname}${location.search}`;
+    if (rotaAtual === item.to) {
       return;
     }
 
@@ -1149,7 +1191,7 @@ export function AppShell() {
   return (
     <div className="min-h-screen bg-[var(--g3-bg)]">
       {atualizandoFrontend && (
-        <div className="fixed inset-x-0 top-0 z-[70] border-b border-emerald-700 bg-emerald-600 px-4 py-2 text-center text-sm font-semibold text-white shadow-lg">
+        <div className="fixed inset-x-0 top-0 z-[70] border-b border-blue-700 bg-blue-600 px-4 py-2 text-center text-sm font-semibold text-white shadow-lg">
           Atualizando sistema...
         </div>
       )}
@@ -1167,13 +1209,22 @@ export function AppShell() {
             ) : (
               <div className="w-full text-center">
                 {logomarcaInstituicao ? (
-                  <img
-                    src={logomarcaTopoUrl || resolverUrlArquivo(logomarcaInstituicao)}
-                    alt={`Logomarca da instituição ${nomeInstituicao}`}
-                    className="mx-auto h-10 w-auto max-w-[170px] object-contain"
-                  />
+                  <div className="space-y-1">
+                    <img
+                      src={logomarcaTopoUrl || resolverUrlArquivo(logomarcaInstituicao)}
+                      alt={`Logomarca da instituição ${nomeInstituicao}`}
+                      className="mx-auto h-12 w-auto max-w-[210px] object-contain"
+                    />
+                    {baseApresentacao ? (
+                      <p className="text-center text-[17px] font-black uppercase tracking-[0.22em] text-white lg:text-[20px]">
+                        Sistema G3
+                      </p>
+                    ) : null}
+                  </div>
                 ) : (
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/85">Sistema G3</p>
+                  <p className="text-[18px] font-black uppercase tracking-[0.22em] text-white lg:text-[21px]">
+                    Sistema G3
+                  </p>
                 )}
               </div>
             )}
@@ -1246,7 +1297,10 @@ export function AppShell() {
                           key={item.id}
                           to={item.to}
                           className={({ isActive }) => {
-                            const itemAtivo = isActive || itemEstaAtivo(location.pathname, item);
+                            // Links educacionais usam query string para abrir a seção correta.
+                            // O NavLink considera apenas o pathname em alguns casos e acabava
+                            // marcando todos os itens /educacional como ativos ao mesmo tempo.
+                            const itemAtivo = itemMenuEstaAtivo(location.pathname, location.search, item, isActive && !item.to?.includes("?"));
                             return `flex w-full items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs font-medium leading-tight transition-colors ${
                               itemAtivo
                                 ? "border-[var(--g3-active)] bg-[var(--g3-card)] text-[var(--g3-active)] shadow-sm"
@@ -1326,17 +1380,25 @@ export function AppShell() {
                 {tarefaAlertaVisivel && (
                   <button
                     type="button"
-                    className={`inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold uppercase text-sky-700 ${
+                    className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase ${
+                      tarefaPisca
+                        ? "border-red-200 bg-red-50 text-red-700"
+                        : "border-sky-200 bg-sky-50 text-sky-700"
+                    } ${
                       tarefaPisca ? "animate-pulse" : ""
                     }`}
                     onClick={abrirTarefas}
                     aria-label="Abrir tarefas e pendências"
-                    title="Abrir tarefas e pendências"
+                    title={tarefaPisca ? "Há tarefas vencidas. Abrir tarefas e pendências" : "Abrir tarefas e pendências"}
                   >
                     <ListTodo className="h-3.5 w-3.5" />
                     Tarefas
                     {totalTarefasPendentes > 0 && (
-                      <span className="ml-1 rounded-full bg-sky-600 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                      <span
+                        className={`ml-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold text-white ${
+                          tarefaPisca ? "bg-red-600" : "bg-sky-600"
+                        }`}
+                      >
                         {totalTarefasPendentes}
                       </span>
                     )}
@@ -1410,7 +1472,7 @@ export function AppShell() {
                             key={item.id}
                             to={item.to}
                             className={({ isActive }) => {
-                              const itemAtivo = isActive || itemEstaAtivo(location.pathname, item);
+                              const itemAtivo = itemMenuEstaAtivo(location.pathname, location.search, item, isActive);
                               return `flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-xs font-medium leading-tight ${
                                 itemAtivo
                                   ? "border-[var(--g3-active)] bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"

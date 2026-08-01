@@ -111,9 +111,11 @@ type DestinatarioRow = {
   cargo: string | null;
   data_registro: Date | null;
   observacao: string | null;
+  aceite_comunicacao?: boolean | null;
 };
 
 let estruturaPromise: Promise<void> | null = null;
+let estruturaCompletaPromise: Promise<void> | null = null;
 
 function toJsonText(value: unknown) {
   return JSON.stringify(value ?? []);
@@ -134,6 +136,13 @@ function actorId(actor?: MensagemAtor) {
 
 function actorName(actor?: MensagemAtor) {
   return actor?.nomeUsuario?.trim() || null;
+}
+
+const caracteresBusca = "áàãâäéèêëíìîïóòõôöúùûüçÁÀÃÂÄÉÈÊËÍÌÎÏÓÒÕÔÖÚÙÛÜÇ";
+const substitutosBusca = "aaaaaeeeeiiiiooooouuuucAAAAAEEEEIIIIOOOOOUUUUC";
+
+function normalizarTermoBusca(valor?: string) {
+  return (valor ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 }
 
 function requireTenant(tenantId?: string | null) {
@@ -588,6 +597,9 @@ export class MensagensPersonalizadasRepository {
         ${input.mensagemSugeridaIa ?? false},
         ${input.chaveSistema}
       )
+      -- A instalação antiga pode ter um índice único global em chave_sistema,
+      -- enquanto as instalações novas usam o índice por tenant. O conflito
+      -- genérico mantém o seed idempotente nos dois formatos.
       ON CONFLICT DO NOTHING
       RETURNING id
     `);
@@ -595,6 +607,8 @@ export class MensagensPersonalizadasRepository {
     if (rows[0]?.id) {
       return this.obterModeloOuFalhar(rows[0].id, tenant);
     }
+
+    return this.obterModeloPorChaveSistema(input.chaveSistema, tenant);
 
     const existenteAposConflito = await this.obterModeloPorChaveSistema(input.chaveSistema, tenant);
     if (existenteAposConflito) return existenteAposConflito;
@@ -819,7 +833,22 @@ export class MensagensPersonalizadasRepository {
       documento: item.documento ?? undefined,
       email: item.email ?? undefined,
       telefone: item.telefone ?? undefined,
-      detalhe: item.detalhe ?? undefined
+      detalhe: item.detalhe ?? undefined,
+      aceitaComunicacao: item.aceite_comunicacao !== false
+    }));
+  }
+
+  async listarTodosDestinatarios(tipo: MensagemDestinatarioTipo, tenantId: string): Promise<MensagemDestinatarioCatalogo[]> {
+    const rows = await this.consultarDestinatarios(tipo, undefined, true, undefined, tenantId, undefined);
+    return rows.map((item) => ({
+      tipo,
+      id: item.id,
+      nome: item.nome,
+      documento: item.documento ?? undefined,
+      email: item.email ?? undefined,
+      telefone: item.telefone ?? undefined,
+      detalhe: item.detalhe ?? undefined,
+      aceitaComunicacao: item.aceite_comunicacao !== false
     }));
   }
 
@@ -847,7 +876,8 @@ export class MensagensPersonalizadasRepository {
       setor: item.setor ?? undefined,
       cargo: item.cargo ?? undefined,
       dataRegistro: item.data_registro?.toISOString() ?? undefined,
-      observacao: item.observacao ?? undefined
+      observacao: item.observacao ?? undefined,
+      aceitaComunicacao: item.aceite_comunicacao !== false
     };
   }
 
@@ -856,13 +886,15 @@ export class MensagensPersonalizadasRepository {
     termo?: string,
     somenteAtivos?: boolean,
     idEspecifico?: string,
-    tenantId?: string
+    tenantId?: string,
+    limite = 30
   ) {
     await this.garantirEstrutura();
     const tenant = requireTenant(tenantId);
     const termoBusca = termo?.trim();
     const idClause = idEspecifico ? Prisma.sql`AND base.id = ${idEspecifico}` : Prisma.empty;
     const likeNome = termoBusca ? `%${termoBusca}%` : undefined;
+    const likeNomeNormalizado = termoBusca ? `%${normalizarTermoBusca(termoBusca)}%` : undefined;
     const digits = termoBusca ? termoBusca.replace(/\D/g, "") : "";
 
     if (tipo === "BENEFICIARIO") {
@@ -872,6 +904,8 @@ export class MensagensPersonalizadasRepository {
           SELECT
             b.id::text AS id,
             b.nome_completo AS nome,
+            b.nome_social AS nome_social,
+            b.apelido AS apelido,
             cpf_doc.numero_documento AS documento,
             contato.email AS email,
             COALESCE(
@@ -886,8 +920,8 @@ export class MensagensPersonalizadasRepository {
             b.criado_em AS data_registro,
             NULL::text AS observacao,
             COALESCE(b.status, 'ATIVO') AS status_base,
-            COALESCE(contato.aceite_comunicacao_mensagens, true) AS aceite_comunicacao,
-            contato.preferencia_canal_comunicacao AS preferencia_canal
+            true AS aceite_comunicacao,
+            NULL::text AS preferencia_canal
           FROM cadastro_beneficiario b
           LEFT JOIN contato_beneficiario contato ON contato.beneficiario_id = b.id
           LEFT JOIN LATERAL (
@@ -903,11 +937,15 @@ export class MensagensPersonalizadasRepository {
         ) base
         WHERE 1 = 1
           ${idClause}
-          AND base.aceite_comunicacao = true
           ${
             likeNome
               ? Prisma.sql`AND (
                   base.nome ILIKE ${likeNome}
+                  OR COALESCE(base.nome_social, '') ILIKE ${likeNome}
+                  OR COALESCE(base.apelido, '') ILIKE ${likeNome}
+                  OR translate(lower(coalesce(base.nome, '')), ${caracteresBusca}, ${substitutosBusca}) ILIKE ${likeNomeNormalizado}
+                  OR translate(lower(coalesce(base.nome_social, '')), ${caracteresBusca}, ${substitutosBusca}) ILIKE ${likeNomeNormalizado}
+                  OR translate(lower(coalesce(base.apelido, '')), ${caracteresBusca}, ${substitutosBusca}) ILIKE ${likeNomeNormalizado}
                   OR COALESCE(base.documento, '') ILIKE ${`%${digits || termoBusca}%`}
                   OR COALESCE(base.detalhe, '') ILIKE ${likeNome}
                 )`
@@ -915,7 +953,7 @@ export class MensagensPersonalizadasRepository {
           }
           ${somenteAtivos ? Prisma.sql`AND base.status_base = 'ATIVO'` : Prisma.empty}
         ORDER BY base.nome ASC
-        LIMIT 30
+        ${limite ? Prisma.sql`LIMIT ${limite}` : Prisma.empty}
       `);
     }
 
@@ -936,14 +974,13 @@ export class MensagensPersonalizadasRepository {
             p.criado_em AS data_registro,
             p.observacoes AS observacao,
             COALESCE(p.status, 'ATIVO') AS status_base,
-            COALESCE(p.aceite_comunicacao_mensagens, true) AS aceite_comunicacao,
-            p.preferencia_canal_comunicacao AS preferencia_canal
+            true AS aceite_comunicacao,
+            NULL::text AS preferencia_canal
           FROM cadastro_profissionais p
           WHERE p.tenant_id::text = ${tenant}
         ) base
         WHERE 1 = 1
           ${idClause}
-          AND base.aceite_comunicacao = true
           ${
             likeNome
               ? Prisma.sql`AND (
@@ -955,7 +992,7 @@ export class MensagensPersonalizadasRepository {
           }
           ${somenteAtivos ? Prisma.sql`AND base.status_base = 'ATIVO'` : Prisma.empty}
         ORDER BY base.nome ASC
-        LIMIT 30
+        ${limite ? Prisma.sql`LIMIT ${limite}` : Prisma.empty}
       `);
     }
 
@@ -976,14 +1013,13 @@ export class MensagensPersonalizadasRepository {
             v.criado_em AS data_registro,
             v.observacoes AS observacao,
             COALESCE(v.status, 'ATIVO') AS status_base,
-            COALESCE(v.aceite_comunicacao_mensagens, true) AS aceite_comunicacao,
-            v.preferencia_canal_comunicacao AS preferencia_canal
+            true AS aceite_comunicacao,
+            NULL::text AS preferencia_canal
           FROM cadastro_voluntario v
           WHERE v.tenant_id::text = ${tenant}
         ) base
         WHERE 1 = 1
           ${idClause}
-          AND base.aceite_comunicacao = true
           ${
             likeNome
               ? Prisma.sql`AND (
@@ -995,7 +1031,7 @@ export class MensagensPersonalizadasRepository {
           }
           ${somenteAtivos ? Prisma.sql`AND base.status_base = 'ATIVO'` : Prisma.empty}
         ORDER BY base.nome ASC
-        LIMIT 30
+        ${limite ? Prisma.sql`LIMIT ${limite}` : Prisma.empty}
       `);
     }
 
@@ -1031,7 +1067,7 @@ export class MensagensPersonalizadasRepository {
               : Prisma.empty
           }
         ORDER BY base.nome ASC
-        LIMIT 30
+        ${limite ? Prisma.sql`LIMIT ${limite}` : Prisma.empty}
       `);
     }
 
@@ -1066,7 +1102,7 @@ export class MensagensPersonalizadasRepository {
             : Prisma.empty
         }
       ORDER BY base.nome ASC
-      LIMIT 30
+      ${limite ? Prisma.sql`LIMIT ${limite}` : Prisma.empty}
     `);
   }
 
@@ -1082,7 +1118,7 @@ export class MensagensPersonalizadasRepository {
   }
 }
 
-export async function ensureMensagensPersonalizadasEstrutura() {
+async function executarGarantiaEstruturaMensagensPersonalizadas() {
   if (!estruturaPromise) {
     estruturaPromise = (async () => {
       for (const comando of estruturaSql) {
@@ -1209,4 +1245,15 @@ export async function ensureMensagensPersonalizadasEstrutura() {
   await prisma.$executeRawUnsafe(
     "CREATE INDEX IF NOT EXISTS mensagens_personalizadas_auditoria_tenant_data_idx ON mensagens_personalizadas_auditoria(tenant_id, criado_em DESC)"
   );
+}
+
+export async function ensureMensagensPersonalizadasEstrutura() {
+  if (!estruturaCompletaPromise) {
+    estruturaCompletaPromise = executarGarantiaEstruturaMensagensPersonalizadas().catch((error) => {
+      estruturaCompletaPromise = null;
+      throw error;
+    });
+  }
+
+  await estruturaCompletaPromise;
 }

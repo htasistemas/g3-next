@@ -1,5 +1,9 @@
 import { httpClient } from "./http-client";
 import type {
+  DisponibilidadeVeiculoConsulta,
+  DisponibilidadeVeiculoDetalhe,
+  DisponibilidadeVeiculoRegistro,
+  DisponibilidadeVeiculoResumo,
   LocalDestinoVeiculo,
   MotoristaAutorizado,
   MotoristaDisponivel,
@@ -165,5 +169,100 @@ export const controleVeiculosService = {
       id: data.arquivo.registro?.id,
       caminhoArquivo: data.arquivo.caminhoArquivo
     } satisfies UploadVeiculoResultado;
+  },
+
+  async listarDisponibilidades() {
+    const { data } = await httpClient.get<{ disponibilidades: DisponibilidadeVeiculoRegistro[] }>(
+      "/api/controle-veiculos/disponibilidade"
+    );
+    return data.disponibilidades ?? [];
+  },
+
+  async consultarDisponibilidade(params: DisponibilidadeVeiculoConsulta) {
+    const { data } = await httpClient.get<DisponibilidadeVeiculoResumo>(
+      "/api/controle-veiculos/disponibilidade/consulta",
+      { params }
+    );
+    return data;
+  },
+
+  async resumirDisponibilidade(params: DisponibilidadeVeiculoConsulta) {
+    const { data } = await httpClient.get<DisponibilidadeVeiculoResumo>(
+      "/api/controle-veiculos/disponibilidade/resumo",
+      { params }
+    );
+    return data;
+  },
+
+  async listarVeiculosDisponibilidade() {
+    const { data } = await httpClient.get<
+      Array<{ id: number; placa?: string | null; modelo?: string | null; marca?: string | null; rotulo: string }>
+    >("/api/controle-veiculos/disponibilidade/veiculos/ativos");
+    return data;
+  },
+
+  async obterAgendaVeiculo(veiculoId: number, params: DisponibilidadeVeiculoConsulta) {
+    const { data } = await httpClient.get<DisponibilidadeVeiculoRegistro[]>(
+      `/api/controle-veiculos/disponibilidade/veiculos/${veiculoId}/agenda`,
+      { params }
+    );
+    return data;
+  },
+
+  async obterProximaDisponibilidade(veiculoId: number) {
+    const { data } = await httpClient.get<{
+      disponivelEm: string;
+      situacaoAtual: string;
+      bloqueios: DisponibilidadeVeiculoRegistro[];
+    }>(`/api/controle-veiculos/disponibilidade/veiculos/${veiculoId}/proxima-disponibilidade`);
+    return data;
+  },
+
+  async obterDetalheDisponibilidade(id: number): Promise<DisponibilidadeVeiculoDetalhe> {
+    const { data } = await httpClient.get<DisponibilidadeVeiculoDetalhe>(
+      `/api/controle-veiculos/disponibilidade/${id}`
+    );
+    return data;
+  },
+
+  async criarDisponibilidade(payload: Omit<DisponibilidadeVeiculoRegistro, "id" | "tenantId" | "version" | "bloqueios" | "proximaLiberacao" | "situacao" | "ativo">) {
+    const { data } = await httpClient.post<DisponibilidadeVeiculoRegistro>(
+      "/api/controle-veiculos/disponibilidade",
+      payload
+    );
+    return data;
+  },
+
+  async atualizarDisponibilidade(
+    id: number,
+    payload: Omit<DisponibilidadeVeiculoRegistro, "id" | "tenantId" | "version" | "bloqueios" | "proximaLiberacao" | "situacao" | "ativo">
+  ) {
+    const { data } = await httpClient.put<DisponibilidadeVeiculoRegistro>(
+      `/api/controle-veiculos/disponibilidade/${id}`,
+      payload
+    );
+    return data;
+  },
+
+  async cancelarDisponibilidade(id: number, motivoCancelamento: string) {
+    const { data } = await httpClient.patch<DisponibilidadeVeiculoRegistro>(
+      `/api/controle-veiculos/disponibilidade/${id}/cancelar`,
+      { motivoCancelamento }
+    );
+    return data;
+  },
+
+  async encerrarDisponibilidade(id: number) {
+    const { data } = await httpClient.patch<DisponibilidadeVeiculoRegistro>(
+      `/api/controle-veiculos/disponibilidade/${id}/encerrar`
+    );
+    return data;
+  },
+
+  async excluirDisponibilidade(id: number) {
+    const { data } = await httpClient.delete<DisponibilidadeVeiculoRegistro>(
+      `/api/controle-veiculos/disponibilidade/${id}`
+    );
+    return data;
   }
 };

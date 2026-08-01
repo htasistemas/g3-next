@@ -89,9 +89,14 @@ export type AgendamentoOperacionalInput = {
   id?: string;
   tipo: AgendamentoOperacionalTipo;
   itemId: number;
+  profissionalNome?: string;
   data: string;
+  horaInicial?: string;
+  horaFinal?: string;
+  duracaoMinutos?: number;
   beneficiariosIds?: number[];
   matriculasIds?: number[];
+  horariosPorMatricula?: Record<string, string>;
 };
 
 export type AgendamentoOperacionalItemRow = {
@@ -100,6 +105,9 @@ export type AgendamentoOperacionalItemRow = {
   nome: string;
   profissional: string | null;
   horario_inicial: string | null;
+  controle_horario_atendimento: boolean | null;
+  horario_final_atendimento: string | null;
+  intervalo_atendimento_minutos: number | null;
   duracao_horas: number | null;
   dias_semana: string | null;
   sala_nome: string | null;
@@ -110,7 +118,9 @@ export type AgendamentoOperacionalItemRow = {
 export type AgendamentoOperacionalBeneficiarioRow = {
   matricula_id: bigint;
   beneficiario_id: bigint | null;
+  codigo: string | null;
   beneficiario_nome: string;
+  data_nascimento: Date | null;
   telefone: string | null;
   email: string | null;
   status: string | null;
@@ -122,6 +132,7 @@ export type AgendamentoBeneficiarioRow = {
   id: bigint;
   agendamento_id: bigint;
   beneficiario_id: bigint | null;
+  codigo: string | null;
   beneficiario_nome: string;
   data_nascimento: Date | null;
   telefone: string | null;
@@ -136,10 +147,13 @@ export type AgendamentoEnvioCanal = "WHATSAPP" | "EMAIL";
 export type AgendamentoParticipanteInput = {
   matriculaId?: number | null;
   beneficiarioId?: number | null;
+  codigo?: string | null;
   beneficiarioNome: string;
+  dataNascimento?: string | null;
   telefone?: string | null;
   comparecimento?: "Pendente" | "Presente" | "Faltou" | "Justificado";
   observacao?: string | null;
+  horario?: string | null;
 };
 
 export type AgendamentoListaEsperaInput = {

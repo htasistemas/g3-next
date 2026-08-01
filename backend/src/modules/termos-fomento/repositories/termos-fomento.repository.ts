@@ -14,6 +14,8 @@ import type {
 type TransactionClient = Prisma.TransactionClient;
 
 const estruturaSql = [
+  "ALTER TABLE IF EXISTS termo_fomento ADD COLUMN IF NOT EXISTS referencia_termo VARCHAR(250)",
+  "ALTER TABLE IF EXISTS termo_fomento ADD COLUMN IF NOT EXISTS responsavel_indicacao VARCHAR(250)",
   "ALTER TABLE IF EXISTS termo_fomento ADD COLUMN IF NOT EXISTS tenant_id UUID",
   "ALTER TABLE IF EXISTS termo_fomento_aditivos ADD COLUMN IF NOT EXISTS tenant_id UUID",
   "ALTER TABLE IF EXISTS termo_fomento_documentos ADD COLUMN IF NOT EXISTS tenant_id UUID",
@@ -64,6 +66,8 @@ export class TermosFomentoRepository {
         id,
         numero_termo,
         tipo_termo,
+        referencia_termo,
+        responsavel_indicacao,
         orgao_concedente,
         data_assinatura,
         data_inicio_vigencia,
@@ -96,6 +100,8 @@ export class TermosFomentoRepository {
         id,
         numero_termo,
         tipo_termo,
+        referencia_termo,
+        responsavel_indicacao,
         orgao_concedente,
         data_assinatura,
         data_inicio_vigencia,
@@ -165,6 +171,8 @@ export class TermosFomentoRepository {
           tenant_id,
           numero_termo,
           tipo_termo,
+          referencia_termo,
+          responsavel_indicacao,
           orgao_concedente,
           data_assinatura,
           data_inicio_vigencia,
@@ -179,6 +187,8 @@ export class TermosFomentoRepository {
           ${tenantId}::uuid,
           ${input.numeroTermo},
           ${input.tipoTermo},
+          ${trimOrUndefined(input.referenciaTermo ?? undefined)},
+          ${trimOrUndefined(input.responsavelIndicacao ?? undefined)},
           ${trimOrUndefined(input.orgaoConcedente ?? undefined)},
           ${toOptionalDate(input.dataAssinatura ?? undefined)},
           ${toOptionalDate(input.dataInicioVigencia ?? undefined)},
@@ -209,6 +219,8 @@ export class TermosFomentoRepository {
         SET
           numero_termo = ${input.numeroTermo},
           tipo_termo = ${input.tipoTermo},
+          referencia_termo = ${trimOrUndefined(input.referenciaTermo ?? undefined)},
+          responsavel_indicacao = ${trimOrUndefined(input.responsavelIndicacao ?? undefined)},
           orgao_concedente = ${trimOrUndefined(input.orgaoConcedente ?? undefined)},
           data_assinatura = ${toOptionalDate(input.dataAssinatura ?? undefined)},
           data_inicio_vigencia = ${toOptionalDate(input.dataInicioVigencia ?? undefined)},

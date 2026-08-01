@@ -318,6 +318,10 @@ export class LicencaUsoService {
       });
     }
 
+    const customerName =
+      configuracao.instituicaoNome?.trim() || configuracao.checkoutHandle?.trim() || "Cliente G3N";
+    const customerEmail = configuracao.emailsAlerta.find((email) => Boolean(email?.trim()))?.trim();
+
     const resposta = await this.infinitePayService.createCheckoutLink({
       handle: configuracao.checkoutHandle,
       order_nsu: orderNsu,
@@ -325,8 +329,8 @@ export class LicencaUsoService {
       redirect_url: configuracao.checkoutRedirectUrl,
       webhook_url: configuracao.pixWebhookUrl,
       customer: {
-        name: configuracao.instituicaoNome,
-        email: configuracao.emailsAlerta[0]
+        name: customerName,
+        email: customerEmail
       }
     });
 

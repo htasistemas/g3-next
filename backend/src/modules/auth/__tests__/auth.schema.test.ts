@@ -1,6 +1,5 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ZodError } from "zod";
 import { authEsqueciSenhaSchema, authLoginSchema } from "../auth.schema.js";
 
 test("authLoginSchema permite login master sem CNPJ", () => {
@@ -24,19 +23,14 @@ test("authLoginSchema aceita CNPJ informado no request do master sem depender de
   assert.equal(resultado.cnpj, "12345678000190");
 });
 
-test("authLoginSchema continua exigindo instituição para outros e-mails", () => {
-  assert.throws(
-    () =>
-      authLoginSchema.parse({
-        email: "operador@instituicao.org.br",
-        senha: "123456"
-      }),
-    (error: unknown) => {
-      assert.ok(error instanceof ZodError);
-      assert.equal(error.issues[0]?.path.join("."), "cnpj");
-      return true;
-    }
-  );
+test("authLoginSchema aceita e-mail de acesso sem CNPJ para permitir resolucao do tenant", () => {
+  const resultado = authLoginSchema.parse({
+    email: "operador@instituicao.org.br",
+    senha: "123456"
+  });
+
+  assert.equal(resultado.email, "operador@instituicao.org.br");
+  assert.equal(resultado.cnpj, undefined);
 });
 
 test("authEsqueciSenhaSchema permite recuperação master sem CNPJ", () => {

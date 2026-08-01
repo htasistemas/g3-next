@@ -21,6 +21,7 @@ import {
   Building2,
   CalendarDays,
   CarFront,
+  BookOpen,
   FolderHeart,
   HandHeart,
   Images,
@@ -54,17 +55,27 @@ function formatarPercentual(valor: number) {
   return `${Number.isFinite(valor) ? valor.toFixed(1) : "0.0"}%`;
 }
 
-function encurtarRotuloGrafico(texto: string, limite = 20) {
+function encurtarRotuloGrafico(texto: string, limite = 32) {
   if (texto.length <= limite) return texto;
   return `${texto.slice(0, limite - 1)}…`;
 }
 
-const coresCadastros = ["#0f766e", "#14b8a6", "#38bdf8", "#3b82f6", "#6366f1", "#f59e0b", "#ef4444"];
-const classeCardVerde =
-  "rounded-xl border border-emerald-200/80 bg-[linear-gradient(180deg,rgba(247,252,249,0.98)_0%,rgba(229,245,234,0.98)_100%)] shadow-[0_18px_40px_-26px_rgba(22,101,52,0.35)]";
-const classeCardVerdeInterativo = `${classeCardVerde} transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-[0_22px_48px_-22px_rgba(22,101,52,0.42)]`;
-const classeCardVerdeSuave =
-  "rounded-xl border border-emerald-100/90 bg-[rgba(255,255,255,0.72)] shadow-[0_14px_32px_-26px_rgba(22,101,52,0.28)] backdrop-blur-[2px]";
+const coresCadastros = [
+  "var(--g3-primary)",
+  "var(--g3-secondary)",
+  "var(--g3-accent)",
+  "var(--g3-warning)",
+  "var(--g3-success)",
+  "var(--g3-info)",
+  "var(--g3-muted)"
+];
+const classeCardVisaoGeral =
+  "rounded-xl border border-[var(--g3-border)] bg-[linear-gradient(180deg,var(--g3-dashboard-card)_0%,var(--g3-dashboard-card-soft)_100%)] shadow-[0_18px_40px_-26px_rgba(15,23,42,0.22)]";
+const classeCardVisaoGeralInterativo = `${classeCardVisaoGeral} transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--g3-primary)] hover:shadow-[0_22px_48px_-22px_rgba(15,23,42,0.26)]`;
+const classeCardVisaoGeralResumo =
+  "rounded-xl border border-[var(--g3-primary-soft)] bg-[linear-gradient(180deg,var(--g3-primary-soft)_0%,var(--g3-card)_100%)] shadow-[0_18px_40px_-26px_rgba(15,23,42,0.22)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--g3-primary)] hover:shadow-[0_22px_48px_-22px_rgba(15,23,42,0.26)]";
+const classeCardVisaoGeralSuave =
+  "rounded-xl border border-[var(--g3-border)] bg-[var(--g3-dashboard-card-soft)] shadow-[0_14px_32px_-26px_rgba(15,23,42,0.16)] backdrop-blur-[2px]";
 
 function obterRotaCadastro(nome: string) {
   switch (nome) {
@@ -161,8 +172,6 @@ export function VisaoGeralPage() {
     if (!data) return [];
     return [
       { nome: "Almoxarifado", valor: itensAlmoxarifado.length || data.cadastros.itensAlmoxarifado },
-      { nome: "Biblioteca", valor: data.cadastros.livrosDisponiveis },
-      { nome: "Veículos", valor: data.cadastros.veiculos },
       { nome: "Profissionais", valor: data.cadastros.profissionais },
       { nome: "Voluntários", valor: data.cadastros.voluntarios },
       { nome: "Famílias", valor: data.cadastros.familias },
@@ -224,18 +233,18 @@ export function VisaoGeralPage() {
     if (!data) return [];
     return [
       {
+        label: "Total de beneficiários",
+        valor: String(data.cadastros.beneficiarios),
+        hint: "Total de registros na instituição",
+        icone: UsersRound,
+        rota: "/cadastros/beneficiarios"
+      },
+      {
         label: "Álbuns e fotos",
         valor: `${resumoFotosEventos.totalAlbuns} / ${resumoFotosEventos.totalFotos}`,
         hint: "Álbuns cadastrados / fotos registradas",
         icone: Images,
         rota: "/setor-administrativo/fotos-eventos"
-      },
-      {
-        label: "Beneficiários no período",
-        valor: String(data.top12.beneficiariosAtendidosPeriodo),
-        hint: "Registros no período filtrado",
-        icone: UsersRound,
-        rota: "/cadastros/beneficiarios"
       },
       {
         label: "Cursos ativos",
@@ -294,6 +303,20 @@ export function VisaoGeralPage() {
         rota: "/setor-administrativo/almoxarifado"
       },
       {
+        label: "Livros da biblioteca",
+        valor: String(data.cadastros.livrosDisponiveis),
+        hint: "Acervo disponível para empréstimo",
+        icone: BookOpen,
+        rota: "/atendimentos/biblioteca"
+      },
+      {
+        label: "Quantidade de veículos",
+        valor: String(data.cadastros.veiculos),
+        hint: "Veículos cadastrados no sistema",
+        icone: CarFront,
+        rota: "/setor-administrativo/controle-veiculos"
+      },
+      {
         label: "Itens no patrimônio",
         valor: String(patrimonios.length || data.cadastros.bensPatrimonio),
         hint: "Bens patrimoniais cadastrados",
@@ -326,6 +349,8 @@ export function VisaoGeralPage() {
     termosVencidos,
     totalMotoristasAutorizados,
     resumoEventosEmprestimos.ativos,
+    data?.cadastros.livrosDisponiveis,
+    data?.cadastros.veiculos,
     resumoCatalogoVagas.cursosNoCatalogo,
     resumoCatalogoVagas.vagasDisponiveis
   ]);
@@ -371,7 +396,7 @@ export function VisaoGeralPage() {
                   <button
                     key={card.label}
                     type="button"
-                    className={`${classeCardVerdeInterativo} px-3 py-3 text-left`}
+                    className={`${classeCardVisaoGeralResumo} px-3 py-3 text-left`}
                     onClick={() => navigate(card.rota)}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -393,7 +418,7 @@ export function VisaoGeralPage() {
               </div>
 
               <div className="space-y-4">
-                <div className={`${classeCardVerde} min-w-0 p-3`}>
+                <div className={`${classeCardVisaoGeral} min-w-0 p-3`}>
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
@@ -403,7 +428,7 @@ export function VisaoGeralPage() {
                         Distribuição dos cadastros monitorados na operação atual.
                       </p>
                     </div>
-                    <div className={`${classeCardVerdeSuave} rounded-lg px-3 py-2 text-right`}>
+                    <div className={`${classeCardVisaoGeralResumo} rounded-lg px-3 py-2 text-right`}>
                       <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
                         Total
                       </p>
@@ -414,7 +439,7 @@ export function VisaoGeralPage() {
                   </div>
 
                   <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
-                    <div className={`${classeCardVerdeSuave} relative h-72 p-3`}>
+                    <div className={`${classeCardVisaoGeralSuave} relative h-72 p-3`}>
                       <ResponsiveChart minWidth={0} minHeight={220}>
                         <PieChart>
                           <Pie
@@ -452,7 +477,7 @@ export function VisaoGeralPage() {
                           />
                         </PieChart>
                       </ResponsiveChart>
-                      <div className="pointer-events-none absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/92 shadow-[0_18px_34px_-24px_rgba(22,101,52,0.35)] ring-1 ring-emerald-100">
+                      <div className="pointer-events-none absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full border border-[var(--g3-border)] bg-[var(--g3-dashboard-card)] shadow-[0_18px_34px_-24px_rgba(15,23,42,0.18)]">
                         <div className="flex h-full w-full flex-col items-center justify-center text-center">
                           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--g3-muted)]">
                             Tipos
@@ -475,7 +500,7 @@ export function VisaoGeralPage() {
                           <button
                             key={item.nome}
                             type="button"
-                            className={`${classeCardVerdeSuave} p-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-[0_22px_48px_-22px_rgba(22,101,52,0.32)]`}
+                            className={`${classeCardVisaoGeralSuave} p-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--g3-primary)] hover:shadow-[0_22px_48px_-22px_rgba(15,23,42,0.22)]`}
                             onClick={() => navigate(obterRotaCadastro(item.nome))}
                           >
                             <div className="flex items-start justify-between gap-3">
@@ -493,7 +518,7 @@ export function VisaoGeralPage() {
                                   </p>
                                 </div>
                               </div>
-                              <div className="min-w-[72px] rounded-xl bg-white/90 px-3 py-2 text-right shadow-[0_16px_28px_-24px_rgba(22,101,52,0.35)]">
+                              <div className="min-w-[72px] rounded-xl bg-[var(--g3-dashboard-card)] px-3 py-2 text-right shadow-[0_16px_28px_-24px_rgba(15,23,42,0.18)]">
                                 <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
                                   Total
                                 </p>
@@ -509,22 +534,24 @@ export function VisaoGeralPage() {
                   </div>
                 </div>
 
-                <div className={`${classeCardVerde} min-w-0 p-3`}>
+                <div className={`${classeCardVisaoGeral} min-w-0 p-3`}>
                   <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
                     Composição financeira
                   </p>
-                  <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3">
+                  <div className="mt-3 grid grid-cols-1 gap-2 xl:grid-cols-3">
                     {dadosFinanceiro.map((item) => (
                       <button
                         key={item.nome}
                         type="button"
-                        className={`${classeCardVerdeSuave} px-3 py-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-[0_22px_48px_-22px_rgba(22,101,52,0.32)]`}
+                        className={`${classeCardVisaoGeralSuave} min-h-[110px] px-4 py-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--g3-primary)] hover:shadow-[0_22px_48px_-22px_rgba(15,23,42,0.22)]`}
                         onClick={() => navigate("/setor-financeiro/contabilidade")}
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="text-xs font-semibold text-[var(--g3-muted)]">{item.nome}</p>
-                            <p className="mt-1 text-2xl font-bold leading-tight text-[var(--g3-foreground)]">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="min-w-0 flex-1">
+                            <p className="break-words text-sm font-semibold leading-5 text-[var(--g3-muted)]">
+                              {item.nome}
+                            </p>
+                            <p className="mt-2 text-2xl font-bold leading-none tracking-tight text-[var(--g3-foreground)]">
                               {formatarMoeda(item.valor)}
                             </p>
                           </div>
@@ -544,7 +571,7 @@ export function VisaoGeralPage() {
                   </div>
                   <button
                     type="button"
-                    className={`${classeCardVerdeSuave} mt-3 w-full p-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-[0_22px_48px_-22px_rgba(22,101,52,0.32)]`}
+                    className={`${classeCardVisaoGeralSuave} mt-3 w-full p-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--g3-primary)] hover:shadow-[0_22px_48px_-22px_rgba(15,23,42,0.22)]`}
                     onClick={() => navigate("/setor-financeiro/contabilidade")}
                   >
                     <div className="flex items-center justify-between gap-2">
@@ -556,7 +583,7 @@ export function VisaoGeralPage() {
                           Distribuição atual dos recursos em caixa e banco.
                         </p>
                       </div>
-                      <div className="rounded-lg border border-emerald-100/90 bg-white/88 px-3 py-2 text-right shadow-[0_16px_28px_-24px_rgba(22,101,52,0.35)]">
+                      <div className="rounded-lg border border-[var(--g3-primary-soft)] bg-[var(--g3-primary-soft)] px-3 py-2 text-right shadow-[0_16px_28px_-24px_rgba(15,23,42,0.18)]">
                         <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
                           Total em contas
                         </p>
@@ -570,23 +597,24 @@ export function VisaoGeralPage() {
                     {dadosFinanceiroContas.length ? (
                       <div
                         className="mt-3"
-                        style={{ height: `${Math.max(260, dadosFinanceiroContas.length * 52)}px` }}
+                        style={{ height: `${Math.max(280, dadosFinanceiroContas.length * 60)}px` }}
                       >
                         <ResponsiveChart minWidth={0} minHeight={240}>
                           <BarChart
                             data={dadosFinanceiroContas}
                             layout="vertical"
-                            margin={{ top: 4, right: 36, bottom: 4, left: 8 }}
+                            margin={{ top: 4, right: 84, bottom: 4, left: 12 }}
                           >
                             <CartesianGrid horizontal={false} stroke="var(--g3-border)" opacity={0.35} />
                             <XAxis type="number" hide />
                             <YAxis
                               type="category"
                               dataKey="nomeCurto"
-                              width={118}
+                              width={220}
                               tick={{ fill: "var(--g3-muted)", fontSize: 12 }}
                               axisLine={false}
                               tickLine={false}
+                              tickMargin={10}
                             />
                             <Tooltip
                               formatter={(value, _name, payload) => [
@@ -606,6 +634,7 @@ export function VisaoGeralPage() {
                               <LabelList
                                 dataKey="saldoFormatado"
                                 position="right"
+                                offset={12}
                                 style={{ fill: "var(--g3-foreground)", fontSize: 12, fontWeight: 600 }}
                               />
                             </Bar>
@@ -613,7 +642,7 @@ export function VisaoGeralPage() {
                         </ResponsiveChart>
                       </div>
                     ) : (
-                      <div className="mt-3 rounded-lg border border-dashed border-emerald-200 bg-white/80 px-3 py-4 text-sm text-[var(--g3-muted)]">
+                      <div className="mt-3 rounded-lg border border-dashed border-[var(--g3-border)] bg-[var(--g3-dashboard-card-soft)] px-3 py-4 text-sm text-[var(--g3-muted)]">
                         Nenhuma conta com saldo disponível foi encontrada para montar o gráfico financeiro.
                       </div>
                     )}
@@ -624,7 +653,7 @@ export function VisaoGeralPage() {
               <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 <button
                   type="button"
-                  className={`${classeCardVerdeInterativo} px-3 py-3 text-left`}
+                  className={`${classeCardVisaoGeralInterativo} px-3 py-3 text-left`}
                   onClick={() => navigate("/setor-financeiro/prestacao-contas")}
                 >
                   <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
@@ -636,7 +665,7 @@ export function VisaoGeralPage() {
                 </button>
                 <button
                   type="button"
-                  className={`${classeCardVerdeInterativo} px-3 py-3 text-left`}
+                  className={`${classeCardVisaoGeralInterativo} px-3 py-3 text-left`}
                   onClick={() => navigate("/setor-rh/registro-ponto")}
                 >
                   <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
@@ -648,7 +677,7 @@ export function VisaoGeralPage() {
                 </button>
                 <button
                   type="button"
-                  className={`${classeCardVerdeInterativo} px-3 py-3 text-left`}
+                  className={`${classeCardVisaoGeralInterativo} px-3 py-3 text-left`}
                   onClick={() => navigate("/setor-financeiro/contabilidade")}
                 >
                   <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">

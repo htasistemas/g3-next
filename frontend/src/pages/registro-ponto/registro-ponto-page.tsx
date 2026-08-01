@@ -267,12 +267,66 @@ function calcularAssimetriaHorizontal(amostra: Uint8ClampedArray) {
 }
 
 function formatarMinutos(totalMinutos?: number) {
-  const valor = Number(totalMinutos ?? 0);
+  const valor = Math.round(Number(totalMinutos ?? 0));
   const sinal = valor < 0 ? "-" : "";
   const absoluto = Math.abs(valor);
   const horas = Math.floor(absoluto / 60);
   const minutos = absoluto % 60;
   return `${sinal}${horas}h ${String(minutos).padStart(2, "0")}m`;
+}
+
+function formatarMediaMinutos(totalMinutos?: number, base?: number) {
+  const divisor = Number(base ?? 0);
+  if (!divisor) return "---";
+  return formatarMinutos(Math.round(Number(totalMinutos ?? 0) / divisor));
+}
+
+function rotuloOcorrenciaEspelho(valor: string) {
+  const normalizado = valor.trim().toUpperCase();
+  if (normalizado === "ATRASO") return "Atraso";
+  if (normalizado === "FALTA") return "Falta";
+  if (normalizado === "HORA_EXTRA") return "Hora extra";
+  if (normalizado === "BANCO_HORAS") return "Banco de horas";
+  if (normalizado === "ESQUECIMENTO_BATIDA") return "Esquecimento";
+  if (normalizado === "INCONSISTENCIA_SEQUENCIA") return "Inconsistência";
+  if (normalizado === "CORRECAO_ADMINISTRATIVA") return "Correção";
+  if (normalizado === "AJUSTE_MANUAL") return "Ajuste manual";
+  if (normalizado === "OBSERVACAO_OPERACIONAL") return "Observação";
+  return valor.replaceAll("_", " ");
+}
+
+function classeOcorrenciaEspelho(valor: string) {
+  const normalizado = valor.trim().toUpperCase();
+  if (normalizado === "HORA_EXTRA" || normalizado === "BANCO_HORAS") return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if (normalizado === "ATRASO" || normalizado === "FALTA") return "border-amber-200 bg-amber-50 text-amber-700";
+  if (normalizado === "INCONSISTENCIA_SEQUENCIA") return "border-sky-200 bg-sky-50 text-sky-700";
+  if (normalizado === "ESQUECIMENTO_BATIDA" || normalizado === "OBSERVACAO_OPERACIONAL") return "border-slate-200 bg-slate-100 text-slate-600";
+  if (normalizado === "CORRECAO_ADMINISTRATIVA" || normalizado === "AJUSTE_MANUAL") return "border-indigo-200 bg-indigo-50 text-indigo-700";
+  return "border-slate-200 bg-slate-100 text-slate-600";
+}
+
+function formatarOcorrenciasEspelho(item: RegistroPontoItem) {
+  const houveJornadaCompleta =
+    !!item.entrada_1 && !!item.saida_1 && !!item.entrada_2 && !!item.saida_2;
+  const semDesviosRelevantes =
+    item.atrasos_minutos === 0 &&
+    item.horas_extras_minutos === 0 &&
+    item.banco_horas_minutos === 0 &&
+    item.faltas_minutos === 0 &&
+    !item.ocorrencias.length;
+
+  if (houveJornadaCompleta && semDesviosRelevantes) {
+    return [{ rotulo: "Lançado corretamente", classe: "border-emerald-200 bg-emerald-50 text-emerald-700" }];
+  }
+
+  if (item.ocorrencias.length) {
+    return item.ocorrencias.map((ocorrencia) => ({
+      rotulo: rotuloOcorrenciaEspelho(ocorrencia),
+      classe: classeOcorrenciaEspelho(ocorrencia)
+    }));
+  }
+
+  return [{ rotulo: "Sem ocorrência registrada", classe: "border-slate-200 bg-slate-100 text-slate-600" }];
 }
 
 function extrairNumero(valor: unknown) {
@@ -486,6 +540,11 @@ export function RegistroPontoPage() {
   const registros = listaData?.registros ?? [];
   const espelho = espelhoData?.registros ?? [];
   const totaisEspelho = espelhoData?.totais;
+  const totalDiasEspelho = totaisEspelho?.total_dias ?? 0;
+  const totalTrabalhadoEspelho = totaisEspelho?.total_trabalhado_minutos ?? 0;
+  const mediaDiariaEspelho = formatarMediaMinutos(totalTrabalhadoEspelho, totalDiasEspelho);
+  const mediaSemanalEspelho = formatarMediaMinutos(totalTrabalhadoEspelho * 7, totalDiasEspelho);
+  const mediaMensalEspelho = formatarMediaMinutos(totalTrabalhadoEspelho * 30, totalDiasEspelho);
   const usuariosCatalogo = usuariosCatalogoData?.usuarios ?? [];
   const horaExtras = horaExtrasData?.registros ?? [];
   const totaisHoraExtra = horaExtrasData?.totais;
@@ -1470,11 +1529,24 @@ export function RegistroPontoPage() {
                 <td className="px-2 py-2">{formatarMinutos(item.atrasos_minutos)}</td>
                 <td className="px-2 py-2">{formatarMinutos(item.faltas_minutos)}</td>
                 <td className="px-2 py-2">
-                  <span className={`rounded-full border px-2 py-1 text-[11px] font-semibold ${badgeStatusClasse(item.status)}`}>
+                  <span className={`inline-flex rounded-full border px-2 py-1 text-[11px] font-semibold ${badgeStatusClasse(item.status)}`}>
                     {item.status === "COMPLETO" ? "Completo" : "Incompleto"}
                   </span>
                 </td>
-                {exibirOcorrencias ? <td className="px-2 py-2">{item.ocorrencias.join(", ") || "---"}</td> : null}
+                {exibirOcorrencias ? (
+                  <td className="px-2 py-2">
+                    <div className="flex flex-wrap gap-1">
+                      {formatarOcorrenciasEspelho(item).map((ocorrencia, ocorrenciaIndex) => (
+                        <span
+                          key={`${item.id}-ocorrencia-${ocorrenciaIndex}`}
+                          className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-tight ${ocorrencia.classe}`}
+                        >
+                          {ocorrencia.rotulo}
+                        </span>
+                      ))}
+                    </div>
+                  </td>
+                ) : null}
               </tr>
             ))}
 
@@ -1664,10 +1736,10 @@ export function RegistroPontoPage() {
                     <label className="flex items-center gap-2 rounded-lg border border-[var(--g3-border)] bg-white px-3 py-2 text-sm">
                       <Checkbox
                         checked={configHoraExtraDraft.exigir_autorizacao_hora_extra_antecipada}
-                        onCheckedChange={(checked) =>
+                        onChange={(event) =>
                           setConfigHoraExtraDraft((atual) => ({
                             ...atual,
-                            exigir_autorizacao_hora_extra_antecipada: checked === true
+                            exigir_autorizacao_hora_extra_antecipada: event.target.checked
                           }))
                         }
                       />
@@ -1679,10 +1751,10 @@ export function RegistroPontoPage() {
                     <label className="flex items-center gap-2 rounded-lg border border-[var(--g3-border)] bg-white px-3 py-2 text-sm">
                       <Checkbox
                         checked={configHoraExtraDraft.permitir_solicitacao_hora_extra_pelo_funcionario}
-                        onCheckedChange={(checked) =>
+                        onChange={(event) =>
                           setConfigHoraExtraDraft((atual) => ({
                             ...atual,
-                            permitir_solicitacao_hora_extra_pelo_funcionario: checked === true
+                            permitir_solicitacao_hora_extra_pelo_funcionario: event.target.checked
                           }))
                         }
                       />
@@ -2220,6 +2292,29 @@ export function RegistroPontoPage() {
             <Card><CardContent className="p-3"><p className="text-xs text-[var(--g3-muted)]">Faltas</p><p className="text-lg font-semibold">{formatarMinutos(totaisEspelho?.faltas_minutos ?? 0)}</p></CardContent></Card>
             <Card><CardContent className="p-3"><p className="text-xs text-[var(--g3-muted)]">Ajustes</p><p className="text-lg font-semibold">{totaisEspelho?.total_ajustes ?? 0}</p></CardContent></Card>
           </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Card>
+              <CardContent className="p-3">
+                <p className="text-xs text-[var(--g3-muted)]">Média por dia</p>
+                <p className="text-lg font-semibold">{mediaDiariaEspelho}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-3">
+                <p className="text-xs text-[var(--g3-muted)]">Média por semana</p>
+                <p className="text-lg font-semibold">{mediaSemanalEspelho}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-3">
+                <p className="text-xs text-[var(--g3-muted)]">Média por mês</p>
+                <p className="text-lg font-semibold">{mediaMensalEspelho}</p>
+              </CardContent>
+            </Card>
+          </div>
+          <p className="text-xs text-[var(--g3-muted)]">
+            Faltas representam o tempo ainda não cumprido nos dias fechados do período. As médias são normalizadas a partir da jornada total trabalhada.
+          </p>
 
           <div className="flex justify-end">
             <Button
@@ -2638,7 +2733,7 @@ export function RegistroPontoPage() {
               <label className="flex items-start gap-2 rounded-lg border border-[var(--g3-border)] bg-slate-50 p-3">
                 <Checkbox
                   checked={cienciaHoraExtraConfirmada}
-                  onCheckedChange={(checked) => setCienciaHoraExtraConfirmada(checked === true)}
+                  onChange={(event) => setCienciaHoraExtraConfirmada(event.target.checked)}
                 />
                 <span className="text-sm text-slate-700">
                   Declaro ciência de que a realização de hora extra depende de autorização da empresa.

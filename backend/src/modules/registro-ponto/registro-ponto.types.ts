@@ -109,6 +109,7 @@ export type RegistroPontoListaItem = {
   atrasos_minutos: number;
   observacoes?: string;
   ocorrencias: string[];
+  ocorrencias_descricao?: string[];
   alterado_manualmente: boolean;
   status: "COMPLETO" | "INCOMPLETO";
   proxima_batida?: string;

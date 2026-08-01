@@ -1,0 +1,49 @@
+import { existsSync, readdirSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { spawnSync, spawn } from "node:child_process";
+import { loadBackendEnvFiles } from "../src/config/env-runtime.js";
+
+loadBackendEnvFiles();
+
+const npmCommand = process.platform === "win32" ? process.env.ComSpec || "cmd.exe" : "npx";
+const npmPrefix = process.platform === "win32" ? ["/d", "/s", "/c", "npx.cmd"] : [];
+const childOptions = { stdio: "inherit" as const, env: process.env, shell: false };
+const migration = spawnSync(npmCommand, [...npmPrefix, "prisma", "migrate", "deploy"], {
+  ...childOptions,
+  stdio: ["ignore", "pipe", "pipe"]
+});
+
+if (migration.status !== 0) {
+  const migrationOutput = `${migration.stdout?.toString() ?? ""}\n${migration.stderr?.toString() ?? ""}`;
+  const bancoLegado = migrationOutput.includes("P3005") || migrationOutput.includes("schema is not empty");
+  const migrationsDir = resolve(process.cwd(), "prisma", "migrations");
+  const migrations = existsSync(migrationsDir)
+    ? readdirSync(migrationsDir).filter((name) => name.includes("educacional") || name.includes("tipo_unidade")).sort()
+    : [];
+
+  if (migrations.length === 0) {
+    process.exit(migration.status ?? 1);
+  }
+
+  if (bancoLegado) {
+    console.warn("[g3n-backend-node] Banco legado detectado; aplicando migrations compatíveis sem apagar dados.");
+  } else {
+    console.error("[g3n-backend-node] Falha ao aplicar migrations do banco:", migrationOutput.trim());
+  }
+  for (const migrationName of migrations) {
+    const file = join(migrationsDir, migrationName, "migration.sql");
+    const result = spawnSync(
+      npmCommand,
+      [...npmPrefix, "prisma", "db", "execute", "--schema", "prisma/schema.prisma", "--file", file],
+      childOptions
+    );
+    if (result.status !== 0) {
+      process.exit(result.status ?? 1);
+    }
+  }
+}
+
+const server = spawn(npmCommand, [...npmPrefix, "tsx", "watch", "src/server.ts"], childOptions);
+server.on("exit", (code, signal) => {
+  process.exitCode = signal ? 1 : code ?? 1;
+});

@@ -544,7 +544,8 @@ export class RegistroPontoRepository {
         u.nome_usuario,
         u.unidade
       FROM usuarios u
-      WHERE COALESCE(u.status, 'ATIVO') <> 'INATIVO'
+      WHERE u.deletado_em IS NULL
+        AND COALESCE(u.status, 'ATIVO') = 'ATIVO'
         AND u.tenant_id::text = ${tenantId}
         AND (
           ${whereTermo ? Prisma.sql`u.nome ILIKE ${`%${whereTermo}%`} OR u.nome_usuario ILIKE ${`%${whereTermo}%`}` : Prisma.sql`TRUE`}
@@ -1732,6 +1733,7 @@ export class RegistroPontoRepository {
           ELSE 'INCOMPLETO'
         END AS status_registro,
         COALESCE(ARRAY_REMOVE(ARRAY_AGG(DISTINCT o.tipo), NULL), ARRAY[]::text[]) AS ocorrencias,
+        COALESCE(ARRAY_REMOVE(ARRAY_AGG(DISTINCT o.descricao), NULL), ARRAY[]::text[]) AS ocorrencias_descricao,
         (
           GREATEST(0, COALESCE(EXTRACT(EPOCH FROM (r.saida_1 - r.entrada_1)) / 60, 0)::integer)
           + GREATEST(0, COALESCE(EXTRACT(EPOCH FROM (r.saida_2 - r.entrada_2)) / 60, 0)::integer)
@@ -2397,6 +2399,8 @@ export class RegistroPontoRepository {
           campo: "entrada_1" | "saida_1" | "entrada_2" | "saida_2";
           minutos: number;
           tipo: "ATRASO" | "HORA_EXTRA";
+          horario_previsto: string;
+          horario_real: string;
         }>;
       };
       resumoHoraExtra: {
@@ -2411,6 +2415,33 @@ export class RegistroPontoRepository {
       registro: RegistroLinha;
     }
   ) {
+    const rotuloCampoBatida = (campo: "entrada_1" | "saida_1" | "entrada_2" | "saida_2") => {
+      if (campo === "entrada_1") return "E1";
+      if (campo === "saida_1") return "S1";
+      if (campo === "entrada_2") return "E2";
+      return "S2";
+    };
+
+    const extrairHorarioCurto = (valor: string) => String(valor ?? "").slice(0, 5);
+
+    const descreverDesvio = (item: {
+      campo: "entrada_1" | "saida_1" | "entrada_2" | "saida_2";
+      minutos: number;
+      tipo: "ATRASO" | "HORA_EXTRA";
+      horario_previsto: string;
+      horario_real: string;
+    }) => {
+      const rotulo = rotuloCampoBatida(item.campo);
+      const previsto = extrairHorarioCurto(item.horario_previsto);
+      const real = extrairHorarioCurto(item.horario_real);
+
+      if (item.tipo === "ATRASO") {
+        return `Lançado com atraso em ${rotulo} (${previsto} → ${real}).`;
+      }
+
+      return `Lançado como hora extra em ${rotulo} (${previsto} → ${real}).`;
+    };
+
     await tx.$executeRaw(Prisma.sql`
       DELETE FROM registro_ponto_ocorrencia
       WHERE registro_ponto_id = ${registroId}
@@ -2423,7 +2454,8 @@ export class RegistroPontoRepository {
         registro_ponto_id: registroId,
         tenant_id: tenantId,
         tipo: "ATRASO",
-        descricao: `Atraso de ${contexto.atrasoMinutos} minuto(s).`,
+        descricao:
+          contexto.desvios.detalhes.filter((item) => item.tipo === "ATRASO").map(descreverDesvio).join(" "),
         origem: "SISTEMA"
       });
     }
@@ -2443,7 +2475,8 @@ export class RegistroPontoRepository {
         registro_ponto_id: registroId,
         tenant_id: tenantId,
         tipo: "HORA_EXTRA",
-        descricao: `Hora extra de ${contexto.horasExtrasMinutos} minuto(s).`,
+        descricao:
+          contexto.desvios.detalhes.filter((item) => item.tipo === "HORA_EXTRA").map(descreverDesvio).join(" "),
         origem: "SISTEMA"
       });
     }
@@ -2453,7 +2486,7 @@ export class RegistroPontoRepository {
         registro_ponto_id: registroId,
         tenant_id: tenantId,
         tipo: "BANCO_HORAS",
-        descricao: `Banco de horas com saldo de ${contexto.bancoHorasMinutos} minuto(s).`,
+        descricao: `Banco de horas com saldo de ${contexto.bancoHorasMinutos > 0 ? "+" : ""}${contexto.bancoHorasMinutos} minuto(s).`,
         origem: "SISTEMA"
       });
     }

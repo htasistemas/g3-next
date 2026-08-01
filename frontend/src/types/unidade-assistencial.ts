@@ -10,11 +10,13 @@ export type DiretoriaUnidade = {
 export type SalaUnidade = {
   id?: string;
   nome: string;
+  capacidade_maxima?: number;
   ativo?: boolean;
 };
 
 export type UnidadeAssistencial = {
   id_unidade?: string;
+  tipo_unidade: "ASSISTENCIAL" | "ENSINO";
   nome_fantasia: string;
   razao_social?: string;
   cnpj?: string;
@@ -60,6 +62,7 @@ export type UnidadeAssistencialListaResponse = {
 };
 
 export type UnidadeAssistencialFiltro = {
+  tipo_unidade?: "ASSISTENCIAL" | "ENSINO";
   nome_fantasia?: string;
   cnpj?: string;
   cidade?: string;

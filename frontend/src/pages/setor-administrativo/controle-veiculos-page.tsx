@@ -2,8 +2,11 @@
 import { useNavigate } from "react-router-dom";
 import type { KeyboardEvent } from "react";
 import {
+  Ban,
   Car,
   ClipboardList,
+  Clock3,
+  CalendarDays,
   LayoutDashboard,
   List,
   MapPinned,
@@ -13,6 +16,7 @@ import {
   Save,
   Search,
   ShieldCheck,
+  CircleCheckBig,
   Trash2,
   Undo2,
   X
@@ -26,6 +30,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AdminPageLayout, type AdminAction, type AdminTab } from "@/components/admin/admin-page-layout";
 import { PopupConfirmacao, PopupMensagem, type PopupMensagemState } from "@/components/admin/admin-popups";
 import {
+  useAgendaVeiculoDisponibilidade,
+  useCancelarDisponibilidadeVeiculo,
+  useConsultaDisponibilidade,
+  useDisponibilidades,
+  useEncerrarDisponibilidadeVeiculo,
+  useExcluirDisponibilidadeVeiculo,
+  useResumoDisponibilidade,
+  useSalvarDisponibilidadeVeiculo,
+  useVeiculosDisponibilidade,
   useDiarioBordo,
   useLocaisDestinoVeiculo,
   useMotoristasAutorizados,
@@ -53,6 +66,9 @@ import { imprimirConteudoAtual, imprimirHtmlSemJanela } from "@/lib/report-utils
 import { arquivosService } from "@/services/arquivos.service";
 import { controleVeiculosService } from "@/services/controle-veiculos.service";
 import type {
+  DisponibilidadeVeiculoConsulta,
+  DisponibilidadeVeiculoRegistro,
+  DisponibilidadeVeiculoSituacaoCalculada,
   LocalDestinoVeiculo,
   MotoristaAutorizado,
   MotoristaDisponivel,
@@ -64,6 +80,7 @@ type AbaId =
   | "dashboard"
   | "cadastro"
   | "listagem"
+  | "disponibilidade"
   | "diario"
   | "destinos"
   | "motoristas";
@@ -71,6 +88,7 @@ type TipoOrigemMotorista = MotoristaAutorizado["tipoOrigem"];
 
 const abas: AdminTab[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { id: "disponibilidade", label: "Disponibilidade de veículos", icon: CalendarDays },
   { id: "cadastro", label: "Cadastro de veículo", icon: Car },
   { id: "listagem", label: "Listagem de veículos", icon: List },
   { id: "diario", label: "Mapa de bordo", icon: ClipboardList },
@@ -85,6 +103,7 @@ const hojeBr = formatarDataPtBr(new Date().toISOString().slice(0, 10));
 const documentoVeiculoMaximoBytes = 15 * 1024 * 1024;
 const combustiveis = ["Gasolina", "Etanol", "Flex", "Diesel", "GNV", "Elétrico", "Híbrido"];
 const categoriasCarteira = ["ACC", "A", "B", "C", "D", "E", "AB", "AC", "AD", "AE"];
+const hojeIso = new Date().toISOString().slice(0, 10);
 
 const defaultVeiculo: VeiculoCadastro = {
   placa: "",
@@ -151,6 +170,49 @@ type PeriodoImpressaoDiario = {
   dataInicial: string;
   dataFinal: string;
   veiculoId: number | null;
+};
+
+type FormDisponibilidade = {
+  id?: number;
+  veiculoId: number | null;
+  tipoSituacao: "RESERVADO" | "INDISPONIVEL";
+  data: string;
+  horaInicial: string;
+  horaFinal: string;
+  motivo: string;
+  motivoDetalhado: string;
+  destino: string;
+  responsavelNome: string;
+  observacoes: string;
+};
+
+type ConsultaDisponibilidadeState = {
+  data: string;
+  horaInicial: string;
+  horaFinal: string;
+  veiculoId: number | null;
+  situacao: "DISPONIVEL" | "RESERVADO" | "INDISPONIVEL" | "";
+};
+
+const formDisponibilidadeInicial: FormDisponibilidade = {
+  veiculoId: null,
+  tipoSituacao: "RESERVADO",
+  data: hojeIso,
+  horaInicial: "08:00",
+  horaFinal: "09:00",
+  motivo: "",
+  motivoDetalhado: "",
+  destino: "",
+  responsavelNome: "",
+  observacoes: ""
+};
+
+const consultaDisponibilidadeInicial: ConsultaDisponibilidadeState = {
+  data: hojeIso,
+  horaInicial: "08:00",
+  horaFinal: "18:00",
+  veiculoId: null,
+  situacao: ""
 };
 
 function mascararDataHifen(valor?: string | null) {
@@ -341,6 +403,33 @@ function PlacaVeiculoVisual({ placa }: { placa?: string | null }) {
   );
 }
 
+function formatarDataHoraVisual(valor?: string | null) {
+  if (!valor) return "---";
+  const data = new Date(valor);
+  if (Number.isNaN(data.getTime())) return "---";
+  return data.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+}
+
+function combinarDataHoraIso(data?: string | null, hora?: string | null) {
+  const dataTexto = String(data ?? "").trim();
+  const horaTexto = String(hora ?? "").trim();
+  if (!dataTexto || !horaTexto) return "";
+  const dataHora = new Date(`${dataTexto}T${horaTexto}:00`);
+  return Number.isNaN(dataHora.getTime()) ? "" : dataHora.toISOString();
+}
+
+function rotuloSituacaoDisponibilidade(valor?: DisponibilidadeVeiculoSituacaoCalculada | null) {
+  if (valor === "INDISPONIVEL") return "Indisponível";
+  if (valor === "RESERVADO") return "Reservado";
+  return "Disponível";
+}
+
+function classeSituacaoDisponibilidade(valor?: DisponibilidadeVeiculoSituacaoCalculada | null) {
+  if (valor === "INDISPONIVEL") return "border-red-200 bg-red-50 text-red-800";
+  if (valor === "RESERVADO") return "border-amber-200 bg-amber-50 text-amber-900";
+  return "border-emerald-200 bg-emerald-50 text-emerald-900";
+}
+
 export function ControleVeiculosPage() {
   const navigate = useNavigate();
   const [abaAtiva, setAbaAtiva] = useState<AbaId>("dashboard");
@@ -349,6 +438,11 @@ export function ControleVeiculosPage() {
   const [localDestinoForm, setLocalDestinoForm] = useState<LocalDestinoVeiculo>(defaultLocalDestino);
   const [motoristaForm, setMotoristaForm] = useState<MotoristaAutorizado>(defaultMotorista);
   const [termoMotorista, setTermoMotorista] = useState("");
+  const [formDisponibilidade, setFormDisponibilidade] = useState<FormDisponibilidade>(formDisponibilidadeInicial);
+  const [consultaDisponibilidade, setConsultaDisponibilidade] = useState<ConsultaDisponibilidadeState>(
+    consultaDisponibilidadeInicial
+  );
+  const [agendaVisualizacao, setAgendaVisualizacao] = useState<"semanal" | "diaria" | "mensal">("semanal");
   const [popupMensagem, setPopupMensagem] = useState<PopupMensagemState | null>(null);
   const [confirmarExcluir, setConfirmarExcluir] = useState(false);
   const [periodoImpressaoDiario, setPeriodoImpressaoDiario] = useState<PeriodoImpressaoDiario>({
@@ -365,11 +459,32 @@ export function ControleVeiculosPage() {
 
   const unidadeAtualQuery = useUnidadeAssistencialAtual();
   const { data: veiculosData } = useVeiculos();
+  const { data: veiculosDisponibilidadeData } = useVeiculosDisponibilidade();
   const { data: diarioData } = useDiarioBordo();
   const { data: locaisDestinoData } = useLocaisDestinoVeiculo();
   const { data: motoristasAutorizadosData } = useMotoristasAutorizados();
   const { data: motoristasVeiculoData } = useMotoristasAutorizados(diarioForm.veiculoId ?? undefined);
   const { data: motoristasDisponiveisData } = useMotoristasDisponiveis(termoMotorista);
+  const consultaDisponibilidadePayload = useMemo(
+    () => ({
+      dataHoraInicio: combinarDataHoraIso(consultaDisponibilidade.data, consultaDisponibilidade.horaInicial),
+      dataHoraFim: combinarDataHoraIso(consultaDisponibilidade.data, consultaDisponibilidade.horaFinal),
+      veiculoId: consultaDisponibilidade.veiculoId ?? undefined,
+      situacao: consultaDisponibilidade.situacao || undefined
+    }),
+    [consultaDisponibilidade]
+  );
+  const resumoDisponibilidadeQuery = useResumoDisponibilidade(consultaDisponibilidadePayload);
+  const consultaDisponibilidadeQuery = useConsultaDisponibilidade(consultaDisponibilidadePayload);
+  const disponibilidadesQuery = useDisponibilidades();
+  const salvarDisponibilidadeMutation = useSalvarDisponibilidadeVeiculo();
+  const cancelarDisponibilidadeMutation = useCancelarDisponibilidadeVeiculo();
+  const encerrarDisponibilidadeMutation = useEncerrarDisponibilidadeVeiculo();
+  const excluirDisponibilidadeMutation = useExcluirDisponibilidadeVeiculo();
+  const agendaDisponibilidadeQuery = useAgendaVeiculoDisponibilidade(
+    formDisponibilidade.veiculoId,
+    consultaDisponibilidadePayload
+  );
 
   const salvarVeiculoMutation = useSalvarVeiculo();
   const salvarDiarioMutation = useSalvarDiarioBordo();
@@ -389,6 +504,7 @@ export function ControleVeiculosPage() {
     [diarioData]
   );
   const locaisDestino = locaisDestinoData ?? [];
+  const veiculosDisponibilidade = veiculosDisponibilidadeData ?? [];
   const motoristasAutorizados = motoristasAutorizadosData ?? [];
   const motoristasVeiculo = motoristasVeiculoData ?? [];
   const motoristasDisponiveis = (motoristasDisponiveisData ?? []).filter(
@@ -402,6 +518,10 @@ export function ControleVeiculosPage() {
     termoMotoristaNormalizado.length >= 2 &&
     termoMotoristaNormalizado !== motoristaSelecionadoNormalizado;
   const locaisDestinoAtivos = locaisDestino.filter((item) => item.ativo !== false);
+  const disponibilidades = disponibilidadesQuery.data ?? [];
+  const resumoDisponibilidade = resumoDisponibilidadeQuery.data;
+  const consultaDisponibilidadeItens = consultaDisponibilidadeQuery.data?.itens ?? [];
+  const agendaDisponibilidade = agendaDisponibilidadeQuery.data ?? [];
 
   const carregandoAcoes =
     salvarVeiculoMutation.isPending ||
@@ -412,6 +532,10 @@ export function ControleVeiculosPage() {
     removerDiarioMutation.isPending ||
     removerLocalDestinoMutation.isPending ||
     removerMotoristaMutation.isPending ||
+    salvarDisponibilidadeMutation.isPending ||
+    cancelarDisponibilidadeMutation.isPending ||
+    encerrarDisponibilidadeMutation.isPending ||
+    excluirDisponibilidadeMutation.isPending ||
     enviandoFotoVeiculo ||
     enviandoDocumentoVeiculo;
 
@@ -705,8 +829,183 @@ export function ControleVeiculosPage() {
     }
   }
 
+  async function salvarDisponibilidade() {
+    const dataHoraInicio = combinarDataHoraIso(formDisponibilidade.data, formDisponibilidade.horaInicial);
+    const dataHoraFim = combinarDataHoraIso(formDisponibilidade.data, formDisponibilidade.horaFinal);
+    const veiculoSelecionado =
+      veiculosDisponibilidade.find((item) => item.id === formDisponibilidade.veiculoId) ?? null;
+
+    if (!formDisponibilidade.veiculoId || !dataHoraInicio || !dataHoraFim) {
+      setPopupMensagem({
+        tipo: "aviso",
+        titulo: "Validação",
+        texto: "Informe veículo, data, hora inicial e hora final."
+      });
+      return;
+    }
+
+    if (formDisponibilidade.horaInicial >= formDisponibilidade.horaFinal) {
+      setPopupMensagem({
+        tipo: "aviso",
+        titulo: "Validação",
+        texto: "A hora final deve ser maior que a hora inicial."
+      });
+      return;
+    }
+
+    if (formDisponibilidade.tipoSituacao === "INDISPONIVEL" && !formDisponibilidade.motivo.trim()) {
+      setPopupMensagem({
+        tipo: "aviso",
+        titulo: "Validação",
+        texto: "Informe o motivo da indisponibilidade."
+      });
+      return;
+    }
+
+    if (!veiculoSelecionado) {
+      setPopupMensagem({
+        tipo: "aviso",
+        titulo: "Validação",
+        texto: "Selecione um veículo ativo da frota."
+      });
+      return;
+    }
+
+    try {
+      const payload = {
+        id: formDisponibilidade.id,
+        veiculoId: formDisponibilidade.veiculoId,
+        tipoSituacao: formDisponibilidade.tipoSituacao,
+        dataHoraInicio,
+        dataHoraFim,
+        motivo: formDisponibilidade.motivo || null,
+        motivoDetalhado:
+          formDisponibilidade.motivo.trim() === "Outro" ? formDisponibilidade.motivoDetalhado || null : null,
+        destino: formDisponibilidade.destino || null,
+        responsavelNome: formDisponibilidade.responsavelNome || null,
+        observacoes: formDisponibilidade.observacoes || null
+      } satisfies DisponibilidadeVeiculoRegistro;
+      const salvo = await salvarDisponibilidadeMutation.mutateAsync(payload);
+      setFormDisponibilidade({
+        id: salvo.id,
+        veiculoId: salvo.veiculoId,
+        tipoSituacao: salvo.tipoSituacao,
+        data: salvo.dataHoraInicio.slice(0, 10),
+        horaInicial: salvo.dataHoraInicio.slice(11, 16),
+        horaFinal: salvo.dataHoraFim.slice(11, 16),
+        motivo: salvo.motivo ?? "",
+        motivoDetalhado: salvo.motivoDetalhado ?? "",
+        destino: salvo.destino ?? "",
+        responsavelNome: salvo.responsavelNome ?? "",
+        observacoes: salvo.observacoes ?? ""
+      });
+      setPopupMensagem({
+        tipo: "sucesso",
+        titulo: "Confirmação",
+        texto: formDisponibilidade.id ? "Registro atualizado com sucesso." : "Registro salvo com sucesso."
+      });
+    } catch (error: any) {
+      setPopupMensagem({
+        tipo: "erro",
+        titulo: "Erro",
+        texto:
+          error?.response?.data?.message ??
+          error?.response?.data?.mensagem ??
+          "Não foi possível concluir o lançamento."
+      });
+    }
+  }
+
+  function novoDisponibilidade() {
+    setFormDisponibilidade(formDisponibilidadeInicial);
+  }
+
+  function selecionarDisponibilidade(item: DisponibilidadeVeiculoRegistro) {
+    setFormDisponibilidade({
+      id: item.id,
+      veiculoId: item.veiculoId,
+      tipoSituacao: item.tipoSituacao,
+      data: item.dataHoraInicio.slice(0, 10),
+      horaInicial: item.dataHoraInicio.slice(11, 16),
+      horaFinal: item.dataHoraFim.slice(11, 16),
+      motivo: item.motivo ?? "",
+      motivoDetalhado: item.motivoDetalhado ?? "",
+      destino: item.destino ?? "",
+      responsavelNome: item.responsavelNome ?? "",
+      observacoes: item.observacoes ?? ""
+    });
+  }
+
+  async function cancelarSelecionado() {
+    if (!formDisponibilidade.id) return;
+    const motivoCancelamento = window.prompt("Informe o motivo do cancelamento:");
+    if (!motivoCancelamento?.trim()) return;
+    try {
+      await cancelarDisponibilidadeMutation.mutateAsync({
+        id: formDisponibilidade.id,
+        motivoCancelamento: motivoCancelamento.trim()
+      });
+      novoDisponibilidade();
+      setPopupMensagem({
+        tipo: "sucesso",
+        titulo: "Confirmação",
+        texto: "Registro cancelado com sucesso."
+      });
+    } catch (error: any) {
+      setPopupMensagem({
+        tipo: "erro",
+        titulo: "Erro",
+        texto: error?.response?.data?.message ?? "Não foi possível cancelar o registro."
+      });
+    }
+  }
+
+  async function encerrarSelecionado() {
+    if (!formDisponibilidade.id) return;
+    if (!window.confirm("Deseja encerrar este registro antes do horário previsto?")) return;
+    try {
+      await encerrarDisponibilidadeMutation.mutateAsync(formDisponibilidade.id);
+      novoDisponibilidade();
+      setPopupMensagem({
+        tipo: "sucesso",
+        titulo: "Confirmação",
+        texto: "Registro encerrado com sucesso."
+      });
+    } catch (error: any) {
+      setPopupMensagem({
+        tipo: "erro",
+        titulo: "Erro",
+        texto: error?.response?.data?.message ?? "Não foi possível encerrar o registro."
+      });
+    }
+  }
+
+  async function excluirDisponibilidadeSelecionada() {
+    if (!formDisponibilidade.id) return;
+    if (!window.confirm("Deseja excluir logicamente este registro?")) return;
+    try {
+      await excluirDisponibilidadeMutation.mutateAsync(formDisponibilidade.id);
+      novoDisponibilidade();
+      setPopupMensagem({
+        tipo: "sucesso",
+        titulo: "Confirmação",
+        texto: "Registro excluído com sucesso."
+      });
+    } catch (error: any) {
+      setPopupMensagem({
+        tipo: "erro",
+        titulo: "Erro",
+        texto: error?.response?.data?.message ?? "Não foi possível excluir o registro."
+      });
+    }
+  }
+
   function novo() {
     if (abaAtiva === "dashboard") return;
+    if (abaAtiva === "disponibilidade") {
+      novoDisponibilidade();
+      return;
+    }
     if (abaAtiva === "cadastro") {
       setVeiculoForm(defaultVeiculo);
       setFotoVeiculoArquivo(null);
@@ -759,6 +1058,7 @@ export function ControleVeiculosPage() {
   function excluir() {
     const possuiId =
       ((abaAtiva === "cadastro" || abaAtiva === "listagem") && !!veiculoForm.id) ||
+      (abaAtiva === "disponibilidade" && !!formDisponibilidade.id) ||
       (abaAtiva === "diario" && !!diarioForm.id) ||
       (abaAtiva === "destinos" && !!localDestinoForm.id) ||
       (abaAtiva === "motoristas" && !!motoristaForm.id);
@@ -793,6 +1093,10 @@ export function ControleVeiculosPage() {
         setFotoVeiculoArquivo(null);
         setFotoVeiculoPreview("");
         setDocumentoVeiculoArquivo(null);
+      }
+      if (abaAtiva === "disponibilidade" && formDisponibilidade.id) {
+        await excluirDisponibilidadeMutation.mutateAsync(formDisponibilidade.id);
+        novoDisponibilidade();
       }
       if (abaAtiva === "diario" && diarioForm.id) {
         await removerDiarioMutation.mutateAsync(diarioForm.id);
@@ -1235,6 +1539,21 @@ export function ControleVeiculosPage() {
       { label: "Imprimir painel", icon: Printer, onClick: imprimir, variant: "outline", disabled: carregandoAcoes },
       { label: "Fechar", icon: X, onClick: () => navigate("/dashboard/visao-geral"), variant: "outline" }
     ],
+    disponibilidade: [
+      {
+        label: "Consultar disponibilidade",
+        icon: Search,
+        onClick: () => window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }),
+        variant: "outline"
+      },
+      { label: "Nova reserva ou indisponibilidade", icon: Plus, onClick: novoDisponibilidade, variant: "default", disabled: carregandoAcoes },
+      { label: "Salvar registro", icon: Save, onClick: () => void salvarDisponibilidade(), variant: "default", disabled: carregandoAcoes },
+      { label: "Cancelar seleção", icon: Undo2, onClick: novoDisponibilidade, variant: "outline", disabled: carregandoAcoes },
+      { label: "Cancelar reserva", icon: Ban, onClick: cancelarSelecionado, variant: "outline", disabled: carregandoAcoes || !formDisponibilidade.id },
+      { label: "Encerrar indisponibilidade", icon: CircleCheckBig, onClick: encerrarSelecionado, variant: "outline", disabled: carregandoAcoes || !formDisponibilidade.id },
+      { label: "Excluir registro", icon: Trash2, onClick: excluirDisponibilidadeSelecionada, variant: "danger", disabled: carregandoAcoes || !formDisponibilidade.id },
+      { label: "Fechar", icon: X, onClick: () => navigate("/dashboard/visao-geral"), variant: "outline" }
+    ],
     cadastro: [
       {
         label: "Buscar veículos",
@@ -1322,11 +1641,40 @@ export function ControleVeiculosPage() {
         ? `Placa: ${veiculoSelecionadoListagem.placa}`
       : abaAtiva === "diario" && diarioForm.id
         ? `Mapa: ${diarioForm.id}`
-        : abaAtiva === "destinos" && localDestinoForm.nome
+      : abaAtiva === "disponibilidade" && formDisponibilidade.id
+        ? `Registro: ${formDisponibilidade.id}`
+      : abaAtiva === "destinos" && localDestinoForm.nome
           ? `Destino: ${localDestinoForm.nome}`
           : abaAtiva === "motoristas" && motoristaForm.nomeMotorista
             ? `Motorista: ${motoristaForm.nomeMotorista}`
             : "Novo";
+
+  const agendaAgrupada = useMemo<Array<[string, DisponibilidadeVeiculoRegistro[]]>>(() => {
+    const base = [...agendaDisponibilidade].sort((a, b) => a.dataHoraInicio.localeCompare(b.dataHoraInicio));
+    if (agendaVisualizacao === "mensal") {
+      const grupos = new Map<string, DisponibilidadeVeiculoRegistro[]>();
+      for (const item of base) {
+        const chave = item.dataHoraInicio.slice(0, 7);
+        const grupo = grupos.get(chave) ?? [];
+        grupo.push(item);
+        grupos.set(chave, grupo);
+      }
+      return Array.from(grupos.entries());
+    }
+
+    if (agendaVisualizacao === "semanal") {
+      const grupos = new Map<string, DisponibilidadeVeiculoRegistro[]>();
+      for (const item of base) {
+        const chave = item.dataHoraInicio.slice(0, 10);
+        const grupo = grupos.get(chave) ?? [];
+        grupo.push(item);
+        grupos.set(chave, grupo);
+      }
+      return Array.from(grupos.entries());
+    }
+
+    return [["Hoje", base]];
+  }, [agendaDisponibilidade, agendaVisualizacao]);
 
   return (
     <>
@@ -1361,12 +1709,429 @@ export function ControleVeiculosPage() {
               <Card className={classeCardDashboard}><CardHeader className="items-center px-3 pb-1 pt-3 text-center"><CardTitle className="text-[11px] font-semibold tracking-[0.02em] text-emerald-900">Locais de destino</CardTitle></CardHeader><CardContent className="px-3 pb-3 pt-0 text-center text-xl font-semibold text-emerald-950">{dashboard.locaisDestino}</CardContent></Card>
               <Card className={classeCardDashboard}><CardHeader className="items-center px-3 pb-1 pt-3 text-center"><CardTitle className="text-[11px] font-semibold tracking-[0.02em] text-emerald-900">Motoristas autorizados</CardTitle></CardHeader><CardContent className="px-3 pb-3 pt-0 text-center text-xl font-semibold text-emerald-950">{dashboard.motoristasAutorizados}</CardContent></Card>
             </div>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" onClick={() => setAbaAtiva("disponibilidade")}>
+                Abrir agenda de disponibilidade
+              </Button>
+            </div>
             <div className="overflow-x-auto rounded-lg border border-[var(--g3-border)]">
               <table className="min-w-full text-sm">
                 <thead className="bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"><tr><th className="px-3 py-2 text-left">Data</th><th className="px-3 py-2 text-left">Veículo</th><th className="px-3 py-2 text-left">Condutor</th><th className="px-3 py-2 text-left">Destino</th><th className="px-3 py-2 text-left">Km rodados</th></tr></thead>
                 <tbody>{rotasRecentes.length ? rotasRecentes.map((item, index) => <tr key={item.id ?? `${item.veiculoId}-${index}`} className={`border-t border-[var(--g3-border)] ${index % 2 === 0 ? "bg-[var(--g3-card)]" : "bg-[var(--g3-primary-soft)]/35"}`}><td className="px-3 py-2">{formatarDataPtBr(item.dataSaida || item.data)}</td><td className="px-3 py-2">{veiculos.find((veiculo) => veiculo.id === item.veiculoId)?.placa ?? "---"}</td><td className="px-3 py-2">{item.condutor ?? "---"}</td><td className="px-3 py-2">{item.localDestinoNome || item.destino || "---"}</td><td className="px-3 py-2">{item.kmRodados ?? calcularKmRodados(item.kmInicial, item.kmFinal)}</td></tr>) : <tr><td className="px-3 py-4 text-center" colSpan={5}>Nenhuma rota cadastrada até o momento.</td></tr>}</tbody>
               </table>
             </div>
+          </section>
+        ) : null}
+
+        {abaAtiva === "disponibilidade" ? (
+          <section className="space-y-4">
+            <Card className="border-[var(--g3-border)]">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex flex-wrap items-center justify-between gap-2 text-base text-[var(--g3-active)]">
+                  <span>Consultar disponibilidade</span>
+                  <Button type="button" variant="outline" onClick={() => setAgendaVisualizacao("semanal")}>
+                    Abrir agenda de disponibilidade
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                  <div className="space-y-1">
+                    <Label>Data</Label>
+                    <Input
+                      type="date"
+                      value={consultaDisponibilidade.data}
+                      onChange={(event) =>
+                        setConsultaDisponibilidade((atual) => ({ ...atual, data: event.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Hora inicial</Label>
+                    <Input
+                      type="time"
+                      value={consultaDisponibilidade.horaInicial}
+                      onChange={(event) =>
+                        setConsultaDisponibilidade((atual) => ({ ...atual, horaInicial: event.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Hora final</Label>
+                    <Input
+                      type="time"
+                      value={consultaDisponibilidade.horaFinal}
+                      onChange={(event) =>
+                        setConsultaDisponibilidade((atual) => ({ ...atual, horaFinal: event.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Veículo</Label>
+                    <Select
+                      value={String(consultaDisponibilidade.veiculoId ?? "")}
+                      onChange={(event) =>
+                        setConsultaDisponibilidade((atual) => ({
+                          ...atual,
+                          veiculoId: Number(event.target.value) || null
+                        }))
+                      }
+                    >
+                      <option value="">Todos</option>
+                      {veiculosDisponibilidade.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.rotulo}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Situação</Label>
+                    <Select
+                      value={consultaDisponibilidade.situacao}
+                      onChange={(event) =>
+                        setConsultaDisponibilidade((atual) => ({
+                          ...atual,
+                          situacao: event.target.value as ConsultaDisponibilidadeState["situacao"]
+                        }))
+                      }
+                    >
+                      <option value="">Todas</option>
+                      <option value="DISPONIVEL">Disponível</option>
+                      <option value="RESERVADO">Reservado</option>
+                      <option value="INDISPONIVEL">Indisponível</option>
+                    </Select>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <Card className="border-emerald-200 bg-emerald-50">
+                <CardHeader className="px-3 pb-1 pt-3 text-center">
+                  <CardTitle className="text-xs font-semibold uppercase tracking-[0.12em] text-emerald-800">
+                    Disponíveis
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-3 pb-3 pt-0 text-center text-2xl font-black text-emerald-900">
+                  {resumoDisponibilidade?.disponiveis ?? 0}
+                </CardContent>
+              </Card>
+              <Card className="border-amber-200 bg-amber-50">
+                <CardHeader className="px-3 pb-1 pt-3 text-center">
+                  <CardTitle className="text-xs font-semibold uppercase tracking-[0.12em] text-amber-800">
+                    Reservados
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-3 pb-3 pt-0 text-center text-2xl font-black text-amber-900">
+                  {resumoDisponibilidade?.reservados ?? 0}
+                </CardContent>
+              </Card>
+              <Card className="border-red-200 bg-red-50">
+                <CardHeader className="px-3 pb-1 pt-3 text-center">
+                  <CardTitle className="text-xs font-semibold uppercase tracking-[0.12em] text-red-800">
+                    Indisponíveis
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-3 pb-3 pt-0 text-center text-2xl font-black text-red-900">
+                  {resumoDisponibilidade?.indisponiveis ?? 0}
+                </CardContent>
+              </Card>
+              <Card className="border-slate-200 bg-slate-50">
+                <CardHeader className="px-3 pb-1 pt-3 text-center">
+                  <CardTitle className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-700">
+                    Total da frota ativa
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-3 pb-3 pt-0 text-center text-2xl font-black text-slate-900">
+                  {resumoDisponibilidade?.total ?? 0}
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+              <Card className="border-[var(--g3-border)]">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex flex-wrap items-center justify-between gap-2 text-base text-[var(--g3-active)]">
+                    <span>Situação da frota no período</span>
+                    <span className="text-xs text-[var(--g3-muted)]">
+                      {formatarDataHoraVisual(combinarDataHoraIso(consultaDisponibilidade.data, consultaDisponibilidade.horaInicial))} - {formatarDataHoraVisual(combinarDataHoraIso(consultaDisponibilidade.data, consultaDisponibilidade.horaFinal))}
+                    </span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    {consultaDisponibilidadeItens.map((item) => (
+                      <div key={item.veiculoId} className={`rounded-xl border p-3 ${classeSituacaoDisponibilidade(item.situacao)}`}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-bold">{item.placa || item.veiculoNome || "Veículo"}</p>
+                            <p className="text-xs opacity-80">
+                              {[item.marca, item.modelo].filter(Boolean).join(" - ") || "---"}
+                            </p>
+                            <p className="mt-1 text-xs opacity-80">Unidade atual da frota</p>
+                          </div>
+                          <span className="rounded-full border px-2 py-1 text-[11px] font-bold">
+                            {rotuloSituacaoDisponibilidade(item.situacao)}
+                          </span>
+                        </div>
+                        <div className="mt-3 space-y-1 text-xs">
+                          <p>
+                            <strong>Motivo:</strong> {item.bloqueios?.[0]?.motivo || "---"}
+                          </p>
+                          <p>
+                            <strong>Horário:</strong>{" "}
+                            {item.bloqueios?.[0]
+                              ? `${formatarDataHoraVisual(item.bloqueios[0].dataHoraInicio)} até ${formatarDataHoraVisual(item.bloqueios[0].dataHoraFim)}`
+                              : "Sem bloqueio"}
+                          </p>
+                          <p>
+                            <strong>Responsável:</strong> {item.bloqueios?.[0]?.responsavelNome || "---"}
+                          </p>
+                          <p>
+                            <strong>Próxima liberação:</strong>{" "}
+                            {item.proximaLiberacao ? formatarDataHoraVisual(item.proximaLiberacao) : "Imediata"}
+                          </p>
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-8 px-3 text-xs"
+                            onClick={() => {
+                              setFormDisponibilidade((atual) => ({ ...atual, veiculoId: item.veiculoId }));
+                              setConsultaDisponibilidade((atual) => ({ ...atual, veiculoId: item.veiculoId }));
+                              setAgendaVisualizacao("semanal");
+                              setAbaAtiva("disponibilidade");
+                            }}
+                          >
+                            Ver agenda do veículo
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                    {!consultaDisponibilidadeItens.length ? (
+                      <div className="col-span-full rounded-xl border border-dashed border-[var(--g3-border)] p-6 text-center text-sm text-[var(--g3-muted)]">
+                        Nenhum veículo encontrado para o período informado.
+                      </div>
+                    ) : null}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-[var(--g3-border)]">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base text-[var(--g3-active)]">
+                    {formDisponibilidade.id ? "Editar reserva ou indisponibilidade" : "Nova reserva ou indisponibilidade"}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="space-y-1">
+                    <Label>Veículo</Label>
+                    <Select
+                      value={String(formDisponibilidade.veiculoId ?? "")}
+                      onChange={(event) =>
+                        setFormDisponibilidade((atual) => ({ ...atual, veiculoId: Number(event.target.value) || null }))
+                      }
+                    >
+                      <option value="">Selecione</option>
+                      {veiculosDisponibilidade.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.rotulo}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <div className="space-y-1">
+                      <Label>Data inicial</Label>
+                      <Input
+                        type="date"
+                        value={formDisponibilidade.data}
+                        onChange={(event) =>
+                          setFormDisponibilidade((atual) => ({ ...atual, data: event.target.value }))
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Hora inicial</Label>
+                      <Input
+                        type="time"
+                        value={formDisponibilidade.horaInicial}
+                        onChange={(event) =>
+                          setFormDisponibilidade((atual) => ({ ...atual, horaInicial: event.target.value }))
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Hora final</Label>
+                      <Input
+                        type="time"
+                        value={formDisponibilidade.horaFinal}
+                        onChange={(event) =>
+                          setFormDisponibilidade((atual) => ({ ...atual, horaFinal: event.target.value }))
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="space-y-1">
+                      <Label>Situação</Label>
+                      <Select
+                        value={formDisponibilidade.tipoSituacao}
+                        onChange={(event) =>
+                          setFormDisponibilidade((atual) => ({
+                            ...atual,
+                            tipoSituacao: event.target.value as FormDisponibilidade["tipoSituacao"]
+                          }))
+                        }
+                      >
+                        <option value="RESERVADO">Reservado</option>
+                        <option value="INDISPONIVEL">Indisponível</option>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Motivo</Label>
+                      <Select
+                        value={formDisponibilidade.motivo}
+                        onChange={(event) =>
+                          setFormDisponibilidade((atual) => ({ ...atual, motivo: event.target.value }))
+                        }
+                      >
+                        <option value="">Opcional para reserva</option>
+                        <option value="Manutenção preventiva">Manutenção preventiva</option>
+                        <option value="Manutenção corretiva">Manutenção corretiva</option>
+                        <option value="Abastecimento">Abastecimento</option>
+                        <option value="Limpeza">Limpeza</option>
+                        <option value="Documentação pendente">Documentação pendente</option>
+                        <option value="Uso institucional">Uso institucional</option>
+                        <option value="Viagem">Viagem</option>
+                        <option value="Empréstimo autorizado">Empréstimo autorizado</option>
+                        <option value="Sinistro">Sinistro</option>
+                        <option value="Outro">Outro</option>
+                      </Select>
+                    </div>
+                  </div>
+                  {formDisponibilidade.motivo === "Outro" ? (
+                    <div className="space-y-1">
+                      <Label>Descreva o motivo</Label>
+                      <Input
+                        value={formDisponibilidade.motivoDetalhado}
+                        onChange={(event) =>
+                          setFormDisponibilidade((atual) => ({ ...atual, motivoDetalhado: event.target.value }))
+                        }
+                      />
+                    </div>
+                  ) : null}
+                  <div className="space-y-1">
+                    <Label>Solicitante ou responsável</Label>
+                    <Input
+                      value={formDisponibilidade.responsavelNome}
+                      onChange={(event) =>
+                        setFormDisponibilidade((atual) => ({ ...atual, responsavelNome: event.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Destino</Label>
+                    <Input
+                      value={formDisponibilidade.destino}
+                      onChange={(event) =>
+                        setFormDisponibilidade((atual) => ({ ...atual, destino: event.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Observações</Label>
+                    <Textarea
+                      rows={3}
+                      value={formDisponibilidade.observacoes}
+                      onChange={(event) =>
+                        setFormDisponibilidade((atual) => ({ ...atual, observacoes: event.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <Button type="button" onClick={() => void salvarDisponibilidade()} disabled={carregandoAcoes}>
+                      <Save className="mr-2 h-4 w-4" />
+                      Salvar
+                    </Button>
+                    <Button type="button" variant="outline" onClick={novoDisponibilidade} disabled={carregandoAcoes}>
+                      <Undo2 className="mr-2 h-4 w-4" />
+                      Limpar
+                    </Button>
+                  </div>
+                  <p className="text-xs text-[var(--g3-muted)]">
+                    A situação disponível é calculada automaticamente quando não houver bloqueio no período.
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card className="border-[var(--g3-border)]">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex flex-wrap items-center justify-between gap-2 text-base text-[var(--g3-active)]">
+                  <span>Agenda de disponibilidade</span>
+                  <div className="flex gap-2">
+                    <Button type="button" variant={agendaVisualizacao === "diaria" ? "default" : "outline"} onClick={() => setAgendaVisualizacao("diaria")}>
+                      Diária
+                    </Button>
+                    <Button type="button" variant={agendaVisualizacao === "semanal" ? "default" : "outline"} onClick={() => setAgendaVisualizacao("semanal")}>
+                      Semanal
+                    </Button>
+                    <Button type="button" variant={agendaVisualizacao === "mensal" ? "default" : "outline"} onClick={() => setAgendaVisualizacao("mensal")}>
+                      Mensal
+                    </Button>
+                  </div>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {agendaAgrupada.map(([grupo, itens]) => (
+                  <div key={grupo} className="space-y-2">
+                    <p className="text-sm font-semibold text-[var(--g3-active)]">
+                      {agendaVisualizacao === "mensal"
+                        ? `Mês ${grupo}`
+                        : agendaVisualizacao === "semanal"
+                          ? formatarDataPtBr(grupo)
+                          : "Período selecionado"}
+                    </p>
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                      {itens.map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          className={`rounded-xl border p-3 text-left transition hover:shadow-sm ${classeSituacaoDisponibilidade(
+                            item.tipoSituacao
+                          )}`}
+                          onClick={() => selecionarDisponibilidade(item)}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-bold">{item.placa || item.veiculoNome}</p>
+                              <p className="text-xs opacity-80">{[item.marca, item.modelo].filter(Boolean).join(" - ") || "---"}</p>
+                            </div>
+                            <span className="rounded-full border px-2 py-1 text-[11px] font-bold">
+                              {rotuloSituacaoDisponibilidade(item.tipoSituacao)}
+                            </span>
+                          </div>
+                          <div className="mt-2 space-y-1 text-xs">
+                            <p><strong>Início:</strong> {formatarDataHoraVisual(item.dataHoraInicio)}</p>
+                            <p><strong>Fim:</strong> {formatarDataHoraVisual(item.dataHoraFim)}</p>
+                            <p><strong>Motivo:</strong> {item.motivo || "---"}</p>
+                            <p><strong>Responsável:</strong> {item.responsavelNome || "---"}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                {!agendaDisponibilidade.length ? (
+                  <div className="rounded-xl border border-dashed border-[var(--g3-border)] p-6 text-center text-sm text-[var(--g3-muted)]">
+                    Nenhuma reserva ou indisponibilidade registrada para o período selecionado.
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
           </section>
         ) : null}
 

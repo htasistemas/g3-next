@@ -81,6 +81,7 @@ export class DocumentosInstituicaoRepository {
         await prisma.$executeRaw(Prisma.sql`
           CREATE TABLE IF NOT EXISTS documentos_instituicao_anexos (
             id BIGSERIAL PRIMARY KEY,
+            arquivo_id BIGINT,
             tenant_id UUID,
             documento_id BIGINT NOT NULL REFERENCES documentos_instituicao(id) ON DELETE CASCADE,
             nome_arquivo VARCHAR(200) NOT NULL,
@@ -95,6 +96,7 @@ export class DocumentosInstituicaoRepository {
         `);
 
         const comandos = [
+          "ALTER TABLE IF EXISTS documentos_instituicao_anexos ADD COLUMN IF NOT EXISTS arquivo_id BIGINT",
           "ALTER TABLE IF EXISTS documentos_instituicao_anexos ADD COLUMN IF NOT EXISTS tenant_id UUID",
           "ALTER TABLE IF EXISTS documentos_instituicao_anexos ADD COLUMN IF NOT EXISTS nome_arquivo VARCHAR(200)",
           "ALTER TABLE IF EXISTS documentos_instituicao_anexos ADD COLUMN IF NOT EXISTS tipo VARCHAR(30)",
@@ -123,6 +125,14 @@ export class DocumentosInstituicaoRepository {
           `,
           `
             UPDATE documentos_instituicao_anexos AS a
+            SET arquivo_id = ar.id
+            FROM arquivos ar
+            WHERE a.arquivo_id IS NULL
+              AND ar.caminho_arquivo = a.caminho_arquivo
+              AND ar.ativo = TRUE
+          `,
+          `
+            UPDATE documentos_instituicao_anexos AS a
             SET tenant_id = d.tenant_id
             FROM documentos_instituicao d
             WHERE a.tenant_id IS NULL
@@ -147,27 +157,34 @@ export class DocumentosInstituicaoRepository {
     await this.garantirEstrutura();
     return prisma.$queryRaw<DocumentoInstituicaoRow[]>(Prisma.sql`
       SELECT
-        id,
-        tipo_documento,
-        orgao_emissor,
-        descricao,
-        categoria,
-        emissao,
-        validade,
-        responsavel_interno,
-        modo_renovacao,
-        observacao_renovacao,
-        gerar_alerta,
-        dias_antecedencia,
-        forma_alerta,
-        em_renovacao,
-        sem_vencimento,
-        vencimento_indeterminado,
-        situacao,
-        criado_em,
-        atualizado_em
-      FROM documentos_instituicao
-      WHERE tenant_id::text = ${tenantId}
+        d.id,
+        d.tipo_documento,
+        d.orgao_emissor,
+        d.descricao,
+        d.categoria,
+        d.emissao,
+        d.validade,
+        d.responsavel_interno,
+        d.modo_renovacao,
+        d.observacao_renovacao,
+        d.gerar_alerta,
+        d.dias_antecedencia,
+        d.forma_alerta,
+        d.em_renovacao,
+        d.sem_vencimento,
+        d.vencimento_indeterminado,
+        d.situacao,
+        d.criado_em,
+        d.atualizado_em,
+        COALESCE(anexos.total, 0)::int AS anexo_quantidade
+      FROM documentos_instituicao d
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*) AS total
+        FROM documentos_instituicao_anexos a
+        WHERE a.documento_id = d.id
+          AND a.tenant_id::text = ${tenantId}
+      ) anexos ON TRUE
+      WHERE d.tenant_id::text = ${tenantId}
       ORDER BY emissao DESC, id DESC
     `);
   }
@@ -176,28 +193,35 @@ export class DocumentosInstituicaoRepository {
     await this.garantirEstrutura();
     const rows = await prisma.$queryRaw<DocumentoInstituicaoRow[]>(Prisma.sql`
       SELECT
-        id,
-        tipo_documento,
-        orgao_emissor,
-        descricao,
-        categoria,
-        emissao,
-        validade,
-        responsavel_interno,
-        modo_renovacao,
-        observacao_renovacao,
-        gerar_alerta,
-        dias_antecedencia,
-        forma_alerta,
-        em_renovacao,
-        sem_vencimento,
-        vencimento_indeterminado,
-        situacao,
-        criado_em,
-        atualizado_em
-      FROM documentos_instituicao
-      WHERE id = ${id}
-        AND tenant_id::text = ${tenantId}
+        d.id,
+        d.tipo_documento,
+        d.orgao_emissor,
+        d.descricao,
+        d.categoria,
+        d.emissao,
+        d.validade,
+        d.responsavel_interno,
+        d.modo_renovacao,
+        d.observacao_renovacao,
+        d.gerar_alerta,
+        d.dias_antecedencia,
+        d.forma_alerta,
+        d.em_renovacao,
+        d.sem_vencimento,
+        d.vencimento_indeterminado,
+        d.situacao,
+        d.criado_em,
+        d.atualizado_em,
+        COALESCE(anexos.total, 0)::int AS anexo_quantidade
+      FROM documentos_instituicao d
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*) AS total
+        FROM documentos_instituicao_anexos a
+        WHERE a.documento_id = d.id
+          AND a.tenant_id::text = ${tenantId}
+      ) anexos ON TRUE
+      WHERE d.id = ${id}
+        AND d.tenant_id::text = ${tenantId}
       LIMIT 1
     `);
     return rows[0] ?? null;
@@ -316,6 +340,7 @@ export class DocumentosInstituicaoRepository {
     return prisma.$queryRaw<DocumentoInstituicaoAnexoRow[]>(Prisma.sql`
       SELECT
         id,
+        arquivo_id,
         documento_id,
         nome_arquivo,
         tipo,
@@ -337,6 +362,7 @@ export class DocumentosInstituicaoRepository {
     const rows = await prisma.$queryRaw<DocumentoInstituicaoAnexoRow[]>(Prisma.sql`
       SELECT
         id,
+        arquivo_id,
         documento_id,
         nome_arquivo,
         tipo,
@@ -373,6 +399,7 @@ export class DocumentosInstituicaoRepository {
 
     const inserted = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
       INSERT INTO documentos_instituicao_anexos (
+        arquivo_id,
         tenant_id,
         documento_id,
         nome_arquivo,
@@ -384,6 +411,7 @@ export class DocumentosInstituicaoRepository {
         usuario,
         criado_em
       ) VALUES (
+        ${input.arquivoId ?? null},
         CAST(${tenantId} AS UUID),
         ${documentoId},
         ${input.nomeArquivo},
@@ -417,6 +445,7 @@ export class DocumentosInstituicaoRepository {
     await prisma.$executeRaw(Prisma.sql`
       UPDATE documentos_instituicao_anexos
       SET
+        arquivo_id = ${input.arquivoId ?? null},
         nome_arquivo = ${input.nomeArquivo},
         tipo = ${input.tipo},
         tipo_mime = ${trimOrUndefined(input.tipoMime ?? undefined)},

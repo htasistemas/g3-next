@@ -1,5 +1,6 @@
 import { httpClient } from "./http-client";
 import type { InstituicaoPayload, InstituicaoResumo } from "@/types/instituicao";
+import type { UsuarioDetalheResponse, UsuarioListaResponse, UsuarioPayload } from "@/types/usuario";
 
 export const instituicoesService = {
   async listar(): Promise<InstituicaoResumo[]> {
@@ -37,6 +38,36 @@ export const instituicoesService = {
       instituicoes_desbloqueadas: number;
       usuarios_desbloqueados: number;
     }>(`/api/master/instituicoes/${id}/desbloquear-acesso`);
+    return data;
+  },
+
+  async listarUsuarios(id: string): Promise<UsuarioListaResponse> {
+    const { data } = await httpClient.get<UsuarioListaResponse>(`/api/master/instituicoes/${id}/usuarios`);
+    return data;
+  },
+
+  async criarUsuario(id: string, payload: UsuarioPayload): Promise<UsuarioDetalheResponse> {
+    const { data } = await httpClient.post<UsuarioDetalheResponse>(`/api/master/instituicoes/${id}/usuarios`, payload);
+    return data;
+  },
+
+  async atualizarUsuario(id: string, usuarioId: string, payload: UsuarioPayload): Promise<UsuarioDetalheResponse> {
+    const { data } = await httpClient.put<UsuarioDetalheResponse>(
+      `/api/master/instituicoes/${id}/usuarios/${usuarioId}`,
+      payload
+    );
+    return data;
+  },
+
+  async resetarSenhaUsuario(
+    id: string,
+    usuarioId: string,
+    payload: { nova_senha: string; confirmar_nova_senha: string; exigir_troca_senha?: boolean }
+  ): Promise<UsuarioDetalheResponse> {
+    const { data } = await httpClient.post<UsuarioDetalheResponse>(
+      `/api/master/instituicoes/${id}/usuarios/${usuarioId}/reset-senha`,
+      payload
+    );
     return data;
   }
 };

@@ -48,6 +48,12 @@ const optionalEmail = z.preprocess((value) => {
   return normalized.length ? normalized : undefined;
 }, z.string().email("E-mail invalido.").optional());
 
+const optionalPortalPin = z.preprocess((value) => {
+  if (typeof value !== "string") return value;
+  const normalized = value.replace(/\D/g, "").trim();
+  return normalized.length ? normalized : undefined;
+}, z.string().regex(/^\d{4}$/, "A senha do portal deve ter 4 digitos.").optional());
+
 export const beneficiarioInputSchema = z.object({
   codigo: optionalTrimmedString,
   status: z.enum(beneficiarioStatusValues).default("EM_ANALISE"),
@@ -104,6 +110,7 @@ export const beneficiarioInputSchema = z.object({
     .string()
     .trim()
     .refine((value) => isValidCpf(value), "Informe um CPF valido."),
+  senha_portal: optionalPortalPin,
   rg_numero: optionalTrimmedString,
   rg_orgao_emissor: optionalTrimmedString,
   rg_uf: optionalTrimmedString,

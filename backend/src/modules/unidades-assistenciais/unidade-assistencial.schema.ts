@@ -25,6 +25,8 @@ const optionalInteger = z.preprocess((value) => {
   return value;
 }, z.number().int().positive().optional());
 
+export const tipoUnidadeSchema = z.enum(["ASSISTENCIAL", "ENSINO"]);
+
 export const diretoriaUnidadeSchema = z.object({
   id: z.union([z.string(), z.number()]).optional(),
   nome_completo: z.string().trim().min(3, "Informe o nome completo da diretoria."),
@@ -48,6 +50,7 @@ export const salaUnidadeSchema = z.object({
 
 export const unidadeAssistencialInputSchema = z.object({
   nome_fantasia: z.string().trim().min(3, "Informe o nome fantasia da unidade."),
+  tipo_unidade: tipoUnidadeSchema.default("ASSISTENCIAL"),
   razao_social: optionalTrimmedString,
   cnpj: z
     .union([z.string().trim().refine((value) => isValidCnpj(value), "Informe um CNPJ valido."), z.undefined()])
@@ -91,6 +94,7 @@ export const unidadeAssistencialInputSchema = z.object({
 });
 
 export const unidadeAssistencialFiltersSchema = z.object({
+  tipo_unidade: tipoUnidadeSchema.optional(),
   nome_fantasia: optionalTrimmedString,
   cnpj: optionalTrimmedString,
   cidade: optionalTrimmedString,

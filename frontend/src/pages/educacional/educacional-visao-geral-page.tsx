@@ -22,7 +22,7 @@ export function EducacionalVisaoGeralPage({ resumo: inicial, carregando }: Props
   const [opcoes, setOpcoes] = useState<{ unidades: UnidadeAssistencial[]; anos: EducacionalItem[]; etapas: EducacionalItem[]; turmas: EducacionalItem[] }>({ unidades: [], anos: [], etapas: [], turmas: [] });
   const [erro, setErro] = useState("");
   useEffect(() => setResumo(inicial), [inicial]);
-  useEffect(() => { void Promise.all([unidadesAssistenciaisService.listar(), educacionalService.listar("anos-letivos"), educacionalService.listar("etapas"), educacionalService.listar("turmas")]).then(([unidades, anos, etapas, turmas]) => setOpcoes({ unidades: unidades.unidades, anos, etapas, turmas })).catch(() => undefined); }, []);
+  useEffect(() => { void Promise.all([unidadesAssistenciaisService.listar({ tipo_unidade: "ENSINO" }), educacionalService.listar("anos-letivos"), educacionalService.listar("etapas"), educacionalService.listar("turmas")]).then(([unidades, anos, etapas, turmas]) => setOpcoes({ unidades: unidades.unidades, anos, etapas, turmas })).catch(() => undefined); }, []);
   async function atualizarIndicadores() {
     try { setErro(""); setResumo(await educacionalService.resumo(Object.fromEntries(Object.entries(filtros).filter(([, valor]) => valor)))); }
     catch (error) { setErro(error instanceof Error ? error.message : "Não foi possível atualizar os indicadores."); }

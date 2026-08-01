@@ -1,7 +1,12 @@
 import { randomUUID } from "node:crypto";
+import bcrypt from "bcryptjs";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../../database/prisma.js";
 import { AppError } from "../../../shared/errors/app-error.js";
+import { CentralAtendimentosRepository } from "../../central-atendimentos/repositories/central-atendimentos.repository.js";
+import { obterBeneficiariosPortalPorCpf } from "../../beneficiarios/repositories/beneficiario.repository.js";
+import { ParametrosSistemaService } from "../../configuracoes-gerais/services/parametros-sistema.service.js";
+import { storageService } from "../../arquivos/services/storage-instance.js";
 
 export type PortalTipo = "voluntario" | "beneficiario" | "transparencia" | "parceiro";
 
@@ -20,9 +25,118 @@ type TimelinePortal = {
   detalhe: string;
 };
 
+type InstituicaoPortal = {
+  id: string;
+  tenantId: string;
+  nome: string;
+  razaoSocial: string;
+  cnpj: string;
+  slug: string;
+  email?: string;
+  telefone?: string;
+  endereco?: string;
+  logoUrl?: string;
+};
+
+type AtendimentoPortal = {
+  id: string;
+  dataHora: string;
+  tipoAtendimento: string;
+  setor: string;
+  profissionalResponsavel: string;
+  status?: string;
+  resumo: string;
+  observacoes?: string;
+  retornoPrevisto?: string;
+};
+
+type BeneficioPortal = {
+  id: string;
+  origem?: string;
+  data: string;
+  tipo: string;
+  item: string;
+  quantidade: number;
+  valorUnitario: number;
+  valorTotal: number;
+  origemRecurso?: string;
+  projetoPrograma?: string;
+  profissionalResponsavel?: string;
+  observacoes?: string;
+  cienteAlertas?: boolean;
+};
+
+type AgendamentoPortal = {
+  id: string;
+  data: string;
+  horaInicial: string;
+  horaFinal?: string;
+  tipoAtendimento?: string;
+  setor?: string;
+  profissionalNome?: string;
+  sala?: string;
+  status?: string;
+  prioridade?: string;
+  modalidade?: string;
+  observacaoCurta?: string;
+  documentosPendentes?: boolean;
+};
+
+type DocumentoPendentePortal = {
+  id: string;
+  nome: string;
+  tipo?: string;
+  numeroDocumento?: string;
+  obrigatorio: boolean;
+  caminhoArquivo?: string;
+  contentType?: string;
+};
+
 type PortalPainel = {
   tipo: PortalTipo;
   token?: string;
+  instituicao?: InstituicaoPortal;
+  instituicoesDisponiveis?: Array<{ slug: string; nome: string; cnpj: string }>;
+  instituicoesBeneficiario?: Array<{ tenantId: string; instituicaoId?: string; nome: string; cnpj?: string }>;
+  checklistTransparencia?: Array<{
+    codigo: string;
+    titulo: string;
+    status: "PUBLICADO" | "PENDENTE";
+    sugestao: string;
+  }>;
+  parcerias?: Array<{
+    id: string;
+    numero: string;
+    tipo: string;
+    orgaoConcedente?: string;
+    dataAssinatura?: string;
+    objeto?: string;
+    valorGlobal: number;
+    situacao: string;
+  }>;
+  tema?: {
+    modo: "CLARO" | "ESCURO" | "AUTOMATICO";
+    preset?: string;
+    paleta: {
+      cor_primaria: string;
+      cor_secundaria: string;
+      cor_destaque: string;
+      cor_botao_primario: string;
+      cor_link: string;
+      cor_elemento_ativo: string;
+      background: string;
+      foreground: string;
+      border: string;
+      muted: string;
+      card: string;
+      dashboard_card: string;
+      dashboard_card_soft: string;
+      danger: string;
+      warning: string;
+      success: string;
+      info: string;
+    };
+  };
   pessoa?: {
     id?: string;
     nome?: string;
@@ -31,11 +145,19 @@ type PortalPainel = {
     telefone?: string;
     tenantId?: string;
   };
+  atendimentos?: AtendimentoPortal[];
+  beneficios?: BeneficioPortal[];
+  agendamentos?: AgendamentoPortal[];
+  documentosPendentes?: DocumentoPendentePortal[];
+  movimentacoes?: Array<Record<string, unknown>>;
   indicadores: IndicadorPortal[];
   cards: CardPortal[];
   linhaDoTempo: TimelinePortal[];
   itens: Array<Record<string, unknown>>;
 };
+
+const parametrosSistemaService = new ParametrosSistemaService();
+const centralAtendimentosRepository = new CentralAtendimentosRepository();
 
 function normalizarTexto(valor: unknown) {
   return String(valor ?? "").trim();
@@ -84,6 +206,39 @@ function montarToken(tipo: PortalTipo, id: string, tenantId?: string) {
 }
 
 export class PortaisExternosService {
+  async obterLogoInstituicao(rawSlug: string) {
+    const slug = normalizarTexto(rawSlug).toLowerCase();
+    const rows = await prisma.$queryRaw<Array<{ logo_url: string | null; tenant_id: string }>>`
+      SELECT i.tenant_id::text, COALESCE(
+        i.logo_url,
+        (
+          SELECT COALESCE(im.logomarca_relatorio, im.logomarca)
+          FROM unidade_assistencial ua
+          LEFT JOIN imagens_unidade im ON im.unidade_id = ua.id
+          WHERE ua.tenant_id = i.tenant_id
+          ORDER BY ua.unidade_principal DESC NULLS LAST, ua.id
+          LIMIT 1
+        )
+      ) AS logo_url
+      FROM instituicoes i
+      WHERE LOWER(i.slug) = ${slug}
+        AND LOWER(i.status) = 'ativo'
+      LIMIT 1
+    `;
+    const logoUrl = rows[0]?.logo_url?.trim();
+    if (!logoUrl) throw new AppError("Logomarca não cadastrada para esta instituição.", 404);
+    if (/^https?:\/\//i.test(logoUrl) || logoUrl.startsWith("data:")) return { url: logoUrl };
+    try {
+      return await storageService.obterConteudoPorCaminhoBruto(logoUrl);
+    } catch (error) {
+      try {
+        return await storageService.obterConteudoPorCaminhoBruto(`tenants/${rows[0].tenant_id}/${logoUrl}`);
+      } catch {
+        throw error;
+      }
+    }
+  }
+
   async acessar(tipo: PortalTipo, input: Record<string, unknown>): Promise<PortalPainel> {
     if (tipo === "transparencia") {
       return this.obterTransparencia(normalizarTexto(input.tenantId));
@@ -97,15 +252,91 @@ export class PortaisExternosService {
     }
 
     if (tipo === "voluntario") return this.acessarVoluntario(identificador);
-    if (tipo === "beneficiario") return this.acessarBeneficiarioFamilia(identificador);
+    if (tipo === "beneficiario") return this.acessarBeneficiarioFamilia(identificador, senha, normalizarTexto(input.tenantId) || undefined);
     if (tipo === "parceiro") return this.acessarParceiro(identificador);
 
     throw new AppError("Portal externo nao reconhecido.", 404);
   }
 
-  async obterTransparencia(rawTenantId?: string): Promise<PortalPainel> {
-    const tenantId = normalizarTexto(rawTenantId) || undefined;
-    const [projetos, prestacoes, documentos, campanhas, unidades] = await Promise.all([
+  async obterTransparencia(rawTenantId?: string, rawSlug?: string): Promise<PortalPainel> {
+    const slug = normalizarTexto(rawSlug).toLowerCase() || undefined;
+    const instituicao = slug
+      ? (
+          await prisma.$queryRaw<
+            Array<{
+              id: string;
+              tenant_id: string;
+              razao_social: string;
+              nome_fantasia: string | null;
+              cnpj: string;
+              slug: string;
+              email: string | null;
+              telefone: string | null;
+              endereco: string | null;
+              logo_url: string | null;
+              status: string;
+            }>
+          >`
+            SELECT
+              i.id::text,
+              i.tenant_id::text,
+              i.razao_social,
+              i.nome_fantasia,
+              i.cnpj,
+              i.slug,
+              i.email,
+              i.telefone,
+              i.endereco,
+              COALESCE(
+                i.logo_url,
+                (
+                  SELECT COALESCE(im.logomarca_relatorio, im.logomarca)
+                  FROM unidade_assistencial ua
+                  LEFT JOIN imagens_unidade im ON im.unidade_id = ua.id
+                  WHERE ua.tenant_id = i.tenant_id
+                  ORDER BY ua.unidade_principal DESC NULLS LAST, ua.id
+                  LIMIT 1
+                )
+              ) AS logo_url,
+              i.status
+            FROM instituicoes i
+            WHERE LOWER(i.slug) = ${slug}
+              AND LOWER(i.status) = 'ativo'
+            LIMIT 1
+          `
+        )[0]
+      : undefined;
+
+    if (slug && !instituicao) {
+      throw new AppError("Instituição não encontrada ou não está disponível para consulta pública.", 404);
+    }
+
+    const tenantId = instituicao?.tenant_id ?? normalizarTexto(rawTenantId) ?? undefined;
+    if (!tenantId) {
+      const instituicoes = await prisma.$queryRaw<
+        Array<{ slug: string; nome: string; cnpj: string }>
+      >`
+        SELECT slug, COALESCE(nome_fantasia, razao_social) AS nome, cnpj
+        FROM instituicoes
+        WHERE LOWER(status) = 'ativo'
+        ORDER BY COALESCE(nome_fantasia, razao_social)
+      `;
+      return {
+        tipo: "transparencia" as const,
+        instituicoesDisponiveis: instituicoes,
+        indicadores: [
+          { label: "Projetos publicados", valor: "0" },
+          { label: "Documentos públicos", valor: "0" },
+          { label: "Recursos prestados", valor: "R$ 0,00" }
+        ],
+        cards: [],
+        linhaDoTempo: [],
+        itens: []
+      };
+    }
+
+    const personalizacao = await parametrosSistemaService.obterPersonalizacao(tenantId);
+    const [projetos, prestacoes, documentos, campanhas, unidades, parcerias] = await Promise.all([
       prisma.$queryRaw<Array<{ id: bigint; nome: string; status: string | null; percentual: unknown; publico_alvo: string | null }>>(Prisma.sql`
         SELECT p.id, p.nome, p.status, COALESCE(p.percentual_evolucao, 0) AS percentual, p.publico_alvo
         FROM (
@@ -156,14 +387,96 @@ export class PortaisExternosService {
         FROM unidade_assistencial u
         WHERE 1 = 1
           ${filtroTenant("u", tenantId)}
-      `)
+      `),
+      prisma
+        .$queryRaw<
+          Array<{
+            id: bigint;
+            numero_termo: string;
+            tipo_termo: string;
+            orgao_concedente: string | null;
+            data_assinatura: Date | null;
+            descricao_objeto: string | null;
+            valor_global: unknown;
+            situacao: string;
+          }>
+        >(Prisma.sql`
+          SELECT id, numero_termo, tipo_termo, orgao_concedente, data_assinatura, descricao_objeto, valor_global, situacao
+          FROM termo_fomento
+          WHERE tenant_id::text = ${tenantId}
+          ORDER BY atualizado_em DESC, id DESC
+          LIMIT 100
+        `)
+        .catch(() => [])
     ]);
 
     const prestacao = prestacoes[0] ?? { total_recebido: 0, total_aplicado: 0, saldo_disponivel: 0 };
     const campanhasResumo = campanhas[0] ?? { total: 0n, arrecadado: 0 };
+    const checklistTransparencia: NonNullable<PortalPainel["checklistTransparencia"]> = [
+      {
+        codigo: "parcerias",
+        titulo: "Parcerias celebradas e planos de trabalho",
+        status: parcerias.length ? "PUBLICADO" : "PENDENTE",
+        sugestao: parcerias.length
+          ? "Dados carregados dos termos de fomento cadastrados."
+          : "Cadastre o termo de fomento, o instrumento, órgão concedente, objeto, valores e plano de trabalho."
+      },
+      {
+        codigo: "identificacao",
+        titulo: "Identificação da organização e CNPJ",
+        status: instituicao && instituicao.cnpj ? "PUBLICADO" : "PENDENTE",
+        sugestao: "Mantenha razão social, nome fantasia, CNPJ, endereço e canais de contato atualizados no cadastro da instituição."
+      },
+      {
+        codigo: "objeto-resultados",
+        titulo: "Objeto, metas, atividades e resultados",
+        status: projetos.length ? "PUBLICADO" : "PENDENTE",
+        sugestao: projetos.length
+          ? "Projetos e evolução das tarefas publicados a partir dos registros do sistema."
+          : "Cadastre o projeto, metas, público-alvo, indicadores, evidências e resultados alcançados."
+      },
+      {
+        codigo: "valores-contas",
+        titulo: "Valores recebidos, aplicados e prestação de contas",
+        status: Number(prestacao.total_recebido ?? 0) > 0 || Number(prestacao.total_aplicado ?? 0) > 0 ? "PUBLICADO" : "PENDENTE",
+        sugestao: "Registre recebimentos, despesas, saldo, conciliação bancária e documentos da prestação de contas."
+      },
+      {
+        codigo: "documentos",
+        titulo: "Documentos comprobatórios e relatórios",
+        status: Number(documentos[0]?.total ?? 0) > 0 ? "PUBLICADO" : "PENDENTE",
+        sugestao: "Anexe relatórios de execução, listas de presença, fotos, vídeos, notas e demais evidências permitidas."
+      }
+    ];
 
     return {
       tipo: "transparencia",
+      instituicao: instituicao
+        ? {
+            id: instituicao.id,
+            tenantId: instituicao.tenant_id,
+            nome: instituicao.nome_fantasia || instituicao.razao_social,
+            razaoSocial: instituicao.razao_social,
+            cnpj: instituicao.cnpj,
+            slug: instituicao.slug,
+            email: instituicao.email ?? undefined,
+            telefone: instituicao.telefone ?? undefined,
+            endereco: instituicao.endereco ?? undefined,
+            logoUrl: instituicao.logo_url ?? undefined
+          }
+        : undefined,
+      tema: personalizacao.personalizacao,
+      checklistTransparencia,
+      parcerias: parcerias.map((item) => ({
+        id: bigintToString(item.id),
+        numero: item.numero_termo,
+        tipo: item.tipo_termo,
+        orgaoConcedente: item.orgao_concedente ?? undefined,
+        dataAssinatura: item.data_assinatura?.toISOString().slice(0, 10),
+        objeto: item.descricao_objeto ?? undefined,
+        valorGlobal: Number(item.valor_global ?? 0),
+        situacao: item.situacao
+      })),
       indicadores: [
         { label: "Projetos publicados", valor: formatarValor(projetos.length) },
         { label: "Documentos públicos", valor: formatarValor(documentos[0]?.total ?? 0) },
@@ -251,81 +564,79 @@ export class PortaisExternosService {
     };
   }
 
-  private async acessarBeneficiarioFamilia(identificador: string): Promise<PortalPainel> {
+  private async acessarBeneficiarioFamilia(identificador: string, senha: string, tenantSelecionado?: string): Promise<PortalPainel> {
     const documento = somenteDigitos(identificador);
-    const termo = normalizarTexto(identificador);
-    const rows = await prisma.$queryRaw<
-      Array<{
-        beneficiario_id: bigint;
-        tenant_id: string | null;
-        nome_completo: string;
-        codigo: string | null;
-        cpf: string | null;
-        telefone: string | null;
-        email: string | null;
-        familia_id: bigint | null;
-        nome_familia: string | null;
-      }>
-    >(Prisma.sql`
-      SELECT
-        b.id AS beneficiario_id,
-        b.tenant_id::text AS tenant_id,
-        b.nome_completo,
-        b.codigo,
-        doc.numero_documento AS cpf,
-        contato.telefone_principal AS telefone,
-        contato.email,
-        vf.id AS familia_id,
-        vf.nome_familia
-      FROM cadastro_beneficiario b
-      LEFT JOIN documentos doc ON doc.beneficiario_id = b.id AND UPPER(COALESCE(doc.tipo_documento, '')) = 'CPF'
-      LEFT JOIN contato_beneficiario contato ON contato.beneficiario_id = b.id
-      LEFT JOIN vinculo_familiar_membro m ON m.beneficiario_id = b.id
-      LEFT JOIN vinculo_familiar vf ON vf.id = m.vinculo_familiar_id
-      WHERE COALESCE(b.status, 'ATIVO') <> 'INATIVO'
-        AND (
-          ${documento} <> '' AND REGEXP_REPLACE(COALESCE(doc.numero_documento, ''), '\\D', '', 'g') = ${documento}
-          OR LOWER(COALESCE(b.codigo, '')) = LOWER(${termo})
-          OR LOWER(COALESCE(vf.nome_familia, '')) = LOWER(${termo})
-          OR vf.id::text = ${termo}
-        )
-      ORDER BY b.atualizado_em DESC, b.id DESC
-      LIMIT 1
-    `);
+    if (documento.length !== 11) {
+      throw new AppError("Informe um CPF valido para acessar o portal.", 400);
+    }
 
-    const beneficiario = rows[0];
-    if (!beneficiario) throw new AppError("Beneficiario ou familia nao encontrados para os dados informados.", 404);
+    const registros = await obterBeneficiariosPortalPorCpf(documento);
+    if (!registros.length) {
+      throw new AppError("Beneficiario nao encontrado para os dados informados.", 404);
+    }
 
-    const tenantId = beneficiario.tenant_id ?? undefined;
-    const [agendamentos, documentosPendentes, atendimentos] = await Promise.all([
-      prisma.$queryRaw<Array<{ total: bigint }>>(Prisma.sql`
-        SELECT COUNT(*)::bigint AS total
-        FROM agendamento a
-        WHERE a.tenant_id::text = ${tenantId}
-          AND (
-            a.beneficiario_id = ${beneficiario.beneficiario_id}
-            OR a.familia_id = ${beneficiario.familia_id}
-          )
-          AND a.data_agendamento >= CURRENT_DATE
-      `).catch(() => [{ total: 0n }]),
-      prisma.$queryRaw<Array<{ total: bigint }>>(Prisma.sql`
-        SELECT COUNT(*)::bigint AS total
-        FROM documentos d
-        WHERE d.beneficiario_id = ${beneficiario.beneficiario_id}
-          AND COALESCE(d.obrigatorio, FALSE) = TRUE
-          AND (d.caminho_arquivo IS NULL OR TRIM(d.caminho_arquivo) = '')
-      `).catch(() => [{ total: 0n }]),
-      prisma.$queryRaw<Array<{ total: bigint }>>(Prisma.sql`
-        SELECT COUNT(*)::bigint AS total
-        FROM central_atendimento a
-        WHERE a.tenant_id::text = ${tenantId}
-          AND a.beneficiario_id = ${beneficiario.beneficiario_id}
-      `).catch(() => [{ total: 0n }])
+    const candidatos = Array.from(
+      new Map(
+        registros
+          .filter((item) => item.tenant_id && (!tenantSelecionado || item.tenant_id === tenantSelecionado))
+          .map((item) => [item.tenant_id as string, item])
+      ).values()
+    );
+    const validos = [];
+    for (const candidato of candidatos) {
+      if (candidato.senha_hash && await bcrypt.compare(senha, candidato.senha_hash)) validos.push(candidato);
+    }
+    if (!validos.length) {
+      throw new AppError("CPF ou senha invalidos para acessar o portal.", 401);
+    }
+
+    if (!tenantSelecionado && validos.length > 1) {
+      return {
+        tipo: "beneficiario",
+        instituicoesBeneficiario: validos.map((item) => ({
+          tenantId: item.tenant_id as string,
+          instituicaoId: item.instituicao_id ?? undefined,
+          nome: item.instituicao_nome || "Instituição vinculada",
+          cnpj: item.instituicao_cnpj ?? undefined
+        })),
+        indicadores: [
+          { label: "Instituições vinculadas", valor: formatarValor(validos.length) },
+          { label: "Atendimentos", valor: "-" },
+          { label: "Agendamentos", valor: "-" }
+        ],
+        cards: [
+          { titulo: "Escolha a instituição", texto: "Selecione uma instituição para abrir seu acompanhamento." }
+        ],
+        linhaDoTempo: [],
+        itens: []
+      };
+    }
+
+    const beneficiario = validos[0];
+
+    const tenantId = beneficiario.tenant_id;
+    if (!tenantId) {
+      throw new AppError("Tenant do beneficiario nao identificado.", 404);
+    }
+    const visaoGeral = await centralAtendimentosRepository.obterVisaoGeral(
+      beneficiario.beneficiario_id,
+      tenantId
+    );
+    const [agendamentos, documentosPendentes] = await Promise.all([
+      this.listarAgendamentosPortal(beneficiario.beneficiario_id, beneficiario.familia_id, tenantId),
+      this.listarDocumentosPendentesPortal(beneficiario.beneficiario_id, tenantId)
     ]);
+    const atendimentos = visaoGeral.atendimentos;
+    const beneficios = visaoGeral.beneficios.map((item) => ({
+      ...item,
+      data: item.data ?? ""
+    })) as BeneficioPortal[];
+    const movimentacoes = visaoGeral.historico;
 
     return {
       tipo: "beneficiario",
       token: montarToken("beneficiario", bigintToString(beneficiario.beneficiario_id), tenantId),
+      tema: (await parametrosSistemaService.obterPersonalizacao(tenantId)).personalizacao,
       pessoa: {
         id: bigintToString(beneficiario.beneficiario_id),
         nome: beneficiario.nome_completo,
@@ -335,22 +646,134 @@ export class PortaisExternosService {
         tenantId
       },
       indicadores: [
-        { label: "Atendimentos", valor: formatarValor(atendimentos[0]?.total ?? 0) },
-        { label: "Agendamentos", valor: formatarValor(agendamentos[0]?.total ?? 0) },
-        { label: "Documentos pendentes", valor: formatarValor(documentosPendentes[0]?.total ?? 0) }
+        { label: "Atendimentos", valor: formatarValor(atendimentos.length) },
+        { label: "Agendamentos", valor: formatarValor(agendamentos.length) },
+        { label: "Documentos pendentes", valor: formatarValor(documentosPendentes.length) }
       ],
       cards: [
-        { titulo: "Agenda da família", texto: `${formatarValor(agendamentos[0]?.total ?? 0)} compromisso(s) futuro(s) localizado(s).` },
-        { titulo: "Histórico de atendimento", texto: `${formatarValor(atendimentos[0]?.total ?? 0)} atendimento(s) registrado(s) na central.` },
-        { titulo: "Documentos e avisos", texto: `${formatarValor(documentosPendentes[0]?.total ?? 0)} documento(s) obrigatório(s) pendente(s).` }
+        { titulo: "Agenda da família", texto: `${formatarValor(agendamentos.length)} compromisso(s) localizado(s) no histórico completo.` },
+        { titulo: "Histórico de atendimento", texto: `${formatarValor(atendimentos.length)} atendimento(s) registrado(s) na central.` },
+        { titulo: "Documentos e avisos", texto: `${formatarValor(documentosPendentes.length)} documento(s) obrigatório(s) pendente(s).` }
       ],
       linhaDoTempo: [
         { titulo: "Cadastro familiar", detalhe: beneficiario.nome_familia ?? "Família ainda não vinculada." },
         { titulo: "Acompanhamento ativo", detalhe: `Beneficiário: ${beneficiario.nome_completo}.` },
         { titulo: "Agenda compartilhada", detalhe: "Compromissos aparecem conforme registros de agendamento." }
       ],
+      atendimentos,
+      beneficios,
+      agendamentos,
+      documentosPendentes,
+      movimentacoes,
       itens: []
     };
+  }
+
+  private async listarAgendamentosPortal(
+    beneficiarioId: bigint,
+    familiaId: bigint | null,
+    tenantId: string
+  ): Promise<AgendamentoPortal[]> {
+    const rows = await prisma.$queryRaw<
+      Array<{
+        id: bigint;
+        data_agendamento: Date | string;
+        hora_inicial: string;
+        hora_final: string | null;
+        tipo_atendimento: string | null;
+        setor: string | null;
+        profissional_nome: string | null;
+        sala: string | null;
+        status: string | null;
+        prioridade: string | null;
+        modalidade: string | null;
+        observacao_curta: string | null;
+        documentos_pendentes: boolean | null;
+      }>
+    >(Prisma.sql`
+      SELECT
+        a.id,
+        a.data_agendamento,
+        a.hora_inicial,
+        a.hora_final,
+        a.tipo_atendimento,
+        a.setor,
+        a.profissional_nome,
+        a.sala,
+        a.status,
+        a.prioridade,
+        a.modalidade,
+        a.observacao_curta,
+        a.documentos_pendentes
+      FROM agendamento a
+      WHERE a.tenant_id::text = ${tenantId}
+        AND (
+          a.beneficiario_id = ${beneficiarioId}
+          OR (${familiaId ? Prisma.sql`${familiaId}` : Prisma.sql`NULL`} IS NOT NULL AND a.familia_id = ${familiaId})
+        )
+      ORDER BY a.data_agendamento DESC, a.hora_inicial DESC, a.id DESC
+    `);
+
+    return rows.map((row) => ({
+      id: bigintToString(row.id),
+      data: row.data_agendamento instanceof Date
+        ? row.data_agendamento.toISOString().slice(0, 10)
+        : String(row.data_agendamento).slice(0, 10),
+      horaInicial: String(row.hora_inicial ?? ""),
+      horaFinal: row.hora_final ? String(row.hora_final).slice(0, 5) : undefined,
+      tipoAtendimento: row.tipo_atendimento ? String(row.tipo_atendimento) : undefined,
+      setor: row.setor ? String(row.setor) : undefined,
+      profissionalNome: row.profissional_nome ? String(row.profissional_nome) : undefined,
+      sala: row.sala ? String(row.sala) : undefined,
+      status: row.status ? String(row.status) : undefined,
+      prioridade: row.prioridade ? String(row.prioridade) : undefined,
+      modalidade: row.modalidade ? String(row.modalidade) : undefined,
+      observacaoCurta: row.observacao_curta ? String(row.observacao_curta) : undefined,
+      documentosPendentes: row.documentos_pendentes ?? undefined
+    }));
+  }
+
+  private async listarDocumentosPendentesPortal(
+    beneficiarioId: bigint,
+    tenantId: string
+  ): Promise<DocumentoPendentePortal[]> {
+    const rows = await prisma.$queryRaw<
+      Array<{
+        id: bigint;
+        nome_documento: string | null;
+        tipo_documento: string | null;
+        numero_documento: string | null;
+        obrigatorio: boolean | null;
+        caminho_arquivo: string | null;
+        content_type: string | null;
+      }>
+    >(Prisma.sql`
+      SELECT
+        d.id,
+        d.nome_documento,
+        d.tipo_documento,
+        d.numero_documento,
+        d.obrigatorio,
+        d.caminho_arquivo,
+        d.content_type
+      FROM documentos d
+      WHERE d.beneficiario_id = ${beneficiarioId}
+        AND d.tenant_id::text = ${tenantId}
+        AND COALESCE(d.obrigatorio, FALSE) = TRUE
+        AND COALESCE(d.ignorado, FALSE) = FALSE
+        AND (d.caminho_arquivo IS NULL OR TRIM(d.caminho_arquivo) = '')
+      ORDER BY d.id DESC
+    `);
+
+    return rows.map((row) => ({
+      id: bigintToString(row.id),
+      nome: row.nome_documento ?? row.tipo_documento ?? "Documento",
+      tipo: row.tipo_documento ?? undefined,
+      numeroDocumento: row.numero_documento ?? undefined,
+      obrigatorio: row.obrigatorio ?? true,
+      caminhoArquivo: row.caminho_arquivo ?? undefined,
+      contentType: row.content_type ?? undefined
+    }));
   }
 
   private async acessarParceiro(identificador: string): Promise<PortalPainel> {

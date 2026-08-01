@@ -23,6 +23,7 @@ type TransactionClient = Prisma.TransactionClient;
 
 const estruturaSql = [
   `ALTER TABLE IF EXISTS plano_trabalho ALTER COLUMN termo_fomento_id DROP NOT NULL`,
+  `ALTER TABLE IF EXISTS plano_trabalho ALTER COLUMN orgao_concedente TYPE VARCHAR(200)`,
   `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS tenant_id UUID`,
   `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS tipo_parceria VARCHAR(80)`,
   `ALTER TABLE IF EXISTS plano_trabalho ADD COLUMN IF NOT EXISTS orgao_parceiro VARCHAR(200)`,

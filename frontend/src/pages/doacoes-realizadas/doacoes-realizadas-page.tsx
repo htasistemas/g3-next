@@ -242,6 +242,7 @@ export function DoacoesRealizadasPage() {
   const [itemPlanejadoSelecionadoNome, setItemPlanejadoSelecionadoNome] = useState("");
   const [plano, setPlano] = useState<PlanoForm>(planoInicial);
   const [planoSelecionado, setPlanoSelecionado] = useState<string>();
+  const [processandoRegistroEntrega, setProcessandoRegistroEntrega] = useState(false);
 
   const { data: listaData, isLoading: carregandoLista } = useDoacoesRealizadas(filtros);
   const { data: detalheData } = useDoacaoRealizada(idSelecionado);
@@ -256,6 +257,7 @@ export function DoacoesRealizadasPage() {
   const salvarPlanejadaMutation = useSalvarDoacaoPlanejada();
   const removerPlanejadaMutation = useRemoverDoacaoPlanejada();
   const processandoAcoes =
+    processandoRegistroEntrega ||
     salvarMutation.isPending ||
     removerMutation.isPending ||
     salvarPlanejadaMutation.isPending ||
@@ -707,11 +709,20 @@ export function DoacoesRealizadasPage() {
   }
 
   async function executarRegistroEntrega(configuracao: ConfirmacaoCarenciaState) {
+    if (processandoRegistroEntrega || salvarMutation.isPending) {
+      return;
+    }
+
+    setProcessandoRegistroEntrega(true);
     try {
       const response = await salvarMutation.mutateAsync(configuracao.payload);
 
       if (configuracao.onSuccess) {
-        await configuracao.onSuccess(response);
+        try {
+          await configuracao.onSuccess(response);
+        } catch (error) {
+          console.error("[doacoes-realizadas] falha ao concluir etapa posterior da entrega", error);
+        }
       }
 
       setValue("id_doacao_realizada", response.doacao.id_doacao_realizada ?? "");
@@ -743,6 +754,8 @@ export function DoacoesRealizadasPage() {
       }
 
       setPopup({ tipo: "erro", titulo: "Erro", texto: mensagemErro });
+    } finally {
+      setProcessandoRegistroEntrega(false);
     }
   }
 
@@ -886,10 +899,10 @@ export function DoacoesRealizadasPage() {
       label: "Salvar",
       texto:
         abaAtiva === "planejamento"
-          ? salvarPlanejadaMutation.isPending
+          ? salvarPlanejadaMutation.isPending || processandoRegistroEntrega
             ? "Salvando..."
             : "Salvar"
-          : salvarMutation.isPending
+          : salvarMutation.isPending || processandoRegistroEntrega
             ? "Registrando..."
             : "Registrar entrega",
       icon: Save,
@@ -1118,7 +1131,7 @@ export function DoacoesRealizadasPage() {
                   type="password"
                   value={senhaAdministrativa}
                   onChange={(event) => setSenhaAdministrativa(event.target.value)}
-                  disabled={salvarMutation.isPending}
+                  disabled={salvarMutation.isPending || processandoRegistroEntrega}
                 />
               </div>
             </div>
@@ -1127,7 +1140,7 @@ export function DoacoesRealizadasPage() {
                 type="button"
                 variant="outline"
                 onClick={() => setConfirmacaoCarencia(null)}
-                disabled={salvarMutation.isPending}
+                disabled={salvarMutation.isPending || processandoRegistroEntrega}
               >
                 Cancelar
               </Button>
@@ -1143,9 +1156,9 @@ export function DoacoesRealizadasPage() {
                     }
                   })
                 }
-                disabled={salvarMutation.isPending || !senhaAdministrativa.trim()}
+                disabled={salvarMutation.isPending || processandoRegistroEntrega || !senhaAdministrativa.trim()}
               >
-                {salvarMutation.isPending ? "Autorizando..." : "Autorizar entrega"}
+                {salvarMutation.isPending || processandoRegistroEntrega ? "Autorizando..." : "Autorizar entrega"}
               </Button>
             </div>
           </div>

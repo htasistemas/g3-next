@@ -17,6 +17,11 @@ const emailOpcionalSchema = z.preprocess(
   z.union([z.string().email("E-mail inválido."), z.literal("")]).optional()
 );
 
+const senhaPortalOpcionalSchema = z.preprocess(
+  (value) => (typeof value === "string" ? value.replace(/\D/g, "").trim() : value),
+  z.union([z.string().regex(/^\d{4}$/, "A senha do portal deve ter 4 dígitos."), z.literal("")]).optional()
+);
+
 function dataIsoReal(value: string) {
   const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return false;
@@ -31,6 +36,7 @@ function dataIsoReal(value: string) {
 
 export const beneficiarioStatusOptions = [
   "ATIVO",
+  "COMPLETO",
   "INATIVO",
   "DESATUALIZADO",
   "INCOMPLETO",
@@ -63,6 +69,7 @@ export const beneficiarioFormSchema = z.object({
   nome_mae: z.string().trim().min(3, "Informe o nome da mãe."),
   nome_pai: z.string().optional(),
   cpf: z.string().optional(),
+  senha_portal: senhaPortalOpcionalSchema,
   rg_numero: z.string().optional(),
   rg_orgao_emissor: z.string().optional(),
   rg_uf: z.string().optional(),
@@ -153,6 +160,7 @@ export const beneficiarioDefaultValues: BeneficiarioFormValues = {
   nome_mae: "",
   nome_pai: "",
   cpf: "",
+  senha_portal: "",
   rg_numero: "",
   rg_orgao_emissor: "",
   rg_uf: "",

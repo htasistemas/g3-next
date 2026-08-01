@@ -39,3 +39,16 @@ export function useExcluirPrestacaoContas() {
     }
   });
 }
+
+export function useAlterarWorkflowPrestacao() {
+  const queryClient = useQueryClient();
+  const { usuario } = useAuth();
+  const tenantId = usuario?.tenant_id ?? "sem-tenant";
+  return useMutation({
+    mutationFn: ({ id, acao }: { id: string; acao: string }) => prestacaoContasService.alterarWorkflow(id, acao),
+    onSuccess: async (registro) => {
+      await queryClient.invalidateQueries({ queryKey: ["prestacao-contas", tenantId, "lista"] });
+      await queryClient.invalidateQueries({ queryKey: ["prestacao-contas", tenantId, "item", registro.id] });
+    }
+  });
+}

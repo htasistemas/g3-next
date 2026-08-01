@@ -7,6 +7,7 @@ const visualizar = ensurePermissions(["ADMINISTRADOR", "OPERADOR", "LEITURA_APEN
 const editar = ensurePermissions(["ADMINISTRADOR", "OPERADOR", "EDUCACIONAL_ESTRUTURA_EDITAR", "EDUCACIONAL_MATRICULAS_EDITAR", "EDUCACIONAL_ENTURMACAO_EDITAR"]);
 const permissaoPorRecurso: Partial<Record<string, string[]>> = {
   alunos: ["EDUCACIONAL_ALUNOS_EDITAR", "EDUCACIONAL_MATRICULAS_EDITAR"],
+  profissionais: ["EDUCACIONAL_PROFISSIONAIS_EDITAR"],
   matriculas: ["EDUCACIONAL_MATRICULAS_EDITAR"],
   enturmacoes: ["EDUCACIONAL_ENTURMACAO_EDITAR"],
   diarios: ["EDUCACIONAL_DIARIO_EDITAR"],
@@ -22,6 +23,20 @@ const permissaoPorRecurso: Partial<Record<string, string[]>> = {
   "resultados-finais": ["EDUCACIONAL_RESULTADO_FINAL"],
   calendario: ["EDUCACIONAL_CALENDARIO", "EDUCACIONAL_ESTRUTURA_EDITAR"]
 };
+const permissaoVisualizacaoPorRecurso: Partial<Record<string, string[]>> = {
+  profissionais: ["EDUCACIONAL_PROFISSIONAIS_VISUALIZAR"],
+  alunos: ["EDUCACIONAL_ALUNOS_VISUALIZAR"],
+  diarios: ["EDUCACIONAL_DIARIO_VISUALIZAR"],
+  frequencias: ["EDUCACIONAL_FREQUENCIA_VISUALIZAR"],
+  avaliacoes: ["EDUCACIONAL_AVALIACOES_VISUALIZAR"],
+  notas: ["EDUCACIONAL_NOTAS_VISUALIZAR"],
+  boletins: ["EDUCACIONAL_BOLETINS_VISUALIZAR"],
+  documentos: ["EDUCACIONAL_DOCUMENTOS_VISUALIZAR"]
+};
+const visualizarPorRecurso = (request: Parameters<ReturnType<typeof ensurePermissions>>[0], response: Parameters<ReturnType<typeof ensurePermissions>>[1], next: Parameters<ReturnType<typeof ensurePermissions>>[2]) => {
+  const permissoes = permissaoVisualizacaoPorRecurso[request.params.recurso] ?? ["EDUCACIONAL_VISUALIZAR"];
+  return ensurePermissions(["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS", ...permissoes])(request, response, next);
+};
 const editarPorRecurso = (request: Parameters<ReturnType<typeof ensurePermissions>>[0], response: Parameters<ReturnType<typeof ensurePermissions>>[1], next: Parameters<ReturnType<typeof ensurePermissions>>[2]) => {
   const permissoes = permissaoPorRecurso[request.params.recurso] ?? ["EDUCACIONAL_ESTRUTURA_EDITAR"];
   return ensurePermissions(["ADMINISTRADOR", "OPERADOR", ...permissoes])(request, response, next);
@@ -30,7 +45,8 @@ export const educacionalRoutes = Router();
 educacionalRoutes.use(ensureAuthenticated);
 educacionalRoutes.get("/resumo", visualizar, controller.resumo.bind(controller));
 educacionalRoutes.get("/alunos/busca", visualizar, controller.buscarBeneficiarios.bind(controller));
+educacionalRoutes.get("/unidades-ensino", visualizar, controller.listarUnidadesEnsino.bind(controller));
 educacionalRoutes.post("/alunos/vincular", ensurePermissions(["ADMINISTRADOR", "OPERADOR", "EDUCACIONAL_ALUNOS_EDITAR", "EDUCACIONAL_MATRICULAS_EDITAR"]), controller.vincularAluno.bind(controller));
-educacionalRoutes.get("/:recurso", visualizar, controller.listar.bind(controller));
+educacionalRoutes.get("/:recurso", visualizarPorRecurso, controller.listar.bind(controller));
 educacionalRoutes.post("/:recurso", editarPorRecurso, controller.salvar.bind(controller));
 educacionalRoutes.put("/:recurso/:id", editarPorRecurso, controller.salvar.bind(controller));

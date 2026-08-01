@@ -1,3 +1,4 @@
+import bcrypt from "bcryptjs";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../../database/prisma.js";
 import { AppError } from "../../../shared/errors/app-error.js";
@@ -57,6 +58,21 @@ type DuplicateBeneficiarioRow = {
   codigo: string | null;
   nome_completo: string;
   cpf: string | null;
+};
+type BeneficiarioPortalAcessoRow = {
+  beneficiario_id: bigint;
+  tenant_id: string | null;
+  instituicao_id?: string | null;
+  instituicao_nome?: string | null;
+  instituicao_cnpj?: string | null;
+  nome_completo: string;
+  codigo: string | null;
+  cpf: string | null;
+  senha_hash: string | null;
+  email: string | null;
+  telefone: string | null;
+  familia_id: bigint | null;
+  nome_familia: string | null;
 };
 const sqlCidadeNormalizada = Prisma.raw(
   "translate(lower(trim(coalesce(cidade, ''))), 'áàãâäéèêëíìîïóòõôöúùûüç', 'aaaaaeeeeiiiiooooouuuuc')"
@@ -137,6 +153,138 @@ async function obterProximoCodigoTransacao(tx: TransactionClient): Promise<strin
   `;
   const maxCode = result[0]?.max_code ?? 0;
   return String(maxCode + 1).padStart(4, "0");
+}
+
+const sqlEstruturaPortalBeneficiario = [
+  `
+    CREATE TABLE IF NOT EXISTS beneficiario_portal_acesso (
+      id BIGSERIAL PRIMARY KEY,
+      beneficiario_id BIGINT NOT NULL UNIQUE REFERENCES cadastro_beneficiario(id) ON DELETE CASCADE,
+      tenant_id UUID,
+      senha_hash VARCHAR(255) NOT NULL,
+      criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+      atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+  `,
+  "ALTER TABLE beneficiario_portal_acesso ADD COLUMN IF NOT EXISTS tenant_id UUID",
+  "CREATE UNIQUE INDEX IF NOT EXISTS beneficiario_portal_acesso_beneficiario_uidx ON beneficiario_portal_acesso (beneficiario_id)",
+  "CREATE INDEX IF NOT EXISTS beneficiario_portal_acesso_tenant_idx ON beneficiario_portal_acesso (tenant_id, beneficiario_id)"
+] as const;
+
+let estruturaPortalPromise: Promise<void> | null = null;
+
+export async function ensureBeneficiarioPortalAcessoEstrutura() {
+  if (!estruturaPortalPromise) {
+    estruturaPortalPromise = (async () => {
+      for (const comando of sqlEstruturaPortalBeneficiario) {
+        await prisma.$executeRawUnsafe(comando);
+      }
+    })();
+  }
+
+  await estruturaPortalPromise;
+}
+
+export async function possuiBeneficiarioPortalAcesso(beneficiarioId: bigint, tenantId: string) {
+  await ensureBeneficiarioPortalAcessoEstrutura();
+  const rows = await prisma.$queryRaw<Array<{ beneficiario_id: bigint }>>(Prisma.sql`
+    SELECT beneficiario_id
+    FROM beneficiario_portal_acesso
+    WHERE beneficiario_id = ${beneficiarioId}
+      AND tenant_id::text = ${tenantId}
+    LIMIT 1
+  `);
+  return rows.length > 0;
+}
+
+export async function obterBeneficiariosPortalPorCpf(cpf: string) {
+  await ensureBeneficiarioPortalAcessoEstrutura();
+  const rows = await prisma.$queryRaw<BeneficiarioPortalAcessoRow[]>(Prisma.sql`
+    SELECT
+      b.id AS beneficiario_id,
+      COALESCE(
+        b.tenant_id::text,
+        acesso.tenant_id::text,
+        vf.tenant_id::text,
+        m.tenant_id::text
+      ) AS tenant_id,
+      i.id::text AS instituicao_id,
+      COALESCE(i.nome_fantasia, i.razao_social) AS instituicao_nome,
+      i.cnpj AS instituicao_cnpj,
+      b.nome_completo,
+      b.codigo,
+      doc.numero_documento AS cpf,
+      acesso.senha_hash,
+      contato.email,
+      contato.telefone_principal AS telefone,
+      vf.id AS familia_id,
+      vf.nome_familia
+    FROM cadastro_beneficiario b
+    LEFT JOIN documentos doc
+      ON doc.beneficiario_id = b.id
+     AND UPPER(COALESCE(doc.tipo_documento, '')) = 'CPF'
+    LEFT JOIN beneficiario_portal_acesso acesso
+      ON acesso.beneficiario_id = b.id
+    LEFT JOIN contato_beneficiario contato
+      ON contato.beneficiario_id = b.id
+    LEFT JOIN vinculo_familiar_membro m
+      ON m.beneficiario_id = b.id
+    LEFT JOIN vinculo_familiar vf
+      ON vf.id = m.vinculo_familiar_id
+    LEFT JOIN instituicoes i
+      ON i.tenant_id = COALESCE(b.tenant_id, acesso.tenant_id, vf.tenant_id, m.tenant_id)
+    WHERE COALESCE(b.status, 'ATIVO') <> 'INATIVO'
+      AND REGEXP_REPLACE(COALESCE(doc.numero_documento, ''), '\\D', '', 'g') = ${cpf}
+    ORDER BY b.atualizado_em DESC, b.id DESC
+  `);
+
+  return rows;
+}
+
+export async function obterBeneficiarioPortalPorCpf(cpf: string) {
+  const rows = await obterBeneficiariosPortalPorCpf(cpf);
+  return rows[0] ?? null;
+}
+
+async function salvarSenhaPortalTx(
+  tx: TransactionClient,
+  beneficiarioId: bigint,
+  tenantId: string,
+  senhaPortal?: string
+) {
+  const senhaLimpa = trimOrUndefined(senhaPortal);
+  if (!senhaLimpa) {
+    return null;
+  }
+
+  const senhaNormalizada = senhaLimpa.replace(/\D/g, "");
+  if (senhaNormalizada.length !== 4) {
+    throw new AppError("A senha do portal deve ter 4 digitos.", 422);
+  }
+
+  const senhaHash = await bcrypt.hash(senhaNormalizada, 10);
+  await tx.$executeRaw(Prisma.sql`
+    INSERT INTO beneficiario_portal_acesso (
+      beneficiario_id,
+      tenant_id,
+      senha_hash,
+      criado_em,
+      atualizado_em
+    ) VALUES (
+      ${beneficiarioId},
+      ${tenantId}::uuid,
+      ${senhaHash},
+      NOW(),
+      NOW()
+    )
+    ON CONFLICT (beneficiario_id)
+    DO UPDATE SET
+      tenant_id = EXCLUDED.tenant_id,
+      senha_hash = EXCLUDED.senha_hash,
+      atualizado_em = NOW()
+  `);
+
+  return senhaNormalizada;
 }
 
 export class BeneficiarioRepository {
@@ -421,6 +569,7 @@ export class BeneficiarioRepository {
 
       await this.recriarDadosRelacionados(tx, beneficiario.id, input, now);
       await this.aplicarTenantDoBeneficiario(tx, beneficiario.id, tenantId);
+      await salvarSenhaPortalTx(tx, beneficiario.id, tenantId, input.senha_portal);
       return this.buscarPorIdTransacao(tx, beneficiario.id);
     });
   }
@@ -511,6 +660,7 @@ export class BeneficiarioRepository {
       await this.limparDadosRelacionados(tx, id);
       await this.recriarDadosRelacionados(tx, id, input, now);
       await this.aplicarTenantDoBeneficiario(tx, id, tenantId);
+      await salvarSenhaPortalTx(tx, id, tenantId, input.senha_portal);
       return this.buscarPorIdTransacao(tx, id, tenantId);
     });
   }

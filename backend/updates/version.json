@@ -1,9 +1,9 @@
 {
-  "latestVersion": "1.00.591",
+  "latestVersion": "1.00.780",
   "releaseDate": "2026-08-01",
-  "description": "Menu Gestao educacional foi restaurado, catalogo de salas ficou compativel com bancos existentes e exclusao de menus passou a exigir autorizacao confirmada.",
+  "description": "Base de teste sincronizada com origin/main, menu Gestao educacional preservado e versao oficial normalizada.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.591",
+  "minCompatibleVersion": "1.00.780",
   "releaseType": "stable"
 }

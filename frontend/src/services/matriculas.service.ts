@@ -6,11 +6,19 @@ import type {
   MatriculaItemResponse,
   MatriculaListaResponse,
   MatriculaPresencaData,
+  MatriculaPresencaItem,
   MatriculaPresencaResponse,
   MatriculaProfissionalCatalogo,
   MatriculaResumoCatalogo,
   MatriculaSalaCatalogo
 } from "@/types/matricula";
+
+type MatriculaPresencaSalvarPayload = {
+  data_aula: string;
+  observacoes?: string;
+  senha_confirmacao?: string;
+  presencas: Array<MatriculaPresencaItem & { matricula_id: string }>;
+};
 
 export const matriculasService = {
   async listar(filtros?: MatriculaFiltro): Promise<MatriculaListaResponse> {
@@ -73,27 +81,6 @@ export const matriculasService = {
     return data;
   },
 
-  async criarPresencaData(cursoId: string, payload: { data_aula: string; observacoes?: string }) {
-    const { data } = await httpClient.post<MatriculaPresencaData>(`/api/matriculas/${cursoId}/presencas/datas`, payload);
-    return data;
-  },
-
-  async atualizarPresencaData(cursoId: string, presencaDataId: string, payload: { observacoes?: string; status?: string }) {
-    const { data } = await httpClient.put<MatriculaPresencaData>(
-      `/api/matriculas/${cursoId}/presencas/datas/${presencaDataId}`,
-      payload
-    );
-    return data;
-  },
-
-  async cancelarPresencaData(cursoId: string, presencaDataId: string) {
-    const { data } = await httpClient.patch<MatriculaPresencaData>(
-      `/api/matriculas/${cursoId}/presencas/datas/${presencaDataId}/cancelar`,
-      {}
-    );
-    return data;
-  },
-
   async removerPresencaData(cursoId: string, presencaDataId: string) {
     await httpClient.delete(`/api/matriculas/${cursoId}/presencas/datas/${presencaDataId}`);
   },
@@ -105,10 +92,18 @@ export const matriculasService = {
     return data;
   },
 
-  async salvarPresencasPorData(cursoId: string, presencaDataId: string, payload: MatriculaPresencaResponse) {
+  async salvarPresencasPorData(cursoId: string, presencaDataId: string, payload: MatriculaPresencaSalvarPayload) {
     const { data } = await httpClient.post<MatriculaPresencaResponse>(
       `/api/matriculas/${cursoId}/presencas/datas/${presencaDataId}/itens`,
       payload
+    );
+    return data;
+  },
+
+  async validarSenhaPresenca(cursoId: string, presencaDataId: string, senha: string) {
+    const { data } = await httpClient.post<{ valido: boolean }>(
+      `/api/matriculas/${cursoId}/presencas/datas/${presencaDataId}/validar-senha`,
+      { senha }
     );
     return data;
   },
