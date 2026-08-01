@@ -51,6 +51,31 @@ compare_versions() {
   (( 10#$left_patch >= 10#$right_patch ))
 }
 
+sync_json_version_file() {
+  local file_path="$1"
+
+  if [ ! -f "$file_path" ]; then
+    return 0
+  fi
+
+  sed -i -E \
+    -e "s/\"latestVersion\"[[:space:]]*:[[:space:]]*\"[^\"]+\"/\"latestVersion\": \"$new_version\"/" \
+    -e "s/\"minCompatibleVersion\"[[:space:]]*:[[:space:]]*\"[^\"]+\"/\"minCompatibleVersion\": \"$new_version\"/" \
+    "$file_path"
+}
+
+sync_frontend_app_version() {
+  local file_path="frontend/src/lib/app-version.ts"
+
+  if [ ! -f "$file_path" ]; then
+    return 0
+  fi
+
+  sed -i -E \
+    "s#\\|\\|[[:space:]]*__APP_VERSION__[[:space:]]*\\|\\|[[:space:]]*\"[^\"]+\"#|| __APP_VERSION__ || \"$new_version\"#" \
+    "$file_path"
+}
+
 if [ ! -f "$VERSION_FILE" ]; then
   echo "Arquivo de versao nao encontrado: $VERSION_FILE" >&2
   exit 1
@@ -88,4 +113,7 @@ if [ -n "$STATE_VERSION_FILE" ]; then
   mkdir -p "$(dirname "$STATE_VERSION_FILE")"
   printf "%s\n" "$new_version" > "$STATE_VERSION_FILE"
 fi
+sync_json_version_file "updates/version.json"
+sync_json_version_file "backend/updates/version.json"
+sync_frontend_app_version
 printf "%s\n" "$new_version"

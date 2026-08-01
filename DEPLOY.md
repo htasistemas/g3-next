@@ -35,7 +35,7 @@ Cloudflare Tunnel:
 
 Observacoes:
 - Nao use `docker-compose.tunnel.yml` em paralelo com este fluxo.
-- O `deploy.sh` incrementa a versao antes do build.
+- O `deploy.sh` publica exatamente a versao versionada em `updates/version.txt`; o bump deve ser feito antes do commit quando a entrega exigir nova versao.
 - O frontend e reconstruido sem cache para evitar publicar bundle antigo de login ou rotas publicas.
-- O estado local de deploy fica em `~/.g3n-deploy`, incluindo backups do checkout e o ultimo numero de versao aplicado.
+- O estado local de deploy fica em `~/.g3n-deploy`, incluindo backups do checkout e o ultimo numero de versao publicado.
 - A flag de manutencao usada pelo proxy fica em `docker/runtime/maintenance.enable`.

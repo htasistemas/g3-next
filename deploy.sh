@@ -122,8 +122,13 @@ if [[ "${DEPLOY_SKIP_GIT_PULL:-0}" != "1" ]] && [[ -d ".git" ]]; then
   git pull --ff-only --autostash
 fi
 
-APP_VERSION="$(STATE_VERSION_FILE="$STATE_VERSION_FILE" bash ./scripts/bump-version.sh)"
-log "Version set to $APP_VERSION"
+APP_VERSION="$(sed -n '1p' updates/version.txt | tr -d '\r' | xargs)"
+if [[ ! "$APP_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  log "ERROR: versao invalida em updates/version.txt: ${APP_VERSION:-vazia}"
+  exit 1
+fi
+printf "%s\n" "$APP_VERSION" > "$STATE_VERSION_FILE"
+log "Version set from repository to $APP_VERSION"
 
 enable_maintenance
 log "Maintenance mode enabled"
