@@ -141,6 +141,20 @@ function criarItemFormPadrao() {
   };
 }
 
+function validarDataIso(valor: string) {
+  const match = valor.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return false;
+  const [, ano, mes, dia] = match.map(Number);
+  const data = new Date(Date.UTC(ano, mes - 1, dia));
+  if (Number.isNaN(data.getTime())) return false;
+  return data.toISOString().slice(0, 10) === valor;
+}
+
+function validarInteiroNaoNegativo(valor: string) {
+  if (!valor.trim()) return true;
+  return /^\d+$/.test(valor.trim());
+}
+
 export function CarteiraDigitalEventoPage() {
   const [abaAtiva, setAbaAtiva] = useState<AbaId>("dashboard");
   const [popup, setPopup] = useState<PopupMensagemState | null>(null);
@@ -177,6 +191,9 @@ export function CarteiraDigitalEventoPage() {
   const [transferenciaMotivo, setTransferenciaMotivo] = useState("");
   const [errosParticipante, setErrosParticipante] = useState<Record<string, string | undefined>>({});
   const [errosOperacao, setErrosOperacao] = useState<Record<string, string | undefined>>({});
+  const [errosEvento, setErrosEvento] = useState<Record<string, string | undefined>>({});
+  const [errosBarraca, setErrosBarraca] = useState<Record<string, string | undefined>>({});
+  const [errosItem, setErrosItem] = useState<Record<string, string | undefined>>({});
   const [consultaSaldoId, setConsultaSaldoId] = useState("");
 
   const eventoSelecionado = useMemo(() => eventos.find((item) => item.id === eventoSelecionadoId) ?? null, [eventos, eventoSelecionadoId]);
@@ -321,6 +338,51 @@ export function CarteiraDigitalEventoPage() {
     return !Object.values(proximosErros).some(Boolean);
   }
 
+  function validarEventoForm() {
+    const dataInicioValida = validarDataIso(eventoForm.data_inicio);
+    const dataFimValida = !eventoForm.data_fim || validarDataIso(eventoForm.data_fim);
+    const validadeCreditoValida = !eventoForm.validade_credito || validarDataIso(eventoForm.validade_credito);
+    const proximosErros = {
+      nome_evento:
+        eventoForm.nome_evento.trim().length >= 3 ? undefined : "Informe um nome de evento com pelo menos 3 caracteres.",
+      data_inicio: dataInicioValida ? undefined : "Informe uma data inicial válida.",
+      data_fim: dataFimValida ? undefined : "Informe uma data final válida.",
+      periodo:
+        dataInicioValida && dataFimValida && eventoForm.data_fim && eventoForm.data_fim < eventoForm.data_inicio
+          ? "A data final não pode ser anterior à data inicial."
+          : undefined,
+      validade_credito: validadeCreditoValida ? undefined : "Informe uma validade de crédito válida."
+    };
+    setErrosEvento(proximosErros);
+    return !Object.values(proximosErros).some(Boolean);
+  }
+
+  function validarBarracaForm() {
+    const proximosErros = {
+      nome_barraca:
+        barracaForm.nome_barraca.trim().length >= 3
+          ? undefined
+          : "Informe um nome de barraca com pelo menos 3 caracteres."
+    };
+    setErrosBarraca(proximosErros);
+    return !Object.values(proximosErros).some(Boolean);
+  }
+
+  function validarItemForm() {
+    const preco = normalizarMoeda(itemForm.preco);
+    const estoqueValido = validarInteiroNaoNegativo(itemForm.estoque);
+    const ordemValida = validarInteiroNaoNegativo(itemForm.ordem_exibicao);
+    const proximosErros = {
+      nome_item:
+        itemForm.nome_item.trim().length >= 2 ? undefined : "Informe um nome de produto com pelo menos 2 caracteres.",
+      preco: preco > 0 ? undefined : "Informe um preço maior que zero.",
+      estoque: estoqueValido ? undefined : "Informe o estoque apenas com números inteiros.",
+      ordem_exibicao: ordemValida ? undefined : "Informe a ordem apenas com números inteiros."
+    };
+    setErrosItem(proximosErros);
+    return !Object.values(proximosErros).some(Boolean);
+  }
+
   function validarRecargaForm() {
     const proximosErros = {
       recargaValor: normalizarMoeda(recargaValor) > 0 ? undefined : "Informe um valor de recarga maior que zero."
@@ -377,6 +439,10 @@ export function CarteiraDigitalEventoPage() {
   }
 
   async function salvarEvento() {
+    if (!validarEventoForm()) {
+      setPopup({ tipo: "aviso", titulo: "Carteira digital do evento", texto: "Revise os campos inválidos do evento antes de salvar." });
+      return;
+    }
     try {
       const payload = { ...eventoForm };
       const eventoSalvo = eventoForm.id
@@ -385,6 +451,7 @@ export function CarteiraDigitalEventoPage() {
       await carregarBase(eventoSalvo.id);
       setEventoSelecionadoId(eventoSalvo.id);
       setEventoForm(criarEventoFormPadrao());
+      setErrosEvento({});
       setPopup({ tipo: "sucesso", titulo: "Carteira digital do evento", texto: eventoForm.id ? "Evento atualizado com sucesso." : "Evento criado com sucesso. Use Novo evento para iniciar outro cadastro." });
     } catch (error: any) {
       setPopup({ tipo: "erro", titulo: "Carteira digital do evento", texto: error?.response?.data?.message ?? "Não foi possível salvar o evento." });
@@ -418,12 +485,17 @@ export function CarteiraDigitalEventoPage() {
 
   async function salvarBarraca() {
     if (!eventoSelecionadoId) return;
+    if (!validarBarracaForm()) {
+      setPopup({ tipo: "aviso", titulo: "Carteira digital do evento", texto: "Revise os campos inválidos da barraca antes de salvar." });
+      return;
+    }
     try {
       const payload = { ...barracaForm, evento_id: eventoSelecionadoId };
       if (barracaForm.id) await carteiraEventoService.atualizarBarraca(barracaForm.id, payload);
       else await carteiraEventoService.criarBarraca(payload);
       await carregarBase(eventoSelecionadoId);
       setBarracaForm(criarBarracaFormPadrao());
+      setErrosBarraca({});
       setPopup({ tipo: "sucesso", titulo: "Carteira digital do evento", texto: "Barraca salva com sucesso." });
     } catch (error: any) {
       setPopup({ tipo: "erro", titulo: "Carteira digital do evento", texto: error?.response?.data?.message ?? "Não foi possível salvar a barraca." });
@@ -432,12 +504,17 @@ export function CarteiraDigitalEventoPage() {
 
   async function salvarItem() {
     if (!eventoSelecionadoId) return;
+    if (!validarItemForm()) {
+      setPopup({ tipo: "aviso", titulo: "Carteira digital do evento", texto: "Revise os campos inválidos do produto antes de salvar." });
+      return;
+    }
     try {
-      const payload = { ...itemForm, evento_id: eventoSelecionadoId, barraca_id: itemForm.barraca_id ? Number(itemForm.barraca_id) : undefined, preco: Number(itemForm.preco || 0), estoque: itemForm.estoque ? Number(itemForm.estoque) : undefined, ordem_exibicao: Number(itemForm.ordem_exibicao || 0) };
+      const payload = { ...itemForm, evento_id: eventoSelecionadoId, barraca_id: itemForm.barraca_id ? Number(itemForm.barraca_id) : undefined, preco: normalizarMoeda(itemForm.preco), estoque: itemForm.estoque ? Number(itemForm.estoque) : undefined, ordem_exibicao: Number(itemForm.ordem_exibicao || 0) };
       if (itemForm.id) await carteiraEventoService.atualizarItem(itemForm.id, payload);
       else await carteiraEventoService.criarItem(payload);
       await carregarBase(eventoSelecionadoId);
       setItemForm(criarItemFormPadrao());
+      setErrosItem({});
       setPopup({ tipo: "sucesso", titulo: "Carteira digital do evento", texto: "Produto salvo com sucesso." });
     } catch (error: any) {
       setPopup({ tipo: "erro", titulo: "Carteira digital do evento", texto: error?.response?.data?.message ?? "Não foi possível salvar o produto." });
@@ -663,7 +740,8 @@ export function CarteiraDigitalEventoPage() {
                 <div className="grid gap-3 pt-2 md:grid-cols-2">
                   <div className="space-y-1 md:col-span-2">
                     <Label>Nome do evento</Label>
-                    <Input value={eventoForm.nome_evento} onChange={(e) => setEventoForm((a) => ({ ...a, nome_evento: e.target.value }))} placeholder="Nome do evento" />
+                    <Input className={classesCampoInvalido(errosEvento.nome_evento)} value={eventoForm.nome_evento} onChange={(e) => setEventoForm((a) => ({ ...a, nome_evento: e.target.value }))} onBlur={validarEventoForm} placeholder="Nome do evento" />
+                    <CampoErro texto={errosEvento.nome_evento} />
                   </div>
                   <div className="space-y-1">
                     <Label>Tipo do evento</Label>
@@ -676,17 +754,19 @@ export function CarteiraDigitalEventoPage() {
                     <Select value={eventoForm.status} onChange={(e) => setEventoForm((a) => ({ ...a, status: e.target.value }))}>
                       <option value="ATIVO">Ativo</option>
                       <option value="PLANEJADO">Planejado</option>
-                      <option value="ENCERRADO">Encerrado</option>
+                      <option value="FINALIZADO">Finalizado</option>
                       <option value="CANCELADO">Cancelado</option>
                     </Select>
                   </div>
                   <div className="space-y-1">
                     <Label>Data inicial</Label>
-                    <Input type="date" value={eventoForm.data_inicio} onChange={(e) => setEventoForm((a) => ({ ...a, data_inicio: e.target.value }))} />
+                    <Input className={classesCampoInvalido(errosEvento.data_inicio || errosEvento.periodo)} type="date" value={eventoForm.data_inicio} onChange={(e) => setEventoForm((a) => ({ ...a, data_inicio: e.target.value }))} onBlur={validarEventoForm} />
+                    <CampoErro texto={errosEvento.data_inicio || errosEvento.periodo} />
                   </div>
                   <div className="space-y-1">
                     <Label>Data final</Label>
-                    <Input type="date" value={eventoForm.data_fim} onChange={(e) => setEventoForm((a) => ({ ...a, data_fim: e.target.value }))} placeholder="Data final" />
+                    <Input className={classesCampoInvalido(errosEvento.data_fim || errosEvento.periodo)} type="date" value={eventoForm.data_fim} onChange={(e) => setEventoForm((a) => ({ ...a, data_fim: e.target.value }))} onBlur={validarEventoForm} placeholder="Data final" />
+                    <CampoErro texto={errosEvento.data_fim || errosEvento.periodo} />
                   </div>
                   <div className="space-y-1">
                     <Label>Centro de receita</Label>
@@ -694,7 +774,8 @@ export function CarteiraDigitalEventoPage() {
                   </div>
                   <div className="space-y-1">
                     <Label>Validade do crédito</Label>
-                    <Input type="date" value={eventoForm.validade_credito} onChange={(e) => setEventoForm((a) => ({ ...a, validade_credito: e.target.value }))} />
+                    <Input className={classesCampoInvalido(errosEvento.validade_credito)} type="date" value={eventoForm.validade_credito} onChange={(e) => setEventoForm((a) => ({ ...a, validade_credito: e.target.value }))} onBlur={validarEventoForm} />
+                    <CampoErro texto={errosEvento.validade_credito} />
                   </div>
                   <div className="space-y-1 md:col-span-2">
                     <Label>Observações do evento</Label>
@@ -723,7 +804,8 @@ export function CarteiraDigitalEventoPage() {
                 <div className="grid gap-3 pt-2 md:grid-cols-2">
                   <div className="space-y-1">
                     <Label>Nome da barraca</Label>
-                    <Input value={barracaForm.nome_barraca} onChange={(e) => setBarracaForm((a) => ({ ...a, nome_barraca: e.target.value }))} placeholder="Nome da barraca" />
+                    <Input className={classesCampoInvalido(errosBarraca.nome_barraca)} value={barracaForm.nome_barraca} onChange={(e) => setBarracaForm((a) => ({ ...a, nome_barraca: e.target.value }))} onBlur={validarBarracaForm} placeholder="Nome da barraca" />
+                    <CampoErro texto={errosBarraca.nome_barraca} />
                   </div>
                   <div className="space-y-1">
                     <Label>Tipo</Label>
@@ -752,7 +834,8 @@ export function CarteiraDigitalEventoPage() {
                 <div className="grid gap-3 pt-2 md:grid-cols-2">
                   <div className="space-y-1 md:col-span-2">
                     <Label>Nome do produto</Label>
-                    <Input value={itemForm.nome_item} onChange={(e) => setItemForm((a) => ({ ...a, nome_item: e.target.value }))} placeholder="Nome do item" />
+                    <Input className={classesCampoInvalido(errosItem.nome_item)} value={itemForm.nome_item} onChange={(e) => setItemForm((a) => ({ ...a, nome_item: e.target.value }))} onBlur={validarItemForm} placeholder="Nome do produto" />
+                    <CampoErro texto={errosItem.nome_item} />
                   </div>
                   <div className="space-y-1">
                     <Label>Barraca</Label>
@@ -769,11 +852,13 @@ export function CarteiraDigitalEventoPage() {
                   </div>
                   <div className="space-y-1">
                     <Label>Preço</Label>
-                    <Input value={itemForm.preco} onChange={(e) => setItemForm((a) => ({ ...a, preco: e.target.value }))} placeholder="Preço" />
+                    <Input className={classesCampoInvalido(errosItem.preco)} inputMode="decimal" value={itemForm.preco} onChange={(e) => setItemForm((a) => ({ ...a, preco: e.target.value }))} onBlur={() => { setItemForm((a) => ({ ...a, preco: formatarMoedaInput(a.preco) })); validarItemForm(); }} placeholder="0,00" />
+                    <CampoErro texto={errosItem.preco} />
                   </div>
                   <div className="space-y-1">
                     <Label>Estoque</Label>
-                    <Input value={itemForm.estoque} onChange={(e) => setItemForm((a) => ({ ...a, estoque: e.target.value }))} placeholder="Estoque opcional" />
+                    <Input className={classesCampoInvalido(errosItem.estoque)} inputMode="numeric" value={itemForm.estoque} onChange={(e) => setItemForm((a) => ({ ...a, estoque: e.target.value.replace(/\D/g, "") }))} onBlur={validarItemForm} placeholder="Estoque opcional" />
+                    <CampoErro texto={errosItem.estoque} />
                   </div>
                   <div className="flex gap-2">
                     <Button type="button" className="flex-1" onClick={() => void salvarItem()}><Save className="mr-1.5 h-4 w-4" />Salvar</Button>

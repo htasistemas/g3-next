@@ -1,6 +1,35 @@
 {
   "entries":  [
                     {
+                        "version":  "1.00.591",
+                        "releaseDate":  "2026-08-01",
+                        "title":  "Menu Gestao educacional restaurado",
+                        "description":  "O menu Gestao educacional voltou ao shell principal com a tela educacional dedicada, o catalogo de salas foi compatibilizado e a regra de exclusao de menus passou a exigir autorizacao confirmada.",
+                        "changes":  [
+                                        "Foi restaurada a secao Gestao educacional no menu principal com os itens Visao geral, Alunos, Vida escolar, Estrutura academica, Professores e equipe pedagogica, Gestao escolar, Relatorios e indicadores e Parcerias publicas apontando para /educacional.",
+                                        "Foi integrado o modulo educacional dedicado disponivel na branch local de revisao, com frontend em /educacional e backend em /api/educacional.",
+                                        "Como esta base de migracao nao contem as telas dedicadas da producao 1.00.780, os itens educacionais mantem acesso compativel para Inscricoes em cursos e oficinas ate a sincronizacao completa.",
+                                        "O atalho existente em Atendimentos diarios foi mantido para preservar compatibilidade de acesso.",
+                                        "A estrutura de matriculas passou a garantir a coluna ativo em salas_unidade antes de consultar o catalogo de salas.",
+                                        "O AGENTS.md recebeu regra explicita proibindo remocao de menus, modulos, rotas ou itens de navegacao sem autorizacao especifica e extremamente confirmada.",
+                                        "O manual do sistema foi atualizado com o caminho Gestao educacional e suas abas principais."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
+                        "version":  "1.00.590",
+                        "releaseDate":  "2026-08-01",
+                        "title":  "Auditoria de campos na carteira digital do evento",
+                        "description":  "Carteira digital do evento passou a validar status, periodo, moeda e estoque antes do salvamento.",
+                        "changes":  [
+                                        "O status Encerrado foi corrigido para Finalizado no cadastro de evento, alinhando a UI ao enum aceito pelo backend.",
+                                        "Evento, barraca e produto passaram a exibir erro visual local para nomes curtos, datas invalidas, periodo incoerente, preco zerado e estoque nao numerico.",
+                                        "O preco do produto agora aceita digitacao monetaria brasileira e e normalizado antes de enviar ao backend.",
+                                        "Foram adicionados testes de schema para proteger o status Finalizado e rejeitar payloads invalidos do modulo."
+                                    ],
+                        "releaseType":  "stable"
+                    },
+                    {
                         "version":  "1.00.589",
                         "releaseDate":  "2026-07-31",
                         "title":  "Modelos institucionais nas informacoes administrativas",

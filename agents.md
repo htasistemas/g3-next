@@ -26,6 +26,13 @@
 - Não aceitar fluxo com clique duplo para executar ação.
 - Exibir feedback visual em ações assíncronas (carregando, sucesso, erro).
 
+### Menus e Navegação
+
+- MUST NOT remover menus, módulos, itens de menu, rotas de navegação ou entradas já criadas no shell do sistema sem autorização explícita, específica e extremamente confirmada pelo usuário.
+- MAY adicionar ou alterar menus para corrigir nomenclatura, agrupamento, permissão, ícone ou rota, desde que a tela continue acessível.
+- Ao substituir um menu por outro, MUST manter compatibilidade de acesso ou registrar claramente a migração no manual do sistema e na entrega.
+- Exclusão definitiva de menu só pode ocorrer quando o usuário solicitar expressamente a remoção e confirmar que entende que o acesso deixará de aparecer na navegação.
+
 ### Manual do Sistema
 
 - MUST manter a tela `Configurações gerais > Manual do sistema` atualizada sempre que houver criação, alteração ou remoção relevante de tela, fluxo, regra de negócio ou nomenclatura no G3N.

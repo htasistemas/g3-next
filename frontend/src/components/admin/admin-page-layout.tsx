@@ -24,9 +24,9 @@ export type AdminAction = {
 };
 
 type AdminPageLayoutProps = {
-  tabs: AdminTab[];
-  activeTab: string;
-  onChangeTab: (tabId: string) => void;
+  tabs?: AdminTab[];
+  activeTab?: string;
+  onChangeTab?: (tabId: string) => void;
   actions: AdminAction[];
   sectionLabel?: string;
   pageTitle?: string;
@@ -39,7 +39,7 @@ type AdminPageLayoutProps = {
 };
 
 export function AdminPageLayout({
-  tabs,
+  tabs = [],
   activeTab,
   onChangeTab,
   actions,
@@ -107,7 +107,7 @@ export function AdminPageLayout({
               <button
                 key={item.id}
                 type="button"
-                onClick={() => onChangeTab(item.id)}
+                onClick={() => onChangeTab?.(item.id)}
                 className={classeBotaoAbaLateral(activeTab === item.id)}
               >
                 <span className={classeNumeroAbaLateral(activeTab === item.id)}>{index + 1}</span>

@@ -119,6 +119,7 @@ const estruturaMatriculasSql = [
   "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS data_conclusao DATE",
   "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS criado_em TIMESTAMP NOT NULL DEFAULT NOW()",
   "ALTER TABLE cursos_atendimentos ADD COLUMN IF NOT EXISTS atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()",
+  "ALTER TABLE salas_unidade ADD COLUMN IF NOT EXISTS ativo BOOLEAN NOT NULL DEFAULT TRUE",
   "CREATE INDEX IF NOT EXISTS cursos_atendimentos_tenant_idx ON cursos_atendimentos (tenant_id, nome)",
   "CREATE INDEX IF NOT EXISTS cursos_atendimentos_status_idx ON cursos_atendimentos (status)",
   "CREATE INDEX IF NOT EXISTS cursos_atendimentos_sala_idx ON cursos_atendimentos (sala_id)",

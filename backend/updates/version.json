@@ -1,9 +1,9 @@
 {
-  "latestVersion": "1.00.589",
-  "releaseDate": "2026-07-31",
-  "description": "Categorias inteligentes de informacoes administrativas passaram a cobrir dados institucionais, sedes e registros oficiais.",
+  "latestVersion": "1.00.591",
+  "releaseDate": "2026-08-01",
+  "description": "Menu Gestao educacional foi restaurado, catalogo de salas ficou compativel com bancos existentes e exclusao de menus passou a exigir autorizacao confirmada.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.589",
+  "minCompatibleVersion": "1.00.591",
   "releaseType": "stable"
 }

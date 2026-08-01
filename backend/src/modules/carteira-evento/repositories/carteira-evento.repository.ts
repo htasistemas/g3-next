@@ -256,9 +256,9 @@ export class CarteiraEventoRepository {
     return rows.map(mapParticipanteCarteira);
   }
 
-  async buscarParticipantePorIdOuFalhar(id: bigint, tenantId: string) {
+  async buscarParticipantePorIdOuFalhar(id: bigint, tenantId: string, db: Tx | typeof prisma = prisma) {
     await ensureCarteiraEventoEstrutura(prisma);
-    const rows = await prisma.$queryRaw<ParticipanteCarteiraRow[]>(Prisma.sql`
+    const rows = await db.$queryRaw<ParticipanteCarteiraRow[]>(Prisma.sql`
       SELECT
         p.id,
         p.evento_id,
@@ -595,7 +595,7 @@ export class CarteiraEventoRepository {
         motivo: trimOrUndefined(input.observacao),
         operador: ator
       });
-      return this.buscarParticipantePorIdOuFalhar(participante.id, tenantId);
+      return this.buscarParticipantePorIdOuFalhar(participante.id, tenantId, tx);
     });
   }
 
@@ -663,8 +663,8 @@ export class CarteiraEventoRepository {
       });
 
       return {
-        origem: await this.buscarParticipantePorIdOuFalhar(origem.id, tenantId),
-        destino: await this.buscarParticipantePorIdOuFalhar(destino.id, tenantId),
+        origem: await this.buscarParticipantePorIdOuFalhar(origem.id, tenantId, tx),
+        destino: await this.buscarParticipantePorIdOuFalhar(destino.id, tenantId, tx),
         referencia
       };
     });
@@ -716,7 +716,7 @@ export class CarteiraEventoRepository {
         motivo: input.motivo,
         operador: ator
       });
-      return this.buscarParticipantePorIdOuFalhar(participante.id, tenantId);
+      return this.buscarParticipantePorIdOuFalhar(participante.id, tenantId, tx);
     });
   }
 

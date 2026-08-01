@@ -292,6 +292,69 @@ export const menuSections: MenuSection[] = [
     ]
   },
   {
+    id: "gestao-educacional",
+    secao: "Gestão educacional",
+    icon: GraduationCap,
+    itens: [
+      {
+        id: "gestao-educacional-visao-geral",
+        to: "/educacional",
+        label: "Visão geral",
+        icon: ChartPie,
+        activeMatchPaths: ["/educacional"]
+      },
+      {
+        id: "gestao-educacional-alunos",
+        to: "/educacional?grupo=alunos&aba=alunos",
+        label: "Alunos",
+        icon: UsersRound,
+        activeMatchPaths: ["/educacional"]
+      },
+      {
+        id: "gestao-educacional-vida-escolar",
+        to: "/educacional?aba=historicos",
+        label: "Vida escolar",
+        icon: FileText,
+        activeMatchPaths: ["/educacional"]
+      },
+      {
+        id: "gestao-educacional-estrutura-academica",
+        to: "/educacional?aba=estrutura",
+        label: "Estrutura acadêmica",
+        icon: Building2,
+        activeMatchPaths: ["/educacional"]
+      },
+      {
+        id: "gestao-educacional-professores-equipe",
+        to: "/educacional?grupo=professores&aba=professores",
+        label: "Professores e equipe pedagógica",
+        icon: UserRoundCheck,
+        activeMatchPaths: ["/educacional"]
+      },
+      {
+        id: "gestao-educacional-gestao-escolar",
+        to: "/educacional?aba=fluxo-academico",
+        label: "Gestão escolar",
+        icon: CheckSquare2,
+        activeMatchPaths: ["/educacional"]
+      },
+      {
+        id: "gestao-educacional-relatorios-indicadores",
+        to: "/educacional?aba=relatorios",
+        label: "Relatórios e indicadores",
+        icon: ChartColumn,
+        activeMatchPaths: ["/educacional"]
+      },
+      {
+        id: "gestao-educacional-parcerias-publicas",
+        to: "/educacional?aba=documentos",
+        label: "Parcerias públicas",
+        icon: Files,
+        activeMatchPaths: ["/educacional"]
+      }
+    ]
+  },
+  {
     id: "setor-administrativo",
     secao: "Administração e gestão",
     icon: FolderKanban,
@@ -622,6 +685,7 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/cadastros/voluntariado")) return "Cadastro de voluntariado";
   if (pathname.startsWith("/atendimentos/central-atendimentos")) return "Central de atendimentos";
   if (pathname.startsWith("/atendimentos/matriculas")) return "Inscrições em cursos e oficinas";
+  if (pathname.startsWith("/educacional")) return "Gestão educacional";
   if (pathname.startsWith("/atendimentos/banco-empregos")) return "Banco de empregos";
   if (pathname.startsWith("/atendimentos/biblioteca")) return "Biblioteca";
   if (pathname.startsWith("/atendimentos/registro-visitas")) return "Registro de visitas";
@@ -684,6 +748,7 @@ function ocultarTituloTopo(pathname: string) {
     pathname.startsWith("/configuracoes/mensagens-personalizadas") ||
     pathname.startsWith("/atendimentos/central-atendimentos") ||
     pathname.startsWith("/atendimentos/matriculas") ||
+    pathname.startsWith("/educacional") ||
     pathname.startsWith("/atendimentos/banco-empregos") ||
     pathname.startsWith("/atendimentos/biblioteca") ||
     pathname.startsWith("/atendimentos/registro-visitas") ||

@@ -73,6 +73,7 @@ const routeModules: RouteModuleDefinition[] = [
     path: "/atendimentos/agendamentos",
     loader: () => import("@/pages/atendimentos/agendamentos-page")
   },
+  { path: "/educacional", loader: () => import("@/pages/educacional/educacional-page") },
   { path: "/atendimentos/ocorrencias", loader: () => import("@/pages/atendimentos/ocorrencias-page") },
   {
     path: "/atendimentos/chamada-senhas",

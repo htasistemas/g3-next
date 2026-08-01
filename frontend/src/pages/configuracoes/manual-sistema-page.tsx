@@ -165,6 +165,7 @@ const secoesManual: ManualSecao[] = [
         nome: "Inscrições em cursos e oficinas",
         objetivo: "Gerenciar inscrições em cursos, oficinas e atividades.",
         comoUsar: [
+          "Acesse Gestão educacional no menu principal para consultar Visão geral, Alunos, Vida escolar, Estrutura acadêmica, Professores e equipe pedagógica, Gestão escolar, Relatórios e indicadores e Parcerias públicas. Os itens abrem a tela educacional dedicada, integrada ao backend em /api/educacional.",
           "Consulte a listagem de inscrições para localizar cada inscrição individual já incluída, com beneficiário, curso, status, data da inscrição, agendamento e profissional; a tabela voltou a carregar os lançamentos reais já salvos na instituição, respeitando os filtros aplicados na própria listagem.",
           "O agendamento da inscrição fica destacado visualmente como agendado, pendente, cancelado ou finalizado, com filtros rápidos por status acima da tabela.",
           "Use os filtros Unidade e Sala na listagem para conferir os alunos vinculados a cada escola e sala; a seção Alunos por unidade e sala mostra os nomes agrupados por local.",
@@ -954,6 +955,7 @@ const secoesManual: ManualSecao[] = [
         comoUsar: [
           "Acesse Vendas e Caixa > Carteira digital do evento para abrir o modulo completo dentro do sistema.",
           "No fluxo administrativo, comece pelo cadastro do evento e defina nome, tipo, periodo, status, regras de recarga, transferencia, estorno, validade do credito, centro de receita e observacoes.",
+          "O status operacional do evento usa Planejado, Ativo, Finalizado ou Cancelado; ao encerrar o evento, selecione Finalizado para manter compatibilidade com a regra gravada no servidor.",
           "Na aba Cadastros, os blocos de evento, barraca e produto agora ficam organizados um abaixo do outro para melhorar a visualizacao e a conferencia durante o preenchimento.",
           "Na aba Cadastros, use o proprio formulario em modo Novo ou Editar. Quando quiser iniciar um cadastro limpo, use o botao Novo evento, Nova barraca ou Novo item.",
           "Abaixo dos formularios, o sistema lista visualmente o evento em edicao, as barracas cadastradas e os produtos vinculados para facilitar a conferencia antes da operacao.",
@@ -962,7 +964,7 @@ const secoesManual: ManualSecao[] = [
           "Na mesma aba, recarga, ajuste e transferencia usam digitacao monetaria em padrao brasileiro, destacam visualmente campos invalidos e bloqueiam envio com valor zerado ou motivo incompleto.",
           "Use o bloco Consulta de saldo para selecionar rapidamente um participante e conferir nome, numero da carteira e saldo atual sem precisar iniciar venda ou recarga.",
           "Use a impressao do cartao ou comanda quando precisar entregar o identificador fisico ao participante, com opcao de QR Code e codigo de barras, ou apresente o codigo diretamente no celular.",
-          "Cadastre barracas ou pontos de venda e em seguida os itens do evento com categoria, preco, estoque opcional e ordem de exibicao para organizar a operacao.",
+          "Cadastre barracas ou pontos de venda e em seguida os itens do evento com categoria, preco em formato monetario brasileiro, estoque opcional apenas numerico e ordem de exibicao para organizar a operacao.",
           "Para carregar saldo, use a recarga da carteira informando participante, valor, forma de pagamento e observacao. O sistema atualiza o saldo e registra a movimentacao no extrato.",
           "Na operacao da barraca, selecione a barraca, monte a compra com os itens, leia ou informe o token da carteira, confira o nome do participante e o saldo atual e confirme a venda.",
           "Quando a venda for confirmada, o sistema consulta o saldo no banco em tempo real, bloqueia saldo insuficiente, debita o valor aprovado e grava barraca, operador, horario, itens e total.",
@@ -973,6 +975,7 @@ const secoesManual: ManualSecao[] = [
         ],
         atencoes: [
           "O QR Code usa um token seguro e o codigo de barras usa o numero da carteira. Em ambos os casos o saldo permanece salvo e validado exclusivamente no banco.",
+          "Evento, barraca e produto agora bloqueiam salvamento com nome curto, periodo incoerente, preco zerado ou estoque invalido, exibindo aviso visual abaixo do campo.",
           "CPF e telefone invalidos nao devem ser persistidos na carteira do participante; revise os avisos abaixo dos campos antes de salvar.",
           "A venda bloqueia saldo insuficiente, evita saldo negativo por padrao e usa chave de operacao para reduzir duplicidade por clique repetido.",
           "Para registrar recargas e vendas, o evento deve estar com status Ativo na aba de cadastro do proprio modulo.",
