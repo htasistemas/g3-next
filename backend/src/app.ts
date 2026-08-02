@@ -11,6 +11,8 @@ import { appRoutes } from "./routes/index.js";
 
 export const app = express();
 
+app.set("trust proxy", 1);
+
 app.use(
   helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" }

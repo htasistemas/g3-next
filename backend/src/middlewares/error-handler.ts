@@ -1,6 +1,7 @@
 import multer from "multer";
 import type { NextFunction, Request, Response } from "express";
 import { ZodError } from "zod";
+import { env } from "../config/env.js";
 import { AppError } from "../shared/errors/app-error.js";
 
 function obterMensagemPrisma(error: unknown): { statusCode: number; message: string } | null {
@@ -17,27 +18,25 @@ function obterMensagemPrisma(error: unknown): { statusCode: number; message: str
   if (prismaError.code === "P2002") {
     return {
       statusCode: 409,
-      message: "Já existe um registro com esses dados."
+      message: "Ja existe um registro com esses dados."
     };
   }
 
   if (prismaError.code === "P2025") {
     return {
       statusCode: 404,
-      message: "O registro solicitado não foi encontrado."
+      message: "O registro solicitado nao foi encontrado."
     };
   }
 
-  if (prismaError.code === "P2010") {
-    return {
-      statusCode: 500,
-      message: prismaError.meta?.message ?? prismaError.message ?? "Falha ao executar a operação no banco de dados."
-    };
-  }
+  const mensagemBanco =
+    env.NODE_ENV === "production"
+      ? "Falha ao executar a operacao no banco de dados."
+      : prismaError.meta?.message ?? prismaError.message ?? "Falha ao executar a operacao no banco de dados.";
 
   return {
     statusCode: 500,
-    message: prismaError.meta?.message ?? prismaError.message ?? "Falha ao executar a operação no banco de dados."
+    message: mensagemBanco
   };
 }
 
