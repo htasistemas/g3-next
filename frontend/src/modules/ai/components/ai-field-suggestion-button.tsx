@@ -15,12 +15,12 @@ export function AiFieldSuggestionButton({
   disabled = false
 }: AiFieldSuggestionButtonProps) {
   const [carregando, setCarregando] = useState(false);
-  const [erro, setErro] = useState(false);
+  const [erro, setErro] = useState("");
 
   async function sugerir() {
     if (carregando || disabled) return;
     setCarregando(true);
-    setErro(false);
+    setErro("");
     try {
       const resposta = await aiService.perguntar(
         `${prompt}\n\nEscreva somente o texto sugerido, em português do Brasil, sem introdução, sem aspas e sem inventar números, nomes ou resultados não informados.`,
@@ -29,9 +29,15 @@ export function AiFieldSuggestionButton({
       const sugestao = resposta.answer?.trim();
       const iaIndisponivel = /IA generativa não está configurada|IA generativa nao esta configurada/i.test(sugestao);
       if (sugestao && !iaIndisponivel) onApply(sugestao);
-      else setErro(true);
-    } catch {
-      setErro(true);
+      else setErro(sugestao || "Não foi possível gerar a sugestão.");
+    } catch (error: any) {
+      setErro(
+        error?.response?.data?.answer ??
+          error?.response?.data?.message ??
+          error?.response?.data?.mensagem ??
+          error?.message ??
+          "Não foi possível gerar a sugestão."
+      );
     } finally {
       setCarregando(false);
     }
@@ -43,7 +49,7 @@ export function AiFieldSuggestionButton({
         {carregando ? <LoaderCircle className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
         {carregando ? "Gerando sugestão..." : "Sugerir com IA"}
       </Button>
-      {erro ? <span className="text-xs text-red-600">Não foi possível gerar a sugestão.</span> : null}
+      {erro ? <span className="text-xs text-red-600">{erro}</span> : null}
     </span>
   );
 }

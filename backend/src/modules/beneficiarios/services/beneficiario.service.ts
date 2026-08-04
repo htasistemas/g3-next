@@ -25,11 +25,13 @@ import type { BeneficiarioInput } from "../beneficiario.types.js";
 import { storageService } from "../../arquivos/services/storage-instance.js";
 import { ParametrosSistemaService } from "../../configuracoes-gerais/services/parametros-sistema.service.js";
 import { prisma } from "../../../database/prisma.js";
+import { BeneficiarioEvolucaoService } from "./beneficiario-evolucao.service.js";
 
 export class BeneficiarioService {
   private readonly repository = new BeneficiarioRepository();
   private readonly emailService = new EmailService();
   private readonly parametrosSistemaService = new ParametrosSistemaService();
+  private readonly evolucaoService = new BeneficiarioEvolucaoService();
 
   async listar(rawFilters: unknown, tenantId?: string) {
     const filtersNormalizados =
@@ -73,6 +75,7 @@ export class BeneficiarioService {
         tenantObrigatorio
       );
       await this.vincularArquivos(preparado.novosCaminhos, beneficiario.id, tenantObrigatorio);
+      await this.finalizarEvolucaoCadastro(beneficiario.id, usuarioId, tenantObrigatorio, "CRIACAO");
       return {
         beneficiario: mapBeneficiarioToResponse(beneficiario),
         senha_portal_gerada: senhaPortalGerada
@@ -182,6 +185,7 @@ export class BeneficiarioService {
       }
 
       const response = mapBeneficiarioToResponse(beneficiario);
+      await this.finalizarEvolucaoCadastro(id, usuarioId, tenantObrigatorio, "EDICAO");
       await this.enviarEmailAtualizacaoCadastro(snapshotAnterior, response);
       return {
         beneficiario: response,
@@ -530,6 +534,34 @@ export class BeneficiarioService {
           error
         });
       }
+    }
+  }
+
+  private async finalizarEvolucaoCadastro(
+    beneficiarioId: bigint,
+    usuarioId: bigint | undefined,
+    tenantId: string,
+    acao: "CRIACAO" | "EDICAO"
+  ) {
+    const ator = {
+      usuarioId: usuarioId ? String(usuarioId) : undefined,
+      usuarioNome: "sistema",
+      tenantId
+    };
+    try {
+      await this.evolucaoService.garantirPessoaBeneficiario(String(beneficiarioId), ator);
+      await this.evolucaoService.registrarAtualizacaoGrupos(String(beneficiarioId), ator);
+      await this.evolucaoService.registrarAuditoria(
+        beneficiarioId,
+        acao,
+        "cadastro",
+        null,
+        acao === "CRIACAO" ? "Cadastro criado" : "Cadastro atualizado",
+        ator
+      );
+      await this.evolucaoService.recalcularCompletude(String(beneficiarioId), ator);
+    } catch (error) {
+      console.warn("[beneficiario] falha ao atualizar estruturas evolutivas do cadastro:", error);
     }
   }
 }

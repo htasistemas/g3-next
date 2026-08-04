@@ -1,6 +1,22 @@
 {
   "entries":  [
                     {
+                        "version": "1.00.782",
+                        "releaseDate": "2026-08-03",
+                        "title": "Fundacao profissional da prestacao de contas",
+                        "description": "O modulo de Prestacao de contas recebeu a fundacao incremental para concedentes, instrumentos, modelos, plano, orcamento, execucao financeira, execucao do objeto, documentos, conciliacao, diligencias, aprovacoes, auditoria, transparencia e IA/OCR configuravel.",
+                        "changes": ["Migration incremental cria 14 tabelas profissionais sem remover tabelas, colunas ou dados antigos.", "A rota atual de Prestacao de contas ganhou APIs profissionais para visao geral, cadastros, execucao, auditoria e configuracoes de IA/OCR com credenciais mascaradas.", "A tela existente preserva as abas antigas e adiciona as novas areas profissionais em abas do mesmo modulo."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.781",
+                        "releaseDate": "2026-08-03",
+                        "title": "Evolucao do cadastro de beneficiarios - parte 1",
+                        "description": "O cadastro de beneficiarios recebeu a primeira etapa de evolucao incremental com pessoa central, analise de duplicidade, cadastro rapido, completude, consentimentos, auditoria e configuracoes por tenant.",
+                        "changes": ["Migration incremental cria pessoa central e estruturas auxiliares sem remover tabelas, colunas ou dados.", "Cadastro de beneficiarios passa a expor completude, possiveis duplicidades, consentimentos, familia e historico de auditoria.", "Configuracoes gerais ganhou Cadastro de beneficiarios e Integracoes e APIs com credenciais mascaradas."],
+                        "releaseType": "stable"
+                    },
+                    {
                         "version": "1.00.780",
                         "releaseDate": "2026-08-01",
                         "title": "Sincronizacao da base de teste",

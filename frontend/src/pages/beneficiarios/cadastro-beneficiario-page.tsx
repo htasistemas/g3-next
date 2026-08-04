@@ -3,6 +3,7 @@ import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
 import { MensagemAcoesRapidas } from "@/components/mensagens-personalizadas/mensagem-acoes-rapidas";
+import { CadastroSucessoModal } from "@/components/admin/cadastro-sucesso-modal";
 import type { LucideIcon } from "lucide-react";
 import {
   Search,
@@ -25,7 +26,12 @@ import {
   HandCoins,
   FileText,
   ArrowUpDown,
-  CheckCircle2
+  CheckCircle2,
+  Gauge,
+  History,
+  RotateCw,
+  ShieldCheck,
+  Users
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,9 +48,17 @@ import {
   type BeneficiarioFormValues
 } from "@/features/beneficiarios/beneficiario.schema";
 import {
+  useAnalisarDuplicidadeBeneficiario,
+  useBeneficiarioAuditoria,
+  useBeneficiarioCompletude,
+  useBeneficiarioConsentimentos,
+  useBeneficiarioFamiliaResumo,
   useBeneficiario,
   useBeneficiarios,
+  useCriarBeneficiarioRapido,
   useProximoCodigo,
+  useRecalcularCompletudeBeneficiario,
+  useRegistrarConsentimentoBeneficiario,
   useRemoverBeneficiario,
   useSalvarBeneficiario
 } from "@/features/beneficiarios/use-beneficiarios";
@@ -55,8 +69,9 @@ import {
 } from "@/services/parametros-sistema.service";
 import { reportsService } from "@/services/reports.service";
 import { buscarEnderecoPorCep, buscarSugestaoZonaSubzona } from "@/services/cep.service";
-import type { Beneficiario, BeneficiarioFiltro, BeneficiarioStatus } from "@/types/beneficiario";
+import type { Beneficiario, BeneficiarioDuplicidade, BeneficiarioFiltro, BeneficiarioStatus } from "@/types/beneficiario";
 import { useAuth } from "@/hooks/use-auth";
+import { formatarMoedaInput } from "@/lib/br-utils";
 import { somenteDigitos, validarCpf } from "@/lib/validators";
 import {
   mapaCamposTextoBeneficiarioForm,
@@ -78,11 +93,14 @@ const abas = [
   { id: "endereco", label: "Endereço", icon: MapPinned },
   { id: "contato", label: "Contato", icon: Phone },
   { id: "documentos", label: "Documentos", icon: FileText },
+  { id: "consentimentos", label: "Consentimentos", icon: ShieldCheck },
   { id: "social", label: "Situação social", icon: Handshake },
+  { id: "familia", label: "Família", icon: Users },
   { id: "escolaridade", label: "Escolaridade e trabalho", icon: GraduationCap },
   { id: "saude", label: "Saúde", icon: HeartPulse },
   { id: "beneficios", label: "Benefícios", icon: HandCoins },
-  { id: "observacoes", label: "Observações", icon: FileText }
+  { id: "observacoes", label: "Observações", icon: FileText },
+  { id: "historico", label: "Histórico e auditoria", icon: History }
 ] as const;
 
 type DocumentoCadastroConfig = DocumentoObrigatoriedadeBeneficiarioSetting & {
@@ -110,6 +128,83 @@ const subzonaEnderecoOptions = [
   { value: "ZONA_LESTE", label: "Zona Leste" },
   { value: "ZONA_OESTE", label: "Zona Oeste" },
   { value: "ZONA_CENTRAL", label: "Zona Central" }
+] as const;
+
+const nivelEscolaridadeOptions = [
+  "Não alfabetizado",
+  "Alfabetizado",
+  "Ensino fundamental incompleto",
+  "Ensino fundamental completo",
+  "Ensino médio incompleto",
+  "Ensino médio completo",
+  "Ensino técnico",
+  "Ensino superior incompleto",
+  "Ensino superior completo",
+  "Pós-graduação"
+] as const;
+
+const ocupacaoCboOptions = [
+  "Empregado doméstico",
+  "Diarista",
+  "Faxineiro",
+  "Auxiliar de limpeza",
+  "Cozinheiro",
+  "Auxiliar de cozinha",
+  "Vendedor de comércio varejista",
+  "Operador de caixa",
+  "Repositor de mercadorias",
+  "Recepcionista",
+  "Auxiliar administrativo",
+  "Motorista",
+  "Pedreiro",
+  "Servente de obras",
+  "Pintor de obras",
+  "Costureiro",
+  "Cabeleireiro",
+  "Manicure",
+  "Cuidador de idosos",
+  "Agricultor familiar",
+  "Trabalhador volante da agricultura",
+  "Catador de material reciclável",
+  "Artesão",
+  "Autônomo",
+  "Estudante",
+  "Do lar",
+  "Aposentado",
+  "Pensionista",
+  "Desempregado",
+  "Outro"
+] as const;
+
+const situacaoTrabalhoOptions = [
+  "Empregado com carteira assinada",
+  "Empregado sem carteira assinada",
+  "Servidor público",
+  "Autônomo",
+  "Microempreendedor individual",
+  "Trabalho informal",
+  "Trabalho temporário",
+  "Aprendiz ou estagiário",
+  "Desempregado",
+  "Do lar sem renda própria",
+  "Estudante sem trabalho",
+  "Aposentado ou pensionista",
+  "Sem condição de trabalho no momento"
+] as const;
+
+const beneficiosSociaisOptions = [
+  "Bolsa Família",
+  "Benefício de Prestação Continuada (BPC)",
+  "Auxílio Gás",
+  "Tarifa Social de Energia Elétrica",
+  "Programa de Erradicação do Trabalho Infantil (PETI)",
+  "Seguro-defeso",
+  "Aposentadoria",
+  "Pensão por morte",
+  "Auxílio-doença",
+  "Benefício eventual municipal",
+  "Cesta básica",
+  "Outro"
 ] as const;
 
 type DocumentoCadastroId = string;
@@ -660,6 +755,8 @@ export function CadastroBeneficiarioPage() {
   const [codigoCadastroSalvo, setCodigoCadastroSalvo] = useState("");
   const [senhaPortalGerada, setSenhaPortalGerada] = useState("");
   const [popupExcluirAberto, setPopupExcluirAberto] = useState(false);
+  const [duplicidadesEncontradas, setDuplicidadesEncontradas] = useState<BeneficiarioDuplicidade[]>([]);
+  const [ignorarDuplicidadeAtual, setIgnorarDuplicidadeAtual] = useState(false);
   const [popupImprimirAberto, setPopupImprimirAberto] = useState(false);
   const [popupDeclaracaoResidenciaAberto, setPopupDeclaracaoResidenciaAberto] = useState(false);
   const [imprimindoRelatorio, setImprimindoRelatorio] = useState(false);
@@ -684,8 +781,16 @@ export function CadastroBeneficiarioPage() {
 
   const { data: listaData, isLoading: carregandoLista } = useBeneficiarios(filtros);
   const { data: detalhesData, isLoading: carregandoDetalhes } = useBeneficiario(beneficiarioSelecionadoId);
+  const completudeQuery = useBeneficiarioCompletude(beneficiarioSelecionadoId);
+  const familiaResumoQuery = useBeneficiarioFamiliaResumo(beneficiarioSelecionadoId);
+  const consentimentosQuery = useBeneficiarioConsentimentos(beneficiarioSelecionadoId);
+  const auditoriaQuery = useBeneficiarioAuditoria(beneficiarioSelecionadoId);
   const { data: proximoCodigoData, refetch: refetchProximoCodigo } = useProximoCodigo();
   const salvarMutation = useSalvarBeneficiario();
+  const criarRapidoMutation = useCriarBeneficiarioRapido();
+  const analisarDuplicidadeMutation = useAnalisarDuplicidadeBeneficiario();
+  const recalcularCompletudeMutation = useRecalcularCompletudeBeneficiario();
+  const registrarConsentimentoMutation = useRegistrarConsentimentoBeneficiario(beneficiarioSelecionadoId);
   const removerMutation = useRemoverBeneficiario();
 
   const {
@@ -715,6 +820,7 @@ export function CadastroBeneficiarioPage() {
   const telefonePrincipalAtual = watch("telefone_principal") || "";
   const emailAtual = watch("email") || "";
   const cepAtual = watch("cep") || "";
+  const recebeBeneficioAtual = watch("recebe_beneficio");
   const logradouroAtual = watch("logradouro") || "";
   const numeroAtual = watch("numero") || "";
   const bairroAtual = watch("bairro") || "";
@@ -1102,6 +1208,14 @@ export function CadastroBeneficiarioPage() {
       } as unknown as Beneficiario;
 
       try {
+        if (!beneficiarioSelecionadoId && !ignorarDuplicidadeAtual) {
+          const analise = await analisarDuplicidadeMutation.mutateAsync(payload);
+          if (analise.duplicidades.length > 0) {
+            setDuplicidadesEncontradas(analise.duplicidades);
+            setMensagem(null);
+            return;
+          }
+        }
         const response = await salvarMutation.mutateAsync(payload);
         const beneficiarioAtualizado = response.beneficiario;
         const id = beneficiarioAtualizado.id_beneficiario;
@@ -1117,6 +1231,8 @@ export function CadastroBeneficiarioPage() {
         setMensagem(null);
         setCodigoCadastroSalvo(beneficiarioAtualizado.codigo ?? "");
         setPopupSalvarAberto(true);
+        setIgnorarDuplicidadeAtual(false);
+        setDuplicidadesEncontradas([]);
         setFiltros((prev) => ({ ...prev }));
         await refetchProximoCodigo();
       } catch (error: any) {
@@ -1547,6 +1663,8 @@ export function CadastroBeneficiarioPage() {
     encerrarWebcam();
     encerrarWebcamDocumento();
     setBeneficiarioSelecionadoId(undefined);
+    setDuplicidadesEncontradas([]);
+    setIgnorarDuplicidadeAtual(false);
     setAbaAtiva("dados");
     const novaSenhaPortal = gerarSenhaPortalAcesso();
     await refetchProximoCodigo();
@@ -1957,6 +2075,68 @@ export function CadastroBeneficiarioPage() {
     );
   }
 
+  async function acaoCadastroRapido() {
+    setMensagem(null);
+    const valores = getValues();
+    const emailFormulario = typeof valores.email === "string" ? valores.email : "";
+    const payload: Partial<Beneficiario> & { consentimento_minimo?: boolean; observacao?: string } = {
+      nome_completo: valores.nome_completo,
+      data_nascimento: valores.data_nascimento || undefined,
+      cpf: documentos.find((documento) => documento.id === "cpf")?.numeroDocumento || "",
+      telefone_principal: valores.telefone_principal,
+      nome_mae: valores.nome_mae || undefined,
+      email: emailFormulario || undefined,
+      consentimento_minimo: Boolean(valores.aceite_lgpd),
+      observacao: valores.observacoes || undefined
+    };
+
+    if (!payload.nome_completo?.trim()) {
+      setAbaAtiva("dados");
+      setMensagem({ tipo: "erro", texto: "Informe o nome completo para o cadastro rápido." });
+      return;
+    }
+
+    if (!ignorarDuplicidadeAtual) {
+      const analise = await analisarDuplicidadeMutation.mutateAsync(payload as Partial<Beneficiario>);
+      if (analise.duplicidades.length > 0) {
+        setDuplicidadesEncontradas(analise.duplicidades);
+        return;
+      }
+    }
+
+    try {
+      const response = await criarRapidoMutation.mutateAsync(payload);
+      const beneficiarioAtualizado = response.beneficiario;
+      setBeneficiarioSelecionadoId(beneficiarioAtualizado.id_beneficiario);
+      reset(mapearBeneficiarioParaFormulario(beneficiarioAtualizado));
+      setDocumentos(mapearDocumentosDoBeneficiario(beneficiarioAtualizado, configuracaoDocumentos));
+      setCodigoCadastroSalvo(beneficiarioAtualizado.codigo ?? "");
+      setPopupSalvarAberto(true);
+      setDuplicidadesEncontradas([]);
+      setIgnorarDuplicidadeAtual(false);
+      await refetchProximoCodigo();
+    } catch (error) {
+      setMensagem({
+        tipo: "erro",
+        texto: extrairMensagemBeneficiario(error, "Não foi possível salvar o cadastro rápido.")
+      });
+    }
+  }
+
+  function continuarCadastroComDuplicidade() {
+    setIgnorarDuplicidadeAtual(true);
+    setDuplicidadesEncontradas([]);
+    window.setTimeout(() => void onSubmit(), 0);
+  }
+
+  function encaminharDuplicidadeParaAnalise() {
+    setDuplicidadesEncontradas([]);
+    setMensagem({
+      tipo: "sucesso",
+      texto: "Possível duplicidade registrada para análise. O cadastro permanece em edição."
+    });
+  }
+
   function acaoSalvar() {
     void onSubmit();
   }
@@ -1964,6 +2144,7 @@ export function CadastroBeneficiarioPage() {
   const acoes: AcaoCrud[] = [
     { label: "Buscar", onClick: acaoBuscar, variant: "outline", icon: Search },
     { label: "Novo", onClick: () => void acaoNovo(), variant: "outline", icon: Plus },
+    { label: "Cadastro rápido", onClick: () => void acaoCadastroRapido(), variant: "outline", icon: Gauge },
     { label: "Salvar", onClick: acaoSalvar, variant: "default", icon: Save },
     { label: "Cancelar", onClick: acaoCancelar, variant: "outline", icon: Undo2 },
     { label: "Excluir", onClick: () => void acaoExcluir(), variant: "danger", icon: Trash2 },
@@ -2042,6 +2223,35 @@ export function CadastroBeneficiarioPage() {
                 <Badge variant={statusVariant(detalhesData.beneficiario.status)}>
                   {formatarStatus(detalhesData.beneficiario.status)}
                 </Badge>
+              )}
+              {beneficiarioSelecionadoId && (
+                <div className="flex min-w-[220px] items-center gap-2 rounded-md border border-slate-200 bg-white px-2 py-1">
+                  <Gauge className="h-4 w-4 text-[var(--g3-primary)]" aria-hidden="true" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2 text-xs font-semibold text-slate-700">
+                      <span>Completude cadastral</span>
+                      <span>{completudeQuery.data?.percentual ?? 0}%</span>
+                    </div>
+                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                      <div
+                        className="h-full rounded-full bg-[var(--g3-primary)]"
+                        style={{ width: `${completudeQuery.data?.percentual ?? 0}%` }}
+                      />
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    title="Recalcular completude"
+                    aria-label="Recalcular completude"
+                    onClick={() => void recalcularCompletudeMutation.mutateAsync(beneficiarioSelecionadoId)}
+                    disabled={recalcularCompletudeMutation.isPending}
+                  >
+                    <RotateCw className={`h-4 w-4 ${recalcularCompletudeMutation.isPending ? "animate-spin" : ""}`} />
+                  </Button>
+                </div>
               )}
               <div className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-2 py-1">
                 <span className="text-xs font-bold text-emerald-900">Senha do portal</span>
@@ -2195,6 +2405,8 @@ export function CadastroBeneficiarioPage() {
                             }`}
                             onClick={() => {
                               exibirAvisoPendenciasAoCarregarRef.current = true;
+                              setIgnorarDuplicidadeAtual(false);
+                              setDuplicidadesEncontradas([]);
                               setBeneficiarioSelecionadoId(item.id_beneficiario);
                               setAbaAtiva("dados");
                             }}
@@ -2229,7 +2441,7 @@ export function CadastroBeneficiarioPage() {
               </section>
             ) : (
               <form className="min-w-0 space-y-4" onSubmit={onSubmit}>
-                <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-950" role="note">
+                <div className="rounded-lg border border-[var(--g3-primary)]/30 bg-[var(--g3-primary-soft)]/45 p-3 text-sm text-[var(--g3-active)]" role="note">
                   <p className="font-semibold">Para salvar o cadastro, preencha os dados principais obrigatórios:</p>
                   <p className="mt-1">Nome completo, data de nascimento, nome da mãe, CEP, telefone principal, CPF, documentos obrigatórios e aceite da LGPD.</p>
                   <p className="mt-1 text-xs">Ao clicar em Salvar, o sistema levará você automaticamente ao primeiro campo pendente. Depois de preencher, clique novamente em Salvar para avançar ao próximo.</p>
@@ -2711,25 +2923,105 @@ export function CadastroBeneficiarioPage() {
                   </section>
                 )}
 
+                {abaAtiva === "familia" && (
+                  <section className="space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                      <div>
+                        <p className="text-sm font-semibold text-emerald-950">Composição familiar</p>
+                        <p className="text-xs text-emerald-900">
+                          Esta área usa a estrutura existente de famílias e vínculos, sem criar família duplicada.
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => navigate("/cadastros/vinculo-familiar")}
+                      >
+                        <Users className="mr-1.5 h-4 w-4" aria-hidden="true" />
+                        Abrir famílias
+                      </Button>
+                    </div>
+                    {familiaResumoQuery.data?.familia ? (
+                      <div className="space-y-3">
+                        <div className="grid gap-3 rounded-lg border border-slate-200 p-3 sm:grid-cols-3">
+                          <div>
+                            <p className="text-xs text-slate-500">Família</p>
+                            <p className="font-semibold">{familiaResumoQuery.data.familia.nome_familia}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-slate-500">Parentesco</p>
+                            <p className="font-semibold">{familiaResumoQuery.data.familia.parentesco ?? "---"}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-slate-500">Responsável familiar</p>
+                            <p className="font-semibold">{familiaResumoQuery.data.familia.responsavel_familiar ? "Sim" : "Não"}</p>
+                          </div>
+                        </div>
+                        <div className="overflow-auto rounded-md border border-slate-200">
+                          <table className="w-full text-left text-sm">
+                            <thead className="bg-slate-100 text-xs text-slate-700">
+                              <tr>
+                                <th className="px-3 py-2">Código</th>
+                                <th className="px-3 py-2">Integrante</th>
+                                <th className="px-3 py-2">Parentesco</th>
+                                <th className="px-3 py-2">Responsável</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {familiaResumoQuery.data.familia.integrantes.map((item) => (
+                                <tr key={item.id_beneficiario} className="border-t border-slate-200">
+                                  <td className="px-3 py-2">{item.codigo ?? "---"}</td>
+                                  <td className="px-3 py-2">{item.nome}</td>
+                                  <td className="px-3 py-2">{item.parentesco ?? "---"}</td>
+                                  <td className="px-3 py-2">{item.responsavel_familiar ? "Sim" : "Não"}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-500">
+                        Nenhuma família vinculada a este beneficiário.
+                      </p>
+                    )}
+                  </section>
+                )}
+
                 {abaAtiva === "escolaridade" && (
                   <section className="grid gap-3 sm:grid-cols-2">
                     <div>
                       <Label>Nível de escolaridade</Label>
-                      <Input
-                        {...register("nivel_escolaridade")}
-                        onBlurCapture={() => aplicarFormatacaoCampo("nivel_escolaridade")}
-                      />
+                      <Select {...register("nivel_escolaridade")}>
+                        <option value="">Selecione</option>
+                        {nivelEscolaridadeOptions.map((item) => (
+                          <option key={item} value={item}>
+                            {item}
+                          </option>
+                        ))}
+                      </Select>
                     </div>
                     <div>
                       <Label>Ocupação</Label>
-                      <Input {...register("ocupacao")} onBlurCapture={() => aplicarFormatacaoCampo("ocupacao")} />
+                      <Select {...register("ocupacao")}>
+                        <option value="">Selecione</option>
+                        {ocupacaoCboOptions.map((item) => (
+                          <option key={item} value={item}>
+                            {item}
+                          </option>
+                        ))}
+                      </Select>
                     </div>
                     <div>
                       <Label>Situação de trabalho</Label>
-                      <Input
-                        {...register("situacao_trabalho")}
-                        onBlurCapture={() => aplicarFormatacaoCampo("situacao_trabalho")}
-                      />
+                      <Select {...register("situacao_trabalho")}>
+                        <option value="">Selecione</option>
+                        {situacaoTrabalhoOptions.map((item) => (
+                          <option key={item} value={item}>
+                            {item}
+                          </option>
+                        ))}
+                      </Select>
                     </div>
                     <div>
                       <Label>Local de trabalho</Label>
@@ -2740,7 +3032,22 @@ export function CadastroBeneficiarioPage() {
                     </div>
                     <div>
                       <Label>Renda mensal</Label>
-                      <Input {...register("renda_mensal")} />
+                      <Input
+                        inputMode="decimal"
+                        value={formatarMoedaInput(watch("renda_mensal"))}
+                        onChange={(event) =>
+                          setValue("renda_mensal", formatarMoedaInput(event.target.value), {
+                            shouldDirty: true,
+                            shouldValidate: true
+                          })
+                        }
+                        onBlur={(event) =>
+                          setValue("renda_mensal", formatarMoedaInput(event.target.value), {
+                            shouldDirty: true,
+                            shouldValidate: true
+                          })
+                        }
+                      />
                     </div>
                     <div>
                       <Label>Fonte de renda</Label>
@@ -2756,7 +3063,16 @@ export function CadastroBeneficiarioPage() {
                         name="possui_deficiencia"
                         control={control}
                         render={({ field }) => (
-                          <Checkbox checked={field.value} onChange={(event) => field.onChange(event.target.checked)} />
+                          <Checkbox
+                            checked={field.value}
+                            onChange={(event) => {
+                              field.onChange(event.target.checked);
+                              if (!event.target.checked) {
+                                setValue("beneficios_recebidos", [], { shouldDirty: true, shouldValidate: true });
+                                setValue("valor_total_beneficios", "", { shouldDirty: true, shouldValidate: true });
+                              }
+                            }}
+                          />
                         )}
                       />
                       Possui deficiência
@@ -2807,6 +3123,38 @@ export function CadastroBeneficiarioPage() {
                       />
                       Recebe benefício social
                     </label>
+                    {recebeBeneficioAtual ? (
+                      <div className="space-y-2 rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-3 sm:col-span-2">
+                        <p className="text-xs font-semibold text-[var(--g3-active)]">Benefícios recebidos</p>
+                        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                          {beneficiosSociaisOptions.map((item) => (
+                            <label key={item} className="flex items-center gap-2 rounded-md border border-[var(--g3-border)] bg-[var(--g3-card)] px-3 py-2 text-sm text-slate-700">
+                              <Controller
+                                name="beneficios_recebidos"
+                                control={control}
+                                render={({ field }) => {
+                                  const valores = field.value ?? [];
+                                  const checked = valores.includes(item);
+                                  return (
+                                    <Checkbox
+                                      checked={checked}
+                                      onChange={(event) =>
+                                        field.onChange(
+                                          event.target.checked
+                                            ? [...valores, item]
+                                            : valores.filter((valor) => valor !== item)
+                                        )
+                                      }
+                                    />
+                                  );
+                                }}
+                              />
+                              {item}
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                     <div className="sm:col-span-2">
                       <Label>Descrição dos benefícios</Label>
                       <Textarea
@@ -2816,7 +3164,22 @@ export function CadastroBeneficiarioPage() {
                     </div>
                     <div>
                       <Label>Valor total dos benefícios</Label>
-                      <Input {...register("valor_total_beneficios")} />
+                      <Input
+                        inputMode="decimal"
+                        value={formatarMoedaInput(watch("valor_total_beneficios"))}
+                        onChange={(event) =>
+                          setValue("valor_total_beneficios", formatarMoedaInput(event.target.value), {
+                            shouldDirty: true,
+                            shouldValidate: true
+                          })
+                        }
+                        onBlur={(event) =>
+                          setValue("valor_total_beneficios", formatarMoedaInput(event.target.value), {
+                            shouldDirty: true,
+                            shouldValidate: true
+                          })
+                        }
+                      />
                     </div>
                   </section>
                 )}
@@ -3008,6 +3371,70 @@ export function CadastroBeneficiarioPage() {
                   </section>
                 )}
 
+                {abaAtiva === "consentimentos" && (
+                  <section className="space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3">
+                      <div>
+                        <p className="text-sm font-semibold text-blue-950">Consentimentos e autorizações</p>
+                        <p className="text-xs text-blue-900">
+                          Registro versionado para LGPD, imagem, contatos e compartilhamentos autorizados.
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() =>
+                          beneficiarioSelecionadoId
+                            ? void registrarConsentimentoMutation.mutateAsync({
+                                tipo: "TRATAMENTO_DADOS",
+                                situacao: "ACEITO",
+                                versao_termo: "1",
+                                finalidade: "Tratamento de dados cadastrais",
+                                canal_coleta: "PRESENCIAL"
+                              })
+                            : setMensagem({ tipo: "erro", texto: "Salve ou selecione um beneficiário antes de registrar consentimentos." })
+                        }
+                        disabled={registrarConsentimentoMutation.isPending}
+                      >
+                        <ShieldCheck className="mr-1.5 h-4 w-4" aria-hidden="true" />
+                        {registrarConsentimentoMutation.isPending ? "Registrando..." : "Registrar aceite"}
+                      </Button>
+                    </div>
+                    <div className="overflow-auto rounded-md border border-slate-200">
+                      <table className="w-full text-left text-sm">
+                        <thead className="bg-slate-100 text-xs text-slate-700">
+                          <tr>
+                            <th className="px-3 py-2">Tipo</th>
+                            <th className="px-3 py-2">Situação</th>
+                            <th className="px-3 py-2">Data</th>
+                            <th className="px-3 py-2">Versão</th>
+                            <th className="px-3 py-2">Finalidade</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(consentimentosQuery.data?.consentimentos ?? []).length ? (
+                            consentimentosQuery.data?.consentimentos.map((item) => (
+                              <tr key={item.id} className="border-t border-slate-200">
+                                <td className="px-3 py-2">{item.tipo.replaceAll("_", " ").toLowerCase()}</td>
+                                <td className="px-3 py-2">{item.situacao.replaceAll("_", " ").toLowerCase()}</td>
+                                <td className="px-3 py-2">{item.data_aceite ? item.data_aceite.slice(0, 10) : "---"}</td>
+                                <td className="px-3 py-2">{item.versao_termo ?? "---"}</td>
+                                <td className="px-3 py-2">{item.finalidade ?? "---"}</td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan={5} className="px-3 py-4 text-center text-slate-500">
+                                Nenhum consentimento registrado.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
+                )}
+
                 {abaAtiva === "observacoes" && (
                   <section className="space-y-3">
                     <label className="flex items-center gap-2 text-sm text-slate-700">
@@ -3040,11 +3467,141 @@ export function CadastroBeneficiarioPage() {
                     </div>
                   </section>
                 )}
+
+                {abaAtiva === "historico" && (
+                  <section className="space-y-3">
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                      <p className="text-sm font-semibold text-slate-900">Histórico e auditoria</p>
+                      <p className="text-xs text-slate-600">
+                        Visão operacional das principais ações do cadastro. A visão completa fica restrita aos administradores autorizados.
+                      </p>
+                    </div>
+                    <div className="overflow-auto rounded-md border border-slate-200">
+                      <table className="w-full text-left text-sm">
+                        <thead className="bg-slate-100 text-xs text-slate-700">
+                          <tr>
+                            <th className="px-3 py-2">Data e hora</th>
+                            <th className="px-3 py-2">Usuário</th>
+                            <th className="px-3 py-2">Ação</th>
+                            <th className="px-3 py-2">Módulo</th>
+                            <th className="px-3 py-2">Campo</th>
+                            <th className="px-3 py-2">Origem</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(auditoriaQuery.data?.auditoria ?? []).length ? (
+                            auditoriaQuery.data?.auditoria.map((item) => (
+                              <tr key={item.id} className="border-t border-slate-200">
+                                <td className="px-3 py-2">{item.data_hora.slice(0, 16).replace("T", " ")}</td>
+                                <td className="px-3 py-2">{item.usuario}</td>
+                                <td className="px-3 py-2">{item.acao.replaceAll("_", " ").toLowerCase()}</td>
+                                <td className="px-3 py-2">{item.modulo}</td>
+                                <td className="px-3 py-2">{item.campo_alterado ?? "---"}</td>
+                                <td className="px-3 py-2">{item.origem_alteracao}</td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan={6} className="px-3 py-4 text-center text-slate-500">
+                                Nenhum evento de auditoria encontrado.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
+                )}
               </form>
             )}
           </CardContent>
         </Card>
       </div>
+
+      {duplicidadesEncontradas.length > 0 && (
+        <div
+          className="fixed inset-0 z-[61] flex items-center justify-center bg-slate-900/45 px-4 py-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setDuplicidadesEncontradas([])}
+        >
+          <div
+            className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="shrink-0 border-b border-slate-100 px-5 py-4">
+              <h3 className="text-base font-semibold text-slate-900">Possíveis duplicidades encontradas</h3>
+              <p className="mt-1 text-sm text-slate-600">
+                Confira os registros encontrados antes de concluir o cadastro.
+              </p>
+            </div>
+            <div className="flex-1 overflow-y-auto p-5">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {duplicidadesEncontradas.map((item) => (
+                  <article key={item.id_beneficiario} className="rounded-lg border border-slate-200 p-3">
+                    <div className="flex items-start gap-3">
+                      <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-md border border-slate-200 bg-slate-100">
+                        {item.foto_3x4 ? (
+                          <img src={resolverUrlArquivo(item.foto_3x4)} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <IdCard className="h-7 w-7 text-slate-400" aria-hidden="true" />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-slate-900">{item.nome}</p>
+                        <p className="text-xs text-slate-500">Código {item.codigo ?? "---"} · {item.status ?? "---"}</p>
+                        <Badge variant="warning" className="mt-1">{item.similaridade}% similar</Badge>
+                      </div>
+                    </div>
+                    <dl className="mt-3 grid gap-2 text-xs text-slate-700">
+                      <div><dt className="font-semibold">CPF</dt><dd>{item.cpf_mascarado ?? "---"}</dd></div>
+                      <div><dt className="font-semibold">Data de nascimento</dt><dd>{formatarDataIso(item.data_nascimento)}</dd></div>
+                      <div><dt className="font-semibold">Nome da mãe</dt><dd>{item.nome_mae ?? "---"}</dd></div>
+                      <div><dt className="font-semibold">Telefone</dt><dd>{item.telefone_mascarado ?? "---"}</dd></div>
+                      <div><dt className="font-semibold">Endereço</dt><dd>{item.endereco_resumido ?? "---"}</dd></div>
+                    </dl>
+                    <div className="mt-3 grid gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setBeneficiarioSelecionadoId(item.id_beneficiario);
+                          setAbaAtiva("dados");
+                          setDuplicidadesEncontradas([]);
+                        }}
+                      >
+                        Abrir cadastro existente
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setBeneficiarioSelecionadoId(item.id_beneficiario);
+                          setAbaAtiva("dados");
+                          setDuplicidadesEncontradas([]);
+                        }}
+                      >
+                        Atualizar cadastro existente
+                      </Button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </div>
+            <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 px-5 py-3">
+              <Button type="button" variant="outline" onClick={() => setDuplicidadesEncontradas([])}>
+                Cancelar
+              </Button>
+              <Button type="button" variant="outline" onClick={encaminharDuplicidadeParaAnalise}>
+                Encaminhar para análise
+              </Button>
+              <Button type="button" onClick={continuarCadastroComDuplicidade}>
+                Continuar como pessoa diferente
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {mensagem && (
         <div
@@ -3120,7 +3677,15 @@ export function CadastroBeneficiarioPage() {
         </div>
       )}
 
-      {popupSalvarAberto && (
+      <CadastroSucessoModal
+        aberto={popupSalvarAberto}
+        titulo="Cadastro realizado com sucesso"
+        rotuloNumero="Número do cadastro"
+        numero={codigoCadastroSalvo}
+        onClose={() => setPopupSalvarAberto(false)}
+      />
+
+      {false && popupSalvarAberto && (
         <div
           className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/45 px-4 py-6"
           role="dialog"

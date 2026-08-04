@@ -252,6 +252,10 @@ export class RelatorioTemplatePadrao {
               overflow-wrap: anywhere;
               padding: 0 8px;
             }
+            .cabecalho-centro {
+              min-width: 0;
+              text-align: center;
+            }
             .linha-separadora {
               border: 0;
               border-top: 1px solid #111827;
@@ -261,15 +265,15 @@ export class RelatorioTemplatePadrao {
               text-align: center;
               font-weight: 800;
               font-size: 15px;
-              margin: 0 0 2px 0;
+              margin: 4px 0 2px 0;
             }
             .cabecalho-meta {
               display: flex;
               flex-wrap: wrap;
               justify-content: center;
               gap: 10px 14px;
-              margin-top: 3px;
-              margin-bottom: 4px;
+              margin-top: 4px;
+              margin-bottom: 0;
               color: #334155;
               font-size: 10px;
             }
@@ -491,12 +495,13 @@ export class RelatorioTemplatePadrao {
             <header class="cabecalho">
               <div class="cabecalho-topo">
                 <div class="cabecalho-logo">${logoHtml}</div>
-                <div class="cabecalho-razao-social">${this.escapeHtml(input.cabecalho.razaoSocial)}</div>
+                <div class="cabecalho-centro">
+                  <div class="cabecalho-razao-social">${this.escapeHtml(input.cabecalho.razaoSocial)}</div>
+                  <h1 class="cabecalho-titulo">${this.escapeHtml(input.titulo)}</h1>
+                  ${metadadosTopoHtml ? `<div class="cabecalho-meta">${metadadosTopoHtml}</div>` : ""}
+                </div>
                 <div></div>
               </div>
-              ${metadadosTopoHtml ? `<div class="cabecalho-meta">${metadadosTopoHtml}</div>` : ""}
-              <hr class="linha-separadora" />
-              <h1 class="cabecalho-titulo">${this.escapeHtml(input.titulo)}</h1>
               <hr class="linha-separadora" />
             </header>
 

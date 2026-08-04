@@ -3,19 +3,27 @@ import { useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
   BadgeDollarSign,
+  Banknote,
   CheckCircle2,
   ClipboardList,
+  FileArchive,
   FileCheck,
   FileSpreadsheet,
+  Landmark,
   List,
+  MessageSquareWarning,
   Plus,
   Printer,
   ReceiptText,
   Save,
   Search,
+  Settings2,
+  ShieldCheck,
+  Target,
   Trash2,
   Undo2,
   Upload,
+  UsersRound,
   X
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -32,6 +40,7 @@ import { formatarMoeda as formatarMoedaBr, formatarMoedaInput, normalizarMoeda }
 import { cn } from "@/lib/utils";
 import { arquivosService } from "@/services/arquivos.service";
 import { useAuth } from "@/hooks/use-auth";
+import { PrestacaoContasProfissionalPanel } from "./prestacao-contas-profissional-panel";
 import {
   useExcluirPrestacaoContas,
   useAlterarWorkflowPrestacao,
@@ -51,7 +60,31 @@ import type {
   StatusWorkflowPrestacao
 } from "@/types/prestacao-contas";
 
-type AbaId = "listagem" | "visao-geral" | "receitas" | "aplicacao" | "documentos" | "revisao";
+type AbaId =
+  | "listagem"
+  | "visao-geral"
+  | "receitas"
+  | "aplicacao"
+  | "documentos"
+  | "revisao"
+  | "profissional-visao"
+  | "concedentes"
+  | "instrumentos"
+  | "modelos"
+  | "plano"
+  | "orcamento"
+  | "recebimentos"
+  | "execucao-financeira"
+  | "execucao-objeto"
+  | "metas"
+  | "conciliacao"
+  | "prestacao-etapas"
+  | "diligencias"
+  | "aprovacoes"
+  | "relatorios"
+  | "transparencia"
+  | "configuracoes"
+  | "auditoria";
 type FiltroStatus = "todos" | "pendente" | "andamento" | "concluido";
 type MainField = "totalRecebido" | "totalAplicado" | "saldoDisponivel" | "prestadoMes";
 
@@ -90,7 +123,25 @@ const abas: AdminTab[] = [
   { id: "receitas", label: "Receitas", icon: ReceiptText },
   { id: "aplicacao", label: "Aplicação dos recursos", icon: ClipboardList },
   { id: "documentos", label: "Documentos e checklist", icon: FileCheck },
-  { id: "revisao", label: "Revisão e envio", icon: FileSpreadsheet }
+  { id: "revisao", label: "Revisão e envio", icon: FileSpreadsheet },
+  { id: "profissional-visao", label: "Visão profissional", icon: BadgeDollarSign },
+  { id: "concedentes", label: "Concedentes", icon: Landmark },
+  { id: "instrumentos", label: "Parcerias e instrumentos", icon: ShieldCheck },
+  { id: "modelos", label: "Modelos do concedente", icon: Settings2 },
+  { id: "plano", label: "Plano de trabalho", icon: ClipboardList },
+  { id: "orcamento", label: "Orçamento", icon: Banknote },
+  { id: "recebimentos", label: "Recebimentos e repasses", icon: ReceiptText },
+  { id: "execucao-financeira", label: "Execução financeira", icon: FileSpreadsheet },
+  { id: "execucao-objeto", label: "Execução do objeto", icon: Target },
+  { id: "metas", label: "Metas e indicadores", icon: Target },
+  { id: "conciliacao", label: "Conciliação bancária", icon: Banknote },
+  { id: "prestacao-etapas", label: "Prestação por etapas", icon: FileArchive },
+  { id: "diligencias", label: "Diligências", icon: MessageSquareWarning },
+  { id: "aprovacoes", label: "Aprovações e pareceres", icon: CheckCircle2 },
+  { id: "relatorios", label: "Relatórios", icon: FileSpreadsheet },
+  { id: "transparencia", label: "Transparência", icon: UsersRound },
+  { id: "configuracoes", label: "Configurações e IA", icon: Settings2 },
+  { id: "auditoria", label: "Auditoria", icon: ShieldCheck }
 ];
 
 const tituloTela = "Prestação de contas";
@@ -713,6 +764,28 @@ export function PrestacaoContasPage() {
         : workflowStatus === "APROVADA" || workflowStatus === "APROVADA_RESSALVAS"
           ? [{ label: "Encerrar prestação", icon: CheckCircle2, onClick: () => void alterarWorkflow("ENCERRAR"), variant: "default", disabled: processando || !podeAprovar }]
           : [];
+
+  const areasProfissionais = {
+    "profissional-visao": "dashboard",
+    concedentes: "concedentes",
+    instrumentos: "instrumentos",
+    modelos: "modelos",
+    plano: "plano",
+    orcamento: "orcamento",
+    recebimentos: "receitas",
+    "execucao-financeira": "despesas",
+    "execucao-objeto": "objeto",
+    metas: "metas",
+    conciliacao: "conciliacao",
+    "prestacao-etapas": "prestacao",
+    diligencias: "diligencias",
+    aprovacoes: "aprovacoes",
+    relatorios: "relatorios",
+    transparencia: "transparencia",
+    configuracoes: "configuracoes",
+    auditoria: "auditoria"
+  } as const;
+  const areaProfissional = areasProfissionais[abaAtiva as keyof typeof areasProfissionais];
 
   return (
     <>
@@ -1790,6 +1863,10 @@ export function PrestacaoContasPage() {
               </Card>
             </div>
           </section>
+        ) : null}
+
+        {areaProfissional ? (
+          <PrestacaoContasProfissionalPanel area={areaProfissional} />
         ) : null}
       </AdminPageLayout>
 

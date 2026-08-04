@@ -4,6 +4,8 @@ export type BeneficiarioStatus =
   | "INATIVO"
   | "DESATUALIZADO"
   | "INCOMPLETO"
+  | "BASICO"
+  | "REVISAO_NECESSARIA"
   | "EM_ANALISE"
   | "BLOQUEADO";
 
@@ -109,6 +111,78 @@ export type Beneficiario = {
   documentos_obrigatorios?: DocumentoBeneficiario[];
   data_cadastro?: string;
   data_atualizacao?: string;
+  percentual_completude?: number;
+  status_cadastral?: string;
+};
+
+export type BeneficiarioDuplicidade = {
+  id_beneficiario: string;
+  codigo?: string;
+  foto_3x4?: string;
+  nome: string;
+  nome_social?: string;
+  cpf_mascarado?: string;
+  data_nascimento?: string;
+  nome_mae?: string;
+  telefone_mascarado?: string;
+  endereco_resumido?: string;
+  status?: string;
+  similaridade: number;
+};
+
+export type BeneficiarioCompletude = {
+  percentual: number;
+  status_cadastral: string;
+  pendencias: Array<{ grupo: string; campo: string; label: string }>;
+  grupos: Record<string, { percentual: number }>;
+  calculado_em?: string;
+  recomendacao?: string;
+};
+
+export type BeneficiarioConsentimento = {
+  id: string;
+  tipo: string;
+  situacao: string;
+  data_aceite?: string;
+  data_revogacao?: string;
+  validade?: string;
+  versao_termo?: string;
+  finalidade?: string;
+  canal_coleta?: string;
+  responsavel_legal_nome?: string;
+  observacao?: string;
+  evidencia?: string;
+};
+
+export type BeneficiarioAuditoriaItem = {
+  id: string;
+  data_hora: string;
+  usuario: string;
+  acao: string;
+  modulo: string;
+  campo_alterado?: string;
+  valor_anterior?: string;
+  valor_posterior?: string;
+  origem_alteracao: string;
+};
+
+export type BeneficiarioFamiliaResumo = {
+  id_familia: string;
+  nome_familia: string;
+  status: string;
+  renda_familiar_total?: string;
+  renda_per_capita?: string;
+  id_referencia_familiar?: string;
+  parentesco?: string;
+  responsavel_familiar?: boolean;
+  reside_mesmo_endereco?: boolean;
+  integrantes: Array<{
+    id_beneficiario: string;
+    nome: string;
+    codigo?: string;
+    parentesco?: string;
+    responsavel_familiar?: boolean;
+  }>;
 };
 
 export type BeneficiarioListaResponse = {
@@ -118,6 +192,7 @@ export type BeneficiarioListaResponse = {
 export type BeneficiarioItemResponse = {
   beneficiario: Beneficiario;
   senha_portal_gerada?: string;
+  duplicidades?: BeneficiarioDuplicidade[];
 };
 
 export type BeneficiarioFiltro = {

@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.780",
-  "releaseDate": "2026-08-01",
-  "description": "Base de teste sincronizada com origin/main, menu Gestao educacional preservado e versao oficial normalizada.",
+  "latestVersion": "1.00.782",
+  "releaseDate": "2026-08-03",
+  "description": "Fundacao profissional incremental do modulo de prestacao de contas com concedentes, instrumentos, execucao, documentos, conciliacao, diligencias, auditoria e IA/OCR configuravel.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.780",
+  "minCompatibleVersion": "1.00.781",
   "releaseType": "stable",
   "downloadUrl": null
 }

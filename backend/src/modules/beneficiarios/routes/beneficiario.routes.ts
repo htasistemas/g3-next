@@ -33,6 +33,60 @@ beneficiarioRoutes.get(
   asyncHandler(controller.obterSugestaoEndereco.bind(controller))
 );
 beneficiarioRoutes.get(
+  "/pendencias",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.listarPendencias.bind(controller))
+);
+beneficiarioRoutes.post(
+  "/duplicidades/analisar",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.analisarDuplicidade.bind(controller))
+);
+beneficiarioRoutes.post(
+  "/rapido",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.criarRapido.bind(controller))
+);
+beneficiarioRoutes.get(
+  "/:id/completude",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.obterCompletude.bind(controller))
+);
+beneficiarioRoutes.post(
+  "/:id/completude/recalcular",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.recalcularCompletude.bind(controller))
+);
+beneficiarioRoutes.get(
+  "/:id/consentimentos",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.listarConsentimentos.bind(controller))
+);
+beneficiarioRoutes.post(
+  "/:id/consentimentos",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  asyncHandler(controller.registrarConsentimento.bind(controller))
+);
+beneficiarioRoutes.get(
+  "/:id/auditoria",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.listarAuditoria.bind(controller))
+);
+beneficiarioRoutes.get(
+  "/:id/familia-resumo",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.obterResumoFamilia.bind(controller))
+);
+beneficiarioRoutes.get(
   "/:id",
   ensureAuthenticated,
   ensurePermissions(permissoesLeitura),

@@ -46,6 +46,7 @@ import { arquivosService } from "@/services/arquivos.service";
 import { obterUrlArquivoAutenticado, resolverUrlArquivo } from "@/lib/arquivos";
 import { useAuth } from "@/hooks/use-auth";
 import { useContasBancarias } from "@/features/contabilidade/use-contabilidade";
+import { useProfissionais } from "@/features/profissionais/use-profissionais";
 import { useExcluirPlanoTrabalho, usePlanosTrabalho, useSalvarPlanoTrabalho } from "@/features/planos-trabalho/use-planos-trabalho";
 import {
   calcularValorTotalAplicacao,
@@ -405,9 +406,11 @@ export function PlanoTrabalhoPage() {
   const unidadesAssistenciaisQuery = useUnidadesAssistenciais({});
   const unidadeAtualQuery = useUnidadeAssistencialAtual();
   const contasBancariasQuery = useContasBancarias();
+  const profissionaisQuery = useProfissionais({ status: "ATIVO" });
 
   const planos = planosQuery.data ?? [];
   const termos = termosQuery.data ?? [];
+  const profissionais = profissionaisQuery.data?.profissionais ?? [];
   const unidadesAssistenciais = useMemo(
     () => unidadesAssistenciaisQuery.data?.unidades ?? [],
     [unidadesAssistenciaisQuery.data]
@@ -426,6 +429,18 @@ export function PlanoTrabalhoPage() {
     `Conselhos, certificações ou registros atuais: ${form.conselhosCertificacoes || "não informado"}.`,
     `Público atendido atualmente: ${form.publicoAtendidoAtual || "não informado"}.`,
     `Capacidade técnica e operacional atual: ${form.capacidadeTecnicaOperacional || "não informada"}.`
+  ].join(" ");
+  const contextoApresentacaoIaSeguro = [
+    `Instituicao: ${form.razaoSocial || form.nomeFantasia || "nao informada"}.`,
+    `Area de atuacao: ${form.areaAtuacao || "nao informada"}.`,
+    `Objeto do plano: ${form.descricaoObjeto || "nao informado"}.`,
+    `Publico-alvo do plano: ${form.publicoAlvo || "nao informado"}.`,
+    `Historico atual: ${form.historicoOsc || "nao informado"}.`,
+    `Finalidade institucional atual: ${form.finalidadeInstitucional || "nao informada"}.`,
+    `Experiencia anterior atual: ${form.experienciaAnterior || "nao informada"}.`,
+    `Conselhos, certificacoes ou registros atuais: ${form.conselhosCertificacoes || "nao informado"}.`,
+    `Publico atendido atualmente: ${form.publicoAtendidoAtual || "nao informado"}.`,
+    `Capacidade tecnica e operacional atual: ${form.capacidadeTecnicaOperacional || "nao informada"}.`
   ].join(" ");
   const progresso = useMemo(() => calcularProgressoSecao(form), [form]);
   const totalAplicacao = useMemo(() => somarAplicacaoRecursos(form), [form]);
@@ -1510,20 +1525,40 @@ export function PlanoTrabalhoPage() {
               </div>
               <div className="space-y-1">
                 <Label>Responsável técnico *</Label>
-                <Input
+                <Select
                   value={form.responsavelTecnico}
                   onChange={(event) => atualizarCampo("responsavelTecnico", event.target.value)}
-                  onBlur={(event) => atualizarCampo("responsavelTecnico", normalizarNomePessoaInput(event.target.value))}
-                />
+                >
+                  <option value="">Selecione</option>
+                  {form.responsavelTecnico && !profissionais.some((item) => item.nome_completo === form.responsavelTecnico) ? (
+                    <option value={form.responsavelTecnico}>{form.responsavelTecnico}</option>
+                  ) : null}
+                  {profissionais.map((item) => (
+                    <option key={item.id_profissional ?? item.nome_completo} value={item.nome_completo}>
+                      {item.nome_completo}
+                      {item.categoria ? ` - ${item.categoria}` : ""}
+                    </option>
+                  ))}
+                </Select>
                 <CampoErro texto={erros.responsavelTecnico} />
               </div>
               <div className="space-y-1">
                 <Label>Responsável legal *</Label>
-                <Input
+                <Select
                   value={form.responsavelLegal}
                   onChange={(event) => atualizarCampo("responsavelLegal", event.target.value)}
-                  onBlur={(event) => atualizarCampo("responsavelLegal", normalizarNomePessoaInput(event.target.value))}
-                />
+                >
+                  <option value="">Selecione</option>
+                  {form.responsavelLegal && !profissionais.some((item) => item.nome_completo === form.responsavelLegal) ? (
+                    <option value={form.responsavelLegal}>{form.responsavelLegal}</option>
+                  ) : null}
+                  {profissionais.map((item) => (
+                    <option key={item.id_profissional ?? item.nome_completo} value={item.nome_completo}>
+                      {item.nome_completo}
+                      {item.categoria ? ` - ${item.categoria}` : ""}
+                    </option>
+                  ))}
+                </Select>
                 <CampoErro texto={erros.responsavelLegal} />
               </div>
               <div className="space-y-1 xl:col-span-2">
@@ -1787,7 +1822,7 @@ export function PlanoTrabalhoPage() {
                 <div className="flex items-center justify-between gap-2">
                   <Label>Histórico da OSC</Label>
                   <AiFieldSuggestionButton
-                    prompt={`Redija um histórico institucional claro e formal para a seção Apresentação e histórico de um plano de trabalho. ${contextoApresentacaoIa} O texto atual deste campo é: ${form.historicoOsc || "vazio"}. Preserve fatos informados, organize a trajetória, os marcos e a atuação da instituição. Se o texto atual estiver preenchido, aprimore-o e complemente-o sem inventar dados.`}
+                    prompt={`Redija um histórico institucional claro e formal para a seção Apresentação e histórico de um plano de trabalho. ${contextoApresentacaoIaSeguro} O texto atual deste campo é: ${form.historicoOsc || "vazio"}. Preserve fatos informados, organize a trajetória, os marcos e a atuação da instituição. Se o texto atual estiver preenchido, aprimore-o e complemente-o sem inventar dados.`}
                     onApply={(suggestao) => atualizarCampo("historicoOsc", suggestao)}
                   />
                 </div>
@@ -1797,7 +1832,7 @@ export function PlanoTrabalhoPage() {
                 <div className="flex items-center justify-between gap-2">
                   <Label>Finalidade institucional</Label>
                   <AiFieldSuggestionButton
-                    prompt={`Redija a finalidade institucional de uma organização da sociedade civil para um plano de trabalho. ${contextoApresentacaoIa} O texto atual deste campo é: ${form.finalidadeInstitucional || "vazio"}. Torne o texto claro, objetivo e alinhado à missão da instituição, sem criar informações não fornecidas.`}
+                    prompt={`Redija a finalidade institucional de uma organização da sociedade civil para um plano de trabalho. ${contextoApresentacaoIaSeguro} O texto atual deste campo é: ${form.finalidadeInstitucional || "vazio"}. Torne o texto claro, objetivo e alinhado à missão da instituição, sem criar informações não fornecidas.`}
                     onApply={(suggestao) => atualizarCampo("finalidadeInstitucional", suggestao)}
                   />
                 </div>
@@ -1807,7 +1842,7 @@ export function PlanoTrabalhoPage() {
                 <div className="flex items-center justify-between gap-2">
                   <Label>Experiência anterior na área</Label>
                   <AiFieldSuggestionButton
-                    prompt={`Descreva a experiência anterior da instituição na área do plano de trabalho. ${contextoApresentacaoIa} O texto atual deste campo é: ${form.experienciaAnterior || "vazio"}. Organize experiências, serviços e resultados apenas com base nas informações fornecidas; quando faltarem dados, use uma redação prudente sem inventar números ou nomes.`}
+                    prompt={`Descreva a experiência anterior da instituição na área do plano de trabalho. ${contextoApresentacaoIaSeguro} O texto atual deste campo é: ${form.experienciaAnterior || "vazio"}. Organize experiências, serviços e resultados apenas com base nas informações fornecidas; quando faltarem dados, use uma redação prudente sem inventar números ou nomes.`}
                     onApply={(suggestao) => atualizarCampo("experienciaAnterior", suggestao)}
                   />
                 </div>
@@ -1817,7 +1852,7 @@ export function PlanoTrabalhoPage() {
                 <div className="flex items-center justify-between gap-2">
                   <Label>Conselhos, certificações ou registros</Label>
                   <AiFieldSuggestionButton
-                    prompt={`Organize as informações sobre conselhos, certificações e registros da instituição para um plano de trabalho. ${contextoApresentacaoIa} O texto atual deste campo é: ${form.conselhosCertificacoes || "vazio"}. Melhore a clareza e a apresentação sem inventar certificações, números ou órgãos.`}
+                    prompt={`Organize as informações sobre conselhos, certificações e registros da instituição para um plano de trabalho. ${contextoApresentacaoIaSeguro} O texto atual deste campo é: ${form.conselhosCertificacoes || "vazio"}. Melhore a clareza e a apresentação sem inventar certificações, números ou órgãos.`}
                     onApply={(suggestao) => atualizarCampo("conselhosCertificacoes", suggestao)}
                   />
                 </div>
@@ -1827,7 +1862,7 @@ export function PlanoTrabalhoPage() {
                 <div className="flex items-center justify-between gap-2">
                   <Label>Público atendido atualmente</Label>
                   <AiFieldSuggestionButton
-                    prompt={`Descreva o público atendido atualmente pela instituição para um plano de trabalho. ${contextoApresentacaoIa} O texto atual deste campo é: ${form.publicoAtendidoAtual || "vazio"}. Organize o perfil do público e a forma de atendimento somente com base no contexto informado, sem inventar quantitativos.`}
+                    prompt={`Descreva o público atendido atualmente pela instituição para um plano de trabalho. ${contextoApresentacaoIaSeguro} O texto atual deste campo é: ${form.publicoAtendidoAtual || "vazio"}. Organize o perfil do público e a forma de atendimento somente com base no contexto informado, sem inventar quantitativos.`}
                     onApply={(suggestao) => atualizarCampo("publicoAtendidoAtual", suggestao)}
                   />
                 </div>
@@ -1837,7 +1872,7 @@ export function PlanoTrabalhoPage() {
                 <div className="flex items-center justify-between gap-2">
                   <Label>Capacidade técnica e operacional</Label>
                   <AiFieldSuggestionButton
-                    prompt={`Descreva a capacidade técnica e operacional da instituição para executar o plano de trabalho. ${contextoApresentacaoIa} O texto atual deste campo é: ${form.capacidadeTecnicaOperacional || "vazio"}. Relacione equipe, estrutura, processos e experiência apenas quando houver base nas informações fornecidas; aprimore o texto atual sem inventar dados.`}
+                    prompt={`Descreva a capacidade técnica e operacional da instituição para executar o plano de trabalho. ${contextoApresentacaoIaSeguro} O texto atual deste campo é: ${form.capacidadeTecnicaOperacional || "vazio"}. Relacione equipe, estrutura, processos e experiência apenas quando houver base nas informações fornecidas; aprimore o texto atual sem inventar dados.`}
                     onApply={(suggestao) => atualizarCampo("capacidadeTecnicaOperacional", suggestao)}
                   />
                 </div>

@@ -4,6 +4,8 @@ export const beneficiarioStatusValues = [
   "INATIVO",
   "DESATUALIZADO",
   "INCOMPLETO",
+  "BASICO",
+  "REVISAO_NECESSARIA",
   "EM_ANALISE",
   "BLOQUEADO"
 ] as const;

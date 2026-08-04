@@ -25,6 +25,42 @@ export function useBeneficiario(id?: string) {
   });
 }
 
+export function useBeneficiarioCompletude(id?: string) {
+  const { usuario } = useAuth();
+  return useQuery({
+    queryKey: ["beneficiario", usuario?.tenant_id ?? "sem-tenant", id, "completude"],
+    queryFn: () => beneficiariosService.obterCompletude(id as string),
+    enabled: !!usuario && !!id
+  });
+}
+
+export function useBeneficiarioFamiliaResumo(id?: string) {
+  const { usuario } = useAuth();
+  return useQuery({
+    queryKey: ["beneficiario", usuario?.tenant_id ?? "sem-tenant", id, "familia-resumo"],
+    queryFn: () => beneficiariosService.obterResumoFamilia(id as string),
+    enabled: !!usuario && !!id
+  });
+}
+
+export function useBeneficiarioConsentimentos(id?: string) {
+  const { usuario } = useAuth();
+  return useQuery({
+    queryKey: ["beneficiario", usuario?.tenant_id ?? "sem-tenant", id, "consentimentos"],
+    queryFn: () => beneficiariosService.listarConsentimentos(id as string),
+    enabled: !!usuario && !!id
+  });
+}
+
+export function useBeneficiarioAuditoria(id?: string) {
+  const { usuario } = useAuth();
+  return useQuery({
+    queryKey: ["beneficiario", usuario?.tenant_id ?? "sem-tenant", id, "auditoria"],
+    queryFn: () => beneficiariosService.listarAuditoria(id as string),
+    enabled: !!usuario && !!id
+  });
+}
+
 export function useSalvarBeneficiario() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -42,6 +78,45 @@ export function useSalvarBeneficiario() {
       } else {
         await queryClient.invalidateQueries({ queryKey: ["beneficiario"] });
       }
+    }
+  });
+}
+
+export function useCriarBeneficiarioRapido() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: Partial<Beneficiario> & { consentimento_minimo?: boolean; observacao?: string }) =>
+      beneficiariosService.criarRapido(payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["beneficiarios"] });
+    }
+  });
+}
+
+export function useAnalisarDuplicidadeBeneficiario() {
+  return useMutation({
+    mutationFn: (payload: Partial<Beneficiario>) => beneficiariosService.analisarDuplicidade(payload)
+  });
+}
+
+export function useRecalcularCompletudeBeneficiario() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => beneficiariosService.recalcularCompletude(id),
+    onSuccess: async (_data, id) => {
+      await queryClient.invalidateQueries({ queryKey: ["beneficiario"] });
+      await queryClient.invalidateQueries({ queryKey: ["beneficiario", id] });
+    }
+  });
+}
+
+export function useRegistrarConsentimentoBeneficiario(id?: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { tipo: string; situacao: string; observacao?: string; validade?: string; versao_termo?: string; finalidade?: string; canal_coleta?: string }) =>
+      beneficiariosService.registrarConsentimento(id as string, payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["beneficiario"] });
     }
   });
 }

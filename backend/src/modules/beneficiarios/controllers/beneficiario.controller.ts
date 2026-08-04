@@ -1,8 +1,20 @@
 import type { Response } from "express";
 import type { AuthenticatedRequest } from "../../auth/middlewares/auth.middleware.js";
 import { BeneficiarioService } from "../services/beneficiario.service.js";
+import { BeneficiarioEvolucaoService } from "../services/beneficiario-evolucao.service.js";
 
 const service = new BeneficiarioService();
+const evolucaoService = new BeneficiarioEvolucaoService();
+
+function buildAtor(request: AuthenticatedRequest) {
+  return {
+    usuarioId: request.authUser?.id,
+    usuarioNome: request.authUser?.nomeUsuario ?? request.authUser?.nome,
+    tenantId: request.authUser?.tenant_id,
+    ip: request.ip,
+    requestId: request.headers["x-request-id"] ? String(request.headers["x-request-id"]) : undefined
+  };
+}
 
 export class BeneficiarioController {
   async listar(request: AuthenticatedRequest, response: Response) {
@@ -47,5 +59,55 @@ export class BeneficiarioController {
   async obterSugestaoEndereco(request: AuthenticatedRequest, response: Response) {
     const sugestao = await service.obterSugestaoEndereco(request.query, request.authUser?.tenant_id);
     return response.json({ sugestao });
+  }
+
+  async analisarDuplicidade(request: AuthenticatedRequest, response: Response) {
+    const resultado = await evolucaoService.analisarDuplicidade(request.body, buildAtor(request));
+    return response.json(resultado);
+  }
+
+  async criarRapido(request: AuthenticatedRequest, response: Response) {
+    const resultado = await evolucaoService.criarRapido(request.body, buildAtor(request));
+    return response.status(201).json(resultado);
+  }
+
+  async obterCompletude(request: AuthenticatedRequest, response: Response) {
+    const completude = await evolucaoService.obterCompletude(request.params.id, buildAtor(request));
+    return response.json({ completude });
+  }
+
+  async recalcularCompletude(request: AuthenticatedRequest, response: Response) {
+    const completude = await evolucaoService.recalcularCompletude(request.params.id, buildAtor(request));
+    return response.json({ completude });
+  }
+
+  async listarConsentimentos(request: AuthenticatedRequest, response: Response) {
+    const resultado = await evolucaoService.listarConsentimentos(request.params.id, buildAtor(request));
+    return response.json(resultado);
+  }
+
+  async registrarConsentimento(request: AuthenticatedRequest, response: Response) {
+    const resultado = await evolucaoService.registrarConsentimento(
+      request.params.id,
+      request.body,
+      buildAtor(request)
+    );
+    return response.status(201).json(resultado);
+  }
+
+  async listarAuditoria(request: AuthenticatedRequest, response: Response) {
+    const completa = request.query.visao === "completa";
+    const resultado = await evolucaoService.listarAuditoria(request.params.id, buildAtor(request), completa);
+    return response.json(resultado);
+  }
+
+  async obterResumoFamilia(request: AuthenticatedRequest, response: Response) {
+    const resultado = await evolucaoService.obterResumoFamilia(request.params.id, buildAtor(request));
+    return response.json(resultado);
+  }
+
+  async listarPendencias(request: AuthenticatedRequest, response: Response) {
+    const resultado = await evolucaoService.listarPendencias(buildAtor(request), request.query);
+    return response.json(resultado);
   }
 }

@@ -20,6 +20,7 @@ export const classesTelaPadraoBeneficiario = {
 export const ordemAcoesCrudPadrao = [
   "Buscar",
   "Novo",
+  "Cadastro rápido",
   "Salvar",
   "Cancelar",
   "Excluir",

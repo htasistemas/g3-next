@@ -78,4 +78,48 @@ export class ParametrosSistemaController {
     );
     return response.json(resultado);
   }
+
+  async obterConfiguracaoCadastroBeneficiario(
+    request: AuthenticatedRequest,
+    response: Response
+  ) {
+    const resultado = await service.obterConfiguracaoCadastroBeneficiario(request.authUser?.tenant_id);
+    return response.json(resultado);
+  }
+
+  async atualizarConfiguracaoCadastroBeneficiario(
+    request: AuthenticatedRequest,
+    response: Response
+  ) {
+    const usuario = request.authUser?.nomeUsuario ?? "sistema";
+    const resultado = await service.atualizarConfiguracaoCadastroBeneficiario(
+      request.body,
+      usuario,
+      request.authUser?.tenant_id ?? ""
+    );
+    return response.json(resultado);
+  }
+
+  async listarIntegracoes(request: AuthenticatedRequest, response: Response) {
+    const resultado = await service.listarIntegracoes(request.authUser?.tenant_id);
+    return response.json(resultado);
+  }
+
+  async salvarIntegracao(request: AuthenticatedRequest, response: Response) {
+    const resultado = await service.salvarIntegracao(
+      request.body,
+      request.authUser?.id,
+      request.authUser?.tenant_id ?? ""
+    );
+    return response.json(resultado);
+  }
+
+  async testarIntegracao(request: AuthenticatedRequest, response: Response) {
+    const resultado = await service.testarIntegracao(
+      request.body,
+      request.authUser?.id,
+      request.authUser?.tenant_id ?? ""
+    );
+    return response.json(resultado);
+  }
 }

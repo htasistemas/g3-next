@@ -8,14 +8,31 @@ import {
 } from "../../auth/middlewares/auth.middleware.js";
 import type { AuthenticatedRequest } from "../../auth/middlewares/auth.middleware.js";
 import { TransparenciasController } from "../controllers/transparencias.controller.js";
+import { PrestacaoContasProfissionalController } from "../controllers/prestacao-contas-profissional.controller.js";
 
 const controller = new TransparenciasController();
+const profissionalController = new PrestacaoContasProfissionalController();
 
 export const transparenciasRoutes = Router();
 
 const permissoesLeitura = ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"];
 const permissoesEscrita = ["ADMINISTRADOR", "OPERADOR"];
 const permissaoExclusao = ["ADMINISTRADOR"];
+const permissoesProfissionaisLeitura = [
+  ...permissoesLeitura,
+  "PRESTACAO_CONTAS_VISUALIZAR",
+  "PRESTACAO_CONTAS_AUDITORIA"
+];
+const permissoesProfissionaisEscrita = [
+  ...permissoesEscrita,
+  "PRESTACAO_CONTAS_CRIAR",
+  "PRESTACAO_CONTAS_EDITAR",
+  "PRESTACAO_CONTAS_LANCAR_RECEITA",
+  "PRESTACAO_CONTAS_LANCAR_DESPESA",
+  "PRESTACAO_CONTAS_CONCILIAR",
+  "PRESTACAO_CONTAS_RESPONDER_DILIGENCIA",
+  "PRESTACAO_CONTAS_APROVAR"
+];
 
 function ensureWorkflowPermission(request: AuthenticatedRequest, _response: Response, next: NextFunction) {
   const usuario = request.authUser;
@@ -29,6 +46,69 @@ function ensureWorkflowPermission(request: AuthenticatedRequest, _response: Resp
   }
   return next();
 }
+
+transparenciasRoutes.get(
+  "/profissional/visao-geral",
+  ensureAuthenticated,
+  ensurePermissions(permissoesProfissionaisLeitura),
+  asyncHandler(profissionalController.visaoGeral.bind(profissionalController))
+);
+
+transparenciasRoutes.get(
+  "/profissional/auditoria",
+  ensureAuthenticated,
+  ensurePermissions(permissoesProfissionaisLeitura),
+  asyncHandler(profissionalController.auditoria.bind(profissionalController))
+);
+
+transparenciasRoutes.get(
+  "/profissional/ia",
+  ensureAuthenticated,
+  ensurePermissions(permissoesProfissionaisLeitura),
+  asyncHandler(profissionalController.listarConfiguracoesIa.bind(profissionalController))
+);
+
+transparenciasRoutes.put(
+  "/profissional/ia",
+  ensureAuthenticated,
+  ensurePermissions(["ADMINISTRADOR", "PRESTACAO_CONTAS_CONFIGURAR_IA"]),
+  asyncHandler(profissionalController.salvarConfiguracaoIa.bind(profissionalController))
+);
+
+transparenciasRoutes.post(
+  "/profissional/ia/testar",
+  ensureAuthenticated,
+  ensurePermissions(["ADMINISTRADOR", "PRESTACAO_CONTAS_CONFIGURAR_IA", "PRESTACAO_CONTAS_ACESSAR_IA"]),
+  asyncHandler(profissionalController.testarConfiguracaoIa.bind(profissionalController))
+);
+
+transparenciasRoutes.post(
+  "/profissional/ocr/analisar-documento",
+  ensureAuthenticated,
+  ensurePermissions(["ADMINISTRADOR", "OPERADOR", "PRESTACAO_CONTAS_ACESSAR_IA"]),
+  asyncHandler(profissionalController.analisarDocumento.bind(profissionalController))
+);
+
+transparenciasRoutes.post(
+  "/profissional/assistente",
+  ensureAuthenticated,
+  ensurePermissions(["ADMINISTRADOR", "OPERADOR", "PRESTACAO_CONTAS_ACESSAR_IA"]),
+  asyncHandler(profissionalController.assistente.bind(profissionalController))
+);
+
+transparenciasRoutes.get(
+  "/profissional/:entidade",
+  ensureAuthenticated,
+  ensurePermissions(permissoesProfissionaisLeitura),
+  asyncHandler(profissionalController.listar.bind(profissionalController))
+);
+
+transparenciasRoutes.post(
+  "/profissional/:entidade",
+  ensureAuthenticated,
+  ensurePermissions(permissoesProfissionaisEscrita),
+  asyncHandler(profissionalController.criar.bind(profissionalController))
+);
 
 transparenciasRoutes.get(
   "/",

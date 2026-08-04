@@ -83,6 +83,44 @@ export type AlertasCentralAtendimentosSettings = {
   alertarInscricaoAtiva: boolean;
 };
 
+export type BeneficiarioConfiguracaoCadastroSettings = {
+  prazo_revisao_dias: number;
+  permitir_sem_cpf: boolean;
+  permitir_sem_data_nascimento_completa: boolean;
+  permitir_sem_documento: boolean;
+  exigir_responsavel_menor: boolean;
+  exigir_familia: boolean;
+  ativar_analise_duplicidade: boolean;
+  sensibilidade_duplicidade: string;
+  bloquear_cpf_duplicado: boolean;
+  ativar_alertas: boolean;
+  campos_obrigatorios_rapido: string[];
+  campos_obrigatorios_completo: string[];
+  pesos_completude: Record<string, number>;
+  documentos_obrigatorios: string[];
+  consentimentos_obrigatorios: string[];
+  validade_documentos_dias?: number | null;
+  validade_consentimentos_dias?: number | null;
+};
+
+export type IntegracaoApiSettings = {
+  tipo: string;
+  ativo: boolean;
+  fornecedor?: string;
+  ambiente: string;
+  url_base?: string;
+  timeout_ms: number;
+  tentativas: number;
+  credencial?: string;
+  credencial_mascarada?: string;
+  limite_uso?: number;
+  observacao?: string;
+  ultima_tentativa_em?: string;
+  ultimo_sucesso_em?: string;
+  ultimo_erro?: string;
+  atualizado_em?: string;
+};
+
 export const documentosObrigatoriedadeBeneficiarioPadrao: DocumentoObrigatoriedadeBeneficiarioSetting[] =
   [
     { id: "cpf", nome: "CPF", obrigatorio: true },
@@ -314,5 +352,45 @@ export const parametrosSistemaService = {
       alertarEncaminhamentoEmAberto: Boolean(data.alertas?.alertar_encaminhamento_em_aberto),
       alertarInscricaoAtiva: Boolean(data.alertas?.alertar_inscricao_ativa)
     };
+  },
+
+  async obterConfiguracaoCadastroBeneficiario(): Promise<BeneficiarioConfiguracaoCadastroSettings> {
+    const { data } = await httpClient.get<{ configuracao: BeneficiarioConfiguracaoCadastroSettings }>(
+      "/api/configuracoes/parametros/beneficiarios/cadastro"
+    );
+    return data.configuracao;
+  },
+
+  async salvarConfiguracaoCadastroBeneficiario(
+    settings: BeneficiarioConfiguracaoCadastroSettings
+  ): Promise<BeneficiarioConfiguracaoCadastroSettings> {
+    const { data } = await httpClient.put<{ configuracao: BeneficiarioConfiguracaoCadastroSettings }>(
+      "/api/configuracoes/parametros/beneficiarios/cadastro",
+      { configuracao: settings }
+    );
+    return data.configuracao;
+  },
+
+  async listarIntegracoes(): Promise<{ tipos: string[]; integracoes: IntegracaoApiSettings[] }> {
+    const { data } = await httpClient.get<{ tipos: string[]; integracoes: IntegracaoApiSettings[] }>(
+      "/api/configuracoes/parametros/integracoes"
+    );
+    return data;
+  },
+
+  async salvarIntegracao(settings: IntegracaoApiSettings): Promise<{ tipos: string[]; integracoes: IntegracaoApiSettings[] }> {
+    const { data } = await httpClient.put<{ tipos: string[]; integracoes: IntegracaoApiSettings[] }>(
+      "/api/configuracoes/parametros/integracoes",
+      settings
+    );
+    return data;
+  },
+
+  async testarIntegracao(tipo: string): Promise<{ ok: boolean; mensagem: string }> {
+    const { data } = await httpClient.post<{ ok: boolean; mensagem: string }>(
+      "/api/configuracoes/parametros/integracoes/testar",
+      { tipo }
+    );
+    return data;
   }
 };

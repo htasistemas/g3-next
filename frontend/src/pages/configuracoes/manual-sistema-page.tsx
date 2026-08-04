@@ -122,6 +122,15 @@ const secoesManual: ManualSecao[] = [
           "A senha do portal do beneficiário é criada no próprio cadastro com 4 dígitos e será usada no acesso do portal do beneficiário e da família junto com o CPF.",
           "Revise a aba Documentos e use a regra de obrigatoriedade definida em parâmetros do sistema; quando houver muitos documentos, a rolagem fica dentro do card da lista de documentos.",
           "Ao abrir um beneficiário, leia o aviso de pendências antes de continuar o atendimento.",
+          "Use Cadastro rápido para criar um registro mínimo quando ainda não houver todos os dados. O sistema grava o cadastro como incompleto, calcula a completude e mantém as pendências para revisão posterior.",
+          "Antes de concluir um novo cadastro, o sistema consulta possíveis duplicidades por CPF, nome, nascimento, filiação, telefone, RG e endereço. Quando houver candidatos, confira o modal e escolha abrir o cadastro existente, continuar como pessoa diferente, cancelar, atualizar o registro existente ou encaminhar para análise.",
+          "O cabeçalho mostra a completude cadastral calculada pelo backend, com barra de progresso, status, pendências e ação para recalcular quando necessário.",
+          "Use a aba Consentimentos para registrar aceite, versão do termo, finalidade e canal de coleta. O aceite de LGPD simples permanece compatível, mas a estrutura nova mantém histórico versionado.",
+          "Use a aba Família para consultar o vínculo familiar existente, integrantes, parentesco e responsável familiar sem duplicar famílias.",
+          "Na aba Família, o botão Abrir famílias direciona para a tela de vínculo familiar cadastrada no sistema, sem abrir rota inexistente.",
+          "Nas abas Escolaridade e Trabalho, selecione escolaridade, ocupação com referência CBO e situação de trabalho pelas opções padronizadas; a renda mensal usa máscara monetária brasileira.",
+          "Na aba Benefícios, marque Recebe benefício social para selecionar os principais benefícios sociais e informe o valor total com máscara monetária brasileira.",
+          "Use a aba Histórico e auditoria para acompanhar criação, edição, alterações de consentimento e demais eventos operacionais do cadastro.",
           "Na aba Listagem de beneficiários, use os filtros no topo e o botão Limpar para localizar registros. A listagem não exibe mais o resumo do beneficiário selecionado acima dos resultados, mantendo a rolagem apenas na grade de beneficiários.",
           "Ao concluir o cadastro de um beneficiário, confira a confirmação visual com o ícone na cor padrão da unidade e o número do cadastro. Clique em Finalizar cadastro para fechar a mensagem e continuar na tela."
         ],
@@ -675,10 +684,11 @@ const secoesManual: ManualSecao[] = [
           "Na aba Dados da instituição, selecione uma unidade assistencial cadastrada para preencher automaticamente razão social, endereço, contato e representante quando houver dados disponíveis.",
           "No card Dados bancários, selecione uma conta bancária cadastrada para reaproveitar banco, agência, conta, Pix e observações estruturadas no próprio plano.",
           "Na Identificação do plano, o campo Órgão concedente ou parceiro oferece sugestões de órgãos municipais, estaduais e federais, mas também permite digitar manualmente outra instituição.",
+          "Na Identificação do plano, selecione Responsável técnico e Responsável legal a partir dos profissionais ativos cadastrados no sistema.",
           "Quando o tipo for Termo de fomento, selecione um termo já cadastrado para vincular ao plano; se ele não existir, clique em Cadastrar termo para abrir a tela de termos de fomento.",
           "Use Salvar rascunho para registrar o plano mesmo com etapas incompletas; a porcentagem de conclusão indica o que ainda precisa ser preenchido. A validação de CPF ocorre quando o campo é informado.",
           "Nos campos de objeto, justificativa, objetivo geral, objetivos específicos e descrição de metas, use Sugerir com IA para gerar um texto inicial com base no contexto informado. Revise e ajuste o conteúdo antes de salvar ou enviar.",
-          "Na aba Apresentação e histórico, use Sugerir com IA nos campos de histórico, finalidade, experiência, registros, público atendido e capacidade técnica. A sugestão considera os dados da instituição e o conteúdo já digitado; ao clicar novamente, a IA aprimora a versão atual.",
+          "Na aba Apresentação e histórico, use Sugerir com IA nos campos de histórico, finalidade, experiência, registros, público atendido e capacidade técnica. A sugestão considera os dados da instituição e o conteúdo já digitado; ao clicar novamente, a IA aprimora a versão atual e exibe o motivo retornado pelo serviço quando a geração estiver indisponível.",
           "Na aba Justificativa, use Sugerir com IA nos cinco campos para estruturar o problema, causas, indicadores, capacidade de execução e impacto esperado. A segunda solicitação considera o texto revisado.",
           "Nas abas Monitoramento e avaliação e Prestação de contas, use Sugerir com IA nos campos textuais e de orientação. As sugestões consideram metas, objeto, indicadores e o conteúdo já revisado.",
           "As sugestões de IA dos campos textuais são tratadas como geração de conteúdo: elas usam o título do campo, o contexto preenchido e o texto atual, sem executar consultas de beneficiários, localização ou faixa etária.",
@@ -824,13 +834,17 @@ const secoesManual: ManualSecao[] = [
           "Registre o parecer técnico, a conclusão, o responsável, a data, as ressalvas e as recomendações antes de tomar uma decisão formal. A conclusão precisa corresponder à ação escolhida no workflow.",
           "A elaboração e o envio para análise usam as permissões de elaboração. A devolução para diligência usa revisão. Aprovação, aprovação com ressalvas, rejeição e encerramento exigem permissão de aprovação; usuários de leitura podem consultar e auditar sem alterar o processo.",
           "O Histórico de versões do parecer registra cada salvamento do parecer com número da versão, usuário, data, conclusão, texto e ressalvas. Esse histórico é somente leitura e não pode ser apagado pela tela.",
-          "Depois de salvar, use Enviar para análise. A prestação pode seguir para diligência, aprovação, aprovação com ressalvas, rejeição e encerramento conforme o workflow."
+          "Depois de salvar, use Enviar para análise. A prestação pode seguir para diligência, aprovação, aprovação com ressalvas, rejeição e encerramento conforme o workflow.",
+          "Use as novas abas profissionais para cadastrar concedentes, parcerias e instrumentos, modelos do concedente, plano de trabalho, rubricas, recebimentos, despesas, metas, documentos, conciliação, diligências, aprovações, relatórios, transparência e auditoria.",
+          "Na aba Configurações e IA, configure por tenant os provedores de IA e OCR, URL, modelo, timeout e credencial. A chave fica mascarada na interface e não deve ser exibida integralmente ao usuário.",
+          "O Assistente de prestação de contas gera apenas rascunhos e sugestões. Ele não aprova despesas, não inventa documentos e sempre exige validação humana antes do uso em relatório, parecer ou resposta a diligência."
         ],
         atencoes: [
           "Os campos monetários exibem formatação brasileira e a tela alerta quando o saldo informado divergir do saldo calculado pelos totais.",
           "A prestação só fica realmente pronta para envio quando houver identificação do instrumento, período, objeto, receitas ou total recebido, aplicação ou total aplicado, comprovantes e checklist sem pendências.",
           "A revisão final mostra claramente o que ainda falta, evitando depender de treinamento informal para concluir a operação.",
-          "A tela Prestação de contas agora separa os dados por instituição e CNPJ da sessão autenticada, incluindo listagem, detalhe, criação, edição, exclusão, recebimentos, destinações, comprovantes, timeline e checklist."
+          "A tela Prestação de contas agora separa os dados por instituição e CNPJ da sessão autenticada, incluindo listagem, detalhe, criação, edição, exclusão, recebimentos, destinações, comprovantes, timeline e checklist.",
+          "A fundação profissional usa tabelas incrementais com exclusão lógica, auditoria e tenant autenticado. Não publique dados pessoais ou documentos protegidos na área de transparência."
         ]
       },
       {
@@ -1112,13 +1126,14 @@ const secoesManual: ManualSecao[] = [
           "Acesse a aba Cadastro facial para capturar a face pela webcam e salvar o cadastro facial do usuário.",
           "Durante a captura pela câmera, use o molde do rosto na tela para centralizar a face antes de confirmar a imagem.",
           "Depois volte para a aba Registrar ponto para consultar a próxima batida, o espelho do dia e o saldo atual antes de marcar.",
-          "Na aba Espelho de ponto, os campos Período inicial e Período final aceitam preenchimento manual para consultar qualquer intervalo antes de clicar em Buscar ou gerar o PDF.",
+          "Na aba Espelho de ponto, os campos Período inicial e Período final aceitam preenchimento manual e atualizam imediatamente a consulta do espelho e a emissão do PDF, respeitando o intervalo selecionado.",
           "Na aba Espelho de ponto, use o botão Gerar espelho de ponto PDF para emitir o relatório individual em um clique; administradores podem selecionar o funcionário antes da emissão, enquanto usuários comuns emitem apenas o próprio espelho.",
           "O campo Funcionário da aba Espelho de ponto passou a listar somente usuários ativos e não deletados do sistema, evitando a exibição de cadastros antigos que já não fazem parte da operação atual.",
           "Registros históricos de ponto continuam preservados mesmo quando o usuário deixa de estar ativo no sistema; a limpeza afeta apenas o catálogo de seleção exibido na tela.",
           "No resumo do espelho de ponto, a tela mostra também a média trabalhada por dia, por semana e por mês para facilitar a leitura da jornada do período.",
           "As ocorrências do espelho de ponto são exibidas em texto curto e didático, por exemplo com indicação de atraso ou hora extra vinculada a E1, S1, E2 ou S2, e a marcação sem desvio aparece como Lançado corretamente.",
           "No espelho de ponto individual em PDF, a legenda de ocorrências é exibida com os significados de Falta, Atraso ou Saída Antecipada, Hora Extra, Abono ou Justificativa, Afastamento e Esquecimento.",
+          "No espelho de ponto individual em PDF, a logomarca permanece isolada no cabeçalho e as informações de emissão, data, hora e período ficam centralizadas no título do relatório.",
           "Ao registrar o ponto, o sistema calcula automaticamente horas extras, banco de horas e atrasos com base no horário previsto e no horário real da batida, sem exigir confirmação adicional.",
           "Quando a jornada prevista do colaborador não estiver preenchida, o espelho usa a jornada padrão da instituição para não exibir totais zerados indevidamente.",
           "Somente após o cadastro da face o botão Registrar ponto agora fica liberado para a confirmação da batida.",
@@ -1157,6 +1172,8 @@ const secoesManual: ManualSecao[] = [
         objetivo: "Definir regras que afetam obrigatoriedade, alertas e comportamento global do G3N.",
         comoUsar: [
           "Use Campos obrigatórios para definir quais documentos e campos devem ser exigidos no cadastro.",
+          "Use a aba Cadastro de beneficiários para configurar prazo de revisão, regras de CPF, exigência de família, análise de duplicidade, alertas e pesos da completude por tenant.",
+          "Use a aba Integrações e APIs para ativar provedores futuros, configurar ambiente, URL, timeout, tentativas, credenciais mascaradas e teste estrutural sem executar integração externa real nesta etapa.",
           "Revise parâmetros da Central de atendimentos para controlar alertas e critérios operacionais.",
           "Salve alterações somente após revisar o impacto nas telas relacionadas."
         ],

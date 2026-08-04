@@ -99,3 +99,68 @@ export type PrestacaoContasPayload = {
 export type PrestacaoContas = PrestacaoContasPayload & {
   id: string;
 };
+
+export type PrestacaoProfissionalEntidade =
+  | "concedentes"
+  | "instrumentos"
+  | "modelos"
+  | "metas"
+  | "rubricas"
+  | "receitas"
+  | "despesas"
+  | "documentos"
+  | "conciliacoes"
+  | "diligencias"
+  | "aprovacoes"
+  | "transparencia";
+
+export type PrestacaoProfissionalRegistro = Record<string, any> & {
+  id?: string;
+  razaoSocial?: string;
+  nome?: string;
+  objeto?: string;
+  descricao?: string;
+  situacao?: string;
+};
+
+export type PrestacaoProfissionalVisaoGeral = {
+  valorGlobal: number;
+  valorPrevisto: number;
+  valorRecebido: number;
+  valorExecutado: number;
+  saldoDisponivel: number;
+  percentualFinanceiroExecutado: number;
+  parcerias: number;
+  vigenciasVencendo: number;
+  metasConcluidas: number;
+  metasEmAndamento: number;
+  metasAtrasadas: number;
+  documentosPendentes: number;
+  documentosVencidos: number;
+  despesasPendentes: number;
+  despesasInconsistentes: number;
+  conciliacoesPendentes: number;
+  diligenciasAbertas: number;
+  diligenciasVencidas: number;
+  aprovacoesPendentes: number;
+  prestacoesAprovadas: number;
+  aprovadasComRessalvas: number;
+  rejeitadas: number;
+};
+
+export type PrestacaoIaConfig = {
+  id?: string;
+  tipo: "IA" | "OCR";
+  provedor?: string | null;
+  urlApi?: string | null;
+  modelo?: string | null;
+  ambiente?: string | null;
+  limiteUso?: number | null;
+  timeoutMs?: number | null;
+  ativo?: boolean;
+  credencialMascarada?: string | null;
+  ultimoTesteEm?: string | null;
+  ultimoSucessoEm?: string | null;
+  ultimoErro?: string | null;
+  observacoes?: string | null;
+};

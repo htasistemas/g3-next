@@ -65,3 +65,38 @@ parametrosSistemaRoutes.put(
   ensurePermissions(["ADMINISTRADOR"]),
   asyncHandler(controller.atualizarAlertasCentralAtendimentos.bind(controller))
 );
+
+parametrosSistemaRoutes.get(
+  "/beneficiarios/cadastro",
+  ensureAuthenticated,
+  ensurePermissions(["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"]),
+  asyncHandler(controller.obterConfiguracaoCadastroBeneficiario.bind(controller))
+);
+
+parametrosSistemaRoutes.put(
+  "/beneficiarios/cadastro",
+  ensureAuthenticated,
+  ensurePermissions(["ADMINISTRADOR"]),
+  asyncHandler(controller.atualizarConfiguracaoCadastroBeneficiario.bind(controller))
+);
+
+parametrosSistemaRoutes.get(
+  "/integracoes",
+  ensureAuthenticated,
+  ensurePermissions(["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"]),
+  asyncHandler(controller.listarIntegracoes.bind(controller))
+);
+
+parametrosSistemaRoutes.put(
+  "/integracoes",
+  ensureAuthenticated,
+  ensurePermissions(["ADMINISTRADOR"]),
+  asyncHandler(controller.salvarIntegracao.bind(controller))
+);
+
+parametrosSistemaRoutes.post(
+  "/integracoes/testar",
+  ensureAuthenticated,
+  ensurePermissions(["ADMINISTRADOR"]),
+  asyncHandler(controller.testarIntegracao.bind(controller))
+);

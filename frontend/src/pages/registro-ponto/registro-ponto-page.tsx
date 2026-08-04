@@ -1354,6 +1354,20 @@ export function RegistroPontoPage() {
     }));
   }
 
+  function atualizarFiltroEspelho(campo: keyof RegistroPontoFiltro, valor: RegistroPontoFiltro[keyof RegistroPontoFiltro]) {
+    setFiltroDraft((prev) => ({
+      ...prev,
+      [campo]: valor
+    }));
+
+    if (abaAtiva === "espelho") {
+      setFiltros((prev) => ({
+        ...prev,
+        [campo]: valor
+      }));
+    }
+  }
+
   function renderFiltros() {
     const usuarioAtualNoCatalogo = usuariosCatalogo.some((item) => item.id === filtroDraft.usuario_id);
     const opcoesUsuarioEspelho =
@@ -1379,12 +1393,7 @@ export function RegistroPontoPage() {
             <Input
               type="date"
               value={filtroDraft.data_inicial ?? ""}
-              onChange={(event) =>
-                setFiltroDraft((prev) => ({
-                  ...prev,
-                  data_inicial: event.target.value || undefined
-                }))
-              }
+              onChange={(event) => atualizarFiltroEspelho("data_inicial", event.target.value || undefined)}
               readOnly={abaAtiva !== "espelho"}
               disabled={abaAtiva !== "espelho"}
             />
@@ -1395,12 +1404,7 @@ export function RegistroPontoPage() {
             <Input
               type="date"
               value={filtroDraft.data_final ?? ""}
-              onChange={(event) =>
-                setFiltroDraft((prev) => ({
-                  ...prev,
-                  data_final: event.target.value || undefined
-                }))
-              }
+              onChange={(event) => atualizarFiltroEspelho("data_final", event.target.value || undefined)}
               readOnly={abaAtiva !== "espelho"}
               disabled={abaAtiva !== "espelho"}
             />
@@ -1435,10 +1439,7 @@ export function RegistroPontoPage() {
             <Select
               value={filtroDraft.status ?? ""}
               onChange={(event) =>
-                setFiltroDraft((prev) => ({
-                  ...prev,
-                  status: (event.target.value || undefined) as RegistroPontoStatus | undefined
-                }))
+                atualizarFiltroEspelho("status", (event.target.value || undefined) as RegistroPontoStatus | undefined)
               }
             >
               <option value="">Todos</option>
@@ -1451,7 +1452,7 @@ export function RegistroPontoPage() {
             <Label>Ocorrência</Label>
             <Input
               value={filtroDraft.ocorrencia ?? ""}
-              onChange={(event) => setFiltroDraft((prev) => ({ ...prev, ocorrencia: event.target.value }))}
+              onChange={(event) => atualizarFiltroEspelho("ocorrencia", event.target.value)}
               placeholder="Ex.: atraso"
             />
           </div>
@@ -1464,9 +1465,7 @@ export function RegistroPontoPage() {
           <label className="flex items-center gap-2 pt-7 text-sm text-slate-700">
             <Checkbox
               checked={!!filtroDraft.somente_alterados}
-              onChange={(event) =>
-                setFiltroDraft((prev) => ({ ...prev, somente_alterados: event.target.checked }))
-              }
+              onChange={(event) => atualizarFiltroEspelho("somente_alterados", event.target.checked)}
             />
             Somente registros alterados
           </label>
@@ -1474,9 +1473,7 @@ export function RegistroPontoPage() {
           <label className="flex items-center gap-2 pt-7 text-sm text-slate-700">
             <Checkbox
               checked={!!filtroDraft.somente_inconsistencias}
-              onChange={(event) =>
-                setFiltroDraft((prev) => ({ ...prev, somente_inconsistencias: event.target.checked }))
-              }
+              onChange={(event) => atualizarFiltroEspelho("somente_inconsistencias", event.target.checked)}
             />
             Somente inconsistências
           </label>

@@ -3,8 +3,10 @@ import {
   BellRing,
   Clock3,
   Eye,
+  PlugZap,
   RefreshCcw,
   Save,
+  Settings2,
   SlidersHorizontal,
   X
 } from "lucide-react";
@@ -28,7 +30,9 @@ import {
   documentosObrigatoriedadeBeneficiarioPadrao,
   parametrosSistemaService,
   type AlertasCentralAtendimentosSettings,
+  type BeneficiarioConfiguracaoCadastroSettings,
   type CarenciaDoacaoRealizadaSettings,
+  type IntegracaoApiSettings,
   type ObrigatoriedadeDocumentosBeneficiarioSettings
 } from "@/services/parametros-sistema.service";
 import type { ThemeSettings } from "@/types/theme";
@@ -37,7 +41,9 @@ const abas = [
   { id: "personalizacao", label: "Personalização", icon: SlidersHorizontal },
   { id: "carencia", label: "Carência", icon: Clock3 },
   { id: "obrigatoriedade", label: "Campos obrigatórios", icon: Eye },
-  { id: "central-atendimentos", label: "Central de atendimentos", icon: BellRing }
+  { id: "central-atendimentos", label: "Central de atendimentos", icon: BellRing },
+  { id: "beneficiarios-cadastro", label: "Cadastro de beneficiários", icon: Settings2 },
+  { id: "integracoes", label: "Integrações e APIs", icon: PlugZap }
 ] as const;
 
 type AbaId = (typeof abas)[number]["id"];
@@ -70,6 +76,35 @@ const obrigatoriedadePadrao: ObrigatoriedadeDocumentosBeneficiarioSettings = {
   documentos: documentosObrigatoriedadeBeneficiarioPadrao
 };
 
+const configuracaoCadastroPadrao: BeneficiarioConfiguracaoCadastroSettings = {
+  prazo_revisao_dias: 365,
+  permitir_sem_cpf: true,
+  permitir_sem_data_nascimento_completa: false,
+  permitir_sem_documento: true,
+  exigir_responsavel_menor: true,
+  exigir_familia: false,
+  ativar_analise_duplicidade: true,
+  sensibilidade_duplicidade: "MEDIA",
+  bloquear_cpf_duplicado: true,
+  ativar_alertas: true,
+  campos_obrigatorios_rapido: ["nome_completo", "consentimento_minimo"],
+  campos_obrigatorios_completo: [],
+  pesos_completude: {
+    identificacao: 20,
+    contatos: 10,
+    endereco: 15,
+    familia: 15,
+    socioeconomico: 15,
+    documentos: 10,
+    consentimentos: 10,
+    programas: 5
+  },
+  documentos_obrigatorios: [],
+  consentimentos_obrigatorios: ["TRATAMENTO_DADOS"],
+  validade_documentos_dias: null,
+  validade_consentimentos_dias: null
+};
+
 export function ParametrosSistemaPage() {
   const { usuario } = useAuth();
   const { settings, applyPreview, clearPreview, saveSettings, carregando: carregandoTema } = useTheme();
@@ -86,9 +121,17 @@ export function ParametrosSistemaPage() {
     useState<AlertasCentralAtendimentosSettings>(alertasCentralAtendimentosPadrao);
   const [alertasCentralSalvos, setAlertasCentralSalvos] =
     useState<AlertasCentralAtendimentosSettings>(alertasCentralAtendimentosPadrao);
+  const [configuracaoCadastroDraft, setConfiguracaoCadastroDraft] =
+    useState<BeneficiarioConfiguracaoCadastroSettings>(configuracaoCadastroPadrao);
+  const [configuracaoCadastroSalva, setConfiguracaoCadastroSalva] =
+    useState<BeneficiarioConfiguracaoCadastroSettings>(configuracaoCadastroPadrao);
+  const [integracoes, setIntegracoes] = useState<IntegracaoApiSettings[]>([]);
+  const [integracaoAtiva, setIntegracaoAtiva] = useState("CONSULTA_CEP");
   const [carregandoCarencia, setCarregandoCarencia] = useState(true);
   const [carregandoObrigatoriedade, setCarregandoObrigatoriedade] = useState(true);
   const [carregandoAlertasCentral, setCarregandoAlertasCentral] = useState(true);
+  const [carregandoConfiguracaoCadastro, setCarregandoConfiguracaoCadastro] = useState(true);
+  const [carregandoIntegracoes, setCarregandoIntegracoes] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [mensagem, setMensagem] = useState<{ tipo: "sucesso" | "erro"; texto: string } | null>(null);
 
@@ -104,11 +147,15 @@ export function ParametrosSistemaPage() {
       setCarregandoCarencia(true);
       setCarregandoObrigatoriedade(true);
       setCarregandoAlertasCentral(true);
+      setCarregandoConfiguracaoCadastro(true);
+      setCarregandoIntegracoes(true);
       try {
-        const [carencia, obrigatoriedade, alertasCentral] = await Promise.all([
+        const [carencia, obrigatoriedade, alertasCentral, configuracaoCadastro, integracoesData] = await Promise.all([
           parametrosSistemaService.obterCarenciaDoacoesRealizadas(),
           parametrosSistemaService.obterObrigatoriedadeDocumentosBeneficiario(),
-          parametrosSistemaService.obterAlertasCentralAtendimentos()
+          parametrosSistemaService.obterAlertasCentralAtendimentos(),
+          parametrosSistemaService.obterConfiguracaoCadastroBeneficiario(),
+          parametrosSistemaService.listarIntegracoes()
         ]);
         if (!ativo) return;
         setCarenciaDraft(carencia);
@@ -117,6 +164,10 @@ export function ParametrosSistemaPage() {
         setObrigatoriedadeSalva(obrigatoriedade);
         setAlertasCentralDraft(alertasCentral);
         setAlertasCentralSalvos(alertasCentral);
+        setConfiguracaoCadastroDraft(configuracaoCadastro);
+        setConfiguracaoCadastroSalva(configuracaoCadastro);
+        setIntegracoes(integracoesData.integracoes);
+        setIntegracaoAtiva(integracoesData.integracoes[0]?.tipo ?? "CONSULTA_CEP");
       } catch (error: any) {
         if (!ativo) return;
         setMensagem({
@@ -128,6 +179,8 @@ export function ParametrosSistemaPage() {
           setCarregandoCarencia(false);
           setCarregandoObrigatoriedade(false);
           setCarregandoAlertasCentral(false);
+          setCarregandoConfiguracaoCadastro(false);
+          setCarregandoIntegracoes(false);
         }
       }
     })();
@@ -155,6 +208,11 @@ export function ParametrosSistemaPage() {
     () => JSON.stringify(alertasCentralDraft) !== JSON.stringify(alertasCentralSalvos),
     [alertasCentralDraft, alertasCentralSalvos]
   );
+  const houveMudancaConfiguracaoCadastro = useMemo(
+    () => JSON.stringify(configuracaoCadastroDraft) !== JSON.stringify(configuracaoCadastroSalva),
+    [configuracaoCadastroDraft, configuracaoCadastroSalva]
+  );
+  const integracaoSelecionada = integracoes.find((item) => item.tipo === integracaoAtiva);
   const houveMudanca =
     abaAtiva === "carencia"
       ? houveMudancaCarencia
@@ -162,9 +220,18 @@ export function ParametrosSistemaPage() {
         ? houveMudancaObrigatoriedade
         : abaAtiva === "central-atendimentos"
           ? houveMudancaAlertasCentral
-          : houveMudancaPersonalizacao;
+          : abaAtiva === "beneficiarios-cadastro"
+            ? houveMudancaConfiguracaoCadastro
+            : abaAtiva === "integracoes"
+              ? true
+              : houveMudancaPersonalizacao;
   const carregando =
-    carregandoTema || carregandoCarencia || carregandoObrigatoriedade || carregandoAlertasCentral;
+    carregandoTema ||
+    carregandoCarencia ||
+    carregandoObrigatoriedade ||
+    carregandoAlertasCentral ||
+    carregandoConfiguracaoCadastro ||
+    carregandoIntegracoes;
 
   function atualizarModo(modo: ThemeSettings["modo"]) {
     setDraft((estadoAtual) => ({ ...estadoAtual, modo }));
@@ -210,6 +277,11 @@ export function ParametrosSistemaPage() {
       return;
     }
 
+    if (abaAtiva === "beneficiarios-cadastro") {
+      setConfiguracaoCadastroDraft(configuracaoCadastroSalva);
+      return;
+    }
+
     clearPreview();
     setDraft(settings);
   }
@@ -237,6 +309,17 @@ export function ParametrosSistemaPage() {
         setAlertasCentralDraft(salvo);
         setAlertasCentralSalvos(salvo);
         setMensagem({ tipo: "sucesso", texto: "Parâmetros da Central de atendimentos salvos com sucesso." });
+      } else if (abaAtiva === "beneficiarios-cadastro") {
+        const salvo = await parametrosSistemaService.salvarConfiguracaoCadastroBeneficiario(
+          configuracaoCadastroDraft
+        );
+        setConfiguracaoCadastroDraft(salvo);
+        setConfiguracaoCadastroSalva(salvo);
+        setMensagem({ tipo: "sucesso", texto: "Configurações do cadastro de beneficiários salvas com sucesso." });
+      } else if (abaAtiva === "integracoes" && integracaoSelecionada) {
+        const salvo = await parametrosSistemaService.salvarIntegracao(integracaoSelecionada);
+        setIntegracoes(salvo.integracoes);
+        setMensagem({ tipo: "sucesso", texto: "Integração salva com sucesso." });
       } else {
         await saveSettings(draft);
         setMensagem({ tipo: "sucesso", texto: "Personalização salva com sucesso." });
@@ -275,6 +358,11 @@ export function ParametrosSistemaPage() {
       return;
     }
 
+    if (abaAtiva === "beneficiarios-cadastro") {
+      setConfiguracaoCadastroDraft(configuracaoCadastroPadrao);
+      return;
+    }
+
     setDraft(defaultThemeSettings);
     applyPreview(defaultThemeSettings);
   }
@@ -292,6 +380,50 @@ export function ParametrosSistemaPage() {
     valor: AlertasCentralAtendimentosSettings[K]
   ) {
     setAlertasCentralDraft((estadoAtual) => ({ ...estadoAtual, [campo]: valor }));
+  }
+
+  function atualizarConfiguracaoCadastro<K extends keyof BeneficiarioConfiguracaoCadastroSettings>(
+    campo: K,
+    valor: BeneficiarioConfiguracaoCadastroSettings[K]
+  ) {
+    setConfiguracaoCadastroDraft((estadoAtual) => ({ ...estadoAtual, [campo]: valor }));
+  }
+
+  function atualizarPesoCompletude(grupo: string, valor: number) {
+    setConfiguracaoCadastroDraft((estadoAtual) => ({
+      ...estadoAtual,
+      pesos_completude: {
+        ...estadoAtual.pesos_completude,
+        [grupo]: Math.max(0, valor)
+      }
+    }));
+  }
+
+  function atualizarIntegracao(campo: keyof IntegracaoApiSettings, valor: string | number | boolean | undefined) {
+    setIntegracoes((estadoAtual) =>
+      estadoAtual.map((item) =>
+        item.tipo === integracaoAtiva ? { ...item, [campo]: valor } : item
+      )
+    );
+  }
+
+  async function testarIntegracaoAtual() {
+    if (!integracaoAtiva) return;
+    setSalvando(true);
+    setMensagem(null);
+    try {
+      const resultado = await parametrosSistemaService.testarIntegracao(integracaoAtiva);
+      setMensagem({ tipo: resultado.ok ? "sucesso" : "erro", texto: resultado.mensagem });
+      const dados = await parametrosSistemaService.listarIntegracoes();
+      setIntegracoes(dados.integracoes);
+    } catch (error: any) {
+      setMensagem({
+        tipo: "erro",
+        texto: error?.response?.data?.message ?? "Não foi possível testar a integração."
+      });
+    } finally {
+      setSalvando(false);
+    }
   }
 
   if (carregando) {
@@ -582,6 +714,154 @@ export function ParametrosSistemaPage() {
                       </label>
                     ))}
                   </div>
+                </div>
+              </section>
+            ) : abaAtiva === "beneficiarios-cadastro" ? (
+              <section className="space-y-5">
+                <div className="rounded-xl border border-slate-200 bg-white p-4">
+                  <p className="text-sm font-semibold text-slate-900">Configurações do cadastro de beneficiários</p>
+                  <p className="mt-2 text-sm text-slate-600">
+                    Parâmetros aplicados por instituição para revisão, duplicidade, obrigatoriedade e completude cadastral.
+                  </p>
+                </div>
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="space-y-1">
+                      <Label>Prazo de revisão cadastral em dias</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={configuracaoCadastroDraft.prazo_revisao_dias}
+                        onChange={(event) =>
+                          atualizarConfiguracaoCadastro("prazo_revisao_dias", Math.max(1, Number(event.target.value) || 1))
+                        }
+                      />
+                    </div>
+                    {[
+                      ["permitir_sem_cpf", "Permitir cadastro sem CPF"],
+                      ["permitir_sem_documento", "Permitir pessoa sem documento"],
+                      ["exigir_responsavel_menor", "Exigir responsável para menores"],
+                      ["exigir_familia", "Exigir família"],
+                      ["ativar_analise_duplicidade", "Ativar análise de duplicidade"],
+                      ["bloquear_cpf_duplicado", "Bloquear CPF duplicado"],
+                      ["ativar_alertas", "Ativar alertas cadastrais"]
+                    ].map(([campo, label]) => (
+                      <label key={campo} className="flex items-center gap-2 text-sm text-slate-700">
+                        <Checkbox
+                          checked={Boolean(configuracaoCadastroDraft[campo as keyof BeneficiarioConfiguracaoCadastroSettings])}
+                          onChange={(event) =>
+                            atualizarConfiguracaoCadastro(
+                              campo as keyof BeneficiarioConfiguracaoCadastroSettings,
+                              event.target.checked as never
+                            )
+                          }
+                        />
+                        {label}
+                      </label>
+                    ))}
+                    <div className="space-y-1">
+                      <Label>Sensibilidade da duplicidade</Label>
+                      <Select
+                        value={configuracaoCadastroDraft.sensibilidade_duplicidade}
+                        onChange={(event) => atualizarConfiguracaoCadastro("sensibilidade_duplicidade", event.target.value)}
+                      >
+                        <option value="BAIXA">Baixa</option>
+                        <option value="MEDIA">Média</option>
+                        <option value="ALTA">Alta</option>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
+                    <p className="text-sm font-semibold text-slate-900">Pesos da completude</p>
+                    {Object.entries(configuracaoCadastroDraft.pesos_completude).map(([grupo, valor]) => (
+                      <div key={grupo} className="grid grid-cols-[1fr_90px] items-center gap-3">
+                        <Label className="capitalize">{grupo}</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          value={valor}
+                          onChange={(event) => atualizarPesoCompletude(grupo, Number(event.target.value) || 0)}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </section>
+            ) : abaAtiva === "integracoes" ? (
+              <section className="space-y-5">
+                <div className="rounded-xl border border-slate-200 bg-white p-4">
+                  <p className="text-sm font-semibold text-slate-900">Integrações e APIs</p>
+                  <p className="mt-2 text-sm text-slate-600">
+                    Estrutura preparada para provedores futuros. Segredos são enviados separados e retornam apenas mascarados.
+                  </p>
+                </div>
+                <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
+                  <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3">
+                    {integracoes.map((item) => (
+                      <button
+                        key={item.tipo}
+                        type="button"
+                        className={classeBotaoAbaLateral(integracaoAtiva === item.tipo)}
+                        onClick={() => setIntegracaoAtiva(item.tipo)}
+                      >
+                        <span className="min-w-0">{item.tipo.replaceAll("_", " ").toLowerCase()}</span>
+                      </button>
+                    ))}
+                  </div>
+                  {integracaoSelecionada ? (
+                    <div className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 md:grid-cols-2">
+                      <label className="flex items-center gap-2 text-sm text-slate-700 md:col-span-2">
+                        <Checkbox
+                          checked={integracaoSelecionada.ativo}
+                          onChange={(event) => atualizarIntegracao("ativo", event.target.checked)}
+                        />
+                        Integração ativa
+                      </label>
+                      <div>
+                        <Label>Fornecedor</Label>
+                        <Input value={integracaoSelecionada.fornecedor ?? ""} onChange={(event) => atualizarIntegracao("fornecedor", event.target.value)} />
+                      </div>
+                      <div>
+                        <Label>Ambiente</Label>
+                        <Select value={integracaoSelecionada.ambiente} onChange={(event) => atualizarIntegracao("ambiente", event.target.value)}>
+                          <option value="HOMOLOGACAO">Homologação</option>
+                          <option value="PRODUCAO">Produção</option>
+                        </Select>
+                      </div>
+                      <div className="md:col-span-2">
+                        <Label>URL base</Label>
+                        <Input value={integracaoSelecionada.url_base ?? ""} onChange={(event) => atualizarIntegracao("url_base", event.target.value)} />
+                      </div>
+                      <div>
+                        <Label>Timeout</Label>
+                        <Input type="number" value={integracaoSelecionada.timeout_ms} onChange={(event) => atualizarIntegracao("timeout_ms", Number(event.target.value) || 5000)} />
+                      </div>
+                      <div>
+                        <Label>Tentativas</Label>
+                        <Input type="number" value={integracaoSelecionada.tentativas} onChange={(event) => atualizarIntegracao("tentativas", Number(event.target.value) || 1)} />
+                      </div>
+                      <div className="md:col-span-2">
+                        <Label>Credencial</Label>
+                        <Input
+                          type="password"
+                          placeholder={integracaoSelecionada.credencial_mascarada ? `Chave configurada: ${integracaoSelecionada.credencial_mascarada}` : "Informe para configurar ou rotacionar"}
+                          onChange={(event) => atualizarIntegracao("credencial", event.target.value)}
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <Label>Observação</Label>
+                        <Input value={integracaoSelecionada.observacao ?? ""} onChange={(event) => atualizarIntegracao("observacao", event.target.value)} />
+                      </div>
+                      <div className="flex flex-wrap gap-2 md:col-span-2">
+                        <Button type="button" variant="outline" onClick={() => void testarIntegracaoAtual()} disabled={salvando}>
+                          Testar conexão
+                        </Button>
+                        <Badge variant={integracaoSelecionada.ultimo_erro ? "danger" : "info"}>
+                          {integracaoSelecionada.ultimo_erro || integracaoSelecionada.ultimo_sucesso_em || "Sem teste registrado"}
+                        </Badge>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               </section>
             ) : (
