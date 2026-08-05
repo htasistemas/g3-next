@@ -1510,6 +1510,20 @@ export function RegistroPontoPage() {
             />
             Somente inconsistências
           </label>
+
+          {abaAtiva === "espelho" ? (
+            <div className="flex items-end justify-end lg:col-span-4">
+              <Button
+                type="button"
+                className="w-full sm:w-auto"
+                onClick={aplicarBusca}
+                disabled={carregandoEspelho}
+              >
+                <Search className="mr-2 h-4 w-4" />
+                Buscar registros
+              </Button>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
     );

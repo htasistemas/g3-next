@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.796",
+  "latestVersion": "1.00.797",
   "releaseDate": "2026-08-04",
-  "description": "Correcao da consulta de registros historicos no espelho de ponto.",
+  "description": "Melhoria da aplicacao dos filtros no espelho de ponto.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.795",
+  "minCompatibleVersion": "1.00.796",
   "releaseType": "stable",
   "downloadUrl": null
 }
