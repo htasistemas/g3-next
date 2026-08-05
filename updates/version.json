@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.797",
-  "releaseDate": "2026-08-04",
-  "description": "Melhoria da aplicacao dos filtros no espelho de ponto.",
+  "latestVersion": "1.00.802",
+  "releaseDate": "2026-08-05",
+  "description": "Correcao da URL da API no desenvolvimento e acesso master.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.796",
+  "minCompatibleVersion": "1.00.801",
   "releaseType": "stable",
   "downloadUrl": null
 }

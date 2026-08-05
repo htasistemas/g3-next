@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { documentoSchema, profissionalVinculoSchema } from "../educacional.schema.js";
+import { alunosAgrupadosFiltrosSchema, documentoSchema, matriculaSchema, profissionalVinculoSchema, transferenciaMatriculaSchema } from "../educacional.schema.js";
 import { evidenciaPublicaSchema, indicadorPublicoSchema, parceriaPublicaSchema } from "../parcerias-publicas.schema.js";
 
 test("aceita vínculo educacional de profissional existente", () => {
@@ -31,4 +31,23 @@ test("valida indicador e evidência de prestação", () => {
   const evidencia = evidenciaPublicaSchema.parse({ indicador_id: indicador.parceria_id, competencia: "2026-07-01", realizado_valor: "42" });
   assert.equal(indicador.periodicidade, "MENSAL");
   assert.equal(evidencia.realizado_valor, 42);
+});
+
+test("valida matrícula escolar com período, turno e situação", () => {
+  const valor = matriculaSchema.parse({
+    aluno_id: "1", ano_letivo_id: "2", unidade_id: "3", sala_id: "4", etapa_id: "5", serie_id: "6",
+    numero_matricula: "0001", data_matricula: "2026-02-01", data_inicio: "2026-02-02",
+    turno: "MATUTINO", situacao: "ATIVA", observacoes: "Turma regular"
+  });
+  assert.equal(valor.aluno_id, 1);
+  assert.equal(valor.turno, "MATUTINO");
+});
+
+test("normaliza filtros de alunos agrupados e transferência", () => {
+  const filtros = alunosAgrupadosFiltrosSchema.parse({ instituicao_id: "3", sem_sala: "true", limite: "100" });
+  assert.equal(filtros.instituicao_id, 3);
+  assert.equal(filtros.sem_sala, true);
+  assert.equal(filtros.limite, 100);
+  const transferencia = transferenciaMatriculaSchema.parse({ instituicao_destino_id: 3, sala_destino_id: 4, data_transferencia: "2026-08-05", motivo: "Mudança de unidade" });
+  assert.equal(transferencia.instituicao_destino_id, 3);
 });
