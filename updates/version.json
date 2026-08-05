@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.795",
+  "latestVersion": "1.00.796",
   "releaseDate": "2026-08-04",
-  "description": "Correcao do periodo aplicado no espelho de ponto.",
+  "description": "Correcao da consulta de registros historicos no espelho de ponto.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.794",
+  "minCompatibleVersion": "1.00.795",
   "releaseType": "stable",
   "downloadUrl": null
 }

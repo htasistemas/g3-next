@@ -1127,6 +1127,7 @@ const secoesManual: ManualSecao[] = [
           "Durante a captura pela câmera, use o molde do rosto na tela para centralizar a face antes de confirmar a imagem.",
           "Depois volte para a aba Registrar ponto para consultar a próxima batida, o espelho do dia e o saldo atual antes de marcar.",
           "Na aba Espelho de ponto, informe Período inicial, Período final e Funcionário e clique em Buscar para consultar exatamente o intervalo selecionado; o PDF usa o mesmo período aplicado na tela.",
+          "O espelho também exibe registros históricos criados antes da migração de tenant, desde que o funcionário pertença ao tenant autenticado.",
           "Na aba Espelho de ponto, use o botão Gerar espelho de ponto PDF para emitir o relatório individual em um clique; administradores podem selecionar o funcionário antes da emissão, enquanto usuários comuns emitem apenas o próprio espelho.",
           "O campo Funcionário da aba Espelho de ponto passou a listar somente usuários ativos e não deletados do sistema, evitando a exibição de cadastros antigos que já não fazem parte da operação atual.",
           "Registros históricos de ponto continuam preservados mesmo quando o usuário deixa de estar ativo no sistema; a limpeza afeta apenas o catálogo de seleção exibido na tela.",

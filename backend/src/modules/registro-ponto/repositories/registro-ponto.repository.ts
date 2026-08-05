@@ -342,7 +342,12 @@ export class RegistroPontoRepository {
     }
 
     where.push(Prisma.sql`AND r.usuario_id = ${usuarioIdFiltro}`);
-    where.push(Prisma.sql`AND r.tenant_id::text = ${ator.tenant_id}`);
+    // Registros antigos podem ter sido criados antes da coluna tenant_id existir.
+    // O usuário já está limitado ao tenant autenticado, então aceitamos esses
+    // registros legados somente quando o tenant do próprio registro está nulo.
+    where.push(
+      Prisma.sql`AND COALESCE(r.tenant_id::text, u.tenant_id::text) = ${ator.tenant_id}`
+    );
     where.push(Prisma.sql`AND u.tenant_id::text = ${ator.tenant_id}`);
 
     if (filters.data_inicial) {
