@@ -40,6 +40,27 @@ export type UnidadeEnsinoCatalogo = {
   salas: Array<{ id: string; nome: string; capacidade_maxima: number; ocupadas: number; disponiveis: number | null; lotada: boolean }>;
 };
 
+export type AlunosAgrupadosResponse = {
+  grupos: Array<{
+    instituicao: { id?: string; nome: string; cnpj?: string | null; alunos_ativos: number; alunos_inativos: number; salas: number };
+    salas: Array<{
+      id?: string;
+      nome: string;
+      turma_nome?: string | null;
+      etapa_nome?: string | null;
+      serie_nome?: string | null;
+      turno?: string | null;
+      capacidade: number;
+      vagas_disponiveis: number | null;
+      alunos: Array<Record<string, unknown>>;
+    }>;
+  }>;
+  total: number;
+  pagina: number;
+  limite: number;
+  indicadores: { instituicoes: number; salas: number; alunos: number; alunos_ativos: number; alunos_sem_sala: number; alunos_sem_instituicao: number };
+};
+
 export const educacionalService = {
   async listarParceriasPublicas() {
     const { data } = await httpClient.get<{ itens: ParceriaPublica[] }>("/api/educacional/parcerias-publicas");
@@ -86,6 +107,26 @@ export const educacionalService = {
   async listarUnidadesEnsino() {
     const { data } = await httpClient.get<{ unidades: UnidadeEnsinoCatalogo[] }>("/api/educacional/unidades-ensino");
     return data.unidades;
+  },
+  async listarAlunosAgrupados(params: Record<string, string | number | boolean | undefined>) {
+    const { data } = await httpClient.get<AlunosAgrupadosResponse>("/api/educacional/alunos/agrupados", { params });
+    return data;
+  },
+  async listarHistoricoMatricula(matriculaId: string) {
+    const { data } = await httpClient.get<{ itens: Array<Record<string, unknown>> }>(`/api/educacional/matriculas/${matriculaId}/historico`);
+    return data.itens;
+  },
+  async transferirMatricula(matriculaId: string, payload: Record<string, unknown>) {
+    const { data } = await httpClient.post(`/api/educacional/matriculas/${matriculaId}/transferir`, payload);
+    return data;
+  },
+  async editarVinculoMatricula(matriculaId: string, payload: Record<string, unknown>) {
+    const { data } = await httpClient.put<{ item: EducacionalItem }>(`/api/educacional/matriculas/${matriculaId}/vinculo`, payload);
+    return data.item;
+  },
+  async criarVinculoAluno(alunoId: string, payload: Record<string, unknown>) {
+    const { data } = await httpClient.post<{ item: EducacionalItem }>(`/api/educacional/alunos/${alunoId}/vinculo`, payload);
+    return data.item;
   },
   async vincularAluno(beneficiarioId: string) {
     const { data } = await httpClient.post<{ aluno: EducacionalItem }>("/api/educacional/alunos/vincular", {

@@ -3,8 +3,9 @@
 
   // URL base da API. Em producao, o G3-Next usa a mesma origem do frontend.
   var apiUrl = "__ENV_API_URL__";
-  window.__env.apiUrl =
-    apiUrl && apiUrl !== "__ENV_API_URL__" ? apiUrl : window.location.origin;
+  if (apiUrl && apiUrl !== "__ENV_API_URL__") {
+    window.__env.apiUrl = apiUrl;
+  }
 
   var googleClientId = "__ENV_GOOGLE_CLIENT_ID__";
   if (googleClientId && googleClientId !== "__ENV_GOOGLE_CLIENT_ID__") {

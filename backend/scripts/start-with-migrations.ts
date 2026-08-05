@@ -1,9 +1,35 @@
 import { existsSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { spawnSync, spawn } from "node:child_process";
+import { createConnection } from "node:net";
 import { loadBackendEnvFiles } from "../src/config/env-runtime.js";
 
 loadBackendEnvFiles();
+
+const apiHost = process.env.API_HOST || "0.0.0.0";
+const apiPort = Number(process.env.API_PORT || 3333);
+
+function portaEmUso(): Promise<boolean> {
+  return new Promise((resolvePorta) => {
+    const socket = createConnection({ host: "127.0.0.1", port: apiPort });
+    const finalizar = (emUso: boolean) => {
+      socket.removeAllListeners();
+      socket.destroy();
+      resolvePorta(emUso);
+    };
+
+    socket.once("connect", () => finalizar(true));
+    socket.once("error", () => finalizar(false));
+    socket.setTimeout(750, () => finalizar(false));
+  });
+}
+
+if (await portaEmUso()) {
+  console.warn(
+    `[g3n-backend-node] API já está em execução em ${apiHost}:${apiPort}; nenhuma nova instância foi iniciada.`
+  );
+  process.exit(0);
+}
 
 const npmCommand = process.platform === "win32" ? process.env.ComSpec || "cmd.exe" : "npx";
 const npmPrefix = process.platform === "win32" ? ["/d", "/s", "/c", "npx.cmd"] : [];

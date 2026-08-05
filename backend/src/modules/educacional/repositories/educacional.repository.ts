@@ -23,6 +23,7 @@ const migrationsEducacionais = [
   "20260719_add_tipo_unidade_atendimento",
   "20260720_create_educacional_parcerias_publicas",
   "20260720_create_educacional_profissional_vinculo"
+  ,"20260805_create_educacional_matricula_vinculos"
 ];
 const tabelaPorRecurso: Record<EducacionalRecurso, string> = { "anos-letivos": "educacional_ano_letivo", etapas: "educacional_etapa", series: "educacional_serie", disciplinas: "educacional_disciplina", turmas: "educacional_turma", alunos: "educacional_aluno", matriculas: "educacional_matricula", enturmacoes: "educacional_enturmacao", profissionais: "educacional_profissional_vinculo", "grade-curricular": "educacional_grade_curricular", horarios: "educacional_horario", diarios: "educacional_diario_aula", frequencias: "educacional_frequencia", "planos-aula": "educacional_plano_aula", planejamentos: "educacional_planejamento_pedagogico", avaliacoes: "educacional_avaliacao", notas: "educacional_nota", boletins: "educacional_boletim", historicos: "educacional_historico_escolar", ocorrencias: "educacional_ocorrencia", agenda: "educacional_agenda", documentos: "educacional_documento", "rotinas-infantis": "educacional_rotina_infantil", "desenvolvimentos-infantis": "educacional_desenvolvimento_infantil", transferencias: "educacional_transferencia", autorizacoes: "educacional_autorizacao", "lista-espera": "educacional_lista_espera", recuperacoes: "educacional_recuperacao", "resultados-finais": "educacional_resultado_final", calendario: "educacional_calendario" };
 
@@ -185,6 +186,188 @@ export class EducacionalRepository {
       }
     }
     return [...unidades.values()];
+  }
+
+  async listarAlunosAgrupados(
+    filtros: {
+      instituicao_id?: number; unidade_id?: number; ano_letivo_id?: number; sala_id?: number;
+      turma_id?: number; etapa_id?: number; serie_id?: number; turno?: string; situacao?: string;
+      busca?: string; sem_sala?: boolean; sem_instituicao?: boolean; matricula_pendente?: boolean;
+      aluno_ativo?: boolean; pagina: number; limite: number;
+    },
+    tenantId: string
+  ) {
+    await this.garantirEstrutura();
+    const condicoes = [
+      Prisma.sql`a.tenant_id::text = ${tenantId}`,
+      Prisma.sql`b.tenant_id::text = ${tenantId}`
+    ];
+    if (filtros.aluno_ativo !== undefined) condicoes.push(Prisma.sql`a.status = ${filtros.aluno_ativo ? "ATIVO" : "INATIVO"}`);
+    if (filtros.instituicao_id || filtros.unidade_id) condicoes.push(Prisma.sql`m.unidade_id = ${filtros.instituicao_id ?? filtros.unidade_id}`);
+    if (filtros.ano_letivo_id) condicoes.push(Prisma.sql`m.ano_letivo_id = ${filtros.ano_letivo_id}`);
+    if (filtros.sala_id) condicoes.push(Prisma.sql`m.sala_id = ${filtros.sala_id}`);
+    if (filtros.turma_id) condicoes.push(Prisma.sql`m.turma_id = ${filtros.turma_id}`);
+    if (filtros.etapa_id) condicoes.push(Prisma.sql`m.etapa_id = ${filtros.etapa_id}`);
+    if (filtros.serie_id) condicoes.push(Prisma.sql`m.serie_id = ${filtros.serie_id}`);
+    if (filtros.turno) condicoes.push(Prisma.sql`COALESCE(m.turno, t.turno, '') = ${filtros.turno}`);
+    if (filtros.situacao) condicoes.push(Prisma.sql`COALESCE(m.situacao, 'PENDENTE') = ${filtros.situacao}`);
+    if (filtros.sem_sala) condicoes.push(Prisma.sql`m.sala_id IS NULL`);
+    if (filtros.sem_instituicao) condicoes.push(Prisma.sql`m.unidade_id IS NULL`);
+    if (filtros.matricula_pendente) condicoes.push(Prisma.sql`COALESCE(m.situacao, 'PENDENTE') = 'PENDENTE'`);
+    if (filtros.busca) {
+      const busca = `%${filtros.busca}%`;
+      condicoes.push(Prisma.sql`(
+        b.nome_completo ILIKE ${busca}
+        OR COALESCE(b.codigo, '') ILIKE ${busca}
+        OR regexp_replace(COALESCE(b.cpf, ''), '[^0-9]', '', 'g') LIKE regexp_replace(${busca}, '[^0-9]', '', 'g')
+        OR COALESCE(m.numero_matricula, '') ILIKE ${busca}
+        OR COALESCE(b.nome_mae, '') ILIKE ${busca}
+        OR EXISTS (SELECT 1 FROM contato_beneficiario cb WHERE cb.beneficiario_id = b.id AND COALESCE(cb.telefone_principal, '') ILIKE ${busca})
+      )`);
+    }
+    const where = Prisma.join(condicoes, " AND ");
+    const from = Prisma.sql`
+      FROM educacional_aluno a
+      INNER JOIN cadastro_beneficiario b ON b.id = a.beneficiario_id AND b.tenant_id::text = ${tenantId}
+      LEFT JOIN LATERAL (
+        SELECT m0.*
+        FROM educacional_matricula m0
+        WHERE m0.aluno_id = a.id AND m0.tenant_id::text = ${tenantId}
+        ORDER BY m0.ativo DESC NULLS LAST, m0.id DESC
+        LIMIT 1
+      ) m ON TRUE
+      LEFT JOIN unidade_assistencial u ON u.id = m.unidade_id AND u.tenant_id::text = ${tenantId}
+      LEFT JOIN salas_unidade s ON s.id = m.sala_id AND s.unidade_id = m.unidade_id
+      LEFT JOIN educacional_turma t ON t.id = m.turma_id AND t.tenant_id::text = ${tenantId}
+      LEFT JOIN educacional_ano_letivo al ON al.id = m.ano_letivo_id AND al.tenant_id::text = ${tenantId}
+      LEFT JOIN educacional_etapa e ON e.id = m.etapa_id AND e.tenant_id::text = ${tenantId}
+      LEFT JOIN educacional_serie se ON se.id = m.serie_id AND se.tenant_id::text = ${tenantId}
+      LEFT JOIN LATERAL (SELECT cb.telefone_principal FROM contato_beneficiario cb WHERE cb.beneficiario_id = b.id ORDER BY cb.id LIMIT 1) c ON TRUE
+      WHERE ${where}
+    `;
+    const base = Prisma.sql`SELECT a.id AS aluno_id, a.status AS aluno_status, a.beneficiario_id,
+      b.nome_completo, b.codigo AS codigo_beneficiario, b.data_nascimento, b.nome_mae,
+      b.foto_3x4, c.telefone_principal,
+      m.id AS matricula_id, m.numero_matricula, m.data_matricula, m.data_inicio, m.data_encerramento,
+      m.situacao, m.turno AS matricula_turno, m.observacoes AS matricula_observacoes,
+      u.id AS unidade_id, u.nome_fantasia AS unidade_nome, u.cnpj AS unidade_cnpj,
+      s.id AS sala_id, s.nome AS sala_nome, s.capacidade_maxima,
+      t.id AS turma_id, t.nome AS turma_nome, t.turno AS turma_turno, t.capacidade_maxima AS turma_capacidade,
+      al.id AS ano_letivo_id, al.ano AS ano_letivo, e.nome AS etapa_nome, se.nome AS serie_nome ${from}`;
+    const offset = (filtros.pagina - 1) * filtros.limite;
+    const rows = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`${base} ORDER BY COALESCE(u.nome_fantasia, 'Sem instituição'), COALESCE(s.nome, 'Sem sala'), b.nome_completo LIMIT ${filtros.limite} OFFSET ${offset}`);
+    const totalRows = await prisma.$queryRaw<Array<{ total: bigint; instituicoes: bigint; salas: bigint; alunos_ativos: bigint; alunos_sem_sala: bigint; alunos_sem_instituicao: bigint }>>(Prisma.sql`SELECT COUNT(*)::bigint AS total, COUNT(DISTINCT unidade_id)::bigint AS instituicoes, COUNT(DISTINCT sala_id)::bigint AS salas, COUNT(*) FILTER (WHERE aluno_status = 'ATIVO')::bigint AS alunos_ativos, COUNT(*) FILTER (WHERE sala_id IS NULL)::bigint AS alunos_sem_sala, COUNT(*) FILTER (WHERE unidade_id IS NULL)::bigint AS alunos_sem_instituicao FROM (${base}) agrupados`);
+    const rowsSerializadas = rows.map((row) => this.serializar(row)).filter((row): row is Record<string, unknown> => !!row);
+    const grupos = new Map<string, { instituicao: Record<string, unknown>; salas: Array<Record<string, unknown>> }>();
+    for (const row of rowsSerializadas) {
+      const instituicaoId = String(row.unidade_id ?? "sem-instituicao");
+      const salaId = String(row.sala_id ?? "sem-sala");
+      if (!grupos.has(instituicaoId)) grupos.set(instituicaoId, { instituicao: { id: row.unidade_id, nome: row.unidade_nome ?? "Sem instituição", cnpj: row.unidade_cnpj, alunos_ativos: 0, alunos_inativos: 0, salas: 0 }, salas: [] });
+      const grupo = grupos.get(instituicaoId)!;
+      let sala = grupo.salas.find((item) => String(item.id) === salaId);
+      if (!sala) { sala = { id: row.sala_id, nome: row.sala_nome ?? "Sem sala", turma_nome: row.turma_nome, etapa_nome: row.etapa_nome, serie_nome: row.serie_nome, turno: row.matricula_turno ?? row.turma_turno, capacidade: row.sala_id ? Number(row.capacidade_maxima ?? row.turma_capacidade ?? 0) : 0, alunos: [], vagas_disponiveis: null }; grupo.salas.push(sala); grupo.instituicao.salas = Number(grupo.instituicao.salas ?? 0) + 1; }
+      (sala.alunos as Array<Record<string, unknown>>).push(row);
+      if (row.aluno_status === "ATIVO") grupo.instituicao.alunos_ativos = Number(grupo.instituicao.alunos_ativos ?? 0) + 1;
+      else grupo.instituicao.alunos_inativos = Number(grupo.instituicao.alunos_inativos ?? 0) + 1;
+    }
+    for (const grupo of grupos.values()) for (const sala of grupo.salas) sala.vagas_disponiveis = Number(sala.capacidade) > 0 ? Math.max(Number(sala.capacidade) - (sala.alunos as unknown[]).filter((item) => ["ATIVA", "PENDENTE"].includes(String((item as Record<string, unknown>).situacao))).length, 0) : null;
+    return { grupos: [...grupos.values()], total: Number(totalRows[0]?.total ?? 0), pagina: filtros.pagina, limite: filtros.limite, indicadores: { instituicoes: Number(totalRows[0]?.instituicoes ?? 0), salas: Number(totalRows[0]?.salas ?? 0), alunos: Number(totalRows[0]?.total ?? 0), alunos_ativos: Number(totalRows[0]?.alunos_ativos ?? 0), alunos_sem_sala: Number(totalRows[0]?.alunos_sem_sala ?? 0), alunos_sem_instituicao: Number(totalRows[0]?.alunos_sem_instituicao ?? 0) } };
+  }
+
+  async transferirMatricula(
+    matriculaId: string,
+    input: { instituicao_destino_id: number; sala_destino_id: number; turma_destino_id?: number | null; data_transferencia: string; motivo: string; observacoes?: string | null },
+    tenantId: string,
+    actor: EducacionalActor
+  ) {
+    await this.garantirEstrutura();
+    const origem = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`SELECT * FROM educacional_matricula WHERE id = ${BigInt(matriculaId)} AND tenant_id::text = ${tenantId} LIMIT 1`);
+    if (!origem[0]) throw new AppError("Matrícula não encontrada nesta instituição.", 404);
+    if (origem[0].situacao !== "ATIVA" || origem[0].ativo === false) throw new AppError("Somente matrículas ativas podem ser transferidas.", 409);
+    await this.validarDestinoTransferencia(input, tenantId, BigInt(matriculaId));
+    const destinoNumero = `${String(origem[0].numero_matricula)}-T${Date.now().toString().slice(-6)}`;
+    const resultado = await prisma.$transaction(async (tx) => {
+      const encerrada = await tx.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`UPDATE educacional_matricula SET situacao = 'TRANSFERIDA', ativo = FALSE, data_encerramento = ${input.data_transferencia}::date, atualizado_em = NOW() WHERE id = ${BigInt(matriculaId)} AND tenant_id::text = ${tenantId} RETURNING *`);
+      const nova = await tx.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`INSERT INTO educacional_matricula (tenant_id, aluno_id, ano_letivo_id, unidade_id, sala_id, etapa_id, serie_id, turma_id, numero_matricula, data_matricula, data_inicio, turno, situacao, observacoes, usuario_responsavel_id, usuario_responsavel_nome, ativo) VALUES (${tenantId}::uuid, ${origem[0].aluno_id}, ${origem[0].ano_letivo_id}, ${input.instituicao_destino_id}, ${input.sala_destino_id}, ${origem[0].etapa_id}, ${origem[0].serie_id}, ${input.turma_destino_id ?? null}, ${destinoNumero}, ${input.data_transferencia}::date, ${input.data_transferencia}::date, ${origem[0].turno ?? null}, 'ATIVA', ${input.observacoes ?? null}, ${actor.id ? BigInt(actor.id) : null}, ${actor.nome ?? actor.nomeUsuario ?? null}, TRUE) RETURNING *`);
+      await tx.$executeRaw(Prisma.sql`INSERT INTO educacional_matricula_movimentacao (tenant_id, matricula_origem_id, matricula_destino_id, tipo, data_movimentacao, motivo, observacoes, dados_anteriores, dados_novos, usuario_responsavel_id, usuario_responsavel_nome) VALUES (${tenantId}::uuid, ${BigInt(matriculaId)}, ${nova[0]?.id}, 'TRANSFERENCIA', ${input.data_transferencia}::date, ${input.motivo}, ${input.observacoes ?? null}, ${jsonSeguro(origem[0])}::jsonb, ${jsonSeguro(nova[0])}::jsonb, ${actor.id ? BigInt(actor.id) : null}, ${actor.nome ?? actor.nomeUsuario ?? null})`);
+      return { origem: encerrada[0], destino: nova[0] };
+    });
+    await this.auditar("educacional_matricula", BigInt(matriculaId), "TRANSFERIR", origem[0], resultado.destino, tenantId, actor);
+    return { origem: this.serializar(resultado.origem), destino: this.serializar(resultado.destino) };
+  }
+
+  async editarVinculoMatricula(
+    matriculaId: string,
+    input: { instituicao_id: number; sala_id: number; turma_id?: number | null; data_alteracao: string; motivo: string; observacoes?: string | null },
+    tenantId: string,
+    actor: EducacionalActor
+  ) {
+    await this.garantirEstrutura();
+    const id = BigInt(matriculaId);
+    const origem = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`SELECT * FROM educacional_matricula WHERE id = ${id} AND tenant_id::text = ${tenantId} LIMIT 1`);
+    if (!origem[0]) throw new AppError("Matrícula não encontrada nesta instituição.", 404);
+    if (origem[0].situacao !== "ATIVA" || origem[0].ativo === false) throw new AppError("Somente matrículas ativas podem ter o vínculo alterado.", 409);
+    await this.validarDestinoTransferencia({ instituicao_destino_id: input.instituicao_id, sala_destino_id: input.sala_id, turma_destino_id: input.turma_id }, tenantId, id);
+    const atualizado = await prisma.$transaction(async (tx) => {
+      const rows = await tx.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`UPDATE educacional_matricula SET unidade_id = ${BigInt(input.instituicao_id)}, sala_id = ${BigInt(input.sala_id)}, turma_id = ${input.turma_id ?? null}, atualizado_em = NOW() WHERE id = ${id} AND tenant_id::text = ${tenantId} RETURNING *`);
+      await tx.$executeRaw(Prisma.sql`INSERT INTO educacional_matricula_movimentacao (tenant_id, matricula_origem_id, matricula_destino_id, tipo, data_movimentacao, motivo, observacoes, dados_anteriores, dados_novos, usuario_responsavel_id, usuario_responsavel_nome) VALUES (${tenantId}::uuid, ${id}, ${id}, 'ALTERACAO_VINCULO', ${input.data_alteracao}::date, ${input.motivo}, ${input.observacoes ?? null}, ${jsonSeguro(origem[0])}::jsonb, ${jsonSeguro(rows[0])}::jsonb, ${actor.id ? BigInt(actor.id) : null}, ${actor.nome ?? actor.nomeUsuario ?? null})`);
+      return rows[0];
+    });
+    await this.auditar("educacional_matricula", id, "ALTERAR_VINCULO", origem[0], atualizado, tenantId, actor);
+    return this.serializar(atualizado);
+  }
+
+  async criarVinculoAluno(
+    alunoId: string,
+    input: { instituicao_id: number; sala_id: number; ano_letivo_id: number; etapa_id: number; serie_id: number; turma_id?: number | null; numero_matricula?: string | null; data_inicio: string; motivo: string; observacoes?: string | null },
+    tenantId: string,
+    actor: EducacionalActor
+  ) {
+    await this.garantirEstrutura();
+    const aluno = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`SELECT * FROM educacional_aluno WHERE id = ${BigInt(alunoId)} AND tenant_id::text = ${tenantId} LIMIT 1`);
+    if (!aluno[0]) throw new AppError("Aluno não encontrado nesta instituição.", 404);
+    const ativa = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`SELECT id FROM educacional_matricula WHERE aluno_id = ${BigInt(alunoId)} AND tenant_id::text = ${tenantId} AND situacao IN ('ATIVA', 'PENDENTE') AND COALESCE(ativo, TRUE) = TRUE LIMIT 1`);
+    if (ativa[0]) throw new AppError("Este aluno já possui matrícula ativa.", 409);
+    await this.validarDestinoTransferencia({ instituicao_destino_id: input.instituicao_id, sala_destino_id: input.sala_id, turma_destino_id: input.turma_id }, tenantId, 0n);
+    const referencias = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`SELECT id FROM educacional_ano_letivo WHERE id = ${BigInt(input.ano_letivo_id)} AND tenant_id::text = ${tenantId} LIMIT 1`);
+    const etapa = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`SELECT id FROM educacional_etapa WHERE id = ${BigInt(input.etapa_id)} AND tenant_id::text = ${tenantId} LIMIT 1`);
+    const serie = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`SELECT id FROM educacional_serie WHERE id = ${BigInt(input.serie_id)} AND tenant_id::text = ${tenantId} LIMIT 1`);
+    if (!referencias[0] || !etapa[0] || !serie[0]) throw new AppError("Ano letivo, etapa ou série não pertence à instituição atual.", 400);
+    const numero = input.numero_matricula?.trim() || `PROV-${alunoId}-${Date.now().toString().slice(-8)}`;
+    const nova = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`INSERT INTO educacional_matricula (tenant_id, aluno_id, ano_letivo_id, unidade_id, sala_id, etapa_id, serie_id, turma_id, numero_matricula, data_matricula, data_inicio, situacao, observacoes, usuario_responsavel_id, usuario_responsavel_nome, ativo) VALUES (${tenantId}::uuid, ${BigInt(alunoId)}, ${BigInt(input.ano_letivo_id)}, ${BigInt(input.instituicao_id)}, ${BigInt(input.sala_id)}, ${BigInt(input.etapa_id)}, ${BigInt(input.serie_id)}, ${input.turma_id ?? null}, ${numero}, ${input.data_inicio}::date, ${input.data_inicio}::date, 'ATIVA', ${input.observacoes ?? null}, ${actor.id ? BigInt(actor.id) : null}, ${actor.nome ?? actor.nomeUsuario ?? null}, TRUE) RETURNING *`);
+    await prisma.$executeRaw(Prisma.sql`INSERT INTO educacional_matricula_movimentacao (tenant_id, matricula_origem_id, matricula_destino_id, tipo, data_movimentacao, motivo, observacoes, dados_anteriores, dados_novos, usuario_responsavel_id, usuario_responsavel_nome) VALUES (${tenantId}::uuid, ${nova[0]?.id}, ${nova[0]?.id}, 'CRIACAO_VINCULO', ${input.data_inicio}::date, ${input.motivo}, ${input.observacoes ?? null}, NULL, ${jsonSeguro(nova[0])}::jsonb, ${actor.id ? BigInt(actor.id) : null}, ${actor.nome ?? actor.nomeUsuario ?? null})`);
+    await this.auditar("educacional_matricula", nova[0]?.id as bigint, "CRIAR_VINCULO", null, nova[0], tenantId, actor);
+    return this.serializar(nova[0]);
+  }
+
+  async listarHistoricoMatricula(matriculaId: string, tenantId: string) {
+    await this.garantirEstrutura();
+    const rows = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+      SELECT mv.*, mo.numero_matricula AS matricula_origem_numero, md.numero_matricula AS matricula_destino_numero,
+        uo.nome_fantasia AS unidade_origem_nome, ud.nome_fantasia AS unidade_destino_nome,
+        so.nome AS sala_origem_nome, sd.nome AS sala_destino_nome
+      FROM educacional_matricula_movimentacao mv
+      INNER JOIN educacional_matricula mo ON mo.id = mv.matricula_origem_id AND mo.tenant_id::text = ${tenantId}
+      LEFT JOIN educacional_matricula md ON md.id = mv.matricula_destino_id AND md.tenant_id::text = ${tenantId}
+      LEFT JOIN unidade_assistencial uo ON uo.id = mo.unidade_id AND uo.tenant_id::text = ${tenantId}
+      LEFT JOIN unidade_assistencial ud ON ud.id = md.unidade_id AND ud.tenant_id::text = ${tenantId}
+      LEFT JOIN salas_unidade so ON so.id = mo.sala_id
+      LEFT JOIN salas_unidade sd ON sd.id = md.sala_id
+      WHERE mv.tenant_id::text = ${tenantId} AND (mv.matricula_origem_id = ${BigInt(matriculaId)} OR mv.matricula_destino_id = ${BigInt(matriculaId)})
+      ORDER BY mv.data_movimentacao DESC, mv.id DESC
+    `);
+    return rows.map((row) => this.serializar(row));
+  }
+
+  private async validarDestinoTransferencia(input: { instituicao_destino_id: number; sala_destino_id: number; turma_destino_id?: number | null }, tenantId: string, matriculaId: bigint) {
+    const sala = await prisma.$queryRaw<Array<{ capacidade_maxima: number }>>(Prisma.sql`SELECT s.capacidade_maxima FROM salas_unidade s INNER JOIN unidade_assistencial u ON u.id = s.unidade_id WHERE s.id = ${BigInt(input.sala_destino_id)} AND s.unidade_id = ${BigInt(input.instituicao_destino_id)} AND u.tenant_id::text = ${tenantId} AND u.tipo_unidade = 'ENSINO' AND COALESCE(s.ativo, TRUE) = TRUE LIMIT 1`);
+    if (!sala[0]) throw new AppError("A sala de destino não pertence a uma unidade escolar desta instituição.", 400);
+    if (input.turma_destino_id) {
+      const turma = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`SELECT id FROM educacional_turma WHERE id = ${BigInt(input.turma_destino_id)} AND tenant_id::text = ${tenantId} AND unidade_id = ${BigInt(input.instituicao_destino_id)} AND (sala_id IS NULL OR sala_id = ${BigInt(input.sala_destino_id)}) AND status = 'ATIVA' LIMIT 1`);
+      if (!turma[0]) throw new AppError("A turma de destino não pertence à instituição e à sala selecionadas.", 400);
+    }
+    const ocupacao = await prisma.$queryRaw<Array<{ total: bigint }>>(Prisma.sql`SELECT COUNT(*)::bigint AS total FROM educacional_matricula WHERE tenant_id::text = ${tenantId} AND unidade_id = ${BigInt(input.instituicao_destino_id)} AND sala_id = ${BigInt(input.sala_destino_id)} AND situacao IN ('ATIVA', 'PENDENTE') AND id <> ${matriculaId}`);
+    if (Number(sala[0].capacidade_maxima ?? 0) > 0 && Number(ocupacao[0]?.total ?? 0) >= Number(sala[0].capacidade_maxima)) throw new AppError("A sala de destino atingiu sua capacidade máxima.", 409);
   }
 
   async criarAluno(input: { beneficiario_id: number; numero_aluno?: string | null; observacoes?: string | null }, tenantId: string, actor: EducacionalActor) {
