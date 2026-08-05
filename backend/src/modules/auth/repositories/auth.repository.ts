@@ -8,6 +8,7 @@ type UsuarioControleAcesso = {
   status: string | null;
   exigir_troca_senha: boolean | null;
   tentativas_login_invalidas: number | bigint | null;
+  ultimo_login_invalido_em: Date | null;
 };
 
 type TenantLookupInput = {
@@ -42,6 +43,10 @@ type AuthUsuarioRow = {
   instituicao_logo_url: string | null;
   is_superadmin: boolean | null;
   perfil_acesso: string | null;
+  exigir_autenticacao_segura: boolean | null;
+  permitir_biometria_facial_login: boolean | null;
+  exigir_biometria_facial_login: boolean | null;
+  face_hash: string | null;
   permissoes: string[] | null;
 };
 
@@ -50,6 +55,31 @@ type UsuarioRecuperacaoSenha = {
   nome_usuario: string;
   nome: string | null;
   email: string;
+};
+
+export type AuthChallengeRow = {
+  id: string;
+  tipo: string;
+  usuario_id: bigint | null;
+  tenant_id: string | null;
+  challenge: string;
+  codigo_hash: string | null;
+  contexto_json: Record<string, unknown> | null;
+  expira_em: Date;
+  usado_em: Date | null;
+  expirado: boolean;
+};
+
+export type UsuarioPasskeyRow = {
+  id: string;
+  usuario_id: bigint;
+  credential_id: string;
+  public_key: string;
+  counter: number | bigint | null;
+  transports: string[] | null;
+  device_type: string | null;
+  backed_up: boolean | null;
+  nome: string | null;
 };
 
 export type TenantContextoPublico = {
@@ -96,6 +126,10 @@ function mapAuthUsuarioRow(row: AuthUsuarioRow | null) {
     instituicaoLogoUrl: row.instituicao_logo_url,
     isSuperadmin: Boolean(row.is_superadmin) || emailAdminPadrao,
     perfilAcesso: row.perfil_acesso,
+    exigirAutenticacaoSegura: Boolean(row.exigir_autenticacao_segura),
+    permitirBiometriaFacialLogin: Boolean(row.permitir_biometria_facial_login),
+    exigirBiometriaFacialLogin: Boolean(row.exigir_biometria_facial_login),
+    faceHash: row.face_hash,
     permissoes: permissoesNormalizadas.map((item) => ({
       permissao: { nome: item }
     }))
@@ -158,6 +192,10 @@ export class AuthRepository {
         i.logo_url AS instituicao_logo_url,
         u.is_superadmin,
         u.perfil_acesso,
+        u.exigir_autenticacao_segura,
+        u.permitir_biometria_facial_login,
+        u.exigir_biometria_facial_login,
+        u.face_hash,
         COALESCE(
           ARRAY_REMOVE(ARRAY_AGG(DISTINCT p.nome), NULL),
           ARRAY[]::text[]
@@ -198,7 +236,11 @@ export class AuthRepository {
         i.status,
         i.logo_url,
         u.is_superadmin,
-        u.perfil_acesso
+        u.perfil_acesso,
+        u.exigir_autenticacao_segura,
+        u.permitir_biometria_facial_login,
+        u.exigir_biometria_facial_login,
+        u.face_hash
       ORDER BY u.is_superadmin DESC, u.id ASC
       LIMIT 1
       `,
@@ -258,6 +300,10 @@ export class AuthRepository {
         i.logo_url AS instituicao_logo_url,
         u.is_superadmin,
         u.perfil_acesso,
+        u.exigir_autenticacao_segura,
+        u.permitir_biometria_facial_login,
+        u.exigir_biometria_facial_login,
+        u.face_hash,
         COALESCE(
           ARRAY_REMOVE(ARRAY_AGG(DISTINCT p.nome), NULL),
           ARRAY[]::text[]
@@ -289,7 +335,11 @@ export class AuthRepository {
         i.status,
         i.logo_url,
         u.is_superadmin,
-        u.perfil_acesso
+        u.perfil_acesso,
+        u.exigir_autenticacao_segura,
+        u.permitir_biometria_facial_login,
+        u.exigir_biometria_facial_login,
+        u.face_hash
       ORDER BY u.is_superadmin DESC, u.id ASC
       LIMIT 1
       `,
@@ -323,6 +373,10 @@ export class AuthRepository {
         i.logo_url AS instituicao_logo_url,
         u.is_superadmin,
         u.perfil_acesso,
+        u.exigir_autenticacao_segura,
+        u.permitir_biometria_facial_login,
+        u.exigir_biometria_facial_login,
+        u.face_hash,
         COALESCE(
           ARRAY_REMOVE(ARRAY_AGG(DISTINCT p.nome), NULL),
           ARRAY[]::text[]
@@ -354,7 +408,11 @@ export class AuthRepository {
         i.status,
         i.logo_url,
         u.is_superadmin,
-        u.perfil_acesso
+        u.perfil_acesso,
+        u.exigir_autenticacao_segura,
+        u.permitir_biometria_facial_login,
+        u.exigir_biometria_facial_login,
+        u.face_hash
       ORDER BY u.is_superadmin DESC, u.id ASC
       LIMIT 1
       `,
@@ -401,8 +459,13 @@ export class AuthRepository {
         i.cnpj AS instituicao_cnpj,
         i.plano AS instituicao_plano,
         i.status AS instituicao_status,
+        i.logo_url AS instituicao_logo_url,
         u.is_superadmin,
         u.perfil_acesso,
+        u.exigir_autenticacao_segura,
+        u.permitir_biometria_facial_login,
+        u.exigir_biometria_facial_login,
+        u.face_hash,
         COALESCE(
           ARRAY_REMOVE(ARRAY_AGG(DISTINCT p.nome), NULL),
           ARRAY[]::text[]
@@ -429,8 +492,13 @@ export class AuthRepository {
         i.cnpj,
         i.plano,
         i.status,
+        i.logo_url,
         u.is_superadmin,
-        u.perfil_acesso
+        u.perfil_acesso,
+        u.exigir_autenticacao_segura,
+        u.permitir_biometria_facial_login,
+        u.exigir_biometria_facial_login,
+        u.face_hash
       LIMIT 1
       `,
       id,
@@ -447,7 +515,8 @@ export class AuthRepository {
       SELECT
         status,
         exigir_troca_senha,
-        tentativas_login_invalidas
+        tentativas_login_invalidas,
+        ultimo_login_invalido_em
       FROM usuarios
       WHERE id = $1
       LIMIT 1
@@ -467,14 +536,9 @@ export class AuthRepository {
       SET
         tentativas_login_invalidas = COALESCE(tentativas_login_invalidas, 0) + 1,
         ultimo_login_invalido_em = NOW(),
-        status = CASE
-          WHEN lower(coalesce(email, '')) = '${EMAIL_ADMIN_PADRAO}' THEN COALESCE(status, 'ATIVO')
-          WHEN COALESCE(tentativas_login_invalidas, 0) + 1 >= 5 THEN 'BLOQUEADO'
-          ELSE COALESCE(status, 'ATIVO')
-        END,
         atualizado_em = NOW()
       WHERE id = $1
-      RETURNING status, exigir_troca_senha, tentativas_login_invalidas
+      RETURNING status, exigir_troca_senha, tentativas_login_invalidas, ultimo_login_invalido_em
       `,
       id
     );
@@ -611,6 +675,187 @@ export class AuthRepository {
     );
   }
 
+  async criarChallenge(input: {
+    id: string;
+    tipo: "MFA_EMAIL" | "PASSKEY_REGISTRATION" | "PASSKEY_AUTHENTICATION" | "FACE_AUTHENTICATION";
+    usuarioId?: bigint | null;
+    tenantId?: string | null;
+    challenge: string;
+    codigoHash?: string | null;
+    contexto?: Record<string, unknown> | null;
+    expiraEm: Date;
+  }) {
+    await this.ensureEstrutura();
+    await prisma.$executeRawUnsafe(
+      `
+      INSERT INTO auth_challenge (
+        id,
+        tipo,
+        usuario_id,
+        tenant_id,
+        challenge,
+        codigo_hash,
+        contexto_json,
+        expira_em
+      )
+      VALUES ($1::uuid, $2, $3, $4::uuid, $5, $6, $7::jsonb, $8)
+      `,
+      input.id,
+      input.tipo,
+      input.usuarioId ?? null,
+      input.tenantId ?? null,
+      input.challenge,
+      input.codigoHash ?? null,
+      input.contexto ? JSON.stringify(input.contexto) : null,
+      input.expiraEm
+    );
+  }
+
+  async buscarChallenge(id: string, tipo?: string): Promise<AuthChallengeRow | null> {
+    await this.ensureEstrutura();
+    const rows = await prisma.$queryRawUnsafe<AuthChallengeRow[]>(
+      `
+      SELECT
+        id::text AS id,
+        tipo,
+        usuario_id,
+        tenant_id::text AS tenant_id,
+        challenge,
+        codigo_hash,
+        contexto_json,
+        expira_em,
+        usado_em,
+        expira_em <= NOW()::timestamp AS expirado
+      FROM auth_challenge
+      WHERE id = $1::uuid
+        AND ($2::text IS NULL OR tipo = $2::text)
+      LIMIT 1
+      `,
+      id,
+      tipo ?? null
+    );
+
+    return rows[0] ?? null;
+  }
+
+  async marcarChallengeUsado(id: string) {
+    await this.ensureEstrutura();
+    await prisma.$executeRawUnsafe(
+      `
+      UPDATE auth_challenge
+      SET usado_em = NOW()
+      WHERE id = $1::uuid
+      `,
+      id
+    );
+  }
+
+  async listarPasskeysUsuario(usuarioId: bigint): Promise<UsuarioPasskeyRow[]> {
+    await this.ensureEstrutura();
+    return prisma.$queryRawUnsafe<UsuarioPasskeyRow[]>(
+      `
+      SELECT
+        id::text AS id,
+        usuario_id,
+        credential_id,
+        public_key,
+        counter,
+        transports,
+        device_type,
+        backed_up,
+        nome
+      FROM usuario_passkey
+      WHERE usuario_id = $1
+      ORDER BY criado_em DESC
+      `,
+      usuarioId
+    );
+  }
+
+  async buscarPasskeyPorCredentialId(credentialId: string): Promise<UsuarioPasskeyRow | null> {
+    await this.ensureEstrutura();
+    const rows = await prisma.$queryRawUnsafe<UsuarioPasskeyRow[]>(
+      `
+      SELECT
+        id::text AS id,
+        usuario_id,
+        credential_id,
+        public_key,
+        counter,
+        transports,
+        device_type,
+        backed_up,
+        nome
+      FROM usuario_passkey
+      WHERE credential_id = $1
+      LIMIT 1
+      `,
+      credentialId
+    );
+
+    return rows[0] ?? null;
+  }
+
+  async salvarPasskey(input: {
+    id: string;
+    usuarioId: bigint;
+    credentialId: string;
+    publicKey: string;
+    counter: number;
+    transports?: string[];
+    deviceType?: string;
+    backedUp?: boolean;
+    nome?: string;
+  }) {
+    await this.ensureEstrutura();
+    await prisma.$executeRawUnsafe(
+      `
+      INSERT INTO usuario_passkey (
+        id,
+        usuario_id,
+        credential_id,
+        public_key,
+        counter,
+        transports,
+        device_type,
+        backed_up,
+        nome
+      )
+      VALUES ($1::uuid, $2, $3, $4, $5, $6::text[], $7, $8, $9)
+      ON CONFLICT (credential_id) DO UPDATE
+      SET public_key = EXCLUDED.public_key,
+          counter = EXCLUDED.counter,
+          transports = EXCLUDED.transports,
+          device_type = EXCLUDED.device_type,
+          backed_up = EXCLUDED.backed_up,
+          nome = EXCLUDED.nome
+      `,
+      input.id,
+      input.usuarioId,
+      input.credentialId,
+      input.publicKey,
+      input.counter,
+      input.transports ?? [],
+      input.deviceType ?? null,
+      input.backedUp ?? false,
+      input.nome ?? null
+    );
+  }
+
+  async atualizarPasskeyCounter(credentialId: string, counter: number) {
+    await this.ensureEstrutura();
+    await prisma.$executeRawUnsafe(
+      `
+      UPDATE usuario_passkey
+      SET counter = $2,
+          ultimo_uso_em = NOW()
+      WHERE credential_id = $1
+      `,
+      credentialId,
+      counter
+    );
+  }
+
   private async resolverFiltroTenant(input?: TenantLookupInput) {
     const tenant = await this.buscarTenantContextoPublico(input ?? {});
     return {
@@ -637,5 +882,42 @@ export class AuthRepository {
   private async ensureEstrutura() {
     await ensureUsuariosGestaoEstrutura(prisma);
     await ensureMultiTenantStructure(prisma);
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS auth_challenge (
+        id UUID PRIMARY KEY,
+        tipo VARCHAR(40) NOT NULL,
+        usuario_id BIGINT REFERENCES usuarios(id) ON DELETE CASCADE,
+        tenant_id UUID,
+        challenge TEXT NOT NULL,
+        codigo_hash VARCHAR(255),
+        contexto_json JSONB,
+        expira_em TIMESTAMP NOT NULL,
+        usado_em TIMESTAMP,
+        criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+    await prisma.$executeRawUnsafe(`
+      CREATE INDEX IF NOT EXISTS auth_challenge_usuario_idx
+      ON auth_challenge(usuario_id, tipo, expira_em)
+    `);
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS usuario_passkey (
+        id UUID PRIMARY KEY,
+        usuario_id BIGINT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+        credential_id TEXT NOT NULL UNIQUE,
+        public_key TEXT NOT NULL,
+        counter BIGINT NOT NULL DEFAULT 0,
+        transports TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+        device_type VARCHAR(30),
+        backed_up BOOLEAN NOT NULL DEFAULT FALSE,
+        nome VARCHAR(120),
+        criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+        ultimo_uso_em TIMESTAMP
+      )
+    `);
+    await prisma.$executeRawUnsafe(`
+      CREATE INDEX IF NOT EXISTS usuario_passkey_usuario_idx
+      ON usuario_passkey(usuario_id)
+    `);
   }
 }

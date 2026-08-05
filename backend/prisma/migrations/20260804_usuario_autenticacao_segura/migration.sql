@@ -1,0 +1,2 @@
+ALTER TABLE usuarios
+ADD COLUMN IF NOT EXISTS exigir_autenticacao_segura BOOLEAN NOT NULL DEFAULT FALSE;

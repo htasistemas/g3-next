@@ -19,6 +19,9 @@ export type UsuarioInputBase = {
   permissoes?: string[];
   status?: UsuarioStatus;
   exigir_troca_senha?: boolean;
+  exigir_autenticacao_segura?: boolean;
+  permitir_biometria_facial_login?: boolean;
+  exigir_biometria_facial_login?: boolean;
   origem_tipo?: UsuarioOrigemTipo;
   origem_id?: string;
   origem_nome?: string;
@@ -87,6 +90,9 @@ export type UsuarioResponse = {
   permissoes: string[];
   status: UsuarioStatus;
   exigir_troca_senha: boolean;
+  exigir_autenticacao_segura: boolean;
+  permitir_biometria_facial_login: boolean;
+  exigir_biometria_facial_login: boolean;
   tentativas_login_invalidas: number;
   ultimo_login_invalido_em?: string;
   ultimo_acesso_em?: string;
@@ -105,4 +111,14 @@ export type UsuarioDetalheResponse = {
 export type UsuarioRemocaoResponse = {
   id_usuario: string;
   removido_em: string;
+};
+
+export type UsuarioFaceStatusResponse = {
+  face_cadastrada: boolean;
+  face_url?: string;
+  face_cadastrada_em?: string;
+};
+
+export type UsuarioFacePayload = {
+  face_imagem: string;
 };

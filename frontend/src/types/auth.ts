@@ -15,6 +15,23 @@ export type UsuarioAutenticado = {
   permissoes: string[];
 };
 
+export type LoginMfaRequired = {
+  mfaRequired: true;
+  challengeId: string;
+  method: "email" | "passkey" | "face";
+  maskedEmail?: string;
+  options?: any;
+  fallbackEmailAvailable?: boolean;
+  devCode?: string;
+};
+
+export type LoginAuthResult =
+  | {
+      token: string;
+      usuario: UsuarioAutenticado;
+    }
+  | LoginMfaRequired;
+
 export type TenantContextoLogin = {
   id: string;
   tenant_id: string;

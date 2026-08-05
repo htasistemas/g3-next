@@ -815,9 +815,44 @@ export function RegistroPontoPage() {
     }
   }, [configuracaoHoraExtraData]);
 
+  function montarFiltrosEspelho(): RegistroPontoFiltro | null {
+    const dataInicial = filtroDraft.data_inicial?.trim() || undefined;
+    const dataFinal = filtroDraft.data_final?.trim() || undefined;
+    const usuarioIdEspelho = isAdmin ? filtroDraft.usuario_id?.trim() || usuario?.id : usuario?.id;
+
+    if (!usuarioIdEspelho) {
+      setMensagem({
+        tipo: "erro",
+        texto: "Selecione o funcionário para consultar o espelho de ponto."
+      });
+      return null;
+    }
+
+    if (dataInicial && dataFinal && dataInicial > dataFinal) {
+      setMensagem({
+        tipo: "erro",
+        texto: "O período inicial não pode ser maior que o período final."
+      });
+      return null;
+    }
+
+    return {
+      data_inicial: dataInicial,
+      data_final: dataFinal,
+      usuario_id: usuarioIdEspelho,
+      status: filtroDraft.status || undefined,
+      ocorrencia: filtroDraft.ocorrencia?.trim() || undefined,
+      unidade: filtroDraft.unidade?.trim() || undefined,
+      somente_alterados: !!filtroDraft.somente_alterados,
+      somente_inconsistencias: !!filtroDraft.somente_inconsistencias
+    };
+  }
+
   function aplicarBusca() {
     if (filtrosTravados) return;
-    setFiltros({ ...filtroDraft });
+    const filtrosEspelho = montarFiltrosEspelho();
+    if (!filtrosEspelho) return;
+    setFiltros(filtrosEspelho);
   }
 
   function aplicarFiltrosHoraExtra() {
@@ -882,7 +917,10 @@ export function RegistroPontoPage() {
     setSearchParams(proximosParams, { replace: true });
 
     if (aba === "espelho") {
-      setFiltros({ ...filtroDraft });
+      const filtrosEspelho = montarFiltrosEspelho();
+      if (filtrosEspelho) {
+        setFiltros(filtrosEspelho);
+      }
     }
   }
 
@@ -1295,10 +1333,14 @@ export function RegistroPontoPage() {
   async function gerarRelatorioEspelho() {
     const janela = reservarJanelaRelatorio("Espelho de Ponto Individual");
     try {
-      const usuarioIdEspelho = isAdmin ? filtros.usuario_id || usuario?.id : usuario?.id;
+      const filtrosEspelho = montarFiltrosEspelho();
+      if (!filtrosEspelho) {
+        janela.fechar();
+        return;
+      }
+      setFiltros(filtrosEspelho);
       const payloadEspelho = {
-        ...filtros,
-        usuario_id: usuarioIdEspelho,
+        ...filtrosEspelho,
         usuarioEmissor: usuario?.nome ?? usuario?.nomeUsuario
       };
 
@@ -1348,10 +1390,6 @@ export function RegistroPontoPage() {
       ...prev,
       usuario_id: usuarioId
     }));
-    setFiltros((prev) => ({
-      ...prev,
-      usuario_id: usuarioId
-    }));
   }
 
   function atualizarFiltroEspelho(campo: keyof RegistroPontoFiltro, valor: RegistroPontoFiltro[keyof RegistroPontoFiltro]) {
@@ -1360,12 +1398,7 @@ export function RegistroPontoPage() {
       [campo]: valor
     }));
 
-    if (abaAtiva === "espelho") {
-      setFiltros((prev) => ({
-        ...prev,
-        [campo]: valor
-      }));
-    }
+    setMensagem(null);
   }
 
   function renderFiltros() {

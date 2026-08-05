@@ -1,6 +1,8 @@
 import { httpClient } from "./http-client";
 import type {
   UsuarioDetalheResponse,
+  UsuarioFacePayload,
+  UsuarioFaceStatus,
   UsuarioFiltros,
   UsuarioListaResponse,
   UsuarioPayload,
@@ -27,6 +29,11 @@ export const usuariosService = {
     return data;
   },
 
+  async buscarFace(id: string): Promise<UsuarioFaceStatus> {
+    const { data } = await httpClient.get<UsuarioFaceStatus>(`/api/usuarios/${id}/face`);
+    return data;
+  },
+
   async criar(payload: UsuarioPayload): Promise<UsuarioDetalheResponse> {
     const { data } = await httpClient.post<UsuarioDetalheResponse>("/api/usuarios", payload);
     return data;
@@ -34,6 +41,11 @@ export const usuariosService = {
 
   async atualizar(id: string, payload: UsuarioPayload): Promise<UsuarioDetalheResponse> {
     const { data } = await httpClient.put<UsuarioDetalheResponse>(`/api/usuarios/${id}`, payload);
+    return data;
+  },
+
+  async salvarFace(id: string, payload: UsuarioFacePayload): Promise<UsuarioFaceStatus & { mensagem: string }> {
+    const { data } = await httpClient.put<UsuarioFaceStatus & { mensagem: string }>(`/api/usuarios/${id}/face`, payload);
     return data;
   },
 
@@ -57,6 +69,11 @@ export const usuariosService = {
 
   async remover(id: string): Promise<UsuarioRemocaoResponse> {
     const { data } = await httpClient.delete<UsuarioRemocaoResponse>(`/api/usuarios/${id}`);
+    return data;
+  },
+
+  async removerFace(id: string): Promise<UsuarioFaceStatus & { mensagem: string }> {
+    const { data } = await httpClient.delete<UsuarioFaceStatus & { mensagem: string }>(`/api/usuarios/${id}/face`);
     return data;
   }
 };

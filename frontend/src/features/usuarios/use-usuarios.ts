@@ -30,6 +30,15 @@ export function usePermissoesUsuarios() {
   });
 }
 
+export function useUsuarioFace(id?: string) {
+  const { usuario } = useAuth();
+  return useQuery({
+    queryKey: ["usuario", usuario?.tenant_id ?? "sem-tenant", id, "face"],
+    queryFn: () => usuariosService.buscarFace(id as string),
+    enabled: !!usuario && !!id
+  });
+}
+
 export function useSalvarUsuario() {
   const { usuario } = useAuth();
   const queryClient = useQueryClient();
@@ -89,6 +98,37 @@ export function useResetarSenhaUsuario() {
       const id = resultado.usuario.id_usuario;
       await queryClient.invalidateQueries({ queryKey: ["usuarios", tenantKey] });
       await queryClient.invalidateQueries({ queryKey: ["usuario", tenantKey, id] });
+    }
+  });
+}
+
+export function useSalvarUsuarioFace() {
+  const { usuario } = useAuth();
+  const queryClient = useQueryClient();
+  const tenantKey = usuario?.tenant_id ?? "sem-tenant";
+
+  return useMutation({
+    mutationFn: ({ id_usuario, face_imagem }: { id_usuario: string; face_imagem: string }) =>
+      usuariosService.salvarFace(id_usuario, { face_imagem }),
+    onSuccess: async (_resultado, variables) => {
+      await queryClient.invalidateQueries({ queryKey: ["usuarios", tenantKey] });
+      await queryClient.invalidateQueries({ queryKey: ["usuario", tenantKey, variables.id_usuario] });
+      await queryClient.invalidateQueries({ queryKey: ["usuario", tenantKey, variables.id_usuario, "face"] });
+    }
+  });
+}
+
+export function useRemoverUsuarioFace() {
+  const { usuario } = useAuth();
+  const queryClient = useQueryClient();
+  const tenantKey = usuario?.tenant_id ?? "sem-tenant";
+
+  return useMutation({
+    mutationFn: (id_usuario: string) => usuariosService.removerFace(id_usuario),
+    onSuccess: async (_resultado, id) => {
+      await queryClient.invalidateQueries({ queryKey: ["usuarios", tenantKey] });
+      await queryClient.invalidateQueries({ queryKey: ["usuario", tenantKey, id] });
+      await queryClient.invalidateQueries({ queryKey: ["usuario", tenantKey, id, "face"] });
     }
   });
 }

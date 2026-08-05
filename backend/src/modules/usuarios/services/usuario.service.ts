@@ -2,11 +2,15 @@ import bcrypt from "bcryptjs";
 import { AppError } from "../../../shared/errors/app-error.js";
 import { mapaCamposTextoUsuario } from "../../../utils/text-format-config.js";
 import { normalizarObjetoTexto } from "../../../utils/text-formatter.js";
+import { storageService } from "../../arquivos/services/storage-instance.js";
+import { parseBase64Payload } from "../../arquivos/services/storage-utils.js";
+import { gerarAssinaturaFace } from "../../registro-ponto/services/registro-ponto-face.js";
 import {
   atualizarStatusUsuarioSchema,
   atualizarUsuarioSchema,
   criarUsuarioSchema,
   resetarSenhaUsuarioSchema,
+  usuarioFaceSchema,
   usuarioFiltersSchema
 } from "../usuario.schema.js";
 import { mapPermissoesParaCatalogo } from "../usuario.mapper.js";
@@ -49,6 +53,58 @@ export class UsuarioService {
   async listarPermissoes() {
     const permissoes = await this.repository.listarPermissoes();
     return mapPermissoesParaCatalogo(permissoes);
+  }
+
+  async buscarFace(rawId: string, atorRaw: AtorRaw) {
+    const id = this.parseId(rawId);
+    const ator = this.parseAtor(atorRaw);
+    return this.repository.buscarFacePorId(id, ator.tenant_id);
+  }
+
+  async salvarFace(rawId: string, rawInput: unknown, atorRaw: AtorRaw) {
+    const id = this.parseId(rawId);
+    const ator = this.parseAtor(atorRaw);
+    await this.validarProtecaoAdmin(id, ator.tenant_id);
+
+    const input = usuarioFaceSchema.parse(rawInput ?? {});
+    const { buffer } = parseBase64Payload(input.face_imagem, "image/jpeg");
+    const faceHash = await gerarAssinaturaFace(buffer);
+    const resultado = await storageService.salvarArquivo({
+      scope: "colaborador_face",
+      conteudo: input.face_imagem,
+      nomeOriginal: `usuario-${id.toString()}-face.jpg`,
+      mimeType: "image/jpeg",
+      entidadeId: id,
+      usuarioUploadId: ator.id,
+      tenantId: ator.tenant_id,
+      observacao: "Cadastro de face do usuario pela tela de usuarios"
+    });
+
+    try {
+      const { status, caminhoAnterior } = await this.repository.salvarFacePorId(
+        id,
+        faceHash,
+        resultado.caminhoArquivo,
+        ator
+      );
+      await storageService.vincularEntidade(resultado.caminhoArquivo, id, ator.tenant_id);
+
+      if (
+        caminhoAnterior &&
+        this.isManagedStoragePath(caminhoAnterior) &&
+        caminhoAnterior !== resultado.caminhoArquivo
+      ) {
+        await storageService.desativarPorCaminho(caminhoAnterior, ator.id, ator.tenant_id);
+      }
+
+      return {
+        mensagem: "Biometria facial cadastrada com sucesso.",
+        ...status
+      };
+    } catch (error) {
+      await storageService.rollbackArquivos([resultado.caminhoArquivo], ator.tenant_id);
+      throw error;
+    }
   }
 
   async criar(rawInput: unknown, atorRaw: AtorRaw) {
@@ -104,6 +160,22 @@ export class UsuarioService {
     return this.repository.remover(id, ator);
   }
 
+  async removerFace(rawId: string, atorRaw: AtorRaw) {
+    const id = this.parseId(rawId);
+    const ator = this.parseAtor(atorRaw);
+    await this.validarProtecaoAdmin(id, ator.tenant_id);
+
+    const { status, caminhoAnterior } = await this.repository.removerFacePorId(id, ator);
+    if (caminhoAnterior && this.isManagedStoragePath(caminhoAnterior)) {
+      await storageService.desativarPorCaminho(caminhoAnterior, ator.id, ator.tenant_id);
+    }
+
+    return {
+      mensagem: "Biometria facial removida com sucesso.",
+      ...status
+    };
+  }
+
   private async validarProtecaoAdmin(id: bigint, tenantId: string) {
     const resultado = await this.repository.buscarPorId(id, tenantId);
     const emailAdmin = "htasistemas@gmail.com";
@@ -155,5 +227,11 @@ export class UsuarioService {
       rawInput as Record<string, unknown>,
       mapaCamposTextoUsuario
     );
+  }
+
+  private isManagedStoragePath(valor?: string | null) {
+    if (!valor?.trim()) return false;
+    const normalized = valor.trim();
+    return !normalized.startsWith("data:") && !/^https?:\/\//i.test(normalized);
   }
 }

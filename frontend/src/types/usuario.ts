@@ -17,6 +17,9 @@ export type Usuario = {
   permissoes: string[];
   status: UsuarioStatus;
   exigir_troca_senha: boolean;
+  exigir_autenticacao_segura: boolean;
+  permitir_biometria_facial_login: boolean;
+  exigir_biometria_facial_login: boolean;
   tentativas_login_invalidas: number;
   ultimo_login_invalido_em?: string;
   ultimo_acesso_em?: string;
@@ -67,6 +70,16 @@ export type UsuarioPermissoesResponse = {
   permissoes: UsuarioPermissaoCatalogo[];
 };
 
+export type UsuarioFaceStatus = {
+  face_cadastrada: boolean;
+  face_url?: string;
+  face_cadastrada_em?: string;
+};
+
+export type UsuarioFacePayload = {
+  face_imagem: string;
+};
+
 export type UsuarioFiltros = {
   nome?: string;
   login?: string;
@@ -96,6 +109,9 @@ export type UsuarioPayload = {
   permissoes?: string[];
   status?: UsuarioStatus;
   exigir_troca_senha?: boolean;
+  exigir_autenticacao_segura?: boolean;
+  permitir_biometria_facial_login?: boolean;
+  exigir_biometria_facial_login?: boolean;
   senha?: string;
   confirmar_senha?: string;
   origem_tipo?: UsuarioOrigemTipo;

@@ -20,6 +20,9 @@ type UsuarioRow = {
   cargo: string | null;
   status: string | null;
   exigir_troca_senha: boolean | null;
+  exigir_autenticacao_segura: boolean | null;
+  permitir_biometria_facial_login: boolean | null;
+  exigir_biometria_facial_login: boolean | null;
   tentativas_login_invalidas: number | bigint | null;
   ultimo_login_invalido_em: Date | null;
   ultimo_acesso_em: Date | null;
@@ -174,6 +177,9 @@ export function mapUsuarioRowParaResponse(row: UsuarioRow): UsuarioResponse {
     permissoes,
     status: mapStatus(row.status),
     exigir_troca_senha: !!row.exigir_troca_senha,
+    exigir_autenticacao_segura: !!row.exigir_autenticacao_segura,
+    permitir_biometria_facial_login: !!row.permitir_biometria_facial_login,
+    exigir_biometria_facial_login: !!row.exigir_biometria_facial_login,
     tentativas_login_invalidas: toInteger(row.tentativas_login_invalidas),
     ultimo_login_invalido_em: row.ultimo_login_invalido_em?.toISOString(),
     ultimo_acesso_em: row.ultimo_acesso_em?.toISOString(),

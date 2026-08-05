@@ -8,7 +8,7 @@ import {
   type PropsWithChildren
 } from "react";
 import { authService } from "@/services/auth.service";
-import type { UsuarioAutenticado } from "@/types/auth";
+import type { LoginAuthResult, UsuarioAutenticado } from "@/types/auth";
 
 type AuthContextValue = {
   usuario: UsuarioAutenticado | null;
@@ -21,7 +21,8 @@ type AuthContextValue = {
     email?: string;
     nomeUsuario?: string;
     senha: string;
-  }) => Promise<void>;
+  }) => Promise<LoginAuthResult>;
+  verificarMfa: (input: { challengeId: string; codigo: string }) => Promise<void>;
   loginGoogle: (input: {
     idToken: string;
     cnpj?: string;
@@ -73,7 +74,13 @@ export function AuthProvider({ children }: PropsWithChildren) {
     nomeUsuario?: string;
     senha: string;
   }) => {
-    const perfil = await authService.login(input);
+    const resultado = await authService.login(input);
+    if ("usuario" in resultado) setUsuario(resultado.usuario);
+    return resultado;
+  }, []);
+
+  const verificarMfa = useCallback(async (input: { challengeId: string; codigo: string }) => {
+    const perfil = await authService.verificarMfa(input);
     setUsuario(perfil);
   }, []);
 
@@ -101,11 +108,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
       carregando,
       autenticado: !!usuario,
       login,
+      verificarMfa,
       loginGoogle,
       logout,
       atualizarPerfil
     }),
-    [usuario, carregando, login, loginGoogle, logout, atualizarPerfil]
+    [usuario, carregando, login, verificarMfa, loginGoogle, logout, atualizarPerfil]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

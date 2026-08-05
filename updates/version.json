@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.782",
-  "releaseDate": "2026-08-03",
-  "description": "Fundacao profissional incremental do modulo de prestacao de contas com concedentes, instrumentos, execucao, documentos, conciliacao, diligencias, auditoria e IA/OCR configuravel.",
+  "latestVersion": "1.00.795",
+  "releaseDate": "2026-08-04",
+  "description": "Correcao do periodo aplicado no espelho de ponto.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.781",
+  "minCompatibleVersion": "1.00.794",
   "releaseType": "stable",
   "downloadUrl": null
 }

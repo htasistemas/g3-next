@@ -12,6 +12,7 @@ import type {
   UsuarioAuditoriaItem,
   UsuarioCreateInput,
   UsuarioDetalheResponse,
+  UsuarioFaceStatusResponse,
   UsuarioFilters,
   UsuarioRemocaoResponse,
   UsuarioResponse,
@@ -40,6 +41,13 @@ type DuplicidadeRow = {
   origem_id: string | null;
 };
 
+type UsuarioFaceRow = {
+  id: bigint;
+  face_hash: string | null;
+  face_foto_url: string | null;
+  face_cadastrada_em: Date | null;
+};
+
 export class UsuarioRepository {
   async listar(filters: UsuarioFilters, tenantId: string) {
     await ensureUsuariosGestaoEstrutura(prisma);
@@ -63,6 +71,9 @@ export class UsuarioRepository {
         u.cargo,
         u.status,
         u.exigir_troca_senha,
+        u.exigir_autenticacao_segura,
+        u.permitir_biometria_facial_login,
+        u.exigir_biometria_facial_login,
         u.tentativas_login_invalidas,
         u.ultimo_login_invalido_em,
         u.ultimo_acesso_em,
@@ -93,6 +104,9 @@ export class UsuarioRepository {
         u.cargo,
         u.status,
         u.exigir_troca_senha,
+        u.exigir_autenticacao_segura,
+        u.permitir_biometria_facial_login,
+        u.exigir_biometria_facial_login,
         u.tentativas_login_invalidas,
         u.ultimo_login_invalido_em,
         u.ultimo_acesso_em,
@@ -157,6 +171,102 @@ export class UsuarioRepository {
       .filter(Boolean);
   }
 
+  async buscarFacePorId(id: bigint, tenantId: string): Promise<UsuarioFaceStatusResponse> {
+    await ensureUsuariosGestaoEstrutura(prisma);
+
+    const usuario = await this.buscarUsuarioFaceRowPorId(id, tenantId);
+    if (!usuario) {
+      throw new AppError("Usuario nao encontrado.", 404);
+    }
+
+    return this.mapFaceStatus(usuario);
+  }
+
+  async salvarFacePorId(
+    id: bigint,
+    faceHash: string,
+    caminhoArquivo: string,
+    ator: UsuarioAtor
+  ): Promise<{ status: UsuarioFaceStatusResponse; caminhoAnterior?: string | null }> {
+    await ensureUsuariosGestaoEstrutura(prisma);
+
+    const usuarioAtual = await this.buscarUsuarioFaceRowPorId(id, ator.tenant_id);
+    if (!usuarioAtual) {
+      throw new AppError("Usuario nao encontrado.", 404);
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`
+        UPDATE usuarios
+           SET face_hash = ${faceHash},
+               face_foto_url = ${caminhoArquivo},
+               face_cadastrada_em = NOW(),
+               atualizado_em = NOW()
+         WHERE id = ${id}
+           AND tenant_id::text = ${ator.tenant_id}
+      `;
+
+      await this.registrarAuditoriaTx(
+        tx,
+        {
+          ator_id: ator.id,
+          acao: usuarioAtual.face_hash ? "UPDATE_FACE" : "CREATE_FACE",
+          entidade_id: id.toString(),
+          tenant_id: ator.tenant_id
+        },
+        {
+          face_cadastrada: true,
+          caminho_arquivo: caminhoArquivo
+        }
+      );
+    });
+
+    return {
+      status: await this.buscarFacePorId(id, ator.tenant_id),
+      caminhoAnterior: usuarioAtual.face_foto_url
+    };
+  }
+
+  async removerFacePorId(id: bigint, ator: UsuarioAtor): Promise<{ status: UsuarioFaceStatusResponse; caminhoAnterior?: string | null }> {
+    await ensureUsuariosGestaoEstrutura(prisma);
+
+    const usuarioAtual = await this.buscarUsuarioFaceRowPorId(id, ator.tenant_id);
+    if (!usuarioAtual) {
+      throw new AppError("Usuario nao encontrado.", 404);
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`
+        UPDATE usuarios
+           SET face_hash = NULL,
+               face_foto_url = NULL,
+               face_cadastrada_em = NULL,
+               exigir_biometria_facial_login = FALSE,
+               atualizado_em = NOW()
+         WHERE id = ${id}
+           AND tenant_id::text = ${ator.tenant_id}
+      `;
+
+      await this.registrarAuditoriaTx(
+        tx,
+        {
+          ator_id: ator.id,
+          acao: "DELETE_FACE",
+          entidade_id: id.toString(),
+          tenant_id: ator.tenant_id
+        },
+        {
+          face_cadastrada: false
+        }
+      );
+    });
+
+    return {
+      status: await this.buscarFacePorId(id, ator.tenant_id),
+      caminhoAnterior: usuarioAtual.face_foto_url
+    };
+  }
+
   async criar(
     input: UsuarioCreateInput,
     senhaHash: string,
@@ -217,6 +327,9 @@ export class UsuarioRepository {
           nome_usuario: nomeUsuario,
           email,
           status: input.status ?? "ATIVO",
+          exigir_autenticacao_segura: !!input.exigir_autenticacao_segura,
+          permitir_biometria_facial_login: !!input.permitir_biometria_facial_login,
+          exigir_biometria_facial_login: !!input.exigir_biometria_facial_login,
           permissoes: permissoesNormalizadas,
           origem_tipo: input.origem_tipo ?? null,
           origem_id: trimOrUndefined(input.origem_id) ?? null
@@ -303,6 +416,9 @@ export class UsuarioRepository {
           nome_usuario: nomeUsuario,
           email,
           status: input.status ?? this.mapStatusPersistido(existente.status),
+          exigir_autenticacao_segura: !!input.exigir_autenticacao_segura,
+          permitir_biometria_facial_login: !!input.permitir_biometria_facial_login,
+          exigir_biometria_facial_login: !!input.exigir_biometria_facial_login,
           permissoes: permissoesNormalizadas,
           origem_tipo: input.origem_tipo ?? null,
           origem_id: trimOrUndefined(input.origem_id) ?? null
@@ -485,6 +601,9 @@ export class UsuarioRepository {
         u.cargo,
         u.status,
         u.exigir_troca_senha,
+        u.exigir_autenticacao_segura,
+        u.permitir_biometria_facial_login,
+        u.exigir_biometria_facial_login,
         u.tentativas_login_invalidas,
         u.ultimo_login_invalido_em,
         u.ultimo_acesso_em,
@@ -517,6 +636,9 @@ export class UsuarioRepository {
         u.cargo,
         u.status,
         u.exigir_troca_senha,
+        u.exigir_autenticacao_segura,
+        u.permitir_biometria_facial_login,
+        u.exigir_biometria_facial_login,
         u.tentativas_login_invalidas,
         u.ultimo_login_invalido_em,
         u.ultimo_acesso_em,
@@ -529,6 +651,31 @@ export class UsuarioRepository {
     `);
 
     return rows[0] ?? null;
+  }
+
+  private async buscarUsuarioFaceRowPorId(id: bigint, tenantId: string): Promise<UsuarioFaceRow | null> {
+    const rows = await prisma.$queryRaw<UsuarioFaceRow[]>(Prisma.sql`
+      SELECT
+        id,
+        face_hash,
+        face_foto_url,
+        face_cadastrada_em
+      FROM usuarios
+      WHERE id = ${id}
+        AND tenant_id::text = ${tenantId}
+        AND deletado_em IS NULL
+      LIMIT 1
+    `);
+
+    return rows[0] ?? null;
+  }
+
+  private mapFaceStatus(usuario: UsuarioFaceRow): UsuarioFaceStatusResponse {
+    return {
+      face_cadastrada: Boolean(usuario.face_hash && usuario.face_foto_url),
+      face_url: usuario.face_foto_url ?? undefined,
+      face_cadastrada_em: usuario.face_cadastrada_em?.toISOString()
+    };
   }
 
   private async buscarAuditoriaPorUsuarioId(
@@ -645,15 +792,18 @@ export class UsuarioRepository {
           cargo = $8,
           status = $9,
           exigir_troca_senha = $10,
-          origem_tipo = $11,
-          origem_id = $12,
-          origem_nome = $13,
-          tenant_id = $14::uuid,
-          instituicao_id = $15::uuid,
+          exigir_autenticacao_segura = $11,
+          permitir_biometria_facial_login = $12,
+          exigir_biometria_facial_login = $13,
+          origem_tipo = $14,
+          origem_id = $15,
+          origem_nome = $16,
+          tenant_id = $17::uuid,
+          instituicao_id = $18::uuid,
           atualizado_em = NOW(),
-          atualizado_por = $16
+          atualizado_por = $19
         WHERE id = $1
-          AND (tenant_id::text = $17 OR tenant_id IS NULL)
+          AND (tenant_id::text = $20 OR tenant_id IS NULL)
       `,
       usuarioId,
       trimOrUndefined(input.nome_exibicao) ?? null,
@@ -665,6 +815,9 @@ export class UsuarioRepository {
       trimOrUndefined(input.cargo) ?? null,
       input.status ?? "ATIVO",
       !!input.exigir_troca_senha,
+      !!input.exigir_autenticacao_segura,
+      !!input.permitir_biometria_facial_login,
+      !!input.permitir_biometria_facial_login && !!input.exigir_biometria_facial_login,
       trimOrUndefined(input.origem_tipo) ?? null,
       trimOrUndefined(input.origem_id) ?? null,
       trimOrUndefined(input.origem_nome) ?? null,

@@ -33,6 +33,13 @@ usuarioRoutes.get(
   asyncHandler(controller.buscarPorId.bind(controller))
 );
 
+usuarioRoutes.get(
+  "/:id/face",
+  ensureAuthenticated,
+  ensurePermissions(permissoesAdministracaoUsuarios),
+  asyncHandler(controller.buscarFace.bind(controller))
+);
+
 usuarioRoutes.post(
   "/",
   ensureAuthenticated,
@@ -47,6 +54,13 @@ usuarioRoutes.put(
   asyncHandler(controller.atualizar.bind(controller))
 );
 
+usuarioRoutes.put(
+  "/:id/face",
+  ensureAuthenticated,
+  ensurePermissions(permissoesAdministracaoUsuarios),
+  asyncHandler(controller.salvarFace.bind(controller))
+);
+
 usuarioRoutes.patch(
   "/:id/status",
   ensureAuthenticated,
@@ -59,6 +73,13 @@ usuarioRoutes.post(
   ensureAuthenticated,
   ensurePermissions(permissoesAdministracaoUsuarios),
   asyncHandler(controller.resetarSenha.bind(controller))
+);
+
+usuarioRoutes.delete(
+  "/:id/face",
+  ensureAuthenticated,
+  ensurePermissions(permissoesAdministracaoUsuarios),
+  asyncHandler(controller.removerFace.bind(controller))
 );
 
 usuarioRoutes.delete(

@@ -1,0 +1,14 @@
+ALTER TABLE usuarios
+ADD COLUMN IF NOT EXISTS permitir_biometria_facial_login BOOLEAN NOT NULL DEFAULT FALSE;
+
+ALTER TABLE usuarios
+ADD COLUMN IF NOT EXISTS exigir_biometria_facial_login BOOLEAN NOT NULL DEFAULT FALSE;
+
+ALTER TABLE usuarios
+ADD COLUMN IF NOT EXISTS face_hash VARCHAR(255);
+
+ALTER TABLE usuarios
+ADD COLUMN IF NOT EXISTS face_foto_url TEXT;
+
+ALTER TABLE usuarios
+ADD COLUMN IF NOT EXISTS face_cadastrada_em TIMESTAMP;

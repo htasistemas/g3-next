@@ -25,8 +25,13 @@ function authCookieOptions(): CookieOptions {
 
 export class AuthController {
   async login(request: Request, response: Response) {
-    const data = await authService.login(request.body);
-    response.cookie(AUTH_COOKIE_NAME, data.token, authCookieOptions());
+    const data = await authService.login({
+      ...request.body,
+      host: request.headers.host
+    });
+    if ("token" in data) {
+      response.cookie(AUTH_COOKIE_NAME, data.token, authCookieOptions());
+    }
     return response.json(data);
   }
 
@@ -92,6 +97,57 @@ export class AuthController {
       message:
         "Se o e-mail informado estiver cadastrado, uma senha temporaria foi enviada. Para acessos institucionais, use o mesmo CNPJ e o mesmo e-mail na tela de login."
     });
+  }
+
+  async verificarMfa(request: Request, response: Response) {
+    const data = await authService.verificarMfa(request.body);
+    response.cookie(AUTH_COOKIE_NAME, data.token, authCookieOptions());
+    return response.json(data);
+  }
+
+  async verificarFace(request: Request, response: Response) {
+    const data = await authService.verificarFace(request.body);
+    response.cookie(AUTH_COOKIE_NAME, data.token, authCookieOptions());
+    return response.json(data);
+  }
+
+  async iniciarCadastroPasskey(request: AuthenticatedRequest, response: Response) {
+    if (!request.authUser?.id) {
+      return response.status(401).json({ message: "Usuario autenticado invalido." });
+    }
+    const data = await authService.iniciarCadastroPasskey(request.authUser.id, {
+      ...request.body,
+      host: request.headers.host
+    });
+    return response.json(data);
+  }
+
+  async concluirCadastroPasskey(request: AuthenticatedRequest, response: Response) {
+    if (!request.authUser?.id) {
+      return response.status(401).json({ message: "Usuario autenticado invalido." });
+    }
+    const data = await authService.concluirCadastroPasskey(request.authUser.id, {
+      ...request.body,
+      host: request.headers.host
+    });
+    return response.json(data);
+  }
+
+  async iniciarLoginPasskey(request: Request, response: Response) {
+    const data = await authService.iniciarLoginPasskey({
+      ...request.body,
+      host: request.headers.host
+    });
+    return response.json(data);
+  }
+
+  async concluirLoginPasskey(request: Request, response: Response) {
+    const data = await authService.concluirLoginPasskey({
+      ...request.body,
+      host: request.headers.host
+    });
+    response.cookie(AUTH_COOKIE_NAME, data.token, authCookieOptions());
+    return response.json(data);
   }
 
   async tenantContext(request: Request, response: Response) {

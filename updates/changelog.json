@@ -1,6 +1,110 @@
 {
   "entries":  [
                     {
+                        "version": "1.00.795",
+                        "releaseDate": "2026-08-04",
+                        "title": "Periodo respeitado no espelho de ponto",
+                        "description": "A aba Espelho de ponto passou a aplicar explicitamente o periodo e funcionario informados antes da consulta e do PDF.",
+                        "changes": ["Campos de periodo e funcionario ficam como rascunho ate o clique em Buscar.", "Consulta do espelho monta payload limpo com data_inicial, data_final e usuario_id.", "Geracao do PDF usa o mesmo payload do periodo informado na tela."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.794",
+                        "releaseDate": "2026-08-04",
+                        "title": "Webcam visivel no cadastro facial",
+                        "description": "O popup de cadastro facial na tela de usuarios passou a manter o video montado antes de anexar o stream da camera.",
+                        "changes": ["Video da webcam fica sempre presente no popup de biometria facial.", "Stream da camera e anexado ao video apos a autorizacao do navegador e apos o elemento existir na tela.", "Mensagem de aguardando autorizacao fica apenas como sobreposicao enquanto a camera ainda nao esta ativa."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.793",
+                        "releaseDate": "2026-08-04",
+                        "title": "Login com Google renderizado na etapa correta",
+                        "description": "A tela de login passou a inicializar o botao do Google somente quando a etapa de usuario esta visivel.",
+                        "changes": ["Fluxo do Google agora depende da etapa de credenciais, garantindo que o container do botao exista antes da renderizacao.", "Quando o script do Google ja estiver carregado, a tela reaproveita a instancia existente para renderizar o botao.", "Falha no carregamento do script passa a exibir aviso orientando uso de e-mail e senha."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.792",
+                        "releaseDate": "2026-08-04",
+                        "title": "Cadastro facial na tela de usuarios",
+                        "description": "A tela de usuarios passou a cadastrar, atualizar e remover a biometria facial do usuario selecionado.",
+                        "changes": ["Configuracoes gerais > Usuarios ganhou bloco de Biometria facial com status, previa e acoes de cadastro.", "Novas rotas administrativas permitem consultar, salvar e remover a face de qualquer usuario do tenant.", "A imagem continua armazenada no storage e o banco mantem apenas hash, caminho e data do cadastro facial."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.791",
+                        "releaseDate": "2026-08-04",
+                        "title": "Biometria facial em popup no login",
+                        "description": "A validacao facial do login passou a abrir em popup para manter a tela compacta e sem rolagem adicional.",
+                        "changes": ["Desafio facial abre automaticamente em uma janela sobre a tela de login.", "Formulario principal exibe apenas uma chamada compacta para reabrir a biometria facial.", "Camera e captura ficaram limitadas ao popup com altura responsiva."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.790",
+                        "releaseDate": "2026-08-04",
+                        "title": "Biometria facial configuravel no login",
+                        "description": "O cadastro de usuarios recebeu opcoes para permitir e exigir biometria facial como etapa adicional do login.",
+                        "changes": ["Configuracoes do usuario passam a salvar Permitir biometria facial no login e Exigir biometria facial no login.", "Quando exigida, a senha correta abre um desafio facial com camera antes de concluir o acesso.", "Backend reaproveita a assinatura facial cadastrada no usuario e registra auditoria de sucesso ou falha da validacao."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.789",
+                        "releaseDate": "2026-08-04",
+                        "title": "Cards do login mais claros",
+                        "description": "Os cards laterais da tela de login passaram a usar mensagens mais úteis para usuários e clientes.",
+                        "changes": ["Termos tecnicos como tenant, MFA e passkey foram substituidos por Acesso seguro, Dados protegidos e Entrada inteligente.", "Cada card passou a exibir uma explicacao curta sobre o beneficio apresentado."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.788",
+                        "releaseDate": "2026-08-04",
+                        "title": "Login responsivo com foto maior",
+                        "description": "A tela de login foi ajustada para se adaptar melhor a diferentes tamanhos de tela e dar mais destaque a foto lateral.",
+                        "changes": ["Container principal passa a permitir rolagem vertical em telas menores.", "Layout desktop redistribui as colunas para ampliar a area visual da foto.", "Indicadores, cabecalho e card de login receberam ajustes responsivos para evitar cortes e sobreposicoes."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.787",
+                        "releaseDate": "2026-08-04",
+                        "title": "Acesso master sem CNPJ no login",
+                        "description": "A tela de login passa a oferecer entrada direta para o usuario master sem exigir CNPJ da instituicao.",
+                        "changes": ["Etapa inicial do login recebeu a acao Acessar como master.", "O e-mail master htasistemas@gmail.com e preenchido automaticamente e segue para credenciais sem CNPJ.", "Login com passkey tambem deixa de enviar CNPJ vazio para o usuario master."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.786",
+                        "releaseDate": "2026-08-04",
+                        "title": "Autenticacao segura configuravel por usuario",
+                        "description": "A exigencia de contrassenha por e-mail no login passa a ser definida individualmente no cadastro de usuarios.",
+                        "changes": ["Cadastro de usuarios recebeu a opcao Exigir autenticacao segura por e-mail.", "Login com senha exige codigo por e-mail apenas quando a opcao estiver marcada para o usuario.", "Usuarios sem autenticacao segura marcada entram com CNPJ, e-mail de acesso e senha, mantendo passkey como opcao direta quando cadastrada."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.785",
+                        "releaseDate": "2026-08-04",
+                        "title": "Correcao da expiracao do codigo de seguranca",
+                        "description": "A validacao do codigo de seguranca passou a respeitar a validade calculada pelo banco de dados, evitando expiracao indevida por diferenca de timezone.",
+                        "changes": ["MFA por email deixa de comparar expira_em pelo Date do Node.", "Passkeys passam a usar a mesma validacao de expiracao calculada pelo banco.", "Teste de regressao cobre challenge valido para o banco mesmo quando o timestamp seria interpretado como expirado pelo Node."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.784",
+                        "releaseDate": "2026-08-04",
+                        "title": "Passkey como verificacao preferencial do login",
+                        "description": "Perfis sensiveis passam a confirmar o acesso com passkey quando houver credencial cadastrada, reduzindo dependencia de codigo por email.",
+                        "changes": ["Login com senha gera desafio de passkey para usuarios sensiveis que ja possuem passkey cadastrada.", "Codigo por email permanece como contingencia para usuarios sem passkey.", "Tela de login diferencia confirmacao por passkey e codigo por email na etapa de seguranca."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.783",
+                        "releaseDate": "2026-08-04",
+                        "title": "Login inteligente com MFA e passkeys",
+                        "description": "A tela de login foi redesenhada em etapas e recebeu verificacao adicional para perfis sensiveis, passkeys WebAuthn e assistente inteligente de acesso.",
+                        "changes": ["Fluxo de login passa por identificacao da instituicao, credenciais e verificacao de seguranca quando exigida.", "Backend adiciona challenges persistentes de MFA e passkeys, com auditoria de eventos de acesso.", "Usuarios autenticados podem cadastrar passkey do dispositivo e usar Entrar com passkey nas proximas sessoes."],
+                        "releaseType": "stable"
+                    },
+                    {
                         "version": "1.00.782",
                         "releaseDate": "2026-08-03",
                         "title": "Fundacao profissional da prestacao de contas",

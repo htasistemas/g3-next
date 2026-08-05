@@ -83,6 +83,35 @@ export class EmailService {
     });
   }
 
+  async enviarEmailCodigoMfa(input: {
+    destinatario: string;
+    nomeUsuario?: string | null;
+    codigo: string;
+  }) {
+    if (!env.APP_EMAIL_HABILITADO) {
+      throw new AppError("Envio de email desabilitado no servidor.", 503);
+    }
+
+    const nomeUsuario = input.nomeUsuario?.trim() || "usuario";
+    const assunto = "Codigo de seguranca - Sistema G3 Next";
+    const mensagem = [
+      `Ola, ${nomeUsuario}.`,
+      "",
+      "Recebemos uma tentativa de acesso ao Sistema G3 Next que exige verificacao adicional.",
+      `Seu codigo de seguranca e: ${input.codigo}`,
+      "",
+      "O codigo expira em 10 minutos.",
+      "",
+      "Se voce nao tentou acessar o sistema, avise o administrador imediatamente."
+    ].join("\n");
+
+    return this.enviarEmailSimples({
+      destinatario: input.destinatario,
+      assunto,
+      mensagem
+    });
+  }
+
   async enviarEmailSimples(input: EnviarEmailSimplesInput): Promise<EnvioEmailTesteResult> {
     if (!env.APP_EMAIL_HABILITADO) {
       throw new AppError("Envio de email desabilitado no servidor.", 503);

@@ -29,6 +29,21 @@ export class UsuarioController {
     return response.json({ permissoes });
   }
 
+  async buscarFace(request: AuthenticatedRequest, response: Response) {
+    const resultado = await service.buscarFace(request.params.id, this.buildAtor(request));
+    return response.json(resultado);
+  }
+
+  async salvarFace(request: AuthenticatedRequest, response: Response) {
+    const resultado = await service.salvarFace(request.params.id, request.body, this.buildAtor(request));
+    return response.json(resultado);
+  }
+
+  async removerFace(request: AuthenticatedRequest, response: Response) {
+    const resultado = await service.removerFace(request.params.id, this.buildAtor(request));
+    return response.json(resultado);
+  }
+
   async criar(request: AuthenticatedRequest, response: Response) {
     const resultado = await service.criar(request.body, this.buildAtor(request));
     return response.status(201).json(resultado);

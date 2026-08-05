@@ -1,5 +1,5 @@
 import { httpClient } from "./http-client";
-import type { TenantContextoLogin, UsuarioAutenticado } from "@/types/auth";
+import type { LoginAuthResult, TenantContextoLogin, UsuarioAutenticado } from "@/types/auth";
 
 type LoginResponse = {
   token: string;
@@ -51,15 +51,28 @@ export const authService = {
     email?: string;
     nomeUsuario?: string;
     senha: string;
-  }): Promise<UsuarioAutenticado> {
-    const { data } = await httpClient.post<LoginResponse>("/api/auth/login", {
+  }): Promise<LoginAuthResult> {
+    const { data } = await httpClient.post<LoginAuthResult>("/api/auth/login", {
       cnpj: input.cnpj,
       codigoInstituicao: input.codigoInstituicao,
       slug: input.slug,
       email: input.email,
       nomeUsuario: input.nomeUsuario,
-      senha: input.senha
+      senha: input.senha,
+      origin: window.location.origin
     });
+    if ("token" in data) persistirSessao(data.token, data.usuario);
+    return data;
+  },
+
+  async verificarMfa(input: { challengeId: string; codigo: string }): Promise<UsuarioAutenticado> {
+    const { data } = await httpClient.post<LoginResponse>("/api/auth/mfa/verificar", input);
+    persistirSessao(data.token, data.usuario);
+    return data.usuario;
+  },
+
+  async verificarFace(input: { challengeId: string; face_imagem: string }): Promise<UsuarioAutenticado> {
+    const { data } = await httpClient.post<LoginResponse>("/api/auth/face/verificar", input);
     persistirSessao(data.token, data.usuario);
     return data.usuario;
   },
@@ -117,6 +130,49 @@ export const authService = {
       params
     });
     return data.instituicao;
+  },
+
+  async iniciarLoginPasskey(input: {
+    email: string;
+    cnpj?: string;
+    slug?: string;
+    codigoInstituicao?: string;
+  }): Promise<{ challengeId: string; options: any }> {
+    const { data } = await httpClient.post<{ challengeId: string; options: any }>(
+      "/api/auth/passkeys/login/options",
+      {
+        ...input,
+        origin: window.location.origin
+      }
+    );
+    return data;
+  },
+
+  async concluirLoginPasskey(input: { challengeId: string; response: any }): Promise<UsuarioAutenticado> {
+    const { data } = await httpClient.post<LoginResponse>("/api/auth/passkeys/login/verify", {
+      ...input,
+      origin: window.location.origin
+    });
+    persistirSessao(data.token, data.usuario);
+    return data.usuario;
+  },
+
+  async iniciarCadastroPasskey(): Promise<{ challengeId: string; options: any }> {
+    const { data } = await httpClient.post<{ challengeId: string; options: any }>(
+      "/api/auth/passkeys/register/options",
+      {
+        origin: window.location.origin
+      }
+    );
+    return data;
+  },
+
+  async concluirCadastroPasskey(input: { challengeId: string; response: any; nome?: string }): Promise<{ cadastrado: boolean }> {
+    const { data } = await httpClient.post<{ cadastrado: boolean }>("/api/auth/passkeys/register/verify", {
+      ...input,
+      origin: window.location.origin
+    });
+    return data;
   },
 
   async obterPreferenciaAgendamentos(): Promise<string | null> {

@@ -21,7 +21,9 @@ export const authLoginSchema = z.object({
   slug: z.string().trim().optional(),
   nomeUsuario: z.string().trim().optional(),
   email: z.string().trim().email("Informe um email valido.").optional(),
-  senha: z.string().min(1, "Informe a senha.")
+  senha: z.string().min(1, "Informe a senha."),
+  origin: z.string().trim().url("Origem invalida.").optional(),
+  host: z.string().trim().optional()
 }).superRefine((value, ctx) => {
   const possuiEmail = Boolean(value.email?.trim());
   const possuiUsuario = Boolean(value.nomeUsuario?.trim());
@@ -90,4 +92,59 @@ export const authEsqueciSenhaSchema = z.object({
       message: "Informe o CNPJ, codigo ou slug da instituicao."
     });
   }
+});
+
+export const authMfaVerificarSchema = z.object({
+  challengeId: z.string().trim().uuid("Challenge invalido."),
+  codigo: z.string().trim().regex(/^\d{6}$/, "Informe o codigo de 6 digitos.")
+});
+
+export const authFaceVerificarSchema = z.object({
+  challengeId: z.string().trim().uuid("Challenge invalido."),
+  face_imagem: z.string().trim().min(1, "Capture a face para confirmar o acesso.")
+});
+
+export const authPasskeyLoginOptionsSchema = z.object({
+  cnpj: z
+    .string()
+    .trim()
+    .optional()
+    .transform((value) => normalizarCnpj(value) ?? undefined),
+  codigoInstituicao: z.string().trim().optional(),
+  slug: z.string().trim().optional(),
+  email: z.string().trim().email("Informe um email valido."),
+  origin: z.string().trim().url("Origem invalida."),
+  host: z.string().trim().optional()
+}).superRefine((value, ctx) => {
+  const possuiInstituicao =
+    Boolean(value.cnpj?.trim()) || Boolean(value.codigoInstituicao?.trim()) || Boolean(value.slug?.trim());
+  const dispensarInstituicao = ehEmailMasterSemTenant(value.email);
+
+  if (!possuiInstituicao && !dispensarInstituicao) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["cnpj"],
+      message: "Informe o CNPJ, codigo ou slug da instituicao."
+    });
+  }
+});
+
+export const authPasskeyLoginVerifySchema = z.object({
+  challengeId: z.string().trim().uuid("Challenge invalido."),
+  response: z.record(z.any()),
+  origin: z.string().trim().url("Origem invalida."),
+  host: z.string().trim().optional()
+});
+
+export const authPasskeyRegisterOptionsSchema = z.object({
+  origin: z.string().trim().url("Origem invalida."),
+  host: z.string().trim().optional()
+});
+
+export const authPasskeyRegisterVerifySchema = z.object({
+  challengeId: z.string().trim().uuid("Challenge invalido."),
+  response: z.record(z.any()),
+  origin: z.string().trim().url("Origem invalida."),
+  host: z.string().trim().optional(),
+  nome: z.string().trim().max(120).optional()
 });

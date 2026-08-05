@@ -1,27 +1,54 @@
 import bcrypt from "bcryptjs";
-import { randomInt } from "node:crypto";
+import { randomInt, randomUUID } from "node:crypto";
 import { OAuth2Client } from "google-auth-library";
+import {
+  generateAuthenticationOptions,
+  generateRegistrationOptions,
+  verifyAuthenticationResponse,
+  verifyRegistrationResponse
+} from "@simplewebauthn/server";
+import type {
+  AuthenticationResponseJSON,
+  RegistrationResponseJSON,
+  WebAuthnCredential
+} from "@simplewebauthn/server";
 import { env } from "../../../config/env.js";
 import { AppError } from "../../../shared/errors/app-error.js";
 import {
+  authFaceVerificarSchema,
   authEsqueciSenhaSchema,
   authGoogleSchema,
-  authLoginSchema
+  authLoginSchema,
+  authMfaVerificarSchema,
+  authPasskeyLoginOptionsSchema,
+  authPasskeyLoginVerifySchema,
+  authPasskeyRegisterOptionsSchema,
+  authPasskeyRegisterVerifySchema
 } from "../auth.schema.js";
 import { AuthRepository } from "../repositories/auth.repository.js";
 import { TokenService } from "./token.service.js";
 import type { UsuarioAutenticado } from "../auth.types.js";
 import { EmailService } from "../../email/services/email.service.js";
+import { parseBase64Payload } from "../../arquivos/services/storage-utils.js";
+import {
+  calcularMenorDistanciaFace,
+  facesConferem,
+  gerarAssinaturaFace
+} from "../../registro-ponto/services/registro-ponto-face.js";
 
 const googleClient = new OAuth2Client();
 const EMAIL_ADMIN_PADRAO = "htasistemas@gmail.com";
+const MFA_EXPIRACAO_MS = 10 * 60 * 1000;
+const PASSKEY_EXPIRACAO_MS = 5 * 60 * 1000;
+const LIMITE_TENTATIVAS_LOGIN_INVALIDAS = 5;
+const BLOQUEIO_TEMPORARIO_LOGIN_MS = 15 * 1000;
 
 export class AuthService {
   private readonly repository = new AuthRepository();
   private readonly tokenService = new TokenService();
   private readonly emailService = new EmailService();
 
-  async login(rawInput: unknown) {
+  async login(rawInput: unknown): Promise<any> {
     const input = authLoginSchema.parse(rawInput);
     const emailNormalizado = input.email?.trim().toLowerCase();
     let tenantsPorEmail: Awaited<ReturnType<AuthRepository["buscarTenantsPorEmail"]>> | undefined;
@@ -114,6 +141,7 @@ export class AuthService {
 
     const controle = await this.repository.buscarControleAcessoPorUsuarioId(usuario.id);
     this.validarAcessoUsuario(controle?.status, usuario.instituicaoStatus, usuario.email, usuario.isSuperadmin);
+    this.validarBloqueioTemporarioLogin(controle);
 
     const senhaValida = await bcrypt.compare(input.senha, usuario.senhaHash);
     if (!senhaValida) {
@@ -126,10 +154,18 @@ export class AuthService {
         identificador
       });
       console.warn(`[auth] tentativa de login invalida para usuario: ${identificador}`);
-      if ((atualizado?.status ?? "").toUpperCase() === "BLOQUEADO") {
-        throw new AppError("Usuario bloqueado por tentativas invalidas de acesso.", 403);
+      if (this.estaEmBloqueioTemporarioLogin(atualizado)) {
+        throw new AppError("Usuario temporariamente bloqueado por tentativas invalidas. Aguarde 15 segundos e tente novamente.", 429);
       }
       throw new AppError("Senha invalida para o usuario informado.", 401);
+    }
+
+    if (this.deveExigirBiometriaFacial(usuario)) {
+      return this.criarFaceChallenge(usuario, identificador);
+    }
+
+    if (this.deveExigirMfa(usuario)) {
+      return this.criarMfaChallenge(usuario, identificador);
     }
 
     await this.repository.registrarLoginSucesso(usuario.id);
@@ -199,6 +235,7 @@ export class AuthService {
 
     const controle = await this.repository.buscarControleAcessoPorUsuarioId(usuario.id);
     this.validarAcessoUsuario(controle?.status, usuario.instituicaoStatus, usuario.email, usuario.isSuperadmin);
+    this.validarBloqueioTemporarioLogin(controle);
     await this.repository.registrarLoginSucesso(usuario.id);
     await this.repository.registrarEventoAcesso({
       tenant_id: usuario.tenantId ?? undefined,
@@ -217,6 +254,295 @@ export class AuthService {
     };
   }
 
+  async verificarMfa(rawInput: unknown) {
+    const input = authMfaVerificarSchema.parse(rawInput);
+    const challenge = await this.repository.buscarChallenge(input.challengeId, "MFA_EMAIL");
+    if (!challenge || challenge.usado_em || challenge.expirado || !challenge.usuario_id) {
+      throw new AppError("Codigo de seguranca expirado ou invalido.", 401);
+    }
+
+    if (!challenge.codigo_hash || !(await bcrypt.compare(input.codigo, challenge.codigo_hash))) {
+      throw new AppError("Codigo de seguranca invalido.", 401);
+    }
+
+    const usuario = await this.repository.buscarUsuarioPorId(challenge.usuario_id);
+    if (!usuario) {
+      throw new AppError("Usuario autenticado nao encontrado.", 401);
+    }
+
+    const controle = await this.repository.buscarControleAcessoPorUsuarioId(usuario.id);
+    this.validarAcessoUsuario(controle?.status, usuario.instituicaoStatus, usuario.email, usuario.isSuperadmin);
+    this.validarBloqueioTemporarioLogin(controle);
+
+    await this.repository.marcarChallengeUsado(challenge.id);
+    await this.repository.registrarLoginSucesso(usuario.id);
+    await this.repository.registrarEventoAcesso({
+      tenant_id: usuario.tenantId ?? undefined,
+      instituicao_id: usuario.instituicaoId ?? undefined,
+      usuario_id: usuario.id,
+      evento: "LOGIN_SUCESSO_MFA",
+      identificador: usuario.email ?? usuario.nomeUsuario
+    });
+
+    const usuarioAutenticado = this.mapUsuarioAutenticado(usuario);
+    const token = this.tokenService.gerarToken(usuarioAutenticado);
+
+    return { token, usuario: usuarioAutenticado };
+  }
+
+  async verificarFace(rawInput: unknown) {
+    const input = authFaceVerificarSchema.parse(rawInput);
+    const challenge = await this.repository.buscarChallenge(input.challengeId, "FACE_AUTHENTICATION");
+    if (!challenge || challenge.usado_em || challenge.expirado || !challenge.usuario_id) {
+      throw new AppError("Validacao facial expirada ou invalida.", 401);
+    }
+
+    const usuario = await this.repository.buscarUsuarioPorId(challenge.usuario_id);
+    if (!usuario) {
+      throw new AppError("Usuario autenticado nao encontrado.", 401);
+    }
+
+    const controle = await this.repository.buscarControleAcessoPorUsuarioId(usuario.id);
+    this.validarAcessoUsuario(controle?.status, usuario.instituicaoStatus, usuario.email, usuario.isSuperadmin);
+    this.validarBloqueioTemporarioLogin(controle);
+
+    if (!usuario.faceHash) {
+      throw new AppError("Este usuario ainda nao possui biometria facial cadastrada.", 403);
+    }
+
+    const { buffer } = parseBase64Payload(input.face_imagem, "image/jpeg");
+    const faceHashAtual = await gerarAssinaturaFace(buffer);
+    const distancia = calcularMenorDistanciaFace(usuario.faceHash, faceHashAtual);
+    if (!facesConferem(usuario.faceHash, faceHashAtual)) {
+      await this.repository.registrarEventoAcesso({
+        tenant_id: usuario.tenantId ?? undefined,
+        instituicao_id: usuario.instituicaoId ?? undefined,
+        usuario_id: usuario.id,
+        evento: "LOGIN_FACE_FALHA",
+        identificador: usuario.email ?? usuario.nomeUsuario,
+        detalhes_json: { distancia }
+      });
+      throw new AppError("A validacao facial nao conferiu com a biometria cadastrada.", 401);
+    }
+
+    await this.repository.marcarChallengeUsado(challenge.id);
+    await this.repository.registrarLoginSucesso(usuario.id);
+    await this.repository.registrarEventoAcesso({
+      tenant_id: usuario.tenantId ?? undefined,
+      instituicao_id: usuario.instituicaoId ?? undefined,
+      usuario_id: usuario.id,
+      evento: "LOGIN_SUCESSO_FACE",
+      identificador: usuario.email ?? usuario.nomeUsuario,
+      detalhes_json: { distancia }
+    });
+
+    const usuarioAutenticado = this.mapUsuarioAutenticado(usuario);
+    const token = this.tokenService.gerarToken(usuarioAutenticado);
+
+    return { token, usuario: usuarioAutenticado };
+  }
+
+  async iniciarCadastroPasskey(usuarioId: string, rawInput: unknown) {
+    const input = authPasskeyRegisterOptionsSchema.parse(rawInput);
+    const usuario = await this.repository.buscarUsuarioPorId(this.parseUsuarioId(usuarioId));
+    if (!usuario) {
+      throw new AppError("Usuario autenticado nao encontrado.", 401);
+    }
+
+    const contexto = this.resolverWebAuthnContexto(input.origin, input.host);
+    const passkeys = await this.repository.listarPasskeysUsuario(usuario.id);
+    const options = await generateRegistrationOptions({
+      rpName: "Sistema G3 Next",
+      rpID: contexto.rpID,
+      userName: usuario.email ?? usuario.nomeUsuario,
+      userID: new TextEncoder().encode(usuario.id.toString()),
+      userDisplayName: usuario.nome ?? usuario.nomeUsuario,
+      timeout: 60000,
+      attestationType: "none",
+      excludeCredentials: passkeys.map((item) => ({
+        id: item.credential_id,
+        transports: this.normalizarTransports(item.transports)
+      })),
+      authenticatorSelection: {
+        residentKey: "preferred",
+        userVerification: "required"
+      }
+    });
+
+    const challengeId = randomUUID();
+    await this.repository.criarChallenge({
+      id: challengeId,
+      tipo: "PASSKEY_REGISTRATION",
+      usuarioId: usuario.id,
+      tenantId: usuario.tenantId,
+      challenge: options.challenge,
+      contexto: contexto,
+      expiraEm: new Date(Date.now() + PASSKEY_EXPIRACAO_MS)
+    });
+
+    return { challengeId, options };
+  }
+
+  async concluirCadastroPasskey(usuarioId: string, rawInput: unknown) {
+    const input = authPasskeyRegisterVerifySchema.parse(rawInput);
+    const challenge = await this.repository.buscarChallenge(input.challengeId, "PASSKEY_REGISTRATION");
+    if (!challenge || challenge.usado_em || challenge.expirado) {
+      throw new AppError("Cadastro de passkey expirado ou invalido.", 401);
+    }
+
+    const usuario = await this.repository.buscarUsuarioPorId(this.parseUsuarioId(usuarioId));
+    if (!usuario || challenge.usuario_id?.toString() !== usuario.id.toString()) {
+      throw new AppError("Usuario autenticado invalido para cadastrar passkey.", 401);
+    }
+
+    const contexto = this.resolverWebAuthnContexto(input.origin, input.host);
+    const verification = await verifyRegistrationResponse({
+      response: input.response as RegistrationResponseJSON,
+      expectedChallenge: challenge.challenge,
+      expectedOrigin: contexto.origin,
+      expectedRPID: contexto.rpID,
+      requireUserVerification: true
+    });
+
+    if (!verification.verified || !verification.registrationInfo) {
+      throw new AppError("Nao foi possivel validar a passkey.", 401);
+    }
+
+    const credential = verification.registrationInfo.credential;
+    await this.repository.salvarPasskey({
+      id: randomUUID(),
+      usuarioId: usuario.id,
+      credentialId: credential.id,
+      publicKey: Buffer.from(credential.publicKey).toString("base64url"),
+      counter: credential.counter,
+      transports: (input.response as RegistrationResponseJSON).response.transports ?? [],
+      deviceType: verification.registrationInfo.credentialDeviceType,
+      backedUp: verification.registrationInfo.credentialBackedUp,
+      nome: input.nome || "Passkey do dispositivo"
+    });
+    await this.repository.marcarChallengeUsado(challenge.id);
+    await this.repository.registrarEventoAcesso({
+      tenant_id: usuario.tenantId ?? undefined,
+      instituicao_id: usuario.instituicaoId ?? undefined,
+      usuario_id: usuario.id,
+      evento: "PASSKEY_CADASTRADA",
+      identificador: usuario.email ?? usuario.nomeUsuario
+    });
+
+    return { cadastrado: true };
+  }
+
+  async iniciarLoginPasskey(rawInput: unknown) {
+    const input = authPasskeyLoginOptionsSchema.parse(rawInput);
+    const usuario = await this.repository.buscarUsuarioPorEmail(input.email, {
+      cnpj: input.cnpj,
+      slug: input.slug,
+      codigoInstituicao: input.codigoInstituicao
+    });
+
+    if (!usuario) {
+      throw new AppError("Usuario nao localizado para login com passkey.", 401);
+    }
+
+    const controle = await this.repository.buscarControleAcessoPorUsuarioId(usuario.id);
+    this.validarAcessoUsuario(controle?.status, usuario.instituicaoStatus, usuario.email, usuario.isSuperadmin);
+    this.validarBloqueioTemporarioLogin(controle);
+
+    if (this.deveExigirMfa(usuario)) {
+      throw new AppError("Este usuario exige autenticacao segura por e-mail. Entre com CNPJ, e-mail e senha para receber a contrassenha.", 403);
+    }
+
+    if (this.deveExigirBiometriaFacial(usuario)) {
+      throw new AppError("Este usuario exige biometria facial. Entre com CNPJ, e-mail e senha para validar a face.", 403);
+    }
+
+    const passkeys = await this.repository.listarPasskeysUsuario(usuario.id);
+    if (passkeys.length === 0) {
+      throw new AppError("Este usuario ainda nao possui passkey cadastrada.", 404);
+    }
+
+    const contexto = this.resolverWebAuthnContexto(input.origin, input.host);
+    const options = await generateAuthenticationOptions({
+      rpID: contexto.rpID,
+      timeout: 60000,
+      userVerification: "required",
+      allowCredentials: passkeys.map((item) => ({
+        id: item.credential_id,
+        transports: this.normalizarTransports(item.transports)
+      }))
+    });
+
+    const challengeId = randomUUID();
+    await this.repository.criarChallenge({
+      id: challengeId,
+      tipo: "PASSKEY_AUTHENTICATION",
+      usuarioId: usuario.id,
+      tenantId: usuario.tenantId,
+      challenge: options.challenge,
+      contexto,
+      expiraEm: new Date(Date.now() + PASSKEY_EXPIRACAO_MS)
+    });
+
+    return { challengeId, options };
+  }
+
+  async concluirLoginPasskey(rawInput: unknown) {
+    const input = authPasskeyLoginVerifySchema.parse(rawInput);
+    const challenge = await this.repository.buscarChallenge(input.challengeId, "PASSKEY_AUTHENTICATION");
+    if (!challenge || challenge.usado_em || challenge.expirado || !challenge.usuario_id) {
+      throw new AppError("Login com passkey expirado ou invalido.", 401);
+    }
+
+    const response = input.response as AuthenticationResponseJSON;
+    const passkey = await this.repository.buscarPasskeyPorCredentialId(response.id);
+    if (!passkey || passkey.usuario_id.toString() !== challenge.usuario_id.toString()) {
+      throw new AppError("Passkey nao reconhecida para este acesso.", 401);
+    }
+
+    const contexto = this.resolverWebAuthnContexto(input.origin, input.host);
+    const credential: WebAuthnCredential = {
+      id: passkey.credential_id,
+      publicKey: Buffer.from(passkey.public_key, "base64url"),
+      counter: Number(passkey.counter ?? 0),
+      transports: this.normalizarTransports(passkey.transports)
+    };
+    const verification = await verifyAuthenticationResponse({
+      response,
+      expectedChallenge: challenge.challenge,
+      expectedOrigin: contexto.origin,
+      expectedRPID: contexto.rpID,
+      credential,
+      requireUserVerification: true
+    });
+
+    if (!verification.verified) {
+      throw new AppError("Nao foi possivel validar a passkey.", 401);
+    }
+
+    const usuario = await this.repository.buscarUsuarioPorId(passkey.usuario_id);
+    if (!usuario) {
+      throw new AppError("Usuario autenticado nao encontrado.", 401);
+    }
+    const controle = await this.repository.buscarControleAcessoPorUsuarioId(usuario.id);
+    this.validarAcessoUsuario(controle?.status, usuario.instituicaoStatus, usuario.email, usuario.isSuperadmin);
+    this.validarBloqueioTemporarioLogin(controle);
+
+    await this.repository.atualizarPasskeyCounter(passkey.credential_id, verification.authenticationInfo.newCounter);
+    await this.repository.marcarChallengeUsado(challenge.id);
+    await this.repository.registrarLoginSucesso(usuario.id);
+    await this.repository.registrarEventoAcesso({
+      tenant_id: usuario.tenantId ?? undefined,
+      instituicao_id: usuario.instituicaoId ?? undefined,
+      usuario_id: usuario.id,
+      evento: "LOGIN_SUCESSO_PASSKEY",
+      identificador: usuario.email ?? usuario.nomeUsuario
+    });
+
+    const usuarioAutenticado = this.mapUsuarioAutenticado(usuario);
+    const token = this.tokenService.gerarToken(usuarioAutenticado);
+    return { token, usuario: usuarioAutenticado };
+  }
+
   async obterPerfilUsuario(id: string) {
     const numericId = Number(id);
     if (!Number.isInteger(numericId) || numericId <= 0) {
@@ -230,6 +556,7 @@ export class AuthService {
 
     const controle = await this.repository.buscarControleAcessoPorUsuarioId(usuario.id);
     this.validarAcessoUsuario(controle?.status, usuario.instituicaoStatus, usuario.email, usuario.isSuperadmin);
+    this.validarBloqueioTemporarioLogin(controle);
 
     return this.mapUsuarioAutenticado(usuario);
   }
@@ -353,6 +680,28 @@ export class AuthService {
     }
   }
 
+  private validarBloqueioTemporarioLogin(
+    controle?: Awaited<ReturnType<AuthRepository["buscarControleAcessoPorUsuarioId"]>> | null
+  ) {
+    if (!this.estaEmBloqueioTemporarioLogin(controle)) {
+      return;
+    }
+
+    throw new AppError("Usuario temporariamente bloqueado por tentativas invalidas. Aguarde 15 segundos e tente novamente.", 429);
+  }
+
+  private estaEmBloqueioTemporarioLogin(
+    controle?: Awaited<ReturnType<AuthRepository["buscarControleAcessoPorUsuarioId"]>> | null
+  ) {
+    const tentativas = Number(controle?.tentativas_login_invalidas ?? 0);
+    const ultimoLoginInvalido = controle?.ultimo_login_invalido_em;
+    if (tentativas < LIMITE_TENTATIVAS_LOGIN_INVALIDAS || !ultimoLoginInvalido) {
+      return false;
+    }
+
+    return Date.now() - ultimoLoginInvalido.getTime() < BLOQUEIO_TEMPORARIO_LOGIN_MS;
+  }
+
   private gerarSenhaTemporaria() {
     const alfabeto = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
     let senha = "";
@@ -361,6 +710,132 @@ export class AuthService {
       senha += alfabeto[randomIndex];
     }
     return senha;
+  }
+
+  private async criarMfaChallenge(
+    usuario: NonNullable<Awaited<ReturnType<AuthRepository["buscarUsuarioPorLogin"]>>>,
+    identificador: string
+  ) {
+    if (!usuario.email) {
+      throw new AppError("Este acesso exige verificacao adicional, mas o usuario nao possui e-mail cadastrado.", 403);
+    }
+
+    const codigo = String(randomInt(100000, 1000000));
+    const challengeId = randomUUID();
+    const codigoHash = await bcrypt.hash(codigo, 10);
+    await this.repository.criarChallenge({
+      id: challengeId,
+      tipo: "MFA_EMAIL",
+      usuarioId: usuario.id,
+      tenantId: usuario.tenantId,
+      challenge: challengeId,
+      codigoHash,
+      contexto: { identificador },
+      expiraEm: new Date(Date.now() + MFA_EXPIRACAO_MS)
+    });
+
+    const deveEnviarEmail = env.APP_EMAIL_HABILITADO;
+    if (deveEnviarEmail) {
+      await this.emailService.enviarEmailCodigoMfa({
+        destinatario: usuario.email,
+        nomeUsuario: usuario.nome ?? usuario.nomeUsuario,
+        codigo
+      });
+    } else if (env.NODE_ENV === "development") {
+      console.warn(`[auth] codigo MFA desenvolvimento para ${usuario.email}: ${codigo}`);
+    } else {
+      throw new AppError("Verificacao adicional indisponivel: envio de e-mail nao configurado.", 503);
+    }
+
+    await this.repository.registrarEventoAcesso({
+      tenant_id: usuario.tenantId ?? undefined,
+      instituicao_id: usuario.instituicaoId ?? undefined,
+      usuario_id: usuario.id,
+      evento: "LOGIN_MFA_SOLICITADO",
+      identificador
+    });
+
+    return {
+      mfaRequired: true,
+      challengeId,
+      method: "email",
+      maskedEmail: this.mascararEmail(usuario.email),
+      fallbackEmailAvailable: false,
+      devCode: env.NODE_ENV === "development" && !env.APP_EMAIL_HABILITADO ? codigo : undefined
+    };
+  }
+
+  private async criarFaceChallenge(
+    usuario: NonNullable<Awaited<ReturnType<AuthRepository["buscarUsuarioPorLogin"]>>>,
+    identificador: string
+  ) {
+    if (!usuario.permitirBiometriaFacialLogin || !usuario.faceHash) {
+      throw new AppError("Este usuario exige biometria facial, mas ainda nao possui face cadastrada.", 403);
+    }
+
+    const challengeId = randomUUID();
+    await this.repository.criarChallenge({
+      id: challengeId,
+      tipo: "FACE_AUTHENTICATION",
+      usuarioId: usuario.id,
+      tenantId: usuario.tenantId,
+      challenge: challengeId,
+      contexto: { identificador },
+      expiraEm: new Date(Date.now() + MFA_EXPIRACAO_MS)
+    });
+    await this.repository.registrarEventoAcesso({
+      tenant_id: usuario.tenantId ?? undefined,
+      instituicao_id: usuario.instituicaoId ?? undefined,
+      usuario_id: usuario.id,
+      evento: "LOGIN_FACE_SOLICITADO",
+      identificador
+    });
+
+    return {
+      mfaRequired: true,
+      challengeId,
+      method: "face",
+      fallbackEmailAvailable: Boolean(usuario.email && usuario.exigirAutenticacaoSegura)
+    };
+  }
+
+  private deveExigirMfa(usuario: NonNullable<Awaited<ReturnType<AuthRepository["buscarUsuarioPorLogin"]>>>) {
+    return Boolean(usuario.exigirAutenticacaoSegura);
+  }
+
+  private deveExigirBiometriaFacial(
+    usuario: NonNullable<Awaited<ReturnType<AuthRepository["buscarUsuarioPorLogin"]>>>
+  ) {
+    return Boolean(usuario.permitirBiometriaFacialLogin && usuario.exigirBiometriaFacialLogin);
+  }
+
+  private mascararEmail(email: string) {
+    const [usuario, dominio] = email.split("@");
+    if (!usuario || !dominio) return email;
+    const inicio = usuario.slice(0, 2);
+    return `${inicio}${"*".repeat(Math.max(3, usuario.length - 2))}@${dominio}`;
+  }
+
+  private parseUsuarioId(id: string) {
+    const numericId = Number(id);
+    if (!Number.isInteger(numericId) || numericId <= 0) {
+      throw new AppError("Usuario autenticado invalido.", 401);
+    }
+    return BigInt(numericId);
+  }
+
+  private resolverWebAuthnContexto(origin: string, host?: string) {
+    const url = new URL(origin);
+    const hostname = (host?.split(":")[0] || url.hostname).trim().toLowerCase();
+    const rpID = hostname || "localhost";
+    return {
+      origin: url.origin,
+      rpID
+    };
+  }
+
+  private normalizarTransports(transports?: string[] | null) {
+    return (transports ?? []).filter(Boolean) as Array<"ble" | "cable" | "hybrid" | "internal" | "nfc" | "smart-card" | "usb">;
   }
 
   private compararTenantLookup(

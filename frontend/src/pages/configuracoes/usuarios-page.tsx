@@ -1,12 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   ChevronDown,
   ChevronRight,
+  Camera,
+  Fingerprint,
   History,
   KeyRound,
   ListFilter,
+  LoaderCircle,
   Lock,
   LockOpen,
   Pencil,
@@ -40,14 +43,18 @@ import {
   type UsuarioFormValues
 } from "@/features/usuarios/usuario.schema";
 import {
+  useRemoverUsuarioFace,
   useAtualizarStatusUsuario,
   usePermissoesUsuarios,
   useRemoverUsuario,
   useResetarSenhaUsuario,
   useSalvarUsuario,
+  useSalvarUsuarioFace,
   useUsuario,
+  useUsuarioFace,
   useUsuarios
 } from "@/features/usuarios/use-usuarios";
+import { obterUrlArquivoAutenticado } from "@/lib/arquivos";
 import { formatarTextoPorCampo } from "@/lib/text-formatter";
 import { mapaCamposTextoUsuarioForm } from "@/lib/text-format-config";
 import { imprimirConteudoAtual } from "@/lib/report-utils";
@@ -85,6 +92,12 @@ type ConfirmacaoState =
     }
   | {
       tipo: "excluir";
+      titulo: string;
+      texto: string;
+      usuarioId: string;
+    }
+  | {
+      tipo: "remover_face";
       titulo: string;
       texto: string;
       usuarioId: string;
@@ -137,6 +150,9 @@ function mapUsuarioParaFormulario(usuario: Usuario): UsuarioFormValues {
     permissoes: usuario.permissoes.length ? usuario.permissoes : ["OPERADOR"],
     status: usuario.status,
     exigir_troca_senha: usuario.exigir_troca_senha,
+    exigir_autenticacao_segura: usuario.exigir_autenticacao_segura,
+    permitir_biometria_facial_login: usuario.permitir_biometria_facial_login,
+    exigir_biometria_facial_login: usuario.exigir_biometria_facial_login,
     origem_tipo: usuario.origem_tipo,
     origem_id: usuario.origem_id,
     origem_nome: usuario.origem_nome,
@@ -169,6 +185,9 @@ function mapFormularioParaPayload(values: UsuarioFormValues): UsuarioPayload {
     permissoes,
     status: values.status,
     exigir_troca_senha: !!values.exigir_troca_senha,
+    exigir_autenticacao_segura: !!values.exigir_autenticacao_segura,
+    permitir_biometria_facial_login: !!values.permitir_biometria_facial_login,
+    exigir_biometria_facial_login: !!values.exigir_biometria_facial_login,
     origem_tipo: values.origem_tipo,
     origem_id: values.origem_id?.trim() || undefined,
     origem_nome: values.origem_nome?.trim() || undefined
@@ -336,6 +355,10 @@ export function UsuariosPage() {
   const [modulosExpandidos, setModulosExpandidos] = useState<string[]>([]);
   const [origemBusca, setOrigemBusca] = useState("");
   const [origemBuscaAplicada, setOrigemBuscaAplicada] = useState("");
+  const [popupFaceAberto, setPopupFaceAberto] = useState(false);
+  const [rascunhoFace, setRascunhoFace] = useState("");
+  const [previewFaceUrl, setPreviewFaceUrl] = useState("");
+  const [cameraFaceAtiva, setCameraFaceAtiva] = useState(false);
   const [filtroDraft, setFiltroDraft] = useState<UsuarioFiltros>({
     nome: "",
     login: "",
@@ -353,12 +376,17 @@ export function UsuariosPage() {
 
   const { data: listaData, isLoading: carregandoLista, isFetching: atualizandoLista } = useUsuarios(filtros);
   const { data: usuarioData, isLoading: carregandoUsuario } = useUsuario(idSelecionado);
+  const { data: faceData, isLoading: carregandoFace } = useUsuarioFace(idSelecionado);
   const { data: permissoesData, isLoading: carregandoPermissoes } = usePermissoesUsuarios();
 
   const salvarMutation = useSalvarUsuario();
   const atualizarStatusMutation = useAtualizarStatusUsuario();
   const resetarSenhaMutation = useResetarSenhaUsuario();
+  const salvarFaceMutation = useSalvarUsuarioFace();
+  const removerFaceMutation = useRemoverUsuarioFace();
   const removerMutation = useRemoverUsuario();
+  const videoFaceRef = useRef<HTMLVideoElement | null>(null);
+  const streamFaceRef = useRef<MediaStream | null>(null);
 
   const {
     register,
@@ -394,6 +422,8 @@ export function UsuariosPage() {
     salvarMutation.isPending ||
     atualizarStatusMutation.isPending ||
     resetarSenhaMutation.isPending ||
+    salvarFaceMutation.isPending ||
+    removerFaceMutation.isPending ||
     removerMutation.isPending;
 
   const gruposPermissoes = useMemo(() => {
@@ -460,6 +490,71 @@ export function UsuariosPage() {
     reset(formValues);
     setSnapshot(formValues);
   }, [reset, usuarioData]);
+
+  useEffect(() => {
+    setRascunhoFace("");
+    if (!idSelecionado) {
+      setPreviewFaceUrl("");
+    }
+  }, [idSelecionado]);
+
+  useEffect(() => {
+    if (!idSelecionado) {
+      setPreviewFaceUrl("");
+      return;
+    }
+
+    if (rascunhoFace) {
+      setPreviewFaceUrl(rascunhoFace);
+      return;
+    }
+
+    const faceUrlSalva = faceData?.face_url;
+    if (!faceUrlSalva) {
+      setPreviewFaceUrl("");
+      return;
+    }
+
+    let ativo = true;
+    let revokeAtual: (() => void) | undefined;
+
+    async function carregarPreviewSalva() {
+      try {
+        const arquivo = await obterUrlArquivoAutenticado(faceUrlSalva, { cache: false, auditar: false });
+        if (!ativo) {
+          arquivo.revoke?.();
+          return;
+        }
+        revokeAtual = arquivo.revoke;
+        setPreviewFaceUrl(arquivo.url);
+      } catch {
+        if (ativo) {
+          setPreviewFaceUrl("");
+        }
+      }
+    }
+
+    void carregarPreviewSalva();
+
+    return () => {
+      ativo = false;
+      revokeAtual?.();
+    };
+  }, [faceData?.face_url, idSelecionado, rascunhoFace]);
+
+  useEffect(() => {
+    if (!popupFaceAberto) {
+      pararCameraFace();
+    }
+    return () => {
+      pararCameraFace();
+    };
+  }, [popupFaceAberto, idSelecionado]);
+
+  useEffect(() => {
+    if (!popupFaceAberto || !cameraFaceAtiva) return;
+    anexarStreamFaceAoVideo();
+  }, [cameraFaceAtiva, popupFaceAberto]);
 
   function aplicarFormatacaoCampo(campo: keyof UsuarioFormValues) {
     const valorAtual = getValues(campo);
@@ -541,6 +636,158 @@ export function UsuariosPage() {
       texto: `Deseja alterar o status para ${formatarStatus(status).toLowerCase()}?`,
       usuarioId: usuario.id_usuario,
       status
+    });
+  }
+
+  function obterMensagemErro(error: any, fallback: string) {
+    return error?.response?.data?.message ?? error?.message ?? fallback;
+  }
+
+  function abrirCadastroFace() {
+    if (!usuarioIdAtual) {
+      setPopupMensagem({
+        tipo: "aviso",
+        titulo: "Salve o usuário",
+        texto: "Salve o cadastro do usuário antes de registrar a biometria facial."
+      });
+      return;
+    }
+
+    setPopupFaceAberto(true);
+    window.setTimeout(() => {
+      void iniciarCameraFace();
+    }, 80);
+  }
+
+  async function iniciarCameraFace() {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setPopupMensagem({
+        tipo: "erro",
+        titulo: "Câmera indisponível",
+        texto: "Este dispositivo não permite captura de câmera para biometria facial."
+      });
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          facingMode: "user",
+          width: { ideal: 640 },
+          height: { ideal: 480 }
+        }
+      });
+      streamFaceRef.current = stream;
+      setCameraFaceAtiva(true);
+    } catch (error: any) {
+      setPopupMensagem({
+        tipo: "erro",
+        titulo: "Câmera indisponível",
+        texto: obterMensagemErro(error, "Não foi possível acessar a câmera para captura facial.")
+      });
+    }
+  }
+
+  function anexarStreamFaceAoVideo() {
+    const stream = streamFaceRef.current;
+    const video = videoFaceRef.current;
+    if (!stream || !video) return;
+
+    if (video.srcObject !== stream) {
+      video.srcObject = stream;
+    }
+
+    const reproduzir = () => {
+      void video.play().catch(() => undefined);
+    };
+
+    if (video.readyState >= 1) {
+      reproduzir();
+      return;
+    }
+
+    video.onloadedmetadata = reproduzir;
+  }
+
+  function pararCameraFace() {
+    streamFaceRef.current?.getTracks().forEach((track) => track.stop());
+    streamFaceRef.current = null;
+    if (videoFaceRef.current) {
+      videoFaceRef.current.onloadedmetadata = null;
+      videoFaceRef.current.srcObject = null;
+    }
+    setCameraFaceAtiva(false);
+  }
+
+  function capturarFace() {
+    const video = videoFaceRef.current;
+    if (!video || !video.videoWidth || !video.videoHeight) {
+      setPopupMensagem({
+        tipo: "erro",
+        titulo: "Capture novamente",
+        texto: "A câmera ainda não está pronta para a captura facial."
+      });
+      return;
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      setPopupMensagem({
+        tipo: "erro",
+        titulo: "Captura não concluída",
+        texto: "Não foi possível preparar a imagem da biometria facial."
+      });
+      return;
+    }
+
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    setRascunhoFace(canvas.toDataURL("image/jpeg", 0.86));
+  }
+
+  async function salvarFaceUsuario() {
+    if (!usuarioIdAtual) return;
+    if (!rascunhoFace) {
+      setPopupMensagem({
+        tipo: "aviso",
+        titulo: "Capture a face",
+        texto: "Capture a imagem da face antes de salvar a biometria facial."
+      });
+      return;
+    }
+
+    try {
+      const resultado = await salvarFaceMutation.mutateAsync({
+        id_usuario: usuarioIdAtual,
+        face_imagem: rascunhoFace
+      });
+      setRascunhoFace("");
+      setPopupFaceAberto(false);
+      pararCameraFace();
+      setPopupMensagem({
+        tipo: "sucesso",
+        titulo: "Biometria facial",
+        texto: resultado.mensagem
+      });
+    } catch (error: any) {
+      setPopupMensagem({
+        tipo: "erro",
+        titulo: "Biometria facial",
+        texto: obterMensagemErro(error, "Não foi possível salvar a biometria facial.")
+      });
+    }
+  }
+
+  function abrirPopupRemoverFace() {
+    if (!usuarioIdAtual || !faceData?.face_cadastrada) return;
+    setPopupConfirmacao({
+      tipo: "remover_face",
+      titulo: "Remover biometria facial",
+      texto: "Deseja remover a biometria facial cadastrada para este usuário? O login facial deixará de funcionar até novo cadastro.",
+      usuarioId: usuarioIdAtual
     });
   }
 
@@ -679,6 +926,16 @@ export function UsuariosPage() {
           tipo: "sucesso",
           titulo: "Usuário excluído",
           texto: "O usuário foi excluído com sucesso."
+        });
+      }
+
+      if (popupConfirmacao.tipo === "remover_face") {
+        const resultado = await removerFaceMutation.mutateAsync(popupConfirmacao.usuarioId);
+        setRascunhoFace("");
+        setPopupMensagem({
+          tipo: "sucesso",
+          titulo: "Biometria facial",
+          texto: resultado.mensagem
         });
       }
     } catch (error: any) {
@@ -1253,12 +1510,122 @@ export function UsuariosPage() {
                   />
                   Exigir troca de senha no primeiro acesso
                 </label>
+                <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-[var(--g3-foreground)]">
+                  <Checkbox
+                    checked={!!watch("exigir_autenticacao_segura")}
+                    onChange={(event) =>
+                      setValue("exigir_autenticacao_segura", event.target.checked, {
+                        shouldDirty: true,
+                        shouldValidate: true
+                      })
+                    }
+                  />
+                  Exigir autenticação segura por e-mail
+                </label>
+                <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-[var(--g3-foreground)]">
+                  <Checkbox
+                    checked={!!watch("permitir_biometria_facial_login")}
+                    onChange={(event) => {
+                      const marcado = event.target.checked;
+                      setValue("permitir_biometria_facial_login", marcado, {
+                        shouldDirty: true,
+                        shouldValidate: true
+                      });
+                      if (!marcado) {
+                        setValue("exigir_biometria_facial_login", false, {
+                          shouldDirty: true,
+                          shouldValidate: true
+                        });
+                      }
+                    }}
+                  />
+                  Permitir biometria facial no login
+                </label>
+                <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-[var(--g3-foreground)]">
+                  <Checkbox
+                    checked={!!watch("exigir_biometria_facial_login")}
+                    onChange={(event) => {
+                      const marcado = event.target.checked;
+                      setValue("exigir_biometria_facial_login", marcado, {
+                        shouldDirty: true,
+                        shouldValidate: true
+                      });
+                      if (marcado) {
+                        setValue("permitir_biometria_facial_login", true, {
+                          shouldDirty: true,
+                          shouldValidate: true
+                        });
+                      }
+                    }}
+                  />
+                  Exigir biometria facial no login
+                </label>
                 <Button type="button" variant="outline" size="sm" disabled={!usuarioIdAtual || acaoEmAndamento} onClick={() => setPopupResetSenhaAberto(true)}>
                   <KeyRound className="mr-1.5 h-3.5 w-3.5" />
                   Redefinir senha
                 </Button>
               </div>
+              <p className="xl:col-span-12 -mt-2 text-xs text-[var(--g3-muted)]">
+                Quando a autenticação por e-mail estiver marcada, esta conta confirma a contrassenha enviada por e-mail. Quando a biometria facial for exigida, a senha abre a câmera para validar a face cadastrada no usuário.
+              </p>
             </section>
+
+            <Card className="border-[var(--g3-border)]">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <Fingerprint className="h-4 w-4 text-[var(--g3-active)]" />
+                  Biometria facial
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-4 md:grid-cols-[160px_1fr]">
+                <div className="overflow-hidden rounded-lg border border-[var(--g3-border)] bg-slate-950">
+                  {previewFaceUrl ? (
+                    <img src={previewFaceUrl} alt="Prévia da biometria facial" className="aspect-[4/3] w-full object-cover" />
+                  ) : (
+                    <div className="flex aspect-[4/3] items-center justify-center px-3 text-center text-xs text-slate-300">
+                      Nenhuma face cadastrada.
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                        faceData?.face_cadastrada
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-slate-100 text-slate-600"
+                      }`}
+                    >
+                      {carregandoFace ? "Carregando..." : faceData?.face_cadastrada ? "Face cadastrada" : "Face não cadastrada"}
+                    </span>
+                    {faceData?.face_cadastrada_em ? (
+                      <span className="text-xs text-[var(--g3-muted)]">
+                        Último cadastro em {formatarDataHora(faceData.face_cadastrada_em)}
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="text-sm text-[var(--g3-muted)]">
+                    Cadastre a face diretamente neste usuário para liberar a biometria no login, mesmo sem vínculo com registro de ponto ou profissional da instituição.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" variant="outline" size="sm" disabled={!usuarioIdAtual || acaoEmAndamento} onClick={abrirCadastroFace}>
+                      <Camera className="mr-1.5 h-3.5 w-3.5" />
+                      {faceData?.face_cadastrada ? "Atualizar biometria" : "Cadastrar biometria"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={!usuarioIdAtual || !faceData?.face_cadastrada || acaoEmAndamento}
+                      onClick={abrirPopupRemoverFace}
+                    >
+                      <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                      Remover biometria
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
             <Card className="border-[var(--g3-border)]">
               <CardHeader className="pb-3">
@@ -1491,11 +1858,66 @@ export function UsuariosPage() {
         titulo={popupConfirmacao?.titulo ?? ""}
         texto={popupConfirmacao?.texto ?? ""}
         processando={acaoEmAndamento}
-        confirmarTexto={popupConfirmacao?.tipo === "excluir" ? "Excluir" : "Confirmar"}
-        confirmarVariant={popupConfirmacao?.tipo === "excluir" ? "danger" : "default"}
+        confirmarTexto={popupConfirmacao?.tipo === "excluir" || popupConfirmacao?.tipo === "remover_face" ? "Remover" : "Confirmar"}
+        confirmarVariant={popupConfirmacao?.tipo === "excluir" || popupConfirmacao?.tipo === "remover_face" ? "danger" : "default"}
         onCancel={() => setPopupConfirmacao(null)}
         onConfirm={() => void confirmarPopupAcao()}
       />
+
+      {popupFaceAberto && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/45 px-4" onClick={() => { if (!salvarFaceMutation.isPending) setPopupFaceAberto(false); }}>
+          <div className="w-full max-w-xl rounded-xl border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+              <div className="flex items-center gap-2">
+                <Fingerprint className="h-4 w-4 text-[var(--g3-active)]" />
+                <h3 className="text-base font-semibold text-slate-900">Cadastrar biometria facial</h3>
+              </div>
+              <Button variant="ghost" size="sm" disabled={salvarFaceMutation.isPending} onClick={() => setPopupFaceAberto(false)}>
+                Fechar
+              </Button>
+            </div>
+            <div className="space-y-4 px-5 py-4">
+              <div className="relative overflow-hidden rounded-lg border border-slate-200 bg-slate-950">
+                <video
+                  ref={videoFaceRef}
+                  className="aspect-[4/3] max-h-[52vh] w-full object-cover"
+                  muted
+                  playsInline
+                  autoPlay
+                  onLoadedMetadata={anexarStreamFaceAoVideo}
+                />
+                {!cameraFaceAtiva ? (
+                  <div className="absolute inset-0 flex items-center justify-center px-4 text-center text-sm text-slate-300">
+                    Aguardando autorização da câmera.
+                  </div>
+                ) : null}
+              </div>
+
+              {rascunhoFace ? (
+                <div className="grid gap-3 sm:grid-cols-[120px_1fr]">
+                  <img src={rascunhoFace} alt="Prévia capturada da biometria facial" className="aspect-[4/3] w-full rounded-lg border border-slate-200 object-cover" />
+                  <p className="text-sm text-[var(--g3-muted)]">
+                    Prévia capturada. Salve para vincular esta biometria facial ao usuário selecionado.
+                  </p>
+                </div>
+              ) : null}
+            </div>
+            <div className="flex flex-col-reverse gap-2 border-t border-slate-100 px-5 py-3 sm:flex-row sm:justify-end">
+              <Button type="button" variant="outline" disabled={salvarFaceMutation.isPending} onClick={() => setPopupFaceAberto(false)}>
+                Cancelar
+              </Button>
+              <Button type="button" variant="outline" disabled={salvarFaceMutation.isPending} onClick={capturarFace}>
+                <Camera className="mr-1.5 h-3.5 w-3.5" />
+                Capturar face
+              </Button>
+              <Button type="button" disabled={salvarFaceMutation.isPending || !rascunhoFace} onClick={() => void salvarFaceUsuario()}>
+                {salvarFaceMutation.isPending ? <LoaderCircle className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-1.5 h-3.5 w-3.5" />}
+                Salvar biometria
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {popupResetSenhaAberto && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/45 px-4" onClick={() => { if (!resetarSenhaMutation.isPending) setPopupResetSenhaAberto(false); }}>
