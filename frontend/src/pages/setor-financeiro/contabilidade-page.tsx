@@ -261,6 +261,7 @@ const contaVazia: ContaBancariaPayload = {
   tipo: 'CONTA_CORRENTE',
   titular: '',
   projetoVinculado: '',
+  fontePagamento: '',
   pixVinculado: false,
   tipoChavePix: '',
   chavePix: '',
@@ -590,6 +591,7 @@ function toContaForm(item: ContaBancaria): ContaBancariaPayload {
     tipo: item.tipo,
     titular: item.titular,
     projetoVinculado: item.projetoVinculado,
+    fontePagamento: item.fontePagamento,
     pixVinculado: item.pixVinculado,
     tipoChavePix: item.tipoChavePix,
     chavePix: item.chavePix,
@@ -1971,7 +1973,13 @@ export function ContabilidadePage() {
                           {conta.projetoVinculado?.trim() || 'Sem projeto vinculado'}
                         </p>
                       </div>
-                      <div className="min-w-0 rounded-lg border border-white/70 bg-white/70 p-3 md:col-span-2 md:min-h-[88px]">
+                      <div className="rounded-lg border border-white/70 bg-white/70 p-2.5">
+                        <p className="text-xs font-semibold text-[var(--g3-muted)]">Fonte de pagamento</p>
+                        <p className="mt-1 text-sm font-medium text-[var(--g3-foreground)]">
+                          {conta.fontePagamento?.trim() || 'Sem fonte vinculada'}
+                        </p>
+                      </div>
+                      <div className="min-w-0 rounded-lg border border-white/70 bg-white/70 p-3 md:min-h-[88px]">
                         <p className="text-xs font-semibold text-[var(--g3-muted)]">Pix</p>
                         <p className="mt-1 break-all text-sm font-medium leading-relaxed text-[var(--g3-foreground)]">{formatarPixConta(conta)}</p>
                       </div>
@@ -2084,6 +2092,7 @@ export function ContabilidadePage() {
             <div className="space-y-1"><Label>Titular</Label><Input value={titularContaPadrao || contaForm.titular || ''} readOnly /></div>
             <div className="space-y-1"><Label>Status</Label><Select value={contaForm.status ?? 'ATIVA'} onChange={(event) => setContaForm((atual) => ({ ...atual, status: event.target.value as ContaBancaria['status'] }))}><option value="ATIVA">Ativa</option><option value="INATIVA">Inativa</option></Select></div>
             <div className="space-y-1"><Label>Projeto vinculado</Label><Select value={contaForm.projetoVinculado ?? ''} onChange={(event) => setContaForm((atual) => ({ ...atual, projetoVinculado: event.target.value }))}><option value="">Selecione</option>{projetosVinculadosDisponiveis.map((projeto) => <option key={projeto} value={projeto}>{projeto}</option>)}</Select></div>
+            <div className="space-y-1"><Label>Fonte de pagamento</Label><Input value={contaForm.fontePagamento ?? ''} placeholder="Ex.: recurso municipal, emenda ou doação" onChange={(event) => setContaForm((atual) => ({ ...atual, fontePagamento: event.target.value }))} /></div>
             <div className="space-y-1"><Label>Pix</Label><Select value={contaForm.pixVinculado ? 'SIM' : 'NAO'} onChange={(event) => setContaForm((atual) => ({ ...atual, pixVinculado: event.target.value === 'SIM', tipoChavePix: event.target.value === 'SIM' ? atual.tipoChavePix : '', chavePix: event.target.value === 'SIM' ? atual.chavePix : '' }))}><option value="SIM">Habilitado</option><option value="NAO">Não habilitado</option></Select></div>
             <div className="space-y-1"><Label>Tipo da chave Pix</Label><Select value={contaForm.tipoChavePix ?? ''} onChange={(event) => setContaForm((atual) => ({ ...atual, tipoChavePix: event.target.value }))} disabled={!contaForm.pixVinculado}><option value="">Selecione</option>{tiposChavePixDisponiveis.map((tipo) => <option key={tipo} value={tipo}>{tipo}</option>)}</Select></div>
             <div className="space-y-1"><Label>Chave Pix</Label><Input value={contaForm.chavePix ?? ''} onChange={(event) => setContaForm((atual) => ({ ...atual, chavePix: event.target.value }))} disabled={!contaForm.pixVinculado} /></div>

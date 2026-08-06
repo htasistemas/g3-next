@@ -34,6 +34,7 @@ export function mapContaBancariaToResponse(row: ContaBancariaRow) {
     tipo: normalizarTipoConta(row.tipo),
     titular: row.titular ?? undefined,
     projetoVinculado: row.projeto_vinculado ?? undefined,
+    fontePagamento: row.fonte_pagamento ?? undefined,
     pixVinculado: row.pix_vinculado,
     tipoChavePix: row.tipo_chave_pix ?? undefined,
     chavePix: row.chave_pix ?? undefined,
@@ -108,6 +109,7 @@ export function mapLancamentoToResponse(row: LancamentoFinanceiroRow) {
     conciliado: row.conciliado,
     bloqueadoOrigem: row.bloqueado_origem,
     contaBancariaNome: row.conta_bancaria_nome ?? undefined,
+    contaBancariaFontePagamento: row.conta_bancaria_fonte_pagamento ?? undefined,
     categoriaNome: row.categoria_nome ?? undefined,
     centroCustoNome: row.centro_custo_nome ?? undefined
   };

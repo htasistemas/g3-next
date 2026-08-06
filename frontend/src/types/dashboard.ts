@@ -26,6 +26,17 @@ export type DashboardGerencialBucket = {
   total: number;
 };
 
+export type DashboardGerencialMatrizFaixaEtariaBairro = {
+  bairro: string;
+  total: number;
+  criancas: number;
+  adolescentes: number;
+  jovens: number;
+  adultos: number;
+  idosos: number;
+  naoInformada: number;
+};
+
 export type DashboardGerencialKpi = {
   id: string;
   titulo: string;
@@ -141,6 +152,23 @@ export type DashboardGerencialResponse = {
     porTipo: DashboardGerencialBucket[];
     porDiaSemana: DashboardGerencialBucket[];
   };
+  doacoes: {
+    cestasEntregues: number;
+    cestasAEntregar: number;
+    cestasAtrasadas: number;
+    porBairro: DashboardGerencialBucket[];
+    porTipo: DashboardGerencialBucket[];
+    planejadasPorPrioridade: DashboardGerencialBucket[];
+  };
+  cursos: {
+    aulasRegistradas: number;
+    presencas: number;
+    ausencias: number;
+    justificadas: number;
+    taxaAusencia: number;
+    porCurso: DashboardGerencialBucket[];
+    porStatus: DashboardGerencialBucket[];
+  };
   engajamento: Array<{
     frente: string;
     beneficiariosVinculados: number;
@@ -160,7 +188,16 @@ export type DashboardGerencialResponse = {
     bairros: DashboardGerencialBucket[];
     cidades: DashboardGerencialBucket[];
     status: DashboardGerencialBucket[];
+    idadePorBairro: DashboardGerencialMatrizFaixaEtariaBairro[];
   };
+  riscoTerritorial: Array<{
+    bairro: string;
+    beneficiarios: number;
+    cestasEntregues: number;
+    cestasAEntregar: number;
+    ausenciasCurso: number;
+    criticidade: number;
+  }>;
   analiseInteligente: Array<{
     id: string;
     titulo: string;

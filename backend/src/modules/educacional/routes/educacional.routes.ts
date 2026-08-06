@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { asyncHandler } from "../../../shared/http/async-handler.js";
 import { ensureAuthenticated, ensurePermissions } from "../../auth/middlewares/auth.middleware.js";
 import { EducacionalController } from "../controllers/educacional.controller.js";
 
@@ -43,15 +44,15 @@ const editarPorRecurso = (request: Parameters<ReturnType<typeof ensurePermission
 };
 export const educacionalRoutes = Router();
 educacionalRoutes.use(ensureAuthenticated);
-educacionalRoutes.get("/resumo", visualizar, controller.resumo.bind(controller));
-educacionalRoutes.get("/alunos/busca", visualizar, controller.buscarBeneficiarios.bind(controller));
-educacionalRoutes.get("/unidades-ensino", visualizar, controller.listarUnidadesEnsino.bind(controller));
-educacionalRoutes.get("/alunos/agrupados", visualizar, controller.listarAlunosAgrupados.bind(controller));
-educacionalRoutes.get("/matriculas/:id/historico", ensurePermissions(["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS", "EDUCACIONAL_ALUNO_HISTORICO_VISUALIZAR", "EDUCACIONAL_MATRICULAS_VISUALIZAR"]), controller.listarHistoricoMatricula.bind(controller));
-educacionalRoutes.post("/matriculas/:id/transferir", ensurePermissions(["ADMINISTRADOR", "OPERADOR", "EDUCACIONAL_ALUNO_TRANSFERIR"]), controller.transferirMatricula.bind(controller));
-educacionalRoutes.put("/matriculas/:id/vinculo", ensurePermissions(["ADMINISTRADOR", "OPERADOR", "EDUCACIONAL_ALUNO_VINCULO_EDITAR"]), controller.editarVinculoMatricula.bind(controller));
-educacionalRoutes.post("/alunos/:alunoId/vinculo", ensurePermissions(["ADMINISTRADOR", "OPERADOR", "EDUCACIONAL_ALUNO_VINCULO_EDITAR"]), controller.criarVinculoAluno.bind(controller));
-educacionalRoutes.post("/alunos/vincular", ensurePermissions(["ADMINISTRADOR", "OPERADOR", "EDUCACIONAL_ALUNOS_EDITAR", "EDUCACIONAL_MATRICULAS_EDITAR"]), controller.vincularAluno.bind(controller));
-educacionalRoutes.get("/:recurso", visualizarPorRecurso, controller.listar.bind(controller));
-educacionalRoutes.post("/:recurso", editarPorRecurso, controller.salvar.bind(controller));
-educacionalRoutes.put("/:recurso/:id", editarPorRecurso, controller.salvar.bind(controller));
+educacionalRoutes.get("/resumo", visualizar, asyncHandler(controller.resumo.bind(controller)));
+educacionalRoutes.get("/alunos/busca", visualizar, asyncHandler(controller.buscarBeneficiarios.bind(controller)));
+educacionalRoutes.get("/unidades-ensino", visualizar, asyncHandler(controller.listarUnidadesEnsino.bind(controller)));
+educacionalRoutes.get("/alunos/agrupados", visualizar, asyncHandler(controller.listarAlunosAgrupados.bind(controller)));
+educacionalRoutes.get("/matriculas/:id/historico", ensurePermissions(["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS", "EDUCACIONAL_ALUNO_HISTORICO_VISUALIZAR", "EDUCACIONAL_MATRICULAS_VISUALIZAR"]), asyncHandler(controller.listarHistoricoMatricula.bind(controller)));
+educacionalRoutes.post("/matriculas/:id/transferir", ensurePermissions(["ADMINISTRADOR", "OPERADOR", "EDUCACIONAL_ALUNO_TRANSFERIR"]), asyncHandler(controller.transferirMatricula.bind(controller)));
+educacionalRoutes.put("/matriculas/:id/vinculo", ensurePermissions(["ADMINISTRADOR", "OPERADOR", "EDUCACIONAL_ALUNO_VINCULO_EDITAR"]), asyncHandler(controller.editarVinculoMatricula.bind(controller)));
+educacionalRoutes.post("/alunos/:alunoId/vinculo", ensurePermissions(["ADMINISTRADOR", "OPERADOR", "EDUCACIONAL_ALUNO_VINCULO_EDITAR"]), asyncHandler(controller.criarVinculoAluno.bind(controller)));
+educacionalRoutes.post("/alunos/vincular", ensurePermissions(["ADMINISTRADOR", "OPERADOR", "EDUCACIONAL_ALUNOS_EDITAR", "EDUCACIONAL_MATRICULAS_EDITAR"]), asyncHandler(controller.vincularAluno.bind(controller)));
+educacionalRoutes.get("/:recurso", visualizarPorRecurso, asyncHandler(controller.listar.bind(controller)));
+educacionalRoutes.post("/:recurso", editarPorRecurso, asyncHandler(controller.salvar.bind(controller)));
+educacionalRoutes.put("/:recurso/:id", editarPorRecurso, asyncHandler(controller.salvar.bind(controller)));

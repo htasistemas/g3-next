@@ -48,6 +48,7 @@ export type ContaBancariaPayload = {
   tipo: ContaBancariaTipo;
   titular?: string;
   projetoVinculado?: string;
+  fontePagamento?: string;
   pixVinculado?: boolean;
   tipoChavePix?: string;
   chavePix?: string;
@@ -124,6 +125,7 @@ export type LancamentoFinanceiro = LancamentoFinanceiroPayload & {
   conciliado: boolean;
   bloqueadoOrigem: boolean;
   contaBancariaNome?: string;
+  contaBancariaFontePagamento?: string;
   categoriaNome?: string;
   centroCustoNome?: string;
 };

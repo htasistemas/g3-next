@@ -53,6 +53,7 @@ export const contaBancariaInputSchema = z.object({
   }),
   titular: optionalTrimmedString.nullable().optional(),
   projetoVinculado: optionalTrimmedString.nullable().optional(),
+  fontePagamento: optionalTrimmedString.nullable().optional(),
   pixVinculado: z.coerce.boolean().optional(),
   tipoChavePix: optionalTrimmedString.nullable().optional(),
   chavePix: optionalTrimmedString.nullable().optional(),

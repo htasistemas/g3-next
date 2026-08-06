@@ -40,6 +40,7 @@ import { formatarMoeda as formatarMoedaBr, formatarMoedaInput, normalizarMoeda }
 import { cn } from "@/lib/utils";
 import { arquivosService } from "@/services/arquivos.service";
 import { useAuth } from "@/hooks/use-auth";
+import { useContasBancarias, useLancamentosContabeis } from "@/features/contabilidade/use-contabilidade";
 import { PrestacaoContasProfissionalPanel } from "./prestacao-contas-profissional-panel";
 import {
   useExcluirPrestacaoContas,
@@ -163,6 +164,9 @@ const timelineVazio: PrestacaoTimeline = { titulo: "", status: "pendente" };
 const checklistVazio: PrestacaoChecklist = { titulo: "", status: "pendente" };
 const despesaVazia: PrestacaoDespesa = { descricao: "", status: "PENDENTE" };
 const LIMITE_RESUMO_EXECUTIVO = 200;
+const periodicidadeReceitaOptions = ["Única", "Mensal", "Bimestral", "Trimestral", "Semestral", "Anual"];
+const situacaoReceitaOptions = ["Previsto", "Pendente", "Recebido", "Confirmado", "Conciliado", "Cancelado"];
+const labelDespesaClass = "flex min-h-8 items-start";
 
 function normalizarBusca(valor: string) {
   return valor
@@ -413,9 +417,10 @@ type CurrencyInputProps = {
   placeholder?: string;
   className?: string;
   onBlur?: () => void;
+  disabled?: boolean;
 };
 
-function CurrencyInput({ value, onValueChange, placeholder, className, onBlur }: CurrencyInputProps) {
+function CurrencyInput({ value, onValueChange, placeholder, className, onBlur, disabled }: CurrencyInputProps) {
   const [displayValue, setDisplayValue] = useState(() => formatCurrencyInput(value));
   const [isFocused, setIsFocused] = useState(false);
 
@@ -431,6 +436,7 @@ function CurrencyInput({ value, onValueChange, placeholder, className, onBlur }:
       placeholder={placeholder}
       value={displayValue}
       className={className}
+      disabled={disabled}
       onFocus={() => setIsFocused(true)}
       onChange={(event) => {
         const next = event.target.value;
@@ -441,6 +447,57 @@ function CurrencyInput({ value, onValueChange, placeholder, className, onBlur }:
         const parsed = parseCurrencyInput(displayValue);
         setIsFocused(false);
         setDisplayValue(formatCurrencyInput(parsed));
+        onValueChange(parsed);
+        onBlur?.();
+      }}
+    />
+  );
+}
+
+type PercentInputProps = {
+  value?: number;
+  onValueChange: (value?: number) => void;
+  className?: string;
+  onBlur?: () => void;
+};
+
+function parsePercentInput(raw: string) {
+  const texto = raw.replace("%", "").trim();
+  if (!texto) return undefined;
+  const parsed = Number(texto.replace(/\./g, "").replace(",", "."));
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function formatPercentInput(value?: number) {
+  if (value == null || Number.isNaN(value)) return "";
+  return `${value.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}%`;
+}
+
+function PercentInput({ value, onValueChange, className, onBlur }: PercentInputProps) {
+  const [displayValue, setDisplayValue] = useState(() => formatPercentInput(value));
+  const [isFocused, setIsFocused] = useState(false);
+
+  useEffect(() => {
+    if (!isFocused) {
+      setDisplayValue(formatPercentInput(value));
+    }
+  }, [isFocused, value]);
+
+  return (
+    <Input
+      inputMode="decimal"
+      value={displayValue}
+      className={className}
+      onFocus={() => setIsFocused(true)}
+      onChange={(event) => {
+        const next = event.target.value;
+        setDisplayValue(next);
+        onValueChange(parsePercentInput(next));
+      }}
+      onBlur={() => {
+        const parsed = parsePercentInput(displayValue);
+        setIsFocused(false);
+        setDisplayValue(formatPercentInput(parsed));
         onValueChange(parsed);
         onBlur?.();
       }}
@@ -490,11 +547,31 @@ export function PrestacaoContasPage() {
   const [confirmarExclusao, setConfirmarExclusao] = useState(false);
 
   const prestacoesQuery = usePrestacoesContas();
+  const lancamentosContabeisQuery = useLancamentosContabeis({ enabled: abaAtiva === "receitas" });
+  const contasBancariasQuery = useContasBancarias({ enabled: abaAtiva === "receitas" });
   const salvarMutation = useSalvarPrestacaoContas();
   const excluirMutation = useExcluirPrestacaoContas();
   const workflowMutation = useAlterarWorkflowPrestacao();
 
   const prestacoes = prestacoesQuery.data ?? [];
+  const fontesReceitaContabilidade = useMemo(() => {
+    const fontes = new Set<string>();
+    const fontesPorConta = new Map(
+      (contasBancariasQuery.data ?? [])
+        .filter((conta) => conta.fontePagamento?.trim())
+        .map((conta) => [conta.id, conta.fontePagamento?.trim() ?? ""])
+    );
+    fontesPorConta.forEach((fonte) => fontes.add(fonte));
+    (lancamentosContabeisQuery.data ?? [])
+      .filter((item) => item.tipo === "RECEITA")
+      .forEach((item) => {
+        const fonte =
+          item.contaBancariaFontePagamento?.trim() ||
+          (item.contaBancariaId ? fontesPorConta.get(item.contaBancariaId) : undefined);
+        if (fonte) fontes.add(fonte);
+      });
+    return Array.from(fontes).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [contasBancariasQuery.data, lancamentosContabeisQuery.data]);
   const resumoAtual = useMemo(() => calcularResumo(form), [form]);
   const processando = salvarMutation.isPending || excluirMutation.isPending || workflowMutation.isPending || enviandoArquivo;
 
@@ -548,8 +625,17 @@ export function PrestacaoContasPage() {
   }
 
   function atualizarCampoPrincipal(field: MainField, value?: number) {
-    setForm((atual) => ({ ...atual, [field]: value }));
-    setMainErrors((atual) => ({ ...atual, [field]: undefined }));
+    setForm((atual) => {
+      const proximo = { ...atual, [field]: value };
+      if (field === "totalRecebido" || field === "totalAplicado") {
+        proximo.saldoDisponivel =
+          proximo.totalRecebido != null && proximo.totalAplicado != null
+            ? Number((proximo.totalRecebido - proximo.totalAplicado).toFixed(2))
+            : undefined;
+      }
+      return proximo;
+    });
+    setMainErrors((atual) => ({ ...atual, [field]: undefined, saldoDisponivel: undefined }));
   }
 
   function validarPrincipaisAntesDeSalvar() {
@@ -1028,16 +1114,11 @@ export function PrestacaoContasPage() {
                     <Label>Saldo disponível</Label>
                     <CurrencyInput
                       value={form.saldoDisponivel}
-                      onValueChange={(value) => atualizarCampoPrincipal("saldoDisponivel", value)}
-                      onBlur={() =>
-                        setMainErrors((atual) => ({
-                          ...atual,
-                          saldoDisponivel: validarCampoPrincipal("saldoDisponivel", form)
-                        }))
-                      }
+                      onValueChange={() => undefined}
+                      disabled
                       className={mainErrors.saldoDisponivel ? "border-red-300 focus:ring-red-500" : undefined}
                     />
-                    <HintText text={`Saldo calculado pela tela: ${formatarMoeda(resumoAtual.saldoCalculado)}`} />
+                    <HintText text="Calculado automaticamente: total recebido menos total aplicado." />
                     <ErrorText message={mainErrors.saldoDisponivel} />
                   </div>
 
@@ -1087,27 +1168,31 @@ export function PrestacaoContasPage() {
                 <CardTitle>Despesas e pagamentos</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
-                  <div className="space-y-1 xl:col-span-2">
-                    <Label>Descrição *</Label>
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-8">
+                  <div className="space-y-1 xl:col-span-3">
+                    <Label className={labelDespesaClass}>Descrição *</Label>
                     <Input value={novaDespesa.descricao} className={despesaErrors.descricao ? "border-red-300" : undefined} onChange={(event) => setNovaDespesa((atual) => ({ ...atual, descricao: event.target.value }))} />
                     <ErrorText message={despesaErrors.descricao} />
                   </div>
-                  <div className="space-y-1">
-                    <Label>Fornecedor</Label>
+                  <div className="space-y-1 xl:col-span-2">
+                    <Label className={labelDespesaClass}>Fornecedor</Label>
                     <Input value={novaDespesa.fornecedor ?? ""} onChange={(event) => setNovaDespesa((atual) => ({ ...atual, fornecedor: event.target.value }))} />
                   </div>
                   <div className="space-y-1">
-                    <Label>Documento fiscal</Label>
+                    <Label className={labelDespesaClass}>Documento fiscal</Label>
                     <Input value={novaDespesa.documentoFiscal ?? ""} onChange={(event) => setNovaDespesa((atual) => ({ ...atual, documentoFiscal: event.target.value }))} />
                   </div>
                   <div className="space-y-1">
-                    <Label>Data do pagamento</Label>
+                    <Label className={labelDespesaClass}>Data do pagamento</Label>
                     <Input type="date" value={novaDespesa.dataPagamento ?? ""} onChange={(event) => setNovaDespesa((atual) => ({ ...atual, dataPagamento: event.target.value }))} />
                   </div>
                   <div className="space-y-1">
-                    <Label>Valor *</Label>
-                    <Input type="number" min="0" step="0.01" value={novaDespesa.valor ?? ""} className={despesaErrors.valor ? "border-red-300" : undefined} onChange={(event) => setNovaDespesa((atual) => ({ ...atual, valor: event.target.value === "" ? undefined : Number(event.target.value) }))} />
+                    <Label className={labelDespesaClass}>Valor *</Label>
+                    <CurrencyInput
+                      value={novaDespesa.valor}
+                      className={despesaErrors.valor ? "border-red-300" : undefined}
+                      onValueChange={(value) => setNovaDespesa((atual) => ({ ...atual, valor: value }))}
+                    />
                     <ErrorText message={despesaErrors.valor} />
                   </div>
                 </div>
@@ -1136,7 +1221,7 @@ export function PrestacaoContasPage() {
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                   <div className="space-y-1">
                     <Label>Fonte *</Label>
-                    <Input
+                    <Select
                       value={novoRecebimento.fonte}
                       className={recebimentoErrors.fonte ? "border-red-300 focus:ring-red-500" : undefined}
                       onBlur={() => setRecebimentoErrors(validarRecebimento(novoRecebimento))}
@@ -1146,7 +1231,11 @@ export function PrestacaoContasPage() {
                           fonte: event.target.value
                         }))
                       }
-                    />
+                    >
+                      <option value="">Selecione a fonte</option>
+                      {fontesReceitaContabilidade.map((fonte) => <option key={fonte} value={fonte}>{fonte}</option>)}
+                    </Select>
+                    <HintText text={lancamentosContabeisQuery.isLoading || contasBancariasQuery.isLoading ? "Carregando fontes da contabilidade." : "Fontes vinculadas às contas bancárias da contabilidade."} />
                     <ErrorText message={recebimentoErrors.fonte} />
                   </div>
 
@@ -1168,30 +1257,34 @@ export function PrestacaoContasPage() {
 
                   <div className="space-y-1">
                     <Label>Periodicidade</Label>
-                    <Input
+                    <Select
                       value={novoRecebimento.periodicidade ?? ""}
-                      placeholder="Mensal, eventual, anual..."
                       onChange={(event) =>
                         setNovoRecebimento((atual) => ({
                           ...atual,
                           periodicidade: event.target.value
                         }))
                       }
-                    />
+                    >
+                      <option value="">Selecione</option>
+                      {periodicidadeReceitaOptions.map((item) => <option key={item} value={item}>{item}</option>)}
+                    </Select>
                   </div>
 
                   <div className="space-y-1">
                     <Label>Situação</Label>
-                    <Input
+                    <Select
                       value={novoRecebimento.status ?? ""}
-                      placeholder="Recebido, previsto, confirmado..."
                       onChange={(event) =>
                         setNovoRecebimento((atual) => ({
                           ...atual,
                           status: event.target.value
                         }))
                       }
-                    />
+                    >
+                      <option value="">Selecione</option>
+                      {situacaoReceitaOptions.map((item) => <option key={item} value={item}>{item}</option>)}
+                    </Select>
                   </div>
                 </div>
 
@@ -1257,7 +1350,7 @@ export function PrestacaoContasPage() {
                 <CardTitle>Aplicação dos recursos</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
                   <div className="space-y-1 xl:col-span-2">
                     <Label>Título *</Label>
                     <Input
@@ -1276,22 +1369,21 @@ export function PrestacaoContasPage() {
 
                   <div className="space-y-1">
                     <Label>Percentual</Label>
-                    <Input
-                      inputMode="decimal"
-                      value={novaDestinacao.percentual ?? ""}
+                    <PercentInput
+                      value={novaDestinacao.percentual}
                       className={destinacaoErrors.percentual ? "border-red-300 focus:ring-red-500" : undefined}
                       onBlur={() => setDestinacaoErrors(validarDestinacao(novaDestinacao))}
-                      onChange={(event) =>
+                      onValueChange={(value) =>
                         setNovaDestinacao((atual) => ({
                           ...atual,
-                          percentual: event.target.value ? Number(event.target.value.replace(",", ".")) : undefined
+                          percentual: value
                         }))
                       }
                     />
                     <ErrorText message={destinacaoErrors.percentual} />
                   </div>
 
-                  <div className="space-y-1">
+                  <div className="space-y-1 xl:col-span-3">
                     <Label>Descrição</Label>
                     <Input
                       value={novaDestinacao.descricao ?? ""}

@@ -49,7 +49,8 @@ import { classesTelaPadraoBeneficiario } from "@/lib/tela-padrao-beneficiario";
 import type {
   DashboardGerencialBucket,
   DashboardGerencialFiltros,
-  DashboardGerencialKpi
+  DashboardGerencialKpi,
+  DashboardGerencialMatrizFaixaEtariaBairro
 } from "@/types/dashboard";
 
 const presetsPeriodo = [
@@ -157,6 +158,53 @@ function GraficoBarras({ dados, cor = "#2563eb" }: { dados: DashboardGerencialBu
         <Bar dataKey="total" fill={cor} radius={[8, 8, 0, 0]} />
       </BarChart>
     </ResponsiveChart>
+  );
+}
+
+const faixasIdade = [
+  { chave: "criancas", label: "Crianças", cor: "#0ea5e9" },
+  { chave: "adolescentes", label: "Adolescentes", cor: "#14b8a6" },
+  { chave: "jovens", label: "Jovens", cor: "#84cc16" },
+  { chave: "adultos", label: "Adultos", cor: "#f59e0b" },
+  { chave: "idosos", label: "Idosos", cor: "#ef4444" },
+  { chave: "naoInformada", label: "Sem idade", cor: "#64748b" }
+] as const;
+
+function MatrizIdadeBairro({ dados }: { dados: DashboardGerencialMatrizFaixaEtariaBairro[] }) {
+  if (!dados.length) return <EstadoVazio texto="Ainda não existem dados suficientes para cruzar idade por bairro." />;
+  const maior = Math.max(1, ...dados.flatMap((bairro) => faixasIdade.map((faixa) => Number(bairro[faixa.chave]))));
+
+  return (
+    <div className="overflow-auto">
+      <table className="w-full min-w-[760px] text-sm">
+        <thead>
+          <tr className="text-left text-xs uppercase text-slate-500">
+            <th className="px-2 py-2">Bairro</th>
+            {faixasIdade.map((faixa) => <th key={faixa.chave} className="px-2 py-2">{faixa.label}</th>)}
+            <th className="px-2 py-2 text-right">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {dados.map((bairro) => (
+            <tr key={bairro.bairro} className="border-t border-slate-200">
+              <td className="max-w-[180px] truncate px-2 py-2 font-semibold text-slate-950">{bairro.bairro}</td>
+              {faixasIdade.map((faixa) => {
+                const valor = Number(bairro[faixa.chave]);
+                const intensidade = Math.max(0.08, valor / maior);
+                return (
+                  <td key={faixa.chave} className="px-2 py-2">
+                    <div className="rounded-md px-2 py-1 text-center font-semibold text-slate-950" style={{ backgroundColor: `${faixa.cor}${Math.round(intensidade * 180).toString(16).padStart(2, "0")}` }}>
+                      {formatarNumero(valor)}
+                    </div>
+                  </td>
+                );
+              })}
+              <td className="px-2 py-2 text-right font-bold text-slate-950">{formatarNumero(bairro.total)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -282,6 +330,8 @@ export function DashboardGerencialPage() {
   const pendencias = data?.pendencias ?? [];
   const evolucao = data?.evolucaoBeneficiarios ?? [];
   const atendimentos = data?.atendimentos;
+  const doacoes = data?.doacoes;
+  const cursos = data?.cursos;
 
   const destaque = useMemo(() => {
     const beneficiarios = cards.find((card) => card.id === "beneficiarios-ativos")?.valor ?? 0;
@@ -607,6 +657,61 @@ export function DashboardGerencialPage() {
               </div>
             ))}
             {!data?.impactoSocial.length ? <EstadoVazio texto="Ainda não existem dados suficientes para calcular este indicador." /> : null}
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+        <Card className="border-[var(--g3-border)] bg-[var(--g3-card)] shadow-sm">
+          <CardHeader><TituloBloco icon={Target} titulo="Operação alimentar" subtitulo="Cestas entregues, pendentes e atrasadas" /></CardHeader>
+          <CardContent>
+            <div className="mb-4 grid grid-cols-3 gap-3 text-sm">
+              <div className="rounded-lg bg-emerald-50 p-3"><p className="text-emerald-700">Entregues</p><strong className="text-2xl text-emerald-950">{formatarNumero(doacoes?.cestasEntregues ?? 0)}</strong></div>
+              <div className="rounded-lg bg-amber-50 p-3"><p className="text-amber-700">A entregar</p><strong className="text-2xl text-amber-950">{formatarNumero(doacoes?.cestasAEntregar ?? 0)}</strong></div>
+              <div className="rounded-lg bg-red-50 p-3"><p className="text-red-700">Atrasadas</p><strong className="text-2xl text-red-950">{formatarNumero(doacoes?.cestasAtrasadas ?? 0)}</strong></div>
+            </div>
+            <GraficoBarras dados={doacoes?.porBairro ?? []} cor="#16a34a" />
+          </CardContent>
+        </Card>
+
+        <Card className="border-[var(--g3-border)] bg-[var(--g3-card)] shadow-sm">
+          <CardHeader><TituloBloco icon={CalendarClock} titulo="Frequência dos cursos" subtitulo="Aulas, presenças e ausências que pedem busca ativa" /></CardHeader>
+          <CardContent>
+            <div className="mb-4 grid grid-cols-2 gap-3 text-sm md:grid-cols-5">
+              <div className="rounded-lg bg-slate-100 p-3"><p className="text-slate-600">Aulas</p><strong className="text-2xl text-slate-950">{formatarNumero(cursos?.aulasRegistradas ?? 0)}</strong></div>
+              <div className="rounded-lg bg-teal-50 p-3"><p className="text-teal-700">Presenças</p><strong className="text-2xl text-teal-950">{formatarNumero(cursos?.presencas ?? 0)}</strong></div>
+              <div className="rounded-lg bg-red-50 p-3"><p className="text-red-700">Ausências</p><strong className="text-2xl text-red-950">{formatarNumero(cursos?.ausencias ?? 0)}</strong></div>
+              <div className="rounded-lg bg-amber-50 p-3"><p className="text-amber-700">Justificadas</p><strong className="text-2xl text-amber-950">{formatarNumero(cursos?.justificadas ?? 0)}</strong></div>
+              <div className="rounded-lg bg-indigo-50 p-3"><p className="text-indigo-700">Taxa</p><strong className="text-2xl text-indigo-950">{formatarPercentual(cursos?.taxaAusencia ?? 0)}</strong></div>
+            </div>
+            <GraficoBarras dados={cursos?.porCurso ?? []} cor="#dc2626" />
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+        <Card className="border-[var(--g3-border)] bg-[var(--g3-card)] shadow-sm">
+          <CardHeader><TituloBloco icon={UsersRound} titulo="Idade por bairro" subtitulo="Matriz territorial para priorizar ações por ciclo de vida" /></CardHeader>
+          <CardContent><MatrizIdadeBairro dados={data?.perfilBeneficiarios.idadePorBairro ?? []} /></CardContent>
+        </Card>
+
+        <Card className="border-[var(--g3-border)] bg-[var(--g3-card)] shadow-sm">
+          <CardHeader><TituloBloco icon={Sparkles} titulo="IA territorial" subtitulo="Ranking ponderado por demanda, cesta pendente e ausência" /></CardHeader>
+          <CardContent className="space-y-3">
+            {data?.riscoTerritorial.length ? data.riscoTerritorial.map((item, index) => (
+              <div key={item.bairro} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-slate-950">{index + 1}. {item.bairro}</p>
+                    <p className="text-xs text-slate-500">{formatarNumero(item.beneficiarios)} beneficiários · {formatarNumero(item.cestasAEntregar)} cestas · {formatarNumero(item.ausenciasCurso)} ausências</p>
+                  </div>
+                  <Badge variant={index < 3 ? "danger" : index < 6 ? "warning" : "info"}>{formatarNumero(item.criticidade)}</Badge>
+                </div>
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-white">
+                  <div className="h-full rounded-full bg-[var(--g3-active)]" style={{ width: `${Math.min(100, item.criticidade / Math.max(1, data.riscoTerritorial[0]?.criticidade ?? 1) * 100)}%` }} />
+                </div>
+              </div>
+            )) : <EstadoVazio texto="Ainda não existem dados suficientes para montar o ranking territorial." />}
           </CardContent>
         </Card>
       </section>

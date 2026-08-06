@@ -57,6 +57,7 @@ export type ContaBancariaInput = {
   tipo: ContaBancariaTipo;
   titular?: string | null;
   projetoVinculado?: string | null;
+  fontePagamento?: string | null;
   pixVinculado?: boolean;
   tipoChavePix?: string | null;
   chavePix?: string | null;
@@ -184,6 +185,7 @@ export type ContaBancariaRow = {
   tipo: string;
   titular: string | null;
   projeto_vinculado: string | null;
+  fonte_pagamento: string | null;
   pix_vinculado: boolean;
   tipo_chave_pix: string | null;
   chave_pix: string | null;
@@ -251,6 +253,7 @@ export type LancamentoFinanceiroRow = {
   bloqueado_origem: boolean;
   ativo: boolean;
   conta_bancaria_nome: string | null;
+  conta_bancaria_fonte_pagamento: string | null;
   categoria_nome: string | null;
   centro_custo_nome: string | null;
 };

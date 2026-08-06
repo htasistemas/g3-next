@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.804",
+  "latestVersion": "1.00.808",
   "releaseDate": "2026-08-06",
-  "description": "Novo dashboard gerencial no Painel de Indicadores.",
+  "description": "Correção da busca por nome na aba Alunos do Educacional.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.803",
+  "minCompatibleVersion": "1.00.807",
   "releaseType": "stable",
   "downloadUrl": null
 }

@@ -72,6 +72,10 @@ function jsonSeguro(valor: unknown) {
   });
 }
 
+function somenteDigitos(valor: string) {
+  return valor.replace(/\D/g, "");
+}
+
 export class EducacionalRepository {
   async garantirEstrutura() {
     const chave = "educacional-fase1";
@@ -216,13 +220,22 @@ export class EducacionalRepository {
     if (filtros.matricula_pendente) condicoes.push(Prisma.sql`COALESCE(m.situacao, 'PENDENTE') = 'PENDENTE'`);
     if (filtros.busca) {
       const busca = `%${filtros.busca}%`;
+      const digitosBusca = somenteDigitos(filtros.busca);
+      const condicoesBusca = [
+        Prisma.sql`b.nome_completo ILIKE ${busca}`,
+        Prisma.sql`COALESCE(b.codigo, '') ILIKE ${busca}`,
+        Prisma.sql`COALESCE(m.numero_matricula, '') ILIKE ${busca}`,
+        Prisma.sql`COALESCE(b.nome_mae, '') ILIKE ${busca}`
+      ];
+      if (digitosBusca) {
+        const buscaNumerica = `%${digitosBusca}%`;
+        condicoesBusca.push(
+          Prisma.sql`regexp_replace(COALESCE(b.cpf, ''), '[^0-9]', '', 'g') LIKE ${buscaNumerica}`,
+          Prisma.sql`EXISTS (SELECT 1 FROM contato_beneficiario cb WHERE cb.beneficiario_id = b.id AND regexp_replace(COALESCE(cb.telefone_principal, ''), '[^0-9]', '', 'g') LIKE ${buscaNumerica})`
+        );
+      }
       condicoes.push(Prisma.sql`(
-        b.nome_completo ILIKE ${busca}
-        OR COALESCE(b.codigo, '') ILIKE ${busca}
-        OR regexp_replace(COALESCE(b.cpf, ''), '[^0-9]', '', 'g') LIKE regexp_replace(${busca}, '[^0-9]', '', 'g')
-        OR COALESCE(m.numero_matricula, '') ILIKE ${busca}
-        OR COALESCE(b.nome_mae, '') ILIKE ${busca}
-        OR EXISTS (SELECT 1 FROM contato_beneficiario cb WHERE cb.beneficiario_id = b.id AND COALESCE(cb.telefone_principal, '') ILIKE ${busca})
+        ${Prisma.join(condicoesBusca, " OR ")}
       )`);
     }
     const where = Prisma.join(condicoes, " AND ");

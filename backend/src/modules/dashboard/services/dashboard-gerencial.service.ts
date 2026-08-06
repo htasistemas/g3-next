@@ -33,6 +33,23 @@ type Periodo = {
 
 type TotalRow = { total: unknown };
 type BucketRow = { chave: string | null; rotulo?: string | null; total: unknown };
+type IdadeBairroRow = {
+  bairro: string | null;
+  total: unknown;
+  criancas: unknown;
+  adolescentes: unknown;
+  jovens: unknown;
+  adultos: unknown;
+  idosos: unknown;
+  nao_informada: unknown;
+};
+type RiscoTerritorialRow = {
+  bairro: string | null;
+  beneficiarios: unknown;
+  cestas_entregues: unknown;
+  cestas_a_entregar: unknown;
+  ausencias_curso: unknown;
+};
 
 const permissoesBaseDashboard = ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS", "PAINEL_INDICADORES_DASHBOARD_VISUALIZAR"];
 const permissoesExportar = ["ADMINISTRADOR", "PAINEL_INDICADORES_DASHBOARD_EXPORTAR"];
@@ -136,24 +153,30 @@ export class DashboardGerencialService {
       cards,
       evolucaoBeneficiarios,
       atendimentos,
+      doacoes,
+      cursos,
       engajamento,
       projetos,
       pendencias,
       eventos,
       impactoSocial,
-      perfilBeneficiarios
+      perfilBeneficiarios,
+      riscoTerritorial
     ] = await Promise.all([
       this.bloco("instituicao", tenantId, () => this.obterInstituicao(authUser, tenantId), { id: authUser?.instituicao_id, nome: authUser?.instituicao_nome, logoUrl: null }),
       this.bloco("opcoes", tenantId, () => this.obterOpcoes(tenantId), { unidades: [], projetos: [], programas: [], servicos: [], profissionais: [], tiposAtendimento: [], statusBeneficiario: [], bairros: [], cidades: [], territorios: [] }),
       this.bloco("cards", tenantId, () => this.obterCards(tenantId, periodo), [] as DashboardGerencialKpi[]),
       this.bloco("evolucao de beneficiarios", tenantId, () => this.obterEvolucaoBeneficiarios(tenantId, periodo), []),
       this.bloco("atendimentos", tenantId, () => this.obterAtendimentos(tenantId, periodo), { total: 0, pessoasUnicas: 0, taxaComparecimento: 0, taxaAusencia: 0, porStatus: [], porTipo: [], porDiaSemana: [] }),
+      this.bloco("doacoes", tenantId, () => this.obterDoacoes(tenantId, periodo), { cestasEntregues: 0, cestasAEntregar: 0, cestasAtrasadas: 0, porBairro: [], porTipo: [], planejadasPorPrioridade: [] }),
+      this.bloco("cursos", tenantId, () => this.obterCursos(tenantId, periodo), { aulasRegistradas: 0, presencas: 0, ausencias: 0, justificadas: 0, taxaAusencia: 0, porCurso: [], porStatus: [] }),
       this.bloco("engajamento", tenantId, () => this.obterEngajamento(tenantId, periodo), []),
       this.bloco("projetos", tenantId, () => this.obterProjetos(tenantId), [] as DashboardGerencialProjeto[]),
       this.bloco("pendencias", tenantId, () => this.obterPendencias(tenantId), [] as DashboardGerencialPendencia[]),
       this.bloco("eventos", tenantId, () => this.obterEventos(tenantId), [] as DashboardGerencialEvento[]),
       this.bloco("impacto social", tenantId, () => this.obterImpactoSocial(tenantId, periodo, permissoes), [] as DashboardGerencialBucket[]),
-      this.bloco("perfil de beneficiarios", tenantId, () => this.obterPerfilBeneficiarios(tenantId, permissoes), { faixaEtaria: [], sexo: [], bairros: [], cidades: [], status: [] })
+      this.bloco("perfil de beneficiarios", tenantId, () => this.obterPerfilBeneficiarios(tenantId, permissoes), { faixaEtaria: [], sexo: [], bairros: [], cidades: [], status: [], idadePorBairro: [] }),
+      this.bloco("risco territorial", tenantId, () => this.obterRiscoTerritorial(tenantId, periodo), [])
     ]);
 
     const avisos = [
@@ -167,7 +190,10 @@ export class DashboardGerencialService {
       ...pendencias.avisos,
       ...eventos.avisos,
       ...impactoSocial.avisos,
-      ...perfilBeneficiarios.avisos
+      ...perfilBeneficiarios.avisos,
+      ...doacoes.avisos,
+      ...cursos.avisos,
+      ...riscoTerritorial.avisos
     ];
 
     return {
@@ -184,13 +210,16 @@ export class DashboardGerencialService {
       cards: cards.dados,
       evolucaoBeneficiarios: evolucaoBeneficiarios.dados,
       atendimentos: atendimentos.dados,
+      doacoes: doacoes.dados,
+      cursos: cursos.dados,
       engajamento: engajamento.dados,
       projetos: projetos.dados,
       pendencias: pendencias.dados,
       eventos: eventos.dados,
       impactoSocial: impactoSocial.dados,
       perfilBeneficiarios: perfilBeneficiarios.dados,
-      analiseInteligente: this.montarAnalise(cards.dados, atendimentos.dados, projetos.dados, pendencias.dados, periodo),
+      riscoTerritorial: riscoTerritorial.dados,
+      analiseInteligente: this.montarAnalise(cards.dados, atendimentos.dados, projetos.dados, pendencias.dados, periodo, doacoes.dados, cursos.dados, riscoTerritorial.dados),
       avisos
     };
   }
@@ -241,6 +270,11 @@ export class DashboardGerencialService {
       projetosAtivosAnterior,
       eventos,
       eventosAnterior,
+      cestasEntregues,
+      cestasEntreguesAnterior,
+      cestasAEntregar,
+      ausenciasCurso,
+      ausenciasCursoAnterior,
       acoes
     ] = await Promise.all([
       this.contarBeneficiariosAtivos(tenantId, periodo.endDate),
@@ -257,6 +291,11 @@ export class DashboardGerencialService {
       this.contarProjetosAtivos(tenantId),
       this.contarEventosAcoes(tenantId, periodo.startDate, periodo.endDate),
       this.contarEventosAcoes(tenantId, periodo.previousStartDate, periodo.previousEndDate),
+      this.contarCestasEntregues(tenantId, periodo.startDate, periodo.endDate),
+      this.contarCestasEntregues(tenantId, periodo.previousStartDate, periodo.previousEndDate),
+      this.contarCestasAEntregar(tenantId, periodo.endDate),
+      this.contarAusenciasCurso(tenantId, periodo.startDate, periodo.endDate),
+      this.contarAusenciasCurso(tenantId, periodo.previousStartDate, periodo.previousEndDate),
       this.contarItensAcao(tenantId)
     ]);
 
@@ -266,6 +305,9 @@ export class DashboardGerencialService {
       montarKpi({ id: "pessoas-atendidas", titulo: "Pessoas atendidas", valor: pessoasAtendidas, anterior: pessoasAtendidasAnterior, interpretacao: "positiva", tooltip: "Pessoas únicas com atendimento registrado no período.", origem: "central_atendimento.beneficiario_id", rotaDetalhe: "/atendimentos/central-atendimentos" }),
       montarKpi({ id: "atendimentos-realizados", titulo: "Atendimentos realizados", valor: atendimentos, anterior: atendimentosAnterior, interpretacao: "positiva", tooltip: "Quantidade de atendimentos registrados no período.", origem: "central_atendimento", rotaDetalhe: "/atendimentos/central-atendimentos" }),
       montarKpi({ id: "atividades-coletivas", titulo: "Atividades coletivas realizadas", valor: atividades, anterior: atividadesAnterior, interpretacao: "positiva", tooltip: "Agendamentos ou matrículas coletivas realizadas no período.", origem: "agendamento e cursos_atendimentos_presencas", rotaDetalhe: "/atendimentos/agendamentos" }),
+      montarKpi({ id: "cestas-entregues", titulo: "Cestas entregues", valor: cestasEntregues, anterior: cestasEntreguesAnterior, interpretacao: "positiva", tooltip: "Cestas básicas registradas como doação realizada no período.", origem: "doacao_realizada e doacao_realizada_item", rotaDetalhe: "/doacoes-realizadas" }),
+      montarKpi({ id: "cestas-a-entregar", titulo: "Cestas a entregar", valor: cestasAEntregar, anterior: 0, interpretacao: "negativa", tooltip: "Cestas básicas planejadas com status pendente até o fim do período.", origem: "doacao_planejada", rotaDetalhe: "/doacoes-realizadas" }),
+      montarKpi({ id: "ausencias-curso", titulo: "Ausências em cursos", valor: ausenciasCurso, anterior: ausenciasCursoAnterior, interpretacao: "negativa", tooltip: "Registros de falta ou ausência em aulas de cursos no período.", origem: "cursos_atendimentos_presencas.status", rotaDetalhe: "/cadastros/matriculas" }),
       montarKpi({ id: "projetos-ativos", titulo: "Projetos ativos", valor: projetosAtivos, anterior: projetosAtivosAnterior, interpretacao: "positiva", tooltip: "Projetos em execução ou ativos.", origem: "projetos", rotaDetalhe: "/setor-administrativo/projetos" }),
       montarKpi({ id: "eventos-acoes", titulo: "Eventos e ações sociais", valor: eventos, anterior: eventosAnterior, interpretacao: "positiva", tooltip: "Compromissos, eventos e ações sociais no período.", origem: "agendamento e emprestimos_eventos", rotaDetalhe: "/atendimentos/agendamentos" }),
       montarKpi({ id: "itens-acao", titulo: "Itens que pedem ação", valor: acoes, anterior: 0, interpretacao: "negativa", tooltip: "Pendências operacionais consolidadas dos módulos monitorados.", origem: "cadastros, documentos, agenda, projetos, estoque e convênios", rotaDetalhe: "/dashboard/gerencial#itens-acao" })
@@ -325,6 +367,64 @@ export class DashboardGerencialService {
       porStatus,
       porTipo,
       porDiaSemana
+    };
+  }
+
+  private async obterDoacoes(tenantId: string, periodo: Periodo) {
+    const [cestasEntregues, cestasAEntregar, cestasAtrasadas, porBairro, porTipo, planejadasPorPrioridade] = await Promise.all([
+      this.contarCestasEntregues(tenantId, periodo.startDate, periodo.endDate),
+      this.contarCestasAEntregar(tenantId, periodo.endDate),
+      this.contarCestasAtrasadas(tenantId, periodo.endDate),
+      this.obterCestasEntreguesPorBairro(tenantId, periodo),
+      this.obterCestasEntreguesPorTipo(tenantId, periodo),
+      this.obterCestasPlanejadasPorPrioridade(tenantId, periodo)
+    ]);
+
+    return {
+      cestasEntregues,
+      cestasAEntregar,
+      cestasAtrasadas,
+      porBairro,
+      porTipo,
+      planejadasPorPrioridade
+    };
+  }
+
+  private async obterCursos(tenantId: string, periodo: Periodo) {
+    if (!(await this.tabelaExiste("cursos_atendimentos_presencas"))) {
+      return { aulasRegistradas: 0, presencas: 0, ausencias: 0, justificadas: 0, taxaAusencia: 0, porCurso: [], porStatus: [] };
+    }
+
+    const [resumoRows, porCurso, porStatus] = await Promise.all([
+      this.query<{ aulas: unknown; presencas: unknown; ausencias: unknown; justificadas: unknown }>(
+        `
+        SELECT COUNT(DISTINCT data_aula)::bigint AS aulas,
+               COUNT(*) FILTER (WHERE UPPER(TRIM(COALESCE(status, ''))) IN ('PRESENTE', 'PRESENCA', 'COMPARECEU'))::bigint AS presencas,
+               COUNT(*) FILTER (WHERE UPPER(TRIM(COALESCE(status, ''))) IN ('FALTA', 'AUSENTE', 'AUSENCIA', 'NAO_COMPARECEU', 'NÃO_COMPARECEU'))::bigint AS ausencias,
+               COUNT(*) FILTER (WHERE UPPER(TRIM(COALESCE(status, ''))) IN ('JUSTIFICADO', 'FALTA_JUSTIFICADA'))::bigint AS justificadas
+        FROM cursos_atendimentos_presencas
+        ${await this.whereComTenant("cursos_atendimentos_presencas", ["data_aula IS NOT NULL", "CAST(data_aula AS date) >= $2", "CAST(data_aula AS date) <= $3"])}
+        `,
+        [tenantId, periodo.startDate, periodo.endDate]
+      ),
+      this.obterAusenciasPorCurso(tenantId, periodo),
+      this.contarBuckets("cursos_atendimentos_presencas", "status", tenantId, "data_aula", periodo.startDate, periodo.endDate)
+    ]);
+
+    const resumo = resumoRows[0];
+    const presencas = toNumber(resumo?.presencas);
+    const ausencias = toNumber(resumo?.ausencias);
+    const justificadas = toNumber(resumo?.justificadas);
+    const totalLancamentos = presencas + ausencias + justificadas;
+
+    return {
+      aulasRegistradas: toNumber(resumo?.aulas),
+      presencas,
+      ausencias,
+      justificadas,
+      taxaAusencia: totalLancamentos ? Math.round(((ausencias + justificadas) / totalLancamentos) * 1000) / 10 : 0,
+      porCurso,
+      porStatus
     };
   }
 
@@ -467,7 +567,8 @@ export class DashboardGerencialService {
       sexo: this.temPermissao(permissoes, permissoesSensiveis) ? await this.contarBuckets("cadastro_beneficiario", "sexo_biologico", tenantId) : [],
       bairros: await this.contarBucketsEndereco("bairro", tenantId),
       cidades: await this.contarBucketsEndereco("cidade", tenantId),
-      status: await this.contarBuckets("cadastro_beneficiario", "status", tenantId)
+      status: await this.contarBuckets("cadastro_beneficiario", "status", tenantId),
+      idadePorBairro: await this.obterIdadePorBairro(tenantId)
     };
   }
 
@@ -486,7 +587,16 @@ export class DashboardGerencialService {
     };
   }
 
-  private montarAnalise(cards: DashboardGerencialKpi[], atendimentos: DashboardGerencialResponse["atendimentos"], projetos: DashboardGerencialProjeto[], pendencias: DashboardGerencialPendencia[], periodo: Periodo): DashboardGerencialAnalise[] {
+  private montarAnalise(
+    cards: DashboardGerencialKpi[],
+    atendimentos: DashboardGerencialResponse["atendimentos"],
+    projetos: DashboardGerencialProjeto[],
+    pendencias: DashboardGerencialPendencia[],
+    periodo: Periodo,
+    doacoes: DashboardGerencialResponse["doacoes"],
+    cursos: DashboardGerencialResponse["cursos"],
+    riscoTerritorial: DashboardGerencialResponse["riscoTerritorial"]
+  ): DashboardGerencialAnalise[] {
     const analises: DashboardGerencialAnalise[] = [];
     const itensAcao = cards.find((item) => item.id === "itens-acao");
     if (itensAcao && itensAcao.valor > 0) {
@@ -494,6 +604,16 @@ export class DashboardGerencialService {
     }
     if (atendimentos.total > 0 && atendimentos.taxaAusencia >= 20) {
       analises.push({ id: "ausencias", titulo: "Taxa de ausência em atenção", descricao: `A ausência está em ${atendimentos.taxaAusencia}%, acima da faixa de atenção de 20%.`, indicador: "Taxa de ausência", periodo: `${periodo.startDate} a ${periodo.endDate}`, regra: "Faltas / atendimentos totais do período.", origem: "central_atendimento.status", rotaDetalhe: "/atendimentos/central-atendimentos" });
+    }
+    if (doacoes.cestasAtrasadas > 0) {
+      analises.push({ id: "cestas-atrasadas", titulo: "Cestas atrasadas no planejamento", descricao: `${doacoes.cestasAtrasadas} cesta(s) planejadas estão vencidas e ainda não foram marcadas como entregues.`, indicador: "Cestas atrasadas", periodo: `${periodo.startDate} a ${periodo.endDate}`, regra: "Doações planejadas de cesta com data prevista vencida e status aberto.", origem: "doacao_planejada", rotaDetalhe: "/doacoes-realizadas" });
+    }
+    if (cursos.taxaAusencia >= 25 && cursos.ausencias > 0) {
+      analises.push({ id: "ausencia-cursos", titulo: "Ausência em cursos acima do limite", descricao: `A ausência em cursos está em ${cursos.taxaAusencia}%, indicando necessidade de busca ativa.`, indicador: "Ausências em cursos", periodo: `${periodo.startDate} a ${periodo.endDate}`, regra: "Faltas e justificativas / lançamentos de frequência.", origem: "cursos_atendimentos_presencas", rotaDetalhe: "/cadastros/matriculas" });
+    }
+    const territorioCritico = riscoTerritorial[0];
+    if (territorioCritico && territorioCritico.criticidade > 0) {
+      analises.push({ id: "territorio-critico", titulo: "Território prioritário para gestão", descricao: `${territorioCritico.bairro} concentra ${territorioCritico.beneficiarios} beneficiário(s), ${territorioCritico.cestasAEntregar} cesta(s) a entregar e ${territorioCritico.ausenciasCurso} ausência(s) em cursos.`, indicador: "Risco territorial", periodo: `${periodo.startDate} a ${periodo.endDate}`, regra: "Beneficiários ativos + cestas pendentes ponderadas + ausências em cursos ponderadas.", origem: "cadastro_beneficiario, doacao_planejada e cursos_atendimentos_presencas" });
     }
     const projetosCriticos = projetos.filter((item) => ["critico", "atrasado"].includes(item.situacao)).length;
     if (projetosCriticos > 0) {
@@ -569,8 +689,73 @@ export class DashboardGerencialService {
 
   private async contarAtividadesColetivas(tenantId: string, startDate: string, endDate: string) {
     const agendamentos = await this.contarTabelaPeriodo("agendamento", tenantId, "data_inicio", startDate, endDate);
-    const presencas = await this.contarTabelaPeriodo("cursos_atendimentos_presencas", tenantId, "data", startDate, endDate);
+    const presencas = await this.contarTabelaPeriodo("cursos_atendimentos_presencas", tenantId, "data_aula", startDate, endDate);
     return agendamentos + presencas;
+  }
+
+  private async contarCestasEntregues(tenantId: string, startDate: string, endDate: string) {
+    if (!(await this.tabelaExiste("doacao_realizada"))) return 0;
+    const possuiItens = (await this.tabelaExiste("doacao_realizada_item")) && (await this.tabelaExiste("almoxarifado_item"));
+    const joinItens = possuiItens ? "LEFT JOIN doacao_realizada_item di ON di.doacao_realizada_id = dr.id LEFT JOIN almoxarifado_item ai ON ai.id = di.almoxarifado_item_id" : "";
+    const textoCesta = possuiItens ? "COALESCE(dr.tipo_doacao, '') || ' ' || COALESCE(ai.descricao, '')" : "COALESCE(dr.tipo_doacao, '')";
+    return this.total(
+      `
+      SELECT COUNT(DISTINCT dr.id)::bigint AS total
+      FROM doacao_realizada dr
+      ${joinItens}
+      WHERE dr.tenant_id::text = $1
+        AND CAST(dr.data_doacao AS date) >= $2
+        AND CAST(dr.data_doacao AS date) <= $3
+        AND UPPER(${textoCesta}) LIKE '%CESTA%'
+      `,
+      [tenantId, startDate, endDate]
+    );
+  }
+
+  private async contarCestasAEntregar(tenantId: string, endDate: string) {
+    if (!(await this.tabelaExiste("doacao_planejada"))) return 0;
+    if (!(await this.tabelaExiste("almoxarifado_item"))) return 0;
+    return this.total(
+      `
+      SELECT COALESCE(SUM(dp.quantidade), 0) AS total
+      FROM doacao_planejada dp
+      INNER JOIN almoxarifado_item ai ON ai.id = dp.almoxarifado_item_id
+      WHERE dp.tenant_id::text = $1
+        AND dp.data_prevista <= $2
+        AND UPPER(COALESCE(ai.descricao, '') || ' ' || COALESCE(dp.observacoes, '')) LIKE '%CESTA%'
+        AND UPPER(TRIM(COALESCE(dp.status, ''))) NOT IN ('ENTREGUE', 'CONCLUIDO', 'CONCLUIDA', 'CANCELADO', 'CANCELADA')
+      `,
+      [tenantId, endDate]
+    );
+  }
+
+  private async contarCestasAtrasadas(tenantId: string, endDate: string) {
+    if (!(await this.tabelaExiste("doacao_planejada"))) return 0;
+    if (!(await this.tabelaExiste("almoxarifado_item"))) return 0;
+    return this.total(
+      `
+      SELECT COALESCE(SUM(dp.quantidade), 0) AS total
+      FROM doacao_planejada dp
+      INNER JOIN almoxarifado_item ai ON ai.id = dp.almoxarifado_item_id
+      WHERE dp.tenant_id::text = $1
+        AND dp.data_prevista < LEAST($2::date, CURRENT_DATE)
+        AND UPPER(COALESCE(ai.descricao, '') || ' ' || COALESCE(dp.observacoes, '')) LIKE '%CESTA%'
+        AND UPPER(TRIM(COALESCE(dp.status, ''))) NOT IN ('ENTREGUE', 'CONCLUIDO', 'CONCLUIDA', 'CANCELADO', 'CANCELADA')
+      `,
+      [tenantId, endDate]
+    );
+  }
+
+  private async contarAusenciasCurso(tenantId: string, startDate: string, endDate: string) {
+    if (!(await this.tabelaExiste("cursos_atendimentos_presencas"))) return 0;
+    return this.total(
+      `
+      SELECT COUNT(*)::bigint AS total
+      FROM cursos_atendimentos_presencas
+      ${await this.whereComTenant("cursos_atendimentos_presencas", ["data_aula IS NOT NULL", "CAST(data_aula AS date) >= $2", "CAST(data_aula AS date) <= $3", "UPPER(TRIM(COALESCE(status, ''))) IN ('FALTA', 'AUSENTE', 'AUSENCIA', 'NAO_COMPARECEU', 'NÃO_COMPARECEU', 'JUSTIFICADO', 'FALTA_JUSTIFICADA')"])}
+      `,
+      [tenantId, startDate, endDate]
+    );
   }
 
   private async contarProjetosAtivos(tenantId: string) {
@@ -704,6 +889,242 @@ export class DashboardGerencialService {
       `,
       [tenantId]
     );
+  }
+
+  private async obterIdadePorBairro(tenantId: string) {
+    if (!(await this.tabelaExiste("cadastro_beneficiario"))) return [];
+    const rows = await this.query<IdadeBairroRow>(
+      `
+      SELECT COALESCE(NULLIF(TRIM(e.bairro), ''), 'Não informado') AS bairro,
+             COUNT(*)::bigint AS total,
+             COUNT(*) FILTER (WHERE b.data_nascimento IS NOT NULL AND EXTRACT(YEAR FROM age(CURRENT_DATE, b.data_nascimento)) <= 11)::bigint AS criancas,
+             COUNT(*) FILTER (WHERE b.data_nascimento IS NOT NULL AND EXTRACT(YEAR FROM age(CURRENT_DATE, b.data_nascimento)) BETWEEN 12 AND 17)::bigint AS adolescentes,
+             COUNT(*) FILTER (WHERE b.data_nascimento IS NOT NULL AND EXTRACT(YEAR FROM age(CURRENT_DATE, b.data_nascimento)) BETWEEN 18 AND 24)::bigint AS jovens,
+             COUNT(*) FILTER (WHERE b.data_nascimento IS NOT NULL AND EXTRACT(YEAR FROM age(CURRENT_DATE, b.data_nascimento)) BETWEEN 25 AND 59)::bigint AS adultos,
+             COUNT(*) FILTER (WHERE b.data_nascimento IS NOT NULL AND EXTRACT(YEAR FROM age(CURRENT_DATE, b.data_nascimento)) >= 60)::bigint AS idosos,
+             COUNT(*) FILTER (WHERE b.data_nascimento IS NULL)::bigint AS nao_informada
+      FROM cadastro_beneficiario b
+      LEFT JOIN endereco e ON e.id = b.endereco_id
+      WHERE b.tenant_id::text = $1
+        AND COALESCE(UPPER(TRIM(b.status)), 'ATIVO') NOT IN ('INATIVO', 'BLOQUEADO', 'DESLIGADO')
+      GROUP BY COALESCE(NULLIF(TRIM(e.bairro), ''), 'Não informado')
+      ORDER BY total DESC
+      LIMIT 12
+      `,
+      [tenantId]
+    );
+
+    return rows.map((row) => ({
+      bairro: String(row.bairro ?? "Não informado"),
+      total: toNumber(row.total),
+      criancas: toNumber(row.criancas),
+      adolescentes: toNumber(row.adolescentes),
+      jovens: toNumber(row.jovens),
+      adultos: toNumber(row.adultos),
+      idosos: toNumber(row.idosos),
+      naoInformada: toNumber(row.nao_informada)
+    }));
+  }
+
+  private async obterCestasEntreguesPorBairro(tenantId: string, periodo: Periodo) {
+    if (!(await this.tabelaExiste("doacao_realizada"))) return [];
+    const possuiItens = (await this.tabelaExiste("doacao_realizada_item")) && (await this.tabelaExiste("almoxarifado_item"));
+    const joinItens = possuiItens ? "LEFT JOIN doacao_realizada_item di ON di.doacao_realizada_id = dr.id LEFT JOIN almoxarifado_item ai ON ai.id = di.almoxarifado_item_id" : "";
+    const textoCesta = possuiItens ? "COALESCE(dr.tipo_doacao, '') || ' ' || COALESCE(ai.descricao, '')" : "COALESCE(dr.tipo_doacao, '')";
+    const rows = await this.query<BucketRow>(
+      `
+      SELECT COALESCE(NULLIF(TRIM(e.bairro), ''), 'Não informado') AS chave,
+             COALESCE(NULLIF(TRIM(e.bairro), ''), 'Não informado') AS rotulo,
+             COUNT(DISTINCT dr.id)::bigint AS total
+      FROM doacao_realizada dr
+      ${joinItens}
+      LEFT JOIN cadastro_beneficiario b ON b.id = dr.beneficiario_id
+      LEFT JOIN endereco e ON e.id = b.endereco_id
+      WHERE dr.tenant_id::text = $1
+        AND CAST(dr.data_doacao AS date) >= $2
+        AND CAST(dr.data_doacao AS date) <= $3
+        AND UPPER(${textoCesta}) LIKE '%CESTA%'
+      GROUP BY COALESCE(NULLIF(TRIM(e.bairro), ''), 'Não informado')
+      ORDER BY total DESC
+      LIMIT 12
+      `,
+      [tenantId, periodo.startDate, periodo.endDate]
+    );
+    return rows.map((row) => this.bucket(row));
+  }
+
+  private async obterCestasEntreguesPorTipo(tenantId: string, periodo: Periodo) {
+    if (!(await this.tabelaExiste("doacao_realizada"))) return [];
+    const possuiItens = (await this.tabelaExiste("doacao_realizada_item")) && (await this.tabelaExiste("almoxarifado_item"));
+    const joinItens = possuiItens ? "LEFT JOIN doacao_realizada_item di ON di.doacao_realizada_id = dr.id LEFT JOIN almoxarifado_item ai ON ai.id = di.almoxarifado_item_id" : "";
+    const textoCesta = possuiItens ? "COALESCE(dr.tipo_doacao, '') || ' ' || COALESCE(ai.descricao, '')" : "COALESCE(dr.tipo_doacao, '')";
+    const rows = await this.query<BucketRow>(
+      `
+      SELECT COALESCE(NULLIF(TRIM(dr.tipo_doacao), ''), 'Não informado') AS chave,
+             COALESCE(NULLIF(TRIM(dr.tipo_doacao), ''), 'Não informado') AS rotulo,
+             COUNT(DISTINCT dr.id)::bigint AS total
+      FROM doacao_realizada dr
+      ${joinItens}
+      WHERE dr.tenant_id::text = $1
+        AND CAST(dr.data_doacao AS date) >= $2
+        AND CAST(dr.data_doacao AS date) <= $3
+        AND UPPER(${textoCesta}) LIKE '%CESTA%'
+      GROUP BY COALESCE(NULLIF(TRIM(dr.tipo_doacao), ''), 'Não informado')
+      ORDER BY total DESC
+      LIMIT 8
+      `,
+      [tenantId, periodo.startDate, periodo.endDate]
+    );
+    return rows.map((row) => this.bucket(row));
+  }
+
+  private async obterCestasPlanejadasPorPrioridade(tenantId: string, periodo: Periodo) {
+    if (!(await this.tabelaExiste("doacao_planejada"))) return [];
+    if (!(await this.tabelaExiste("almoxarifado_item"))) return [];
+    const rows = await this.query<BucketRow>(
+      `
+      SELECT COALESCE(NULLIF(TRIM(dp.prioridade), ''), 'Sem prioridade') AS chave,
+             COALESCE(NULLIF(TRIM(dp.prioridade), ''), 'Sem prioridade') AS rotulo,
+             COALESCE(SUM(dp.quantidade), 0) AS total
+      FROM doacao_planejada dp
+      INNER JOIN almoxarifado_item ai ON ai.id = dp.almoxarifado_item_id
+      WHERE dp.tenant_id::text = $1
+        AND dp.data_prevista <= $2
+        AND UPPER(COALESCE(ai.descricao, '') || ' ' || COALESCE(dp.observacoes, '')) LIKE '%CESTA%'
+        AND UPPER(TRIM(COALESCE(dp.status, ''))) NOT IN ('ENTREGUE', 'CONCLUIDO', 'CONCLUIDA', 'CANCELADO', 'CANCELADA')
+      GROUP BY COALESCE(NULLIF(TRIM(dp.prioridade), ''), 'Sem prioridade')
+      ORDER BY total DESC
+      LIMIT 8
+      `,
+      [tenantId, periodo.endDate]
+    );
+    return rows.map((row) => this.bucket(row));
+  }
+
+  private async obterAusenciasPorCurso(tenantId: string, periodo: Periodo) {
+    if (!(await this.tabelaExiste("cursos_atendimentos_presencas"))) return [];
+    const possuiCursos = await this.tabelaExiste("cursos_atendimentos");
+    const campoCurso = possuiCursos ? "COALESCE(NULLIF(TRIM(c.nome), ''), 'Curso não informado')" : "COALESCE(p.curso_id::text, 'Curso não informado')";
+    const rows = await this.query<BucketRow>(
+      `
+      SELECT ${campoCurso} AS chave,
+             ${campoCurso} AS rotulo,
+             COUNT(*)::bigint AS total
+      FROM cursos_atendimentos_presencas p
+      ${possuiCursos ? "LEFT JOIN cursos_atendimentos c ON c.id = p.curso_id" : ""}
+      WHERE p.tenant_id::text = $1
+        AND p.data_aula IS NOT NULL
+        AND CAST(p.data_aula AS date) >= $2
+        AND CAST(p.data_aula AS date) <= $3
+        AND UPPER(TRIM(COALESCE(p.status, ''))) IN ('FALTA', 'AUSENTE', 'AUSENCIA', 'NAO_COMPARECEU', 'NÃO_COMPARECEU', 'JUSTIFICADO', 'FALTA_JUSTIFICADA')
+      GROUP BY COALESCE(NULLIF(TRIM(c.nome), ''), 'Curso não informado')
+      ORDER BY total DESC
+      LIMIT 10
+      `,
+      [tenantId, periodo.startDate, periodo.endDate]
+    );
+    return rows.map((row) => this.bucket(row));
+  }
+
+  private async obterRiscoTerritorial(tenantId: string, periodo: Periodo) {
+    if (!(await this.tabelaExiste("cadastro_beneficiario"))) return [];
+    const possuiDoacaoRealizada = await this.tabelaExiste("doacao_realizada");
+    const possuiItensDoacao = (await this.tabelaExiste("doacao_realizada_item")) && (await this.tabelaExiste("almoxarifado_item"));
+    const possuiDoacaoPlanejada = (await this.tabelaExiste("doacao_planejada")) && (await this.tabelaExiste("almoxarifado_item"));
+    const possuiPresencasCurso = await this.tabelaExiste("cursos_atendimentos_presencas");
+    const possuiMatriculasCurso = await this.tabelaExiste("cursos_atendimentos_matriculas");
+    const joinItensEntregues = possuiItensDoacao ? "LEFT JOIN doacao_realizada_item di ON di.doacao_realizada_id = dr.id LEFT JOIN almoxarifado_item ai ON ai.id = di.almoxarifado_item_id" : "";
+    const textoCestaEntregue = possuiItensDoacao ? "COALESCE(dr.tipo_doacao, '') || ' ' || COALESCE(ai.descricao, '')" : "COALESCE(dr.tipo_doacao, '')";
+    const entreguesCte = possuiDoacaoRealizada
+      ? `
+      entregues AS (
+        SELECT COALESCE(NULLIF(TRIM(e.bairro), ''), 'Não informado') AS bairro,
+               COUNT(DISTINCT dr.id)::bigint AS cestas_entregues
+        FROM doacao_realizada dr
+        ${joinItensEntregues}
+        LEFT JOIN cadastro_beneficiario b ON b.id = dr.beneficiario_id
+        LEFT JOIN endereco e ON e.id = b.endereco_id
+        WHERE dr.tenant_id::text = $1
+          AND CAST(dr.data_doacao AS date) >= $2
+          AND CAST(dr.data_doacao AS date) <= $3
+          AND UPPER(${textoCestaEntregue}) LIKE '%CESTA%'
+        GROUP BY COALESCE(NULLIF(TRIM(e.bairro), ''), 'Não informado')
+      )`
+      : "entregues AS (SELECT NULL::text AS bairro, 0::bigint AS cestas_entregues WHERE FALSE)";
+    const planejadasCte = possuiDoacaoPlanejada
+      ? `
+      planejadas AS (
+        SELECT COALESCE(NULLIF(TRIM(e.bairro), ''), 'Não informado') AS bairro,
+               COALESCE(SUM(dp.quantidade), 0) AS cestas_a_entregar
+        FROM doacao_planejada dp
+        INNER JOIN almoxarifado_item ai ON ai.id = dp.almoxarifado_item_id
+        LEFT JOIN cadastro_beneficiario b ON b.id = dp.beneficiario_id
+        LEFT JOIN endereco e ON e.id = b.endereco_id
+        WHERE dp.tenant_id::text = $1
+          AND dp.data_prevista <= $3
+          AND UPPER(COALESCE(ai.descricao, '') || ' ' || COALESCE(dp.observacoes, '')) LIKE '%CESTA%'
+          AND UPPER(TRIM(COALESCE(dp.status, ''))) NOT IN ('ENTREGUE', 'CONCLUIDO', 'CONCLUIDA', 'CANCELADO', 'CANCELADA')
+        GROUP BY COALESCE(NULLIF(TRIM(e.bairro), ''), 'Não informado')
+      )`
+      : "planejadas AS (SELECT NULL::text AS bairro, 0::numeric AS cestas_a_entregar WHERE FALSE)";
+    const ausenciasCte = possuiPresencasCurso && possuiMatriculasCurso
+      ? `
+      ausencias AS (
+        SELECT COALESCE(NULLIF(TRIM(e.bairro), ''), 'Não informado') AS bairro,
+               COUNT(*)::bigint AS ausencias_curso
+        FROM cursos_atendimentos_presencas p
+        LEFT JOIN cursos_atendimentos_matriculas m ON m.id = p.matricula_id
+        LEFT JOIN cadastro_beneficiario b ON b.cpf = m.cpf
+        LEFT JOIN endereco e ON e.id = b.endereco_id
+        WHERE p.tenant_id::text = $1
+          AND CAST(p.data_aula AS date) >= $2
+          AND CAST(p.data_aula AS date) <= $3
+          AND UPPER(TRIM(COALESCE(p.status, ''))) IN ('FALTA', 'AUSENTE', 'AUSENCIA', 'NAO_COMPARECEU', 'NÃO_COMPARECEU', 'JUSTIFICADO', 'FALTA_JUSTIFICADA')
+        GROUP BY COALESCE(NULLIF(TRIM(e.bairro), ''), 'Não informado')
+      )`
+      : "ausencias AS (SELECT NULL::text AS bairro, 0::bigint AS ausencias_curso WHERE FALSE)";
+    const rows = await this.query<RiscoTerritorialRow>(
+      `
+      WITH beneficiarios AS (
+        SELECT COALESCE(NULLIF(TRIM(e.bairro), ''), 'Não informado') AS bairro,
+               COUNT(*)::bigint AS beneficiarios
+        FROM cadastro_beneficiario b
+        LEFT JOIN endereco e ON e.id = b.endereco_id
+        WHERE b.tenant_id::text = $1
+          AND COALESCE(UPPER(TRIM(b.status)), 'ATIVO') NOT IN ('INATIVO', 'BLOQUEADO', 'DESLIGADO')
+        GROUP BY COALESCE(NULLIF(TRIM(e.bairro), ''), 'Não informado')
+      ),
+      ${entreguesCte},
+      ${planejadasCte},
+      ${ausenciasCte}
+      SELECT b.bairro,
+             b.beneficiarios,
+             COALESCE(e.cestas_entregues, 0) AS cestas_entregues,
+             COALESCE(p.cestas_a_entregar, 0) AS cestas_a_entregar,
+             COALESCE(a.ausencias_curso, 0) AS ausencias_curso
+      FROM beneficiarios b
+      LEFT JOIN entregues e ON e.bairro = b.bairro
+      LEFT JOIN planejadas p ON p.bairro = b.bairro
+      LEFT JOIN ausencias a ON a.bairro = b.bairro
+      ORDER BY (b.beneficiarios + COALESCE(p.cestas_a_entregar, 0) * 3 + COALESCE(a.ausencias_curso, 0) * 2) DESC
+      LIMIT 12
+      `,
+      [tenantId, periodo.startDate, periodo.endDate]
+    );
+
+    return rows.map((row) => {
+      const beneficiarios = toNumber(row.beneficiarios);
+      const cestasAEntregar = toNumber(row.cestas_a_entregar);
+      const ausenciasCurso = toNumber(row.ausencias_curso);
+      return {
+        bairro: String(row.bairro ?? "Não informado"),
+        beneficiarios,
+        cestasEntregues: toNumber(row.cestas_entregues),
+        cestasAEntregar,
+        ausenciasCurso,
+        criticidade: beneficiarios + cestasAEntregar * 3 + ausenciasCurso * 2
+      };
+    });
   }
 
   private async perfilFaixaEtaria(tenantId: string) {

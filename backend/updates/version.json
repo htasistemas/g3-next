@@ -1,9 +1,9 @@
 {
-  "latestVersion": "1.00.795",
-  "releaseDate": "2026-08-04",
-  "description": "Correcao do periodo aplicado no espelho de ponto.",
+  "latestVersion": "1.00.808",
+  "releaseDate": "2026-08-06",
+  "description": "Correção da busca por nome na aba Alunos do Educacional.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.794",
+  "minCompatibleVersion": "1.00.807",
   "releaseType": "stable"
 }

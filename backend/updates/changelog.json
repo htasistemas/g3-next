@@ -1,6 +1,38 @@
 {
   "entries":  [
                     {
+                        "version": "1.00.808",
+                        "releaseDate": "2026-08-06",
+                        "title": "Correcao da busca de alunos",
+                        "description": "A aba Alunos do Educacional foi ajustada para buscar por nome sem gerar erro de rede.",
+                        "changes": ["Rotas do modulo Educacional passaram a usar o tratamento assincrono padrao de erros.", "A busca textual de alunos deixou de consultar CPF e telefone quando o termo digitado nao possui numeros.", "Falhas do backend na busca deixam de aparecer como Network error sem detalhe."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.807",
+                        "releaseDate": "2026-08-06",
+                        "title": "Fontes de pagamento nas contas contabeis",
+                        "description": "As contas bancarias da tela Lancamentos contabeis passaram a informar fonte de pagamento para uso na Prestacao de contas.",
+                        "changes": ["Contas bancarias receberam o campo Fonte de pagamento.", "Lancamentos de receita passam a expor a fonte vinculada a conta bancaria.", "Na aba Receitas da Prestacao de contas, o campo Fonte lista as fontes cadastradas nas contas bancarias.", "Manual do sistema e diagnostico de banco atualizados."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.806",
+                        "releaseDate": "2026-08-06",
+                        "title": "Mascaras financeiras na Prestacao de contas",
+                        "description": "A tela Prestacao de contas recebeu mascaras e escolhas orientadas nas abas Visao geral, Receitas e Aplicacao dos recursos.",
+                        "changes": ["Total recebido, Total aplicado, Saldo disponivel, Prestado no mes, Receita e Despesa passam a usar mascara de moeda brasileira.", "Saldo disponivel e calculado automaticamente pela diferenca entre Total recebido e Total aplicado.", "Receitas passam a selecionar a fonte a partir das entradas de receita da contabilidade.", "Periodicidade e Situacao das receitas passam a usar opcoes de selecao.", "Aplicacao dos recursos ganhou mascara de percentual e mais espaco para o campo Descricao.", "Manual do sistema atualizado com as novas regras operacionais."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.805",
+                        "releaseDate": "2026-08-06",
+                        "title": "Dashboard gerencial ampliado para gestao acirrada",
+                        "description": "O Dashboard gerencial passou a consolidar visao territorial, operacao alimentar e frequencia de cursos com paineis mais densos e acionaveis.",
+                        "changes": ["Novos cards e blocos para cestas entregues, cestas a entregar, cestas atrasadas e ranking por bairro.", "Nova leitura de frequencia dos cursos com aulas registradas, presencas, ausencias, justificativas, taxa de ausencia e cursos com maior necessidade de busca ativa.", "Nova matriz Idade por bairro cruza territorio e ciclo de vida dos beneficiarios ativos.", "Nova IA territorial prioriza bairros por beneficiarios ativos, cestas pendentes e ausencias em cursos.", "Manual do sistema atualizado com as novas orientacoes do dashboard."],
+                        "releaseType": "stable"
+                    },
+                    {
                         "version": "1.00.795",
                         "releaseDate": "2026-08-04",
                         "title": "Periodo respeitado no espelho de ponto",
