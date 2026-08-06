@@ -2,10 +2,12 @@ import type { Response } from "express";
 import type { AuthenticatedRequest } from "../../auth/middlewares/auth.middleware.js";
 import { DashboardService } from "../services/dashboard.service.js";
 import { DashboardGeorreferenciamentoService } from "../services/dashboard-georreferenciamento.service.js";
+import { DashboardGerencialService } from "../services/dashboard-gerencial.service.js";
 import { DashboardPowerBiService } from "../services/dashboard-power-bi.service.js";
 import { DashboardVulnerabilidadeService } from "../services/dashboard-vulnerabilidade.service.js";
 
 const service = new DashboardService();
+const gerencialService = new DashboardGerencialService();
 const powerBiService = new DashboardPowerBiService();
 const vulnerabilidadeService = new DashboardVulnerabilidadeService();
 const georreferenciamentoService = new DashboardGeorreferenciamentoService();
@@ -13,6 +15,11 @@ const georreferenciamentoService = new DashboardGeorreferenciamentoService();
 export class DashboardController {
   async obterAssistencia(request: AuthenticatedRequest, response: Response) {
     const dashboard = await service.obterAssistencia(request.query, request.authUser?.tenant_id);
+    return response.json(dashboard);
+  }
+
+  async obterGerencial(request: AuthenticatedRequest, response: Response) {
+    const dashboard = await gerencialService.obter(request.query, request.authUser);
     return response.json(dashboard);
   }
 

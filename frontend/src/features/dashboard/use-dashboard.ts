@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { dashboardService } from "@/services/dashboard.service";
-import type { DashboardFiltros } from "@/types/dashboard";
+import type { DashboardFiltros, DashboardGerencialFiltros } from "@/types/dashboard";
 import type { GeoFilters } from "@/types/georreferenciamento";
 import type { PowerBiDetalheTabela, PowerBiFiltros } from "@/types/power-bi";
 
@@ -21,6 +21,21 @@ export function useDashboardAssistencia(
     queryFn: () => dashboardService.obterAssistencia(filtros),
     enabled: !!usuario,
     staleTime: 15000,
+    refetchInterval: options.autoRefresh ? refreshIntervalMs : false
+  });
+}
+
+export function useDashboardGerencial(
+  filtros: DashboardGerencialFiltros = {},
+  options: UseDashboardOptions = {}
+) {
+  const { usuario } = useAuth();
+  const refreshIntervalMs = options.refreshIntervalMs ?? 60_000;
+  return useQuery({
+    queryKey: ["dashboard", "gerencial", usuario?.tenant_id ?? "sem-tenant", filtros],
+    queryFn: () => dashboardService.obterGerencial(filtros),
+    enabled: !!usuario,
+    staleTime: 30_000,
     refetchInterval: options.autoRefresh ? refreshIntervalMs : false
   });
 }

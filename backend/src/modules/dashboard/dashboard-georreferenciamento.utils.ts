@@ -45,7 +45,8 @@ export function resolverFaixaEtaria(idade?: number): GeoAgeGroup | undefined {
 }
 
 export function resolverEstrategiaConsulta(modo: GeoViewMode, zoom: number) {
-  if (modo === "agregado" || zoom <= 11) {
+  void zoom;
+  if (modo === "agregado") {
     return "agregada" as const;
   }
 

@@ -148,6 +148,7 @@ const CarteiraDigitalEventoPage = carregarPagina("/setor-vendas/carteira-digital
 const VisaoGeralPage = carregarPagina("/dashboard/visao-geral", "VisaoGeralPage");
 const IndicadoresPage = carregarPagina("/dashboard/indicadores", "IndicadoresPage");
 const PowerBiPage = carregarPagina("/dashboard/power-bi", "PowerBiPage");
+const DashboardGerencialPage = carregarPagina("/dashboard/gerencial", "DashboardGerencialPage");
 const VulnerabilidadePage = carregarPagina("/dashboard/vulnerabilidade", "VulnerabilidadePage");
 const CadastroBeneficiarioPage = carregarPagina("/cadastros/beneficiarios", "CadastroBeneficiarioPage");
 const CadastroProfissionalPage = carregarPagina("/cadastros/profissionais", "CadastroProfissionalPage");
@@ -346,6 +347,16 @@ export const router = createBrowserRouter([
       { path: "/dashboard/indicadores", element: IndicadoresPage },
       { path: "/dashboard/vulnerabilidade", element: VulnerabilidadePage },
       { path: "/dashboard/power-bi", element: PowerBiPage },
+      {
+        path: "/dashboard/gerencial",
+        element: (
+          <RequirePermission
+            permissions={["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS", "PAINEL_INDICADORES_DASHBOARD_VISUALIZAR"]}
+          >
+            {DashboardGerencialPage}
+          </RequirePermission>
+        )
+      },
       { path: "/cadastros/beneficiarios", element: CadastroBeneficiarioPage },
       { path: "/cadastros/profissionais", element: CadastroProfissionalPage },
       { path: "/cadastros/voluntariado", element: CadastroVoluntariadoPage },

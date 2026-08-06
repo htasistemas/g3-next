@@ -356,6 +356,24 @@ const secoesManual: ManualSecao[] = [
     icon: Search,
     telas: [
       {
+        nome: "Dashboard",
+        objetivo: "Consolidar indicadores gerenciais reais para diretoria, gestores, coordenadores e equipes acompanharem operação, impacto social e itens que pedem ação.",
+        comoUsar: [
+          "Acesse Painel de indicadores > Dashboard para abrir a visão gerencial sem substituir Visão geral, Indicadores, Georreferenciamento ou Power BI.",
+          "Use os filtros globais para selecionar período, unidade, projeto, serviço, situação do beneficiário e bairro; clique em Aplicar filtros para atualizar todos os blocos compatíveis.",
+          "A primeira linha diferencia pessoas únicas atendidas de quantidade de atendimentos realizados, evitando duplicidade de contagem gerencial.",
+          "Clique nos cards, pendências, projetos e eventos para abrir as telas operacionais já existentes no G3N sempre que houver rota relacionada.",
+          "Use Exportar para baixar a planilha resumida dos cards e PDF para imprimir o dashboard com cabeçalho institucional.",
+          "Quando autorizado, use Personalizar dashboard para ocultar ou reexibir cards no seu próprio usuário, sem alterar a visão dos demais usuários."
+        ],
+        atencoes: [
+          "O dashboard usa apenas dados reais agregados do banco; quando não há estrutura ou dados suficientes, o bloco exibe aviso em vez de número simulado.",
+          "O backend aplica tenant_id nas consultas quando a tabela possui a coluna, mantendo isolamento entre instituições.",
+          "Dados sensíveis e indicadores financeiros dependem das permissões específicas do dashboard gerencial.",
+          "As permissões novas são PAINEL_INDICADORES_DASHBOARD_VISUALIZAR, PAINEL_INDICADORES_DASHBOARD_EXPORTAR, PAINEL_INDICADORES_DASHBOARD_PERSONALIZAR, PAINEL_INDICADORES_DASHBOARD_VISUALIZAR_FINANCEIRO e PAINEL_INDICADORES_DASHBOARD_VISUALIZAR_DADOS_SENSIVEIS."
+        ]
+      },
+      {
         nome: "Indicadores",
         objetivo: "Acompanhar a leitura gerencial da assistência com distribuição por idade, renda, vulnerabilidades, bairros e alertas de termos.",
         comoUsar: [
@@ -380,12 +398,14 @@ const secoesManual: ManualSecao[] = [
           "Use os filtros laterais para escolher camadas, bairros e período antes de atualizar a leitura territorial.",
           "O botão Idosos sozinhos aplica foco em beneficiários e famílias com faixa etária idoso e sinais de vulnerabilidade alimentar.",
           "O botão Aguardando cestas concentra famílias e beneficiários com necessidade urgente de alimentos para apoiar priorização operacional.",
-          "O botão Mapa de apoio e risco cruza violência, cestas entregues, instituições e doadores em visão agregada para leitura estratégica.",
+          "O botão Cestas entregues mostra cada entrega individualmente no mapa, identificando o beneficiário ou a família que recebeu o benefício.",
+          "O botão Mapa de apoio e risco cruza violência, cestas entregues, instituições e doadores em pontos individuais para permitir abertura de cada registro.",
           "A visualização do mapa passou a usar uma base gratuita CARTO Voyager com Leaflet, sem depender de chave ou faturamento.",
           "A abertura da tela foi compatibilizada com runtimes React que ainda não expõem useEffectEvent, evitando erro de navegação ao entrar no georreferenciamento."
         ],
         atencoes: [
           "Os atalhos estratégicos ajustam filtros automaticamente e podem ser combinados com bairro e período.",
+          "As visões estratégicas usam marcadores individuais; quando vários registros possuem o mesmo endereço, o mapa desloca levemente os pontos para que cada pessoa, família ou benefício continue clicável.",
           "As camadas Instituições e Doadores ficam disponíveis na lista O que ver no mapa? para aprofundar a análise territorial.",
           "A base gratuita da CARTO é carregada diretamente no navegador e não exige configuração de chave no frontend.",
           "Se o mapa não carregar, valide apenas a conectividade do navegador com os tiles externos da CARTO.",

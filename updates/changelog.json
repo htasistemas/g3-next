@@ -1,6 +1,22 @@
 {
   "entries":  [
                     {
+                        "version": "1.00.804",
+                        "releaseDate": "2026-08-06",
+                        "title": "Dashboard gerencial no Painel de Indicadores",
+                        "description": "O menu Painel de Indicadores recebeu o novo submenu Dashboard, preservando Visao geral, Indicadores, Georreferenciamento e Power BI.",
+                        "changes": ["Nova rota /dashboard/gerencial com cabecalho institucional, filtros globais, cards, graficos, pendencias, agenda, projetos, impacto social, perfil e analise inteligente baseada em dados reais.", "Novo endpoint /api/dashboard/gerencial consolida os blocos com consultas agregadas no backend e isolamento por tenant.", "Permissoes especificas do dashboard gerencial foram adicionadas ao catalogo de usuarios.", "Manual do sistema atualizado com orientacao operacional do novo submenu."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.803",
+                        "releaseDate": "2026-08-06",
+                        "title": "Marcadores individuais no georreferenciamento",
+                        "description": "As visoes estrategicas do georreferenciamento passaram a exibir cada pessoa, familia ou beneficio individualmente no mapa, sem substituir os nomes por quantidade total.",
+                        "changes": ["Cestas entregues agora filtra a camada de distribuicoes e mostra cada entrega com o beneficiario ou familia recebedora.", "Idosos sozinhos, Aguardando cestas, Todos os cadastrados e Mapa de apoio e risco passam a usar marcadores individuais.", "Pontos com o mesmo endereco recebem pequeno deslocamento visual para que cada registro continue clicavel no mapa.", "Manual do sistema atualizado com a nova leitura operacional das visoes estrategicas."],
+                        "releaseType": "stable"
+                    },
+                    {
                         "version": "1.00.795",
                         "releaseDate": "2026-08-04",
                         "title": "Periodo respeitado no espelho de ponto",

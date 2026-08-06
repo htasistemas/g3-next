@@ -154,6 +154,32 @@ function criarIconePin(cor: string) {
   });
 }
 
+function distribuirMarcadoresSobrepostos(marcadores: GeoMapPoint[]) {
+  const grupos = new Map<string, GeoMapPoint[]>();
+
+  marcadores.forEach((item) => {
+    const chave = `${item.latitude.toFixed(6)}:${item.longitude.toFixed(6)}`;
+    grupos.set(chave, [...(grupos.get(chave) ?? []), item]);
+  });
+
+  return marcadores.map((item) => {
+    const chave = `${item.latitude.toFixed(6)}:${item.longitude.toFixed(6)}`;
+    const grupo = grupos.get(chave) ?? [item];
+    const indice = grupo.findIndex((ponto) => ponto.id === item.id);
+    if (grupo.length <= 1 || indice < 0) {
+      return { item, latitudeVisual: item.latitude, longitudeVisual: item.longitude };
+    }
+
+    const raio = 0.00008 + Math.floor(indice / 8) * 0.00005;
+    const angulo = (2 * Math.PI * indice) / grupo.length;
+    return {
+      item,
+      latitudeVisual: item.latitude + Math.sin(angulo) * raio,
+      longitudeVisual: item.longitude + Math.cos(angulo) * raio
+    };
+  });
+}
+
 function Observer({
   center,
   zoom,
@@ -239,6 +265,8 @@ function GoogleGeoMap({
   onViewportChange: (payload: { zoom: number; bbox: GeoBBox }) => void;
   onSelecionar: (ponto: GeoMapPoint) => void;
 }) {
+  const marcadoresDistribuidos = useMemo(() => distribuirMarcadoresSobrepostos(marcadores), [marcadores]);
+
   return (
     <MapContainer center={center} zoom={zoom} className="h-full w-full" zoomControl attributionControl>
       <TileLayer
@@ -271,12 +299,12 @@ function GoogleGeoMap({
           </Popup>
         </CircleMarker>
       ))}
-      {marcadores.map((item) => {
+      {marcadoresDistribuidos.map(({ item, latitudeVisual, longitudeVisual }) => {
         const isGrupo = (item.quantidade ?? 1) > 1;
         return (
           <Marker
             key={item.id}
-            position={[item.latitude, item.longitude]}
+            position={[latitudeVisual, longitudeVisual]}
             icon={
               isGrupo
                 ? L.divIcon({
@@ -298,7 +326,9 @@ function GoogleGeoMap({
               <div className="min-w-[190px]">
                 <div className="text-[10px] font-bold uppercase text-slate-500">{item.tipoLabel}</div>
                 <div className="mt-1 text-sm font-extrabold text-slate-900">{item.titulo}</div>
-                <div className="mt-2 text-xs text-slate-600">{item.bairro || "Bairro nao informado"}</div>
+                {item.subtitulo ? <div className="mt-1 text-xs text-slate-600">{item.subtitulo}</div> : null}
+                <div className="mt-2 text-xs text-slate-600">{item.bairro || "Bairro não informado"}</div>
+                {item.programaServico ? <div className="mt-1 text-xs text-slate-600">{item.programaServico}</div> : null}
               </div>
             </Popup>
           </Marker>
@@ -362,8 +392,8 @@ export function VulnerabilidadePage() {
   function ativarModoCesta() {
     setFiltros((atual) => ({
       ...atual,
-      camadas: ["beneficiarios", "pontos_distribuicao"],
-      modo: "cluster",
+      camadas: ["pontos_distribuicao"],
+      modo: "marcadores",
       receberCestaBasica: true,
       necessidadeCesta: undefined,
       ocorrenciaViolencia: undefined,
@@ -377,7 +407,7 @@ export function VulnerabilidadePage() {
     setFiltros((atual) => ({
       ...atual,
       camadas: ["beneficiarios"],
-      modo: "cluster",
+      modo: "marcadores",
       receberCestaBasica: undefined,
       necessidadeCesta: undefined,
       ocorrenciaViolencia: undefined,
@@ -392,7 +422,7 @@ export function VulnerabilidadePage() {
     setFiltros((atual) => ({
       ...atual,
       camadas: ["beneficiarios", "familias", "vulnerabilidade"],
-      modo: "cluster",
+      modo: "marcadores",
       faixaEtaria: ["idoso"],
       receberCestaBasica: undefined,
       necessidadeCesta: true,
@@ -405,7 +435,7 @@ export function VulnerabilidadePage() {
     setFiltros((atual) => ({
       ...atual,
       camadas: ["beneficiarios", "familias", "pontos_distribuicao", "vulnerabilidade"],
-      modo: "cluster",
+      modo: "marcadores",
       necessidadeCesta: true,
       receberCestaBasica: undefined,
       ocorrenciaViolencia: undefined
@@ -417,7 +447,7 @@ export function VulnerabilidadePage() {
     setFiltros((atual) => ({
       ...atual,
       camadas: ["violencia", "pontos_distribuicao", "instituicoes", "doadores"] as GeoLayer[],
-      modo: "agregado",
+      modo: "marcadores",
       receberCestaBasica: undefined,
       necessidadeCesta: undefined,
       ocorrenciaViolencia: undefined,
@@ -453,10 +483,10 @@ export function VulnerabilidadePage() {
     if (!data) return;
     const popup = window.open("", "_blank", "noopener,noreferrer,width=1200,height=900");
     if (!popup) return;
-    popup.document.write(`<html><head><meta charset="utf-8"><title>Relatorio territorial</title></head><body style="font-family:Arial;padding:24px"><h1>Relatorio territorial</h1><p>Total encontrado: ${data.totalEncontrado.toLocaleString("pt-BR")} | Geolocalizados: ${data.totalGeolocalizado.toLocaleString("pt-BR")}</p></body></html>`);
+    popup.document.write(`<html><head><meta charset="utf-8"><title>Relatório territorial</title></head><body style="font-family:Arial;padding:24px"><h1>Relatório territorial</h1><p>Total encontrado: ${data.totalEncontrado.toLocaleString("pt-BR")} | Geolocalizados: ${data.totalGeolocalizado.toLocaleString("pt-BR")}</p></body></html>`);
     popup.document.close();
     popup.print();
-    setMensagem("Janela de impressao aberta para PDF.");
+    setMensagem("Janela de impressão aberta para PDF.");
   }
 
   const camadasDisponiveis: GeoLayer[] = opcoes?.camadas?.map((item) => item.id as GeoLayer) ?? ([
@@ -482,7 +512,7 @@ export function VulnerabilidadePage() {
     filtros.necessidadeCesta === true;
   const mapaApoioERiscoAtivo =
     mesmasCamadas(filtros.camadas, ["violencia", "pontos_distribuicao", "instituicoes", "doadores"]) &&
-    filtros.modo === "agregado";
+    filtros.modo === "marcadores";
 
   return (
     <main className="flex h-[calc(100vh-64px)] w-full overflow-hidden bg-slate-50">
@@ -513,14 +543,14 @@ export function VulnerabilidadePage() {
 
             {/* ONDE? (LOCALIZACAO) */}
             <div className="space-y-3 border-t pt-4">
-              <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Onde? (Bairros e Regioes)</Label>
-              <Input value={filtros.termo ?? ""} onChange={(e) => setFiltros(a => ({ ...a, termo: e.target.value || undefined }))} placeholder="Buscar bairro ou endereco..." className="h-9" />
-              <FiltroLista titulo="Selecionar Bairros" itens={opcoes?.bairros ?? []} selecionados={filtros.bairro} onToggle={(v) => atualizarLista("bairro", v)} />
+              <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Onde? (Bairros e regiões)</Label>
+              <Input value={filtros.termo ?? ""} onChange={(e) => setFiltros(a => ({ ...a, termo: e.target.value || undefined }))} placeholder="Buscar bairro ou endereço..." className="h-9" />
+              <FiltroLista titulo="Selecionar bairros" itens={opcoes?.bairros ?? []} selecionados={filtros.bairro} onToggle={(v) => atualizarLista("bairro", v)} />
             </div>
 
             {/* FILTROS ESTRATEGICOS */}
             <div className="space-y-3 border-t pt-4">
-              <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Visoes Estrategicas</Label>
+              <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Visões estratégicas</Label>
               <div className="grid grid-cols-1 gap-2">
                 <Button variant="outline" size="sm" className={`justify-start h-10 border-emerald-200 text-emerald-700 hover:bg-emerald-50 ${filtros.receberCestaBasica ? "bg-emerald-100 ring-2 ring-emerald-500 ring-offset-1" : ""}`} onClick={ativarModoCesta}>
                   <MapPinned className="mr-2 h-4 w-4" /> Cestas entregues
@@ -556,14 +586,14 @@ export function VulnerabilidadePage() {
                   <span className="text-[9px] font-bold text-slate-400 uppercase">Leitura rápida</span>
                   <p className="text-[10px] text-slate-600">Idosos sozinhos prioriza beneficiários e famílias com faixa etária idoso e sinais de vulnerabilidade alimentar.</p>
                   <p className="text-[10px] text-slate-600">Aguardando cestas concentra famílias e beneficiários com necessidade urgente de cesta.</p>
-                  <p className="text-[10px] text-slate-600">Mapa de apoio e risco cruza violência, cestas entregues, instituições e doadores em visão agregada.</p>
+                  <p className="text-[10px] text-slate-600">Mapa de apoio e risco cruza violência, cestas entregues, instituições e doadores em pontos individuais.</p>
                 </div>
               </div>
             </div>
 
-            {/* QUANDO? (PERIODO) */}
+            {/* QUANDO? (PERÍODO) */}
             <div className="space-y-3 border-t pt-4">
-              <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Quando? (Periodo)</Label>
+              <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Quando? (Período)</Label>
               <div className="grid grid-cols-2 gap-2">
                 <Input type="date" value={filtros.periodoInicio ?? ""} onChange={(e) => setFiltros(a => ({ ...a, periodoInicio: e.target.value || undefined }))} className="h-8 text-[10px]" />
                 <Input type="date" value={filtros.periodoFim ?? ""} onChange={(e) => setFiltros(a => ({ ...a, periodoFim: e.target.value || undefined }))} className="h-8 text-[10px]" />
@@ -600,8 +630,8 @@ export function VulnerabilidadePage() {
 
         {/* ACOES RAPIDAS NO TOPO DIREITO */}
         <div className="absolute right-4 top-4 z-30 flex flex-col gap-2">
-          <button title="Marcacao Manual" onClick={() => setModoMarcacao(!modoMarcacao)} className={`rounded-lg p-2.5 shadow-lg border transition-all ${modoMarcacao ? "bg-amber-500 text-white border-amber-600" : "bg-white text-slate-600 hover:bg-slate-50"}`}><Target className="h-5 w-5" /></button>
-          <button title="Exportar Dados" onClick={exportarLista} className="rounded-lg bg-white p-2.5 text-slate-600 shadow-lg border hover:bg-slate-50 transition-all"><Download className="h-5 w-5" /></button>
+          <button title="Marcação manual" onClick={() => setModoMarcacao(!modoMarcacao)} className={`rounded-lg p-2.5 shadow-lg border transition-all ${modoMarcacao ? "bg-amber-500 text-white border-amber-600" : "bg-white text-slate-600 hover:bg-slate-50"}`}><Target className="h-5 w-5" /></button>
+          <button title="Exportar dados" onClick={exportarLista} className="rounded-lg bg-white p-2.5 text-slate-600 shadow-lg border hover:bg-slate-50 transition-all"><Download className="h-5 w-5" /></button>
           <button title="Gerar PDF" onClick={exportarPdf} className="rounded-lg bg-white p-2.5 text-slate-600 shadow-lg border hover:bg-slate-50 transition-all"><Printer className="h-5 w-5" /></button>
         </div>
 
@@ -642,7 +672,7 @@ export function VulnerabilidadePage() {
                   {detalheAtual?.situacaoResumo && <div className="rounded-lg bg-amber-50 p-2 border border-amber-100 text-amber-800 mt-2">{detalheAtual.situacaoResumo}</div>}
                 </div>
                 {detalheAtual?.rotaCadastro && (
-                  <Button className="w-full h-8 text-xs font-bold" onClick={() => navigate(String(detalheAtual.rotaCadastro))}>Abrir Ficha de Cadastro</Button>
+                  <Button className="w-full h-8 text-xs font-bold" onClick={() => navigate(String(detalheAtual.rotaCadastro))}>Abrir ficha de cadastro</Button>
                 )}
               </CardContent>
             </Card>

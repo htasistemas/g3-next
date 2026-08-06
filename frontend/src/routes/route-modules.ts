@@ -32,6 +32,7 @@ const routeModules: RouteModuleDefinition[] = [
   { path: "/dashboard/visao-geral", loader: () => import("@/pages/dashboard/visao-geral-page") },
   { path: "/dashboard/indicadores", loader: () => import("@/pages/dashboard/indicadores-page") },
   { path: "/dashboard/power-bi", loader: () => import("@/pages/dashboard/power-bi-page") },
+  { path: "/dashboard/gerencial", loader: () => import("@/pages/dashboard/dashboard-gerencial-page") },
   {
     path: "/dashboard/vulnerabilidade",
     loader: () => import("@/pages/dashboard/vulnerabilidade-page")

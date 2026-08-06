@@ -18,6 +18,13 @@ dashboardRoutes.get(
 );
 
 dashboardRoutes.get(
+  "/gerencial",
+  ensureAuthenticated,
+  ensurePermissions(["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS", "PAINEL_INDICADORES_DASHBOARD_VISUALIZAR"]),
+  asyncHandler(controller.obterGerencial.bind(controller))
+);
+
+dashboardRoutes.get(
   "/power-bi",
   ensureAuthenticated,
   ensurePermissions(["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"]),

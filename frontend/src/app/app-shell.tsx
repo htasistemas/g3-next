@@ -123,7 +123,8 @@ function ordenarItensMenu<T extends { label: string; id?: string }>(itens: T[]) 
     ["dashboard-visao-geral", 0],
     ["dashboard-indicadores", 1],
     ["dashboard-vulnerabilidade", 2],
-    ["dashboard-power-bi", 3]
+    ["dashboard-power-bi", 3],
+    ["dashboard-gerencial", 4]
   ]);
 
   return [...itens].sort((itemA, itemB) => {
@@ -207,6 +208,13 @@ const menuSectionsBase: MenuSection[] = [
         label: "Power BI",
         icon: Presentation,
         requiredPermissions: ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS"]
+      },
+      {
+        id: "dashboard-gerencial",
+        to: "/dashboard/gerencial",
+        label: "Dashboard",
+        icon: LayoutDashboard,
+        requiredPermissions: ["ADMINISTRADOR", "OPERADOR", "LEITURA_APENAS", "PAINEL_INDICADORES_DASHBOARD_VISUALIZAR"]
       }
     ]
   },
@@ -707,6 +715,7 @@ function obterTitulo(pathname: string): string {
   if (pathname.startsWith("/dashboard/indicadores")) return "Indicadores";
   if (pathname.startsWith("/dashboard/vulnerabilidade")) return "Georreferenciamento";
   if (pathname.startsWith("/dashboard/power-bi")) return "Power BI";
+  if (pathname.startsWith("/dashboard/gerencial")) return "Dashboard";
   if (pathname.startsWith("/cadastros/beneficiarios")) return "Cadastro de beneficiários";
   if (pathname.startsWith("/cadastros/profissionais")) return "Cadastro de profissionais";
   if (pathname.startsWith("/cadastros/voluntariado")) return "Cadastro de voluntariado";

@@ -32,7 +32,6 @@ import {
   calcularIdade,
   clusterizarMarcadores,
   gerarHeatmap,
-  limitarMarcadores,
   resolverEstrategiaConsulta,
   resolverFaixaEtaria,
   resumirIndicadores
@@ -469,18 +468,17 @@ export class DashboardGeorreferenciamentoService {
         visiveis: datasets[camada]?.geolocalizados.length ?? 0
       }));
 
-      const limiteMarcadores = filtros.modo === "marcadores";
       const marcadores =
         filtros.modo === "heatmap" || estrategia === "agregada"
           ? []
           : filtros.modo === "cluster"
             ? clusterizarMarcadores(pontosVisiveis, filtros.zoom)
-            : limitarMarcadores(pontosVisiveis, 400).marcadores;
+            : pontosVisiveis.map((item) => ({ ...item, quantidade: 1 }));
 
       const agregados = estrategia === "agregada" ? agruparPorBairro(pontosVisiveis) : [];
       const heatmap = filtros.modo === "heatmap" ? gerarHeatmap(pontosVisiveis, filtros.zoom) : [];
       const limiteIndividualAtingido =
-        limiteMarcadores && filtros.modo === "marcadores" ? pontosVisiveis.length > marcadores.length : false;
+        filtros.modo === "marcadores" ? false : pontosVisiveis.length > marcadores.length;
 
       return {
         estrategia,

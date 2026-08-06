@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.802",
-  "releaseDate": "2026-08-05",
-  "description": "Correcao da URL da API no desenvolvimento e acesso master.",
+  "latestVersion": "1.00.804",
+  "releaseDate": "2026-08-06",
+  "description": "Novo dashboard gerencial no Painel de Indicadores.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.801",
+  "minCompatibleVersion": "1.00.803",
   "releaseType": "stable",
   "downloadUrl": null
 }

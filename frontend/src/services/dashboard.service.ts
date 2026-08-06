@@ -2,6 +2,8 @@ import { httpClient } from "./http-client";
 import type {
   DashboardAssistenciaResponse,
   DashboardFiltros,
+  DashboardGerencialFiltros,
+  DashboardGerencialResponse,
   DashboardVulnerabilidadeGeocodingResponse,
   DashboardVulnerabilidadeResponse
 } from "@/types/dashboard";
@@ -46,6 +48,13 @@ export const dashboardService = {
 
     const { data } = await httpClient.get<DashboardAssistenciaResponse>("/api/dashboard/assistencia", {
       params
+    });
+    return data;
+  },
+
+  async obterGerencial(filtros: DashboardGerencialFiltros = {}): Promise<DashboardGerencialResponse> {
+    const { data } = await httpClient.get<DashboardGerencialResponse>("/api/dashboard/gerencial", {
+      params: filtros
     });
     return data;
   },
