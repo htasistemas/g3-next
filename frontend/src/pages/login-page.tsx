@@ -520,11 +520,21 @@ export function LoginPage() {
     setCarregandoGoogle(true);
     try {
       const cnpjNormalizado = normalizarCnpj(cnpj);
-      await loginGoogle({
+      const resultado = await loginGoogle({
         idToken,
         cnpj: slugSubdominio ? undefined : cnpjNormalizado || undefined,
         slug: slugSubdominio
       });
+      if ("mfaRequired" in resultado) {
+        setMfaPendente(resultado);
+        setEtapa("mfa");
+        setAviso(
+          resultado.devCode
+            ? `Código de desenvolvimento: ${resultado.devCode}`
+            : `Enviamos um código de segurança para ${resultado.maskedEmail}.`
+        );
+        return;
+      }
       salvarLembrancaInstituicao(cnpjNormalizado);
       irParaDestino();
     } catch (error: any) {

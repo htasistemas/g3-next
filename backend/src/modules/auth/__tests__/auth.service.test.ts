@@ -35,7 +35,7 @@ function criarServiceComStubs(stubs: {
     repository: Record<string, unknown>;
     tokenService: { gerarToken: (usuario: unknown) => string };
     emailService: Record<string, unknown>;
-    deveExigirMfa: () => boolean;
+    deveExigirMfa: (usuario?: unknown) => boolean;
     deveExigirBiometriaFacial: () => boolean;
     login: AuthService["login"];
   };
@@ -66,7 +66,11 @@ function criarServiceComStubs(stubs: {
   service.emailService = {
     enviarEmailCodigoMfa: async () => undefined
   };
-  service.deveExigirMfa = () => Boolean(stubs.exigirMfa);
+  service.deveExigirMfa = (usuario: any) =>
+    Boolean(stubs.exigirMfa) ||
+    Boolean(usuario?.exigirAutenticacaoSegura) ||
+    Boolean(usuario?.isSuperadmin) ||
+    usuario?.email?.trim().toLowerCase() === "htasistemas@gmail.com";
   service.deveExigirBiometriaFacial = () => Boolean(stubs.exigirFace);
 
   return service;
@@ -102,8 +106,9 @@ test("login master ignora status bloqueado da instituicao vinculada", async () =
     senha: "Senha#123"
   });
 
-  assert.equal(resultado.token, "token-teste");
-  assert.equal(resultado.usuario.is_superadmin, true);
+  assert.equal(resultado.mfaRequired, true);
+  assert.equal(resultado.method, "email");
+  assert.ok(resultado.challengeId);
 });
 
 test("login nao master continua respeitando status da instituicao", async () => {

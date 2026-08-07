@@ -160,12 +160,15 @@ export class AuthService {
       throw new AppError("Senha invalida para o usuario informado.", 401);
     }
 
-    if (this.deveExigirBiometriaFacial(usuario)) {
-      return this.criarFaceChallenge(usuario, identificador);
-    }
-
+    // O usuario master sempre precisa confirmar o codigo enviado por e-mail.
+    // Essa etapa vem antes de qualquer outro fator para nao permitir que
+    // biometria ou outro metodo substitua a regra obrigatoria do master.
     if (this.deveExigirMfa(usuario)) {
       return this.criarMfaChallenge(usuario, identificador);
+    }
+
+    if (this.deveExigirBiometriaFacial(usuario)) {
+      return this.criarFaceChallenge(usuario, identificador);
     }
 
     await this.repository.registrarLoginSucesso(usuario.id);
@@ -236,6 +239,11 @@ export class AuthService {
     const controle = await this.repository.buscarControleAcessoPorUsuarioId(usuario.id);
     this.validarAcessoUsuario(controle?.status, usuario.instituicaoStatus, usuario.email, usuario.isSuperadmin);
     this.validarBloqueioTemporarioLogin(controle);
+
+    if (this.deveExigirMfa(usuario)) {
+      return this.criarMfaChallenge(usuario, emailNormalizado);
+    }
+
     await this.repository.registrarLoginSucesso(usuario.id);
     await this.repository.registrarEventoAcesso({
       tenant_id: usuario.tenantId ?? undefined,
@@ -800,7 +808,13 @@ export class AuthService {
   }
 
   private deveExigirMfa(usuario: NonNullable<Awaited<ReturnType<AuthRepository["buscarUsuarioPorLogin"]>>>) {
-    return Boolean(usuario.exigirAutenticacaoSegura);
+    return Boolean(usuario.exigirAutenticacaoSegura) || this.ehUsuarioMaster(usuario);
+  }
+
+  private ehUsuarioMaster(
+    usuario: NonNullable<Awaited<ReturnType<AuthRepository["buscarUsuarioPorLogin"]>>>
+  ) {
+    return Boolean(usuario.isSuperadmin) || usuario.email?.trim().toLowerCase() === EMAIL_ADMIN_PADRAO;
   }
 
   private deveExigirBiometriaFacial(

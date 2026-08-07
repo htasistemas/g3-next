@@ -37,7 +37,9 @@ export class AuthController {
 
   async loginGoogle(request: Request, response: Response) {
     const data = await authService.loginGoogle(request.body);
-    response.cookie(AUTH_COOKIE_NAME, data.token, authCookieOptions());
+    if ("token" in data) {
+      response.cookie(AUTH_COOKIE_NAME, data.token, authCookieOptions());
+    }
     return response.json(data);
   }
 

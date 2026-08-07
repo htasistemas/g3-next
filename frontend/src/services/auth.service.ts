@@ -87,15 +87,15 @@ export const authService = {
     cnpj?: string;
     slug?: string;
     codigoInstituicao?: string;
-  }): Promise<UsuarioAutenticado> {
-    const { data } = await httpClient.post<LoginResponse>("/api/auth/google", {
+  }): Promise<LoginAuthResult> {
+    const { data } = await httpClient.post<LoginAuthResult>("/api/auth/google", {
       idToken: input.idToken,
       cnpj: input.cnpj,
       slug: input.slug,
       codigoInstituicao: input.codigoInstituicao
     });
-    persistirSessao(data.token, data.usuario);
-    return data.usuario;
+    if ("token" in data) persistirSessao(data.token, data.usuario);
+    return data;
   },
 
   async logout(): Promise<void> {

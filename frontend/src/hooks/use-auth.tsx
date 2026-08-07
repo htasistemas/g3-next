@@ -28,7 +28,7 @@ type AuthContextValue = {
     cnpj?: string;
     slug?: string;
     codigoInstituicao?: string;
-  }) => Promise<void>;
+  }) => Promise<LoginAuthResult>;
   logout: () => Promise<void>;
   atualizarPerfil: () => Promise<void>;
 };
@@ -90,8 +90,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
     slug?: string;
     codigoInstituicao?: string;
   }) => {
-    const perfil = await authService.loginGoogle(input);
-    setUsuario(perfil);
+    const resultado = await authService.loginGoogle(input);
+    if ("token" in resultado) setUsuario(resultado.usuario);
+    return resultado;
   }, []);
 
   const logout = useCallback(async () => {
