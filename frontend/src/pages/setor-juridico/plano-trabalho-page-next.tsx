@@ -1,4 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Building2,
@@ -29,7 +30,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { CadastroSucessoModal } from "@/components/admin/cadastro-sucesso-modal";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Label as UiLabel } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -110,6 +111,129 @@ type AbaId =
   | "declaracao";
 
 type OrdenacaoPlano = "maisRecente" | "maisAntigo" | "az";
+
+const dicasCamposPlano: Record<string, string> = {
+  Pesquisa: "Digite código, título, órgão, CNPJ, situação ou número do termo.",
+  Situação: "Use a situação que representa a etapa atual do plano.",
+  Ordenação: "Escolha como os planos devem aparecer na listagem.",
+  "Título do plano de trabalho": "Use um nome curto que identifique a ação, o público e o local; por exemplo: Oficinas de convivência para idosos.",
+  Tipo: "Selecione o instrumento jurídico usado para formalizar a parceria.",
+  "Órgão concedente ou parceiro": "Informe o órgão público ou parceiro que participa do financiamento ou da execução.",
+  "Número do edital/chamamento": "Copie o número publicado no edital ou no chamamento público.",
+  "Número do processo": "Informe o número completo do processo administrativo, se houver.",
+  "Período inicial": "Informe a data prevista para começar a execução do plano.",
+  "Período final": "Informe a data prevista para terminar a execução do plano.",
+  "Responsável técnico": "Selecione o profissional que acompanhará tecnicamente a execução.",
+  "Responsável legal": "Selecione quem representa legalmente a instituição na parceria.",
+  "Termo de fomento vinculado": "Vincule o termo já cadastrado quando o plano decorrer de um Termo de fomento.",
+  "Carregar dados da unidade assistencial": "Selecione uma unidade cadastrada para preencher automaticamente os dados institucionais.",
+  "Carregar dados bancários da conta": "Selecione a conta específica cadastrada para copiar os dados bancários.",
+  "Razão social": "Informe o nome oficial da instituição conforme o CNPJ.",
+  "Nome fantasia": "Informe o nome pelo qual a instituição é conhecida, se diferente da razão social.",
+  CNPJ: "Digite o CNPJ da instituição; os números serão formatados automaticamente.",
+  CEP: "Informe o CEP do endereço principal da instituição.",
+  Logradouro: "Informe rua, avenida, praça ou outro tipo de via.",
+  Número: "Informe o número do imóvel; use S/N quando não existir numeração.",
+  Complemento: "Informe sala, bloco, conjunto ou outra referência adicional.",
+  Bairro: "Informe o bairro do endereço.",
+  Cidade: "Informe o município onde a instituição está localizada.",
+  UF: "Informe a sigla do estado com duas letras, como SP ou RJ.",
+  Telefone: "Informe um telefone com DDD para contato institucional.",
+  "E-mail": "Informe o e-mail institucional usado para comunicações da parceria.",
+  "Representante legal": "Informe o nome completo de quem assinará ou responderá pela parceria.",
+  "CPF do representante": "Informe o CPF do representante legal; a máscara será aplicada automaticamente.",
+  "Cargo/função": "Informe o cargo ocupado pelo representante legal.",
+  Banco: "Informe o nome ou código do banco da conta específica.",
+  Agência: "Informe o número da agência bancária, incluindo o dígito quando houver.",
+  Conta: "Informe o número da conta específica e seu dígito.",
+  Operação: "Informe a operação bancária, quando aplicável, como 003 ou 013.",
+  "Chave PIX": "Informe a chave PIX que será usada para movimentar ou receber os recursos.",
+  "Observação bancária": "Registre informações úteis sobre a conta, como titularidade ou restrições.",
+  "Histórico da OSC": "Conte brevemente a trajetória, os principais marcos e a atuação da organização.",
+  "Finalidade institucional": "Descreva a missão e o propósito da organização conforme seus documentos oficiais.",
+  "Experiência anterior na área": "Liste projetos ou serviços anteriores relacionados ao objeto deste plano.",
+  "Conselhos, certificações ou registros": "Informe conselhos, certificações, registros e respectivos números, quando houver.",
+  "Público atendido atualmente": "Descreva quem a instituição atende hoje e como realiza esse atendimento.",
+  "Capacidade técnica e operacional": "Explique equipe, estrutura, processos e recursos disponíveis para executar o plano.",
+  "Descrição objetiva do que será executado": "Resuma a ação principal, o público beneficiado, o local e o resultado esperado.",
+  "Área de atuação": "Selecione a área que melhor representa a finalidade da proposta.",
+  "Local de execução": "Informe endereço, unidade, bairro ou território onde as atividades acontecerão.",
+  "Abrangência territorial": "Informe os bairros, municípios ou regiões alcançados pela ação.",
+  "Público-alvo": "Descreva o perfil das pessoas que serão beneficiadas, como faixa etária ou situação social.",
+  "Quantidade estimada de beneficiários": "Informe o número aproximado de pessoas que serão atendidas.",
+  "Critérios de seleção dos beneficiários": "Explique quem poderá participar e quais critérios serão usados para selecionar os beneficiários.",
+  "Qual problema social será enfrentado?": "Descreva a necessidade concreta que motivou a proposta, sem generalidades.",
+  "Quais são as causas e consequências?": "Relacione as principais causas do problema e os efeitos observados no público.",
+  "Quais dados ou indicadores justificam a proposta?": "Informe números, fontes, pesquisas ou registros que comprovem a necessidade.",
+  "Por que a instituição tem capacidade de executar?": "Relacione experiência, equipe, estrutura e processos que sustentam a execução.",
+  "Qual impacto esperado?": "Descreva a mudança que se espera produzir na vida do público ou no território.",
+  "Objetivo geral": "Escreva o resultado amplo que o plano pretende alcançar, começando com um verbo de ação.",
+  Descrição: "Explique o que será feito, com qual finalidade e para quem.",
+  "Resultado esperado": "Descreva a mudança ou entrega que deverá existir ao final da atividade.",
+  "Relação com metas": "Explique como este objetivo contribui para as metas cadastradas.",
+  "Número da meta": "Use uma numeração simples e sequencial, como 1, 2 e 3.",
+  "Descrição da meta": "Defina uma entrega concreta e mensurável que ajude a alcançar o objetivo.",
+  "Indicador de resultado": "Informe como será medido o alcance da meta, como número de atendimentos ou percentual.",
+  "Unidade de medida": "Informe a unidade do indicador, como pessoas, atendimentos, oficinas ou percentual.",
+  "Quantidade prevista": "Informe o valor que se pretende alcançar até o final da meta.",
+  "Meio de verificação": "Informe o documento ou registro que comprovará o resultado, como lista de presença ou relatório.",
+  "Nome da etapa/fase": "Dê um nome curto à fase, como mobilização, execução ou avaliação.",
+  "Ação a executar": "Descreva a atividade prática que será realizada nesta etapa.",
+  "Descrição detalhada": "Explique o passo a passo, a metodologia e os principais cuidados da etapa.",
+  "Público atendido": "Informe quem será atendido especificamente nesta etapa.",
+  Quantidade: "Informe quantas unidades, pessoas, encontros ou entregas estão previstas.",
+  Unidade: "Informe como a quantidade será contada, como pessoas, horas, kits ou encontros.",
+  Local: "Informe onde esta etapa, atividade ou despesa ocorrerá.",
+  "Data inicial": "Informe quando esta meta ou etapa começará.",
+  "Data final": "Informe quando esta meta ou etapa terminará.",
+  "Valor estimado": "Informe o custo aproximado desta etapa em reais.",
+  Responsável: "Informe a pessoa ou equipe responsável por realizar ou acompanhar a atividade.",
+  "Documento comprobatório esperado": "Informe qual documento demonstrará que a etapa foi realizada.",
+  "Categoria da despesa": "Selecione o grupo da despesa, como pessoal, material, serviço ou equipamento.",
+  Item: "Informe o bem ou serviço que será comprado ou contratado.",
+  "Valor unitário": "Informe o preço de uma unidade do item em reais.",
+  "Valor total": "Informe ou confira o resultado da quantidade multiplicada pelo valor unitário.",
+  "Fonte do recurso": "Selecione de onde virá o recurso usado nesta despesa ou parcela.",
+  "Meta vinculada": "Relacione a despesa à meta que ela ajudará a executar.",
+  "Etapa vinculada": "Informe a etapa que utilizará diretamente este recurso.",
+  "Natureza da despesa": "Informe a classificação contábil ou orçamentária da despesa, se exigida.",
+  Observação: "Registre uma informação complementar que ajude na análise ou conferência.",
+  "Mês/ano": "Informe o mês previsto no formato MM/AAAA, como 03/2026.",
+  "Valor previsto": "Informe quanto será desembolsado no mês indicado.",
+  "Forma de acompanhamento": "Explique como a execução será acompanhada, por exemplo, visitas e relatórios mensais.",
+  "Indicadores de monitoramento": "Liste os indicadores usados para acompanhar andamento, qualidade e resultados.",
+  Periodicidade: "Informe de quanto em quanto tempo o acompanhamento ou a prestação será feita.",
+  "Responsável pela coleta dos dados": "Informe quem registrará e consolidará as informações do monitoramento.",
+  Instrumentos: "Informe as ferramentas usadas, como formulário, lista de presença, entrevista ou sistema.",
+  "Evidências obrigatórias": "Liste os registros que deverão ser guardados para comprovar a execução.",
+  "Data limite de entrega": "Informe o último dia para entregar a prestação ou o documento.",
+  "Documentos exigidos": "Liste os documentos que deverão acompanhar a prestação de contas.",
+  Observações: "Registre orientações ou condições importantes para a prestação de contas.",
+  Documento: "Informe o nome do documento que deverá ser conferido na prestação.",
+  "Tipo do anexo": "Selecione a categoria que melhor identifica o arquivo enviado.",
+  Arquivo: "Escolha o arquivo que será anexado ao plano.",
+  Data: "Informe a data em que a declaração foi assinada ou aprovada.",
+  "Nome do representante legal": "Informe o nome completo da pessoa que assina a declaração.",
+  CPF: "Informe o CPF da pessoa que assina a declaração.",
+  Cargo: "Informe o cargo da pessoa que assina a declaração.",
+  "Aprovação interna": "Informe a instância que aprovou o plano, como diretoria ou conselho.",
+  "Situação da aprovação": "Informe se a aprovação está pendente, aprovada ou condicionada.",
+  "Observação do aprovador": "Registre recomendações, condicionantes ou justificativas da aprovação."
+};
+
+type CampoLabelProps = ComponentProps<typeof UiLabel> & { children: ReactNode };
+
+function Label({ children, ...props }: CampoLabelProps) {
+  const texto = typeof children === "string" ? children.replace(/\s*\*$/, "") : "";
+  const dica = dicasCamposPlano[texto] ?? "Informe o dado correspondente a este campo e confira a informação antes de salvar.";
+  return (
+    <span className="block" title={dica} data-campo-dica={dica}>
+      <UiLabel {...props} title={dica}>
+        {children}
+      </UiLabel>
+    </span>
+  );
+}
 
 const abas: AdminTab[] = [
   { id: "listagem", label: "Listagem", icon: List },
@@ -553,6 +677,19 @@ export function PlanoTrabalhoPage() {
     };
   }, [planoSelecionadoId]);
 
+  useEffect(() => {
+    const labels = document.querySelectorAll<HTMLElement>("[data-campo-dica]");
+    labels.forEach((label) => {
+      const dica = label.dataset.campoDica;
+      if (!dica) return;
+      const campo = label.closest<HTMLElement>("[class*='space-y-1']") ?? label.parentElement;
+      campo?.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>("input, select, textarea").forEach((elemento) => {
+        elemento.title = dica;
+        elemento.setAttribute("aria-description", dica);
+      });
+    });
+  }, [abaAtiva, form]);
+
   const planosFiltrados = useMemo(() => {
     const termo = filtroPesquisaDebounced.trim().toLowerCase();
     const filtrados = planos.filter((plano) => {
@@ -574,9 +711,16 @@ export function PlanoTrabalhoPage() {
 
     return filtrados.sort((a, b) => {
       if (filtroOrdenacao === "az") return a.titulo.localeCompare(b.titulo, "pt-BR");
-      const idA = Number(a.id);
-      const idB = Number(b.id);
-      return filtroOrdenacao === "maisAntigo" ? idA - idB : idB - idA;
+      const periodoA = a.periodoInicio || "";
+      const periodoB = b.periodoInicio || "";
+      if (periodoA !== periodoB) {
+        if (!periodoA) return 1;
+        if (!periodoB) return -1;
+        return filtroOrdenacao === "maisAntigo"
+          ? periodoA.localeCompare(periodoB)
+          : periodoB.localeCompare(periodoA);
+      }
+      return a.titulo.localeCompare(b.titulo, "pt-BR");
     });
   }, [filtroOrdenacao, filtroPesquisaDebounced, filtroStatus, planos]);
 
@@ -1368,8 +1512,8 @@ export function PlanoTrabalhoPage() {
                   value={filtroOrdenacao}
                   onChange={(event) => setFiltroOrdenacao(event.target.value as OrdenacaoPlano)}
                 >
-                  <option value="maisRecente">Mais recente</option>
-                  <option value="maisAntigo">Mais antigo</option>
+                  <option value="maisRecente">Período inicial mais recente</option>
+                  <option value="maisAntigo">Período inicial mais antigo</option>
                   <option value="az">A-Z</option>
                 </Select>
               </div>
