@@ -345,6 +345,7 @@ function imprimirFichaHtml(options: {
 
           .g3-print-sheet-inner {
             padding: ${paddingRaiz};
+            box-sizing: border-box;
           }
 
           table {
@@ -372,7 +373,7 @@ function imprimirFichaHtml(options: {
             }
 
             .g3-print-sheet {
-              width: auto;
+              width: 100%;
               min-height: auto;
               margin: 0;
               box-shadow: none;
@@ -382,6 +383,7 @@ function imprimirFichaHtml(options: {
 
             .g3-print-sheet-inner {
               padding: ${paddingRaiz};
+              box-sizing: border-box;
             }
           }
 
@@ -923,9 +925,15 @@ export function AgendamentosPage() {
         .g3-meta-item strong { display: block; margin-bottom: 3px; font-size: 10px; font-weight: 600; color: #5d7467; }
         .g3-meta-item span { display: block; font-size: 13px; font-weight: 700; color: #163027; line-height: 1.15; }
         .g3-orientacao { margin: 0 0 16px; border-left: 4px solid #0f8a57; border-radius: 10px; padding: 10px 12px; background: #f4fbf7; font-size: 12px; color: #4b6356; }
-        .g3-tabela { width: 100%; table-layout: fixed; border: 1px solid #dbe7df; border-radius: 16px; overflow: hidden; }
+        .g3-tabela { width: 100% !important; table-layout: fixed !important; border: 1px solid #dbe7df; border-radius: 16px; overflow: hidden; }
+        .g3-tabela col:nth-child(1) { width: 7% !important; }
+        .g3-tabela col:nth-child(2) { width: 10% !important; }
+        .g3-tabela col:nth-child(3) { width: 10% !important; }
+        .g3-tabela col:nth-child(4) { width: 42% !important; }
+        .g3-tabela col:nth-child(5) { width: 15% !important; }
+        .g3-tabela col:nth-child(6) { width: 16% !important; }
         .g3-tabela thead th { padding: 11px 12px; background: #0f8a57; color: #ffffff; font-size: 12px; font-weight: 700; text-align: left; }
-        .g3-tabela th, .g3-tabela td { border: 1px solid #dbe7df; padding: 10px 12px; text-align: left; }
+        .g3-tabela th, .g3-tabela td { border: 1px solid #dbe7df; padding: 8px 8px; text-align: left; }
         .g3-tabela tbody tr:nth-child(even) td { background: #f8fbf9; }
         .g3-tabela td { font-size: 13px; color: #233a31; min-height: 36px; }
         .g3-tabela td:first-child,
@@ -934,18 +942,20 @@ export function AgendamentosPage() {
         .g3-tabela td:nth-child(5) { white-space: nowrap; }
         .g3-tabela td:nth-child(3) { white-space: nowrap; }
         .g3-tabela td:nth-child(4) { white-space: normal; }
+        .g3-tabela th:nth-child(1),
+        .g3-tabela td:nth-child(1) { width: 7% !important; }
         .g3-tabela th:nth-child(2),
-        .g3-tabela td:nth-child(2) { width: 54px; }
+        .g3-tabela td:nth-child(2) { width: 10% !important; }
         .g3-tabela th:nth-child(3),
-        .g3-tabela td:nth-child(3) { width: 82px; }
+        .g3-tabela td:nth-child(3) { width: 10% !important; }
         .g3-tabela th:nth-child(4),
-        .g3-tabela td:nth-child(4) { width: 34%; }
+        .g3-tabela td:nth-child(4) { width: 42% !important; }
         .g3-tabela th:nth-child(5),
-        .g3-tabela td:nth-child(5) { width: 132px; }
+        .g3-tabela td:nth-child(5) { width: 15% !important; }
         .g3-tabela th:nth-child(6),
-        .g3-tabela td:nth-child(6) { width: 158px; }
+        .g3-tabela td:nth-child(6) { width: 16% !important; }
         .g3-beneficiario { display: flex; flex-direction: column; gap: 2px; }
-        .g3-beneficiario-nome { display: block; line-height: 1.2; white-space: normal; word-break: normal; overflow-wrap: anywhere; }
+        .g3-beneficiario-nome { display: block; font-size: 14px; font-weight: 600; line-height: 1.2; white-space: normal; word-break: normal; overflow-wrap: anywhere; }
         .g3-beneficiario-idade { display: block; font-size: 11px; color: #6b7f75; line-height: 1.15; }
         .g3-assinatura-campo { display: block; min-height: 20px; border-bottom: 1px solid #96b3a2; }
         .g3-rodape { margin-top: 18px; padding-top: 12px; border-top: 1px solid #dbe7df; font-size: 11px; color: #6b7f75; text-align: center; }
@@ -984,14 +994,22 @@ export function AgendamentosPage() {
             </div>
           </section>
           <table class="g3-tabela">
+            <colgroup>
+              <col style="width: 7%;" />
+              <col style="width: 10%;" />
+              <col style="width: 10%;" />
+              <col style="width: 42%;" />
+              <col style="width: 15%;" />
+              <col style="width: 16%;" />
+            </colgroup>
             <thead>
               <tr>
-                <th style="width: 42px;">Número</th>
-                <th style="width: 54px;">Código</th>
-                <th style="width: 82px;">Horário</th>
+                <th>Número</th>
+                <th>Código</th>
+                <th>Horário</th>
                 <th>Beneficiário</th>
-                <th style="width: 132px;">Telefone</th>
-                <th style="width: 158px;">Assinatura</th>
+                <th>Telefone</th>
+                <th>Assinatura</th>
               </tr>
             </thead>
             <tbody>${linhas}</tbody>

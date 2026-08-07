@@ -365,11 +365,16 @@ function CampoErro({ texto }: { texto?: string }) {
   return <p className="text-xs text-red-600">{texto}</p>;
 }
 
-function BadgePendencia({ texto }: { texto: string }) {
+function BadgePendencia({ texto, onClick }: { texto: string; onClick: () => void }) {
   return (
-    <span className="inline-flex rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+    <button
+      type="button"
+      className="inline-flex rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-left text-xs font-semibold text-amber-700 transition hover:border-amber-500 hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-amber-400"
+      onClick={onClick}
+      title="Clique para preencher este item"
+    >
       {texto}
-    </span>
+    </button>
   );
 }
 
@@ -759,7 +764,45 @@ export function PlanoTrabalhoPage() {
       declaracaoVeracidade: "declaracao"
     };
 
+    const campoPorChave: Record<string, string> = {
+      titulo: "plano-titulo",
+      tipoParceria: "plano-tipo-parceria",
+      orgaoParceiro: "plano-orgao-parceiro",
+      periodoInicio: "plano-periodo-inicio",
+      periodoFim: "plano-periodo-fim",
+      responsavelTecnico: "plano-responsavel-tecnico",
+      responsavelLegal: "plano-responsavel-legal",
+      razaoSocial: "plano-razao-social",
+      cnpj: "plano-cnpj",
+      representanteLegal: "plano-representante-legal",
+      representanteCpf: "plano-representante-cpf",
+      descricaoObjeto: "plano-descricao-objeto",
+      areaAtuacao: "plano-area-atuacao",
+      localExecucao: "plano-local-execucao",
+      publicoAlvo: "plano-publico-alvo",
+      problemaSocial: "plano-problema-social",
+      objetivoGeral: "plano-objetivo-geral",
+      objetivosEspecificos: "plano-objetivos-especificos",
+      metas: "plano-metas",
+      metasIndicadores: "plano-metas",
+      metasEtapas: "plano-metas",
+      etapasResponsavel: "plano-metas",
+      cronogramaExecucao: "plano-cronograma",
+      aplicacaoRecursos: "plano-aplicacao-recursos",
+      desembolso: "plano-desembolso",
+      checklistPrestacao: "plano-checklist-prestacao",
+      declaracaoVeracidade: "plano-declaracao-veracidade"
+    };
+
     setAbaAtiva(abaPorCampo[chave] ?? "declaracao");
+    window.setTimeout(() => {
+      const elemento = document.getElementById(campoPorChave[chave] ?? "");
+      if (!elemento) return;
+      elemento.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (elemento instanceof HTMLInputElement || elemento instanceof HTMLSelectElement || elemento instanceof HTMLTextAreaElement) {
+        elemento.focus({ preventScroll: true });
+      }
+    }, 80);
   }
 
   function duplicarPlano() {
@@ -980,10 +1023,10 @@ export function PlanoTrabalhoPage() {
           </div>
           {Object.keys(pendenciasEnvio).length ? (
             <div className="flex flex-wrap gap-2 pt-1">
-              {Object.values(pendenciasEnvio)
+              {Object.entries(pendenciasEnvio)
                 .slice(0, 4)
-                .map((item) => (
-                  <BadgePendencia key={item} texto={item} />
+                .map(([chave, item]) => (
+                  <BadgePendencia key={chave} texto={item} onClick={() => navegarParaPendencia(chave)} />
                 ))}
             </div>
           ) : (
@@ -1419,6 +1462,7 @@ export function PlanoTrabalhoPage() {
               <div className="space-y-1 xl:col-span-2">
                 <Label>Título do plano de trabalho *</Label>
                 <Input
+                  id="plano-titulo"
                   value={form.titulo}
                   onChange={(event) => atualizarCampo("titulo", event.target.value)}
                 />
@@ -1427,6 +1471,7 @@ export function PlanoTrabalhoPage() {
               <div className="space-y-1">
                 <Label>Tipo *</Label>
                 <Select
+                  id="plano-tipo-parceria"
                   value={form.tipoParceria}
                   onChange={(event) => {
                     const tipo = event.target.value;
@@ -1459,6 +1504,7 @@ export function PlanoTrabalhoPage() {
                 <Label>Órgão concedente ou parceiro *</Label>
                 <div className="relative">
                   <Input
+                    id="plano-orgao-parceiro"
                     value={form.orgaoParceiro}
                     onFocus={() => setMostrarSugestoesOrgaos(true)}
                     onBlur={() => window.setTimeout(() => setMostrarSugestoesOrgaos(false), 150)}
@@ -1508,6 +1554,7 @@ export function PlanoTrabalhoPage() {
               <div className="space-y-1">
                 <Label>Período inicial *</Label>
                 <Input
+                  id="plano-periodo-inicio"
                   type="date"
                   value={form.periodoInicio}
                   onChange={(event) => atualizarCampo("periodoInicio", event.target.value)}
@@ -1517,6 +1564,7 @@ export function PlanoTrabalhoPage() {
               <div className="space-y-1">
                 <Label>Período final *</Label>
                 <Input
+                  id="plano-periodo-fim"
                   type="date"
                   value={form.periodoFim}
                   onChange={(event) => atualizarCampo("periodoFim", event.target.value)}
@@ -1526,6 +1574,7 @@ export function PlanoTrabalhoPage() {
               <div className="space-y-1">
                 <Label>Responsável técnico *</Label>
                 <Select
+                  id="plano-responsavel-tecnico"
                   value={form.responsavelTecnico}
                   onChange={(event) => atualizarCampo("responsavelTecnico", event.target.value)}
                 >
@@ -1545,6 +1594,7 @@ export function PlanoTrabalhoPage() {
               <div className="space-y-1">
                 <Label>Responsável legal *</Label>
                 <Select
+                  id="plano-responsavel-legal"
                   value={form.responsavelLegal}
                   onChange={(event) => atualizarCampo("responsavelLegal", event.target.value)}
                 >
@@ -1655,6 +1705,7 @@ export function PlanoTrabalhoPage() {
               <div className="space-y-1 xl:col-span-2">
                 <Label>Razão social *</Label>
                 <Input
+                  id="plano-razao-social"
                   value={form.razaoSocial}
                   onChange={(event) => atualizarCampo("razaoSocial", event.target.value)}
                 />
@@ -1670,6 +1721,7 @@ export function PlanoTrabalhoPage() {
               <div className="space-y-1">
                 <Label>CNPJ *</Label>
                 <Input
+                  id="plano-cnpj"
                   value={formatarCnpj(form.cnpj)}
                   onChange={(event) => atualizarCampo("cnpj", normalizarCnpj(event.target.value))}
                 />
@@ -1746,6 +1798,7 @@ export function PlanoTrabalhoPage() {
               <div className="space-y-1">
                 <Label>Representante legal *</Label>
                 <Input
+                  id="plano-representante-legal"
                   value={form.representanteLegal}
                   onChange={(event) => atualizarCampo("representanteLegal", event.target.value)}
                   onBlur={(event) => atualizarCampo("representanteLegal", normalizarNomePessoaInput(event.target.value))}
@@ -1755,6 +1808,7 @@ export function PlanoTrabalhoPage() {
               <div className="space-y-1">
                 <Label>CPF do representante *</Label>
                 <Input
+                  id="plano-representante-cpf"
                   value={formatarCpf(form.representanteCpf)}
                   onChange={(event) => atualizarCampo("representanteCpf", normalizarCpf(event.target.value))}
                 />
@@ -1894,12 +1948,12 @@ export function PlanoTrabalhoPage() {
                     onApply={(suggestao) => atualizarCampo("descricaoObjeto", suggestao)}
                   />
                 </div>
-                <Textarea rows={4} value={form.descricaoObjeto} onChange={(event) => atualizarCampo("descricaoObjeto", event.target.value)} />
+                <Textarea id="plano-descricao-objeto" rows={4} value={form.descricaoObjeto} onChange={(event) => atualizarCampo("descricaoObjeto", event.target.value)} />
                 <CampoErro texto={erros.descricaoObjeto} />
               </div>
               <div className="space-y-1">
                 <Label>Área de atuação *</Label>
-                <Select value={form.areaAtuacao} onChange={(event) => atualizarCampo("areaAtuacao", event.target.value)}>
+                <Select id="plano-area-atuacao" value={form.areaAtuacao} onChange={(event) => atualizarCampo("areaAtuacao", event.target.value)}>
                   <option value="">Selecione</option>
                   {areasAtuacao.map((item) => (
                     <option key={item} value={item}>{item}</option>
@@ -1909,7 +1963,7 @@ export function PlanoTrabalhoPage() {
               </div>
               <div className="space-y-1 xl:col-span-2">
                 <Label>Local de execução *</Label>
-                <Input value={form.localExecucao} onChange={(event) => atualizarCampo("localExecucao", event.target.value)} />
+                <Input id="plano-local-execucao" value={form.localExecucao} onChange={(event) => atualizarCampo("localExecucao", event.target.value)} />
                 <CampoErro texto={erros.localExecucao} />
               </div>
               <div className="space-y-1">
@@ -1918,7 +1972,7 @@ export function PlanoTrabalhoPage() {
               </div>
               <div className="space-y-1 xl:col-span-2">
                 <Label>Público-alvo *</Label>
-                <Input value={form.publicoAlvo} onChange={(event) => atualizarCampo("publicoAlvo", event.target.value)} />
+                <Input id="plano-publico-alvo" value={form.publicoAlvo} onChange={(event) => atualizarCampo("publicoAlvo", event.target.value)} />
                 <CampoErro texto={erros.publicoAlvo} />
               </div>
               <div className="space-y-1">
@@ -1956,7 +2010,7 @@ export function PlanoTrabalhoPage() {
                     onApply={(suggestao) => atualizarCampo("problemaSocial", suggestao)}
                   />
                 </div>
-                <Textarea rows={4} value={form.problemaSocial} onChange={(event) => atualizarCampo("problemaSocial", event.target.value)} />
+                <Textarea id="plano-problema-social" rows={4} value={form.problemaSocial} onChange={(event) => atualizarCampo("problemaSocial", event.target.value)} />
                 <CampoErro texto={erros.problemaSocial} />
               </div>
               <div className="space-y-1">
@@ -2005,7 +2059,7 @@ export function PlanoTrabalhoPage() {
         ) : null}
 
         {abaAtiva === "objetivos" ? (
-          <section className="space-y-4">
+          <section id="plano-objetivos-especificos" className="space-y-4">
             <div className="space-y-1">
               <div className="flex items-center justify-between gap-2">
                 <Label>Objetivo geral *</Label>
@@ -2014,7 +2068,7 @@ export function PlanoTrabalhoPage() {
                   onApply={(suggestao) => atualizarCampo("objetivoGeral", suggestao)}
                 />
               </div>
-              <Textarea rows={3} value={form.objetivoGeral} onChange={(event) => atualizarCampo("objetivoGeral", event.target.value)} />
+              <Textarea id="plano-objetivo-geral" rows={3} value={form.objetivoGeral} onChange={(event) => atualizarCampo("objetivoGeral", event.target.value)} />
               <CampoErro texto={erros.objetivoGeral} />
             </div>
 
@@ -2092,7 +2146,7 @@ export function PlanoTrabalhoPage() {
         ) : null}
 
         {abaAtiva === "metas" ? (
-          <section className="space-y-4">
+          <section id="plano-metas" className="space-y-4">
             <div className="flex items-center justify-between rounded-xl border border-[var(--g3-border)] p-4">
               <div>
                 <h3 className="text-sm font-semibold text-[var(--g3-active)]">Metas, etapas e indicadores</h3>
@@ -2263,7 +2317,7 @@ export function PlanoTrabalhoPage() {
         ) : null}
 
         {abaAtiva === "cronograma" ? (
-          <section className="space-y-4">
+          <section id="plano-cronograma" className="space-y-4">
             <BlocoAjuda
               titulo="Cronograma gerado automaticamente"
               texto="O cronograma de execução é montado a partir das metas e etapas cadastradas. Revise sempre se as datas estão dentro do período de execução e se cada etapa tem responsável."
@@ -2332,7 +2386,7 @@ export function PlanoTrabalhoPage() {
         ) : null}
 
         {abaAtiva === "aplicacao" ? (
-          <section className="space-y-4">
+          <section id="plano-aplicacao-recursos" className="space-y-4">
             <div className="flex items-center justify-between rounded-xl border border-[var(--g3-border)] p-4">
               <div>
                 <h3 className="text-sm font-semibold text-[var(--g3-active)]">Plano de aplicação dos recursos</h3>
@@ -2432,7 +2486,7 @@ export function PlanoTrabalhoPage() {
         ) : null}
 
         {abaAtiva === "desembolso" ? (
-          <section className="space-y-4">
+          <section id="plano-desembolso" className="space-y-4">
             <div className="flex items-center justify-between rounded-xl border border-[var(--g3-border)] p-4">
               <div>
                 <h3 className="text-sm font-semibold text-[var(--g3-active)]">Cronograma de desembolso</h3>
@@ -2602,7 +2656,7 @@ export function PlanoTrabalhoPage() {
         ) : null}
 
         {abaAtiva === "prestacao" ? (
-          <section className="space-y-4">
+          <section id="plano-checklist-prestacao" className="space-y-4">
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <div className="space-y-1">
                 <Label>Periodicidade</Label>
@@ -2742,7 +2796,7 @@ export function PlanoTrabalhoPage() {
         ) : null}
 
         {abaAtiva === "declaracao" ? (
-          <section className="space-y-4">
+          <section id="plano-declaracao-veracidade" className="space-y-4">
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <div className="space-y-1">
                 <Label>Local</Label>

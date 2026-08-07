@@ -1,10 +1,10 @@
 {
-  "latestVersion": "1.00.802",
-  "releaseDate": "2026-08-05",
-  "description": "Correcao da URL da API no desenvolvimento e acesso master.",
+  "latestVersion": "1.00.806",
+  "releaseDate": "2026-08-06",
+  "description": "Navegacao clicavel das pendencias no plano de trabalho.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.801",
+  "minCompatibleVersion": "1.00.805",
   "releaseType": "stable",
   "downloadUrl": null
 }
