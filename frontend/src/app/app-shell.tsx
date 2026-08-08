@@ -659,6 +659,7 @@ const menuSectionsBase: MenuSection[] = [
     itens: [
       { id: "educacional-visao-geral", to: "/educacional", label: "Visão geral", icon: ChartPie },
       { id: "educacional-alunos", to: "/educacional?grupo=alunos&aba=alunos", label: "Alunos", icon: UsersRound },
+      { id: "educacional-vida-academica", to: "/educacional?grupo=alunos&aba=vida-academica", label: "Vida acadêmica 360º", icon: Files },
       { id: "educacional-vida-escolar", to: "/educacional?grupo=vida-escolar&aba=transferencias", label: "Vida escolar", icon: Files },
       { id: "educacional-estrutura", to: "/educacional?grupo=estrutura&aba=estrutura", label: "Estrutura acadêmica", icon: Building2 },
       { id: "educacional-professores", to: "/educacional?grupo=professores&aba=professores", label: "Professores e equipe pedagógica", icon: UsersRound },

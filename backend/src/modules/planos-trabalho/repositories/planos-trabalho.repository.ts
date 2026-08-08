@@ -338,7 +338,8 @@ export class PlanosTrabalhoRepository {
         p.criado_em,
         p.atualizado_em,
         t.numero_termo AS termo_numero,
-        t.descricao_objeto AS termo_objeto
+        t.descricao_objeto AS termo_objeto,
+        t.responsavel_indicacao AS termo_responsavel_indicacao
       FROM plano_trabalho p
       LEFT JOIN termo_fomento t ON t.id = p.termo_fomento_id
       WHERE p.tenant_id::text = ${tenantId}
@@ -451,7 +452,8 @@ export class PlanosTrabalhoRepository {
         p.criado_em,
         p.atualizado_em,
         t.numero_termo AS termo_numero,
-        t.descricao_objeto AS termo_objeto
+        t.descricao_objeto AS termo_objeto,
+        t.responsavel_indicacao AS termo_responsavel_indicacao
       FROM plano_trabalho p
       LEFT JOIN termo_fomento t ON t.id = p.termo_fomento_id
       WHERE p.id = ${id}

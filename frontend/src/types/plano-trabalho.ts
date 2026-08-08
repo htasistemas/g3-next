@@ -177,5 +177,5 @@ export type PlanoCronogramaExecucaoItem = {
 export type PlanoTrabalho = PlanoTrabalhoPayload & {
   id: string;
   codigoInterno: string;
-  termoFomento?: { id: string; numero: string; objeto?: string };
+  termoFomento?: { id: string; numero: string; objeto?: string; responsavelIndicacao?: string };
 };

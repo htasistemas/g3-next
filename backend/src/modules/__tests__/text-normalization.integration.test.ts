@@ -4,6 +4,7 @@ import { mapBeneficiarioToResponse } from "../beneficiarios/beneficiario.mapper.
 import { BeneficiarioService } from "../beneficiarios/services/beneficiario.service.js";
 import { FamiliaService } from "../familias/services/familia.service.js";
 import { UnidadeAssistencialService } from "../unidades-assistenciais/services/unidade-assistencial.service.js";
+import { unidadeAssistencialInputSchema } from "../unidades-assistenciais/unidade-assistencial.schema.js";
 
 test("BeneficiarioService normaliza payload textual antes de persistir", () => {
   const service = new BeneficiarioService() as any;
@@ -71,6 +72,23 @@ test("UnidadeAssistencialService normaliza unidade e diretoria", () => {
   assert.equal(normalizado.observacoes, "Atendimento no CRAS");
   assert.equal(normalizado.diretoria[0].nome_completo, "Maria de Souza Lima");
   assert.equal(normalizado.diretoria[0].funcao, "Secretaria de Assistencia Social");
+});
+
+test("unidadeAssistencialInputSchema preserva capacidade das salas", () => {
+  const parsed = unidadeAssistencialInputSchema.parse({
+    nome_fantasia: "Escola teste",
+    tipo_unidade: "ENSINO",
+    salas: [
+      {
+        nome: "Sala 01",
+        capacidade_maxima: "30",
+        ativo: "true"
+      }
+    ]
+  });
+
+  assert.equal(parsed.salas?.[0]?.capacidade_maxima, 30);
+  assert.equal(parsed.salas?.[0]?.ativo, true);
 });
 
 test("mapBeneficiarioToResponse formata nomes legados em caixa alta", () => {

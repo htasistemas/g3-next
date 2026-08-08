@@ -154,7 +154,7 @@ export class DocumentosInstituicaoRepository {
   }
 
   async listar(tenantId: string) {
-    await this.garantirEstrutura();
+    await this.garantirSchemaAnexos();
     return prisma.$queryRaw<DocumentoInstituicaoRow[]>(Prisma.sql`
       SELECT
         d.id,
@@ -190,7 +190,7 @@ export class DocumentosInstituicaoRepository {
   }
 
   async buscarPorId(id: bigint, tenantId: string) {
-    await this.garantirEstrutura();
+    await this.garantirSchemaAnexos();
     const rows = await prisma.$queryRaw<DocumentoInstituicaoRow[]>(Prisma.sql`
       SELECT
         d.id,

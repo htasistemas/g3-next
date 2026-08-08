@@ -232,6 +232,7 @@ export type PlanoTrabalhoRow = {
   atualizado_em: Date;
   termo_numero: string | null;
   termo_objeto: string | null;
+  termo_responsavel_indicacao: string | null;
 };
 
 export type PlanoObjetivoEspecificoRow = {

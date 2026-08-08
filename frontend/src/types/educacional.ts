@@ -17,6 +17,10 @@ export type EducacionalResumo = {
   ocorrencias_recorrentes?: number;
   chamadas_pendentes?: number;
   media_geral?: number;
+  documentos_pendentes?: number;
+  turmas_sem_professor?: number;
+  turmas_proximas_capacidade?: number;
+  pendencias?: Array<{ chave: string; prioridade: string; descricao: string; total: number; destino: string }>;
   matriculas?: Record<string, number>;
 };
 

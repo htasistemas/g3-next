@@ -45,6 +45,7 @@ export const diretoriaUnidadeSchema = z.object({
 export const salaUnidadeSchema = z.object({
   id: z.union([z.string(), z.number()]).optional(),
   nome: z.string().trim().min(2, "Informe o nome da sala ou auditório."),
+  capacidade_maxima: z.coerce.number().int().nonnegative().optional().default(0),
   ativo: optionalBoolean
 });
 

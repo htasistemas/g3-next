@@ -10,6 +10,10 @@ export const painelEducacionalFiltrosSchema = z.object({
   turma_id: z.coerce.number().int().positive().optional(),
   turno: z.string().trim().max(30).optional()
 });
+export const pendenciaEducacionalTipoSchema = z.enum(["documentos", "chamadas", "baixa-frequencia", "turmas-sem-professor", "capacidade"]);
+export const pendenciasEducacionaisFiltrosSchema = painelEducacionalFiltrosSchema.extend({
+  limite: z.coerce.number().int().min(1).max(200).default(100)
+});
 
 export const buscaBeneficiarioSchema = z.object({ busca: texto });
 export const anoLetivoSchema = z.object({ ano: z.coerce.number().int().min(2000).max(2200), descricao: texto, data_inicial: data, data_final: data, status: z.string().trim().min(3).default("PLANEJAMENTO"), periodos: z.array(z.record(z.unknown())).optional() });
@@ -31,6 +35,14 @@ export const matriculaSchema = z.object({
   data_inicio: data,
   data_encerramento: data,
   turno: z.string().trim().max(30).optional().nullable(),
+  origem: z.enum(["NOVO", "TRANSFERENCIA", "REMATRICULA", "RETORNO", "OUTRO"]).default("NOVO"),
+  escola_anterior: z.string().trim().max(200).optional().nullable(),
+  responsavel_id: id.optional().nullable(),
+  responsavel_nome: z.string().trim().max(200).optional().nullable(),
+  transporte_escolar: z.boolean().optional().default(false),
+  transporte_descricao: z.string().trim().optional().nullable(),
+  documentacao: z.record(z.unknown()).optional().default({}),
+  informacoes_complementares: z.string().trim().optional().nullable(),
   situacao: z.string().trim().min(3).default("ATIVA"),
   observacoes: z.string().trim().optional().nullable(),
   ativo: z.boolean().optional()
@@ -85,16 +97,41 @@ export const criarVinculoAlunoSchema = z.object({
   motivo: texto,
   observacoes: z.string().trim().optional().nullable()
 });
+export const rematriculaSchema = z.object({
+  ano_letivo_id: id,
+  unidade_id: id,
+  sala_id: id,
+  etapa_id: id,
+  serie_id: id,
+  turma_id: id.optional().nullable(),
+  numero_matricula: z.string().trim().max(60).optional().nullable(),
+  data_inicio: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  motivo: texto,
+  observacoes: z.string().trim().optional().nullable()
+});
+export const rematriculaLoteSchema = rematriculaSchema.extend({
+  matriculas_ids: z.array(id).min(1, "Selecione ao menos uma matrícula para rematricular.")
+});
 export const enturmacaoSchema = z.object({ matricula_id: id, turma_id: id, data_inicio: data, data_fim: data, motivo: z.string().trim().optional().nullable() });
 export const gradeCurricularSchema = z.object({ ano_letivo_id: id, etapa_id: id, serie_id: id, disciplina_id: id, aulas_semanais: z.coerce.number().int().nonnegative(), carga_horaria: z.coerce.number().int().nonnegative().optional().nullable(), status: z.string().trim().min(3).default("ATIVA") });
 export const horarioSchema = z.object({ turma_id: id, disciplina_id: id, professor_id: id.optional().nullable(), sala_id: id.optional().nullable(), dia_semana: z.coerce.number().int().min(1).max(7), hora_inicio: z.string().regex(/^\d{2}:\d{2}$/), hora_fim: z.string().regex(/^\d{2}:\d{2}$/), status: z.string().trim().min(3).default("ATIVO") });
 export const diarioSchema = z.object({ turma_id: id, disciplina_id: id, professor_id: id.optional().nullable(), data_aula: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), conteudo: z.string().trim().optional().nullable(), objetivos: z.string().trim().optional().nullable(), metodologia: z.string().trim().optional().nullable(), atividades: z.string().trim().optional().nullable(), observacoes: z.string().trim().optional().nullable(), status: z.string().trim().min(3).default("RASCUNHO") });
 export const frequenciaSchema = z.object({ diario_aula_id: id, matricula_id: id, situacao: z.enum(["PRESENTE", "AUSENTE", "JUSTIFICADO", "ATRASO", "SAIDA_ANTECIPADA"]), justificativa: z.string().trim().optional().nullable(), observacao: z.string().trim().optional().nullable() });
+export const chamadaRapidaSchema = z.object({
+  registros: z.array(z.object({
+    matricula_id: id,
+    situacao: z.enum(["PRESENTE", "AUSENTE", "JUSTIFICADO", "ATRASO", "SAIDA_ANTECIPADA"]),
+    justificativa: z.string().trim().optional().nullable(),
+    observacao: z.string().trim().optional().nullable()
+  })).min(1, "Informe ao menos um aluno para salvar a chamada.")
+});
 export const planoAulaSchema = z.object({ turma_id: id, disciplina_id: id, professor_id: id.optional().nullable(), data_aula: data, tema: texto, objetivos: z.string().trim().optional().nullable(), habilidades: z.string().trim().optional().nullable(), conteudo: z.string().trim().optional().nullable(), metodologia: z.string().trim().optional().nullable(), recursos: z.string().trim().optional().nullable(), avaliacao: z.string().trim().optional().nullable(), observacoes: z.string().trim().optional().nullable(), status: z.string().trim().min(3).default("RASCUNHO") });
 export const planejamentoSchema = z.object({ ano_letivo_id: id, etapa_id: id.optional().nullable(), turma_id: id.optional().nullable(), responsavel_id: id.optional().nullable(), periodo: texto, titulo: texto, objetivos: z.string().trim().optional().nullable(), estrategias: z.string().trim().optional().nullable(), metas: z.string().trim().optional().nullable(), observacoes: z.string().trim().optional().nullable(), status: z.string().trim().min(3).default("RASCUNHO") });
 export const avaliacaoSchema = z.object({ turma_id: id, disciplina_id: id, periodo: texto, tipo: texto, data_avaliacao: data, valor_maximo: z.coerce.number().positive(), peso: z.coerce.number().positive(), descricao: z.string().trim().optional().nullable(), status: z.string().trim().min(3).default("ABERTA") });
 export const notaSchema = z.object({ avaliacao_id: id, matricula_id: id, valor: z.coerce.number().nonnegative().optional().nullable(), conceito: z.string().trim().optional().nullable(), observacao: z.string().trim().optional().nullable() });
 export const boletimSchema = z.object({ matricula_id: id, ano_letivo_id: id, periodo: texto, media: z.coerce.number().nonnegative().optional().nullable(), frequencia: z.coerce.number().min(0).max(100).optional().nullable(), resultado: z.string().trim().optional().nullable(), observacoes: z.string().trim().optional().nullable(), emitido_em: z.string().datetime().optional().nullable() });
+export const gerarBoletimSchema = z.object({ matricula_id: id, ano_letivo_id: id, periodo: texto });
+export const gerarHistoricoSchema = z.object({ aluno_id: id, ano_letivo_id: id });
 export const historicoSchema = z.object({ aluno_id: id, ano_letivo_id: id, escola_descricao: z.string().trim().optional().nullable(), etapa_descricao: z.string().trim().optional().nullable(), serie_descricao: z.string().trim().optional().nullable(), media: z.coerce.number().nonnegative().optional().nullable(), frequencia: z.coerce.number().min(0).max(100).optional().nullable(), resultado: texto, observacoes: z.string().trim().optional().nullable() });
 export const ocorrenciaSchema = z.object({ aluno_id: id, matricula_id: id.optional().nullable(), data_ocorrencia: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), hora_ocorrencia: z.string().regex(/^\d{2}:\d{2}$/).optional().nullable(), tipo: texto, descricao: texto, providencias: z.string().trim().optional().nullable(), responsavel_comunicado: z.boolean().default(false), status: z.string().trim().min(3).default("ABERTA") });
 export const agendaSchema = z.object({ unidade_id: id.optional().nullable(), turma_id: id.optional().nullable(), aluno_id: id.optional().nullable(), data_inicio: z.string().datetime(), data_fim: z.string().datetime().optional().nullable(), tipo: texto, titulo: texto, descricao: z.string().trim().optional().nullable(), status: z.string().trim().min(3).default("ATIVO") });
@@ -106,5 +143,17 @@ export const autorizacaoSchema = z.object({ aluno_id: id, responsavel_id: id.opt
 export const profissionalVinculoSchema = z.object({ profissional_id: id, funcao: texto, unidade_id: id.optional().nullable(), disciplina_id: id.optional().nullable(), turma_id: id.optional().nullable(), carga_horaria: z.coerce.number().int().nonnegative().optional().nullable(), status: z.string().trim().min(3).default("ATIVO"), observacoes: z.string().trim().optional().nullable() });
 export const listaEsperaSchema = z.object({ beneficiario_id: id.optional().nullable(), aluno_id: id.optional().nullable(), ano_letivo_id: id, unidade_id: id.optional().nullable(), etapa_id: id, serie_id: id, turno: z.string().trim().min(3), prioridade: z.coerce.number().int().min(0).default(0), data_inscricao: data, situacao: z.string().trim().min(3).default("AGUARDANDO"), observacoes: z.string().trim().optional().nullable() });
 export const recuperacaoSchema = z.object({ matricula_id: id, disciplina_id: id, periodo: texto, tipo: texto, valor_maximo: z.coerce.number().positive().default(10), valor: z.coerce.number().nonnegative().optional().nullable(), conceito: z.string().trim().optional().nullable(), resultado: z.string().trim().optional().nullable(), status: z.string().trim().min(3).default("ABERTA") });
+export const recuperacaoSugestoesSchema = z.object({
+  ano_letivo_id: id,
+  periodo: z.string().trim().optional(),
+  disciplina_id: id.optional(),
+  media_minima: z.coerce.number().min(0).max(10).default(6)
+});
 export const resultadoFinalSchema = z.object({ matricula_id: id, ano_letivo_id: id, situacao: texto, media: z.coerce.number().nonnegative().optional().nullable(), frequencia: z.coerce.number().min(0).max(100).optional().nullable(), observacoes: z.string().trim().optional().nullable(), data_resultado: data });
 export const calendarioSchema = z.object({ ano_letivo_id: id, unidade_id: id.optional().nullable(), data_evento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), tipo: texto, titulo: texto, descricao: z.string().trim().optional().nullable(), dia_letivo: z.boolean().default(false), status: z.string().trim().min(3).default("ATIVO") });
+export const configuracaoEducacionalSchema = z.object({
+  chave: z.string().trim().min(2).max(80),
+  valor: z.string().trim().min(1).max(200),
+  descricao: z.string().trim().optional().nullable(),
+  ativo: z.boolean().default(true)
+});

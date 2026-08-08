@@ -74,6 +74,8 @@ const classeCardVisaoGeral =
 const classeCardVisaoGeralInterativo = `${classeCardVisaoGeral} transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--g3-primary)] hover:shadow-[0_22px_48px_-22px_rgba(15,23,42,0.26)]`;
 const classeCardVisaoGeralResumo =
   "rounded-xl border border-[var(--g3-primary-soft)] bg-[linear-gradient(180deg,var(--g3-primary-soft)_0%,var(--g3-card)_100%)] shadow-[0_18px_40px_-26px_rgba(15,23,42,0.22)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--g3-primary)] hover:shadow-[0_22px_48px_-22px_rgba(15,23,42,0.26)]";
+const classeCardVisaoGeralResumoAlerta =
+  "g3-alerta-documentos-vencidos border-red-600 hover:border-red-700";
 const classeCardVisaoGeralSuave =
   "rounded-xl border border-[var(--g3-border)] bg-[var(--g3-dashboard-card-soft)] shadow-[0_14px_32px_-26px_rgba(15,23,42,0.16)] backdrop-blur-[2px]";
 
@@ -279,7 +281,8 @@ export function VisaoGeralPage() {
         valor: String(documentosVencidos),
         hint: "Registros com validade expirada",
         icone: Archive,
-        rota: "/setor-administrativo/gestao-documentos"
+        rota: "/setor-administrativo/gestao-documentos",
+        alerta: documentosVencidos > 0
       },
       {
         label: "Documentos a vencer",
@@ -392,29 +395,36 @@ export function VisaoGeralPage() {
           ) : (
             <>
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
-                {cardsResumo.map((card) => (
-                  <button
-                    key={card.label}
-                    type="button"
-                    className={`${classeCardVisaoGeralResumo} px-3 py-3 text-left`}
-                    onClick={() => navigate(card.rota)}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
-                          {card.label}
-                        </p>
-                        <p className="mt-1 text-2xl font-semibold text-[var(--g3-foreground)]">
-                          {card.valor}
-                        </p>
-                        <p className="mt-1 text-xs text-[var(--g3-muted)]">{card.hint}</p>
+                {cardsResumo.map((card) => {
+                  const cardEmAlerta = Boolean(card.alerta);
+                  return (
+                    <button
+                      key={card.label}
+                      type="button"
+                      className={`${classeCardVisaoGeralResumo} ${cardEmAlerta ? classeCardVisaoGeralResumoAlerta : ""} px-3 py-3 text-left`}
+                      onClick={() => navigate(card.rota)}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
+                            {card.label}
+                          </p>
+                          <p className="mt-1 text-2xl font-semibold text-[var(--g3-foreground)]">
+                            {card.valor}
+                          </p>
+                          <p className="mt-1 text-xs text-[var(--g3-muted)]">{card.hint}</p>
+                        </div>
+                        <span
+                          className={`rounded-md p-2 ${
+                            cardEmAlerta ? "bg-red-100 text-red-700" : "bg-[var(--g3-primary-soft)] text-[var(--g3-active)]"
+                          }`}
+                        >
+                          <card.icone className="h-4 w-4" />
+                        </span>
                       </div>
-                      <span className="rounded-md bg-[var(--g3-primary-soft)] p-2 text-[var(--g3-active)]">
-                        <card.icone className="h-4 w-4" />
-                      </span>
-                    </div>
-                  </button>
-                ))}
+                    </button>
+                  );
+                })}
               </div>
 
               <div className="space-y-4">

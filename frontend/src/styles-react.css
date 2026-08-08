@@ -164,3 +164,31 @@ a {
 .g3-sidebar-scroll::-webkit-scrollbar-thumb:hover {
   background: rgba(236, 253, 245, 0.68);
 }
+
+@layer utilities {
+  .g3-alerta-documentos-vencidos {
+    animation: g3-alerta-documentos-vencidos 1.05s ease-in-out infinite;
+  }
+}
+
+@keyframes g3-alerta-documentos-vencidos {
+  0%,
+  100% {
+    box-shadow:
+      0 18px 40px -26px rgba(15, 23, 42, 0.22),
+      0 0 0 1px rgba(220, 38, 38, 0.45);
+  }
+
+  50% {
+    box-shadow:
+      0 18px 40px -26px rgba(15, 23, 42, 0.22),
+      0 0 0 4px rgba(220, 38, 38, 0.42),
+      0 0 18px rgba(220, 38, 38, 0.34);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .g3-alerta-documentos-vencidos {
+    animation: none;
+  }
+}

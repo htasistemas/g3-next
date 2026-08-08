@@ -698,9 +698,9 @@ export function PlanoTrabalhoPage() {
         plano.titulo,
         plano.orgaoParceiro,
         plano.status,
-        plano.razaoSocial,
         plano.numeroProcesso ?? "",
-        plano.termoFomento?.numero ?? ""
+        plano.termoFomento?.numero ?? "",
+        plano.termoFomento?.responsavelIndicacao ?? ""
       ]
         .join(" ")
         .toLowerCase();
@@ -1490,7 +1490,7 @@ export function PlanoTrabalhoPage() {
               <div className="space-y-1 xl:col-span-2">
                 <Label>Pesquisa</Label>
                 <Input
-                  placeholder="Código, título, órgão, CNPJ, status ou termo"
+                  placeholder="Código, título, órgão, status, termo ou indicação"
                   value={filtroPesquisa}
                   onChange={(event) => setFiltroPesquisa(event.target.value)}
                 />
@@ -1547,11 +1547,11 @@ export function PlanoTrabalhoPage() {
                   <tr>
                     <th className="px-3 py-2 text-left">Código</th>
                     <th className="px-3 py-2 text-left">Título</th>
-                    <th className="px-3 py-2 text-left">Instituição</th>
+                    <th className="px-3 py-2 text-left">Valor</th>
+                    <th className="px-3 py-2 text-left">Indicação</th>
                     <th className="px-3 py-2 text-left">Órgão parceiro</th>
                     <th className="px-3 py-2 text-left">Situação</th>
                     <th className="px-3 py-2 text-left">Período</th>
-                    <th className="px-3 py-2 text-left">Aplicação</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1576,7 +1576,12 @@ export function PlanoTrabalhoPage() {
                           <p className="font-semibold text-[var(--g3-foreground)]">{plano.titulo}</p>
                           <p className="text-xs text-[var(--g3-muted)]">{plano.tipoParceria || "---"}</p>
                         </td>
-                        <td className="px-3 py-3">{plano.razaoSocial || "---"}</td>
+                        <td className="px-3 py-3 font-semibold">{formatarMoeda(somarAplicacaoRecursos(plano))}</td>
+                        <td className="px-3 py-3">
+                          {plano.termoFomento?.responsavelIndicacao ||
+                            termosQuery.data?.find((termo) => termo.id === plano.termoFomentoId)?.responsavelIndicacao ||
+                            "---"}
+                        </td>
                         <td className="px-3 py-3">{plano.orgaoParceiro || "---"}</td>
                         <td className="px-3 py-3">
                           {statusOptions.find((item) => item.value === plano.status)?.label ?? plano.status}
@@ -1584,7 +1589,6 @@ export function PlanoTrabalhoPage() {
                         <td className="px-3 py-3">
                           {formatarDataPtBr(plano.periodoInicio)} a {formatarDataPtBr(plano.periodoFim)}
                         </td>
-                        <td className="px-3 py-3">{formatarMoeda(somarAplicacaoRecursos(plano))}</td>
                       </tr>
                     ))
                   ) : (

@@ -24,8 +24,10 @@ const migrationsEducacionais = [
   "20260720_create_educacional_parcerias_publicas",
   "20260720_create_educacional_profissional_vinculo"
   ,"20260805_create_educacional_matricula_vinculos"
+  ,"20260806_add_educacional_matricula_completa"
+  ,"20260806_create_educacional_configuracoes"
 ];
-const tabelaPorRecurso: Record<EducacionalRecurso, string> = { "anos-letivos": "educacional_ano_letivo", etapas: "educacional_etapa", series: "educacional_serie", disciplinas: "educacional_disciplina", turmas: "educacional_turma", alunos: "educacional_aluno", matriculas: "educacional_matricula", enturmacoes: "educacional_enturmacao", profissionais: "educacional_profissional_vinculo", "grade-curricular": "educacional_grade_curricular", horarios: "educacional_horario", diarios: "educacional_diario_aula", frequencias: "educacional_frequencia", "planos-aula": "educacional_plano_aula", planejamentos: "educacional_planejamento_pedagogico", avaliacoes: "educacional_avaliacao", notas: "educacional_nota", boletins: "educacional_boletim", historicos: "educacional_historico_escolar", ocorrencias: "educacional_ocorrencia", agenda: "educacional_agenda", documentos: "educacional_documento", "rotinas-infantis": "educacional_rotina_infantil", "desenvolvimentos-infantis": "educacional_desenvolvimento_infantil", transferencias: "educacional_transferencia", autorizacoes: "educacional_autorizacao", "lista-espera": "educacional_lista_espera", recuperacoes: "educacional_recuperacao", "resultados-finais": "educacional_resultado_final", calendario: "educacional_calendario" };
+const tabelaPorRecurso: Record<EducacionalRecurso, string> = { "anos-letivos": "educacional_ano_letivo", etapas: "educacional_etapa", series: "educacional_serie", disciplinas: "educacional_disciplina", turmas: "educacional_turma", alunos: "educacional_aluno", matriculas: "educacional_matricula", enturmacoes: "educacional_enturmacao", profissionais: "educacional_profissional_vinculo", "grade-curricular": "educacional_grade_curricular", horarios: "educacional_horario", diarios: "educacional_diario_aula", frequencias: "educacional_frequencia", "planos-aula": "educacional_plano_aula", planejamentos: "educacional_planejamento_pedagogico", avaliacoes: "educacional_avaliacao", notas: "educacional_nota", boletins: "educacional_boletim", historicos: "educacional_historico_escolar", ocorrencias: "educacional_ocorrencia", agenda: "educacional_agenda", documentos: "educacional_documento", "rotinas-infantis": "educacional_rotina_infantil", "desenvolvimentos-infantis": "educacional_desenvolvimento_infantil", transferencias: "educacional_transferencia", autorizacoes: "educacional_autorizacao", "lista-espera": "educacional_lista_espera", recuperacoes: "educacional_recuperacao", "resultados-finais": "educacional_resultado_final", calendario: "educacional_calendario", configuracoes: "educacional_configuracao" };
 
 function dividirComandosSql(sql: string) {
   return sql.split(/;\s*(?:\r?\n|$)/).map((comando) => comando.trim()).filter(Boolean);
@@ -48,7 +50,7 @@ const camposData = new Set([
   "data_rotina"
 ]);
 const camposHorario = new Set(["hora_inicio", "hora_fim", "hora_ocorrencia", "sono_inicio", "sono_fim"]);
-const camposJsonb = new Set(["periodos"]);
+const camposJsonb = new Set(["periodos", "documentacao"]);
 
 function valorSql(campo: string, valor: unknown) {
   if (valor === null) return Prisma.sql`NULL`;
@@ -124,14 +126,197 @@ export class EducacionalRepository {
     const desempenho = await prisma.$queryRaw<Array<{ media: number | null }>>(Prisma.sql`SELECT AVG(n.valor / NULLIF(av.valor_maximo, 0) * 10)::float AS media FROM educacional_nota n INNER JOIN educacional_avaliacao av ON av.id = n.avaliacao_id INNER JOIN educacional_matricula m ON m.id = n.matricula_id LEFT JOIN educacional_turma t ON t.id = m.turma_id WHERE ${matriculasWhere} AND n.valor IS NOT NULL`);
     const disciplinas = await prisma.$queryRaw<Array<{ total: bigint }>>(Prisma.sql`SELECT COUNT(*)::bigint AS total FROM educacional_disciplina d WHERE d.tenant_id::text = ${tenantId} AND d.status = 'ATIVA'`);
     const anosAbertos = await prisma.$queryRaw<Array<{ total: bigint }>>(Prisma.sql`SELECT COUNT(*)::bigint AS total FROM educacional_ano_letivo a WHERE a.tenant_id::text = ${tenantId} AND a.status IN ('PLANEJAMENTO', 'ABERTO', 'EM_ANDAMENTO')`);
+    const documentosPendentes = await prisma.$queryRaw<Array<{ total: bigint }>>(Prisma.sql`
+      SELECT COUNT(DISTINCT m.aluno_id)::bigint AS total
+      FROM educacional_matricula m
+      LEFT JOIN educacional_turma t ON t.id = m.turma_id
+      WHERE ${matriculasWhere}
+        AND NOT EXISTS (
+          SELECT 1
+          FROM educacional_documento d
+          WHERE d.tenant_id::text = ${tenantId}
+            AND d.aluno_id = m.aluno_id
+            AND COALESCE(d.status, 'EMITIDO') <> 'CANCELADO'
+        )
+    `);
+    const turmasSemProfessor = await prisma.$queryRaw<Array<{ total: bigint }>>(Prisma.sql`
+      SELECT COUNT(*)::bigint AS total
+      FROM educacional_turma t
+      WHERE t.tenant_id::text = ${tenantId}
+        AND t.status = 'ATIVA'
+        AND t.professor_responsavel_id IS NULL
+        AND NULLIF(TRIM(COALESCE(t.professor_responsavel_nome, '')), '') IS NULL
+        ${filtros.ano_letivo_id ? Prisma.sql`AND t.ano_letivo_id = ${filtros.ano_letivo_id}` : Prisma.empty}
+        ${filtros.unidade_id ? Prisma.sql`AND t.unidade_id = ${filtros.unidade_id}` : Prisma.empty}
+        ${filtros.etapa_id ? Prisma.sql`AND t.etapa_id = ${filtros.etapa_id}` : Prisma.empty}
+        ${filtros.turma_id ? Prisma.sql`AND t.id = ${filtros.turma_id}` : Prisma.empty}
+        ${filtros.turno ? Prisma.sql`AND t.turno = ${filtros.turno}` : Prisma.empty}
+    `);
+    const turmasProximasCapacidade = await prisma.$queryRaw<Array<{ total: bigint }>>(Prisma.sql`
+      SELECT COUNT(*)::bigint AS total
+      FROM (
+        SELECT t.id, t.capacidade_maxima, COUNT(m.id)::int AS matriculados
+        FROM educacional_turma t
+        LEFT JOIN educacional_matricula m ON m.turma_id = t.id AND m.tenant_id::text = ${tenantId} AND m.situacao IN ('ATIVA', 'PENDENTE')
+        WHERE t.tenant_id::text = ${tenantId}
+          AND t.status = 'ATIVA'
+          AND COALESCE(t.capacidade_maxima, 0) > 0
+          ${filtros.ano_letivo_id ? Prisma.sql`AND t.ano_letivo_id = ${filtros.ano_letivo_id}` : Prisma.empty}
+          ${filtros.unidade_id ? Prisma.sql`AND t.unidade_id = ${filtros.unidade_id}` : Prisma.empty}
+          ${filtros.etapa_id ? Prisma.sql`AND t.etapa_id = ${filtros.etapa_id}` : Prisma.empty}
+          ${filtros.turma_id ? Prisma.sql`AND t.id = ${filtros.turma_id}` : Prisma.empty}
+          ${filtros.turno ? Prisma.sql`AND t.turno = ${filtros.turno}` : Prisma.empty}
+        GROUP BY t.id, t.capacidade_maxima
+      ) dados
+      WHERE dados.matriculados >= CEIL(dados.capacidade_maxima * 0.9)
+    `);
     const resultadoFrequencia = frequencia[0] ?? { presentes: 0n, total: 0n };
     const totalFrequencia = Number(resultadoFrequencia.total);
     const percentualFrequencia = totalFrequencia ? Number(resultadoFrequencia.presentes) / totalFrequencia * 100 : 0;
     const matriculasPorSituacao = Object.fromEntries(matriculas.map((item) => [item.situacao.toLowerCase(), Number(item.total)]));
+    const pendenciasEducacionais = [
+      { chave: "documentos", prioridade: "Atenção", descricao: "Alunos sem documento acadêmico registrado", total: Number(documentosPendentes[0]?.total ?? 0), destino: "?aba=pendencias&pendencia=documentos" },
+      { chave: "chamadas", prioridade: "Crítica", descricao: "Aulas sem chamada lançada", total: Number(pendencias[0]?.total ?? 0), destino: "?aba=pendencias&pendencia=chamadas" },
+      { chave: "baixa-frequencia", prioridade: "Crítica", descricao: "Alunos com frequência crítica", total: Number(risco[0]?.criticos ?? 0), destino: "?aba=pendencias&pendencia=baixa-frequencia" },
+      { chave: "turmas-sem-professor", prioridade: "Atenção", descricao: "Turmas sem professor responsável", total: Number(turmasSemProfessor[0]?.total ?? 0), destino: "?aba=pendencias&pendencia=turmas-sem-professor" },
+      { chave: "capacidade", prioridade: "Acompanhar", descricao: "Turmas próximas da capacidade máxima", total: Number(turmasProximasCapacidade[0]?.total ?? 0), destino: "?aba=pendencias&pendencia=capacidade" }
+    ];
     return {
       alunos_ativos: Number(alunosAtivos[0]?.total ?? 0), matriculas_ativas: matriculasPorSituacao.ativa ?? 0, turmas_ativas: Number(turmas[0]?.total ?? 0), disciplinas_ativas: Number(disciplinas[0]?.total ?? 0), anos_abertos: Number(anosAbertos[0]?.total ?? 0),
-      matriculas: matriculasPorSituacao, frequencia_geral: percentualFrequencia, alunos_risco: Number(risco[0]?.total ?? 0), alunos_risco_critico: Number(risco[0]?.criticos ?? 0), risco_evasao: Number(evasao[0]?.total ?? 0), ocorrencias_mes: Number(ocorrencias[0]?.total ?? 0), ocorrencias_recorrentes: Number(ocorrencias[0]?.recorrentes ?? 0), chamadas_pendentes: Number(pendencias[0]?.total ?? 0), media_geral: Number(desempenho[0]?.media ?? 0), filtros
+      matriculas: matriculasPorSituacao, frequencia_geral: percentualFrequencia, alunos_risco: Number(risco[0]?.total ?? 0), alunos_risco_critico: Number(risco[0]?.criticos ?? 0), risco_evasao: Number(evasao[0]?.total ?? 0), ocorrencias_mes: Number(ocorrencias[0]?.total ?? 0), ocorrencias_recorrentes: Number(ocorrencias[0]?.recorrentes ?? 0), chamadas_pendentes: Number(pendencias[0]?.total ?? 0), media_geral: Number(desempenho[0]?.media ?? 0), documentos_pendentes: Number(documentosPendentes[0]?.total ?? 0), turmas_sem_professor: Number(turmasSemProfessor[0]?.total ?? 0), turmas_proximas_capacidade: Number(turmasProximasCapacidade[0]?.total ?? 0), pendencias: pendenciasEducacionais, filtros
     };
+  }
+
+  async listarPendencias(tipo: "documentos" | "chamadas" | "baixa-frequencia" | "turmas-sem-professor" | "capacidade", filtros: { ano_letivo_id?: number; unidade_id?: number; etapa_id?: number; turma_id?: number; turno?: string; limite: number }, tenantId: string) {
+    await this.garantirEstrutura();
+    const condicoesMatricula = [Prisma.sql`m.tenant_id::text = ${tenantId}`, Prisma.sql`m.situacao = 'ATIVA'`];
+    if (filtros.ano_letivo_id) condicoesMatricula.push(Prisma.sql`m.ano_letivo_id = ${filtros.ano_letivo_id}`);
+    if (filtros.unidade_id) condicoesMatricula.push(Prisma.sql`m.unidade_id = ${filtros.unidade_id}`);
+    if (filtros.etapa_id) condicoesMatricula.push(Prisma.sql`m.etapa_id = ${filtros.etapa_id}`);
+    if (filtros.turma_id) condicoesMatricula.push(Prisma.sql`m.turma_id = ${filtros.turma_id}`);
+    if (filtros.turno) condicoesMatricula.push(Prisma.sql`COALESCE(t.turno, '') = ${filtros.turno}`);
+    const whereMatricula = Prisma.join(condicoesMatricula, " AND ");
+    const filtroTurma = Prisma.sql`
+      t.tenant_id::text = ${tenantId}
+      AND t.status = 'ATIVA'
+      ${filtros.ano_letivo_id ? Prisma.sql`AND t.ano_letivo_id = ${filtros.ano_letivo_id}` : Prisma.empty}
+      ${filtros.unidade_id ? Prisma.sql`AND t.unidade_id = ${filtros.unidade_id}` : Prisma.empty}
+      ${filtros.etapa_id ? Prisma.sql`AND t.etapa_id = ${filtros.etapa_id}` : Prisma.empty}
+      ${filtros.turma_id ? Prisma.sql`AND t.id = ${filtros.turma_id}` : Prisma.empty}
+      ${filtros.turno ? Prisma.sql`AND t.turno = ${filtros.turno}` : Prisma.empty}
+    `;
+    const limite = filtros.limite;
+    const meta: Record<typeof tipo, { titulo: string; descricao: string }> = {
+      documentos: { titulo: "Documentação acadêmica pendente", descricao: "Alunos com matrícula ativa sem documento acadêmico emitido ou registrado." },
+      chamadas: { titulo: "Chamadas pendentes", descricao: "Aulas registradas no diário que ainda não possuem frequência lançada." },
+      "baixa-frequencia": { titulo: "Alunos com frequência crítica", descricao: "Alunos com pelo menos 50% de faltas nas chamadas registradas." },
+      "turmas-sem-professor": { titulo: "Turmas sem professor responsável", descricao: "Turmas ativas sem professor responsável vinculado ou informado." },
+      capacidade: { titulo: "Turmas próximas da capacidade máxima", descricao: "Turmas ativas com ocupação igual ou superior a 90% da capacidade configurada." }
+    };
+    const itens = tipo === "documentos"
+      ? await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+        SELECT m.id AS matricula_id, m.numero_matricula, a.id AS aluno_id, b.nome_completo AS aluno_nome,
+          al.ano AS ano_letivo, u.nome_fantasia AS unidade_nome, t.nome AS turma_nome, e.nome AS etapa_nome, s.nome AS serie_nome,
+          'Sem documento acadêmico registrado' AS motivo
+        FROM educacional_matricula m
+        INNER JOIN educacional_aluno a ON a.id = m.aluno_id AND a.tenant_id::text = ${tenantId}
+        INNER JOIN cadastro_beneficiario b ON b.id = a.beneficiario_id AND b.tenant_id::text = ${tenantId}
+        LEFT JOIN educacional_turma t ON t.id = m.turma_id
+        LEFT JOIN educacional_ano_letivo al ON al.id = m.ano_letivo_id AND al.tenant_id::text = ${tenantId}
+        LEFT JOIN educacional_etapa e ON e.id = m.etapa_id AND e.tenant_id::text = ${tenantId}
+        LEFT JOIN educacional_serie s ON s.id = m.serie_id AND s.tenant_id::text = ${tenantId}
+        LEFT JOIN unidade_assistencial u ON u.id = m.unidade_id AND u.tenant_id::text = ${tenantId}
+        WHERE ${whereMatricula}
+          AND NOT EXISTS (
+            SELECT 1 FROM educacional_documento d
+            WHERE d.tenant_id::text = ${tenantId}
+              AND d.aluno_id = m.aluno_id
+              AND COALESCE(d.status, 'EMITIDO') <> 'CANCELADO'
+          )
+        ORDER BY b.nome_completo ASC
+        LIMIT ${limite}
+      `)
+      : tipo === "chamadas"
+        ? await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+          SELECT d.id AS diario_id, d.data_aula, d.status, t.id AS turma_id, t.nome AS turma_nome,
+            disc.nome AS disciplina_nome, al.ano AS ano_letivo, u.nome_fantasia AS unidade_nome,
+            'Aula sem chamada lançada' AS motivo
+          FROM educacional_diario_aula d
+          INNER JOIN educacional_turma t ON t.id = d.turma_id
+          LEFT JOIN educacional_disciplina disc ON disc.id = d.disciplina_id AND disc.tenant_id::text = ${tenantId}
+          LEFT JOIN educacional_ano_letivo al ON al.id = t.ano_letivo_id AND al.tenant_id::text = ${tenantId}
+          LEFT JOIN unidade_assistencial u ON u.id = t.unidade_id AND u.tenant_id::text = ${tenantId}
+          WHERE d.tenant_id::text = ${tenantId}
+            AND ${filtroTurma}
+            AND NOT EXISTS (SELECT 1 FROM educacional_frequencia f WHERE f.diario_aula_id = d.id AND f.tenant_id::text = ${tenantId})
+          ORDER BY d.data_aula DESC, d.id DESC
+          LIMIT ${limite}
+        `)
+        : tipo === "baixa-frequencia"
+          ? await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+            SELECT dados.*, ROUND((dados.faltas::numeric / NULLIF(dados.total_aulas, 0)) * 100, 2)::float AS percentual_faltas,
+              ROUND((dados.presencas::numeric / NULLIF(dados.total_aulas, 0)) * 100, 2)::float AS percentual_presenca,
+              'Frequência crítica' AS motivo
+            FROM (
+              SELECT m.id AS matricula_id, m.numero_matricula, a.id AS aluno_id, b.nome_completo AS aluno_nome,
+                al.ano AS ano_letivo, u.nome_fantasia AS unidade_nome, t.nome AS turma_nome,
+                COUNT(f.id)::int AS total_aulas,
+                COUNT(f.id) FILTER (WHERE f.situacao = 'AUSENTE')::int AS faltas,
+                COUNT(f.id) FILTER (WHERE f.situacao IN ('PRESENTE','ATRASO','SAIDA_ANTECIPADA'))::int AS presencas
+              FROM educacional_matricula m
+              INNER JOIN educacional_aluno a ON a.id = m.aluno_id AND a.tenant_id::text = ${tenantId}
+              INNER JOIN cadastro_beneficiario b ON b.id = a.beneficiario_id AND b.tenant_id::text = ${tenantId}
+              LEFT JOIN educacional_turma t ON t.id = m.turma_id
+              LEFT JOIN educacional_ano_letivo al ON al.id = m.ano_letivo_id AND al.tenant_id::text = ${tenantId}
+              LEFT JOIN unidade_assistencial u ON u.id = m.unidade_id AND u.tenant_id::text = ${tenantId}
+              LEFT JOIN educacional_frequencia f ON f.matricula_id = m.id AND f.tenant_id::text = ${tenantId}
+              WHERE ${whereMatricula}
+              GROUP BY m.id, m.numero_matricula, a.id, b.nome_completo, al.ano, u.nome_fantasia, t.nome
+            ) dados
+            WHERE dados.total_aulas > 0 AND dados.faltas::numeric / dados.total_aulas >= 0.5
+            ORDER BY percentual_faltas DESC, aluno_nome ASC
+            LIMIT ${limite}
+          `)
+          : tipo === "turmas-sem-professor"
+            ? await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+              SELECT t.id AS turma_id, t.nome AS turma_nome, t.turno, t.capacidade_maxima, al.ano AS ano_letivo,
+                u.nome_fantasia AS unidade_nome, e.nome AS etapa_nome, s.nome AS serie_nome,
+                'Turma sem professor responsável' AS motivo
+              FROM educacional_turma t
+              LEFT JOIN educacional_ano_letivo al ON al.id = t.ano_letivo_id AND al.tenant_id::text = ${tenantId}
+              LEFT JOIN educacional_etapa e ON e.id = t.etapa_id AND e.tenant_id::text = ${tenantId}
+              LEFT JOIN educacional_serie s ON s.id = t.serie_id AND s.tenant_id::text = ${tenantId}
+              LEFT JOIN unidade_assistencial u ON u.id = t.unidade_id AND u.tenant_id::text = ${tenantId}
+              WHERE ${filtroTurma}
+                AND t.professor_responsavel_id IS NULL
+                AND NULLIF(TRIM(COALESCE(t.professor_responsavel_nome, '')), '') IS NULL
+              ORDER BY t.nome ASC
+              LIMIT ${limite}
+            `)
+            : await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+              SELECT dados.*, GREATEST(dados.capacidade_maxima - dados.matriculados, 0)::int AS vagas,
+                ROUND((dados.matriculados::numeric / NULLIF(dados.capacidade_maxima, 0)) * 100, 2)::float AS ocupacao_percentual,
+                'Turma próxima da capacidade máxima' AS motivo
+              FROM (
+                SELECT t.id AS turma_id, t.nome AS turma_nome, t.turno, t.capacidade_maxima, al.ano AS ano_letivo,
+                  u.nome_fantasia AS unidade_nome, e.nome AS etapa_nome, s.nome AS serie_nome,
+                  COUNT(m.id)::int AS matriculados
+                FROM educacional_turma t
+                LEFT JOIN educacional_matricula m ON m.turma_id = t.id AND m.tenant_id::text = ${tenantId} AND m.situacao IN ('ATIVA', 'PENDENTE')
+                LEFT JOIN educacional_ano_letivo al ON al.id = t.ano_letivo_id AND al.tenant_id::text = ${tenantId}
+                LEFT JOIN educacional_etapa e ON e.id = t.etapa_id AND e.tenant_id::text = ${tenantId}
+                LEFT JOIN educacional_serie s ON s.id = t.serie_id AND s.tenant_id::text = ${tenantId}
+                LEFT JOIN unidade_assistencial u ON u.id = t.unidade_id AND u.tenant_id::text = ${tenantId}
+                WHERE ${filtroTurma}
+                  AND COALESCE(t.capacidade_maxima, 0) > 0
+                GROUP BY t.id, t.nome, t.turno, t.capacidade_maxima, al.ano, u.nome_fantasia, e.nome, s.nome
+              ) dados
+              WHERE dados.matriculados >= CEIL(dados.capacidade_maxima * 0.9)
+              ORDER BY ocupacao_percentual DESC, turma_nome ASC
+              LIMIT ${limite}
+            `);
+    const serializados = itens.map((row) => this.serializar(row));
+    return { tipo, ...meta[tipo], total: serializados.length, itens: serializados, filtros };
   }
 
   async listar(recurso: EducacionalRecurso, tenantId: string) {
@@ -147,13 +332,45 @@ export class EducacionalRepository {
     return rows.map((row) => this.serializar(row));
   }
 
+  async proximoNumeroMatricula(tenantId: string) {
+    await this.garantirEstrutura();
+    const rows = await prisma.$queryRaw<Array<{ proximo: number }>>(Prisma.sql`
+      SELECT (COALESCE(MAX(numero_matricula::int), 0) + 1)::int AS proximo
+      FROM educacional_matricula
+      WHERE tenant_id::text = ${tenantId}
+        AND numero_matricula ~ '^[0-9]+$'
+    `);
+    return String(rows[0]?.proximo ?? 1).padStart(5, "0");
+  }
+
   async buscarBeneficiarios(termo: string, tenantId: string) {
+    await this.garantirEstrutura();
     const busca = `%${termo.trim()}%`;
+    const buscaNumerica = `%${somenteDigitos(termo)}%`;
+    const filtroCpf = somenteDigitos(termo)
+      ? Prisma.sql`OR regexp_replace(COALESCE(cpf_doc.numero_documento, ''), '[^0-9]', '', 'g') LIKE ${buscaNumerica}`
+      : Prisma.empty;
     return prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
-      SELECT b.id, b.codigo, b.nome_completo, b.data_nascimento, b.nome_mae
+      SELECT b.id, b.codigo, b.nome_completo, b.data_nascimento, b.nome_mae, cpf_doc.numero_documento AS cpf
       FROM cadastro_beneficiario b
+      LEFT JOIN LATERAL (
+        SELECT d.numero_documento
+        FROM documentos d
+        WHERE d.beneficiario_id = b.id
+          AND d.tenant_id::text = ${tenantId}
+          AND (
+            UPPER(COALESCE(d.tipo_documento, '')) = 'CPF'
+            OR UPPER(COALESCE(d.nome_documento, '')) LIKE '%CPF%'
+          )
+        ORDER BY d.id DESC
+        LIMIT 1
+      ) cpf_doc ON TRUE
       WHERE b.tenant_id::text = ${tenantId}
-        AND (b.nome_completo ILIKE ${busca} OR COALESCE(b.codigo, '') ILIKE ${busca} OR regexp_replace(COALESCE(b.cpf, ''), '[^0-9]', '', 'g') LIKE regexp_replace(${busca}, '[^0-9]', '', 'g'))
+        AND (
+          b.nome_completo ILIKE ${busca}
+          OR COALESCE(b.codigo, '') ILIKE ${busca}
+          ${filtroCpf}
+        )
       ORDER BY b.nome_completo ASC LIMIT 50
     `).then((rows) => rows.map((row) => this.serializar(row)));
   }
@@ -230,7 +447,7 @@ export class EducacionalRepository {
       if (digitosBusca) {
         const buscaNumerica = `%${digitosBusca}%`;
         condicoesBusca.push(
-          Prisma.sql`regexp_replace(COALESCE(b.cpf, ''), '[^0-9]', '', 'g') LIKE ${buscaNumerica}`,
+          Prisma.sql`regexp_replace(COALESCE(cpf_doc.numero_documento, ''), '[^0-9]', '', 'g') LIKE ${buscaNumerica}`,
           Prisma.sql`EXISTS (SELECT 1 FROM contato_beneficiario cb WHERE cb.beneficiario_id = b.id AND regexp_replace(COALESCE(cb.telefone_principal, ''), '[^0-9]', '', 'g') LIKE ${buscaNumerica})`
         );
       }
@@ -242,6 +459,18 @@ export class EducacionalRepository {
     const from = Prisma.sql`
       FROM educacional_aluno a
       INNER JOIN cadastro_beneficiario b ON b.id = a.beneficiario_id AND b.tenant_id::text = ${tenantId}
+      LEFT JOIN LATERAL (
+        SELECT d.numero_documento
+        FROM documentos d
+        WHERE d.beneficiario_id = b.id
+          AND d.tenant_id::text = ${tenantId}
+          AND (
+            UPPER(COALESCE(d.tipo_documento, '')) = 'CPF'
+            OR UPPER(COALESCE(d.nome_documento, '')) LIKE '%CPF%'
+          )
+        ORDER BY d.id DESC
+        LIMIT 1
+      ) cpf_doc ON TRUE
       LEFT JOIN LATERAL (
         SELECT m0.*
         FROM educacional_matricula m0
@@ -287,6 +516,451 @@ export class EducacionalRepository {
     return { grupos: [...grupos.values()], total: Number(totalRows[0]?.total ?? 0), pagina: filtros.pagina, limite: filtros.limite, indicadores: { instituicoes: Number(totalRows[0]?.instituicoes ?? 0), salas: Number(totalRows[0]?.salas ?? 0), alunos: Number(totalRows[0]?.total ?? 0), alunos_ativos: Number(totalRows[0]?.alunos_ativos ?? 0), alunos_sem_sala: Number(totalRows[0]?.alunos_sem_sala ?? 0), alunos_sem_instituicao: Number(totalRows[0]?.alunos_sem_instituicao ?? 0) } };
   }
 
+  async vidaAcademicaAluno(alunoId: string, tenantId: string) {
+    await this.garantirEstrutura();
+    const id = BigInt(alunoId);
+    const aluno = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+      SELECT a.id AS aluno_id, a.status AS aluno_status, a.numero_aluno, a.observacoes AS aluno_observacoes,
+        b.id AS beneficiario_id, b.codigo AS codigo_beneficiario, b.nome_completo, b.data_nascimento,
+        b.nome_mae, b.foto_3x4,
+        cpf_doc.numero_documento AS cpf,
+        contato.telefone_principal, contato.email
+      FROM educacional_aluno a
+      INNER JOIN cadastro_beneficiario b ON b.id = a.beneficiario_id AND b.tenant_id::text = ${tenantId}
+      LEFT JOIN LATERAL (
+        SELECT d.numero_documento
+        FROM documentos d
+        WHERE d.beneficiario_id = b.id
+          AND d.tenant_id::text = ${tenantId}
+          AND (UPPER(COALESCE(d.tipo_documento, '')) = 'CPF' OR UPPER(COALESCE(d.nome_documento, '')) LIKE '%CPF%')
+        ORDER BY d.id DESC
+        LIMIT 1
+      ) cpf_doc ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT cb.telefone_principal, cb.email
+        FROM contato_beneficiario cb
+        WHERE cb.beneficiario_id = b.id
+        ORDER BY cb.id DESC
+        LIMIT 1
+      ) contato ON TRUE
+      WHERE a.id = ${id} AND a.tenant_id::text = ${tenantId}
+      LIMIT 1
+    `);
+    if (!aluno[0]) throw new AppError("Aluno não encontrado nesta instituição.", 404);
+
+    const beneficiarioId = BigInt(String(aluno[0].beneficiario_id));
+    const matriculas = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+      SELECT m.*, al.ano AS ano_letivo, e.nome AS etapa_nome, se.nome AS serie_nome,
+        t.nome AS turma_nome, COALESCE(m.turno, t.turno) AS turno,
+        u.nome_fantasia AS unidade_nome, s.nome AS sala_nome
+      FROM educacional_matricula m
+      LEFT JOIN educacional_ano_letivo al ON al.id = m.ano_letivo_id AND al.tenant_id::text = ${tenantId}
+      LEFT JOIN educacional_etapa e ON e.id = m.etapa_id AND e.tenant_id::text = ${tenantId}
+      LEFT JOIN educacional_serie se ON se.id = m.serie_id AND se.tenant_id::text = ${tenantId}
+      LEFT JOIN educacional_turma t ON t.id = m.turma_id AND t.tenant_id::text = ${tenantId}
+      LEFT JOIN unidade_assistencial u ON u.id = m.unidade_id AND u.tenant_id::text = ${tenantId}
+      LEFT JOIN salas_unidade s ON s.id = m.sala_id AND s.unidade_id = m.unidade_id
+      WHERE m.aluno_id = ${id} AND m.tenant_id::text = ${tenantId}
+      ORDER BY m.data_inicio DESC NULLS LAST, m.id DESC
+    `);
+    const endereco = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+      SELECT e.*, concat_ws(', ', e.logradouro, e.numero, e.bairro, e.cidade, e.estado) AS endereco_resumido
+      FROM cadastro_beneficiario b
+      LEFT JOIN endereco e ON e.id = b.endereco_id
+      WHERE b.id = ${beneficiarioId} AND b.tenant_id::text = ${tenantId}
+      LIMIT 1
+    `);
+    const contatos = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+      SELECT telefone_principal, telefone_principal_whatsapp, telefone_secundario, telefone_recado_nome,
+        telefone_recado_numero, email, permite_contato_tel, permite_contato_sms, horario_preferencial_contato
+      FROM contato_beneficiario
+      WHERE beneficiario_id = ${beneficiarioId}
+      ORDER BY atualizado_em DESC, id DESC
+      LIMIT 5
+    `);
+    const documentosBeneficiario = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+      SELECT id, tipo_documento, nome_documento, numero_documento, nome_arquivo, caminho_arquivo,
+        data_emissao, validade, obrigatorio, ativo, categoria
+      FROM documentos
+      WHERE beneficiario_id = ${beneficiarioId}
+        AND tenant_id::text = ${tenantId}
+        AND COALESCE(ativo, TRUE) = TRUE
+      ORDER BY COALESCE(validade, data_emissao) DESC NULLS LAST, id DESC
+      LIMIT 30
+    `);
+    const responsaveis = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+      SELECT DISTINCT ON (bm.beneficiario_id)
+        vf.id AS familia_id, vf.nome_familia, vf.status AS familia_status,
+        bm.beneficiario_id AS responsavel_beneficiario_id, cb.nome_completo, cb.codigo, bm.parentesco,
+        bm.responsavel_familiar, bm.usa_endereco_familia,
+        contato.telefone_principal, contato.email
+      FROM vinculo_familiar_membro m
+      INNER JOIN vinculo_familiar vf ON vf.id = m.vinculo_familiar_id AND vf.tenant_id::text = ${tenantId}
+      INNER JOIN vinculo_familiar_membro bm ON bm.vinculo_familiar_id = vf.id AND bm.tenant_id::text = ${tenantId}
+      INNER JOIN cadastro_beneficiario cb ON cb.id = bm.beneficiario_id AND cb.tenant_id::text = ${tenantId}
+      LEFT JOIN LATERAL (
+        SELECT c.telefone_principal, c.email
+        FROM contato_beneficiario c
+        WHERE c.beneficiario_id = cb.id
+        ORDER BY c.atualizado_em DESC, c.id DESC
+        LIMIT 1
+      ) contato ON TRUE
+      WHERE m.beneficiario_id = ${beneficiarioId}
+        AND m.tenant_id::text = ${tenantId}
+        AND COALESCE(vf.status, 'ATIVO') <> 'INATIVO'
+        AND (COALESCE(bm.responsavel_familiar, FALSE) = TRUE OR vf.id_referencia_familiar = bm.beneficiario_id)
+      ORDER BY bm.beneficiario_id, COALESCE(bm.responsavel_familiar, FALSE) DESC
+      LIMIT 10
+    `);
+    const frequencia = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+      SELECT COUNT(*)::bigint AS total,
+        COUNT(*) FILTER (WHERE f.situacao IN ('PRESENTE','ATRASO','SAIDA_ANTECIPADA'))::bigint AS presencas,
+        COUNT(*) FILTER (WHERE f.situacao = 'AUSENTE')::bigint AS ausencias,
+        COUNT(*) FILTER (WHERE f.situacao = 'JUSTIFICADO')::bigint AS justificadas,
+        COUNT(*) FILTER (WHERE f.situacao = 'ATRASO')::bigint AS atrasos,
+        COUNT(*) FILTER (WHERE f.situacao = 'SAIDA_ANTECIPADA')::bigint AS saidas_antecipadas
+      FROM educacional_frequencia f
+      INNER JOIN educacional_matricula m ON m.id = f.matricula_id AND m.tenant_id::text = ${tenantId}
+      WHERE m.aluno_id = ${id} AND f.tenant_id::text = ${tenantId}
+    `);
+    const notas = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+      SELECT n.*, av.periodo, av.tipo AS avaliacao_tipo, av.valor_maximo, d.nome AS disciplina_nome
+      FROM educacional_nota n
+      INNER JOIN educacional_avaliacao av ON av.id = n.avaliacao_id AND av.tenant_id::text = ${tenantId}
+      LEFT JOIN educacional_disciplina d ON d.id = av.disciplina_id AND d.tenant_id::text = ${tenantId}
+      INNER JOIN educacional_matricula m ON m.id = n.matricula_id AND m.tenant_id::text = ${tenantId}
+      WHERE m.aluno_id = ${id} AND n.tenant_id::text = ${tenantId}
+      ORDER BY av.data_avaliacao DESC NULLS LAST, n.id DESC
+      LIMIT 50
+    `);
+    const ocorrencias = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+      SELECT *
+      FROM educacional_ocorrencia
+      WHERE aluno_id = ${id} AND tenant_id::text = ${tenantId}
+      ORDER BY data_ocorrencia DESC, id DESC
+      LIMIT 20
+    `);
+    const documentos = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+      SELECT *
+      FROM educacional_documento
+      WHERE aluno_id = ${id} AND tenant_id::text = ${tenantId}
+      ORDER BY data_emissao DESC NULLS LAST, id DESC
+      LIMIT 20
+    `);
+    const historico = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+      SELECT *
+      FROM educacional_historico_escolar
+      WHERE aluno_id = ${id} AND tenant_id::text = ${tenantId}
+      ORDER BY ano_letivo_id DESC, id DESC
+    `);
+    const movimentacoes = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+      SELECT mv.*
+      FROM educacional_matricula_movimentacao mv
+      INNER JOIN educacional_matricula m ON (m.id = mv.matricula_origem_id OR m.id = mv.matricula_destino_id)
+        AND m.tenant_id::text = ${tenantId}
+      WHERE m.aluno_id = ${id} AND mv.tenant_id::text = ${tenantId}
+      ORDER BY mv.data_movimentacao DESC, mv.id DESC
+      LIMIT 30
+    `);
+
+    const frequenciaSerializada = this.serializar(frequencia[0] ?? {}) as Record<string, unknown>;
+    const totalFrequencia = Number(frequenciaSerializada.total ?? 0);
+    const presencas = Number(frequenciaSerializada.presencas ?? 0);
+    const percentualFrequencia = totalFrequencia ? Number(((presencas / totalFrequencia) * 100).toFixed(2)) : 0;
+    const alertas = [
+      ...(percentualFrequencia > 0 && percentualFrequencia < 75 ? [{ tipo: "Frequência", severidade: "Crítica", mensagem: "Frequência geral abaixo de 75%." }] : []),
+      ...(!responsaveis.length ? [{ tipo: "Responsáveis", severidade: "Atenção", mensagem: "Nenhum responsável familiar identificado no cadastro central." }] : []),
+      ...(!endereco[0]?.id ? [{ tipo: "Endereço", severidade: "Atenção", mensagem: "Endereço do aluno não localizado no cadastro central." }] : []),
+      ...(!documentosBeneficiario.length && !documentos.length ? [{ tipo: "Documentos", severidade: "Atenção", mensagem: "Nenhum documento localizado para o aluno." }] : []),
+      ...(!matriculas.some((item) => String(item.situacao ?? "").toUpperCase() === "ATIVA") ? [{ tipo: "Matrícula", severidade: "Atenção", mensagem: "Aluno sem matrícula ativa no histórico educacional." }] : [])
+    ];
+    return {
+      aluno: this.serializar(aluno[0]),
+      matriculas: matriculas.map((row) => this.serializar(row)),
+      endereco: this.serializar(endereco[0]),
+      contatos: contatos.map((row) => this.serializar(row)),
+      responsaveis: responsaveis.map((row) => this.serializar(row)),
+      documentos_beneficiario: documentosBeneficiario.map((row) => this.serializar(row)),
+      alertas,
+      frequencia: { ...frequenciaSerializada, percentual: percentualFrequencia },
+      notas: notas.map((row) => this.serializar(row)),
+      ocorrencias: ocorrencias.map((row) => this.serializar(row)),
+      documentos: documentos.map((row) => this.serializar(row)),
+      historico: historico.map((row) => this.serializar(row)),
+      linha_tempo: [
+        ...movimentacoes.map((row) => ({ tipo: "Movimentação acadêmica", data: row.data_movimentacao, descricao: row.tipo, origem: this.serializar(row) })),
+        ...ocorrencias.map((row) => ({ tipo: "Ocorrência", data: row.data_ocorrencia, descricao: row.tipo, origem: this.serializar(row) })),
+        ...documentos.map((row) => ({ tipo: "Documento", data: row.data_emissao, descricao: row.titulo, origem: this.serializar(row) }))
+      ].sort((a, b) => String(b.data ?? "").localeCompare(String(a.data ?? ""))).slice(0, 30)
+    };
+  }
+
+  async obterChamadaRapida(diarioId: string, tenantId: string) {
+    await this.garantirEstrutura();
+    const id = BigInt(diarioId);
+    const diario = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+      SELECT d.*, t.nome AS turma_nome, disc.nome AS disciplina_nome
+      FROM educacional_diario_aula d
+      INNER JOIN educacional_turma t ON t.id = d.turma_id AND t.tenant_id::text = ${tenantId}
+      INNER JOIN educacional_disciplina disc ON disc.id = d.disciplina_id AND disc.tenant_id::text = ${tenantId}
+      WHERE d.id = ${id} AND d.tenant_id::text = ${tenantId}
+      LIMIT 1
+    `);
+    if (!diario[0]) throw new AppError("Aula do diário não encontrada nesta instituição.", 404);
+    const turmaId = BigInt(String(diario[0].turma_id));
+    const alunos = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+      SELECT m.id AS matricula_id, m.numero_matricula, a.id AS aluno_id, b.nome_completo,
+        f.id AS frequencia_id, COALESCE(f.situacao, 'PRESENTE') AS situacao, f.justificativa, f.observacao
+      FROM educacional_matricula m
+      INNER JOIN educacional_aluno a ON a.id = m.aluno_id AND a.tenant_id::text = ${tenantId}
+      INNER JOIN cadastro_beneficiario b ON b.id = a.beneficiario_id AND b.tenant_id::text = ${tenantId}
+      LEFT JOIN educacional_frequencia f ON f.matricula_id = m.id AND f.diario_aula_id = ${id} AND f.tenant_id::text = ${tenantId}
+      WHERE m.tenant_id::text = ${tenantId}
+        AND m.situacao = 'ATIVA'
+        AND (
+          m.turma_id = ${turmaId}
+          OR EXISTS (
+            SELECT 1
+            FROM educacional_enturmacao e
+            WHERE e.tenant_id::text = ${tenantId}
+              AND e.matricula_id = m.id
+              AND e.turma_id = ${turmaId}
+              AND e.data_fim IS NULL
+          )
+        )
+      ORDER BY b.nome_completo ASC, m.id ASC
+    `);
+    const total = alunos.length;
+    const preenchidos = alunos.filter((item) => item.frequencia_id).length;
+    return {
+      diario: this.serializar(diario[0]),
+      alunos: alunos.map((row) => this.serializar(row)),
+      resumo: { total, preenchidos, pendentes: total - preenchidos }
+    };
+  }
+
+  async salvarChamadaRapida(
+    diarioId: string,
+    input: { registros: Array<{ matricula_id: number; situacao: string; justificativa?: string | null; observacao?: string | null }> },
+    tenantId: string,
+    actor: EducacionalActor
+  ) {
+    await this.garantirEstrutura();
+    const id = BigInt(diarioId);
+    const diario = await prisma.$queryRaw<Array<{ turma_id: bigint }>>(Prisma.sql`
+      SELECT turma_id
+      FROM educacional_diario_aula
+      WHERE id = ${id} AND tenant_id::text = ${tenantId}
+      LIMIT 1
+    `);
+    if (!diario[0]) throw new AppError("Aula do diário não encontrada nesta instituição.", 404);
+    const turmaId = diario[0].turma_id;
+    const matriculas = input.registros.map((registro) => BigInt(registro.matricula_id));
+    const permitidas = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+      SELECT m.id
+      FROM educacional_matricula m
+      WHERE m.tenant_id::text = ${tenantId}
+        AND m.situacao = 'ATIVA'
+        AND m.id IN (${Prisma.join(matriculas)})
+        AND (
+          m.turma_id = ${turmaId}
+          OR EXISTS (
+            SELECT 1
+            FROM educacional_enturmacao e
+            WHERE e.tenant_id::text = ${tenantId}
+              AND e.matricula_id = m.id
+              AND e.turma_id = ${turmaId}
+              AND e.data_fim IS NULL
+          )
+        )
+    `);
+    const permitidasSet = new Set(permitidas.map((item) => String(item.id)));
+    const invalidas = matriculas.filter((matriculaId) => !permitidasSet.has(String(matriculaId)));
+    if (invalidas.length) throw new AppError("A chamada contém aluno que não pertence à turma da aula selecionada.", 400);
+
+    const salvos = await prisma.$transaction(async (tx) => {
+      const resultado: Array<Record<string, unknown>> = [];
+      for (const registro of input.registros) {
+        const rows = await tx.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+          INSERT INTO educacional_frequencia (tenant_id, diario_aula_id, matricula_id, situacao, justificativa, observacao)
+          VALUES (${tenantId}::uuid, ${id}, ${BigInt(registro.matricula_id)}, ${registro.situacao}, ${registro.justificativa ?? null}, ${registro.observacao ?? null})
+          ON CONFLICT (tenant_id, diario_aula_id, matricula_id)
+          DO UPDATE SET situacao = EXCLUDED.situacao, justificativa = EXCLUDED.justificativa, observacao = EXCLUDED.observacao, atualizado_em = NOW()
+          RETURNING *
+        `);
+        resultado.push(rows[0]);
+      }
+      await tx.$executeRaw(Prisma.sql`UPDATE educacional_diario_aula SET status = 'FINALIZADO', atualizado_em = NOW() WHERE id = ${id} AND tenant_id::text = ${tenantId}`);
+      return resultado;
+    });
+    await this.auditar("educacional_frequencia", id, "CHAMADA_RAPIDA", null, { diario_aula_id: id, total: salvos.length }, tenantId, actor);
+    return { itens: salvos.map((row) => this.serializar(row)), total: salvos.length };
+  }
+
+  async gerarBoletimAutomatico(input: { matricula_id: number; ano_letivo_id: number; periodo: string }, tenantId: string, actor: EducacionalActor) {
+    await this.garantirEstrutura();
+    const matriculaId = BigInt(input.matricula_id);
+    const anoLetivoId = BigInt(input.ano_letivo_id);
+    const periodo = input.periodo.trim();
+    const matricula = await prisma.$queryRaw<Array<{ id: bigint; ano_letivo_id: bigint }>>(Prisma.sql`
+      SELECT id, ano_letivo_id
+      FROM educacional_matricula
+      WHERE id = ${matriculaId} AND tenant_id::text = ${tenantId}
+      LIMIT 1
+    `);
+    if (!matricula[0]) throw new AppError("Matrícula não encontrada nesta instituição.", 404);
+    if (matricula[0].ano_letivo_id !== anoLetivoId) throw new AppError("O ano letivo informado não corresponde à matrícula selecionada.", 400);
+
+    const notas = await prisma.$queryRaw<Array<{ media: number | null; total: bigint }>>(Prisma.sql`
+      SELECT AVG(n.valor / NULLIF(av.valor_maximo, 0) * 10)::float AS media,
+        COUNT(n.id)::bigint AS total
+      FROM educacional_nota n
+      INNER JOIN educacional_avaliacao av ON av.id = n.avaliacao_id AND av.tenant_id::text = ${tenantId}
+      WHERE n.tenant_id::text = ${tenantId}
+        AND n.matricula_id = ${matriculaId}
+        AND av.periodo = ${periodo}
+        AND n.valor IS NOT NULL
+        AND av.valor_maximo > 0
+    `);
+    const frequencia = await prisma.$queryRaw<Array<{ presencas: bigint; total: bigint }>>(Prisma.sql`
+      SELECT COUNT(*) FILTER (WHERE f.situacao IN ('PRESENTE','ATRASO','SAIDA_ANTECIPADA'))::bigint AS presencas,
+        COUNT(*)::bigint AS total
+      FROM educacional_frequencia f
+      WHERE f.tenant_id::text = ${tenantId}
+        AND f.matricula_id = ${matriculaId}
+    `);
+    const totalNotas = Number(notas[0]?.total ?? 0);
+    const media = notas[0]?.media === null || notas[0]?.media === undefined ? null : Number(Number(notas[0].media).toFixed(2));
+    const totalFrequencia = Number(frequencia[0]?.total ?? 0);
+    const percentualFrequencia = totalFrequencia
+      ? Number(((Number(frequencia[0]?.presencas ?? 0) / totalFrequencia) * 100).toFixed(2))
+      : null;
+    const resultado = media === null && percentualFrequencia === null
+      ? "SEM_DADOS"
+      : media !== null && media < 6
+        ? "EM_ATENCAO"
+        : percentualFrequencia !== null && percentualFrequencia < 75
+          ? "FREQUENCIA_INSUFICIENTE"
+          : "REGULAR";
+
+    const rows = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+      INSERT INTO educacional_boletim (tenant_id, matricula_id, ano_letivo_id, periodo, media, frequencia, resultado, observacoes, emitido_em)
+      VALUES (
+        ${tenantId}::uuid,
+        ${matriculaId},
+        ${anoLetivoId},
+        ${periodo},
+        ${media},
+        ${percentualFrequencia},
+        ${resultado},
+        ${`Gerado automaticamente a partir de ${totalNotas} nota(s) e ${totalFrequencia} registro(s) de frequência.`},
+        NOW()
+      )
+      ON CONFLICT (tenant_id, matricula_id, ano_letivo_id, periodo)
+      DO UPDATE SET media = EXCLUDED.media, frequencia = EXCLUDED.frequencia, resultado = EXCLUDED.resultado, observacoes = EXCLUDED.observacoes, emitido_em = NOW(), atualizado_em = NOW()
+      RETURNING *
+    `);
+    await this.auditar("educacional_boletim", rows[0]?.id as bigint, "GERAR_AUTOMATICO", null, rows[0], tenantId, actor);
+    return {
+      item: this.serializar(rows[0]),
+      calculo: { notas: totalNotas, frequencias: totalFrequencia, media, frequencia: percentualFrequencia, resultado }
+    };
+  }
+
+  async gerarHistoricoAutomatico(input: { aluno_id: number; ano_letivo_id: number }, tenantId: string, actor: EducacionalActor) {
+    await this.garantirEstrutura();
+    const alunoId = BigInt(input.aluno_id);
+    const anoLetivoId = BigInt(input.ano_letivo_id);
+    const matriculas = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+      SELECT m.id, m.aluno_id, m.ano_letivo_id, m.situacao,
+        u.nome_fantasia AS unidade_nome,
+        e.nome AS etapa_nome,
+        s.nome AS serie_nome
+      FROM educacional_matricula m
+      LEFT JOIN unidade_assistencial u ON u.id = m.unidade_id AND u.tenant_id::text = ${tenantId}
+      LEFT JOIN educacional_etapa e ON e.id = m.etapa_id AND e.tenant_id::text = ${tenantId}
+      LEFT JOIN educacional_serie s ON s.id = m.serie_id AND s.tenant_id::text = ${tenantId}
+      WHERE m.aluno_id = ${alunoId}
+        AND m.ano_letivo_id = ${anoLetivoId}
+        AND m.tenant_id::text = ${tenantId}
+      ORDER BY COALESCE(m.ativo, TRUE) DESC, m.data_inicio DESC NULLS LAST, m.id DESC
+      LIMIT 1
+    `);
+    const matricula = matriculas[0];
+    if (!matricula) throw new AppError("Não há matrícula do aluno para o ano letivo informado.", 404);
+    const matriculaId = BigInt(String(matricula.id));
+
+    const resultadoFinal = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+      SELECT situacao, media, frequencia, observacoes
+      FROM educacional_resultado_final
+      WHERE matricula_id = ${matriculaId}
+        AND ano_letivo_id = ${anoLetivoId}
+        AND tenant_id::text = ${tenantId}
+      ORDER BY data_resultado DESC, id DESC
+      LIMIT 1
+    `);
+    const boletins = await prisma.$queryRaw<Array<{ media: number | null; frequencia: number | null; total: bigint }>>(Prisma.sql`
+      SELECT AVG(media)::float AS media, AVG(frequencia)::float AS frequencia, COUNT(*)::bigint AS total
+      FROM educacional_boletim
+      WHERE matricula_id = ${matriculaId}
+        AND ano_letivo_id = ${anoLetivoId}
+        AND tenant_id::text = ${tenantId}
+    `);
+    const frequencia = await prisma.$queryRaw<Array<{ presencas: bigint; total: bigint }>>(Prisma.sql`
+      SELECT COUNT(*) FILTER (WHERE f.situacao IN ('PRESENTE','ATRASO','SAIDA_ANTECIPADA'))::bigint AS presencas,
+        COUNT(*)::bigint AS total
+      FROM educacional_frequencia f
+      WHERE f.tenant_id::text = ${tenantId}
+        AND f.matricula_id = ${matriculaId}
+    `);
+
+    const resultado = resultadoFinal[0];
+    const boletim = boletins[0];
+    const media = resultado?.media !== null && resultado?.media !== undefined
+      ? Number(Number(resultado.media).toFixed(2))
+      : boletim?.media !== null && boletim?.media !== undefined
+        ? Number(Number(boletim.media).toFixed(2))
+        : null;
+    const frequenciaResultado = resultado?.frequencia !== null && resultado?.frequencia !== undefined ? Number(Number(resultado.frequencia).toFixed(2)) : null;
+    const frequenciaBoletim = boletim?.frequencia !== null && boletim?.frequencia !== undefined ? Number(Number(boletim.frequencia).toFixed(2)) : null;
+    const totalFrequencia = Number(frequencia[0]?.total ?? 0);
+    const frequenciaChamada = totalFrequencia
+      ? Number(((Number(frequencia[0]?.presencas ?? 0) / totalFrequencia) * 100).toFixed(2))
+      : null;
+    const frequenciaFinal = frequenciaResultado ?? frequenciaBoletim ?? frequenciaChamada;
+    const situacao = String(resultado?.situacao ?? (media === null && frequenciaFinal === null ? "SEM_DADOS" : media !== null && media < 6 ? "EM_ATENCAO" : frequenciaFinal !== null && frequenciaFinal < 75 ? "FREQUENCIA_INSUFICIENTE" : "REGULAR"));
+    const totalBoletins = Number(boletim?.total ?? 0);
+
+    const rows = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+      INSERT INTO educacional_historico_escolar (
+        tenant_id, aluno_id, ano_letivo_id, escola_descricao, etapa_descricao, serie_descricao,
+        media, frequencia, resultado, observacoes
+      )
+      VALUES (
+        ${tenantId}::uuid,
+        ${alunoId},
+        ${anoLetivoId},
+        ${String(matricula.unidade_nome ?? "") || null},
+        ${String(matricula.etapa_nome ?? "") || null},
+        ${String(matricula.serie_nome ?? "") || null},
+        ${media},
+        ${frequenciaFinal},
+        ${situacao},
+        ${`Gerado automaticamente a partir da matrícula ${String(matricula.id)}, ${totalBoletins} boletim(ns) e ${totalFrequencia} registro(s) de frequência.`}
+      )
+      ON CONFLICT (tenant_id, aluno_id, ano_letivo_id)
+      DO UPDATE SET escola_descricao = EXCLUDED.escola_descricao, etapa_descricao = EXCLUDED.etapa_descricao,
+        serie_descricao = EXCLUDED.serie_descricao, media = EXCLUDED.media, frequencia = EXCLUDED.frequencia,
+        resultado = EXCLUDED.resultado, observacoes = EXCLUDED.observacoes, atualizado_em = NOW()
+      RETURNING *
+    `);
+    await this.auditar("educacional_historico_escolar", rows[0]?.id as bigint, "GERAR_AUTOMATICO", null, rows[0], tenantId, actor);
+    return {
+      item: this.serializar(rows[0]),
+      calculo: { matricula_id: String(matricula.id), boletins: totalBoletins, frequencias: totalFrequencia, media, frequencia: frequenciaFinal, resultado: situacao }
+    };
+  }
+
   async transferirMatricula(
     matriculaId: string,
     input: { instituicao_destino_id: number; sala_destino_id: number; turma_destino_id?: number | null; data_transferencia: string; motivo: string; observacoes?: string | null },
@@ -307,6 +981,137 @@ export class EducacionalRepository {
     });
     await this.auditar("educacional_matricula", BigInt(matriculaId), "TRANSFERIR", origem[0], resultado.destino, tenantId, actor);
     return { origem: this.serializar(resultado.origem), destino: this.serializar(resultado.destino) };
+  }
+
+  async rematricular(
+    matriculaId: string,
+    input: { ano_letivo_id: number; unidade_id: number; sala_id: number; etapa_id: number; serie_id: number; turma_id?: number | null; numero_matricula?: string | null; data_inicio: string; motivo: string; observacoes?: string | null },
+    tenantId: string,
+    actor: EducacionalActor
+  ) {
+    await this.garantirEstrutura();
+    const id = BigInt(matriculaId);
+    const origem = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+      SELECT *
+      FROM educacional_matricula
+      WHERE id = ${id} AND tenant_id::text = ${tenantId}
+      LIMIT 1
+    `);
+    if (!origem[0]) throw new AppError("Matrícula de origem não encontrada nesta instituição.", 404);
+    const alunoId = BigInt(String(origem[0].aluno_id));
+    const anoLetivoId = BigInt(input.ano_letivo_id);
+    const existente = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+      SELECT id
+      FROM educacional_matricula
+      WHERE tenant_id::text = ${tenantId}
+        AND aluno_id = ${alunoId}
+        AND ano_letivo_id = ${anoLetivoId}
+        AND situacao IN ('ATIVA', 'PENDENTE')
+        AND COALESCE(ativo, TRUE) = TRUE
+      LIMIT 1
+    `);
+    if (existente[0]) throw new AppError("Este aluno já possui matrícula ativa ou pendente para o ano letivo selecionado.", 409);
+
+    const numero = input.numero_matricula?.trim() || await this.proximoNumeroMatricula(tenantId);
+    await this.validarNumeroMatricula({ numero_matricula: numero }, undefined, tenantId);
+    await this.validarDestinoTransferencia({ instituicao_destino_id: input.unidade_id, sala_destino_id: input.sala_id, turma_destino_id: input.turma_id }, tenantId, 0n);
+    await this.validarCompatibilidadeMatricula({ ...input, numero_matricula: numero }, tenantId);
+
+    const nova = await prisma.$transaction(async (tx) => {
+      const rows = await tx.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+        INSERT INTO educacional_matricula (
+          tenant_id, aluno_id, ano_letivo_id, unidade_id, sala_id, etapa_id, serie_id, turma_id,
+          numero_matricula, data_matricula, data_inicio, turno, situacao, observacoes,
+          usuario_responsavel_id, usuario_responsavel_nome, ativo
+        )
+        VALUES (
+          ${tenantId}::uuid, ${alunoId}, ${anoLetivoId}, ${BigInt(input.unidade_id)}, ${BigInt(input.sala_id)},
+          ${BigInt(input.etapa_id)}, ${BigInt(input.serie_id)}, ${input.turma_id ?? null},
+          ${numero}, ${input.data_inicio}::date, ${input.data_inicio}::date, ${origem[0].turno ?? null},
+          'ATIVA', ${input.observacoes ?? null}, ${actor.id ? BigInt(actor.id) : null}, ${actor.nome ?? actor.nomeUsuario ?? null}, TRUE
+        )
+        RETURNING *
+      `);
+      await tx.$executeRaw(Prisma.sql`
+        INSERT INTO educacional_matricula_movimentacao (
+          tenant_id, matricula_origem_id, matricula_destino_id, tipo, data_movimentacao, motivo,
+          observacoes, dados_anteriores, dados_novos, usuario_responsavel_id, usuario_responsavel_nome
+        )
+        VALUES (
+          ${tenantId}::uuid, ${id}, ${rows[0]?.id}, 'REMATRICULA', ${input.data_inicio}::date, ${input.motivo},
+          ${input.observacoes ?? null}, ${jsonSeguro(origem[0])}::jsonb, ${jsonSeguro(rows[0])}::jsonb,
+          ${actor.id ? BigInt(actor.id) : null}, ${actor.nome ?? actor.nomeUsuario ?? null}
+        )
+      `);
+      return rows[0];
+    });
+    await this.auditar("educacional_matricula", nova.id as bigint, "REMATRICULAR", origem[0], nova, tenantId, actor);
+    return { origem: this.serializar(origem[0]), destino: this.serializar(nova) };
+  }
+
+  async rematricularLote(
+    input: { matriculas_ids: number[]; ano_letivo_id: number; unidade_id: number; sala_id: number; etapa_id: number; serie_id: number; turma_id?: number | null; numero_matricula?: string | null; data_inicio: string; motivo: string; observacoes?: string | null },
+    tenantId: string,
+    actor: EducacionalActor
+  ) {
+    const matriculasIds = Array.from(new Set(input.matriculas_ids.map((item) => String(item))));
+    const criadas: Array<Record<string, unknown>> = [];
+    const recusadas: Array<{ matricula_id: string; motivo: string }> = [];
+    const { matriculas_ids: _matriculasIds, ...payload } = input;
+    for (const matriculaId of matriculasIds) {
+      try {
+        const resultado = await this.rematricular(matriculaId, { ...payload, numero_matricula: null }, tenantId, actor);
+        criadas.push(resultado.destino as Record<string, unknown>);
+      } catch (erro) {
+        recusadas.push({ matricula_id: matriculaId, motivo: erro instanceof Error ? erro.message : "Não foi possível rematricular esta matrícula." });
+      }
+    }
+    return { total: matriculasIds.length, criadas, recusadas };
+  }
+
+  async sugerirRecuperacoes(
+    input: { ano_letivo_id: number; periodo?: string; disciplina_id?: number; media_minima: number },
+    tenantId: string
+  ) {
+    await this.garantirEstrutura();
+    const anoLetivoId = BigInt(input.ano_letivo_id);
+    const disciplinaId = input.disciplina_id ? BigInt(input.disciplina_id) : null;
+    const periodo = input.periodo?.trim() || null;
+    const rows = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+      SELECT m.id AS matricula_id, m.numero_matricula, m.ano_letivo_id,
+        a.id AS aluno_id, b.nome_completo AS aluno_nome,
+        d.id AS disciplina_id, d.nome AS disciplina_nome,
+        av.periodo,
+        ROUND(AVG((n.valor / NULLIF(av.valor_maximo, 0)) * 10)::numeric, 2) AS media_atual,
+        ${input.media_minima}::numeric AS media_minima,
+        COUNT(n.id)::int AS notas_lancadas
+      FROM educacional_nota n
+      INNER JOIN educacional_avaliacao av ON av.id = n.avaliacao_id AND av.tenant_id::text = ${tenantId}
+      INNER JOIN educacional_disciplina d ON d.id = av.disciplina_id AND d.tenant_id::text = ${tenantId}
+      INNER JOIN educacional_matricula m ON m.id = n.matricula_id AND m.tenant_id::text = ${tenantId}
+      INNER JOIN educacional_aluno a ON a.id = m.aluno_id AND a.tenant_id::text = ${tenantId}
+      INNER JOIN cadastro_beneficiario b ON b.id = a.beneficiario_id AND b.tenant_id::text = ${tenantId}
+      WHERE n.tenant_id::text = ${tenantId}
+        AND m.ano_letivo_id = ${anoLetivoId}
+        AND n.valor IS NOT NULL
+        AND (${periodo}::text IS NULL OR av.periodo = ${periodo})
+        AND (${disciplinaId}::bigint IS NULL OR d.id = ${disciplinaId})
+        AND m.situacao IN ('ATIVA', 'PENDENTE')
+        AND NOT EXISTS (
+          SELECT 1
+          FROM educacional_recuperacao r
+          WHERE r.tenant_id::text = ${tenantId}
+            AND r.matricula_id = m.id
+            AND r.disciplina_id = d.id
+            AND (${periodo}::text IS NULL OR r.periodo = ${periodo})
+            AND r.status IN ('ABERTA', 'EM_ANDAMENTO')
+        )
+      GROUP BY m.id, m.numero_matricula, m.ano_letivo_id, a.id, b.nome_completo, d.id, d.nome, av.periodo
+      HAVING AVG((n.valor / NULLIF(av.valor_maximo, 0)) * 10) < ${input.media_minima}
+      ORDER BY media_atual ASC, b.nome_completo ASC
+      LIMIT 200
+    `);
+    return { itens: rows.map((row) => this.serializar(row)), total: rows.length, media_minima: input.media_minima };
   }
 
   async editarVinculoMatricula(
@@ -347,6 +1152,8 @@ export class EducacionalRepository {
     const serie = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`SELECT id FROM educacional_serie WHERE id = ${BigInt(input.serie_id)} AND tenant_id::text = ${tenantId} LIMIT 1`);
     if (!referencias[0] || !etapa[0] || !serie[0]) throw new AppError("Ano letivo, etapa ou série não pertence à instituição atual.", 400);
     const numero = input.numero_matricula?.trim() || `PROV-${alunoId}-${Date.now().toString().slice(-8)}`;
+    await this.validarCompatibilidadeMatricula({ ...input, unidade_id: input.instituicao_id, numero_matricula: numero }, tenantId);
+    await this.validarNumeroMatricula({ numero_matricula: numero }, undefined, tenantId);
     const nova = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`INSERT INTO educacional_matricula (tenant_id, aluno_id, ano_letivo_id, unidade_id, sala_id, etapa_id, serie_id, turma_id, numero_matricula, data_matricula, data_inicio, situacao, observacoes, usuario_responsavel_id, usuario_responsavel_nome, ativo) VALUES (${tenantId}::uuid, ${BigInt(alunoId)}, ${BigInt(input.ano_letivo_id)}, ${BigInt(input.instituicao_id)}, ${BigInt(input.sala_id)}, ${BigInt(input.etapa_id)}, ${BigInt(input.serie_id)}, ${input.turma_id ?? null}, ${numero}, ${input.data_inicio}::date, ${input.data_inicio}::date, 'ATIVA', ${input.observacoes ?? null}, ${actor.id ? BigInt(actor.id) : null}, ${actor.nome ?? actor.nomeUsuario ?? null}, TRUE) RETURNING *`);
     await prisma.$executeRaw(Prisma.sql`INSERT INTO educacional_matricula_movimentacao (tenant_id, matricula_origem_id, matricula_destino_id, tipo, data_movimentacao, motivo, observacoes, dados_anteriores, dados_novos, usuario_responsavel_id, usuario_responsavel_nome) VALUES (${tenantId}::uuid, ${nova[0]?.id}, ${nova[0]?.id}, 'CRIACAO_VINCULO', ${input.data_inicio}::date, ${input.motivo}, ${input.observacoes ?? null}, NULL, ${jsonSeguro(nova[0])}::jsonb, ${actor.id ? BigInt(actor.id) : null}, ${actor.nome ?? actor.nomeUsuario ?? null})`);
     await this.auditar("educacional_matricula", nova[0]?.id as bigint, "CRIAR_VINCULO", null, nova[0], tenantId, actor);
@@ -399,6 +1206,7 @@ export class EducacionalRepository {
     if (recurso === "horarios") await this.validarConflitoHorario(input, rawId, tenantId);
     if (recurso === "enturmacoes") await this.validarEnturmacao(input, rawId, tenantId);
     if (recurso === "notas") await this.validarNota(input, tenantId);
+    if (recurso === "matriculas") await this.validarNumeroMatricula(input, rawId, tenantId);
     const id = rawId ? BigInt(rawId) : undefined;
     const permitido = Object.entries(input).filter(([key, value]) => key !== "id" && value !== undefined).map(([key, value]) => [key, value] as const);
     if (!permitido.length) throw new AppError("Informe dados para salvar.", 400);
@@ -442,6 +1250,16 @@ export class EducacionalRepository {
       if (input.etapa_id) referencias.push(["educacional_etapa", "etapa_id"]);
       if (input.serie_id) referencias.push(["educacional_serie", "serie_id"]);
       if (input.turma_id) referencias.push(["educacional_turma", "turma_id"]);
+      if (input.responsavel_id) {
+        const responsavel = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+          SELECT id
+          FROM cadastro_beneficiario
+          WHERE id = ${BigInt(String(input.responsavel_id))}
+            AND tenant_id::text = ${tenantId}
+          LIMIT 1
+        `);
+        if (!responsavel[0]) throw new AppError("Responsável da matrícula não encontrado nesta instituição.", 404);
+      }
     }
     if (recurso === "enturmacoes") {
       if (input.matricula_id) referencias.push(["educacional_matricula", "matricula_id"]);
@@ -538,8 +1356,67 @@ export class EducacionalRepository {
       const encontrado = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`SELECT id FROM ${Prisma.raw(tabelaReferencia)} WHERE id = ${valor} AND tenant_id::text = ${tenantId} LIMIT 1`);
       if (!encontrado[0]) throw new AppError("A referência informada não pertence à instituição atual.", 400);
     }
+    if (recurso === "matriculas") await this.validarCompatibilidadeMatricula(input, tenantId);
   }
 
+  private async validarNumeroMatricula(input: Record<string, unknown>, rawId: string | undefined, tenantId: string) {
+    const numero = String(input.numero_matricula ?? "").trim();
+    if (!numero) return;
+    const id = rawId ? BigInt(rawId) : null;
+    const existente = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+      SELECT id
+      FROM educacional_matricula
+      WHERE tenant_id::text = ${tenantId}
+        AND numero_matricula = ${numero}
+        AND (${id}::bigint IS NULL OR id <> ${id})
+      LIMIT 1
+    `);
+    if (existente[0]) throw new AppError("Já existe uma matrícula com este número. Informe outro número para continuar.", 409);
+  }
+
+  private async validarCompatibilidadeMatricula(input: Record<string, unknown>, tenantId: string) {
+    const etapaId = input.etapa_id ? BigInt(String(input.etapa_id)) : null;
+    const serieId = input.serie_id ? BigInt(String(input.serie_id)) : null;
+    if (etapaId && serieId) {
+      const serie = await prisma.$queryRaw<Array<{ etapa_id: bigint }>>(Prisma.sql`
+        SELECT etapa_id
+        FROM educacional_serie
+        WHERE id = ${serieId} AND tenant_id::text = ${tenantId}
+        LIMIT 1
+      `);
+      if (serie[0] && serie[0].etapa_id !== etapaId) {
+        throw new AppError("A série selecionada não pertence à etapa de ensino informada.", 400);
+      }
+    }
+
+    if (!input.turma_id) return;
+    const turmaId = BigInt(String(input.turma_id));
+    const turma = await prisma.$queryRaw<Array<{
+      ano_letivo_id: bigint;
+      unidade_id: bigint | null;
+      sala_id: bigint | null;
+      etapa_id: bigint;
+      serie_id: bigint;
+      status: string;
+    }>>(Prisma.sql`
+      SELECT ano_letivo_id, unidade_id, sala_id, etapa_id, serie_id, status
+      FROM educacional_turma
+      WHERE id = ${turmaId} AND tenant_id::text = ${tenantId}
+      LIMIT 1
+    `);
+    if (!turma[0]) throw new AppError("Turma não encontrada nesta instituição.", 400);
+    if (turma[0].status !== "ATIVA") throw new AppError("A turma selecionada não está ativa para receber matrículas.", 400);
+
+    const incompatibilidades: string[] = [];
+    if (input.ano_letivo_id && turma[0].ano_letivo_id !== BigInt(String(input.ano_letivo_id))) incompatibilidades.push("ano letivo");
+    if (input.etapa_id && turma[0].etapa_id !== BigInt(String(input.etapa_id))) incompatibilidades.push("etapa");
+    if (input.serie_id && turma[0].serie_id !== BigInt(String(input.serie_id))) incompatibilidades.push("série");
+    if (input.unidade_id && turma[0].unidade_id && turma[0].unidade_id !== BigInt(String(input.unidade_id))) incompatibilidades.push("unidade de ensino");
+    if (input.sala_id && turma[0].sala_id && turma[0].sala_id !== BigInt(String(input.sala_id))) incompatibilidades.push("sala");
+    if (incompatibilidades.length) {
+      throw new AppError(`A turma selecionada não é compatível com ${incompatibilidades.join(", ")} da matrícula.`, 400);
+    }
+  }
   private async validarVagaSala(input: Record<string, unknown>, tenantId: string, rawId?: string) {
     const unidadeId = BigInt(String(input.unidade_id));
     const salaId = BigInt(String(input.sala_id));

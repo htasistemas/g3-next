@@ -32,7 +32,8 @@ export type EducacionalRecurso =
   | "lista-espera"
   | "recuperacoes"
   | "resultados-finais"
-  | "calendario";
+  | "calendario"
+  | "configuracoes";
 
 export type UnidadeEnsinoCatalogo = {
   id: string;
@@ -59,6 +60,37 @@ export type AlunosAgrupadosResponse = {
   pagina: number;
   limite: number;
   indicadores: { instituicoes: number; salas: number; alunos: number; alunos_ativos: number; alunos_sem_sala: number; alunos_sem_instituicao: number };
+};
+
+export type VidaAcademicaAlunoResponse = {
+  aluno: Record<string, unknown>;
+  matriculas: Array<Record<string, unknown>>;
+  endereco?: Record<string, unknown> | null;
+  contatos?: Array<Record<string, unknown>>;
+  responsaveis?: Array<Record<string, unknown>>;
+  documentos_beneficiario?: Array<Record<string, unknown>>;
+  alertas?: Array<{ tipo: string; severidade: string; mensagem: string }>;
+  frequencia: Record<string, unknown> & { percentual?: number };
+  notas: Array<Record<string, unknown>>;
+  ocorrencias: Array<Record<string, unknown>>;
+  documentos: Array<Record<string, unknown>>;
+  historico: Array<Record<string, unknown>>;
+  linha_tempo: Array<{ tipo: string; data?: unknown; descricao?: unknown; origem?: Record<string, unknown> }>;
+};
+
+export type ChamadaRapidaResponse = {
+  diario: Record<string, unknown>;
+  alunos: Array<Record<string, unknown>>;
+  resumo: { total: number; preenchidos: number; pendentes: number };
+};
+export type PendenciaEducacionalTipo = "documentos" | "chamadas" | "baixa-frequencia" | "turmas-sem-professor" | "capacidade";
+export type PendenciasEducacionaisResponse = {
+  tipo: PendenciaEducacionalTipo;
+  titulo: string;
+  descricao: string;
+  total: number;
+  itens: Array<Record<string, unknown>>;
+  filtros: Record<string, unknown>;
 };
 
 export const educacionalService = {
@@ -108,8 +140,36 @@ export const educacionalService = {
     const { data } = await httpClient.get<{ unidades: UnidadeEnsinoCatalogo[] }>("/api/educacional/unidades-ensino");
     return data.unidades;
   },
+  async proximoNumeroMatricula() {
+    const { data } = await httpClient.get<{ numero: string }>("/api/educacional/matriculas/proximo-numero");
+    return data.numero;
+  },
   async listarAlunosAgrupados(params: Record<string, string | number | boolean | undefined>) {
     const { data } = await httpClient.get<AlunosAgrupadosResponse>("/api/educacional/alunos/agrupados", { params });
+    return data;
+  },
+  async listarPendenciasEducacionais(tipo: PendenciaEducacionalTipo, params?: Record<string, string | number | undefined>) {
+    const { data } = await httpClient.get<PendenciasEducacionaisResponse>(`/api/educacional/pendencias/${tipo}`, { params });
+    return data;
+  },
+  async obterVidaAcademicaAluno(alunoId: string) {
+    const { data } = await httpClient.get<VidaAcademicaAlunoResponse>(`/api/educacional/alunos/${alunoId}/vida-academica`);
+    return data;
+  },
+  async obterChamadaRapida(diarioId: string) {
+    const { data } = await httpClient.get<ChamadaRapidaResponse>(`/api/educacional/diarios/${diarioId}/chamada`);
+    return data;
+  },
+  async salvarChamadaRapida(diarioId: string, registros: Array<Record<string, unknown>>) {
+    const { data } = await httpClient.post<{ itens: EducacionalItem[]; total: number }>(`/api/educacional/diarios/${diarioId}/chamada`, { registros });
+    return data;
+  },
+  async gerarBoletimAutomatico(payload: { matricula_id: number; ano_letivo_id: number; periodo: string }) {
+    const { data } = await httpClient.post<{ item: EducacionalItem; calculo: Record<string, unknown> }>("/api/educacional/boletins/gerar", payload);
+    return data;
+  },
+  async gerarHistoricoAutomatico(payload: { aluno_id: number; ano_letivo_id: number }) {
+    const { data } = await httpClient.post<{ item: EducacionalItem; calculo: Record<string, unknown> }>("/api/educacional/historicos/gerar", payload);
     return data;
   },
   async listarHistoricoMatricula(matriculaId: string) {
@@ -118,6 +178,18 @@ export const educacionalService = {
   },
   async transferirMatricula(matriculaId: string, payload: Record<string, unknown>) {
     const { data } = await httpClient.post(`/api/educacional/matriculas/${matriculaId}/transferir`, payload);
+    return data;
+  },
+  async rematricular(matriculaId: string, payload: Record<string, unknown>) {
+    const { data } = await httpClient.post(`/api/educacional/matriculas/${matriculaId}/rematricular`, payload);
+    return data;
+  },
+  async rematricularLote(payload: Record<string, unknown>) {
+    const { data } = await httpClient.post<{ total: number; criadas: EducacionalItem[]; recusadas: Array<{ matricula_id: string; motivo: string }> }>("/api/educacional/matriculas/rematricular-lote", payload);
+    return data;
+  },
+  async sugerirRecuperacoes(params: Record<string, string | number | undefined>) {
+    const { data } = await httpClient.get<{ itens: EducacionalItem[]; total: number; media_minima: number }>("/api/educacional/recuperacoes/sugestoes", { params });
     return data;
   },
   async editarVinculoMatricula(matriculaId: string, payload: Record<string, unknown>) {

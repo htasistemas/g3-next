@@ -1560,11 +1560,12 @@ export function CadastroUnidadeAssistencialPage() {
                                 </td>
                                 <td className="px-3 py-2">
                                   <Input
+                                    {...register(`salas.${indice}.capacidade_maxima`, { valueAsNumber: true })}
                                     type="number"
                                     min="0"
                                     className="w-24"
-                                    value={String(sala.capacidade_maxima ?? 0)}
-                                    onChange={(event) => atualizarCapacidadeSala(indice, event.target.value)}
+                                    defaultValue={sala.capacidade_maxima ?? 0}
+                                    onBlur={(event) => atualizarCapacidadeSala(indice, event.target.value)}
                                     aria-label={`Vagas da sala ${indice + 1}`}
                                   />
                                 </td>
