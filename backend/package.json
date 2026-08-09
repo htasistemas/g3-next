@@ -20,6 +20,7 @@
     "dev:seed-admin": "tsx scripts/seed-dev-admin.ts",
     "g3n:base": "tsx scripts/preparar-tenant-apresentacao.ts",
     "seed:demo:torresoft": "tsx scripts/seed-demo-torresoft.ts",
+    "acesso:desbloquear-criticos": "tsx scripts/desbloquear-acessos-criticos.ts",
     "storage:migrate-tenants": "tsx scripts/migrar-storage-tenant.ts",
     "storage:migrate-tenants:dry-run": "tsx scripts/migrar-storage-tenant.ts --dry-run",
     "storage:cleanup-missing": "tsx scripts/limpar-arquivos-sem-fisico.ts",
