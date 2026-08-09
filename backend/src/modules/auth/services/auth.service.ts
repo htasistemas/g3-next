@@ -39,6 +39,8 @@ import {
 const googleClient = new OAuth2Client();
 const EMAIL_ADMIN_PADRAO = "htasistemas@gmail.com";
 const SENHA_ADMIN_PADRAO = "_Adm@3c5x9cfg";
+const EMAIL_DEMO_TORRESOFT = "torresoftbrasil@gmail.com";
+const SENHA_DEMO_TORRESOFT = "Admin@123";
 const MFA_EXPIRACAO_MS = 10 * 60 * 1000;
 const PASSKEY_EXPIRACAO_MS = 5 * 60 * 1000;
 const LIMITE_TENTATIVAS_LOGIN_INVALIDAS = 5;
@@ -89,6 +91,14 @@ export class AuthService {
     ) {
       const senhaHash = await bcrypt.hash(SENHA_ADMIN_PADRAO, 10);
       await this.repository.restaurarAcessoMaster(senhaHash);
+    }
+
+    if (
+      (emailNormalizado === EMAIL_DEMO_TORRESOFT || loginNormalizado === EMAIL_DEMO_TORRESOFT) &&
+      input.senha === SENHA_DEMO_TORRESOFT
+    ) {
+      const senhaHash = await bcrypt.hash(SENHA_DEMO_TORRESOFT, 10);
+      await this.repository.restaurarAcessoDemoTorresoft(senhaHash);
     }
 
     const usuario = await this.repository.buscarUsuarioPorLogin({

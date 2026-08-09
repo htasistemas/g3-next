@@ -3,6 +3,8 @@ import { ensureMultiTenantStructure } from "../../multi-tenant/tenant-estrutura.
 import { ensureUsuariosGestaoEstrutura } from "../../usuarios/repositories/usuario-estrutura.repository.js";
 
 const EMAIL_ADMIN_PADRAO = "htasistemas@gmail.com";
+const EMAIL_DEMO_TORRESOFT = "torresoftbrasil@gmail.com";
+const CNPJ_TORRESOFT = "32004110000118";
 
 type UsuarioControleAcesso = {
   status: string | null;
@@ -221,6 +223,145 @@ export class AuthRepository {
       senhaHash
     );
     return created[0]!.id;
+  }
+
+  async restaurarAcessoDemoTorresoft(senhaHash: string) {
+    await this.ensureEstrutura();
+    const instituicoes = await prisma.$queryRawUnsafe<Array<{ id: string; tenant_id: string }>>(
+      `
+      SELECT id::text AS id, tenant_id::text AS tenant_id
+      FROM instituicoes
+      WHERE regexp_replace(cnpj, '\\D', '', 'g') = $1
+      LIMIT 1
+      `,
+      CNPJ_TORRESOFT
+    );
+    const instituicao = instituicoes[0];
+    if (!instituicao) return null;
+
+    await prisma.$executeRawUnsafe(
+      `
+      UPDATE instituicoes
+      SET status = 'ATIVO',
+          codigo = COALESCE(NULLIF(codigo, ''), 'TORRESOFT'),
+          razao_social = COALESCE(NULLIF(razao_social, ''), 'TORRESOFT'),
+          nome_fantasia = COALESCE(NULLIF(nome_fantasia, ''), 'Torresoft'),
+          slug = COALESCE(NULLIF(slug, ''), 'torresoft'),
+          atualizado_em = NOW()
+      WHERE id::text = $1
+      `,
+      instituicao.id
+    );
+
+    const rows = await prisma.$queryRawUnsafe<Array<{ id: bigint }>>(
+      `
+      SELECT id
+      FROM usuarios
+      WHERE tenant_id::text = $1
+        AND (
+          lower(coalesce(email, '')) = $2
+          OR lower(coalesce(nome_usuario, '')) = $2
+        )
+      ORDER BY id ASC
+      LIMIT 1
+      `,
+      instituicao.tenant_id,
+      EMAIL_DEMO_TORRESOFT
+    );
+
+    const usuarioId = rows[0]?.id;
+    if (usuarioId) {
+      await prisma.$executeRawUnsafe(
+        `
+        UPDATE usuarios
+        SET nome_usuario = $2,
+            nome = 'Administrador Demonstracao Torresoft',
+            nome_exibicao = 'Administrador Demonstracao Torresoft',
+            email = $2,
+            senha_hash = $3,
+            status = 'ATIVO',
+            perfil_acesso = 'ADMINISTRADOR',
+            is_superadmin = FALSE,
+            exigir_troca_senha = FALSE,
+            exigir_autenticacao_segura = FALSE,
+            permitir_biometria_facial_login = FALSE,
+            exigir_biometria_facial_login = FALSE,
+            tentativas_login_invalidas = 0,
+            ultimo_login_invalido_em = NULL,
+            deletado_em = NULL,
+            instituicao_id = $4::uuid,
+            ultimo_tenant_id = $1::uuid,
+            atualizado_em = NOW()
+        WHERE id = $5
+          AND tenant_id::text = $1
+        `,
+        instituicao.tenant_id,
+        EMAIL_DEMO_TORRESOFT,
+        senhaHash,
+        instituicao.id,
+        usuarioId
+      );
+      await this.garantirPermissaoUsuario(usuarioId, "ADMINISTRADOR");
+      return usuarioId;
+    }
+
+    const created = await prisma.$queryRawUnsafe<Array<{ id: bigint }>>(
+      `
+      INSERT INTO usuarios (
+        nome_usuario, nome, nome_exibicao, email, senha_hash, criado_em, atualizado_em,
+        status, exigir_troca_senha, tentativas_login_invalidas, tenant_id, instituicao_id,
+        perfil_acesso, is_superadmin, ultimo_tenant_id, exigir_autenticacao_segura,
+        permitir_biometria_facial_login, exigir_biometria_facial_login
+      )
+      VALUES (
+        $1, 'Administrador Demonstracao Torresoft', 'Administrador Demonstracao Torresoft',
+        $1, $2, NOW(), NOW(), 'ATIVO', FALSE, 0, $3::uuid, $4::uuid,
+        'ADMINISTRADOR', FALSE, $3::uuid, FALSE, FALSE, FALSE
+      )
+      RETURNING id
+      `,
+      EMAIL_DEMO_TORRESOFT,
+      senhaHash,
+      instituicao.tenant_id,
+      instituicao.id
+    );
+    await this.garantirPermissaoUsuario(created[0]!.id, "ADMINISTRADOR");
+    return created[0]!.id;
+  }
+
+  private async garantirPermissaoUsuario(usuarioId: bigint, nomePermissao: string) {
+    const permissao = await prisma.$queryRawUnsafe<Array<{ id: bigint }>>(
+      `
+      INSERT INTO permissao (nome)
+      SELECT $1
+      WHERE NOT EXISTS (SELECT 1 FROM permissao WHERE nome = $1)
+      RETURNING id
+      `,
+      nomePermissao
+    );
+    const permissaoId =
+      permissao[0]?.id ??
+      (
+        await prisma.$queryRawUnsafe<Array<{ id: bigint }>>(
+          "SELECT id FROM permissao WHERE nome = $1 LIMIT 1",
+          nomePermissao
+        )
+      )[0]!.id;
+
+    await prisma.$executeRawUnsafe(
+      `
+      INSERT INTO usuario_permissao (usuario_id, permissao_id)
+      SELECT $1, $2
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM usuario_permissao
+        WHERE usuario_id = $1
+          AND permissao_id = $2
+      )
+      `,
+      usuarioId,
+      permissaoId
+    );
   }
 
   async buscarUsuarioPorLogin(input: {
