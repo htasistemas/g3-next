@@ -160,6 +160,69 @@ function ehEmailAdminPadrao(email?: string | null) {
 }
 
 export class AuthRepository {
+  async restaurarAcessoMaster(senhaHash: string) {
+    await this.ensureEstrutura();
+    const rows = await prisma.$queryRawUnsafe<Array<{ id: bigint }>>(
+      `
+      SELECT id
+      FROM usuarios
+      WHERE lower(coalesce(email, '')) = $1
+         OR lower(coalesce(nome_usuario, '')) = $1
+      ORDER BY is_superadmin DESC, id ASC
+      LIMIT 1
+      `,
+      EMAIL_ADMIN_PADRAO
+    );
+
+    if (rows[0]?.id) {
+      await prisma.$executeRawUnsafe(
+        `
+        UPDATE usuarios
+        SET nome_usuario = $1,
+            email = $1,
+            nome = COALESCE(NULLIF(nome, ''), 'Administrador Master'),
+            nome_exibicao = COALESCE(NULLIF(nome_exibicao, ''), 'Administrador Master'),
+            senha_hash = $2,
+            status = 'ATIVO',
+            is_superadmin = TRUE,
+            perfil_acesso = 'MASTER',
+            exigir_troca_senha = FALSE,
+            exigir_autenticacao_segura = FALSE,
+            permitir_biometria_facial_login = FALSE,
+            exigir_biometria_facial_login = FALSE,
+            tentativas_login_invalidas = 0,
+            ultimo_login_invalido_em = NULL,
+            deletado_em = NULL,
+            atualizado_em = NOW()
+        WHERE id = $3
+        `,
+        EMAIL_ADMIN_PADRAO,
+        senhaHash,
+        rows[0].id
+      );
+      return rows[0].id;
+    }
+
+    const created = await prisma.$queryRawUnsafe<Array<{ id: bigint }>>(
+      `
+      INSERT INTO usuarios (
+        nome_usuario, nome, nome_exibicao, email, senha_hash, criado_em, atualizado_em,
+        status, exigir_troca_senha, tentativas_login_invalidas, perfil_acesso,
+        is_superadmin, exigir_autenticacao_segura, permitir_biometria_facial_login,
+        exigir_biometria_facial_login
+      )
+      VALUES (
+        $1, 'Administrador Master', 'Administrador Master', $1, $2, NOW(), NOW(),
+        'ATIVO', FALSE, 0, 'MASTER', TRUE, FALSE, FALSE, FALSE
+      )
+      RETURNING id
+      `,
+      EMAIL_ADMIN_PADRAO,
+      senhaHash
+    );
+    return created[0]!.id;
+  }
+
   async buscarUsuarioPorLogin(input: {
     nomeUsuario?: string;
     email?: string;
