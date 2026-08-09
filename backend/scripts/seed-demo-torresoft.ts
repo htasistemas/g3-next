@@ -1,5 +1,7 @@
 import bcrypt from "bcryptjs";
+import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
+import { join } from "node:path";
 import { prisma } from "../src/database/prisma.js";
 import { ensureChecklistDiarioEstrutura } from "../src/modules/checklist-diario/repositories/checklist-diario-estrutura.repository.js";
 import { ensureCarteiraEventoEstrutura } from "../src/modules/carteira-evento/repositories/carteira-evento-estrutura.repository.js";
@@ -162,6 +164,391 @@ async function count(tx: typeof prisma, table: string, tenantId: string) {
     tenantId
   );
   return Number(rows[0]?.total ?? 0n);
+}
+
+function splitSqlStatements(sql: string) {
+  return sql
+    .split(";")
+    .map((statement) => statement.trim())
+    .filter(Boolean);
+}
+
+async function executarSqlArquivo(tx: typeof prisma, caminho: string) {
+  const conteudo = readFileSync(caminho, "utf8");
+  for (const comando of splitSqlStatements(conteudo)) {
+    await tx.$executeRawUnsafe(comando);
+  }
+}
+
+async function ensureParceriasPublicasEstrutura(tx: typeof prisma) {
+  await executarSqlArquivo(
+    tx,
+    join(process.cwd(), "prisma", "migrations", "20260803_prestacao_contas_profissional", "migration.sql")
+  );
+
+  const comandos = [
+    `CREATE TABLE IF NOT EXISTS termo_fomento (
+      id BIGSERIAL PRIMARY KEY,
+      tenant_id UUID,
+      numero_termo VARCHAR(120) NOT NULL,
+      tipo_termo VARCHAR(120) NOT NULL,
+      referencia_termo VARCHAR(250),
+      responsavel_indicacao VARCHAR(250),
+      orgao_concedente VARCHAR(250),
+      data_assinatura DATE,
+      data_inicio_vigencia DATE,
+      data_fim_vigencia DATE,
+      situacao VARCHAR(80) NOT NULL DEFAULT 'RASCUNHO',
+      descricao_objeto TEXT,
+      valor_global NUMERIC(14,2),
+      responsavel_interno VARCHAR(200),
+      criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+      atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE TABLE IF NOT EXISTS termo_fomento_aditivos (
+      id BIGSERIAL PRIMARY KEY,
+      tenant_id UUID,
+      termo_fomento_id BIGINT NOT NULL REFERENCES termo_fomento(id) ON DELETE CASCADE,
+      tipo_aditivo VARCHAR(160) NOT NULL,
+      data_aditivo DATE NOT NULL,
+      nova_data_fim DATE,
+      novo_valor NUMERIC(14,2),
+      observacoes TEXT,
+      criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+      atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE TABLE IF NOT EXISTS termo_fomento_documentos (
+      id BIGSERIAL PRIMARY KEY,
+      tenant_id UUID,
+      termo_fomento_id BIGINT NOT NULL REFERENCES termo_fomento(id) ON DELETE CASCADE,
+      aditivo_id BIGINT REFERENCES termo_fomento_aditivos(id) ON DELETE CASCADE,
+      tipo_documento VARCHAR(80) NOT NULL DEFAULT 'outro',
+      nome VARCHAR(240) NOT NULL,
+      data_url TEXT,
+      criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE TABLE IF NOT EXISTS plano_trabalho (
+      id BIGSERIAL PRIMARY KEY,
+      tenant_id UUID,
+      codigo_interno VARCHAR(80),
+      titulo VARCHAR(240) NOT NULL,
+      descricao_geral TEXT,
+      status VARCHAR(80) NOT NULL DEFAULT 'RASCUNHO',
+      orgao_concedente VARCHAR(250),
+      area_programa VARCHAR(160),
+      data_elaboracao DATE,
+      data_aprovacao DATE,
+      vigencia_inicio DATE,
+      vigencia_fim DATE,
+      termo_fomento_id BIGINT REFERENCES termo_fomento(id),
+      numero_processo VARCHAR(120),
+      modalidade VARCHAR(120),
+      observacoes_vinculacao TEXT,
+      arquivo_formato VARCHAR(40),
+      tipo_parceria VARCHAR(80),
+      orgao_parceiro VARCHAR(200),
+      edital_chamamento VARCHAR(200),
+      periodo_inicio DATE,
+      periodo_fim DATE,
+      responsavel_tecnico VARCHAR(200),
+      responsavel_legal VARCHAR(200),
+      razao_social VARCHAR(200),
+      nome_fantasia VARCHAR(200),
+      cnpj VARCHAR(20),
+      cep VARCHAR(10),
+      logradouro VARCHAR(200),
+      numero VARCHAR(40),
+      complemento VARCHAR(200),
+      bairro VARCHAR(120),
+      cidade VARCHAR(120),
+      uf VARCHAR(2),
+      telefone VARCHAR(20),
+      email VARCHAR(200),
+      representante_legal VARCHAR(200),
+      representante_cpf VARCHAR(14),
+      representante_cargo VARCHAR(200),
+      banco_nome VARCHAR(120),
+      banco_agencia VARCHAR(40),
+      banco_conta VARCHAR(60),
+      banco_operacao VARCHAR(40),
+      banco_pix VARCHAR(120),
+      banco_observacao TEXT,
+      historico_osc TEXT,
+      finalidade_institucional TEXT,
+      experiencia_anterior TEXT,
+      conselhos_certificacoes TEXT,
+      publico_atendido_atual TEXT,
+      capacidade_tecnica_operacional TEXT,
+      descricao_objeto TEXT,
+      area_atuacao VARCHAR(120),
+      local_execucao TEXT,
+      abrangencia_territorial VARCHAR(160),
+      publico_alvo TEXT,
+      quantidade_beneficiarios INTEGER,
+      criterios_selecao TEXT,
+      problema_social TEXT,
+      causas_consequencias TEXT,
+      dados_indicadores TEXT,
+      capacidade_execucao TEXT,
+      impacto_esperado TEXT,
+      objetivo_geral TEXT,
+      forma_acompanhamento TEXT,
+      indicadores_monitoramento TEXT,
+      periodicidade_monitoramento VARCHAR(80),
+      responsavel_coleta_dados VARCHAR(200),
+      instrumentos_monitoramento TEXT,
+      resultado_esperado_monitoramento TEXT,
+      evidencias_obrigatorias TEXT,
+      periodicidade_prestacao VARCHAR(60),
+      data_limite_prestacao DATE,
+      documentos_exigidos TEXT,
+      responsavel_prestacao VARCHAR(200),
+      observacoes_prestacao TEXT,
+      local_declaracao VARCHAR(160),
+      data_declaracao DATE,
+      nome_representante_declaracao VARCHAR(200),
+      cpf_representante_declaracao VARCHAR(14),
+      cargo_representante_declaracao VARCHAR(200),
+      declaracao_veracidade BOOLEAN NOT NULL DEFAULT FALSE,
+      aprovacao_interna VARCHAR(80),
+      situacao_aprovacao VARCHAR(80),
+      observacao_aprovador TEXT,
+      criado_em TIMESTAMP NOT NULL DEFAULT NOW(),
+      atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE TABLE IF NOT EXISTS plano_trabalho_metas (
+      id BIGSERIAL PRIMARY KEY,
+      plano_trabalho_id BIGINT NOT NULL REFERENCES plano_trabalho(id) ON DELETE CASCADE,
+      tenant_id UUID,
+      codigo VARCHAR(40),
+      numero_meta VARCHAR(30),
+      descricao TEXT NOT NULL,
+      indicador TEXT,
+      indicador_resultado TEXT,
+      unidade_medida VARCHAR(80),
+      quantidade_prevista NUMERIC(14,2),
+      resultado_esperado TEXT,
+      meio_verificacao TEXT,
+      data_inicio DATE,
+      data_fim DATE,
+      responsavel VARCHAR(200),
+      situacao VARCHAR(60),
+      ordem INTEGER NOT NULL DEFAULT 0,
+      criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE TABLE IF NOT EXISTS plano_trabalho_atividades (
+      id BIGSERIAL PRIMARY KEY,
+      meta_id BIGINT NOT NULL REFERENCES plano_trabalho_metas(id) ON DELETE CASCADE,
+      tenant_id UUID,
+      descricao TEXT,
+      justificativa TEXT,
+      publico_alvo TEXT,
+      local_execucao TEXT,
+      produto_esperado TEXT,
+      nome_etapa VARCHAR(200),
+      acao_executar TEXT,
+      descricao_detalhada TEXT,
+      publico_atendido TEXT,
+      quantidade NUMERIC(14,2),
+      unidade VARCHAR(60),
+      data_inicio DATE,
+      data_fim DATE,
+      valor_estimado NUMERIC(14,2),
+      documento_comprobatorio TEXT,
+      responsavel VARCHAR(200),
+      situacao VARCHAR(60),
+      ordem INTEGER NOT NULL DEFAULT 0,
+      criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE TABLE IF NOT EXISTS plano_trabalho_objetivos (
+      id BIGSERIAL PRIMARY KEY,
+      plano_trabalho_id BIGINT NOT NULL REFERENCES plano_trabalho(id) ON DELETE CASCADE,
+      tenant_id UUID,
+      descricao TEXT NOT NULL,
+      resultado_esperado TEXT,
+      metas_vinculadas TEXT,
+      ordem INTEGER NOT NULL DEFAULT 0,
+      criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE TABLE IF NOT EXISTS plano_trabalho_aplicacao_recursos (
+      id BIGSERIAL PRIMARY KEY,
+      plano_trabalho_id BIGINT NOT NULL REFERENCES plano_trabalho(id) ON DELETE CASCADE,
+      tenant_id UUID,
+      categoria_despesa VARCHAR(120) NOT NULL,
+      item VARCHAR(160) NOT NULL,
+      descricao TEXT,
+      quantidade NUMERIC(14,2),
+      unidade VARCHAR(60),
+      valor_unitario NUMERIC(14,2),
+      valor_total NUMERIC(14,2),
+      fonte_recurso VARCHAR(120),
+      meta_numero VARCHAR(30),
+      etapa_nome VARCHAR(200),
+      natureza_despesa VARCHAR(120),
+      observacao TEXT,
+      ordem INTEGER NOT NULL DEFAULT 0,
+      criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE TABLE IF NOT EXISTS plano_trabalho_desembolso (
+      id BIGSERIAL PRIMARY KEY,
+      plano_trabalho_id BIGINT NOT NULL REFERENCES plano_trabalho(id) ON DELETE CASCADE,
+      tenant_id UUID,
+      mes_ano VARCHAR(7) NOT NULL,
+      valor_previsto NUMERIC(14,2),
+      fonte_recurso VARCHAR(120),
+      meta_numero VARCHAR(30),
+      observacao TEXT,
+      ordem INTEGER NOT NULL DEFAULT 0,
+      criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE TABLE IF NOT EXISTS plano_trabalho_checklist_prestacao (
+      id BIGSERIAL PRIMARY KEY,
+      plano_trabalho_id BIGINT NOT NULL REFERENCES plano_trabalho(id) ON DELETE CASCADE,
+      tenant_id UUID,
+      descricao TEXT NOT NULL,
+      obrigatorio BOOLEAN NOT NULL DEFAULT TRUE,
+      concluido BOOLEAN NOT NULL DEFAULT FALSE,
+      ordem INTEGER NOT NULL DEFAULT 0,
+      criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE TABLE IF NOT EXISTS transparencia (
+      id BIGSERIAL PRIMARY KEY,
+      tenant_id UUID,
+      unidade_id BIGINT,
+      prestacao_instrumento_id BIGINT,
+      percentual_preenchimento NUMERIC(5,2) NOT NULL DEFAULT 0,
+      proxima_prestacao_em DATE,
+      instrumento VARCHAR(180),
+      objeto TEXT,
+      periodo_inicio DATE,
+      periodo_fim DATE,
+      tipo_prestacao VARCHAR(20) DEFAULT 'FINAL',
+      status_workflow VARCHAR(30) DEFAULT 'RASCUNHO',
+      total_recebido NUMERIC(14,2) DEFAULT 0,
+      total_recebido_helper TEXT,
+      total_aplicado NUMERIC(14,2) DEFAULT 0,
+      total_aplicado_helper TEXT,
+      saldo_disponivel NUMERIC(14,2) DEFAULT 0,
+      saldo_disponivel_helper TEXT,
+      prestado_mes NUMERIC(14,2) DEFAULT 0,
+      prestado_mes_helper TEXT,
+      parecer_conclusao VARCHAR(30),
+      parecer_texto TEXT,
+      parecer_ressalvas TEXT,
+      parecer_recomendacoes TEXT,
+      parecer_responsavel VARCHAR(180),
+      parecer_data DATE,
+      criado_em TIMESTAMP DEFAULT NOW(),
+      atualizado_em TIMESTAMP DEFAULT NOW()
+    )`,
+    `CREATE TABLE IF NOT EXISTS transparencia_recebimentos (
+      id BIGSERIAL PRIMARY KEY,
+      tenant_id UUID,
+      transparencia_id BIGINT NOT NULL REFERENCES transparencia(id) ON DELETE CASCADE,
+      fonte VARCHAR(180) NOT NULL,
+      valor NUMERIC(14,2),
+      periodicidade VARCHAR(80),
+      status VARCHAR(80),
+      ordem INTEGER NOT NULL DEFAULT 0,
+      criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE TABLE IF NOT EXISTS transparencia_destinacoes (
+      id BIGSERIAL PRIMARY KEY,
+      tenant_id UUID,
+      transparencia_id BIGINT NOT NULL REFERENCES transparencia(id) ON DELETE CASCADE,
+      titulo VARCHAR(180) NOT NULL,
+      descricao TEXT,
+      percentual NUMERIC(8,2),
+      ordem INTEGER NOT NULL DEFAULT 0,
+      criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE TABLE IF NOT EXISTS transparencia_comprovantes (
+      id BIGSERIAL PRIMARY KEY,
+      tenant_id UUID,
+      transparencia_id BIGINT NOT NULL REFERENCES transparencia(id) ON DELETE CASCADE,
+      arquivo_id BIGINT,
+      titulo VARCHAR(180) NOT NULL,
+      descricao TEXT,
+      arquivo_nome VARCHAR(240),
+      arquivo_url TEXT,
+      ordem INTEGER NOT NULL DEFAULT 0,
+      criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE TABLE IF NOT EXISTS transparencia_timelines (
+      id BIGSERIAL PRIMARY KEY,
+      tenant_id UUID,
+      transparencia_id BIGINT NOT NULL REFERENCES transparencia(id) ON DELETE CASCADE,
+      titulo VARCHAR(180) NOT NULL,
+      detalhe TEXT,
+      status VARCHAR(80),
+      ordem INTEGER NOT NULL DEFAULT 0,
+      criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE TABLE IF NOT EXISTS transparencia_checklist (
+      id BIGSERIAL PRIMARY KEY,
+      tenant_id UUID,
+      transparencia_id BIGINT NOT NULL REFERENCES transparencia(id) ON DELETE CASCADE,
+      titulo VARCHAR(180) NOT NULL,
+      descricao TEXT,
+      status VARCHAR(80),
+      ordem INTEGER NOT NULL DEFAULT 0,
+      criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE TABLE IF NOT EXISTS transparencia_despesas (
+      id BIGSERIAL PRIMARY KEY,
+      tenant_id UUID NOT NULL,
+      transparencia_id BIGINT NOT NULL,
+      descricao VARCHAR(240) NOT NULL,
+      fornecedor VARCHAR(180),
+      documento_fiscal VARCHAR(100),
+      data_pagamento DATE,
+      categoria VARCHAR(120),
+      valor NUMERIC(14,2),
+      status VARCHAR(30) DEFAULT 'PENDENTE',
+      ordem INTEGER NOT NULL DEFAULT 0
+    )`,
+    `CREATE TABLE IF NOT EXISTS transparencia_parecer_historico (
+      id BIGSERIAL PRIMARY KEY,
+      tenant_id UUID NOT NULL,
+      transparencia_id BIGINT NOT NULL,
+      versao INTEGER NOT NULL,
+      conclusao VARCHAR(30),
+      parecer_texto TEXT,
+      ressalvas TEXT,
+      recomendacoes TEXT,
+      responsavel VARCHAR(180),
+      data_parecer DATE,
+      usuario_id VARCHAR(80),
+      usuario_nome VARCHAR(180),
+      criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE TABLE IF NOT EXISTS transparencia_auditoria (
+      id BIGSERIAL PRIMARY KEY,
+      tenant_id UUID NOT NULL,
+      transparencia_id BIGINT NOT NULL,
+      acao VARCHAR(40) NOT NULL,
+      status_anterior VARCHAR(30),
+      status_novo VARCHAR(30),
+      usuario_id VARCHAR(80),
+      usuario_nome VARCHAR(180),
+      observacao TEXT,
+      criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
+    "ALTER TABLE IF EXISTS transparencia ADD COLUMN IF NOT EXISTS prestacao_instrumento_id BIGINT",
+    "ALTER TABLE IF EXISTS transparencia ADD COLUMN IF NOT EXISTS percentual_preenchimento NUMERIC(5,2) NOT NULL DEFAULT 0",
+    "ALTER TABLE IF EXISTS transparencia ADD COLUMN IF NOT EXISTS proxima_prestacao_em DATE",
+    "ALTER TABLE IF EXISTS transparencia ADD COLUMN IF NOT EXISTS total_recebido NUMERIC(14,2) DEFAULT 0",
+    "ALTER TABLE IF EXISTS transparencia ADD COLUMN IF NOT EXISTS total_aplicado NUMERIC(14,2) DEFAULT 0",
+    "ALTER TABLE IF EXISTS transparencia ADD COLUMN IF NOT EXISTS saldo_disponivel NUMERIC(14,2) DEFAULT 0",
+    "ALTER TABLE IF EXISTS transparencia ADD COLUMN IF NOT EXISTS prestado_mes NUMERIC(14,2) DEFAULT 0",
+    "CREATE INDEX IF NOT EXISTS termo_fomento_tenant_idx ON termo_fomento(tenant_id, atualizado_em DESC, id DESC)",
+    "CREATE INDEX IF NOT EXISTS plano_trabalho_tenant_idx ON plano_trabalho(tenant_id, atualizado_em DESC, id DESC)",
+    "CREATE INDEX IF NOT EXISTS transparencia_tenant_idx ON transparencia(tenant_id, id DESC)"
+  ];
+
+  for (const comando of comandos) {
+    await tx.$executeRawUnsafe(comando);
+  }
 }
 
 async function getInstituicao(tx: typeof prisma) {
@@ -4843,7 +5230,7 @@ async function popularEducacional(tx: typeof prisma, tenantId: string, beneficia
 }
 
 async function popularPrestacaoContas(tx: typeof prisma, tenantId: string, unidadesCriadas: Awaited<ReturnType<typeof garantirUnidades>>, usuarioId: bigint) {
-  if (!(await tableExists(tx, "prestacao_contas_instrumento"))) return;
+  await ensureParceriasPublicasEstrutura(tx);
 
   const marcador = `${DEMO}_PRESTACAO`;
   const concedentesBase = [
@@ -5581,6 +5968,7 @@ async function popularPrestacaoContas(tx: typeof prisma, tenantId: string, unida
 }
 
 async function popularTermosPlanosTransparencia(tx: typeof prisma, tenantId: string, unidadesCriadas: Awaited<ReturnType<typeof garantirUnidades>>, usuarioId: bigint) {
+  await ensureParceriasPublicasEstrutura(tx);
   const marcador = `${DEMO}_PRESTACAO`;
   const unidadePrincipal = unidadesCriadas[0]?.id ?? null;
   for (const tabela of [
