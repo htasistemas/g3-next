@@ -85,6 +85,11 @@ const estruturaSql = [
   "ALTER TABLE IF EXISTS transparencia_comprovantes ADD COLUMN IF NOT EXISTS tenant_id UUID",
   "ALTER TABLE IF EXISTS transparencia_timelines ADD COLUMN IF NOT EXISTS tenant_id UUID",
   "ALTER TABLE IF EXISTS transparencia_checklist ADD COLUMN IF NOT EXISTS tenant_id UUID",
+  "ALTER TABLE IF EXISTS transparencia_recebimentos ADD COLUMN IF NOT EXISTS ordem INTEGER NOT NULL DEFAULT 0",
+  "ALTER TABLE IF EXISTS transparencia_destinacoes ADD COLUMN IF NOT EXISTS ordem INTEGER NOT NULL DEFAULT 0",
+  "ALTER TABLE IF EXISTS transparencia_comprovantes ADD COLUMN IF NOT EXISTS ordem INTEGER NOT NULL DEFAULT 0",
+  "ALTER TABLE IF EXISTS transparencia_timelines ADD COLUMN IF NOT EXISTS ordem INTEGER NOT NULL DEFAULT 0",
+  "ALTER TABLE IF EXISTS transparencia_checklist ADD COLUMN IF NOT EXISTS ordem INTEGER NOT NULL DEFAULT 0",
   "CREATE INDEX IF NOT EXISTS transparencia_despesas_tenant_idx ON transparencia_despesas(tenant_id, transparencia_id, id)",
   "CREATE INDEX IF NOT EXISTS transparencia_parecer_historico_tenant_idx ON transparencia_parecer_historico(tenant_id, transparencia_id, versao DESC)",
   "CREATE INDEX IF NOT EXISTS transparencia_tenant_idx ON transparencia(tenant_id, id DESC)",
@@ -169,6 +174,7 @@ function tenantFilter(alias: string, tenantId: string) {
 export class TransparenciasRepository {
   async listar(tenantId: string) {
     await ensureTransparenciasEstrutura();
+    await this.sincronizarInstrumentosProfissionais(tenantId);
 
     const transparencias = await prisma.$queryRaw<TransparenciaRow[]>(Prisma.sql`
       SELECT
@@ -218,6 +224,7 @@ export class TransparenciasRepository {
 
   async buscarPorId(id: bigint, tenantId: string) {
     await ensureTransparenciasEstrutura();
+    await this.sincronizarInstrumentosProfissionais(tenantId);
 
     const rows = await prisma.$queryRaw<TransparenciaRow[]>(Prisma.sql`
       SELECT
@@ -445,6 +452,139 @@ export class TransparenciasRepository {
     }
 
     return unidade.id;
+  }
+
+  private async sincronizarInstrumentosProfissionais(tenantId: string) {
+    await prisma.$executeRaw(Prisma.sql`
+      INSERT INTO transparencia (
+        tenant_id,
+        unidade_id,
+        prestacao_instrumento_id,
+        percentual_preenchimento,
+        proxima_prestacao_em,
+        instrumento,
+        objeto,
+        periodo_inicio,
+        periodo_fim,
+        tipo_prestacao,
+        status_workflow,
+        total_recebido,
+        total_recebido_helper,
+        total_aplicado,
+        total_aplicado_helper,
+        saldo_disponivel,
+        saldo_disponivel_helper,
+        prestado_mes,
+        prestado_mes_helper,
+        parecer_conclusao,
+        parecer_texto,
+        parecer_ressalvas,
+        parecer_recomendacoes,
+        parecer_responsavel,
+        parecer_data,
+        criado_em,
+        atualizado_em
+      )
+      SELECT
+        i.tenant_id,
+        i.unidade_id,
+        i.id,
+        100,
+        COALESCE(i.termino_vigencia + INTERVAL '30 days', CURRENT_DATE + INTERVAL '30 days')::date,
+        COALESCE(i.numero_instrumento, CONCAT(i.tipo_instrumento, ' ', i.id::text)),
+        i.objeto,
+        i.inicio_vigencia,
+        i.termino_vigencia,
+        CASE
+          WHEN i.situacao ILIKE '%PARCIAL%' THEN 'PARCIAL'
+          WHEN i.situacao ILIKE '%ANUAL%' THEN 'ANUAL'
+          ELSE 'FINAL'
+        END,
+        CASE
+          WHEN i.situacao IN ('APROVADA', 'APROVADO') THEN 'APROVADA'
+          WHEN i.situacao IN ('APROVADA_RESSALVAS', 'APROVADO_RESSALVAS') THEN 'APROVADA_RESSALVAS'
+          WHEN i.situacao ILIKE '%DILIGENCIA%' THEN 'EM_DILIGENCIA'
+          WHEN i.situacao ILIKE '%ANALISE%' THEN 'EM_ANALISE'
+          ELSE 'RASCUNHO'
+        END,
+        COALESCE((
+          SELECT SUM(r.valor_recebido)
+          FROM prestacao_contas_receita r
+          WHERE r.tenant_id = i.tenant_id
+            AND r.instrumento_id = i.id
+            AND r.excluido_em IS NULL
+        ), i.valor_repasse, 0),
+        'Total sincronizado a partir dos recebimentos profissionais da prestação.',
+        COALESCE((
+          SELECT SUM(d.valor_liquido)
+          FROM prestacao_contas_despesa d
+          WHERE d.tenant_id = i.tenant_id
+            AND d.instrumento_id = i.id
+            AND d.excluido_em IS NULL
+        ), 0),
+        'Total sincronizado a partir das despesas profissionais da prestação.',
+        COALESCE((
+          SELECT SUM(r.valor_recebido)
+          FROM prestacao_contas_receita r
+          WHERE r.tenant_id = i.tenant_id
+            AND r.instrumento_id = i.id
+            AND r.excluido_em IS NULL
+        ), i.valor_repasse, 0) - COALESCE((
+          SELECT SUM(d.valor_liquido)
+          FROM prestacao_contas_despesa d
+          WHERE d.tenant_id = i.tenant_id
+            AND d.instrumento_id = i.id
+            AND d.excluido_em IS NULL
+        ), 0),
+        'Saldo sincronizado automaticamente para exibição na listagem.',
+        COALESCE((
+          SELECT SUM(d.valor_liquido)
+          FROM prestacao_contas_despesa d
+          WHERE d.tenant_id = i.tenant_id
+            AND d.instrumento_id = i.id
+            AND d.excluido_em IS NULL
+            AND d.data_pagamento >= date_trunc('month', CURRENT_DATE)::date
+        ), 0),
+        'Valor aplicado no mês atual conforme despesas profissionais.',
+        CASE WHEN EXISTS (
+          SELECT 1
+          FROM prestacao_contas_aprovacao a
+          WHERE a.tenant_id = i.tenant_id
+            AND a.instrumento_id = i.id
+            AND a.decisao = 'APROVADO_RESSALVAS'
+            AND a.excluido_em IS NULL
+        ) THEN 'APROVAR_RESSALVAS' ELSE 'APROVAR' END,
+        'Registro sincronizado automaticamente a partir da prestação profissional para exibição na listagem principal.',
+        CASE WHEN EXISTS (
+          SELECT 1
+          FROM prestacao_contas_aprovacao a
+          WHERE a.tenant_id = i.tenant_id
+            AND a.instrumento_id = i.id
+            AND a.decisao = 'APROVADO_RESSALVAS'
+            AND a.excluido_em IS NULL
+        ) THEN 'Há ressalvas registradas na aprovação profissional.' ELSE NULL END,
+        'Conferir documentos, despesas, conciliações e pareceres antes do encerramento.',
+        COALESCE(i.atualizado_por, i.criado_por),
+        CURRENT_DATE,
+        NOW(),
+        NOW()
+      FROM prestacao_contas_instrumento i
+      WHERE i.tenant_id::text = ${tenantId}
+        AND i.excluido_em IS NULL
+        AND NOT EXISTS (
+          SELECT 1
+          FROM transparencia t
+          WHERE t.tenant_id = i.tenant_id
+            AND (
+              t.prestacao_instrumento_id = i.id
+              OR (
+                t.instrumento IS NOT NULL
+                AND i.numero_instrumento IS NOT NULL
+                AND t.instrumento = i.numero_instrumento
+              )
+            )
+        )
+    `);
   }
 
   private async listarRecebimentos(ids: bigint[], tenantId: string) {

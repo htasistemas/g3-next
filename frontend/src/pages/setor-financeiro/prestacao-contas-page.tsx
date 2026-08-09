@@ -35,12 +35,13 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AdminPageLayout, type AdminAction, type AdminTab } from "@/components/admin/admin-page-layout";
 import { PopupConfirmacao, PopupMensagem, type PopupMensagemState } from "@/components/admin/admin-popups";
-import { imprimirConteudoAtual } from "@/lib/report-utils";
+import { imprimirHtml } from "@/lib/report-utils";
 import { formatarMoeda as formatarMoedaBr, formatarMoedaInput, normalizarMoeda } from "@/lib/br-utils";
 import { cn } from "@/lib/utils";
 import { arquivosService } from "@/services/arquivos.service";
 import { useAuth } from "@/hooks/use-auth";
 import { useContasBancarias, useLancamentosContabeis } from "@/features/contabilidade/use-contabilidade";
+import { gerarHtmlRelatorioPrestacaoContas } from "@/features/prestacao-contas/prestacao-contas-report";
 import { PrestacaoContasProfissionalPanel } from "./prestacao-contas-profissional-panel";
 import {
   useExcluirPrestacaoContas,
@@ -804,6 +805,44 @@ export function PrestacaoContasPage() {
     }));
   }
 
+  function gerarRelatorio() {
+    const registrosBase = registroSelecionadoId ? [form] : registrosFiltrados;
+
+    if (!registrosBase.length) {
+      setPopup({
+        tipo: "aviso",
+        titulo: "Relatório indisponível",
+        texto: "Nenhuma prestação de contas foi encontrada para os filtros atuais."
+      });
+      return;
+    }
+
+    try {
+      imprimirHtml({
+        titulo: "Relatório de prestação de contas",
+        html: gerarHtmlRelatorioPrestacaoContas({
+          registros: registrosBase,
+          resumoPorRegistro: calcularResumo,
+          geradoPor: usuario?.nome || usuario?.nomeUsuario || "Sistema G3N",
+          filtros: {
+            busca: filtro,
+            situacao: filtroStatus,
+            apenasPendencias
+          }
+        }),
+        tamanhoPagina: "A4 portrait",
+        margemPagina: "12mm",
+        paddingRaiz: "0"
+      });
+    } catch (error: any) {
+      setPopup({
+        tipo: "erro",
+        titulo: "Erro",
+        texto: error?.message ?? "Não foi possível preparar o relatório."
+      });
+    }
+  }
+
   const acoes: AdminAction[] = [
     { label: "Buscar", icon: Search, onClick: () => setAbaAtiva("listagem"), variant: "outline" },
     { label: "Novo", icon: Plus, onClick: novo, variant: "default", disabled: processando || !podeEditar },
@@ -817,19 +856,9 @@ export function PrestacaoContasPage() {
       disabled: processando || !registroSelecionadoId || !permissoes.includes("ADMINISTRADOR")
     },
     {
-      label: "Imprimir",
+      label: "Gerar relatório",
       icon: Printer,
-      onClick: () => {
-        try {
-          imprimirConteudoAtual({ titulo: "Prestação de contas" });
-        } catch (error: any) {
-          setPopup({
-            tipo: "erro",
-            titulo: "Erro",
-            texto: error?.message ?? "Não foi possível preparar a impressão."
-          });
-        }
-      },
+      onClick: gerarRelatorio,
       variant: "outline"
     },
     { label: "Fechar", icon: X, onClick: () => navigate("/dashboard/visao-geral"), variant: "outline" }

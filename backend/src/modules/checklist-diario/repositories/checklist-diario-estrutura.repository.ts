@@ -260,22 +260,36 @@ export async function ensureChecklistDiarioEstrutura(db: DatabaseLike) {
       `);
       await db.$executeRawUnsafe(`
         UPDATE checklist_execucoes AS e
-        SET tenant_id = COALESCE(u.tenant_id, m.tenant_id)
+        SET tenant_id = COALESCE(
+          u.tenant_id,
+          (
+            SELECT m.tenant_id
+            FROM checklist_modelos m
+            WHERE m.id = e.modelo_id
+            LIMIT 1
+          )
+        )
         FROM usuarios u
-        LEFT JOIN checklist_modelos m ON m.id = e.modelo_id
         WHERE e.tenant_id IS NULL
           AND u.id = e.usuario_id
       `);
       await db.$executeRawUnsafe(`
         UPDATE checklist_execucao_historico AS h
-        SET tenant_id = COALESCE(e.tenant_id, m.tenant_id)
-        FROM checklist_execucoes e
-        LEFT JOIN checklist_modelos m ON m.id = h.modelo_id
-        WHERE h.tenant_id IS NULL
-          AND (
-            (e.id = h.execucao_id)
-            OR h.execucao_id IS NULL
+        SET tenant_id = COALESCE(
+          (
+            SELECT e.tenant_id
+            FROM checklist_execucoes e
+            WHERE e.id = h.execucao_id
+            LIMIT 1
+          ),
+          (
+            SELECT m.tenant_id
+            FROM checklist_modelos m
+            WHERE m.id = h.modelo_id
+            LIMIT 1
           )
+        )
+        WHERE h.tenant_id IS NULL
       `);
       await db.$executeRawUnsafe(`
         UPDATE checklist_configuracoes AS c

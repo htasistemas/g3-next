@@ -28,15 +28,20 @@ export class FamiliaService {
   async listar(rawFilters: unknown, atorRaw: AtorRaw) {
     const filtersNormalizados =
       rawFilters && typeof rawFilters === "object"
-        ? normalizarObjetoTexto(
-            rawFilters as Record<string, unknown>,
-            {
-              nome_familia: "instituicao",
-              municipio: "endereco",
-              referencia: "nomePessoa",
-              status: "textoCurto"
+        ? (() => {
+            const normalizados = normalizarObjetoTexto(
+              rawFilters as Record<string, unknown>,
+              {
+                nome_familia: "instituicao",
+                municipio: "endereco",
+                referencia: "nomePessoa"
+              }
+            );
+            if (typeof normalizados.status === "string") {
+              normalizados.status = normalizados.status.trim().toUpperCase();
             }
-          )
+            return normalizados;
+          })()
         : rawFilters;
 
     const filters = familiaFiltersSchema.parse(filtersNormalizados);
