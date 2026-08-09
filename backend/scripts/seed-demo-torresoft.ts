@@ -4514,6 +4514,19 @@ async function popularVisitasDomiciliares(tx: typeof prisma, tenantId: string, b
 }
 
 async function popularEducacional(tx: typeof prisma, tenantId: string, beneficiarios: bigint[], profissionais: bigint[], unidadesCriadas: Awaited<ReturnType<typeof garantirUnidades>>, usuarioId: bigint) {
+  await tx.$executeRawUnsafe("ALTER TABLE IF EXISTS educacional_matricula ADD COLUMN IF NOT EXISTS sala_id BIGINT");
+  await tx.$executeRawUnsafe("ALTER TABLE IF EXISTS educacional_matricula ADD COLUMN IF NOT EXISTS data_inicio DATE");
+  await tx.$executeRawUnsafe("ALTER TABLE IF EXISTS educacional_matricula ADD COLUMN IF NOT EXISTS turno VARCHAR(40)");
+  await tx.$executeRawUnsafe("ALTER TABLE IF EXISTS educacional_matricula ADD COLUMN IF NOT EXISTS observacoes TEXT");
+  await tx.$executeRawUnsafe("ALTER TABLE IF EXISTS educacional_matricula ADD COLUMN IF NOT EXISTS usuario_responsavel_id BIGINT");
+  await tx.$executeRawUnsafe("ALTER TABLE IF EXISTS educacional_matricula ADD COLUMN IF NOT EXISTS usuario_responsavel_nome VARCHAR(180)");
+  await tx.$executeRawUnsafe("ALTER TABLE IF EXISTS educacional_matricula ADD COLUMN IF NOT EXISTS ativo BOOLEAN NOT NULL DEFAULT TRUE");
+  await tx.$executeRawUnsafe("ALTER TABLE IF EXISTS educacional_matricula ADD COLUMN IF NOT EXISTS origem VARCHAR(60)");
+  await tx.$executeRawUnsafe("ALTER TABLE IF EXISTS educacional_matricula ADD COLUMN IF NOT EXISTS responsavel_nome VARCHAR(180)");
+  await tx.$executeRawUnsafe("ALTER TABLE IF EXISTS educacional_matricula ADD COLUMN IF NOT EXISTS transporte_escolar BOOLEAN NOT NULL DEFAULT FALSE");
+  await tx.$executeRawUnsafe("ALTER TABLE IF EXISTS educacional_matricula ADD COLUMN IF NOT EXISTS documentacao JSONB");
+  await tx.$executeRawUnsafe("ALTER TABLE IF EXISTS educacional_matricula ADD COLUMN IF NOT EXISTS informacoes_complementares TEXT");
+
   const unidadeEscolar = unidadesCriadas.find((item) => item.tipo === "ENSINO") ?? unidadesCriadas[0];
   const anoRows = await Promise.all([2025, 2026, 2027].map(async (ano) => {
     const existente = await tx.$queryRawUnsafe<IdRow[]>(
