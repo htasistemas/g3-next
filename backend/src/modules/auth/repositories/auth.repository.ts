@@ -302,6 +302,7 @@ export class AuthRepository {
         usuarioId
       );
       await this.garantirPermissaoUsuario(usuarioId, "ADMINISTRADOR");
+      await this.garantirDadosMinimosDemoTorresoft(instituicao);
       return usuarioId;
     }
 
@@ -326,7 +327,313 @@ export class AuthRepository {
       instituicao.id
     );
     await this.garantirPermissaoUsuario(created[0]!.id, "ADMINISTRADOR");
+    await this.garantirDadosMinimosDemoTorresoft(instituicao);
     return created[0]!.id;
+  }
+
+  private async garantirDadosMinimosDemoTorresoft(instituicao: { id: string; tenant_id: string }) {
+    const tenantId = instituicao.tenant_id;
+    await this.executarDemoSeguro("beneficiarios", async () => {
+      await prisma.$executeRawUnsafe("ALTER TABLE IF EXISTS cadastro_beneficiario ADD COLUMN IF NOT EXISTS status_cadastral VARCHAR(40)");
+      await prisma.$executeRawUnsafe("ALTER TABLE IF EXISTS cadastro_beneficiario ADD COLUMN IF NOT EXISTS modo_cadastro VARCHAR(40)");
+      const count = await this.contarTabelaTenant("cadastro_beneficiario", tenantId);
+      if (count > 0) return;
+      for (let i = 0; i < 30; i += 1) {
+        await prisma.$executeRawUnsafe(
+          `
+          INSERT INTO cadastro_beneficiario (
+            codigo, nome_completo, data_nascimento, sexo_biologico, cor_raca,
+            estado_civil, nacionalidade, naturalidade_cidade, naturalidade_uf,
+            nome_mae, nome_pai, criado_em, atualizado_em, status,
+            opta_receber_cesta_basica, apto_receber_cesta_basica, tenant_id,
+            status_cadastral, modo_cadastro
+          )
+          VALUES (
+            $1, $2, $3::date, $4, $5, 'Solteiro(a)', 'Brasileira',
+            'Uberlandia', 'MG', $6, $7, NOW(), NOW(), 'ATIVO',
+            $8, $9, $10::uuid, 'COMPLETO', 'DEMONSTRACAO'
+          )
+          `,
+          `DEMO-TS-AUTO-BEN-${String(i + 1).padStart(4, "0")}`,
+          `Beneficiario Demo Torresoft ${String(i + 1).padStart(2, "0")}`,
+          `20${String(10 + (i % 12)).padStart(2, "0")}-${String((i % 12) + 1).padStart(2, "0")}-15`,
+          i % 2 === 0 ? "FEMININO" : "MASCULINO",
+          ["Parda", "Branca", "Preta"][i % 3],
+          `Mae Demo Torresoft ${i + 1}`,
+          `Pai Demo Torresoft ${i + 1}`,
+          i % 3 === 0,
+          i % 4 === 0,
+          tenantId
+        );
+      }
+    });
+
+    await this.executarDemoSeguro("profissionais", async () => {
+      const count = await this.contarTabelaTenant("cadastro_profissionais", tenantId);
+      if (count > 0) return;
+      const categorias = ["Assistente social", "Psicologo", "Pedagogo", "Professor", "Administrativo", "Coordenador"];
+      for (let i = 0; i < 8; i += 1) {
+        await prisma.$executeRawUnsafe(
+          `
+          INSERT INTO cadastro_profissionais (
+            nome_completo, categoria, email, telefone, unidade, carga_horaria,
+            status, resumo, observacoes, criado_em, atualizado_em, tenant_id
+          )
+          VALUES ($1, $2, $3, $4, 'Unidade Torresoft', 40, 'ATIVO', $5, $6, NOW(), NOW(), $7::uuid)
+          `,
+          `Profissional Demo Torresoft ${String(i + 1).padStart(2, "0")}`,
+          categorias[i % categorias.length],
+          `profissional.demo${i + 1}@exemplo.com.br`,
+          `34988${String(100000 + i).slice(0, 6)}`,
+          "Registro ficticio para apresentacao comercial.",
+          "DEMO_TORRESOFT - profissional ficticio.",
+          tenantId
+        );
+      }
+    });
+
+    await this.executarDemoSeguro("familias", async () => {
+      const count = await this.contarTabelaTenant("vinculo_familiar", tenantId);
+      if (count > 0) return;
+      for (let i = 0; i < 10; i += 1) {
+        await prisma.$executeRawUnsafe(
+          `
+          INSERT INTO vinculo_familiar (
+            nome_familia, status, cep, logradouro, numero, bairro, municipio, uf,
+            situacao_imovel, tipo_moradia, agua_encanada, esgoto_tipo, coleta_lixo,
+            energia_eletrica, internet, arranjo_familiar, qtd_membros,
+            renda_familiar_total, renda_per_capita, tecnico_responsavel,
+            observacoes, criado_em, atualizado_em, tenant_id
+          )
+          VALUES (
+            $1, 'ATIVO', '38400000', 'Rua Demonstracao Torresoft', $2, $3,
+            'Uberlandia', 'MG', 'Alugado', 'Casa', TRUE, 'Rede publica',
+            'Regular', TRUE, TRUE, 'Nuclear', $4, $5, $6,
+            'Equipe social Torresoft', $7, NOW(), NOW(), $8::uuid
+          )
+          `,
+          `Familia Demo Torresoft ${String(i + 1).padStart(2, "0")}`,
+          String(100 + i),
+          ["Centro", "Jardim Aurora", "Nova Esperanca"][i % 3],
+          3 + (i % 4),
+          String(1800 + i * 140).replace(".", ","),
+          String(450 + i * 35).replace(".", ","),
+          "DEMO_TORRESOFT - familia ficticia para painel de apresentacao.",
+          tenantId
+        );
+      }
+    });
+
+    await this.executarDemoSeguro("almoxarifado", async () => {
+      const count = await this.contarTabelaTenant("almoxarifado_item", tenantId);
+      if (count > 0) return;
+      const itens = [
+        ["DEMO-TS-AUTO-ALM-001", "Cesta basica demonstrativa", "Alimentos", "un", 120, 85.5],
+        ["DEMO-TS-AUTO-ALM-002", "Kit higiene familiar", "Higiene", "kit", 95, 42.9],
+        ["DEMO-TS-AUTO-ALM-003", "Material escolar completo", "Educacao", "kit", 80, 68.4],
+        ["DEMO-TS-AUTO-ALM-004", "Cobertor social", "Vestuário", "un", 60, 74.2],
+        ["DEMO-TS-AUTO-ALM-005", "Livro paradidatico", "Educacao", "un", 140, 29.9],
+        ["DEMO-TS-AUTO-ALM-006", "Kit oficina de artes", "Oficinas", "kit", 45, 119.9]
+      ] as const;
+      for (const item of itens) {
+        await prisma.$executeRawUnsafe(
+          `
+          INSERT INTO almoxarifado_item (
+            tenant_id, codigo, descricao, categoria, unidade, localizacao,
+            localizacao_interna, estoque_atual, estoque_minimo, valor_unitario,
+            situacao, observacoes, criado_em, atualizado_em
+          )
+          VALUES ($1::uuid, $2, $3, $4, $5, 'Almoxarifado Torresoft',
+                  'Prateleira demonstracao', $6, 10, $7, 'ATIVO', $8, NOW(), NOW())
+          `,
+          tenantId,
+          item[0],
+          item[1],
+          item[2],
+          item[3],
+          item[4],
+          item[5],
+          "DEMO_TORRESOFT - item ficticio."
+        );
+      }
+    });
+
+    await this.executarDemoSeguro("biblioteca", async () => {
+      const count = await this.contarTabelaTenant("biblioteca_livro", tenantId);
+      if (count > 0) return;
+      for (let i = 0; i < 12; i += 1) {
+        await prisma.$executeRawUnsafe(
+          `
+          INSERT INTO biblioteca_livro (
+            tenant_id, codigo, titulo, autor, editora, ano_publicacao, categoria,
+            quantidade_total, quantidade_disponivel, localizacao, status,
+            estado_livro, observacoes, criado_em, atualizado_em
+          )
+          VALUES ($1::uuid, $2, $3, $4, 'Editora Demonstracao', $5, $6, $7, $8,
+                  'Estante demo', 'ATIVO', 'Bom', $9, NOW(), NOW())
+          `,
+          tenantId,
+          `TS-LIV-AUTO-${String(i + 1).padStart(4, "0")}`,
+          `Livro Demo Torresoft ${String(i + 1).padStart(2, "0")}`,
+          `Autor Ficticio ${i + 1}`,
+          2014 + (i % 10),
+          ["Literatura", "Educacao", "Cidadania"][i % 3],
+          3 + (i % 4),
+          2 + (i % 3),
+          "DEMO_TORRESOFT - livro ficticio."
+        );
+      }
+    });
+
+    await this.executarDemoSeguro("patrimonio", async () => {
+      const count = await this.contarTabelaTenant("patrimonio_item", tenantId);
+      if (count > 0) return;
+      for (let i = 0; i < 10; i += 1) {
+        await prisma.$executeRawUnsafe(
+          `
+          INSERT INTO patrimonio_item (
+            tenant_id, numero_patrimonio, nome, categoria, conservacao, status,
+            data_aquisicao, valor_aquisicao, origem, responsavel, unidade,
+            sala, observacoes, criado_em, atualizado_em
+          )
+          VALUES ($1::uuid, $2, $3, $4, 'Bom', 'ATIVO', $5::date, $6,
+                  'Demonstracao', 'Equipe Torresoft', 'Unidade Torresoft',
+                  'Sala demo', $7, NOW(), NOW())
+          `,
+          tenantId,
+          `TS-PAT-AUTO-${String(i + 1).padStart(4, "0")}`,
+          ["Notebook", "Projetor", "Mesa", "Cadeira", "Impressora"][i % 5] + ` Demo ${i + 1}`,
+          ["Informatica", "Mobiliario", "Equipamentos"][i % 3],
+          `2025-${String((i % 12) + 1).padStart(2, "0")}-10`,
+          900 + i * 180,
+          "DEMO_TORRESOFT - patrimonio ficticio."
+        );
+      }
+    });
+
+    await this.executarDemoSeguro("documentos", async () => {
+      const count = await this.contarTabelaTenant("documentos_instituicao", tenantId);
+      if (count > 0) return;
+      const documentos = [
+        ["Alvara de funcionamento", "Prefeitura Municipal", "vencido", "2026-07-01"],
+        ["Certidao negativa municipal", "Prefeitura Municipal", "vence_em_breve", "2026-08-20"],
+        ["Ata de diretoria", "Cartorio", "regular", "2027-02-10"],
+        ["Plano de trabalho demonstrativo", "Diretoria", "regular", "2027-05-30"]
+      ] as const;
+      for (let i = 0; i < documentos.length; i += 1) {
+        const doc = documentos[i];
+        await prisma.$executeRawUnsafe(
+          `
+          INSERT INTO documentos_instituicao (
+            tenant_id, tipo_documento, orgao_emissor, descricao, categoria,
+            emissao, validade, responsavel_interno, modo_renovacao,
+            gerar_alerta, situacao, criado_em, atualizado_em
+          )
+          VALUES ($1::uuid, $2, $3, $4, 'Institucional', '2025-01-10'::date,
+                  $5::date, 'Administrador Demonstracao Torresoft', 'Manual',
+                  TRUE, $6, NOW(), NOW())
+          `,
+          tenantId,
+          doc[0],
+          doc[1],
+          "DEMO_TORRESOFT - documento ficticio para apresentacao.",
+          doc[3],
+          doc[2]
+        );
+      }
+    });
+
+    await this.executarDemoSeguro("fotos_eventos", async () => {
+      const count = await this.contarTabelaTenant("fotos_eventos", tenantId);
+      if (count > 0) return;
+      for (let i = 0; i < 3; i += 1) {
+        await prisma.$executeRawUnsafe(
+          `
+          INSERT INTO fotos_eventos (
+            tenant_id, titulo, descricao, data_evento, local, tags,
+            status, criado_em, atualizado_em
+          )
+          VALUES ($1::uuid, $2, $3, $4::date, 'Unidade Torresoft',
+                  'demo,apresentacao,eventos', 'PUBLICADO', NOW(), NOW())
+          `,
+          tenantId,
+          `Album Demo Torresoft ${i + 1}`,
+          "DEMO_TORRESOFT - album ficticio para apresentacao.",
+          `2026-0${i + 1}-15`
+        );
+      }
+    });
+
+    await this.executarDemoSeguro("emprestimos_eventos", async () => {
+      const count = await this.contarTabelaTenant("emprestimos_eventos", tenantId);
+      if (count > 0) return;
+      const evento = await prisma.$queryRawUnsafe<Array<{ id: bigint }>>(
+        `
+        INSERT INTO eventos_emprestimos (
+          tenant_id, titulo, descricao, local, data_inicio, data_fim,
+          status, promovido_por, criado_em, atualizado_em
+        )
+        VALUES ($1::uuid, 'Evento Demo Torresoft', $2, 'Unidade Torresoft',
+                NOW() + INTERVAL '5 days', NOW() + INTERVAL '5 days 4 hours',
+                'PLANEJADO', 'Equipe Torresoft', NOW(), NOW())
+        RETURNING id
+        `,
+        tenantId,
+        "DEMO_TORRESOFT - evento ficticio para emprestimos."
+      );
+      if (!evento[0]?.id) return;
+      await prisma.$executeRawUnsafe(
+        `
+        INSERT INTO emprestimos_eventos (
+          tenant_id, evento_id, data_retirada_prevista, data_devolucao_prevista,
+          status, responsavel_nome, observacoes, criado_em, atualizado_em
+        )
+        VALUES ($1::uuid, $2, NOW() + INTERVAL '4 days',
+                NOW() + INTERVAL '6 days', 'RESERVADO',
+                'Administrador Demonstracao Torresoft',
+                'DEMO_TORRESOFT - emprestimo ficticio para evento.', NOW(), NOW())
+        `,
+        tenantId,
+        evento[0].id
+      );
+    });
+  }
+
+  private async executarDemoSeguro(nome: string, operacao: () => Promise<void>) {
+    try {
+      await operacao();
+    } catch (error) {
+      console.warn(`[auth/demo-torresoft] bloco ${nome} ignorado.`, error);
+    }
+  }
+
+  private async contarTabelaTenant(tabela: string, tenantId: string) {
+    const existe = await prisma.$queryRawUnsafe<Array<{ exists: boolean }>>(
+      "SELECT to_regclass($1) IS NOT NULL AS exists",
+      `public.${tabela}`
+    );
+    if (!existe[0]?.exists) return 1;
+    const tenantColumn = await prisma.$queryRawUnsafe<Array<{ exists: boolean }>>(
+      `
+      SELECT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = $1
+          AND column_name = 'tenant_id'
+      ) AS exists
+      `,
+      tabela
+    );
+    const rows = tenantColumn[0]?.exists
+      ? await prisma.$queryRawUnsafe<Array<{ total: bigint }>>(
+          `SELECT COUNT(*)::bigint AS total FROM "${tabela}" WHERE tenant_id::text = $1`,
+          tenantId
+        )
+      : await prisma.$queryRawUnsafe<Array<{ total: bigint }>>(
+          `SELECT COUNT(*)::bigint AS total FROM "${tabela}"`
+        );
+    return Number(rows[0]?.total ?? 0n);
   }
 
   private async garantirPermissaoUsuario(usuarioId: bigint, nomePermissao: string) {
