@@ -167,10 +167,51 @@ async function count(tx: typeof prisma, table: string, tenantId: string) {
 }
 
 function splitSqlStatements(sql: string) {
-  return sql
-    .split(";")
-    .map((statement) => statement.trim())
-    .filter(Boolean);
+  const statements: string[] = [];
+  let atual = "";
+  let emAspas = false;
+  let emComentarioLinha = false;
+
+  for (let i = 0; i < sql.length; i += 1) {
+    const char = sql[i];
+    const proximo = sql[i + 1];
+
+    if (!emAspas && char === "-" && proximo === "-") {
+      emComentarioLinha = true;
+    }
+
+    if (emComentarioLinha) {
+      if (char === "\n") {
+        emComentarioLinha = false;
+        atual += char;
+      }
+      continue;
+    }
+
+    if (char === "'") {
+      atual += char;
+      if (emAspas && proximo === "'") {
+        atual += proximo;
+        i += 1;
+        continue;
+      }
+      emAspas = !emAspas;
+      continue;
+    }
+
+    if (char === ";" && !emAspas) {
+      const statement = atual.trim();
+      if (statement) statements.push(statement);
+      atual = "";
+      continue;
+    }
+
+    atual += char;
+  }
+
+  const restante = atual.trim();
+  if (restante) statements.push(restante);
+  return statements;
 }
 
 async function executarSqlArquivo(tx: typeof prisma, caminho: string) {
