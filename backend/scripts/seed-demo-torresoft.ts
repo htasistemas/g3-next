@@ -380,6 +380,11 @@ async function garantirBeneficiarios(tx: typeof prisma, tenantId: string) {
   await tx.$executeRawUnsafe("ALTER TABLE IF EXISTS cadastro_beneficiario ADD COLUMN IF NOT EXISTS completude_calculada_em TIMESTAMP");
   await tx.$executeRawUnsafe("ALTER TABLE IF EXISTS cadastro_beneficiario ADD COLUMN IF NOT EXISTS ultima_revisao_cadastral DATE");
   await tx.$executeRawUnsafe("ALTER TABLE IF EXISTS cadastro_beneficiario ADD COLUMN IF NOT EXISTS proxima_revisao_cadastral DATE");
+  await tx.$executeRawUnsafe("ALTER TABLE IF EXISTS documentos ADD COLUMN IF NOT EXISTS categoria VARCHAR(80)");
+  await tx.$executeRawUnsafe("ALTER TABLE IF EXISTS documentos ADD COLUMN IF NOT EXISTS documento_principal BOOLEAN NOT NULL DEFAULT FALSE");
+  await tx.$executeRawUnsafe("ALTER TABLE IF EXISTS documentos ADD COLUMN IF NOT EXISTS ativo BOOLEAN NOT NULL DEFAULT TRUE");
+  await tx.$executeRawUnsafe("ALTER TABLE IF EXISTS documentos ADD COLUMN IF NOT EXISTS versao INTEGER NOT NULL DEFAULT 1");
+  await tx.$executeRawUnsafe("ALTER TABLE IF EXISTS documentos ADD COLUMN IF NOT EXISTS observacao TEXT");
 
   const ids: bigint[] = [];
   for (let i = 0; i < 129; i += 1) {
