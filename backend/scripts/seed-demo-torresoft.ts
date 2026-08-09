@@ -374,6 +374,13 @@ async function garantirUnidades(tx: typeof prisma, tenantId: string) {
 }
 
 async function garantirBeneficiarios(tx: typeof prisma, tenantId: string) {
+  await tx.$executeRawUnsafe("ALTER TABLE IF EXISTS cadastro_beneficiario ADD COLUMN IF NOT EXISTS status_cadastral VARCHAR(40)");
+  await tx.$executeRawUnsafe("ALTER TABLE IF EXISTS cadastro_beneficiario ADD COLUMN IF NOT EXISTS modo_cadastro VARCHAR(40)");
+  await tx.$executeRawUnsafe("ALTER TABLE IF EXISTS cadastro_beneficiario ADD COLUMN IF NOT EXISTS percentual_completude NUMERIC(5,2)");
+  await tx.$executeRawUnsafe("ALTER TABLE IF EXISTS cadastro_beneficiario ADD COLUMN IF NOT EXISTS completude_calculada_em TIMESTAMP");
+  await tx.$executeRawUnsafe("ALTER TABLE IF EXISTS cadastro_beneficiario ADD COLUMN IF NOT EXISTS ultima_revisao_cadastral DATE");
+  await tx.$executeRawUnsafe("ALTER TABLE IF EXISTS cadastro_beneficiario ADD COLUMN IF NOT EXISTS proxima_revisao_cadastral DATE");
+
   const ids: bigint[] = [];
   for (let i = 0; i < 129; i += 1) {
     const codigo = `DEMO-TS-BEN-${String(i + 1).padStart(4, "0")}`;
