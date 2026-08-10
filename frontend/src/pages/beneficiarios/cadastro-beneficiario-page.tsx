@@ -2875,34 +2875,6 @@ export function CadastroBeneficiarioPage() {
                     style={{ width: `${percentualCadastro}%` }}
                   />
                 </div>
-                <div className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-5">
-                  {etapasProgresso.map((etapa, indice) => (
-                    <button
-                      key={etapa.id}
-                      type="button"
-                      className={`rounded-md border px-2 py-1.5 text-left text-[11px] transition ${
-                        abaAtiva === etapa.id
-                          ? "border-[var(--g3-primary)] bg-[var(--g3-primary-soft)] font-semibold text-[var(--g3-active)]"
-                          : etapa.completo
-                            ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                            : "border-slate-200 bg-white text-slate-600 hover:border-[var(--g3-primary)]/50"
-                      }`}
-                      onClick={() => setAbaAtiva(etapa.id)}
-                      aria-current={abaAtiva === etapa.id ? "step" : undefined}
-                    >
-                      <span className="flex items-center gap-1.5">
-                        {etapa.completo ? (
-                          <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                        ) : (
-                          <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border border-current text-[9px]">
-                            {indice + 1}
-                          </span>
-                        )}
-                        <span className="truncate">{etapa.label}</span>
-                      </span>
-                    </button>
-                  ))}
-                </div>
               </div>
             )}
             {abaAtiva === "listagem" ? (

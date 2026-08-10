@@ -1,9 +1,9 @@
 {
-  "latestVersion": "1.00.813",
+  "latestVersion": "1.00.814",
   "releaseDate": "2026-08-10",
-  "description": "Auditoria e correções do cadastro de beneficiários.",
+  "description": "Ajuste da navegação no progresso do cadastro de beneficiários.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.812",
+  "minCompatibleVersion": "1.00.813",
   "releaseType": "stable"
 }
