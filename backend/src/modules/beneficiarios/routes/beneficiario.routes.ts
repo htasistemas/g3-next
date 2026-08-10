@@ -1,6 +1,9 @@
 import { Router } from "express";
 import { asyncHandler } from "../../../shared/http/async-handler.js";
-import { BeneficiarioController } from "../controllers/beneficiario.controller.js";
+import {
+  BeneficiarioController,
+  beneficiarioOcrUploadMiddleware
+} from "../controllers/beneficiario.controller.js";
 import {
   ensureAuthenticated,
   ensurePermissions
@@ -49,6 +52,13 @@ beneficiarioRoutes.post(
   ensureAuthenticated,
   ensurePermissions(permissoesEscrita),
   asyncHandler(controller.criarRapido.bind(controller))
+);
+beneficiarioRoutes.post(
+  "/ocr/cpf",
+  ensureAuthenticated,
+  ensurePermissions(permissoesEscrita),
+  beneficiarioOcrUploadMiddleware,
+  asyncHandler(controller.lerCpfPorOcr.bind(controller))
 );
 beneficiarioRoutes.get(
   "/:id/completude",

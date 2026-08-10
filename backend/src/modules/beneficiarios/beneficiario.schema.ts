@@ -169,6 +169,12 @@ export const beneficiarioInputSchema = z.object({
         nomeArquivo: optionalTrimmedString,
         caminhoArquivo: optionalTrimmedString,
         contentType: optionalTrimmedString,
+        dataEmissao: optionalIsoDate,
+        dataValidade: optionalIsoDate,
+        orgaoEmissor: optionalTrimmedString,
+        ufEmissor: optionalTrimmedString,
+        categoria: optionalTrimmedString,
+        observacao: optionalTrimmedString,
         obrigatorio: optionalBoolean,
         ignorado: optionalBoolean,
         conteudo: optionalTrimmedString

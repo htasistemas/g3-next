@@ -137,6 +137,12 @@ export const beneficiarioFormSchema = z.object({
         nomeArquivo: z.string().optional(),
         caminhoArquivo: z.string().optional(),
         contentType: z.string().optional(),
+        dataEmissao: z.string().optional(),
+        dataValidade: z.string().optional(),
+        orgaoEmissor: z.string().optional(),
+        ufEmissor: z.string().optional(),
+        categoria: z.string().optional(),
+        observacao: z.string().optional(),
         obrigatorio: z.boolean().optional(),
         ignorado: z.boolean().optional()
       })

@@ -955,6 +955,12 @@ export class BeneficiarioRepository {
         nomeArquivo,
         caminhoArquivo,
         contentType,
+        dataEmissao: toOptionalDate(doc.dataEmissao),
+        dataValidade: toOptionalDate(doc.dataValidade),
+        orgaoEmissor: trimOrUndefined(doc.orgaoEmissor),
+        ufEmissor: trimOrUndefined(doc.ufEmissor),
+        categoria: trimOrUndefined(doc.categoria),
+        observacao: trimOrUndefined(doc.observacao),
         obrigatorio: doc.ignorado ? false : (doc.obrigatorio ?? true),
         criadoEm: now,
         atualizadoEm: now

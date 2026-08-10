@@ -1,0 +1,4 @@
+ALTER TABLE documentos
+  ADD COLUMN IF NOT EXISTS data_validade DATE,
+  ADD COLUMN IF NOT EXISTS categoria VARCHAR(60),
+  ADD COLUMN IF NOT EXISTS observacao TEXT;

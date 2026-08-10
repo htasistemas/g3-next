@@ -4,6 +4,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
 import { MensagemAcoesRapidas } from "@/components/mensagens-personalizadas/mensagem-acoes-rapidas";
 import { CadastroSucessoModal } from "@/components/admin/cadastro-sucesso-modal";
+import { CadastroBeneficiarioTour } from "@/components/beneficiarios/cadastro-beneficiario-tour";
+import { AIConversationPanel } from "@/modules/ai/components/AIConversationPanel";
 import type { LucideIcon } from "lucide-react";
 import {
   Search,
@@ -31,7 +33,15 @@ import {
   History,
   RotateCw,
   ShieldCheck,
-  Users
+  Users,
+  Sparkles,
+  Mic,
+  MicOff,
+  Paperclip,
+  FileX2,
+  Ellipsis,
+  Pencil,
+  Download
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -68,6 +78,7 @@ import {
   type DocumentoObrigatoriedadeBeneficiarioSetting
 } from "@/services/parametros-sistema.service";
 import { reportsService } from "@/services/reports.service";
+import { beneficiariosService } from "@/services/beneficiarios.service";
 import { buscarEnderecoPorCep, buscarSugestaoZonaSubzona } from "@/services/cep.service";
 import type { Beneficiario, BeneficiarioDuplicidade, BeneficiarioFiltro, BeneficiarioStatus } from "@/types/beneficiario";
 import { useAuth } from "@/hooks/use-auth";
@@ -112,6 +123,23 @@ const documentosConfigBase: DocumentoCadastroConfig[] =
     ...documento,
     permiteIgnorar: true
   }));
+
+const tiposDocumentoCadastro = [
+  { id: "cpf", nome: "CPF", campo: "numero" },
+  { id: "rg", nome: "RG", campo: "numero" },
+  { id: "cnh", nome: "CNH", campo: "numero" },
+  { id: "certidao_nascimento", nome: "Certidão de nascimento", campo: "certidao" },
+  { id: "certidao_casamento", nome: "Certidão de casamento", campo: "certidao" },
+  { id: "titulo_eleitor", nome: "Título de eleitor", campo: "numero" },
+  { id: "carteira_trabalho", nome: "Carteira de trabalho", campo: "numero" },
+  { id: "nis", nome: "PIS/PASEP/NIT", campo: "numero" },
+  { id: "cartao_sus", nome: "Cartão SUS", campo: "numero" },
+  { id: "comprovante_endereco", nome: "Comprovante de residência", campo: "comprovante" },
+  { id: "laudo", nome: "Laudo", campo: "generico" },
+  { id: "atestado", nome: "Atestado", campo: "generico" },
+  { id: "documento_judicial", nome: "Documento judicial", campo: "generico" },
+  { id: "outros", nome: "Outros documentos", campo: "generico" }
+] as const;
 
 const opcaoAutoDeclaracaoResidencia = "Auto declaração de residência";
 
@@ -209,6 +237,90 @@ const beneficiosSociaisOptions = [
 
 type DocumentoCadastroId = string;
 
+type CampoPreenchimentoVoz =
+  | "nome_completo"
+  | "nome_mae"
+  | "data_nascimento"
+  | "cpf"
+  | "telefone_principal"
+  | "cep"
+  | "logradouro"
+  | "numero"
+  | "bairro"
+  | "municipio"
+  | "uf"
+  | "email"
+  | "tipo_deficiencia"
+  | "cid_principal"
+  | "beneficios_descricao"
+  | "observacoes";
+
+type CampoVozDetectado = {
+  campo: CampoPreenchimentoVoz;
+  valor: string;
+};
+
+type ReconhecimentoVozResultEvent = Event & {
+  results: ArrayLike<ArrayLike<{ transcript: string }>>;
+};
+
+type ReconhecimentoVoz = {
+  lang: string;
+  interimResults: boolean;
+  maxAlternatives: number;
+  onresult: ((event: ReconhecimentoVozResultEvent) => void) | null;
+  onerror: ((event: Event) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+};
+
+type ReconhecimentoVozConstructor = new () => ReconhecimentoVoz;
+
+const camposPreenchimentoVoz: Array<{ value: CampoPreenchimentoVoz; label: string }> = [
+  { value: "nome_completo", label: "Nome completo" },
+  { value: "nome_mae", label: "Nome da mãe" },
+  { value: "data_nascimento", label: "Data de nascimento" },
+  { value: "cpf", label: "CPF" },
+  { value: "telefone_principal", label: "Telefone principal" },
+  { value: "cep", label: "CEP" },
+  { value: "logradouro", label: "Logradouro" },
+  { value: "numero", label: "Número" },
+  { value: "bairro", label: "Bairro" },
+  { value: "municipio", label: "Município" },
+  { value: "uf", label: "UF" },
+  { value: "email", label: "E-mail" },
+  { value: "tipo_deficiencia", label: "Tipo de deficiência" },
+  { value: "cid_principal", label: "CID principal" },
+  { value: "beneficios_descricao", label: "Descrição dos benefícios" },
+  { value: "observacoes", label: "Observações" }
+];
+
+function detectarCamposNaFala(texto: string): CampoVozDetectado[] {
+  const encontrados: CampoVozDetectado[] = [];
+  const regras: Array<{ campo: CampoPreenchimentoVoz; padrao: RegExp }> = [
+    { campo: "nome_completo", padrao: /(?:meu nome completo é|nome completo é|nome é)\s+([^,.]+?)(?=\s+(?:minha mãe|data de nascimento|nasci|cpf|telefone|cep|e-?mail)\b|[,.]|$)/i },
+    { campo: "nome_mae", padrao: /(?:nome da mãe|minha mãe)\s*(?:é|:)?\s*([^,.]+?)(?=\s+(?:data de nascimento|nasci|cpf|telefone|cep|e-?mail)\b|[,.]|$)/i },
+    { campo: "data_nascimento", padrao: /(?:data de nascimento|nasci em)\s*(?:é|:|no dia)?\s*(\d{1,2}[\s/]\d{1,2}[\s/]\d{2,4})/i },
+    { campo: "cpf", padrao: /\b(\d{3}[.\s]?\d{3}[.\s]?\d{3}[-\s]?\d{2})\b/ },
+    { campo: "telefone_principal", padrao: /(?:telefone|celular|contato)\s*(?:é|:)?\s*(\(?\d{2}\)?[\s-]?\d{4,5}[\s-]?\d{4})/i },
+    { campo: "cep", padrao: /(?:cep)\s*(?:é|:)?\s*(\d{5}[-\s]?\d{3})/i },
+    { campo: "email", padrao: /(?:e-?mail)\s*(?:é|:)?\s*([\w.+-]+@[\w.-]+\.[a-z]{2,})/i },
+    { campo: "logradouro", padrao: /(?:logradouro|rua|avenida|endereço)\s*(?:é|:)?\s*([^,.]+?)(?=\s+(?:número|numero|bairro|cep)\b|[,.]|$)/i },
+    { campo: "numero", padrao: /(?:número|numero)\s*(?:é|:)?\s*([\w-]+)/i },
+    { campo: "bairro", padrao: /bairro\s*(?:é|:)?\s*([^,.]+?)(?=\s+(?:cidade|município|municipio|cep)\b|[,.]|$)/i },
+    { campo: "municipio", padrao: /(?:cidade|município|municipio)\s*(?:é|:)?\s*([^,.]+?)(?=\s+(?:uf|estado|cep)\b|[,.]|$)/i },
+    { campo: "uf", padrao: /(?:uf|estado)\s*(?:é|:)?\s*([a-z]{2})\b/i }
+  ];
+
+  for (const regra of regras) {
+    const resultado = texto.match(regra.padrao);
+    const valor = resultado?.[1]?.trim();
+    if (valor) encontrados.push({ campo: regra.campo, valor });
+  }
+  return encontrados;
+}
+
 type DocumentoCadastro = {
   id: DocumentoCadastroId;
   nome: string;
@@ -216,6 +328,12 @@ type DocumentoCadastro = {
   nomeArquivo?: string;
   caminhoArquivo?: string;
   contentType?: string;
+  dataEmissao?: string;
+  dataValidade?: string;
+  orgaoEmissor?: string;
+  ufEmissor?: string;
+  categoria?: string;
+  observacao?: string;
   ignorado: boolean;
   obrigatorio: boolean;
   permiteIgnorar: boolean;
@@ -261,6 +379,29 @@ const mapaCamposObrigatorios: Partial<
   email: { label: "E-mail", aba: "contato" },
   aceite_lgpd: { label: "Aceite LGPD", aba: "observacoes" }
 };
+
+type DocumentoEditorRascunho = Omit<DocumentoCadastro, "id" | "permiteIgnorar"> & {
+  id?: string;
+};
+
+const etapasCadastroInteligente = [
+  { id: "dados", label: "Dados pessoais" },
+  { id: "endereco", label: "Endereço" },
+  { id: "contato", label: "Contato" },
+  { id: "documentos", label: "Documentos" },
+  { id: "consentimentos", label: "Consentimentos" }
+] as const;
+
+const situacoesComDetalhesDeTrabalho = new Set([
+  "Empregado com carteira assinada",
+  "Empregado sem carteira assinada",
+  "Servidor público",
+  "Autônomo",
+  "Microempreendedor individual",
+  "Trabalho informal",
+  "Trabalho temporário",
+  "Aprendiz ou estagiário"
+]);
 
 function obterPendenciasFormulario(
   errors: Partial<Record<keyof BeneficiarioFormValues, unknown>>
@@ -482,6 +623,12 @@ function mapearDocumentosDoBeneficiario(
       nomeArquivo: anexo?.nomeArquivo,
       caminhoArquivo: anexo?.caminhoArquivo,
       contentType: anexo?.contentType,
+      dataEmissao: anexo?.dataEmissao,
+      dataValidade: anexo?.dataValidade,
+      orgaoEmissor: anexo?.orgaoEmissor,
+      ufEmissor: anexo?.ufEmissor,
+      categoria: anexo?.categoria,
+      observacao: anexo?.observacao,
       ignorado: documento.permiteIgnorar ? !!anexo?.ignorado : false,
       obrigatorio: documento.obrigatorio,
       permiteIgnorar: documento.permiteIgnorar
@@ -500,6 +647,12 @@ function mapearDocumentosDoBeneficiario(
         nomeArquivo: doc.nomeArquivo,
         caminhoArquivo: doc.caminhoArquivo,
         contentType: doc.contentType,
+        dataEmissao: doc.dataEmissao,
+        dataValidade: doc.dataValidade,
+        orgaoEmissor: doc.orgaoEmissor,
+        ufEmissor: doc.ufEmissor,
+        categoria: doc.categoria,
+        observacao: doc.observacao,
         ignorado: !!doc.ignorado,
         obrigatorio: !!doc.obrigatorio,
         permiteIgnorar: !doc.obrigatorio
@@ -668,7 +821,14 @@ function extrairMensagemBeneficiario(error: unknown, fallback: string) {
 
     const directMessage = (error as any).message;
     if (typeof directMessage === "string" && directMessage.trim()) {
+      if ((error as any).code === "ERR_NETWORK" || directMessage.trim().toLowerCase() === "network error") {
+        return "Não foi possível conectar ao servidor. Verifique se o backend do G3N está em execução e tente novamente.";
+      }
       return directMessage;
+    }
+
+    if ((error as any).code === "ERR_NETWORK") {
+      return "Não foi possível conectar ao servidor. Verifique se o backend do G3N está em execução e tente novamente.";
     }
   }
 
@@ -751,6 +911,11 @@ export function CadastroBeneficiarioPage() {
     DocumentoObrigatoriedadeBeneficiarioSetting[]
   >(documentosObrigatoriedadeBeneficiarioPadrao);
   const [documentos, setDocumentos] = useState<DocumentoCadastro[]>(() => criarDocumentosPadrao());
+  const [documentoEditorAberto, setDocumentoEditorAberto] = useState(false);
+  const [documentoEditorId, setDocumentoEditorId] = useState<DocumentoCadastroId | null>(null);
+  const [tipoDocumentoEditor, setTipoDocumentoEditor] = useState("");
+  const [buscaDocumentos, setBuscaDocumentos] = useState("");
+  const [documentoEditorRascunho, setDocumentoEditorRascunho] = useState<DocumentoEditorRascunho | null>(null);
   const [popupSalvarAberto, setPopupSalvarAberto] = useState(false);
   const [codigoCadastroSalvo, setCodigoCadastroSalvo] = useState("");
   const [senhaPortalGerada, setSenhaPortalGerada] = useState("");
@@ -759,6 +924,23 @@ export function CadastroBeneficiarioPage() {
   const [ignorarDuplicidadeAtual, setIgnorarDuplicidadeAtual] = useState(false);
   const [popupImprimirAberto, setPopupImprimirAberto] = useState(false);
   const [popupDeclaracaoResidenciaAberto, setPopupDeclaracaoResidenciaAberto] = useState(false);
+  const [tourAberto, setTourAberto] = useState(false);
+  const [assistenteAberto, setAssistenteAberto] = useState(false);
+  const [perguntaAssistenteInicial, setPerguntaAssistenteInicial] = useState<string | null>(null);
+  const [vozAberta, setVozAberta] = useState(false);
+  const [vozOuvindo, setVozOuvindo] = useState(false);
+  const [vozModo, setVozModo] = useState<"campo" | "conversa">("campo");
+  const [vozTexto, setVozTexto] = useState("");
+  const [vozConversaTexto, setVozConversaTexto] = useState("");
+  const [vozCamposDetectados, setVozCamposDetectados] = useState<CampoVozDetectado[]>([]);
+  const [vozCampo, setVozCampo] = useState<CampoPreenchimentoVoz>("nome_completo");
+  const [ocrCpfCarregando, setOcrCpfCarregando] = useState(false);
+  const [ocrCpfResultado, setOcrCpfResultado] = useState<{
+    cpf: string;
+    texto: string;
+    confianca: number;
+    mensagem: string;
+  } | null>(null);
   const [imprimindoRelatorio, setImprimindoRelatorio] = useState(false);
   const [popupExcluirDocumentoId, setPopupExcluirDocumentoId] = useState<DocumentoCadastroId | null>(null);
   const [foto3x4PreviewUrl, setFoto3x4PreviewUrl] = useState("");
@@ -769,6 +951,8 @@ export function CadastroBeneficiarioPage() {
   const [carregandoWebcamDocumento, setCarregandoWebcamDocumento] = useState(false);
   const [documentoWebcamId, setDocumentoWebcamId] = useState<DocumentoCadastroId | null>(null);
   const inputArquivoRef = useRef<HTMLInputElement | null>(null);
+  const reconhecimentoVozRef = useRef<ReconhecimentoVoz | null>(null);
+  const inputOcrCpfRef = useRef<HTMLInputElement | null>(null);
   const inputDocumentosRef = useRef<Record<string, HTMLInputElement | null>>({});
   const ultimoCepConsultadoRef = useRef("");
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -815,19 +999,41 @@ export function CadastroBeneficiarioPage() {
 
   const foto3x4Atual = watch("foto_3x4") || "";
   const nomeCompletoAtual = watch("nome_completo") || "";
+  const nomeMaeAtual = watch("nome_mae") || "";
   const dataNascimentoAtual = watch("data_nascimento") || "";
   const cpfAtual = watch("cpf") || "";
   const telefonePrincipalAtual = watch("telefone_principal") || "";
   const emailAtual = watch("email") || "";
   const cepAtual = watch("cep") || "";
   const recebeBeneficioAtual = watch("recebe_beneficio");
+  const situacaoTrabalhoAtual = watch("situacao_trabalho") || "";
+  const localTrabalhoAtual = watch("local_trabalho") || "";
+  const rendaMensalAtual = watch("renda_mensal") || "";
+  const fonteRendaAtual = watch("fonte_renda") || "";
+  const beneficiosDescricaoAtual = watch("beneficios_descricao") || "";
+  const valorTotalBeneficiosAtual = watch("valor_total_beneficios") || "";
+  const beneficiosRecebidosAtual = watch("beneficios_recebidos") || [];
+  const possuiDeficienciaAtual = watch("possui_deficiencia");
+  const tipoDeficienciaAtual = watch("tipo_deficiencia") || "";
+  const cidPrincipalAtual = watch("cid_principal") || "";
+  const usaMedicacaoContinuaAtual = watch("usa_medicacao_continua");
+  const descricaoMedicacaoAtual = watch("descricao_medicacao") || "";
   const logradouroAtual = watch("logradouro") || "";
   const numeroAtual = watch("numero") || "";
   const bairroAtual = watch("bairro") || "";
   const municipioAtual = watch("municipio") || "";
   const ufAtual = watch("uf") || "";
   const subzonaAtual = watch("subzona") || "";
+  const aceiteLgpdAtual = watch("aceite_lgpd");
   const idadeAtual = calcularIdade(dataNascimentoAtual);
+  const detalhesTrabalhoVisiveis =
+    situacoesComDetalhesDeTrabalho.has(situacaoTrabalhoAtual) ||
+    Boolean(localTrabalhoAtual || rendaMensalAtual || fonteRendaAtual);
+  const detalhesBeneficioVisiveis =
+    Boolean(recebeBeneficioAtual) ||
+    Boolean(beneficiosDescricaoAtual || valorTotalBeneficiosAtual || beneficiosRecebidosAtual.length);
+  const detalhesDeficienciaVisiveis = Boolean(possuiDeficienciaAtual) || Boolean(tipoDeficienciaAtual || cidPrincipalAtual);
+  const detalhesMedicacaoVisiveis = Boolean(usaMedicacaoContinuaAtual) || Boolean(descricaoMedicacaoAtual);
   const possuiEnderecoParaMapa = [
     logradouroAtual,
     numeroAtual,
@@ -836,6 +1042,13 @@ export function CadastroBeneficiarioPage() {
     ufAtual,
     cepAtual
   ].some((valor) => valor.trim().length > 0);
+
+  useEffect(() => {
+    return () => {
+      reconhecimentoVozRef.current?.stop();
+      reconhecimentoVozRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     let ativo = true;
@@ -1093,6 +1306,56 @@ export function CadastroBeneficiarioPage() {
   const documentoWebcamAtual = documentoWebcamId
     ? documentos.find((documento) => documento.id === documentoWebcamId)
     : null;
+  const cpfDocumentoAtual = documentos.find((documento) => documento.id === "cpf")?.numeroDocumento ?? "";
+  const etapasProgresso = [
+    {
+      ...etapasCadastroInteligente[0],
+      completo: Boolean(nomeCompletoAtual.trim() && dataNascimentoAtual.trim() && nomeMaeAtual.trim())
+    },
+    {
+      ...etapasCadastroInteligente[1],
+      completo: Boolean(cepAtual.trim() && logradouroAtual.trim() && numeroAtual.trim() && bairroAtual.trim() && municipioAtual.trim() && ufAtual.trim())
+    },
+    {
+      ...etapasCadastroInteligente[2],
+      completo: Boolean(
+        telefoneValido(telefonePrincipalAtual) &&
+          emailValido(typeof emailAtual === "string" ? emailAtual : "")
+      )
+    },
+    {
+      ...etapasCadastroInteligente[3],
+      completo: Boolean(cpfDocumentoAtual.trim() && validarCpf(cpfDocumentoAtual) && obterPendenciasDocumentos(documentos).length === 0)
+    },
+    {
+      ...etapasCadastroInteligente[4],
+      completo: Boolean(aceiteLgpdAtual)
+    }
+  ];
+  const etapasConcluidas = etapasProgresso.filter((etapa) => etapa.completo).length;
+  const camposEssenciaisCadastro = [
+    Boolean(nomeCompletoAtual.trim()),
+    Boolean(dataNascimentoAtual.trim()),
+    Boolean(nomeMaeAtual.trim()),
+    Boolean(cepAtual.trim()),
+    Boolean(logradouroAtual.trim()),
+    Boolean(numeroAtual.trim()),
+    Boolean(bairroAtual.trim()),
+    Boolean(municipioAtual.trim()),
+    Boolean(ufAtual.trim()),
+    Boolean(telefoneValido(telefonePrincipalAtual)),
+    Boolean(typeof emailAtual === "string" && emailValido(emailAtual)),
+    Boolean(cpfDocumentoAtual.trim() && validarCpf(cpfDocumentoAtual)),
+    Boolean(obterPendenciasDocumentos(documentos).length === 0),
+    Boolean(aceiteLgpdAtual)
+  ];
+  const percentualCadastro = Math.round(
+    (camposEssenciaisCadastro.filter(Boolean).length / camposEssenciaisCadastro.length) * 100
+  );
+  const etapaAtualIndex = Math.max(
+    0,
+    etapasProgresso.findIndex((etapa) => etapa.id === abaAtiva)
+  );
 
   const bloqueadoAcao =
     salvarMutation.isPending || removerMutation.isPending || carregandoDetalhes || imprimindoRelatorio;
@@ -1168,6 +1431,12 @@ export function CadastroBeneficiarioPage() {
             nomeArquivo: documento.nomeArquivo,
             caminhoArquivo: documento.caminhoArquivo,
             contentType: documento.contentType,
+            dataEmissao: documento.dataEmissao,
+            dataValidade: documento.dataValidade,
+            orgaoEmissor: documento.orgaoEmissor,
+            ufEmissor: documento.ufEmissor,
+            categoria: documento.categoria,
+            observacao: documento.observacao,
             obrigatorio: documento.obrigatorio,
             ignorado: documento.permiteIgnorar ? documento.ignorado : false
           };
@@ -1445,6 +1714,137 @@ export function CadastroBeneficiarioPage() {
         texto: error?.message ?? "Não foi possível anexar o documento."
       });
     }
+  }
+
+  function abrirNovoDocumento() {
+    setDocumentoEditorId(null);
+    setTipoDocumentoEditor("");
+    setDocumentoEditorRascunho(null);
+    setDocumentoEditorAberto(true);
+  }
+
+  function abrirEdicaoDocumento(documento: DocumentoCadastro) {
+    setDocumentoEditorId(documento.id);
+    setTipoDocumentoEditor(documento.id);
+    setDocumentoEditorRascunho({ ...documento });
+    setDocumentoEditorAberto(true);
+  }
+
+  function selecionarTipoDocumentoEditor(tipo: string) {
+    const configuracao = tiposDocumentoCadastro.find((item) => item.id === tipo);
+    const documentoExistente = documentos.find(
+      (item) => item.id === tipo || normalizarNomeDocumento(item.nome) === normalizarNomeDocumento(configuracao?.nome ?? "")
+    );
+    setTipoDocumentoEditor(tipo);
+    setDocumentoEditorId(documentoExistente?.id ?? null);
+    setDocumentoEditorRascunho(
+      documentoExistente
+        ? { ...documentoExistente }
+        : {
+            nome: configuracao?.nome ?? "",
+            numeroDocumento: "",
+            dataEmissao: "",
+            dataValidade: "",
+            categoria: "",
+            observacao: "",
+            nomeArquivo: undefined,
+            caminhoArquivo: undefined,
+            contentType: undefined,
+            ignorado: false,
+            obrigatorio: false
+          }
+    );
+  }
+
+  function atualizarRascunhoDocumento(patch: Partial<DocumentoEditorRascunho>) {
+    setDocumentoEditorRascunho((atual) => (atual ? { ...atual, ...patch } : atual));
+  }
+
+  function salvarDocumentoEditor() {
+    const rascunho = documentoEditorRascunho;
+    const configuracao = tiposDocumentoCadastro.find((item) => item.id === tipoDocumentoEditor);
+    if (!rascunho || !configuracao || !rascunho.nome.trim()) {
+      setMensagem({ tipo: "erro", texto: "Selecione o tipo de documento antes de salvar." });
+      return;
+    }
+    if (rascunho.dataEmissao && rascunho.dataValidade && rascunho.dataValidade < rascunho.dataEmissao) {
+      setMensagem({ tipo: "erro", texto: "A validade deve ser posterior à data de emissão." });
+      return;
+    }
+    if (tipoDocumentoEditor === "cpf" && rascunho.numeroDocumento && !validarCpf(rascunho.numeroDocumento)) {
+      setMensagem({ tipo: "erro", texto: "Informe um CPF válido." });
+      return;
+    }
+    const nome = tipoDocumentoEditor === "outros" ? rascunho.nome.trim() : configuracao.nome;
+    const documentoFinal: DocumentoCadastro = {
+      ...rascunho,
+      id: documentoEditorId ?? `extra-${Date.now()}`,
+      nome,
+      permiteIgnorar: !rascunho.obrigatorio,
+      ignorado: false
+    };
+    const duplicado = documentos.some(
+      (item) => item.id !== documentoEditorId &&
+        normalizarNomeDocumento(item.nome) === normalizarNomeDocumento(nome) &&
+        Boolean(rascunho.numeroDocumento?.trim()) &&
+        normalizarNomeDocumento(item.numeroDocumento ?? "") === normalizarNomeDocumento(rascunho.numeroDocumento ?? "") &&
+        !["laudo", "atestado", "documento_judicial", "outros"].includes(tipoDocumentoEditor)
+    );
+    if (duplicado) {
+      setMensagem({ tipo: "erro", texto: `Este beneficiário já possui ${nome} cadastrado.` });
+      return;
+    }
+    setDocumentos((atuais) => {
+      const existe = atuais.some((item) => item.id === documentoFinal.id);
+      return existe ? atuais.map((item) => (item.id === documentoFinal.id ? documentoFinal : item)) : [...atuais, documentoFinal];
+    });
+    setDocumentoEditorAberto(false);
+    setMensagem({ tipo: "sucesso", texto: "Documento validado. Salvando o cadastro..." });
+    window.setTimeout(() => void onSubmit(), 0);
+  }
+
+  async function onSelecionarArquivoEditor(event: React.ChangeEvent<HTMLInputElement>) {
+    const arquivo = event.target.files?.[0];
+    event.target.value = "";
+    if (!arquivo || !documentoEditorRascunho) return;
+    const tipoValido = ["application/pdf", "image/jpeg", "image/png"].includes(arquivo.type);
+    if (!tipoValido || arquivo.size > documentoMaximoBytes) {
+      setMensagem({ tipo: "erro", texto: "Selecione um PDF, JPG ou PNG de até 10 MB." });
+      return;
+    }
+    const dataUrl = await lerArquivoComoDataUrl(arquivo);
+    atualizarRascunhoDocumento({ nomeArquivo: arquivo.name, caminhoArquivo: dataUrl, contentType: arquivo.type, ignorado: false });
+  }
+
+  async function onSelecionarCpfParaOcr(event: React.ChangeEvent<HTMLInputElement>) {
+    const arquivo = event.target.files?.[0];
+    event.target.value = "";
+    if (!arquivo) return;
+    if (!arquivo.type.startsWith("image/")) {
+      setMensagem({ tipo: "erro", texto: "Para ler o CPF, envie uma imagem." });
+      return;
+    }
+
+    setOcrCpfCarregando(true);
+    setMensagem(null);
+    try {
+      const resultado = await beneficiariosService.lerCpfPorOcr(arquivo);
+      setOcrCpfResultado(resultado);
+    } catch (error: any) {
+      setMensagem({
+        tipo: "erro",
+        texto: error?.response?.data?.message ?? error?.message ?? "Não foi possível ler o CPF."
+      });
+    } finally {
+      setOcrCpfCarregando(false);
+    }
+  }
+
+  function aplicarCpfLidoPorOcr() {
+    if (!ocrCpfResultado?.cpf) return;
+    atualizarDocumento("cpf", { numeroDocumento: ocrCpfResultado.cpf, ignorado: false });
+    setOcrCpfResultado(null);
+    setMensagem({ tipo: "sucesso", texto: "CPF aplicado ao cadastro. Confira o número antes de salvar." });
   }
 
   function encerrarWebcamDocumento() {
@@ -2108,9 +2508,11 @@ export function CadastroBeneficiarioPage() {
       const response = await criarRapidoMutation.mutateAsync(payload);
       const beneficiarioAtualizado = response.beneficiario;
       setBeneficiarioSelecionadoId(beneficiarioAtualizado.id_beneficiario);
+      setAbaAtiva("dados");
       reset(mapearBeneficiarioParaFormulario(beneficiarioAtualizado));
       setDocumentos(mapearDocumentosDoBeneficiario(beneficiarioAtualizado, configuracaoDocumentos));
       setCodigoCadastroSalvo(beneficiarioAtualizado.codigo ?? "");
+      setAvisoPendenciasSelecao(obterPendenciasAvisoBeneficiario(beneficiarioAtualizado));
       setPopupSalvarAberto(true);
       setDuplicidadesEncontradas([]);
       setIgnorarDuplicidadeAtual(false);
@@ -2156,6 +2558,124 @@ export function CadastroBeneficiarioPage() {
     .map((label) => acoes.find((acao) => acao.label === label))
     .filter((acao): acao is AcaoCrud => !!acao);
 
+  function abrirAssistente() {
+    const etapa = etapasProgresso[etapaAtualIndex]?.label ?? tituloAbaAtiva;
+    const pendentes = etapasProgresso
+      .filter((item) => !item.completo)
+      .map((item) => item.label)
+      .join(", ");
+    setPerguntaAssistenteInicial(
+      `Estou no cadastro de beneficiários, na etapa ${etapa}. Meu cadastro está ${percentualCadastro}% concluído. Explique de forma prática o que devo preencher nesta etapa e indique o próximo passo. Etapas ainda incompletas: ${pendentes || "nenhuma"}.`
+    );
+    setAssistenteAberto(true);
+  }
+
+  function abrirPreenchimentoPorVoz() {
+    setVozAberta(true);
+    setVozTexto("");
+    setVozConversaTexto("");
+    setVozCamposDetectados([]);
+    setVozCampo(
+      abaAtiva === "endereco"
+        ? "cep"
+        : abaAtiva === "contato"
+          ? "telefone_principal"
+          : abaAtiva === "saude"
+            ? "tipo_deficiencia"
+            : "nome_completo"
+    );
+  }
+
+  function iniciarReconhecimentoVoz() {
+    const janela = window as Window & {
+      SpeechRecognition?: ReconhecimentoVozConstructor;
+      webkitSpeechRecognition?: ReconhecimentoVozConstructor;
+    };
+    const Construtor = janela.SpeechRecognition ?? janela.webkitSpeechRecognition;
+
+    if (!Construtor) {
+      setMensagem({
+        tipo: "erro",
+        texto: "O reconhecimento de voz não está disponível neste navegador. Use uma versão atualizada do Chrome ou Edge."
+      });
+      return;
+    }
+
+    reconhecimentoVozRef.current?.stop();
+    const reconhecimento = new Construtor();
+    reconhecimento.lang = "pt-BR";
+    reconhecimento.interimResults = false;
+    reconhecimento.maxAlternatives = 1;
+    reconhecimento.onresult = (event) => {
+      const textoReconhecido = Array.from(event.results)
+        .map((resultado) => resultado[0]?.transcript ?? "")
+        .join(" ")
+        .trim();
+      if (textoReconhecido) {
+        if (vozModo === "conversa") {
+          setVozConversaTexto(textoReconhecido);
+          setVozCamposDetectados(detectarCamposNaFala(textoReconhecido));
+        } else {
+          setVozTexto(textoReconhecido);
+        }
+      }
+    };
+    reconhecimento.onerror = () => {
+      setVozOuvindo(false);
+      setMensagem({ tipo: "erro", texto: "Não foi possível reconhecer a fala. Verifique a permissão do microfone e tente novamente." });
+    };
+    reconhecimento.onend = () => setVozOuvindo(false);
+    reconhecimentoVozRef.current = reconhecimento;
+    setVozOuvindo(true);
+    try {
+      reconhecimento.start();
+    } catch {
+      setVozOuvindo(false);
+      setMensagem({ tipo: "erro", texto: "O microfone já está em uso. Aguarde alguns segundos e tente novamente." });
+    }
+  }
+
+  function pararReconhecimentoVoz() {
+    reconhecimentoVozRef.current?.stop();
+    setVozOuvindo(false);
+  }
+
+  function aplicarTextoReconhecido() {
+    const texto = vozTexto.trim();
+    if (!texto) {
+      setMensagem({ tipo: "erro", texto: "Fale ou digite um valor antes de aplicar ao cadastro." });
+      return;
+    }
+
+    let valor = texto;
+    if (vozCampo === "cpf") valor = somenteDigitos(texto);
+    if (vozCampo === "telefone_principal") valor = formatarTelefoneInput(texto);
+    if (vozCampo === "cep") valor = formatarCep(texto);
+    setValue(vozCampo, valor, { shouldDirty: true, shouldValidate: true });
+    setMensagem({ tipo: "sucesso", texto: `Valor aplicado em “${camposPreenchimentoVoz.find((item) => item.value === vozCampo)?.label}”. Revise antes de salvar.` });
+    setVozTexto("");
+  }
+
+  function formatarValorVoz(campo: CampoPreenchimentoVoz, valor: string) {
+    if (campo === "cpf") return somenteDigitos(valor);
+    if (campo === "telefone_principal") return formatarTelefoneInput(valor);
+    if (campo === "cep") return formatarCep(valor);
+    return valor.trim();
+  }
+
+  function aplicarCamposDetectados() {
+    if (!vozCamposDetectados.length) {
+      setMensagem({ tipo: "erro", texto: "Não identifiquei campos. Fale, por exemplo: meu nome completo é Maria Silva, CPF 000.000.000-00 e CEP 38400-000." });
+      return;
+    }
+    for (const item of vozCamposDetectados) {
+      setValue(item.campo, formatarValorVoz(item.campo, item.valor), { shouldDirty: true, shouldValidate: true });
+    }
+    setMensagem({ tipo: "sucesso", texto: `${vozCamposDetectados.length} campo(s) identificado(s) e aplicado(s). Revise antes de salvar.` });
+    setVozConversaTexto("");
+    setVozCamposDetectados([]);
+  }
+
   return (
     <main className={classesTelaPadraoBeneficiario.container}>
       <section className={classesTelaPadraoBeneficiario.barraAcoes} data-print="toolbar">
@@ -2170,15 +2690,59 @@ export function CadastroBeneficiarioPage() {
           </div>
 
           <div className={classesTelaPadraoBeneficiario.gradeAcoes}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-9 w-9 p-0"
+              onClick={() => setTourAberto(true)}
+              title="Abrir guia de preenchimento"
+              aria-label="Abrir guia de preenchimento"
+            >
+              <GraduationCap className="h-4 w-4" aria-hidden="true" />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-9 w-9 p-0"
+              onClick={abrirAssistente}
+              title="Abrir assistente de IA do cadastro"
+              aria-label="Abrir assistente de IA do cadastro"
+            >
+              <Sparkles className="h-4 w-4" aria-hidden="true" />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className={`h-9 w-9 p-0 ${vozOuvindo ? "border-red-300 bg-red-50 text-red-700" : ""}`}
+              onClick={vozAberta ? (vozOuvindo ? pararReconhecimentoVoz : iniciarReconhecimentoVoz) : abrirPreenchimentoPorVoz}
+              title={vozOuvindo ? "Parar preenchimento por voz" : "Preencher cadastro por voz"}
+              aria-label={vozOuvindo ? "Parar preenchimento por voz" : "Preencher cadastro por voz"}
+            >
+              {vozOuvindo ? <MicOff className="h-4 w-4" aria-hidden="true" /> : <Mic className="h-4 w-4" aria-hidden="true" />}
+            </Button>
             {acoesNaOrdemPadrao.map((acao) => (
               <Button
                 key={acao.label}
                 type="button"
-                variant={acao.variant}
+                variant={acao.label === "Novo" ? "default" : acao.variant}
                 size="sm"
-                className={classesTelaPadraoBeneficiario.botaoAcao}
+                className={
+                  acao.label === "Novo"
+                    ? "border-sky-700 bg-sky-600 text-white hover:bg-sky-700"
+                    : classesTelaPadraoBeneficiario.botaoAcao
+                }
                 onClick={acao.onClick}
                 disabled={bloqueadoAcao || (acao.label === "Excluir" && !beneficiarioSelecionadoId)}
+                data-tour={
+                  acao.label === "Novo"
+                    ? "beneficiario-novo"
+                    : acao.label === "Salvar"
+                      ? "beneficiario-salvar"
+                      : undefined
+                }
               >
                 <acao.icon className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
                 {acao.label}
@@ -2197,6 +2761,7 @@ export function CadastroBeneficiarioPage() {
                 type="button"
                 onClick={() => setAbaAtiva(aba.id)}
                 className={classeBotaoAbaLateral(abaAtiva === aba.id)}
+                data-tour={aba.id === "dados" ? "beneficiario-aba-dados" : undefined}
                 >
                 <span
                   className={classeNumeroAbaLateral(abaAtiva === aba.id)}
@@ -2230,12 +2795,12 @@ export function CadastroBeneficiarioPage() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2 text-xs font-semibold text-slate-700">
                       <span>Completude cadastral</span>
-                      <span>{completudeQuery.data?.percentual ?? 0}%</span>
+                      <span>{percentualCadastro}%</span>
                     </div>
                     <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100">
                       <div
                         className="h-full rounded-full bg-[var(--g3-primary)]"
-                        style={{ width: `${completudeQuery.data?.percentual ?? 0}%` }}
+                        style={{ width: `${percentualCadastro}%` }}
                       />
                     </div>
                   </div>
@@ -2291,6 +2856,55 @@ export function CadastroBeneficiarioPage() {
             </div>
           </CardHeader>
           <CardContent>
+            {abaAtiva !== "listagem" && (
+              <div className="mb-4 rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-3" aria-label="Progresso do cadastro">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-xs font-semibold text-[var(--g3-foreground)]">Progresso do cadastro</p>
+                    <p className="mt-0.5 text-[11px] text-[var(--g3-muted)]">
+                      {etapasConcluidas} de {etapasProgresso.length} etapas essenciais concluídas
+                    </p>
+                  </div>
+                  <Badge variant={percentualCadastro === 100 ? "success" : "default"}>
+                    {percentualCadastro}%
+                  </Badge>
+                </div>
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200" aria-hidden="true">
+                  <div
+                    className="h-full rounded-full bg-[var(--g3-primary)] transition-all duration-300"
+                    style={{ width: `${percentualCadastro}%` }}
+                  />
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-5">
+                  {etapasProgresso.map((etapa, indice) => (
+                    <button
+                      key={etapa.id}
+                      type="button"
+                      className={`rounded-md border px-2 py-1.5 text-left text-[11px] transition ${
+                        abaAtiva === etapa.id
+                          ? "border-[var(--g3-primary)] bg-[var(--g3-primary-soft)] font-semibold text-[var(--g3-active)]"
+                          : etapa.completo
+                            ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                            : "border-slate-200 bg-white text-slate-600 hover:border-[var(--g3-primary)]/50"
+                      }`}
+                      onClick={() => setAbaAtiva(etapa.id)}
+                      aria-current={abaAtiva === etapa.id ? "step" : undefined}
+                    >
+                      <span className="flex items-center gap-1.5">
+                        {etapa.completo ? (
+                          <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        ) : (
+                          <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border border-current text-[9px]">
+                            {indice + 1}
+                          </span>
+                        )}
+                        <span className="truncate">{etapa.label}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             {abaAtiva === "listagem" ? (
               <section className="flex h-[calc(100vh-250px)] min-h-[420px] flex-col gap-4 overflow-hidden">
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-12">
@@ -2441,11 +3055,6 @@ export function CadastroBeneficiarioPage() {
               </section>
             ) : (
               <form className="min-w-0 space-y-4" onSubmit={onSubmit}>
-                <div className="rounded-lg border border-[var(--g3-primary)]/30 bg-[var(--g3-primary-soft)]/45 p-3 text-sm text-[var(--g3-active)]" role="note">
-                  <p className="font-semibold">Para salvar o cadastro, preencha os dados principais obrigatórios:</p>
-                  <p className="mt-1">Nome completo, data de nascimento, nome da mãe, CEP, telefone principal, CPF, documentos obrigatórios e aceite da LGPD.</p>
-                  <p className="mt-1 text-xs">Ao clicar em Salvar, o sistema levará você automaticamente ao primeiro campo pendente. Depois de preencher, clique novamente em Salvar para avançar ao próximo.</p>
-                </div>
                 {abaAtiva === "dados" && (
                   <section className="grid gap-2 sm:grid-cols-2 xl:grid-cols-12 [&_button]:h-8 [&_input]:h-8 [&_label]:text-xs [&_select]:h-8">
                     <input type="hidden" {...register("foto_3x4")} />
@@ -2521,7 +3130,11 @@ export function CadastroBeneficiarioPage() {
 
                     <div className="sm:col-span-2 xl:col-span-7">
                       <Label>Nome completo*</Label>
-                      <Input {...register("nome_completo")} onBlurCapture={() => aplicarFormatacaoCampo("nome_completo")} />
+                      <Input
+                        {...register("nome_completo")}
+                        data-tour="beneficiario-nome"
+                        onBlurCapture={() => aplicarFormatacaoCampo("nome_completo")}
+                      />
                       {errors.nome_completo && (
                         <p className="mt-1 text-xs text-red-600">{errors.nome_completo.message}</p>
                       )}
@@ -3023,36 +3636,44 @@ export function CadastroBeneficiarioPage() {
                         ))}
                       </Select>
                     </div>
-                    <div>
-                      <Label>Local de trabalho</Label>
-                      <Input
-                        {...register("local_trabalho")}
-                        onBlurCapture={() => aplicarFormatacaoCampo("local_trabalho")}
-                      />
-                    </div>
-                    <div>
-                      <Label>Renda mensal</Label>
-                      <Input
-                        inputMode="decimal"
-                        value={formatarMoedaInput(watch("renda_mensal"))}
-                        onChange={(event) =>
-                          setValue("renda_mensal", formatarMoedaInput(event.target.value), {
-                            shouldDirty: true,
-                            shouldValidate: true
-                          })
-                        }
-                        onBlur={(event) =>
-                          setValue("renda_mensal", formatarMoedaInput(event.target.value), {
-                            shouldDirty: true,
-                            shouldValidate: true
-                          })
-                        }
-                      />
-                    </div>
-                    <div>
-                      <Label>Fonte de renda</Label>
-                      <Input {...register("fonte_renda")} onBlurCapture={() => aplicarFormatacaoCampo("fonte_renda")} />
-                    </div>
+                    {detalhesTrabalhoVisiveis ? (
+                      <>
+                        <div>
+                          <Label>Local de trabalho</Label>
+                          <Input
+                            {...register("local_trabalho")}
+                            onBlurCapture={() => aplicarFormatacaoCampo("local_trabalho")}
+                          />
+                        </div>
+                        <div>
+                          <Label>Renda mensal</Label>
+                          <Input
+                            inputMode="decimal"
+                            value={formatarMoedaInput(rendaMensalAtual)}
+                            onChange={(event) =>
+                              setValue("renda_mensal", formatarMoedaInput(event.target.value), {
+                                shouldDirty: true,
+                                shouldValidate: true
+                              })
+                            }
+                            onBlur={(event) =>
+                              setValue("renda_mensal", formatarMoedaInput(event.target.value), {
+                                shouldDirty: true,
+                                shouldValidate: true
+                              })
+                            }
+                          />
+                        </div>
+                        <div>
+                          <Label>Fonte de renda</Label>
+                          <Input {...register("fonte_renda")} onBlurCapture={() => aplicarFormatacaoCampo("fonte_renda")} />
+                        </div>
+                      </>
+                    ) : (
+                      <p className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-3 text-xs text-slate-600 sm:col-span-2">
+                        Selecione uma situação de trabalho para informar local, renda e fonte de renda.
+                      </p>
+                    )}
                   </section>
                 )}
 
@@ -3067,10 +3688,6 @@ export function CadastroBeneficiarioPage() {
                             checked={field.value}
                             onChange={(event) => {
                               field.onChange(event.target.checked);
-                              if (!event.target.checked) {
-                                setValue("beneficios_recebidos", [], { shouldDirty: true, shouldValidate: true });
-                                setValue("valor_total_beneficios", "", { shouldDirty: true, shouldValidate: true });
-                              }
                             }}
                           />
                         )}
@@ -3087,13 +3704,28 @@ export function CadastroBeneficiarioPage() {
                       />
                       Usa medicação contínua
                     </label>
-                    <div>
-                      <Label>Tipo de deficiência</Label>
-                      <Input
-                        {...register("tipo_deficiencia")}
-                        onBlurCapture={() => aplicarFormatacaoCampo("tipo_deficiencia")}
-                      />
-                    </div>
+                    {detalhesDeficienciaVisiveis ? (
+                      <>
+                        <div>
+                          <Label>Tipo de deficiência</Label>
+                          <Input
+                            {...register("tipo_deficiencia")}
+                            onBlurCapture={() => aplicarFormatacaoCampo("tipo_deficiencia")}
+                          />
+                        </div>
+                        <div>
+                          <Label>CID principal</Label>
+                          <Input
+                            {...register("cid_principal")}
+                            onBlurCapture={() => aplicarFormatacaoCampo("cid_principal")}
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <p className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-3 text-xs text-slate-600 sm:col-span-2">
+                        Marque “Possui deficiência” para informar o tipo e o CID, se necessário.
+                      </p>
+                    )}
                     <div>
                       <Label>Serviço de saúde de referência</Label>
                       <Input
@@ -3101,13 +3733,19 @@ export function CadastroBeneficiarioPage() {
                         onBlurCapture={() => aplicarFormatacaoCampo("servico_saude_referencia")}
                       />
                     </div>
-                    <div className="sm:col-span-2">
-                      <Label>Descrição de medicação</Label>
-                      <Textarea
-                        {...register("descricao_medicacao")}
-                        onBlurCapture={() => aplicarFormatacaoCampo("descricao_medicacao")}
-                      />
-                    </div>
+                    {detalhesMedicacaoVisiveis ? (
+                      <div className="sm:col-span-2">
+                        <Label>Descrição de medicação</Label>
+                        <Textarea
+                          {...register("descricao_medicacao")}
+                          onBlurCapture={() => aplicarFormatacaoCampo("descricao_medicacao")}
+                        />
+                      </div>
+                    ) : (
+                      <p className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-3 text-xs text-slate-600 sm:col-span-2">
+                        Marque “Usa medicação contínua” para informar os medicamentos utilizados.
+                      </p>
+                    )}
                   </section>
                 )}
 
@@ -3123,68 +3761,127 @@ export function CadastroBeneficiarioPage() {
                       />
                       Recebe benefício social
                     </label>
-                    {recebeBeneficioAtual ? (
-                      <div className="space-y-2 rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-3 sm:col-span-2">
-                        <p className="text-xs font-semibold text-[var(--g3-active)]">Benefícios recebidos</p>
-                        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                          {beneficiosSociaisOptions.map((item) => (
-                            <label key={item} className="flex items-center gap-2 rounded-md border border-[var(--g3-border)] bg-[var(--g3-card)] px-3 py-2 text-sm text-slate-700">
-                              <Controller
-                                name="beneficios_recebidos"
-                                control={control}
-                                render={({ field }) => {
-                                  const valores = field.value ?? [];
-                                  const checked = valores.includes(item);
-                                  return (
-                                    <Checkbox
-                                      checked={checked}
-                                      onChange={(event) =>
-                                        field.onChange(
-                                          event.target.checked
-                                            ? [...valores, item]
-                                            : valores.filter((valor) => valor !== item)
-                                        )
-                                      }
-                                    />
-                                  );
-                                }}
-                              />
-                              {item}
-                            </label>
-                          ))}
+                    {detalhesBeneficioVisiveis ? (
+                      <>
+                        <div className="space-y-2 rounded-lg border border-[var(--g3-border)] bg-[var(--g3-card-soft)] p-3 sm:col-span-2">
+                          <p className="text-xs font-semibold text-[var(--g3-active)]">Benefícios recebidos</p>
+                          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                            {beneficiosSociaisOptions.map((item) => (
+                              <label key={item} className="flex items-center gap-2 rounded-md border border-[var(--g3-border)] bg-[var(--g3-card)] px-3 py-2 text-sm text-slate-700">
+                                <Controller
+                                  name="beneficios_recebidos"
+                                  control={control}
+                                  render={({ field }) => {
+                                    const valores = field.value ?? [];
+                                    const checked = valores.includes(item);
+                                    return (
+                                      <Checkbox
+                                        checked={checked}
+                                        onChange={(event) =>
+                                          field.onChange(
+                                            event.target.checked
+                                              ? [...valores, item]
+                                              : valores.filter((valor) => valor !== item)
+                                          )
+                                        }
+                                      />
+                                    );
+                                  }}
+                                />
+                                {item}
+                              </label>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    ) : null}
-                    <div className="sm:col-span-2">
-                      <Label>Descrição dos benefícios</Label>
-                      <Textarea
-                        {...register("beneficios_descricao")}
-                        onBlurCapture={() => aplicarFormatacaoCampo("beneficios_descricao")}
-                      />
-                    </div>
-                    <div>
-                      <Label>Valor total dos benefícios</Label>
-                      <Input
-                        inputMode="decimal"
-                        value={formatarMoedaInput(watch("valor_total_beneficios"))}
-                        onChange={(event) =>
-                          setValue("valor_total_beneficios", formatarMoedaInput(event.target.value), {
-                            shouldDirty: true,
-                            shouldValidate: true
-                          })
-                        }
-                        onBlur={(event) =>
-                          setValue("valor_total_beneficios", formatarMoedaInput(event.target.value), {
-                            shouldDirty: true,
-                            shouldValidate: true
-                          })
-                        }
-                      />
-                    </div>
+                        <div className="sm:col-span-2">
+                          <Label>Descrição dos benefícios</Label>
+                          <Textarea
+                            {...register("beneficios_descricao")}
+                            onBlurCapture={() => aplicarFormatacaoCampo("beneficios_descricao")}
+                          />
+                        </div>
+                        <div>
+                          <Label>Valor total dos benefícios</Label>
+                          <Input
+                            inputMode="decimal"
+                            value={formatarMoedaInput(valorTotalBeneficiosAtual)}
+                            onChange={(event) =>
+                              setValue("valor_total_beneficios", formatarMoedaInput(event.target.value), {
+                                shouldDirty: true,
+                                shouldValidate: true
+                              })
+                            }
+                            onBlur={(event) =>
+                              setValue("valor_total_beneficios", formatarMoedaInput(event.target.value), {
+                                shouldDirty: true,
+                                shouldValidate: true
+                              })
+                            }
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <p className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-3 text-xs text-slate-600 sm:col-span-2">
+                        Marque “Recebe benefício social” para informar os benefícios e os valores recebidos.
+                      </p>
+                    )}
                   </section>
                 )}
 
                 {abaAtiva === "documentos" && (
+                  <section className="space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4">
+                      <div>
+                        <p className="text-base font-semibold text-slate-900">Documentos</p>
+                        <p className="mt-1 text-xs text-slate-600">
+                          {documentos.filter((item) => item.numeroDocumento || item.nomeArquivo || item.caminhoArquivo).length} cadastrados • {documentos.filter((item) => item.caminhoArquivo).length} com anexos • {documentos.filter((item) => !item.caminhoArquivo && !item.ignorado && (item.numeroDocumento || item.obrigatorio)).length} sem anexo
+                        </p>
+                      </div>
+                      <Button type="button" onClick={abrirNovoDocumento}>
+                        <Plus className="mr-1.5 h-4 w-4" aria-hidden="true" />
+                        Adicionar documento
+                      </Button>
+                    </div>
+                    <div className="relative">
+                      <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" aria-hidden="true" />
+                      <Input value={buscaDocumentos} onChange={(event) => setBuscaDocumentos(event.target.value)} placeholder="Buscar documentos..." className="pl-9" />
+                    </div>
+                    <div className="overflow-auto rounded-xl border border-slate-200 bg-white">
+                      <table className="w-full min-w-[680px] text-left text-sm">
+                        <thead className="bg-slate-50 text-xs text-slate-600">
+                          <tr><th className="px-4 py-3">Documento</th><th className="px-4 py-3">Número</th><th className="px-4 py-3">Emissão</th><th className="px-4 py-3">Validade</th><th className="px-4 py-3">Anexo</th><th className="px-4 py-3 text-right">Ações</th></tr>
+                        </thead>
+                        <tbody>
+                          {documentos.filter((item) => `${item.nome} ${item.numeroDocumento ?? ""} ${item.observacao ?? ""}`.toLowerCase().includes(buscaDocumentos.toLowerCase())).map((documento) => (
+                            <tr key={documento.id} className="border-t border-slate-100 hover:bg-slate-50">
+                              <td className="px-4 py-3 font-medium text-slate-900">{documento.nome}{documento.obrigatorio ? " *" : ""}</td>
+                              <td className="px-4 py-3 text-slate-600">{documento.numeroDocumento || "—"}</td>
+                              <td className="px-4 py-3 text-slate-600">{documento.dataEmissao ? documento.dataEmissao.split("-").reverse().join("/") : "—"}</td>
+                              <td className="px-4 py-3 text-slate-600">{documento.dataValidade ? documento.dataValidade.split("-").reverse().join("/") : "—"}</td>
+                              <td className="px-4 py-3">
+                                <span title={documento.caminhoArquivo ? "Documento com anexo" : "Nenhum arquivo anexado"} className="inline-flex items-center gap-1 text-xs text-slate-600">
+                                  {documento.caminhoArquivo ? <Paperclip className="h-4 w-4 text-emerald-700" aria-hidden="true" /> : <FileX2 className="h-4 w-4 text-slate-400" aria-hidden="true" />}
+                                  <span className="sr-only">{documento.caminhoArquivo ? "Documento com anexo" : "Nenhum arquivo anexado"}</span>
+                                  {documento.caminhoArquivo ? "Com anexo" : "Sem anexo"}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                <div className="flex justify-end gap-1">
+                                  <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => abrirEdicaoDocumento(documento)} title="Editar documento" aria-label="Editar documento"><Pencil className="h-4 w-4" aria-hidden="true" /></Button>
+                                  {documento.caminhoArquivo ? <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => void visualizarDocumento(documento)} title="Visualizar anexo" aria-label="Visualizar anexo"><Eye className="h-4 w-4" aria-hidden="true" /></Button> : null}
+                                  {documento.caminhoArquivo ? <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => void imprimirDocumento(documento)} title="Baixar ou imprimir anexo" aria-label="Baixar ou imprimir anexo"><Download className="h-4 w-4" aria-hidden="true" /></Button> : null}
+                                  <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => solicitarExclusaoDocumento(documento.id)} title="Excluir documento" aria-label="Excluir documento"><Ellipsis className="h-4 w-4" aria-hidden="true" /></Button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
+                )}
+
+                {false && abaAtiva === "documentos" && (
                   <section className="flex h-[calc(100vh-250px)] min-h-[420px] flex-col gap-3 overflow-hidden">
                     <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
                       {listarDocumentosObrigatorios(documentos).length
@@ -3285,6 +3982,31 @@ export function CadastroBeneficiarioPage() {
                                           : "Informe o número do documento"
                                       }
                                     />
+                                    {documento.id === "cpf" ? (
+                                      <>
+                                        <input
+                                          ref={inputOcrCpfRef}
+                                          type="file"
+                                          accept="image/*"
+                                          className="hidden"
+                                          onChange={onSelecionarCpfParaOcr}
+                                        />
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          size="sm"
+                                          className="mt-2"
+                                          onClick={() => inputOcrCpfRef.current?.click()}
+                                          disabled={ocrCpfCarregando}
+                                        >
+                                          <Sparkles className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                                          {ocrCpfCarregando ? "Lendo CPF..." : "Ler CPF com IA"}
+                                        </Button>
+                                        <p className="mt-1 text-[11px] text-slate-500">
+                                          A imagem será analisada sem ser salva. Você confirma antes de aplicar o número.
+                                        </p>
+                                      </>
+                                    ) : null}
                                   </div>
                                 )}
 
@@ -3677,6 +4399,65 @@ export function CadastroBeneficiarioPage() {
         </div>
       )}
 
+      {documentoEditorAberto && (
+        <div className="fixed inset-0 z-[75] flex items-center justify-center bg-slate-950/25 p-4">
+          <div className="max-h-[90vh] w-[min(94vw,620px)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <div><h3 className="text-lg font-semibold text-slate-900">{documentoEditorId ? "Editar documento" : "Novo documento"}</h3><p className="mt-1 text-xs text-slate-600">Preencha somente as informações relacionadas ao tipo escolhido.</p></div>
+              <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setDocumentoEditorAberto(false)} aria-label="Fechar formulário"><X className="h-4 w-4" aria-hidden="true" /></Button>
+            </div>
+            <div className="mt-4 space-y-3">
+              <div><Label htmlFor="tipo-documento-editor">Tipo de documento</Label><Select id="tipo-documento-editor" value={tipoDocumentoEditor} onChange={(event) => selecionarTipoDocumentoEditor(event.target.value)}><option value="">Selecione</option>{tiposDocumentoCadastro.map((tipo) => <option key={tipo.id} value={tipo.id}>{tipo.nome}</option>)}</Select></div>
+              {documentoEditorRascunho && tipoDocumentoEditor ? <>
+                {tipoDocumentoEditor === "outros" ? <div><Label>Nome/descrição</Label><Input value={documentoEditorRascunho.nome} onChange={(event) => atualizarRascunhoDocumento({ nome: event.target.value })} /></div> : null}
+                {tiposDocumentoCadastro.find((tipo) => tipo.id === tipoDocumentoEditor)?.campo !== "comprovante" ? <div><Label>Número do documento</Label><Input value={documentoEditorRascunho.numeroDocumento} onChange={(event) => atualizarRascunhoDocumento({ numeroDocumento: event.target.value })} placeholder={tipoDocumentoEditor === "cpf" ? "000.000.000-00" : "Número, se aplicável"} /></div> : null}
+                {!["cpf", "titulo_eleitor", "nis", "cartao_sus", "comprovante_endereco"].includes(tipoDocumentoEditor) ? <div className="grid gap-3 sm:grid-cols-2"><div><Label>Órgão emissor</Label><Input value={documentoEditorRascunho.orgaoEmissor ?? ""} onChange={(event) => atualizarRascunhoDocumento({ orgaoEmissor: event.target.value })} /></div><div><Label>UF</Label><Input maxLength={2} value={documentoEditorRascunho.ufEmissor ?? ""} onChange={(event) => atualizarRascunhoDocumento({ ufEmissor: event.target.value.toUpperCase() })} /></div></div> : null}
+                <div className="grid gap-3 sm:grid-cols-2"><div><Label>Data de emissão</Label><Input type="date" value={documentoEditorRascunho.dataEmissao ?? ""} onChange={(event) => atualizarRascunhoDocumento({ dataEmissao: event.target.value })} /></div><div><Label>Data de validade</Label><Input type="date" value={documentoEditorRascunho.dataValidade ?? ""} onChange={(event) => atualizarRascunhoDocumento({ dataValidade: event.target.value })} /></div></div>
+                <div><Label>Observação</Label><Textarea value={documentoEditorRascunho.observacao ?? ""} onChange={(event) => atualizarRascunhoDocumento({ observacao: event.target.value })} rows={3} /></div>
+                <div className="rounded-lg border border-dashed border-slate-300 p-3"><p className="text-sm font-medium text-slate-800">Anexar documento</p><p className="mt-1 text-xs text-slate-500">PDF, JPG ou PNG de até 10 MB.</p><input ref={(elemento) => { inputDocumentosRef.current.editor = elemento; }} type="file" accept="application/pdf,image/jpeg,image/png" className="hidden" onChange={onSelecionarArquivoEditor} /><div className="mt-2 flex items-center gap-2"><Button type="button" variant="outline" size="sm" onClick={() => inputDocumentosRef.current.editor?.click()}><Upload className="mr-1.5 h-4 w-4" aria-hidden="true" />Selecionar arquivo</Button><span className="truncate text-xs text-slate-600">{documentoEditorRascunho.nomeArquivo ?? "Nenhum arquivo selecionado"}</span></div></div>
+                <div className="flex justify-end gap-2 border-t border-slate-100 pt-4"><Button type="button" variant="outline" onClick={() => setDocumentoEditorAberto(false)}>Cancelar</Button><Button type="button" onClick={salvarDocumentoEditor}>Salvar documento</Button></div>
+              </> : null}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {ocrCpfResultado && (
+        <div
+          className="fixed inset-0 z-[66] flex items-center justify-center bg-slate-900/45 px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Conferência do CPF lido"
+        >
+          <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl">
+            <div className="border-b border-slate-100 px-5 py-4">
+              <h3 className="text-base font-semibold text-slate-900">Conferir CPF lido</h3>
+            </div>
+            <div className="space-y-3 px-5 py-4">
+              <p className="text-sm text-slate-700">{ocrCpfResultado.mensagem}</p>
+              {ocrCpfResultado.cpf ? (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-center">
+                  <p className="text-xs font-medium text-emerald-700">CPF identificado</p>
+                  <p className="mt-1 text-xl font-semibold tracking-wide text-emerald-900">{ocrCpfResultado.cpf}</p>
+                  <p className="mt-1 text-[11px] text-emerald-700">
+                    Confiança aproximada: {Math.round(ocrCpfResultado.confianca)}%
+                  </p>
+                </div>
+              ) : null}
+              <p className="text-xs text-slate-500">Confira o documento original. A leitura automática pode conter erros.</p>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3">
+              <Button type="button" variant="outline" onClick={() => setOcrCpfResultado(null)}>
+                Cancelar
+              </Button>
+              <Button type="button" onClick={aplicarCpfLidoPorOcr} disabled={!ocrCpfResultado.cpf}>
+                Aplicar CPF
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <CadastroSucessoModal
         aberto={popupSalvarAberto}
         titulo="Cadastro realizado com sucesso"
@@ -4006,6 +4787,164 @@ export function CadastroBeneficiarioPage() {
               <Button type="button" onClick={() => void capturarFotoWebcam()}>
                 Capturar
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <CadastroBeneficiarioTour
+        aberto={tourAberto}
+        onClose={() => setTourAberto(false)}
+        onNavigate={(aba) => setAbaAtiva(aba)}
+      />
+
+      {assistenteAberto && (
+        <div className="fixed bottom-4 right-4 z-[70] h-[min(78vh,680px)] w-[min(94vw,560px)]">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="absolute right-3 top-3 z-10 h-8 w-8 p-0 text-[var(--g3-active)] hover:bg-emerald-100"
+            onClick={() => setAssistenteAberto(false)}
+            aria-label="Fechar assistente de IA"
+            title="Fechar assistente de IA"
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </Button>
+          <AIConversationPanel
+            variant="compact"
+            context={{
+              pathname: "/cadastros/beneficiarios",
+              pageTitle: `${tituloTela} · ${tituloAbaAtiva}`,
+              mode: "assistant"
+            }}
+            title="Assistente IA do cadastro"
+            subtitle={`Orientação para a etapa ${etapasProgresso[etapaAtualIndex]?.label ?? tituloAbaAtiva}. O assistente não salva nem altera dados.`}
+            queuedQuestion={perguntaAssistenteInicial}
+            onQueuedQuestionHandled={() => setPerguntaAssistenteInicial(null)}
+          />
+        </div>
+      )}
+
+      {vozAberta && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/25 p-4">
+          <div className="w-[min(94vw,480px)] rounded-2xl border border-sky-200 bg-white p-4 shadow-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">Preenchimento por voz</p>
+                <p className="mt-1 text-xs text-slate-600">Escolha um modo, fale os dados e revise antes de aplicar.</p>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0"
+                onClick={() => {
+                  pararReconhecimentoVoz();
+                  setVozAberta(false);
+                }}
+                aria-label="Fechar preenchimento por voz"
+                title="Fechar preenchimento por voz"
+              >
+                <X className="h-4 w-4" aria-hidden="true" />
+              </Button>
+            </div>
+            <div className="mt-3 space-y-3">
+              <div className="grid grid-cols-2 gap-2 rounded-lg bg-slate-100 p-1">
+                <Button type="button" size="sm" variant={vozModo === "campo" ? "default" : "ghost"} onClick={() => setVozModo("campo")}>
+                  Campo único
+                </Button>
+                <Button type="button" size="sm" variant={vozModo === "conversa" ? "default" : "ghost"} onClick={() => setVozModo("conversa")}>
+                  Modo conversa
+                </Button>
+              </div>
+              {vozModo === "campo" ? (
+                <>
+                  <div>
+                    <Label htmlFor="campo-preenchimento-voz">Campo</Label>
+                    <Select
+                      id="campo-preenchimento-voz"
+                      value={vozCampo}
+                      onChange={(event) => setVozCampo(event.target.value as CampoPreenchimentoVoz)}
+                    >
+                      {camposPreenchimentoVoz.map((campo) => (
+                        <option key={campo.value} value={campo.value}>
+                          {campo.label}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="texto-preenchimento-voz">Valor reconhecido</Label>
+                    <Textarea
+                      id="texto-preenchimento-voz"
+                      value={vozTexto}
+                      onChange={(event) => setVozTexto(event.target.value)}
+                      placeholder="O texto reconhecido aparecerá aqui"
+                      rows={3}
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <Label htmlFor="texto-conversa-voz">Fale vários dados de uma vez</Label>
+                    <Textarea
+                      id="texto-conversa-voz"
+                      value={vozConversaTexto}
+                      onChange={(event) => {
+                        setVozConversaTexto(event.target.value);
+                        setVozCamposDetectados(detectarCamposNaFala(event.target.value));
+                      }}
+                      placeholder="Ex.: Meu nome completo é Maria Silva, CPF 000.000.000-00 e CEP 38400-000."
+                      rows={4}
+                    />
+                  </div>
+                  <div className="rounded-lg border border-sky-100 bg-sky-50 p-3">
+                    <p className="text-xs font-semibold text-sky-900">Campos identificados</p>
+                    {vozCamposDetectados.length ? (
+                      <div className="mt-2 space-y-2">
+                        {vozCamposDetectados.map((item) => (
+                          <div key={item.campo} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] items-center gap-2">
+                            <span className="text-xs text-sky-800">
+                              {camposPreenchimentoVoz.find((campo) => campo.value === item.campo)?.label}
+                            </span>
+                            <Input
+                              value={item.valor}
+                              onChange={(event) =>
+                                setVozCamposDetectados((atual) =>
+                                  atual.map((campo) => (campo.campo === item.campo ? { ...campo, valor: event.target.value } : campo))
+                                )
+                              }
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-1 text-xs text-sky-700">Fale ou digite frases com nome, CPF, telefone, CEP ou endereço.</p>
+                    )}
+                  </div>
+                </>
+              )}
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className={`text-xs ${vozOuvindo ? "text-red-700" : "text-slate-500"}`}>
+                  {vozOuvindo ? "Ouvindo… fale agora." : "O microfone não altera o cadastro sozinho."}
+                </p>
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={vozOuvindo ? pararReconhecimentoVoz : iniciarReconhecimentoVoz}>
+                    {vozOuvindo ? <MicOff className="mr-1.5 h-4 w-4" aria-hidden="true" /> : <Mic className="mr-1.5 h-4 w-4" aria-hidden="true" />}
+                    {vozOuvindo ? "Parar" : "Ouvir"}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={vozModo === "campo" ? aplicarTextoReconhecido : aplicarCamposDetectados}
+                    disabled={vozModo === "campo" ? !vozTexto.trim() : !vozCamposDetectados.length}
+                  >
+                    Aplicar {vozModo === "conversa" ? "campos" : "valor"}
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

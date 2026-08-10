@@ -16,6 +16,12 @@ export type DocumentoBeneficiario = {
   nomeArquivo?: string;
   caminhoArquivo?: string;
   contentType?: string;
+  dataEmissao?: string;
+  dataValidade?: string;
+  orgaoEmissor?: string;
+  ufEmissor?: string;
+  categoria?: string;
+  observacao?: string;
   obrigatorio?: boolean;
   ignorado?: boolean;
 };

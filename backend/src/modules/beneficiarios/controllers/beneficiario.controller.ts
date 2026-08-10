@@ -1,10 +1,18 @@
+import multer from "multer";
 import type { Response } from "express";
 import type { AuthenticatedRequest } from "../../auth/middlewares/auth.middleware.js";
 import { BeneficiarioService } from "../services/beneficiario.service.js";
 import { BeneficiarioEvolucaoService } from "../services/beneficiario-evolucao.service.js";
+import { BeneficiarioOcrService } from "../services/beneficiario-ocr.service.js";
 
 const service = new BeneficiarioService();
 const evolucaoService = new BeneficiarioEvolucaoService();
+const ocrService = new BeneficiarioOcrService();
+
+export const beneficiarioOcrUploadMiddleware = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024, files: 1 }
+}).single("arquivo");
 
 function buildAtor(request: AuthenticatedRequest) {
   return {
@@ -69,6 +77,13 @@ export class BeneficiarioController {
   async criarRapido(request: AuthenticatedRequest, response: Response) {
     const resultado = await evolucaoService.criarRapido(request.body, buildAtor(request));
     return response.status(201).json(resultado);
+  }
+
+  async lerCpfPorOcr(request: AuthenticatedRequest, response: Response) {
+    const resultado = await ocrService.lerCpf(
+      (request as AuthenticatedRequest & { file?: Express.Multer.File }).file
+    );
+    return response.json({ resultado });
   }
 
   async obterCompletude(request: AuthenticatedRequest, response: Response) {

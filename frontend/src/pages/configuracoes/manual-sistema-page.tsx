@@ -130,7 +130,11 @@ const secoesManual: ManualSecao[] = [
           "Use a aba Família para consultar o vínculo familiar existente, integrantes, parentesco e responsável familiar sem duplicar famílias.",
           "Na aba Família, o botão Abrir famílias direciona para a tela de vínculo familiar cadastrada no sistema, sem abrir rota inexistente.",
           "Nas abas Escolaridade e Trabalho, selecione escolaridade, ocupação com referência CBO e situação de trabalho pelas opções padronizadas; a renda mensal usa máscara monetária brasileira.",
+          "O preenchimento inteligente mostra local de trabalho, renda e fonte de renda quando a situação indicar trabalho; se já houver informação preenchida, os campos permanecem visíveis para revisão.",
+          "Use o botão com microfone para preencher por voz. No modo Campo único, escolha um campo; no Modo conversa, fale vários dados, revise os campos identificados e só depois clique em Aplicar campos. O sistema não grava automaticamente.",
           "Na aba Benefícios, marque Recebe benefício social para selecionar os principais benefícios sociais e informe o valor total com máscara monetária brasileira.",
+          "Na aba Documentos, use Adicionar documento para abrir apenas os campos relacionados ao tipo escolhido. A lista permite pesquisar, editar, visualizar anexos e identificar documentos com ou sem arquivo pelo ícone de clipe.",
+          "Na aba Saúde, marque Possui deficiência ou Usa medicação contínua para abrir os campos complementares. Informações já cadastradas não são ocultadas nem apagadas.",
           "Use a aba Histórico e auditoria para acompanhar criação, edição, alterações de consentimento e demais eventos operacionais do cadastro.",
           "Na aba Listagem de beneficiários, use os filtros no topo e o botão Limpar para localizar registros. A listagem não exibe mais o resumo do beneficiário selecionado acima dos resultados, mantendo a rolagem apenas na grade de beneficiários.",
           "Ao concluir o cadastro de um beneficiário, confira a confirmação visual com o ícone na cor padrão da unidade e o número do cadastro. Clique em Finalizar cadastro para fechar a mensagem e continuar na tela."

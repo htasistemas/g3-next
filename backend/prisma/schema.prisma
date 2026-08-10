@@ -95,6 +95,9 @@ model Documento {
   orgaoEmissor   String?              @map("orgao_emissor") @db.VarChar(120)
   ufEmissor      String?              @map("uf_emissor") @db.VarChar(2)
   dataEmissao    DateTime?            @map("data_emissao") @db.Date
+  dataValidade   DateTime?            @map("data_validade") @db.Date
+  categoria      String?              @db.VarChar(60)
+  observacao     String?              @db.Text
   livro          String?              @db.VarChar(40)
   folha          String?              @db.VarChar(40)
   termo          String?              @db.VarChar(60)

@@ -97,7 +97,12 @@ export const mapaCamposTextoBeneficiarioForm: Record<string, TipoFormatacaoTexto
 };
 
 export const mapaDocumentoBeneficiarioForm: Record<string, TipoFormatacaoTexto> = {
-  nome: "textoCurto"
+  nome: "textoCurto",
+  orgaoEmissor: "instituicao",
+  ufEmissor: "textoCurto",
+  categoria: "textoCurto",
+  observacao: "textoCurto",
+  nomeArquivo: "textoCurto"
 };
 
 export const mapaCamposTextoFamiliaForm: Record<string, TipoFormatacaoTexto> = {

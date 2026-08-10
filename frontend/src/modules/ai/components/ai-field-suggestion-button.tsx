@@ -45,9 +45,17 @@ export function AiFieldSuggestionButton({
 
   return (
     <span className="inline-flex items-center gap-2">
-      <Button type="button" variant="outline" size="sm" onClick={() => void sugerir()} disabled={disabled || carregando}>
-        {carregando ? <LoaderCircle className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
-        {carregando ? "Gerando sugestão..." : "Sugerir com IA"}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="h-8 w-8 p-0"
+        onClick={() => void sugerir()}
+        disabled={disabled || carregando}
+        aria-label={carregando ? "Gerando sugestão com IA" : "Sugerir com IA"}
+        title={carregando ? "Gerando sugestão com IA" : "Sugerir com IA"}
+      >
+        {carregando ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
       </Button>
       {erro ? <span className="text-xs text-red-600">{erro}</span> : null}
     </span>

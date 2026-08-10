@@ -34,6 +34,27 @@ export const beneficiariosService = {
     return data;
   },
 
+  async lerCpfPorOcr(arquivo: File): Promise<{
+    tipoDocumento: "CPF";
+    cpf: string;
+    texto: string;
+    confianca: number;
+    mensagem: string;
+  }> {
+    const formulario = new FormData();
+    formulario.append("arquivo", arquivo);
+    const { data } = await httpClient.post<{
+      resultado: {
+        tipoDocumento: "CPF";
+        cpf: string;
+        texto: string;
+        confianca: number;
+        mensagem: string;
+      };
+    }>("/api/beneficiarios/ocr/cpf", formulario);
+    return data.resultado;
+  },
+
   async analisarDuplicidade(payload: Partial<Beneficiario>): Promise<{ duplicidades: BeneficiarioDuplicidade[]; total: number }> {
     const { data } = await httpClient.post<{ duplicidades: BeneficiarioDuplicidade[]; total: number }>(
       "/api/beneficiarios/duplicidades/analisar",
