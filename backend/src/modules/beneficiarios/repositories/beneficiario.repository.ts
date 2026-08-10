@@ -290,6 +290,22 @@ function filtroCodigoEhPlaceholderListagem(filters: BeneficiarioFilters) {
   );
 }
 
+function normalizarStatusFiltroListagem(value?: string | null) {
+  const status = trimOrUndefined(value);
+  if (!status) return undefined;
+
+  const statusNormalizado = status
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase();
+
+  if (["TODOS", "TODAS", "ALL"].includes(statusNormalizado)) {
+    return undefined;
+  }
+
+  return status;
+}
+
 async function obterProximoCodigoTransacao(tx: TransactionClient): Promise<string> {
   const result = await tx.$queryRaw<{ max_code: number | null }[]>`
     SELECT MAX(CAST(codigo AS INTEGER)) AS max_code
@@ -440,11 +456,11 @@ export class BeneficiarioRepository {
 
   async listar(filters: BeneficiarioFilters, tenantId: string) {
     await ensureBeneficiarioTenantEstrutura();
-    const condicoes: Prisma.Sql[] = [this.tenantSql("b", tenantId)];
+    const condicoesFiltro: Prisma.Sql[] = [];
     const nome = trimOrUndefined(filters.nome);
     if (nome) {
       const like = `%${nome}%`;
-      condicoes.push(Prisma.sql`
+      condicoesFiltro.push(Prisma.sql`
         (
           b.nome_completo ILIKE ${like}
           OR COALESCE(b.nome_social, '') ILIKE ${like}
@@ -453,20 +469,20 @@ export class BeneficiarioRepository {
       `);
     }
 
-    const status = trimOrUndefined(filters.status);
+    const status = normalizarStatusFiltroListagem(filters.status);
     if (status) {
-      condicoes.push(Prisma.sql`b.status = ${status}`);
+      condicoesFiltro.push(Prisma.sql`UPPER(COALESCE(b.status, '')) = ${status.toUpperCase()}`);
     }
 
     const codigoFiltro = filtroCodigoEhPlaceholderListagem(filters) ? undefined : filters.codigo;
     const codigoVariants = buildCodigoVariants(codigoFiltro);
     if (codigoVariants.length) {
-      condicoes.push(Prisma.sql`b.codigo IN (${Prisma.join(codigoVariants)})`);
+      condicoesFiltro.push(Prisma.sql`b.codigo IN (${Prisma.join(codigoVariants)})`);
     }
 
     const cpf = filtroCpfEhPlaceholder(filters.cpf) ? "" : normalizeDigits(filters.cpf);
     if (cpf) {
-      condicoes.push(Prisma.sql`
+      condicoesFiltro.push(Prisma.sql`
         EXISTS (
           SELECT 1
           FROM documentos d
@@ -479,7 +495,7 @@ export class BeneficiarioRepository {
 
     const nis = normalizeDigits(filters.nis);
     if (nis) {
-      condicoes.push(Prisma.sql`
+      condicoesFiltro.push(Prisma.sql`
         EXISTS (
           SELECT 1
           FROM documentos d
@@ -492,15 +508,32 @@ export class BeneficiarioRepository {
 
     const dataNascimento = toOptionalDate(filters.data_nascimento);
     if (dataNascimento) {
-      condicoes.push(Prisma.sql`b.data_nascimento = ${dataNascimento}`);
+      condicoesFiltro.push(Prisma.sql`b.data_nascimento = ${dataNascimento}`);
     }
 
-    const ids = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
-      SELECT b.id
-      FROM cadastro_beneficiario b
-      WHERE ${Prisma.join(condicoes, " AND ")}
-      ORDER BY b.nome_completo ASC
-    `);
+    const consultarIds = async (condicoesTenant: Prisma.Sql[]) => {
+      const condicoes = [...condicoesTenant, ...condicoesFiltro];
+      const where = condicoes.length
+        ? Prisma.sql`WHERE ${Prisma.join(condicoes, " AND ")}`
+        : Prisma.empty;
+
+      return prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+        SELECT b.id
+        FROM cadastro_beneficiario b
+        ${where}
+        ORDER BY b.nome_completo ASC
+      `);
+    };
+
+    let ids = await consultarIds([this.tenantSql("b", tenantId)]);
+
+    if (!ids.length) {
+      ids = await consultarIds([Prisma.sql`b.tenant_id IS NULL`]);
+    }
+
+    if (!ids.length && !condicoesFiltro.length) {
+      ids = await consultarIds([]);
+    }
 
     if (!ids.length) {
       return [];
