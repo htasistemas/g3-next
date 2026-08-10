@@ -92,6 +92,75 @@ type DocumentoPendentePortal = {
   contentType?: string;
 };
 
+type InscricaoPortal = {
+  id: string;
+  nome: string;
+  tipo?: string;
+  dataInicio?: string;
+  dataFinal?: string;
+  situacao?: string;
+  responsavel?: string;
+  local?: string;
+  dataInscricao?: string;
+};
+
+type EncaminhamentoPortal = {
+  id: string;
+  data?: string;
+  tipo: string;
+  destino: string;
+  motivo: string;
+  retornoEsperado?: string;
+  status?: string;
+  observacoes?: string;
+};
+
+type AlertaPortal = {
+  prioridade?: string;
+  titulo: string;
+  descricao: string;
+};
+
+type MembroFamiliaPortal = {
+  id: string;
+  nomeCompleto: string;
+  parentesco?: string;
+  responsavelFamiliar?: boolean;
+  situacaoCadastral?: string;
+  telefone?: string;
+};
+
+type GrupoFamiliarPortal = {
+  id: string;
+  nome: string;
+  responsavelFamiliar?: string;
+  enderecoPrincipal?: string;
+  situacaoFamiliar?: string;
+  status?: string;
+  membros: MembroFamiliaPortal[];
+  custoMes: number;
+  custoAno: number;
+  custoHistorico: number;
+  alertas: string[];
+};
+
+type CestaPendentePortal = {
+  id: string;
+  item: string;
+  quantidade: number;
+  dataPrevista: string;
+  status: string;
+  observacoes?: string;
+};
+
+type FaltaCursoPortal = {
+  id: string;
+  curso: string;
+  dataAula: string;
+  status: string;
+  observacao?: string;
+};
+
 type PortalPainel = {
   tipo: PortalTipo;
   token?: string;
@@ -143,12 +212,24 @@ type PortalPainel = {
     documento?: string;
     email?: string;
     telefone?: string;
+    dataNascimento?: string;
+    idade?: number;
+    endereco?: string;
+    bairro?: string;
+    familiaNome?: string;
+    situacaoCadastral?: string;
     tenantId?: string;
   };
   atendimentos?: AtendimentoPortal[];
   beneficios?: BeneficioPortal[];
   agendamentos?: AgendamentoPortal[];
   documentosPendentes?: DocumentoPendentePortal[];
+  inscricoes?: InscricaoPortal[];
+  encaminhamentos?: EncaminhamentoPortal[];
+  alertas?: AlertaPortal[];
+  grupoFamiliar?: GrupoFamiliarPortal | null;
+  cestasPendentes?: CestaPendentePortal[];
+  faltasCursos?: FaltaCursoPortal[];
   movimentacoes?: Array<Record<string, unknown>>;
   indicadores: IndicadorPortal[];
   cards: CardPortal[];
@@ -622,9 +703,11 @@ export class PortaisExternosService {
       beneficiario.beneficiario_id,
       tenantId
     );
-    const [agendamentos, documentosPendentes] = await Promise.all([
+    const [agendamentos, documentosPendentes, cestasPendentes, faltasCursos] = await Promise.all([
       this.listarAgendamentosPortal(beneficiario.beneficiario_id, beneficiario.familia_id, tenantId),
-      this.listarDocumentosPendentesPortal(beneficiario.beneficiario_id, tenantId)
+      this.listarDocumentosPendentesPortal(beneficiario.beneficiario_id, tenantId),
+      this.listarCestasPendentesPortal(beneficiario.beneficiario_id, beneficiario.familia_id, tenantId),
+      this.listarFaltasCursosPortal(beneficiario.cpf, beneficiario.nome_completo, tenantId)
     ]);
     const atendimentos = visaoGeral.atendimentos;
     const beneficios = visaoGeral.beneficios.map((item) => ({
@@ -643,17 +726,26 @@ export class PortaisExternosService {
         documento: beneficiario.cpf ?? undefined,
         email: beneficiario.email ?? undefined,
         telefone: beneficiario.telefone ?? undefined,
+        dataNascimento: visaoGeral.beneficiario.dataNascimento,
+        idade: visaoGeral.beneficiario.idade,
+        endereco: visaoGeral.beneficiario.endereco,
+        bairro: visaoGeral.beneficiario.bairro,
+        familiaNome: visaoGeral.beneficiario.familiaNome,
+        situacaoCadastral: visaoGeral.beneficiario.situacaoCadastral,
         tenantId
       },
       indicadores: [
         { label: "Atendimentos", valor: formatarValor(atendimentos.length) },
-        { label: "Agendamentos", valor: formatarValor(agendamentos.length) },
-        { label: "Documentos pendentes", valor: formatarValor(documentosPendentes.length) }
+        { label: "Pendências", valor: formatarValor((visaoGeral.alertas?.length ?? 0) + documentosPendentes.length + visaoGeral.encaminhamentos.filter((item: any) => String(item.status ?? "").toLowerCase() !== "concluído").length) },
+        { label: "Cestas a retirar", valor: formatarValor(cestasPendentes.length) },
+        { label: "Cursos ativos", valor: formatarValor(visaoGeral.inscricoes.length) },
+        { label: "Faltas em cursos", valor: formatarValor(faltasCursos.length) }
       ],
       cards: [
-        { titulo: "Agenda da família", texto: `${formatarValor(agendamentos.length)} compromisso(s) localizado(s) no histórico completo.` },
-        { titulo: "Histórico de atendimento", texto: `${formatarValor(atendimentos.length)} atendimento(s) registrado(s) na central.` },
-        { titulo: "Documentos e avisos", texto: `${formatarValor(documentosPendentes.length)} documento(s) obrigatório(s) pendente(s).` }
+        { titulo: "Próximos compromissos", texto: `${formatarValor(agendamentos.filter((item) => String(item.status ?? "").toUpperCase() !== "CANCELADO").length)} compromisso(s) no acompanhamento da família.` },
+        { titulo: "Benefícios e cesta básica", texto: cestasPendentes.length ? `${formatarValor(cestasPendentes.length)} cesta(s) aguardando retirada.` : "Nenhuma cesta básica pendente para retirada." },
+        { titulo: "Cursos e frequência", texto: `${formatarValor(visaoGeral.inscricoes.length)} curso(s) ativo(s) e ${formatarValor(faltasCursos.length)} falta(s) registrada(s).` },
+        { titulo: "Pendências importantes", texto: `${formatarValor(documentosPendentes.length)} documento(s) pendente(s) e ${formatarValor(visaoGeral.encaminhamentos.filter((item: any) => String(item.status ?? "").toLowerCase() !== "concluído").length)} encaminhamento(s) em acompanhamento.` }
       ],
       linhaDoTempo: [
         { titulo: "Cadastro familiar", detalhe: beneficiario.nome_familia ?? "Família ainda não vinculada." },
@@ -664,9 +756,70 @@ export class PortaisExternosService {
       beneficios,
       agendamentos,
       documentosPendentes,
+      inscricoes: visaoGeral.inscricoes,
+      encaminhamentos: visaoGeral.encaminhamentos,
+      alertas: visaoGeral.alertas,
+      grupoFamiliar: visaoGeral.grupoFamiliar as GrupoFamiliarPortal | null,
+      cestasPendentes,
+      faltasCursos,
       movimentacoes,
       itens: []
     };
+  }
+
+  private async listarCestasPendentesPortal(
+    beneficiarioId: bigint,
+    familiaId: bigint | null,
+    tenantId: string
+  ): Promise<CestaPendentePortal[]> {
+    try {
+      const rows = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+        SELECT dp.id, ai.descricao AS item, dp.quantidade, dp.data_prevista, dp.status, dp.observacoes
+        FROM doacao_planejada dp
+        INNER JOIN almoxarifado_item ai ON ai.id = dp.almoxarifado_item_id
+        WHERE dp.tenant_id::text = ${tenantId}
+          AND (dp.beneficiario_id = ${beneficiarioId} OR (${familiaId ? Prisma.sql`${familiaId}` : Prisma.sql`NULL`} IS NOT NULL AND dp.vinculo_familiar_id = ${familiaId}))
+          AND (LOWER(COALESCE(ai.descricao, '')) LIKE '%cesta%' OR LOWER(COALESCE(dp.observacoes, '')) LIKE '%cesta%')
+          AND UPPER(COALESCE(dp.status, '')) NOT IN ('ENTREGUE', 'FINALIZADO', 'CANCELADO')
+        ORDER BY dp.data_prevista ASC, dp.id DESC
+      `);
+      return rows.map((row) => ({
+        id: bigintToString(row.id),
+        item: String(row.item ?? "Cesta básica"),
+        quantidade: Number(row.quantidade ?? 0),
+        dataPrevista: row.data_prevista instanceof Date ? row.data_prevista.toISOString().slice(0, 10) : String(row.data_prevista ?? "").slice(0, 10),
+        status: String(row.status ?? "Pendente"),
+        observacoes: row.observacoes ? String(row.observacoes) : undefined
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  private async listarFaltasCursosPortal(cpf: string | null, nomeCompleto: string, tenantId: string): Promise<FaltaCursoPortal[]> {
+    try {
+      const cpfNormalizado = somenteDigitos(cpf);
+      const rows = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+        SELECT p.id, c.nome AS curso, p.data_aula, p.status, p.observacao
+        FROM cursos_atendimentos_presencas p
+        INNER JOIN cursos_atendimentos_matriculas m ON m.id = p.matricula_id AND m.tenant_id::text = ${tenantId}
+        INNER JOIN cursos_atendimentos c ON c.id = p.curso_id AND c.tenant_id::text = ${tenantId}
+        WHERE p.tenant_id::text = ${tenantId}
+          AND UPPER(COALESCE(p.status, '')) IN ('FALTA', 'AUSENTE', 'AUSENCIA', 'NAO_COMPARECEU', 'NÃO_COMPARECEU', 'JUSTIFICADO', 'FALTA_JUSTIFICADA')
+          AND (${cpfNormalizado} <> '' AND regexp_replace(COALESCE(m.cpf, ''), '\\D', '', 'g') = ${cpfNormalizado}
+            OR LOWER(TRIM(COALESCE(m.beneficiario_nome, ''))) = LOWER(TRIM(${nomeCompleto})))
+        ORDER BY p.data_aula DESC, p.id DESC
+      `);
+      return rows.map((row) => ({
+        id: bigintToString(row.id),
+        curso: String(row.curso ?? "Curso"),
+        dataAula: row.data_aula instanceof Date ? row.data_aula.toISOString().slice(0, 10) : String(row.data_aula ?? "").slice(0, 10),
+        status: String(row.status ?? "Falta"),
+        observacao: row.observacao ? String(row.observacao) : undefined
+      }));
+    } catch {
+      return [];
+    }
   }
 
   private async listarAgendamentosPortal(

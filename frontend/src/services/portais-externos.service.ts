@@ -79,6 +79,52 @@ export type PortalExternoDocumentoPendente = {
   contentType?: string;
 };
 
+export type PortalExternoInscricao = {
+  id: string;
+  nome: string;
+  tipo?: string;
+  dataInicio?: string;
+  dataFinal?: string;
+  situacao?: string;
+  responsavel?: string;
+  local?: string;
+  dataInscricao?: string;
+};
+
+export type PortalExternoEncaminhamento = {
+  id: string;
+  data?: string;
+  tipo: string;
+  destino: string;
+  motivo: string;
+  retornoEsperado?: string;
+  status?: string;
+  observacoes?: string;
+};
+
+export type PortalExternoAlerta = {
+  prioridade?: string;
+  titulo: string;
+  descricao: string;
+};
+
+export type PortalExternoCestaPendente = {
+  id: string;
+  item: string;
+  quantidade: number;
+  dataPrevista: string;
+  status: string;
+  observacoes?: string;
+};
+
+export type PortalExternoFaltaCurso = {
+  id: string;
+  curso: string;
+  dataAula: string;
+  status: string;
+  observacao?: string;
+};
+
 export type PortalExternoTema = {
   modo: "CLARO" | "ESCURO" | "AUTOMATICO";
   preset?: string;
@@ -143,12 +189,43 @@ export type PortalExternoPainel = {
     documento?: string;
     email?: string;
     telefone?: string;
+    dataNascimento?: string;
+    idade?: number;
+    endereco?: string;
+    bairro?: string;
+    familiaNome?: string;
+    situacaoCadastral?: string;
     tenantId?: string;
   };
   atendimentos?: PortalExternoAtendimento[];
   beneficios?: PortalExternoBeneficio[];
   agendamentos?: PortalExternoAgendamento[];
   documentosPendentes?: PortalExternoDocumentoPendente[];
+  inscricoes?: PortalExternoInscricao[];
+  encaminhamentos?: PortalExternoEncaminhamento[];
+  alertas?: PortalExternoAlerta[];
+  grupoFamiliar?: {
+    id: string;
+    nome: string;
+    responsavelFamiliar?: string;
+    enderecoPrincipal?: string;
+    situacaoFamiliar?: string;
+    status?: string;
+    membros: Array<{
+      id: string;
+      nomeCompleto: string;
+      parentesco?: string;
+      responsavelFamiliar?: boolean;
+      situacaoCadastral?: string;
+      telefone?: string;
+    }>;
+    custoMes: number;
+    custoAno: number;
+    custoHistorico: number;
+    alertas: string[];
+  } | null;
+  cestasPendentes?: PortalExternoCestaPendente[];
+  faltasCursos?: PortalExternoFaltaCurso[];
   movimentacoes?: Array<Record<string, unknown>>;
   indicadores: PortalExternoIndicador[];
   cards: PortalExternoCard[];

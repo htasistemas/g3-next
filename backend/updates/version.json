@@ -1,9 +1,9 @@
 {
-  "latestVersion": "1.00.814",
+  "latestVersion": "1.00.815",
   "releaseDate": "2026-08-10",
-  "description": "Ajuste da navegação no progresso do cadastro de beneficiários.",
+  "description": "Painel consolidado do portal do beneficiário e família.",
   "packageName": "",
   "checksum": "",
-  "minCompatibleVersion": "1.00.813",
+  "minCompatibleVersion": "1.00.814",
   "releaseType": "stable"
 }

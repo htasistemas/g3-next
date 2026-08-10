@@ -380,7 +380,15 @@ function PortalExternoPage({ tipo, tenantSlug }: { tipo: PortalTipo; tenantSlug?
     setSenha((valorAtual) => somenteDigitos(valorAtual).slice(0, 4));
   }, [tipo]);
 
-  async function acessarPortal(tenantSelecionadoOverride?: string) {
+  useEffect(() => {
+    if (tipo !== "beneficiario" || !acessoLiberado || !identificador || !senha) return;
+    const intervalo = window.setInterval(() => {
+      void acessarPortal(instituicaoBeneficiario || undefined, true);
+    }, 120000);
+    return () => window.clearInterval(intervalo);
+  }, [acessoLiberado, identificador, instituicaoBeneficiario, senha, tipo]);
+
+  async function acessarPortal(tenantSelecionadoOverride?: string, silencioso = false) {
     const cpfNormalizado = somenteDigitos(identificador).slice(0, 11);
     const senhaNormalizada = somenteDigitos(senha).slice(0, 4);
 
@@ -433,20 +441,24 @@ function PortalExternoPage({ tipo, tenantSlug }: { tipo: PortalTipo; tenantSlug?
       }
 
       if (tipo !== "beneficiario") setAcessoLiberado(true);
-      setPopup({
-        tipo: "sucesso",
-        titulo: config.acessoRestrito ? "Acesso liberado" : "Consulta aberta",
-        texto: config.acessoRestrito
-          ? "O painel externo foi carregado com dados reais vinculados ao cadastro localizado."
-          : "A consulta pública foi carregada com dados reais da instituição."
-      });
+      if (!silencioso) {
+        setPopup({
+          tipo: "sucesso",
+          titulo: config.acessoRestrito ? "Acesso liberado" : "Consulta aberta",
+          texto: config.acessoRestrito
+            ? "O painel externo foi carregado com dados reais vinculados ao cadastro localizado."
+            : "A consulta pública foi carregada com dados reais da instituição."
+        });
+      }
     } catch (error: any) {
-      setAcessoLiberado(!config.acessoRestrito);
-      setPopup({
-        tipo: "erro",
-        titulo: "Acesso não liberado",
-        texto: obterMensagemErro(error, "Não foi possível validar o acesso ao portal.")
-      });
+      if (!silencioso) {
+        setAcessoLiberado(!config.acessoRestrito);
+        setPopup({
+          tipo: "erro",
+          titulo: "Acesso não liberado",
+          texto: obterMensagemErro(error, "Não foi possível validar o acesso ao portal.")
+        });
+      }
     } finally {
       setCarregando(false);
     }
@@ -742,6 +754,12 @@ function PortalExternoPage({ tipo, tenantSlug }: { tipo: PortalTipo; tenantSlug?
 
   function renderPortalBeneficiario() {
     const pessoa = painel?.pessoa;
+    const inscricoesPortal = painel?.inscricoes ?? [];
+    const encaminhamentosPortal = painel?.encaminhamentos ?? [];
+    const alertasPortal = painel?.alertas ?? [];
+    const grupoFamiliarPortal = painel?.grupoFamiliar;
+    const cestasPendentesPortal = painel?.cestasPendentes ?? [];
+    const faltasCursosPortal = painel?.faltasCursos ?? [];
     const categorias = [
       { titulo: "Atendimentos", Icone: HeartHandshake },
       { titulo: "Agendamentos", Icone: CalendarCheck },
@@ -762,7 +780,7 @@ function PortalExternoPage({ tipo, tenantSlug }: { tipo: PortalTipo; tenantSlug?
             <button type="button" onClick={() => setIdentificador(identificador)} className="px-2 py-3">Atendimentos</button>
             <button type="button" onClick={() => setIdentificador(identificador)} className="px-2 py-3">Agenda</button>
             <button type="button" onClick={() => setIdentificador(identificador)} className="px-2 py-3">Documentos</button>
-            {acessoLiberado ? <Button type="button" size="sm" variant="outline" onClick={sairPortal}>Sair</Button> : null}
+            {acessoLiberado ? <><Button type="button" size="sm" variant="outline" onClick={() => void acessarPortal(instituicaoBeneficiario || undefined, true)} disabled={carregando}>Atualizar dados</Button><Button type="button" size="sm" variant="outline" onClick={sairPortal}>Sair</Button></> : null}
           </nav>
         </header>
 
@@ -833,11 +851,44 @@ function PortalExternoPage({ tipo, tenantSlug }: { tipo: PortalTipo; tenantSlug?
             })}
           </div>
 
-          <div className="mt-8 grid gap-5 lg:grid-cols-3">
+          <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             {indicadores.map((indicador) => <div key={indicador.label} className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm"><p className="text-sm text-slate-500">{indicador.label}</p><p className="mt-1 text-2xl font-black text-blue-900">{indicador.valor}</p></div>)}
           </div>
 
-          {acessoLiberado ? <section className="mt-8 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"><p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Acompanhamento</p><h2 className="mt-1 text-xl font-bold">Dados do beneficiário</h2><div className="mt-4 grid gap-3 md:grid-cols-2"><div className="rounded-2xl bg-blue-50 px-4 py-4"><p className="text-sm text-slate-500">Nome</p><p className="mt-1 font-bold">{pessoa?.nome ?? identificador}</p></div><div className="rounded-2xl bg-blue-50 px-4 py-4"><p className="text-sm text-slate-500">Status do acesso</p><p className="mt-1 font-bold text-emerald-700">Acesso validado</p></div></div></section> : null}
+          {acessoLiberado ? (
+            <>
+              <section className="mt-8 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div><p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Resumo do cadastro</p><h2 className="mt-1 text-xl font-bold">Dados do beneficiário</h2></div>
+                  <Badge variant="success">{pessoa?.situacaoCadastral ?? "Acesso validado"}</Badge>
+                </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  {[
+                    ["Nome", pessoa?.nome ?? identificador],
+                    ["CPF", pessoa?.documento ? formatarCpf(pessoa.documento) : "Não informado"],
+                    ["Nascimento", pessoa?.dataNascimento ? formatarDataPortal(pessoa.dataNascimento) : "Não informado"],
+                    ["Idade", pessoa?.idade !== undefined ? `${pessoa.idade} anos` : "Não informado"],
+                    ["Telefone", pessoa?.telefone ?? "Não informado"],
+                    ["E-mail", pessoa?.email ?? "Não informado"],
+                    ["Família", pessoa?.familiaNome ?? "Sem vínculo familiar"],
+                    ["Endereço", pessoa?.endereco ?? "Não informado"]
+                  ].map(([label, valor]) => <div key={label} className="rounded-2xl bg-blue-50 px-4 py-3"><p className="text-xs text-slate-500">{label}</p><p className="mt-1 break-words text-sm font-bold text-slate-900">{valor}</p></div>)}
+                </div>
+              </section>
+
+              <section className="mt-5 grid gap-5 lg:grid-cols-2">
+                <Card className="border-slate-200"><CardHeader><CardTitle className="flex items-center gap-2 text-base"><HandCoins className="h-5 w-5 text-blue-700" />Cesta básica para retirar</CardTitle></CardHeader><CardContent className="space-y-3">{cestasPendentesPortal.length ? cestasPendentesPortal.map((item) => <div key={item.id} className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3"><div className="flex items-center justify-between gap-2"><p className="font-semibold text-slate-900">{item.item}</p><Badge variant="warning">{item.status}</Badge></div><p className="mt-1 text-sm text-slate-600">Quantidade: {item.quantidade} • Retirada prevista: {formatarDataPortal(item.dataPrevista)}</p>{item.observacoes ? <p className="mt-1 text-xs text-slate-500">{item.observacoes}</p> : null}</div>) : <p className="text-sm text-slate-500">Nenhuma cesta básica pendente para retirada.</p>}</CardContent></Card>
+                <Card className="border-slate-200"><CardHeader><CardTitle className="flex items-center gap-2 text-base"><CalendarCheck className="h-5 w-5 text-blue-700" />Cursos agendados</CardTitle></CardHeader><CardContent className="space-y-3">{inscricoesPortal.length ? inscricoesPortal.slice(0, 5).map((item) => <div key={item.id} className="rounded-xl border border-slate-200 px-4 py-3"><div className="flex items-center justify-between gap-2"><p className="font-semibold text-slate-900">{item.nome}</p><Badge variant="info">{item.situacao ?? "Inscrito"}</Badge></div><p className="mt-1 text-sm text-slate-600">{item.tipo ?? "Curso"}{item.dataInicio ? ` • início: ${formatarDataPortal(item.dataInicio)}` : ""}{item.local ? ` • ${item.local}` : ""}</p></div>) : <p className="text-sm text-slate-500">Nenhum curso agendado ou inscrição ativa encontrada.</p>}</CardContent></Card>
+              </section>
+
+              <section className="mt-5 grid gap-5 lg:grid-cols-2">
+                <Card className="border-slate-200"><CardHeader><CardTitle className="flex items-center gap-2 text-base"><ClipboardList className="h-5 w-5 text-blue-700" />Pendências e encaminhamentos</CardTitle></CardHeader><CardContent className="space-y-3">{[...alertasPortal.map((item) => ({ id: `alerta-${item.titulo}`, titulo: item.titulo, detalhe: item.descricao, status: item.prioridade ?? "Atenção" })), ...encaminhamentosPortal.filter((item) => !["concluido", "concluida", "finalizado", "finalizada"].includes(String(item.status ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""))).map((item) => ({ id: `enc-${item.id}`, titulo: `${item.tipo} • ${item.destino}`, detalhe: item.motivo, status: item.status ?? "Pendente" }))].length ? [...alertasPortal.map((item) => ({ id: `alerta-${item.titulo}`, titulo: item.titulo, detalhe: item.descricao, status: item.prioridade ?? "Atenção" })), ...encaminhamentosPortal.filter((item) => !["concluido", "concluida", "finalizado", "finalizada"].includes(String(item.status ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""))).map((item) => ({ id: `enc-${item.id}`, titulo: `${item.tipo} • ${item.destino}`, detalhe: item.motivo, status: item.status ?? "Pendente" }))].slice(0, 5).map((item) => <div key={item.id} className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3"><div className="flex items-center justify-between gap-2"><p className="font-semibold text-slate-900">{item.titulo}</p><Badge variant="danger">{item.status}</Badge></div><p className="mt-1 text-sm text-slate-600">{item.detalhe}</p></div>) : <p className="text-sm text-slate-500">Nenhuma pendência ativa encontrada.</p>}</CardContent></Card>
+                <Card className="border-slate-200"><CardHeader><CardTitle className="flex items-center gap-2 text-base"><CheckCircle2 className="h-5 w-5 text-blue-700" />Faltas e frequência</CardTitle></CardHeader><CardContent className="space-y-3">{faltasCursosPortal.length ? faltasCursosPortal.slice(0, 5).map((item) => <div key={item.id} className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-3"><div className="flex items-center justify-between gap-2"><p className="font-semibold text-slate-900">{item.curso}</p><Badge variant="warning">{item.status}</Badge></div><p className="mt-1 text-sm text-slate-600">Aula em {formatarDataPortal(item.dataAula)}{item.observacao ? ` • ${item.observacao}` : ""}</p></div>) : <p className="text-sm text-slate-500">Nenhuma falta registrada nos cursos.</p>}</CardContent></Card>
+              </section>
+
+              {grupoFamiliarPortal ? <section className="mt-5 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Núcleo familiar</p><h2 className="mt-1 text-xl font-bold">{grupoFamiliarPortal.nome}</h2></div><Badge variant="info">{grupoFamiliarPortal.membros.length} membro(s)</Badge></div><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{grupoFamiliarPortal.membros.map((membro) => <div key={membro.id} className="rounded-xl border border-slate-200 px-4 py-3"><p className="font-semibold text-slate-900">{membro.nomeCompleto}</p><p className="mt-1 text-xs text-slate-500">{membro.responsavelFamiliar ? "Responsável familiar" : membro.parentesco ?? "Membro da família"}</p><p className="mt-1 text-xs text-slate-500">Situação: {membro.situacaoCadastral ?? "Ativo"}</p></div>)}</div></section> : null}
+            </>
+          ) : null}
         </section>
 
         <footer className="bg-[linear-gradient(135deg,#173f70_0%,#0d2d52_100%)] px-5 py-9 text-blue-100 sm:px-8"><div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4"><div><p className="font-bold text-white">Portal do Beneficiário e Família</p><p className="mt-1 text-sm text-blue-200">Informações protegidas e autorizadas pela instituição.</p></div><p className="text-sm text-blue-200">G3N · portal externo</p></div></footer>

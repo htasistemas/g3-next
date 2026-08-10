@@ -1024,7 +1024,8 @@ const secoesManual: ManualSecao[] = [
           "O beneficiário informa CPF e a senha de 4 dígitos criada no cadastro para acessar o portal.",
           "Se o mesmo CPF e senha estiverem vinculados a mais de uma instituição, o portal apresenta as instituições disponíveis; selecione uma para abrir somente os dados daquele vínculo.",
           "O portal carrega automaticamente as cores padrão da instituição após a autenticação para manter a identidade visual do tenant.",
-          "Após o acesso, o portal consulta beneficiário, vínculo familiar, agenda, atendimentos e documentos pendentes em formato resumido.",
+          "Após o acesso, o portal consulta beneficiário, vínculo familiar, agenda, atendimentos, benefícios, cesta básica para retirada, cursos, faltas, encaminhamentos, alertas e documentos pendentes em formato resumido.",
+          "Os dados são atualizados automaticamente a cada dois minutos enquanto o portal permanece aberto; o botão Atualizar dados permite consultar imediatamente as alterações mais recentes.",
           "Mantenha CPF, código familiar, vínculos, contatos, agendamentos e documentos atualizados nos módulos internos para alimentar o portal."
         ],
         atencoes: [
