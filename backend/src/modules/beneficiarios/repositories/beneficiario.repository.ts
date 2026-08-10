@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../../database/prisma.js";
 import { AppError } from "../../../shared/errors/app-error.js";
+import { ensureMultiTenantStructure } from "../../multi-tenant/tenant-estrutura.service.js";
 import {
   joinSemicolonList,
   normalizeDigits,
@@ -95,6 +96,128 @@ const sqlNomeCompletoNormalizadoBusca = Prisma.raw(
 const sqlNomeMaeNormalizadoBusca = Prisma.raw(
   `translate(lower(trim(coalesce(nome_mae, ''))), '${caracteresAcentuadosNormalizacao}', 'aaaaaeeeeiiiiooooouuuuc')`
 );
+
+let estruturaTenantBeneficiarioPromise: Promise<void> | null = null;
+
+async function ensureBeneficiarioTenantEstrutura() {
+  if (!estruturaTenantBeneficiarioPromise) {
+    estruturaTenantBeneficiarioPromise = (async () => {
+      await ensureMultiTenantStructure(prisma);
+      await prisma.$executeRawUnsafe(`
+        DO $$
+        DECLARE
+          tenant_torresoft UUID;
+          total_torresoft INTEGER;
+          total_instituicoes INTEGER;
+          tenant_unico UUID;
+        BEGIN
+          SELECT tenant_id
+            INTO tenant_torresoft
+          FROM instituicoes
+          WHERE regexp_replace(coalesce(cnpj, ''), '\\D', '', 'g') = '32004110000118'
+             OR lower(coalesce(slug, '')) = 'torresoft'
+             OR upper(coalesce(codigo, '')) = 'TORRESOFT'
+          ORDER BY atualizado_em DESC
+          LIMIT 1;
+
+          SELECT COUNT(*)
+            INTO total_instituicoes
+          FROM instituicoes;
+
+          SELECT tenant_id
+            INTO tenant_unico
+          FROM instituicoes
+          ORDER BY criado_em ASC
+          LIMIT 1;
+
+          IF total_instituicoes = 1 AND tenant_unico IS NOT NULL THEN
+            UPDATE cadastro_beneficiario
+               SET tenant_id = tenant_unico
+             WHERE tenant_id IS NULL;
+          END IF;
+
+          IF tenant_torresoft IS NOT NULL THEN
+            SELECT COUNT(*)
+              INTO total_torresoft
+            FROM cadastro_beneficiario
+            WHERE tenant_id = tenant_torresoft;
+
+            IF total_torresoft = 0 THEN
+              UPDATE cadastro_beneficiario
+                 SET tenant_id = tenant_torresoft
+               WHERE tenant_id IS NULL
+                  OR codigo ILIKE 'DEMO-TS-BEN-%'
+                  OR codigo ILIKE 'DEMO-TS-AUTO-BEN-%';
+            ELSE
+              UPDATE cadastro_beneficiario
+                 SET tenant_id = tenant_torresoft
+               WHERE tenant_id IS NULL
+                 AND (
+                   codigo ILIKE 'DEMO-TS-BEN-%'
+                   OR codigo ILIKE 'DEMO-TS-AUTO-BEN-%'
+                 );
+            END IF;
+          END IF;
+
+          UPDATE contato_beneficiario c
+             SET tenant_id = b.tenant_id
+            FROM cadastro_beneficiario b
+           WHERE c.beneficiario_id = b.id
+             AND b.tenant_id IS NOT NULL
+             AND c.tenant_id IS DISTINCT FROM b.tenant_id;
+
+          UPDATE documentos d
+             SET tenant_id = b.tenant_id
+            FROM cadastro_beneficiario b
+           WHERE d.beneficiario_id = b.id
+             AND b.tenant_id IS NOT NULL
+             AND d.tenant_id IS DISTINCT FROM b.tenant_id;
+
+          UPDATE situacao_social s
+             SET tenant_id = b.tenant_id
+            FROM cadastro_beneficiario b
+           WHERE s.beneficiario_id = b.id
+             AND b.tenant_id IS NOT NULL
+             AND s.tenant_id IS DISTINCT FROM b.tenant_id;
+
+          UPDATE escolaridade_beneficiario e
+             SET tenant_id = b.tenant_id
+            FROM cadastro_beneficiario b
+           WHERE e.beneficiario_id = b.id
+             AND b.tenant_id IS NOT NULL
+             AND e.tenant_id IS DISTINCT FROM b.tenant_id;
+
+          UPDATE saude_beneficiario s
+             SET tenant_id = b.tenant_id
+            FROM cadastro_beneficiario b
+           WHERE s.beneficiario_id = b.id
+             AND b.tenant_id IS NOT NULL
+             AND s.tenant_id IS DISTINCT FROM b.tenant_id;
+
+          UPDATE beneficios_beneficiario bb
+             SET tenant_id = b.tenant_id
+            FROM cadastro_beneficiario b
+           WHERE bb.beneficiario_id = b.id
+             AND b.tenant_id IS NOT NULL
+             AND bb.tenant_id IS DISTINCT FROM b.tenant_id;
+
+          UPDATE observacoes_beneficiario o
+             SET tenant_id = b.tenant_id
+            FROM cadastro_beneficiario b
+           WHERE o.beneficiario_id = b.id
+             AND b.tenant_id IS NOT NULL
+             AND o.tenant_id IS DISTINCT FROM b.tenant_id;
+        END
+        $$;
+      `);
+    })().catch((error) => {
+      estruturaTenantBeneficiarioPromise = null;
+      throw error;
+    });
+  }
+
+  await estruturaTenantBeneficiarioPromise;
+}
 
 function hasAnyAddressData(input: BeneficiarioInput): boolean {
   return !!(
@@ -293,6 +416,7 @@ export class BeneficiarioRepository {
   }
 
   async listar(filters: BeneficiarioFilters, tenantId: string) {
+    await ensureBeneficiarioTenantEstrutura();
     const condicoes: Prisma.Sql[] = [this.tenantSql("b", tenantId)];
     const nome = trimOrUndefined(filters.nome);
     if (nome) {
@@ -368,6 +492,7 @@ export class BeneficiarioRepository {
   }
 
   async buscarPorId(id: bigint, tenantId: string) {
+    await ensureBeneficiarioTenantEstrutura();
     const rows = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
       SELECT b.id
       FROM cadastro_beneficiario b
@@ -391,6 +516,7 @@ export class BeneficiarioRepository {
   }
 
   async obterProximoCodigo(tenantId: string) {
+    await ensureBeneficiarioTenantEstrutura();
     const result = await prisma.$queryRaw<Array<{ max_code: number | null }>>(Prisma.sql`
       SELECT MAX(CAST(codigo AS INTEGER)) AS max_code
       FROM cadastro_beneficiario

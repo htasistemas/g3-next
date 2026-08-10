@@ -1,9 +1,9 @@
 {
-  "latestVersion": "1.00.815",
-  "releaseDate": "2026-08-10",
-  "description": "Painel consolidado do portal do beneficiário e família.",
-  "packageName": "",
-  "checksum": "",
-  "minCompatibleVersion": "1.00.814",
-  "releaseType": "stable"
+    "latestVersion":  "1.00.816",
+    "releaseDate":  "2026-08-10",
+    "description":  "Correção da listagem de beneficiários em produção com compatibilização de tenant legado.",
+    "packageName":  "",
+    "checksum":  "",
+    "minCompatibleVersion":  "1.00.815",
+    "releaseType":  "stable"
 }

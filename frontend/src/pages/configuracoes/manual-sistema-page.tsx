@@ -147,7 +147,8 @@ const secoesManual: ManualSecao[] = [
           "Capturas de documentos pela webcam passam por compressão antes do salvamento e exibem mensagem detalhada quando a imagem não puder ser processada.",
           "Ao salvar o cadastro, anexos que não tiverem sido processados corretamente retornam mensagem orientando novo envio, em vez de erro interno genérico.",
           "Falhas na limpeza de arquivos antigos do storage não devem mais derrubar a atualização do cadastro em produção.",
-          "A compatibilidade com a base legada de produção foi mantida ignorando no ORM campos de comunicação que ainda não existem em contato_beneficiario."
+          "A compatibilidade com a base legada de produção foi mantida ignorando no ORM campos de comunicação que ainda não existem em contato_beneficiario.",
+          "A listagem de beneficiários respeita o tenant da sessão; bases legadas com registros sem tenant ou demonstração Torresoft são compatibilizadas para voltar a exibir os cadastros corretos sem misturar instituições."
         ]
       }
     ]
