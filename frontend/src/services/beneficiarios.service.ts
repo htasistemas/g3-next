@@ -11,10 +11,31 @@ import type {
   BeneficiarioListaResponse
 } from "@/types/beneficiario";
 
+function somenteDigitosLocal(valor?: string) {
+  return (valor ?? "").replace(/\D/g, "");
+}
+
+function normalizarFiltrosBeneficiario(filtros?: BeneficiarioFiltro): BeneficiarioFiltro | undefined {
+  if (!filtros) return undefined;
+
+  const cpf = somenteDigitosLocal(filtros.cpf);
+  const normalizados: BeneficiarioFiltro = {
+    nome: filtros.nome?.trim() || undefined,
+    codigo: filtros.codigo?.trim() || undefined,
+    cpf: cpf && !/^0+$/.test(cpf) ? cpf : undefined,
+    status: filtros.status?.trim() || undefined,
+    data_nascimento: filtros.data_nascimento?.trim() || undefined
+  };
+
+  return Object.fromEntries(
+    Object.entries(normalizados).filter(([, valor]) => Boolean(valor))
+  ) as BeneficiarioFiltro;
+}
+
 export const beneficiariosService = {
   async listar(filtros?: BeneficiarioFiltro): Promise<BeneficiarioListaResponse> {
     const { data } = await httpClient.get<BeneficiarioListaResponse>("/api/beneficiarios", {
-      params: filtros
+      params: normalizarFiltrosBeneficiario(filtros)
     });
     return data;
   },

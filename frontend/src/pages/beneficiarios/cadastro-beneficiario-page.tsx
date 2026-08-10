@@ -366,6 +366,14 @@ function normalizarTipoComprovanteEndereco(tipo?: string) {
 const tituloTela = "Cadastro de beneficiários";
 type AbaFormularioId = (typeof abas)[number]["id"];
 
+const filtrosListagemVazios: BeneficiarioFiltro = {
+  nome: "",
+  codigo: "",
+  cpf: "",
+  status: "",
+  data_nascimento: ""
+};
+
 const mapaCamposObrigatorios: Partial<
   Record<keyof BeneficiarioFormValues, { label: string; aba: AbaFormularioId }>
 > = {
@@ -587,6 +595,19 @@ function reconciliarDocumentosComConfiguracao(
 
   const documentosExtras = documentosAtuais.filter((documento) => !idsPadrao.has(documento.id));
   return [...documentosPadrao, ...documentosExtras];
+}
+
+function normalizarFiltrosListagemBeneficiario(filtros: BeneficiarioFiltro): BeneficiarioFiltro {
+  const codigo = filtros.codigo?.trim() ?? "";
+  const cpf = somenteDigitos(filtros.cpf);
+
+  return {
+    nome: filtros.nome?.trim() ?? "",
+    codigo: codigo === "0000" ? "" : codigo,
+    cpf: cpf && !/^0+$/.test(cpf) ? cpf : "",
+    status: filtros.status?.trim() ?? "",
+    data_nascimento: filtros.data_nascimento?.trim() ?? ""
+  };
 }
 
 function mapearDocumentosDoBeneficiario(
@@ -890,14 +911,8 @@ export function CadastroBeneficiarioPage() {
   const navigate = useNavigate();
   const { usuario } = useAuth();
   const [abaAtiva, setAbaAtiva] = useState<(typeof abas)[number]["id"]>("listagem");
-  const [filtroDraft, setFiltroDraft] = useState<BeneficiarioFiltro>({
-    nome: "",
-    codigo: "",
-    cpf: "",
-    status: "",
-    data_nascimento: ""
-  });
-  const [filtros, setFiltros] = useState<BeneficiarioFiltro>(filtroDraft);
+  const [filtroDraft, setFiltroDraft] = useState<BeneficiarioFiltro>(filtrosListagemVazios);
+  const [filtros, setFiltros] = useState<BeneficiarioFiltro>(filtrosListagemVazios);
   const [ordenacaoListagem, setOrdenacaoListagem] = useState<{
     coluna: ColunaOrdenacaoBeneficiario;
     direcao: DirecaoOrdenacao;
@@ -2055,8 +2070,16 @@ export function CadastroBeneficiarioPage() {
 
   function acaoBuscar() {
     setMensagem(null);
-    setFiltros({ ...filtroDraft });
+    const filtrosNormalizados = normalizarFiltrosListagemBeneficiario(filtroDraft);
+    setFiltroDraft(filtrosNormalizados);
+    setFiltros(filtrosNormalizados);
     setAbaAtiva("listagem");
+  }
+
+  function limparFiltrosListagem() {
+    setFiltroDraft(filtrosListagemVazios);
+    setFiltros(filtrosListagemVazios);
+    setMensagem(null);
   }
 
   async function acaoNovo() {
@@ -2947,15 +2970,7 @@ export function CadastroBeneficiarioPage() {
                   type="button"
                   variant="outline"
                   className="w-full border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
-                  onClick={() =>
-                    setFiltroDraft({
-                      nome: "",
-                      codigo: "",
-                      cpf: "",
-                      status: "",
-                      data_nascimento: ""
-                    })
-                  }
+                  onClick={limparFiltrosListagem}
                 >
                   Limpar filtros
                 </Button>
