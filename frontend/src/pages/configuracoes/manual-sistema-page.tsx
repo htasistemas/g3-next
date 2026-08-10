@@ -137,7 +137,7 @@ const secoesManual: ManualSecao[] = [
           "Na aba Saúde, marque Possui deficiência ou Usa medicação contínua para abrir os campos complementares. Informações já cadastradas não são ocultadas nem apagadas.",
           "Use a aba Histórico e auditoria para acompanhar criação, edição, alterações de consentimento e demais eventos operacionais do cadastro.",
           "Na aba Listagem de beneficiários, use os filtros no topo e o botão Limpar para localizar registros. A listagem não exibe mais o resumo do beneficiário selecionado acima dos resultados, mantendo a rolagem apenas na grade de beneficiários.",
-          "Na aba Listagem de beneficiários, os campos de código e CPF exibidos como exemplo não filtram a consulta inicial; use Buscar para aplicar filtros válidos e Limpar filtros para voltar a listar todos os beneficiários do tenant.",
+          "Na aba Listagem de beneficiários, os campos de código e CPF exibidos como exemplo não filtram a consulta inicial; mesmo se o navegador reenviar código 0001 e CPF zerado, a API ignora esses placeholders. Use Buscar para aplicar filtros válidos e Limpar filtros para voltar a listar todos os beneficiários do tenant.",
           "Ao concluir o cadastro de um beneficiário, confira a confirmação visual com o ícone na cor padrão da unidade e o número do cadastro. Clique em Finalizar cadastro para fechar a mensagem e continuar na tela."
         ],
         atencoes: [

@@ -267,6 +267,29 @@ function buildCodigoVariants(value?: string): string[] {
   return [...variants].filter(Boolean);
 }
 
+function filtroCpfEhPlaceholder(value?: string | null) {
+  const cpf = normalizeDigits(value) ?? "";
+  return cpf.length > 0 && /^0+$/.test(cpf);
+}
+
+function filtroCodigoEhPlaceholderListagem(filters: BeneficiarioFilters) {
+  const codigo = trimOrUndefined(filters.codigo);
+  if (!codigo) return false;
+
+  const codigoNormalizado = codigo.replace(/\D/g, "");
+  const semOutrosFiltros =
+    !trimOrUndefined(filters.nome) &&
+    !trimOrUndefined(filters.status) &&
+    !trimOrUndefined(filters.data_nascimento) &&
+    !normalizeDigits(filters.nis);
+
+  return (
+    filtroCpfEhPlaceholder(filters.cpf) &&
+    semOutrosFiltros &&
+    (codigoNormalizado === "1" || codigoNormalizado === "0001")
+  );
+}
+
 async function obterProximoCodigoTransacao(tx: TransactionClient): Promise<string> {
   const result = await tx.$queryRaw<{ max_code: number | null }[]>`
     SELECT MAX(CAST(codigo AS INTEGER)) AS max_code
@@ -435,12 +458,13 @@ export class BeneficiarioRepository {
       condicoes.push(Prisma.sql`b.status = ${status}`);
     }
 
-    const codigoVariants = buildCodigoVariants(filters.codigo);
+    const codigoFiltro = filtroCodigoEhPlaceholderListagem(filters) ? undefined : filters.codigo;
+    const codigoVariants = buildCodigoVariants(codigoFiltro);
     if (codigoVariants.length) {
       condicoes.push(Prisma.sql`b.codigo IN (${Prisma.join(codigoVariants)})`);
     }
 
-    const cpf = normalizeDigits(filters.cpf);
+    const cpf = filtroCpfEhPlaceholder(filters.cpf) ? "" : normalizeDigits(filters.cpf);
     if (cpf) {
       condicoes.push(Prisma.sql`
         EXISTS (

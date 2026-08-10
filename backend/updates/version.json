@@ -1,9 +1,9 @@
 {
-    "latestVersion":  "1.00.817",
+    "latestVersion":  "1.00.818",
     "releaseDate":  "2026-08-10",
-    "description":  "Correção dos filtros da listagem de beneficiários para exibir todos os cadastros do tenant.",
+    "description":  "Hotfix defensivo da API de beneficiarios para ignorar filtros placeholder.",
     "packageName":  "",
     "checksum":  "",
-    "minCompatibleVersion":  "1.00.816",
+    "minCompatibleVersion":  "1.00.817",
     "releaseType":  "stable"
 }
