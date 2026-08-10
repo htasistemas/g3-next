@@ -134,6 +134,7 @@ const secoesManual: ManualSecao[] = [
           "Use o botão com microfone para preencher por voz. No modo Campo único, escolha um campo; no Modo conversa, fale vários dados, revise os campos identificados e só depois clique em Aplicar campos. O sistema não grava automaticamente.",
           "Na aba Benefícios, marque Recebe benefício social para selecionar os principais benefícios sociais e informe o valor total com máscara monetária brasileira.",
           "Na aba Documentos, use Adicionar documento para abrir apenas os campos relacionados ao tipo escolhido. A lista permite pesquisar, editar, visualizar anexos e identificar documentos com ou sem arquivo pelo ícone de clipe.",
+          "A listagem de beneficiários valida a estrutura da tabela de documentos antes de carregar, garantindo compatibilidade com bases que ainda não tenham colunas opcionais como data de validade, categoria, observação e dados de arquivo.",
           "Na aba Saúde, marque Possui deficiência ou Usa medicação contínua para abrir os campos complementares. Informações já cadastradas não são ocultadas nem apagadas.",
           "Use a aba Histórico e auditoria para acompanhar criação, edição, alterações de consentimento e demais eventos operacionais do cadastro.",
           "Na aba Listagem de beneficiários, use os filtros no topo e o botão Limpar para localizar registros. A listagem não exibe mais o resumo do beneficiário selecionado acima dos resultados, mantendo a rolagem apenas na grade de beneficiários.",

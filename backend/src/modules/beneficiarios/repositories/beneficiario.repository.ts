@@ -103,6 +103,13 @@ async function ensureBeneficiarioTenantEstrutura() {
   if (!estruturaTenantBeneficiarioPromise) {
     estruturaTenantBeneficiarioPromise = (async () => {
       await ensureMultiTenantStructure(prisma);
+      await prisma.$executeRawUnsafe("ALTER TABLE documentos ADD COLUMN IF NOT EXISTS data_validade DATE");
+      await prisma.$executeRawUnsafe("ALTER TABLE documentos ADD COLUMN IF NOT EXISTS categoria VARCHAR(60)");
+      await prisma.$executeRawUnsafe("ALTER TABLE documentos ADD COLUMN IF NOT EXISTS observacao TEXT");
+      await prisma.$executeRawUnsafe("ALTER TABLE documentos ADD COLUMN IF NOT EXISTS obrigatorio BOOLEAN");
+      await prisma.$executeRawUnsafe("ALTER TABLE documentos ADD COLUMN IF NOT EXISTS content_type VARCHAR(120)");
+      await prisma.$executeRawUnsafe("ALTER TABLE documentos ADD COLUMN IF NOT EXISTS nome_arquivo VARCHAR(200)");
+      await prisma.$executeRawUnsafe("ALTER TABLE documentos ADD COLUMN IF NOT EXISTS caminho_arquivo TEXT");
       await prisma.$executeRawUnsafe(`
         DO $$
         DECLARE

@@ -1,10 +1,10 @@
 {
-    "latestVersion":  "1.00.819",
+    "latestVersion":  "1.00.820",
     "releaseDate":  "2026-08-10",
-    "description":  "Fallback de recuperacao da listagem de beneficiarios em bases legadas.",
+    "description":  "Compatibilidade de documentos para restaurar a listagem de beneficiarios.",
     "packageName":  "",
     "checksum":  "",
-    "minCompatibleVersion":  "1.00.818",
+    "minCompatibleVersion":  "1.00.819",
     "releaseType":  "stable",
     "downloadUrl":  null
 }
