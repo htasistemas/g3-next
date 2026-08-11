@@ -203,6 +203,8 @@ export function IndicadoresPage() {
   const cadastroCompletoPercentual = data?.atendimento.cadastroCompletoPercentual ?? 0;
   const rendaMediaFamiliar = data?.familias.rendaMediaFamiliar ?? 0;
   const rendaReferencial = arredondarParaCima(Math.max(rendaMediaFamiliar * 1.25, 1500), 500);
+  const termosAtivos = data?.termos.ativos ?? 0;
+  const termosReferencial = arredondarParaCima(Math.max(termosAtivos * 1.25, 10), 5);
   const rankingBairrosTopo = dadosBairros[0];
 
   function aplicarFiltros() {
@@ -311,12 +313,15 @@ export function IndicadoresPage() {
                   maxRotulo={formatarMoedaAbreviada(rendaReferencial)}
                   cor="var(--g3-accent)"
                 />
-                <div className="rounded-2xl border border-[var(--g3-border)] bg-[var(--g3-card)] px-3 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">
-                    Termos ativos
-                  </p>
-                  <p className="mt-1 text-2xl font-semibold text-[var(--g3-foreground)]">{data.termos.ativos}</p>
-                </div>
+                <KpiIndicatorCard
+                  titulo="Termos ativos"
+                  valor={formatarNumero(termosAtivos)}
+                  percentual={termosReferencial > 0 ? (termosAtivos / termosReferencial) * 100 : 0}
+                  apoio={`Escala visual até ${formatarNumero(termosReferencial)} termos`}
+                  minRotulo="0"
+                  maxRotulo={`${formatarNumero(termosReferencial)} termos`}
+                  cor="var(--g3-info)"
+                />
               </div>
 
               <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">

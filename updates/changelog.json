@@ -1,6 +1,14 @@
 {
   "entries":  [
                     {
+                        "version": "1.00.821",
+                        "releaseDate": "2026-08-11",
+                        "title": "Indicadores com medidores percentuais corrigidos",
+                        "description": "O card Termos ativos passou a usar medidor percentual e o card Cadastro completo voltou a calcular o percentual sobre o total de beneficiários da instituição atual.",
+                        "changes": ["Card Termos ativos substituído pelo medidor KPI radial.", "Escala visual calculada automaticamente a partir da quantidade de termos ativos.", "Cadastro completo passa a contar cadastros completos no mesmo tenant usado no total de beneficiários.", "Percentual de Cadastro completo limitado à faixa válida de 0% a 100%.", "Manual do sistema atualizado com o novo comportamento."],
+                        "releaseType": "stable"
+                    },
+                    {
                         "version": "1.00.808",
                         "releaseDate": "2026-08-06",
                         "title": "Correção da busca de alunos",

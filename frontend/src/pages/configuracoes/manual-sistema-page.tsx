@@ -395,7 +395,8 @@ const secoesManual: ManualSecao[] = [
           "Use os filtros de data inicial e data final no topo da tela e depois clique em Visualizar para atualizar os indicadores do período.",
           "O card Faixa etária agora organiza os beneficiários por fases da vida em leitura direta: 0-12 crianças, 13-17 adolescentes, 18-29 jovens, 30-59 adultos e 60+ idosos.",
           "O gráfico Distribuição por idade continua disponível para análise detalhada por idade exata quando você precisar de leitura mais fina.",
-          "Os cards Beneficiários ativos, Cadastro completo e Renda média familiar agora usam medidor KPI em estilo velocímetro de carro, sem ponteiro central para não esconder o valor exibido no meio do gráfico.",
+          "Os cards Beneficiários ativos, Cadastro completo, Renda média familiar e Termos ativos agora usam medidor KPI em estilo velocímetro de carro, sem ponteiro central para não esconder o valor exibido no meio do gráfico.",
+          "O card Cadastro completo exibe o percentual de beneficiários com cadastro completo sobre o total de beneficiários da instituição atual; por exemplo, 20 cadastros completos em 100 cadastros resultam em 20%.",
           "O card Ranking de bairros exibe os 12 primeiros bairros no topo e permite rolagem para consultar os demais bairros cadastrados com a respectiva quantidade de beneficiários.",
           "Nomes de bairro iguais com formatação diferente, como caixa alta, caixa baixa ou capitalização inicial, são consolidados em uma única soma antes da exibição.",
           "Use Atualizar para recarregar os dados sem sair da tela quando houver novos cadastros ou mudanças recentes no período."

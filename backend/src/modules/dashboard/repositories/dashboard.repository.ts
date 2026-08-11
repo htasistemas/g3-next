@@ -157,18 +157,26 @@ export class DashboardRepository {
       return 0;
     }
 
+    const tenant = await this.montarFiltroTenant("cadastro_beneficiario", "b");
+    const condicoes = [
+      "b.endereco_id IS NOT NULL",
+      `EXISTS (
+          SELECT 1
+          FROM contato_beneficiario c
+          WHERE c.beneficiario_id = b.id
+        )`
+    ];
+    if (tenant.sql) {
+      condicoes.unshift(tenant.sql);
+    }
+
     return this.consultarTotal(
       `
       SELECT COUNT(*)::bigint AS total
       FROM cadastro_beneficiario b
-      WHERE b.endereco_id IS NOT NULL
-        AND EXISTS (
-          SELECT 1
-          FROM contato_beneficiario c
-          WHERE c.beneficiario_id = b.id
-        )
+      WHERE ${condicoes.join(" AND ")}
       `,
-      []
+      tenant.params
     );
   }
 

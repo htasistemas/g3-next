@@ -27,6 +27,11 @@ function arredondarDuasCasas(valor: number): number {
   return Math.round(valor * 100) / 100;
 }
 
+function limitarPercentual(valor: number): number {
+  if (!Number.isFinite(valor)) return 0;
+  return Math.max(0, Math.min(100, valor));
+}
+
 function calcularIdade(dataNascimento: Date, dataReferencia = new Date()): number {
   const anoAtual = dataReferencia.getUTCFullYear();
   const mesAtual = dataReferencia.getUTCMonth();
@@ -150,8 +155,9 @@ export class DashboardService {
       totalBeneficiarios - pendentes - bloqueados - emAnalise - desatualizados
     );
 
-    const cadastroCompletoPercentual =
-      totalBeneficiarios === 0 ? 0 : (cadastrosCompletos / totalBeneficiarios) * 100;
+    const cadastroCompletoPercentual = limitarPercentual(
+      totalBeneficiarios === 0 ? 0 : (cadastrosCompletos / totalBeneficiarios) * 100
+    );
 
     const faixaEtaria = this.calcularFaixaEtaria(datasNascimento);
     const idades = this.calcularIdades(datasNascimento);
