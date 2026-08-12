@@ -102,6 +102,15 @@ export class AutorizacaoComprasController {
     return response.json(fornecedor);
   }
 
+  async consultarDocumentoFornecedor(request: AuthenticatedRequest, response: Response) {
+    const fornecedor = await service.consultarDocumentoFornecedor(
+      request.params.tipo,
+      request.params.documento,
+      request.authUser?.tenant_id
+    );
+    return response.json(fornecedor);
+  }
+
   async registrarReservaBancaria(request: AuthenticatedRequest, response: Response) {
     const reservas = await service.registrarReservaBancaria(request.params.id, request.body, obterAtor(request));
     return response.status(201).json(reservas);

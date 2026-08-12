@@ -781,7 +781,13 @@ function documentoTemConteudoPersistivel(documento: DocumentoCadastro) {
     documento.ignorado ||
     documento.numeroDocumento.trim().length > 0 ||
     documento.nomeArquivo?.trim() ||
-    documento.caminhoArquivo?.trim()
+    documento.caminhoArquivo?.trim() ||
+    documento.dataEmissao?.trim() ||
+    documento.dataValidade?.trim() ||
+    documento.orgaoEmissor?.trim() ||
+    documento.ufEmissor?.trim() ||
+    documento.categoria?.trim() ||
+    documento.observacao?.trim()
   );
 }
 
@@ -1322,6 +1328,20 @@ export function CadastroBeneficiarioPage() {
     ? documentos.find((documento) => documento.id === documentoWebcamId)
     : null;
   const cpfDocumentoAtual = documentos.find((documento) => documento.id === "cpf")?.numeroDocumento ?? "";
+  const documentosCadastrados = useMemo(
+    () => documentos.filter((documento) => documentoTemConteudoPersistivel(documento)),
+    [documentos]
+  );
+  const documentosListagem = useMemo(() => {
+    const buscaNormalizada = buscaDocumentos.trim().toLowerCase();
+    if (!buscaNormalizada) return documentosCadastrados;
+
+    return documentosCadastrados.filter((item) =>
+      `${item.nome} ${item.numeroDocumento ?? ""} ${item.observacao ?? ""}`
+        .toLowerCase()
+        .includes(buscaNormalizada)
+    );
+  }, [buscaDocumentos, documentosCadastrados]);
   const etapasProgresso = [
     {
       ...etapasCadastroInteligente[0],
@@ -3821,7 +3841,7 @@ export function CadastroBeneficiarioPage() {
                       <div>
                         <p className="text-base font-semibold text-slate-900">Documentos</p>
                         <p className="mt-1 text-xs text-slate-600">
-                          {documentos.filter((item) => item.numeroDocumento || item.nomeArquivo || item.caminhoArquivo).length} cadastrados • {documentos.filter((item) => item.caminhoArquivo).length} com anexos • {documentos.filter((item) => !item.caminhoArquivo && !item.ignorado && (item.numeroDocumento || item.obrigatorio)).length} sem anexo
+                          {documentosCadastrados.length} cadastrados • {documentosCadastrados.filter((item) => item.caminhoArquivo).length} com anexos • {documentosCadastrados.filter((item) => !item.caminhoArquivo && !item.ignorado).length} sem anexo
                         </p>
                       </div>
                       <Button type="button" onClick={abrirNovoDocumento}>
@@ -3839,7 +3859,13 @@ export function CadastroBeneficiarioPage() {
                           <tr><th className="px-4 py-3">Documento</th><th className="px-4 py-3">Número</th><th className="px-4 py-3">Emissão</th><th className="px-4 py-3">Validade</th><th className="px-4 py-3">Anexo</th><th className="px-4 py-3 text-right">Ações</th></tr>
                         </thead>
                         <tbody>
-                          {documentos.filter((item) => `${item.nome} ${item.numeroDocumento ?? ""} ${item.observacao ?? ""}`.toLowerCase().includes(buscaDocumentos.toLowerCase())).map((documento) => (
+                          {documentosListagem.length === 0 ? (
+                            <tr>
+                              <td colSpan={6} className="border-t border-slate-100 px-4 py-6 text-center text-sm text-slate-500">
+                                Nenhum documento adicionado.
+                              </td>
+                            </tr>
+                          ) : documentosListagem.map((documento) => (
                             <tr key={documento.id} className="border-t border-slate-100 hover:bg-slate-50">
                               <td className="px-4 py-3 font-medium text-slate-900">{documento.nome}{documento.obrigatorio ? " *" : ""}</td>
                               <td className="px-4 py-3 text-slate-600">{documento.numeroDocumento || "—"}</td>

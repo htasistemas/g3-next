@@ -134,6 +134,7 @@ const secoesManual: ManualSecao[] = [
           "Use o botão com microfone para preencher por voz. No modo Campo único, escolha um campo; no Modo conversa, fale vários dados, revise os campos identificados e só depois clique em Aplicar campos. O sistema não grava automaticamente.",
           "Na aba Benefícios, marque Recebe benefício social para selecionar os principais benefícios sociais e informe o valor total com máscara monetária brasileira.",
           "Na aba Documentos, use Adicionar documento para abrir apenas os campos relacionados ao tipo escolhido. A lista permite pesquisar, editar, visualizar anexos e identificar documentos com ou sem arquivo pelo ícone de clipe.",
+          "A listagem da aba Documentos exibe somente documentos adicionados ao cadastro, com número, anexo ou metadados preenchidos; documentos padrão ainda não adicionados não aparecem na tabela.",
           "A listagem de beneficiários valida a estrutura da tabela de documentos antes de carregar, garantindo compatibilidade com bases que ainda não tenham colunas opcionais como data de validade, categoria, observação e dados de arquivo.",
           "Na aba Saúde, marque Possui deficiência ou Usa medicação contínua para abrir os campos complementares. Informações já cadastradas não são ocultadas nem apagadas.",
           "Use a aba Histórico e auditoria para acompanhar criação, edição, alterações de consentimento e demais eventos operacionais do cadastro.",
@@ -765,6 +766,7 @@ const secoesManual: ManualSecao[] = [
           "Use a listagem para localizar rapidamente as solicitações e abrir o processo desejado para edição, aprovação ou conclusão.",
           "Ao cadastrar uma solicitação, informe solicitante, setor, centro de custo, tipo de compra, prioridade, justificativa e os itens que compõem o pedido.",
           "Depois do cadastro, use o fluxo da tela para enviar para aprovação, registrar pareceres, lançar cotações, definir fornecedor vencedor e efetuar a reserva financeira.",
+          "Na aba Cotações, use o checkbox CPF quando o fornecedor for pessoa física; quando desmarcado, o campo usa CNPJ. O botão com ícone de lupa valida CPF e, para CNPJ, consulta os dados do cartão CNPJ pela integração externa e preenche fornecedor, razão social, telefone, e-mail, situação, início de atividade, endereço e observações disponíveis. O campo Valor usa máscara monetária brasileira.",
           "Quando a compra for concluída, a tela também pode gerar autorização de pagamento e integrar automaticamente materiais ao almoxarifado e bens ao patrimônio."
         ],
         atencoes: [

@@ -10,6 +10,7 @@ import type {
   AutorizacaoPagamentoPayload,
   EscolhaFornecedorPayload,
   FornecedorCnpj,
+  FornecedorDocumentoConsulta,
   PainelComprasIndicadores,
   ReservaBancaria,
   ReservaBancariaPayload
@@ -88,6 +89,13 @@ export const autorizacaoComprasService = {
 
   async buscarFornecedorPorCnpj(cnpj: string) {
     const { data } = await httpClient.get<FornecedorCnpj>(`${baseUrl}/fornecedores/cnpj/${cnpj}`);
+    return data;
+  },
+
+  async consultarDocumentoFornecedor(tipo: "cpf" | "cnpj", documento: string) {
+    const { data } = await httpClient.get<FornecedorDocumentoConsulta>(
+      `${baseUrl}/fornecedores/documentos/${tipo}/${documento}`
+    );
     return data;
   },
 

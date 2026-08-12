@@ -31,6 +31,8 @@ import { AdminPageLayout, type AdminAction, type AdminTab } from "@/components/a
 import { PopupConfirmacao, PopupMensagem, type PopupMensagemState } from "@/components/admin/admin-popups";
 import { imprimirConteudoAtual } from "@/lib/report-utils";
 import { resolverUrlArquivo } from "@/lib/arquivos";
+import { formatarCnpj, formatarCpf, formatarMoedaInput, normalizarMoeda, somenteDigitos, validarCnpj, validarCpf } from "@/lib/br-utils";
+import { autorizacaoComprasService } from "@/services/autorizacao-compras.service";
 import {
   useArquivosAutorizacaoCompra,
   useAutorizacoesCompras,
@@ -75,6 +77,8 @@ type AbaId =
   | "historico"
   | "anexos"
   | "impressoes";
+
+type TipoDocumentoCotacao = "cpf" | "cnpj";
 
 const abas: AdminTab[] = [
   { id: "listagem", label: "Painel e listagem", icon: List },
@@ -183,6 +187,9 @@ const cotacaoVazia: AutorizacaoCotacaoPayload = {
   fornecedor: "",
   cnpj: "",
   contato: "",
+  situacaoCadastral: "",
+  inicioAtividade: "",
+  enderecoCartaoCnpj: "",
   valor: 0,
   prazoEntrega: "",
   formaPagamento: "",
@@ -283,6 +290,8 @@ export function AutorizacaoComprasPage() {
   const [form, setForm] = useState<AutorizacaoCompraPayload>(compraVazia(usuario?.nome ?? usuario?.nomeUsuario ?? ""));
   const [snapshot, setSnapshot] = useState<AutorizacaoCompraPayload>(compraVazia(usuario?.nome ?? usuario?.nomeUsuario ?? ""));
   const [cotacaoForm, setCotacaoForm] = useState<AutorizacaoCotacaoPayload>(cotacaoVazia);
+  const [tipoDocumentoCotacao, setTipoDocumentoCotacao] = useState<TipoDocumentoCotacao>("cnpj");
+  const [consultandoDocumentoCotacao, setConsultandoDocumentoCotacao] = useState(false);
   const [aprovacaoForm, setAprovacaoForm] = useState<AprovacaoCompraPayload>(aprovacaoVazia);
   const [fornecedorForm, setFornecedorForm] = useState<EscolhaFornecedorPayload>(escolhaVazia);
   const [reservaForm, setReservaForm] = useState<ReservaBancariaPayload>(reservaVazia);
@@ -360,6 +369,7 @@ export function AutorizacaoComprasPage() {
     criarCotacaoMutation.isPending ||
     excluirCotacaoMutation.isPending ||
     definirFornecedorMutation.isPending ||
+    consultandoDocumentoCotacao ||
     registrarReservaMutation.isPending ||
     removerReservaMutation.isPending ||
     pagarMutation.isPending ||
@@ -381,6 +391,7 @@ export function AutorizacaoComprasPage() {
     setForm(vazio);
     setSnapshot(vazio);
     setCotacaoForm(cotacaoVazia);
+    setTipoDocumentoCotacao("cnpj");
     setAprovacaoForm(aprovacaoVazia);
     setFornecedorForm(escolhaVazia);
     setReservaForm(reservaVazia);
@@ -497,8 +508,109 @@ export function AutorizacaoComprasPage() {
     }
   }
 
+  function atualizarDocumentoCotacao(valor: string, tipo = tipoDocumentoCotacao) {
+    const limite = tipo === "cpf" ? 11 : 14;
+    const digitos = somenteDigitos(valor).slice(0, limite);
+    setCotacaoForm((atual) => ({
+      ...atual,
+      cnpj: tipo === "cpf" ? formatarCpf(digitos) : formatarCnpj(digitos)
+    }));
+  }
+
+  function alternarTipoDocumentoCotacao(usarCpf: boolean) {
+    const tipo: TipoDocumentoCotacao = usarCpf ? "cpf" : "cnpj";
+    setTipoDocumentoCotacao(tipo);
+    if (tipo === "cpf") {
+      setArquivoCartaoCotacao(null);
+    }
+    atualizarDocumentoCotacao(cotacaoForm.cnpj, tipo);
+  }
+
+  async function consultarDocumentoCotacao() {
+    const documento = somenteDigitos(cotacaoForm.cnpj);
+    const documentoValido =
+      tipoDocumentoCotacao === "cpf" ? validarCpf(documento) : validarCnpj(documento);
+
+    if (!documentoValido) {
+      setPopup({
+        tipo: "erro",
+        titulo: "Documento inválido",
+        texto: tipoDocumentoCotacao === "cpf" ? "Informe um CPF válido." : "Informe um CNPJ válido."
+      });
+      return;
+    }
+
+    setConsultandoDocumentoCotacao(true);
+    try {
+      const consulta = await autorizacaoComprasService.consultarDocumentoFornecedor(
+        tipoDocumentoCotacao,
+        documento
+      );
+
+      if (tipoDocumentoCotacao === "cpf") {
+        setCotacaoForm((atual) => ({ ...atual, cnpj: formatarCpf(consulta.documento) }));
+        setPopup({
+          tipo: "sucesso",
+          titulo: "CPF validado",
+          texto: consulta.mensagem ?? "CPF validado com sucesso."
+        });
+        return;
+      }
+
+      const detalhesCartao = [
+        consulta.origem ? `Origem: ${consulta.origem}` : "",
+        consulta.situacaoCadastral ? `Situação cadastral: ${consulta.situacaoCadastral}` : "",
+        consulta.dataInicioAtividade ? `Início de atividade: ${consulta.dataInicioAtividade}` : "",
+        consulta.atividadePrincipal ? `Atividade principal: ${consulta.atividadePrincipal}` : "",
+        consulta.endereco ? `Endereço: ${consulta.endereco}` : ""
+      ].filter(Boolean);
+
+      setCotacaoForm((atual) => ({
+        ...atual,
+        cnpj: formatarCnpj(consulta.documento),
+        fornecedor: consulta.fornecedor || atual.fornecedor,
+        razaoSocial: consulta.razaoSocial || atual.razaoSocial,
+        telefone: consulta.telefone || atual.telefone,
+        email: consulta.email || atual.email,
+        situacaoCadastral: consulta.situacaoCadastral || atual.situacaoCadastral,
+        inicioAtividade: consulta.dataInicioAtividade || atual.inicioAtividade,
+        enderecoCartaoCnpj: consulta.endereco || atual.enderecoCartaoCnpj,
+        observacoes: detalhesCartao.length
+          ? [atual.observacoes?.trim(), `Cartão CNPJ consultado. ${detalhesCartao.join(" | ")}`]
+              .filter(Boolean)
+              .join("\n")
+          : atual.observacoes
+      }));
+      setPopup({
+        tipo: "sucesso",
+        titulo: "CNPJ consultado",
+        texto: "Dados principais do cartão CNPJ preenchidos na cotação."
+      });
+    } catch (error: any) {
+      setPopup({
+        tipo: "erro",
+        titulo: "Erro na consulta",
+        texto: error?.response?.data?.message ?? "Não foi possível consultar o documento informado."
+      });
+    } finally {
+      setConsultandoDocumentoCotacao(false);
+    }
+  }
+
   async function adicionarCotacao() {
     if (!autorizacaoSelecionadaId) return;
+    const documentoCotacao = somenteDigitos(cotacaoForm.cnpj);
+    const documentoValido =
+      tipoDocumentoCotacao === "cpf" ? validarCpf(documentoCotacao) : validarCnpj(documentoCotacao);
+    if (!documentoValido) {
+      setPopup({
+        tipo: "erro",
+        titulo: "Documento inválido",
+        texto: tipoDocumentoCotacao === "cpf" ? "Informe um CPF válido." : "Informe um CNPJ válido."
+      });
+      return;
+    }
+
     try {
       let orcamentoArquivoId = cotacaoForm.orcamentoArquivoId;
       let cartaoCnpjArquivoId = cotacaoForm.cartaoCnpjArquivoId;
@@ -510,7 +622,7 @@ export function AutorizacaoComprasPage() {
         });
         orcamentoArquivoId = upload.id;
       }
-      if (arquivoCartaoCotacao) {
+      if (tipoDocumentoCotacao === "cnpj" && arquivoCartaoCotacao) {
         const upload = await uploadArquivoMutation.mutateAsync({
           arquivo: arquivoCartaoCotacao,
           observacao: "Cartão do CNPJ da cotação"
@@ -528,6 +640,7 @@ export function AutorizacaoComprasPage() {
       });
 
       setCotacaoForm(cotacaoVazia);
+      setTipoDocumentoCotacao("cnpj");
       setArquivoOrcamentoCotacao(null);
       setArquivoCartaoCotacao(null);
       setPopup({ tipo: "sucesso", titulo: "Confirmação", texto: "Cotação registrada com sucesso." });
@@ -901,18 +1014,52 @@ export function AutorizacaoComprasPage() {
         <div className="rounded-lg border border-[var(--g3-border)] p-3">
           <h3 className="text-sm font-semibold text-[var(--g3-active)]">Cadastrar cotação</h3>
           <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="space-y-1 md:max-w-[19rem]">
+              <div className="flex items-center justify-between gap-2">
+                <Label>{tipoDocumentoCotacao === "cpf" ? "CPF" : "CNPJ"}</Label>
+                <label className="inline-flex items-center gap-1.5 text-xs text-[var(--g3-muted)]">
+                  <input
+                    type="checkbox"
+                    checked={tipoDocumentoCotacao === "cpf"}
+                    onChange={(event) => alternarTipoDocumentoCotacao(event.target.checked)}
+                  />
+                  CPF
+                </label>
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  value={cotacaoForm.cnpj}
+                  placeholder={tipoDocumentoCotacao === "cpf" ? "000.000.000-00" : "00.000.000/0000-00"}
+                  onChange={(event) => atualizarDocumentoCotacao(event.target.value)}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-10 w-10 shrink-0 p-0"
+                  onClick={() => void consultarDocumentoCotacao()}
+                  disabled={consultandoDocumentoCotacao}
+                  title="Consultar documento"
+                  aria-label="Consultar documento"
+                >
+                  <Search className={`h-4 w-4 ${consultandoDocumentoCotacao ? "animate-spin" : ""}`} />
+                </Button>
+              </div>
+            </div>
             <div className="space-y-1 xl:col-span-2"><Label>Fornecedor</Label><Input value={cotacaoForm.fornecedor} onChange={(event) => setCotacaoForm((atual) => ({ ...atual, fornecedor: event.target.value }))} /></div>
-            <div className="space-y-1"><Label>CPF/CNPJ</Label><Input value={cotacaoForm.cnpj} onChange={(event) => setCotacaoForm((atual) => ({ ...atual, cnpj: event.target.value }))} /></div>
+            <div className="space-y-1"><Label>Razão social</Label><Input value={cotacaoForm.razaoSocial ?? ""} onChange={(event) => setCotacaoForm((atual) => ({ ...atual, razaoSocial: event.target.value }))} /></div>
             <div className="space-y-1"><Label>Contato</Label><Input value={cotacaoForm.contato} onChange={(event) => setCotacaoForm((atual) => ({ ...atual, contato: event.target.value }))} /></div>
             <div className="space-y-1"><Label>Telefone</Label><Input value={cotacaoForm.telefone ?? ""} onChange={(event) => setCotacaoForm((atual) => ({ ...atual, telefone: event.target.value }))} /></div>
             <div className="space-y-1"><Label>E-mail</Label><Input value={cotacaoForm.email ?? ""} onChange={(event) => setCotacaoForm((atual) => ({ ...atual, email: event.target.value }))} /></div>
-            <div className="space-y-1"><Label>Valor</Label><Input type="number" min={0} step="0.01" value={cotacaoForm.valor} onChange={(event) => setCotacaoForm((atual) => ({ ...atual, valor: Number(event.target.value) || 0 }))} /></div>
+            <div className="space-y-1"><Label>Situação</Label><Input value={cotacaoForm.situacaoCadastral ?? ""} onChange={(event) => setCotacaoForm((atual) => ({ ...atual, situacaoCadastral: event.target.value }))} /></div>
+            <div className="space-y-1"><Label>Início de atividade</Label><Input type="date" value={cotacaoForm.inicioAtividade ?? ""} onChange={(event) => setCotacaoForm((atual) => ({ ...atual, inicioAtividade: event.target.value }))} /></div>
+            <div className="space-y-1 md:col-span-2 xl:col-span-4"><Label>Endereço</Label><Input value={cotacaoForm.enderecoCartaoCnpj ?? ""} onChange={(event) => setCotacaoForm((atual) => ({ ...atual, enderecoCartaoCnpj: event.target.value }))} /></div>
+            <div className="space-y-1"><Label>Valor</Label><Input inputMode="decimal" value={formatarMoedaInput(cotacaoForm.valor)} onChange={(event) => setCotacaoForm((atual) => ({ ...atual, valor: normalizarMoeda(event.target.value) }))} /></div>
             <div className="space-y-1"><Label>Prazo de entrega</Label><Input type="date" value={cotacaoForm.prazoEntrega ?? ""} onChange={(event) => setCotacaoForm((atual) => ({ ...atual, prazoEntrega: event.target.value }))} /></div>
             <div className="space-y-1"><Label>Forma de pagamento</Label><Input value={cotacaoForm.formaPagamento} onChange={(event) => setCotacaoForm((atual) => ({ ...atual, formaPagamento: event.target.value }))} /></div>
             <div className="space-y-1"><Label>Validade da proposta</Label><Input type="date" value={cotacaoForm.validadeProposta} onChange={(event) => setCotacaoForm((atual) => ({ ...atual, validadeProposta: event.target.value }))} /></div>
             <div className="space-y-1"><Label>Data da cotação</Label><Input type="date" value={cotacaoForm.dataCotacao} onChange={(event) => setCotacaoForm((atual) => ({ ...atual, dataCotacao: event.target.value }))} /></div>
             <div className="space-y-1"><Label>Anexo do orçamento</Label><Input type="file" onChange={(event) => setArquivoOrcamentoCotacao(event.target.files?.[0] ?? null)} /></div>
-            <div className="space-y-1"><Label>Cartão do CNPJ</Label><Input type="file" onChange={(event) => setArquivoCartaoCotacao(event.target.files?.[0] ?? null)} /></div>
+            {tipoDocumentoCotacao === "cnpj" ? <div className="space-y-1"><Label>Cartão do CNPJ</Label><Input type="file" onChange={(event) => setArquivoCartaoCotacao(event.target.files?.[0] ?? null)} /></div> : null}
             <div className="space-y-1 md:col-span-2 xl:col-span-4"><Label>Observações</Label><Textarea rows={2} value={cotacaoForm.observacoes ?? ""} onChange={(event) => setCotacaoForm((atual) => ({ ...atual, observacoes: event.target.value }))} /></div>
           </div>
           <div className="mt-3"><Button onClick={() => void adicionarCotacao()} disabled={!autorizacaoSelecionadaId}>Registrar cotação</Button></div>
@@ -924,6 +1071,13 @@ export function AutorizacaoComprasPage() {
                 <div>
                   <p className="font-semibold">{cotacao.fornecedor}</p>
                   <p className="text-xs text-[var(--g3-muted)]">{cotacao.cnpj} · {cotacao.contato}</p>
+                  {cotacao.razaoSocial ? <p className="text-xs text-[var(--g3-muted)]">Razão social: {cotacao.razaoSocial}</p> : null}
+                  {cotacao.situacaoCadastral || cotacao.inicioAtividade ? (
+                    <p className="text-xs text-[var(--g3-muted)]">
+                      {[cotacao.situacaoCadastral, cotacao.inicioAtividade ? `Início: ${cotacao.inicioAtividade.split("-").reverse().join("/")}` : ""].filter(Boolean).join(" · ")}
+                    </p>
+                  ) : null}
+                  {cotacao.enderecoCartaoCnpj ? <p className="text-xs text-[var(--g3-muted)]">Endereço: {cotacao.enderecoCartaoCnpj}</p> : null}
                   <p className="text-sm">{moeda(cotacao.valor)} · {cotacao.formaPagamento}</p>
                 </div>
                 <div className="flex gap-2">

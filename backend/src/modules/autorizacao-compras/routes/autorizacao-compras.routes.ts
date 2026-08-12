@@ -36,6 +36,13 @@ autorizacaoComprasRoutes.get(
 );
 
 autorizacaoComprasRoutes.get(
+  "/fornecedores/documentos/:tipo/:documento",
+  ensureAuthenticated,
+  ensurePermissions(permissoesLeitura),
+  asyncHandler(controller.consultarDocumentoFornecedor.bind(controller))
+);
+
+autorizacaoComprasRoutes.get(
   "/",
   ensureAuthenticated,
   ensurePermissions(permissoesLeitura),

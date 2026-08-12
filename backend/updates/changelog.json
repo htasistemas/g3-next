@@ -1,6 +1,22 @@
 {
   "entries":  [
                     {
+                        "version": "1.00.823",
+                        "releaseDate": "2026-08-11",
+                        "title": "Consulta CPF/CNPJ nas cotacoes de compras",
+                        "description": "A aba Cotacoes da Autorizacao de compras recebeu selecao CPF/CNPJ, consulta cadastral de fornecedores, campos do cartao CNPJ e mascara de valor em reais.",
+                        "changes": ["Campo CPF/CNPJ ganhou checkbox para identificar fornecedor pessoa fisica.", "Consulta de CPF valida o documento informado com feedback visual.", "Consulta de CNPJ usa integracao server-side com Minha Receita e BrasilAPI para preencher fornecedor, razao social, telefone, e-mail, situacao, inicio de atividade, endereco e observacoes do cartao CNPJ.", "Campo Valor da cotacao passa a usar mascara monetaria brasileira.", "Manual do sistema atualizado com o novo fluxo."],
+                        "releaseType": "stable"
+                    },
+                    {
+                        "version": "1.00.822",
+                        "releaseDate": "2026-08-11",
+                        "title": "Listagem de documentos do beneficiario",
+                        "description": "A aba Documentos do cadastro de beneficiarios passou a listar somente documentos realmente adicionados ao cadastro.",
+                        "changes": ["Documentos padrao sem informacao deixam de aparecer na tabela principal.", "Contadores da aba passam a considerar apenas documentos adicionados.", "Metadados como emissao, validade, orgao, categoria e observacao passam a caracterizar documento cadastrado mesmo sem anexo.", "Manual do sistema atualizado com a regra da listagem."],
+                        "releaseType": "stable"
+                    },
+                    {
                         "version": "1.00.821",
                         "releaseDate": "2026-08-11",
                         "title": "Indicadores com medidores percentuais corrigidos",

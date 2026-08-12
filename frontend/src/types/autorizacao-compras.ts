@@ -157,6 +157,9 @@ export type AutorizacaoCotacaoPayload = {
   contato: string;
   telefone?: string;
   email?: string;
+  situacaoCadastral?: string;
+  inicioAtividade?: string;
+  enderecoCartaoCnpj?: string;
   valor: number;
   prazoEntrega?: string;
   formaPagamento: string;
@@ -309,6 +312,23 @@ export type FornecedorCnpj = {
   razaoSocial?: string;
   nomeFantasia?: string;
   idConsulta?: string;
+};
+
+export type FornecedorDocumentoConsulta = {
+  tipo: "cpf" | "cnpj";
+  documento: string;
+  encontrado: boolean;
+  fornecedor?: string;
+  razaoSocial?: string;
+  nomeFantasia?: string;
+  telefone?: string;
+  email?: string;
+  situacaoCadastral?: string;
+  dataInicioAtividade?: string;
+  atividadePrincipal?: string;
+  endereco?: string;
+  origem?: string;
+  mensagem?: string;
 };
 
 export type PainelComprasIndicadores = {

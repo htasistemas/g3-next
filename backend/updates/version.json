@@ -1,9 +1,9 @@
 {
-    "latestVersion":  "1.00.821",
+    "latestVersion":  "1.00.823",
     "releaseDate":  "2026-08-11",
-    "description":  "Card Termos ativos no painel de indicadores com medidor percentual.",
+    "description":  "Cotacoes de compras com consulta CPF/CNPJ, cartao CNPJ e valor em reais.",
     "packageName":  "",
     "checksum":  "",
-    "minCompatibleVersion":  "1.00.820",
+    "minCompatibleVersion":  "1.00.822",
     "releaseType":  "stable"
 }

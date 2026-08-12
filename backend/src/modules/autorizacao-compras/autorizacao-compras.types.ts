@@ -84,6 +84,9 @@ export type AutorizacaoCompraCotacaoInput = {
   contato: string;
   telefone?: string | null;
   email?: string | null;
+  situacaoCadastral?: string | null;
+  inicioAtividade?: string | null;
+  enderecoCartaoCnpj?: string | null;
   valor: number;
   prazoEntrega?: string | null;
   formaPagamento: string;
@@ -223,6 +226,9 @@ export type AutorizacaoCompraCotacaoRow = {
   contato: string | null;
   telefone: string | null;
   email: string | null;
+  situacao_cadastral: string | null;
+  inicio_atividade: Date | null;
+  endereco_cartao_cnpj: string | null;
   valor: number;
   prazo_entrega: Date | null;
   forma_pagamento: string | null;
