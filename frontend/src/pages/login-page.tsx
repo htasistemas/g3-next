@@ -122,6 +122,9 @@ function obterMensagemErroLogin(error: any) {
   if (normalizada.includes("vinculado a outra instituicao")) {
     return "O e-mail informado está vinculado a outra instituição. Verifique o CNPJ e a Administração inicial.";
   }
+  if (normalizada.includes("rota nao encontrada") || normalizada.includes("rota não encontrada")) {
+    return "Não foi possível conectar ao serviço de autenticação. Atualize a página e tente novamente.";
+  }
   return mensagem;
 }
 

@@ -49,6 +49,7 @@ educacionalRoutes.use(ensureAuthenticated);
 educacionalRoutes.get("/resumo", visualizar, asyncHandler(controller.resumo.bind(controller)));
 educacionalRoutes.get("/pendencias/:tipo", visualizar, asyncHandler(controller.listarPendencias.bind(controller)));
 educacionalRoutes.get("/alunos/busca", visualizar, asyncHandler(controller.buscarBeneficiarios.bind(controller)));
+educacionalRoutes.get("/alunos/busca-matricula", visualizar, asyncHandler(controller.buscarAlunos.bind(controller)));
 educacionalRoutes.get("/unidades-ensino", visualizar, asyncHandler(controller.listarUnidadesEnsino.bind(controller)));
 educacionalRoutes.get("/alunos/agrupados", visualizar, asyncHandler(controller.listarAlunosAgrupados.bind(controller)));
 educacionalRoutes.get("/alunos/:alunoId/vida-academica", visualizar, asyncHandler(controller.vidaAcademicaAluno.bind(controller)));

@@ -136,6 +136,12 @@ export const educacionalService = {
       nomeMae: item.nome_mae ? String(item.nome_mae) : null
     }));
   },
+  async buscarAlunos(termo: string) {
+    const { data } = await httpClient.get<{ alunos: EducacionalItem[] }>("/api/educacional/alunos/busca-matricula", {
+      params: { busca: termo }
+    });
+    return data.alunos;
+  },
   async listarUnidadesEnsino() {
     const { data } = await httpClient.get<{ unidades: UnidadeEnsinoCatalogo[] }>("/api/educacional/unidades-ensino");
     return data.unidades;

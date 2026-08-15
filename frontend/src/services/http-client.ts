@@ -4,7 +4,7 @@ const runtimeApiUrl = window.__env?.apiUrl?.trim();
 const apiBaseUrl =
   runtimeApiUrl ??
   import.meta.env["VITE_API_URL"] ??
-  (import.meta.env.PROD ? window.location.origin : "http://localhost:3333");
+  "/";
 
 declare global {
   interface Window {

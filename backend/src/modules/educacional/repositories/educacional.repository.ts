@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { prisma } from "../../../database/prisma.js";
 import { AppError } from "../../../shared/errors/app-error.js";
 import type { EducacionalActor, EducacionalRecurso } from "../educacional.types.js";
+import { listarIncompatibilidadesEnturmacao } from "../educacional.utils.js";
 
 const estruturaPromise = new Map<string, Promise<void>>();
 const migrationsEducacionais = [
@@ -26,6 +27,7 @@ const migrationsEducacionais = [
   ,"20260805_create_educacional_matricula_vinculos"
   ,"20260806_add_educacional_matricula_completa"
   ,"20260806_create_educacional_configuracoes"
+  ,"20260816_harden_educacional_salas"
 ];
 const tabelaPorRecurso: Record<EducacionalRecurso, string> = { "anos-letivos": "educacional_ano_letivo", etapas: "educacional_etapa", series: "educacional_serie", disciplinas: "educacional_disciplina", turmas: "educacional_turma", alunos: "educacional_aluno", matriculas: "educacional_matricula", enturmacoes: "educacional_enturmacao", profissionais: "educacional_profissional_vinculo", "grade-curricular": "educacional_grade_curricular", horarios: "educacional_horario", diarios: "educacional_diario_aula", frequencias: "educacional_frequencia", "planos-aula": "educacional_plano_aula", planejamentos: "educacional_planejamento_pedagogico", avaliacoes: "educacional_avaliacao", notas: "educacional_nota", boletins: "educacional_boletim", historicos: "educacional_historico_escolar", ocorrencias: "educacional_ocorrencia", agenda: "educacional_agenda", documentos: "educacional_documento", "rotinas-infantis": "educacional_rotina_infantil", "desenvolvimentos-infantis": "educacional_desenvolvimento_infantil", transferencias: "educacional_transferencia", autorizacoes: "educacional_autorizacao", "lista-espera": "educacional_lista_espera", recuperacoes: "educacional_recuperacao", "resultados-finais": "educacional_resultado_final", calendario: "educacional_calendario", configuracoes: "educacional_configuracao" };
 
@@ -372,6 +374,28 @@ export class EducacionalRepository {
           ${filtroCpf}
         )
       ORDER BY b.nome_completo ASC LIMIT 50
+    `).then((rows) => rows.map((row) => this.serializar(row)));
+  }
+
+  async buscarAlunos(termo: string, tenantId: string) {
+    await this.garantirEstrutura();
+    const busca = `%${termo.trim()}%`;
+    return prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+      SELECT a.id, a.beneficiario_id, a.status, b.nome_completo, b.codigo AS codigo_beneficiario,
+             b.data_nascimento, b.nome_mae
+      FROM educacional_aluno a
+      INNER JOIN cadastro_beneficiario b
+        ON b.id = a.beneficiario_id
+       AND b.tenant_id::text = ${tenantId}
+      WHERE a.tenant_id::text = ${tenantId}
+        AND a.status = 'ATIVO'
+        AND (
+          b.nome_completo ILIKE ${busca}
+          OR COALESCE(b.codigo, '') ILIKE ${busca}
+          OR CAST(a.id AS text) = ${termo.trim()}
+        )
+      ORDER BY b.nome_completo ASC
+      LIMIT 50
     `).then((rows) => rows.map((row) => this.serializar(row)));
   }
 
@@ -1204,6 +1228,7 @@ export class EducacionalRepository {
     if (recurso === "lista-espera" && input.beneficiario_id) await this.validarBeneficiario(String(input.beneficiario_id), tenantId);
     if (recurso === "recuperacoes" && input.valor !== null && input.valor !== undefined && Number(input.valor) > Number(input.valor_maximo)) throw new AppError("A nota da recuperação não pode ser maior que o valor máximo.", 400);
     if (recurso === "horarios") await this.validarConflitoHorario(input, rawId, tenantId);
+    if (recurso === "diarios" || recurso === "frequencias" || recurso === "notas") await this.validarVinculosAcademicos(recurso, input, tenantId);
     if (recurso === "enturmacoes") await this.validarEnturmacao(input, rawId, tenantId);
     if (recurso === "notas") await this.validarNota(input, tenantId);
     if (recurso === "matriculas") await this.validarNumeroMatricula(input, rawId, tenantId);
@@ -1243,6 +1268,8 @@ export class EducacionalRepository {
       if (input.ano_letivo_id) referencias.push(["educacional_ano_letivo", "ano_letivo_id"]);
       if (input.etapa_id) referencias.push(["educacional_etapa", "etapa_id"]);
       if (input.serie_id) referencias.push(["educacional_serie", "serie_id"]);
+      if (input.unidade_id) referencias.push(["unidade_assistencial", "unidade_id"]);
+      if (input.professor_responsavel_id) referencias.push(["cadastro_profissionais", "professor_responsavel_id"]);
     }
     if (recurso === "matriculas") {
       if (input.aluno_id) referencias.push(["educacional_aluno", "aluno_id"]);
@@ -1274,6 +1301,7 @@ export class EducacionalRepository {
     if (recurso === "horarios") {
       if (input.turma_id) referencias.push(["educacional_turma", "turma_id"]);
       if (input.disciplina_id) referencias.push(["educacional_disciplina", "disciplina_id"]);
+      if (input.professor_id) referencias.push(["cadastro_profissionais", "professor_id"]);
     }
     if (recurso === "diarios") {
       if (input.turma_id) referencias.push(["educacional_turma", "turma_id"]);
@@ -1349,6 +1377,55 @@ export class EducacionalRepository {
       const unidade = await prisma.$queryRaw<Array<{ tipo_unidade: string }>>(Prisma.sql`SELECT tipo_unidade FROM unidade_assistencial WHERE id = ${BigInt(String(input.unidade_id))} AND tenant_id::text = ${tenantId} LIMIT 1`);
       if (!unidade[0]) throw new AppError("Unidade de ensino não encontrada nesta instituição.", 400);
       if (unidade[0].tipo_unidade !== "ENSINO") throw new AppError("Selecione uma unidade classificada como unidade de ensino.", 400);
+    }
+    if (recurso === "turmas" && input.sala_id) {
+      if (!input.unidade_id) throw new AppError("Informe a unidade de ensino antes de selecionar a sala da turma.", 400);
+      const sala = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+        SELECT s.id
+        FROM salas_unidade s
+        INNER JOIN unidade_assistencial u ON u.id = s.unidade_id
+        WHERE s.id = ${BigInt(String(input.sala_id))}
+          AND s.unidade_id = ${BigInt(String(input.unidade_id))}
+          AND u.tenant_id::text = ${tenantId}
+          AND u.tipo_unidade = 'ENSINO'
+          AND COALESCE(s.ativo, TRUE) = TRUE
+        LIMIT 1
+      `);
+      if (!sala[0]) throw new AppError("A sala selecionada não pertence à unidade de ensino atual.", 400);
+    }
+    if (recurso === "turmas" || recurso === "grade-curricular") {
+      const etapaId = input.etapa_id ? BigInt(String(input.etapa_id)) : null;
+      const serieId = input.serie_id ? BigInt(String(input.serie_id)) : null;
+      if (etapaId && serieId) {
+        const serie = await prisma.$queryRaw<Array<{ etapa_id: bigint }>>(Prisma.sql`
+          SELECT etapa_id
+          FROM educacional_serie
+          WHERE id = ${serieId} AND tenant_id::text = ${tenantId}
+          LIMIT 1
+        `);
+        if (serie[0] && serie[0].etapa_id !== etapaId) {
+          throw new AppError("A série selecionada não pertence à etapa de ensino informada.", 400);
+        }
+      }
+    }
+    if (recurso === "horarios" && input.sala_id && input.turma_id) {
+      const compatibilidade = await prisma.$queryRaw<Array<{ unidade_id: bigint | null }>>(Prisma.sql`
+        SELECT t.unidade_id
+        FROM educacional_turma t
+        WHERE t.id = ${BigInt(String(input.turma_id))}
+          AND t.tenant_id::text = ${tenantId}
+        LIMIT 1
+      `);
+      const unidadeId = compatibilidade[0]?.unidade_id;
+      const sala = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+        SELECT s.id
+        FROM salas_unidade s
+        WHERE s.id = ${BigInt(String(input.sala_id))}
+          AND (${unidadeId ?? null}::bigint IS NULL OR s.unidade_id = ${unidadeId ?? null})
+          AND COALESCE(s.ativo, TRUE) = TRUE
+        LIMIT 1
+      `);
+      if (!sala[0]) throw new AppError("A sala do horário não é compatível com a unidade da turma.", 400);
     }
     if (recurso === "matriculas") await this.validarVagaSala(input, tenantId, rawId);
     for (const [tabelaReferencia, campo] of referencias) {
@@ -1447,12 +1524,39 @@ export class EducacionalRepository {
     const matriculaId = BigInt(String(input.matricula_id));
     const turmaId = BigInt(String(input.turma_id));
     const id = rawId ? BigInt(rawId) : null;
-    const matricula = await prisma.$queryRaw<Array<{ aluno_id: bigint; situacao: string }>>(Prisma.sql`SELECT aluno_id, situacao FROM educacional_matricula WHERE id = ${matriculaId} AND tenant_id::text = ${tenantId} LIMIT 1`);
+    const matricula = await prisma.$queryRaw<Array<{
+      aluno_id: bigint;
+      situacao: string;
+      ano_letivo_id: bigint;
+      unidade_id: bigint;
+      etapa_id: bigint;
+      serie_id: bigint;
+    }>>(Prisma.sql`
+      SELECT aluno_id, situacao, ano_letivo_id, unidade_id, etapa_id, serie_id
+      FROM educacional_matricula
+      WHERE id = ${matriculaId} AND tenant_id::text = ${tenantId}
+      LIMIT 1
+    `);
     if (!matricula[0] || matricula[0].situacao !== "ATIVA") throw new AppError("A matrícula precisa estar ativa para ser alocada em uma turma.", 400);
     const atual = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`SELECT id FROM educacional_enturmacao WHERE tenant_id::text = ${tenantId} AND matricula_id = ${matriculaId} AND data_fim IS NULL AND (${id}::bigint IS NULL OR id <> ${id}) LIMIT 1`);
     if (atual[0]) throw new AppError("Este aluno já está alocado em uma turma ativa.", 409);
-    const turma = await prisma.$queryRaw<Array<{ capacidade_maxima: number }>>(Prisma.sql`SELECT capacidade_maxima FROM educacional_turma WHERE id = ${turmaId} AND tenant_id::text = ${tenantId} AND status = 'ATIVA' LIMIT 1`);
+    const turma = await prisma.$queryRaw<Array<{
+      capacidade_maxima: number;
+      ano_letivo_id: bigint;
+      unidade_id: bigint | null;
+      etapa_id: bigint;
+      serie_id: bigint;
+    }>>(Prisma.sql`
+      SELECT capacidade_maxima, ano_letivo_id, unidade_id, etapa_id, serie_id
+      FROM educacional_turma
+      WHERE id = ${turmaId} AND tenant_id::text = ${tenantId} AND status = 'ATIVA'
+      LIMIT 1
+    `);
     if (!turma[0]) throw new AppError("Turma ativa não encontrada nesta instituição.", 404);
+    const incompatibilidades = listarIncompatibilidadesEnturmacao({ matricula: matricula[0], turma: turma[0] });
+    if (incompatibilidades.length) {
+      throw new AppError(`A turma selecionada não é compatível com ${incompatibilidades.join(", ")} da matrícula.`, 400);
+    }
     if (Number(turma[0].capacidade_maxima) > 0) {
       const ocupacao = await prisma.$queryRaw<Array<{ total: bigint }>>(Prisma.sql`SELECT COUNT(*)::bigint AS total FROM educacional_enturmacao e INNER JOIN educacional_matricula m ON m.id = e.matricula_id WHERE e.tenant_id::text = ${tenantId} AND e.turma_id = ${turmaId} AND e.data_fim IS NULL AND m.situacao = 'ATIVA' AND (${id}::bigint IS NULL OR e.id <> ${id})`);
       if (Number(ocupacao[0]?.total ?? 0) >= Number(turma[0].capacidade_maxima)) throw new AppError("A capacidade máxima da turma foi atingida.", 409);
@@ -1464,6 +1568,57 @@ export class EducacionalRepository {
     const avaliacao = await prisma.$queryRaw<Array<{ valor_maximo: number }>>(Prisma.sql`SELECT valor_maximo FROM educacional_avaliacao WHERE id = ${BigInt(String(input.avaliacao_id))} AND tenant_id::text = ${tenantId} LIMIT 1`);
     if (!avaliacao[0]) throw new AppError("Avaliação não encontrada nesta instituição.", 404);
     if (Number(input.valor) > Number(avaliacao[0].valor_maximo)) throw new AppError(`A nota não pode ser maior que ${avaliacao[0].valor_maximo}.`, 400);
+  }
+
+  private async validarVinculosAcademicos(recurso: EducacionalRecurso, input: Record<string, unknown>, tenantId: string) {
+    if (recurso === "diarios") {
+      const turma = await prisma.$queryRaw<Array<{ status: string }>>(Prisma.sql`
+        SELECT status
+        FROM educacional_turma
+        WHERE id = ${BigInt(String(input.turma_id))} AND tenant_id::text = ${tenantId}
+        LIMIT 1
+      `);
+      if (!turma[0]) throw new AppError("A turma do diário não pertence à instituição atual.", 400);
+      if (turma[0].status !== "ATIVA") throw new AppError("Somente turmas ativas podem receber aulas no diário.", 400);
+      return;
+    }
+
+    const turmaId = recurso === "frequencias"
+      ? (await prisma.$queryRaw<Array<{ turma_id: bigint }>>(Prisma.sql`
+          SELECT turma_id
+          FROM educacional_diario_aula
+          WHERE id = ${BigInt(String(input.diario_aula_id))} AND tenant_id::text = ${tenantId}
+          LIMIT 1
+        `))[0]?.turma_id
+      : (await prisma.$queryRaw<Array<{ turma_id: bigint }>>(Prisma.sql`
+          SELECT turma_id
+          FROM educacional_avaliacao
+          WHERE id = ${BigInt(String(input.avaliacao_id))} AND tenant_id::text = ${tenantId}
+          LIMIT 1
+        `))[0]?.turma_id;
+    if (!turmaId) throw new AppError(recurso === "frequencias" ? "O diário da frequência não foi encontrado nesta instituição." : "A avaliação não foi encontrada nesta instituição.", 404);
+
+    const matriculaId = BigInt(String(input.matricula_id));
+    const matricula = await prisma.$queryRaw<Array<{ id: bigint }>>(Prisma.sql`
+      SELECT m.id
+      FROM educacional_matricula m
+      WHERE m.id = ${matriculaId}
+        AND m.tenant_id::text = ${tenantId}
+        AND m.situacao = 'ATIVA'
+        AND (
+          m.turma_id = ${turmaId}
+          OR EXISTS (
+            SELECT 1
+            FROM educacional_enturmacao e
+            WHERE e.tenant_id::text = ${tenantId}
+              AND e.matricula_id = m.id
+              AND e.turma_id = ${turmaId}
+              AND e.data_fim IS NULL
+          )
+        )
+      LIMIT 1
+    `);
+    if (!matricula[0]) throw new AppError("A matrícula selecionada não pertence à turma deste registro.", 400);
   }
 
   private async validarBeneficiario(rawId: string, tenantId: string) {

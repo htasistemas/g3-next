@@ -12,6 +12,7 @@ export class EducacionalController {
   async listar(request: AuthenticatedRequest, response: Response) { return response.json({ itens: await service.listar(request.params.recurso as EducacionalRecurso, request.authUser?.tenant_id) }); }
   async proximoNumeroMatricula(request: AuthenticatedRequest, response: Response) { return response.json({ numero: await service.proximoNumeroMatricula(request.authUser?.tenant_id) }); }
   async buscarBeneficiarios(request: AuthenticatedRequest, response: Response) { return response.json({ beneficiarios: await service.buscarBeneficiarios(request.query, request.authUser?.tenant_id) }); }
+  async buscarAlunos(request: AuthenticatedRequest, response: Response) { return response.json({ alunos: await service.buscarAlunos(request.query, request.authUser?.tenant_id) }); }
   async listarUnidadesEnsino(request: AuthenticatedRequest, response: Response) { return response.json({ unidades: await service.listarUnidadesEnsino(request.authUser?.tenant_id) }); }
   async listarAlunosAgrupados(request: AuthenticatedRequest, response: Response) { return response.json(await service.listarAlunosAgrupados(request.query, request.authUser?.tenant_id)); }
   async vidaAcademicaAluno(request: AuthenticatedRequest, response: Response) { return response.json(await service.vidaAcademicaAluno(request.params.alunoId, request.authUser?.tenant_id)); }

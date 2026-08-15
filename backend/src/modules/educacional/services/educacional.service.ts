@@ -11,6 +11,7 @@ export class EducacionalService {
   async listar(recurso: EducacionalRecurso, tenantId?: string) { return this.repository.listar(recurso, this.tenant(tenantId)); }
   async proximoNumeroMatricula(tenantId?: string) { return this.repository.proximoNumeroMatricula(this.tenant(tenantId)); }
   async buscarBeneficiarios(raw: unknown, tenantId?: string) { const input = buscaBeneficiarioSchema.parse(raw); return this.repository.buscarBeneficiarios(input.busca, this.tenant(tenantId)); }
+  async buscarAlunos(raw: unknown, tenantId?: string) { const input = buscaBeneficiarioSchema.parse(raw); return this.repository.buscarAlunos(input.busca, this.tenant(tenantId)); }
   async listarUnidadesEnsino(tenantId?: string) { return this.repository.listarUnidadesEnsino(this.tenant(tenantId)); }
   async listarAlunosAgrupados(rawFiltros: unknown, tenantId?: string) { return this.repository.listarAlunosAgrupados(alunosAgrupadosFiltrosSchema.parse(rawFiltros ?? {}), this.tenant(tenantId)); }
   async vidaAcademicaAluno(rawId: string, tenantId?: string) { return this.repository.vidaAcademicaAluno(rawId, this.tenant(tenantId)); }

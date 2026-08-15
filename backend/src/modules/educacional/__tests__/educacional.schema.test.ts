@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { alunosAgrupadosFiltrosSchema, chamadaRapidaSchema, configuracaoEducacionalSchema, diarioSchema, documentoSchema, gerarBoletimSchema, gerarHistoricoSchema, matriculaSchema, profissionalVinculoSchema, recuperacaoSugestoesSchema, rematriculaLoteSchema, rematriculaSchema, transferenciaMatriculaSchema } from "../educacional.schema.js";
 import { evidenciaPublicaSchema, indicadorPublicoSchema, parceriaPublicaSchema } from "../parcerias-publicas.schema.js";
+import { listarIncompatibilidadesEnturmacao } from "../educacional.utils.js";
 
 test("aceita vÃ­nculo educacional de profissional existente", () => {
   const valor = profissionalVinculoSchema.parse({ profissional_id: "12", funcao: "Professor", carga_horaria: "20" });
@@ -142,4 +143,20 @@ test("valida configuraÃ§Ã£o educacional por chave e valor", () => {
   });
   assert.equal(configuracao.chave, "media_minima");
   assert.equal(configuracao.ativo, true);
+});
+
+test("bloqueia enturmaÃ§Ã£o incompatÃ­vel com a matrÃ­cula", () => {
+  const incompatibilidades = listarIncompatibilidadesEnturmacao({
+    matricula: { ano_letivo_id: 2026n, unidade_id: 10n, etapa_id: 20n, serie_id: 30n },
+    turma: { ano_letivo_id: 2027n, unidade_id: 11n, etapa_id: 21n, serie_id: 31n }
+  });
+  assert.deepEqual(incompatibilidades, ["ano letivo", "unidade de ensino", "etapa", "série"]);
+});
+
+test("aceita turma sem unidade específica quando os demais vínculos são compatíveis", () => {
+  const incompatibilidades = listarIncompatibilidadesEnturmacao({
+    matricula: { ano_letivo_id: 2026n, unidade_id: 10n, etapa_id: 20n, serie_id: 30n },
+    turma: { ano_letivo_id: 2026n, unidade_id: null, etapa_id: 20n, serie_id: 30n }
+  });
+  assert.deepEqual(incompatibilidades, []);
 });
