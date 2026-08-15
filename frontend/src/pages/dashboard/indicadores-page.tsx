@@ -1,5 +1,16 @@
 import { useMemo, useState } from "react";
-import { Bar, BarChart, PolarAngleAxis, RadialBar, RadialBarChart, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  Bar,
+  BarChart,
+  Cell,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  Tooltip,
+  XAxis,
+  YAxis
+} from "recharts";
 import { ResponsiveChart } from "@/components/charts/responsive-chart";
 import { ChartColumn, Eraser, Filter, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -101,55 +112,93 @@ function KpiIndicatorCard(props: {
   minRotulo: string;
   maxRotulo: string;
   cor: string;
+  tipo: "pizza" | "rosca" | "colunas" | "linha";
+  dados: Array<Record<string, string | number>>;
 }) {
   const percentualNormalizado = Math.max(0, Math.min(100, props.percentual));
-  const dados = [{ nome: props.titulo, valor: percentualNormalizado }];
+  const grafico = (() => {
+    if (props.tipo === "pizza") {
+      return (
+        <PieChart>
+          <Pie data={props.dados} dataKey="valor" nameKey="nome" cx="50%" cy="50%" outerRadius="78%" strokeWidth={2}>
+            {props.dados.map((item, index) => (
+              <Cell key={`${String(item.nome)}-${index}`} fill={index === 0 ? props.cor : "var(--g3-border)"} />
+            ))}
+          </Pie>
+          <Tooltip
+            formatter={(valor: number) => [formatarNumero(valor), "Quantidade"]}
+            contentStyle={{ borderRadius: 10, borderColor: "var(--g3-border)", backgroundColor: "var(--g3-card)" }}
+          />
+        </PieChart>
+      );
+    }
+
+    if (props.tipo === "rosca") {
+      return (
+        <PieChart>
+          <Pie data={props.dados} dataKey="valor" nameKey="nome" cx="50%" cy="50%" innerRadius="58%" outerRadius="78%" strokeWidth={2}>
+            {props.dados.map((item, index) => (
+              <Cell key={`${String(item.nome)}-${index}`} fill={index === 0 ? props.cor : "var(--g3-border)"} />
+            ))}
+          </Pie>
+          <Tooltip
+            formatter={(valor: number) => [formatarNumero(valor), "Quantidade"]}
+            contentStyle={{ borderRadius: 10, borderColor: "var(--g3-border)", backgroundColor: "var(--g3-card)" }}
+          />
+        </PieChart>
+      );
+    }
+
+    if (props.tipo === "linha") {
+      return (
+        <LineChart data={props.dados} margin={{ top: 12, right: 8, left: -20, bottom: 0 }}>
+          <XAxis dataKey="nome" hide />
+          <YAxis hide domain={[0, "dataMax"]} />
+          <Tooltip
+            formatter={(valor: number) => [formatarNumero(valor), "Quantidade"]}
+            contentStyle={{ borderRadius: 10, borderColor: "var(--g3-border)", backgroundColor: "var(--g3-card)" }}
+          />
+          <Line type="monotone" dataKey="valor" stroke={props.cor} strokeWidth={4} dot={{ r: 4, fill: props.cor }} activeDot={{ r: 6 }} />
+        </LineChart>
+      );
+    }
+
+    return (
+      <BarChart data={props.dados} margin={{ top: 12, right: 8, left: -20, bottom: 0 }}>
+        <XAxis dataKey="nome" hide />
+        <YAxis hide domain={[0, "dataMax"]} />
+        <Tooltip
+          formatter={(valor: number) => [formatarNumero(valor), "Valor"]}
+          contentStyle={{ borderRadius: 10, borderColor: "var(--g3-border)", backgroundColor: "var(--g3-card)" }}
+        />
+        <Bar dataKey="valor" fill={props.cor} radius={[8, 8, 0, 0]} barSize={28} />
+      </BarChart>
+    );
+  })();
 
   return (
-    <div className="rounded-2xl border border-[var(--g3-border)] bg-[linear-gradient(180deg,#ffffff_0%,var(--g3-card-soft)_42%,var(--g3-card)_100%)] px-4 py-4 shadow-sm">
+    <div className="rounded-2xl border border-[var(--g3-border)] bg-[linear-gradient(180deg,#ffffff_0%,var(--g3-card-soft)_42%,var(--g3-card)_100%)] px-4 py-4 shadow-[0_10px_28px_rgba(15,23,42,0.10)] transition-shadow hover:shadow-[0_14px_34px_rgba(15,23,42,0.16)]">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-[var(--g3-muted)]">{props.titulo}</p>
+        <p className="text-sm font-semibold text-[var(--g3-foreground)]">{props.titulo}</p>
         <span className="rounded-full bg-[var(--g3-primary-soft)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--g3-active)]">
-          Indicador de desempenho
+          Visualização
         </span>
       </div>
-      <div className="relative mt-3 h-56">
-        <ResponsiveChart minWidth={0} minHeight={220}>
-          <RadialBarChart
-            cx="50%"
-            cy="76%"
-            innerRadius="68%"
-            outerRadius="100%"
-            barSize={16}
-            data={dados}
-            startAngle={180}
-            endAngle={0}
-          >
-            <PolarAngleAxis type="number" domain={[0, 100]} tick={false} axisLine={false} />
-            <RadialBar
-              dataKey="valor"
-              fill={props.cor}
-              cornerRadius={999}
-              background={{ fill: "rgba(148, 163, 184, 0.18)" }}
-            />
-          </RadialBarChart>
+      <div className="mt-3 h-44" role="img" aria-label={`${props.titulo}: ${props.valor}. ${props.apoio}`}>
+        <ResponsiveChart minWidth={0} minHeight={170}>
+          {grafico}
         </ResponsiveChart>
-
-        <div className="pointer-events-none absolute inset-x-0 bottom-2 flex flex-col items-center text-center">
-          <span className="text-[9px] font-medium uppercase tracking-[0.18em] text-[var(--g3-muted)]">
-            Desempenho atual
-          </span>
-          <span className="mt-1 text-3xl font-semibold tracking-tight text-[var(--g3-foreground)]">
-            {props.valor}
-          </span>
-          <span className="max-w-[220px] text-[11px] leading-4 text-[var(--g3-muted)]">
-            {props.apoio}
-          </span>
-        </div>
       </div>
-      <div className="mt-2 flex items-center justify-between text-[11px] text-[var(--g3-muted)]">
-        <span>{props.minRotulo}</span>
-        <span>{props.maxRotulo}</span>
+      <div className="mt-2 flex items-end justify-between gap-2">
+        <div>
+          <p className="text-xl font-semibold tracking-tight text-[var(--g3-foreground)]">{props.valor}</p>
+          <p className="mt-1 text-[11px] leading-4 text-[var(--g3-muted)]">{props.apoio}</p>
+        </div>
+        <div className="text-right text-[10px] text-[var(--g3-muted)]">
+          <span>{props.minRotulo}</span>
+          <span className="mx-1">•</span>
+          <span>{props.maxRotulo}</span>
+        </div>
       </div>
     </div>
   );
@@ -294,6 +343,11 @@ export function IndicadoresPage() {
                   minRotulo="0"
                   maxRotulo={`${formatarNumero(totalBeneficiarios)} total`}
                   cor="var(--g3-primary)"
+                  tipo="pizza"
+                  dados={[
+                    { nome: "Ativos", valor: beneficiariosAtivos },
+                    { nome: "Demais cadastros", valor: Math.max(totalBeneficiarios - beneficiariosAtivos, 0) }
+                  ]}
                 />
                 <KpiIndicatorCard
                   titulo="Cadastro completo"
@@ -303,6 +357,11 @@ export function IndicadoresPage() {
                   minRotulo="0%"
                   maxRotulo="100%"
                   cor="var(--g3-secondary)"
+                  tipo="rosca"
+                  dados={[
+                    { nome: "Com cadastro completo", valor: cadastroCompletoPercentual },
+                    { nome: "A completar", valor: Math.max(100 - cadastroCompletoPercentual, 0) }
+                  ]}
                 />
                 <KpiIndicatorCard
                   titulo="Renda média familiar"
@@ -312,6 +371,11 @@ export function IndicadoresPage() {
                   minRotulo="R$ 0"
                   maxRotulo={formatarMoedaAbreviada(rendaReferencial)}
                   cor="var(--g3-accent)"
+                  tipo="colunas"
+                  dados={[
+                    { nome: "Atual", valor: rendaMediaFamiliar },
+                    { nome: "Referência", valor: rendaReferencial }
+                  ]}
                 />
                 <KpiIndicatorCard
                   titulo="Termos ativos"
@@ -321,6 +385,12 @@ export function IndicadoresPage() {
                   minRotulo="0"
                   maxRotulo={`${formatarNumero(termosReferencial)} termos`}
                   cor="var(--g3-info)"
+                  tipo="linha"
+                  dados={[
+                    { nome: "Ativos", valor: termosAtivos },
+                    { nome: "Alertas", valor: data.termos.alertas.length },
+                    { nome: "Referência", valor: termosReferencial }
+                  ]}
                 />
               </div>
 
